@@ -55,7 +55,8 @@ abstract class BaseApiController extends Controller
 
     public function __construct()
     {
-        // $this->middleware('throttle:api');
+        $rateLimit = config('api.rate_limit.requests', 60);
+        $this->middleware("throttle:{$rateLimit},1")->except(['index', 'show']);
     }
 
     // === Authorization (المسؤولية الوحيدة للكنترولر) ===

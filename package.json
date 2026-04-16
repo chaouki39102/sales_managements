@@ -4,14 +4,38 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "lint": "eslint resources/js --ext .ts,.tsx"
+    },
+    "dependencies": {
+        "@hookform/resolvers": "^3.9.1",
+        "@tanstack/react-query": "^5.66.0",
+        "axios": "^1.7.9",
+        "clsx": "^2.1.1",
+        "i18next": "^24.2.2",
+        "lucide-react": "^0.475.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-hook-form": "^7.54.2",
+        "react-i18next": "^15.4.1",
+        "react-router-dom": "^7.1.1",
+        "recharts": "^2.15.0",
+        "sonner": "^1.7.3",
+        "zod": "^3.24.1"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
-        "axios": ">=1.11.0 <=1.14.0",
+        "@types/react": "^18.3.18",
+        "@types/react-dom": "^18.3.5",
+        "@vitejs/plugin-react": "^4.3.4",
+        "autoprefixer": "^10.4.20",
         "concurrently": "^9.0.1",
-        "laravel-vite-plugin": "^3.0.0",
+        "eslint": "^9.19.0",
+        "eslint-plugin-react": "^7.37.4",
+        "eslint-plugin-react-hooks": "^5.1.0",
+        "laravel-vite-plugin": "^0.5.4",
         "tailwindcss": "^4.0.0",
-        "vite": "^8.0.0"
+        "typescript": "^5.7.3",
+        "vite": "^6.0.0"
     }
 }
