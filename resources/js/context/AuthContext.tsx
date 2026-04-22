@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import api from '@/lib/api';
+import api, { setToken, clearToken } from '@/lib/api';
 import type { User, LoginCredentials, RegisterData, AuthResponse } from '@/types';
 
 interface AuthContextType {
@@ -20,12 +20,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
+      // محاولة جلب بيانات المستخدم الحالية باستخدام التوكن المخزن
       api.get('/auth/me')
         .then((res) => {
           setUser(res.data.data);
         })
         .catch(() => {
-          localStorage.removeItem('token');
+          // في حال كان التوكن منتهي الصلاحية أو غير صحيح
+          clearToken();
+          setUser(null);
         })
         .finally(() => {
           setIsLoading(false);
@@ -37,21 +40,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (credentials: LoginCredentials) => {
     const res = await api.post<AuthResponse>('/auth/login', credentials);
-    api.setToken(res.data.data.token);
-    setUser(res.data.data.user);
+    const token = res.data.data.token;
+    const userData = res.data.data.user;
+
+    // استدعاء الدوال المستوردة مباشرة لتحديث localStorage و Axios
+    setToken(token);
+    setUser(userData);
   };
 
   const register = async (data: RegisterData) => {
     const res = await api.post<AuthResponse>('/auth/register', data);
-    api.setToken(res.data.data.token);
-    setUser(res.data.data.user);
+    const token = res.data.data.token;
+    const userData = res.data.data.user;
+
+    setToken(token);
+    setUser(userData);
   };
 
   const logout = async () => {
     try {
       await api.post('/auth/logout');
     } finally {
-      api.clearToken();
+      // تنظيف البيانات محلياً بغض النظر عن نجاح طلب السيرفر
+      clearToken();
       setUser(null);
     }
   };

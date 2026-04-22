@@ -1,15 +1,25 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+// ════════════════════════════════════════════════
+// App.tsx — نقطة الدخول الرئيسية
+// ════════════════════════════════════════════════
+import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from './context/AuthContext';
-import DashboardLayout from './components/layouts/DashboardLayout';
-import DashboardPage from './pages/dashboard/DashboardPage';
-import LoginPage from './pages/auth/LoginPage';
+import { AuthProvider } from '@/context/AuthContext';
+import { AppRoutes }   from '@/config/navigation';
+
+// CSS — الترتيب مهم جداً
+import '../css/theme/tokens.css';
+import '../css/theme/layout.css';
+import '../css/theme/components.css';
+import '../css/theme/pages.css';
+import '../css/theme/utilities.css';
+import '../css/theme/pos.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      staleTime: 30_000,
     },
   },
 });
@@ -19,13 +29,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/dashboard" element={<DashboardLayout />}>
-              <Route index element={<DashboardPage />} />
-            </Route>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+          <AppRoutes />
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

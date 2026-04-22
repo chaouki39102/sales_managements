@@ -54,5 +54,12 @@ class ApiClient {
   }
 }
 
-export const api = new ApiClient();
-export default api.instance;
+const apiClient = new ApiClient();
+
+// تصدير الدوال للاستخدام في AuthContext
+export const setToken = (token: string) => apiClient.setToken(token);
+export const clearToken = () => apiClient.clearToken();
+
+// تصدير الـ instance كـ default لاستخدامه في جلب البيانات
+const api = apiClient.instance;
+export default api;

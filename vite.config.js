@@ -10,7 +10,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
     plugins: [
-        laravel({
+        laravelPlugin({
+            input: ['resources/js/app.jsx', 'resources/css/app.css'],
             buildDirectory: 'build',
             refresh: true,
         }),
@@ -29,6 +30,6 @@ export default defineConfig({
     publicDir: false,
     server: {
         port: 5173,
-        host: true,
+        host: '127.0.0.1',
     },
 });
