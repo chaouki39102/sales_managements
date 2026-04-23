@@ -1,92 +1,75 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import api, { setToken, clearToken } from '@/lib/api';
-import type { User, LoginCredentials, RegisterData, AuthResponse } from '@/types';
+// ════════════════════════════════════════════════
+// context/AuthContext.tsx
+// ════════════════════════════════════════════════
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import apiClient, { setAuthToken, clearAuthToken, getAuthToken } from '@/lib/api/client';
+import type { User, LoginCredentials } from '@/types';
 
-interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
+interface AuthContextValue {
+  user:            User | null;
   isAuthenticated: boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
+  isLoading:       boolean;
+  login:           (creds: LoginCredentials) => Promise<void>;
+  logout:          () => Promise<void>;
+  updateUser:      (data: Partial<User>) => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user,      setUser]      = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ── Restore session on mount ──────────────────
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      // محاولة جلب بيانات المستخدم الحالية باستخدام التوكن المخزن
-      api.get('/auth/me')
-        .then((res) => {
-          setUser(res.data.data);
-        })
-        .catch(() => {
-          // في حال كان التوكن منتهي الصلاحية أو غير صحيح
-          clearToken();
-          setUser(null);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
-      setIsLoading(false);
-    }
+    const token = getAuthToken();
+    if (!token) { setIsLoading(false); return; }
+
+    apiClient.get<{ data: User }>('/auth/me')
+      .then(res => setUser(res.data.data))
+      .catch(() => clearAuthToken())
+      .finally(() => setIsLoading(false));
   }, []);
 
-  const login = async (credentials: LoginCredentials) => {
-    const res = await api.post<AuthResponse>('/auth/login', credentials);
-    const token = res.data.data.token;
-    const userData = res.data.data.user;
+  // ── Login ─────────────────────────────────────
+  const login = useCallback(async (creds: LoginCredentials) => {
+    const res = await apiClient.post<{ data: { user: User; token: string } }>('/auth/login', creds);
+    const { user: u, token } = res.data.data;
+    setAuthToken(token);
+    setUser(u);
+  }, []);
 
-    // استدعاء الدوال المستوردة مباشرة لتحديث localStorage و Axios
-    setToken(token);
-    setUser(userData);
-  };
+  // ── Logout ────────────────────────────────────
+  const logout = useCallback(async () => {
+    try { await apiClient.post('/auth/logout'); } catch {}
+    clearAuthToken();
+    setUser(null);
+    window.location.href = '/login';
+  }, []);
 
-  const register = async (data: RegisterData) => {
-    const res = await api.post<AuthResponse>('/auth/register', data);
-    const token = res.data.data.token;
-    const userData = res.data.data.user;
-
-    setToken(token);
-    setUser(userData);
-  };
-
-  const logout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } finally {
-      // تنظيف البيانات محلياً بغض النظر عن نجاح طلب السيرفر
-      clearToken();
-      setUser(null);
-    }
-  };
+  const updateUser = useCallback((data: Partial<User>) => {
+    setUser(u => u ? { ...u, ...data } : null);
+  }, []);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        register,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated: !!user,
+      isLoading,
+      login,
+      logout,
+      updateUser,
+    }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
+  return ctx;
 }
+
+// ── Standalone hook alias ─────────────────────────
+export const useAuthUser = () => useAuth().user;
