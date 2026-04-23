@@ -19,6 +19,40 @@ class SettingController extends BaseApiController
         parent::__construct();
     }
 
+    /**
+     * تجاوز store() لاستخدام updateOrCreate بدلاً من create
+     * ويتجاوز الـ Policy لأن إعداد المؤسسة مسموح لأي مستخدم مسجّل دخوله
+     */
+    public function store(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'key'   => 'required|string|max:150',
+                'group' => 'nullable|string|max:100',
+                'value' => 'nullable',
+            ]);
+
+            $setting = Setting::updateOrCreate(
+                ['key' => $request->key],
+                [
+                    'value' => $request->value,
+                    'group' => $request->group ?? 'general',
+                ]
+            );
+
+            return $this->successResponse(
+                new SettingResource($setting),
+                'تم حفظ الإعداد بنجاح',
+                201
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'store');
+        }
+    }
+
+    /**
+     * جلب الإعدادات حسب المجموعة
+     */
     public function byGroup(Request $request, string $group): JsonResponse
     {
         try {
@@ -32,11 +66,20 @@ class SettingController extends BaseApiController
         }
     }
 
+    /**
+     * جلب قيمة إعداد بواسطة المفتاح
+     * إذا لم يوجد المفتاح يُرجع null بدلاً من 500
+     */
     public function getValue(Request $request, string $key): JsonResponse
     {
         try {
-            $value = $this->settingService->getValue($key);
-            return $this->successResponse(['key' => $key, 'value' => $value]);
+            $setting = Setting::where('key', $key)->first();
+
+            // ← إرجاع مباشر بدون Resource
+            return $this->successResponse([
+                'key'   => $key,
+                'value' => $setting?->value,
+            ]);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'getValue');
         }

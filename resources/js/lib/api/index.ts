@@ -61,26 +61,26 @@ export const partiesApi = {
 import type { Unit, Tva, Family, Brand, PriceLevel, Warehouse, FiscalYear, Currency, DocumentType, PaymentMode, TreasuryAccount } from '@/types';
 
 export const lookupsApi = {
-  units:            () => client.get<{ data: Unit[] }>('/units'),
-  tvas:             () => client.get<{ data: Tva[] }>('/tvas'),
-  families:         () => client.get<{ data: Family[] }>('/families'),
-  brands:           () => client.get<{ data: Brand[] }>('/brands'),
-  priceLevels:      () => client.get<{ data: PriceLevel[] }>('/price-levels'),
-  warehouses:       () => client.get<{ data: Warehouse[] }>('/warehouses'),
-  fiscalYears:      () => client.get<{ data: FiscalYear[] }>('/fiscal-years'),
-  currentFiscalYear:() => client.get<{ data: FiscalYear }>('/fiscal-years/current'),
-  currencies:       () => client.get<{ data: Currency[] }>('/currencies'),
-  documentTypes:    () => client.get<{ data: DocumentType[] }>('/document-types'),
-  paymentModes:     () => client.get<{ data: PaymentMode[] }>('/payment-modes'),
-  treasuryAccounts: () => client.get<{ data: TreasuryAccount[] }>('/treasury-accounts'),
-  documentStatuses: () => client.get<{ data: unknown[] }>('/document-statuses'),
+  units:             () => client.get<{ data: Unit[] }>('/units'),
+  tvas:              () => client.get<{ data: Tva[] }>('/tvas'),
+  families:          () => client.get<{ data: Family[] }>('/families'),
+  brands:            () => client.get<{ data: Brand[] }>('/brands'),
+  priceLevels:       () => client.get<{ data: PriceLevel[] }>('/price-levels'),
+  warehouses:        () => client.get<{ data: Warehouse[] }>('/warehouses'),
+  fiscalYears:       () => client.get<{ data: FiscalYear[] }>('/fiscal-years'),
+  currentFiscalYear: () => client.get<{ data: FiscalYear }>('/fiscal-years/current'),
+  currencies:        () => client.get<{ data: Currency[] }>('/currencies'),
+  documentTypes:     () => client.get<{ data: DocumentType[] }>('/document-types'),
+  paymentModes:      () => client.get<{ data: PaymentMode[] }>('/payment-modes'),
+  treasuryAccounts:  () => client.get<{ data: TreasuryAccount[] }>('/treasury-accounts'),
+  documentStatuses:  () => client.get<{ data: unknown[] }>('/document-statuses'),
 };
 
 
 // ════════════════════════════════════════════════
 // lib/api/index.ts — تصدير مركزي
 // ════════════════════════════════════════════════
-export { dashboardApi } from './dashboard';
+export { dashboardApi }             from './dashboard';
 export { productsApi, variantsApi } from './products';
-export { invoicesApi, partiesApi, lookupsApi };
-export { default as apiClient } from './client';
+export { default as apiClient }     from './client';
+// invoicesApi, partiesApi, lookupsApi مُصدَّرة بالفعل أعلاه بـ export const

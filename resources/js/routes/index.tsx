@@ -5,6 +5,8 @@ import React, { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
+import { useSetupRequired } from '@/context/useSetupWizard';
+
 
 // ── Lazy-loaded pages ─────────────────────────────
 const LoginPage       = lazy(() => import('@/pages/auth/LoginPage'));
@@ -16,6 +18,7 @@ const InventoryPage   = lazy(() => import('@/pages/inventory/InventoryPage'));
 const ClientsPage     = lazy(() => import('@/pages/clients/ClientsPage'));
 const UsersPage       = lazy(() => import('@/pages/users/UsersPage'));
 const SettingsPage    = lazy(() => import('@/pages/settings/SettingsPage'));
+const SetupWizard = lazy(() => import('@/pages/setup/SetupWizard'));
 
 // ── Page loader ───────────────────────────────────
 export function PageLoader() {
@@ -80,6 +83,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// ── Setup guard — يُستدعى بعد التحقق من Auth فقط ──
+function SetupGuard({ children }: { children: React.ReactNode }) {
+  const { needsSetup, markComplete } = useSetupRequired();
+
+  if (needsSetup === null) return <FullLoader />;
+  if (needsSetup === true) return <SetupWizard onComplete={markComplete} />;
+  return <>{children}</>;
+}
+
 // ── Main router ───────────────────────────────────
 export function AppRoutes() {
   return (
@@ -93,7 +105,9 @@ export function AppRoutes() {
           path="/"
           element={
             <ProtectedRoute>
-              <DashboardLayout />
+              <SetupGuard>
+                <DashboardLayout />
+              </SetupGuard>
             </ProtectedRoute>
           }
         >

@@ -230,10 +230,11 @@ Route::prefix('v1')->group(function () {
         Route::get('product-lots/expiring', [ProductLotController::class, 'expiring']);
 
         // Fiscal Year Routes
-        Route::apiResource('fiscal-years', FiscalYearController::class);
         Route::get('fiscal-years/current', [FiscalYearController::class, 'current']);
-        Route::get('fiscal-years/open', [FiscalYearController::class, 'open']);
+        Route::get('fiscal-years/open',    [FiscalYearController::class, 'open']);
         Route::post('fiscal-years/{id}/close', [FiscalYearController::class, 'close']);
+
+        Route::apiResource('fiscal-years', FiscalYearController::class);
 
         // Payment Routes
         Route::apiResource('payments', PaymentController::class);
