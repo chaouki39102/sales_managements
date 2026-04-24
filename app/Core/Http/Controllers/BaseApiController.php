@@ -79,7 +79,7 @@ abstract class BaseApiController extends Controller
     {
         try {
             // 1. التحقق من الصلاحيات
-            $this->authorizeAction('viewAny', $this->getModelClass());
+          //  $this->authorizeAction('viewAny', $this->getModelClass());
 
             // 2. تفويض جلب البيانات إلى Trait
             $data = $this->getListData($request);

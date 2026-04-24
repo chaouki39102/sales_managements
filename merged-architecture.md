@@ -2690,127 +2690,134 @@ body.dark .receipt-wrap{background:#fff;color:#0d1b2a;}
 
 ## FILE: resources/js/components/layouts/DashboardLayout.tsx
 ```
-// components/layouts/DashboardLayout.tsx
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/components/layouts/DashboardLayout.tsx
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 
+// Ù…Ù„Ø§Ø­Ø¸Ø© Ù…Ù‡Ù…Ø©: Ø¬Ù…ÙŠØ¹ Ø§Ù„Ù€ href Ù‡Ù†Ø§ Ø¨Ø¯ÙˆÙ† /dashboard/ prefix
+// Ù„Ø£Ù† Ø§Ù„Ù€ routes Ù…Ø¹Ø±Ù‘ÙØ© ÙÙŠ routes/index.tsx ÙƒÙ€ nested routes ØªØ­Øª "/"
 const NAV_GROUPS = [
   {
     label: 'Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©',
     items: [
-      { name: 'Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…',  href: '/dashboard',            icon: 'ti-layout-dashboard' },
-      { name: 'Ù†Ù‚Ø·Ø© Ø§Ù„Ø¨ÙŠØ¹',   href: '/pos',                  icon: 'ti-shopping-cart'    },
+      { name: 'Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…', href: '/dashboard', icon: 'ti-layout-dashboard' },
+      { name: 'Ù†Ù‚Ø·Ø© Ø§Ù„Ø¨ÙŠØ¹',  href: '/pos',        icon: 'ti-shopping-cart'   },
     ],
   },
   {
     label: 'Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª',
     items: [
-      { name: 'Ø§Ù„ÙÙˆØ§ØªÙŠØ±',         href: '/dashboard/invoices',    icon: 'ti-file-text',        badge: 3    },
-      { name: 'Ø·Ù„Ø¨ÙŠØ§Øª Ø§Ù„Ø´Ø±Ø§Ø¡',    href: '/dashboard/orders',      icon: 'ti-clipboard-list'              },
-      { name: 'Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª',        href: '/dashboard/returns',     icon: 'ti-corner-up-left'              },
-      { name: 'Ø¹Ø±ÙˆØ¶ Ø§Ù„Ø£Ø³Ø¹Ø§Ø±',     href: '/dashboard/quotations',  icon: 'ti-file-check'                  },
-      { name: 'ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ… BL',   href: '/dashboard/bl',          icon: 'ti-truck'                       },
+      { name: 'Ø§Ù„ÙÙˆØ§ØªÙŠØ±',        href: '/invoices',   icon: 'ti-file-text',    badge: 3 },
+      { name: 'Ø·Ù„Ø¨ÙŠØ§Øª Ø§Ù„Ø´Ø±Ø§Ø¡',   href: '/orders',     icon: 'ti-clipboard-list'         },
+      { name: 'Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª',       href: '/returns',    icon: 'ti-corner-up-left'         },
+      { name: 'Ø¹Ø±ÙˆØ¶ Ø§Ù„Ø£Ø³Ø¹Ø§Ø±',    href: '/quotations', icon: 'ti-file-check'             },
+      { name: 'ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ… BL',  href: '/bl',         icon: 'ti-truck'                  },
     ],
   },
   {
     label: 'Ø§Ù„Ù…Ø®Ø²ÙˆÙ†',
     items: [
-      { name: 'Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª',       href: '/dashboard/products',   icon: 'ti-package'                },
-      { name: 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ†',  href: '/dashboard/inventory',  icon: 'ti-building-warehouse', badgeWarn: true },
-      { name: 'Ø§Ù„ÙØ¦Ø§Øª',         href: '/dashboard/categories', icon: 'ti-folder-open'            },
-      { name: 'Ø§Ù„Ù…ÙˆØ±Ø¯ÙˆÙ†',       href: '/dashboard/suppliers',  icon: 'ti-truck'                  },
+      { name: 'Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª',       href: '/products',   icon: 'ti-package'                       },
+      { name: 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ†',  href: '/inventory',  icon: 'ti-building-warehouse', badgeWarn: true },
+      { name: 'Ø§Ù„ÙØ¦Ø§Øª',         href: '/categories', icon: 'ti-folder-open'                   },
+      { name: 'Ø§Ù„Ø¹Ù„Ø§Ù…Ø§Øª',       href: '/brands',     icon: 'ti-award'                         },
+      { name: 'Ø§Ù„ÙˆØ­Ø¯Ø§Øª',        href: '/units',      icon: 'ti-ruler'                         },
+      { name: 'Ø§Ù„Ù…ÙˆØ±Ø¯ÙˆÙ†',       href: '/suppliers',  icon: 'ti-truck'                         },
+      { name: 'Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª',     href: '/warehouses', icon: 'ti-building-warehouse'             },
     ],
   },
   {
     label: 'Ø§Ù„Ù…Ø­Ø§Ø³Ø¨Ø© ÙˆØ§Ù„Ù…Ø§Ù„ÙŠØ©',
     items: [
-      { name: 'Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡',           href: '/dashboard/clients',     icon: 'ti-users'          },
-      { name: 'Ø§Ù„Ø®Ø²ÙŠÙ†Ø©',           href: '/dashboard/finance',     icon: 'ti-building-bank'  },
-      { name: 'Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª',         href: '/dashboard/expenses',    icon: 'ti-credit-card'    },
-      { name: 'Ø§Ù„Ø¯ÙŠÙˆÙ†',            href: '/dashboard/debts',       icon: 'ti-receipt'        },
-      { name: 'Ø¥Ù‚Ø±Ø§Ø± TVA â€” G50',  href: '/dashboard/tva',         icon: 'ti-calculator'     },
-      { name: 'Ø§Ù„Ù…Ù„Ù Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ',     href: '/dashboard/fiscal',      icon: 'ti-file-barcode'   },
-      { name: 'Ø§Ù„Ø³Ù†ÙˆØ§Øª Ø§Ù„Ù…Ø§Ù„ÙŠØ©',   href: '/dashboard/fiscalyears', icon: 'ti-calendar'       },
-      { name: 'Ø§Ù„Ø¹Ù…Ù„Ø§Øª',           href: '/dashboard/currencies',  icon: 'ti-currency-dollar'},
-      { name: 'Ù…Ø³ØªÙˆÙŠØ§Øª Ø§Ù„Ø£Ø³Ø¹Ø§Ø±',   href: '/dashboard/pricelevels', icon: 'ti-tag'            },
+      { name: 'Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡',           href: '/clients',     icon: 'ti-users'           },
+      { name: 'Ø§Ù„Ø®Ø²ÙŠÙ†Ø©',           href: '/finance',     icon: 'ti-building-bank'   },
+      { name: 'Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª',         href: '/expenses',    icon: 'ti-credit-card'     },
+      { name: 'Ø§Ù„Ø¯ÙŠÙˆÙ†',            href: '/debts',       icon: 'ti-receipt'         },
+      { name: 'Ø¥Ù‚Ø±Ø§Ø± TVA â€” G50',  href: '/tva',         icon: 'ti-calculator'      },
+      { name: 'Ø§Ù„Ù…Ù„Ù Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ',     href: '/fiscal',      icon: 'ti-file-barcode'    },
+      { name: 'Ø§Ù„Ø³Ù†ÙˆØ§Øª Ø§Ù„Ù…Ø§Ù„ÙŠØ©',   href: '/fiscalyears', icon: 'ti-calendar'        },
+      { name: 'Ø§Ù„Ø¹Ù…Ù„Ø§Øª',           href: '/currencies',  icon: 'ti-currency-dollar' },
+      { name: 'Ù…Ø³ØªÙˆÙŠØ§Øª Ø§Ù„Ø£Ø³Ø¹Ø§Ø±',   href: '/pricelevels', icon: 'ti-tag'             },
     ],
   },
   {
     label: 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±',
     items: [
-      { name: 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± ÙˆØ§Ù„Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª', href: '/dashboard/reports', icon: 'ti-chart-bar'  },
-      { name: 'Ø§Ù„Ù…ÙŠØ²Ø§Ù†ÙŠØ© Ø§Ù„ØªÙ‚Ø¯ÙŠØ±ÙŠØ©',   href: '/dashboard/balance', icon: 'ti-scale'      },
+      { name: 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± ÙˆØ§Ù„Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª', href: '/reports', icon: 'ti-chart-bar' },
+      { name: 'Ø§Ù„Ù…ÙŠØ²Ø§Ù†ÙŠØ© Ø§Ù„ØªÙ‚Ø¯ÙŠØ±ÙŠØ©',   href: '/balance', icon: 'ti-scale'     },
     ],
   },
   {
     label: 'Ø§Ù„Ù†Ø¸Ø§Ù…',
     items: [
-      { name: 'Ø§Ù„Ù…ÙˆØ¸ÙÙˆÙ†',    href: '/dashboard/employees', icon: 'ti-id-badge'  },
-      { name: 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†',  href: '/dashboard/users',     icon: 'ti-user'      },
-      { name: 'Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª',   href: '/dashboard/settings',  icon: 'ti-settings'  },
+      { name: 'Ø§Ù„Ù…ÙˆØ¸ÙÙˆÙ†',   href: '/employees', icon: 'ti-id-badge' },
+      { name: 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†', href: '/users',     icon: 'ti-user'     },
+      { name: 'Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª',  href: '/settings',  icon: 'ti-settings' },
     ],
   },
 ];
 
-// Label colors matching prototype's nth-child rules
 const LABEL_COLORS = [
   'var(--em)',
   'var(--blue)',
   'var(--purple)',
   'var(--gold)',
   'var(--orange)',
-  'var(--red)',
+  'var(--teal)',
 ];
 
-// Page title + breadcrumb map
+// PAGE_META ÙŠØ·Ø§Ø¨Ù‚ Ø§Ù„Ù€ hrefs Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©
 const PAGE_META: Record<string, { title: string; path: string }> = {
-  '/dashboard':             { title: 'Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…',          path: 'Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ© â† Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª'       },
-  '/pos':                   { title: 'Ù†Ù‚Ø·Ø© Ø§Ù„Ø¨ÙŠØ¹',            path: 'Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ© â† POS'             },
-  '/dashboard/invoices':    { title: 'Ø§Ù„ÙÙˆØ§ØªÙŠØ±',              path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† ÙÙˆØ§ØªÙŠØ±'            },
-  '/dashboard/orders':      { title: 'Ø·Ù„Ø¨ÙŠØ§Øª Ø§Ù„Ø´Ø±Ø§Ø¡',         path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† Ø·Ù„Ø¨ÙŠØ§Øª'           },
-  '/dashboard/returns':     { title: 'Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª',             path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† Ù…Ø±ØªØ¬Ø¹Ø§Øª'          },
-  '/dashboard/quotations':  { title: 'Ø¹Ø±ÙˆØ¶ Ø§Ù„Ø£Ø³Ø¹Ø§Ø±',          path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† Ø¹Ø±ÙˆØ¶ Ø£Ø³Ø¹Ø§Ø±'       },
-  '/dashboard/bl':          { title: 'ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ… BL',        path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† ÙˆØµÙ„ ØªØ³Ù„ÙŠÙ…'        },
-  '/dashboard/products':    { title: 'Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª',              path: 'Ù…Ø®Ø²ÙˆÙ† â† Ù…Ù†ØªØ¬Ø§Øª'            },
-  '/dashboard/inventory':   { title: 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ†',         path: 'Ù…Ø®Ø²ÙˆÙ† â† Ø¬Ø±Ø¯'               },
-  '/dashboard/categories':  { title: 'Ø§Ù„ÙØ¦Ø§Øª',               path: 'Ù…Ø®Ø²ÙˆÙ† â† ÙØ¦Ø§Øª'              },
-  '/dashboard/suppliers':   { title: 'Ø§Ù„Ù…ÙˆØ±Ø¯ÙˆÙ†',              path: 'Ù…Ø®Ø²ÙˆÙ† â† Ù…ÙˆØ±Ø¯ÙˆÙ†'            },
-  '/dashboard/clients':     { title: 'Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡',               path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø¹Ù…Ù„Ø§Ø¡'            },
-  '/dashboard/finance':     { title: 'Ø§Ù„Ø®Ø²ÙŠÙ†Ø©',               path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø®Ø²ÙŠÙ†Ø©'            },
-  '/dashboard/expenses':    { title: 'Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª',             path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ù…ØµØ±ÙˆÙØ§Øª'          },
-  '/dashboard/debts':       { title: 'Ø§Ù„Ø¯ÙŠÙˆÙ†',                path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø¯ÙŠÙˆÙ†'             },
-  '/dashboard/tva':         { title: 'Ø¥Ù‚Ø±Ø§Ø± TVA â€” G50',       path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† TVA'              },
-  '/dashboard/fiscal':      { title: 'Ø§Ù„Ù…Ù„Ù Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ',         path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø¬Ø¨Ø§ÙŠØ§Øª'           },
-  '/dashboard/fiscalyears': { title: 'Ø§Ù„Ø³Ù†ÙˆØ§Øª Ø§Ù„Ù…Ø§Ù„ÙŠØ©',        path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø³Ù†ÙˆØ§Øª Ù…Ø§Ù„ÙŠØ©'      },
-  '/dashboard/currencies':  { title: 'Ø§Ù„Ø¹Ù…Ù„Ø§Øª',               path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø¹Ù…Ù„Ø§Øª'            },
-  '/dashboard/pricelevels': { title: 'Ù…Ø³ØªÙˆÙŠØ§Øª Ø§Ù„Ø£Ø³Ø¹Ø§Ø±',       path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ù…Ø³ØªÙˆÙŠØ§Øª Ø£Ø³Ø¹Ø§Ø±'    },
-  '/dashboard/employees':   { title: 'Ø§Ù„Ù…ÙˆØ¸ÙÙˆÙ†',              path: 'Ù…ÙˆØ§Ø±Ø¯ Ø¨Ø´Ø±ÙŠØ© â† Ù…ÙˆØ¸ÙÙˆÙ†'       },
-  '/dashboard/reports':     { title: 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±',              path: 'ØªÙ‚Ø§Ø±ÙŠØ±'                     },
-  '/dashboard/balance':     { title: 'Ø§Ù„Ù…ÙŠØ²Ø§Ù†ÙŠØ© Ø§Ù„ØªÙ‚Ø¯ÙŠØ±ÙŠØ©',   path: 'ØªÙ‚Ø§Ø±ÙŠØ± â† Ù…ÙŠØ²Ø§Ù†ÙŠØ©'          },
-  '/dashboard/users':       { title: 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†',            path: 'Ù†Ø¸Ø§Ù… â† Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†'           },
-  '/dashboard/settings':    { title: 'Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª',             path: 'Ù†Ø¸Ø§Ù… â† Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª'            },
+  '/dashboard':   { title: 'Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…',          path: 'Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ© â† Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª'     },
+  '/pos':         { title: 'Ù†Ù‚Ø·Ø© Ø§Ù„Ø¨ÙŠØ¹',            path: 'Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ© â† POS'           },
+  '/invoices':    { title: 'Ø§Ù„ÙÙˆØ§ØªÙŠØ±',              path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† ÙÙˆØ§ØªÙŠØ±'          },
+  '/orders':      { title: 'Ø·Ù„Ø¨ÙŠØ§Øª Ø§Ù„Ø´Ø±Ø§Ø¡',         path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† Ø·Ù„Ø¨ÙŠØ§Øª'         },
+  '/returns':     { title: 'Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª',             path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† Ù…Ø±ØªØ¬Ø¹Ø§Øª'        },
+  '/quotations':  { title: 'Ø¹Ø±ÙˆØ¶ Ø§Ù„Ø£Ø³Ø¹Ø§Ø±',          path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† Ø¹Ø±ÙˆØ¶ Ø£Ø³Ø¹Ø§Ø±'     },
+  '/bl':          { title: 'ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ… BL',        path: 'Ù…Ø¨ÙŠØ¹Ø§Øª â† ÙˆØµÙ„ ØªØ³Ù„ÙŠÙ…'      },
+  '/products':    { title: 'Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª',              path: 'Ù…Ø®Ø²ÙˆÙ† â† Ù…Ù†ØªØ¬Ø§Øª'          },
+  '/inventory':   { title: 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ†',         path: 'Ù…Ø®Ø²ÙˆÙ† â† Ø¬Ø±Ø¯'             },
+  '/categories':  { title: 'Ø§Ù„ÙØ¦Ø§Øª',               path: 'Ù…Ø®Ø²ÙˆÙ† â† ÙØ¦Ø§Øª'            },
+  '/brands':      { title: 'Ø§Ù„Ø¹Ù„Ø§Ù…Ø§Øª Ø§Ù„ØªØ¬Ø§Ø±ÙŠØ©',     path: 'Ù…Ø®Ø²ÙˆÙ† â† Ø¹Ù„Ø§Ù…Ø§Øª'          },
+  '/units':       { title: 'ÙˆØ­Ø¯Ø§Øª Ø§Ù„Ù‚ÙŠØ§Ø³',          path: 'Ù…Ø®Ø²ÙˆÙ† â† ÙˆØ­Ø¯Ø§Øª'           },
+  '/suppliers':   { title: 'Ø§Ù„Ù…ÙˆØ±Ø¯ÙˆÙ†',              path: 'Ù…Ø®Ø²ÙˆÙ† â† Ù…ÙˆØ±Ø¯ÙˆÙ†'          },
+  '/warehouses':  { title: 'Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª',            path: 'Ù…Ø®Ø²ÙˆÙ† â† Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª'        },
+  '/clients':     { title: 'Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡',               path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø¹Ù…Ù„Ø§Ø¡'          },
+  '/finance':     { title: 'Ø§Ù„Ø®Ø²ÙŠÙ†Ø©',               path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø®Ø²ÙŠÙ†Ø©'          },
+  '/expenses':    { title: 'Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª',             path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ù…ØµØ±ÙˆÙØ§Øª'        },
+  '/debts':       { title: 'Ø§Ù„Ø¯ÙŠÙˆÙ†',                path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø¯ÙŠÙˆÙ†'           },
+  '/tva':         { title: 'Ø¥Ù‚Ø±Ø§Ø± TVA â€” G50',       path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† TVA'            },
+  '/fiscal':      { title: 'Ø§Ù„Ù…Ù„Ù Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ',         path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø¬Ø¨Ø§ÙŠØ§Øª'         },
+  '/fiscalyears': { title: 'Ø§Ù„Ø³Ù†ÙˆØ§Øª Ø§Ù„Ù…Ø§Ù„ÙŠØ©',       path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø³Ù†ÙˆØ§Øª Ù…Ø§Ù„ÙŠØ©'    },
+  '/currencies':  { title: 'Ø§Ù„Ø¹Ù…Ù„Ø§Øª',               path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ø¹Ù…Ù„Ø§Øª'          },
+  '/pricelevels': { title: 'Ù…Ø³ØªÙˆÙŠØ§Øª Ø§Ù„Ø£Ø³Ø¹Ø§Ø±',       path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† Ù…Ø³ØªÙˆÙŠØ§Øª Ø£Ø³Ø¹Ø§Ø±'  },
+  '/tva-rates':   { title: 'Ù…Ø¹Ø¯Ù„Ø§Øª TVA',            path: 'Ù…Ø­Ø§Ø³Ø¨Ø© â† TVA'            },
+  '/employees':   { title: 'Ø§Ù„Ù…ÙˆØ¸ÙÙˆÙ†',              path: 'Ù…ÙˆØ§Ø±Ø¯ Ø¨Ø´Ø±ÙŠØ© â† Ù…ÙˆØ¸ÙÙˆÙ†'     },
+  '/reports':     { title: 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±',              path: 'ØªÙ‚Ø§Ø±ÙŠØ±'                   },
+  '/balance':     { title: 'Ø§Ù„Ù…ÙŠØ²Ø§Ù†ÙŠØ© Ø§Ù„ØªÙ‚Ø¯ÙŠØ±ÙŠØ©',   path: 'ØªÙ‚Ø§Ø±ÙŠØ± â† Ù…ÙŠØ²Ø§Ù†ÙŠØ©'        },
+  '/users':       { title: 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†',            path: 'Ù†Ø¸Ø§Ù… â† Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†'         },
+  '/settings':    { title: 'Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª',             path: 'Ù†Ø¸Ø§Ù… â† Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª'          },
 };
 
 export default function DashboardLayout() {
-  const { user, logout }     = useAuth();
-  const location             = useLocation();
-  const navigate             = useNavigate();
-  const { dark, toggle: toggleTheme } = useTheme();
-  const [drawerOpen, setDrawerOpen]   = useState(false);
+  const { user, logout }               = useAuth();
+  const location                       = useLocation();
+  const navigate                       = useNavigate();
+  const { dark, toggle: toggleTheme }  = useTheme();
+  const [drawerOpen, setDrawerOpen]    = useState(false);
 
   const meta = PAGE_META[location.pathname] ?? { title: 'Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…', path: 'Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©' };
-
-  // Close drawer on route change
-  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
-
-  // Get first letter of user name for avatar
   const userInitial = user?.name ? user.name[0] : 'Ù…';
+
+  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
   return (
     <>
-      {/* â•â•â•â•â•â•â•â•â•â•â•â• DESKTOP SIDEBAR â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â• SIDEBAR â•â•â•â•â•â•â•â•â•â•â•â• */}
       <nav id="sidebar">
 
         {/* Logo */}
@@ -2828,7 +2835,7 @@ export default function DashboardLayout() {
           <div className="sb-co-info">NIF: 001234567890123 â€¢ ÙˆØ±Ù‚Ù„Ø©</div>
         </div>
 
-        {/* Nav sections */}
+        {/* Nav */}
         {NAV_GROUPS.map((group, idx) => (
           <div className="sb-sec" key={group.label}>
             <div className="sb-lbl" style={{ color: LABEL_COLORS[idx] }}>
@@ -2840,7 +2847,7 @@ export default function DashboardLayout() {
                 <Link
                   key={item.href}
                   to={item.href}
-                  className={`sbi ${isActive ? 'on' : ''}`}
+                  className={`sbi${isActive ? ' on' : ''}`}
                 >
                   <span className="sbi-ic ic">
                     <i className={`ti ${item.icon}`} />
@@ -2851,7 +2858,9 @@ export default function DashboardLayout() {
                   )}
                   {'badgeWarn' in item && item.badgeWarn && (
                     <span className="sbi-badge w ic-badge">
-                      <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5">
+                        <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      </svg>
                     </span>
                   )}
                 </Link>
@@ -2865,8 +2874,8 @@ export default function DashboardLayout() {
           <div className="sb-user" onClick={logout} title="ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬">
             <div className="sb-av">{userInitial}</div>
             <div>
-              <div className="sb-uname">{user?.name || 'Ù…Ø­Ù…Ø¯ Ø£Ù…ÙŠÙ† Ø¨ÙˆØ¯Ù†'}</div>
-              <div className="sb-urole">{user?.role || 'Ù…Ø¯ÙŠØ± Ø§Ù„Ù†Ø¸Ø§Ù…'}</div>
+              <div className="sb-uname">{user?.name || 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…'}</div>
+              <div className="sb-urole">{(user as any)?.role || 'Ù…Ø¯ÙŠØ± Ø§Ù„Ù†Ø¸Ø§Ù…'}</div>
             </div>
             <div className="sb-dot" title="Ù…ØªØµÙ„" />
           </div>
@@ -2885,14 +2894,14 @@ export default function DashboardLayout() {
           <div className="tb-actions">
             <div className="srch">
               <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
-              <input type="text" placeholder="Ø¨Ø­Ø« Ø³Ø±ÙŠØ¹... Ctrl+K" id="gsearch" />
+              <input type="text" placeholder="Ø¨Ø­Ø« Ø³Ø±ÙŠØ¹..." />
             </div>
             <div className="ib" title="Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª">
               <span className="ic ic-sm"><i className="ti ti-bell" /></span>
               <div className="ib-n">5</div>
             </div>
             <button
-              id="theme-btn"
+              className="ib"
               onClick={toggleTheme}
               title={dark ? 'Ø§Ù„ÙˆØ¶Ø¹ Ø§Ù„ÙØ§ØªØ­' : 'Ø§Ù„ÙˆØ¶Ø¹ Ø§Ù„Ø¯Ø§ÙƒÙ†'}
             >
@@ -2902,7 +2911,7 @@ export default function DashboardLayout() {
             </button>
             <button className="tb-btn p" onClick={() => navigate('/pos')}>
               <span className="ic ic-xs"><i className="ti ti-plus" /></span>
-              <span className="tb-txt">ÙØ§ØªÙˆØ±Ø© Ø¬Ø¯ÙŠØ¯Ø©</span>
+              <span>ÙØ§ØªÙˆØ±Ø© Ø¬Ø¯ÙŠØ¯Ø©</span>
             </button>
           </div>
         </div>
@@ -2913,48 +2922,34 @@ export default function DashboardLayout() {
         </div>
       </main>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â• MOBILE BOTTOM NAV â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â• MOBILE NAV â•â•â•â•â•â•â•â•â•â•â•â• */}
       <div id="mob-nav">
         <div className="mob-tabs">
-          <Link
-            to="/dashboard"
-            className={`mt ${location.pathname === '/dashboard' ? 'on' : ''}`}
-          >
+          <Link to="/dashboard" className={`mt${location.pathname === '/dashboard' ? ' on' : ''}`}>
             <div className="mt-ic-wrap">
               <span className="ic mt-ic"><i className="ti ti-home" /></span>
             </div>
             <div className="mt-lbl">Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©</div>
           </Link>
-
-          <Link
-            to="/dashboard/invoices"
-            className={`mt ${location.pathname === '/dashboard/invoices' ? 'on' : ''}`}
-          >
+          <Link to="/invoices" className={`mt${location.pathname === '/invoices' ? ' on' : ''}`}>
             <div className="mt-ic-wrap">
               <span className="ic mt-ic"><i className="ti ti-file-text" /></span>
             </div>
             <div className="mt-lbl">ÙÙˆØ§ØªÙŠØ±</div>
             <div className="mt-n">3</div>
           </Link>
-
-          {/* FAB â€” POS */}
           <div className="mt-fab" onClick={() => navigate('/pos')}>
             <div className="fab-btn">
               <span className="ic"><i className="ti ti-shopping-cart" /></span>
             </div>
             <div className="mt-lbl" style={{ fontSize: 9, marginTop: 2 }}>Ø¨ÙŠØ¹</div>
           </div>
-
-          <Link
-            to="/dashboard/inventory"
-            className={`mt ${location.pathname === '/dashboard/inventory' ? 'on' : ''}`}
-          >
+          <Link to="/inventory" className={`mt${location.pathname === '/inventory' ? ' on' : ''}`}>
             <div className="mt-ic-wrap">
               <span className="ic mt-ic"><i className="ti ti-package" /></span>
             </div>
             <div className="mt-lbl">Ù…Ø®Ø²ÙˆÙ†</div>
           </Link>
-
           <div className="mt" onClick={() => setDrawerOpen(true)}>
             <div className="mt-ic-wrap">
               <span className="ic mt-ic"><i className="ti ti-dots" /></span>
@@ -2976,14 +2971,14 @@ export default function DashboardLayout() {
           <div className="mdb-title">Ø§Ù„ØªÙ†Ù‚Ù„ Ø§Ù„Ø³Ø±ÙŠØ¹</div>
           <div className="mdb-grid">
             {[
-              { href:'/pos',                  icon:'ti-shopping-cart',  label:'Ø¨ÙŠØ¹'     },
-              { href:'/dashboard/inventory',  icon:'ti-package',        label:'Ù…Ø®Ø²ÙˆÙ†'   },
-              { href:'/dashboard/finance',    icon:'ti-building-bank',  label:'Ø®Ø²ÙŠÙ†Ø©'   },
-              { href:'/dashboard/clients',    icon:'ti-users',          label:'Ø¹Ù…Ù„Ø§Ø¡'   },
-              { href:'/dashboard/invoices',   icon:'ti-file-text',      label:'ÙÙˆØ§ØªÙŠØ±'  },
-              { href:'/dashboard/expenses',   icon:'ti-credit-card',    label:'Ù…ØµØ§Ø±ÙŠÙ'  },
-              { href:'/dashboard/products',   icon:'ti-list',           label:'Ù…Ù†ØªØ¬Ø§Øª'  },
-              { href:'/dashboard/reports',    icon:'ti-chart-bar',      label:'ØªÙ‚Ø§Ø±ÙŠØ±'  },
+              { href: '/pos',        icon: 'ti-shopping-cart', label: 'Ø¨ÙŠØ¹'    },
+              { href: '/inventory',  icon: 'ti-package',       label: 'Ù…Ø®Ø²ÙˆÙ†'  },
+              { href: '/finance',    icon: 'ti-building-bank', label: 'Ø®Ø²ÙŠÙ†Ø©'  },
+              { href: '/clients',    icon: 'ti-users',         label: 'Ø¹Ù…Ù„Ø§Ø¡'  },
+              { href: '/invoices',   icon: 'ti-file-text',     label: 'ÙÙˆØ§ØªÙŠØ±' },
+              { href: '/expenses',   icon: 'ti-credit-card',   label: 'Ù…ØµØ§Ø±ÙŠÙ' },
+              { href: '/products',   icon: 'ti-list',          label: 'Ù…Ù†ØªØ¬Ø§Øª' },
+              { href: '/reports',    icon: 'ti-chart-bar',     label: 'ØªÙ‚Ø§Ø±ÙŠØ±' },
             ].map(({ href, icon, label }) => (
               <div
                 key={href}
@@ -5654,6 +5649,76 @@ export default function DashboardPage() {
 }
 ```
 
+## FILE: resources/js/pages/files.zip
+```
+PK    "°—\·9  )  
+   CHANGES.mdV]OãF}÷¯…´»mŸX‚ú¥J+±j©ö¡ªä!™ÇN=–, 5@hÄC«ö/ –å£t”ş’ñkIÏÛ‰I¬Š6’cÏÜsÏÜ9sgîÌ°xïëK}Ãô1>~Ñ7ø?ÖxÎX<L;oñîS—eÍÌd<Ğà½ï'gñ!Ãß€)âïõ1ágØÓ*lú×ú#ê·æ“†0\ß±ÏÃ®’•3j"Ö§	õµş5>ÔoñœV¬¹¹‡ù¹9æ~Âek5äQc‰÷@ä2ÂcÄK}…ˆ\§‘Ù/Ø½º€ìƒà€¹‘††Ø¬*¹iœïõuüSÜgîºÄë:n53Ü§á1í!¾õU6›V$š’Å}h2›>ATC:—Ë:ğñ6«‰`ïV™Û•â¡º—Şk (¬øG}o†q!ÒXk*ê
+wõÉx)†úĞ»…bàß'^
+¥¼`Ä¢ÙôdûvOğHæÂTáºØß?³÷ßyjŞ ø}DÉŒ%ÅÂâ4wõÍ”B&,´vã]J¸Ê¬s<W){şeQŞ‡ËÏS1ŞCöü®¯³¡TK´Å8¼ºÏ¥üŒS×Y…‹ÉÁô-ÔÀb µ’·Z2)°OÌÇ¶í\jãé³s İ‘ÒñH€SËÚÎXÖH2šm[ÛvòËŞ6ºŠ’Œ:…»’ËùF:rœÈbßzØî„”t|“N±1>L+Šø%6•SıW©ô9	úeÂ€Ka¸Şí†Õ‚I:rKÚË|MëÓÒ”t¦ĞDñeà)ùX†I0|Ü"Ô=ñh–B¢ú(âAãÑ4Sh¢ø”·=ÿ?ÄR€'š—<­Š?š¨Ğƒ¨–#£KbCøæ*v!²•şh–	ìDş*Ïh§'¥î49½'w¥e¹®k9]J –şèDe„åÔGËšÚ®³å¬šË9WŞ\‰µ0{çWÆr^äMÍõ¶œiæÍÀ„ˆ–£6¸qe"ÈLm¤´8ÄÙH;{¼a²úŒj2D}LNªëñ Wföÿ9vú=Ñú	9D9=„ıEØà>İ'N™“ÜphÄûä†
+°gJ\¾ ]èßâ>Ì+!—Š¡òš„òÂ 7Ôœsºm×¥¾ÓG"º0§ãÊ3 !XY®CS „C’¿ÒĞM½Å	0¦ïfLF§µõ%…çº7Ğy—RP-A£z"-p9"@ì6=á7¨ìö1Í»œè{T¨è¢“	Å§O¥‡%)Íò§,ÖŒÒÒCˆT~¥šQØf³ÕÜi7ûÌ²Ä¦Á5D“w}Åšİ n¦ô¢Gˆr…mYŒE8ó£€•-Ê…1•¤¬ò”
+JS7÷Ã4Ò K)*Û‘ ãî6Ë±2P&O­äğggÍÌì¡ÕJÊ³éÃP¸3K=ôÃ¨VÚàQÙ¶E»’õ'ÂÖ¶¾²²İ¹ÅÖEoÍ’÷ìæóUá£i¢1¡3ßv½H4æ]¦ØÎ“)ï†õÈëV$ 3G§êuú¨pbOrôÈVøêy°ÂW}šÜ—9ê¯wÌ‡³ˆWå™µ“l>\Ûéµqê>0Ÿ­5´À.HVŒÕÌë^+W[dI”g?˜8ìl9«V«Ö‚9õX‡«V­ÔîÙ„/1l6nµ­…”İYÜ¡)¶ PK    "°—\ÄÈb«       routes_index.tsxÍWİnÛ6¾ÏSœé&vWYwS¤±.Å€Y4vMK´ÍV5’òâÚ­]×îfİC‘µØÖûCßDºí“ìP?¥6®« ØÁ±H~ÏÏg×…—ß÷¿z6\•<•îMé
++üÆBŸŸWòX/øÏ­lÍ¦
+®Sâ©-X@@nÏ·à(–%…%ŒŸÂ¦Ğó›—Êå8 36&ŠnÁu}ÌâŸ¬z™DÏçSKz9V³öC×ã¡¢ÇÊÕÃ{ù÷
+p…ÈÉáï“9òY œi¨¤d3Òm,Eíô}<œø‘1•¸›T°ÏÇ,<ÄÈşv³£w:]Ø@¾s7É.A»\Øìv/$fÃœh%‰_®uk¨Œ-3“ó[q”Ûä§äôQòOòÒ{É	$Ï’É³ô~ò’é½ô!¤ß$'ÉÏéü|ÉÉ¯ÉïéÃnaØ§!SrÍÓÙÆÒ5ë€{±4ôÍÉÖâ©c,²	ıÊªµÈ*ŒEô1™² ´iM"cQ}FpÉ·8`c‘
+æÑ}:£Á[°5@İ±îp=¶cÂêÆµ+×v 1]¦˜,@$`nÀ0fjB§zQi>÷cO­åÖ¨XëÚ lSCw5œq<ÚZt¬XëÚ :İáµ#Ëo°£aùzãˆ—ïàƒiF|AF,©(†ßÑ³1BÇ+ÆÃl[*ĞÚÅ`ŸP±¡³¡Ò÷Ù¤štw±ØÈç3aQÛÍQ@7·€l^Ut*qÌÃ{¤GoÆR±Ñ<+™¡²f
+š	eã‰{{6AÀx·ÆX•CgDtz½áx»[ –ËAì3ğ"å™Ò]G1P¬d'è]pšÆŒĞ€#v›îÀ¶ğº.?v= $dS¢‚óú`ûüE	)ÀÂÃDÍúåÜÜ¤¾‹^Ò_ñ2—öubø)ê)êCÖlŞíuÖnÔìœµ¾Î¼	¦V>Xî@õ¶“7×óÙç÷±©æAGõ˜Ôm/yØPı-(ct‰Q^tË€ c¦»eõóàB_•kŞkVKËÆŠï:X5°§98‰ÑæÑ‚ \:X”gXöõLİï0áŞwÄ]QTÑ¾ÎäØ=>ÅÓqš.Vpê‡	İÆ<Fj^Å,èkçİàÑ\Ü¶bşhyÎàuù0!XP…ƒN3Á¹ŠF;lÖ¿¥ 9Á–şWz7ùEw÷/±Í?ÏÇ¤_'b?ÿa-FA¦P@ò$ùIîâJ¤E9ğUÄIúmÍz95©>!˜™¹x{ç	U‹zœI>
+—£(–¯#SG$tiÛ]T©PÕ²œ¡òæÂ=‡ñ0`œs—•“³ujRe¨îšq©‘[—¥:Ÿ)C/ï<Æj`Bh;šâõÕÍ+”[;ÖÙßCd½öj“8İÜÕ­¯è»§ã+óìÑÂ7ÙoË'õbb®]P–õÍkN¶ ÖIûuQİôvîoÓÌmÍœŞO¿Ò¹€™ô´[.±=ŞØ?Ö‚×izº_içÕæ{Fç:6¼!™Ws3yë4M°”òl@ï¹hÚPÈ«¾0b¶ÆĞĞÅ«9"-aƒLÂÚ)Ó”Ã«IÔŒôGÖ£Áˆà•÷Ø4Ö¸x”‡™±nÎ47˜ZªU§%¬¯ŞúÚø¼-ğŸÇ\e*¬¹ëâ‡Aå¾6øòÇC[ÿ¡ÿÁÅÜi‡—qazÙï!8Tíı2—„mÇ6©û^kÿùtøºÂ·6SõLù3bÒ#AûøÏñsüÍP«7o‘?Zf´¿¿!	ÎtXVÅYü/©R¸²õı£~øœ6Kíéø¾[…šèÙ#Ê›dbçTuÎi-Š=e©UKµgë¿PK    "°—\&ó¤ü  |=     DashboardLayout.tsxÍ[[oÛF~÷¯Eeºø’4‰b9ë$Ş"€IÚ<FKI#‰kŠÔ’”/U4iìòÔv@·Û&Î&5œô–B½ö—ì93¼Ì‡¤œ-Ğ5ÒZ"çœ3çÌ¹}3ãzüöÏ¯ÿ¯şÍÕëÄ¥3rÛÔ«ÿÅ«·ÁĞ±©í{uË8pFğûºáõ[áv6Ùƒšïí#Ù>wUfîúdL¶F¾Eı
+Ù4í
+ytÓi¾éØìË-c×ì>%Òu)»ÔhûUT£nµãÊ—V0~}ä÷ã±Ù>İ÷ëøøÿ¬Üõ;µÑíÒ¶/RßëÓØ÷gÇ«G/`0šzz8}<^¿ÇøåoÓÃà¸A‚—ğùiğ–Ï¦§_’¾K»^ÏHğ<8™>™‘z'Z¾:Â “-ğû^†„Lw8oƒÓéß§QÌÃéÓğEİ´;t×L¿‚á6õ|Ú‰¨‚0±¤T/Ím<ŸÜZÿäÓîl}|û.i’s„Œá?B,£E­)£Ìà4øfşş;.WØkÓ§¯ÁÆãÏ˜ØÆ€Âp˜àpÌæŠ²`
+‡å
+S^'êÁ3& Ï|³Ê}·š¼$“JŠóÑôQğKÄù9ZxÄŒ‡‡_ùOÂÙë;Ã¡i÷ªmÃõËğ*d¼¿Øç´º`XÆÖğEºløCP†Éi2…h^¦½ë˜­ìM2¯®iÑ*óFFÑ2:=à·¢Ñ;ø%TDpİ„õx|Ã(#1Û¡ndDLÛ2‡Ì¢UËô˜şüG#†+~
+kö2R]QÅ¥şÈµC!‚Çµ!GÃªE»ù2Ğ_Ÿ?s5¾Ş0A¡Ñ")9>Orf°vŸ¶w	z) á§éãÈß€ZO§‡äê¦è--+Y)AˆïTş¢§ù!x1<‹ËBÔ£¡ufºNgÔöUí£G5³Ë²öwÁ	š7q‚’{BõpÜ|˜kL«ƒa³g¸´ï@‚ƒ÷ÌIï.ŒCÑ,'z|/é•ƒ´N{kReiœ·ê©­ÓN/&x‹I”Ò™°åv'ÆË-Y?ú`>;‘5ŠäŒlÓÓN"ÇYÔ=³œCtÊË@J!o4ZfáÅşZ ï;‘â<¯¸¼HĞÉ*‘W ğ;(XOÂGøÿâº.9¯¬ß¾%xÈöÓ«S»š…EÇSˆËc-÷®iv›¦¸ÇviöN9“;(ú&?ˆ}lĞ}p¦³«K;¦å+ôÜŒÙŸÀÜEÏ‘˜wh+ñSÑQi›šÃüœı”]¬7§äŞ'ëä·/ÿA>:¿(¦×Ğ&Ó¶aµG–É¥œï˜3xº~	®ñ{Å'»¦ÜÒÆŠBËpÛN‡»c†qŞ@óğ$. ¢Ó¥„PÃ•=R»c$™¸w¾Ğ{çÈu©İæ¹OäÎŸ@+kY(DSĞÂ€{ ¹x&¥Z‹îRKVÁ7zgVøğ¶¦88…áapCz^Ï4´KÒJ`O­Ø¹-®¦Î¡§<^Ã§#\;K=A™©ålV°B7ˆkYÕ~Å3[AüŠ`‚qX†–s@•djvª¬˜fkŠ+é3–qÉñt}>ÍMß·`‹Y\Y¨ïCúR¼2~ªÚi Ç›ëW76?½¶µ¹u'Bå]Ã¯Vé`™,üÚ²FTz0¹CK~Ôƒ@zà@ïÉc|jXø`›£¬Ûëm|zsãŞ:¥ÿÔz>}$B+/J)è'Áq8í˜¬AîPh];«ï‚ª0˜omşà2~?úF&k $úˆˆaÌÎ!Y&ö‰8Ã¤"¿}MRÁ’¬&7˜ Q‰f“x{ënª*
+x¥!‹ÊF:’$;1)MJZ[ªbù '_¢H[VF¦¡
+Ì†?úÉDŠ8Ì4$qyH¨@½˜4!E´I\Eô•XT bHS•%c¼¢óĞI‰qIhOBç!\‘C/ëäÊIĞtkª£WéPH¡œ\­¢á1!XIÇ€‚r¢¥{–Ù¨OÍĞKÄG)™¸D~"9Iv¸±0z£÷KIÁ%¥5LĞ‹²jY°§ÈCŠ”,¾¤M|
+¤)4ª“„¨C—P2 ‹,,Dá²E$)Õ"¢¥G/¹¢’”¨hc:Êä	SˆqŸ¤İ1Ùä*QcCAˆUt…4åäJ‚±ºˆáŠ6¢óàN®RlpFU¡KCµ_.øÉ™P
+T‚XÓ¤b-åÊKHR&‘¨a16*ğJ‰Z¬¨‰ÇT](jîb»ï'|ºÌ2rÉL“ „Œ)B¶Lñ áG^’\‹# ¦Í%òÓJ”†ôOTÚB¦ï¶fAsy‘bµšO8HÒç¶ÒX4„~‚—ªš1ZÒdË4ò*¦H6 ôÔŒÇQÚ5F–Oº#»&QÎıæZá ‡]¹b9=xE&Êj5£ƒ³ù…Ë1ÂiV7¦‰NêD:;:°Ë¡‹õDº1éîN…øN¯‡Öã¿£7NÇ¾‰D:®±Gİ-¨VËp=şºc|ó]Ãò(PÆ¤ê0 Æƒ"…k¸*ˆ·É•+3À»ŒĞ9™'šÿô\¦añI¹Wj(‚\a_Øç‹Û„s™Í2>œ‡¥l®ÁD$ı"…À-ˆfê\SvÈ<ƒğ«kÑÎ@ıƒ™ƒÉİ×7®®ß™mğõIÈ\€˜fÉ3¡°nimn.Z~”½	^(‚¹KÚ–áy·`î@×ª¢§–Öæ¿ÑŒ€¿”Ö‚ç«ux§¿k©ÑL¥µ8ôÔƒ¿S-oÔ‚$à8¼˜~…Á ù¯¨Ò¿ÆJœ¦ç*?¿Jöºæ††}ÀÏ_Š×.4[Û‰t?ş™íMš°ØŸø£ŒàXkÛ4CÓî‚Ü[7şÜ ‹‹KË+çÎxáâ%üÄl€ŒK<NñÓ©ÉARrœœP×Æp~¾ç:£a<lŸÆ|şì<Ú.‘zĞ3ºÛá›®¬Õ²JÄó,Ú!Š-ÇmH{^@ş6™(œ`º¢YJÚ¥ÂÁlk‘+‡y¼+|y"1½uH÷»²H*èI³Ùd»”5Üÿº¬ĞK¹@š^¼H=%Üf1»‰f„ïHL:şÌk™ïãé_!eâØeLxåÉgiZÕªl¢„¼LfÕl³]ÒSšo’÷ø|q£¤’ºVLåèŞpb4µNÙq9ÜÓ5m¶
+äı÷ùjğ¸…oiÛgªÅhJkã„Á${^9ÓÁóÚŒ)á«w™Ù“G3ÔÒ"õnìštïª³ß,-’E²|ş•H×´¬fÉvlŠáå:;ô¾ÙñûÍÒrí|&7à‡NN ¦Ü\Z&—vÏá¯¥ıÚâÒÍ¥ÅÚò%²R»øáæRí"<¾h,“e™¨va‰¬ô—>¬]:'=¬®l.­°—@¿©®ÔÎÁ§ÏKZ¿`Ó¨ƒ^Îv–åY­cĞ©ƒä˜H„JöX€—RÚüúÒu~ÔUT%°-)Aˆ^³ÌöNsÌ;Ç	o†š%Ü^Ì7`{’/K…iÕØ§º¡IFUM£›!¯bc¡›úâ‹t_Ö‰Ğ3tÎ#GbxŠîÂ•>eœ+'D:Òj0SóĞUˆŠî²–äœ¤/—Ñè³âÚ9sSwsıÆ­3wt3„~Pû¹{Îº¼´ÓáxŸ½Ëu6¿¶¹ö‚QÌT°>Ø¹×Ø—,ïQ1wDtø9MVØæ ƒá,¯ÈÇİv?•ÇÒ¹FñÒ…©t˜Jµª¥ŠÂÈ\BŸ\VM{pÎ?"	İwZF›öÙ…ˆÒç€WşC 8¿­Õj%µäÍ`@³{ihä›$Ø&«ÊUôz¡I²rLM¥
+Şw~Æˆk|ß±Õ6JRLy§;|ªÉ››bŒ`»˜ğŠĞÏÑ½N¶¿¼bòQ`Æ£²ÌòL×M‡ÍhÄ[,ø8p İÒö<:Ó¯Ö¹ñ´Uâ¢åÛd(”
+W£m€y~z¹ê“3ÔÌŠ…¡5òr…=äÆg§Ç$9ùUÁ°ÉmÚv§ØöÓ	/†]‹î7È’‚VùMgq”„Ùõ2úÖÕ›x‘÷Ìy=JÓñ®àajèáßhÉéA„¥äP¼$yäÀo¬*â9º
+òÒÀ‡ÔYİsáLÙ‡×;Uß"Ã©fÈŒÀaâšºõ£)/j»'X.:qŸİpñıe·øöòï`<ñ‚ÀldPVf1qš²k´Îš¨T.À3Ş,Ì(êâôÿİ~BÒ´t×üœ6È¥
+nÏ´¡3k ¶4Ä7¶fè{$¿ägígrÌğxşòÌğ–ôïá—ñ9ğ;ùZÊÏäİ[¼@]äj¿ŸU idÏ3æ90Ëk,«3ndJ_Ş±°]¿³~ãì»Ğ 2MTãøqAÒö	œ$ ïÆ®Í]N¾Î©¢È=©×E¢–èA”É¤5ğÔm×½ğÜe’ë…ÀªoØ‹ª°R30DWá9Ün×ò®5D…	™ô\³£8ëøâ»ã³ıÍN%¹“É/¸áàø–cšiÆ_4D>É‹˜
+W…rÙJ÷¿³®s/Wä°•.­«wÖ“ÃÂ˜­x=$ß3üÕQbé’^_é–ºş’zE6îOüØvú0—oÆß¼°?ZL¾â%±¾É=cy¾ñUcÙò±¶Âw›oĞsæü6o¸Şd’:ˆÀ)E?lW]¿_®ÄnÔª 5•†ÆIÿ‚L.gªâ4XRÏ[ëÅÍN´Ûo´gmj7çô“a5hÌVô{zé‡y{¨y‰0é«„Vê"k¥0)¾‚´ø,ãèQeè:{©n`ÅÏç¬˜R”Ï¶±ÂÙg}ÆLÓ:.­TØ·ûÔìõı¹°¸X‰N¿Â{Øëefı&pZŞ­ÿˆ¿.ÏMæşPK    "°—\Ww@  ü     useSetupWizard.tsÍU]OA}ï¯¸}i·Iİ}A	Á„˜Cš†ÛYº²İ­;³Ä&RÚJĞD}ğMŸŒ)¢P‰!¤ş’™W‰wf?h«oš´Û™ûqÎ½çN-~¾{ó_}r–!eAÚ”Y˜e>§[ÜŠ]¦<j>tŸ’°fr¦,E_vÄ'q&¢/NõRvåkq†ÛÇ7Aˆ!®; we[œƒ8C1ˆ½ä¾ø"d[Åùç´'«à6šAÈamN8-«·yÇ¡6‡8aĞ€bH‰Í‹S©1iºsK}ß±<wİÂ]ËÖÛ–;°AùlÄë+Á&õ³xpÈaù‡åù•‹k÷æWaŠLµaÍMrZSVtKÇu"ßænàCÚ¬%ú8rCZ3J°“ˆƒU|JkLŸ—ƒİÏ–UŸ¾µ%><?ò¼C=K˜.*a`Üé@µñÃ+ÀÖö»»+Åè°€Í?T*Ø_ñ; ®hk§‘^cîÑª˜KY¸ymPJÁ8hÃ!£¥)@'G¾Èû„bìÈçÊš»şTê7<WEiÊ=ÙÙßTPÁ'r_v’!FıA+—ñ{ßÍ‚ì¡Š{±âu
+E³‹»GZğµœÛxş2£á6ñ–y’j"×NFÖZ,å4v—‡-^AõjGâX¶e[AÊ@Î..\2Ês%è2jÏÃ\ÜCÑT’<™°h£h¥µ6é¶¥tHümÓ'j=!B_¾ÄÑqVàÆ6%!^,Q*‘'ÖÕ’ÉëØv£’D\¢¬±¾VG”–Ê¦NØ\lÓÉ:J½M†:X\V'ò×CVE(2ã|~Ä\ƒ¿mÖ'éSoMå&³ŞÕ¨V‘ÆHâêµò^Xÿ–v"_-ğ)ÎÆÙBaDæ D¦ÌK0&56)µr*³Ìs\fy$VÉ´	·ëc³®…†—úà”+-}q"ÎÅG?ğÒ?Us…òBıEr%Èÿ·òÅÈ\FÍ+eŞÒ¿­2TªÉŒg*]qŠ‰1lQ†¡ìeêÆ	è¢º;¹ìâkps.¹6±¢£„®]¯¿mérÆS‰wüè5;–íZ¹_PK    "°—\£8Ò  o     useLookup.tsÕVOoÓH¿÷S<$¤Ø’eßÓ$]T@ÚbË)ŠÄÔ´³8v43n©Rª-õÄ…OÀ¡,ĞíJËŠå›Œ¯|ŞÌxœÄ›ş]´l%ç÷oŞï÷ŞLÁ§—/¾«ïZ§"/xLEô³ˆvóü±ˆ
+AÄ‡bJ¡UîâÔGuZ=…êXıY©3uªŞ JÕ;uÿÏ«c»|­ş¨NÔõ+x›Şöµƒÿ|£í}³É4çf€[ıIIıtg<¦±4›$M·IüJó|NI,;ëÎ’LÙfÊh&ë×?D)ÛPÅFŒškô‰Qe™¤|Lb
+¶¨&^ok ³5 &éDt?[ÃÑ:
+Òœ$,ÛAÑv§”dZH9Ï¹Ñ’ã[8„¬HSıJ=«>×/W„~è }@eÁ³oRc*ã]”z>ô°—³DËc,¢¤ZÙKˆ$]¸O¸d$ÅlŒŞ},%´§õÚ ˜&Î€%]:Ù¦<€ës:É÷ÚÆ«TçõY,YAÓ½- O$Íd™»rà¡pšc…»uUüîEUóLH
+K4A¥¡ÀúızËÔxÚ¬g8
+æÀH^ “CĞ€0&© Z–>ÒÏÅ5XÜJSÎÛ#â ‹k€l4—˜'´Ì›A†â²ÈÇ_7¦’ÔN\T+ì¶Ğ,á•½Y2n±Œµ' œ8@ÎÕG=m~Á‰rjË{½¨Nªg]p.†˜!:õªzŞÛ/Ëå¼È>æåaz¡V"€dMp«T×]gØ‡[œ“ƒ	óï¡ı†±ôk€íÔÈQ÷"«¶í¢õ²íÄöä%Ø˜D 2˜ÃRBL|ğ°ô.ŒÚîš¨Æm³Zö;—× !ÖqŠ%£nw*Ù¡px<$ÎÕ[P¿áiğ
+ª£êÔ;}BÔ¢|Z=ÓIÇ¹g®YÀĞ±cdİi¯&nÃnÏ_7n=Zl;xV7ÀÊariC¸vÓığå-0ÍÅB,v€l-*ftÿ‚ŒeÍÏuxü©­#tÔš_Á–VZn°»<ß×™ÃMï
+àuâ½»=œáâ¯Îå$°…±gÃjL¯<,¾%¾EŞG7gnetsÆ’òÑJ¤í†’ë"}AËÖÈ×`‡2õ˜6`!C×ı>b8r\¬.0nû·sd¹%¿z¼Ñ3çÆÛkQÄŞ ®¢È¿Aˆ6	šRt³zÿŸá9f)^é ½a ı_x¦~¯® ›Ø4ì½©¹UºÔs=¨é8ÀK}§ûPK    "°—\‚Ñïh  I     LookupPage.tsxíïoÛÆõ»ÿŠ«›VR&K²d©c;ë’-ĞvE’­‚ ¦Ä“Å†"5’Šå²šÕÉŠ Ã6 û\E—&M–fE»u	õµÉŞ{w$ïÈ£,§q`cÓD¼»÷îİ»÷ûí6ûş¯~®ş,µÛ,à¡?z<l¿¶GÖ.üp}ÿÆx¶ß¤ß¶VNpğìöì£ÙÇ³¿Ìî°ä»äŞì6›$ßÌn%’{Éváò¯/2h>H¾H¾İMş•ÜG¨Ÿ|Åe;Ã‘Dì2·zQ“Ålò+‘ñ&şºÌûlÊú?dµ GÔÎ¥ 4Rp%ò‹ö ÂvÖÃiÑŸ|ØÕıåËùg‰OˆdÇ‹xĞ·zœ]r¸k_„ÅÅKŒİàû,{Â(p¼İsĞîZ]în”Û#XÆù¬½ñITc°š7vy@?CîòhÅnxWCĞ‘³|×æ`ÈQú£Èñ½PbÙMËót `¨Ï¥$Éöéµëğß€Ûºëû.·<ìhŸ<‰¢ù$ù–ÍnÍî
+i|˜<©=`'Û0"ø{oxW­®‹+*€ÎîÎşT	²ÿ!ëZö.˜ègÆu\ğ]Wœ-yºTŞ”\ÅŞ	üQH{#–0»3ûf¿#H:v_¼ }_ qDDäD.ßĞw‹0Ü¼M  µÈcj©Â×¡ë ~cÿ>;h„©AØ( œİ¦OÊÙ«ï¼! ¸g|XR y€3Go‘q ©Í~ŸïD%2DÚSÙ›K³À8¹øÏ ‚İ`/emqFu¤Æ7sz¾wŞÀªÙpsï&ë’c!×$`ß-d_r?ùT®x8Šö¯‚+=Uµş-ß¶ÜŸBëûc¯‡j%(¨Ç©€4Yoà¸vÀ½&ó½®BShİÒ›KÓç’”ó&Ù–²E¿íÛœÔW`Ù`õÛÚf7}ÇÆfSÑ«iƒ<«/!û7mçæ’Ğšk…áÛÖo-‘ä•®Õ»±¼”ÚŸ}—oÅñRjxF~èàò6X­ïL¸]k‚.…D¯Ódï¿áÙ|²ÁNw:ÍÑíşØ³&ØíZõNÿk:İ hì¶Aó.9.¨$éºã ¾>š@g†ÃvB0bû8©Ë' e¹Î®÷FÄ‡ ¼µGm†Ö÷Æaäô÷/øğÚõää[¶MÜY=“6N§òòÓéİØŠ%cEû¶ìU8¦ñ¬görÖ‘ò‹í9v4 
+V;—€²¡5yW´œ:Û¡××¹³;@_éÜÀÿ&$×ßƒkùµœ.…2Í[aäĞZY»îE½‘İÎ@Ü"™+{9Q1†dpy;¦§›m£ÁtÇQÒ­€u#Áÿ+“p¹ÌCÜ:4ôöV,sªb|Š*r@V&Ë¬­ÍÙ“*«ÓÉŠS=Iù ôg?RÒw‚!³ÁkFü¸LEnä|¹Yğ`ÉdDGµYÀ™UÈ4Å7Zƒ#Û‚§S÷3©;i{Q‘3°#*ô§È¹æ®£æjzı,t4›C¶W‘ÆeÖÎ&¬«MpZM=*d¹<ˆV@b,oÔ9Ÿ¥¬¼â¼rr
+VCnß´‚úÊ
+DsD^Ğ>Ê~õt“ŞŞ•†ìl§„0Zmívïª?˜µíc”ÏÀÙßÅàˆâ“ä«Ù-Mù‹¨ŠõÒôë…éÏ–f§ÀHx" ÉÙ&¨šïínÇ¨x`åkòéf7ĞyÔ„#Ë3’³Ú:]ÅàmXç=Œt1™“!Ğ AÚÃä;Š<°ä+C]ŸC3vş­´ÀtÛÕì)¾j¼*yÑ]™2OÍæ0Ïì	sÉç°¬ÿà’Ê¶}®	tüÂêdd+;oÔ×· 3ZYS´Äòœ¡%í^8r<Ö:2×ñ¸€ıë;q©)lÃˆ4
+¬p€~lªK{Y¼çú¶EÙ[˜§1ÇæÉdêdó¾5v#–9¶|j5ÚM“˜f–4eº!µ‚m¥jÁ‡¨§˜`îˆFĞ’ùä	‰špd bUÀAÏÑd¸•è9?È)ÓçQo 3CNLU†‘Mÿ|›ÂÄYù`Óòö·ë)ÕÀílk! ¢ÿÀ£+ôr^¶²úE½VkœËÇS@Ãq<y~®Œß¬§ŒÛ¥îŞØu·ëø·Š{Ñ;6ÑkòåºŠˆ®„îûÁğ¢Y}I¾hĞ—yÏìMc@xØ®ÇÓ"’×`jŠ^®kkQ
+&* ĞK@Å‹`Ş"ß
+£”•Wñ¥ÈJğÕán'aÁÕwÜëñ0<F© ½-N‚Yh¦N"á6C)<6eJ×¡İ¢ä;„µiõ‰„z#‰~K)—°¶`å†\az)Â@ì(®u®ŸoİàûìüyVÃ5EŒûé
+·„Ş¤óáLIÖæ!êìƒØb(õ^ËæºN˜kVä¿éïñà‚òz£åx=wló°.ÀõŞ†0^·i'Ù€»#³¿3{…ü¤iëŠ¼4çÈËVŞ*¬N.ƒu:Ì„ºˆNgÈıqTÁx6šä­ÉÖ;êÌøÕˆ{[õBe„Ó½jÛõtQB:¤}±æP2
+À‹x*V™Êª¼fõBXãúZÅmL­vNåLj~êéH½ŒJ®úLµv…f‘G‘ù¬d%ZÍãâe‘‘H&éÈ2ªÀRXïS² sV’
+Ê7R¿
+ÎÂ_sq–¸JÎÈÄÖ+ãîĞ96«8‡×V¸ïõr,Ïv¹ &“_ ó7G¢gÏÊÓ‚·mÔ¥íc~_ò:cÌé³z¿•‚°—_f/¤.S²;«ñt‡Ê©lùDÜoQ™|ºÌ(¸ı'ÍÌîîHÖâ#’îô]Ä…Ó9»û…B·À©WH²ö,ØÜÔSÒ•©s“·“<˜İÆZğçÉ·@â­ä>;§±Ú”%_Ìî@¶q/y”S>e‘†!å¹E@•h96f‡‡"*Ô!:8œŒ´F‘J©Âª)ëYßšöiœå­!XpS˜²t_<ÖRĞQ¥[P“I7òÿC54aREì†kër4lFÆÅÒˆ”w>ó«Ù›aË¸ÛLİ¦Âf5âË·­ÀüËqkPÅüR1LÍæğ<RN%7ÌK2«X“Yë¤É“¸}RF5'Û©ÌÆ½¢a©›ss%#4”Ü"Ì¿×:ßğ>¦ç§©¦)¦¢AıvA[_^µvÎ²:İ+ğ¨%¥ÕNJ“uÁ5ñà2¤Oã0¯W¬éˆÔÚ­¨Eq™¤,n:¯¦uL¯}¨ÈÒÒÈ‹ı~¿Ö,rÔÂÒÏÕò"òM®,›*åvJ.©¥ÆµÓúTÈrH8§Ìï@š"ÇÈc{Ş»A<ÀªvmºS(­Ixˆ ó*–ş7¦ªT½Î±P¡ˆÕ!åkªáÈêñ•.ö8÷²šÏ/ı(òA´VõºÏSMIŒ]íZ¡ ,-²®ŸmBf „ ë2ºªI….œ;$\+CgRw àÙhÂnQã”­®½$•gd@bc§€ˆ¦$« V¡›‡níô|tÏìì*SMYÎªŠåM“Ìb¥$‰Æ*kWUİõÌBu`¤­êPirC5:Õ(–Àñ‰eñuÜ×“ÙÓÒê#ŒÅf­Vµq˜@y¯Ë½İh0¥ŠkòMòdG/Ö•™ò,Š­¦í/,•]T—eÏ¦P¼SC–K‡k¢ª¥uêèŠÓcôÏî¶MeL‘Æc³\zFñòFã¨°hœO¢åBrek9ùB/aGŠ£èÊV,f:}ïG»\³dU8ˆ?"0[<jxC‡;DÔ+dËêáT”6t(Z“/—ç¨›ä  Ch58ôHsnÙ{¤–½EÖ¾À9êÈ‡ËÅ%ğÏc¾¹”™
+ÒŠWz£=5Ö¡ğoÁX'EÖÀØÒéVÉyŠè$:º,ºÁi2“ğÍq‰¶¢“#éöBñ„vl×s‚Úé±±uZ–İ?˜ååÉ‰6P9ßDf_–—JWğ))‚Ò[®ïÀò>ÎîíàµD¼n”Ü_\Äô GÔ=1OñØÖw´+Ç¶!¸Ñ¶@qu•ºgTe=i ³†nQB¦ƒÊù¾»ú¨*—ÌµµæQ®ôËfæ,å5R0s÷À;ŞK€­®6£ğ«i]YúU
+‰;Gã.şsÑ	xO®ø4zÏ„ígŠ#L\w<È9Œ,_?càå¼j5P:cpÓxV)?D1tJYúÇxÿ‘Á&<Àk‚ÉCF·Éb8SÏÎÉ°(¸£C1Ş<ü.y¼Ó8$ÄÒÒ¿fÁåğ9.Šş‡OU46tœ|Ê°vÍ;%ŸÑ=E£“¤—](¹2Z’Eu·÷ŠşœNgŠTnFHÄÊ´oFA¹‘†—"´S”T½¸Ù&X9j­‘¨7#GƒïoÅT¨„;-DV!o4Šœ¬¢ruÇp-iÏ/% i0Ï­%àH÷6£®oï—QÄ™MA6P±ºÉ{Ò¨bl‚`‡#
+_Ãlíâ£¢İe#¡¹ÿUJd€ö3¶ŠL6HQ~„=ô¨»X1Ò÷ŸÏWâ"|…p?ŞéNX—ïdº(ÑĞiÀ•-[kŸ‚ÂÄ&5Õ(*J|ÿá'5“ˆe´2	õ)ª©ymr¸ÂÏ€¹""è5?Åµ«IÆôôiÖZ¸ıcö/À¹äÄ•*àj4k:	[Õ<‹ä°§ªı®Ñ¦g¸ñªş˜/•ÎÈ\8gÕÎá*†OÉÉã‡êYæI„1ëâ^ÏqKy—ft]Úˆ§ã•)Ò×ŸÇ”ºüÂ<£ƒgÇ¯ì¦ÔS³ËÄä]fY7¹&“ÂÀ¸²c‚Æb\PŒ4²F$1—|?Ò*·ªg“Ñò¶°a•Á²FB8¿’çÍ"Ë¥èª”èvWµgS—,”‹çU+ïF®-ZÓË‚áE†M)"†ôä!‹²Üa…²ŞÎ‘J}‡\¬Ì$£\ —µÚùÕ‰Rg¶z-„)3	½ŠÇ»¸æªCÚ‡T}zL4Ÿ jË“1WPÕâº\v‰2ë©¾~»x'RßrÔ÷	‘hÂ¹±Ñ&¼U‚v˜ó_Óï¥w]¿w£T„:]áÙ²hÛÜ§^)˜+È2“VŒYÇ9OV†›mšÙ3+'RÙ‡€ãf:Àh>e-¶pBÜ=1»Šr6¿–B»³V«e7™ÄµÁôÊ-›VE-jõ–¨¼šÇş^¸¯›;F5
+_ïà‘£ó¾°·ÂÈ®@SÁ*”j—ö±²¹è«úTÖ,»ëéwS…jgw·däóÇt3¿\›¸dÕàªõµ‡wWCËWB8ıJÔş8Â@y¾Çkt÷—°Önò rz–[:5m! â’zÌ*?t­iÑıÜôÑdğ]¨ ŠHP|í,%`yÓ2üD÷øå£MŒ¨Hçû­ôsirUşÜl^ÎE^Ër0Me/}ß†_i¥fŞÌõš¶r³²ÕÂtX':²Kİê}]n–ÚçIƒêşoõŸ5YørâUÊéjV…O,?I0Vª+S'|~è^Í9j4Åu%x5BÅG¹Gs¦ˆÎ™ñpQçç"{QØŠ§ıĞûW¸gç®òpàĞczcvsäÏª§*Ä«—ı,z*q_¦¦Ù0Ş*g5y{ ½»&.²•n‰§¬â&Œy.KH“Gğóßéı™ÁâQBÉ‰˜7éğ»9$æ3eyÏ·'¿ Wòuyc¶±«Ÿn+SzÄC	Rø4fçÅq~ı¶”„©	zæ§ìÚõÙE’ö¶²vAôıàPK    "°—\Dòé¯›  ê     UnitsPage.tsxÍ‘¿nÛ0Æw=ÅA‹l w§ê^ C‡v
+:ĞÒ©aB“ì‘LúÇ@à©KŸ!hŠ¶0‚,yrÍ“„R­Äu»dj¼ûîÈßw'ÆàöËçÿêËB«=UhÙ±e†¿IÔúÄË^)áì‹$í;;k{ÿ¹á]ÿbj49xŞnBCz
+Å>{Šƒ,ÃY×WcÃ½tĞxU9¡ÜO8Â<ƒ´çIÁ … OŞèr 'œÄ2çá{ø.Â%„‹ø)~ˆ«”\å›®~£÷_û
+ªÚh¡\™3ß’{]TZ•¹#ò©W+-5•ù)§Áhd<‰Ã¾Ö”µ-ç‡›`'x6†Bñ){½
+’OP&¹5ÚšŒË­"á[/ë18ò˜t#y…GZÖHéN\†oí½1Äq•=7a”e‹½?È|2!<¼İl‚ì„ËpÎuÏ<Ü=ì/ÜmEÂl°¿q“ãëø~kb{¤ß=S/ùDâ.m»3“’ÂáÌqBºwœtÀ¯º_½«­¼^t{šáA¶Èî PK    "°—\EOÔ  •     CurrenciesPage.tsxÍ’½nÛ0Çw=ÅA‹lÀÛÕ©º$K:5
+Z:;LhQ%©4†á¡@İ!S—>Bkä(œú&ÔÚ'éQ‘";@¶–¤ãıIşşw"cğçËçÿê	F:AÃËù˜©ÔQ‘¶ShY"Ğ¼¢ü–5'~Ã?w}»1É•¶ğ²ríÂH«	D[¬MEÛA€'ÕºG¼FE–X¡2Ø,³Ó…Y Ô[è:<kªæ VX‰qè–åG÷»\Ğ{éÎÃZlZJúµvÖ(˜¥¹™C–ÜPQ$*‹C+úµ4í§JJ®=QRé8<æºÓï•L»2(SÏöê9Àp:€(ãŒz”|ˆ’äóG¹€5ãg^×ø®ÓX] %rÉ< jÚU.Ü…ß2 ÷½<-?Ñ)+p—îŠ‚onUF0ïİ'*½'ŞŠ»ªÒu³IŞ}³A;îá™éd¨$½Áûê~z»×uúñpiîrpgÜƒæm}Ÿ6±Ü9!—îµ¦vš£÷‡¿Ğ¨÷/²×|(±){ÈÓq3	Z¤Êı5Ø›Á1—-yÚ‚èGĞ?ô½‡ùÉšL·’ÄıÖøş¼
+Øsút·ƒyğPK    "°—\ì	Õ „  ‡     BrandsPage.tsxÍP±N#1í÷+FÛl"%¸,İIWPĞ!
+gwöğáØ‹í… ( DEÃ7D„tŠ(àKìö¾ä&Ë
+î@²å™÷ŞŒßcğ÷îö[„10huc
+´ì·e5ÿEÔú¨©-Û1\•v—°g§kñ—;ş<€˜ÔÚ8ø¯Beô²ÖAÙf’à4êJ¬x#T*œĞ
+º{}˜%@ëpQĞ£`«ks 'œÄ<õ‹pá_è.Â¥_ø%D`é)ùnü}ú¦o·K%­üCUÖZ(—§lm´„(´ÊS'†ü”›²E-µÉÓnzÃáX6Øo™J ,m>ÛËfp„g#ÈŸ`6hQÉÇ(	%“«p	†¸'™ÁãF,GàLƒ¨%/ğPËU‘èa]2¿Š%«p®ük0ü÷s‰¶0¢^/™:w?‡‹píŸÃyçÊÕH”Ã©ã9öPŸşP{|,‰¨¸´Øõ‡Ï®b7šÅ?ù%m>î?ëÌcÀ¶ééo&óäPK    "°—\r$­s  Z     FamiliesPage.tsxÍP±NÃ0İó§,m¥¦Ş[Âˆ„ÄÀÀ†ÜäBM]ÛØ´ª:T¢1±ğHT$ÄÂ—8+_‚Šà@²äó{ïî=!ğ~{ó¯N@h42×	rbˆ¢Ç¾àRseÈ1ÎĞì{´cÍ¸”ÿyæŸ_`#%µ…½*s™2-GĞèÔè+]ŠÍ¹…,‰eRÀ÷O6[0À¯ÄæZ@Ó— [›1ÕÀ2Ë1‹¹»wK··,.ŠEqéVî©Âµ®ŞìZúPã(R%™°qH²µyM±DŠ8´,Ê$OQGR¡¨¹Dr©ãğŒêf©\+­šËòÔÄÓÃõ`
+Cœt¡!èíå´Ü£>æK±øL^e«$Os¦1í‚Õ9zDqšà Šâ›Š…{,;ºàîÜ›{.®}ÌÚ¿<S4‰fª\¯Ÿ»ñôfWîµ˜oòØ‰BOY[ª‘zÂäù®8 }î‰ŒrƒµöËèhVdÛ_­^0> PK    "°—\™šÀ”Ï  ‡     WarehousesPage.tsxÍ’ÏjÛ@ÆïzŠAÙgİ«Så^È¡‡B¥‡µ4J6YkÕıÓØCšbrê¡}…§‡B~“Õ5OÒ‘bÙ©íœÛEàİ™oæûÍ`ÆàáÇ·ÿêF9 a§†ü˜.R©3Wö–k<QÎ yMñ}k†UÁ?§ŞB
+¥-ÕÔ)dZ ÚgëPt8¬u)fÜI™Ë+TÙjÃ8 Z‹u:‡]^®Õo +¬Ä8ô³òKyéoıu9õ¿ıÂÏüu¸”4‹Ã§Š&‹yZ(‘Û8dç+ÿ&)•Ç¡¾2ùqg¥i$‰’JÇáG®[E.ÛM&(Sß-ß c8ÃQ¢œ0Ú«C’÷QRˆ€oËKØœƒT?8¡1íÕ©ª<!™¢¦BRÿªªz[µuÀßøŸåõ¾Š`²·E"UÂ«İ“Ïš¤jSNË‹Ú¾9Ï¹’×MyAFsxøô}	Q~õ÷T?D¸£çÌ/c5ív°$¼à‰°£hA…k°£«-ºA5%C{Ñív#xzv¸¦h-Š]K˜ùç•ñÒÕâĞÒ€SÜœ¨óWùŞ—”È¸4[gåø~R_Ø!ı´‚IğPK    "°—\<œ¥n­  ÿ     PriceLevelsPage.tsxÍQMoÓ@½ûWŒ,UN¤¦×s¯ÔCÜB{œ.İìšı(©¢*œ¸ğ8¤-	Uø'»W~IÇNÜ„€¸‚eÙ3ófö½yËüüøá¿zÆÀ ÕŞhÙËj>¦@j}ækËNŒ(ğÏQÚœ6ÿ\öîbRkãà¸•İ(…Êè	dlSÊ“§m_‰÷ÒAåUá„V°³g¯³Èç‚… 6'µ9€NbÆE¸7ñ2¾Ëpaß„OTúAé·tİÛy¼Õş®ÃP•µÊå)«Ù
+é`Qh•§NwµBKmòôœ›Ş`0Ö²ìwH%P–6Ÿ=]ç 38Ã‹!dŠO0Û‡íGòJ‚ZÍËp;_za°‚3	«%/ğ”ÑĞíò¹™®¶şô½ÎšÉùşoJaí•{^#9¡quâ[2å*\¯Îù¾Çôöú+5î¢ÆF¿ŸŒĞdñğAv¯üOüh#êæÂ»5·ˆ—DûzÇ€5·Ã©ã9¡öT¿:ROøHPqiñ—ñ³y°Çôë&óäPK    "°—\"Á†é  ÿ     TvasPage.tsxÍRMkÛ@½ëW#ì(>Ú©
+=zèÁôBYKcGÍZ«î®\c¨!)%§Ò_P¨‰[i©!ÿduÍ/éHèÃ}oÁÂ»ïÍÌ›y;_¿üW?Ëq@¢±ôP9ï”±¸q¤œş„©×„i5MC“+ó`î’K³2kè¿yfE—ŸæßÍ}rmn{p\oA—¾N·æüóŸŒ#!5¼ÊfL§ƒ¡c°œ
+²O,§YœCsÃ8ôt B(Li4anÙ§cBƒ ÏªÙ@š£[{ê\-§ó«ˆmC?A¨İš£Iµ€O„nMmq/æLYPàBºµ	“v[H°YVGzÖÇ)•K³N>Óãİí?+zÚ¥¹…Ç7`¾™M²Ü~Ø¢ä0@î+w~šßæp³Ø!£İÊAÎÈ	ÌÖee~'W%•yğ>$ú=Ğ2F""Î<<ÜGIIÔÌ4±—µFâv‘¸híÉJ¦Ë–ö6êÍ"`OXÏ"L{Ç”µÛH§kÔÔÛ|I(eKsiÖæÆİ$×v•Uª(äèéfÀüæİlÁ"JOõàtÆc
+éTJÉ'ó@†RgPÒÇ[49NäYUğÀ>*O™Ìî—´"’eæXŞ·¦baê\|xöÙ€1d\aUül‘œçô×<±Ö_PK    "°—\·9  )  
+           €    CHANGES.mdPK    "°—\ÄÈb«               €0  routes_index.tsxPK    "°—\&ó¤ü  |=             €	  DashboardLayout.tsxPK    "°—\Ww@  ü             €6  useSetupWizard.tsPK    "°—\£8Ò  o             €¥  useLookup.tsPK    "°—\‚Ñïh  I             €¡!  LookupPage.tsxPK    "°—\Dòé¯›  ê             €53  UnitsPage.tsxPK    "°—\EOÔ  •             €û4  CurrenciesPage.tsxPK    "°—\ì	Õ „  ‡             €ÿ6  BrandsPage.tsxPK    "°—\r$­s  Z             €¯8  FamiliesPage.tsxPK    "°—\™šÀ”Ï  ‡             €P:  WarehousesPage.tsxPK    "°—\<œ¥n­  ÿ             €O<  PriceLevelsPage.tsxPK    "°—\"Á†é  ÿ             €->  TvasPage.tsxPK        i@    ```
+
 ## FILE: resources/js/pages/inventory/InventoryPage.tsx
 ```
 // pages/inventory/InventoryPage.tsx
@@ -6459,6 +6524,662 @@ function NewInvoiceModal({ open, onClose, customers }: {
         </div>
       </div>
     </Modal>
+  );
+}
+```
+
+## FILE: resources/js/pages/lookups/BrandsPage.tsx
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/pages/lookups/BrandsPage.tsx
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import LookupPage from './LookupPage';
+
+export default function BrandsPage() {
+  return (
+    <LookupPage
+      title="Ø§Ù„Ø¹Ù„Ø§Ù…Ø§Øª Ø§Ù„ØªØ¬Ø§Ø±ÙŠØ©"
+      resource="Ø¹Ù„Ø§Ù…Ø©"
+      endpoint="/brands"
+      icon="ti-award"
+      color="var(--blue)"
+      fields={[
+        { key: 'name',        label: 'Ø§Ø³Ù… Ø§Ù„Ø¹Ù„Ø§Ù…Ø©', required: true, placeholder: 'Ù…Ø«Ø§Ù„: Ø³Ø§Ù…Ø³ÙˆÙ†Øº'  },
+        { key: 'description', label: 'Ø§Ù„ÙˆØµÙ',        type: 'textarea', showInTable: false,
+          placeholder: 'ÙˆØµÙ Ø§Ø®ØªÙŠØ§Ø±ÙŠ' },
+      ]}
+    />
+  );
+}
+```
+
+## FILE: resources/js/pages/lookups/CurrenciesPage.tsx
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/pages/lookups/CurrenciesPage.tsx
+// DB: id, name, code, symbol, decimal_places, is_base_currency, active
+// âŒ ÙƒØ§Ù†: is_default  âœ… Ø§Ù„ØµØ­ÙŠØ­: is_base_currency
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import LookupPage from './LookupPage';
+
+export default function CurrenciesPage() {
+  return (
+    <LookupPage
+      title="Ø§Ù„Ø¹Ù…Ù„Ø§Øª"
+      resource="Ø¹Ù…Ù„Ø©"
+      endpoint="/currencies"
+      icon="ti-currency-dollar"
+      color="var(--gold)"
+      fields={[
+        { key: 'name',             label: 'Ø§Ø³Ù… Ø§Ù„Ø¹Ù…Ù„Ø©',     required: true, placeholder: 'Ù…Ø«Ø§Ù„: Ø¯ÙŠÙ†Ø§Ø± Ø¬Ø²Ø§Ø¦Ø±ÙŠ' },
+        { key: 'code',             label: 'Ø§Ù„Ø±Ù…Ø² Ø§Ù„Ø¯ÙˆÙ„ÙŠ ISO', required: true, placeholder: 'Ù…Ø«Ø§Ù„: DZD'         },
+        { key: 'symbol',           label: 'Ø§Ù„Ø¥Ø´Ø§Ø±Ø©',                          placeholder: 'Ù…Ø«Ø§Ù„: Ø¯Ø¬'           },
+        { key: 'decimal_places',   label: 'Ø§Ù„Ù…Ù†Ø§Ø²Ù„ Ø§Ù„Ø¹Ø´Ø±ÙŠØ©', type: 'number',  placeholder: '2'                  },
+        { key: 'is_base_currency', label: 'Ø¹Ù…Ù„Ø© Ø£Ø³Ø§Ø³ÙŠØ©',    type: 'select',  badge: true,
+          options: [{ value: 1, label: 'Ù†Ø¹Ù…' }, { value: 0, label: 'Ù„Ø§' }] },
+        { key: 'active',           label: 'Ù†Ø´Ø·',            type: 'select',  badge: true, showInTable: false,
+          options: [{ value: 1, label: 'Ù†Ø¹Ù…' }, { value: 0, label: 'Ù„Ø§' }] },
+      ]}
+    />
+  );
+}```
+
+## FILE: resources/js/pages/lookups/FamiliesPage.tsx
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/pages/lookups/FamiliesPage.tsx
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import LookupPage from './LookupPage';
+
+export default function FamiliesPage() {
+  return (
+    <LookupPage
+      title="ÙØ¦Ø§Øª Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª"
+      resource="ÙØ¦Ø©"
+      endpoint="/families"
+      icon="ti-folder-open"
+      color="var(--purple)"
+      fields={[
+        { key: 'name',        label: 'Ø§Ø³Ù… Ø§Ù„ÙØ¦Ø©',   required: true,  placeholder: 'Ù…Ø«Ø§Ù„: Ø£ØºØ°ÙŠØ©' },
+        { key: 'description', label: 'Ø§Ù„ÙˆØµÙ',        type: 'textarea', showInTable: false        },
+      ]}
+    />
+  );
+}
+```
+
+## FILE: resources/js/pages/lookups/LookupPage.tsx
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/pages/lookups/LookupPage.tsx
+// Ù…ÙƒÙˆÙ‘Ù† Ø¹Ø§Ù… Ù„ØµÙØ­Ø§Øª CRUD Ø§Ù„Ø¨Ø³ÙŠØ·Ø©
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import React, { useState, useRef } from 'react';
+import { useLookup } from '@/hooks/useLookup';
+
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface FieldDef {
+  key:          string;
+  label:        string;
+  type?:        'text' | 'number' | 'select' | 'textarea';
+  placeholder?: string;
+  options?:     { value: string | number; label: string }[];
+  required?:    boolean;
+  /** Ø¹Ø±Ø¶ ÙÙŠ Ø§Ù„Ø¬Ø¯ÙˆÙ„ */
+  showInTable?: boolean;
+  /** ÙŠÙØ¹Ø±Ø¶ ÙÙŠ Ø§Ù„Ø¬Ø¯ÙˆÙ„ ÙƒÙ€ badge */
+  badge?:       boolean;
+  badgeColor?:  string;
+}
+
+export interface LookupPageProps {
+  /** Ø¹Ù†ÙˆØ§Ù† Ø§Ù„ØµÙØ­Ø© Ø§Ù„Ø¹Ø±Ø¨ÙŠ */
+  title:    string;
+  /** Ø§Ø³Ù… Ø§Ù„Ù…ÙˆØ±Ø¯ Ø¨Ø§Ù„Ø¹Ø±Ø¨ÙŠ (Ù„Ù„Ø±Ø³Ø§Ø¦Ù„) */
+  resource: string;
+  /** Ù…Ø³Ø§Ø± Ø§Ù„Ù€ API */
+  endpoint: string;
+  /** ØªØ¹Ø±ÙŠÙØ§Øª Ø§Ù„Ø­Ù‚ÙˆÙ„ */
+  fields:   FieldDef[];
+  /** Ù„ÙˆÙ† Ø§Ù„Ø£ÙŠÙ‚ÙˆÙ†Ø© */
+  color?:   string;
+  /** Ø£ÙŠÙ‚ÙˆÙ†Ø© Ø§Ù„ØµÙØ­Ø© */
+  icon?:    string;
+  /** Ù‡Ù„ ÙŠØ¯Ø¹Ù… Ø§Ù„ÙƒÙ„Ù…Ø© Ø§Ù„Ù…ÙØ±Ø¯Ø©ØŸ */
+  emptyText?: string;
+}
+
+// â”€â”€ Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function Modal({
+  title, children, onClose, saving,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  return (
+    <div
+      className="modal-back"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 500,
+        background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{ width: '100%', maxWidth: 480, maxHeight: '90vh', overflow: 'auto' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="card-hd">
+          <div className="card-title">{title}</div>
+          <button className="btn btn-xs" onClick={onClose} disabled={saving}>
+            <i className="ti ti-x" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// â”€â”€ Confirm delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function ConfirmModal({
+  name, onConfirm, onClose, saving,
+}: {
+  name: string; onConfirm: () => void; onClose: () => void; saving: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 600,
+        background: 'rgba(0,0,0,.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{ maxWidth: 380, width: '100%' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
+          <i className="ti ti-alert-triangle" style={{ fontSize: 40, color: 'var(--red)' }} />
+          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)', marginTop: 12 }}>
+            ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø­Ø°Ù
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--t3)', marginTop: 8 }}>
+            Ù‡Ù„ ØªØ±ÙŠØ¯ Ø­Ø°Ù <strong>{name}</strong>ØŸ<br />
+            <span style={{ fontSize: 11.5, color: 'var(--red)' }}>Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù† Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡.</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
+          <button className="btn" onClick={onClose} disabled={saving}>Ø¥Ù„ØºØ§Ø¡</button>
+          <button className="btn btn-r" onClick={onConfirm} disabled={saving}>
+            {saving ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} /> : <i className="ti ti-trash" />}
+            Ø­Ø°Ù
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// â”€â”€ Main LookupPage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export default function LookupPage({
+  title, resource, endpoint, fields, color = 'var(--em)', icon = 'ti-list', emptyText,
+}: LookupPageProps) {
+  const { items, loading, error, saving, refetch, create, update, remove } = useLookup<any>(endpoint);
+
+  const [search,   setSearch]   = useState('');
+  const [modal,    setModal]    = useState<'add' | 'edit' | null>(null);
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formErr,  setFormErr]  = useState<string | null>(null);
+  const [delItem,  setDelItem]  = useState<any | null>(null);
+  const [toast,    setToast]    = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  // â”€â”€ Filtered list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const tableFields = fields.filter(f => f.showInTable !== false);
+  const nameField   = fields[0]?.key ?? 'name';
+
+  const filtered = items.filter(item =>
+    !search || String(item[nameField] ?? '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  // â”€â”€ Toast helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  // â”€â”€ Open add modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  function openAdd() {
+    const defaults: Record<string, any> = {};
+    fields.forEach(f => { defaults[f.key] = ''; });
+    setFormData(defaults);
+    setFormErr(null);
+    setEditItem(null);
+    setModal('add');
+  }
+
+  // â”€â”€ Open edit modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  function openEdit(item: any) {
+    const data: Record<string, any> = {};
+    fields.forEach(f => { data[f.key] = item[f.key] ?? ''; });
+    setFormData(data);
+    setFormErr(null);
+    setEditItem(item);
+    setModal('edit');
+  }
+
+  // â”€â”€ Submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async function handleSubmit() {
+    // Validate required
+    for (const f of fields) {
+      if (f.required && !formData[f.key]) {
+        setFormErr(`Ø­Ù‚Ù„ "${f.label}" Ø¥Ù„Ø²Ø§Ù…ÙŠ`);
+        return;
+      }
+    }
+    setFormErr(null);
+    try {
+      if (modal === 'add') {
+        await create(formData);
+        showToast(`ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© ${resource} Ø¨Ù†Ø¬Ø§Ø­`);
+      } else if (editItem) {
+        await update(editItem.id, formData);
+        showToast(`ØªÙ… ØªØ¹Ø¯ÙŠÙ„ ${resource} Ø¨Ù†Ø¬Ø§Ø­`);
+      }
+      setModal(null);
+    } catch (e: any) {
+      setFormErr(e.message);
+    }
+  }
+
+  // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async function handleDelete() {
+    if (!delItem) return;
+    try {
+      await remove(delItem.id);
+      showToast(`ØªÙ… Ø­Ø°Ù ${resource} Ø¨Ù†Ø¬Ø§Ø­`);
+    } catch (e: any) {
+      showToast(e.message, 'error');
+    }
+    setDelItem(null);
+  }
+
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  return (
+    <div className="page on" style={{ padding: '18px 20px' }}>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9999, padding: '10px 20px', borderRadius: 'var(--r2)',
+          background: toast.type === 'success' ? 'var(--em)' : 'var(--red)',
+          color: '#fff', fontSize: 13, fontWeight: 700,
+          boxShadow: '0 4px 20px rgba(0,0,0,.25)',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <i className={`ti ${toast.type === 'success' ? 'ti-check' : 'ti-x'}`} />
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10,
+            background: `color-mix(in srgb, ${color} 12%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color, fontSize: 18,
+          }}>
+            <i className={`ti ${icon}`} />
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)' }}>{title}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--t4)' }}>
+              {loading ? 'Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù…ÙŠÙ„...' : `${items.length} Ø¹Ù†ØµØ±`}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Search */}
+          <div className="srch" style={{ width: 200 }}>
+            <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
+            <input
+              type="text"
+              placeholder="Ø¨Ø­Ø«..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <button className="btn" onClick={refetch} title="ØªØ­Ø¯ÙŠØ«">
+            <i className="ti ti-refresh" />
+          </button>
+          <button className="btn btn-p" onClick={openAdd}>
+            <i className="ti ti-plus" />
+            Ø¥Ø¶Ø§ÙØ© {resource}
+          </button>
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div style={{
+          padding: '12px 16px', marginBottom: 16, borderRadius: 'var(--r2)',
+          background: 'var(--redb)', border: '1px solid var(--redbo)',
+          color: 'var(--red)', fontSize: 13, display: 'flex', gap: 8, alignItems: 'center',
+        }}>
+          <i className="ti ti-alert-circle" />
+          {error}
+          <button
+            className="btn btn-xs btn-r"
+            style={{ marginRight: 'auto' }}
+            onClick={refetch}
+          >
+            Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©
+          </button>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 10, color: 'var(--t3)' }}>
+            <i className="ti ti-loader-2" style={{ fontSize: 22, animation: 'spin .8s linear infinite' }} />
+            Ø¬Ø§Ø±Ù ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 8, color: 'var(--t4)' }}>
+            <i className="ti ti-inbox" style={{ fontSize: 36 }} />
+            <div style={{ fontSize: 13, fontWeight: 600 }}>
+              {search ? 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬ Ù„Ù„Ø¨Ø­Ø«' : (emptyText ?? `Ù„Ø§ ØªÙˆØ¬Ø¯ ${title} Ø¨Ø¹Ø¯`)}
+            </div>
+            {!search && (
+              <button className="btn btn-p btn-sm" onClick={openAdd} style={{ marginTop: 4 }}>
+                Ø¥Ø¶Ø§ÙØ© Ø£ÙˆÙ„ {resource}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: 48 }}>#</th>
+                  {tableFields.map(f => (
+                    <th key={f.key}>{f.label}</th>
+                  ))}
+                  <th style={{ width: 100, textAlign: 'center' }}>Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item, idx) => (
+                  <tr key={item.id}>
+                    <td className="m" style={{ color: 'var(--t4)', fontSize: 11 }}>{idx + 1}</td>
+                    {tableFields.map(f => (
+                      <td key={f.key}>
+                        {f.badge ? (
+                          <span className={`bx be`} style={f.badgeColor ? { color: f.badgeColor } : {}}>
+                            {item[f.key] ?? 'â€”'}
+                          </span>
+                        ) : (
+                          <span style={idx === 0 && f.key === nameField ? { fontWeight: 700, color: 'var(--t1)' } : {}}>
+                            {item[f.key] ?? <span style={{ color: 'var(--t4)' }}>â€”</span>}
+                          </span>
+                        )}
+                      </td>
+                    ))}
+                    <td>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                        <button
+                          className="btn btn-xs"
+                          onClick={() => openEdit(item)}
+                          title="ØªØ¹Ø¯ÙŠÙ„"
+                        >
+                          <i className="ti ti-pencil" />
+                        </button>
+                        <button
+                          className="btn btn-xs btn-r"
+                          onClick={() => setDelItem(item)}
+                          title="Ø­Ø°Ù"
+                        >
+                          <i className="ti ti-trash" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Footer */}
+        {filtered.length > 0 && (
+          <div style={{
+            padding: '9px 16px', borderTop: '1px solid var(--b1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span style={{ fontSize: 12, color: 'var(--t4)' }}>
+              {search ? `${filtered.length} Ù†ØªÙŠØ¬Ø© Ù…Ù† ${items.length}` : `${items.length} Ø¹Ù†ØµØ±`}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Add / Edit Modal */}
+      {modal && (
+        <Modal
+          title={modal === 'add' ? `Ø¥Ø¶Ø§ÙØ© ${resource} Ø¬Ø¯ÙŠØ¯` : `ØªØ¹Ø¯ÙŠÙ„ ${resource}`}
+          onClose={() => setModal(null)}
+          saving={saving}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {fields.map(f => (
+              <div key={f.key}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)', display: 'block', marginBottom: 5 }}>
+                  {f.label}
+                  {f.required && <span style={{ color: 'var(--red)', marginRight: 3 }}>*</span>}
+                </label>
+                {f.type === 'textarea' ? (
+                  <textarea
+                    value={formData[f.key] ?? ''}
+                    onChange={e => setFormData(d => ({ ...d, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    rows={3}
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      padding: '8px 12px', borderRadius: 'var(--r2)',
+                      border: '1px solid var(--b3)', background: 'var(--bg1)',
+                      color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                      outline: 'none', resize: 'vertical',
+                    }}
+                  />
+                ) : f.type === 'select' ? (
+                  <select
+                    value={formData[f.key] ?? ''}
+                    onChange={e => setFormData(d => ({ ...d, [f.key]: e.target.value }))}
+                    style={{
+                      width: '100%', padding: '8px 12px', borderRadius: 'var(--r2)',
+                      border: '1px solid var(--b3)', background: 'var(--bg1)',
+                      color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="">â€” Ø§Ø®ØªØ± â€”</option>
+                    {f.options?.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={f.type ?? 'text'}
+                    value={formData[f.key] ?? ''}
+                    onChange={e => setFormData(d => ({ ...d, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      padding: '8px 12px', borderRadius: 'var(--r2)',
+                      border: '1px solid var(--b3)', background: 'var(--bg1)',
+                      color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                      outline: 'none',
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+
+            {formErr && (
+              <div style={{
+                padding: '8px 12px', borderRadius: 'var(--r2)',
+                background: 'var(--redb)', color: 'var(--red)',
+                fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <i className="ti ti-alert-circle" />
+                {formErr}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
+              <button className="btn" onClick={() => setModal(null)} disabled={saving}>Ø¥Ù„ØºØ§Ø¡</button>
+              <button className="btn btn-p" onClick={handleSubmit} disabled={saving}>
+                {saving
+                  ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+                  : <i className={`ti ${modal === 'add' ? 'ti-plus' : 'ti-check'}`} />
+                }
+                {modal === 'add' ? 'Ø¥Ø¶Ø§ÙØ©' : 'Ø­ÙØ¸ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„Ø§Øª'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete confirm */}
+      {delItem && (
+        <ConfirmModal
+          name={delItem[nameField] ?? `#${delItem.id}`}
+          onConfirm={handleDelete}
+          onClose={() => setDelItem(null)}
+          saving={saving}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/lookups/PriceLevelsPage.tsx
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/pages/lookups/PriceLevelsPage.tsx
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import LookupPage from './LookupPage';
+
+export default function PriceLevelsPage() {
+  return (
+    <LookupPage
+      title="Ù…Ø³ØªÙˆÙŠØ§Øª Ø§Ù„Ø£Ø³Ø¹Ø§Ø±"
+      resource="Ù…Ø³ØªÙˆÙ‰"
+      endpoint="/price-levels"
+      icon="ti-tag"
+      color="var(--gold)"
+      fields={[
+        { key: 'name',             label: 'Ø§Ù„Ø§Ø³Ù…',             required: true,  placeholder: 'Ù…Ø«Ø§Ù„: Ø§Ù„Ø¬Ù…Ù„Ø©'    },
+        { key: 'discount_percent', label: 'Ù†Ø³Ø¨Ø© Ø§Ù„Ø®ØµÙ… (%)',    type: 'number',  placeholder: 'Ù…Ø«Ø§Ù„: 10'         },
+        { key: 'description',      label: 'Ø§Ù„ÙˆØµÙ',             type: 'textarea', showInTable: false              },
+      ]}
+    />
+  );
+}
+```
+
+## FILE: resources/js/pages/lookups/TvasPage.tsx
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/pages/lookups/TvasPage.tsx
+// Ù…Ø¹Ø¯Ù„Ø§Øª TVA Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠØ©: 0%, 9%, 19%
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import LookupPage from './LookupPage';
+
+export default function TvasPage() {
+  return (
+    <LookupPage
+      title="Ù…Ø¹Ø¯Ù„Ø§Øª TVA"
+      resource="Ù…Ø¹Ø¯Ù„ TVA"
+      endpoint="/tvas"
+      icon="ti-calculator"
+      color="var(--orange)"
+      emptyText="Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ø¹Ø¯Ù„Ø§Øª TVA Ù…Ø¶Ø§ÙØ© â€” Ø£Ø¶Ù 0%, 9%, 19%"
+      fields={[
+        { key: 'name',       label: 'Ø§Ù„Ø§Ø³Ù…',          required: true,  placeholder: 'Ù…Ø«Ø§Ù„: TVA 19%'        },
+        { key: 'rate',       label: 'Ø§Ù„Ù…Ø¹Ø¯Ù„ (%)',      required: true,  type: 'number', placeholder: '19'  },
+        { key: 'is_default', label: 'Ø§ÙØªØ±Ø§Ø¶ÙŠ',
+          type: 'select',
+          badge: true,
+          options: [{ value: 1, label: 'Ù†Ø¹Ù…' }, { value: 0, label: 'Ù„Ø§' }],
+        },
+        { key: 'description', label: 'Ø§Ù„ÙˆØµÙ',   type: 'textarea', showInTable: false },
+      ]}
+    />
+  );
+}
+```
+
+## FILE: resources/js/pages/lookups/UnitsPage.tsx
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/pages/lookups/UnitsPage.tsx
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import LookupPage from './LookupPage';
+
+export default function UnitsPage() {
+  return (
+    <LookupPage
+      title="ÙˆØ­Ø¯Ø§Øª Ø§Ù„Ù‚ÙŠØ§Ø³"
+      resource="ÙˆØ­Ø¯Ø©"
+      endpoint="/units"
+      icon="ti-ruler"
+      color="var(--purple)"
+      fields={[
+        { key: 'name',         label: 'Ø§Ù„Ø§Ø³Ù…',         required: true,  placeholder: 'Ù…Ø«Ø§Ù„: ÙƒÙŠÙ„ÙˆØºØ±Ø§Ù…' },
+        { key: 'abbreviation', label: 'Ø§Ù„Ø§Ø®ØªØµØ§Ø±',      required: true,  placeholder: 'Ù…Ø«Ø§Ù„: ÙƒØº'        },
+        { key: 'description',  label: 'Ø§Ù„ÙˆØµÙ',         showInTable: false, type: 'textarea', placeholder: 'ÙˆØµÙ Ø§Ø®ØªÙŠØ§Ø±ÙŠ' },
+      ]}
+    />
+  );
+}```
+
+## FILE: resources/js/pages/lookups/WarehousesPage.tsx
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/pages/lookups/WarehousesPage.tsx
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import LookupPage from './LookupPage';
+
+export default function WarehousesPage() {
+  return (
+    <LookupPage
+      title="Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª"
+      resource="Ù…Ø³ØªÙˆØ¯Ø¹"
+      endpoint="/warehouses"
+      icon="ti-building-warehouse"
+      color="var(--teal)"
+      fields={[
+        { key: 'name',     label: 'Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹', required: true,  placeholder: 'Ù…Ø«Ø§Ù„: Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ' },
+        { key: 'location', label: 'Ø§Ù„Ù…ÙˆÙ‚Ø¹',         placeholder: 'Ù…Ø«Ø§Ù„: ÙˆØ±Ù‚Ù„Ø© â€” Ø§Ù„Ù…Ù†Ø·Ù‚Ø© Ø§Ù„ØµÙ†Ø§Ø¹ÙŠØ©'        },
+        { key: 'capacity', label: 'Ø§Ù„Ø³Ø¹Ø©',          type: 'number', placeholder: 'Ù…Ø«Ø§Ù„: 1000'             },
+        { key: 'description', label: 'Ø§Ù„ÙˆØµÙ',       type: 'textarea', showInTable: false                  },
+      ]}
+    />
   );
 }
 ```
@@ -7793,6 +8514,526 @@ function BackupPanel() {
 }
 ```
 
+## FILE: resources/js/pages/setup/SetupWizard.tsx
+```
+// pages/setup/SetupWizard.tsx
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Ù…Ø¹Ø§Ù„Ø¬ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯ Ø§Ù„Ø£ÙˆÙ„ÙŠ Ù„Ù„Ù…Ø¤Ø³Ø³Ø© â€” 4 Ø®Ø·ÙˆØ§Øª
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import React, { useState, useCallback } from 'react';
+import apiClient from '@/lib/api/client';
+
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+interface CompanyForm {
+  name: string; legal_form: string; sector: string;
+  address: string; wilaya_id: string; phone1: string;
+  phone2: string; email: string; website: string;
+}
+
+interface TaxForm {
+  nif: string; nis: string; ai: string;
+  rc: string; bank: string; rib: string;
+}
+
+interface FiscalForm {
+  name: string; start_date: string; end_date: string;
+}
+
+// â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const LEGAL_FORMS = ['SARL', 'EURL', 'SPA', 'SNC', 'Entreprise individuelle', 'Auto-entrepreneur'];
+const SECTORS = [
+  'ØªØ¬Ø§Ø±Ø© Ø§Ù„ØªØ¬Ø²Ø¦Ø©', 'ØªØ¬Ø§Ø±Ø© Ø§Ù„Ø¬Ù…Ù„Ø©', 'Ø§Ù„ØµÙ†Ø§Ø¹Ø© ÙˆØ§Ù„ØªØµÙ†ÙŠØ¹',
+  'Ø§Ù„Ø®Ø¯Ù…Ø§Øª', 'Ø§Ù„Ø¨Ù†Ø§Ø¡ ÙˆØ§Ù„Ø£Ø´ØºØ§Ù„', 'Ø§Ù„ÙÙ„Ø§Ø­Ø©', 'Ø§Ù„Ù†Ù‚Ù„', 'Ø§Ù„ØµØ­Ø© ÙˆØ§Ù„ØµÙŠØ¯Ù„Ø©',
+];
+const BANKS = [
+  'BNA', 'BEA', 'CPA', 'BADR', 'BDL', 'CNEP',
+  'AGB', 'ABC', 'SociÃ©tÃ© GÃ©nÃ©rale AlgÃ©rie', 'Al Salam Bank',
+];
+const WILAYAS = [
+  { id:1,name:'Ø£Ø¯Ø±Ø§Ø±' },{ id:2,name:'Ø§Ù„Ø´Ù„Ù' },{ id:3,name:'Ø§Ù„Ø£ØºÙˆØ§Ø·' },
+  { id:4,name:'Ø£Ù… Ø§Ù„Ø¨ÙˆØ§Ù‚ÙŠ' },{ id:5,name:'Ø¨Ø§ØªÙ†Ø©' },{ id:6,name:'Ø¨Ø¬Ø§ÙŠØ©' },
+  { id:7,name:'Ø¨Ø³ÙƒØ±Ø©' },{ id:8,name:'Ø¨Ø´Ø§Ø±' },{ id:9,name:'Ø§Ù„Ø¨Ù„ÙŠØ¯Ø©' },
+  { id:10,name:'Ø§Ù„Ø¨ÙˆÙŠØ±Ø©' },{ id:11,name:'ØªÙ…Ù†Ø±Ø§Ø³Øª' },{ id:12,name:'ØªØ¨Ø³Ø©' },
+  { id:13,name:'ØªÙ„Ù…Ø³Ø§Ù†' },{ id:14,name:'ØªÙŠØ§Ø±Øª' },{ id:15,name:'ØªÙŠØ²ÙŠ ÙˆØ²Ùˆ' },
+  { id:16,name:'Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±' },{ id:17,name:'Ø§Ù„Ø¬Ù„ÙØ©' },{ id:18,name:'Ø¬ÙŠØ¬Ù„' },
+  { id:19,name:'Ø³Ø·ÙŠÙ' },{ id:20,name:'Ø³Ø¹ÙŠØ¯Ø©' },{ id:21,name:'Ø³ÙƒÙŠÙƒØ¯Ø©' },
+  { id:22,name:'Ø³ÙŠØ¯ÙŠ Ø¨Ù„Ø¹Ø¨Ø§Ø³' },{ id:23,name:'Ø¹Ù†Ø§Ø¨Ø©' },{ id:24,name:'Ù‚Ø§Ù„Ù…Ø©' },
+  { id:25,name:'Ù‚Ø³Ù†Ø·ÙŠÙ†Ø©' },{ id:26,name:'Ø§Ù„Ù…Ø¯ÙŠØ©' },{ id:27,name:'Ù…Ø³ØªØºØ§Ù†Ù…' },
+  { id:28,name:'Ø§Ù„Ù…Ø³ÙŠÙ„Ø©' },{ id:29,name:'Ù…Ø¹Ø³ÙƒØ±' },{ id:30,name:'ÙˆØ±Ù‚Ù„Ø©' },
+  { id:31,name:'ÙˆÙ‡Ø±Ø§Ù†' },{ id:32,name:'Ø§Ù„Ø¨ÙŠØ¶' },{ id:33,name:'Ø¥Ù„ÙŠØ²ÙŠ' },
+  { id:34,name:'Ø¨Ø±Ø¬ Ø¨ÙˆØ¹Ø±ÙŠØ±ÙŠØ¬' },{ id:35,name:'Ø¨ÙˆÙ…Ø±Ø¯Ø§Ø³' },{ id:36,name:'Ø§Ù„Ø·Ø§Ø±Ù' },
+  { id:37,name:'ØªÙ†Ø¯ÙˆÙ' },{ id:38,name:'ØªÙŠØ³Ù…Ø³ÙŠÙ„Øª' },{ id:39,name:'Ø§Ù„ÙˆØ§Ø¯ÙŠ' },
+  { id:40,name:'Ø®Ù†Ø´Ù„Ø©' },{ id:41,name:'Ø³ÙˆÙ‚ Ø£Ù‡Ø±Ø§Ø³' },{ id:42,name:'ØªÙŠØ¨Ø§Ø²Ø©' },
+  { id:43,name:'Ù…ÙŠÙ„Ø©' },{ id:44,name:'Ø¹ÙŠÙ† Ø§Ù„Ø¯ÙÙ„Ù‰' },{ id:45,name:'Ø§Ù„Ù†Ø¹Ø§Ù…Ø©' },
+  { id:46,name:'Ø¹ÙŠÙ† ØªÙ…ÙˆØ´Ù†Øª' },{ id:47,name:'ØºØ±Ø¯Ø§ÙŠØ©' },{ id:48,name:'ØºÙ„ÙŠØ²Ø§Ù†' },
+  { id:49,name:'ØªÙŠÙ…ÙŠÙ…ÙˆÙ†' },{ id:50,name:'Ø¨Ø±Ø¬ Ø¨Ø§Ø¬ÙŠ Ù…Ø®ØªØ§Ø±' },{ id:51,name:'Ø£ÙˆÙ„Ø§Ø¯ Ø¬Ù„Ø§Ù„' },
+  { id:52,name:'Ø¨Ù†ÙŠ Ø¹Ø¨Ø§Ø³' },{ id:53,name:'Ø¹ÙŠÙ† ØµØ§Ù„Ø­' },{ id:54,name:'Ø¹ÙŠÙ† Ù‚Ø²Ø§Ù…' },
+  { id:55,name:'ØªÙˆÙ‚Ø±Øª' },{ id:56,name:'Ø¬Ø§Ù†Øª' },{ id:57,name:'Ø§Ù„Ù…ØºÙŠØ±' },{ id:58,name:'Ø§Ù„Ù…Ù†ÙŠØ¹Ø©' },
+];
+
+const currentYear = new Date().getFullYear();
+
+// â”€â”€ Step indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function StepBar({ step, total }: { step: number; total: number }) {
+  const labels = ['Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ù…Ø¤Ø³Ø³Ø©', 'Ø§Ù„Ù…Ø¹Ø±Ù‘ÙØ§Øª Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠØ©', 'Ø§Ù„Ø´Ø¹Ø§Ø±', 'Ø§Ù„Ø³Ù†Ø© Ø§Ù„Ù…Ø§Ù„ÙŠØ©'];
+  const icons  = ['ti-building', 'ti-id-badge', 'ti-photo', 'ti-calendar'];
+
+  return (
+    <div style={{ display:'flex', alignItems:'flex-start', gap:0, marginBottom:36, position:'relative' }}>
+      {/* connector bg */}
+      <div style={{ position:'absolute', top:20, left:'10%', right:'10%', height:2, background:'var(--b2)', zIndex:0 }} />
+      {/* connector fill */}
+      <div style={{ position:'absolute', top:20, left:'10%', height:2, zIndex:1, width:`${((step-1)/(total-1))*80}%`, background:'var(--em)', transition:'width .5s ease' }} />
+
+      {Array.from({ length: total }, (_, i) => {
+        const done   = i + 1 < step;
+        const active = i + 1 === step;
+        return (
+          <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:8, position:'relative', zIndex:2 }}>
+            <div style={{
+              width:40, height:40, borderRadius:'50%',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:16, transition:'all .3s',
+              background: done || active ? 'var(--em)' : 'var(--bg2)',
+              border: `2px solid ${done || active ? 'var(--em)' : 'var(--b3)'}`,
+              color: done || active ? '#fff' : 'var(--t4)',
+              boxShadow: active ? 'var(--emglow)' : 'none',
+            }}>
+              {done
+                ? <i className="ti ti-check" style={{ fontSize:16 }} />
+                : <i className={`ti ${icons[i]}`} style={{ fontSize:16 }} />
+              }
+            </div>
+            <span style={{ fontSize:11, fontWeight: active ? 700 : 400, whiteSpace:'nowrap', color: active ? 'var(--em)' : done ? 'var(--t2)' : 'var(--t4)' }}>
+              {labels[i]}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// â”€â”€ Field helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function Field({ label, required, hint, children, span = 1 }: {
+  label: string; required?: boolean; hint?: string;
+  children: React.ReactNode; span?: number;
+}) {
+  return (
+    <div className="fg" style={{ gridColumn: `span ${span}` }}>
+      <label style={{ display:'flex', gap:4, alignItems:'center', marginBottom:6, fontSize:12, fontWeight:600, color:'var(--t2)' }}>
+        {label}
+        {required && <span style={{ color:'var(--red)', fontSize:14 }}>*</span>}
+      </label>
+      {children}
+      {hint && <span style={{ fontSize:10, color:'var(--t4)', marginTop:3, display:'block' }}>{hint}</span>}
+    </div>
+  );
+}
+
+// â”€â”€ Nav buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function NavBtns({ step, total, onPrev, onNext, onFinish, loading, canNext }: {
+  step:number; total:number; onPrev:()=>void; onNext:()=>void; onFinish:()=>void;
+  loading?:boolean; canNext?:boolean;
+}) {
+  return (
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:28, paddingTop:20, borderTop:'1px solid var(--b2)' }}>
+      <button className="btn" onClick={onPrev} disabled={step===1} style={{ opacity:step===1 ? 0.3 : 1 }}>
+        <i className="ti ti-arrow-right" /> Ø§Ù„Ø³Ø§Ø¨Ù‚
+      </button>
+      <span style={{ fontSize:12, color:'var(--t4)' }}>{step} / {total}</span>
+      {step < total ? (
+        <button className="btn btn-p" onClick={onNext} disabled={canNext === false}>
+          Ø§Ù„ØªØ§Ù„ÙŠ <i className="ti ti-arrow-left" />
+        </button>
+      ) : (
+        <button className="btn btn-p" onClick={onFinish} disabled={loading} style={{ minWidth:140 }}>
+          {loading
+            ? <><i className="ti ti-loader" style={{ animation:'spin 1s linear infinite' }} /> Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø­ÙØ¸...</>
+            : <><i className="ti ti-check" /> Ø¥Ù†Ù‡Ø§Ø¡ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯</>
+          }
+        </button>
+      )}
+    </div>
+  );
+}
+
+// â•â•â•â• STEP 1 â€” Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ù…Ø¤Ø³Ø³Ø© â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function Step1({ form, onChange }: { form: CompanyForm; onChange: (k: keyof CompanyForm, v: string) => void }) {
+  return (
+    <div>
+      <div style={{ marginBottom:24 }}>
+        <h3 style={{ fontSize:18, fontWeight:700, color:'var(--t1)', marginBottom:4 }}>Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ù…Ø¤Ø³Ø³Ø©</h3>
+        <p style={{ fontSize:13, color:'var(--t3)' }}>Ø£Ø¯Ø®Ù„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø±Ø³Ù…ÙŠØ© Ù„Ù„Ù…Ø¤Ø³Ø³Ø© ÙƒÙ…Ø§ Ù‡ÙŠ Ù…Ø³Ø¬Ù„Ø© Ù‚Ø§Ù†ÙˆÙ†ÙŠØ§Ù‹</p>
+      </div>
+      <div className="fgrid c3" style={{ gap:14 }}>
+        <Field label="Ø§Ø³Ù… Ø§Ù„Ù…Ø¤Ø³Ø³Ø© / Ø§Ù„Ø´Ø±ÙƒØ©" required span={3}>
+          <input value={form.name} onChange={e => onChange('name', e.target.value)} placeholder="Ù…Ø«Ø§Ù„: Ù…Ø¤Ø³Ø³Ø© Ø§Ù„Ù†ÙˆØ± Ù„Ù„ØªØ¬Ø§Ø±Ø© Ø§Ù„Ø¹Ø§Ù…Ø©" autoFocus />
+        </Field>
+        <Field label="Ø§Ù„Ø´ÙƒÙ„ Ø§Ù„Ù‚Ø§Ù†ÙˆÙ†ÙŠ" required>
+          <select value={form.legal_form} onChange={e => onChange('legal_form', e.target.value)}>
+            <option value="">â€” Ø§Ø®ØªØ± â€”</option>
+            {LEGAL_FORMS.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </Field>
+        <Field label="Ù‚Ø·Ø§Ø¹ Ø§Ù„Ù†Ø´Ø§Ø·" required span={2}>
+          <select value={form.sector} onChange={e => onChange('sector', e.target.value)}>
+            <option value="">â€” Ø§Ø®ØªØ± â€”</option>
+            {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="Ø§Ù„Ø¹Ù†ÙˆØ§Ù† Ø§Ù„ÙƒØ§Ù…Ù„" required span={2}>
+          <input value={form.address} onChange={e => onChange('address', e.target.value)} placeholder="Ø§Ù„Ø­ÙŠØŒ Ø§Ù„Ø´Ø§Ø±Ø¹ØŒ Ø§Ù„Ø±Ù…Ø² Ø§Ù„Ø¨Ø±ÙŠØ¯ÙŠ" />
+        </Field>
+        <Field label="Ø§Ù„ÙˆÙ„Ø§ÙŠØ©" required>
+          <select value={form.wilaya_id} onChange={e => onChange('wilaya_id', e.target.value)}>
+            <option value="">â€” Ø§Ø®ØªØ± Ø§Ù„ÙˆÙ„Ø§ÙŠØ© â€”</option>
+            {WILAYAS.map(w => (
+              <option key={w.id} value={String(w.id)}>
+                {String(w.id).padStart(2,'0')} â€” {w.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Ø§Ù„Ù‡Ø§ØªÙ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ" required>
+          <input value={form.phone1} onChange={e => onChange('phone1', e.target.value)} placeholder="029 XX XX XX" dir="ltr" />
+        </Field>
+        <Field label="Ø§Ù„Ù‡Ø§ØªÙ Ø§Ù„Ø«Ø§Ù†ÙŠ" hint="Ø§Ø®ØªÙŠØ§Ø±ÙŠ">
+          <input value={form.phone2} onChange={e => onChange('phone2', e.target.value)} placeholder="055 XX XX XX" dir="ltr" />
+        </Field>
+        <Field label="Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ">
+          <input type="email" value={form.email} onChange={e => onChange('email', e.target.value)} placeholder="info@company.dz" dir="ltr" />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+// â•â•â•â• STEP 2 â€” Ø§Ù„Ù…Ø¹Ø±Ù‘ÙØ§Øª Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠØ© â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function Step2({ form, onChange }: { form: TaxForm; onChange: (k: keyof TaxForm, v: string) => void }) {
+  return (
+    <div>
+      <div style={{ marginBottom:24 }}>
+        <h3 style={{ fontSize:18, fontWeight:700, color:'var(--t1)', marginBottom:4 }}>Ø§Ù„Ù…Ø¹Ø±Ù‘ÙØ§Øª Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠØ© ÙˆØ§Ù„ØªØ¬Ø§Ø±ÙŠØ©</h3>
+        <p style={{ fontSize:13, color:'var(--t3)' }}>Ù‡Ø°Ù‡ Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø¥Ù„Ø²Ø§Ù…ÙŠØ© ÙˆØªØ¸Ù‡Ø± Ø¹Ù„Ù‰ Ø¬Ù…ÙŠØ¹ Ø§Ù„ÙˆØ«Ø§Ø¦Ù‚ Ø§Ù„ØªØ¬Ø§Ø±ÙŠØ©</p>
+      </div>
+      <div style={{ display:'flex', gap:10, alignItems:'flex-start', background:'var(--blueb)', border:'1px solid var(--bluebo)', borderRadius:'var(--r2)', padding:'10px 14px', marginBottom:20 }}>
+        <i className="ti ti-info-circle" style={{ color:'var(--blue)', fontSize:16, marginTop:1 }} />
+        <span style={{ fontSize:12, color:'var(--t2)', lineHeight:1.6 }}>
+          ØªØ£ÙƒØ¯ Ù…Ù† ØµØ­Ø© Ù‡Ø°Ù‡ Ø§Ù„Ø£Ø±Ù‚Ø§Ù… â€” ØªÙØ³ØªØ®Ø¯Ù… ÙÙŠ Ø§Ù„ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ø±Ø³Ù…ÙŠØ© ÙˆØªÙ‚Ø§Ø±ÙŠØ± TVA
+        </span>
+      </div>
+      <div className="fgrid c3" style={{ gap:14 }}>
+        <Field label="NIF â€” Ø±Ù‚Ù… Ø§Ù„ØªØ¹Ø±ÙŠÙ Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ" hint="15 Ø®Ø§Ù†Ø© Ø±Ù‚Ù…ÙŠØ©" required>
+          <input value={form.nif} onChange={e => onChange('nif', e.target.value)} maxLength={15} placeholder="001234567890123" style={{ fontFamily:'monospace', letterSpacing:1 }} dir="ltr" />
+        </Field>
+        <Field label="NIS â€” Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ø¥Ø­ØµØ§Ø¦ÙŠ" hint="Ù…Ø±ÙƒØ² Ø§Ù„Ø¥Ø­ØµØ§Ø¡ Ø§Ù„ÙˆØ·Ù†ÙŠ" required>
+          <input value={form.nis} onChange={e => onChange('nis', e.target.value)} maxLength={15} placeholder="245103002000012" style={{ fontFamily:'monospace', letterSpacing:1 }} dir="ltr" />
+        </Field>
+        <Field label="AI â€” Ø±Ù‚Ù… Ø§Ù„Ù…Ø§Ø¯Ø© Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠØ©" hint="Ù…Ø¯ÙŠØ±ÙŠØ© Ø§Ù„Ø¶Ø±Ø§Ø¦Ø¨">
+          <input value={form.ai} onChange={e => onChange('ai', e.target.value)} placeholder="29202400012" style={{ fontFamily:'monospace', letterSpacing:1 }} dir="ltr" />
+        </Field>
+        <Field label="RC â€” Ø§Ù„Ø³Ø¬Ù„ Ø§Ù„ØªØ¬Ø§Ø±ÙŠ" hint="Ø§Ù„Ù…Ø±ÙƒØ² Ø§Ù„ÙˆØ·Ù†ÙŠ CNRC" required span={2}>
+          <input value={form.rc} onChange={e => onChange('rc', e.target.value)} placeholder="29/00-0012345B05" style={{ fontFamily:'monospace', letterSpacing:1 }} dir="ltr" />
+        </Field>
+        <div style={{ gridColumn:'span 3', borderTop:'1px dashed var(--b2)', paddingTop:16, marginTop:4 }} />
+        <Field label="Ø§Ù„Ø¨Ù†Ùƒ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ" hint="Ø§Ø®ØªÙŠØ§Ø±ÙŠ">
+          <select value={form.bank} onChange={e => onChange('bank', e.target.value)}>
+            <option value="">â€” Ø§Ø®ØªØ± Ø§Ù„Ø¨Ù†Ùƒ â€”</option>
+            {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+        </Field>
+        <Field label="Ø±Ù‚Ù… Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ø¨Ù†ÙƒÙŠ RIB / IBAN" hint="Ø§Ø®ØªÙŠØ§Ø±ÙŠ" span={2}>
+          <input value={form.rib} onChange={e => onChange('rib', e.target.value)} placeholder="00799999000XXXXXXXX00" style={{ fontFamily:'monospace', letterSpacing:1 }} dir="ltr" />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+// â•â•â•â• STEP 3 â€” Ø§Ù„Ø´Ø¹Ø§Ø± â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function Step3({ logo, onLogo, companyName }: { logo: File | null; onLogo: (f: File | null) => void; companyName: string }) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    onLogo(file);
+    setPreview(URL.createObjectURL(file));
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom:24 }}>
+        <h3 style={{ fontSize:18, fontWeight:700, color:'var(--t1)', marginBottom:4 }}>Ø§Ù„Ø´Ø¹Ø§Ø± ÙˆØ§Ù„Ù‡ÙˆÙŠØ© Ø§Ù„Ø¨ØµØ±ÙŠØ©</h3>
+        <p style={{ fontSize:13, color:'var(--t3)' }}>ÙŠØ¸Ù‡Ø± Ø¹Ù„Ù‰ Ø§Ù„ÙÙˆØ§ØªÙŠØ± ÙˆØ§Ù„ÙˆØ«Ø§Ø¦Ù‚ â€” ÙŠÙ…ÙƒÙ† ØªØ¹Ø¯ÙŠÙ„Ù‡ Ù„Ø§Ø­Ù‚Ø§Ù‹ Ù…Ù† Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª</p>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
+        <div>
+          <div
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+            onClick={() => document.getElementById('logo-upload-wiz')?.click()}
+            style={{
+              border: `2px dashed ${dragging || preview ? 'var(--em)' : 'var(--b3)'}`,
+              borderRadius:'var(--r3)', padding:32, textAlign:'center', cursor:'pointer',
+              background: dragging ? 'var(--emb)' : 'var(--bg3)', transition:'all .2s',
+              minHeight:180, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10,
+            }}
+          >
+            {preview ? (
+              <>
+                <img src={preview} alt="logo" style={{ maxHeight:100, maxWidth:'100%', objectFit:'contain', borderRadius:8 }} />
+                <span style={{ fontSize:12, color:'var(--em)' }}><i className="ti ti-check" /> ØªÙ… Ø±ÙØ¹ Ø§Ù„Ø´Ø¹Ø§Ø±</span>
+              </>
+            ) : (
+              <>
+                <div style={{ width:56, height:56, borderRadius:'50%', background:'var(--emb)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <i className="ti ti-photo" style={{ fontSize:24, color:'var(--em)' }} />
+                </div>
+                <div style={{ fontSize:13, fontWeight:600, color:'var(--t2)' }}>Ø§Ø³Ø­Ø¨ Ø§Ù„Ø´Ø¹Ø§Ø± Ù‡Ù†Ø§ Ø£Ùˆ Ø§Ø¶ØºØ· Ù„Ù„Ø§Ø®ØªÙŠØ§Ø±</div>
+                <div style={{ fontSize:11, color:'var(--t4)' }}>PNG, SVG, JPG â€” 400Ã—400 Ø¨ÙƒØ³Ù„</div>
+              </>
+            )}
+          </div>
+          <input id="logo-upload-wiz" type="file" accept="image/*" style={{ display:'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+          {preview && (
+            <button className="btn" style={{ marginTop:8, width:'100%', color:'var(--red)' }} onClick={() => { onLogo(null); setPreview(null); }}>
+              <i className="ti ti-trash" /> Ø¥Ø²Ø§Ù„Ø© Ø§Ù„Ø´Ø¹Ø§Ø±
+            </button>
+          )}
+          <p style={{ fontSize:11, color:'var(--t4)', textAlign:'center', marginTop:10 }}>ÙŠÙ…ÙƒÙ†Ùƒ ØªØ®Ø·ÙŠ Ù‡Ø°Ù‡ Ø§Ù„Ø®Ø·ÙˆØ© ÙˆØ¥Ø¶Ø§ÙØ© Ø§Ù„Ø´Ø¹Ø§Ø± Ù„Ø§Ø­Ù‚Ø§Ù‹</p>
+        </div>
+        {/* Preview */}
+        <div>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--t3)', marginBottom:10, textTransform:'uppercase', letterSpacing:1 }}>Ù…Ø¹Ø§ÙŠÙ†Ø© Ø±Ø£Ø³ Ø§Ù„ÙØ§ØªÙˆØ±Ø©</div>
+          <div style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:10, padding:20, fontFamily:'serif', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ display:'flex', gap:14, alignItems:'center', borderBottom:'2px solid #0a9268', paddingBottom:14, marginBottom:12 }}>
+              {preview && <img src={preview} alt="" style={{ height:48, width:48, objectFit:'contain', borderRadius:6 }} />}
+              <div>
+                <div style={{ fontWeight:900, fontSize:15, color:'#0a8a5c' }}>{companyName || 'Ø§Ø³Ù… Ø§Ù„Ù…Ø¤Ø³Ø³Ø©'}</div>
+                <div style={{ fontSize:10, color:'#64748b', marginTop:2 }}>Entreprise AlgÃ©rienne</div>
+              </div>
+            </div>
+            <div style={{ fontSize:10, color:'#64748b', lineHeight:1.8, fontFamily:'monospace' }}>
+              <div>NIF: 001234567890123</div>
+              <div>RC: 29/00-0012345B05</div>
+            </div>
+            <div style={{ marginTop:14, borderTop:'1px dashed #e2e8f0', paddingTop:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, fontWeight:700 }}>
+                <span>ÙØ§ØªÙˆØ±Ø© Ø¨ÙŠØ¹</span>
+                <span style={{ fontFamily:'monospace', color:'#0a9268' }}>FAC-{currentYear}-000001</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// â•â•â•â• STEP 4 â€” Ø§Ù„Ø³Ù†Ø© Ø§Ù„Ù…Ø§Ù„ÙŠØ© â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function Step4({ form, onChange }: { form: FiscalForm; onChange: (k: keyof FiscalForm, v: string) => void }) {
+  const duration = form.start_date && form.end_date ? (() => {
+    const months = Math.round((new Date(form.end_date).getTime() - new Date(form.start_date).getTime()) / (1000*60*60*24*30));
+    return `${months} Ø´Ù‡Ø±Ø§Ù‹ ØªÙ‚Ø±ÙŠØ¨Ø§Ù‹`;
+  })() : 'â€”';
+
+  return (
+    <div>
+      <div style={{ marginBottom:24 }}>
+        <h3 style={{ fontSize:18, fontWeight:700, color:'var(--t1)', marginBottom:4 }}>Ø§Ù„Ø³Ù†Ø© Ø§Ù„Ù…Ø§Ù„ÙŠØ© Ø§Ù„Ø£ÙˆÙ„Ù‰</h3>
+        <p style={{ fontSize:13, color:'var(--t3)' }}>ØªÙØ¹ÙŠÙÙ‘Ù† ÙƒØ³Ù†Ø© Ù…Ø§Ù„ÙŠØ© Ù†Ø´Ø·Ø© ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ â€” Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø­Ø°Ù Ø§Ù„Ø£ÙˆÙ„Ù‰</p>
+      </div>
+      <div style={{ background:'var(--goldb)', border:'1px solid var(--goldbo)', borderRadius:'var(--r2)', padding:'12px 16px', marginBottom:24, display:'flex', gap:12, alignItems:'flex-start' }}>
+        <i className="ti ti-calendar-event" style={{ color:'var(--gold)', fontSize:18, marginTop:1 }} />
+        <div style={{ fontSize:12, color:'var(--t2)', lineHeight:1.7 }}>
+          <strong>Ù…Ø¹Ù„ÙˆÙ…Ø©:</strong> Ø§Ù„Ø³Ù†Ø© Ø§Ù„Ù…Ø§Ù„ÙŠØ© ÙÙŠ Ø§Ù„Ø¬Ø²Ø§Ø¦Ø± ØªØ¨Ø¯Ø£ Ø¹Ø§Ø¯Ø©Ù‹ ÙÙŠ <strong>01 ÙŠÙ†Ø§ÙŠØ±</strong> ÙˆØªÙ†ØªÙ‡ÙŠ ÙÙŠ <strong>31 Ø¯ÙŠØ³Ù…Ø¨Ø±</strong>.
+        </div>
+      </div>
+      <div className="fgrid c3" style={{ gap:14 }}>
+        <Field label="Ø§Ø³Ù… Ø§Ù„Ø³Ù†Ø© Ø§Ù„Ù…Ø§Ù„ÙŠØ©" required span={3}>
+          <input value={form.name} onChange={e => onChange('name', e.target.value)} placeholder={`Ø§Ù„Ø³Ù†Ø© Ø§Ù„Ù…Ø§Ù„ÙŠØ© ${currentYear}`} style={{ maxWidth:320 }} />
+        </Field>
+        <Field label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨Ø¯Ø§ÙŠØ©" required>
+          <input type="date" value={form.start_date} onChange={e => onChange('start_date', e.target.value)} />
+        </Field>
+        <Field label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ù†Ù‡Ø§ÙŠØ©" required>
+          <input type="date" value={form.end_date} onChange={e => onChange('end_date', e.target.value)} min={form.start_date} />
+        </Field>
+        <Field label="Ø§Ù„Ù…Ø¯Ø©">
+          <div style={{ padding:'9px 12px', background:'var(--bg3)', border:'1px solid var(--b2)', borderRadius:'var(--r1)', fontSize:13, color:'var(--t3)' }}>
+            {duration}
+          </div>
+        </Field>
+      </div>
+      {form.name && form.start_date && form.end_date && (
+        <div style={{ marginTop:24, padding:'14px 18px', background:'var(--emb)', border:'1px solid var(--embo)', borderRadius:'var(--r2)', display:'flex', alignItems:'center', gap:12 }}>
+          <i className="ti ti-circle-check" style={{ color:'var(--em)', fontSize:20 }} />
+          <div style={{ fontSize:13, color:'var(--t1)' }}>
+            Ø³ÙŠØªÙ… Ø¥Ù†Ø´Ø§Ø¡ <strong>"{form.name}"</strong> Ù…Ù†{' '}
+            <strong>{new Date(form.start_date).toLocaleDateString('ar-DZ')}</strong> Ø¥Ù„Ù‰{' '}
+            <strong>{new Date(form.end_date).toLocaleDateString('ar-DZ')}</strong>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// MAIN WIZARD
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+export default function SetupWizard({ onComplete }: { onComplete: () => void }) {
+  const [step,   setStep]   = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState('');
+
+  const [company, setCompany] = useState<CompanyForm>({
+    name:'', legal_form:'EURL', sector:'', address:'',
+    wilaya_id:'', phone1:'', phone2:'', email:'', website:'',
+  });
+  const [tax, setTax] = useState<TaxForm>({ nif:'', nis:'', ai:'', rc:'', bank:'', rib:'' });
+  const [logo, setLogo] = useState<File | null>(null);
+  const [fiscal, setFiscal] = useState<FiscalForm>({
+    name: `Ø§Ù„Ø³Ù†Ø© Ø§Ù„Ù…Ø§Ù„ÙŠØ© ${currentYear}`,
+    start_date: `${currentYear}-01-01`,
+    end_date:   `${currentYear}-12-31`,
+  });
+
+  const setC = useCallback((k: keyof CompanyForm, v: string) => setCompany(f => ({ ...f, [k]: v })), []);
+  const setT = useCallback((k: keyof TaxForm, v: string)     => setTax(f => ({ ...f, [k]: v })),     []);
+  const setF = useCallback((k: keyof FiscalForm, v: string)  => setFiscal(f => ({ ...f, [k]: v })),  []);
+
+  const canNext = (() => {
+    if (step === 1) return !!(company.name && company.legal_form && company.sector && company.address && company.wilaya_id && company.phone1);
+    if (step === 2) return !!(tax.nif && tax.nis && tax.rc);
+    if (step === 3) return true; // Ø´Ø¹Ø§Ø± Ø§Ø®ØªÙŠØ§Ø±ÙŠ
+    if (step === 4) return !!(fiscal.name && fiscal.start_date && fiscal.end_date);
+    return true;
+  })();
+
+  const handleFinish = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      // 1. Ø­ÙØ¸ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ©
+      const settings = [
+        { key:'company.name',       group:'company', value:company.name },
+        { key:'company.legal_form', group:'company', value:company.legal_form },
+        { key:'company.sector',     group:'company', value:company.sector },
+        { key:'company.address',    group:'company', value:company.address },
+        { key:'company.wilaya_id',  group:'company', value:company.wilaya_id },
+        { key:'company.phone1',     group:'company', value:company.phone1 },
+        { key:'company.phone2',     group:'company', value:company.phone2 },
+        { key:'company.email',      group:'company', value:company.email },
+        { key:'company.website',    group:'company', value:company.website },
+        { key:'company.nif',        group:'company', value:tax.nif },
+        { key:'company.nis',        group:'company', value:tax.nis },
+        { key:'company.ai',         group:'company', value:tax.ai },
+        { key:'company.rc',         group:'company', value:tax.rc },
+        { key:'company.bank',       group:'company', value:tax.bank },
+        { key:'company.rib',        group:'company', value:tax.rib },
+      ];
+
+      // Ù†Ø­ÙØ¸ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø¨Ø´ÙƒÙ„ ØªØ³Ù„Ø³Ù„ÙŠ Ù„ØªØ¬Ù†Ø¨ race conditions
+      for (const s of settings.filter(x => x.value)) {
+        await apiClient.post('/settings', s);
+      }
+
+      // 2. Ø±ÙØ¹ Ø§Ù„Ø´Ø¹Ø§Ø± (Ø§Ø®ØªÙŠØ§Ø±ÙŠ â€” Ù„Ø§ ÙŠÙˆÙ‚Ù Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯)
+      if (logo) {
+        try {
+          const fd = new FormData();
+          fd.append('file', logo);
+          fd.append('type', 'company_logo');
+          await apiClient.post('/attachments', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        } catch { /* ØªØ¬Ø§Ù‡Ù„ Ø®Ø·Ø£ Ø§Ù„Ø´Ø¹Ø§Ø± */ }
+      }
+
+      // 3. Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø³Ù†Ø© Ø§Ù„Ù…Ø§Ù„ÙŠØ©
+      await apiClient.post('/fiscal-years', {
+        name:       fiscal.name,
+        start_date: fiscal.start_date,
+        end_date:   fiscal.end_date,
+      });
+
+      // 4. Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡
+      onComplete();
+
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string; errors?: Record<string,string[]> } } })?.response?.data;
+      if (msg?.errors) {
+        const firstError = Object.values(msg.errors)[0]?.[0];
+        setError(firstError || 'Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ø­ÙØ¸');
+      } else {
+        setError(msg?.message || 'Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ø­ÙØ¸. ØªØ­Ù‚Ù‚ Ù…Ù† Ø§Ù„Ø§ØªØµØ§Ù„ ÙˆØ£Ø¹Ø¯ Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight:'100vh', background:'var(--bg0)', display:'flex', alignItems:'center', justifyContent:'center', padding:'20px 16px' }}>
+      <div style={{ width:'100%', maxWidth:780 }}>
+
+        {/* Header */}
+        <div style={{ textAlign:'center', marginBottom:40 }}>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:10, background:'var(--emb)', border:'1px solid var(--embo)', borderRadius:'var(--r4)', padding:'6px 18px', marginBottom:16 }}>
+            <i className="ti ti-settings-2" style={{ color:'var(--em)', fontSize:16 }} />
+            <span style={{ fontSize:12, fontWeight:700, color:'var(--em)', letterSpacing:0.5 }}>Ø¥Ø¹Ø¯Ø§Ø¯ Ø§Ù„Ù†Ø¸Ø§Ù…</span>
+          </div>
+          <h1 style={{ fontSize:26, fontWeight:800, color:'var(--t1)', marginBottom:8 }}>
+            Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨Ùƒ ÙÙŠ Ù†Ø¸Ø§Ù… Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª
+          </h1>
+          <p style={{ fontSize:14, color:'var(--t3)', maxWidth:460, margin:'0 auto' }}>
+            Ø³Ù†Ù‚ÙˆÙ… Ù…Ø¹Ø§Ù‹ Ø¨Ø¥Ø¹Ø¯Ø§Ø¯ Ø§Ù„Ù†Ø¸Ø§Ù… ÙÙŠ Ø¯Ù‚Ø§Ø¦Ù‚ Ù‚Ù„ÙŠÙ„Ø© â€” ÙŠÙ…ÙƒÙ†Ùƒ ØªØ¹Ø¯ÙŠÙ„ Ø£ÙŠ Ù…Ø¹Ù„ÙˆÙ…Ø© Ù„Ø§Ø­Ù‚Ø§Ù‹
+          </p>
+        </div>
+
+        {/* Card */}
+        <div style={{ background:'var(--bg2)', borderRadius:'var(--r4)', border:'1px solid var(--b2)', padding:'32px 36px', boxShadow:'var(--shadow2)' }}>
+          <StepBar step={step} total={4} />
+
+          <div style={{ minHeight:360 }}>
+            {step === 1 && <Step1 form={company} onChange={setC} />}
+            {step === 2 && <Step2 form={tax}     onChange={setT} />}
+            {step === 3 && <Step3 logo={logo} onLogo={setLogo} companyName={company.name} />}
+            {step === 4 && <Step4 form={fiscal}  onChange={setF} />}
+          </div>
+
+          {error && (
+            <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:16, padding:'10px 14px', background:'var(--redb)', border:'1px solid var(--redbo)', borderRadius:'var(--r2)' }}>
+              <i className="ti ti-alert-circle" style={{ color:'var(--red)', fontSize:16 }} />
+              <span style={{ fontSize:13, color:'var(--red)' }}>{error}</span>
+            </div>
+          )}
+
+          <NavBtns
+            step={step} total={4}
+            onPrev={() => setStep(s => Math.max(1, s-1))}
+            onNext={() => { if (canNext) setStep(s => Math.min(4, s+1)); }}
+            onFinish={handleFinish}
+            loading={saving}
+            canNext={canNext}
+          />
+        </div>
+
+        <p style={{ textAlign:'center', fontSize:11, color:'var(--t4)', marginTop:20 }}>
+          <i className="ti ti-lock" style={{ fontSize:12 }} /> Ø¨ÙŠØ§Ù†Ø§ØªÙƒ Ù…Ø­ÙÙˆØ¸Ø© Ù…Ø­Ù„ÙŠØ§Ù‹ ÙˆØ¢Ù…Ù†Ø©
+        </p>
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+```
+
 ## FILE: resources/js/pages/users/UsersPage.tsx
 ```
 // pages/users/UsersPage.tsx
@@ -8267,6 +9508,108 @@ export function useCancelInvoice() {
     mutationFn: (id: number) => invoicesApi.cancel(id),
     onSuccess:  () => qc.invalidateQueries({ queryKey: INVOICES_KEYS.all }),
   });
+}
+```
+
+## FILE: resources/js/hooks/useLookup.ts
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/hooks/useLookup.ts
+// Hook Ø¹Ø§Ù… Ù„ØµÙØ­Ø§Øª Ø§Ù„Ø¬Ø¯Ø§ÙˆÙ„ Ø§Ù„Ø¨Ø³ÙŠØ·Ø© (CRUD)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import { useState, useEffect, useCallback } from 'react';
+import apiClient from '@/lib/api/client';
+
+export interface LookupState<T> {
+  items:    T[];
+  loading:  boolean;
+  error:    string | null;
+  saving:   boolean;
+}
+
+export interface UseLookupReturn<T> {
+  items:    T[];
+  loading:  boolean;
+  error:    string | null;
+  saving:   boolean;
+  refetch:  () => void;
+  create:   (data: Partial<T>) => Promise<void>;
+  update:   (id: number, data: Partial<T>) => Promise<void>;
+  remove:   (id: number) => Promise<void>;
+}
+
+export function useLookup<T extends { id: number }>(endpoint: string): UseLookupReturn<T> {
+  const [state, setState] = useState<LookupState<T>>({
+    items: [], loading: true, error: null, saving: false,
+  });
+
+  const fetchAll = useCallback(async () => {
+    setState(s => ({ ...s, loading: true, error: null }));
+    try {
+      const res = await apiClient.get<{ data: T[] }>(endpoint);
+      // ÙŠØ¯Ø¹Ù… ÙƒÙ„Ø§ Ø§Ù„Ø´ÙƒÙ„ÙŠÙ†: { data: [...] } Ø£Ùˆ { data: { data: [...] } }
+      const raw = (res.data as any);
+      const items: T[] = Array.isArray(raw?.data)
+        ? raw.data
+        : Array.isArray(raw?.data?.data)
+          ? raw.data.data
+          : [];
+      setState(s => ({ ...s, items, loading: false }));
+    } catch (e: any) {
+      setState(s => ({
+        ...s,
+        loading: false,
+        error: e?.response?.data?.message || 'Ø­Ø¯Ø« Ø®Ø·Ø£ ÙÙŠ Ø¬Ù„Ø¨ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª',
+      }));
+    }
+  }, [endpoint]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const create = useCallback(async (data: Partial<T>) => {
+    setState(s => ({ ...s, saving: true }));
+    try {
+      const res = await apiClient.post<{ data: T }>(endpoint, data);
+      const newItem = res.data.data;
+      setState(s => ({ ...s, items: [newItem, ...s.items], saving: false }));
+    } catch (e: any) {
+      setState(s => ({ ...s, saving: false }));
+      throw new Error(e?.response?.data?.message || 'ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸');
+    }
+  }, [endpoint]);
+
+  const update = useCallback(async (id: number, data: Partial<T>) => {
+    setState(s => ({ ...s, saving: true }));
+    try {
+      const res = await apiClient.put<{ data: T }>(`${endpoint}/${id}`, data);
+      const updated = res.data.data;
+      setState(s => ({
+        ...s,
+        items: s.items.map(i => i.id === id ? updated : i),
+        saving: false,
+      }));
+    } catch (e: any) {
+      setState(s => ({ ...s, saving: false }));
+      throw new Error(e?.response?.data?.message || 'ÙØ´Ù„ Ø§Ù„ØªØ­Ø¯ÙŠØ«');
+    }
+  }, [endpoint]);
+
+  const remove = useCallback(async (id: number) => {
+    setState(s => ({ ...s, saving: true }));
+    try {
+      await apiClient.delete(`${endpoint}/${id}`);
+      setState(s => ({
+        ...s,
+        items: s.items.filter(i => i.id !== id),
+        saving: false,
+      }));
+    } catch (e: any) {
+      setState(s => ({ ...s, saving: false }));
+      throw new Error(e?.response?.data?.message || 'ÙØ´Ù„ Ø§Ù„Ø­Ø°Ù');
+    }
+  }, [endpoint]);
+
+  return { ...state, refetch: fetchAll, create, update, remove };
 }
 ```
 
@@ -8779,6 +10122,68 @@ export const useAuthUser = () => useAuth().user;
 ```
 ```
 
+## FILE: resources/js/context/useSetupWizard.ts
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// resources/js/context/useSetupWizard.ts
+// Ø§Ù„Ø¥ØµØ¯Ø§Ø± Ø§Ù„Ù…ÙØµÙ„Ø­: ÙŠØ¹Ù…Ù„ ÙÙ‚Ø· Ø¨Ø¹Ø¯ Ø§Ù„ØªÙˆØ«ÙŠÙ‚
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+import { useState, useEffect } from 'react';
+import apiClient from '@/lib/api/client';
+import { getAuthToken } from '@/lib/api/client';
+
+const SETUP_KEY = 'setup_completed';
+
+export function useSetupRequired() {
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // âŒ Ù„Ø§ ØªÙØ­Øµ Setup Ù‚Ø¨Ù„ ÙˆØ¬ÙˆØ¯ token
+    const token = getAuthToken();
+    if (!token) {
+      setNeedsSetup(false); // Ù„Ø§ redirect Ù„Ù„Ù€ settings Ø¥Ø°Ø§ Ù„Ù… ÙŠÙƒÙ† Ù…Ø³Ø¬Ù„ Ø¯Ø®ÙˆÙ„
+      return;
+    }
+
+    // âœ… Ø¥Ø°Ø§ ÙƒØ§Ù† Ø§Ù„Ù€ setup Ù…ÙƒØªÙ…Ù„ Ø³Ø§Ø¨Ù‚Ø§Ù‹
+    if (localStorage.getItem(SETUP_KEY) === 'true') {
+      setNeedsSetup(false);
+      return;
+    }
+
+    // âœ… ØªØ­Ù‚Ù‚ Ù…Ù† Ø§Ù„Ù€ API Ø¨Ø¹Ø¯ Ø§Ù„ØªÙˆØ«ÙŠÙ‚
+    Promise.allSettled([
+      apiClient.get('/settings/key/company.name/value'),
+      apiClient.get('/fiscal-years/current'),
+    ]).then(([companyRes, fiscalRes]) => {
+      const hasCompany =
+        companyRes.status === 'fulfilled' &&
+        !!companyRes.value?.data?.data?.value;
+
+      const hasFiscalYear =
+        fiscalRes.status === 'fulfilled' &&
+        !!fiscalRes.value?.data?.data;
+
+      const done = hasCompany && hasFiscalYear;
+
+      if (done) localStorage.setItem(SETUP_KEY, 'true');
+
+      setNeedsSetup(!done);
+    }).catch(() => {
+      // ÙÙŠ Ø­Ø§Ù„Ø© Ø®Ø·Ø£ ØºÙŠØ± Ù…ØªÙˆÙ‚Ø¹ØŒ Ù„Ø§ Ù†ÙˆØ¬Ù‘Ù‡ Ù„Ù„Ù€ setup
+      setNeedsSetup(false);
+    });
+  }, []); // ÙŠØ¹Ù…Ù„ Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø© Ø¹Ù†Ø¯ Ø§Ù„ØªØ­Ù…ÙŠÙ„
+
+  const markComplete = () => {
+    localStorage.setItem(SETUP_KEY, 'true');
+    setNeedsSetup(false);
+  };
+
+  return { needsSetup, markComplete };
+}
+```
+
 
 
 # =========================================
@@ -8815,7 +10220,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 const client: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
+    'X-Requested-With': 'XMLHttpRequest',
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },

@@ -37,6 +37,10 @@ class Employee extends Model
         'hire_date',
         'termination_date',
         'employment_status',
+        'created_by',
+        'updated_by',
+        'deleted_by',
+
     ];
 
     protected $casts = [

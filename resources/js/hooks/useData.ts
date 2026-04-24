@@ -98,6 +98,12 @@ export function useUpdateParty() {
   });
 }
 
+export const useTreasuryAccountTypes = () => useQu({
+    queryKey: ['treasury-account-types'],
+    queryFn: () => lookupsApi.treasuryAccountTypes().then(r => r.data.data),
+    staleTime: STALE
+});
+
 
 // ════════════════════════════════════════════════
 // hooks/useLookups.ts — جداول البحث الثابتة (cached)
@@ -117,3 +123,5 @@ export const usePaymentModes   = () => useQu({ queryKey: ['payment-modes'],  que
 export const useTreasuryAccounts = () => useQu({ queryKey: ['treasury'],     queryFn: () => lookupsApi.treasuryAccounts().then(r => r.data.data),staleTime: STALE });
 export const useCurrentFiscalYear = () => useQu({ queryKey: ['fiscal-year-current'], queryFn: () => lookupsApi.currentFiscalYear().then(r => r.data.data), staleTime: STALE });
 export const useDocumentTypes  = () => useQu({ queryKey: ['document-types'], queryFn: () => lookupsApi.documentTypes().then(r => r.data.data),   staleTime: STALE });
+
+

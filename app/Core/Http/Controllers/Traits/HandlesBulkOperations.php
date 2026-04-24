@@ -51,15 +51,16 @@ trait HandlesBulkOperations
             $ids = $request->input('ids');
 
             return DB::transaction(function () use ($ids) {
+                $modelClass = $this->getModelClass(); // ✅ إصلاح: استبدال $this->model
                 // التحقق من الصلاحيات لكل عنصر
-                $items = $this->model::whereIn('id', $ids)->get();
+                $items = $modelClass::whereIn('id', $ids)->get();
 
                 foreach ($items as $item) {
                     $this->authorizeAction('delete', $item);
                 }
 
                 // حذف العناصر
-                $deletedCount = $this->model::whereIn('id', $ids)->delete();
+                $deletedCount = $modelClass::whereIn('id', $ids)->delete();
 
                 // مسح الكاش وإطلاق الأحداث
                 $this->clearModelCache();
@@ -134,8 +135,9 @@ trait HandlesBulkOperations
             $updateData = $request->input('data');
 
             return DB::transaction(function () use ($ids, $updateData, $request) {
+                $modelClass = $this->getModelClass(); // ✅ إصلاح
                 // جلب العناصر والتحقق من الصلاحيات
-                $items = $this->model::whereIn('id', $ids)->get();
+                $items = $modelClass::whereIn('id', $ids)->get();
 
                 foreach ($items as $item) {
                     $this->authorizeAction('update', $item);
@@ -150,14 +152,14 @@ trait HandlesBulkOperations
                     }
                     $updatedCount = $items->count();
                 } else {
-                    $updatedCount = $this->model::whereIn('id', $ids)->update($updateData);
+                    $updatedCount = $modelClass::whereIn('id', $ids)->update($updateData);
                 }
 
                 // مسح الكاش وإطلاق الأحداث
                 $this->clearModelCache();
 
                 // إعادة جلب العناصر المحدثة
-                $updatedItems = $this->model::whereIn('id', $ids)->get();
+                $updatedItems = $modelClass::whereIn('id', $ids)->get();
 
                 foreach ($updatedItems as $item) {
                     $this->logOperation('bulk_update', $item, ['updated_fields' => array_keys($updateData)]);
@@ -204,7 +206,7 @@ trait HandlesBulkOperations
     {
         try {
             // التحقق من أن الموديل يدعم Soft Deletes
-            if (!method_exists($this->model, 'withTrashed')) {
+            if (!method_exists($this->getModelClass(), 'withTrashed')) {
                 return $this->errorResponse(
                     'هذا المورد لا يدعم الاستعادة',
                     400,
@@ -230,7 +232,8 @@ trait HandlesBulkOperations
 
             return DB::transaction(function () use ($ids) {
                 // جلب العناصر المحذوفة والتحقق من الصلاحيات
-                $items = $this->model::onlyTrashed()->whereIn('id', $ids)->get();
+                $modelClass = $this->getModelClass(); // ✅
+                $items = $modelClass::onlyTrashed()->whereIn('id', $ids)->get();
 
                 if ($items->isEmpty()) {
                     return $this->errorResponse(
@@ -245,13 +248,13 @@ trait HandlesBulkOperations
                 }
 
                 // استعادة العناصر
-                $restoredCount = $this->model::onlyTrashed()->whereIn('id', $ids)->restore();
+                $restoredCount = $modelClass::onlyTrashed()->whereIn('id', $ids)->restore();
 
                 // مسح الكاش وإطلاق الأحداث
                 $this->clearModelCache();
 
                 // إعادة جلب العناصر المستعادة
-                $restoredItems = $this->model::whereIn('id', $ids)->get();
+                $restoredItems = $modelClass::whereIn('id', $ids)->get();
 
                 foreach ($restoredItems as $item) {
                     $this->logOperation('bulk_restore', $item);
@@ -297,7 +300,7 @@ trait HandlesBulkOperations
     {
         try {
             // التحقق من أن الموديل يدعم Soft Deletes
-            if (!method_exists($this->model, 'withTrashed')) {
+            if (!method_exists($this->getModelClass(), 'withTrashed')) {
                 return $this->errorResponse(
                     'هذا المورد لا يدعم الحذف النهائي',
                     400,
@@ -323,7 +326,8 @@ trait HandlesBulkOperations
 
             return DB::transaction(function () use ($ids) {
                 // جلب العناصر (بما فيها المحذوفة) والتحقق من الصلاحيات
-                $items = $this->model::withTrashed()->whereIn('id', $ids)->get();
+                $modelClass = $this->getModelClass(); // ✅
+                $items = $modelClass::withTrashed()->whereIn('id', $ids)->get();
 
                 if ($items->isEmpty()) {
                     return $this->errorResponse(
@@ -343,7 +347,7 @@ trait HandlesBulkOperations
                 }
 
                 // الحذف النهائي
-                $deletedCount = $this->model::withTrashed()->whereIn('id', $ids)->forceDelete();
+                $deletedCount = $modelClass::withTrashed()->whereIn('id', $ids)->forceDelete();
 
                 // مسح الكاش وإطلاق الأحداث
                 $this->clearModelCache();

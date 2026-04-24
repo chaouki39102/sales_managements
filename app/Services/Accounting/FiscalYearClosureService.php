@@ -4,7 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Exceptions\FiscalYearClosedException;
 use App\Models\FiscalYear;
-use App\Models\Observers\Traits\BelongsToFiscalYear;
+use App\Models\Traits\BelongsToFiscalYear; // ✅ إصلاح: namespace صحيح
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Exception;

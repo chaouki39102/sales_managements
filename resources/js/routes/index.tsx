@@ -1,160 +1,111 @@
-// ════════════════════════════════════════════════
-// routes/index.tsx — مسارات التطبيق الكاملة
-// ════════════════════════════════════════════════
+// resources/js/routes/index.tsx
 import React, { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
-import { useSetupRequired } from '@/context/useSetupWizard';
+
+// Lazy load pages for code splitting
+const LoginPage     = lazy(() => import('@/pages/auth/LoginPage'));
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
+const POSPage       = lazy(() => import('@/pages/pos/POSPage'));
+const InvoicesPage  = lazy(() => import('@/pages/invoices/InvoicesPage'));
+const ProductsPage  = lazy(() => import('@/pages/products/ProductsPage'));
+const InventoryPage = lazy(() => import('@/pages/inventory/InventoryPage'));
+const ClientsPage   = lazy(() => import('@/pages/clients/ClientsPage'));
+const SuppliersPage = lazy(() => import('@/pages/suppliers/SuppliersPage'));
+const FinancePage   = lazy(() => import('@/pages/finance/FinancePage'));
+const ExpensesPage  = lazy(() => import('@/pages/expenses/ExpensesPage'));
+const ReportsPage   = lazy(() => import('@/pages/reports/ReportsPage'));
+const SettingsPage  = lazy(() => import('@/pages/settings/SettingsPage'));
+const UsersPage     = lazy(() => import('@/pages/users/UsersPage'));
+const EmployeesPage = lazy(() => import('@/pages/users/EmployeesPage'));
+const FiscalYearsPage = lazy(() => import('@/pages/fiscal/FiscalYearsPage'));
+const TvaPage       = lazy(() => import('@/pages/fiscal/TvaPage'));
+const DebtsPage     = lazy(() => import('@/pages/debts/DebtsPage'));
 
 
-// ── Lazy-loaded pages ─────────────────────────────
-const LoginPage       = lazy(() => import('@/pages/auth/LoginPage'));
-const DashboardPage   = lazy(() => import('@/pages/dashboard/DashboardPage'));
-const POSPage         = lazy(() => import('@/pages/pos/POSPage'));
-const ProductsPage    = lazy(() => import('@/pages/products/ProductsPage'));
-const InvoicesPage    = lazy(() => import('@/pages/invoices/InvoicesPage'));
-const InventoryPage   = lazy(() => import('@/pages/inventory/InventoryPage'));
-const ClientsPage     = lazy(() => import('@/pages/clients/ClientsPage'));
-const UsersPage       = lazy(() => import('@/pages/users/UsersPage'));
-const SettingsPage    = lazy(() => import('@/pages/settings/SettingsPage'));
-const SetupWizard = lazy(() => import('@/pages/setup/SetupWizard'));
+// Lookup pages
+const BrandsPage    = lazy(() => import('@/pages/lookups/BrandsPage'));
+const FamiliesPage  = lazy(() => import('@/pages/lookups/FamiliesPage'));
+const UnitsPage     = lazy(() => import('@/pages/lookups/UnitsPage'));
+const CurrenciesPage = lazy(() => import('@/pages/lookups/CurrenciesPage'));
+const WarehousesPage = lazy(() => import('@/pages/lookups/WarehousesPage'));
+const PriceLevelsPage = lazy(() => import('@/pages/lookups/PriceLevelsPage'));
+const TvasPage      = lazy(() => import('@/pages/lookups/TvasPage'));
 
-// ── Page loader ───────────────────────────────────
-export function PageLoader() {
+function Loader() {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '60vh', flexDirection: 'column', gap: 12,
-    }}>
-      <div style={{ position: 'relative', width: 40, height: 40 }}>
-        <div style={{
-          position: 'absolute', inset: 0, borderRadius: '50%',
-          border: '3px solid var(--emb)',
-          borderTopColor: 'var(--em)',
-          animation: 'spin .8s linear infinite',
-        }}/>
-      </div>
-      <span style={{ fontSize: 12, color: 'var(--t4)', fontWeight: 600 }}>جاري التحميل...</span>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'var(--bg0)' }}>
+      <span className="ic ic-xl" style={{ color:'var(--em)' }}>
+        <i className="ti ti-loader" style={{ animation:'spin 1s linear infinite' }} />
+      </span>
     </div>
   );
 }
 
-// ── Full-screen loader (auth check) ──────────────
-function FullLoader() {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh', background: 'var(--bg0)', flexDirection: 'column', gap: 14,
-    }}>
-      <div style={{
-        width: 44, height: 44, borderRadius: '50%',
-        border: '3px solid var(--emb)', borderTopColor: 'var(--em)',
-        animation: 'spin .8s linear infinite',
-      }}/>
-      <span style={{ fontSize: 13, color: 'var(--t4)' }}>جاري التحقق من الجلسة...</span>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-}
-
-// ── Coming Soon placeholder ───────────────────────
-function ComingSoon() {
-  const loc = useLocation();
-  return (
-    <div className="page on">
-      <div className="empty" style={{ paddingTop: 80 }}>
-        <div className="empty-ic"><i className="ti ti-hammer"/></div>
-        <div className="empty-tx">قيد الإنشاء</div>
-        <div className="empty-sub" style={{ fontFamily: 'monospace', fontSize: 12 }}>
-          {loc.pathname}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Protected route wrapper ───────────────────────
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) return <FullLoader />;
+  if (isLoading) return <Loader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
-// ── Setup guard — يُستدعى بعد التحقق من Auth فقط ──
-function SetupGuard({ children }: { children: React.ReactNode }) {
-  const { needsSetup, markComplete } = useSetupRequired();
-
-  if (needsSetup === null) return <FullLoader />;
-  if (needsSetup === true) return <SetupWizard onComplete={markComplete} />;
-  return <>{children}</>;
+function ComingSoon() {
+  return (
+    <div className="page on">
+      <div className="empty" style={{ paddingTop: 80 }}>
+        <div className="empty-ic"><i className="ti ti-hammer" /></div>
+        <div className="empty-tx">هذه الصفحة قيد الإنشاء</div>
+        <div className="empty-sub">سيتم إضافتها قريباً</div>
+      </div>
+    </div>
+  );
 }
 
-// ── Main router ───────────────────────────────────
 export function AppRoutes() {
   return (
-    <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<Loader />}>
       <Routes>
-        {/* ── Public ── */}
         <Route path="/login" element={<LoginPage />} />
-
-        {/* ── Protected layout ── */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <SetupGuard>
-                <DashboardLayout />
-              </SetupGuard>
-            </ProtectedRoute>
-          }
-        >
+        <Route path="/" element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }>
           <Route index element={<Navigate to="/dashboard" replace />} />
-
-          {/* Core */}
           <Route path="dashboard"  element={<DashboardPage />} />
           <Route path="pos"        element={<POSPage />} />
-
-          {/* Sales */}
           <Route path="invoices"   element={<InvoicesPage />} />
+          <Route path="products"   element={<ProductsPage />} />
+          <Route path="inventory"  element={<InventoryPage />} />
+          <Route path="clients"    element={<ClientsPage />} />
+          <Route path="suppliers"  element={<SuppliersPage />} />
+          <Route path="finance"    element={<FinancePage />} />
+          <Route path="expenses"   element={<ExpensesPage />} />
+          <Route path="debts"      element={<ComingSoon />} />
+          <Route path="tva"        element={<TvaPage />} />
+          <Route path="fiscal"     element={<ComingSoon />} />
+          <Route path="fiscalyears" element={<FiscalYearsPage />} />
+          <Route path="reports"    element={<ReportsPage />} />
+          <Route path="balance"    element={<ComingSoon />} />
+          <Route path="debts"      element={<DebtsPage />} />
+          <Route path="users"      element={<UsersPage />} />
+          <Route path="employees"  element={<EmployeesPage />} />
+          <Route path="settings"   element={<SettingsPage />} />
+
+          {/* Lookups */}
+          <Route path="categories" element={<FamiliesPage />} />
+          <Route path="brands"     element={<BrandsPage />} />
+          <Route path="units"      element={<UnitsPage />} />
+          <Route path="warehouses" element={<WarehousesPage />} />
+          <Route path="currencies" element={<CurrenciesPage />} />
+          <Route path="pricelevels" element={<PriceLevelsPage />} />
+          <Route path="tvas"       element={<TvasPage />} />
           <Route path="orders"     element={<ComingSoon />} />
           <Route path="returns"    element={<ComingSoon />} />
           <Route path="quotations" element={<ComingSoon />} />
           <Route path="bl"         element={<ComingSoon />} />
-
-          {/* Inventory */}
-          <Route path="products"   element={<ProductsPage />} />
-          <Route path="inventory"  element={<InventoryPage />} />
-          <Route path="categories" element={<ComingSoon />} />
-          <Route path="brands"     element={<ComingSoon />} />
-          <Route path="units"      element={<ComingSoon />} />
-          <Route path="suppliers"  element={<ComingSoon />} />
-          <Route path="warehouses" element={<ComingSoon />} />
-
-          {/* Accounting */}
-          <Route path="clients"     element={<ClientsPage />} />
-          <Route path="finance"     element={<ComingSoon />} />
-          <Route path="expenses"    element={<ComingSoon />} />
-          <Route path="debts"       element={<ComingSoon />} />
-          <Route path="tva"         element={<ComingSoon />} />
-          <Route path="fiscal"      element={<ComingSoon />} />
-          <Route path="fiscalyears" element={<ComingSoon />} />
-          <Route path="currencies"  element={<ComingSoon />} />
-          <Route path="pricelevels" element={<ComingSoon />} />
-
-          {/* Reports */}
-          <Route path="reports"  element={<ComingSoon />} />
-          <Route path="balance"  element={<ComingSoon />} />
-
-          {/* System */}
-          <Route path="employees" element={<ComingSoon />} />
-          <Route path="users"     element={<UsersPage />} />
-          <Route path="settings"  element={<SettingsPage />} />
         </Route>
-
-        {/* ── Catch-all ── */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>

@@ -7,7 +7,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 const client: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
+    'X-Requested-With': 'XMLHttpRequest',
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },

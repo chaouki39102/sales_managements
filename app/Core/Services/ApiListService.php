@@ -36,28 +36,8 @@ class ApiListService
      */
     public static function getList(string $modelClass, array $config, Request $request)
     {
-        $cacheTtl      = $config['cache_ttl'] ?? null;
-        $cacheTags     = $config['cache_tags'] ?? ['api', class_basename($modelClass)];
+        // ✅ الكاش مُعطَّل: تخزين LengthAwarePaginator يسبب مشكلة unserialize
         $queryCallback = $config['query_callback'] ?? null;
-
-        // إذا كان الكاش مفعّلاً، قم باستخدامه مع قفل لمنع التضارب (Cache Stampede)
-        if ($cacheTtl && $cacheTtl > 0) {
-            $cacheKey = self::generateCacheKey($modelClass, $request, $config);
-            $lockKey  = $cacheKey . ':lock';
-
-            // استخدام قفل ذري لضمان أن عملية بناء الكاش تتم مرة واحدة فقط عند الطلبات المتزامنة
-            return Cache::lock($lockKey, 10)->get(function () use ($cacheKey, $cacheTtl, $cacheTags, $modelClass, $config, $request, $queryCallback) {
-                $execute = fn() => self::executeQuery($modelClass, $config, $request, $queryCallback);
-
-                if (method_exists(Cache::getStore(), 'tags')) {
-                    return Cache::tags($cacheTags)->remember($cacheKey, $cacheTtl, $execute);
-                }
-
-                return Cache::remember($cacheKey, $cacheTtl, $execute);
-            });
-        }
-
-        // إذا كان الكاش معطلاً، نفذ الاستعلام مباشرة
         return self::executeQuery($modelClass, $config, $request, $queryCallback);
     }
 
@@ -158,10 +138,13 @@ class ApiListService
             $qb->withTrashed();
         }
 
-        $qb->with($defaultIncludes)
-           ->allowedFilters($allowedFilters)
-           ->allowedSorts($allowedSorts)
-           ->allowedIncludes($allowedIncludes);
+        $qb->with($defaultIncludes);
+
+        // ✅ إصلاح: Spatie QueryBuilder يرفض [] في بعض الإصدارات
+        // ✅ استخدام spread operator لأن Spatie تقبل AllowedFilter|string وليس array
+        if (!empty($allowedFilters))  { $qb->allowedFilters(...$allowedFilters);   }
+        if (!empty($allowedSorts))    { $qb->allowedSorts(...$allowedSorts);       }
+        if (!empty($allowedIncludes)) { $qb->allowedIncludes(...$allowedIncludes); }
 
         // تطبيق الترتيب الافتراضي فقط إذا لم يحدده المستخدم
         if (!$request->has('sort')) {
@@ -191,9 +174,32 @@ class ApiListService
         $filters = array_merge($config['filters'] ?? [], $config['custom_filters'] ?? []);
 
         foreach ($filters as $key => $definition) {
-            $name   = is_string($key) ? $key : $definition;
-            $type   = is_array($definition) ? ($definition['type'] ?? 'partial') : 'partial';
-            $column = is_array($definition) ? ($definition['column'] ?? $name) : $name;
+
+            // ✅ حالة: definition هي array مسطحة مثل ['active', 'name']
+            // هذا يحدث عندما يُمرَّر $filterable من الموديل مباشرة كـ nested array
+            if (is_int($key) && is_array($definition)) {
+                foreach ($definition as $subKey => $subDef) {
+                    $subName = is_string($subKey) ? $subKey : (is_string($subDef) ? $subDef : null);
+                    if ($subName === null) continue;
+                    $subType   = is_array($subDef) ? ($subDef['type']   ?? 'partial') : 'partial';
+                    $subColumn = is_array($subDef) ? ($subDef['column'] ?? $subName)  : $subName;
+                    $allowed[] = match ($subType) {
+                        'exact'    => AllowedFilter::exact($subName, $subColumn),
+                        'boolean'  => AllowedFilter::callback($subName, fn(Builder $q, $v) => $q->where($subColumn, filter_var($v, FILTER_VALIDATE_BOOLEAN))),
+                        default    => AllowedFilter::partial($subName, $subColumn),
+                    };
+                }
+                continue;
+            }
+
+            // ✅ حالة: name هو string (المسار الطبيعي)
+            $name = is_string($key) ? $key : (is_string($definition) ? $definition : null);
+
+            // تخطي إذا لم يكن name صالحاً
+            if ($name === null || !is_string($name)) continue;
+
+            $type   = is_array($definition) ? ($definition['type']   ?? 'partial') : 'partial';
+            $column = is_array($definition) ? ($definition['column'] ?? $name)     : $name;
 
             $allowed[] = match ($type) {
                 'exact'         => AllowedFilter::exact($name, $column),
@@ -208,7 +214,9 @@ class ApiListService
 
         // إضافة الفلاتر المتقدمة
         foreach ($config['advanced_filters'] ?? [] as $advancedFilter) {
-            $allowed[] = $advancedFilter;
+            if ($advancedFilter instanceof AllowedFilter || is_string($advancedFilter)) {
+                $allowed[] = $advancedFilter;
+            }
         }
 
         // إضافة فلتر البحث العام

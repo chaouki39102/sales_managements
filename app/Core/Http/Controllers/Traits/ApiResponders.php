@@ -86,14 +86,19 @@ trait ApiResponders
     /**
      * إرجاع رد خطأ موحد (JSON)
      */
-    protected function errorResponse(string $message, int $status = 400, string $code = 'ERROR'): JsonResponse
+    protected function errorResponse(string $message, int $status = 400, string $code = 'ERROR', array $errors = []): JsonResponse
     {
-        return response()->json([
-            'status' => 'error',
-            'code' => $code,
-            'message' => $message,
+        $body = [
+            'status'    => 'error',
+            'code'      => $code,
+            'message'   => $message,
             'timestamp' => now()->toISOString(),
-        ], $status);
+        ];
+        // ✅ أضف errors فقط إذا كانت موجودة (ValidationException)
+        if (!empty($errors)) {
+            $body['errors'] = $errors;
+        }
+        return response()->json($body, $status);
     }
 
     /**
