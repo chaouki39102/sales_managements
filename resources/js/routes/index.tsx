@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 
+
 // Lazy load pages for code splitting
 const LoginPage     = lazy(() => import('@/pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
@@ -22,6 +23,10 @@ const EmployeesPage = lazy(() => import('@/pages/users/EmployeesPage'));
 const FiscalYearsPage = lazy(() => import('@/pages/fiscal/FiscalYearsPage'));
 const TvaPage       = lazy(() => import('@/pages/fiscal/TvaPage'));
 const DebtsPage     = lazy(() => import('@/pages/debts/DebtsPage'));
+const DocumentTypesPage = lazy(() => import('@/pages/settings/DocumentTypesPage'));
+const CommercialDocumentsPage = lazy(() => import('@/pages/documents/CommercialDocumentsPage'));
+
+
 
 
 // Lookup pages
@@ -77,6 +82,8 @@ export function AppRoutes() {
           <Route path="pos"        element={<POSPage />} />
           <Route path="invoices"   element={<InvoicesPage />} />
           <Route path="products"   element={<ProductsPage />} />
+          <Route path="documents/:typeCode" element={<CommercialDocumentsPage />} />
+
           <Route path="inventory"  element={<InventoryPage />} />
           <Route path="clients"    element={<ClientsPage />} />
           <Route path="suppliers"  element={<SuppliersPage />} />
@@ -92,6 +99,8 @@ export function AppRoutes() {
           <Route path="users"      element={<UsersPage />} />
           <Route path="employees"  element={<EmployeesPage />} />
           <Route path="settings"   element={<SettingsPage />} />
+          <Route path="settings/document-types" element={<DocumentTypesPage />} />
+
 
           {/* Lookups */}
           <Route path="categories" element={<FamiliesPage />} />

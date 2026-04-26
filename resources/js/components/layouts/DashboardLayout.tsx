@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { FiscalYearSelector } from '@/context/FiscalYearContext';
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -19,11 +20,21 @@ const NAV_GROUPS = [
   {
     label: 'المبيعات',
     items: [
-      { name: 'الفواتير',        href: '/invoices',   icon: 'ti-file-text',    badge: 3 },
-      { name: 'طلبيات الشراء',   href: '/orders',     icon: 'ti-clipboard-list'         },
-      { name: 'المرتجعات',       href: '/returns',    icon: 'ti-corner-up-left'         },
-      { name: 'عروض الأسعار',    href: '/quotations', icon: 'ti-file-check'             },
-      { name: 'وصل التسليم BL',  href: '/bl',         icon: 'ti-truck'                  },
+      { name: 'عروض الأسعار',         href: '/documents/DEV', icon: 'ti-file-check'          },
+      { name: 'طلبيات العملاء',        href: '/documents/BCC', icon: 'ti-clipboard-list'      },
+      { name: 'وصل التسليم BL',        href: '/documents/BL',  icon: 'ti-truck'               },
+      { name: 'فواتير البيع',          href: '/documents/FV',  icon: 'ti-file-invoice', badge: 3 },
+      { name: 'مرتجعات البيع',         href: '/documents/AV',  icon: 'ti-corner-up-left'      },
+    ],
+  },
+  {
+    label: 'المشتريات',
+    items: [
+      { name: 'طلبات عروض الأسعار',   href: '/documents/DDP', icon: 'ti-file-search'        },
+      { name: 'أوامر الشراء للموردين',  href: '/documents/BCF', icon: 'ti-clipboard-check'    },
+      { name: 'وصل الاستلام',           href: '/documents/BR',  icon: 'ti-package-import'     },
+      { name: 'فواتير الشراء',          href: '/documents/FA',  icon: 'ti-file-invoice'       },
+      { name: 'مرتجعات الشراء',         href: '/documents/AA',  icon: 'ti-corner-up-left-double' },
     ],
   },
   {
@@ -65,6 +76,7 @@ const NAV_GROUPS = [
       { name: 'الموظفون',   href: '/employees', icon: 'ti-id-badge' },
       { name: 'المستخدمون', href: '/users',     icon: 'ti-user'     },
       { name: 'الإعدادات',  href: '/settings',  icon: 'ti-settings' },
+      { name: 'أنواع المستندات', href: '/settings/document-types', icon: 'ti-file' },
     ],
   },
 ];
@@ -82,11 +94,19 @@ const LABEL_COLORS = [
 const PAGE_META: Record<string, { title: string; path: string }> = {
   '/dashboard':   { title: 'لوحة التحكم',          path: 'الرئيسية ← إحصائيات'     },
   '/pos':         { title: 'نقطة البيع',            path: 'الرئيسية ← POS'           },
-  '/invoices':    { title: 'الفواتير',              path: 'مبيعات ← فواتير'          },
-  '/orders':      { title: 'طلبيات الشراء',         path: 'مبيعات ← طلبيات'         },
-  '/returns':     { title: 'المرتجعات',             path: 'مبيعات ← مرتجعات'        },
-  '/quotations':  { title: 'عروض الأسعار',          path: 'مبيعات ← عروض أسعار'     },
-  '/bl':          { title: 'وصل التسليم BL',        path: 'مبيعات ← وصل تسليم'      },
+  // مبيعات
+  '/documents/DEV':  { title: 'عروض الأسعار',         path: 'مبيعات ← عروض أسعار'     },
+  '/documents/BCC':  { title: 'طلبيات العملاء',       path: 'مبيعات ← طلبيات العملاء'  },
+  '/documents/BL':   { title: 'وصل التسليم BL',       path: 'مبيعات ← وصل تسليم'      },
+  '/documents/FV':   { title: 'فواتير البيع',         path: 'مبيعات ← فواتير البيع'    },
+  '/documents/AV':   { title: 'مرتجعات البيع',        path: 'مبيعات ← مرتجعات البيع'   },
+  // مشتريات
+  '/documents/DDP':  { title: 'طلبات عروض الأسعار',   path: 'مشتريات ← طلبات عروض'    },
+  '/documents/BCF':  { title: 'أوامر الشراء',         path: 'مشتريات ← أوامر شراء'    },
+  '/documents/BR':   { title: 'وصل الاستلام',         path: 'مشتريات ← وصل استلام'    },
+  '/documents/FA':   { title: 'فواتير الشراء',        path: 'مشتريات ← فواتير شراء'   },
+  '/documents/AA':   { title: 'مرتجعات الشراء',       path: 'مشتريات ← مرتجعات شراء'  },
+  // مخزون
   '/products':    { title: 'المنتجات',              path: 'مخزون ← منتجات'          },
   '/inventory':   { title: 'إدارة المخزون',         path: 'مخزون ← جرد'             },
   '/categories':  { title: 'الفئات',               path: 'مخزون ← فئات'            },
@@ -94,6 +114,7 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   '/units':       { title: 'وحدات القياس',          path: 'مخزون ← وحدات'           },
   '/suppliers':   { title: 'الموردون',              path: 'مخزون ← موردون'          },
   '/warehouses':  { title: 'المستودعات',            path: 'مخزون ← مستودعات'        },
+  // محاسبة
   '/clients':     { title: 'العملاء',               path: 'محاسبة ← عملاء'          },
   '/finance':     { title: 'الخزينة',               path: 'محاسبة ← خزينة'          },
   '/expenses':    { title: 'المصروفات',             path: 'محاسبة ← مصروفات'        },
@@ -104,11 +125,13 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   '/currencies':  { title: 'العملات',               path: 'محاسبة ← عملات'          },
   '/pricelevels': { title: 'مستويات الأسعار',       path: 'محاسبة ← مستويات أسعار'  },
   '/tva-rates':   { title: 'معدلات TVA',            path: 'محاسبة ← TVA'            },
+  // نظام
   '/employees':   { title: 'الموظفون',              path: 'موارد بشرية ← موظفون'     },
   '/reports':     { title: 'التقارير',              path: 'تقارير'                   },
   '/balance':     { title: 'الميزانية التقديرية',   path: 'تقارير ← ميزانية'        },
   '/users':       { title: 'المستخدمون',            path: 'نظام ← مستخدمون'         },
   '/settings':    { title: 'الإعدادات',             path: 'نظام ← إعدادات'          },
+  '/settings/document-types': { title: 'أنواع المستندات', path: 'نظام ← أنواع المستندات' },
 };
 
 export default function DashboardLayout() {
@@ -200,6 +223,7 @@ export default function DashboardLayout() {
             <div className="tb-path">{meta.path}</div>
           </div>
           <div className="tb-actions">
+            <FiscalYearSelector />
             <div className="srch">
               <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
               <input type="text" placeholder="بحث سريع..." />
@@ -239,7 +263,7 @@ export default function DashboardLayout() {
             </div>
             <div className="mt-lbl">الرئيسية</div>
           </Link>
-          <Link to="/invoices" className={`mt${location.pathname === '/invoices' ? ' on' : ''}`}>
+          <Link to="/documents/FV" className={`mt${location.pathname === '/documents/FV' ? ' on' : ''}`}>
             <div className="mt-ic-wrap">
               <span className="ic mt-ic"><i className="ti ti-file-text" /></span>
             </div>
@@ -283,7 +307,7 @@ export default function DashboardLayout() {
               { href: '/inventory',  icon: 'ti-package',       label: 'مخزون'  },
               { href: '/finance',    icon: 'ti-building-bank', label: 'خزينة'  },
               { href: '/clients',    icon: 'ti-users',         label: 'عملاء'  },
-              { href: '/invoices',   icon: 'ti-file-text',     label: 'فواتير' },
+              { href: '/documents/FV', icon: 'ti-file-text',   label: 'فواتير' },
               { href: '/expenses',   icon: 'ti-credit-card',   label: 'مصاريف' },
               { href: '/products',   icon: 'ti-list',          label: 'منتجات' },
               { href: '/reports',    icon: 'ti-chart-bar',     label: 'تقارير' },

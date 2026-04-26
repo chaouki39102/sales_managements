@@ -2676,6 +2676,271 @@ body.dark .receipt-wrap{background:#fff;color:#0d1b2a;}
 ```
 ```
 
+## FILE: resources/js/components/common/FiscalYearSelector.tsx
+```
+// ════════════════════════════════════════════════
+// resources/js/components/common/FiscalYearSelector.tsx
+// ════════════════════════════════════════════════
+import { useState, useRef, useEffect } from 'react';
+import { useFiscalYear } from '@/context/FiscalYearContext';
+import type { FiscalYear } from '@/context/FiscalYearContext';
+
+export default function FiscalYearSelector() {
+    const { years, selected, loading, isReadOnly, selectYear } = useFiscalYear();
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    // إغلاق عند النقر خارجاً
+    useEffect(() => {
+        function handler(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    if (loading) return (
+        <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '5px 10px', borderRadius: 'var(--r2)',
+            border: '1px solid var(--b2)', background: 'var(--bg3)',
+            fontSize: 12, color: 'var(--t4)',
+        }}>
+            <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+            تحميل...
+        </div>
+    );
+
+    if (!selected) return null;
+
+    // دالة مساعدة لتنسيق التاريخ
+    const toDateInputValue = (date: any): string => {
+        if (!date) return '';
+        const match = String(date).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return match ? `${match[1]}-${match[2]}-${match[3]}` : '';
+    };
+
+    return (
+        <div ref={ref} style={{ position: 'relative' }}>
+            {/* الزر الرئيسي */}
+            <button
+                onClick={() => setOpen(o => !o)}
+                style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '5px 12px', borderRadius: 'var(--r2)',
+                    border: `1px solid ${isReadOnly ? 'var(--redbo)' : 'var(--b3)'}`,
+                    background: isReadOnly
+                        ? 'var(--redb)'
+                        : 'var(--bg3)',
+                    cursor: 'pointer', fontSize: 12.5, fontFamily: 'Tajawal, sans-serif',
+                    color: 'var(--t1)', transition: 'all .15s',
+                }}
+            >
+                {/* أيقونة الحالة */}
+                <span style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: selected.is_current
+                        ? 'var(--emb)'
+                        : isReadOnly
+                            ? 'var(--redb)'
+                            : 'var(--blueb)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                }}>
+                    <i className={`ti ${isReadOnly ? 'ti-lock' : selected.is_current ? 'ti-calendar-check' : 'ti-calendar'}`}
+                        style={{
+                            fontSize: 10,
+                            color: selected.is_current ? 'var(--em)' : isReadOnly ? 'var(--red)' : 'var(--blue)',
+                        }}
+                    />
+                </span>
+
+                <span style={{ fontWeight: 700 }}>س.م {selected.name}</span>
+
+                {/* badge الحالة */}
+                {isReadOnly && (
+                    <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '1px 6px',
+                        borderRadius: 10, background: 'var(--red)', color: '#fff',
+                    }}>
+                        للقراءة فقط
+                    </span>
+                )}
+                {selected.is_current && !isReadOnly && (
+                    <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '1px 6px',
+                        borderRadius: 10, background: 'var(--em)', color: '#fff',
+                    }}>
+                        جارية
+                    </span>
+                )}
+
+                <i className={`ti ti-chevron-${open ? 'up' : 'down'}`}
+                    style={{ fontSize: 11, color: 'var(--t4)', marginRight: 2 }} />
+            </button>
+
+            {/* Dropdown */}
+            {open && (
+                <div style={{
+                    position: 'absolute', top: 'calc(100% + 6px)',
+                    left: 0, minWidth: 280, zIndex: 9999,
+                    background: 'var(--bg2)', border: '1px solid var(--b2)',
+                    borderRadius: 'var(--r3)', boxShadow: 'var(--shadow2)',
+                    overflow: 'hidden',
+                }}>
+                    {/* Header */}
+                    <div style={{
+                        padding: '10px 14px', borderBottom: '1px solid var(--b1)',
+                        fontSize: 11, fontWeight: 700, color: 'var(--t4)',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                        <i className="ti ti-calendar-stats" />
+                        اختيار السنة المالية
+                    </div>
+
+                    {/* القائمة */}
+                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                        {years.map(year => (
+                            <button
+                                key={year.id}
+                                onClick={() => { selectYear(year); setOpen(false); }}
+                                style={{
+                                    width: '100%', textAlign: 'right', padding: '10px 14px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    gap: 8, cursor: 'pointer', border: 'none', fontFamily: 'Tajawal, sans-serif',
+                                    background: selected.id === year.id
+                                        ? 'var(--emb)'
+                                        : 'transparent',
+                                    borderRight: selected.id === year.id
+                                        ? '3px solid var(--em)' : '3px solid transparent',
+                                    transition: 'background .1s',
+                                    fontSize: 13,
+                                }}
+                                onMouseEnter={e => {
+                                    if (selected.id !== year.id)
+                                        (e.currentTarget as HTMLElement).style.background = 'var(--bg3)';
+                                }}
+                                onMouseLeave={e => {
+                                    if (selected.id !== year.id)
+                                        (e.currentTarget as HTMLElement).style.background = 'transparent';
+                                }}
+                            >
+                                <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontWeight: 700, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        {selected.id === year.id && (
+                                            <i className="ti ti-check" style={{ fontSize: 12, color: 'var(--em)' }} />
+                                        )}
+                                        سنة {year.name}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 2 }}>
+                                        {toDateInputValue(year.start_date)} — {toDateInputValue(year.end_date)}
+                                    </div>
+                                </div>
+
+                                {/* Badges */}
+                                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                                    {year.is_current && (
+                                        <span style={{
+                                            fontSize: 10, fontWeight: 700, padding: '2px 7px',
+                                            borderRadius: 10,
+                                            background: 'var(--emb)', color: 'var(--em)',
+                                        }}>جارية</span>
+                                    )}
+                                    {year.is_closed && (
+                                        <span style={{
+                                            fontSize: 10, fontWeight: 700, padding: '2px 7px',
+                                            borderRadius: 10,
+                                            background: 'var(--redb)', color: 'var(--red)',
+                                            display: 'flex', alignItems: 'center', gap: 3,
+                                        }}>
+                                            <i className="ti ti-lock" style={{ fontSize: 9 }} /> مقفلة
+                                        </span>
+                                    )}
+                                    {!year.is_closed && !year.is_current && (
+                                        <span style={{
+                                            fontSize: 10, fontWeight: 700, padding: '2px 7px',
+                                            borderRadius: 10,
+                                            background: 'var(--blueb)', color: 'var(--blue)',
+                                        }}>مفتوحة</span>
+                                    )}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Footer */}
+                    <div style={{
+                        padding: '8px 14px', borderTop: '1px solid var(--b1)',
+                        fontSize: 11, color: 'var(--t4)',
+                    }}>
+                        <i className="ti ti-info-circle" style={{ marginLeft: 4 }} />
+                        السنة المقفلة: للعرض فقط — لا يمكن التعديل
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+```
+
+## FILE: resources/js/components/common/ReadOnlyBanner.tsx
+```
+// ════════════════════════════════════════════════
+// resources/js/components/common/ReadOnlyBanner.tsx
+// ════════════════════════════════════════════════
+import { useFiscalYear } from '@/context/FiscalYearContext';
+
+export default function ReadOnlyBanner() {
+    const { selected, isReadOnly } = useFiscalYear();
+    if (!isReadOnly || !selected) return null;
+
+    const toDateString = (d?: string | null) => {
+        if (!d) return '—';
+        const match = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!match) return '—';
+        return new Date(+match[1], +match[2] - 1, +match[3]).toLocaleDateString('ar-DZ', {
+            year: 'numeric', month: 'long', day: 'numeric',
+        });
+    };
+
+    return (
+        <div style={{
+            background: 'var(--redb)',
+            border: '1px solid var(--redbo)',
+            borderRadius: 'var(--r3)',
+            padding: '12px 18px',
+            marginBottom: 18,
+            display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+            <div style={{
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                background: 'var(--red)', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+                <i className="ti ti-lock" style={{ fontSize: 18 }} />
+            </div>
+            <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--red)' }}>
+                    سنة مالية مقفلة — وضع القراءة فقط
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--t2)', marginTop: 3 }}>
+                    السنة المالية <strong>{selected.name}</strong> مقفلة بتاريخ{' '}
+                    {toDateString(selected.closed_at)}.
+                    لا يمكن إضافة أو تعديل أو حذف أي بيانات.
+                    {selected.closing_notes && (
+                        <span style={{ color: 'var(--t3)', display: 'block', marginTop: 2 }}>
+                            📝 {selected.closing_notes}
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+```
+
 ## FILE: resources/js/components/forms/FormGrid.tsx
 ```
 ```
@@ -2695,6 +2960,7 @@ body.dark .receipt-wrap{background:#fff;color:#0d1b2a;}
 // ════════════════════════════════════════════════
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { FiscalYearSelector } from '@/context/FiscalYearContext';
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -2892,6 +3158,7 @@ export default function DashboardLayout() {
             <div className="tb-path">{meta.path}</div>
           </div>
           <div className="tb-actions">
+            <FiscalYearSelector />
             <div className="srch">
               <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
               <input type="text" placeholder="بحث سريع..." />
@@ -5649,6 +5916,575 @@ export default function DashboardPage() {
 }
 ```
 
+## FILE: resources/js/pages/debts/DebtsPage.tsx
+```
+// resources/js/pages/debts/DebtsPage.tsx
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useModal } from '@/hooks/useModal';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import KpiCard from '@/components/ui/KpiCard';
+import EmptyState from '@/components/ui/EmptyState';
+import ProgressBar from '@/components/ui/ProgressBar';
+import Avatar from '@/components/ui/Avatar';
+import apiClient from '@/lib/api/client';
+import type { CommercialDocument } from '@/types';
+
+export default function DebtsPage() {
+    const [activeTab, setActiveTab] = useState<'unpaid' | 'overdue'>('unpaid');
+    const [search, setSearch] = useState('');
+    const [selectedDoc, setSelectedDoc] = useState<CommercialDocument | null>(null);
+    const detailModal = useModal();
+    const qc = useQueryClient();
+
+    // جلب الفواتير غير المدفوعة
+    const { data: unpaidDocs, isLoading: loadingUnpaid } = useQuery({
+        queryKey: ['debts', 'unpaid', search],
+        queryFn: () => apiClient.get('/commercial-documents/unpaid', {
+            params: { search: search || undefined }
+        }).then(r => r.data.data || []),
+    });
+
+    // جلب الفواتير المتأخرة
+    const { data: overdueDocs, isLoading: loadingOverdue } = useQuery({
+        queryKey: ['debts', 'overdue', search],
+        queryFn: () => apiClient.get('/commercial-documents/overdue', {
+            params: { search: search || undefined }
+        }).then(r => r.data.data || []),
+    });
+
+    const docs = activeTab === 'unpaid' ? (unpaidDocs || []) : (overdueDocs || []);
+    const totalAmount = docs.reduce((sum: number, doc: CommercialDocument) => sum + doc.amount_remaining, 0);
+    const totalTTC = docs.reduce((sum: number, doc: CommercialDocument) => sum + doc.total_ttc, 0);
+    const clientsCount = new Set(docs.filter((d: CommercialDocument) => d.party_id).map((d: CommercialDocument) => d.party_id)).size;
+
+    const viewDetail = (doc: CommercialDocument) => {
+        setSelectedDoc(doc);
+        detailModal.openModal();
+    };
+
+    return (
+        <div className="page on" id="p-debts">
+            <PageHeader
+                title="الديون والمستحقات"
+                subtitle="متابعة الفواتير غير المدفوعة والمتأخرة"
+                actions={
+                    <>
+                        <Button size="sm" icon={<i className="ti ti-download"/>}>تصدير</Button>
+                        <Button size="sm" icon={<i className="ti ti-printer"/>}>طباعة</Button>
+                    </>
+                }
+            />
+
+            {/* KPIs */}
+            <div className="kpis" style={{ marginBottom: 20 }}>
+                <KpiCard
+                    variant="red" icon="ti-cash" label="إجمالي الديون"
+                    value={totalAmount.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج"
+                    sub={`${docs.length} مستند`}
+                />
+                <KpiCard
+                    variant={activeTab === 'overdue' ? 'red' : 'gold'} icon="ti-clock"
+                    label={activeTab === 'overdue' ? 'متأخرة' : 'معلقة'}
+                    value={docs.length}
+                    sub={`${clientsCount} عميل`}
+                />
+                <KpiCard
+                    variant="blue" icon="ti-file-invoice" label="إجمالي TTC"
+                    value={totalTTC.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج"
+                />
+                <KpiCard
+                    variant="purple" icon="ti-percentage" label="نسبة التحصيل"
+                    value={`${totalTTC > 0 ? Math.round((1 - totalAmount / totalTTC) * 100) : 0}%`}
+                    sub="من إجمالي المستحقات"
+                />
+            </div>
+
+            {/* Tabs */}
+            <div className="tabs" style={{ marginBottom: 16 }}>
+                <div className={`tab ${activeTab === 'unpaid' ? 'on' : ''}`} onClick={() => setActiveTab('unpaid')}>
+                    <span className="ic ic-xs"><i className="ti ti-file-text"/></span>
+                    غير مدفوعة {unpaidDocs ? `(${unpaidDocs.length})` : ''}
+                </div>
+                <div className={`tab ${activeTab === 'overdue' ? 'on' : ''}`} onClick={() => setActiveTab('overdue')}>
+                    <span className="ic ic-xs"><i className="ti ti-alert-triangle"/></span>
+                    متأخرة {overdueDocs ? `(${overdueDocs.length})` : ''}
+                </div>
+            </div>
+
+            {/* Search */}
+            <div className="filters" style={{ marginBottom: 16 }}>
+                <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
+                    <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
+                    <input
+                        type="text"
+                        placeholder="ابحث برقم الفاتورة أو اسم العميل..."
+                        style={{ width: '100%' }}
+                        onChange={e => setSearch(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            {/* Table */}
+            {(activeTab === 'unpaid' ? loadingUnpaid : loadingOverdue) ? (
+                <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
+            ) : docs.length === 0 ? (
+                <EmptyState
+                    icon="ti-receipt"
+                    text={activeTab === 'unpaid' ? 'لا توجد فواتير غير مدفوعة' : 'لا توجد فواتير متأخرة'}
+                    sub="جميع المدفوعات مكتملة"
+                />
+            ) : (
+                <Card noHeader style={{ padding: 0 }}>
+                    <div className="tw">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>رقم الفاتورة</th>
+                                    <th>العميل</th>
+                                    <th>TTC</th>
+                                    <th>المدفوع</th>
+                                    <th>المتبقي</th>
+                                    <th>نسبة التحصيل</th>
+                                    <th>تاريخ الاستحقاق</th>
+                                    <th>الحالة</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {docs.map((doc: CommercialDocument, i: number) => {
+                                    const isOverdue = doc.due_date && new Date(doc.due_date) < new Date();
+                                    const percentPaid = doc.total_ttc > 0
+                                        ? Math.round((doc.amount_paid / doc.total_ttc) * 100)
+                                        : 0;
+                                    return (
+                                        <tr key={doc.id} onClick={() => viewDetail(doc)} style={{ cursor: 'pointer' }}>
+                                            <td className="m">{doc.document_number}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                                                    <Avatar
+                                                        initials={doc.party?.name?.[0] || '?'}
+                                                        color={((i % 7) + 1) as 1|2|3|4|5|6|7}
+                                                        size={26}
+                                                    />
+                                                    <span className="s">{doc.party?.name || 'عابر'}</span>
+                                                </div>
+                                            </td>
+                                            <td className="e">{doc.total_ttc.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
+                                            <td style={{ color: 'var(--em)', fontFamily: 'monospace' }}>
+                                                {doc.amount_paid.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج
+                                            </td>
+                                            <td className="r">{doc.amount_remaining.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <ProgressBar
+                                                        value={percentPaid}
+                                                        color={percentPaid > 50 ? 'var(--em)' : 'var(--red)'}
+                                                        height={5}
+                                                    />
+                                                    <span style={{ fontSize: 10, color: 'var(--t4)', minWidth: 32 }}>
+                                                        {percentPaid}%
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td style={{
+                                                fontSize: 12,
+                                                color: isOverdue ? 'var(--red)' : 'var(--t4)',
+                                                fontWeight: isOverdue ? 700 : 400
+                                            }}>
+                                                {doc.due_date
+                                                    ? new Date(doc.due_date).toLocaleDateString('fr-DZ')
+                                                    : '—'}
+                                            </td>
+                                            <td>
+                                                <Badge variant={isOverdue ? 'danger' : doc.status === 'partial' ? 'warning' : 'info'}>
+                                                    {isOverdue ? 'متأخرة' : doc.status === 'partial' ? 'جزئية' : 'معلقة'}
+                                                </Badge>
+                                            </td>
+                                            <td onClick={e => e.stopPropagation()}>
+                                                <div style={{ display: 'flex', gap: 3 }}>
+                                                    <Button size="xs" variant="primary" icon={<i className="ti ti-cash"/>}>
+                                                        تحصيل
+                                                    </Button>
+                                                    <Button size="xs" icon={<i className="ti ti-eye"/>} onClick={() => viewDetail(doc)}/>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+
+            {/* Detail Modal */}
+            <DebtDetailModal
+                open={detailModal.open}
+                doc={selectedDoc}
+                onClose={detailModal.closeModal}
+            />
+        </div>
+    );
+}
+
+// ===============================================
+// Debt Detail Modal
+// ===============================================
+function DebtDetailModal({ open, doc, onClose }: {
+    open: boolean;
+    doc: CommercialDocument | null;
+    onClose: () => void;
+}) {
+    if (!doc) return null;
+
+    const isOverdue = doc.due_date && new Date(doc.due_date) < new Date();
+    const percentPaid = doc.total_ttc > 0 ? Math.round((doc.amount_paid / doc.total_ttc) * 100) : 0;
+    const daysLate = doc.due_date
+        ? Math.floor((new Date().getTime() - new Date(doc.due_date).getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+
+    return (
+        <Modal
+            open={open} onClose={onClose} size="md"
+            title={`تفاصيل — ${doc.document_number}`}
+            subtitle={doc.party?.name || 'عميل عابر'}
+            footer={
+                <>
+                    <Button onClick={onClose}>إغلاق</Button>
+                    <Button variant="primary" icon={<i className="ti ti-cash"/>}>تسجيل دفعة</Button>
+                </>
+            }
+        >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Status */}
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 16px',
+                    background: isOverdue ? 'var(--redb)' : 'var(--goldb)',
+                    border: `1px solid ${isOverdue ? 'var(--redbo)' : 'var(--goldbo)'}`,
+                    borderRadius: 'var(--r2)'
+                }}>
+                    <span className="ic ic-sm" style={{ color: isOverdue ? 'var(--red)' : 'var(--gold)' }}>
+                        <i className={`ti ${isOverdue ? 'ti-alert-triangle' : 'ti-clock'}`}/>
+                    </span>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--t1)' }}>
+                            {isOverdue ? `متأخرة بـ ${daysLate} يوم` : 'معلقة'}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 2 }}>
+                            تاريخ الاستحقاق: {doc.due_date ? new Date(doc.due_date).toLocaleDateString('ar-DZ') : 'غير محدد'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Summary */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {[
+                        { label: 'الإجمالي TTC', value: doc.total_ttc.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }), color: 'var(--em)' },
+                        { label: 'المدفوع', value: doc.amount_paid.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }), color: 'var(--em)' },
+                        { label: 'المتبقي', value: doc.amount_remaining.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }), color: 'var(--red)' },
+                        { label: 'TVA', value: doc.total_tva.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }), color: 'var(--t3)' },
+                    ].map(item => (
+                        <div key={item.label} style={{
+                            padding: 10, background: 'var(--bg3)', borderRadius: 'var(--r2)',
+                            border: '1px solid var(--b1)'
+                        }}>
+                            <div style={{ fontSize: 10, color: 'var(--t4)', marginBottom: 4 }}>{item.label}</div>
+                            <div style={{ fontWeight: 700, color: item.color }}>{item.value} دج</div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Progress */}
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                        <span style={{ color: 'var(--t3)' }}>نسبة التحصيل</span>
+                        <span style={{ fontWeight: 700, color: percentPaid > 50 ? 'var(--em)' : 'var(--red)' }}>{percentPaid}%</span>
+                    </div>
+                    <ProgressBar value={percentPaid} color={percentPaid > 50 ? 'var(--em)' : 'var(--red)'} height={8} />
+                </div>
+
+                {/* Dates */}
+                <div>
+                    {[
+                        { label: 'تاريخ الفاتورة', value: new Date(doc.document_date).toLocaleDateString('ar-DZ') },
+                        { label: 'تاريخ الاستحقاق', value: doc.due_date ? new Date(doc.due_date).toLocaleDateString('ar-DZ') : '—' },
+                        { label: 'تاريخ الإنشاء', value: new Date(doc.created_at).toLocaleDateString('ar-DZ') },
+                    ].map(row => (
+                        <div key={row.label} className="sr">
+                            <span className="sr-l">{row.label}</span>
+                            <span className="sr-v">{row.value}</span>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Client Info */}
+                {doc.party && (
+                    <div style={{
+                        padding: 12, background: 'var(--bg3)', borderRadius: 'var(--r2)',
+                        border: '1px solid var(--b1)'
+                    }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t4)', marginBottom: 8 }}>
+                            معلومات العميل
+                        </div>
+                        <div className="sr">
+                            <span className="sr-l">الاسم</span>
+                            <span className="sr-v">{doc.party.name}</span>
+                        </div>
+                        {doc.party.phone && (
+                            <div className="sr">
+                                <span className="sr-l">الهاتف</span>
+                                <span className="sr-v">{doc.party.phone}</span>
+                            </div>
+                        )}
+                        {doc.party.nif && (
+                            <div className="sr">
+                                <span className="sr-l">NIF</span>
+                                <span className="sr-v" style={{ fontFamily: 'monospace', fontSize: 12 }}>{doc.party.nif}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </Modal>
+    );
+}
+```
+
+## FILE: resources/js/pages/expenses/ExpensesPage.tsx
+```
+// resources/js/pages/finance/FinancePage.tsx
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useModal } from '@/hooks/useModal';
+import { useTreasuryAccounts, usePaymentModes, useTreasuryAccountTypes } from '@/hooks/useData';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import KpiCard from '@/components/ui/KpiCard';
+import EmptyState from '@/components/ui/EmptyState';
+import apiClient from '@/lib/api/client';
+import type { TreasuryAccount, PaymentMode, TreasuryAccountType } from '@/types';
+
+export default function FinancePage() {
+    const [activeTab, setActiveTab] = useState('accounts');
+    const accountModal = useModal();
+    const modeModal = useModal();
+    const qc = useQueryClient();
+
+    const { data: accounts, isLoading: loadingAccounts } = useTreasuryAccounts();
+    const { data: paymentModes, isLoading: loadingModes } = usePaymentModes();
+    const { data: accountTypes } = useTreasuryAccountTypes();
+
+    const totalBalance = accounts?.reduce((sum: number, acc: TreasuryAccount) => sum + acc.balance, 0) ?? 0;
+    const bankBalance = accounts?.filter((a: TreasuryAccount) => a.type === 'bank').reduce((sum: number, acc: TreasuryAccount) => sum + acc.balance, 0) ?? 0;
+    const cashBalance = accounts?.filter((a: TreasuryAccount) => a.type === 'cash').reduce((sum: number, acc: TreasuryAccount) => sum + acc.balance, 0) ?? 0;
+
+    const deleteAccount = useMutation({
+        mutationFn: (id: number) => apiClient.delete(`/treasury-accounts/${id}`),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ['treasury-accounts'] }),
+    });
+
+    return (
+        <div className="page on" id="p-finance">
+            <PageHeader
+                title="الخزينة والمالية"
+                subtitle="إدارة الحسابات البنكية والصناديق وطرق الدفع"
+                actions={
+                    <>
+                        <Button variant="primary" size="sm" icon={<i className="ti ti-plus"/>} onClick={activeTab === 'accounts' ? accountModal.openModal : modeModal.openModal}>
+                            {activeTab === 'accounts' ? 'حساب جديد' : 'طريقة دفع جديدة'}
+                        </Button>
+                    </>
+                }
+            />
+
+            <div className="tabs" style={{ marginBottom: 20 }}>
+                <div className={`tab ${activeTab === 'accounts' ? 'on' : ''}`} onClick={() => setActiveTab('accounts')}>الحسابات والصناديق</div>
+                <div className={`tab ${activeTab === 'modes' ? 'on' : ''}`} onClick={() => setActiveTab('modes')}>طرق الدفع</div>
+            </div>
+
+            <div className="kpis" style={{ marginBottom: 16 }}>
+                <KpiCard variant="green" icon="ti-wallet" label="إجمالي الأرصدة" value={totalBalance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
+                <KpiCard variant="blue" icon="ti-building-bank" label="الرصيد البنكي" value={bankBalance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
+                <KpiCard variant="gold" icon="ti-cash" label="الرصيد النقدي" value={cashBalance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
+                <KpiCard variant="purple" icon="ti-file-text" label="عدد الحسابات" value={accounts?.length ?? 0} />
+            </div>
+
+            {activeTab === 'accounts' && (
+                <Card title="الحسابات البنكية والصناديق" noHeader style={{ padding: 0 }}>
+                    <div className="tw">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>الاسم</th>
+                                    <th>النوع</th>
+                                    <th>الكود</th>
+                                    <th>البنك</th>
+                                    <th>الرصيد الحالي</th>
+                                    <th>الافتراضي</th>
+                                    <th>الحالة</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loadingAccounts ? (
+                                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)' }}>جاري التحميل...</td></tr>
+                                ) : accounts?.length === 0 ? (
+                                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)' }}>لا توجد حسابات</td></tr>
+                                ) : accounts?.map((acc: TreasuryAccount) => (
+                                    <tr key={acc.id}>
+                                        <td className="s">{acc.name}</td>
+                                        <td><Badge variant={acc.type === 'bank' ? 'info' : 'warning'}>{acc.type === 'bank' ? 'حساب بنكي' : 'صندوق نقدي'}</Badge></td>
+                                        <td className="m">{acc.code ?? '—'}</td>
+                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>{acc.type === 'bank' ? acc.name : '—'}</td>
+                                        <td className="e">{acc.balance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
+                                        <td>{acc.is_default ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span> : '—'}</td>
+                                        <td><Badge variant={acc.active ? 'success' : 'danger'}>{acc.active ? 'نشط' : 'موقوف'}</Badge></td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 3 }}>
+                                                <Button size="xs" icon={<i className="ti ti-pencil"/>} />
+                                                <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => deleteAccount.mutate(acc.id)} />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+
+            {activeTab === 'modes' && (
+                <Card title="طرق الدفع" noHeader style={{ padding: 0 }}>
+                    <div className="tw">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>الاسم</th>
+                                    <th>الكود</th>
+                                    <th>الحساب المرتبط</th>
+                                    <th>يتطلب مرجع</th>
+                                    <th>الحالة</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loadingModes ? (
+                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)' }}>جاري التحميل...</td></tr>
+                                ) : paymentModes?.length === 0 ? (
+                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)' }}>لا توجد طرق دفع</td></tr>
+                                ) : paymentModes?.map((mode: PaymentMode) => (
+                                    <tr key={mode.id}>
+                                        <td className="s">{mode.name}</td>
+                                        <td className="m">{mode.code}</td>
+                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>—</td>
+                                        <td>{mode.requires_reference ? 'نعم' : 'لا'}</td>
+                                        <td><Badge variant={mode.active ? 'success' : 'danger'}>{mode.active ? 'نشط' : 'موقوف'}</Badge></td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 3 }}>
+                                                <Button size="xs" icon={<i className="ti ti-pencil"/>} />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+
+            <AccountModal open={accountModal.open} onClose={accountModal.closeModal} />
+        </div>
+    );
+}
+
+function AccountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+    const qc = useQueryClient();
+    const { data: accountTypes } = useTreasuryAccountTypes();
+
+    const [form, setForm] = useState({
+        name: '',
+        code: '',
+        treasury_account_type_id: '',
+        bank_name: '',
+        account_number: '',
+        rib: '',
+        initial_balance: '0',
+        is_default: false,
+    });
+
+    const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }));
+
+    const saveMutation = useMutation({
+        mutationFn: (data: typeof form) => apiClient.post('/treasury-accounts', {
+            ...data,
+            treasury_account_type_id: parseInt(data.treasury_account_type_id) || null,
+            initial_balance: parseFloat(data.initial_balance) || 0,
+        }),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['treasury-accounts'] }); onClose(); },
+    });
+
+    return (
+        <Modal open={open} onClose={onClose} title="حساب مالي جديد" size="md"
+            footer={
+                <>
+                    <Button onClick={onClose}>إلغاء</Button>
+                    <Button variant="primary" onClick={() => saveMutation.mutate(form)} disabled={!form.name || saveMutation.isPending}>
+                        {saveMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
+                    </Button>
+                </>
+            }>
+            <div className="fgrid">
+                <div className="fg s2">
+                    <label className="req">اسم الحساب</label>
+                    <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="مثال: الصندوق الرئيسي" />
+                </div>
+                <div className="fg">
+                    <label>الكود</label>
+                    <input value={form.code} onChange={e => set('code', e.target.value)} placeholder="CP01" />
+                </div>
+                <div className="fg">
+                    <label className="req">النوع</label>
+                    <select value={form.treasury_account_type_id} onChange={e => set('treasury_account_type_id', e.target.value)}>
+                        <option value="">— اختر —</option>
+                        {accountTypes?.map((at: TreasuryAccountType) => (
+                            <option key={at.id} value={at.id}>{at.label}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="fg">
+                    <label>اسم البنك</label>
+                    <input value={form.bank_name} onChange={e => set('bank_name', e.target.value)} />
+                </div>
+                <div className="fg">
+                    <label>رقم الحساب</label>
+                    <input value={form.account_number} onChange={e => set('account_number', e.target.value)} style={{ fontFamily: 'monospace' }} />
+                </div>
+                <div className="fg">
+                    <label>RIB</label>
+                    <input value={form.rib} onChange={e => set('rib', e.target.value)} style={{ fontFamily: 'monospace' }} />
+                </div>
+                <div className="fg">
+                    <label>الرصيد الافتتاحي</label>
+                    <div className="inp-row">
+                        <input type="number" value={form.initial_balance} onChange={e => set('initial_balance', e.target.value)} />
+                        <div className="inp-suf">دج</div>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+```
+
 ## FILE: resources/js/pages/files.zip
 ```
 PK    "��\�9  )  
@@ -5718,6 +6554,1602 @@ C�t�!��崏ܣ>�K��L^e�$Os�1��9zDq�ࠊ⛊�{,;���ܛ{.�}�ڿ<S4�f�\�����fWo�
 �O,�Y��Cs�8�t B(Li4an٧cB�� Ϫ�@��[{�\-��mC?A�ݚ�I��O�nMm�q/�LYP��B��	��v[H��YVGz��)�K�N>����?+zڥ��Ǐ7`��M��~آ�0@�+w~���p���!���A��	��ee~'W%�y�>$�=�2F""�<<�GII�̏4���F�v��h��J�˖�6��"`OX�"L{�����H�k���|I(eKsi����$�v�U�(���f����l�"JO��t�c
 �TJ�'�@�RgP��[49N�YU��>*O�����"�e�X޷�ba�\|x�ـ1d\aU�l�����<��_PK    "��\�9  )  
            �    CHANGES.mdPK    "��\��b�               �0  routes_index.tsxPK    "��\&��  |=             �	  DashboardLayout.tsxPK    "��\Ww@  �             �6  useSetupWizard.tsPK    "��\�8�  o             ��  useLookup.tsPK    "��\���h  I             ��!  LookupPage.tsxPK    "��\D�鯛  �             �53  UnitsPage.tsxPK    "��\E�O�  �             ��4  CurrenciesPage.tsxPK    "��\�	� �  �             ��6  BrandsPage.tsxPK    "��\r$�s  Z             ��8  FamiliesPage.tsxPK    "��\�����  �             �P:  WarehousesPage.tsxPK    "��\<��n�  �             �O<  PriceLevelsPage.tsxPK    "��\"���  �             �->  TvasPage.tsxPK        i@    ```
+
+## FILE: resources/js/pages/finance/FinancePage.tsx
+```
+// resources/js/pages/finance/FinancePage.tsx
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useModal } from '@/hooks/useModal';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import KpiCard from '@/components/ui/KpiCard';
+import Switch from '@/components/ui/Switch';
+import EmptyState from '@/components/ui/EmptyState';
+import AlertBar from '@/components/ui/AlertBar';
+import apiClient from '@/lib/api/client';
+import type { TreasuryAccount, PaymentMode } from '@/types';
+
+// ===============================================
+// MAIN COMPONENT
+// ===============================================
+export default function FinancePage() {
+    const [activeTab, setActiveTab] = useState(0);
+    const [editingAccount, setEditingAccount] = useState<TreasuryAccount | null>(null);
+    const [editingMode, setEditingMode] = useState<PaymentMode | null>(null);
+    const accountModal = useModal();
+    const modeModal = useModal();
+    const qc = useQueryClient();
+
+    // جلب الحسابات المالية
+    const { data: accounts, isLoading: loadingAccounts, error: accountsError } = useQuery({
+        queryKey: ['treasury-accounts'],
+        queryFn: () => apiClient.get('/treasury-accounts').then(r => r.data.data),
+    });
+
+    // جلب طرق الدفع
+    const { data: paymentModes, isLoading: loadingModes } = useQuery({
+        queryKey: ['payment-modes'],
+        queryFn: () => apiClient.get('/payment-modes').then(r => r.data.data),
+    });
+
+    // تحويل البيانات: treasuryAccountType يحتوي على name وليس type مباشرة
+    const enrichAccounts = accounts?.map((acc: any) => ({
+        ...acc,
+        type: acc.relations?.treasuryAccountType?.name === 'cash' ? 'cash' : 'bank',
+    })) || [];
+
+    const totalBalance = enrichAccounts.reduce((sum: number, acc: any) => sum + (acc.current_balance || 0), 0) || 0;
+    const bankAccounts = enrichAccounts.filter((a: any) => a.type === 'bank');
+    const cashAccounts = enrichAccounts.filter((a: any) => a.type === 'cash');
+    const bankBalance = bankAccounts.reduce((sum: number, acc: any) => sum + (acc.current_balance || 0), 0);
+    const cashBalance = cashAccounts.reduce((sum: number, acc: any) => sum + (acc.current_balance || 0), 0);
+
+    // حذف حساب
+    const deleteAccount = useMutation({
+        mutationFn: (id: number) => apiClient.delete(`/treasury-accounts/${id}`),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['treasury-accounts'] });
+        },
+    });
+
+    // حذف طريقة دفع
+    const deleteMode = useMutation({
+        mutationFn: (id: number) => apiClient.delete(`/payment-modes/${id}`),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['payment-modes'] });
+        },
+    });
+
+    const openAddAccount = () => { setEditingAccount(null); accountModal.openModal(); };
+    const openEditAccount = (account: TreasuryAccount) => { setEditingAccount(account); accountModal.openModal(); };
+    const openAddMode = () => { setEditingMode(null); modeModal.openModal(); };
+    const openEditMode = (mode: PaymentMode) => { setEditingMode(mode); modeModal.openModal(); };
+
+    return (
+        <div className="page on" id="p-finance">
+            <PageHeader
+                title="الخزينة والمالية"
+                subtitle="إدارة الحسابات البنكية والصناديق وطرق الدفع"
+                actions={
+                    <Button variant="primary" size="sm" icon={<i className="ti ti-plus"/>}
+                        onClick={activeTab === 0 ? openAddAccount : openAddMode}>
+                        {activeTab === 0 ? 'حساب جديد' : 'طريقة دفع جديدة'}
+                    </Button>
+                }
+            />
+
+            {/* Tabs */}
+            <div className="tabs" style={{ marginBottom: 20 }}>
+                <div className={`tab ${activeTab === 0 ? 'on' : ''}`} onClick={() => setActiveTab(0)}>
+                    <span className="ic ic-xs"><i className="ti ti-building-bank"/></span>
+                    الحسابات والصناديق
+                </div>
+                <div className={`tab ${activeTab === 1 ? 'on' : ''}`} onClick={() => setActiveTab(1)}>
+                    <span className="ic ic-xs"><i className="ti ti-credit-card"/></span>
+                    طرق الدفع
+                </div>
+            </div>
+
+            {/* KPIs */}
+            <div className="kpis" style={{ marginBottom: 20 }}>
+                <KpiCard variant="green" icon="ti-wallet" label="إجمالي الأرصدة"
+                    value={totalBalance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج"
+                    sub={`${enrichAccounts.length} حساب`} />
+                <KpiCard variant="blue" icon="ti-building-bank" label="الرصيد البنكي"
+                    value={bankBalance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج"
+                    sub={`${bankAccounts.length} حساب بنكي`} />
+                <KpiCard variant="gold" icon="ti-cash-register" label="الرصيد النقدي"
+                    value={cashBalance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج"
+                    sub={`${cashAccounts.length} صندوق`} />
+                <KpiCard variant="purple" icon="ti-credit-card" label="طرق الدفع"
+                    value={paymentModes?.length ?? 0}
+                    sub={`${paymentModes?.filter((m: PaymentMode) => m.active).length ?? 0} نشطة`} />
+            </div>
+
+            {/* رسالة خطأ إذا فشل جلب البيانات */}
+            {accountsError && (
+                <AlertBar variant="red">
+                    فشل جلب الحسابات المالية. تأكد من اتصالك بالخادم.
+                </AlertBar>
+            )}
+
+            {/* ACCOUNTS TAB */}
+            {activeTab === 0 && (
+                loadingAccounts ? (
+                    <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
+                ) : enrichAccounts.length === 0 ? (
+                    <EmptyState
+                        icon="ti-building-bank"
+                        text="لا توجد حسابات مالية"
+                        sub="أضف أول حساب بنكي أو صندوق نقدي للبدء"
+                        action={<Button variant="primary" onClick={openAddAccount}>إضافة حساب جديد</Button>}
+                    />
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {/* Bank Accounts */}
+                        {bankAccounts.length > 0 && (
+                            <Card
+                                title={<><span className="ic ic-sm" style={{ color: 'var(--blue)' }}><i className="ti ti-building-bank"/></span> الحسابات البنكية</>}
+                                noHeader
+                                style={{ padding: 0 }}
+                            >
+                                <div className="tw">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>الاسم</th>
+                                                <th>الكود</th>
+                                                <th>البنك</th>
+                                                <th>رقم الحساب</th>
+                                                <th>الرصيد</th>
+                                                <th>الافتراضي</th>
+                                                <th>الحالة</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {bankAccounts.map((acc: any) => (
+                                                <tr key={acc.id}>
+                                                    <td className="s">{acc.name}</td>
+                                                    <td className="m">{acc.code || '—'}</td>
+                                                    <td style={{ fontSize: 12, color: 'var(--t3)' }}>{acc.bank_name || '—'}</td>
+                                                    <td className="m" style={{ fontSize: 11 }}>{acc.account_number || acc.rib || acc.iban || '—'}</td>
+                                                    <td className="e">{(acc.current_balance || 0).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
+                                                    <td>{acc.is_default ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span> : '—'}</td>
+                                                    <td><Badge variant={acc.active ? 'success' : 'danger'}>{acc.active ? 'نشط' : 'موقوف'}</Badge></td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: 3 }}>
+                                                            <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEditAccount(acc)}/>
+                                                            <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => deleteAccount.mutate(acc.id)}/>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </Card>
+                        )}
+
+                        {/* Cash Accounts */}
+                        {cashAccounts.length > 0 && (
+                            <Card
+                                title={<><span className="ic ic-sm" style={{ color: 'var(--gold)' }}><i className="ti ti-cash-register"/></span> الصناديق النقدية</>}
+                                noHeader
+                                style={{ padding: 0 }}
+                            >
+                                <div className="tw">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>الاسم</th>
+                                                <th>الكود</th>
+                                                <th>الرصيد</th>
+                                                <th>الرصيد الافتتاحي</th>
+                                                <th>الافتراضي</th>
+                                                <th>الحالة</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {cashAccounts.map((acc: any) => (
+                                                <tr key={acc.id}>
+                                                    <td className="s">{acc.name}</td>
+                                                    <td className="m">{acc.code || '—'}</td>
+                                                    <td className="e">{(acc.current_balance || 0).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
+                                                    <td className="m">{(acc.initial_balance || 0).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
+                                                    <td>{acc.is_default ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span> : '—'}</td>
+                                                    <td><Badge variant={acc.active ? 'success' : 'danger'}>{acc.active ? 'نشط' : 'موقوف'}</Badge></td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: 3 }}>
+                                                            <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEditAccount(acc)}/>
+                                                            <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => deleteAccount.mutate(acc.id)}/>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </Card>
+                        )}
+                    </div>
+                )
+            )}
+
+            {/* PAYMENT MODES TAB */}
+            {activeTab === 1 && (
+                loadingModes ? (
+                    <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
+                ) : !paymentModes || paymentModes.length === 0 ? (
+                    <EmptyState
+                        icon="ti-credit-card"
+                        text="لا توجد طرق دفع"
+                        sub="أضف طريقة دفع جديدة"
+                        action={<Button variant="primary" onClick={openAddMode}>طريقة دفع جديدة</Button>}
+                    />
+                ) : (
+                    <Card noHeader style={{ padding: 0 }}>
+                        <div className="tw">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>الاسم</th>
+                                        <th>الكود</th>
+                                        <th>الحساب</th>
+                                        <th>نقدي</th>
+                                        <th>مرجع</th>
+                                        <th>الحالة</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paymentModes.map((mode: PaymentMode) => (
+                                        <tr key={mode.id}>
+                                            <td className="s">{mode.name}</td>
+                                            <td className="m">{mode.code}</td>
+                                            <td style={{ fontSize: 12, color: 'var(--t3)' }}>—</td>
+                                            <td><Badge variant={mode.is_cash ? 'success' : 'gray'}>{mode.is_cash ? 'نعم' : 'لا'}</Badge></td>
+                                            <td>{mode.requires_reference ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span> : '—'}</td>
+                                            <td><Badge variant={mode.active ? 'success' : 'danger'}>{mode.active ? 'نشط' : 'موقوف'}</Badge></td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 3 }}>
+                                                    <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEditMode(mode)}/>
+                                                    <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => deleteMode.mutate(mode.id)}/>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                )
+            )}
+
+            {/* Account Modal */}
+            <AccountModal
+                open={accountModal.open}
+                account={editingAccount}
+                onClose={accountModal.closeModal}
+            />
+
+            {/* Payment Mode Modal */}
+            <PaymentModeModal
+                open={modeModal.open}
+                mode={editingMode}
+                onClose={modeModal.closeModal}
+            />
+        </div>
+    );
+}
+
+// ===============================================
+// ACCOUNT MODAL - مع useEffect صحيح
+// ===============================================
+function AccountModal({ open, account, onClose }: {
+    open: boolean;
+    account: TreasuryAccount | null;
+    onClose: () => void;
+}) {
+    const isEdit = !!account;
+    const qc = useQueryClient();
+
+    const emptyForm = {
+        name: '',
+        code: '',
+        type: 'bank' as 'bank' | 'cash',
+        bank_name: '',
+        account_number: '',
+        rib: '',
+        iban: '',
+        swift_bic: '',
+        currency: 'DZD',
+        initial_balance: 0,
+        current_balance: 0,
+        is_default: false,
+        active: true,
+        notes: '',
+        treasury_account_type_id: null as number | null,
+    };
+
+    const [form, setForm] = useState(emptyForm);
+    const [error, setError] = useState('');
+
+    // إعادة تعيين النموذج
+    useEffect(() => {
+        if (open) {
+            if (account) {
+                const acc = account as any;
+                setForm({
+                    name: acc.name || '',
+                    code: acc.code || '',
+                    type: acc.type || (acc.relations?.treasuryAccountType?.name === 'cash' ? 'cash' : 'bank'),
+                    bank_name: acc.bank_name || '',
+                    account_number: acc.account_number || '',
+                    rib: acc.rib || '',
+                    iban: acc.iban || '',
+                    swift_bic: acc.swift_bic || '',
+                    currency: acc.currency || 'DZD',
+                    initial_balance: acc.initial_balance || 0,
+                    current_balance: acc.current_balance || 0,
+                    is_default: acc.is_default || false,
+                    active: acc.active ?? true,
+                    notes: acc.notes || '',
+                    treasury_account_type_id: acc.treasury_account_type_id || null,
+                });
+            } else {
+                setForm(emptyForm);
+            }
+            setError('');
+        }
+    }, [open, account]);
+
+    const set = (k: string, v: string | boolean | number | null) => {
+        setForm(f => ({ ...f, [k]: v }));
+        setError('');
+    };
+
+    const saveMutation = useMutation({
+        mutationFn: (data: typeof form) => {
+            const payload: any = {
+                name: data.name,
+                code: data.code || null,
+                treasury_account_type_id: data.type === 'cash' ? 2 : 1, // 1=bank, 2=cash
+                bank_name: data.type === 'bank' ? data.bank_name : null,
+                account_number: data.type === 'bank' ? data.account_number : null,
+                rib: data.type === 'bank' ? data.rib : null,
+                iban: data.type === 'bank' ? data.iban : null,
+                swift_bic: data.type === 'bank' ? data.swift_bic : null,
+                currency: data.currency,
+                initial_balance: data.initial_balance,
+                current_balance: data.current_balance,
+                is_default: data.is_default,
+                active: data.active,
+                notes: data.notes || null,
+            };
+
+            if (isEdit) {
+                return apiClient.put(`/treasury-accounts/${account!.id}`, payload);
+            }
+            return apiClient.post('/treasury-accounts', payload);
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['treasury-accounts'] });
+            onClose();
+        },
+        onError: (err: any) => {
+            const msg = err?.response?.data?.message || 'فشل الحفظ. تحقق من البيانات وحاول مجدداً.';
+            setError(msg);
+        },
+    });
+
+    const handleSave = () => {
+        if (!form.name.trim()) {
+            setError('اسم الحساب مطلوب');
+            return;
+        }
+        saveMutation.mutate(form);
+    };
+
+    return (
+        <Modal
+            open={open} onClose={onClose} size="lg"
+            title={isEdit ? `تعديل — ${(account as any)?.name || ''}` : 'حساب مالي جديد'}
+            subtitle={isEdit ? '' : 'إضافة حساب بنكي أو صندوق نقدي'}
+            footer={
+                <>
+                    <Button onClick={onClose}>إلغاء</Button>
+                    <Button variant="primary" icon={<i className="ti ti-device-floppy"/>}
+                        onClick={handleSave}
+                        disabled={saveMutation.isPending}>
+                        {saveMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
+                    </Button>
+                </>
+            }
+        >
+            {error && (
+                <AlertBar variant="red">{error}</AlertBar>
+            )}
+
+            <div className="fgrid c2">
+                <div className="fg s2">
+                    <label className="req">اسم الحساب</label>
+                    <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="مثال: الحساب الجاري BNA" autoFocus />
+                </div>
+                <div className="fg">
+                    <label>الكود</label>
+                    <input value={form.code} onChange={e => set('code', e.target.value)} placeholder="CP01" />
+                </div>
+                <div className="fg">
+                    <label className="req">النوع</label>
+                    <select value={form.type} onChange={e => set('type', e.target.value)}>
+                        <option value="bank">🏦 حساب بنكي</option>
+                        <option value="cash">💵 صندوق نقدي</option>
+                    </select>
+                </div>
+
+                {form.type === 'bank' && (
+                    <>
+                        <div className="fg">
+                            <label>اسم البنك</label>
+                            <input value={form.bank_name} onChange={e => set('bank_name', e.target.value)} placeholder="BNA" />
+                        </div>
+                        <div className="fg">
+                            <label>رقم الحساب</label>
+                            <input value={form.account_number} onChange={e => set('account_number', e.target.value)} placeholder="00000000000" style={{ fontFamily: 'monospace' }} />
+                        </div>
+                        <div className="fg">
+                            <label>RIB</label>
+                            <input value={form.rib} onChange={e => set('rib', e.target.value)} placeholder="00799999000XXXXXXXX00" style={{ fontFamily: 'monospace' }} />
+                        </div>
+                        <div className="fg">
+                            <label>IBAN</label>
+                            <input value={form.iban} onChange={e => set('iban', e.target.value)} placeholder="DZ..." style={{ fontFamily: 'monospace' }} />
+                        </div>
+                        <div className="fg">
+                            <label>SWIFT / BIC</label>
+                            <input value={form.swift_bic} onChange={e => set('swift_bic', e.target.value)} placeholder="BNAL...DZ" style={{ fontFamily: 'monospace' }} />
+                        </div>
+                    </>
+                )}
+
+                <div className="fg">
+                    <label>الرصيد الافتتاحي</label>
+                    <div className="inp-row">
+                        <input type="number" value={form.initial_balance} onChange={e => set('initial_balance', parseFloat(e.target.value) || 0)} />
+                        <div className="inp-suf">دج</div>
+                    </div>
+                </div>
+                <div className="fg">
+                    <label>الرصيد الحالي</label>
+                    <div className="inp-row">
+                        <input type="number" value={form.current_balance} onChange={e => set('current_balance', parseFloat(e.target.value) || 0)} />
+                        <div className="inp-suf">دج</div>
+                    </div>
+                </div>
+                <div className="fg s2">
+                    <label>ملاحظات</label>
+                    <textarea value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="ملاحظات إضافية..." rows={2} />
+                </div>
+                <div className="fg" style={{ justifyContent: 'flex-end' }}>
+                    <label>افتراضي</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <Switch checked={form.is_default} onChange={(v) => set('is_default', v)} />
+                    </div>
+                </div>
+                <div className="fg" style={{ justifyContent: 'flex-end' }}>
+                    <label>نشط</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <Switch checked={form.active} onChange={(v) => set('active', v)} />
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
+// ===============================================
+// PAYMENT MODE MODAL - مع useEffect صحيح
+// ===============================================
+function PaymentModeModal({ open, mode, onClose }: {
+    open: boolean;
+    mode: PaymentMode | null;
+    onClose: () => void;
+}) {
+    const isEdit = !!mode;
+    const qc = useQueryClient();
+
+    const { data: treasuryAccounts } = useQuery({
+        queryKey: ['treasury-accounts'],
+        queryFn: () => apiClient.get('/treasury-accounts').then(r => r.data.data),
+        enabled: open,
+    });
+
+    const emptyForm = {
+        name: '',
+        code: '',
+        description: '',
+        treasury_account_id: '' as string | number,
+        requires_reference: false,
+        is_cash: false,
+        active: true,
+        display_order: 0,
+    };
+
+    const [form, setForm] = useState(emptyForm);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (open) {
+            if (mode) {
+                setForm({
+                    name: mode.name || '',
+                    code: mode.code || '',
+                    description: (mode as any).description || '',
+                    treasury_account_id: (mode as any).treasury_account_id || '',
+                    requires_reference: mode.requires_reference || false,
+                    is_cash: mode.is_cash || false,
+                    active: mode.active ?? true,
+                    display_order: (mode as any).display_order || 0,
+                });
+            } else {
+                setForm(emptyForm);
+            }
+            setError('');
+        }
+    }, [open, mode]);
+
+    const set = (k: string, v: string | boolean | number) => setForm(f => ({ ...f, [k]: v }));
+
+    const saveMutation = useMutation({
+        mutationFn: (data: typeof form) => {
+            const payload: any = {
+                name: data.name,
+                code: data.code,
+                description: data.description || null,
+                treasury_account_id: data.treasury_account_id ? parseInt(data.treasury_account_id as string) : null,
+                requires_reference: data.requires_reference,
+                is_cash: data.is_cash,
+                active: data.active,
+                display_order: data.display_order,
+            };
+
+            if (isEdit) {
+                return apiClient.put(`/payment-modes/${mode!.id}`, payload);
+            }
+            return apiClient.post('/payment-modes', payload);
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['payment-modes'] });
+            onClose();
+        },
+        onError: (err: any) => {
+            const msg = err?.response?.data?.message || 'فشل الحفظ. تحقق من البيانات.';
+            setError(msg);
+        },
+    });
+
+    return (
+        <Modal
+            open={open} onClose={onClose} size="md"
+            title={isEdit ? `تعديل — ${mode?.name || ''}` : 'طريقة دفع جديدة'}
+            footer={
+                <>
+                    <Button onClick={onClose}>إلغاء</Button>
+                    <Button variant="primary" icon={<i className="ti ti-device-floppy"/>}
+                        onClick={() => saveMutation.mutate(form)}
+                        disabled={saveMutation.isPending || !form.name.trim() || !form.code.trim()}>
+                        {saveMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
+                    </Button>
+                </>
+            }
+        >
+            {error && <AlertBar variant="red">{error}</AlertBar>}
+
+            <div className="fgrid">
+                <div className="fg s2">
+                    <label className="req">الاسم</label>
+                    <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="نقداً، شيك، CIB..." autoFocus />
+                </div>
+                <div className="fg">
+                    <label className="req">الكود</label>
+                    <input value={form.code} onChange={e => set('code', e.target.value)} placeholder="cash, check, cib" style={{ fontFamily: 'monospace' }} />
+                </div>
+                <div className="fg">
+                    <label>الحساب الافتراضي</label>
+                    <select value={form.treasury_account_id as string} onChange={e => set('treasury_account_id', e.target.value)}>
+                        <option value="">— اختر —</option>
+                        {(treasuryAccounts || []).map((acc: any) => (
+                            <option key={acc.id} value={acc.id}>{acc.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="fg">
+                    <label>ترتيب العرض</label>
+                    <input type="number" value={form.display_order} onChange={e => set('display_order', parseInt(e.target.value) || 0)} />
+                </div>
+                <div className="fg" style={{ justifyContent: 'flex-end' }}>
+                    <label>نقدي</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <Switch checked={form.is_cash} onChange={(v) => set('is_cash', v)} />
+                    </div>
+                </div>
+                <div className="fg" style={{ justifyContent: 'flex-end' }}>
+                    <label>يتطلب مرجع</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <Switch checked={form.requires_reference} onChange={(v) => set('requires_reference', v)} />
+                    </div>
+                </div>
+                <div className="fg" style={{ justifyContent: 'flex-end' }}>
+                    <label>نشط</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <Switch checked={form.active} onChange={(v) => set('active', v)} />
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+```
+
+## FILE: resources/js/pages/fiscal/FiscalYearsPage.tsx
+```
+// ════════════════════════════════════════════════════════════
+// resources/js/pages/fiscal/FiscalYearsPage.tsx
+// النسخة النهائية المُحسَّنة — تجمع أفضل الميزات
+// ════════════════════════════════════════════════════════════
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useModal } from '@/hooks/useModal';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import KpiCard from '@/components/ui/KpiCard';
+import AlertBar from '@/components/ui/AlertBar';
+import ProgressBar from '@/components/ui/ProgressBar';
+import EmptyState from '@/components/ui/EmptyState';
+import apiClient from '@/lib/api/client';
+import type { FiscalYear } from '@/types';
+
+// ─────────────────────────────────────────────────────────────
+// Date helpers — timezone-safe (من النسخة المُحسَّنة)
+// ─────────────────────────────────────────────────────────────
+const extractDate = (date: unknown): string => {
+    if (!date) return '';
+    const m = String(date).match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
+};
+
+const fmtDate = (date: unknown): string => {
+    const d = extractDate(date);
+    if (!d) return '—';
+    const [y, m, day] = d.split('-');
+    return `${day}/${m}/${y}`;
+};
+
+const daysBetween = (start: string, end: string): number => {
+    const [y1, m1, d1] = start.split('-').map(Number);
+    const [y2, m2, d2] = end.split('-').map(Number);
+    return Math.round((new Date(y2, m2 - 1, d2).getTime() - new Date(y1, m1 - 1, d1).getTime()) / 86_400_000);
+};
+
+const calcProgress = (startStr: string, endStr: string): number => {
+    const total = daysBetween(startStr, endStr);
+    if (total <= 0) return 0;
+    const [y1, m1, d1] = startStr.split('-').map(Number);
+    const elapsed = Math.max(0, Math.min(
+        (Date.now() - new Date(y1, m1 - 1, d1).getTime()) / 86_400_000,
+        total
+    ));
+    return Math.round((elapsed / total) * 100);
+};
+
+const toInput = extractDate;
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+const safeNextYear = (yearName: string): number => {
+    const m = String(yearName ?? '').match(/(\d{4})/);
+    if (m) { const n = parseInt(m[1], 10); if (!isNaN(n)) return n + 1; }
+    const direct = parseInt(String(yearName ?? ''), 10);
+    if (!isNaN(direct)) return direct + 1;
+    return new Date().getFullYear() + 1;
+};
+
+const resolveClosedByName = (year: FiscalYear): string => {
+    const y = year as unknown as Record<string, unknown>;
+    for (const key of ['closed_by_user', 'closedBy', 'relations']) {
+        const v = y[key];
+        if (v && typeof v === 'object') {
+            const obj = v as Record<string, unknown>;
+            // relations.closedBy
+            const inner = (obj as any)?.closedBy || obj;
+            if (typeof inner?.name === 'string' && inner.name.trim()) return inner.name.trim();
+            if (inner?.id) return `المستخدم #${inner.id}`;
+        }
+    }
+    const cb = y['closed_by'];
+    if (cb && (typeof cb === 'number' || (typeof cb === 'string' && !isNaN(Number(cb))))) {
+        return `المستخدم #${cb}`;
+    }
+    return '—';
+};
+
+const parseApiError = (err: unknown, fallback: string): string => {
+    const e = err as {
+        response?: {
+            data?: {
+                message?: string;
+                error?: string;
+                errors?: Record<string, string[]>;
+            };
+        };
+        message?: string;
+    };
+    if (e?.response?.data?.errors) {
+        const first = Object.values(e.response.data.errors)[0];
+        if (first?.[0]) return first[0];
+    }
+    if (e?.response?.data?.message) return e.response.data.message;
+    if (e?.response?.data?.error) return e.response.data.error;
+    if (e?.message) return e.message;
+    return fallback;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Checklist الإقفال
+// ─────────────────────────────────────────────────────────────
+const CLOSURE_CHECKLIST = [
+    { id: 1, label: 'التحقق من توازن الميزانية (Balance Sheet)', dz: 'المادة 131 SCF' },
+    { id: 2, label: "مراجعة قيود التسوية الجردية (Écritures d'inventaire)", dz: 'المادة 132 SCF' },
+    { id: 3, label: 'ترحيل نتيجة الدورة إلى الأموال الخاصة', dz: 'المادة 137 SCF' },
+    { id: 4, label: 'تسوية الأرصدة الدائنة والمدينة مع الأطراف', dz: 'دليل المحاسبة الوطني' },
+    { id: 5, label: 'الإقرار بالضرائب (TVA G50 + IBS/IRG)', dz: 'قانون الضرائب المباشرة' },
+    { id: 6, label: 'التحقق من جرد المخزون (CUMP/FIFO)', dz: 'المادة 218 SCF' },
+];
+
+// ─────────────────────────────────────────────────────────────
+// Status Badge
+// ─────────────────────────────────────────────────────────────
+function StatusBadge({ year }: { year: FiscalYear }) {
+    if (year.is_current) return <Badge variant="success"><i className="ti ti-star-filled" style={{ fontSize: 11, color: 'var(--gold)' }}/> الحالية</Badge>;
+    if (year.is_closed) return <Badge variant="danger"><i className="ti ti-lock" style={{ fontSize: 11 }}/> مقفلة</Badge>;
+    return <Badge variant="info">مفتوحة</Badge>;
+}
+
+// ════════════════════════════════════════════════════════════
+// MAIN PAGE
+// ════════════════════════════════════════════════════════════
+export default function FiscalYearsPage() {
+    const qc = useQueryClient();
+
+    const [editingYear, setEditingYear] = useState<FiscalYear | null>(null);
+    const [closingYear, setClosingYear] = useState<FiscalYear | null>(null);
+    const [viewingYear, setViewingYear] = useState<FiscalYear | null>(null);
+
+    const addModal = useModal();
+    const closeModal = useModal();
+    const detailModal = useModal();
+
+    const { data, isLoading, isError, refetch } = useQuery({
+        queryKey: ['fiscal-years'],
+        queryFn: () => apiClient
+            .get('/fiscal-years', { params: { include: 'closedBy', per_page: 50 } })
+            .then(r => r.data.data as FiscalYear[]),
+        staleTime: 60_000,
+    });
+
+    const years = data ?? [];
+    const currentYear = years.find(y => y.is_current);
+    const openYears = years.filter(y => !y.is_closed);
+    const closedYears = years.filter(y => y.is_closed);
+
+    // تذكير G50
+    const g50Reminder = useMemo(() => {
+        if (!currentYear) return null;
+        const endDate = extractDate(currentYear.end_date);
+        const diff = Math.round((new Date(endDate).getTime() - Date.now()) / 86_400_000);
+        return diff > 0 && diff <= 60 ? diff : null;
+    }, [currentYear]);
+
+    // تعيين سنة كحالية
+    const setCurrent = useMutation({
+        mutationFn: (id: number) => apiClient.put(`/fiscal-years/${id}`, { is_current: true }),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ['fiscal-years'] }),
+    });
+
+    // حذف سنة
+    const deleteYear = useMutation({
+        mutationFn: (id: number) => apiClient.delete(`/fiscal-years/${id}`),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ['fiscal-years'] }),
+    });
+
+    const openAdd = () => { setEditingYear(null); addModal.openModal(); };
+    const openEdit = (y: FiscalYear) => { if (!y.is_closed) { setEditingYear(y); addModal.openModal(); } };
+    const openClose = (y: FiscalYear) => { setClosingYear(y); closeModal.openModal(); };
+    const openDetail = (y: FiscalYear) => { setViewingYear(y); detailModal.openModal(); };
+
+    const handleDelete = async (y: FiscalYear) => {
+        if (y.is_closed || y.is_current) return;
+        if (!confirm(`هل أنت متأكد من حذف السنة المالية "${y.name}"؟`)) return;
+        deleteYear.mutate(y.id);
+    };
+
+    return (
+        <div className="page on" id="p-fiscalyears">
+
+            <PageHeader
+                title="السنوات المالية"
+                subtitle={`إدارة الفترات المحاسبية وفق SCF — الحالية: ${currentYear?.name ?? 'غير محددة'}`}
+                actions={
+                    <Button variant="primary" size="sm" icon={<i className="ti ti-calendar-plus"/>} onClick={openAdd}>
+                        سنة مالية جديدة
+                    </Button>
+                }
+            />
+
+            {/* تنبيهات */}
+            {isError && (
+                <AlertBar variant="red">
+                    فشل تحميل السنوات المالية.{' '}
+                    <button onClick={() => refetch()} style={{ fontWeight: 700, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>
+                        إعادة المحاولة
+                    </button>
+                </AlertBar>
+            )}
+
+            {g50Reminder !== null && (
+                <AlertBar variant="gold">
+                    <strong>تذكير G50:</strong> تبقّى <strong>{g50Reminder} يوماً</strong> على نهاية السنة المالية {currentYear?.name}.
+                </AlertBar>
+            )}
+
+            {openYears.length > 1 && (
+                <AlertBar variant="gold">
+                    يوجد <strong>{openYears.length} سنوات مفتوحة</strong> — يُنصح بإقفال السنوات القديمة.
+                </AlertBar>
+            )}
+
+            {/* KPIs */}
+            <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
+                <KpiCard variant="green" icon="ti-calendar-check"
+                    label="السنة المالية الحالية" value={currentYear?.name ?? '—'}
+                    sub={currentYear ? `${fmtDate(currentYear.start_date)} — ${fmtDate(currentYear.end_date)}` : 'لم تُحدَّد بعد'} />
+                <KpiCard variant="blue" icon="ti-lock-open"
+                    label="سنوات مفتوحة" value={openYears.length}
+                    sub={`${openYears.filter(y => y.is_current).length} حالية`} />
+                <KpiCard variant="red" icon="ti-lock"
+                    label="سنوات مقفلة" value={closedYears.length}
+                    sub="مؤرشفة نهائياً" />
+                <KpiCard variant="gold" icon="ti-calendar"
+                    label="إجمالي الفترات" value={years.length}
+                    sub={currentYear && !currentYear.is_closed ? `${calcProgress(toInput(currentYear.start_date), toInput(currentYear.end_date))}٪ مكتمل` : '—'} />
+            </div>
+
+            {/* شريط تقدم السنة الحالية */}
+            {currentYear && !currentYear.is_closed && (() => {
+                const s = toInput(currentYear.start_date), e = toInput(currentYear.end_date);
+                const progress = calcProgress(s, e), total = daysBetween(s, e);
+                const elapsed = Math.round(progress / 100 * total), remaining = total - elapsed;
+                return (
+                    <Card
+                        title={<><span className="ic ic-sm" style={{ color: 'var(--em)' }}><i className="ti ti-calendar-stats"/></span> تقدم السنة المالية — {currentYear.name}</>}
+                        style={{ marginBottom: 18 }}
+                    >
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 20, alignItems: 'center' }}>
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
+                                    <span style={{ color: 'var(--t4)' }}>{fmtDate(s)}</span>
+                                    <span style={{ fontWeight: 700, color: 'var(--em)' }}>{progress}٪</span>
+                                    <span style={{ color: 'var(--t4)' }}>{fmtDate(e)}</span>
+                                </div>
+                                <ProgressBar value={progress} color={progress > 80 ? 'var(--gold)' : 'var(--em)'} height={10} />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11, color: 'var(--t4)' }}>
+                                    <span>مضى: <strong style={{ color: 'var(--t2)' }}>{elapsed} يوم</strong></span>
+                                    <span>متبقي: <strong style={{ color: remaining < 90 ? 'var(--gold)' : 'var(--t2)' }}>{remaining} يوم</strong></span>
+                                    <span>الإجمالي: <strong style={{ color: 'var(--t2)' }}>{total} يوم</strong></span>
+                                </div>
+                            </div>
+                            {remaining < 90 && (
+                                <div style={{ padding: '10px 16px', background: 'var(--goldb)', border: '1px solid var(--goldbo)', borderRadius: 'var(--r2)', textAlign: 'center', minWidth: 140 }}>
+                                    <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--gold)', lineHeight: 1 }}>{remaining}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>يوماً على نهاية السنة</div>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                );
+            })()}
+
+            {/* جدول السنوات */}
+            {isLoading ? (
+                <div className="empty">
+                    <div className="empty-ic"><i className="ti ti-loader"/></div>
+                    <div className="empty-tx">جاري التحميل...</div>
+                </div>
+            ) : years.length === 0 ? (
+                <EmptyState icon="ti-calendar-off" text="لا توجد سنوات مالية" sub="أنشئ سنتك المالية الأولى"
+                    action={<Button variant="primary" onClick={openAdd}><i className="ti ti-plus"/> سنة مالية جديدة</Button>} />
+            ) : (
+                <Card noHeader style={{ padding: 0 }}>
+                    <div className="tw">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>السنة المالية</th>
+                                    <th>بداية الفترة</th>
+                                    <th>نهاية الفترة</th>
+                                    <th>المدة</th>
+                                    <th>التقدم</th>
+                                    <th>الحالة</th>
+                                    <th>الإقفال</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {years.map(y => {
+                                    const s = toInput(y.start_date), e = toInput(y.end_date);
+                                    const total = daysBetween(s, e);
+                                    const months = Math.round(total / 30.44);
+                                    const progress = y.is_closed ? 100 : calcProgress(s, e);
+                                    const closedByName = resolveClosedByName(y);
+
+                                    return (
+                                        <tr key={y.id} style={{ ...(y.is_current ? { background: 'var(--emb)' } : {}), cursor: 'pointer' }}
+                                            onClick={() => openDetail(y)}>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <div style={{
+                                                        width: 36, height: 36, borderRadius: 10,
+                                                        background: y.is_closed ? 'var(--bg4)' : y.is_current ? 'var(--emb)' : 'var(--blueb)',
+                                                        border: `1px solid ${y.is_closed ? 'var(--b2)' : y.is_current ? 'var(--embo)' : 'var(--bluebo)'}`,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    }}>
+                                                        <i className={`ti ${y.is_closed ? 'ti-lock' : y.is_current ? 'ti-star-filled' : 'ti-calendar'}`}
+                                                            style={{ fontSize: 16, color: y.is_closed ? 'var(--t4)' : y.is_current ? 'var(--gold)' : 'var(--blue)' }}/>
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--t1)' }}>{y.name}</div>
+                                                        <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>
+                                                            {y.is_current ? '★ الحالية' : y.is_closed ? '🔒 مقفلة' : 'مفتوحة'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="m">{fmtDate(y.start_date)}</td>
+                                            <td className="m">{fmtDate(y.end_date)}</td>
+                                            <td style={{ fontSize: 12, color: 'var(--t3)' }}>{months} شهراً</td>
+                                            <td style={{ minWidth: 120 }}>
+                                                {y.is_closed ? (
+                                                    <span style={{ fontSize: 11, color: 'var(--t4)', fontStyle: 'italic' }}>مكتملة</span>
+                                                ) : (
+                                                    <div>
+                                                        <ProgressBar value={progress} color={y.is_current ? 'var(--em)' : 'var(--blue)'} height={6}/>
+                                                        <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 3, textAlign: 'left' }}>{progress}٪</div>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td><StatusBadge year={y}/></td>
+                                            <td style={{ fontSize: 11, color: 'var(--t4)' }}>
+                                                {y.is_closed ? (
+                                                    <div>
+                                                        <div>{fmtDate(y.closed_at)}</div>
+                                                        {closedByName !== '—' && <div style={{ color: 'var(--t3)' }}>{closedByName}</div>}
+                                                    </div>
+                                                ) : '—'}
+                                            </td>
+                                            <td onClick={e => e.stopPropagation()}>
+                                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                    <Button size="xs" icon={<i className="ti ti-eye"/>} onClick={() => openDetail(y)}/>
+                                                    {!y.is_closed && (
+                                                        <>
+                                                            {!y.is_current && (
+                                                                <Button size="xs" variant="info" icon={<i className="ti ti-star"/>}
+                                                                    onClick={() => setCurrent.mutate(y.id)} disabled={setCurrent.isPending}/>
+                                                            )}
+                                                            <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(y)}/>
+                                                            {y.is_current && (
+                                                                <Button size="xs" variant="warning" icon={<i className="ti ti-lock"/>} onClick={() => openClose(y)}>إقفال</Button>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+
+            {/* Modals */}
+            <FiscalYearModal open={addModal.open} year={editingYear} years={years} onClose={addModal.closeModal}/>
+            <CloseYearModal open={closeModal.open} year={closingYear} onClose={closeModal.closeModal}/>
+            <FiscalYearDetailModal open={detailModal.open} year={viewingYear}
+                onClose={detailModal.closeModal}
+                onClose2={() => { detailModal.closeModal(); openClose(viewingYear!); }}/>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODAL: إضافة / تعديل
+// ─────────────────────────────────────────────────────────────
+function FiscalYearModal({ open, year, years, onClose }: {
+    open: boolean; year: FiscalYear | null; years: FiscalYear[]; onClose: () => void;
+}) {
+    const isEdit = !!year;
+    const qc = useQueryClient();
+    const nextY = new Date().getFullYear();
+
+    const [form, setForm] = useState({ name: '', start_date: '', end_date: '', is_current: false });
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (!open) return;
+        setError('');
+        if (year) {
+            setForm({ name: year.name, start_date: toInput(year.start_date), end_date: toInput(year.end_date), is_current: year.is_current });
+        } else {
+            const suggested = years.length > 0
+                ? Math.max(...years.map(y => safeNextYear(y.name) - 1)) + 1
+                : nextY;
+            setForm({
+                name: String(suggested),
+                start_date: `${suggested}-01-01`,
+                end_date: `${suggested}-12-31`,
+                is_current: years.length === 0,
+            });
+        }
+    }, [open, year, years.length]);
+
+    const set = (k: string, v: string | boolean) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
+
+    const overlapError = useMemo(() => {
+        if (!form.start_date || !form.end_date) return '';
+        for (const y of years.filter(y => !isEdit || y.id !== year?.id)) {
+            const s = toInput(y.start_date), e = toInput(y.end_date);
+            if (form.start_date <= e && form.end_date >= s)
+                return `تتداخل مع السنة المالية ${y.name} (${fmtDate(s)} — ${fmtDate(e)})`;
+        }
+        if (form.start_date >= form.end_date) return 'تاريخ البداية يجب أن يكون قبل تاريخ النهاية';
+        return '';
+    }, [form.start_date, form.end_date, years, year?.id, isEdit]);
+
+    const duration = form.start_date && form.end_date && !overlapError
+        ? `${Math.round(daysBetween(form.start_date, form.end_date) / 30.44)} شهراً`
+        : null;
+
+    const saveMut = useMutation({
+        mutationFn: (d: typeof form) => {
+            const payload = { name: d.name, start_date: d.start_date, end_date: d.end_date, is_current: d.is_current };
+            return isEdit ? apiClient.put(`/fiscal-years/${year!.id}`, payload) : apiClient.post('/fiscal-years', payload);
+        },
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['fiscal-years'] }); onClose(); },
+        onError: (err: unknown) => {
+            const msg = parseApiError(err, 'فشل الحفظ. تحقق من البيانات.');
+            setError(msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('already')
+                ? `اسم السنة المالية "${form.name}" موجود مسبقاً` : msg);
+        },
+    });
+
+    return (
+        <Modal open={open} onClose={onClose} size="md"
+            title={isEdit ? `تعديل — ${year?.name}` : 'سنة مالية جديدة'}
+            subtitle={isEdit ? 'تعديل بيانات السنة المالية' : 'وفق النظام المحاسبي المالي SCF'}
+            footer={
+                <>
+                    <Button onClick={onClose}>إلغاء</Button>
+                    <Button variant="primary" icon={<i className="ti ti-device-floppy"/>}
+                        onClick={() => saveMut.mutate(form)}
+                        disabled={!(form.name && form.start_date && form.end_date && !overlapError && !saveMut.isPending)}>
+                        {saveMut.isPending ? 'جاري الحفظ...' : 'حفظ'}
+                    </Button>
+                </>
+            }>
+            {(error || overlapError) && <AlertBar variant="red">{error || overlapError}</AlertBar>}
+
+            <div style={{ background: 'var(--blueb)', border: '1px solid var(--bluebo)', borderRadius: 'var(--r2)', padding: '8px 14px', marginBottom: 16, display: 'flex', gap: 8, fontSize: 12, color: 'var(--t2)' }}>
+                <i className="ti ti-info-circle" style={{ color: 'var(--blue)', fontSize: 15, flexShrink: 0 }}/>
+                السنة المالية في الجزائر: <strong>01 يناير — 31 ديسمبر</strong> (المرسوم 08-156)
+            </div>
+
+            <div className="fgrid" style={{ gap: 14 }}>
+                <div className="fg s2">
+                    <label className="req">اسم السنة المالية</label>
+                    <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="مثال: 2025" autoFocus/>
+                    <span style={{ fontSize: 10, color: 'var(--t4)', marginTop: 2 }}>يُنصح باستخدام السنة الميلادية</span>
+                </div>
+                <div className="fg">
+                    <label className="req">تاريخ البداية</label>
+                    <input type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)}/>
+                </div>
+                <div className="fg">
+                    <label className="req">تاريخ النهاية</label>
+                    <input type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} min={form.start_date}/>
+                </div>
+                {duration && !overlapError && (
+                    <div className="fg s2">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: 'var(--emb)', border: '1px solid var(--embo)', borderRadius: 'var(--r2)' }}>
+                            <i className="ti ti-check" style={{ color: 'var(--em)', fontSize: 16 }}/>
+                            <span style={{ fontSize: 13, color: 'var(--em)', fontWeight: 700 }}>
+                                المدة: {duration} ({daysBetween(form.start_date, form.end_date)} يوم)
+                            </span>
+                        </div>
+                    </div>
+                )}
+                <div className="fg s2">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg3)', border: '1px solid var(--b2)', borderRadius: 'var(--r2)' }}>
+                        <div>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>تعيين كسنة حالية</div>
+                            <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 2 }}>ستُلغى الحالية الأخرى تلقائياً</div>
+                        </div>
+                        <div className={`sw ${form.is_current ? 'on' : ''}`} onClick={() => set('is_current', !form.is_current)}/>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODAL: إقفال السنة المالية (مع Checklist)
+// ─────────────────────────────────────────────────────────────
+function CloseYearModal({ open, year, onClose }: {
+    open: boolean; year: FiscalYear | null; onClose: () => void;
+}) {
+    const qc = useQueryClient();
+    const [notes, setNotes] = useState('');
+    const [error, setError] = useState('');
+    const [checked, setChecked] = useState<Set<number>>(new Set());
+    const [step, setStep] = useState<'checklist' | 'confirm' | 'success'>('checklist');
+
+    useEffect(() => {
+        if (open) { setNotes(''); setError(''); setChecked(new Set()); setStep('checklist'); }
+    }, [open]);
+
+    const allChecked = checked.size === CLOSURE_CHECKLIST.length;
+    const nextYearName = year ? safeNextYear(year.name) : null;
+
+    const closeMut = useMutation({
+        mutationFn: (id: number) => apiClient.post(`/fiscal-years/${id}/close`, { notes: notes || null }),
+        onSuccess: async () => {
+            setStep('success');
+            await qc.refetchQueries({ queryKey: ['fiscal-years'] });
+            setTimeout(onClose, 800);
+        },
+        onError: (err: unknown) => {
+            setError(parseApiError(err, 'فشل إقفال السنة المالية. تحقق من المتطلبات.'));
+        },
+    });
+
+    if (!year) return null;
+
+    return (
+        <Modal
+            open={open} onClose={onClose} size="md"
+            title={
+                step === 'success'
+                    ? <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <i className="ti ti-circle-check" style={{ color: 'var(--em)', fontSize: 20 }}/>
+                        تم الإقفال بنجاح
+                    </span>
+                    : <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <i className="ti ti-alert-triangle" style={{ color: 'var(--red)', fontSize: 20 }}/>
+                        إقفال السنة المالية {year.name}
+                    </span>
+            }
+            footer={
+                step === 'success' ? null : (
+                    <>
+                        <Button onClick={onClose} disabled={closeMut.isPending}>إلغاء</Button>
+                        {step === 'checklist' ? (
+                            <Button variant="warning" icon={<i className="ti ti-arrow-left"/>}
+                                onClick={() => setStep('confirm')} disabled={!allChecked}>
+                                المتابعة للتأكيد
+                            </Button>
+                        ) : (
+                            <Button variant="danger" icon={<i className="ti ti-lock"/>}
+                                onClick={() => closeMut.mutate(year.id)} disabled={closeMut.isPending}>
+                                {closeMut.isPending ? 'جاري الإقفال...' : 'تأكيد الإقفال النهائي'}
+                            </Button>
+                        )}
+                    </>
+                )
+            }>
+            {step === 'success' ? (
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <div style={{
+                        width: 64, height: 64, borderRadius: '50%',
+                        background: 'var(--emb)', border: '2px solid var(--embo)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '0 auto 16px',
+                    }}>
+                        <i className="ti ti-circle-check" style={{ fontSize: 32, color: 'var(--em)' }}/>
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)', marginBottom: 6 }}>
+                        تم إقفال {year.name} بنجاح
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--t4)' }}>
+                        جاري إنشاء السنة {nextYearName} وترحيل الأرصدة...
+                    </div>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {/* تحذير */}
+                    <div style={{ display: 'flex', gap: 10, padding: '10px 14px', background: 'var(--redb)', border: '1px solid var(--redbo)', borderRadius: 'var(--r2)' }}>
+                        <i className="ti ti-lock" style={{ color: 'var(--red)', fontSize: 18, flexShrink: 0, marginTop: 1 }}/>
+                        <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.7 }}>
+                            <strong>تحذير نهائي:</strong> بعد الإقفال لا يمكن إضافة أو تعديل أي مستند في هذه السنة.
+                        </div>
+                    </div>
+
+                    {step === 'checklist' && (
+                        <>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', display: 'flex', justifyContent: 'space-between' }}>
+                                <span>قائمة تحقق الإقفال — SCF</span>
+                                <span style={{ color: allChecked ? 'var(--em)' : 'var(--t4)' }}>{checked.size}/{CLOSURE_CHECKLIST.length}</span>
+                            </div>
+                            {CLOSURE_CHECKLIST.map(item => (
+                                <label key={item.id} style={{
+                                    display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+                                    background: checked.has(item.id) ? 'var(--emb)' : 'var(--bg3)',
+                                    border: `1px solid ${checked.has(item.id) ? 'var(--embo)' : 'var(--b2)'}`,
+                                    borderRadius: 'var(--r2)', cursor: 'pointer',
+                                }}>
+                                    <input type="checkbox" checked={checked.has(item.id)}
+                                        onChange={() => setChecked(prev => {
+                                            const n = new Set(prev);
+                                            n.has(item.id) ? n.delete(item.id) : n.add(item.id);
+                                            return n;
+                                        })}
+                                        style={{ accentColor: 'var(--em)', width: 16, height: 16, flexShrink: 0 }}/>
+                                    <div>
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: checked.has(item.id) ? 'var(--em)' : 'var(--t1)' }}>{item.label}</div>
+                                        <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>{item.dz}</div>
+                                    </div>
+                                </label>
+                            ))}
+                        </>
+                    )}
+
+                    {step === 'confirm' && (
+                        <>
+                            {error && <AlertBar variant="red">{error}</AlertBar>}
+                            <div className="fg">
+                                <label>ملاحظات الإقفال (اختياري)</label>
+                                <textarea value={notes} onChange={e => setNotes(e.target.value)}
+                                    placeholder="ملاحظات للمدقق..." rows={3} style={{ resize: 'vertical' }}/>
+                            </div>
+                            <div style={{ padding: '10px 14px', background: 'var(--bg3)', border: '1px solid var(--b2)', borderRadius: 'var(--r2)', fontSize: 12, color: 'var(--t4)' }}>
+                                <i className="ti ti-calendar-plus" style={{ fontSize: 14, marginLeft: 6 }}/>
+                                سيتم إنشاء السنة المالية <strong>{nextYearName ?? '(التالية)'}</strong> تلقائياً.
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+        </Modal>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODAL: تفاصيل السنة المالية
+// ─────────────────────────────────────────────────────────────
+function FiscalYearDetailModal({ open, year, onClose, onClose2 }: {
+    open: boolean; year: FiscalYear | null; onClose: () => void; onClose2: () => void;
+}) {
+    if (!year) return null;
+
+    const s = toInput(year.start_date), e = toInput(year.end_date);
+    const totalDays = daysBetween(s, e);
+    const progress = year.is_closed ? 100 : calcProgress(s, e);
+    const elapsed = Math.round(progress / 100 * totalDays);
+    const closedByName = resolveClosedByName(year);
+    const closingNotes = (year as unknown as { closing_notes?: string }).closing_notes;
+
+    return (
+        <Modal open={open} onClose={onClose} size="md"
+            title={`السنة المالية — ${year.name}`}
+            subtitle={year.is_closed ? 'مقفلة نهائياً' : year.is_current ? 'السنة الحالية' : 'مفتوحة'}
+            footer={
+                <>
+                    {!year.is_closed && year.is_current && (
+                        <Button variant="warning" icon={<i className="ti ti-lock"/>} onClick={onClose2}>إقفال السنة</Button>
+                    )}
+                    <Button onClick={onClose}>إغلاق</Button>
+                </>
+            }>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Status */}
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                    background: year.is_closed ? 'var(--redb)' : year.is_current ? 'var(--emb)' : 'var(--blueb)',
+                    border: `1px solid ${year.is_closed ? 'var(--redbo)' : year.is_current ? 'var(--embo)' : 'var(--bluebo)'}`,
+                    borderRadius: 'var(--r2)',
+                }}>
+                    <i className={`ti ${year.is_closed ? 'ti-lock' : year.is_current ? 'ti-star-filled' : 'ti-calendar'}`}
+                        style={{ fontSize: 24, color: year.is_closed ? 'var(--red)' : year.is_current ? 'var(--gold)' : 'var(--blue)' }}/>
+                    <div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)' }}>
+                            {year.is_closed ? 'مقفلة' : year.is_current ? 'السنة الحالية' : 'مفتوحة'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Info */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {[
+                        { label: 'اسم السنة', value: year.name },
+                        { label: 'المدة', value: `${Math.round(totalDays / 30.44)} شهراً — ${totalDays} يوم` },
+                        { label: 'تاريخ البداية', value: fmtDate(year.start_date) },
+                        { label: 'تاريخ النهاية', value: fmtDate(year.end_date) },
+                    ].map(({ label, value }) => (
+                        <div key={label} style={{ padding: '10px 12px', background: 'var(--bg3)', border: '1px solid var(--b1)', borderRadius: 'var(--r2)' }}>
+                            <div style={{ fontSize: 10, color: 'var(--t4)', marginBottom: 4 }}>{label}</div>
+                            <div style={{ fontWeight: 700, color: 'var(--t1)', fontSize: 13 }}>{value}</div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Progress */}
+                {!year.is_closed && (
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                            <span style={{ color: 'var(--t3)' }}>نسبة الإنجاز</span>
+                            <span style={{ fontWeight: 700, color: 'var(--em)' }}>{progress}٪</span>
+                        </div>
+                        <ProgressBar value={progress} height={8}/>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: 'var(--t4)' }}>
+                            <span>مضى: {elapsed} يوم</span>
+                            <span>متبقي: {totalDays - elapsed} يوم</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Closure info */}
+                {year.is_closed && (
+                    <div style={{ padding: '12px 14px', background: 'var(--bg3)', border: '1px solid var(--b2)', borderRadius: 'var(--r2)' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t4)', marginBottom: 10 }}>معلومات الإقفال</div>
+                        <div className="sr"><span className="sr-l">تاريخ الإقفال</span><span className="sr-v">{fmtDate(year.closed_at)}</span></div>
+                        <div className="sr"><span className="sr-l">أُقفلت بواسطة</span><span className="sr-v">{closedByName}</span></div>
+                        {closingNotes && <div className="sr"><span className="sr-l">ملاحظات</span><span className="sr-v" style={{ fontSize: 11 }}>{closingNotes}</span></div>}
+                    </div>
+                )}
+            </div>
+        </Modal>
+    );
+}
+```
+
+## FILE: resources/js/pages/fiscal/TvaPage.tsx
+```
+// resources/js/pages/fiscal/TvaPage.tsx
+import React, { useState } from 'react';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import KpiCard from '@/components/ui/KpiCard';
+import ProgressBar from '@/components/ui/ProgressBar';
+
+// Static data for demonstration (will be replaced by API later)
+const TVA_SUMMARY = {
+    totalCollected: 237196.00,
+    totalDeductible: -46588.00,
+    netToPay: 190608.00,
+    submitted: false,
+    deadline: '2024-05-20', // Usually the 20th of next month
+};
+
+const TVA_TRANSACTIONS = [
+    { id: 1, date: '2024-04-25', description: 'فاتورة رقم #0342', client: 'بوزيد أحمد', amount: 45000.00, tva: 8550.00, type: 'collected' },
+    { id: 2, date: '2024-04-24', description: 'فاتورة رقم #0341', client: 'فاطمة بن علي', amount: 8200.00, tva: 1558.00, type: 'collected' },
+    { id: 3, date: '2024-04-22', description: 'شراء بضاعة', supplier: 'مورد الجملة', amount: 50000.00, tva: 9500.00, type: 'deductible' },
+    { id: 4, date: '2024-04-20', description: 'فاتورة رقم #0340', client: 'الشركة الوطنية', amount: 152000.00, tva: 28880.00, type: 'collected' },
+    { id: 5, date: '2024-04-18', description: 'مصاريف كهرباء', supplier: 'سونلغاز', amount: 12000.00, tva: 1080.00, type: 'deductible' },
+    { id: 6, date: '2024-04-15', description: 'فاتورة رقم #0339', client: 'كمال دبيح', amount: 5800.00, tva: 1102.00, type: 'collected' },
+    { id: 7, date: '2024-04-10', description: 'شراء أثاث', supplier: 'الأثاث العصري', amount: 35000.00, tva: 6650.00, type: 'deductible' },
+];
+
+export default function TvaPage() {
+    const [period, setPeriod] = useState('2024-04');
+    const [declarationType, setDeclarationType] = useState<'G50' | 'G12'>('G50');
+
+    const totalTvaCollected = TVA_TRANSACTIONS
+        .filter(t => t.type === 'collected')
+        .reduce((sum, t) => sum + t.tva, 0);
+
+    const totalTvaDeductible = TVA_TRANSACTIONS
+        .filter(t => t.type === 'deductible')
+        .reduce((sum, t) => sum + t.tva, 0);
+
+    const netTva = totalTvaCollected - totalTvaDeductible;
+
+    return (
+        <div className="page on" id="p-tva">
+            <PageHeader
+                title="إقرار TVA"
+                subtitle={`إقرار ${declarationType} — ${new Date(period + '-01').toLocaleDateString('ar-DZ', { month: 'long', year: 'numeric' })}`}
+                actions={
+                    <>
+                        <Button size="sm" icon={<i className="ti ti-file-export"/>}>تصدير Excel</Button>
+                        <Button size="sm" icon={<i className="ti ti-printer"/>}>طباعة</Button>
+                        <Button variant="primary" size="sm" icon={<i className="ti ti-send"/>} disabled={TVA_SUMMARY.submitted}>
+                            {TVA_SUMMARY.submitted ? 'تم التصريح' : 'تقديم الإقرار'}
+                        </Button>
+                    </>
+                }
+            />
+
+            {/* Type selector */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                <Button
+                    variant={declarationType === 'G50' ? 'primary' : 'default'}
+                    size="sm"
+                    onClick={() => setDeclarationType('G50')}
+                >
+                    G50 — شهري
+                </Button>
+                <Button
+                    variant={declarationType === 'G12' ? 'primary' : 'default'}
+                    size="sm"
+                    onClick={() => setDeclarationType('G12')}
+                >
+                    G12 — ربع سنوي
+                </Button>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="kpis" style={{ marginBottom: 20 }}>
+                <KpiCard
+                    variant="green"
+                    icon="ti-arrow-up-circle"
+                    label="TVA محصلة"
+                    value={totalTvaCollected.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+                    unit="دج"
+                    sub="من الفواتير والمبيعات"
+                />
+                <KpiCard
+                    variant="blue"
+                    icon="ti-arrow-down-circle"
+                    label="TVA مستردة"
+                    value={totalTvaDeductible.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+                    unit="دج"
+                    sub="من المشتريات والمصاريف"
+                />
+                <KpiCard
+                    variant="red"
+                    icon="ti-calculator"
+                    label="المستحق للدولة"
+                    value={netTva.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+                    unit="دج"
+                    sub={`آخر أجل: ${new Date(TVA_SUMMARY.deadline).toLocaleDateString('ar-DZ')}`}
+                />
+                <KpiCard
+                    variant="purple"
+                    icon="ti-file-check"
+                    label="حالة الإقرار"
+                    value={TVA_SUMMARY.submitted ? 'مقدم' : 'قيد الإعداد'}
+                    sub={TVA_SUMMARY.submitted ? 'بانتظار المراجعة' : 'لم يقدم بعد'}
+                />
+            </div>
+
+            {/* Summary Card */}
+            <div className="g2" style={{ marginBottom: 20 }}>
+                <Card title="ملخص الإقرار" subtitle={`${declarationType} — ${new Date(period + '-01').toLocaleDateString('ar-DZ', { month: 'long', year: 'numeric' })}`}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {[
+                            { label: 'رقم الإقرار', value: declarationType === 'G50' ? 'G50-04-2024' : 'G12-T1-2024', mono: true },
+                            { label: 'الفترة القانونية', value: new Date(period + '-01').toLocaleDateString('ar-DZ', { month: 'long', year: 'numeric' }) },
+                            { label: 'المبيعات الإجمالية HT', value: `${(totalTvaCollected / 0.19).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج` },
+                            { label: 'TVA محصلة (19%)', value: `${totalTvaCollected.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج`, color: 'var(--em)' },
+                            { label: 'المشتريات الإجمالية HT', value: `${(totalTvaDeductible / 0.19).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج` },
+                            { label: 'TVA قابلة للخصم', value: `${totalTvaDeductible.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج`, color: 'var(--blue)' },
+                        ].map((row) => (
+                            <div key={row.label} className="sr">
+                                <span className="sr-l">{row.label}</span>
+                                <span className="sr-v" style={row.color ? { fontFamily: row.mono ? 'monospace' : undefined, color: 'var(--t1)', fontWeight: 700 } : { fontFamily: row.mono ? 'monospace' : undefined }}>
+                                    {row.value}
+                                </span>
+                            </div>
+                        ))}
+                        <div style={{ borderTop: '1px solid var(--b3)', paddingTop: 12, marginTop: 4 }}>
+                            <div className="sr">
+                                <span className="sr-l" style={{ fontWeight: 800, color: 'var(--t1)' }}>المبلغ المستحق للدفع</span>
+                                <span className="sr-v" style={{ fontSize: 18, fontWeight: 900, color: 'var(--red)' }}>
+                                    {netTva.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+
+                <Card title="نسبة الامتثال الضريبي" subtitle="آخر 6 أشهر">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {[
+                            { month: 'نوفمبر 2023', percent: 100 },
+                            { month: 'ديسمبر 2023', percent: 100 },
+                            { month: 'جانفي 2024', percent: 100 },
+                            { month: 'فيفري 2024', percent: 85 },
+                            { month: 'مارس 2024', percent: 100 },
+                            { month: 'أفريل 2024', percent: 100 },
+                        ].map((m) => (
+                            <div key={m.month}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                                    <span style={{ color: 'var(--t3)' }}>{m.month}</span>
+                                    <span style={{ fontWeight: 700, color: m.percent < 100 ? 'var(--red)' : 'var(--em)' }}>{m.percent}%</span>
+                                </div>
+                                <ProgressBar value={m.percent} color={m.percent < 100 ? 'var(--red)' : 'var(--em)'} height={4} />
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+            </div>
+
+            {/* Transactions Detail */}
+            <Card title="تفاصيل العمليات" subtitle="حركات TVA للفترة المحددة">
+                <div className="tw">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>البيان</th>
+                                <th>الطرف</th>
+                                <th>المبلغ HT</th>
+                                <th>TVA</th>
+                                <th>النوع</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {TVA_TRANSACTIONS.map((trans) => (
+                                <tr key={trans.id}>
+                                    <td className="m">{new Date(trans.date).toLocaleDateString('fr-DZ')}</td>
+                                    <td className="s">{trans.description}</td>
+                                    <td style={{ color: 'var(--t3)' }}>{trans.client || trans.supplier}</td>
+                                    <td className="m">{trans.amount.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
+                                    <td className={trans.type === 'collected' ? 'e' : 'r'}>
+                                        {trans.type === 'deductible' ? '- ' : ''}{trans.tva.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج
+                                    </td>
+                                    <td>
+                                        <Badge variant={trans.type === 'collected' ? 'success' : 'info'}>
+                                            {trans.type === 'collected' ? 'محصلة' : 'قابلة للخصم'}
+                                        </Badge>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, padding: '12px 0', borderTop: '1px solid var(--b2)' }}>
+                    <div>
+                        <span style={{ fontSize: 12, color: 'var(--t4)' }}>إجمالي TVA المحصلة: </span>
+                        <strong style={{ color: 'var(--em)' }}>{totalTvaCollected.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</strong>
+                    </div>
+                    <div>
+                        <span style={{ fontSize: 12, color: 'var(--t4)' }}>إجمالي TVA القابلة للخصم: </span>
+                        <strong style={{ color: 'var(--red)' }}>- {totalTvaDeductible.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</strong>
+                    </div>
+                    <div>
+                        <span style={{ fontSize: 12, color: 'var(--t4)' }}>الصافي المستحق: </span>
+                        <strong style={{ color: 'var(--red)', fontSize: 15 }}>{netTva.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</strong>
+                    </div>
+                </div>
+            </Card>
+        </div>
+    );
+}
+```
 
 ## FILE: resources/js/pages/inventory/InventoryPage.tsx
 ```
@@ -6588,6 +9020,7 @@ export default function CurrenciesPage() {
 ```
 // ════════════════════════════════════════════════
 // resources/js/pages/lookups/FamiliesPage.tsx
+// ✅ v3: parent_id كـ remote-select من /families
 // ════════════════════════════════════════════════
 import LookupPage from './LookupPage';
 
@@ -6600,8 +9033,38 @@ export default function FamiliesPage() {
       icon="ti-folder-open"
       color="var(--purple)"
       fields={[
-        { key: 'name',        label: 'اسم الفئة',   required: true,  placeholder: 'مثال: أغذية' },
-        { key: 'description', label: 'الوصف',        type: 'textarea', showInTable: false        },
+        { key: 'name',
+          label: 'اسم الفئة',
+          required: true,
+          placeholder: 'مثال: أغذية ومشروبات' },
+
+        // ✅ parent_id: remote-select من نفس الـ endpoint
+        { key: 'parent_id',
+          label: 'الفئة الأم',
+          type: 'remote-select',
+          remoteEndpoint: '/families',
+          remoteLabel: 'name',
+          remoteValue: 'id',
+          remotePlaceholder: '— فئة رئيسية (بدون أم) —',
+          // في الجدول نعرض اسم الفئة الأم بدل الـ id
+          showInTable: true },
+
+        { key: 'active',
+          label: 'نشط',
+          type: 'select',
+          badge: true,
+          options: [{ value: 1, label: 'نعم' }, { value: 0, label: 'لا' }] },
+
+        { key: 'display_order',
+          label: 'ترتيب العرض',
+          type: 'number',
+          showInTable: false,
+          placeholder: '0' },
+
+        { key: 'description',
+          label: 'الوصف',
+          type: 'textarea',
+          showInTable: false },
       ]}
     />
   );
@@ -6612,66 +9075,263 @@ export default function FamiliesPage() {
 ```
 // ════════════════════════════════════════════════
 // resources/js/pages/lookups/LookupPage.tsx
-// مكوّن عام لصفحات CRUD البسيطة
+// v3: يدعم cascade select (wilaya → commune)
 // ════════════════════════════════════════════════
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLookup } from '@/hooks/useLookup';
+import apiClient from '@/lib/api/client';
 
 // ── Types ──────────────────────────────────────
 export interface FieldDef {
   key:          string;
   label:        string;
-  type?:        'text' | 'number' | 'select' | 'textarea';
+  type?:        'text' | 'number' | 'select' | 'textarea' | 'remote-select';
   placeholder?: string;
   options?:     { value: string | number; label: string }[];
+
+  // remote-select
+  remoteEndpoint?:    string;
+  remoteLabel?:       string;     // افتراضي: 'arabic_name' إن وُجد وإلا 'name'
+  remoteValue?:       string;     // افتراضي: 'id'
+  remotePlaceholder?: string;
+  remoteParams?:      Record<string, any>;  // params ثابتة إضافية
+
+  // cascade: هذا الحقل يُصفَّى بناءً على قيمة حقل آخر
+  cascadeParent?: string;         // مفتاح الحقل الأب (مثال: 'wilaya_id')
+  cascadeParam?:  string;         // اسم الـ param المُرسَل (مثال: 'filter[wilaya_id]')
+
   required?:    boolean;
-  /** عرض في الجدول */
   showInTable?: boolean;
-  /** يُعرض في الجدول كـ badge */
   badge?:       boolean;
-  badgeColor?:  string;
+  renderCell?:  (value: any, item: any, labels: RemoteLabels) => React.ReactNode;
 }
 
+export type RemoteLabels = Record<string, Record<string | number, string>>;
+
 export interface LookupPageProps {
-  /** عنوان الصفحة العربي */
-  title:    string;
-  /** اسم المورد بالعربي (للرسائل) */
-  resource: string;
-  /** مسار الـ API */
-  endpoint: string;
-  /** تعريفات الحقول */
-  fields:   FieldDef[];
-  /** لون الأيقونة */
-  color?:   string;
-  /** أيقونة الصفحة */
-  icon?:    string;
-  /** هل يدعم الكلمة المفردة؟ */
+  title:      string;
+  resource:   string;
+  endpoint:   string;
+  fields:     FieldDef[];
+  color?:     string;
+  icon?:      string;
   emptyText?: string;
 }
 
-// ── Modal ──────────────────────────────────────
-function Modal({
-  title, children, onClose, saving,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-  saving: boolean;
+// ════════════════════════════════════════════════
+// Hook: يجلب خيارات remote-select
+// parentValue: إذا تغيّر يُعيد الجلب مع param إضافي
+// ════════════════════════════════════════════════
+function useRemoteOptions(
+  endpoint?: string,
+  labelField = 'name',
+  valueField = 'id',
+  extraParams: Record<string, any> = {},
+  cascadeParam?: string,
+  parentValue?: any,
+) {
+  const [options, setOptions] = useState<{ value: string | number; label: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetch = useCallback(() => {
+    if (!endpoint) return;
+    // إذا كان هناك cascade ولم تُختَر قيمة الأب بعد — نفرّغ الخيارات
+    if (cascadeParam && !parentValue) {
+      setOptions([]);
+      return;
+    }
+    setLoading(true);
+    const params: Record<string, any> = { per_page: 500, ...extraParams };
+    if (cascadeParam && parentValue) params[cascadeParam] = parentValue;
+
+    apiClient.get(endpoint, { params })
+      .then(res => {
+        const raw = res.data as any;
+        const items: any[] = Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw?.data?.data)
+            ? raw.data.data
+            : [];
+        setOptions(items.map(i => ({
+          value: i[valueField] ?? i.id,
+          // نفضّل arabic_name إذا طُلب labelField='name' وكان arabic_name موجوداً
+          label: i[labelField] ?? i.arabic_name ?? i.name ?? String(i.id),
+        })));
+      })
+      .catch(() => setOptions([]))
+      .finally(() => setLoading(false));
+  }, [endpoint, labelField, valueField, cascadeParam, parentValue,
+      JSON.stringify(extraParams)]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { options, loading, refetch: fetch };
+}
+
+// ════════════════════════════════════════════════
+// RemoteSelect — يدعم cascade
+// ════════════════════════════════════════════════
+function RemoteSelect({ field, value, onChange, parentValue }: {
+  field:       FieldDef;
+  value:       any;
+  onChange:    (v: any) => void;
+  parentValue?: any;
+}) {
+  const { options, loading } = useRemoteOptions(
+    field.remoteEndpoint,
+    field.remoteLabel  ?? 'arabic_name',
+    field.remoteValue  ?? 'id',
+    field.remoteParams ?? {},
+    field.cascadeParam,
+    parentValue,
+  );
+
+  // عند تغيّر الأب، نصفّر قيمة هذا الحقل
+  useEffect(() => {
+    if (field.cascadeParent && parentValue !== undefined) {
+      onChange('');
+    }
+  }, [parentValue]);
+
+  const isDisabled = loading || (!!field.cascadeParent && !parentValue);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <select
+        value={value ?? ''}
+        onChange={e => onChange(e.target.value)}
+        disabled={isDisabled}
+        style={{
+          width: '100%', padding: '8px 12px', borderRadius: 'var(--r2)',
+          border: `1px solid ${isDisabled ? 'var(--b2)' : 'var(--b3)'}`,
+          background: isDisabled ? 'var(--bg2)' : 'var(--bg1)',
+          color: (value && !isDisabled) ? 'var(--t1)' : 'var(--t4)',
+          fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
+          cursor: isDisabled ? 'not-allowed' : 'pointer',
+        }}
+      >
+        <option value="">
+          {loading
+            ? 'جارٍ التحميل...'
+            : (field.cascadeParent && !parentValue)
+              ? `— اختر ${getCascadeParentLabel(field)} أولاً —`
+              : (field.remotePlaceholder ?? `— اختر ${field.label} —`)}
+        </option>
+        {options.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      {loading && (
+        <i className="ti ti-loader-2" style={{
+          position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+          fontSize: 13, color: 'var(--t4)', animation: 'spin .8s linear infinite',
+        }} />
+      )}
+      {/* عدد الخيارات */}
+      {!loading && options.length > 0 && (
+        <span style={{
+          position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+          fontSize: 10, color: 'var(--t4)',
+        }}>
+          {options.length}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function getCascadeParentLabel(field: FieldDef): string {
+  // نستخرج label الأب من cascadeParent key
+  // مثال: 'wilaya_id' → 'الولاية'
+  const map: Record<string, string> = {
+    wilaya_id: 'الولاية', parent_id: 'الفئة الأم',
+    region_id: 'المنطقة', category_id: 'الفئة',
+  };
+  return map[field.cascadeParent ?? ''] ?? field.cascadeParent ?? 'الحقل الأب';
+}
+
+// ════════════════════════════════════════════════
+// FormField
+// ════════════════════════════════════════════════
+function FormField({ field, value, onChange, formData }: {
+  field:    FieldDef;
+  value:    any;
+  onChange: (v: any) => void;
+  formData: Record<string, any>;
+}) {
+  const inputStyle: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box',
+    padding: '8px 12px', borderRadius: 'var(--r2)',
+    border: '1px solid var(--b3)', background: 'var(--bg1)',
+    color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+    outline: 'none',
+  };
+
+  if (field.type === 'remote-select') {
+    // قيمة الأب من formData إذا كان cascade
+    const parentValue = field.cascadeParent ? formData[field.cascadeParent] : undefined;
+    return (
+      <RemoteSelect
+        field={field}
+        value={value}
+        onChange={onChange}
+        parentValue={parentValue}
+      />
+    );
+  }
+
+  if (field.type === 'textarea') {
+    return (
+      <textarea
+        value={value ?? ''}
+        onChange={e => onChange(e.target.value)}
+        placeholder={field.placeholder}
+        rows={3}
+        style={{ ...inputStyle, resize: 'vertical' }}
+      />
+    );
+  }
+
+  if (field.type === 'select') {
+    return (
+      <select value={value ?? ''} onChange={e => onChange(e.target.value)} style={inputStyle}>
+        <option value="">— اختر —</option>
+        {field.options?.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <input
+      type={field.type ?? 'text'}
+      value={value ?? ''}
+      onChange={e => onChange(e.target.value)}
+      placeholder={field.placeholder}
+      style={inputStyle}
+    />
+  );
+}
+
+// ════════════════════════════════════════════════
+// Modal / ConfirmModal
+// ════════════════════════════════════════════════
+function Modal({ title, children, onClose, saving }: {
+  title: string; children: React.ReactNode; onClose: () => void; saving: boolean;
 }) {
   return (
     <div
-      className="modal-back"
       style={{
         position: 'fixed', inset: 0, zIndex: 500,
         background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
       }}
       onClick={onClose}
     >
       <div
         className="card"
-        style={{ width: '100%', maxWidth: 480, maxHeight: '90vh', overflow: 'auto' }}
+        style={{ width: '100%', maxWidth: 540, maxHeight: '90vh', overflow: 'auto' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="card-hd">
@@ -6686,10 +9346,7 @@ function Modal({
   );
 }
 
-// ── Confirm delete ─────────────────────────────
-function ConfirmModal({
-  name, onConfirm, onClose, saving,
-}: {
+function ConfirmModal({ name, onConfirm, onClose, saving }: {
   name: string; onConfirm: () => void; onClose: () => void; saving: boolean;
 }) {
   return (
@@ -6701,11 +9358,7 @@ function ConfirmModal({
       }}
       onClick={onClose}
     >
-      <div
-        className="card"
-        style={{ maxWidth: 380, width: '100%' }}
-        onClick={e => e.stopPropagation()}
-      >
+      <div className="card" style={{ maxWidth: 380, width: '100%' }} onClick={e => e.stopPropagation()}>
         <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
           <i className="ti ti-alert-triangle" style={{ fontSize: 40, color: 'var(--red)' }} />
           <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)', marginTop: 12 }}>
@@ -6719,7 +9372,9 @@ function ConfirmModal({
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
           <button className="btn" onClick={onClose} disabled={saving}>إلغاء</button>
           <button className="btn btn-r" onClick={onConfirm} disabled={saving}>
-            {saving ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} /> : <i className="ti ti-trash" />}
+            {saving
+              ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+              : <i className="ti ti-trash" />}
             حذف
           </button>
         </div>
@@ -6728,9 +9383,12 @@ function ConfirmModal({
   );
 }
 
-// ── Main LookupPage ─────────────────────────────
+// ════════════════════════════════════════════════
+// LookupPage
+// ════════════════════════════════════════════════
 export default function LookupPage({
-  title, resource, endpoint, fields, color = 'var(--em)', icon = 'ti-list', emptyText,
+  title, resource, endpoint, fields,
+  color = 'var(--em)', icon = 'ti-list', emptyText,
 }: LookupPageProps) {
   const { items, loading, error, saving, refetch, create, update, remove } = useLookup<any>(endpoint);
 
@@ -6742,21 +9400,40 @@ export default function LookupPage({
   const [delItem,  setDelItem]  = useState<any | null>(null);
   const [toast,    setToast]    = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  // ── Filtered list ─────────────────────────────
+  // جلب labels الـ remote-select لعرضها في الجدول
+  const [remoteLabels, setRemoteLabels] = useState<RemoteLabels>({});
+  useEffect(() => {
+    fields
+      .filter(f => f.type === 'remote-select' && f.remoteEndpoint)
+      .forEach(f => {
+        apiClient.get(f.remoteEndpoint!, { params: { per_page: 500 } })
+          .then(res => {
+            const raw = res.data as any;
+            const arr: any[] = Array.isArray(raw?.data) ? raw.data
+              : Array.isArray(raw?.data?.data) ? raw.data.data : [];
+            const labelField = f.remoteLabel ?? 'arabic_name';
+            const valueField = f.remoteValue ?? 'id';
+            const map: Record<string | number, string> = {};
+            arr.forEach(i => {
+              map[i[valueField]] = i[labelField] ?? i.arabic_name ?? i.name ?? String(i[valueField]);
+            });
+            setRemoteLabels(prev => ({ ...prev, [f.key]: map }));
+          })
+          .catch(() => {});
+      });
+  }, []);
+
   const tableFields = fields.filter(f => f.showInTable !== false);
   const nameField   = fields[0]?.key ?? 'name';
-
-  const filtered = items.filter(item =>
+  const filtered    = items.filter(item =>
     !search || String(item[nameField] ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
-  // ── Toast helper ──────────────────────────────
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   }
 
-  // ── Open add modal ────────────────────────────
   function openAdd() {
     const defaults: Record<string, any> = {};
     fields.forEach(f => { defaults[f.key] = ''; });
@@ -6766,7 +9443,6 @@ export default function LookupPage({
     setModal('add');
   }
 
-  // ── Open edit modal ───────────────────────────
   function openEdit(item: any) {
     const data: Record<string, any> = {};
     fields.forEach(f => { data[f.key] = item[f.key] ?? ''; });
@@ -6776,9 +9452,7 @@ export default function LookupPage({
     setModal('edit');
   }
 
-  // ── Submit ─────────────────────────────────────
   async function handleSubmit() {
-    // Validate required
     for (const f of fields) {
       if (f.required && !formData[f.key]) {
         setFormErr(`حقل "${f.label}" إلزامي`);
@@ -6800,7 +9474,6 @@ export default function LookupPage({
     }
   }
 
-  // ── Delete ─────────────────────────────────────
   async function handleDelete() {
     if (!delItem) return;
     try {
@@ -6812,7 +9485,42 @@ export default function LookupPage({
     setDelItem(null);
   }
 
-  // ── Render ─────────────────────────────────────
+  function renderCellValue(f: FieldDef, item: any) {
+    const val = item[f.key];
+    if (f.renderCell) return f.renderCell(val, item, remoteLabels);
+
+    if (f.type === 'remote-select') {
+      const label = remoteLabels[f.key]?.[val];
+      return label
+        ? <span style={{ fontWeight: 600, color: 'var(--t1)' }}>{label}</span>
+        : val
+          ? <span style={{ color: 'var(--t4)', fontSize: 11 }}>#{val}</span>
+          : <span style={{ color: 'var(--t4)' }}>—</span>;
+    }
+
+    if (f.badge) {
+      const opt = f.options?.find(o => String(o.value) === String(val));
+      const isYes = String(val) === '1' || val === true;
+      return (
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+          background: isYes
+            ? 'color-mix(in srgb, var(--em) 12%, transparent)'
+            : 'color-mix(in srgb, var(--t4) 10%, transparent)',
+          color: isYes ? 'var(--em)' : 'var(--t4)',
+        }}>
+          {opt?.label ?? (isYes ? 'نعم' : 'لا')}
+        </span>
+      );
+    }
+
+    if (val === null || val === undefined || val === '') {
+      return <span style={{ color: 'var(--t4)' }}>—</span>;
+    }
+    return val;
+  }
+
   return (
     <div className="page on" style={{ padding: '18px 20px' }}>
 
@@ -6851,14 +9559,11 @@ export default function LookupPage({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {/* Search */}
           <div className="srch" style={{ width: 200 }}>
             <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
             <input
-              type="text"
-              placeholder="بحث..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              type="text" placeholder="بحث..."
+              value={search} onChange={e => setSearch(e.target.value)}
             />
           </div>
           <button className="btn" onClick={refetch} title="تحديث">
@@ -6880,11 +9585,7 @@ export default function LookupPage({
         }}>
           <i className="ti ti-alert-circle" />
           {error}
-          <button
-            className="btn btn-xs btn-r"
-            style={{ marginRight: 'auto' }}
-            onClick={refetch}
-          >
+          <button className="btn btn-xs btn-r" style={{ marginRight: 'auto' }} onClick={refetch}>
             إعادة المحاولة
           </button>
         </div>
@@ -6915,43 +9616,23 @@ export default function LookupPage({
               <thead>
                 <tr>
                   <th style={{ width: 48 }}>#</th>
-                  {tableFields.map(f => (
-                    <th key={f.key}>{f.label}</th>
-                  ))}
+                  {tableFields.map(f => <th key={f.key}>{f.label}</th>)}
                   <th style={{ width: 100, textAlign: 'center' }}>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((item, idx) => (
                   <tr key={item.id}>
-                    <td className="m" style={{ color: 'var(--t4)', fontSize: 11 }}>{idx + 1}</td>
+                    <td style={{ color: 'var(--t4)', fontSize: 11 }}>{idx + 1}</td>
                     {tableFields.map(f => (
-                      <td key={f.key}>
-                        {f.badge ? (
-                          <span className={`bx be`} style={f.badgeColor ? { color: f.badgeColor } : {}}>
-                            {item[f.key] ?? '—'}
-                          </span>
-                        ) : (
-                          <span style={idx === 0 && f.key === nameField ? { fontWeight: 700, color: 'var(--t1)' } : {}}>
-                            {item[f.key] ?? <span style={{ color: 'var(--t4)' }}>—</span>}
-                          </span>
-                        )}
-                      </td>
+                      <td key={f.key}>{renderCellValue(f, item)}</td>
                     ))}
                     <td>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                        <button
-                          className="btn btn-xs"
-                          onClick={() => openEdit(item)}
-                          title="تعديل"
-                        >
+                        <button className="btn btn-xs" onClick={() => openEdit(item)} title="تعديل">
                           <i className="ti ti-pencil" />
                         </button>
-                        <button
-                          className="btn btn-xs btn-r"
-                          onClick={() => setDelItem(item)}
-                          title="حذف"
-                        >
+                        <button className="btn btn-xs btn-r" onClick={() => setDelItem(item)} title="حذف">
                           <i className="ti ti-trash" />
                         </button>
                       </div>
@@ -6962,13 +9643,8 @@ export default function LookupPage({
             </table>
           </div>
         )}
-
-        {/* Footer */}
         {filtered.length > 0 && (
-          <div style={{
-            padding: '9px 16px', borderTop: '1px solid var(--b1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
+          <div style={{ padding: '9px 16px', borderTop: '1px solid var(--b1)' }}>
             <span style={{ fontSize: 12, color: 'var(--t4)' }}>
               {search ? `${filtered.length} نتيجة من ${items.length}` : `${items.length} عنصر`}
             </span>
@@ -6976,7 +9652,7 @@ export default function LookupPage({
         )}
       </div>
 
-      {/* Add / Edit Modal */}
+      {/* Modal */}
       {modal && (
         <Modal
           title={modal === 'add' ? `إضافة ${resource} جديد` : `تعديل ${resource}`}
@@ -6986,55 +9662,19 @@ export default function LookupPage({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {fields.map(f => (
               <div key={f.key}>
-                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)', display: 'block', marginBottom: 5 }}>
+                <label style={{
+                  fontSize: 12, fontWeight: 700, color: 'var(--t2)',
+                  display: 'block', marginBottom: 5,
+                }}>
                   {f.label}
                   {f.required && <span style={{ color: 'var(--red)', marginRight: 3 }}>*</span>}
                 </label>
-                {f.type === 'textarea' ? (
-                  <textarea
-                    value={formData[f.key] ?? ''}
-                    onChange={e => setFormData(d => ({ ...d, [f.key]: e.target.value }))}
-                    placeholder={f.placeholder}
-                    rows={3}
-                    style={{
-                      width: '100%', boxSizing: 'border-box',
-                      padding: '8px 12px', borderRadius: 'var(--r2)',
-                      border: '1px solid var(--b3)', background: 'var(--bg1)',
-                      color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                      outline: 'none', resize: 'vertical',
-                    }}
-                  />
-                ) : f.type === 'select' ? (
-                  <select
-                    value={formData[f.key] ?? ''}
-                    onChange={e => setFormData(d => ({ ...d, [f.key]: e.target.value }))}
-                    style={{
-                      width: '100%', padding: '8px 12px', borderRadius: 'var(--r2)',
-                      border: '1px solid var(--b3)', background: 'var(--bg1)',
-                      color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                      outline: 'none',
-                    }}
-                  >
-                    <option value="">— اختر —</option>
-                    {f.options?.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type={f.type ?? 'text'}
-                    value={formData[f.key] ?? ''}
-                    onChange={e => setFormData(d => ({ ...d, [f.key]: e.target.value }))}
-                    placeholder={f.placeholder}
-                    style={{
-                      width: '100%', boxSizing: 'border-box',
-                      padding: '8px 12px', borderRadius: 'var(--r2)',
-                      border: '1px solid var(--b3)', background: 'var(--bg1)',
-                      color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                      outline: 'none',
-                    }}
-                  />
-                )}
+                <FormField
+                  field={f}
+                  value={formData[f.key]}
+                  onChange={v => setFormData(d => ({ ...d, [f.key]: v }))}
+                  formData={formData}
+                />
               </div>
             ))}
 
@@ -7054,8 +9694,7 @@ export default function LookupPage({
               <button className="btn btn-p" onClick={handleSubmit} disabled={saving}>
                 {saving
                   ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
-                  : <i className={`ti ${modal === 'add' ? 'ti-plus' : 'ti-check'}`} />
-                }
+                  : <i className={`ti ${modal === 'add' ? 'ti-plus' : 'ti-check'}`} />}
                 {modal === 'add' ? 'إضافة' : 'حفظ التعديلات'}
               </button>
             </div>
@@ -7063,7 +9702,6 @@ export default function LookupPage({
         </Modal>
       )}
 
-      {/* Delete confirm */}
       {delItem && (
         <ConfirmModal
           name={delItem[nameField] ?? `#${delItem.id}`}
@@ -7162,8 +9800,83 @@ export default function UnitsPage() {
 ```
 // ════════════════════════════════════════════════
 // resources/js/pages/lookups/WarehousesPage.tsx
+// v4: cascade wilaya → commune
 // ════════════════════════════════════════════════
-import LookupPage from './LookupPage';
+import LookupPage, { FieldDef } from './LookupPage';
+
+const fields: FieldDef[] = [
+  { key: 'name',
+    label: 'اسم المستودع',
+    required: true,
+    placeholder: 'مثال: المستودع الرئيسي' },
+
+  { key: 'code',
+    label: 'الرمز',
+    placeholder: 'مثال: WH-01' },
+
+  { key: 'manager_name',
+    label: 'اسم المسؤول',
+    placeholder: 'مثال: محمد بن علي' },
+
+  { key: 'phone',
+    label: 'الهاتف',
+    placeholder: 'مثال: 0555 123 456' },
+
+  // ── الولاية (الأب في الـ cascade) ──────────────
+  { key: 'wilaya_id',
+    label: 'الولاية',
+    type: 'remote-select',
+    remoteEndpoint: '/wilayas',
+    remoteLabel: 'arabic_name',   // arabic_name أوضح للمستخدم
+    remoteValue: 'id',
+    remotePlaceholder: '— اختر الولاية —',
+    showInTable: true },
+
+  // ── البلدية (الابن في الـ cascade) ─────────────
+  { key: 'commune_id',
+    label: 'البلدية',
+    type: 'remote-select',
+    remoteEndpoint: '/communes',
+    remoteLabel: 'arabic_name',
+    remoteValue: 'id',
+    remotePlaceholder: '— اختر الولاية أولاً —',
+    // cascade: تُصفَّى حسب wilaya_id المختارة
+    cascadeParent: 'wilaya_id',
+    // الـ param المُرسَل للـ API: GET /communes?filter[wilaya_id]=5
+    cascadeParam: 'filter[wilaya_id]',
+    showInTable: false },
+
+  { key: 'rc',
+    label: 'السجل التجاري RC',
+    placeholder: 'مثال: 25/00-1234567',
+    showInTable: false },
+
+  { key: 'nif',
+    label: 'رقم التعريف الجبائي NIF',
+    placeholder: '15 رقماً',
+    showInTable: false },
+
+  { key: 'nis',
+    label: 'رقم التعريف الإحصائي NIS',
+    placeholder: 'اختياري',
+    showInTable: false },
+
+  { key: 'ai',
+    label: 'رقم المادة AI',
+    placeholder: 'اختياري',
+    showInTable: false },
+
+  { key: 'active',
+    label: 'نشط',
+    type: 'select',
+    badge: true,
+    options: [{ value: 1, label: 'نعم' }, { value: 0, label: 'لا' }] },
+
+  { key: 'address',
+    label: 'العنوان التفصيلي',
+    type: 'textarea',
+    showInTable: false },
+];
 
 export default function WarehousesPage() {
   return (
@@ -7173,12 +9886,7 @@ export default function WarehousesPage() {
       endpoint="/warehouses"
       icon="ti-building-warehouse"
       color="var(--teal)"
-      fields={[
-        { key: 'name',     label: 'اسم المستودع', required: true,  placeholder: 'مثال: المستودع الرئيسي' },
-        { key: 'location', label: 'الموقع',         placeholder: 'مثال: ورقلة — المنطقة الصناعية'        },
-        { key: 'capacity', label: 'السعة',          type: 'number', placeholder: 'مثال: 1000'             },
-        { key: 'description', label: 'الوصف',       type: 'textarea', showInTable: false                  },
-      ]}
+      fields={fields}
     />
   );
 }
@@ -8096,6 +10804,359 @@ function ProductModal({
       </div>
     </Modal>
   );
+}
+```
+
+## FILE: resources/js/pages/reports/ReportsPage.tsx
+```
+// ════════════════════════════════════════════════
+// resources/js/pages/reports/ReportsPage.tsx
+// لوحة التقارير والإحصائيات
+// ════════════════════════════════════════════════
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import KpiCard from '@/components/ui/KpiCard';
+import AlertBar from '@/components/ui/AlertBar';
+import ProgressBar from '@/components/ui/ProgressBar';
+import apiClient from '@/lib/api/client';
+import { useFiscalYear } from '@/context/FiscalYearContext';
+
+// ─────────────────────────────────────────────────────────────
+// أنواع التقارير
+// ─────────────────────────────────────────────────────────────
+interface ReportCard {
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    color: string;
+    endpoint: string;
+    params?: Record<string, string>;
+    badge?: string;
+    badgeColor?: string;
+}
+
+const REPORT_CARDS: ReportCard[] = [
+    {
+        id: 'sales',
+        title: 'تقرير المبيعات',
+        description: 'تحليل المبيعات حسب الفترة، المنتج، والعميل مع مقارنة سنوية',
+        icon: 'ti-trending-up',
+        color: 'var(--em)',
+        endpoint: '/reports/sales',
+        badge: 'الأكثر استخداماً',
+    },
+    {
+        id: 'purchases',
+        title: 'تقرير المشتريات',
+        description: 'تحليل المشتريات والموردين مع تتبع التكاليف',
+        icon: 'ti-trending-down',
+        color: 'var(--blue)',
+        endpoint: '/reports/purchases',
+    },
+    {
+        id: 'customers',
+        title: 'تقرير العملاء',
+        description: 'كشف حساب العملاء، الديون المستحقة، وأفضل العملاء',
+        icon: 'ti-users',
+        color: 'var(--purple)',
+        endpoint: '/reports/customers',
+    },
+    {
+        id: 'suppliers',
+        title: 'تقرير الموردين',
+        description: 'كشف حساب الموردين، المستحقات، وأفضل الموردين',
+        icon: 'ti-truck',
+        color: 'var(--gold)',
+        endpoint: '/reports/suppliers',
+    },
+    {
+        id: 'products',
+        title: 'تقرير المنتجات',
+        description: 'حركة المنتجات، الأكثر مبيعاً، والأقل مبيعاً',
+        icon: 'ti-package',
+        color: 'var(--teal)',
+        endpoint: '/reports/products',
+    },
+    {
+        id: 'inventory',
+        title: 'تقرير المخزون',
+        description: 'تقييم المخزون، الحركات، والمنتجات المنخفضة',
+        icon: 'ti-building-warehouse',
+        color: 'var(--orange)',
+        endpoint: '/reports/inventory',
+    },
+    {
+        id: 'payments',
+        title: 'تقرير الدفعات',
+        description: 'سجل الدفعات والتحصيلات حسب طريقة الدفع والفترة',
+        icon: 'ti-cash',
+        color: 'var(--em)',
+        endpoint: '/reports/payments',
+    },
+    {
+        id: 'taxes',
+        title: 'تقرير الضرائب',
+        description: 'تقرير TVA، الطابع الجبائي، وإقرار G50',
+        icon: 'ti-calculator',
+        color: 'var(--red)',
+        endpoint: '/reports/taxes',
+        badge: 'G50',
+        badgeColor: 'var(--gold)',
+    },
+];
+
+// ─────────────────────────────────────────────────────────────
+// مكون التقرير السريع
+// ─────────────────────────────────────────────────────────────
+function QuickReportCard({ report }: { report: ReportCard }) {
+    const navigate = useNavigate();
+
+    return (
+        <Card
+            style={{ cursor: 'pointer', transition: 'all .2s' }}
+            onClick={() => navigate(`/reports?id=${report.id}`)}
+        >
+            <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                {/* الأيقونة */}
+                <div style={{
+                    width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+                    background: `color-mix(in srgb, ${report.color} 12%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${report.color} 25%, transparent)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: report.color, fontSize: 22,
+                }}>
+                    <span className="ic"><i className={`ti ${report.icon}`}/></span>
+                </div>
+
+                {/* المحتوى */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--t1)' }}>
+                            {report.title}
+                        </div>
+                        {report.badge && (
+                            <Badge variant="success" noDot>
+                                {report.badge}
+                            </Badge>
+                        )}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--t4)', marginBottom: 12, lineHeight: 1.6 }}>
+                        {report.description}
+                    </div>
+                    <Button size="xs" variant="primary" icon={<i className="ti ti-arrow-left"/>}>
+                        عرض التقرير
+                    </Button>
+                </div>
+            </div>
+        </Card>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────
+// مكون عرض تقرير محدد
+// ─────────────────────────────────────────────────────────────
+function ReportViewer({ reportId, fiscalYearId }: { reportId: string; fiscalYearId?: number }) {
+    const report = REPORT_CARDS.find(r => r.id === reportId);
+    const isTaxReport = reportId === 'taxes';
+
+    const { data, isLoading, isError, refetch } = useQuery({
+        queryKey: ['report', reportId, fiscalYearId],
+        queryFn: () => apiClient.get(report?.endpoint || '', {
+            params: {
+                fiscal_year_id: fiscalYearId,
+                ...(report?.params || {}),
+            },
+        }).then(r => r.data),
+        enabled: !!reportId && !!report?.endpoint,
+    });
+
+    if (!report) {
+        return (
+            <EmptyState icon="ti-file-search" text="تقرير غير موجود" sub="اختر تقريراً من القائمة"/>
+        );
+    }
+
+    return (
+        <div>
+            <PageHeader
+                title={report.title}
+                subtitle={report.description}
+                actions={
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <Button size="sm" icon={<i className="ti ti-download"/>} onClick={() => window.open(`${report.endpoint}?fiscal_year_id=${fiscalYearId}&export=excel`, '_blank')}>
+                            تصدير Excel
+                        </Button>
+                        <Button size="sm" icon={<i className="ti ti-printer"/>} onClick={() => window.open(`${report.endpoint}?fiscal_year_id=${fiscalYearId}&export=pdf`, '_blank')}>
+                            PDF
+                        </Button>
+                        <Button size="sm" icon={<i className="ti ti-refresh"/>} onClick={() => refetch()}>
+                            تحديث
+                        </Button>
+                    </div>
+                }
+            />
+
+            {isLoading ? (
+                <div className="empty" style={{ padding: 60 }}>
+                    <div className="empty-ic"><i className="ti ti-loader"/></div>
+                    <div className="empty-tx">جاري تحميل التقرير...</div>
+                </div>
+            ) : isError ? (
+                <AlertBar variant="red">
+                    فشل تحميل التقرير.{' '}
+                    <button onClick={() => refetch()} style={{ fontWeight: 700, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>
+                        إعادة المحاولة
+                    </button>
+                </AlertBar>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* KPIs خاصة بالتقرير */}
+                    {isTaxReport && data?.summary && (
+                        <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+                            <KpiCard variant="green" icon="ti-arrow-up-circle" label="TVA محصلة" value={data.summary.tva_collected?.toLocaleString('fr-DZ') || '—'} unit="دج"/>
+                            <KpiCard variant="blue" icon="ti-arrow-down-circle" label="TVA قابلة للخصم" value={data.summary.tva_deductible?.toLocaleString('fr-DZ') || '—'} unit="دج"/>
+                            <KpiCard variant="red" icon="ti-calculator" label="المستحق" value={data.summary.net_tva?.toLocaleString('fr-DZ') || '—'} unit="دج"/>
+                            <KpiCard variant="gold" icon="ti-file-check" label="حالة الإقرار" value={data.summary.submitted ? 'مقدم' : 'قيد الإعداد'}/>
+                        </div>
+                    )}
+
+                    {/* جدول البيانات */}
+                    {data?.data && data.data.length > 0 && (
+                        <Card noHeader style={{ padding: 0 }}>
+                            <div className="tw">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            {Object.keys(data.data[0]).slice(0, 6).map(key => (
+                                                <th key={key}>{key}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.data.slice(0, 20).map((row: any, i: number) => (
+                                            <tr key={i}>
+                                                {Object.values(row).slice(0, 6).map((val: any, j: number) => (
+                                                    <td key={j}>{String(val ?? '—')}</td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {data.data.length > 20 && (
+                                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--b1)', fontSize: 12, color: 'var(--t4)', textAlign: 'center' }}>
+                                    عرض 20 من أصل {data.data.length} سجل — حمّل الملف للاطلاع على الكل
+                                </div>
+                            )}
+                        </Card>
+                    )}
+
+                    {(!data?.data || data.data.length === 0) && (
+                        <div className="empty" style={{ padding: 40 }}>
+                            <div className="empty-ic"><i className="ti ti-file-off"/></div>
+                            <div className="empty-tx">لا توجد بيانات متاحة لهذه الفترة</div>
+                            <div className="empty-sub">جرب تغيير السنة المالية أو معايير التقرير</div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────
+// حالة فارغة
+// ─────────────────────────────────────────────────────────────
+function EmptyState({ icon, text, sub }: { icon: string; text: string; sub?: string }) {
+    return (
+        <div className="empty" style={{ padding: 60 }}>
+            <div className="empty-ic"><i className={`ti ${icon}`}/></div>
+            <div className="empty-tx">{text}</div>
+            {sub && <div className="empty-sub">{sub}</div>}
+        </div>
+    );
+}
+
+// ════════════════════════════════════════════════
+// الصفحة الرئيسية للتقارير
+// ════════════════════════════════════════════════
+export default function ReportsPage() {
+    const { selectedYear } = useFiscalYear();
+    const [viewingReport, setViewingReport] = useState<string | null>(null);
+
+    // إذا كان هناك تقرير مطلوب عرضه
+    if (viewingReport) {
+        return (
+            <div className="page on" id="p-reports">
+                <div style={{ marginBottom: 16 }}>
+                    <Button size="sm" icon={<i className="ti ti-arrow-right"/>} onClick={() => setViewingReport(null)}>
+                        العودة لقائمة التقارير
+                    </Button>
+                </div>
+                <ReportViewer reportId={viewingReport} fiscalYearId={selectedYear?.id}/>
+            </div>
+        );
+    }
+
+    return (
+        <div className="page on" id="p-reports">
+            <PageHeader
+                title="التقارير والإحصائيات"
+                subtitle={`جميع التقارير المالية والإدارية — السنة: ${selectedYear?.name || '—'}`}
+            />
+
+            {/* KPIs للتقارير */}
+            <div className="kpis" style={{ marginBottom: 24 }}>
+                <KpiCard variant="green" icon="ti-file-text" label="إجمالي التقارير" value={REPORT_CARDS.length}/>
+                <KpiCard variant="blue" icon="ti-clock" label="آخر تحديث" value="قبل لحظات"/>
+                <KpiCard variant="gold" icon="ti-download" label="التقارير المُصدرة" value="—"/>
+                <KpiCard variant="purple" icon="ti-star" label="التقارير المفضلة" value="3"/>
+            </div>
+
+            {/* سنة مقفلة — تحذير */}
+            {selectedYear?.is_closed && (
+                <AlertBar variant="gold">
+                    🔒 السنة المالية {selectedYear.name} مقفلة — التقارير للعرض فقط ولا يمكن تعديل البيانات.
+                </AlertBar>
+            )}
+
+            {/* قائمة التقارير */}
+            <div className="g2" style={{ marginBottom: 20 }}>
+                {REPORT_CARDS.map(report => (
+                    <div key={report.id} onClick={() => setViewingReport(report.id)}>
+                        <QuickReportCard report={report}/>
+                    </div>
+                ))}
+            </div>
+
+            {/* معلومات إضافية */}
+            <Card
+                title={<><span className="ic ic-sm" style={{ color: 'var(--blue)' }}><i className="ti ti-info-circle"/></span> معلومات عن التقارير</>}
+                noHeader={false}
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: 'var(--t3)' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <i className="ti ti-check" style={{ color: 'var(--em)', flexShrink: 0, marginTop: 3 }}/>
+                        <span>جميع التقارير تدعم التصدير بصيغ <strong>Excel</strong> و <strong>PDF</strong></span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <i className="ti ti-check" style={{ color: 'var(--em)', flexShrink: 0, marginTop: 3 }}/>
+                        <span>يمكن تصفية التقارير حسب <strong>السنة المالية</strong> المختارة من الشريط العلوي</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <i className="ti ti-check" style={{ color: 'var(--em)', flexShrink: 0, marginTop: 3 }}/>
+                        <span>التقارير تُحدَّث <strong>تلقائياً</strong> مع كل عملية بيع أو شراء</span>
+                    </div>
+                </div>
+            </Card>
+        </div>
+    );
 }
 ```
 
@@ -9034,6 +12095,649 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
 }
 ```
 
+## FILE: resources/js/pages/suppliers/SuppliersPage.tsx
+```
+// resources/js/pages/suppliers/SuppliersPage.tsx
+import React, { useState, useEffect } from 'react';
+import { useSuppliers, useCreateParty, useUpdateParty } from '@/hooks/useData';
+import { useModal } from '@/hooks/useModal';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import KpiCard from '@/components/ui/KpiCard';
+import Avatar from '@/components/ui/Avatar';
+import EmptyState from '@/components/ui/EmptyState';
+import ProgressBar from '@/components/ui/ProgressBar';
+import Switch from '@/components/ui/Switch';
+import AlertBar from '@/components/ui/AlertBar';
+import { useQuery } from '@tanstack/react-query';
+import apiClient from '@/lib/api/client';
+import type { Party } from '@/types';
+
+export default function SuppliersPage() {
+    const [search, setSearch] = useState('');
+    const [editing, setEditing] = useState<Party | null>(null);
+    const modal = useModal();
+
+    const { data, isLoading } = useSuppliers({ search: search || undefined, per_page: 30 });
+    const suppliers = data?.data ?? [];
+    const meta = data?.meta;
+
+    const openCreate = () => { setEditing(null); modal.openModal(); };
+    const openEdit = (c: Party) => { setEditing(c); modal.openModal(); };
+
+    const withDebt = suppliers.filter((c: Party) => (c.balance ?? 0) > 0).length;
+    const totalDebt = suppliers.reduce((s: number, c: Party) => s + (c.balance ?? 0), 0);
+    const totalBusiness = suppliers.reduce((s: number, c: Party) => s + (c.total_purchases ?? 0), 0);
+
+    return (
+        <div className="page on" id="p-suppliers">
+            <PageHeader
+                title="الموردون"
+                subtitle={`إدارة قائمة الموردين — ${meta?.total ?? '...'} مورد`}
+                actions={
+                    <>
+                        <Button size="sm" icon={<i className="ti ti-table-export"/>}>تصدير</Button>
+                        <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus"/>} onClick={openCreate}>
+                            مورد جديد
+                        </Button>
+                    </>
+                }
+            />
+
+            {/* KPIs */}
+            <div className="kpis" style={{ marginBottom: 20 }}>
+                <KpiCard variant="green" icon="ti-users" label="إجمالي الموردين" value={meta?.total ?? '—'} />
+                <KpiCard variant="blue" icon="ti-trending-up" label="إجمالي المشتريات" value={totalBusiness.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
+                <KpiCard variant="red" icon="ti-receipt" label="ديون للموردين" value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} مورد`} />
+                <KpiCard variant="gold" icon="ti-star" label="موردون نشطون" value={suppliers.filter((s: Party) => s.active).length} />
+            </div>
+
+            {/* Search */}
+            <div className="filters" style={{ marginBottom: 16 }}>
+                <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
+                    <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
+                    <input type="text" placeholder="ابحث بالاسم، الهاتف، NIF..." style={{ width: '100%' }} onChange={e => setSearch(e.target.value)} />
+                </div>
+                <select style={{ width: 140 }}>
+                    <option>كل الأنواع</option>
+                    <option>نشط</option>
+                    <option>موقوف</option>
+                </select>
+            </div>
+
+            {/* Grid */}
+            {isLoading ? (
+                <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
+            ) : suppliers.length === 0 ? (
+                <EmptyState icon="ti-truck" text="لا يوجد موردون" sub="أضف موردك الأول" action={<Button variant="primary" onClick={openCreate}>مورد جديد</Button>} />
+            ) : (
+                <div className="g3">
+                    {suppliers.map((c: Party, i: number) => {
+                        const hasDebt = (c.balance ?? 0) > 0;
+                        const avatarColor = ((i % 7) + 1) as 1|2|3|4|5|6|7;
+                        const creditUsed = c.credit_limit > 0 ? Math.min(100, ((c.balance ?? 0) / c.credit_limit) * 100) : 0;
+
+                        return (
+                            <Card key={c.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(c)}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
+                                    <Avatar initials={c.name[0]} color={avatarColor} size={42} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--t1)', marginBottom: 2 }}>{c.name}</div>
+                                        <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                                            <Badge variant={c.active ? 'success' : 'danger'}>{c.active ? 'نشط' : 'موقوف'}</Badge>
+                                            {hasDebt && <Badge variant="danger">دين</Badge>}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {(c.phone || c.nif) && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--t3)' }}>
+                                        {c.phone && <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><i className="ti ti-phone" style={{ fontSize: 13, color: 'var(--t4)' }}/><span>{c.phone}</span></div>}
+                                        {c.nif && <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><i className="ti ti-file-certificate" style={{ fontSize: 13, color: 'var(--t4)' }}/><span style={{ fontFamily: 'monospace', fontSize: 11 }}>NIF: {c.nif}</span></div>}
+                                    </div>
+                                )}
+
+                                {c.credit_limit > 0 && (
+                                    <div style={{ marginTop: 10 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--t4)', marginBottom: 3 }}>
+                                            <span>حد الائتمان</span>
+                                            <span>{creditUsed.toFixed(0)}%</span>
+                                        </div>
+                                        <ProgressBar value={creditUsed} color={creditUsed > 80 ? 'var(--red)' : creditUsed > 50 ? 'var(--gold)' : 'var(--em)'} height={4} />
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', gap: 6, marginTop: 10 }} onClick={e => e.stopPropagation()}>
+                                    <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(c)}>تعديل</Button>
+                                    <Button size="xs" icon={<i className="ti ti-file-invoice"/>}>فواتيره</Button>
+                                    {hasDebt && <Button size="xs" variant="danger" icon={<i className="ti ti-cash"/>}>تسوية</Button>}
+                                </div>
+                            </Card>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Modal */}
+            <SupplierModal open={modal.open} party={editing} onClose={modal.closeModal} />
+        </div>
+    );
+}
+
+// ===============================================
+// Supplier Modal
+// ===============================================
+function SupplierModal({ open, party, onClose }: { open: boolean; party: Party | null; onClose: () => void }) {
+    const isEdit = !!party;
+    const createMut = useCreateParty();
+    const updateMut = useUpdateParty();
+
+    const emptyForm = {
+        name: '',
+        commercial_name: '',
+        phone: '',
+        mobile: '',
+        email: '',
+        address: '',
+        nif: '',
+        nis: '',
+        rc: '',
+        ai: '',
+        credit_limit: 0,
+        credit_days: 30,
+        is_tva_exempt: false,
+        active: true,
+    };
+
+    const [form, setForm] = useState(emptyForm);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (open) {
+            if (party) {
+                setForm({
+                    name: party.name || '',
+                    commercial_name: party.commercial_name || '',
+                    phone: party.phone || '',
+                    mobile: party.mobile || '',
+                    email: party.email || '',
+                    address: party.address || '',
+                    nif: party.nif || '',
+                    nis: party.nis || '',
+                    rc: party.rc || '',
+                    ai: party.ai || '',
+                    credit_limit: party.credit_limit || 0,
+                    credit_days: party.credit_days || 30,
+                    is_tva_exempt: party.is_tva_exempt || false,
+                    active: party.active ?? true,
+                });
+            } else {
+                setForm(emptyForm);
+            }
+            setError('');
+        }
+    }, [open, party]);
+
+    const set = (k: string, v: string | number | boolean) => setForm(f => ({ ...f, [k]: v }));
+
+    const handleSave = async () => {
+        if (!form.name.trim()) {
+            setError('اسم المورد مطلوب');
+            return;
+        }
+
+        try {
+            if (isEdit) {
+                await updateMut.mutateAsync({ id: party!.id, data: { ...form, party_type_id: 2 } });
+            } else {
+                await createMut.mutateAsync({ ...form, party_type_id: 2 });
+            }
+            onClose();
+        } catch (err: any) {
+            setError(err?.response?.data?.message || 'فشل الحفظ. تحقق من البيانات.');
+        }
+    };
+
+    return (
+        <Modal open={open} onClose={onClose} size="lg"
+            title={isEdit ? `تعديل — ${party?.name}` : 'مورد جديد'}
+            subtitle={isEdit ? '' : 'إضافة مورد جديد'}
+            footer={
+                <>
+                    <Button onClick={onClose}>إلغاء</Button>
+                    <Button variant="primary" icon={<i className="ti ti-device-floppy"/>} onClick={handleSave}
+                        disabled={createMut.isPending || updateMut.isPending || !form.name.trim()}>
+                        {(createMut.isPending || updateMut.isPending) ? 'جاري الحفظ...' : 'حفظ'}
+                    </Button>
+                </>
+            }>
+
+            {error && <AlertBar variant="red">{error}</AlertBar>}
+
+            <div className="tabs" style={{ marginBottom: 16 }}>
+                <div className="tab on">المعلومات الأساسية</div>
+                <div className="tab">القانونية والمالية</div>
+            </div>
+
+            <div className="fgrid c3">
+                <div className="fg s2">
+                    <label className="req">الاسم الكامل / الشركة</label>
+                    <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="الاسم واللقب أو اسم الشركة" autoFocus />
+                </div>
+                <div className="fg">
+                    <label>الاسم التجاري</label>
+                    <input value={form.commercial_name} onChange={e => set('commercial_name', e.target.value)} placeholder="اختياري" />
+                </div>
+                <div className="fg">
+                    <label>الهاتف</label>
+                    <input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="029 xx xx xx" />
+                </div>
+                <div className="fg">
+                    <label>الجوال</label>
+                    <input value={form.mobile} onChange={e => set('mobile', e.target.value)} placeholder="0555 xx xx xx" />
+                </div>
+                <div className="fg">
+                    <label>البريد الإلكتروني</label>
+                    <input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="contact@fournisseur.dz" />
+                </div>
+                <div className="fg s3">
+                    <label>العنوان</label>
+                    <input value={form.address} onChange={e => set('address', e.target.value)} placeholder="العنوان الكامل" />
+                </div>
+                <div className="fg">
+                    <label>NIF</label>
+                    <input value={form.nif} onChange={e => set('nif', e.target.value)} placeholder="000000000000000" style={{ fontFamily: 'monospace' }} />
+                </div>
+                <div className="fg">
+                    <label>NIS</label>
+                    <input value={form.nis} onChange={e => set('nis', e.target.value)} placeholder="رقم إحصائي" style={{ fontFamily: 'monospace' }} />
+                </div>
+                <div className="fg">
+                    <label>RC — السجل التجاري</label>
+                    <input value={form.rc} onChange={e => set('rc', e.target.value)} placeholder="29/00-0012345B05" style={{ fontFamily: 'monospace' }} />
+                </div>
+                <div className="fg">
+                    <label>AI — المادة الجبائية</label>
+                    <input value={form.ai} onChange={e => set('ai', e.target.value)} style={{ fontFamily: 'monospace' }} />
+                </div>
+                <div className="fg">
+                    <label>حد الائتمان (دج)</label>
+                    <input type="number" value={form.credit_limit} onChange={e => set('credit_limit', +e.target.value)} min={0} />
+                </div>
+                <div className="fg">
+                    <label>أجل الدفع (يوم)</label>
+                    <input type="number" value={form.credit_days} onChange={e => set('credit_days', +e.target.value)} min={0} />
+                </div>
+                <div className="fg" style={{ justifyContent: 'flex-end' }}>
+                    <label>معفى من TVA</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <Switch checked={form.is_tva_exempt} onChange={(v) => set('is_tva_exempt', v)} />
+                        <span style={{ fontSize: 12, color: 'var(--t3)' }}>{form.is_tva_exempt ? 'نعم' : 'لا'}</span>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+```
+
+## FILE: resources/js/pages/users/EmployeesPage.tsx
+```
+// resources/js/pages/users/EmployeesPage.tsx
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useModal } from '@/hooks/useModal';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import KpiCard from '@/components/ui/KpiCard';
+import Avatar from '@/components/ui/Avatar';
+import EmptyState from '@/components/ui/EmptyState';
+import Switch from '@/components/ui/Switch';
+import AlertBar from '@/components/ui/AlertBar';
+import apiClient from '@/lib/api/client';
+import type { Employee } from '@/types';
+
+export default function EmployeesPage() {
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+    const modal = useModal();
+    const qc = useQueryClient();
+
+    const { data: employees, isLoading, error } = useQuery({
+        queryKey: ['employees', search, statusFilter],
+        queryFn: () => apiClient.get('/employees', {
+            params: {
+                search: search || undefined,
+                employment_status: statusFilter || undefined
+            }
+        }).then(r => r.data.data),
+    });
+
+    const activeEmployees = employees?.filter((emp: any) => emp.employment_status === 'active') || [];
+    const suspendedEmployees = employees?.filter((emp: any) => emp.employment_status === 'suspended') || [];
+    const terminatedEmployees = employees?.filter((emp: any) => emp.employment_status === 'terminated') || [];
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: number) => apiClient.delete(`/employees/${id}`),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+    });
+
+    const openAdd = () => { setEditingEmployee(null); modal.openModal(); };
+    const openEdit = (emp: Employee) => { setEditingEmployee(emp); modal.openModal(); };
+
+    return (
+        <div className="page on" id="p-employees">
+            <PageHeader
+                title="الموظفون"
+                subtitle={`إدارة بيانات الموظفين — ${employees?.length || 0} موظف`}
+                actions={
+                    <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus"/>} onClick={openAdd}>
+                        موظف جديد
+                    </Button>
+                }
+            />
+
+            {/* KPIs */}
+            <div className="kpis" style={{ marginBottom: 20 }}>
+                <KpiCard variant="green" icon="ti-users" label="إجمالي الموظفين" value={employees?.length || 0} />
+                <KpiCard variant="blue" icon="ti-user-check" label="نشطون" value={activeEmployees.length} />
+                <KpiCard variant="gold" icon="ti-user-pause" label="معلقون" value={suspendedEmployees.length} />
+                <KpiCard variant="red" icon="ti-user-off" label="منتهي خدمتهم" value={terminatedEmployees.length} />
+            </div>
+
+            {/* Filters */}
+            <div className="filters" style={{ marginBottom: 16 }}>
+                <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
+                    <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
+                    <input type="text" placeholder="ابحث باسم الموظف أو رقم التسجيل..." style={{ width: '100%' }}
+                        onChange={e => setSearch(e.target.value)} />
+                </div>
+                <select style={{ width: 160 }} onChange={e => setStatusFilter(e.target.value)}>
+                    <option value="">كل الحالات</option>
+                    <option value="active">نشط</option>
+                    <option value="suspended">معلق</option>
+                    <option value="terminated">منتهي الخدمة</option>
+                </select>
+            </div>
+
+            {/* Error */}
+            {error && (
+                <AlertBar variant="red">
+                    فشل جلب بيانات الموظفين. تأكد من اتصالك بالخادم.
+                </AlertBar>
+            )}
+
+            {/* Content */}
+            {isLoading ? (
+                <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
+            ) : !employees || employees.length === 0 ? (
+                <EmptyState icon="ti-users" text="لا يوجد موظفون" sub="أضف أول موظف" action={<Button variant="primary" onClick={openAdd}>موظف جديد</Button>} />
+            ) : (
+                <Card noHeader style={{ padding: 0 }}>
+                    <div className="tw">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>الموظف</th>
+                                    <th>رقم التسجيل</th>
+                                    <th>NSS</th>
+                                    <th>تاريخ الميلاد</th>
+                                    <th>تاريخ التوظيف</th>
+                                    <th>الحالة الوظيفية</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {employees.map((emp: any, i: number) => (
+                                    <tr key={emp.id}>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <Avatar
+                                                    initials={`${emp.first_name?.[0] || ''}${emp.last_name?.[0] || ''}`}
+                                                    color={((i % 7) + 1) as 1|2|3|4|5|6|7}
+                                                    size={32}
+                                                />
+                                                <div>
+                                                    <div className="s">{emp.first_name} {emp.last_name}</div>
+                                                    <div style={{ fontSize: 11, color: 'var(--t4)' }}>
+                                                        {emp.relations?.user?.email || '—'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="m">{emp.matricule || '—'}</td>
+                                        <td className="m" style={{ fontSize: 11 }}>{emp.nss || '—'}</td>
+                                        <td style={{ fontSize: 12, color: 'var(--t4)' }}>
+                                            {emp.birth_date ? new Date(emp.birth_date).toLocaleDateString('fr-DZ') : '—'}
+                                        </td>
+                                        <td style={{ fontSize: 12, color: 'var(--t4)' }}>
+                                            {emp.hire_date ? new Date(emp.hire_date).toLocaleDateString('fr-DZ') : '—'}
+                                        </td>
+                                        <td>
+                                            <Badge variant={
+                                                emp.employment_status === 'active' ? 'success' :
+                                                emp.employment_status === 'suspended' ? 'warning' : 'danger'
+                                            }>
+                                                {emp.employment_status === 'active' ? 'نشط' :
+                                                 emp.employment_status === 'suspended' ? 'معلق' : 'منتهي الخدمة'}
+                                            </Badge>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 3 }}>
+                                                <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(emp)}/>
+                                                <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => deleteMutation.mutate(emp.id)}/>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+
+            <EmployeeModal open={modal.open} employee={editingEmployee} onClose={modal.closeModal} />
+        </div>
+    );
+}
+
+// ===============================================
+// Employee Modal
+// ===============================================
+function EmployeeModal({ open, employee, onClose }: {
+    open: boolean;
+    employee: Employee | null;
+    onClose: () => void;
+}) {
+    const isEdit = !!employee;
+    const qc = useQueryClient();
+
+    const emptyForm = {
+        first_name: '',
+        last_name: '',
+        matricule: '',
+        nss: '',
+        birth_date: '',
+        gender_id: '',
+        rib: '',
+        bank_name: '',
+        hire_date: new Date().toISOString().split('T')[0],
+        termination_date: '',
+        employment_status: 'active',
+    };
+
+    const [form, setForm] = useState(emptyForm);
+    const [error, setError] = useState('');
+
+    // Fetch genders
+    const { data: genders } = useQuery({
+        queryKey: ['genders'],
+        queryFn: () => apiClient.get('/genders').then(r => r.data.data),
+        staleTime: 10 * 60_000,
+        enabled: open,
+    });
+
+    // إعادة تعيين النموذج
+    useEffect(() => {
+        if (open) {
+            if (employee) {
+                const emp = employee as any;
+                setForm({
+                    first_name: emp.first_name || '',
+                    last_name: emp.last_name || '',
+                    matricule: emp.matricule || '',
+                    nss: emp.nss || '',
+                    birth_date: emp.birth_date ? emp.birth_date.split('T')[0] : '',
+                    gender_id: emp.gender_id || '',
+                    rib: emp.rib || '',
+                    bank_name: emp.bank_name || '',
+                    hire_date: emp.hire_date ? emp.hire_date.split('T')[0] : '',
+                    termination_date: emp.termination_date ? emp.termination_date.split('T')[0] : '',
+                    employment_status: emp.employment_status || 'active',
+                });
+            } else {
+                setForm(emptyForm);
+            }
+            setError('');
+        }
+    }, [open, employee]);
+
+    const set = (k: string, v: string) => {
+        setForm(f => ({ ...f, [k]: v }));
+        setError('');
+    };
+
+    // في EmployeesPage.tsx، داخل EmployeeModal، عدل saveMutation:
+
+const saveMutation = useMutation({
+    mutationFn: (data: typeof form) => {
+        const payload: any = {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            matricule: data.matricule || null,
+            nss: data.nss || null,
+            birth_date: data.birth_date || null,
+            gender_id: data.gender_id ? parseInt(data.gender_id) : null,
+            rib: data.rib || null,
+            bank_name: data.bank_name || null,
+            hire_date: data.hire_date || null,
+            termination_date: data.termination_date || null,
+            employment_status: data.employment_status || 'active',
+        };
+
+        // ✅ لا نرسل created_by - الباك-إند يجب أن يتعامل معها تلقائياً
+        if (isEdit) {
+            return apiClient.put(`/employees/${employee!.id}`, payload);
+        }
+        return apiClient.post('/employees', payload);
+    },
+    onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['employees'] });
+        onClose();
+    },
+    onError: (err: any) => {
+        const msg = err?.response?.data?.message || err?.response?.data?.error || 'فشل الحفظ. تحقق من البيانات.';
+        // ✅ إذا كان الخطأ يتعلق بـ created_by، نعرض رسالة أوضح
+        if (msg.includes('created_by')) {
+            setError('خطأ في الخادم: تأكد من تسجيل الدخول بشكل صحيح.');
+        } else {
+            setError(msg);
+        }
+    },
+});
+
+    const handleSave = () => {
+        if (!form.first_name.trim() || !form.last_name.trim()) {
+            setError('الاسم واللقب مطلوبان');
+            return;
+        }
+        saveMutation.mutate(form);
+    };
+
+    return (
+        <Modal open={open} onClose={onClose} size="lg"
+            title={isEdit ? `تعديل — ${(employee as any)?.first_name} ${(employee as any)?.last_name}` : 'موظف جديد'}
+            subtitle={isEdit ? '' : 'إضافة موظف جديد إلى النظام'}
+            footer={
+                <>
+                    <Button onClick={onClose}>إلغاء</Button>
+                    <Button variant="primary" icon={<i className="ti ti-device-floppy"/>}
+                        onClick={handleSave}
+                        disabled={saveMutation.isPending}>
+                        {saveMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
+                    </Button>
+                </>
+            }>
+
+            {error && <AlertBar variant="red">{error}</AlertBar>}
+
+            <div className="fgrid c3">
+                <div className="fg">
+                    <label className="req">الاسم الأول</label>
+                    <input value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="الاسم" autoFocus />
+                </div>
+                <div className="fg">
+                    <label className="req">اللقب</label>
+                    <input value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="اللقب" />
+                </div>
+                <div className="fg">
+                    <label>رقم التسجيل</label>
+                    <input value={form.matricule} onChange={e => set('matricule', e.target.value)} placeholder="MAT-001" />
+                </div>
+                <div className="fg">
+                    <label>NSS</label>
+                    <input value={form.nss} onChange={e => set('nss', e.target.value)} placeholder="رقم الضمان الاجتماعي" style={{ fontFamily: 'monospace' }} />
+                </div>
+                <div className="fg">
+                    <label>تاريخ الميلاد</label>
+                    <input type="date" value={form.birth_date} onChange={e => set('birth_date', e.target.value)} />
+                </div>
+                <div className="fg">
+                    <label>الجنس</label>
+                    <select value={form.gender_id} onChange={e => set('gender_id', e.target.value)}>
+                        <option value="">— اختر —</option>
+                        {genders?.map((g: any) => (
+                            <option key={g.id} value={g.id}>{g.label || g.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="fg">
+                    <label>تاريخ التوظيف</label>
+                    <input type="date" value={form.hire_date} onChange={e => set('hire_date', e.target.value)} />
+                </div>
+                <div className="fg">
+                    <label>تاريخ إنهاء الخدمة</label>
+                    <input type="date" value={form.termination_date} onChange={e => set('termination_date', e.target.value)} />
+                </div>
+                <div className="fg">
+                    <label>الحالة الوظيفية</label>
+                    <select value={form.employment_status} onChange={e => set('employment_status', e.target.value)}>
+                        <option value="active">نشط</option>
+                        <option value="suspended">معلق</option>
+                        <option value="terminated">منتهي الخدمة</option>
+                    </select>
+                </div>
+                <div className="fg">
+                    <label>اسم البنك</label>
+                    <input value={form.bank_name} onChange={e => set('bank_name', e.target.value)} placeholder="BNA" />
+                </div>
+                <div className="fg">
+                    <label>RIB</label>
+                    <input value={form.rib} onChange={e => set('rib', e.target.value)} placeholder="00799999000XXXXXXXX00" style={{ fontFamily: 'monospace' }} />
+                </div>
+            </div>
+        </Modal>
+    );
+}
+```
+
 ## FILE: resources/js/pages/users/UsersPage.tsx
 ```
 // pages/users/UsersPage.tsx
@@ -9436,6 +13140,12 @@ export function useUpdateParty() {
   });
 }
 
+export const useTreasuryAccountTypes = () => useQu({
+    queryKey: ['treasury-account-types'],
+    queryFn: () => lookupsApi.treasuryAccountTypes().then(r => r.data.data),
+    staleTime: STALE
+});
+
 
 // ════════════════════════════════════════════════
 // hooks/useLookups.ts — جداول البحث الثابتة (cached)
@@ -9455,6 +13165,8 @@ export const usePaymentModes   = () => useQu({ queryKey: ['payment-modes'],  que
 export const useTreasuryAccounts = () => useQu({ queryKey: ['treasury'],     queryFn: () => lookupsApi.treasuryAccounts().then(r => r.data.data),staleTime: STALE });
 export const useCurrentFiscalYear = () => useQu({ queryKey: ['fiscal-year-current'], queryFn: () => lookupsApi.currentFiscalYear().then(r => r.data.data), staleTime: STALE });
 export const useDocumentTypes  = () => useQu({ queryKey: ['document-types'], queryFn: () => lookupsApi.documentTypes().then(r => r.data.data),   staleTime: STALE });
+
+
 ```
 
 ## FILE: resources/js/hooks/useInvoices.ts
@@ -10116,6 +13828,252 @@ export function useAuth(): AuthContextValue {
 
 // ── Standalone hook alias ─────────────────────────
 export const useAuthUser = () => useAuth().user;
+```
+
+## FILE: resources/js/context/FiscalYearContext.tsx
+```
+// resources/js/context/FiscalYearContext.tsx
+// ════════════════════════════════════════════════
+// سياق السنة المالية — يُغلّف التطبيق بأكمله
+// ويوفر محدِّد السنة في الـ Topbar
+// ════════════════════════════════════════════════
+import React, {
+  createContext, useContext, useState,
+  useEffect, useCallback, useMemo,
+} from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import apiClient from '@/lib/api/client';
+import type { FiscalYear } from '@/types';
+
+// ── Types ──────────────────────────────────────────
+interface FiscalYearContextType {
+  years:           FiscalYear[];
+  selectedYear:    FiscalYear | null;
+  currentYear:     FiscalYear | null;       // السنة المعيَّنة كـ is_current
+  setSelectedYear: (year: FiscalYear) => void;
+  goToCurrentYear: () => void;
+  isLoading:       boolean;
+  hasMultipleOpen: boolean;
+}
+
+const FiscalYearContext = createContext<FiscalYearContextType | undefined>(undefined);
+
+// ── Provider ───────────────────────────────────────
+export function FiscalYearProvider({ children }: { children: React.ReactNode }) {
+  const [selectedYear, setSelectedYearState] = useState<FiscalYear | null>(null);
+  const qc = useQueryClient();
+
+  const { data: years = [], isLoading } = useQuery<FiscalYear[]>({
+    queryKey: ['fiscal-years'],
+    queryFn:  () => apiClient
+      .get('/fiscal-years', { params: { per_page: 50 } })
+      .then(r => r.data.data),
+    staleTime: 5 * 60_000,
+    retry: 1,
+  });
+
+  // السنة المعيَّنة فعلياً كحالية
+  const currentYear = useMemo(
+    () => years.find(y => y.is_current) ?? years[0] ?? null,
+    [years]
+  );
+
+  // تعيين السنة الحالية تلقائياً عند التحميل
+  useEffect(() => {
+    if (years.length > 0 && !selectedYear) {
+      setSelectedYearState(currentYear);
+    }
+  }, [years, currentYear, selectedYear]);
+
+  const setSelectedYear = useCallback((year: FiscalYear) => {
+    setSelectedYearState(year);
+    // persist selection in sessionStorage
+    try { sessionStorage.setItem('selected_fiscal_year', String(year.id)); } catch {}
+  }, []);
+
+  const goToCurrentYear = useCallback(() => {
+    if (currentYear) setSelectedYearState(currentYear);
+  }, [currentYear]);
+
+  const hasMultipleOpen = useMemo(
+    () => years.filter(y => !y.is_closed).length > 1,
+    [years]
+  );
+
+  const value: FiscalYearContextType = {
+    years, selectedYear, currentYear,
+    setSelectedYear, goToCurrentYear,
+    isLoading, hasMultipleOpen,
+  };
+
+  return (
+    <FiscalYearContext.Provider value={value}>
+      {children}
+    </FiscalYearContext.Provider>
+  );
+}
+
+export function useFiscalYear(): FiscalYearContextType {
+  const ctx = useContext(FiscalYearContext);
+  if (!ctx) throw new Error('useFiscalYear must be used within FiscalYearProvider');
+  return ctx;
+}
+
+// ─────────────────────────────────────────────────────────────
+// FiscalYearSelector — مكوّن يُوضع في الـ Topbar
+// ─────────────────────────────────────────────────────────────
+export function FiscalYearSelector() {
+  const { years, selectedYear, currentYear, setSelectedYear, isLoading } = useFiscalYear();
+  const [open, setOpen] = useState(false);
+
+  const openYears   = years.filter(y => !y.is_closed);
+  const closedYears = years.filter(y => y.is_closed);
+
+  if (isLoading) {
+    return (
+      <div style={{
+        display:'flex', alignItems:'center', gap:6, padding:'5px 10px',
+        background:'var(--bg3)', border:'1px solid var(--b2)', borderRadius:'var(--r2)',
+        fontSize:12, color:'var(--t4)',
+      }}>
+        <i className="ti ti-loader" style={{ animation:'spin .8s linear infinite' }} />
+        جاري التحميل...
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    );
+  }
+
+  if (!selectedYear) return null;
+
+  return (
+    <div style={{ position:'relative' }}>
+      {/* Trigger */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display:'flex', alignItems:'center', gap:6,
+          padding:'5px 10px', borderRadius:'var(--r2)',
+          border:'1px solid var(--b2)', background:'var(--bg3)',
+          cursor:'pointer', transition:'.15s', fontFamily:'Tajawal,sans-serif',
+        }}
+      >
+        <i className={`ti ${selectedYear.is_closed ? 'ti-lock' : 'ti-calendar-check'}`}
+           style={{ color: selectedYear.is_closed ? 'var(--t4)' : 'var(--em)', fontSize:14 }} />
+        <span style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>
+          {selectedYear.name}
+        </span>
+        {selectedYear.is_current && (
+          <i className="ti ti-star-filled" style={{ color:'var(--gold)', fontSize:10 }} />
+        )}
+        {selectedYear.is_closed && (
+          <span style={{ fontSize:9, color:'var(--t4)', fontWeight:400 }}>مقفلة</span>
+        )}
+        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize:11, color:'var(--t4)' }} />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <>
+          {/* Backdrop */}
+          <div
+            style={{ position:'fixed', inset:0, zIndex:10000 }}
+            onClick={() => setOpen(false)}
+          />
+          <div style={{
+            position:'absolute', top:'calc(100% + 6px)', left:0,
+            background:'var(--bg2)', border:'1px solid var(--b2)',
+            borderRadius:'var(--r3)', boxShadow:'var(--shadow2)',
+            zIndex:10001, minWidth:240, overflow:'hidden',
+          }}>
+            {/* Header */}
+            <div style={{ padding:'8px 12px', background:'var(--bg3)', borderBottom:'1px solid var(--b1)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:1 }}>
+                السنوات المالية
+              </div>
+            </div>
+
+            {/* Open years */}
+            {openYears.length > 0 && (
+              <>
+                <div style={{ padding:'4px 12px 2px', fontSize:9, fontWeight:700, color:'var(--em)', textTransform:'uppercase', letterSpacing:1 }}>
+                  مفتوحة
+                </div>
+                {openYears.map(y => (
+                  <YearOption key={y.id} year={y} selected={selectedYear?.id === y.id} onClick={() => { setSelectedYear(y); setOpen(false); }} />
+                ))}
+              </>
+            )}
+
+            {/* Closed years */}
+            {closedYears.length > 0 && (
+              <>
+                <div style={{ padding:'6px 12px 2px', borderTop:'1px solid var(--b1)', fontSize:9, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:1 }}>
+                  مقفلة
+                </div>
+                {closedYears.slice(0, 3).map(y => (
+                  <YearOption key={y.id} year={y} selected={selectedYear?.id === y.id} onClick={() => { setSelectedYear(y); setOpen(false); }} />
+                ))}
+                {closedYears.length > 3 && (
+                  <div style={{ padding:'6px 12px', fontSize:11, color:'var(--t4)', fontStyle:'italic' }}>
+                    + {closedYears.length - 3} سنوات أخرى...
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Link to manage */}
+            <div style={{ padding:'6px 12px', borderTop:'1px solid var(--b1)' }}>
+              <a
+                href="/fiscalyears"
+                style={{ fontSize:12, color:'var(--em)', fontWeight:600, textDecoration:'none', display:'flex', alignItems:'center', gap:6 }}
+                onClick={() => setOpen(false)}
+              >
+                <i className="ti ti-settings" style={{ fontSize:13 }} />
+                إدارة السنوات المالية
+              </a>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function YearOption({ year, selected, onClick }: { year: FiscalYear; selected: boolean; onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display:'flex', alignItems:'center', gap:10,
+        padding:'8px 12px', cursor:'pointer', transition:'.13s',
+        background: selected ? 'var(--emb)' : 'transparent',
+      }}
+      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg3)'; }}
+      onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+    >
+      <i className={`ti ${year.is_closed ? 'ti-lock' : year.is_current ? 'ti-star-filled' : 'ti-calendar'}`}
+         style={{ fontSize:14, color: year.is_closed ? 'var(--t4)' : year.is_current ? 'var(--gold)' : 'var(--em)', flexShrink:0 }} />
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:13, fontWeight: selected ? 700 : 500, color: selected ? 'var(--em)' : 'var(--t1)' }}>
+          {year.name}
+          {year.is_current && <span style={{ fontSize:9, color:'var(--gold)', marginRight:6 }}>★ حالية</span>}
+        </div>
+        <div style={{ fontSize:10, color:'var(--t4)' }}>
+          {_fmtShort(year.start_date)} — {_fmtShort(year.end_date)}
+        </div>
+      </div>
+      {selected && <i className="ti ti-check" style={{ color:'var(--em)', fontSize:14 }} />}
+    </div>
+  );
+}
+
+function _fmtShort(date: unknown): string {
+  const d = String(date).match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? '';
+  if (!d) return '—';
+  const [y, m] = d.split('-');
+  const months = ['يناير','فبراير','مارس','أبريل','ماي','جوان','جويلية','أوت','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return `${months[parseInt(m) - 1]} ${y}`;
+}
 ```
 
 ## FILE: resources/js/context/ThemeContext.tsx
@@ -12894,39 +16852,42 @@ if (container) {
 // ════════════════════════════════════════════════
 // App.tsx — نقطة الدخول الرئيسية
 // ════════════════════════════════════════════════
-import { BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from '@/context/AuthContext';
-import { AppRoutes }   from '@/routes/index';
+import { BrowserRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { FiscalYearProvider } from "@/context/FiscalYearContext";
+import { AuthProvider } from "@/context/AuthContext";
+import { AppRoutes } from "@/routes/index";
 
 // CSS — الترتيب مهم جداً
-import '../css/theme/tokens.css';
-import '../css/theme/layout.css';
-import '../css/theme/components.css';
-import '../css/theme/pages.css';
-import '../css/theme/utilities.css';
-import '../css/theme/pos.css';
+import "../css/theme/tokens.css";
+import "../css/theme/layout.css";
+import "../css/theme/components.css";
+import "../css/theme/pages.css";
+import "../css/theme/utilities.css";
+import "../css/theme/pos.css";
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 30_000,
+    defaultOptions: {
+        queries: {
+            refetchOnWindowFocus: false,
+            retry: 1,
+            staleTime: 30_000,
+        },
     },
-  },
 });
 
 export default function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
-    </QueryClientProvider>
-  );
+    return (
+        <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+                <FiscalYearProvider>
+                    <BrowserRouter>
+                        <AppRoutes />
+                    </BrowserRouter>
+                </FiscalYearProvider>
+            </AuthProvider>
+        </QueryClientProvider>
+    );
 }
 ```
 
