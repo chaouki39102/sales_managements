@@ -3034,6 +3034,8 @@ const NAV_GROUPS = [
       { name: 'المستخدمون', href: '/users',     icon: 'ti-user'     },
       { name: 'الإعدادات',  href: '/settings',  icon: 'ti-settings' },
       { name: 'أنواع المستندات', href: '/settings/document-types', icon: 'ti-file' },
+      { name: 'سلاسل الترقيم',  href: '/numbering-series', icon: 'ti-list-numbers' },
+      { name: 'طرق الدفع',  href: '/payment-methods', icon: 'ti-credit-card' },
     ],
   },
 ];
@@ -3089,6 +3091,8 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   '/users':       { title: 'المستخدمون',            path: 'نظام ← مستخدمون'         },
   '/settings':    { title: 'الإعدادات',             path: 'نظام ← إعدادات'          },
   '/settings/document-types': { title: 'أنواع المستندات', path: 'نظام ← أنواع المستندات' },
+  '/numbering-series': { title: 'سلاسل الترقيم', path: 'نظام ← سلاسل الترقيم' },
+  '/payment-methods': { title: 'طرق الدفع', path: 'نظام ← طرق الدفع' },
 };
 
 export default function DashboardLayout() {
@@ -7070,10 +7074,13 @@ export default function CommercialDocumentsPage() {
   // ── Fetch document type info ────────────────
   const { data: docType } = useQuery<DocumentType>({
     queryKey: ['document-type', typeCode],
-    queryFn:  () => apiClient.get('/document-types', { params: { 'filter[code]': typeCode } })
-      .then(r => r.data.data?.[0] ?? null),
-    enabled:  !!typeCode,
-  });
+   queryFn: () =>
+  apiClient
+    .get('/document-types', { params: { per_page: 500 } })
+    .then((r) => {
+      const list = r.data.data ?? [];
+      return list.find((dt: any) => dt.code === typeCode) ?? null;
+    }),
 
   // ── Fetch documents ─────────────────────────
   const { data: docs, isLoading, isFetching } = useQuery({
@@ -7643,11 +7650,11 @@ function DocumentViewModal({ doc, docType, onClose, onEdit, isReadOnly }: {
 
 ## FILE: resources/js/pages/expenses/ExpensesPage.tsx
 ```
-// resources/js/pages/finance/FinancePage.tsx
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+// resources/js/pages/expenses/ExpensesPage.tsx
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
-import { useTreasuryAccounts, usePaymentModes, useTreasuryAccountTypes } from '@/hooks/useData';
+import { useFiscalYear } from '@/context/FiscalYearContext';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -7655,218 +7662,446 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
+import AlertBar from '@/components/ui/AlertBar';
+import Switch from '@/components/ui/Switch';
 import apiClient from '@/lib/api/client';
-import type { TreasuryAccount, PaymentMode, TreasuryAccountType } from '@/types';
 
-export default function FinancePage() {
-    const [activeTab, setActiveTab] = useState('accounts');
-    const accountModal = useModal();
-    const modeModal = useModal();
-    const qc = useQueryClient();
-
-    const { data: accounts, isLoading: loadingAccounts } = useTreasuryAccounts();
-    const { data: paymentModes, isLoading: loadingModes } = usePaymentModes();
-    const { data: accountTypes } = useTreasuryAccountTypes();
-
-    const totalBalance = accounts?.reduce((sum: number, acc: TreasuryAccount) => sum + acc.balance, 0) ?? 0;
-    const bankBalance = accounts?.filter((a: TreasuryAccount) => a.type === 'bank').reduce((sum: number, acc: TreasuryAccount) => sum + acc.balance, 0) ?? 0;
-    const cashBalance = accounts?.filter((a: TreasuryAccount) => a.type === 'cash').reduce((sum: number, acc: TreasuryAccount) => sum + acc.balance, 0) ?? 0;
-
-    const deleteAccount = useMutation({
-        mutationFn: (id: number) => apiClient.delete(`/treasury-accounts/${id}`),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ['treasury-accounts'] }),
-    });
-
-    return (
-        <div className="page on" id="p-finance">
-            <PageHeader
-                title="الخزينة والمالية"
-                subtitle="إدارة الحسابات البنكية والصناديق وطرق الدفع"
-                actions={
-                    <>
-                        <Button variant="primary" size="sm" icon={<i className="ti ti-plus"/>} onClick={activeTab === 'accounts' ? accountModal.openModal : modeModal.openModal}>
-                            {activeTab === 'accounts' ? 'حساب جديد' : 'طريقة دفع جديدة'}
-                        </Button>
-                    </>
-                }
-            />
-
-            <div className="tabs" style={{ marginBottom: 20 }}>
-                <div className={`tab ${activeTab === 'accounts' ? 'on' : ''}`} onClick={() => setActiveTab('accounts')}>الحسابات والصناديق</div>
-                <div className={`tab ${activeTab === 'modes' ? 'on' : ''}`} onClick={() => setActiveTab('modes')}>طرق الدفع</div>
-            </div>
-
-            <div className="kpis" style={{ marginBottom: 16 }}>
-                <KpiCard variant="green" icon="ti-wallet" label="إجمالي الأرصدة" value={totalBalance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
-                <KpiCard variant="blue" icon="ti-building-bank" label="الرصيد البنكي" value={bankBalance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
-                <KpiCard variant="gold" icon="ti-cash" label="الرصيد النقدي" value={cashBalance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
-                <KpiCard variant="purple" icon="ti-file-text" label="عدد الحسابات" value={accounts?.length ?? 0} />
-            </div>
-
-            {activeTab === 'accounts' && (
-                <Card title="الحسابات البنكية والصناديق" noHeader style={{ padding: 0 }}>
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>الاسم</th>
-                                    <th>النوع</th>
-                                    <th>الكود</th>
-                                    <th>البنك</th>
-                                    <th>الرصيد الحالي</th>
-                                    <th>الافتراضي</th>
-                                    <th>الحالة</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loadingAccounts ? (
-                                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)' }}>جاري التحميل...</td></tr>
-                                ) : accounts?.length === 0 ? (
-                                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)' }}>لا توجد حسابات</td></tr>
-                                ) : accounts?.map((acc: TreasuryAccount) => (
-                                    <tr key={acc.id}>
-                                        <td className="s">{acc.name}</td>
-                                        <td><Badge variant={acc.type === 'bank' ? 'info' : 'warning'}>{acc.type === 'bank' ? 'حساب بنكي' : 'صندوق نقدي'}</Badge></td>
-                                        <td className="m">{acc.code ?? '—'}</td>
-                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>{acc.type === 'bank' ? acc.name : '—'}</td>
-                                        <td className="e">{acc.balance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
-                                        <td>{acc.is_default ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span> : '—'}</td>
-                                        <td><Badge variant={acc.active ? 'success' : 'danger'}>{acc.active ? 'نشط' : 'موقوف'}</Badge></td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 3 }}>
-                                                <Button size="xs" icon={<i className="ti ti-pencil"/>} />
-                                                <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => deleteAccount.mutate(acc.id)} />
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </Card>
-            )}
-
-            {activeTab === 'modes' && (
-                <Card title="طرق الدفع" noHeader style={{ padding: 0 }}>
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>الاسم</th>
-                                    <th>الكود</th>
-                                    <th>الحساب المرتبط</th>
-                                    <th>يتطلب مرجع</th>
-                                    <th>الحالة</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loadingModes ? (
-                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)' }}>جاري التحميل...</td></tr>
-                                ) : paymentModes?.length === 0 ? (
-                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)' }}>لا توجد طرق دفع</td></tr>
-                                ) : paymentModes?.map((mode: PaymentMode) => (
-                                    <tr key={mode.id}>
-                                        <td className="s">{mode.name}</td>
-                                        <td className="m">{mode.code}</td>
-                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>—</td>
-                                        <td>{mode.requires_reference ? 'نعم' : 'لا'}</td>
-                                        <td><Badge variant={mode.active ? 'success' : 'danger'}>{mode.active ? 'نشط' : 'موقوف'}</Badge></td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 3 }}>
-                                                <Button size="xs" icon={<i className="ti ti-pencil"/>} />
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </Card>
-            )}
-
-            <AccountModal open={accountModal.open} onClose={accountModal.closeModal} />
-        </div>
-    );
+// --------------- Types ---------------
+interface Expense {
+  id: number;
+  date: string;
+  amount: number;
+  expense_category_id: number;
+  fiscal_year_id?: number;
+  payment_mode_id?: number | null;
+  treasury_account_id?: number | null;
+  party_id?: number | null;
+  description: string;
+  reference?: string;
+  is_paid: boolean;
+  is_recurring?: boolean;
 }
 
-function AccountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-    const qc = useQueryClient();
-    const { data: accountTypes } = useTreasuryAccountTypes();
+// --------------- API Layer ---------------
+const expensesApi = {
+  list: (params: Record<string, any>) =>
+    apiClient.get('/expenses', { params }).then(r => r.data),
+  create: (data: any) =>
+    apiClient.post('/expenses', data).then(r => r.data),
+  update: (id: number, data: any) =>
+    apiClient.put(`/expenses/${id}`, data).then(r => r.data),
+  delete: (id: number) =>
+    apiClient.delete(`/expenses/${id}`).then(r => r.data),
+};
 
-    const [form, setForm] = useState({
-        name: '',
-        code: '',
-        treasury_account_type_id: '',
-        bank_name: '',
-        account_number: '',
-        rib: '',
-        initial_balance: '0',
-        is_default: false,
-    });
+function useDebounce<T>(value: T, delay = 300): T {
+  const [debounced, setDebounced] = useState<T>(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
 
-    const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }));
+const formatDZD = (amount: number) =>
+  new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount) + ' دج';
 
-    const saveMutation = useMutation({
-        mutationFn: (data: typeof form) => apiClient.post('/treasury-accounts', {
-            ...data,
-            treasury_account_type_id: parseInt(data.treasury_account_type_id) || null,
-            initial_balance: parseFloat(data.initial_balance) || 0,
-        }),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['treasury-accounts'] }); onClose(); },
-    });
+export default function ExpensesPage() {
+  const qc = useQueryClient();
+  const { selectedYear } = useFiscalYear() as any;
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 350);
+  const [page, setPage] = useState(1);
+  const [perPage] = useState(15);
+  const [paidFilter, setPaidFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [editing, setEditing] = useState<Expense | null>(null);
+  const modal = useModal();
+  const deleteModal = useModal();
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-    return (
-        <Modal open={open} onClose={onClose} title="حساب مالي جديد" size="md"
-            footer={
-                <>
-                    <Button onClick={onClose}>إلغاء</Button>
-                    <Button variant="primary" onClick={() => saveMutation.mutate(form)} disabled={!form.name || saveMutation.isPending}>
-                        {saveMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
-                    </Button>
-                </>
-            }>
-            <div className="fgrid">
-                <div className="fg s2">
-                    <label className="req">اسم الحساب</label>
-                    <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="مثال: الصندوق الرئيسي" />
-                </div>
-                <div className="fg">
-                    <label>الكود</label>
-                    <input value={form.code} onChange={e => set('code', e.target.value)} placeholder="CP01" />
-                </div>
-                <div className="fg">
-                    <label className="req">النوع</label>
-                    <select value={form.treasury_account_type_id} onChange={e => set('treasury_account_type_id', e.target.value)}>
-                        <option value="">— اختر —</option>
-                        {accountTypes?.map((at: TreasuryAccountType) => (
-                            <option key={at.id} value={at.id}>{at.label}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="fg">
-                    <label>اسم البنك</label>
-                    <input value={form.bank_name} onChange={e => set('bank_name', e.target.value)} />
-                </div>
-                <div className="fg">
-                    <label>رقم الحساب</label>
-                    <input value={form.account_number} onChange={e => set('account_number', e.target.value)} style={{ fontFamily: 'monospace' }} />
-                </div>
-                <div className="fg">
-                    <label>RIB</label>
-                    <input value={form.rib} onChange={e => set('rib', e.target.value)} style={{ fontFamily: 'monospace' }} />
-                </div>
-                <div className="fg">
-                    <label>الرصيد الافتتاحي</label>
-                    <div className="inp-row">
-                        <input type="number" value={form.initial_balance} onChange={e => set('initial_balance', e.target.value)} />
-                        <div className="inp-suf">دج</div>
-                    </div>
-                </div>
+  const { data: paginated, isLoading, isFetching } = useQuery({
+    queryKey: ['expenses', debouncedSearch, paidFilter, categoryFilter, page, perPage],
+    queryFn: () => expensesApi.list({
+      'filter[search]': debouncedSearch || undefined,
+      'filter[is_paid]': paidFilter || undefined,
+      'filter[expense_category_id]': categoryFilter || undefined,
+      sort: '-date',
+      per_page: perPage,
+      page,
+    }),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  });
+
+  const expenses: Expense[] = paginated?.data ?? [];
+  const meta = paginated?.meta;
+
+  // قوائم الاختيار – سنستخدمها لعرض الأسماء
+  const { data: categories } = useQuery({
+    queryKey: ['expense-categories-select'],
+    queryFn: () => apiClient.get('/expense-categories', { params: { per_page: 200 } }).then(r => r.data.data),
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: parties } = useQuery({
+    queryKey: ['suppliers-select'],
+    queryFn: () => apiClient.get('/suppliers', { params: { per_page: 200 } }).then(r => r.data.data),
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: paymentModes } = useQuery({
+    queryKey: ['payment-modes-select'],
+    queryFn: () => apiClient.get('/payment-modes', { params: { per_page: 200 } }).then(r => r.data.data),
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: treasuryAccounts } = useQuery({
+    queryKey: ['treasury-accounts-select'],
+    queryFn: () => apiClient.get('/treasury-accounts', { params: { per_page: 200 } }).then(r => r.data.data),
+    staleTime: 5 * 60_000,
+  });
+
+  // دوال مساعدة للبحث عن الاسم باستخدام id
+  const getCategoryName = (id: number) => categories?.find((c: any) => c.id === id)?.name ?? '—';
+  const getPartyName    = (id?: number | null) => !id ? '—' : parties?.find((p: any) => p.id === id)?.name ?? '—';
+  const getPaymentName  = (id?: number | null) => !id ? '—' : paymentModes?.find((pm: any) => pm.id === id)?.name ?? '—';
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => expensesApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      deleteModal.closeModal();
+      setError(null);
+    },
+    onError: (err: any) => {
+      setError(err?.response?.data?.message || 'فشل الحذف');
+      deleteModal.closeModal();
+    },
+  });
+
+  const handleDelete = (id: number) => { setDeletingId(id); deleteModal.openModal(); };
+  const confirmDelete = () => { if (deletingId) deleteMutation.mutate(deletingId); };
+  const openAdd = () => { setEditing(null); modal.openModal(); };
+  const openEdit = (item: Expense) => { setEditing(item); modal.openModal(); };
+
+  const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const paidCount = expenses.filter(e => e.is_paid).length;
+  const unpaidCount = expenses.filter(e => !e.is_paid).length;
+
+  return (
+    <div className="page on" id="p-expenses">
+      <PageHeader
+        title="المصروفات"
+        subtitle={`إدارة المصروفات — ${meta?.total ?? 0} عملية`}
+        actions={
+          <Button variant="primary" size="sm" icon={<i className="ti ti-plus" />} onClick={openAdd}>
+            تسجيل مصروف جديد
+          </Button>
+        }
+      />
+
+      {error && <AlertBar variant="red" dismissible>{error}</AlertBar>}
+
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
+        <KpiCard variant="green" icon="ti-receipt" label="إجمالي المصروفات" value={formatDZD(totalAmount)} />
+        <KpiCard variant="blue" icon="ti-check" label="مدفوعة" value={paidCount} />
+        <KpiCard variant="red" icon="ti-clock" label="غير مدفوعة" value={unpaidCount} />
+        <KpiCard variant="purple" icon="ti-folders" label="عدد العمليات" value={meta?.total ?? 0} />
+      </div>
+
+      <div className="filters" style={{ marginBottom: 16 }}>
+        <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
+          <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
+          <input type="text" placeholder="ابحث بالوصف أو المرجع..." style={{ width: '100%' }}
+            value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+        </div>
+        <select style={{ width: 140 }} value={paidFilter} onChange={e => { setPaidFilter(e.target.value); setPage(1); }}>
+          <option value="">كل الحالات</option>
+          <option value="1">مدفوعة</option>
+          <option value="0">غير مدفوعة</option>
+        </select>
+        <select style={{ width: 150 }} value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}>
+          <option value="">كل الفئات</option>
+          {categories?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+
+      {isLoading ? (
+        <div className="empty"><div className="empty-ic"><i className="ti ti-loader" /></div><div className="empty-tx">جاري التحميل...</div></div>
+      ) : expenses.length === 0 ? (
+        <EmptyState icon="ti-credit-card" text="لا توجد مصروفات" sub="سجل أول مصروف" action={<Button variant="primary" onClick={openAdd}>مصروف جديد</Button>} />
+      ) : (
+        <Card noHeader style={{ padding: 0, opacity: isFetching ? 0.7 : 1 }}>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>الوصف</th>
+                  <th>الفئة</th>
+                  <th>المستفيد</th>
+                  <th>المبلغ</th>
+                  <th>طريقة الدفع</th>
+                  <th>مدفوعة؟</th>
+                  <th>التاريخ</th>
+                  <th style={{ textAlign: 'center', width: 120 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {expenses.map(exp => (
+                  <tr key={exp.id} onClick={() => openEdit(exp)} style={{ cursor: 'pointer' }}>
+                    <td>
+                      <div style={{ fontWeight: 700 }}>{exp.description}</div>
+                      {exp.reference && <div style={{ fontSize: 11, color: 'var(--t4)' }}>Ref: {exp.reference}</div>}
+                    </td>
+                    <td><Badge variant="warning" noDot>{getCategoryName(exp.expense_category_id)}</Badge></td>
+                    <td>{getPartyName(exp.party_id)}</td>
+                    <td className="e" style={{ direction: 'ltr', textAlign: 'right' }}>{formatDZD(exp.amount)}</td>
+                    <td>{getPaymentName(exp.payment_mode_id)}</td>
+                    <td><Badge variant={exp.is_paid ? 'success' : 'danger'}>{exp.is_paid ? 'مدفوعة' : 'غير مدفوعة'}</Badge></td>
+                    <td style={{ fontSize: 12, color: 'var(--t4)' }}>
+                      {new Date(exp.date).toLocaleDateString('fr-DZ')}
+                    </td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(exp)} />
+                        <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(exp.id)} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {meta && meta.last_page > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 16px', borderTop: '1px solid var(--b1)' }}>
+              <span style={{ fontSize: 12, color: 'var(--t4)' }}>{meta.from}–{meta.to} من {meta.total}</span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <Button size="xs" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+                  <i className="ti ti-chevron-right" />
+                </Button>
+                {Array.from({ length: Math.min(5, meta.last_page) }, (_, i) => i + 1).map(p => (
+                  <button key={p} className={`btn btn-xs ${p === page ? 'btn-p' : ''}`} onClick={() => setPage(p)}>{p}</button>
+                ))}
+                <Button size="xs" disabled={page >= meta.last_page} onClick={() => setPage(p => Math.min(meta.last_page, p + 1))}>
+                  <i className="ti ti-chevron-left" />
+                </Button>
+              </div>
             </div>
-        </Modal>
-    );
+          )}
+        </Card>
+      )}
+
+      <ExpenseModal
+        open={modal.open} record={editing}
+        categories={categories ?? []} parties={parties ?? []}
+        paymentModes={paymentModes ?? []} treasuryAccounts={treasuryAccounts ?? []}
+        fiscalYearId={selectedYear?.id}
+        onClose={modal.closeModal}
+      />
+
+      <ConfirmDeleteModal open={deleteModal.open} onClose={deleteModal.closeModal} onConfirm={confirmDelete} loading={deleteMutation.isPending} />
+    </div>
+  );
+}
+
+// =============== Modal (سليم) ===============
+function ExpenseModal({
+  open, record, categories, parties, paymentModes, treasuryAccounts, fiscalYearId, onClose,
+}: {
+  open: boolean; record: Expense | null; categories: any[]; parties: any[]; paymentModes: any[]; treasuryAccounts: any[]; fiscalYearId?: number; onClose: () => void;
+}) {
+  const isEdit = !!record;
+  const qc = useQueryClient();
+
+  const emptyForm = {
+    date: new Date().toISOString().split('T')[0],
+    amount: '',
+    expense_category_id: '',
+    payment_mode_id: '' as string | number,
+    treasury_account_id: '' as string | number,
+    party_id: '' as string | number,
+    description: '',
+    reference: '',
+    is_paid: false,
+    is_recurring: false,
+  };
+
+  const [form, setForm] = useState(emptyForm);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      if (record) {
+        setForm({
+          date: record.date?.split('T')[0] ?? new Date().toISOString().split('T')[0],
+          amount: String(record.amount ?? ''),
+          expense_category_id: String(record.expense_category_id ?? ''),
+          payment_mode_id: record.payment_mode_id ?? '',
+          treasury_account_id: record.treasury_account_id ?? '',
+          party_id: record.party_id ?? '',
+          description: record.description ?? '',
+          reference: record.reference ?? '',
+          is_paid: record.is_paid ?? false,
+          is_recurring: record.is_recurring ?? false,
+        });
+      } else {
+        setForm(emptyForm);
+      }
+      setErrors({});
+      setServerError('');
+    }
+  }, [open, record]);
+
+  const set = (k: string, v: any) => {
+    setForm(f => ({ ...f, [k]: v }));
+    if (errors[k]) setErrors(prev => { const n = { ...prev }; delete n[k]; return n; });
+  };
+
+const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!form.amount || parseFloat(form.amount) <= 0) errs.amount = 'المبلغ غير صالح';
+    if (!form.description.trim()) errs.description = 'الوصف مطلوب';
+    if (!form.date) errs.date = 'التاريخ مطلوب';
+    if (!form.expense_category_id) errs.expense_category_id = 'اختر فئة المصروف';
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: (data: typeof form) => {
+      const payload = {
+        date: data.date,
+        amount: parseFloat(data.amount),
+        expense_category_id: parseInt(data.expense_category_id) || null,
+        payment_mode_id: data.payment_mode_id ? parseInt(String(data.payment_mode_id)) : null,
+        treasury_account_id: data.treasury_account_id ? parseInt(String(data.treasury_account_id)) : null,
+        party_id: data.party_id ? parseInt(String(data.party_id)) : null,
+        description: data.description.trim(),
+        reference: data.reference || null,
+        is_paid: data.is_paid,
+        is_recurring: data.is_recurring,
+        fiscal_year_id: fiscalYearId ?? null,
+      };
+      return isEdit ? expensesApi.update(record!.id, payload) : expensesApi.create(payload);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['expenses'] }); onClose(); },
+    onError: (err: any) => {
+      const msg = err?.response?.data;
+      if (msg?.errors) {
+        const fieldErrors: Record<string, string> = {};
+        for (const [k, v] of Object.entries(msg.errors)) fieldErrors[k] = (v as string[])[0];
+        setErrors(fieldErrors);
+      } else {
+        setServerError(msg?.message || 'فشل الحفظ');
+      }
+    },
+  });
+
+  const handleSave = () => {
+    if (!validate()) return;
+    saveMutation.mutate(form);
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} size="md"
+      title={isEdit ? 'تعديل المصروف' : 'تسجيل مصروف جديد'}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={saveMutation.isPending}>إلغاء</Button>
+          <Button variant="primary" icon={<i className="ti ti-device-floppy" />} onClick={handleSave} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+          </Button>
+        </>
+      }
+    >
+      {serverError && <AlertBar variant="red">{serverError}</AlertBar>}
+      <div className="fgrid c2" style={{ gap: 14 }}>
+        <div className="fg s2">
+          <label className="req">الوصف</label>
+          <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="وصف المصروف" />
+          {errors.description && <span style={{ color: 'var(--red)', fontSize: 11 }}>{errors.description}</span>}
+        </div>
+        <div className="fg">
+          <label className="req">المبلغ</label>
+          <div className="inp-row"><input type="number" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0.00" /><div className="inp-suf">دج</div></div>
+          {errors.amount && <span style={{ color: 'var(--red)', fontSize: 11 }}>{errors.amount}</span>}
+        </div>
+        <div className="fg">
+          <label className="req">التاريخ</label>
+          <input type="date" value={form.date} onChange={e => set('date', e.target.value)} />
+          {errors.date && <span style={{ color: 'var(--red)', fontSize: 11 }}>{errors.date}</span>}
+        </div>
+        <div className="fg">
+          <label className="req">الفئة</label>
+          <select
+            value={form.expense_category_id as string}
+            onChange={e => set('expense_category_id', e.target.value)}
+            style={{ borderColor: errors.expense_category_id ? 'var(--red)' : undefined }}
+          >
+            <option value="">— اختر —</option>
+            {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {errors.expense_category_id && <span style={{ color: 'var(--red)', fontSize: 11 }}>{errors.expense_category_id}</span>}
+        </div>
+        <div className="fg">
+          <label>المستفيد</label>
+          <select value={form.party_id} onChange={e => set('party_id', e.target.value)}>
+            <option value="">— بدون —</option>
+            {parties.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label>طريقة الدفع</label>
+          <select value={form.payment_mode_id} onChange={e => set('payment_mode_id', e.target.value)}>
+            <option value="">— غير محدد —</option>
+            {paymentModes.map((pm: any) => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label>الحساب المالي</label>
+          <select value={form.treasury_account_id} onChange={e => set('treasury_account_id', e.target.value)}>
+            <option value="">— غير محدد —</option>
+            {treasuryAccounts.map((acc: any) => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label>مرجع</label>
+          <input value={form.reference} onChange={e => set('reference', e.target.value)} placeholder="اختياري" />
+        </div>
+        <div className="fg">
+          <label>مدفوعة</label>
+          <Switch checked={form.is_paid} onChange={v => set('is_paid', v)} />
+        </div>
+        <div className="fg">
+          <label>متكررة</label>
+          <Switch checked={form.is_recurring} onChange={v => set('is_recurring', v)} />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function ConfirmDeleteModal({ open, onClose, onConfirm, loading }: {
+  open: boolean; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} size="sm" title="تأكيد الحذف">
+      <div style={{ textAlign: 'center', padding: 16 }}>
+        <i className="ti ti-alert-triangle" style={{ fontSize: 40, color: 'var(--red)' }} />
+        <div style={{ fontWeight: 800, fontSize: 15, margin: '12px 0 6px' }}>هل أنت متأكد؟</div>
+        <div style={{ fontSize: 13, color: 'var(--t4)' }}>لا يمكن التراجع عن حذف المصروف.</div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: '8px 0 0' }}>
+        <Button onClick={onClose} disabled={loading}>إلغاء</Button>
+        <Button variant="danger" onClick={onConfirm} disabled={loading} icon={loading ? <i className="ti ti-loader" /> : <i className="ti ti-trash" />}>
+          {loading ? 'جاري الحذف...' : 'حذف'}
+        </Button>
+      </div>
+    </Modal>
+  );
 }
 ```
 
@@ -11100,6 +11335,626 @@ export default function LookupPage({
 }
 ```
 
+## FILE: resources/js/pages/lookups/NumberingSeriesPage.tsx
+```
+// resources/js/pages/lookups/NumberingSeriesPage.tsx
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useModal } from '@/hooks/useModal';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import KpiCard from '@/components/ui/KpiCard';
+import EmptyState from '@/components/ui/EmptyState';
+import AlertBar from '@/components/ui/AlertBar';
+import Switch from '@/components/ui/Switch';
+import apiClient from '@/lib/api/client';
+
+// =============== Types ===============
+interface NumberingSeriesRecord {
+  id: number;
+  document_type_id: number;
+  warehouse_id: number | null;
+  prefix: string;
+  suffix: string | null;
+  format: string;
+  last_number: number;
+  padding: number;
+  start_number: number;
+  max_number: number | null;
+  reset_yearly: boolean;
+  reset_monthly: boolean;
+  current_year: number;
+  current_month: number;
+  active: boolean;
+  is_locked: boolean;
+  relations?: {
+    documentType?: { id: number; name: string; code: string };
+    warehouse?: { id: number; name: string };
+  };
+  // حقل إضافي من الـ API بعد المزامنة
+  actual_last_number?: number;
+}
+
+interface DocumentTypeOption { id: number; name: string; code: string }
+interface WarehouseOption { id: number; name: string }
+
+// =============== API Layer ===============
+const numberingSeriesApi = {
+  list: (params: Record<string, any>) =>
+    apiClient.get('/numbering-series', { params }).then(r => r.data),
+  create: (data: any) =>
+    apiClient.post('/numbering-series', data).then(r => r.data),
+  update: (id: number, data: any) =>
+    apiClient.put(`/numbering-series/${id}`, data).then(r => r.data),
+  delete: (id: number) =>
+    apiClient.delete(`/numbering-series/${id}`).then(r => r.data),
+  preview: (id: number) =>
+    apiClient.get(`/numbering-series/${id}/next-number?preview=true`).then(r => r.data),
+  lock: (id: number) =>
+    apiClient.post(`/numbering-series/${id}/lock`).then(r => r.data),
+  unlock: (id: number) =>
+    apiClient.post(`/numbering-series/${id}/unlock`).then(r => r.data),
+  sync: (id: number) =>
+    apiClient.post(`/numbering-series/${id}/sync`).then(r => r.data),
+};
+
+// =============== Helpers ===============
+function simulateNumber(series: NumberingSeriesRecord, next = true): string {
+  try {
+    const num = next ? series.last_number + 1 : series.last_number;
+    const padded = String(num).padStart(series.padding, '0');
+    let fmt = series.format
+      .replace('{PREFIX}', series.prefix || '')
+      .replace('{SUFFIX}', series.suffix || '')
+      .replace('{YY}', String(series.current_year || new Date().getFullYear()).slice(-2))
+      .replace('{YYYY}', String(series.current_year || new Date().getFullYear()))
+      .replace('{MM}', String(series.current_month || new Date().getMonth() + 1).padStart(2, '0'))
+      .replace('{MONTH}', String(series.current_month || new Date().getMonth() + 1).padStart(2, '0'))
+      .replace('{NUMBER}', padded);
+    return fmt.replace(/\{NUMBER:(\d+)\}/g, (_, w) => String(num).padStart(Number(w), '0'));
+  } catch { return '—'; }
+}
+
+function haveDocumentsBeenCreated(series: NumberingSeriesRecord): boolean {
+  return series.last_number >= series.start_number;
+}
+
+// =============== Main Component ===============
+export default function NumberingSeriesPage() {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState<NumberingSeriesRecord | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage] = useState(15);
+  const modal = useModal();
+  const deleteModal = useModal();
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Queries
+  const { data: paginated, isLoading, isFetching } = useQuery({
+    queryKey: ['numbering-series', debouncedSearch, page, perPage],
+    queryFn: () => numberingSeriesApi.list({
+      'filter[search]': debouncedSearch || undefined,
+      include: 'documentType,warehouse',
+      sort: '-id',
+      per_page: perPage,
+      page,
+    }),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  });
+
+  const items: NumberingSeriesRecord[] = paginated?.data ?? [];
+  const meta = paginated?.meta;
+
+  const { data: documentTypes } = useQuery<DocumentTypeOption[]>({
+    queryKey: ['document-types-select'],
+    queryFn: () => apiClient.get('/document-types', { params: { per_page: 500 } }).then(r => r.data.data),
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: warehouses } = useQuery<WarehouseOption[]>({
+    queryKey: ['warehouses-select'],
+    queryFn: () => apiClient.get('/warehouses', { params: { per_page: 500 } }).then(r => r.data.data),
+    staleTime: 5 * 60_000,
+  });
+
+  // Mutations with error handling
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => numberingSeriesApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['numbering-series'] });
+      deleteModal.closeModal();
+      setSyncError(null);
+    },
+    onError: (err: any) => {
+      setSyncError(err?.response?.data?.message || 'فشل حذف السلسلة');
+      deleteModal.closeModal();
+    },
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: (id: number) => numberingSeriesApi.lock(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['numbering-series'] }); setSyncError(null); },
+    onError: (err: any) => setSyncError(err?.response?.data?.message || 'فشل القفل'),
+  });
+  const unlockMutation = useMutation({
+    mutationFn: (id: number) => numberingSeriesApi.unlock(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['numbering-series'] }); setSyncError(null); },
+    onError: (err: any) => setSyncError(err?.response?.data?.message || 'فشل فتح القفل'),
+  });
+  const syncMutation = useMutation({
+    mutationFn: (id: number) => numberingSeriesApi.sync(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['numbering-series'] }); setSyncError(null); },
+    onError: (err: any) => setSyncError(err?.response?.data?.message || 'فشل المزامنة'),
+  });
+
+  const handleDelete = (id: number) => {
+    setDeletingId(id);
+    deleteModal.openModal();
+  };
+  const confirmDelete = () => {
+    if (deletingId) deleteMutation.mutate(deletingId);
+  };
+  const openAdd = () => { setEditing(null); modal.openModal(); };
+  const openEdit = (item: NumberingSeriesRecord) => { setEditing(item); modal.openModal(); };
+
+  return (
+    <div className="page on" id="p-numbering-series">
+      <PageHeader
+        title="سلاسل الترقيم"
+        subtitle={`إدارة تسلسلات المستندات — ${meta?.total ?? 0} سلسلة`}
+        actions={
+          <Button variant="primary" size="sm" icon={<i className="ti ti-plus" />} onClick={openAdd}>
+            سلسلة جديدة
+          </Button>
+        }
+      />
+
+      {syncError && (
+        <AlertBar variant="red" dismissible onDismiss={() => setSyncError(null)}>
+          {syncError}
+        </AlertBar>
+      )}
+
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 16 }}>
+        <KpiCard variant="green" icon="ti-list-numbers" label="إجمالي السلاسل" value={meta?.total ?? 0} />
+        <KpiCard variant="blue" icon="ti-calendar-repeat" label="إعادة سنوية" value={items.filter(i => i.reset_yearly).length} />
+        <KpiCard variant="red" icon="ti-lock" label="مقفلة" value={items.filter(i => i.is_locked).length} />
+      </div>
+
+      <div className="filters" style={{ marginBottom: 16 }}>
+        <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
+          <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
+          <input
+            type="text"
+            placeholder="ابحث بالبادئة أو الصيغة..."
+            style={{ width: '100%' }}
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="empty"><div className="empty-ic"><i className="ti ti-loader" /></div><div className="empty-tx">جاري التحميل...</div></div>
+      ) : items.length === 0 ? (
+        <EmptyState icon="ti-list-numbers" text="لا توجد سلاسل ترقيم" sub="أضف أول سلسلة ترقيم" action={<Button variant="primary" onClick={openAdd}>إضافة</Button>} />
+      ) : (
+        <Card noHeader style={{ padding: 0, opacity: isFetching ? 0.7 : 1 }}>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>نوع المستند</th>
+                  <th>البادئة</th>
+                  <th>الصيغة</th>
+                  <th style={{ textAlign: 'center' }}>الرقم الحالي</th>
+                  <th style={{ textAlign: 'center' }}>الرقم التالي ⏭</th>
+                  <th>إعادة سنوية</th>
+                  <th>نشط</th>
+                  <th>مقفل</th>
+                  <th style={{ textAlign: 'center', width: 190 }}>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const docType = item.relations?.documentType;
+                  const warehouse = item.relations?.warehouse;
+                  const hasDocuments = haveDocumentsBeenCreated(item);
+                  return (
+                    <tr key={item.id}>
+                      <td>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{docType?.name ?? '—'}</div>
+                        {docType?.code && <div style={{ fontSize: 11, color: 'var(--t4)', fontFamily: 'monospace' }}>{docType.code}</div>}
+                        {warehouse && <div style={{ fontSize: 10, color: 'var(--t3)' }}>🏭 {warehouse.name}</div>}
+                      </td>
+                      <td>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--em)' }}>
+                          {item.prefix || '—'}
+                        </span>
+                      </td>
+                      <td>
+                        <code style={{ fontSize: 11, background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>
+                          {item.format}
+                        </code>
+                      </td>
+                      <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: 800, fontSize: 14 }}>
+                        {hasDocuments ? (
+                          item.last_number
+                        ) : (
+                          <span style={{ color: 'var(--t4)', fontWeight: 400, fontSize: 12 }}>لم يصدر بعد</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'center', direction: 'ltr' }}>
+                        <span style={{
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          background: 'var(--emb)',
+                          padding: '2px 8px',
+                          borderRadius: 10,
+                          color: 'var(--em)',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {hasDocuments ? simulateNumber(item, true) : '—'}
+                        </span>
+                      </td>
+                      <td><Badge variant={item.reset_yearly ? 'success' : 'gray'}>{item.reset_yearly ? 'نعم' : 'لا'}</Badge></td>
+                      <td><Badge variant={item.active ? 'success' : 'danger'}>{item.active ? 'نشط' : 'موقوف'}</Badge></td>
+                      <td><Badge variant={item.is_locked ? 'danger' : 'success'}>{item.is_locked ? 'مقفل' : 'مفتوح'}</Badge></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+                          <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(item)} disabled={item.is_locked} />
+                          {item.is_locked ? (
+                            <Button size="xs" variant="warning" icon={<i className="ti ti-lock-open" />} onClick={() => unlockMutation.mutate(item.id)} />
+                          ) : (
+                            <Button size="xs" variant="info" icon={<i className="ti ti-lock" />} onClick={() => lockMutation.mutate(item.id)} />
+                          )}
+                          <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(item.id)} disabled={item.is_locked} />
+                          <Button size="xs" icon={<i className="ti ti-refresh" />} onClick={() => syncMutation.mutate(item.id)} title="مزامنة الرقم بعد حذف مستند" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {meta && meta.last_page > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 16px', borderTop: '1px solid var(--b1)' }}>
+              <span style={{ fontSize: 12, color: 'var(--t4)' }}>{meta.from}–{meta.to} من {meta.total}</span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <Button size="xs" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+                  <i className="ti ti-chevron-right" />
+                </Button>
+                {Array.from({ length: Math.min(5, meta.last_page) }, (_, i) => i + 1).map(p => (
+                  <button key={p} className={`btn btn-xs ${p === page ? 'btn-p' : ''}`} onClick={() => setPage(p)}>{p}</button>
+                ))}
+                <Button size="xs" disabled={page >= meta.last_page} onClick={() => setPage(p => Math.min(meta.last_page, p + 1))}>
+                  <i className="ti ti-chevron-left" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      <NumberingSeriesModal
+        open={modal.open}
+        record={editing}
+        documentTypes={documentTypes ?? []}
+        warehouses={warehouses ?? []}
+        onClose={modal.closeModal}
+      />
+
+      <ConfirmDeleteModal
+        open={deleteModal.open}
+        onClose={deleteModal.closeModal}
+        onConfirm={confirmDelete}
+        loading={deleteMutation.isPending}
+      />
+    </div>
+  );
+}
+
+// =============== Confirm Delete Modal ===============
+function ConfirmDeleteModal({ open, onClose, onConfirm, loading }: {
+  open: boolean; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} size="sm" title="تأكيد الحذف">
+      <div style={{ textAlign: 'center', padding: 16 }}>
+        <i className="ti ti-alert-triangle" style={{ fontSize: 40, color: 'var(--red)' }} />
+        <div style={{ fontWeight: 800, fontSize: 15, margin: '12px 0 6px' }}>هل أنت متأكد؟</div>
+        <div style={{ fontSize: 13, color: 'var(--t4)' }}>لا يمكن التراجع عن حذف سلسلة الترقيم.</div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: '8px 0 0' }}>
+        <Button onClick={onClose} disabled={loading}>إلغاء</Button>
+        <Button variant="danger" onClick={onConfirm} disabled={loading} icon={loading ? <i className="ti ti-loader" /> : <i className="ti ti-trash" />}>
+          {loading ? 'جاري الحذف...' : 'حذف'}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// =============== NumberingSeries Modal (محسّن) ===============
+function NumberingSeriesModal({
+  open, record, documentTypes, warehouses, onClose,
+}: {
+  open: boolean; record: NumberingSeriesRecord | null; documentTypes: DocumentTypeOption[]; warehouses: WarehouseOption[]; onClose: () => void;
+}) {
+  const isEdit = !!record;
+  const qc = useQueryClient();
+
+  // إذا وصلنا إلى مرحلة التحرير، نتحقق من وجود مستندات سابقة
+  const hasExistingDocuments = record ? haveDocumentsBeenCreated(record) : false;
+
+  const emptyForm = {
+    document_type_id: '',
+    warehouse_id: '' as string | number,
+    prefix: '',
+    suffix: '',
+    format: '{PREFIX}-{YYYY}-{NUMBER:6}',
+    last_number: 0,
+    padding: 6,
+    start_number: 1,
+    max_number: '' as string | number,
+    reset_yearly: true,
+    reset_monthly: false,
+    active: true,
+  };
+
+  const [form, setForm] = useState(emptyForm);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      if (record) {
+        setForm({
+          document_type_id: String(record.document_type_id ?? ''),
+          warehouse_id: record.warehouse_id ?? '',
+          prefix: record.prefix ?? '',
+          suffix: record.suffix ?? '',
+          format: record.format ?? '{PREFIX}-{YYYY}-{NUMBER:6}',
+          last_number: record.last_number ?? 0,
+          padding: record.padding ?? 6,
+          start_number: record.start_number ?? 1,
+          max_number: record.max_number ?? '',
+          reset_yearly: record.reset_yearly ?? true,
+          reset_monthly: record.reset_monthly ?? false,
+          active: record.active ?? true,
+        });
+      } else {
+        setForm(emptyForm);
+      }
+      setErrors({});
+      setServerError('');
+    }
+  }, [open, record]);
+
+  const set = (k: string, v: any) => {
+    setForm(f => ({ ...f, [k]: v }));
+    if (errors[k]) setErrors(prev => { const n = { ...prev }; delete n[k]; return n; });
+  };
+
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!form.document_type_id) errs.document_type_id = 'نوع المستند مطلوب';
+    if (!form.format) errs.format = 'الصيغة مطلوبة';
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const simulatedNext = useMemo(() => {
+    try {
+      const num = form.start_number;
+      const padded = String(num).padStart(form.padding, '0');
+      let fmt = form.format
+        .replace('{PREFIX}', form.prefix || 'XXX')
+        .replace('{SUFFIX}', form.suffix || '')
+        .replace('{YY}', new Date().getFullYear().toString().slice(-2))
+        .replace('{YYYY}', new Date().getFullYear().toString())
+        .replace('{MM}', String(new Date().getMonth() + 1).padStart(2, '0'))
+        .replace('{NUMBER}', padded);
+      return fmt.replace(/\{NUMBER:(\d+)\}/g, (_, w) => String(num).padStart(Number(w), '0'));
+    } catch { return '...'; }
+  }, [form]);
+
+  const saveMutation = useMutation({
+    mutationFn: (data: typeof form) => {
+      const payload = {
+        document_type_id: parseInt(data.document_type_id || '0') || null,
+        warehouse_id: data.warehouse_id ? parseInt(String(data.warehouse_id)) : null,
+        prefix: data.prefix || null,
+        suffix: data.suffix || null,
+        format: data.format,
+        padding: data.padding,
+        start_number: data.start_number,
+        max_number: data.max_number ? Number(data.max_number) : null,
+        reset_yearly: data.reset_yearly,
+        reset_monthly: data.reset_monthly,
+        active: data.active,
+        ...(isEdit ? {} : { last_number: data.start_number - 1 }),
+      };
+      return isEdit
+        ? numberingSeriesApi.update(record!.id, payload)
+        : numberingSeriesApi.create(payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['numbering-series'] });
+      onClose();
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data;
+      if (msg?.errors) {
+        const fieldErrors: Record<string, string> = {};
+        for (const [k, v] of Object.entries(msg.errors)) {
+          fieldErrors[k] = (v as string[])[0];
+        }
+        setErrors(fieldErrors);
+      } else {
+        setServerError(msg?.message || 'فشل الحفظ');
+      }
+    },
+  });
+
+  const handleSave = () => {
+    if (!validate()) return;
+    saveMutation.mutate(form);
+  };
+
+  return (
+    <Modal
+      open={open} onClose={onClose} size="lg"
+      title={isEdit ? 'تعديل سلسلة الترقيم' : 'سلسلة ترقيم جديدة'}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={saveMutation.isPending}>إلغاء</Button>
+          <Button variant="primary" icon={<i className="ti ti-device-floppy" />} onClick={handleSave} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+          </Button>
+        </>
+      }
+    >
+      {serverError && <AlertBar variant="red">{serverError}</AlertBar>}
+
+      {/* تحذير عند وجود مستندات سابقة */}
+      {hasExistingDocuments && (
+        <AlertBar variant="gold">
+          <strong>تنبيه:</strong> توجد مستندات مرتبطة بهذه السلسلة. تعديل الصيغة أو الرقم الحالي قد يسبب تعارضاً.
+        </AlertBar>
+      )}
+
+      <div className="fgrid c2" style={{ gap: 14 }}>
+        <div className="fg">
+          <label className="req">نوع المستند</label>
+          <select value={form.document_type_id as string} onChange={e => set('document_type_id', e.target.value)}
+            style={{ borderColor: errors.document_type_id ? 'var(--red)' : undefined }}>
+            <option value="">— اختر —</option>
+            {documentTypes.map(dt => <option key={dt.id} value={dt.id}>{dt.name} ({dt.code})</option>)}
+          </select>
+          {errors.document_type_id && <span style={{ color: 'var(--red)', fontSize: 11 }}>{errors.document_type_id}</span>}
+        </div>
+
+        <div className="fg">
+          <label>المستودع (اختياري)</label>
+          <select value={form.warehouse_id} onChange={e => set('warehouse_id', e.target.value)}>
+            <option value="">— كل المستودعات —</option>
+            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+          </select>
+        </div>
+
+        <div className="fg">
+          <label>البادئة</label>
+          <input value={form.prefix} onChange={e => set('prefix', e.target.value.toUpperCase())} placeholder="INV" style={{ fontFamily: 'monospace' }} />
+        </div>
+        <div className="fg">
+          <label>اللاحقة</label>
+          <input value={form.suffix ?? ''} onChange={e => set('suffix', e.target.value.toUpperCase() || null)} placeholder="-DZ" style={{ fontFamily: 'monospace' }} />
+        </div>
+
+        <div className="fg s2">
+          <label className="req">الصيغة</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={form.format}
+              onChange={e => set('format', e.target.value)}
+              style={{
+                fontFamily: 'monospace', flex: 1,
+                borderColor: errors.format ? 'var(--red)' : undefined,
+                background: hasExistingDocuments ? 'var(--bg3)' : undefined,
+                opacity: hasExistingDocuments ? 0.7 : 1,
+              }}
+              readOnly={hasExistingDocuments}
+              placeholder="الصيغة"
+            />
+            {!hasExistingDocuments && (
+              <select style={{ width: 130, fontFamily: 'monospace', fontSize: 11 }} onChange={e => set('format', e.target.value)} value="">
+                <option value="">نماذج</option>
+                {['{PREFIX}-{YYYY}-{NUMBER:6}','{PREFIX}-{YY}{MM}-{NUMBER:4}','{PREFIX}/{YYYY}/{NUMBER:5}','{NUMBER:8}'].map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            )}
+          </div>
+          {errors.format && <span style={{ color: 'var(--red)', fontSize: 11 }}>{errors.format}</span>}
+          {hasExistingDocuments && <span style={{ fontSize: 10, color: 'var(--gold)' }}>تم تعطيل تعديل الصيغة لوجود مستندات مرتبطة</span>}
+        </div>
+
+        <div className="fg">
+          <label>الخانات (Padding)</label>
+          <select value={form.padding} onChange={e => set('padding', +e.target.value)}>
+            {[2,3,4,5,6,7,8].map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label>رقم البداية</label>
+          <input type="number" value={form.start_number} onChange={e => set('start_number', +e.target.value || 0)} min={0} />
+        </div>
+        {isEdit && (
+          <div className="fg">
+            <label>الرقم الحالي</label>
+            <input
+              type="number"
+              value={form.last_number}
+              onChange={e => {
+                if (!hasExistingDocuments) set('last_number', +e.target.value || 0);
+              }}
+              readOnly={hasExistingDocuments}
+              style={{
+                background: hasExistingDocuments ? 'var(--bg3)' : undefined,
+                opacity: hasExistingDocuments ? 0.7 : 1,
+              }}
+            />
+            {hasExistingDocuments && <span style={{ fontSize: 10, color: 'var(--gold)' }}>لا يمكن تقليل الرقم لأقل من أعلى رقم صادر</span>}
+          </div>
+        )}
+        <div className="fg">
+          <label>الحد الأقصى</label>
+          <input type="number" value={form.max_number} onChange={e => set('max_number', e.target.value)} placeholder="غير محدود" />
+        </div>
+
+        <div className="fg">
+          <label>إعادة سنوية</label>
+          <Switch checked={form.reset_yearly} onChange={v => { set('reset_yearly', v); if (v) set('reset_monthly', false); }} />
+          <span style={{ fontSize: 11, color: 'var(--t4)' }}>{form.reset_yearly ? 'سيعاد التعيين مع بداية السنة' : ''}</span>
+        </div>
+        <div className="fg">
+          <label>إعادة شهرية</label>
+          <Switch checked={form.reset_monthly} onChange={v => { set('reset_monthly', v); if (v) set('reset_yearly', false); }} />
+        </div>
+        <div className="fg">
+          <label>نشط</label>
+          <Switch checked={form.active} onChange={v => set('active', v)} />
+        </div>
+        <div className="fg s2" style={{ marginTop: 8 }}>
+          <label>معاينة الرقم الأول</label>
+          <div style={{
+            padding: '12px', background: 'var(--emb)', border: '1px solid var(--embo)',
+            borderRadius: 'var(--r2)', fontFamily: 'monospace', fontSize: 18, fontWeight: 800,
+            color: 'var(--em)', textAlign: 'center', direction: 'ltr', letterSpacing: 1,
+          }}>{simulatedNext}</div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+```
+
 ## FILE: resources/js/pages/lookups/PriceLevelsPage.tsx
 ```
 // ════════════════════════════════════════════════
@@ -13002,6 +13857,430 @@ function DocumentTypeModal({ open, docType, onClose }: {
             </div>
         </Modal>
     );
+}
+```
+
+## FILE: resources/js/pages/settings/PaymentMethodsPage.tsx
+```
+// resources/js/pages/settings/PaymentMethodsPage.tsx
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useModal } from '@/hooks/useModal';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import KpiCard from '@/components/ui/KpiCard';
+import EmptyState from '@/components/ui/EmptyState';
+import AlertBar from '@/components/ui/AlertBar';
+import Switch from '@/components/ui/Switch';
+import apiClient from '@/lib/api/client';
+
+// --------------- Types ---------------
+interface PaymentMethod {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+  treasury_account_id?: number | null;
+  requires_reference: boolean;
+  is_cash: boolean;
+  active: boolean;
+  display_order: number;
+  relations?: {
+    treasuryAccount?: { id: number; name: string };
+  };
+}
+
+interface TreasuryAccount {
+  id: number;
+  name: string;
+}
+
+// --------------- API Layer ---------------
+const paymentMethodsApi = {
+  list: (params: Record<string, any>) =>
+    apiClient.get('/payment-modes', { params }).then(r => r.data),
+  create: (data: any) =>
+    apiClient.post('/payment-modes', data).then(r => r.data),
+  update: (id: number, data: any) =>
+    apiClient.put(`/payment-modes/${id}`, data).then(r => r.data),
+  delete: (id: number) =>
+    apiClient.delete(`/payment-modes/${id}`).then(r => r.data),
+};
+
+// --------------- Debounce ---------------
+function useDebounce<T>(value: T, delay = 300): T {
+  const [debounced, setDebounced] = useState<T>(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
+// =============== Main Component ===============
+export default function PaymentMethodsPage() {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 350);
+  const [page, setPage] = useState(1);
+  const [perPage] = useState(15);
+  const [editing, setEditing] = useState<PaymentMethod | null>(null);
+  const modal = useModal();
+  const deleteModal = useModal();
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch payment methods
+  const { data: paginated, isLoading, isFetching } = useQuery({
+    queryKey: ['payment-modes', debouncedSearch, page, perPage],
+    queryFn: () => paymentMethodsApi.list({
+      'filter[search]': debouncedSearch || undefined,
+      sort: 'name',
+      per_page: perPage,
+      page,
+      include: 'treasuryAccount',
+    }),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  });
+
+  const methods: PaymentMethod[] = paginated?.data ?? [];
+  const meta = paginated?.meta;
+
+  // Treasury accounts (for modal)
+  const { data: treasuryAccounts } = useQuery<TreasuryAccount[]>({
+    queryKey: ['treasury-accounts-select'],
+    queryFn: () => apiClient.get('/treasury-accounts', { params: { per_page: 200 } })
+      .then(r => r.data.data),
+    staleTime: 5 * 60_000,
+  });
+
+  // Mutations
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => paymentMethodsApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['payment-modes'] });
+      deleteModal.closeModal();
+      setError(null);
+    },
+    onError: (err: any) => {
+      setError(err?.response?.data?.message || 'فشل الحذف');
+      deleteModal.closeModal();
+    },
+  });
+
+  const handleDelete = (id: number) => {
+    setDeletingId(id);
+    deleteModal.openModal();
+  };
+  const confirmDelete = () => {
+    if (deletingId) deleteMutation.mutate(deletingId);
+  };
+
+  const openAdd = () => { setEditing(null); modal.openModal(); };
+  const openEdit = (item: PaymentMethod) => { setEditing(item); modal.openModal(); };
+
+  return (
+    <div className="page on" id="p-payment-methods">
+      <PageHeader
+        title="طرق الدفع"
+        subtitle={`إدارة وسائل الدفع المتاحة — ${meta?.total ?? 0} طريقة`}
+        actions={
+          <Button variant="primary" size="sm" icon={<i className="ti ti-plus" />} onClick={openAdd}>
+            إضافة طريقة دفع
+          </Button>
+        }
+      />
+
+      {error && (
+        <AlertBar variant="red" dismissible onDismiss={() => setError(null)}>
+          {error}
+        </AlertBar>
+      )}
+
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
+        <KpiCard variant="green" icon="ti-credit-card" label="إجمالي الطرق" value={meta?.total ?? 0} />
+        <KpiCard variant="blue" icon="ti-cash" label="طرق نقدية" value={methods.filter(m => m.is_cash).length} />
+        <KpiCard variant="purple" icon="ti-receipt" label="تتطلب مرجع" value={methods.filter(m => m.requires_reference).length} />
+        <KpiCard variant="red" icon="ti-ban" label="موقوفة" value={methods.filter(m => !m.active).length} />
+      </div>
+
+      <div className="filters" style={{ marginBottom: 16 }}>
+        <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
+          <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
+          <input
+            type="text"
+            placeholder="ابحث بالاسم أو الكود..."
+            style={{ width: '100%' }}
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="empty"><div className="empty-ic"><i className="ti ti-loader" /></div><div className="empty-tx">جاري التحميل...</div></div>
+      ) : methods.length === 0 ? (
+        <EmptyState
+          icon="ti-credit-card"
+          text="لا توجد طرق دفع"
+          sub="أضف أول طريقة دفع (نقداً، CIB، شيك...)"
+          action={<Button variant="primary" onClick={openAdd}>إضافة طريقة دفع</Button>}
+        />
+      ) : (
+        <Card noHeader style={{ padding: 0, opacity: isFetching ? 0.7 : 1 }}>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>الاسم</th>
+                  <th>الكود</th>
+                  <th>الحساب المالي</th>
+                  <th>نقدي</th>
+                  <th>يتطلب مرجع</th>
+                  <th>الترتيب</th>
+                  <th>نشط</th>
+                  <th style={{ textAlign: 'center', width: 130 }}>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {methods.map(item => (
+                  <tr key={item.id}>
+                    <td className="s">{item.name}</td>
+                    <td><code style={{ fontSize: 12, background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>{item.code}</code></td>
+                    <td style={{ fontSize: 12, color: 'var(--t3)' }}>
+                      {item.relations?.treasuryAccount?.name ?? '—'}
+                    </td>
+                    <td><Badge variant={item.is_cash ? 'success' : 'gray'}>{item.is_cash ? 'نعم' : 'لا'}</Badge></td>
+                    <td>
+                      {item.requires_reference ? (
+                        <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check" /></span>
+                      ) : '—'}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>{item.display_order}</td>
+                    <td><Badge variant={item.active ? 'success' : 'danger'}>{item.active ? 'نشط' : 'موقوف'}</Badge></td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                        <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(item)} />
+                        <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(item.id)} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {meta && meta.last_page > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 16px', borderTop: '1px solid var(--b1)' }}>
+              <span style={{ fontSize: 12, color: 'var(--t4)' }}>{meta.from}–{meta.to} من {meta.total}</span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <Button size="xs" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+                  <i className="ti ti-chevron-right" />
+                </Button>
+                {Array.from({ length: Math.min(5, meta.last_page) }, (_, i) => i + 1).map(p => (
+                  <button key={p} className={`btn btn-xs ${p === page ? 'btn-p' : ''}`} onClick={() => setPage(p)}>{p}</button>
+                ))}
+                <Button size="xs" disabled={page >= meta.last_page} onClick={() => setPage(p => Math.min(meta.last_page, p + 1))}>
+                  <i className="ti ti-chevron-left" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      <PaymentMethodModal
+        open={modal.open}
+        record={editing}
+        treasuryAccounts={treasuryAccounts ?? []}
+        onClose={modal.closeModal}
+      />
+
+      <ConfirmDeleteModal
+        open={deleteModal.open}
+        onClose={deleteModal.closeModal}
+        onConfirm={confirmDelete}
+        loading={deleteMutation.isPending}
+      />
+    </div>
+  );
+}
+
+// =============== Confirm Delete Modal ===============
+function ConfirmDeleteModal({ open, onClose, onConfirm, loading }: {
+  open: boolean; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} size="sm" title="تأكيد الحذف">
+      <div style={{ textAlign: 'center', padding: 16 }}>
+        <i className="ti ti-alert-triangle" style={{ fontSize: 40, color: 'var(--red)' }} />
+        <div style={{ fontWeight: 800, fontSize: 15, margin: '12px 0 6px' }}>هل أنت متأكد؟</div>
+        <div style={{ fontSize: 13, color: 'var(--t4)' }}>لن تتمكن من استعادة طريقة الدفع بعد الحذف.</div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: '8px 0 0' }}>
+        <Button onClick={onClose} disabled={loading}>إلغاء</Button>
+        <Button variant="danger" onClick={onConfirm} disabled={loading} icon={loading ? <i className="ti ti-loader" /> : <i className="ti ti-trash" />}>
+          {loading ? 'جاري الحذف...' : 'حذف'}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// =============== Add/Edit Modal ===============
+function PaymentMethodModal({
+  open, record, treasuryAccounts, onClose,
+}: {
+  open: boolean; record: PaymentMethod | null; treasuryAccounts: TreasuryAccount[]; onClose: () => void;
+}) {
+  const isEdit = !!record;
+  const qc = useQueryClient();
+
+  const emptyForm = {
+    name: '',
+    code: '',
+    description: '',
+    treasury_account_id: '' as string | number,
+    requires_reference: false,
+    is_cash: false,
+    active: true,
+    display_order: 0,
+  };
+
+  const [form, setForm] = useState(emptyForm);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      if (record) {
+        setForm({
+          name: record.name || '',
+          code: record.code || '',
+          description: record.description || '',
+          treasury_account_id: record.treasury_account_id ?? '',
+          requires_reference: record.requires_reference || false,
+          is_cash: record.is_cash || false,
+          active: record.active ?? true,
+          display_order: record.display_order || 0,
+        });
+      } else {
+        setForm(emptyForm);
+      }
+      setErrors({});
+      setServerError('');
+    }
+  }, [open, record]);
+
+  const set = (k: string, v: any) => {
+    setForm(f => ({ ...f, [k]: v }));
+    if (errors[k]) setErrors(prev => { const n = { ...prev }; delete n[k]; return n; });
+  };
+
+  const validate = () => {
+    const errs: Record<string, string> = {};
+    if (!form.name.trim()) errs.name = 'الاسم مطلوب';
+    if (!form.code.trim()) errs.code = 'الكود مطلوب';
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: (data: typeof form) => {
+      const payload = {
+        ...data,
+        treasury_account_id: data.treasury_account_id ? parseInt(String(data.treasury_account_id)) : null,
+      };
+      return isEdit
+        ? paymentMethodsApi.update(record!.id, payload)
+        : paymentMethodsApi.create(payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['payment-modes'] });
+      onClose();
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data;
+      if (msg?.errors) {
+        const fieldErrors: Record<string, string> = {};
+        for (const [k, v] of Object.entries(msg.errors)) {
+          fieldErrors[k] = (v as string[])[0];
+        }
+        setErrors(fieldErrors);
+      } else {
+        setServerError(msg?.message || 'فشل الحفظ');
+      }
+    },
+  });
+
+  const handleSave = () => {
+    if (!validate()) return;
+    saveMutation.mutate(form);
+  };
+
+  return (
+    <Modal
+      open={open} onClose={onClose} size="md"
+      title={isEdit ? 'تعديل طريقة الدفع' : 'طريقة دفع جديدة'}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={saveMutation.isPending}>إلغاء</Button>
+          <Button variant="primary" icon={<i className="ti ti-device-floppy" />} onClick={handleSave} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+          </Button>
+        </>
+      }
+    >
+      {serverError && <AlertBar variant="red">{serverError}</AlertBar>}
+
+      <div className="fgrid c2" style={{ gap: 14 }}>
+        <div className="fg s2">
+          <label className="req">الاسم</label>
+          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="مثال: نقداً" />
+          {errors.name && <span style={{ color: 'var(--red)', fontSize: 11 }}>{errors.name}</span>}
+        </div>
+        <div className="fg">
+          <label className="req">الكود</label>
+          <input value={form.code} onChange={e => set('code', e.target.value)} placeholder="cash, cib, check" style={{ fontFamily: 'monospace' }} />
+          {errors.code && <span style={{ color: 'var(--red)', fontSize: 11 }}>{errors.code}</span>}
+        </div>
+        <div className="fg">
+          <label>الحساب المالي الافتراضي</label>
+          <select value={form.treasury_account_id} onChange={e => set('treasury_account_id', e.target.value)}>
+            <option value="">— اختياري —</option>
+            {treasuryAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label>ترتيب العرض</label>
+          <input type="number" value={form.display_order} onChange={e => set('display_order', parseInt(e.target.value) || 0)} />
+        </div>
+        <div className="fg">
+          <label>نقدي</label>
+          <Switch checked={form.is_cash} onChange={v => set('is_cash', v)} />
+          <span style={{ fontSize: 11, color: 'var(--t4)', marginTop: 4 }}>
+            {form.is_cash ? 'سيظهر كدفع نقدي' : ''}
+          </span>
+        </div>
+        <div className="fg">
+          <label>يتطلب مرجع (رقم شيك، معرف تحويل...)</label>
+          <Switch checked={form.requires_reference} onChange={v => set('requires_reference', v)} />
+        </div>
+        <div className="fg">
+          <label>نشط</label>
+          <Switch checked={form.active} onChange={v => set('active', v)} />
+        </div>
+        <div className="fg s2">
+          <label>وصف</label>
+          <textarea value={form.description} onChange={e => set('description', e.target.value)} placeholder="وصف اختياري..." rows={2} />
+        </div>
+      </div>
+    </Modal>
+  );
 }
 ```
 

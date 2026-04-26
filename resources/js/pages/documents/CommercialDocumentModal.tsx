@@ -1,8 +1,8 @@
 // ════════════════════════════════════════════════
 // resources/js/pages/documents/CommercialDocumentModal.tsx
-// Modal إنشاء/تعديل المستند التجاري — احترافي متكامل
+// Modal إنشاء/تعديل المستند التجاري — نسخة محسّنة
 // ════════════════════════════════════════════════
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api/client';
 import { useFiscalYear } from '@/context/FiscalYearContext';
@@ -12,7 +12,7 @@ import type { DocumentType } from '@/types';
 function calcFiscalStamp(totalTtc: number): number {
   if (totalTtc <= 0) return 0;
   if (totalTtc < 30_000) return 0;
-  return Math.min(Math.ceil(totalTtc * 0.01), 2_500); // 1% سقف 2500 دج
+  return Math.min(Math.ceil(totalTtc * 0.01), 2_500);
 }
 
 // ── Types ──────────────────────────────────────
@@ -96,9 +96,8 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
   const { selectedYear } = useFiscalYear() as any;
   const isPurch  = documentType?.document_base_operation_id === 2;
   const needsParty = documentType?.requires_party !== false;
-  const affects_stock = documentType?.affects_stock_direction !== 0;
 
-  // ── Dependencies ──────────────────────────────
+  // ── جلب الأطراف (زبائن / موردين) ──────────────────
   const { data: parties = [] } = useQuery({
     queryKey: ['parties-select', isPurch],
     queryFn:  () => apiClient.get(isPurch ? '/suppliers' : '/customers', { params: { per_page: 500 } })
@@ -106,47 +105,62 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
     enabled: open && needsParty,
     staleTime: 60_000,
   });
-  const { data: variants = [] } = useQuery({
+
+  // ── جلب المنتجات (بدون include product.unit لتجنب 500 مؤقتاً) ──
+  const { data: variantsRaw = [], isLoading: isLoadingVariants, error: variantsError, refetch: refetchVariants } = useQuery({
     queryKey: ['variants-select'],
-    queryFn:  () => apiClient.get('/product-variants', { params: { per_page: 500, include: 'product,product.unit' } })
+    queryFn:  () => apiClient.get('/product-variants', { params: { per_page: 500, include: 'product' } })
       .then(r => extractList(r.data)),
     enabled: open,
     staleTime: 60_000,
+    retry: 1,
   });
+  const variants = variantsRaw;
+  const hasVariantsError = !!variantsError;
+
+  // ── باقي الجداول المساعدة ─────────────────────────
   const { data: warehouses = [] } = useQuery({
     queryKey: ['warehouses-select'],
-    queryFn:  () => apiClient.get('/warehouses', { params: { per_page: 100 } })
-      .then(r => extractList(r.data)),
+    queryFn:  () => apiClient.get('/warehouses', { params: { per_page: 100 } }).then(r => extractList(r.data)),
     enabled: open,
     staleTime: 120_000,
   });
+
   const { data: currencies = [] } = useQuery({
     queryKey: ['currencies-select'],
-    queryFn:  () => apiClient.get('/currencies', { params: { per_page: 50 } })
-      .then(r => extractList(r.data)),
+    queryFn:  () => apiClient.get('/currencies', { params: { per_page: 50 } }).then(r => extractList(r.data)),
     enabled: open,
     staleTime: 300_000,
   });
+
   const { data: fiscalYears = [] } = useQuery({
     queryKey: ['fiscal-years-select'],
-    queryFn:  () => apiClient.get('/fiscal-years', { params: { per_page: 20, 'filter[is_closed]': 0 } })
-      .then(r => extractList(r.data)),
+    queryFn:  () => apiClient.get('/fiscal-years', { params: { per_page: 20, 'filter[is_closed]': 0 } }).then(r => extractList(r.data)),
     enabled: open,
     staleTime: 60_000,
   });
+
   const { data: tvaRates = [] } = useQuery({
     queryKey: ['tvas-select'],
-    queryFn:  () => apiClient.get('/tvas', { params: { per_page: 20 } })
-      .then(r => extractList(r.data)),
+    queryFn:  () => apiClient.get('/tvas', { params: { per_page: 20 } }).then(r => extractList(r.data)),
     enabled: open,
     staleTime: 300_000,
   });
 
-  // ── Form state ────────────────────────────────
-  const baseCurrency = currencies.find((c: any) => c.is_base_currency) ?? currencies[0];
-  const defaultWh    = warehouses[0];
+  // ── استخراج القيم الافتراضية باستخدام useMemo (لتجنب الحلقات اللانهائية) ──
+  const baseCurrencyId = useMemo(() => {
+    const base = currencies.find((c: any) => c.is_base_currency) ?? currencies[0];
+    return base ? String(base.id) : '';
+  }, [currencies]);
 
-  const [form,    setForm]    = useState<FormState>(buildDefault());
+  const defaultWhId = useMemo(() => {
+    return warehouses[0] ? String(warehouses[0].id) : '';
+  }, [warehouses]);
+
+  const selectedYearId = useMemo(() => selectedYear?.id ? String(selectedYear.id) : '', [selectedYear]);
+
+  // ── حالة النموذج ────────────────────────────────
+  const [form,    setForm]    = useState<FormState>(() => buildDefault());
   const [errors,  setErrors]  = useState<Record<string, string>>({});
   const [apiErr,  setApiErr]  = useState('');
   const [lineErr, setLineErr] = useState('');
@@ -182,7 +196,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
       due_date:       '',
       notes:          '',
       warehouse_id:   '',
-      fiscal_year_id: String(selectedYear?.id ?? ''),
+      fiscal_year_id: selectedYearId,
       currency_id:    '',
       exchange_rate:  '1',
       apply_stamp:    false,
@@ -190,26 +204,35 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
     };
   }
 
-  // fill defaults when dependencies load
+  // تعبئة القيم الافتراضية للحقول غير المعبأة (للمستند الجديد فقط)
   useEffect(() => {
-    if (!isEdit) {
+    if (!isEdit && open) {
       setForm(f => ({
         ...f,
-        warehouse_id:   f.warehouse_id   || String(defaultWh?.id   ?? ''),
-        currency_id:    f.currency_id    || String(baseCurrency?.id ?? ''),
-        fiscal_year_id: f.fiscal_year_id || String(selectedYear?.id ?? ''),
+        warehouse_id:   f.warehouse_id   || defaultWhId,
+        currency_id:    f.currency_id    || baseCurrencyId,
+        fiscal_year_id: f.fiscal_year_id || selectedYearId,
       }));
     }
-  }, [warehouses, currencies, selectedYear]);
+  }, [defaultWhId, baseCurrencyId, selectedYearId, isEdit, open]);
 
+  // إعادة تعيين النموذج عند فتح الـ modal أو تغيير المستند الموجود
   useEffect(() => {
-    if (open) { setForm(buildDefault()); setErrors({}); setApiErr(''); setLineErr(''); }
+    if (open) {
+      setForm(buildDefault());
+      setErrors({});
+      setApiErr('');
+      setLineErr('');
+    }
   }, [open, existingDocument?.id]);
 
-  const set = (k: keyof FormState, v: any) => setForm(f => ({ ...f, [k]: v }));
+  const set = useCallback((k: keyof FormState, v: any) => {
+    setForm(f => ({ ...f, [k]: v }));
+    if (errors[k]) setErrors(prev => ({ ...prev, [k]: undefined }));
+  }, [errors]);
 
-  // ── Line helpers ──────────────────────────────
-  function addLine() {
+  // ── دوال الأسطر ──────────────────────────────────
+  const addLine = useCallback(() => {
     const defaultTva = tvaRates.find((t: any) => t.is_default)?.rate ?? 19;
     setForm(f => ({
       ...f,
@@ -220,60 +243,56 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
       }],
     }));
     setLineErr('');
-  }
+  }, [tvaRates]);
 
-  function updateLine(idx: number, field: keyof LineItem, value: any) {
+  const updateLine = useCallback((idx: number, field: keyof LineItem, value: any) => {
     setForm(f => {
       const lines = [...f.lines];
       lines[idx] = { ...lines[idx], [field]: value };
-
-      // auto-fill product info
       if (field === 'product_variant_id' && value) {
         const v = variants.find((vr: any) => String(vr.id) === String(value));
         if (v) {
           lines[idx]._productName = v.product?.name ?? '';
-          lines[idx]._variantName = v.variant_name  ?? '';
-          lines[idx]._unitSymbol  = v.product?.unit?.symbol ?? '';
-          // auto fill price from product variant
+          lines[idx]._variantName = v.variant_name ?? '';
+          lines[idx]._unitSymbol = v.product?.unit?.symbol ?? '';
           if (!lines[idx].unit_price_ht || lines[idx].unit_price_ht === 0) {
             lines[idx].unit_price_ht = parseFloat(v.price_ht ?? v.prix_detail ?? 0);
           }
-          // auto fill tva
           if (v.tva_rate) lines[idx].tva_rate = parseFloat(v.tva_rate);
         }
       }
       return { ...f, lines };
     });
-  }
+  }, [variants]);
 
-  function removeLine(idx: number) {
+  const removeLine = useCallback((idx: number) => {
     setForm(f => ({ ...f, lines: f.lines.filter((_, i) => i !== idx) }));
-  }
+  }, []);
 
-  // ── Totals ────────────────────────────────────
+  // ── حساب الإجماليات ─────────────────────────────
   const totals = useMemo(() => {
     let ht = 0, tva = 0, discount = 0;
     form.lines.forEach(l => {
       const gross = (l.unit_price_ht || 0) * (l.quantity || 0);
-      const disc  = gross * ((l.discount_percentage || 0) / 100);
-      const net   = gross - disc;
-      ht       += net;
-      tva      += net * ((l.tva_rate || 0) / 100);
+      const disc = gross * ((l.discount_percentage || 0) / 100);
+      const net = gross - disc;
+      ht += net;
+      tva += net * ((l.tva_rate || 0) / 100);
       discount += disc;
     });
-    const ttc   = ht + tva;
+    const ttc = ht + tva;
     const stamp = form.apply_stamp ? calcFiscalStamp(ttc) : 0;
     return { ht, tva, ttc, discount, stamp, netToPay: ttc + stamp };
   }, [form.lines, form.apply_stamp]);
 
-  // ── Validation ────────────────────────────────
-  function validate(): boolean {
+  // ── التحقق من صحة البيانات ───────────────────────
+  const validate = useCallback((): boolean => {
     const errs: Record<string, string> = {};
     if (needsParty && !form.party_id) errs.party_id = 'هذا الحقل إلزامي';
-    if (!form.document_date)           errs.document_date = 'هذا الحقل إلزامي';
-    if (!form.warehouse_id)            errs.warehouse_id = 'اختر مستودعاً';
-    if (!form.fiscal_year_id)          errs.fiscal_year_id = 'اختر السنة المالية';
-    if (!form.currency_id)             errs.currency_id = 'اختر العملة';
+    if (!form.document_date) errs.document_date = 'هذا الحقل إلزامي';
+    if (!form.warehouse_id) errs.warehouse_id = 'اختر مستودعاً';
+    if (!form.fiscal_year_id) errs.fiscal_year_id = 'اختر السنة المالية';
+    if (!form.currency_id) errs.currency_id = 'اختر العملة';
     if (form.lines.length === 0) {
       setLineErr('يجب إضافة سطر واحد على الأقل');
       return false;
@@ -290,30 +309,30 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }
+  }, [form, needsParty]);
 
-  // ── Save ──────────────────────────────────────
+  // ── حفظ المستند ─────────────────────────────────
   const saveMut = useMutation({
     mutationFn: async () => {
       const payload = {
         document_type_id: documentType?.id,
-        party_id:         needsParty && form.party_id ? parseInt(form.party_id) : null,
-        warehouse_id:     parseInt(form.warehouse_id),
-        fiscal_year_id:   parseInt(form.fiscal_year_id),
-        currency_id:      parseInt(form.currency_id),
-        exchange_rate:    parseFloat(form.exchange_rate) || 1,
-        document_date:    form.document_date,
-        due_date:         form.due_date || null,
-        notes:            form.notes || null,
-        total_discount:   totals.discount,
-        total_stamp:      totals.stamp,
+        party_id: needsParty && form.party_id ? parseInt(form.party_id) : null,
+        warehouse_id: parseInt(form.warehouse_id),
+        fiscal_year_id: parseInt(form.fiscal_year_id),
+        currency_id: parseInt(form.currency_id),
+        exchange_rate: parseFloat(form.exchange_rate) || 1,
+        document_date: form.document_date,
+        due_date: form.due_date || null,
+        notes: form.notes || null,
+        total_discount: totals.discount,
+        total_stamp: totals.stamp,
         lines: form.lines.map(l => ({
           ...(l.id ? { id: l.id } : {}),
-          product_variant_id:  parseInt(l.product_variant_id),
-          description:         l.description || null,
-          quantity:            l.quantity,
-          unit_price_ht:       l.unit_price_ht,
-          tva_rate:            l.tva_rate,
+          product_variant_id: parseInt(l.product_variant_id),
+          description: l.description || null,
+          quantity: l.quantity,
+          unit_price_ht: l.unit_price_ht,
+          tva_rate: l.tva_rate,
           discount_percentage: l.discount_percentage || 0,
         })),
       };
@@ -333,31 +352,36 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
     },
   });
 
-  function handleSave() {
+  const handleSave = useCallback(() => {
     setApiErr('');
     if (validate()) saveMut.mutate();
-  }
+  }, [validate, saveMut]);
 
   if (!open) return null;
 
-  // ── Render ─────────────────────────────────────
   const isPending = saveMut.isPending;
+  const disableForm = isPending || isLoadingVariants;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 500,
-      background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-      padding: '20px 16px', overflowY: 'auto',
-    }} onClick={onClose}>
-      <div style={{
-        width: '100%', maxWidth: 920,
-        background: 'var(--bg1)', borderRadius: 'var(--r3)',
-        boxShadow: '0 24px 64px rgba(0,0,0,.25)',
-        display: 'flex', flexDirection: 'column',
-      }} onClick={e => e.stopPropagation()}>
-
-        {/* ── Header ─────────────────────────── */}
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 500,
+        background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '20px 16px', overflowY: 'auto',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%', maxWidth: 920,
+          background: 'var(--bg1)', borderRadius: 'var(--r3)',
+          boxShadow: '0 24px 64px rgba(0,0,0,.25)',
+          display: 'flex', flexDirection: 'column',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
         <div style={{
           padding: '16px 20px', borderBottom: '1px solid var(--b1)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -373,18 +397,18 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
               </div>
             )}
           </div>
-          <button onClick={onClose} style={{
+          <button onClick={onClose} disabled={isPending} style={{
             width: 30, height: 30, borderRadius: 8,
             border: '1px solid var(--b2)', background: 'var(--bg1)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: 'var(--t3)',
+            cursor: isPending ? 'not-allowed' : 'pointer',
+            color: 'var(--t3)',
           }}>
             <i className="ti ti-x" style={{ fontSize: 14 }} />
           </button>
         </div>
 
         <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-
           {/* API Error */}
           {apiErr && (
             <div style={{
@@ -399,7 +423,6 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
           {/* ── Section: الأساسيات ─────────────── */}
           <Section title="معلومات المستند" icon="ti-file-description">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-
               {needsParty && (
                 <div style={{ gridColumn: 'span 2' }}>
                   <Label required>{isPurch ? 'المورد' : 'الزبون'}</Label>
@@ -407,6 +430,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                     value={form.party_id}
                     onChange={e => set('party_id', e.target.value)}
                     style={{ ...inpStyle(!!errors.party_id), cursor: 'pointer' }}
+                    disabled={disableForm}
                   >
                     <option value="">— اختر {isPurch ? 'مورداً' : 'زبوناً'} —</option>
                     {parties.map((p: any) => (
@@ -420,30 +444,30 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
               <div>
                 <Label required>تاريخ المستند</Label>
                 <input type="date" style={inpStyle(!!errors.document_date)}
-                  value={form.document_date} onChange={e => set('document_date', e.target.value)} />
+                  value={form.document_date} onChange={e => set('document_date', e.target.value)} disabled={disableForm} />
               </div>
               <div>
                 <Label>تاريخ الاستحقاق</Label>
                 <input type="date" style={inpStyle()}
-                  value={form.due_date} onChange={e => set('due_date', e.target.value)} />
+                  value={form.due_date} onChange={e => set('due_date', e.target.value)} disabled={disableForm} />
               </div>
               <div>
                 <Label required>المستودع</Label>
                 <select style={{ ...inpStyle(!!errors.warehouse_id), cursor: 'pointer' }}
-                  value={form.warehouse_id} onChange={e => set('warehouse_id', e.target.value)}>
+                  value={form.warehouse_id} onChange={e => set('warehouse_id', e.target.value)} disabled={disableForm}>
                   <option value="">— اختر —</option>
                   {warehouses.map((w: any) => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
+                    <option key={w.id} value={String(w.id)}>{w.name}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <Label required>السنة المالية</Label>
                 <select style={{ ...inpStyle(!!errors.fiscal_year_id), cursor: 'pointer' }}
-                  value={form.fiscal_year_id} onChange={e => set('fiscal_year_id', e.target.value)}>
+                  value={form.fiscal_year_id} onChange={e => set('fiscal_year_id', e.target.value)} disabled={disableForm}>
                   <option value="">— اختر —</option>
                   {fiscalYears.map((fy: any) => (
-                    <option key={fy.id} value={fy.id}>
+                    <option key={fy.id} value={String(fy.id)}>
                       {fy.name} {fy.is_current ? '★' : ''}{fy.is_closed ? ' (مقفلة)' : ''}
                     </option>
                   ))}
@@ -453,10 +477,10 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
               <div>
                 <Label required>العملة</Label>
                 <select style={{ ...inpStyle(!!errors.currency_id), cursor: 'pointer' }}
-                  value={form.currency_id} onChange={e => set('currency_id', e.target.value)}>
+                  value={form.currency_id} onChange={e => set('currency_id', e.target.value)} disabled={disableForm}>
                   <option value="">— اختر —</option>
                   {currencies.map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
+                    <option key={c.id} value={String(c.id)}>{c.code} — {c.name}</option>
                   ))}
                 </select>
               </div>
@@ -464,7 +488,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                 <Label>سعر الصرف</Label>
                 <input type="number" step="0.0001" min="0" style={inpStyle()}
                   value={form.exchange_rate}
-                  onChange={e => set('exchange_rate', e.target.value)} />
+                  onChange={e => set('exchange_rate', e.target.value)} disabled={disableForm} />
               </div>
             </div>
             <div style={{ marginTop: 14 }}>
@@ -472,7 +496,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
               <textarea style={{ ...inpStyle(), resize: 'vertical' }} rows={2}
                 value={form.notes}
                 placeholder="ملاحظات اختيارية..."
-                onChange={e => set('notes', e.target.value)} />
+                onChange={e => set('notes', e.target.value)} disabled={disableForm} />
             </div>
           </Section>
 
@@ -488,8 +512,25 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
               </div>
             )}
 
-            <div className="tw" style={{ marginBottom: 10 }}>
-              <table>
+            {isLoadingVariants ? (
+              <div style={{ textAlign: 'center', padding: 20, color: 'var(--t4)' }}>
+                <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> جاري تحميل المنتجات...
+              </div>
+            ) : hasVariantsError ? (
+              <div style={{ padding: '10px 14px', marginBottom: 10, borderRadius: 'var(--r2)', background: 'var(--redb)', color: 'var(--red)', fontSize: 12 }}>
+                <i className="ti ti-alert-circle" /> فشل تحميل قائمة المنتجات.
+                <button onClick={() => refetchVariants()} style={{ background: 'none', border: 'none', color: 'var(--red)', textDecoration: 'underline', cursor: 'pointer', marginRight: 8 }}>
+                  إعادة المحاولة
+                </button>
+              </div>
+            ) : variants.length === 0 && !isLoadingVariants ? (
+              <div style={{ padding: '10px 14px', marginBottom: 10, borderRadius: 'var(--r2)', background: 'var(--goldb)', color: 'var(--gold)', fontSize: 12 }}>
+                <i className="ti ti-info-circle" /> لا توجد منتجات مسجلة. يرجى إضافة منتجات أولاً.
+              </div>
+            ) : null}
+
+            <div className="tw" style={{ marginBottom: 10, opacity: isLoadingVariants ? 0.6 : 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     <th style={{ width: 36 }}>#</th>
@@ -504,9 +545,9 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                 </thead>
                 <tbody>
                   {form.lines.map((line, idx) => {
-                    const gross  = (line.unit_price_ht || 0) * (line.quantity || 0);
-                    const disc   = gross * ((line.discount_percentage || 0) / 100);
-                    const net    = gross - disc;
+                    const gross = (line.unit_price_ht || 0) * (line.quantity || 0);
+                    const disc = gross * ((line.discount_percentage || 0) / 100);
+                    const net = gross - disc;
                     const lineTtc = net + net * ((line.tva_rate || 0) / 100);
                     return (
                       <tr key={idx}>
@@ -516,6 +557,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                             value={line.product_variant_id}
                             onChange={e => updateLine(idx, 'product_variant_id', e.target.value)}
                             style={{ width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none' }}
+                            disabled={isLoadingVariants || variants.length === 0 || isPending}
                           >
                             <option value="">— اختر منتجاً —</option>
                             {variants.map((v: any) => (
@@ -530,6 +572,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                             value={line.quantity}
                             onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
                             style={{ width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none', textAlign: 'center' }}
+                            disabled={isPending}
                           />
                         </td>
                         <td>
@@ -537,6 +580,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                             value={line.unit_price_ht}
                             onChange={e => updateLine(idx, 'unit_price_ht', parseFloat(e.target.value) || 0)}
                             style={{ width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none', textAlign: 'right', direction: 'ltr' }}
+                            disabled={isPending}
                           />
                         </td>
                         <td>
@@ -544,6 +588,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                             value={line.discount_percentage}
                             onChange={e => updateLine(idx, 'discount_percentage', parseFloat(e.target.value) || 0)}
                             style={{ width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none', textAlign: 'center' }}
+                            disabled={isPending}
                           />
                         </td>
                         <td>
@@ -551,6 +596,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                             value={line.tva_rate}
                             onChange={e => updateLine(idx, 'tva_rate', parseFloat(e.target.value))}
                             style={{ width: '100%', padding: '5px 4px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none' }}
+                            disabled={isPending}
                           >
                             {tvaRates.length > 0
                               ? tvaRates.map((t: any) => (
@@ -572,6 +618,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                               background: 'color-mix(in srgb, var(--red) 8%, transparent)',
                               color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                             }}
+                            disabled={isPending}
                           >
                             <i className="ti ti-trash" style={{ fontSize: 12 }} />
                           </button>
@@ -585,16 +632,18 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
 
             <button
               onClick={addLine}
+              disabled={isLoadingVariants || isPending || (variants.length === 0 && !hasVariantsError)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '7px 14px', borderRadius: 'var(--r2)',
                 border: '1px dashed var(--b3)', background: 'transparent',
                 color: 'var(--em)', fontSize: 13, fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
-                transition: 'all .15s',
+                cursor: (isLoadingVariants || isPending || (variants.length === 0 && !hasVariantsError)) ? 'not-allowed' : 'pointer',
+                fontFamily: 'Tajawal, sans-serif',
+                transition: 'all .15s', opacity: (isLoadingVariants || isPending || (variants.length === 0 && !hasVariantsError)) ? 0.6 : 1,
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--em) 6%, transparent)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+              onMouseEnter={e => { if (!isLoadingVariants && !isPending && variants.length > 0) (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--em) 6%, transparent)'; }}
+              onMouseLeave={e => { if (!isLoadingVariants && !isPending && variants.length > 0) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <i className="ti ti-plus" style={{ fontSize: 14 }} />
               إضافة سطر
@@ -603,25 +652,23 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
 
           {/* ── Section: المجاميع ──────────────── */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' }}>
-
             {/* Stamp toggle */}
             <div style={{
               padding: '12px 16px', borderRadius: 'var(--r2)',
               background: 'var(--bg2)', border: '1px solid var(--b1)',
               display: 'flex', alignItems: 'center', gap: 12,
+              opacity: disableForm ? 0.6 : 1,
             }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>الطابع الجبائي</div>
                 <div style={{ fontSize: 11, color: 'var(--t4)' }}>
-                  {totals.ttc >= 30_000
-                    ? `1% من TTC — سقف 2500 دج`
-                    : 'يُطبَّق للمبالغ ≥ 30,000 دج'}
+                  {totals.ttc >= 30_000 ? `1% من TTC — سقف 2500 دج` : 'يُطبَّق للمبالغ ≥ 30,000 دج'}
                 </div>
               </div>
               <div
-                onClick={() => set('apply_stamp', !form.apply_stamp)}
+                onClick={() => !disableForm && set('apply_stamp', !form.apply_stamp)}
                 style={{
-                  width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+                  width: 44, height: 24, borderRadius: 12, cursor: disableForm ? 'not-allowed' : 'pointer',
                   background: form.apply_stamp ? 'var(--em)' : 'var(--b2)',
                   position: 'relative', transition: 'background .2s',
                   flexShrink: 0,
@@ -639,18 +686,18 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
             {/* Totals box */}
             <div style={{ minWidth: 300, display: 'flex', flexDirection: 'column', gap: 7 }}>
               {[
-                { label: 'إجمالي HT',     value: totals.ht,       color: 'var(--t2)' },
-                { label: 'TVA',             value: totals.tva,      color: 'var(--t3)' },
+                { label: 'إجمالي HT', value: totals.ht, color: 'var(--t2)' },
+                { label: 'TVA', value: totals.tva, color: 'var(--t3)' },
                 totals.discount > 0 ? { label: 'إجمالي الخصم', value: -totals.discount, color: 'var(--red)' } : null,
-                totals.stamp > 0    ? { label: 'الطابع الجبائي',value: totals.stamp,   color: 'var(--orange)' } : null,
+                totals.stamp > 0 ? { label: 'الطابع الجبائي', value: totals.stamp, color: 'var(--orange)' } : null,
               ].filter(Boolean).map((row: any) => (
                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                   <span style={{ color: 'var(--t3)' }}>{row.label}</span>
                   <span style={{ color: row.color, fontWeight: 600, direction: 'ltr' }}>
                     {row.value < 0
                       ? `-${Math.abs(row.value).toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}`
-                      : row.value.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })
-                    } دج
+                      : row.value.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}
+                    دج
                   </span>
                 </div>
               ))}
@@ -678,7 +725,8 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
             padding: '8px 20px', borderRadius: 'var(--r2)',
             border: '1px solid var(--b3)', background: 'var(--bg1)',
             color: 'var(--t2)', fontSize: 13, fontWeight: 700,
-            cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+            cursor: isPending ? 'not-allowed' : 'pointer',
+            fontFamily: 'Tajawal, sans-serif',
           }}>
             إلغاء
           </button>
@@ -704,9 +752,10 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
 
 // ── Utils ──────────────────────────────────────
 function extractList(data: any): any[] {
-  if (Array.isArray(data?.data))        return data.data;
-  if (Array.isArray(data?.data?.data))  return data.data.data;
-  if (Array.isArray(data))              return data;
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.data)) return data.data;
+  if (data.data && Array.isArray(data.data.data)) return data.data.data;
   return [];
 }
 
