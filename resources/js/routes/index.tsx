@@ -26,6 +26,7 @@ const DebtsPage     = lazy(() => import('@/pages/debts/DebtsPage'));
 const DocumentTypesPage = lazy(() => import('@/pages/settings/DocumentTypesPage'));
 const CommercialDocumentsPage = lazy(() => import('@/pages/documents/CommercialDocumentsPage'));
 const NumberingSeriesPage = lazy(() => import('@/pages/lookups/NumberingSeriesPage'));
+const PaymentMethodsPage = lazy(() => import('@/pages/settings/PaymentMethodsPage'));
 
 
 
@@ -110,7 +111,7 @@ export function AppRoutes() {
           <Route path="currencies" element={<CurrenciesPage />} />
           <Route path="pricelevels" element={<PriceLevelsPage />} />
           <Route path="tvas"       element={<TvasPage />} />
-
+         <Route path="payment-methods" element={<PaymentMethodsPage />} />
           <Route path="numbering-series" element={<NumberingSeriesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

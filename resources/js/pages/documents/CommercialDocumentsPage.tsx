@@ -69,10 +69,13 @@ export default function CommercialDocumentsPage() {
   // ── Fetch document type info ────────────────
   const { data: docType } = useQuery<DocumentType>({
     queryKey: ['document-type', typeCode],
-    queryFn:  () => apiClient.get('/document-types', { params: { 'filter[code]': typeCode } })
-      .then(r => r.data.data?.[0] ?? null),
-    enabled:  !!typeCode,
-  });
+   queryFn: () =>
+  apiClient
+    .get('/document-types', { params: { per_page: 500 } })
+    .then((r) => {
+      const list = r.data.data ?? [];
+      return list.find((dt: any) => dt.code === typeCode) ?? null;
+    }),
 
   // ── Fetch documents ─────────────────────────
   const { data: docs, isLoading, isFetching } = useQuery({
