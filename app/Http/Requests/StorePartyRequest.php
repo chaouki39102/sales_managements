@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * Store Party Request
  *
- * التحقق من صحة بيانات إنشاء طرف جديد
+ * التحقق من صحة بيانات إنشاء متعامل جديد
  */
 class StorePartyRequest extends FormRequest
 {
@@ -75,8 +75,8 @@ class StorePartyRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'party_type_id.required' => 'نوع الطرف مطلوب',
-            'party_type_id.exists' => 'نوع الطرف غير صحيح',
+            'party_type_id.required' => 'نوع المتعامل مطلوب',
+            'party_type_id.exists' => 'نوع المتعامل غير صحيح',
             'code.unique' => 'الرمز موجود بالفعل',
             'name.required' => 'الاسم مطلوب',
             'name.max' => 'الاسم يجب أن لا يتجاوز 150 حرف',

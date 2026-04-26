@@ -77,6 +77,8 @@ const NAV_GROUPS = [
       { name: 'المستخدمون', href: '/users',     icon: 'ti-user'     },
       { name: 'الإعدادات',  href: '/settings',  icon: 'ti-settings' },
       { name: 'أنواع المستندات', href: '/settings/document-types', icon: 'ti-file' },
+      { name: 'سلاسل الترقيم',  href: '/numbering-series', icon: 'ti-list-numbers' },
+      { name: 'طرق الدفع',  href: '/payment-methods', icon: 'ti-credit-card' },
     ],
   },
 ];
@@ -132,6 +134,8 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   '/users':       { title: 'المستخدمون',            path: 'نظام ← مستخدمون'         },
   '/settings':    { title: 'الإعدادات',             path: 'نظام ← إعدادات'          },
   '/settings/document-types': { title: 'أنواع المستندات', path: 'نظام ← أنواع المستندات' },
+  '/numbering-series': { title: 'سلاسل الترقيم', path: 'نظام ← سلاسل الترقيم' },
+  '/payment-methods': { title: 'طرق الدفع', path: 'نظام ← طرق الدفع' },
 };
 
 export default function DashboardLayout() {

@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * Update Party Request
  *
- * التحقق من صحة بيانات تحديث طرف موجود
+ * التحقق من صحة بيانات تحديث متعامل موجود
  */
 class UpdatePartyRequest extends FormRequest
 {
@@ -77,7 +77,7 @@ class UpdatePartyRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'party_type_id.exists' => 'نوع الطرف غير صحيح',
+            'party_type_id.exists' => 'نوع المتعامل غير صحيح',
             'code.unique' => 'الرمز موجود بالفعل',
             'name.required' => 'الاسم مطلوب',
             'name.max' => 'الاسم يجب أن لا يتجاوز 150 حرف',

@@ -71,7 +71,7 @@ class PartyService extends \App\Core\Services\BaseService
         if ($item->active && isset($data['active']) && !$data['active']) {
             // Check if party has active commercial documents
             if ($item->commercialDocuments()->where('status', 'confirmed')->exists()) {
-                throw new BusinessRuleException('لا يمكن إلغاء تفعيل طرف لديه وثائق تجارية نشطة', 409);
+                throw new BusinessRuleException('لا يمكن إلغاء تفعيل متعامل لديه وثائق تجارية نشطة', 409);
             }
         }
 
@@ -97,11 +97,11 @@ class PartyService extends \App\Core\Services\BaseService
     {
         // Check if party can be deleted
         if ($item->commercialDocuments()->exists()) {
-            throw new BusinessRuleException('لا يمكن حذف طرف لديه وثائق تجارية', 409);
+            throw new BusinessRuleException('لا يمكن حذف متعامل لديه وثائق تجارية', 409);
         }
 
         if ($item->payments()->exists()) {
-            throw new BusinessRuleException('لا يمكن حذف طرف لديه دفعات', 409);
+            throw new BusinessRuleException('لا يمكن حذف متعامل لديه دفعات', 409);
         }
     }
 

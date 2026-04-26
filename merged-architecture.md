@@ -2977,11 +2977,21 @@ const NAV_GROUPS = [
   {
     label: 'المبيعات',
     items: [
-      { name: 'الفواتير',        href: '/invoices',   icon: 'ti-file-text',    badge: 3 },
-      { name: 'طلبيات الشراء',   href: '/orders',     icon: 'ti-clipboard-list'         },
-      { name: 'المرتجعات',       href: '/returns',    icon: 'ti-corner-up-left'         },
-      { name: 'عروض الأسعار',    href: '/quotations', icon: 'ti-file-check'             },
-      { name: 'وصل التسليم BL',  href: '/bl',         icon: 'ti-truck'                  },
+      { name: 'عروض الأسعار',         href: '/documents/DEV', icon: 'ti-file-check'          },
+      { name: 'طلبيات العملاء',        href: '/documents/BCC', icon: 'ti-clipboard-list'      },
+      { name: 'وصل التسليم BL',        href: '/documents/BL',  icon: 'ti-truck'               },
+      { name: 'فواتير البيع',          href: '/documents/FV',  icon: 'ti-file-invoice', badge: 3 },
+      { name: 'مرتجعات البيع',         href: '/documents/AV',  icon: 'ti-corner-up-left'      },
+    ],
+  },
+  {
+    label: 'المشتريات',
+    items: [
+      { name: 'طلبات عروض الأسعار',   href: '/documents/DDP', icon: 'ti-file-search'        },
+      { name: 'أوامر الشراء للموردين',  href: '/documents/BCF', icon: 'ti-clipboard-check'    },
+      { name: 'وصل الاستلام',           href: '/documents/BR',  icon: 'ti-package-import'     },
+      { name: 'فواتير الشراء',          href: '/documents/FA',  icon: 'ti-file-invoice'       },
+      { name: 'مرتجعات الشراء',         href: '/documents/AA',  icon: 'ti-corner-up-left-double' },
     ],
   },
   {
@@ -3023,6 +3033,7 @@ const NAV_GROUPS = [
       { name: 'الموظفون',   href: '/employees', icon: 'ti-id-badge' },
       { name: 'المستخدمون', href: '/users',     icon: 'ti-user'     },
       { name: 'الإعدادات',  href: '/settings',  icon: 'ti-settings' },
+      { name: 'أنواع المستندات', href: '/settings/document-types', icon: 'ti-file' },
     ],
   },
 ];
@@ -3040,11 +3051,19 @@ const LABEL_COLORS = [
 const PAGE_META: Record<string, { title: string; path: string }> = {
   '/dashboard':   { title: 'لوحة التحكم',          path: 'الرئيسية ← إحصائيات'     },
   '/pos':         { title: 'نقطة البيع',            path: 'الرئيسية ← POS'           },
-  '/invoices':    { title: 'الفواتير',              path: 'مبيعات ← فواتير'          },
-  '/orders':      { title: 'طلبيات الشراء',         path: 'مبيعات ← طلبيات'         },
-  '/returns':     { title: 'المرتجعات',             path: 'مبيعات ← مرتجعات'        },
-  '/quotations':  { title: 'عروض الأسعار',          path: 'مبيعات ← عروض أسعار'     },
-  '/bl':          { title: 'وصل التسليم BL',        path: 'مبيعات ← وصل تسليم'      },
+  // مبيعات
+  '/documents/DEV':  { title: 'عروض الأسعار',         path: 'مبيعات ← عروض أسعار'     },
+  '/documents/BCC':  { title: 'طلبيات العملاء',       path: 'مبيعات ← طلبيات العملاء'  },
+  '/documents/BL':   { title: 'وصل التسليم BL',       path: 'مبيعات ← وصل تسليم'      },
+  '/documents/FV':   { title: 'فواتير البيع',         path: 'مبيعات ← فواتير البيع'    },
+  '/documents/AV':   { title: 'مرتجعات البيع',        path: 'مبيعات ← مرتجعات البيع'   },
+  // مشتريات
+  '/documents/DDP':  { title: 'طلبات عروض الأسعار',   path: 'مشتريات ← طلبات عروض'    },
+  '/documents/BCF':  { title: 'أوامر الشراء',         path: 'مشتريات ← أوامر شراء'    },
+  '/documents/BR':   { title: 'وصل الاستلام',         path: 'مشتريات ← وصل استلام'    },
+  '/documents/FA':   { title: 'فواتير الشراء',        path: 'مشتريات ← فواتير شراء'   },
+  '/documents/AA':   { title: 'مرتجعات الشراء',       path: 'مشتريات ← مرتجعات شراء'  },
+  // مخزون
   '/products':    { title: 'المنتجات',              path: 'مخزون ← منتجات'          },
   '/inventory':   { title: 'إدارة المخزون',         path: 'مخزون ← جرد'             },
   '/categories':  { title: 'الفئات',               path: 'مخزون ← فئات'            },
@@ -3052,6 +3071,7 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   '/units':       { title: 'وحدات القياس',          path: 'مخزون ← وحدات'           },
   '/suppliers':   { title: 'الموردون',              path: 'مخزون ← موردون'          },
   '/warehouses':  { title: 'المستودعات',            path: 'مخزون ← مستودعات'        },
+  // محاسبة
   '/clients':     { title: 'العملاء',               path: 'محاسبة ← عملاء'          },
   '/finance':     { title: 'الخزينة',               path: 'محاسبة ← خزينة'          },
   '/expenses':    { title: 'المصروفات',             path: 'محاسبة ← مصروفات'        },
@@ -3062,11 +3082,13 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   '/currencies':  { title: 'العملات',               path: 'محاسبة ← عملات'          },
   '/pricelevels': { title: 'مستويات الأسعار',       path: 'محاسبة ← مستويات أسعار'  },
   '/tva-rates':   { title: 'معدلات TVA',            path: 'محاسبة ← TVA'            },
+  // نظام
   '/employees':   { title: 'الموظفون',              path: 'موارد بشرية ← موظفون'     },
   '/reports':     { title: 'التقارير',              path: 'تقارير'                   },
   '/balance':     { title: 'الميزانية التقديرية',   path: 'تقارير ← ميزانية'        },
   '/users':       { title: 'المستخدمون',            path: 'نظام ← مستخدمون'         },
   '/settings':    { title: 'الإعدادات',             path: 'نظام ← إعدادات'          },
+  '/settings/document-types': { title: 'أنواع المستندات', path: 'نظام ← أنواع المستندات' },
 };
 
 export default function DashboardLayout() {
@@ -3198,7 +3220,7 @@ export default function DashboardLayout() {
             </div>
             <div className="mt-lbl">الرئيسية</div>
           </Link>
-          <Link to="/invoices" className={`mt${location.pathname === '/invoices' ? ' on' : ''}`}>
+          <Link to="/documents/FV" className={`mt${location.pathname === '/documents/FV' ? ' on' : ''}`}>
             <div className="mt-ic-wrap">
               <span className="ic mt-ic"><i className="ti ti-file-text" /></span>
             </div>
@@ -3242,7 +3264,7 @@ export default function DashboardLayout() {
               { href: '/inventory',  icon: 'ti-package',       label: 'مخزون'  },
               { href: '/finance',    icon: 'ti-building-bank', label: 'خزينة'  },
               { href: '/clients',    icon: 'ti-users',         label: 'عملاء'  },
-              { href: '/invoices',   icon: 'ti-file-text',     label: 'فواتير' },
+              { href: '/documents/FV', icon: 'ti-file-text',   label: 'فواتير' },
               { href: '/expenses',   icon: 'ti-credit-card',   label: 'مصاريف' },
               { href: '/products',   icon: 'ti-list',          label: 'منتجات' },
               { href: '/reports',    icon: 'ti-chart-bar',     label: 'تقارير' },
@@ -3815,7 +3837,7 @@ export default function Cart({
               onSetClient(id ? (customers.find(c => c.id === id) ?? null) : null);
             }}
           >
-            <option value="">👤 عميل عابر</option>
+            <option value="">👤 زبون عابر</option>
             {customers.map(c => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -4176,7 +4198,7 @@ export default function PaymentModal({
           <div className="pay-ttc-big">{formatDZD(totalTtc)}</div>
           <div className="pay-client-badge">
             <span className="ic ic-xs"><i className="ti ti-user" /></span>
-            <span>{client?.name ?? 'عميل عابر'}</span>
+            <span>{client?.name ?? 'زبون عابر'}</span>
           </div>
         </div>
 
@@ -4244,7 +4266,7 @@ export default function PaymentModal({
               </div>
               {/* Change */}
               <div className="change-display">
-                <span className="change-lbl2">الباقي للعميل</span>
+                <span className="change-lbl2">الباقي للزبون</span>
                 <span className="change-val2" style={{ color: change >= 0 ? 'var(--em)' : 'var(--red)' }}>
                   {formatDZD(change)}
                 </span>
@@ -4506,7 +4528,7 @@ export default function Receipt({
               التاريخ: {now}
             </div>
             <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 500 }}>
-              العميل: {client?.name ?? 'عابر'}
+              الزبون: {client?.name ?? 'عابر'}
             </div>
           </div>
         </div>
@@ -5184,12 +5206,12 @@ export default function ClientsPage() {
 
       <PageHeader
         title="العملاء"
-        subtitle={`إدارة قاعدة العملاء — ${meta?.total ?? '...'} عميل`}
+        subtitle={`إدارة قاعدة العملاء — ${meta?.total ?? '...'} زبون`}
         actions={
           <>
             <Button size="sm" icon={<i className="ti ti-table-export"/>}>تصدير</Button>
             <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus"/>} onClick={openCreate}>
-              عميل جديد
+              زبون جديد
             </Button>
           </>
         }
@@ -5199,7 +5221,7 @@ export default function ClientsPage() {
       <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
         <KpiCard variant="green"  icon="ti-users"         label="إجمالي العملاء"    value={meta?.total ?? '—'} />
         <KpiCard variant="blue"   icon="ti-trending-up"   label="إجمالي المشتريات"  value={totalBusiness.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
-        <KpiCard variant="red"    icon="ti-receipt"       label="ديون العملاء"      value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} عميل متأخر`} />
+        <KpiCard variant="red"    icon="ti-receipt"       label="ديون العملاء"      value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} زبون متأخر`} />
         <KpiCard variant="gold"   icon="ti-star"          label="عملاء VIP"         value="—" />
       </div>
 
@@ -5226,7 +5248,7 @@ export default function ClientsPage() {
       {isLoading ? (
         <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
       ) : clients.length === 0 ? (
-        <EmptyState icon="ti-users" text="لا يوجد عملاء" sub="أضف عميلك الأول" action={<Button variant="primary" onClick={openCreate}>عميل جديد</Button>} />
+        <EmptyState icon="ti-users" text="لا يوجد عملاء" sub="أضف زبونك الأول" action={<Button variant="primary" onClick={openCreate}>زبون جديد</Button>} />
       ) : (
         <div className="g3">
           {clients.map((c, i) => {
@@ -5346,7 +5368,7 @@ function ClientModal({ open, party, onClose }: {
   return (
     <Modal
       open={open} onClose={onClose} size="lg"
-      title={isEdit ? `تعديل — ${party!.name}` : 'عميل جديد'}
+      title={isEdit ? `تعديل — ${party!.name}` : 'زبون جديد'}
       footer={
         <>
           <Button onClick={onClose}>إلغاء</Button>
@@ -5469,7 +5491,7 @@ const STOCK_ALERTS: StockAlert[] = [
 
 const ACTIVITIES: Activity[] = [
   { dot:'e', time:'منذ 12 دقيقة', text: <><strong>#0342 — 24,500 دج</strong> فاتورة جديدة</> },
-  { dot:'b', time:'منذ 35 دقيقة', text: <>عميل جديد: <strong>فاطمة بن علي</strong></> },
+  { dot:'b', time:'منذ 35 دقيقة', text: <>زبون جديد: <strong>فاطمة بن علي</strong></> },
   { dot:'g', time:'منذ ساعة',     text: <>إدخال مخزون: <strong>+24 وحدة زيت</strong></> },
   { dot:'r', time:'منذ 2 ساعة',   text: <>فاتورة <strong>#0338 ملغاة</strong></> },
   { dot:'z', time:'منذ 5 ساعات',  text: <>نسخة احتياطية — <strong>2.4 MB</strong></> },
@@ -5594,7 +5616,7 @@ export default function DashboardPage() {
           variant="blue" icon="ti-users"
           label="عملاء جدد — أفريل" value="47"
           trend="▲ 3" trendDir="up"
-          sub="إجمالي: 284 عميل"
+          sub="إجمالي: 284 زبون"
         />
         <KpiCard
           variant="red" icon="ti-package"
@@ -5754,7 +5776,7 @@ export default function DashboardPage() {
               <thead>
                 <tr>
                   <th>رقم</th>
-                  <th>العميل</th>
+                  <th>الزبون</th>
                   <th>المبلغ</th>
                   <th>TVA</th>
                   <th>الحالة</th>
@@ -5991,7 +6013,7 @@ export default function DebtsPage() {
                     variant={activeTab === 'overdue' ? 'red' : 'gold'} icon="ti-clock"
                     label={activeTab === 'overdue' ? 'متأخرة' : 'معلقة'}
                     value={docs.length}
-                    sub={`${clientsCount} عميل`}
+                    sub={`${clientsCount} زبون`}
                 />
                 <KpiCard
                     variant="blue" icon="ti-file-invoice" label="إجمالي TTC"
@@ -6022,7 +6044,7 @@ export default function DebtsPage() {
                     <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
                     <input
                         type="text"
-                        placeholder="ابحث برقم الفاتورة أو اسم العميل..."
+                        placeholder="ابحث برقم الفاتورة أو اسم الزبون..."
                         style={{ width: '100%' }}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -6045,7 +6067,7 @@ export default function DebtsPage() {
                             <thead>
                                 <tr>
                                     <th>رقم الفاتورة</th>
-                                    <th>العميل</th>
+                                    <th>الزبون</th>
                                     <th>TTC</th>
                                     <th>المدفوع</th>
                                     <th>المتبقي</th>
@@ -6152,7 +6174,7 @@ function DebtDetailModal({ open, doc, onClose }: {
         <Modal
             open={open} onClose={onClose} size="md"
             title={`تفاصيل — ${doc.document_number}`}
-            subtitle={doc.party?.name || 'عميل عابر'}
+            subtitle={doc.party?.name || 'زبون عابر'}
             footer={
                 <>
                     <Button onClick={onClose}>إغلاق</Button>
@@ -6230,7 +6252,7 @@ function DebtDetailModal({ open, doc, onClose }: {
                         border: '1px solid var(--b1)'
                     }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t4)', marginBottom: 8 }}>
-                            معلومات العميل
+                            معلومات الزبون
                         </div>
                         <div className="sr">
                             <span className="sr-l">الاسم</span>
@@ -6253,6 +6275,1369 @@ function DebtDetailModal({ open, doc, onClose }: {
             </div>
         </Modal>
     );
+}
+```
+
+## FILE: resources/js/pages/documents/CommercialDocumentModal.tsx
+```
+// ════════════════════════════════════════════════
+// resources/js/pages/documents/CommercialDocumentModal.tsx
+// Modal إنشاء/تعديل المستند التجاري — احترافي متكامل
+// ════════════════════════════════════════════════
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '@/lib/api/client';
+import { useFiscalYear } from '@/context/FiscalYearContext';
+import type { DocumentType } from '@/types';
+
+// ── Algerian fiscal stamp rules (LF 2024) ─────
+function calcFiscalStamp(totalTtc: number): number {
+  if (totalTtc <= 0) return 0;
+  if (totalTtc < 30_000) return 0;
+  return Math.min(Math.ceil(totalTtc * 0.01), 2_500); // 1% سقف 2500 دج
+}
+
+// ── Types ──────────────────────────────────────
+interface LineItem {
+  id?:                   number;
+  product_variant_id:    string;
+  description:           string;
+  quantity:              number;
+  unit_price_ht:         number;
+  discount_percentage:   number;
+  tva_rate:              number;
+  _variantName?:         string;
+  _productName?:         string;
+  _unitSymbol?:          string;
+}
+
+interface FormState {
+  party_id:       string;
+  document_date:  string;
+  due_date:       string;
+  notes:          string;
+  warehouse_id:   string;
+  fiscal_year_id: string;
+  currency_id:    string;
+  exchange_rate:  string;
+  apply_stamp:    boolean;
+  lines:          LineItem[];
+}
+
+// ── Helpers ────────────────────────────────────
+function inpStyle(err?: boolean): React.CSSProperties {
+  return {
+    width: '100%', boxSizing: 'border-box',
+    padding: '8px 12px', borderRadius: 'var(--r2)',
+    border: `1px solid ${err ? 'var(--red)' : 'var(--b3)'}`,
+    background: 'var(--bg1)', color: 'var(--t1)',
+    fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
+  };
+}
+
+function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t3)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+      {children}
+      {required && <span style={{ color: 'var(--red)', marginRight: 3 }}>*</span>}
+    </label>
+  );
+}
+
+function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+        paddingBottom: 8, borderBottom: '1px solid var(--b1)',
+      }}>
+        <i className={`ti ${icon}`} style={{ color: 'var(--em)', fontSize: 15 }} />
+        <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          {title}
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════
+// Modal Component
+// ════════════════════════════════════════════════
+interface Props {
+  open:              boolean;
+  documentType:      DocumentType | null;
+  existingDocument?: any;
+  onClose:           () => void;
+  onSaved:           () => void;
+}
+
+export default function CommercialDocumentModal({ open, documentType, existingDocument, onClose, onSaved }: Props) {
+  const isEdit   = !!existingDocument;
+  const qc       = useQueryClient();
+  const { selectedYear } = useFiscalYear() as any;
+  const isPurch  = documentType?.document_base_operation_id === 2;
+  const needsParty = documentType?.requires_party !== false;
+  const affects_stock = documentType?.affects_stock_direction !== 0;
+
+  // ── Dependencies ──────────────────────────────
+  const { data: parties = [] } = useQuery({
+    queryKey: ['parties-select', isPurch],
+    queryFn:  () => apiClient.get(isPurch ? '/suppliers' : '/customers', { params: { per_page: 500 } })
+      .then(r => extractList(r.data)),
+    enabled: open && needsParty,
+    staleTime: 60_000,
+  });
+  const { data: variants = [] } = useQuery({
+    queryKey: ['variants-select'],
+    queryFn:  () => apiClient.get('/product-variants', { params: { per_page: 500, include: 'product,product.unit' } })
+      .then(r => extractList(r.data)),
+    enabled: open,
+    staleTime: 60_000,
+  });
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ['warehouses-select'],
+    queryFn:  () => apiClient.get('/warehouses', { params: { per_page: 100 } })
+      .then(r => extractList(r.data)),
+    enabled: open,
+    staleTime: 120_000,
+  });
+  const { data: currencies = [] } = useQuery({
+    queryKey: ['currencies-select'],
+    queryFn:  () => apiClient.get('/currencies', { params: { per_page: 50 } })
+      .then(r => extractList(r.data)),
+    enabled: open,
+    staleTime: 300_000,
+  });
+  const { data: fiscalYears = [] } = useQuery({
+    queryKey: ['fiscal-years-select'],
+    queryFn:  () => apiClient.get('/fiscal-years', { params: { per_page: 20, 'filter[is_closed]': 0 } })
+      .then(r => extractList(r.data)),
+    enabled: open,
+    staleTime: 60_000,
+  });
+  const { data: tvaRates = [] } = useQuery({
+    queryKey: ['tvas-select'],
+    queryFn:  () => apiClient.get('/tvas', { params: { per_page: 20 } })
+      .then(r => extractList(r.data)),
+    enabled: open,
+    staleTime: 300_000,
+  });
+
+  // ── Form state ────────────────────────────────
+  const baseCurrency = currencies.find((c: any) => c.is_base_currency) ?? currencies[0];
+  const defaultWh    = warehouses[0];
+
+  const [form,    setForm]    = useState<FormState>(buildDefault());
+  const [errors,  setErrors]  = useState<Record<string, string>>({});
+  const [apiErr,  setApiErr]  = useState('');
+  const [lineErr, setLineErr] = useState('');
+
+  function buildDefault(): FormState {
+    if (existingDocument) {
+      return {
+        party_id:       String(existingDocument.party_id       ?? ''),
+        document_date:  existingDocument.document_date         ?? today(),
+        due_date:       existingDocument.due_date              ?? '',
+        notes:          existingDocument.notes                 ?? '',
+        warehouse_id:   String(existingDocument.warehouse_id   ?? ''),
+        fiscal_year_id: String(existingDocument.fiscal_year_id ?? ''),
+        currency_id:    String(existingDocument.currency_id    ?? ''),
+        exchange_rate:  String(existingDocument.exchange_rate  ?? '1'),
+        apply_stamp:    parseFloat(existingDocument.total_stamp ?? 0) > 0,
+        lines:          (existingDocument.lines ?? []).map((l: any) => ({
+          id:                  l.id,
+          product_variant_id:  String(l.product_variant_id ?? ''),
+          description:         l.description ?? '',
+          quantity:            parseFloat(l.quantity) || 1,
+          unit_price_ht:       parseFloat(l.unit_price_ht) || 0,
+          discount_percentage: parseFloat(l.discount_percentage) || 0,
+          tva_rate:            parseFloat(l.tva_rate) || 19,
+          _productName:        l.product_variant?.product?.name,
+          _variantName:        l.product_variant?.variant_name,
+        })),
+      };
+    }
+    return {
+      party_id:       '',
+      document_date:  today(),
+      due_date:       '',
+      notes:          '',
+      warehouse_id:   '',
+      fiscal_year_id: String(selectedYear?.id ?? ''),
+      currency_id:    '',
+      exchange_rate:  '1',
+      apply_stamp:    false,
+      lines:          [],
+    };
+  }
+
+  // fill defaults when dependencies load
+  useEffect(() => {
+    if (!isEdit) {
+      setForm(f => ({
+        ...f,
+        warehouse_id:   f.warehouse_id   || String(defaultWh?.id   ?? ''),
+        currency_id:    f.currency_id    || String(baseCurrency?.id ?? ''),
+        fiscal_year_id: f.fiscal_year_id || String(selectedYear?.id ?? ''),
+      }));
+    }
+  }, [warehouses, currencies, selectedYear]);
+
+  useEffect(() => {
+    if (open) { setForm(buildDefault()); setErrors({}); setApiErr(''); setLineErr(''); }
+  }, [open, existingDocument?.id]);
+
+  const set = (k: keyof FormState, v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  // ── Line helpers ──────────────────────────────
+  function addLine() {
+    const defaultTva = tvaRates.find((t: any) => t.is_default)?.rate ?? 19;
+    setForm(f => ({
+      ...f,
+      lines: [...f.lines, {
+        product_variant_id: '', description: '',
+        quantity: 1, unit_price_ht: 0,
+        discount_percentage: 0, tva_rate: defaultTva,
+      }],
+    }));
+    setLineErr('');
+  }
+
+  function updateLine(idx: number, field: keyof LineItem, value: any) {
+    setForm(f => {
+      const lines = [...f.lines];
+      lines[idx] = { ...lines[idx], [field]: value };
+
+      // auto-fill product info
+      if (field === 'product_variant_id' && value) {
+        const v = variants.find((vr: any) => String(vr.id) === String(value));
+        if (v) {
+          lines[idx]._productName = v.product?.name ?? '';
+          lines[idx]._variantName = v.variant_name  ?? '';
+          lines[idx]._unitSymbol  = v.product?.unit?.symbol ?? '';
+          // auto fill price from product variant
+          if (!lines[idx].unit_price_ht || lines[idx].unit_price_ht === 0) {
+            lines[idx].unit_price_ht = parseFloat(v.price_ht ?? v.prix_detail ?? 0);
+          }
+          // auto fill tva
+          if (v.tva_rate) lines[idx].tva_rate = parseFloat(v.tva_rate);
+        }
+      }
+      return { ...f, lines };
+    });
+  }
+
+  function removeLine(idx: number) {
+    setForm(f => ({ ...f, lines: f.lines.filter((_, i) => i !== idx) }));
+  }
+
+  // ── Totals ────────────────────────────────────
+  const totals = useMemo(() => {
+    let ht = 0, tva = 0, discount = 0;
+    form.lines.forEach(l => {
+      const gross = (l.unit_price_ht || 0) * (l.quantity || 0);
+      const disc  = gross * ((l.discount_percentage || 0) / 100);
+      const net   = gross - disc;
+      ht       += net;
+      tva      += net * ((l.tva_rate || 0) / 100);
+      discount += disc;
+    });
+    const ttc   = ht + tva;
+    const stamp = form.apply_stamp ? calcFiscalStamp(ttc) : 0;
+    return { ht, tva, ttc, discount, stamp, netToPay: ttc + stamp };
+  }, [form.lines, form.apply_stamp]);
+
+  // ── Validation ────────────────────────────────
+  function validate(): boolean {
+    const errs: Record<string, string> = {};
+    if (needsParty && !form.party_id) errs.party_id = 'هذا الحقل إلزامي';
+    if (!form.document_date)           errs.document_date = 'هذا الحقل إلزامي';
+    if (!form.warehouse_id)            errs.warehouse_id = 'اختر مستودعاً';
+    if (!form.fiscal_year_id)          errs.fiscal_year_id = 'اختر السنة المالية';
+    if (!form.currency_id)             errs.currency_id = 'اختر العملة';
+    if (form.lines.length === 0) {
+      setLineErr('يجب إضافة سطر واحد على الأقل');
+      return false;
+    }
+    for (let i = 0; i < form.lines.length; i++) {
+      if (!form.lines[i].product_variant_id) {
+        setLineErr(`السطر ${i + 1}: اختر منتجاً`);
+        return false;
+      }
+      if (!form.lines[i].quantity || form.lines[i].quantity <= 0) {
+        setLineErr(`السطر ${i + 1}: الكمية يجب أن تكون أكبر من صفر`);
+        return false;
+      }
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  // ── Save ──────────────────────────────────────
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        document_type_id: documentType?.id,
+        party_id:         needsParty && form.party_id ? parseInt(form.party_id) : null,
+        warehouse_id:     parseInt(form.warehouse_id),
+        fiscal_year_id:   parseInt(form.fiscal_year_id),
+        currency_id:      parseInt(form.currency_id),
+        exchange_rate:    parseFloat(form.exchange_rate) || 1,
+        document_date:    form.document_date,
+        due_date:         form.due_date || null,
+        notes:            form.notes || null,
+        total_discount:   totals.discount,
+        total_stamp:      totals.stamp,
+        lines: form.lines.map(l => ({
+          ...(l.id ? { id: l.id } : {}),
+          product_variant_id:  parseInt(l.product_variant_id),
+          description:         l.description || null,
+          quantity:            l.quantity,
+          unit_price_ht:       l.unit_price_ht,
+          tva_rate:            l.tva_rate,
+          discount_percentage: l.discount_percentage || 0,
+        })),
+      };
+      if (isEdit)
+        return apiClient.put(`/commercial-documents/${existingDocument.id}`, payload);
+      return apiClient.post('/commercial-documents', payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['commercial-documents'] });
+      onSaved();
+    },
+    onError: (e: any) => {
+      const msg = e?.response?.data?.message ?? e?.response?.data?.errors
+        ? Object.values(e.response.data.errors).flat().join(' | ')
+        : 'فشل الحفظ';
+      setApiErr(String(msg));
+    },
+  });
+
+  function handleSave() {
+    setApiErr('');
+    if (validate()) saveMut.mutate();
+  }
+
+  if (!open) return null;
+
+  // ── Render ─────────────────────────────────────
+  const isPending = saveMut.isPending;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 500,
+      background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      padding: '20px 16px', overflowY: 'auto',
+    }} onClick={onClose}>
+      <div style={{
+        width: '100%', maxWidth: 920,
+        background: 'var(--bg1)', borderRadius: 'var(--r3)',
+        boxShadow: '0 24px 64px rgba(0,0,0,.25)',
+        display: 'flex', flexDirection: 'column',
+      }} onClick={e => e.stopPropagation()}>
+
+        {/* ── Header ─────────────────────────── */}
+        <div style={{
+          padding: '16px 20px', borderBottom: '1px solid var(--b1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'var(--bg2)', borderRadius: 'var(--r3) var(--r3) 0 0',
+        }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)' }}>
+              {isEdit ? `تعديل ${documentType?.name}` : `${documentType?.name} جديد`}
+            </div>
+            {documentType?.name_latin && (
+              <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 2 }}>
+                {documentType.name_latin} — {documentType.code}
+              </div>
+            )}
+          </div>
+          <button onClick={onClose} style={{
+            width: 30, height: 30, borderRadius: 8,
+            border: '1px solid var(--b2)', background: 'var(--bg1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: 'var(--t3)',
+          }}>
+            <i className="ti ti-x" style={{ fontSize: 14 }} />
+          </button>
+        </div>
+
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+
+          {/* API Error */}
+          {apiErr && (
+            <div style={{
+              padding: '10px 14px', marginBottom: 16, borderRadius: 'var(--r2)',
+              background: 'var(--redb)', border: '1px solid var(--redbo)',
+              color: 'var(--red)', fontSize: 13, display: 'flex', gap: 8, alignItems: 'center',
+            }}>
+              <i className="ti ti-alert-circle" />{apiErr}
+            </div>
+          )}
+
+          {/* ── Section: الأساسيات ─────────────── */}
+          <Section title="معلومات المستند" icon="ti-file-description">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+
+              {needsParty && (
+                <div style={{ gridColumn: 'span 2' }}>
+                  <Label required>{isPurch ? 'المورد' : 'الزبون'}</Label>
+                  <select
+                    value={form.party_id}
+                    onChange={e => set('party_id', e.target.value)}
+                    style={{ ...inpStyle(!!errors.party_id), cursor: 'pointer' }}
+                  >
+                    <option value="">— اختر {isPurch ? 'مورداً' : 'زبوناً'} —</option>
+                    {parties.map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  {errors.party_id && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>{errors.party_id}</div>}
+                </div>
+              )}
+
+              <div>
+                <Label required>تاريخ المستند</Label>
+                <input type="date" style={inpStyle(!!errors.document_date)}
+                  value={form.document_date} onChange={e => set('document_date', e.target.value)} />
+              </div>
+              <div>
+                <Label>تاريخ الاستحقاق</Label>
+                <input type="date" style={inpStyle()}
+                  value={form.due_date} onChange={e => set('due_date', e.target.value)} />
+              </div>
+              <div>
+                <Label required>المستودع</Label>
+                <select style={{ ...inpStyle(!!errors.warehouse_id), cursor: 'pointer' }}
+                  value={form.warehouse_id} onChange={e => set('warehouse_id', e.target.value)}>
+                  <option value="">— اختر —</option>
+                  {warehouses.map((w: any) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label required>السنة المالية</Label>
+                <select style={{ ...inpStyle(!!errors.fiscal_year_id), cursor: 'pointer' }}
+                  value={form.fiscal_year_id} onChange={e => set('fiscal_year_id', e.target.value)}>
+                  <option value="">— اختر —</option>
+                  {fiscalYears.map((fy: any) => (
+                    <option key={fy.id} value={fy.id}>
+                      {fy.name} {fy.is_current ? '★' : ''}{fy.is_closed ? ' (مقفلة)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {errors.fiscal_year_id && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>{errors.fiscal_year_id}</div>}
+              </div>
+              <div>
+                <Label required>العملة</Label>
+                <select style={{ ...inpStyle(!!errors.currency_id), cursor: 'pointer' }}
+                  value={form.currency_id} onChange={e => set('currency_id', e.target.value)}>
+                  <option value="">— اختر —</option>
+                  {currencies.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>سعر الصرف</Label>
+                <input type="number" step="0.0001" min="0" style={inpStyle()}
+                  value={form.exchange_rate}
+                  onChange={e => set('exchange_rate', e.target.value)} />
+              </div>
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <Label>ملاحظات</Label>
+              <textarea style={{ ...inpStyle(), resize: 'vertical' }} rows={2}
+                value={form.notes}
+                placeholder="ملاحظات اختيارية..."
+                onChange={e => set('notes', e.target.value)} />
+            </div>
+          </Section>
+
+          {/* ── Section: الأسطر ────────────────── */}
+          <Section title="أسطر المستند" icon="ti-list-details">
+            {lineErr && (
+              <div style={{
+                padding: '8px 12px', marginBottom: 10, borderRadius: 'var(--r2)',
+                background: 'var(--redb)', color: 'var(--red)',
+                fontSize: 12.5, display: 'flex', gap: 6, alignItems: 'center',
+              }}>
+                <i className="ti ti-alert-circle" />{lineErr}
+              </div>
+            )}
+
+            <div className="tw" style={{ marginBottom: 10 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: 36 }}>#</th>
+                    <th style={{ minWidth: 180 }}>المنتج</th>
+                    <th style={{ width: 80 }}>الكمية</th>
+                    <th style={{ width: 110 }}>سعر HT</th>
+                    <th style={{ width: 80 }}>خصم %</th>
+                    <th style={{ width: 80 }}>TVA %</th>
+                    <th style={{ width: 120, textAlign: 'left' }}>إجمالي TTC</th>
+                    <th style={{ width: 36 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.lines.map((line, idx) => {
+                    const gross  = (line.unit_price_ht || 0) * (line.quantity || 0);
+                    const disc   = gross * ((line.discount_percentage || 0) / 100);
+                    const net    = gross - disc;
+                    const lineTtc = net + net * ((line.tva_rate || 0) / 100);
+                    return (
+                      <tr key={idx}>
+                        <td style={{ color: 'var(--t4)', fontSize: 11, textAlign: 'center' }}>{idx + 1}</td>
+                        <td>
+                          <select
+                            value={line.product_variant_id}
+                            onChange={e => updateLine(idx, 'product_variant_id', e.target.value)}
+                            style={{ width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none' }}
+                          >
+                            <option value="">— اختر منتجاً —</option>
+                            {variants.map((v: any) => (
+                              <option key={v.id} value={v.id}>
+                                {v.product?.name ?? v.name}{v.variant_name ? ` — ${v.variant_name}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <input type="number" min="0" step="0.001"
+                            value={line.quantity}
+                            onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                            style={{ width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none', textAlign: 'center' }}
+                          />
+                        </td>
+                        <td>
+                          <input type="number" min="0" step="0.01"
+                            value={line.unit_price_ht}
+                            onChange={e => updateLine(idx, 'unit_price_ht', parseFloat(e.target.value) || 0)}
+                            style={{ width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none', textAlign: 'right', direction: 'ltr' }}
+                          />
+                        </td>
+                        <td>
+                          <input type="number" min="0" max="100" step="0.01"
+                            value={line.discount_percentage}
+                            onChange={e => updateLine(idx, 'discount_percentage', parseFloat(e.target.value) || 0)}
+                            style={{ width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none', textAlign: 'center' }}
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={line.tva_rate}
+                            onChange={e => updateLine(idx, 'tva_rate', parseFloat(e.target.value))}
+                            style={{ width: '100%', padding: '5px 4px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none' }}
+                          >
+                            {tvaRates.length > 0
+                              ? tvaRates.map((t: any) => (
+                                  <option key={t.id} value={t.rate}>{t.rate}%</option>
+                                ))
+                              : [0, 9, 19].map(r => <option key={r} value={r}>{r}%</option>)
+                            }
+                          </select>
+                        </td>
+                        <td style={{ fontWeight: 700, color: 'var(--em)', direction: 'ltr', textAlign: 'right', fontSize: 13 }}>
+                          {lineTtc.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td>
+                          <button
+                            onClick={() => removeLine(idx)}
+                            style={{
+                              width: 26, height: 26, borderRadius: 6, cursor: 'pointer',
+                              border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
+                              background: 'color-mix(in srgb, var(--red) 8%, transparent)',
+                              color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                          >
+                            <i className="ti ti-trash" style={{ fontSize: 12 }} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <button
+              onClick={addLine}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 'var(--r2)',
+                border: '1px dashed var(--b3)', background: 'transparent',
+                color: 'var(--em)', fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+                transition: 'all .15s',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--em) 6%, transparent)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+            >
+              <i className="ti ti-plus" style={{ fontSize: 14 }} />
+              إضافة سطر
+            </button>
+          </Section>
+
+          {/* ── Section: المجاميع ──────────────── */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' }}>
+
+            {/* Stamp toggle */}
+            <div style={{
+              padding: '12px 16px', borderRadius: 'var(--r2)',
+              background: 'var(--bg2)', border: '1px solid var(--b1)',
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>الطابع الجبائي</div>
+                <div style={{ fontSize: 11, color: 'var(--t4)' }}>
+                  {totals.ttc >= 30_000
+                    ? `1% من TTC — سقف 2500 دج`
+                    : 'يُطبَّق للمبالغ ≥ 30,000 دج'}
+                </div>
+              </div>
+              <div
+                onClick={() => set('apply_stamp', !form.apply_stamp)}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+                  background: form.apply_stamp ? 'var(--em)' : 'var(--b2)',
+                  position: 'relative', transition: 'background .2s',
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                  position: 'absolute', top: 3,
+                  left: form.apply_stamp ? 'calc(100% - 21px)' : 3,
+                  transition: 'left .2s', boxShadow: '0 1px 4px rgba(0,0,0,.2)',
+                }} />
+              </div>
+            </div>
+
+            {/* Totals box */}
+            <div style={{ minWidth: 300, display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {[
+                { label: 'إجمالي HT',     value: totals.ht,       color: 'var(--t2)' },
+                { label: 'TVA',             value: totals.tva,      color: 'var(--t3)' },
+                totals.discount > 0 ? { label: 'إجمالي الخصم', value: -totals.discount, color: 'var(--red)' } : null,
+                totals.stamp > 0    ? { label: 'الطابع الجبائي',value: totals.stamp,   color: 'var(--orange)' } : null,
+              ].filter(Boolean).map((row: any) => (
+                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: 'var(--t3)' }}>{row.label}</span>
+                  <span style={{ color: row.color, fontWeight: 600, direction: 'ltr' }}>
+                    {row.value < 0
+                      ? `-${Math.abs(row.value).toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}`
+                      : row.value.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })
+                    } دج
+                  </span>
+                </div>
+              ))}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                paddingTop: 10, marginTop: 4, borderTop: '2px solid var(--b2)',
+                fontSize: 16, fontWeight: 800,
+              }}>
+                <span style={{ color: 'var(--t1)' }}>الإجمالي TTC</span>
+                <span style={{ color: 'var(--em)', direction: 'ltr' }}>
+                  {totals.netToPay.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })} دج
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Footer ─────────────────────────── */}
+        <div style={{
+          padding: '14px 20px', borderTop: '1px solid var(--b1)',
+          display: 'flex', justifyContent: 'flex-end', gap: 8,
+          background: 'var(--bg2)', borderRadius: '0 0 var(--r3) var(--r3)',
+        }}>
+          <button onClick={onClose} disabled={isPending} style={{
+            padding: '8px 20px', borderRadius: 'var(--r2)',
+            border: '1px solid var(--b3)', background: 'var(--bg1)',
+            color: 'var(--t2)', fontSize: 13, fontWeight: 700,
+            cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+          }}>
+            إلغاء
+          </button>
+          <button onClick={handleSave} disabled={isPending} style={{
+            padding: '8px 24px', borderRadius: 'var(--r2)',
+            border: 'none', background: isPending ? 'var(--b2)' : 'var(--em)',
+            color: '#fff', fontSize: 13, fontWeight: 700,
+            cursor: isPending ? 'not-allowed' : 'pointer',
+            fontFamily: 'Tajawal, sans-serif',
+            display: 'flex', alignItems: 'center', gap: 7,
+            transition: 'all .15s',
+          }}>
+            {isPending
+              ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+              : <i className={`ti ${isEdit ? 'ti-check' : 'ti-plus'}`} />}
+            {isPending ? 'جارٍ الحفظ...' : isEdit ? 'حفظ التعديلات' : 'إنشاء المستند'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Utils ──────────────────────────────────────
+function extractList(data: any): any[] {
+  if (Array.isArray(data?.data))        return data.data;
+  if (Array.isArray(data?.data?.data))  return data.data.data;
+  if (Array.isArray(data))              return data;
+  return [];
+}
+
+function today(): string {
+  return new Date().toISOString().split('T')[0];
+}
+```
+
+## FILE: resources/js/pages/documents/CommercialDocumentsPage.tsx
+```
+// ════════════════════════════════════════════════
+// resources/js/pages/documents/CommercialDocumentsPage.tsx
+// صفحة المستندات التجارية — نظام متكامل
+// ════════════════════════════════════════════════
+import React, { useState, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '@/lib/api/client';
+import { useFiscalYear } from '@/context/FiscalYearContext';
+import CommercialDocumentModal from './CommercialDocumentModal';
+import type { DocumentType } from '@/types';
+
+// ── Status config ──────────────────────────────
+const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
+  draft:          { label: 'مسودة',           color: 'var(--t4)',     bg: 'var(--bg3)'   },
+  pending:        { label: 'قيد الانتظار',     color: 'var(--orange)', bg: 'color-mix(in srgb, var(--orange) 12%, transparent)' },
+  validated:      { label: 'معتمد',            color: 'var(--blue)',   bg: 'color-mix(in srgb, var(--blue) 12%, transparent)'   },
+  partially_paid: { label: 'مدفوع جزئياً',    color: 'var(--purple)', bg: 'color-mix(in srgb, var(--purple) 12%, transparent)' },
+  paid:           { label: 'مدفوع',            color: 'var(--em)',     bg: 'color-mix(in srgb, var(--em) 12%, transparent)'     },
+  overdue:        { label: 'متأخر',            color: 'var(--red)',    bg: 'color-mix(in srgb, var(--red) 12%, transparent)'    },
+  cancelled:      { label: 'ملغي',             color: 'var(--red)',    bg: 'color-mix(in srgb, var(--red) 8%, transparent)'     },
+  returned:       { label: 'مرتجع',            color: 'var(--purple)', bg: 'color-mix(in srgb, var(--purple) 10%, transparent)' },
+};
+
+// ── Helpers ────────────────────────────────────
+function fmtDate(d?: string) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('ar-DZ', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+function fmtNum(n?: number | string) {
+  const v = parseFloat(String(n ?? 0));
+  return isNaN(v) ? '—' : v.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' دج';
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CFG[status] ?? { label: status, color: 'var(--t4)', bg: 'var(--bg3)' };
+  return (
+    <span style={{
+      padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+      color: cfg.color, background: cfg.bg, whiteSpace: 'nowrap',
+    }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+// ════════════════════════════════════════════════
+// Main Page
+// ════════════════════════════════════════════════
+export default function CommercialDocumentsPage() {
+  const { typeCode } = useParams<{ typeCode: string }>();
+  const navigate     = useNavigate();
+  const qc           = useQueryClient();
+  const { selectedYear, isReadOnly } = useFiscalYear() as any;
+
+  // Filters state
+  const [search,     setSearch]     = useState('');
+  const [statusFilter, setStatus]   = useState('');
+  const [page,       setPage]       = useState(1);
+  const [modal,      setModal]      = useState<'add' | 'edit' | 'view' | null>(null);
+  const [activeDoc,  setActiveDoc]  = useState<any | null>(null);
+  const [toast,      setToast]      = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  // ── Fetch document type info ────────────────
+  const { data: docType } = useQuery<DocumentType>({
+    queryKey: ['document-type', typeCode],
+    queryFn:  () => apiClient.get('/document-types', { params: { 'filter[code]': typeCode } })
+      .then(r => r.data.data?.[0] ?? null),
+    enabled:  !!typeCode,
+  });
+
+  // ── Fetch documents ─────────────────────────
+  const { data: docs, isLoading, isFetching } = useQuery({
+    queryKey: ['commercial-documents', typeCode, selectedYear?.id, search, statusFilter, page],
+    queryFn:  () => apiClient.get('/commercial-documents', {
+      params: {
+        'filter[document_type_id]': docType?.id,
+        'filter[fiscal_year_id]':   selectedYear?.id,
+        'filter[search]':           search || undefined,
+        'filter[document_status_id]': statusFilter || undefined,
+        include:  'party,documentStatus,warehouse',
+        sort:     '-document_date',
+        per_page: 15,
+        page,
+      },
+    }).then(r => r.data),
+    enabled: !!docType?.id && !!selectedYear?.id,
+    keepPreviousData: true,
+  });
+
+  const items    = docs?.data ?? [];
+  const meta     = docs?.meta ?? {};
+  const isPurch  = docType?.document_base_operation_id === 2;
+
+  // ── Actions ─────────────────────────────────
+  const validateMutation = useMutation({
+    mutationFn: (id: number) => apiClient.post(`/commercial-documents/${id}/validate`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['commercial-documents'] }); showToast('تم اعتماد المستند بنجاح'); },
+    onError:   (e: any) => showToast(e?.response?.data?.message ?? 'فشل الاعتماد', 'error'),
+  });
+  const lockMutation = useMutation({
+    mutationFn: (id: number) => apiClient.post(`/commercial-documents/${id}/lock`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['commercial-documents'] }); showToast('تم قفل المستند'); },
+    onError:   (e: any) => showToast(e?.response?.data?.message ?? 'فشل القفل', 'error'),
+  });
+  const cancelMutation = useMutation({
+    mutationFn: (id: number) => apiClient.post(`/commercial-documents/${id}/cancel`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['commercial-documents'] }); showToast('تم إلغاء المستند'); },
+    onError:   (e: any) => showToast(e?.response?.data?.message ?? 'فشل الإلغاء', 'error'),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiClient.delete(`/commercial-documents/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['commercial-documents'] }); showToast('تم حذف المستند'); },
+    onError:   (e: any) => showToast(e?.response?.data?.message ?? 'فشل الحذف', 'error'),
+  });
+
+  // ── Operation color/icon ─────────────────────
+  const opColor = isPurch ? 'var(--purple)' : 'var(--em)';
+  const opIcon  = isPurch ? 'ti-shopping-cart' : 'ti-file-invoice';
+
+  return (
+    <div className="page on" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9999, padding: '10px 22px', borderRadius: 'var(--r2)',
+          background: toast.type === 'success' ? 'var(--em)' : 'var(--red)',
+          color: '#fff', fontSize: 13, fontWeight: 700,
+          boxShadow: '0 4px 24px rgba(0,0,0,.2)',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <i className={`ti ${toast.type === 'success' ? 'ti-check' : 'ti-x'}`} />
+          {toast.msg}
+        </div>
+      )}
+
+      {/* ── Header ─────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+            background: `color-mix(in srgb, ${opColor} 12%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${opColor} 25%, transparent)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: opColor, fontSize: 20,
+          }}>
+            <i className={`ti ${opIcon}`} />
+          </div>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--t1)' }}>
+              {docType?.name ?? '...'}
+              {docType?.name_latin && (
+                <span style={{ fontSize: 12, color: 'var(--t4)', marginRight: 8, fontWeight: 400 }}>
+                  {docType.name_latin}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+              <span style={{ fontSize: 11, color: 'var(--t4)' }}>
+                {meta.total ?? 0} مستند
+              </span>
+              {selectedYear && (
+                <span style={{
+                  fontSize: 10, padding: '2px 7px', borderRadius: 10, fontWeight: 700,
+                  background: 'color-mix(in srgb, var(--blue) 12%, transparent)',
+                  color: 'var(--blue)',
+                }}>
+                  {selectedYear.name}
+                </span>
+              )}
+              {isReadOnly && (
+                <span style={{
+                  fontSize: 10, padding: '2px 7px', borderRadius: 10, fontWeight: 700,
+                  background: 'color-mix(in srgb, var(--red) 12%, transparent)',
+                  color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 3,
+                }}>
+                  <i className="ti ti-lock" style={{ fontSize: 9 }} /> للقراءة فقط
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {!isReadOnly && (
+          <button
+            className="btn btn-p"
+            onClick={() => { setActiveDoc(null); setModal('add'); }}
+          >
+            <i className="ti ti-plus" />
+            {docType?.name ?? 'مستند'} جديد
+          </button>
+        )}
+      </div>
+
+      {/* ── Filters bar ────────────────────── */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="srch" style={{ flex: '1 1 220px', maxWidth: 320 }}>
+          <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
+          <input
+            type="text" placeholder="بحث برقم المستند، اسم المتعامل..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+
+        <select
+          value={statusFilter}
+          onChange={e => { setStatus(e.target.value); setPage(1); }}
+          style={{
+            padding: '7px 12px', borderRadius: 'var(--r2)',
+            border: '1px solid var(--b3)', background: 'var(--bg1)',
+            color: 'var(--t1)', fontSize: 12.5, fontFamily: 'Tajawal, sans-serif',
+            outline: 'none', cursor: 'pointer',
+          }}
+        >
+          <option value="">كل الحالات</option>
+          {Object.entries(STATUS_CFG).map(([k, v]) => (
+            <option key={k} value={k}>{v.label}</option>
+          ))}
+        </select>
+
+        <button
+          className="btn"
+          onClick={() => { setSearch(''); setStatus(''); setPage(1); }}
+          title="إعادة الضبط"
+        >
+          <i className="ti ti-refresh" />
+        </button>
+      </div>
+
+      {/* ── Table ──────────────────────────── */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden', flex: 1 }}>
+        {isLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 220, gap: 10, color: 'var(--t3)' }}>
+            <i className="ti ti-loader-2" style={{ fontSize: 22, animation: 'spin .8s linear infinite' }} />
+            جارٍ تحميل المستندات...
+          </div>
+        ) : items.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 220, gap: 10, color: 'var(--t4)' }}>
+            <i className="ti ti-file-off" style={{ fontSize: 40 }} />
+            <div style={{ fontSize: 14, fontWeight: 700 }}>لا توجد مستندات</div>
+            <div style={{ fontSize: 12 }}>
+              {search || statusFilter ? 'لا توجد نتائج تطابق البحث' : `لم يتم إنشاء أي ${docType?.name ?? 'مستند'} بعد`}
+            </div>
+            {!isReadOnly && !search && !statusFilter && (
+              <button className="btn btn-p btn-sm" style={{ marginTop: 4 }}
+                onClick={() => { setActiveDoc(null); setModal('add'); }}>
+                <i className="ti ti-plus" /> إضافة أول مستند
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="tw" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity .2s' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>رقم المستند</th>
+                    <th>التاريخ</th>
+                    <th>{isPurch ? 'المورد' : 'الزبون'}</th>
+                    <th>المستودع</th>
+                    <th>الإجمالي HT</th>
+                    <th>TVA</th>
+                    <th>الإجمالي TTC</th>
+                    <th>الحالة</th>
+                    <th style={{ textAlign: 'center', width: 130 }}>إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((doc: any) => {
+                    const status   = doc.document_status?.name ?? 'draft';
+                    const canEdit  = !doc.is_locked && status === 'draft';
+                    const canValid = !doc.validated_at && status === 'draft';
+                    const canLock  = !!doc.validated_at && !doc.is_locked;
+                    const canCancel = !['cancelled', 'returned'].includes(status);
+
+                    return (
+                      <tr key={doc.id} style={{ cursor: 'pointer' }}
+                        onClick={() => { setActiveDoc(doc); setModal('view'); }}>
+                        <td>
+                          <span style={{ fontWeight: 800, color: opColor, fontFamily: 'monospace', fontSize: 13 }}>
+                            {doc.document_number ?? `#${doc.id}`}
+                          </span>
+                          {doc.is_locked && (
+                            <i className="ti ti-lock" style={{ fontSize: 11, color: 'var(--t4)', marginRight: 6 }} />
+                          )}
+                        </td>
+                        <td style={{ color: 'var(--t3)', fontSize: 12 }}>{fmtDate(doc.document_date)}</td>
+                        <td>
+                          {doc.party
+                            ? <span style={{ fontWeight: 600, color: 'var(--t1)' }}>{doc.party.name}</span>
+                            : <span style={{ color: 'var(--t4)' }}>—</span>}
+                        </td>
+                        <td style={{ color: 'var(--t3)', fontSize: 12 }}>{doc.warehouse?.name ?? '—'}</td>
+                        <td style={{ fontWeight: 600, color: 'var(--t2)', textAlign: 'left', direction: 'ltr' }}>
+                          {fmtNum(doc.total_ht)}
+                        </td>
+                        <td style={{ color: 'var(--t4)', fontSize: 12, textAlign: 'left', direction: 'ltr' }}>
+                          {fmtNum(doc.total_tva)}
+                        </td>
+                        <td style={{ fontWeight: 800, color: opColor, textAlign: 'left', direction: 'ltr' }}>
+                          {fmtNum(doc.total_ttc)}
+                        </td>
+                        <td><StatusBadge status={status} /></td>
+                        <td onClick={e => e.stopPropagation()}>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                            {/* تعديل */}
+                            {!isReadOnly && canEdit && (
+                              <button className="btn btn-xs" title="تعديل"
+                                onClick={() => { setActiveDoc(doc); setModal('edit'); }}>
+                                <i className="ti ti-pencil" />
+                              </button>
+                            )}
+                            {/* اعتماد */}
+                            {!isReadOnly && canValid && (
+                              <button className="btn btn-xs" title="اعتماد"
+                                style={{ color: 'var(--blue)', borderColor: 'color-mix(in srgb, var(--blue) 30%, transparent)' }}
+                                onClick={() => validateMutation.mutate(doc.id)}>
+                                <i className="ti ti-check" />
+                              </button>
+                            )}
+                            {/* قفل */}
+                            {!isReadOnly && canLock && (
+                              <button className="btn btn-xs" title="قفل"
+                                style={{ color: 'var(--orange)', borderColor: 'color-mix(in srgb, var(--orange) 30%, transparent)' }}
+                                onClick={() => lockMutation.mutate(doc.id)}>
+                                <i className="ti ti-lock" />
+                              </button>
+                            )}
+                            {/* طباعة */}
+                            <button className="btn btn-xs" title="طباعة"
+                              style={{ color: 'var(--t4)' }}>
+                              <i className="ti ti-printer" />
+                            </button>
+                            {/* إلغاء / حذف */}
+                            {!isReadOnly && (
+                              canEdit
+                                ? <button className="btn btn-xs btn-r" title="حذف"
+                                    onClick={() => { if(confirm('هل تريد حذف هذا المستند؟')) deleteMutation.mutate(doc.id); }}>
+                                    <i className="ti ti-trash" />
+                                  </button>
+                                : canCancel
+                                  ? <button className="btn btn-xs btn-r" title="إلغاء"
+                                      onClick={() => { if(confirm('إلغاء هذا المستند؟')) cancelMutation.mutate(doc.id); }}>
+                                      <i className="ti ti-x" />
+                                    </button>
+                                  : null
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {meta.last_page > 1 && (
+              <div style={{
+                padding: '10px 16px', borderTop: '1px solid var(--b1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <span style={{ fontSize: 12, color: 'var(--t4)' }}>
+                  {meta.from}–{meta.to} من {meta.total}
+                </span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button className="btn btn-xs" disabled={page <= 1}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}>
+                    <i className="ti ti-chevron-right" />
+                  </button>
+                  {Array.from({ length: Math.min(meta.last_page, 7) }, (_, i) => {
+                    const p = i + 1;
+                    return (
+                      <button key={p} className="btn btn-xs"
+                        style={page === p ? { background: 'var(--em)', color: '#fff', borderColor: 'var(--em)' } : {}}
+                        onClick={() => setPage(p)}>
+                        {p}
+                      </button>
+                    );
+                  })}
+                  <button className="btn btn-xs" disabled={page >= meta.last_page}
+                    onClick={() => setPage(p => Math.min(meta.last_page, p + 1))}>
+                    <i className="ti ti-chevron-left" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Modal */}
+      {(modal === 'add' || modal === 'edit') && (
+        <CommercialDocumentModal
+          open={true}
+          documentType={docType ?? null}
+          existingDocument={modal === 'edit' ? activeDoc : undefined}
+          onClose={() => { setModal(null); setActiveDoc(null); }}
+          onSaved={() => {
+            showToast(modal === 'add' ? 'تم إنشاء المستند بنجاح' : 'تم تحديث المستند بنجاح');
+            setModal(null);
+            setActiveDoc(null);
+            qc.invalidateQueries({ queryKey: ['commercial-documents'] });
+          }}
+        />
+      )}
+
+      {modal === 'view' && activeDoc && (
+        <DocumentViewModal
+          doc={activeDoc}
+          docType={docType ?? null}
+          onClose={() => { setModal(null); setActiveDoc(null); }}
+          onEdit={() => setModal('edit')}
+          isReadOnly={isReadOnly}
+        />
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════
+// Document View Modal — عرض تفاصيل المستند
+// ════════════════════════════════════════════════
+function DocumentViewModal({ doc, docType, onClose, onEdit, isReadOnly }: {
+  doc:        any;
+  docType:    DocumentType | null;
+  onClose:    () => void;
+  onEdit:     () => void;
+  isReadOnly: boolean;
+}) {
+  const status = doc.document_status?.name ?? 'draft';
+  const isPurch = docType?.document_base_operation_id === 2;
+
+  // Fetch full doc with lines
+  const { data: fullDoc, isLoading } = useQuery({
+    queryKey: ['commercial-document-detail', doc.id],
+    queryFn:  () => apiClient.get(`/commercial-documents/${doc.id}`, {
+      params: { include: 'party,documentStatus,warehouse,fiscalYear,currency,lines,lines.productVariant,lines.productVariant.product,documentType,validatedBy' },
+    }).then(r => r.data.data),
+  });
+
+  const d = fullDoc ?? doc;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 500,
+      background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }} onClick={onClose}>
+      <div
+        style={{
+          width: '100%', maxWidth: 860, maxHeight: '92vh', overflow: 'auto',
+          background: 'var(--bg1)', borderRadius: 'var(--r3)',
+          boxShadow: '0 24px 64px rgba(0,0,0,.25)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px', borderBottom: '1px solid var(--b1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'var(--bg2)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)' }}>
+                {docType?.name} — {d.document_number ?? `#${d.id}`}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
+                <StatusBadge status={status} />
+                {d.is_locked && (
+                  <span style={{ fontSize: 11, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <i className="ti ti-lock" style={{ fontSize: 11 }} /> مقفل
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {!isReadOnly && !d.is_locked && status === 'draft' && (
+              <button className="btn btn-sm" onClick={onEdit}>
+                <i className="ti ti-pencil" /> تعديل
+              </button>
+            )}
+            <button className="btn btn-sm" onClick={() => window.print()}>
+              <i className="ti ti-printer" /> طباعة
+            </button>
+            <button className="btn btn-sm btn-xs" onClick={onClose}>
+              <i className="ti ti-x" />
+            </button>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 10, color: 'var(--t3)' }}>
+            <i className="ti ti-loader-2" style={{ fontSize: 22, animation: 'spin .8s linear infinite' }} />
+          </div>
+        ) : (
+          <div style={{ padding: '20px' }}>
+
+            {/* Info grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
+              {[
+                { label: isPurch ? 'المورد' : 'الزبون',      value: d.party?.name           },
+                { label: 'التاريخ',                           value: fmtDate(d.document_date) },
+                { label: 'تاريخ الاستحقاق',                   value: fmtDate(d.due_date)      },
+                { label: 'المستودع',                          value: d.warehouse?.name        },
+                { label: 'السنة المالية',                     value: d.fiscal_year?.name      },
+                { label: 'العملة',                            value: d.currency?.code         },
+              ].map(({ label, value }) => value ? (
+                <div key={label} style={{
+                  padding: '10px 14px', borderRadius: 'var(--r2)',
+                  background: 'var(--bg2)', border: '1px solid var(--b1)',
+                }}>
+                  <div style={{ fontSize: 10, color: 'var(--t4)', fontWeight: 700, marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    {label}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{value}</div>
+                </div>
+              ) : null)}
+            </div>
+
+            {/* Lines */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                أسطر المستند
+              </div>
+              <div className="tw">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>المنتج</th>
+                      <th style={{ textAlign: 'left' }}>الكمية</th>
+                      <th style={{ textAlign: 'left' }}>سعر HT</th>
+                      <th style={{ textAlign: 'left' }}>خصم</th>
+                      <th style={{ textAlign: 'left' }}>TVA</th>
+                      <th style={{ textAlign: 'left' }}>الإجمالي TTC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(d.lines ?? []).map((line: any, idx: number) => {
+                      const product = line.product_variant?.product;
+                      const variantName = line.product_variant?.variant_name;
+                      return (
+                        <tr key={line.id ?? idx}>
+                          <td style={{ color: 'var(--t4)', fontSize: 11 }}>{idx + 1}</td>
+                          <td>
+                            <div style={{ fontWeight: 700, color: 'var(--t1)', fontSize: 13 }}>
+                              {product?.name ?? '—'}
+                            </div>
+                            {variantName && (
+                              <div style={{ fontSize: 11, color: 'var(--t4)' }}>{variantName}</div>
+                            )}
+                          </td>
+                          <td style={{ direction: 'ltr', textAlign: 'left', fontWeight: 600 }}>
+                            {parseFloat(line.quantity).toLocaleString('fr-DZ')}
+                          </td>
+                          <td style={{ direction: 'ltr', textAlign: 'left' }}>
+                            {fmtNum(line.unit_price_ht)}
+                          </td>
+                          <td style={{ color: 'var(--red)', direction: 'ltr', textAlign: 'left' }}>
+                            {parseFloat(line.discount_percentage ?? 0) > 0
+                              ? `-${line.discount_percentage}%`
+                              : '—'}
+                          </td>
+                          <td style={{ color: 'var(--t4)', direction: 'ltr', textAlign: 'left' }}>
+                            {line.tva_rate}%
+                          </td>
+                          <td style={{ fontWeight: 800, color: 'var(--em)', direction: 'ltr', textAlign: 'left' }}>
+                            {fmtNum(line.total_ttc)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Totals */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ width: 300, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  { label: 'إجمالي HT',   value: d.total_ht,       color: 'var(--t2)' },
+                  { label: 'TVA',           value: d.total_tva,      color: 'var(--t3)' },
+                  { label: 'الخصم',        value: d.total_discount && parseFloat(d.total_discount) > 0 ? `-${fmtNum(d.total_discount)}` : null, color: 'var(--red)' },
+                  { label: 'الطابع الجبائي', value: d.total_stamp && parseFloat(d.total_stamp) > 0 ? d.total_stamp : null, color: 'var(--t3)' },
+                ].map(({ label, value, color }) => value ? (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color }}>
+                    <span>{label}</span>
+                    <span style={{ fontWeight: 600, direction: 'ltr' }}>
+                      {typeof value === 'string' && value.startsWith('-') ? value : fmtNum(value as any)}
+                    </span>
+                  </div>
+                ) : null)}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  paddingTop: 10, marginTop: 4, borderTop: '2px solid var(--b2)',
+                  fontSize: 15, fontWeight: 800,
+                }}>
+                  <span style={{ color: 'var(--t1)' }}>الإجمالي TTC</span>
+                  <span style={{ color: 'var(--em)', direction: 'ltr' }}>{fmtNum(d.total_ttc)}</span>
+                </div>
+                {d.remaining_amount && parseFloat(d.remaining_amount) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                    <span style={{ color: 'var(--t4)' }}>المبلغ المتبقي</span>
+                    <span style={{ color: 'var(--red)', fontWeight: 700, direction: 'ltr' }}>
+                      {fmtNum(d.remaining_amount)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Notes */}
+            {d.notes && (
+              <div style={{
+                marginTop: 16, padding: '10px 14px', borderRadius: 'var(--r2)',
+                background: 'var(--bg2)', border: '1px solid var(--b1)',
+                fontSize: 12.5, color: 'var(--t3)',
+              }}>
+                <i className="ti ti-notes" style={{ marginLeft: 6 }} />
+                {d.notes}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 ```
 
@@ -8105,7 +9490,7 @@ export default function TvaPage() {
                             <tr>
                                 <th>التاريخ</th>
                                 <th>البيان</th>
-                                <th>الطرف</th>
+                                <th>المتعامل</th>
                                 <th>المبلغ HT</th>
                                 <th>TVA</th>
                                 <th>النوع</th>
@@ -8523,7 +9908,7 @@ export default function InvoicesPage() {
           <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
           <input
             type="text"
-            placeholder="ابحث برقم الفاتورة، اسم العميل..."
+            placeholder="ابحث برقم الفاتورة، اسم الزبون..."
             style={{ width: '100%' }}
             onChange={e => setFilters(f => ({ ...f, search: e.target.value || undefined, page: 1 }))}
           />
@@ -8581,7 +9966,7 @@ export default function InvoicesPage() {
                 <tr>
                   <th style={{ width: 36 }}></th>
                   <th>رقم الفاتورة</th>
-                  <th>العميل</th>
+                  <th>الزبون</th>
                   <th>HT</th>
                   <th>TVA</th>
                   <th>TTC</th>
@@ -8857,9 +10242,9 @@ function NewInvoiceModal({ open, onClose, customers }: {
       {/* Client + Date */}
       <div className="fgrid" style={{ marginBottom: 16 }}>
         <div className="fg">
-          <label>العميل</label>
+          <label>الزبون</label>
           <select value={clientId} onChange={e => setClientId(e.target.value)}>
-            <option value="">👤 عميل عابر</option>
+            <option value="">👤 زبون عابر</option>
             {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
@@ -10845,7 +12230,7 @@ const REPORT_CARDS: ReportCard[] = [
     {
         id: 'sales',
         title: 'تقرير المبيعات',
-        description: 'تحليل المبيعات حسب الفترة، المنتج، والعميل مع مقارنة سنوية',
+        description: 'تحليل المبيعات حسب الفترة، المنتج، والزبون مع مقارنة سنوية',
         icon: 'ti-trending-up',
         color: 'var(--em)',
         endpoint: '/reports/sales',
@@ -11156,6 +12541,466 @@ export default function ReportsPage() {
                 </div>
             </Card>
         </div>
+    );
+}
+```
+
+## FILE: resources/js/pages/settings/DocumentTypesPage.tsx
+```
+// resources/js/pages/settings/DocumentTypesPage.tsx
+// resources/js/pages/settings/DocumentTypesPage.tsx
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useModal } from '@/hooks/useModal';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import KpiCard from '@/components/ui/KpiCard';
+import EmptyState from '@/components/ui/EmptyState';
+import AlertBar from '@/components/ui/AlertBar';
+import Switch from '@/components/ui/Switch';
+import apiClient from '@/lib/api/client';
+import type { DocumentType } from '@/types';
+
+// ===============================================
+// MAIN COMPONENT
+// ===============================================
+export default function DocumentTypesPage() {
+    const qc = useQueryClient();
+    const [editing, setEditing] = useState<DocumentType | null>(null);
+    const [filter, setFilter] = useState('');
+    const modal = useModal();
+
+    // 1. جلب أنواع المستندات
+    const { data: items, isLoading, isError, refetch } = useQuery<DocumentType[]>({
+        queryKey: ['document-types', filter],
+        queryFn: () => apiClient.get('/document-types', { params: { filter: filter || undefined } }).then(r => r.data.data),
+    });
+
+    // 2. جلب العمليات الأساسية لتحويل id -> اسم
+    const { data: operationsData } = useQuery({
+        queryKey: ['document-base-operations'],
+        queryFn: () => apiClient.get('/document-base-operations').then(r => r.data.data),
+        staleTime: 10 * 60_000, // تخزين طويل
+    });
+
+    // إنشاء خريطة id -> label
+    const operationMap = useMemo(() => {
+        const map: Record<number, string> = {};
+        if (operationsData) {
+            // دالة ترجمة احتياطية
+            const translate = (name: string) => {
+                const dict: Record<string, string> = {
+                    sale: 'مبيعات', purchase: 'مشتريات', transfer: 'نقل مخزون', adjustment: 'تسوية (جرد)'
+                };
+                return dict[name] || name;
+            };
+            operationsData.forEach((op: any) => {
+                map[op.id] = op.label || translate(op.name) || op.name;
+            });
+        }
+        return map;
+    }, [operationsData]);
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: number) => apiClient.delete(`/document-types/${id}`),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ['document-types'] }),
+    });
+
+    const openAdd = () => { setEditing(null); modal.openModal(); };
+    const openEdit = (item: DocumentType) => { setEditing(item); modal.openModal(); };
+    const handleDelete = (id: number) => {
+        if (confirm('هل تريد حذف نوع المستند هذا؟')) deleteMutation.mutate(id);
+    };
+
+    return (
+        <div className="page on" id="p-document-types">
+            <PageHeader
+                title="أنواع المستندات"
+                subtitle="تخصيص أسماء المستندات وتأثيرها على المخزون والترقيم"
+                actions={
+                    <Button variant="primary" size="sm" icon={<i className="ti ti-plus" />} onClick={openAdd}>
+                        إضافة نوع جديد
+                    </Button>
+                }
+            />
+
+            {/* KPIs */}
+            <div className="kpis" style={{ marginBottom: 16 }}>
+                <KpiCard variant="green"  icon="ti-file-text"     label="أنواع المستندات" value={items?.length ?? 0} />
+                <KpiCard variant="blue"   icon="ti-package"       label="تأثير على المخزون" value={items?.filter(d => d.affects_stock_direction !== 0).length ?? 0} />
+                <KpiCard variant="gold"   icon="ti-calculator"    label="تأثير محاسبي"       value={items?.filter(d => d.affects_accounting).length ?? 0} />
+                <KpiCard variant="purple" icon="ti-clipboard-check" label="يتطلب متعامل"        value={items?.filter(d => d.requires_party).length ?? 0} />
+            </div>
+
+            {/* Filters */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <div className="srch" style={{ flex: 1, display: 'flex' }}>
+                    <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
+                    <input type="text" placeholder="بحث بالاسم أو الكود..." onChange={e => setFilter(e.target.value)} />
+                </div>
+            </div>
+
+            {/* Content */}
+            {isLoading ? (
+                <div className="empty"><span className="ic ic-xl"><i className="ti ti-loader" /></span><div className="empty-tx">جارٍ التحميل...</div></div>
+            ) : isError ? (
+                <AlertBar variant="red">فشل تحميل البيانات. <button onClick={() => refetch()} style={{ fontWeight: 700, textDecoration: 'underline' }}>إعادة المحاولة</button></AlertBar>
+            ) : !items || items.length === 0 ? (
+                <EmptyState icon="ti-file-off" text="لم يتم العثور على أنواع مستندات" sub="أضف نوعاً جديداً للبدء" action={<Button variant="primary" onClick={openAdd}>إضافة نوع جديد</Button>} />
+            ) : (
+                <Card noHeader style={{ padding: 0 }}>
+                    <div className="tw">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>الاسم (عربي)</th>
+                                    <th>الاسم (لاتيني)</th>
+                                    <th>الكود</th>
+                                    <th>العملية الأساسية</th>
+                                    <th>اتجاه المخزون</th>
+                                    <th>يحتاج متعامل</th>
+                                    <th>محاسبي</th>
+                                    <th>نشط</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items.map((item: any) => {
+                                    // الحصول على اسم العملية من الخريطة
+                                    const operationName = operationMap[item.document_base_operation_id] || '-';
+                                    const operationCode = operationsData?.find((o: any) => o.id === item.document_base_operation_id)?.name || '';
+                                    // اختيار لون البادج
+                                    let badgeVariant: any = 'info';
+                                    if (operationCode === 'sale') badgeVariant = 'success';
+                                    else if (operationCode === 'purchase') badgeVariant = 'warning';
+                                    else if (operationCode === 'transfer') badgeVariant = 'info';
+                                    else if (operationCode === 'adjustment') badgeVariant = 'info';
+
+                                    return (
+                                        <tr key={item.id}>
+                                            <td className="s">{item.name}</td>
+                                            <td style={{ color: 'var(--t3)' }}>{item.name_latin}</td>
+                                            <td className="m">{item.code}</td>
+                                            <td>
+                                                <Badge variant={badgeVariant}>
+                                                    {operationName}
+                                                </Badge>
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {item.affects_stock_direction === 1 ? (
+                                                    <Badge variant="success">+ دخول</Badge>
+                                                ) : item.affects_stock_direction === -1 ? (
+                                                    <Badge variant="danger">- خروج</Badge>
+                                                ) : (
+                                                    <Badge variant="gray">لا تأثير</Badge>
+                                                )}
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span className="ic ic-xs" style={{ color: item.requires_party ? 'var(--em)' : 'var(--t4)' }}>
+                                                    <i className={`ti ${item.requires_party ? 'ti-check' : 'ti-x'}`} />
+                                                </span>
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span className="ic ic-xs" style={{ color: item.affects_accounting ? 'var(--em)' : 'var(--t4)' }}>
+                                                    <i className={`ti ${item.affects_accounting ? 'ti-check' : 'ti-x'}`} />
+                                                </span>
+                                            </td>
+                                            <td><Badge variant={item.active ? 'success' : 'danger'}>{item.active ? 'نشط' : 'موقوف'}</Badge></td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 3 }}>
+                                                    <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(item)} />
+                                                    <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(item.id)} />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+
+            {/* Modal */}
+            <DocumentTypeModal
+                open={modal.open}
+                docType={editing}
+                onClose={modal.closeModal}
+            />
+        </div>
+    );
+}
+
+
+// ===============================================
+// MODAL: Add / Edit Document Type
+// ===============================================
+// داخل نفس ملف DocumentTypesPage.tsx، استبدلي مكون DocumentTypeModal بهذا:
+
+// ===============================================
+// MODAL: Add / Edit Document Type (محسّن)
+// ===============================================
+// ===============================================
+// MODAL: Add / Edit Document Type (إصدار نهائي)
+// ===============================================
+// ===============================================
+// MODAL: Add / Edit Document Type (كامل بعد التعديل)
+// ===============================================
+// ===============================================
+// MODAL: Add / Edit Document Type (مع حماية البيانات التاريخية)
+// ===============================================
+function DocumentTypeModal({ open, docType, onClose }: {
+    open: boolean; docType: DocumentType | null; onClose: () => void;
+}) {
+    const isEdit = !!docType;
+    const qc = useQueryClient();
+
+    // ---------- العمليات الأساسية ----------
+    const STATIC_OPERATIONS = [
+        { id: 1, name: 'sale',       label: 'مبيعات' },
+        { id: 2, name: 'purchase',   label: 'مشتريات' },
+        { id: 3, name: 'transfer',   label: 'نقل مخزون' },
+        { id: 4, name: 'adjustment', label: 'تسوية (جرد)' },
+    ];
+
+    const translateOperationName = (name: string) => {
+        const map: Record<string, string> = {
+            sale:       'مبيعات',
+            purchase:   'مشتريات',
+            transfer:   'نقل مخزون',
+            adjustment: 'تسوية (جرد)',
+        };
+        return map[name] || name;
+    };
+
+    const { data: serverOps, isLoading: opsLoading } = useQuery({
+        queryKey: ['document-base-operations'],
+        queryFn: () => apiClient.get('/document-base-operations').then(r => r.data.data),
+        enabled: open,
+        staleTime: 2 * 60_000,
+    });
+
+    const operations = React.useMemo(() => {
+        const source = (Array.isArray(serverOps) && serverOps.length > 0) ? serverOps : STATIC_OPERATIONS;
+        return source.map((op: any) => ({ id: op.id, label: op.label || translateOperationName(op.name) || op.name }));
+    }, [serverOps]);
+
+    // ---------- عدد المستندات المنشأة بهذا النوع ----------
+    const [docsCount, setDocsCount] = useState(0);
+    const [checkingDocs, setCheckingDocs] = useState(false);
+
+    useEffect(() => {
+        if (open && isEdit && docType?.id) {
+            setCheckingDocs(true);
+            apiClient.get('/commercial-documents', {
+                params: { document_type_id: docType.id, per_page: 1 }
+            })
+            .then(res => {
+                const meta = res.data?.meta;
+                setDocsCount(meta?.total ?? 0);
+            })
+            .catch(() => setDocsCount(0))
+            .finally(() => setCheckingDocs(false));
+        } else {
+            setDocsCount(0);
+        }
+    }, [open, isEdit, docType]);
+
+    // ---------- النموذج ----------
+    const [form, setForm] = useState({
+        name: '',
+        name_latin: '',
+        code: '',
+        description: '',
+        document_base_operation_id: '',
+        affects_stock_direction: '0',
+        requires_party: true,
+        affects_accounting: true,
+        is_printable: true,
+        display_order: 0,
+        active: true,
+    });
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (open) {
+            if (docType) {
+                setForm({
+                    name: docType.name || '',
+                    name_latin: docType.name_latin || '',
+                    code: docType.code || '',
+                    description: docType.description || '',
+                    document_base_operation_id: String(docType.document_base_operation_id || ''),
+                    affects_stock_direction: String(docType.affects_stock_direction ?? 0),
+                    requires_party: docType.requires_party ?? true,
+                    affects_accounting: docType.affects_accounting ?? true,
+                    is_printable: docType.is_printable ?? true,
+                    display_order: docType.display_order ?? 0,
+                    active: docType.active ?? true,
+                });
+            } else {
+                setForm({
+                    name: '',
+                    name_latin: '',
+                    code: '',
+                    description: '',
+                    document_base_operation_id: '',
+                    affects_stock_direction: '0',
+                    requires_party: true,
+                    affects_accounting: true,
+                    is_printable: true,
+                    display_order: 0,
+                    active: true,
+                });
+            }
+            setError('');
+        }
+    }, [open, docType]);
+
+    const set = (k: string, v: any) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
+
+    const saveMutation = useMutation({
+        mutationFn: (data: typeof form) => {
+            const payload = {
+                ...data,
+                document_base_operation_id: parseInt(data.document_base_operation_id) || null,
+                affects_stock_direction: parseInt(data.affects_stock_direction),
+                display_order: parseInt(String(data.display_order)) || 0,
+            };
+            return isEdit
+                ? apiClient.put(`/document-types/${docType!.id}`, payload)
+                : apiClient.post('/document-types', payload);
+        },
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['document-types'] }); onClose(); },
+        onError: (err: any) => setError(err?.response?.data?.message || 'فشل الحفظ'),
+    });
+
+    const handleSave = () => {
+        if (!form.name.trim()) { setError('الاسم العربي مطلوب'); return; }
+        if (!form.code.trim()) { setError('الكود مطلوب'); return; }
+        if (!form.document_base_operation_id) { setError('يجب اختيار العملية الأساسية'); return; }
+        saveMutation.mutate(form);
+    };
+
+    const hasDocuments = docsCount > 0;
+    const criticalFieldsDisabled = isEdit && hasDocuments;
+
+    return (
+        <Modal open={open} onClose={onClose} size="md"
+            title={isEdit ? `تعديل — ${docType?.name}` : 'إضافة نوع مستند جديد'}
+            footer={
+                <>
+                    <Button onClick={onClose}>إلغاء</Button>
+                    <Button variant="primary" icon={<i className="ti ti-device-floppy"/>}
+                        onClick={handleSave} disabled={saveMutation.isPending}>
+                        {saveMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+                    </Button>
+                </>
+            }>
+
+            {/* رسالة تحذيرية عند وجود مستندات سابقة */}
+            {checkingDocs ? (
+                <div style={{ padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--r2)', marginBottom: 12, fontSize: 13, color: 'var(--t3)' }}>
+                    جارٍ فحص المستندات المرتبطة...
+                </div>
+            ) : hasDocuments && (
+                <AlertBar variant="gold">
+                    <strong>تنبيه هام:</strong> يوجد <strong>{docsCount}</strong> مستند تم إنشاؤه بهذا النوع. لا يمكن تعديل الخصائص المؤثرة على المخزون أو المحاسبة أو العملية الأساسية حفاظاً على سلامة البيانات.
+                </AlertBar>
+            )}
+
+            {error && <AlertBar variant="red">{error}</AlertBar>}
+
+            <div className="fgrid">
+                <div className="fg s2">
+                    <label className="req">الاسم العربي</label>
+                    <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="مثال: فاتورة البيع" autoFocus />
+                </div>
+                <div className="fg s2">
+                    <label className="req">الاسم اللاتيني</label>
+                    <input value={form.name_latin} onChange={e => set('name_latin', e.target.value)} placeholder="Sales Invoice" />
+                </div>
+                <div className="fg">
+                    <label className="req">الكود</label>
+                    <input value={form.code} onChange={e => set('code', e.target.value)} placeholder="FV, BL, BCC..." style={{ fontFamily: 'monospace' }} />
+                </div>
+
+                {/* العملية الأساسية – معطلة إذا كانت هناك مستندات */}
+                <div className="fg">
+                    <label className="req">العملية الأساسية</label>
+                    <select
+                        value={form.document_base_operation_id}
+                        onChange={e => set('document_base_operation_id', e.target.value)}
+                        disabled={criticalFieldsDisabled}
+                        style={{
+                            width: '100%', padding: '8px 12px', borderRadius: 'var(--r2)',
+                            border: '1px solid var(--b3)', background: criticalFieldsDisabled ? 'var(--bg3)' : 'var(--bg2)',
+                            color: form.document_base_operation_id ? 'var(--t1)' : 'var(--t4)',
+                            fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                            opacity: criticalFieldsDisabled ? 0.6 : 1,
+                            cursor: criticalFieldsDisabled ? 'not-allowed' : 'pointer',
+                        }}
+                    >
+                        <option value="">— اختر —</option>
+                        {operations.map((op: any) => (
+                            <option key={op.id} value={op.id} style={{ color: 'var(--t1)', background: 'var(--bg2)' }}>
+                                {op.label}
+                            </option>
+                        ))}
+                    </select>
+                    {criticalFieldsDisabled && <span style={{ fontSize: 10, color: 'var(--gold)', marginTop: 2 }}>لا يمكن التعديل – مرتبط بمستندات سابقة</span>}
+                </div>
+
+                <div className="fg">
+                    <label className="req">تأثير على المخزون</label>
+                    <select value={form.affects_stock_direction} onChange={e => set('affects_stock_direction', e.target.value)}
+                        disabled={criticalFieldsDisabled}
+                        style={{ opacity: criticalFieldsDisabled ? 0.6 : 1, cursor: criticalFieldsDisabled ? 'not-allowed' : 'pointer', background: criticalFieldsDisabled ? 'var(--bg3)' : undefined }}
+                    >
+                        <option value="-1">خروج (-1)</option>
+                        <option value="0">لا تأثير (0)</option>
+                        <option value="1">دخول (+1)</option>
+                    </select>
+                </div>
+                <div className="fg">
+                    <label>الوصف</label>
+                    <textarea value={form.description} onChange={e => set('description', e.target.value)} placeholder="وصف اختياري..." />
+                </div>
+                <div className="fg">
+                    <label>يتطلب متعامل (زبون/مورد)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, opacity: criticalFieldsDisabled ? 0.6 : 1 }}>
+                        <Switch checked={form.requires_party} onChange={(v) => { if (!criticalFieldsDisabled) set('requires_party', v); }} />
+                        {criticalFieldsDisabled && <span style={{ fontSize: 10, color: 'var(--gold)' }}>مُعطل مؤقتاً</span>}
+                    </div>
+                </div>
+                <div className="fg">
+                    <label>يؤثر على المحاسبة</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, opacity: criticalFieldsDisabled ? 0.6 : 1 }}>
+                        <Switch checked={form.affects_accounting} onChange={(v) => { if (!criticalFieldsDisabled) set('affects_accounting', v); }} />
+                        {criticalFieldsDisabled && <span style={{ fontSize: 10, color: 'var(--gold)' }}>مُعطل مؤقتاً</span>}
+                    </div>
+                </div>
+                <div className="fg">
+                    <label>قابل للطباعة</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <Switch checked={form.is_printable} onChange={(v) => set('is_printable', v)} />
+                    </div>
+                </div>
+                <div className="fg">
+                    <label>ترتيب العرض</label>
+                    <input type="number" value={form.display_order} onChange={e => set('display_order', e.target.value)} />
+                </div>
+                <div className="fg">
+                    <label>نشط</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <Switch checked={form.active} onChange={(v) => set('active', v)} />
+                    </div>
+                </div>
+            </div>
+        </Modal>
     );
 }
 ```
@@ -14956,7 +16801,7 @@ export default function Cart({
               onSetClient(id ? (customers.find(c => c.id === id) ?? null) : null);
             }}
           >
-            <option value="">👤 عميل عابر</option>
+            <option value="">👤 زبون عابر</option>
             {customers.map(c => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -15317,7 +17162,7 @@ export default function PaymentModal({
           <div className="pay-ttc-big">{formatDZD(totalTtc)}</div>
           <div className="pay-client-badge">
             <span className="ic ic-xs"><i className="ti ti-user" /></span>
-            <span>{client?.name ?? 'عميل عابر'}</span>
+            <span>{client?.name ?? 'زبون عابر'}</span>
           </div>
         </div>
 
@@ -15385,7 +17230,7 @@ export default function PaymentModal({
               </div>
               {/* Change */}
               <div className="change-display">
-                <span className="change-lbl2">الباقي للعميل</span>
+                <span className="change-lbl2">الباقي للزبون</span>
                 <span className="change-val2" style={{ color: change >= 0 ? 'var(--em)' : 'var(--red)' }}>
                   {formatDZD(change)}
                 </span>
@@ -15647,7 +17492,7 @@ export default function Receipt({
               التاريخ: {now}
             </div>
             <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 500 }}>
-              العميل: {client?.name ?? 'عابر'}
+              الزبون: {client?.name ?? 'عابر'}
             </div>
           </div>
         </div>

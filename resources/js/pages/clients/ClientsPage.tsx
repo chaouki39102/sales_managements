@@ -35,12 +35,12 @@ export default function ClientsPage() {
 
       <PageHeader
         title="العملاء"
-        subtitle={`إدارة قاعدة العملاء — ${meta?.total ?? '...'} عميل`}
+        subtitle={`إدارة قاعدة العملاء — ${meta?.total ?? '...'} زبون`}
         actions={
           <>
             <Button size="sm" icon={<i className="ti ti-table-export"/>}>تصدير</Button>
             <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus"/>} onClick={openCreate}>
-              عميل جديد
+              زبون جديد
             </Button>
           </>
         }
@@ -50,7 +50,7 @@ export default function ClientsPage() {
       <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
         <KpiCard variant="green"  icon="ti-users"         label="إجمالي العملاء"    value={meta?.total ?? '—'} />
         <KpiCard variant="blue"   icon="ti-trending-up"   label="إجمالي المشتريات"  value={totalBusiness.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
-        <KpiCard variant="red"    icon="ti-receipt"       label="ديون العملاء"      value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} عميل متأخر`} />
+        <KpiCard variant="red"    icon="ti-receipt"       label="ديون العملاء"      value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} زبون متأخر`} />
         <KpiCard variant="gold"   icon="ti-star"          label="عملاء VIP"         value="—" />
       </div>
 
@@ -77,7 +77,7 @@ export default function ClientsPage() {
       {isLoading ? (
         <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
       ) : clients.length === 0 ? (
-        <EmptyState icon="ti-users" text="لا يوجد عملاء" sub="أضف عميلك الأول" action={<Button variant="primary" onClick={openCreate}>عميل جديد</Button>} />
+        <EmptyState icon="ti-users" text="لا يوجد عملاء" sub="أضف زبونك الأول" action={<Button variant="primary" onClick={openCreate}>زبون جديد</Button>} />
       ) : (
         <div className="g3">
           {clients.map((c, i) => {
@@ -197,7 +197,7 @@ function ClientModal({ open, party, onClose }: {
   return (
     <Modal
       open={open} onClose={onClose} size="lg"
-      title={isEdit ? `تعديل — ${party!.name}` : 'عميل جديد'}
+      title={isEdit ? `تعديل — ${party!.name}` : 'زبون جديد'}
       footer={
         <>
           <Button onClick={onClose}>إلغاء</Button>

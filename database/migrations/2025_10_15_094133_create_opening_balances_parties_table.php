@@ -18,7 +18,7 @@ return new class extends Migration
             // الربط بالسنة المالية (يحذف الرصيد إذا حذفت السنة)
             $table->foreignId('fiscal_year_id')->constrained('fiscal_years')->cascadeOnDelete();
 
-            // الربط بالطرف (يمنع حذف طرف له رصيد افتتاحي)
+            // الربط بالمتعامل (يمنع حذف متعامل له رصيد افتتاحي)
             $table->foreignId('party_id')->constrained('parties')->restrictOnDelete();
 
             // الرصيد الافتتاحي
@@ -27,7 +27,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // ضمان عدم تكرار الطرف في نفس السنة
+            // ضمان عدم تكرار المتعامل في نفس السنة
             $table->unique(['fiscal_year_id', 'party_id'], 'opening_party_unique');
         });
     }

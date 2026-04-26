@@ -1,16 +1,16 @@
 <?php
 
-$dir = __DIR__ . '/app\Http\Controllers\API\V1';
-$outputFile = __DIR__ . '/all_Controllers_combined.php';
+$dir = __DIR__ . '/app\http/Requests';
+$outputFile = __DIR__ . '/all_Requests_combined.php';
 
 $files = glob($dir . '/*.php');
 
 if (!$files) {
-    echo "❌ لم يتم العثور على ملفات Controllers.\n";
+    echo "❌ لم يتم العثور على ملفات Requests.\n";
     exit;
 }
 
-$content = "<?php\n\n// دمج تلقائي لكل ملفات الـ Controllers\n\n";
+$content = "<?php\n\n// دمج تلقائي لكل ملفات الـ Requests\n\n";
 
 foreach ($files as $file) {
     $filename = basename($file);
@@ -26,4 +26,4 @@ foreach ($files as $file) {
 
 file_put_contents($outputFile, $content);
 
-echo "✅ تم دمج جميع ملفات الـ Controllers في الملف: all_Controllers_combined.php\n";
+echo "✅ تم دمج جميع ملفات الـ Requests في الملف: all_Requests_combined.php\n";

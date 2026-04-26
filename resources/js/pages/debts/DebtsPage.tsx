@@ -71,7 +71,7 @@ export default function DebtsPage() {
                     variant={activeTab === 'overdue' ? 'red' : 'gold'} icon="ti-clock"
                     label={activeTab === 'overdue' ? 'متأخرة' : 'معلقة'}
                     value={docs.length}
-                    sub={`${clientsCount} عميل`}
+                    sub={`${clientsCount} زبون`}
                 />
                 <KpiCard
                     variant="blue" icon="ti-file-invoice" label="إجمالي TTC"
@@ -102,7 +102,7 @@ export default function DebtsPage() {
                     <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
                     <input
                         type="text"
-                        placeholder="ابحث برقم الفاتورة أو اسم العميل..."
+                        placeholder="ابحث برقم الفاتورة أو اسم الزبون..."
                         style={{ width: '100%' }}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -125,7 +125,7 @@ export default function DebtsPage() {
                             <thead>
                                 <tr>
                                     <th>رقم الفاتورة</th>
-                                    <th>العميل</th>
+                                    <th>الزبون</th>
                                     <th>TTC</th>
                                     <th>المدفوع</th>
                                     <th>المتبقي</th>
@@ -232,7 +232,7 @@ function DebtDetailModal({ open, doc, onClose }: {
         <Modal
             open={open} onClose={onClose} size="md"
             title={`تفاصيل — ${doc.document_number}`}
-            subtitle={doc.party?.name || 'عميل عابر'}
+            subtitle={doc.party?.name || 'زبون عابر'}
             footer={
                 <>
                     <Button onClick={onClose}>إغلاق</Button>
@@ -310,7 +310,7 @@ function DebtDetailModal({ open, doc, onClose }: {
                         border: '1px solid var(--b1)'
                     }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t4)', marginBottom: 8 }}>
-                            معلومات العميل
+                            معلومات الزبون
                         </div>
                         <div className="sr">
                             <span className="sr-l">الاسم</span>

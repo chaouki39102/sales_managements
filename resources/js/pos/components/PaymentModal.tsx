@@ -135,7 +135,7 @@ export default function PaymentModal({
           <div className="pay-ttc-big">{formatDZD(totalTtc)}</div>
           <div className="pay-client-badge">
             <span className="ic ic-xs"><i className="ti ti-user" /></span>
-            <span>{client?.name ?? 'عميل عابر'}</span>
+            <span>{client?.name ?? 'زبون عابر'}</span>
           </div>
         </div>
 
@@ -203,7 +203,7 @@ export default function PaymentModal({
               </div>
               {/* Change */}
               <div className="change-display">
-                <span className="change-lbl2">الباقي للعميل</span>
+                <span className="change-lbl2">الباقي للزبون</span>
                 <span className="change-val2" style={{ color: change >= 0 ? 'var(--em)' : 'var(--red)' }}>
                   {formatDZD(change)}
                 </span>

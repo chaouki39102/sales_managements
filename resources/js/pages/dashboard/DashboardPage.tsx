@@ -44,7 +44,7 @@ const STOCK_ALERTS: StockAlert[] = [
 
 const ACTIVITIES: Activity[] = [
   { dot:'e', time:'منذ 12 دقيقة', text: <><strong>#0342 — 24,500 دج</strong> فاتورة جديدة</> },
-  { dot:'b', time:'منذ 35 دقيقة', text: <>عميل جديد: <strong>فاطمة بن علي</strong></> },
+  { dot:'b', time:'منذ 35 دقيقة', text: <>زبون جديد: <strong>فاطمة بن علي</strong></> },
   { dot:'g', time:'منذ ساعة',     text: <>إدخال مخزون: <strong>+24 وحدة زيت</strong></> },
   { dot:'r', time:'منذ 2 ساعة',   text: <>فاتورة <strong>#0338 ملغاة</strong></> },
   { dot:'z', time:'منذ 5 ساعات',  text: <>نسخة احتياطية — <strong>2.4 MB</strong></> },
@@ -169,7 +169,7 @@ export default function DashboardPage() {
           variant="blue" icon="ti-users"
           label="عملاء جدد — أفريل" value="47"
           trend="▲ 3" trendDir="up"
-          sub="إجمالي: 284 عميل"
+          sub="إجمالي: 284 زبون"
         />
         <KpiCard
           variant="red" icon="ti-package"
@@ -329,7 +329,7 @@ export default function DashboardPage() {
               <thead>
                 <tr>
                   <th>رقم</th>
-                  <th>العميل</th>
+                  <th>الزبون</th>
                   <th>المبلغ</th>
                   <th>TVA</th>
                   <th>الحالة</th>

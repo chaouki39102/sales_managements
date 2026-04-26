@@ -204,7 +204,7 @@ export default function CommercialDocumentsPage() {
         <div className="srch" style={{ flex: '1 1 220px', maxWidth: 320 }}>
           <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
           <input
-            type="text" placeholder="بحث برقم المستند، اسم الطرف..."
+            type="text" placeholder="بحث برقم المستند، اسم المتعامل..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
           />
@@ -264,7 +264,7 @@ export default function CommercialDocumentsPage() {
                   <tr>
                     <th>رقم المستند</th>
                     <th>التاريخ</th>
-                    <th>{isPurch ? 'المورد' : 'العميل'}</th>
+                    <th>{isPurch ? 'المورد' : 'الزبون'}</th>
                     <th>المستودع</th>
                     <th>الإجمالي HT</th>
                     <th>TVA</th>
@@ -509,7 +509,7 @@ function DocumentViewModal({ doc, docType, onClose, onEdit, isReadOnly }: {
             {/* Info grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
               {[
-                { label: isPurch ? 'المورد' : 'العميل',      value: d.party?.name           },
+                { label: isPurch ? 'المورد' : 'الزبون',      value: d.party?.name           },
                 { label: 'التاريخ',                           value: fmtDate(d.document_date) },
                 { label: 'تاريخ الاستحقاق',                   value: fmtDate(d.due_date)      },
                 { label: 'المستودع',                          value: d.warehouse?.name        },

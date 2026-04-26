@@ -32,7 +32,7 @@ class DocumentTypeSeeder extends Seeder
                 'name' => 'Bon de commande client',
                 'name_latin' => 'Customer Order',
                 'code' => 'BCC',
-                'description' => 'أمر شراء من العميل',
+                'description' => 'أمر شراء من الزبون',
                 'document_base_operation_id' => $saleOperationId,
                 'affects_stock_direction' => 0,
                 'requires_party' => true,

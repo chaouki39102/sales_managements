@@ -402,13 +402,13 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
 
               {needsParty && (
                 <div style={{ gridColumn: 'span 2' }}>
-                  <Label required>{isPurch ? 'المورد' : 'العميل'}</Label>
+                  <Label required>{isPurch ? 'المورد' : 'الزبون'}</Label>
                   <select
                     value={form.party_id}
                     onChange={e => set('party_id', e.target.value)}
                     style={{ ...inpStyle(!!errors.party_id), cursor: 'pointer' }}
                   >
-                    <option value="">— اختر {isPurch ? 'مورداً' : 'عميلاً'} —</option>
+                    <option value="">— اختر {isPurch ? 'مورداً' : 'زبوناً'} —</option>
                     {parties.map((p: any) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}

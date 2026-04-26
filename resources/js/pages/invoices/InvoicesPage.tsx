@@ -96,7 +96,7 @@ export default function InvoicesPage() {
           <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
           <input
             type="text"
-            placeholder="ابحث برقم الفاتورة، اسم العميل..."
+            placeholder="ابحث برقم الفاتورة، اسم الزبون..."
             style={{ width: '100%' }}
             onChange={e => setFilters(f => ({ ...f, search: e.target.value || undefined, page: 1 }))}
           />
@@ -154,7 +154,7 @@ export default function InvoicesPage() {
                 <tr>
                   <th style={{ width: 36 }}></th>
                   <th>رقم الفاتورة</th>
-                  <th>العميل</th>
+                  <th>الزبون</th>
                   <th>HT</th>
                   <th>TVA</th>
                   <th>TTC</th>
@@ -430,9 +430,9 @@ function NewInvoiceModal({ open, onClose, customers }: {
       {/* Client + Date */}
       <div className="fgrid" style={{ marginBottom: 16 }}>
         <div className="fg">
-          <label>العميل</label>
+          <label>الزبون</label>
           <select value={clientId} onChange={e => setClientId(e.target.value)}>
-            <option value="">👤 عميل عابر</option>
+            <option value="">👤 زبون عابر</option>
             {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>

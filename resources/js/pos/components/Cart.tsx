@@ -85,7 +85,7 @@ export default function Cart({
               onSetClient(id ? (customers.find(c => c.id === id) ?? null) : null);
             }}
           >
-            <option value="">👤 عميل عابر</option>
+            <option value="">👤 زبون عابر</option>
             {customers.map(c => (
               <option key={c.id} value={c.id}>
                 {c.name}

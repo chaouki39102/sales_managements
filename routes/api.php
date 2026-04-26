@@ -111,9 +111,11 @@ Route::prefix('v1')->group(function () {
 
         // Numbering Series Routes
         Route::apiResource('numbering-series', NumberingSeriesController::class);
-        Route::get('numbering-series/{id}/next-number', [NumberingSeriesController::class, 'getNextNumber']);
         Route::post('numbering-series/{id}/lock', [NumberingSeriesController::class, 'lock']);
         Route::post('numbering-series/{id}/unlock', [NumberingSeriesController::class, 'unlock']);
+        Route::get('numbering-series/{id}/next-number', [NumberingSeriesController::class, 'getNextNumber']);
+        Route::get('numbering-series/{id}/preview-next-number', [NumberingSeriesController::class, 'previewNextNumber']);
+        Route::post('numbering-series/{id}/sync', [NumberingSeriesController::class, 'syncNumber']);
 
         // Audit Routes
         Route::apiResource('audits', AuditController::class);

@@ -19,19 +19,55 @@ class NumberingSeriesController extends BaseApiController
         parent::__construct();
     }
 
-    public function getNextNumber(Request $request, int $id): JsonResponse
+    /**
+     * معاينة الرقم التالي — لا يزيد العداد (للاستعلام فقط)
+     */
+    public function previewNextNumber(Request $request, int $id): JsonResponse
     {
         try {
             $series = $this->numberingSeriesService->findById($id);
-            $nextNumber = $series->getNextNumber();
-            $series->incrementNumber();
-            
+            $preview = $series->formatNumber($series->last_number + 1);
+
             return $this->successResponse([
                 'series_id' => $series->id,
-                'next_number' => $nextNumber,
+                'next_number' => $preview,
+            ], 'معاينة الرقم التالي');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'previewNextNumber');
+        }
+    }
+
+    /**
+     * الحصول على الرقم التالي وزيادة العداد (مع قفل الصف لمنع Race Condition)
+     */
+    public function getNextNumber(Request $request, int $id): JsonResponse
+    {
+        try {
+            $result = $this->numberingSeriesService->getNextNumberWithLock($id);
+
+            return $this->successResponse([
+                'series_id' => $result['series_id'],
+                'next_number' => $result['next_number'],
             ], 'تم جلب الرقم التالي بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'getNextNumber');
+        }
+    }
+
+    /**
+     * مزامنة الرقم الحالي مع أعلى رقم مستخدم فعلياً في المستندات
+     */
+    public function syncNumber(Request $request, int $id): JsonResponse
+    {
+        try {
+            $series = $this->numberingSeriesService->syncWithActualDocuments($id);
+
+            return $this->successResponse(
+                $this->transformItem($series),
+                'تمت مزامنة الرقم الحالي مع المستندات الفعلية'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'syncNumber');
         }
     }
 
@@ -40,7 +76,7 @@ class NumberingSeriesController extends BaseApiController
         try {
             $series = $this->numberingSeriesService->findById($id);
             $series = $this->numberingSeriesService->unlock($series);
-            
+
             return $this->successResponse(
                 $this->transformItem($series),
                 'تم فتح القفل بنجاح'
@@ -55,7 +91,7 @@ class NumberingSeriesController extends BaseApiController
         try {
             $series = $this->numberingSeriesService->findById($id);
             $series = $this->numberingSeriesService->lock($series);
-            
+
             return $this->successResponse(
                 $this->transformItem($series),
                 'تم القفل بنجاح'

@@ -51,7 +51,7 @@ export default function Receipt({
               التاريخ: {now}
             </div>
             <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 500 }}>
-              العميل: {client?.name ?? 'عابر'}
+              الزبون: {client?.name ?? 'عابر'}
             </div>
           </div>
         </div>

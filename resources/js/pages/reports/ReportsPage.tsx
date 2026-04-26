@@ -34,7 +34,7 @@ const REPORT_CARDS: ReportCard[] = [
     {
         id: 'sales',
         title: 'تقرير المبيعات',
-        description: 'تحليل المبيعات حسب الفترة، المنتج، والعميل مع مقارنة سنوية',
+        description: 'تحليل المبيعات حسب الفترة، المنتج، والزبون مع مقارنة سنوية',
         icon: 'ti-trending-up',
         color: 'var(--em)',
         endpoint: '/reports/sales',

@@ -312,7 +312,7 @@ class DocumentTypeSeeder extends Seeder
                 'name' => 'Bon de commande client',
                 'name_latin' => 'Customer Order',
                 'code' => 'BCC',
-                'description' => 'أمر شراء من العميل',
+                'description' => 'أمر شراء من الزبون',
                 'document_base_operation_id' => $saleOperationId,
                 'affects_stock_direction' => 0,
                 'requires_party' => true,
@@ -1076,39 +1076,39 @@ class RolesAndPermissionsSeeder extends Seeder
         ]);
         Permission::firstOrCreate([
             'name' => 'view_party',
-            'display_name' => 'عرض طرف',
+            'display_name' => 'عرض متعامل',
             'group' => 'الأطراف',
-            'description' => 'عرض طرف واحد',
+            'description' => 'عرض متعامل واحد',
         ]);
         Permission::firstOrCreate([
             'name' => 'create_party',
-            'display_name' => 'إنشاء طرف',
+            'display_name' => 'إنشاء متعامل',
             'group' => 'الأطراف',
-            'description' => 'إنشاء طرف جديد',
+            'description' => 'إنشاء متعامل جديد',
         ]);
         Permission::firstOrCreate([
             'name' => 'update_party',
-            'display_name' => 'تحديث طرف',
+            'display_name' => 'تحديث متعامل',
             'group' => 'الأطراف',
-            'description' => 'تحديث بيانات طرف',
+            'description' => 'تحديث بيانات متعامل',
         ]);
         Permission::firstOrCreate([
             'name' => 'delete_party',
-            'display_name' => 'حذف طرف',
+            'display_name' => 'حذف متعامل',
             'group' => 'الأطراف',
-            'description' => 'حذف طرف',
+            'description' => 'حذف متعامل',
         ]);
         Permission::firstOrCreate([
             'name' => 'restore_party',
-            'display_name' => 'استعادة طرف',
+            'display_name' => 'استعادة متعامل',
             'group' => 'الأطراف',
-            'description' => 'استعادة طرف محذوف',
+            'description' => 'استعادة متعامل محذوف',
         ]);
         Permission::firstOrCreate([
             'name' => 'force_delete_party',
             'display_name' => 'حذف نهائي',
             'group' => 'الأطراف',
-            'description' => 'حذف نهائي لطرف',
+            'description' => 'حذف نهائي لمتعامل',
         ]);
 
         // Product permissions (for Policies)

@@ -169,7 +169,7 @@ export default function TvaPage() {
                             <tr>
                                 <th>التاريخ</th>
                                 <th>البيان</th>
-                                <th>الطرف</th>
+                                <th>المتعامل</th>
                                 <th>المبلغ HT</th>
                                 <th>TVA</th>
                                 <th>النوع</th>

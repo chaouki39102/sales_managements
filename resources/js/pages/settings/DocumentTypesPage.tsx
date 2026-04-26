@@ -421,7 +421,7 @@ function DocumentTypeModal({ open, docType, onClose }: {
                     <textarea value={form.description} onChange={e => set('description', e.target.value)} placeholder="وصف اختياري..." />
                 </div>
                 <div className="fg">
-                    <label>يتطلب متعامل (عميل/مورد)</label>
+                    <label>يتطلب متعامل (زبون/مورد)</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, opacity: criticalFieldsDisabled ? 0.6 : 1 }}>
                         <Switch checked={form.requires_party} onChange={(v) => { if (!criticalFieldsDisabled) set('requires_party', v); }} />
                         {criticalFieldsDisabled && <span style={{ fontSize: 10, color: 'var(--gold)' }}>مُعطل مؤقتاً</span>}

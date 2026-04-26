@@ -2491,7 +2491,7 @@ return new class extends Migration
             // الربط بالسنة المالية (يحذف الرصيد إذا حذفت السنة)
             $table->foreignId('fiscal_year_id')->constrained('fiscal_years')->cascadeOnDelete();
 
-            // الربط بالطرف (يمنع حذف طرف له رصيد افتتاحي)
+            // الربط بالمتعامل (يمنع حذف متعامل له رصيد افتتاحي)
             $table->foreignId('party_id')->constrained('parties')->restrictOnDelete();
 
             // الرصيد الافتتاحي
@@ -2500,7 +2500,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // ضمان عدم تكرار الطرف في نفس السنة
+            // ضمان عدم تكرار المتعامل في نفس السنة
             $table->unique(['fiscal_year_id', 'party_id'], 'opening_party_unique');
         });
     }
@@ -2949,4 +2949,115 @@ return new class extends Migration
         Schema::dropIfExists('login_attempts');
     }
 };
+
+
+
+// ===== ملف: 2026_04_23_182757_create_telescope_entries_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Get the migration connection name.
+     */
+    public function getConnection(): ?string
+    {
+        return config('telescope.storage.database.connection');
+    }
+
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        $schema = Schema::connection($this->getConnection());
+
+        $schema->create('telescope_entries', function (Blueprint $table) {
+            $table->bigIncrements('sequence');
+            $table->uuid('uuid');
+            $table->uuid('batch_id');
+            $table->string('family_hash')->nullable();
+            $table->boolean('should_display_on_index')->default(true);
+            $table->string('type', 20);
+            $table->longText('content');
+            $table->dateTime('created_at')->nullable();
+
+            $table->unique('uuid');
+            $table->index('batch_id');
+            $table->index('family_hash');
+            $table->index('created_at');
+            $table->index(['type', 'should_display_on_index']);
+        });
+
+        $schema->create('telescope_entries_tags', function (Blueprint $table) {
+            $table->uuid('entry_uuid');
+            $table->string('tag');
+
+            $table->primary(['entry_uuid', 'tag']);
+            $table->index('tag');
+
+            $table->foreign('entry_uuid')
+                ->references('uuid')
+                ->on('telescope_entries')
+                ->cascadeOnDelete();
+        });
+
+        $schema->create('telescope_monitoring', function (Blueprint $table) {
+            $table->string('tag')->primary();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        $schema = Schema::connection($this->getConnection());
+
+        $schema->dropIfExists('telescope_entries_tags');
+        $schema->dropIfExists('telescope_entries');
+        $schema->dropIfExists('telescope_monitoring');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_04_24_225600_add_audit_columns_to_employees_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('employees', function (Blueprint $table) {
+            // إضافة أعمدة التدقيق
+            $table->foreignId('created_by')->nullable()->after('employment_status')->constrained('users')->nullOnDelete();
+            $table->foreignId('updated_by')->nullable()->after('created_by')->constrained('users')->nullOnDelete();
+            $table->foreignId('deleted_by')->nullable()->after('updated_by')->constrained('users')->nullOnDelete();
+
+            // تعديل بعض الأعمدة لتكون nullable
+            $table->string('first_name')->nullable()->change();
+            $table->string('last_name')->nullable()->change();
+            $table->date('hire_date')->nullable()->change();
+            $table->date('birth_date')->nullable()->change();
+            $table->dropUnique('employees_nss_unique'); // إزالة unique من nss مؤقتاً
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('employees', function (Blueprint $table) {
+            $table->dropForeign(['created_by']);
+            $table->dropForeign(['updated_by']);
+            $table->dropForeign(['deleted_by']);
+            $table->dropColumn(['created_by', 'updated_by', 'deleted_by']);
+        });
+    }
+};
+
 
