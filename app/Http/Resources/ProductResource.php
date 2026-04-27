@@ -5,11 +5,6 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * Product Resource
- *
- * @package App\Http\Resources
- */
 class ProductResource extends JsonResource
 {
     public function toArray(Request $request): array
@@ -22,38 +17,54 @@ class ProductResource extends JsonResource
             'family_id' => $this->family_id,
             'brand_id' => $this->brand_id,
             'product_type_id' => $this->product_type_id,
-            'specifications' => $this->specifications,
             'images' => $this->images,
-            'meta_title' => $this->meta_title,
-            'meta_description' => $this->meta_description,
-            'meta_keywords' => $this->meta_keywords,
             'active' => $this->active,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
-            
-            'relations' => [
-                'family' => $this->whenLoaded('family', fn() => [
-                    'id' => $this->family->id,
-                    'name' => $this->family->name,
-                ]),
-                'brand' => $this->whenLoaded('brand', fn() => [
-                    'id' => $this->brand->id,
-                    'name' => $this->brand->name,
-                ]),
-                'productType' => $this->whenLoaded('productType', fn() => [
-                    'id' => $this->productType->id,
-                    'name' => $this->productType->name,
-                ]),
-                'variants' => $this->whenLoaded('variants', fn() => 
-                    $this->variants->map(fn($variant) => [
-                        'id' => $variant->id,
-                        'sku' => $variant->sku,
-                        'name' => $variant->name,
-                        'price' => $variant->price,
-                        'quantity' => $variant->quantity,
-                    ])
-                ),
-            ],
+
+            // العلاقات الرئيسية
+            'family' => $this->whenLoaded('family', fn () => [
+                'id'   => $this->family->id,
+                'name' => $this->family->name,
+            ]),
+            'brand' => $this->whenLoaded('brand', fn () => [
+                'id'   => $this->brand->id,
+                'name' => $this->brand->name,
+            ]),
+            'productType' => $this->whenLoaded('productType', fn () => [
+                'id'   => $this->productType->id,
+                'name' => $this->productType->name,
+            ]),
+
+            // المتغيرات (Product Variants)
+            'variants' => $this->whenLoaded('variants', function () {
+                return $this->variants->map(function ($variant) {
+                    return [
+                        'id'               => $variant->id,
+                        'ref'              => $variant->ref,
+                        'variant_name'     => $variant->variant_name,
+                        'barcode'          => $variant->barcode,
+                        'purchase_price'   => $variant->last_purchase_price ?? 0,
+                        'price_ht'         => $variant->default_selling_price_ht ?? 0,
+                        'tva_rate'         => $variant->tva->rate ?? 19,
+                        'unit_id'          => $variant->unit_id,
+                        'min_stock'        => $variant->min_stock_alert ?? 0,
+                        'active'           => $variant->active,
+                        'stock_quantity'   => $variant->current_stock ?? 0,
+
+                        // أسعار المستويات (Price Levels) – تُجلَب إن كانت العلاقة محملة
+                        'prices' => $variant->relationLoaded('variantPrices')
+                            ? $variant->variantPrices->map(fn ($price) => [
+                                'price_level_id' => $price->price_level_id,
+                                'price'          => $price->price,
+                                'priceLevel'     => $price->relationLoaded('priceLevel')
+                                    ? ['name' => $price->priceLevel->name]
+                                    : null,
+                            ])->toArray()
+                            : [],
+                    ];
+                })->toArray();
+            }),
         ];
     }
 }

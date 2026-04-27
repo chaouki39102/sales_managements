@@ -1,186 +1,203 @@
-/* ═══════════════════════════════════════════════
-   tokens.css — نظام التصميم المتكامل v2.0
+/* ═══════════════════════════════════════════════════════
+   tokens.css — المصدر الوحيد للتصميم v3.0
    نظام إدارة المبيعات الجزائري
-═══════════════════════════════════════════════ */
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html{scroll-behavior:smooth;}
-body{
-  font-family:'Tajawal',sans-serif;
-  font-size:14px;line-height:1.6;
-  overflow-x:hidden;min-height:100vh;
-  background:var(--bg1);color:var(--t1);
-  transition:background .25s,color .25s;
+   ملاحظة: هذا الملف يحل محل tokens.css القديم و app.css (:root section)
+   يجب أن يُستورد أولاً قبل أي ملف CSS آخر
+═══════════════════════════════════════════════════════ */
+
+/* ─── Reset ─── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Tajawal', sans-serif;
+  font-size: 14px; line-height: 1.6;
+  overflow-x: hidden; min-height: 100vh;
+  background: var(--bg1); color: var(--t1);
+  transition: background .25s, color .25s;
 }
 
-/* ═══ LIGHT THEME ═══ */
-:root{
-  /* Backgrounds */
-  --bg0:#e8eef7;
-  --bg1:#f0f4fa;
-  --bg2:#ffffff;
-  --bg3:#f5f8fd;
-  --bg4:#eaf0f8;
-  --bg5:#dde5f0;
+/* ════════════════════════════════════════
+   LIGHT THEME
+════════════════════════════════════════ */
+:root {
+  /* ── Backgrounds ── */
+  --bg0: #e8eef7;
+  --bg1: #f0f4fa;
+  --bg2: #ffffff;
+  --bg3: #f5f8fd;
+  --bg4: #eaf0f8;
+  --bg5: #dde5f0;
 
-  /* Borders */
-  --b1:rgba(0,0,0,0.05);
-  --b2:rgba(0,0,0,0.08);
-  --b3:rgba(0,0,0,0.13);
-  --b4:rgba(0,0,0,0.20);
+  /* ── Borders ── */
+  --b1: rgba(0,0,0,0.05);
+  --b2: rgba(0,0,0,0.08);
+  --b3: rgba(0,0,0,0.13);
+  --b4: rgba(0,0,0,0.20);
 
-  /* Text */
-  --t1:#0d1b2a;
-  --t2:#1e3a5f;
-  --t3:#4a6785;
-  --t4:#8aa4c0;
+  /* ── Text ── */
+  --t1: #0d1b2a;
+  --t2: #1e3a5f;
+  --t3: #4a6785;
+  --t4: #8aa4c0;
 
-  /* Primary — Emerald Green (Algerian theme) */
-  --em:#0a8a5c;
-  --em2:#077a50;
-  --em3:#0dbf84;
-  --emb:rgba(10,138,92,.08);
-  --embo:rgba(10,138,92,.20);
-  --em2b:rgba(10,138,92,.15);
-  --emglow:0 4px 20px rgba(10,138,92,.30);
-  --emglow2:0 8px 32px rgba(10,138,92,.25);
+  /* ── Primary — Emerald (Algerian theme) ──
+     القيمة الموحدة: #0a8a5c (من tokens.css الأصلي)
+     تم حذف قيمة app.css #0a9268 لصالح هذه
+  ── */
+  --em:   #0a8a5c;
+  --em2:  #077a50;
+  --em3:  #0dbf84;
+  --emb:  rgba(10,138,92,.08);
+  --embo: rgba(10,138,92,.20);
+  --em2b: rgba(10,138,92,.15);
+  --emglow:  0 4px 20px rgba(10,138,92,.30);
+  --emglow2: 0 8px 32px rgba(10,138,92,.25);
 
-  /* Accent — Gold */
-  --gold:#b87d0a;
-  --goldb:rgba(184,125,10,.08);
-  --goldbo:rgba(184,125,10,.22);
+  /* ── Gold ── */
+  --gold:   #b87d0a;
+  --goldb:  rgba(184,125,10,.08);
+  --goldbo: rgba(184,125,10,.22);
 
-  /* Red */
-  --red:#d42b2b;
-  --redb:rgba(212,43,43,.07);
-  --redbo:rgba(212,43,43,.20);
+  /* ── Red ── */
+  --red:   #d42b2b;
+  --redb:  rgba(212,43,43,.07);
+  --redbo: rgba(212,43,43,.20);
 
-  /* Blue */
-  --blue:#1a4fd6;
-  --blueb:rgba(26,79,214,.07);
-  --bluebo:rgba(26,79,214,.20);
+  /* ── Blue ── */
+  --blue:   #1a4fd6;
+  --blueb:  rgba(26,79,214,.07);
+  --bluebo: rgba(26,79,214,.20);
 
-  /* Purple */
-  --purple:#6920d4;
-  --purb:rgba(105,32,212,.07);
-  --purbo:rgba(105,32,212,.20);
+  /* ── Purple ── */
+  --purple: #6920d4;
+  --purb:   rgba(105,32,212,.07);
+  --purbo:  rgba(105,32,212,.20);
 
-  /* Orange */
-  --orange:#c43a0a;
-  --orb:rgba(196,58,10,.07);
-  --orbo:rgba(196,58,10,.20);
+  /* ── Orange ── */
+  --orange: #c43a0a;
+  --orb:    rgba(196,58,10,.07);
+  --orbo:   rgba(196,58,10,.20);
 
-  /* Teal */
-  --teal:#0d7a8c;
-  --tealb:rgba(13,122,140,.07);
-  --tealbo:rgba(13,122,140,.20);
+  /* ── Teal ── */
+  --teal:   #0d7a8c;
+  --tealb:  rgba(13,122,140,.07);
+  --tealbo: rgba(13,122,140,.20);
 
-  /* Indigo */
-  --indigo:#3730a3;
-  --indigob:rgba(55,48,163,.07);
+  /* ── Indigo ── */
+  --indigo:  #3730a3;
+  --indigob: rgba(55,48,163,.07);
 
-  /* Radii */
-  --r1:5px;
-  --r2:10px;
-  --r3:14px;
-  --r4:20px;
-  --r5:28px;
+  /* ── Radii ──
+     القيمة الموحدة لـ --r1: 5px (من tokens.css)
+     تم حذف قيمة app.css 6px
+  ── */
+  --r1: 5px;
+  --r2: 10px;
+  --r3: 14px;
+  --r4: 20px;
+  --r5: 28px;
 
-  /* Layout */
-  --sb:264px;
-  --tb:60px;
-  --mb:64px;
+  /* ── Layout ──
+     القيمة الموحدة لـ --sb: 264px (من tokens.css)
+     تم حذف قيمة app.css 256px
+  ── */
+  --sb: 264px;
+  --tb: 60px;
+  --mb: 64px;
 
-  /* Shadows */
-  --shadow:0 1px 3px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.05);
-  --shadow2:0 4px 20px rgba(0,0,0,0.09),0 1px 4px rgba(0,0,0,0.06);
-  --shadow3:0 12px 40px rgba(0,0,0,0.12);
-  --shadow-colored:0 4px 20px rgba(10,138,92,.20);
+  /* ── Shadows ── */
+  --shadow:         0 1px 3px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.05);
+  --shadow2:        0 4px 20px rgba(0,0,0,.09), 0 1px 4px rgba(0,0,0,.06);
+  --shadow3:        0 12px 40px rgba(0,0,0,.12);
+  --shadow-colored: 0 4px 20px rgba(10,138,92,.20);
 
-  /* Gradients */
-  --grad-em:linear-gradient(135deg,#0a8a5c,#0dbf84);
-  --grad-em2:linear-gradient(135deg,#077a50,#0a8a5c);
-  --grad-header:linear-gradient(135deg,#0a8a5c 0%,#0dbf84 100%);
-  --grad-bg:linear-gradient(160deg,#f0f4fa 0%,#e8eef7 100%);
+  /* ── Gradients ── */
+  --grad-em:     linear-gradient(135deg, #0a8a5c, #0dbf84);
+  --grad-em2:    linear-gradient(135deg, #077a50, #0a8a5c);
+  --grad-header: linear-gradient(135deg, #0a8a5c 0%, #0dbf84 100%);
+  --grad-bg:     linear-gradient(160deg, #f0f4fa 0%, #e8eef7 100%);
 }
 
-/* ═══ DARK THEME ═══ */
-body.dark{
-  --bg0:#050810;
-  --bg1:#0a0e16;
-  --bg2:#111520;
-  --bg3:#161b28;
-  --bg4:#1c2232;
-  --bg5:#22293c;
+/* ════════════════════════════════════════
+   DARK THEME
+════════════════════════════════════════ */
+body.dark {
+  --bg0: #050810;
+  --bg1: #0a0e16;
+  --bg2: #111520;
+  --bg3: #161b28;
+  --bg4: #1c2232;
+  --bg5: #22293c;
 
-  --b1:rgba(255,255,255,0.04);
-  --b2:rgba(255,255,255,0.07);
-  --b3:rgba(255,255,255,0.11);
-  --b4:rgba(255,255,255,0.17);
+  --b1: rgba(255,255,255,0.04);
+  --b2: rgba(255,255,255,0.07);
+  --b3: rgba(255,255,255,0.11);
+  --b4: rgba(255,255,255,0.17);
 
-  --t1:#e8f0f8;
-  --t2:#a8bdce;
-  --t3:#6882a0;
-  --t4:#3d5570;
+  --t1: #e8f0f8;
+  --t2: #a8bdce;
+  --t3: #6882a0;
+  --t4: #3d5570;
 
-  --em:#14a872;
-  --em2:#1ac485;
-  --em3:#22e0a0;
-  --emb:rgba(20,168,114,.11);
-  --embo:rgba(20,168,114,.28);
-  --em2b:rgba(20,168,114,.18);
-  --emglow:0 4px 20px rgba(20,168,114,.30);
-  --emglow2:0 8px 32px rgba(20,168,114,.22);
+  --em:   #14a872;
+  --em2:  #1ac485;
+  --em3:  #22e0a0;
+  --emb:  rgba(20,168,114,.11);
+  --embo: rgba(20,168,114,.28);
+  --em2b: rgba(20,168,114,.18);
+  --emglow:  0 4px 20px rgba(20,168,114,.30);
+  --emglow2: 0 8px 32px rgba(20,168,114,.22);
 
-  --gold:#e0a830;
-  --goldb:rgba(224,168,48,.10);
-  --goldbo:rgba(224,168,48,.28);
+  --gold:   #e0a830;
+  --goldb:  rgba(224,168,48,.10);
+  --goldbo: rgba(224,168,48,.28);
 
-  --red:#e84848;
-  --redb:rgba(232,72,72,.10);
-  --redbo:rgba(232,72,72,.28);
+  --red:   #e84848;
+  --redb:  rgba(232,72,72,.10);
+  --redbo: rgba(232,72,72,.28);
 
-  --blue:#4d80ff;
-  --blueb:rgba(77,128,255,.10);
-  --bluebo:rgba(77,128,255,.28);
+  --blue:   #4d80ff;
+  --blueb:  rgba(77,128,255,.10);
+  --bluebo: rgba(77,128,255,.28);
 
-  --purple:#a04cff;
-  --purb:rgba(160,76,255,.10);
-  --purbo:rgba(160,76,255,.28);
+  --purple: #a04cff;
+  --purb:   rgba(160,76,255,.10);
+  --purbo:  rgba(160,76,255,.28);
 
-  --orange:#e06830;
-  --orb:rgba(224,104,48,.10);
-  --orbo:rgba(224,104,48,.28);
+  --orange: #e06830;
+  --orb:    rgba(224,104,48,.10);
+  --orbo:   rgba(224,104,48,.28);
 
-  --teal:#20b8cc;
-  --tealb:rgba(32,184,204,.10);
-  --tealbo:rgba(32,184,204,.28);
+  --teal:   #20b8cc;
+  --tealb:  rgba(32,184,204,.10);
+  --tealbo: rgba(32,184,204,.28);
 
-  --shadow:0 2px 8px rgba(0,0,0,0.40);
-  --shadow2:0 8px 32px rgba(0,0,0,0.50);
-  --shadow3:0 16px 48px rgba(0,0,0,0.60);
-  --shadow-colored:0 4px 20px rgba(20,168,114,.20);
+  --shadow:         0 2px 8px rgba(0,0,0,.40);
+  --shadow2:        0 8px 32px rgba(0,0,0,.50);
+  --shadow3:        0 16px 48px rgba(0,0,0,.60);
+  --shadow-colored: 0 4px 20px rgba(20,168,114,.20);
 }
 
-/* ═══ SCROLLBAR ═══ */
-::-webkit-scrollbar{width:5px;height:5px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--b3);border-radius:6px;}
-::-webkit-scrollbar-thumb:hover{background:var(--b4);}
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--b3); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--b4); }
 
-/* ═══ ICONS ═══ */
-.ic{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
-.ic svg{width:var(--ic-sz,18px);height:var(--ic-sz,18px);stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;}
-.ic-sm svg{--ic-sz:15px;}
-.ic-xs svg{--ic-sz:13px;}
-.ic-lg svg{--ic-sz:22px;}
-.ic-xl svg{--ic-sz:28px;}
-.ic-2xl svg{--ic-sz:34px;}
-.kpi-ic .ic svg{--ic-sz:17px;}
-.sbi-ic .ic svg{--ic-sz:16px;}
-.mt-ic .ic svg{--ic-sz:22px;stroke-width:1.6;}
-.fab-btn .ic svg{--ic-sz:26px;stroke:white;stroke-width:1.8;}
-.mdb-ic .ic svg{--ic-sz:24px;}
-.bx.no-dot::before{display:none;}
+/* ─── Icon system ─── */
+.ic { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ic svg { width: var(--ic-sz, 18px); height: var(--ic-sz, 18px); stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.ic-xs svg  { --ic-sz: 13px; }
+.ic-sm svg  { --ic-sz: 15px; }
+.ic-lg svg  { --ic-sz: 22px; }
+.ic-xl svg  { --ic-sz: 28px; }
+.ic-2xl svg { --ic-sz: 34px; }
+.kpi-ic .ic svg  { --ic-sz: 17px; }
+.sbi-ic .ic svg  { --ic-sz: 16px; }
+.mt-ic .ic svg   { --ic-sz: 22px; stroke-width: 1.6; }
+.fab-btn .ic svg { --ic-sz: 26px; stroke: white; stroke-width: 1.8; }
+.mdb-ic .ic svg  { --ic-sz: 24px; }
+.bx.no-dot::before { display: none; }
 
-/* ═══ SELECTION ═══ */
-::selection{background:var(--emb);color:var(--em);}
+/* ─── Selection ─── */
+::selection { background: var(--emb); color: var(--em); }

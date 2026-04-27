@@ -8,8 +8,8 @@ use RecursiveDirectoryIterator;
 
 class ExportModuleCommand extends Command
 {
-    protected $signature = 'module:export 
-                            {name : Module name (e.g. Invoice)} 
+    protected $signature = 'module:export
+                            {name : Module name (e.g. Invoice)}
                             {--with-routes}
                             {--with-migrations}';
 
