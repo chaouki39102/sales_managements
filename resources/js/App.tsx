@@ -16,13 +16,15 @@ import "../css/theme/utilities.css";
 import "../css/theme/pos.css";
 
 const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            refetchOnWindowFocus: false,
-            retry: 1,
-            staleTime: 30_000,
-        },
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,          // ⭐ لا تُعد الجلب عند كل تنقل بين الصفحات
+      retry: 1,
+      staleTime: 10 * 60 * 1000,     // 10 دقائق بدلاً من 30 ثانية
+      cacheTime: 30 * 60 * 1000,     // احتفظ بالبيانات في الكاش لمدة نصف ساعة
     },
+  },
 });
 
 export default function App() {
