@@ -15,10 +15,11 @@ return new class extends Migration
     {
         Schema::create('price_levels', function (Blueprint $table) {
             $table->id();
-            $table->string('name', 100)->unique();
+            $table->string('name', 100)->unique()
+                ->comment('مثال: Détail, Gros, Semi-Gros');
             $table->text('description')->nullable();
-            $table->boolean('is_percentage')->default(false)->comment('Is the value a percentage?');
-            $table->decimal('value', 10, 2)->default(0)->comment('Fixed price or percentage value');
+            $table->boolean('is_default')->default(false)->index()
+                ->comment('التعريفة الافتراضية عند إنشاء زبون جديد');
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();

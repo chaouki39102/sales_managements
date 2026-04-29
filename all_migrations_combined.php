@@ -420,10 +420,11 @@ return new class extends Migration
     {
         Schema::create('price_levels', function (Blueprint $table) {
             $table->id();
-            $table->string('name', 100)->unique();
+            $table->string('name', 100)->unique()
+                ->comment('مثال: Détail, Gros, Semi-Gros');
             $table->text('description')->nullable();
-            $table->boolean('is_percentage')->default(false)->comment('Is the value a percentage?');
-            $table->decimal('value', 10, 2)->default(0)->comment('Fixed price or percentage value');
+            $table->boolean('is_default')->default(false)->index()
+                ->comment('التعريفة الافتراضية عند إنشاء زبون جديد');
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
@@ -1160,78 +1161,7 @@ return new class extends Migration
 
 
 
-// ===== ملف: 2025_10_15_093308_create_products_table.php =====
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
-
-/**
- * Migration for products table (renamed from articles)
- *
- * Stores general product information (parent level)
- * This table contains shared information for all product variants
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('products', function (Blueprint $table) {
-            $table->id();
-
-            // Basic information
-            $table->string('name', 150);
-            $table->string('slug', 150)->unique();
-            $table->text('description')->nullable();
-
-            // Categorization
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('family_id')->nullable()->constrained('families')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete()->cascadeOnUpdate();
-            // ✅ CORRECTED: Kept restrictOnDelete (non-nullable), added cascadeOnUpdate
-            $table->foreignId('product_type_id')->constrained('product_types')->restrictOnDelete()->cascadeOnUpdate();
-
-            // Product specifications
-            $table->json('specifications')->nullable()->comment('Product specifications and attributes');
-
-            // Images and media
-            $table->json('images')->nullable()->comment('Product images');
-
-            // SEO and metadata
-            $table->string('meta_title', 200)->nullable();
-            $table->text('meta_description')->nullable();
-            $table->json('meta_keywords')->nullable();
-
-            // Status and audit
-            $table->boolean('active')->default(true)->index();
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // Indexes
-            $table->index(['name', 'active']);
-            $table->index(['family_id', 'brand_id', 'active']);
-            // Disable fullText for SQLite (not supported)
-            if (app()->environment() !== 'testing' && DB::getDriverName() !== 'sqlite') {
-                $table->fullText(['name', 'description']);
-            }
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('products');
-    }
-};
-
-
-
-
-// ===== ملف: 2025_10_15_093309_create_inventory_valuation_methods_table.php =====
+// ===== ملف: 2025_10_15_093307_create_inventory_valuation_methods_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -1264,181 +1194,97 @@ return new class extends Migration
 
 
 
-// ===== ملف: 2025_10_15_093313_create_product_variants_table.php =====
+// ===== ملف: 2025_10_15_093308_create_products_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
-/**
- * Migration for product_variants table
- *
- * Stores specific variant information (SKU level)
- * Each variant represents a sellable unit with unique pricing and inventory
- */
 return new class extends Migration
 {
+    /**
+     * تشغيل التهجير: إنشاء جدول المنتجات بنسخته النهائية المدمجة.
+     */
     public function up(): void
     {
-        Schema::create('product_variants', function (Blueprint $table) {
+        Schema::create('products', function (Blueprint $table) {
             $table->id();
 
-            // Parent product relationship
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used cascadeOnDelete)
-            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete()->cascadeOnUpdate();
+            // --- المعلومات الأساسية ---
+            $table->string('name', 150);
+            $table->string('slug', 150)->unique();
+            $table->string('ref', 50)->nullable()->unique()->comment('SKU / مرجع المنتج');
+            $table->string('barcode', 50)->nullable()->unique()->comment('الباركود');
+            $table->text('description')->nullable();
 
-            // Variant identification
-            $table->string('ref', 50)->nullable()->unique()->comment('SKU/Reference');
-            $table->string('barcode', 50)->nullable()->unique();
-            $table->string('variant_name', 100)->nullable()->comment('Variant name (e.g., Size L, Color Red)');
-
-            // Unit and tax
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete()->cascadeOnUpdate();
+            // --- التصنيف والروابط الخارجية ---
+            $table->foreignId('family_id')->nullable()->constrained('families')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreignId('product_type_id')->constrained('product_types')->restrictOnDelete()->cascadeOnUpdate();
             $table->foreignId('tva_id')->nullable()->constrained('tvas')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete()->cascadeOnUpdate();
 
-            // Pricing
-            $table->decimal('last_purchase_price', 15, 4)->default(0)->unsigned();
-            $table->decimal('average_cost_price', 15, 4)->default(0)->unsigned();
-            $table->decimal('default_selling_price_ht', 15, 4)->default(0)->unsigned();
+            // --- التسعير (HT) ---
+            $table->decimal('purchase_price_ht', 15, 4)->default(0)->comment('سعر الشراء الأساسي');
 
-            // Stock management settings
+            // --- إعدادات المخزون ---
             $table->boolean('manages_stock')->default(true);
             $table->boolean('allow_negative_stock')->default(false);
-            $table->boolean('has_lots')->default(false)->comment('Tracks lot/batch numbers');
+            $table->boolean('has_lots')->default(false);
             $table->boolean('has_expiration_date')->default(false);
-            $table->decimal('min_stock_alert', 15, 4)->default(0)->unsigned();
-            $table->decimal('max_stock_alert', 15, 4)->default(0)->unsigned();
-
-            // Discounts
+            $table->decimal('min_stock_alert', 15, 4)->default(0);
+            $table->decimal('max_stock_alert', 15, 4)->default(0);
             $table->boolean('manages_quantity_discounts')->default(false);
 
-            // Physical attributes
-            $table->decimal('weight', 15, 3)->default(0)->unsigned()->comment('Weight in kg');
-            $table->decimal('volume', 15, 3)->default(0)->unsigned()->comment('Volume in m³');
-            $table->decimal('length', 15, 4)->default(0)->unsigned()->nullable()->comment('Length in cm');
-            $table->decimal('width', 15, 4)->default(0)->unsigned()->nullable()->comment('Width in cm');
-            $table->decimal('height', 15, 4)->default(0)->unsigned()->nullable()->comment('Height in cm');
+            // --- المواصفات الفيزيائية ---
+            $table->decimal('weight', 8, 2)->nullable();
+            $table->decimal('volume', 8, 2)->nullable();
+            $table->decimal('length', 8, 2)->nullable();
+            $table->decimal('width', 8, 2)->nullable();
+            $table->decimal('height', 8, 2)->nullable();
 
-            // Variant-specific data
-            $table->json('variant_attributes')->nullable()->comment('Color, size, etc.');
-
-            // Status and audit
-            $table->boolean('active')->default(true)->index();
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('valuation_method_id')
                 ->nullable()
-                ->constrained('inventory_valuation_methods');
+                ->constrained('inventory_valuation_methods')
+                ->nullOnDelete()
+                ->cascadeOnUpdate();
+
+            // --- الحقول المرنة والبيانات الوصفية ---
+            $table->json('specifications')->nullable()->comment('خصائص تقنية مرنة');
+            $table->json('images')->nullable();
+
+            // SEO
+            $table->string('meta_title', 200)->nullable();
+            $table->text('meta_description')->nullable();
+            $table->json('meta_keywords')->nullable();
+
+            // --- الحالة والرقابة ---
+            $table->boolean('active')->default(true)->index();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->timestamps();
             $table->softDeletes();
 
-            // Indexes
-            $table->index(['ref', 'barcode', 'active']);
-            $table->index(['product_id', 'active']);
-            $table->index(['manages_stock']); // للمنتجات التي تحتاج إدارة مخزون
-        });
-        // Disable CHECK constraints for SQLite (not fully supported)
-        if (DB::getDriverName() !== 'sqlite') {
-            DB::statement('ALTER TABLE product_variants
-                ADD CONSTRAINT chk_prices CHECK (default_selling_price_ht >= 0)');
-            DB::statement('ALTER TABLE product_variants
-                ADD CONSTRAINT chk_stock_alerts CHECK (min_stock_alert <= max_stock_alert)');
-        }
-    }
+            // --- الفهارس (Indexes) ---
+            $table->index(['name', 'active']);
+            $table->index(['ref', 'barcode', 'active'], 'idx_products_lookup');
+            $table->index(['family_id', 'brand_id', 'active'], 'idx_products_filter');
 
-    public function down(): void
-    {
-        Schema::dropIfExists('product_variants');
-    }
-};
-
-
-
-
-// ===== ملف: 2025_10_15_093319_create_product_variant_prices_table.php =====
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for product_variant_prices table (renamed from article_prices)
- *
- * Manages different pricing levels for product variants
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('product_variant_prices', function (Blueprint $table) {
-            $table->id();
-
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used cascadeOnDelete)
-            $table->foreignId('product_variant_id')->constrained('product_variants')->cascadeOnDelete()->cascadeOnUpdate();
-            $table->foreignId('price_level_id')->constrained('price_levels')->cascadeOnDelete()->cascadeOnUpdate();
-
-            $table->decimal('price', 15, 4)->unsigned();
-            $table->date('valid_from')->default(now())->comment('Price validity start date');
-            $table->date('valid_to')->nullable()->comment('Price validity end date');
-            $table->boolean('active')->default(true)->index();
-            $table->timestamps();
-
-            $table->unique(['product_variant_id', 'price_level_id', 'valid_from'], 'variant_price_level_date_unique');
-            $table->index(['product_variant_id', 'active']);
-            $table->index(['valid_from', 'valid_to']);
+            // FullText Search - مراعاة MariaDB/MySQL و SQLite
+            if (app()->environment() !== 'testing' && DB::getDriverName() !== 'sqlite') {
+                $table->fullText(['name', 'description']);
+            }
         });
     }
 
+    /**
+     * التراجع عن التهجير.
+     */
     public function down(): void
     {
-        Schema::dropIfExists('product_variant_prices');
-    }
-};
-
-
-
-
-// ===== ملف: 2025_10_15_093416_create_quantity_discounts_table.php =====
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for quantity_discounts table
- *
- * Manages volume-based discounts for product variants
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('quantity_discounts', function (Blueprint $table) {
-            $table->id();
-
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used cascadeOnDelete)
-            $table->foreignId('product_variant_id')->constrained('product_variants')->cascadeOnDelete()->cascadeOnUpdate();
-
-            $table->decimal('min_quantity', 15, 4)->unsigned();
-            $table->decimal('max_quantity', 15, 4)->nullable()->unsigned()->comment('NULL means no upper limit');
-            $table->decimal('discount_per_unit', 15, 4)->unsigned()->comment('Discount amount per unit');
-            $table->decimal('discount_percentage', 8, 2)->nullable()->unsigned()->comment('Alternative: percentage discount');
-            $table->unsignedTinyInteger('tier_order')->default(0)->comment('Order of discount tiers');
-            $table->boolean('active')->default(true)->index();
-            $table->date('valid_from')->default(now());
-            $table->date('valid_to')->nullable();
-            $table->timestamps();
-
-            $table->index(['product_variant_id', 'active']);
-            $table->index(['min_quantity', 'max_quantity']);
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('quantity_discounts');
+        Schema::dropIfExists('products');
     }
 };
 
@@ -1552,203 +1398,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('numbering_series');
-    }
-};
-
-
-
-
-// ===== ملف: 2025_10_15_093429_create_stock_movements_table.php =====
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for stock_movements table
- *
- * Tracks all inventory movements
- * Now linked to product_variant_id instead of article_id
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('stock_movements', function (Blueprint $table) {
-            $table->id();
-
-            // Product and location
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used restrictOnDelete)
-            $table->foreignId('product_variant_id')->constrained('product_variants')->restrictOnDelete()->cascadeOnUpdate();
-            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete()->cascadeOnUpdate();
-
-            // ⭐ تعديل: إضافة السنة المالية ⭐
-            $table->foreignId('fiscal_year_id')->constrained('fiscal_years')->restrictOnDelete()->cascadeOnUpdate();
-
-            // Movement type
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used restrictOnDelete)
-            $table->foreignId('stock_movement_type_id')->constrained('stock_movement_types')->restrictOnDelete()->cascadeOnUpdate();
-
-            // Related document
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-$table->unsignedBigInteger('commercial_document_line_id') // <--- تم التغيير من foreignId
-    ->nullable();
-            // Movement details
-            $table->dateTime('movement_date');
-            $table->decimal('quantity', 15, 3);
-            $table->decimal('unit_price', 15, 4);
-            $table->decimal('cost_price', 15, 4)->comment('Cost price at movement time');
-            $table->decimal('total_price', 15, 4);
-
-            // Stock balance after movement
-            $table->decimal('stock_balance_after', 15, 3)->comment('Stock quantity after this movement');
-
-            // Lot tracking
-            $table->string('lot_number', 100)->nullable();
-            $table->date('expiration_date')->nullable();
-
-            // Additional information
-            $table->string('reason', 255)->nullable()->comment('Reason for movement');
-            $table->text('notes')->nullable();
-
-            // User and relationships
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('parent_movement_id')->nullable()->constrained('stock_movements')->nullOnDelete()->cascadeOnUpdate()->comment('For adjustments or reversals');
-
-            $table->boolean('is_validated')->default(false)->index()
-                ->comment('محققة ومعتمدة؟');
-            $table->foreignId('validated_by')->nullable()
-                ->constrained('users')->nullOnDelete();
-            $table->timestamp('validated_at')->nullable();
-
-// Lot tracking
-$table->unsignedBigInteger('stock_lot_id') // <--- تم التغيير من foreignId
-    ->nullable()
-    ->index();
-
-            // Audit
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // Indexes
-            $table->index(['product_variant_id', 'warehouse_id', 'movement_date'], 'stock_mov_prod_wh_date_idx');
-            $table->index(['movement_date', 'stock_movement_type_id']);
-            $table->index(['warehouse_id', 'movement_date']);
-            $table->index('lot_number');
-            // ⭐ تعديل: إضافة فهرس للسنة المالية ⭐
-            $table->index(['fiscal_year_id', 'movement_date']);
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('stock_movements');
-    }
-};
-
-
-
-
-// ===== ملف: 2025_10_15_093430_create_product_lots_table.php =====
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * 📦 جدول دفعات المنتجات (Product Lots)
- * النسخة النهائية – متوافقة مع Laravel 12 و Blueprint v4
- * تشمل تطبيق FIFO + التتبع + التكلفة القانونية
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('product_lots', function (Blueprint $table) {
-            $table->id();
-
-            // 🧾 معلومات أساسية
-            $table->string('lot_number', 50)->unique();
-            $table->foreignId('product_variant_id')
-                ->constrained('product_variants')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-            $table->foreignId('warehouse_id')
-                ->constrained('warehouses')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            // 📅 معلومات زمنية (التصنيع والانتهاء والشراء)
-            $table->date('manufacturing_date')->nullable()->index()->comment('تاريخ التصنيع');
-            $table->date('expiration_date')->nullable()->index()->comment('تاريخ انتهاء الصلاحية');
-            $table->date('purchase_date')->index()->comment('تاريخ الشراء');
-
-            // 💰 الأسعار والكميات
-            $table->decimal('purchase_price', 15, 4)->comment('سعر الشراء للوحدة');
-            $table->decimal('legal_selling_price', 15, 4)->comment('السعر القانوني للوحدة');
-            $table->decimal('margin_percentage', 8, 4)->default(5.00)->comment('نسبة الهامش');
-            $table->decimal('original_quantity', 15, 3)->comment('الكمية الأصلية');
-            $table->decimal('remaining_quantity', 15, 3)->index()->comment('الكمية المتبقية');
-
-            // ⚙️ أعمدة محسوبة (Computed Columns)
-            if (DB::getDriverName() !== 'sqlite') {
-                $table->boolean('is_depleted')
-                    ->storedAs('CASE WHEN remaining_quantity <= 0 THEN 1 ELSE 0 END')
-                    ->index()
-                    ->comment('هل تم استهلاك الدفعة بالكامل؟');
-
-                $table->decimal('total_cost', 15, 4)
-                    ->storedAs('original_quantity * purchase_price')
-                    ->comment('إجمالي تكلفة الدفعة');
-
-                $table->decimal('remaining_value', 15, 4)
-                    ->storedAs('remaining_quantity * purchase_price')
-                    ->comment('قيمة المخزون المتبقي');
-            } else {
-                $table->boolean('is_depleted')->default(false)->index();
-                $table->decimal('total_cost', 15, 4)->nullable();
-                $table->decimal('remaining_value', 15, 4)->nullable();
-            }
-
-            // 🔗 الربط بالحركة الأصلية (لتتبع الدفعات)
-$table->unsignedBigInteger('stock_movement_id') // <--- تم التغيير من foreignId
-    ->nullable();
-
-            // 🧾 رقم دفعة المورد
-            $table->string('supplier_lot_number', 100)->nullable()->comment('رقم الدفعة عند المورد');
-
-            // ⚡ الحالة
-            $table->boolean('active')->default(true)->index();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // 📈 الفهارس المخصصة لتحسين الأداء
-            $table->index(['product_variant_id', 'warehouse_id', 'is_depleted', 'purchase_date'], 'idx_fifo_lookup');
-            $table->index(['active', 'remaining_quantity'], 'idx_active_stock');
-        });
-
-        // ✅ قيود التحقق (Data Validation Constraints)
-        if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("
-                ALTER TABLE product_lots
-                ADD CONSTRAINT chk_quantities
-                CHECK (remaining_quantity >= 0 AND remaining_quantity <= original_quantity)
-            ");
-            DB::statement("
-                ALTER TABLE product_lots
-                ADD CONSTRAINT chk_prices
-                CHECK (purchase_price > 0 AND legal_selling_price >= purchase_price)
-            ");
-        }
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('product_lots');
     }
 };
 
@@ -1908,71 +1557,78 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Migration for commercial_document_lines table (renamed from document_lines)
- *
- * Stores line items for commercial documents
- * Now linked to product_variant_id instead of product_id
- */
 return new class extends Migration
 {
+    /**
+     * تشغيل التهجير: إنشاء جدول أسطر الوثائق التجارية المرتبط بالمنتجات مباشرة.
+     */
     public function up(): void
     {
         Schema::create('commercial_document_lines', function (Blueprint $table) {
             $table->id();
 
-            // Parent document
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used cascadeOnDelete)
-            $table->foreignId('commercial_document_id')->constrained('commercial_documents')->cascadeOnDelete()->cascadeOnUpdate();
+            // --- الربط بالوثيقة الأم ---
+            $table->foreignId('commercial_document_id')
+                ->constrained('commercial_documents')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
 
-            // Product variant reference
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used restrictOnDelete)
-            $table->foreignId('product_variant_id')->constrained('product_variants')->restrictOnDelete()->cascadeOnUpdate();
+            // --- الربط بالمنتج (بديل لـ product_variant_id المحذوف) ---
+            $table->foreignId('product_id')
+                ->constrained('products')
+                ->restrictOnDelete()
+                ->cascadeOnUpdate();
 
-            // Line details
-            $table->unsignedSmallInteger('line_order')->default(0)->comment('Display order');
-            $table->text('description')->nullable()->comment('Line description');
+            // --- تفاصيل السطر ---
+            $table->unsignedSmallInteger('line_order')->default(0)->comment('ترتيب العرض');
+            $table->text('description')->nullable()->comment('وصف إضافي للسطر');
 
-            // Quantities
+            // --- الكميات ---
             $table->decimal('quantity', 15, 3);
-            $table->decimal('delivered_quantity', 15, 3)->default(0)->comment('Quantity delivered');
-            $table->decimal('returned_quantity', 15, 3)->default(0)->comment('Quantity returned');
+            $table->decimal('delivered_quantity', 15, 3)->default(0)->comment('الكمية المستلمة/المسلمة');
+            $table->decimal('returned_quantity', 15, 3)->default(0)->comment('الكمية المرتجعة');
 
-            // Pricing
-            $table->decimal('unit_price_ht', 15, 4)->comment('Unit price excluding tax');
+            // --- التسعير والضرائب ---
+            $table->decimal('unit_price_ht', 15, 4)->comment('سعر الوحدة قبل الضريبة');
             $table->decimal('discount_percentage', 8, 2)->default(0.00);
             $table->decimal('discount_amount', 15, 4)->default(0.00);
-            $table->decimal('tva_rate', 8, 2);
-            $table->decimal('total_ht', 15, 4)->comment('Line total excluding tax');
+            $table->decimal('tva_rate', 8, 2)->comment('نسبة القيمة المضافة');
+
+            $table->decimal('total_ht', 15, 4)->comment('المجموع الصافي قبل الضريبة');
             $table->decimal('total_tva', 15, 4)->default(0.00);
-            $table->decimal('total_ttc', 15, 4)->comment('Line total including tax');
+            $table->decimal('total_ttc', 15, 4)->comment('المجموع النهائي شامل الضريبة');
 
-            // Lot tracking
-            $table->unsignedBigInteger('stock_lot_id') // <--- تم التغيير من foreignId
-                ->nullable();
+            // --- إدارة الدفعات (Lots) ---
+            // نستخدم unsignedBigInteger لتجنب مشاكل الدائرية في البداية
+            $table->unsignedBigInteger('stock_lot_id')->nullable();
 
-            $table->boolean('is_auto_split')->default(false)
-                ->index();
-
+            // --- دعم تجزئة الأسطر (Auto-Split) ---
+            $table->boolean('is_auto_split')->default(false)->index();
             $table->unsignedBigInteger('parent_line_id')->nullable();
 
             $table->foreign('parent_line_id')
                 ->references('id')
                 ->on('commercial_document_lines')
-                ->restrictOnDelete(); // 🔒 منع حذف السطر الأب
+                ->restrictOnDelete();
 
-            // Additional data
-            $table->json('line_attributes')->nullable()->comment('Additional line attributes');
+            // --- بيانات إضافية مرنة ---
+            $table->json('line_attributes')->nullable()->comment('خصائص إضافية للسطر');
 
             $table->timestamps();
 
-            // Indexes
-            $table->index(['commercial_document_id', 'line_order'], 'doc_lines_doc_order_idx');
-            $table->index('product_variant_id');
-            $table->index('stock_lot_id');
+            // --- الفهارس (Indexes) ---
+            // تحسين البحث عن أسطر وثيقة معينة مرتبة
+            $table->index(['commercial_document_id', 'line_order'], 'idx_cdl_doc_order');
+            // تحسين التقارير المبنية على المنتجات
+            $table->index('product_id', 'idx_cdl_product');
+            // فهرس لدفعات المخزون
+            $table->index('stock_lot_id', 'idx_cdl_lot');
         });
     }
 
+    /**
+     * التراجع عن التهجير.
+     */
     public function down(): void
     {
         Schema::dropIfExists('commercial_document_lines');
@@ -2314,9 +1970,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * (جدول جديد)
- * إنشاء جدول الأرصدة الافتتاحية للمخزون
- * لتسجيل رصيد المخزون في بداية كل سنة مالية
+ * جدول الأرصدة الافتتاحية للمخزون - Opening Balances Stock
+ * تم التعديل للربط المباشر بـ product_id
  */
 return new class extends Migration
 {
@@ -2325,22 +1980,41 @@ return new class extends Migration
         Schema::create('opening_balances_stock', function (Blueprint $table) {
             $table->id();
 
-            // الربط بالسنة المالية (يحذف الرصيد إذا حذفت السنة)
-            $table->foreignId('fiscal_year_id')->constrained('fiscal_years')->cascadeOnDelete();
+            // الربط بالسنة المالية
+            $table->foreignId('fiscal_year_id')
+                ->constrained('fiscal_years')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
 
-            // الربط بالصنف (يمنع حذف صنف له رصيد افتتاحي)
-            $table->foreignId('product_variant_id')->constrained('product_variants')->restrictOnDelete();
+            // الربط بالمنتج مباشرة (بديل لـ product_variant_id)
+            $table->foreignId('product_id')
+                ->constrained('products')
+                ->restrictOnDelete()
+                ->cascadeOnUpdate();
 
-            // الربط بالمستودع (يمنع حذف مستودع له رصيد افتتاحي)
-            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
+            // الربط بالمستودع
+            $table->foreignId('warehouse_id')
+                ->constrained('warehouses')
+                ->restrictOnDelete()
+                ->cascadeOnUpdate();
 
-            $table->decimal('opening_quantity', 15, 3);
-            $table->decimal('opening_value', 15, 4)->comment('القيمة الإجمالية للمخزون الافتتاحي (PMP)');
+            // بيانات الرصيد
+            $table->decimal('opening_quantity', 15, 3)->default(0);
+            $table->decimal('opening_value', 15, 4)
+                ->comment('القيمة الإجمالية للمخزون الافتتاحي (PMP) عند بداية السنة');
 
             $table->timestamps();
 
-            // ضمان عدم تكرار الصنف في نفس المستودع والسنة
-            $table->unique(['fiscal_year_id', 'product_variant_id', 'warehouse_id'], 'opening_stock_unique');
+            // --- القيود والفهارس ---
+
+            // ضمان عدم تكرار الرصيد الافتتاحي لنفس المنتج في نفس المستودع خلال نفس السنة المالية
+            $table->unique(
+                ['fiscal_year_id', 'product_id', 'warehouse_id'],
+                'obs_year_product_wh_unique'
+            );
+
+            // فهرس لتحسين سرعة التقارير المخزنية
+            $table->index(['product_id', 'warehouse_id'], 'idx_obs_product_warehouse');
         });
     }
 
@@ -2824,73 +2498,6 @@ return new class extends Migration
 
 
 
-// ===== ملف: 2025_10_23_135226_add_foreing_keys.php =====
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration to add foreign keys that caused circular dependencies
- * (stock_movements, commercial_document_lines, product_lots).
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        // 1. ربط stock_lot_id في commercial_document_lines
-        Schema::table('commercial_document_lines', function (Blueprint $table) {
-            $table->foreign('stock_lot_id')
-                ->references('id')
-                ->on('product_lots')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-        });
-
-        // 2. ربط commercial_document_line_id و stock_lot_id في stock_movements
-        Schema::table('stock_movements', function (Blueprint $table) {
-            $table->foreign('commercial_document_line_id')
-                ->references('id')
-                ->on('commercial_document_lines')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->foreign('stock_lot_id')
-                ->references('id')
-                ->on('product_lots')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-        });
-
-        // 3. ربط stock_movement_id في product_lots
-        Schema::table('product_lots', function (Blueprint $table) {
-            $table->foreign('stock_movement_id')
-                ->references('id')
-                ->on('stock_movements')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('commercial_document_lines', function (Blueprint $table) {
-            $table->dropForeign(['stock_lot_id']);
-        });
-
-        Schema::table('stock_movements', function (Blueprint $table) {
-            $table->dropForeign(['commercial_document_line_id']);
-            $table->dropForeign(['stock_lot_id']);
-        });
-
-        Schema::table('product_lots', function (Blueprint $table) {
-            $table->dropForeign(['stock_movement_id']);
-        });
-    }
-};
-
-
-
-
 // ===== ملف: 2026_04_13_092026_alter_users_table_make_password_nullable.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -3056,6 +2663,591 @@ return new class extends Migration
             $table->dropForeign(['updated_by']);
             $table->dropForeign(['deleted_by']);
             $table->dropColumn(['created_by', 'updated_by', 'deleted_by']);
+        });
+    }
+};
+
+
+
+
+// ===== ملف: 2026_04_28_184027_create_product_packagings_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * جدول وحدات التعبئة — Colisages
+ *
+ * مثال:
+ *   UN  / قارورة  / quantity=1    ← الوحدة الأساسية
+ *   FD  / فاردو   / quantity=6
+ *   PLT / باليطة  / quantity=480
+ *
+ * السعر يُحسب دائماً من سعر الوحدة الأساسية × quantity
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('product_packagings', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('product_id')
+                ->constrained('products')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->string('code', 20)->comment('UN / FD / PLT');
+            $table->string('label', 100)->comment('قارورة / فاردو / باليطة');
+
+            // معامل التحويل — كم وحدة أساسية في هذه التعبئة
+            $table->decimal('quantity', 15, 4)->default(1)
+                ->comment('عدد الوحدات الأساسية في هذه التعبئة');
+
+            $table->string('barcode', 50)->nullable()->unique()
+                ->comment('باركود خاص بهذه التعبئة');
+
+            $table->boolean('is_default')->default(false)
+                ->comment('الوحدة الأساسية (quantity=1)');
+
+            $table->boolean('active')->default(true);
+            $table->unsignedSmallInteger('display_order')->default(0);
+
+            $table->timestamps();
+
+            // فهارس
+            $table->unique(['product_id', 'code'], 'product_packaging_code_unique');
+            $table->index(['product_id', 'active']);
+            $table->index(['product_id', 'is_default']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('product_packagings');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_04_28_184054_create_product_prices_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * جدول أسعار المنتجات — Tarifs
+ *
+ * ثلاث طرق لتحديد سعر البيع HT لكل تعريفة:
+ *
+ *   fixed  → السعر مُدخَل مباشرة
+ *            price_ht = price
+ *
+ *   rate   → نسبة ربح فوق سعر الشراء
+ *            price_ht = purchase_price_ht × (1 + rate/100)
+ *
+ *   margin → هامش ربح ثابت بالدج
+ *            price_ht = purchase_price_ht + margin
+ *
+ * الحساب يتم في PHP (ProductPrice::computePrice()) وليس في DB.
+ * لا يوجد عمود price_computed لتجنب مشكلة تزامن البيانات.
+ *
+ * مثال:
+ *   منتج A | Détail | fixed  | price=250.00
+ *   منتج A | Gros   | rate   | rate=15.00   (15% فوق الشراء)
+ *   منتج B | Détail | margin | margin=50.00
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('product_prices', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('product_id')
+                ->constrained('products')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->foreignId('price_level_id')
+                ->constrained('price_levels')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            // طريقة التسعير
+            $table->enum('pricing_method', ['fixed', 'rate', 'margin'])
+                ->default('fixed')
+                ->comment('fixed=سعر مباشر | rate=نسبة% فوق الشراء | margin=هامش ثابت دج');
+
+            // قيم الإدخال — فقط الحقل المناسب للطريقة يُملأ، الباقي NULL
+            $table->decimal('price', 15, 4)->nullable()
+                ->comment('Prix de Vente HT — للطريقة fixed فقط');
+            $table->decimal('rate', 8, 4)->nullable()
+                ->comment('Taux % — للطريقة rate فقط');
+            $table->decimal('margin', 15, 4)->nullable()
+                ->comment('Marge دج — للطريقة margin فقط');
+
+            $table->boolean('active')->default(true)->index();
+            $table->timestamps();
+
+            // قيد: منتج × تعريفة = سجل واحد فقط
+            $table->unique(['product_id', 'price_level_id'], 'product_price_level_unique');
+            $table->index(['product_id', 'active']);
+        });
+
+        // قيد CHECK: التحقق أن الحقل المناسب مملوء حسب الطريقة
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("
+                ALTER TABLE product_prices
+                ADD CONSTRAINT chk_pricing_method
+                CHECK (
+                    (pricing_method = 'fixed'  AND price  IS NOT NULL AND price  >= 0) OR
+                    (pricing_method = 'rate'   AND rate   IS NOT NULL AND rate   >= 0) OR
+                    (pricing_method = 'margin' AND margin IS NOT NULL)
+                )
+            ");
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('product_prices');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_04_28_184333_create_quantity_discounts_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * جدول تخفيضات الكميات — Tx Remise
+ *
+ * الخصم يُطبَّق على سعر البيع المحسوب في PHP وليس على price_computed (محذوف).
+ *
+ * كل تعريفة (price_level) لها شرائح تخفيض مستقلة لكل منتج.
+ *
+ * مثال:
+ *   منتج A | Détail | من 20  إلى 95  → خصم 2%
+ *   منتج A | Détail | من 96  إلى 479 → خصم 5%
+ *   منتج A | Détail | من 480 → ∞     → خصم 8%
+ *   منتج A | Gros   | من 100 → ∞     → خصم 3%
+ *
+ * الحساب النهائي في PHP:
+ *   سعر_البيع  = ProductPrice::computePrice(product, price_level)
+ *   الخصم      = QuantityDiscount::findDiscount(product, price_level, quantity)
+ *   السعر_النهائي = سعر_البيع × (1 - discount_percentage/100)
+ *              أو = سعر_البيع - discount_amount
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('quantity_discounts', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('product_id')
+                ->constrained('products')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            // الخصم مرتبط بتعريفة محددة
+            $table->foreignId('price_level_id')
+                ->constrained('price_levels')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            // نطاق الكميات (بالوحدة الأساسية دائماً)
+            $table->decimal('min_qty', 15, 4)->unsigned()
+                ->comment('Qte De — الحد الأدنى للكمية');
+            $table->decimal('max_qty', 15, 4)->nullable()->unsigned()
+                ->comment('Qte À — الحد الأعلى (NULL = بلا حد أعلى)');
+
+            // نوع الخصم — واحد منهما على الأقل يجب أن يكون مملوءاً
+            $table->decimal('discount_amount', 15, 4)->nullable()->unsigned()
+                ->comment('Montant Remise — خصم ثابت بالدج لكل وحدة');
+            $table->decimal('discount_percentage', 8, 4)->nullable()->unsigned()
+                ->comment('Tx Remise % — نسبة خصم من سعر البيع');
+
+            // ترتيب الشريحة (للعرض والترتيب في الواجهة)
+            $table->unsignedTinyInteger('tier_order')->default(0);
+
+            // تجميد الشريحة مؤقتاً دون حذفها
+            $table->boolean('is_blocked')->default(false)
+                ->comment('Bloqué — تجميد هذه الشريحة مؤقتاً');
+
+            $table->boolean('active')->default(true)->index();
+            $table->timestamps();
+
+            // فهارس
+            $table->index(
+                ['product_id', 'price_level_id', 'active'],
+                'qty_disc_prod_level_active_idx'
+            );
+            $table->index(['min_qty', 'max_qty'], 'qty_disc_range_idx');
+        });
+
+        // قيود CHECK
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("
+                ALTER TABLE quantity_discounts
+                ADD CONSTRAINT chk_qty_range
+                CHECK (max_qty IS NULL OR max_qty > min_qty)
+            ");
+            DB::statement("
+                ALTER TABLE quantity_discounts
+                ADD CONSTRAINT chk_discount_not_empty
+                CHECK (
+                    discount_amount IS NOT NULL OR discount_percentage IS NOT NULL
+                )
+            ");
+            DB::statement("
+                ALTER TABLE quantity_discounts
+                ADD CONSTRAINT chk_discount_values
+                CHECK (
+                    (discount_amount     IS NULL OR discount_amount     >= 0) AND
+                    (discount_percentage IS NULL OR (discount_percentage >= 0 AND discount_percentage <= 100))
+                )
+            ");
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('quantity_discounts');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_04_28_184440_create_stock_movements_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * جدول حركات المخزون  [مرتبط بـ product_id مباشرة]
+ *
+ * الـ circular FKs التالية تُضاف في migration منفصل (add_foreign_keys_new):
+ *   - commercial_document_line_id  → commercial_document_lines
+ *   - stock_lot_id                 → product_lots
+ *
+ * price_source: يوضح مصدر السعر المسجَّل في unit_price
+ *   purchase  → سعر شراء (فاتورة شراء، إدخال مخزون)
+ *   sale      → سعر بيع  (فاتورة بيع، إخراج مخزون)
+ *   adjustment→ تسوية يدوية أو جرد
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('stock_movements', function (Blueprint $table) {
+            $table->id();
+
+            // المنتج والمستودع
+            $table->foreignId('product_id')
+                ->constrained('products')
+                ->restrictOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->foreignId('warehouse_id')
+                ->constrained('warehouses')
+                ->restrictOnDelete()
+                ->cascadeOnUpdate();
+
+            // وحدة التعبئة المستخدمة في الحركة
+            $table->foreignId('packaging_id')
+                ->nullable()
+                ->constrained('product_packagings')
+                ->nullOnDelete()
+                ->cascadeOnUpdate()
+                ->comment('التعبئة المستخدمة — UN / FD / PLT');
+
+            // السنة المالية
+            $table->foreignId('fiscal_year_id')
+                ->constrained('fiscal_years')
+                ->restrictOnDelete()
+                ->cascadeOnUpdate();
+
+            // نوع الحركة
+            $table->foreignId('stock_movement_type_id')
+                ->constrained('stock_movement_types')
+                ->restrictOnDelete()
+                ->cascadeOnUpdate();
+
+            // الوثيقة التجارية المرتبطة (FK يُضاف في add_foreign_keys_new)
+            $table->unsignedBigInteger('commercial_document_line_id')
+                ->nullable()
+                ->comment('FK يُضاف لاحقاً — circular dependency');
+
+            // تفاصيل الحركة
+            $table->dateTime('movement_date');
+
+            // الكميات — دائماً بالوحدة الأساسية
+            $table->decimal('quantity', 15, 4)
+                ->comment('الكمية بالوحدة الأساسية');
+            $table->decimal('packaging_quantity', 15, 4)->nullable()
+                ->comment('الكمية بوحدة التعبئة — للعرض فقط');
+
+            // الأسعار
+            $table->decimal('unit_price', 15, 4)
+                ->comment('سعر الوحدة الأساسية وقت الحركة');
+            $table->decimal('cost_price', 15, 4)
+                ->comment('سعر التكلفة (PMP أو FIFO) وقت الحركة');
+            $table->decimal('total_price', 15, 4);
+
+            // مصدر السعر — يوضح من أين جاء unit_price
+            $table->enum('price_source', ['purchase', 'sale', 'adjustment'])
+                ->default('purchase')
+                ->comment('purchase=شراء | sale=بيع | adjustment=تسوية');
+
+            // الرصيد بعد الحركة
+            $table->decimal('stock_balance_after', 15, 4)
+                ->comment('الرصيد بالوحدة الأساسية بعد الحركة');
+
+            // تتبع الدفعات (Lots)
+            $table->string('lot_number', 100)->nullable();
+            $table->date('expiration_date')->nullable();
+            $table->unsignedBigInteger('stock_lot_id')->nullable()->index()
+                ->comment('FK يُضاف لاحقاً — circular dependency');
+
+            // معلومات إضافية
+            $table->string('reason', 255)->nullable();
+            $table->text('notes')->nullable();
+
+            // المستخدم المنفِّذ
+            $table->foreignId('user_id')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete()
+                ->cascadeOnUpdate();
+
+            // حركة أب (للتحويلات والإلغاءات)
+            $table->foreignId('parent_movement_id')
+                ->nullable()
+                ->constrained('stock_movements')
+                ->nullOnDelete()
+                ->cascadeOnUpdate();
+
+            // التحقق والاعتماد
+            $table->boolean('is_validated')->default(false)->index();
+            $table->foreignId('validated_by')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+            $table->timestamp('validated_at')->nullable();
+
+            // المنشئ
+            $table->foreignId('created_by')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->timestamps();
+            $table->softDeletes();
+
+            // فهارس
+            $table->index(
+                ['product_id', 'warehouse_id', 'movement_date'],
+                'stock_mov_prod_wh_date_idx'
+            );
+            $table->index(['movement_date', 'stock_movement_type_id']);
+            $table->index(['warehouse_id', 'movement_date']);
+            $table->index(['fiscal_year_id', 'movement_date']);
+            $table->index('lot_number');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('stock_movements');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_04_28_184501_create_product_lots_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * جدول دفعات المنتجات — Lots  [نسخة جديدة مرتبطة بـ product_id مباشرة]
+ *
+ * ملاحظة: هذا الملف يستبدل 2025_10_15_093430_create_product_lots_table.php
+ *         الذي كان مرتبطاً بـ product_id أيضاً لكنه محذوف ضمن redesign.
+ *
+ * الـ circular FK: stock_movement_id → stock_movements
+ * يُضاف في migration منفصل (add_foreign_keys_new) لتجنب الدائرية.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('product_lots', function (Blueprint $table) {
+            $table->id();
+
+            $table->string('lot_number', 50)->unique();
+
+            $table->foreignId('product_id')
+                ->constrained('products')
+                ->restrictOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->foreignId('warehouse_id')
+                ->constrained('warehouses')
+                ->restrictOnDelete()
+                ->cascadeOnUpdate();
+
+            // تواريخ
+            $table->date('manufacturing_date')->nullable()->index();
+            $table->date('expiration_date')->nullable()->index();
+            $table->date('purchase_date')->index();
+
+            // أسعار وكميات
+            $table->decimal('purchase_price', 15, 4);
+            $table->decimal('legal_selling_price', 15, 4);
+            $table->decimal('margin_percentage', 8, 4)->default(5.00);
+            $table->decimal('original_quantity', 15, 4);
+            $table->decimal('remaining_quantity', 15, 4)->index();
+
+            // أعمدة محسوبة (مدعومة في MySQL/MariaDB)
+            if (DB::getDriverName() !== 'sqlite') {
+                $table->boolean('is_depleted')
+                    ->storedAs('CASE WHEN remaining_quantity <= 0 THEN 1 ELSE 0 END')
+                    ->index();
+                $table->decimal('total_cost', 15, 4)
+                    ->storedAs('original_quantity * purchase_price');
+                $table->decimal('remaining_value', 15, 4)
+                    ->storedAs('remaining_quantity * purchase_price');
+            } else {
+                // SQLite: أعمدة عادية للتطوير والاختبار
+                $table->boolean('is_depleted')->default(false)->index();
+                $table->decimal('total_cost', 15, 4)->nullable();
+                $table->decimal('remaining_value', 15, 4)->nullable();
+            }
+
+            // الربط بحركة المخزون (FK يُضاف لاحقاً — circular dependency)
+            $table->unsignedBigInteger('stock_movement_id')->nullable()
+                ->comment('FK يُضاف لاحقاً في add_foreign_keys_new');
+
+            $table->string('supplier_lot_number', 100)->nullable();
+            $table->boolean('active')->default(true)->index();
+
+            $table->timestamps();
+            $table->softDeletes();
+
+            // فهارس
+            $table->index(
+                ['product_id', 'warehouse_id', 'is_depleted', 'purchase_date'],
+                'idx_fifo_lookup'
+            );
+            $table->index(['active', 'remaining_quantity'], 'idx_active_stock');
+        });
+
+        // قيود CHECK
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("
+                ALTER TABLE product_lots
+                ADD CONSTRAINT chk_quantities
+                CHECK (remaining_quantity >= 0 AND remaining_quantity <= original_quantity)
+            ");
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('product_lots');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_04_28_184611_add_foreign_keys.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * إضافة المفاتيح الأجنبية الدائرية (Circular Foreign Keys)  [نسخة مصححة]
+ *
+ * هذا الملف يستبدل 2025_10_23_135226_add_foreing_keys.php الذي كان يشير
+ * إلى جداول محذوفة (product_variants, product_lots القديم).
+ *
+ * يجب تنفيذه بعد إنشاء كل الجداول التالية:
+ *   - commercial_document_lines  (بعد fix_commercial_document_lines)
+ *   - stock_movements            (النسخة الجديدة مرتبطة بـ product_id)
+ *   - product_lots               (النسخة الجديدة)
+ *
+ * الدائريات الثلاث:
+ *   1. commercial_document_lines.stock_lot_id   → product_lots
+ *   2. stock_movements.commercial_document_line_id → commercial_document_lines
+ *   3. stock_movements.stock_lot_id             → product_lots
+ *   4. product_lots.stock_movement_id           → stock_movements
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // 1. ربط stock_lot_id في commercial_document_lines → product_lots
+        Schema::table('commercial_document_lines', function (Blueprint $table) {
+            $table->foreign('stock_lot_id')
+                ->references('id')
+                ->on('product_lots')
+                ->restrictOnDelete()   // لا تحذف الـ lot إذا كان في سطر وثيقة
+                ->cascadeOnUpdate();
+        });
+
+        // 2. ربط commercial_document_line_id في stock_movements → commercial_document_lines
+        Schema::table('stock_movements', function (Blueprint $table) {
+            $table->foreign('commercial_document_line_id')
+                ->references('id')
+                ->on('commercial_document_lines')
+                ->nullOnDelete()       // اجعل الحركة بلا وثيقة إذا حُذف السطر
+                ->cascadeOnUpdate();
+
+            // 3. ربط stock_lot_id في stock_movements → product_lots
+            $table->foreign('stock_lot_id')
+                ->references('id')
+                ->on('product_lots')
+                ->restrictOnDelete()   // لا تحذف الـ lot إذا كان له حركة
+                ->cascadeOnUpdate();
+        });
+
+        // 4. ربط stock_movement_id في product_lots → stock_movements
+        Schema::table('product_lots', function (Blueprint $table) {
+            $table->foreign('stock_movement_id')
+                ->references('id')
+                ->on('stock_movements')
+                ->nullOnDelete()       // اجعل الـ lot بلا حركة إذا حُذفت الحركة
+                ->cascadeOnUpdate();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('commercial_document_lines', function (Blueprint $table) {
+            $table->dropForeign(['stock_lot_id']);
+        });
+
+        Schema::table('stock_movements', function (Blueprint $table) {
+            $table->dropForeign(['commercial_document_line_id']);
+            $table->dropForeign(['stock_lot_id']);
+        });
+
+        Schema::table('product_lots', function (Blueprint $table) {
+            $table->dropForeign(['stock_movement_id']);
         });
     }
 };
