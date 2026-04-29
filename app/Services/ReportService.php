@@ -103,10 +103,6 @@ class ReportService
 
         $parties = $query->orderBy('created_at', 'desc')->get();
 
-        $customersWithSales = $query->clone()
-            ->withCount(['commercialDocuments' => fn($q) => $q->whereHas('documentType', fn($q) => $q->where('code', 'invoice'))])
-            ->get();
-
         return [
             'customers' => $parties->map(fn($party) => [
                 'id' => $party->id,
@@ -178,50 +174,50 @@ class ReportService
         return [
             'products' => $products->map(fn($product) => [
                 'id' => $product->id,
-                'code' => $product->code,
+                'ref' => $product->ref,
                 'name' => $product->name,
                 'family' => $product->family?->name,
                 'brand' => $product->brand?->name,
                 'unit' => $product->unit?->name,
-                'sale_price' => round($product->sale_price, 2),
-                'purchase_price' => round($product->purchase_price, 2),
+                'purchase_price_ht' => round($product->purchase_price_ht, 2),
+                'current_cost_price' => round($product->current_cost_price, 2),
                 'tva_rate' => $product->tva?->rate,
-                'stock_quantity' => $product->variants->sum('quantity'),
-                'minimum_stock' => $product->minimum_stock,
+                'stock_quantity' => $product->current_stock, // ✅ استخدام attribute المحسوب
+                'min_stock_alert' => $product->min_stock_alert,
             ])->toArray(),
             'summary' => [
                 'total_products' => $products->count(),
-                'total_stock_value' => round($products->map(fn($p) => $p->variants->sum('quantity') * $p->purchase_price)->sum(), 2),
+                'total_stock_value' => round($products->sum(fn($p) => $p->current_stock * $p->current_cost_price), 2),
             ],
         ];
     }
 
     public function inventoryReport(array $filters = []): array
     {
-        $query = Product::with(['variants', 'family', 'brand']);
+        $query = Product::with(['family', 'brand']);
 
         $products = $query->get();
 
-        $lowStock = $products->filter(fn($p) => $p->variants->sum('quantity') <= ($p->minimum_stock ?? 0));
-        $outOfStock = $products->filter(fn($p) => $p->variants->sum('quantity') == 0);
+        $lowStock = $products->filter(fn($p) => $p->current_stock <= $p->min_stock_alert);
+        $outOfStock = $products->filter(fn($p) => $p->current_stock == 0);
 
         return [
             'products' => $products->map(fn($product) => [
                 'id' => $product->id,
-                'code' => $product->code,
+                'ref' => $product->ref,
                 'name' => $product->name,
                 'family' => $product->family?->name,
                 'brand' => $product->brand?->name,
-                'quantity' => $product->variants->sum('quantity'),
-                'minimum_stock' => $product->minimum_stock,
-                'purchase_price' => round($product->purchase_price, 2),
-                'stock_value' => round($product->variants->sum('quantity') * $product->purchase_price, 2),
-                'status' => $product->variants->sum('quantity') == 0 ? 'out_of_stock' : ($product->variants->sum('quantity') <= ($product->minimum_stock ?? 0) ? 'low_stock' : 'in_stock'),
+                'stock_quantity' => $product->current_stock,
+                'min_stock_alert' => $product->min_stock_alert,
+                'purchase_price_ht' => round($product->purchase_price_ht, 2),
+                'stock_value' => round($product->current_stock * $product->current_cost_price, 2),
+                'status' => $product->current_stock == 0 ? 'out_of_stock' : ($product->current_stock <= $product->min_stock_alert ? 'low_stock' : 'in_stock'),
             ])->toArray(),
             'summary' => [
                 'total_products' => $products->count(),
-                'total_quantity' => $products->sum(fn($p) => $p->variants->sum('quantity')),
-                'total_value' => round($products->map(fn($p) => $p->variants->sum('quantity') * $p->purchase_price)->sum(), 2),
+                'total_quantity' => $products->sum('current_stock'),
+                'total_value' => round($products->sum(fn($p) => $p->current_stock * $p->current_cost_price), 2),
                 'low_stock_count' => $lowStock->count(),
                 'out_of_stock_count' => $outOfStock->count(),
             ],

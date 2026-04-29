@@ -99,7 +99,7 @@ class CommercialDocumentLine extends Model
     /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
         'commercialDocument',
-        'productVariant',
+        'product',
         'stockLot',
         'parentLine',
         'childLines',

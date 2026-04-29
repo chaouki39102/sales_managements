@@ -15,7 +15,7 @@ class OpeningBalanceStockService extends \App\Core\Services\BaseService
 {
     protected string $model = OpeningBalanceStock::class;
     protected string $resourceName = 'opening_balance_stock';
-    protected array $defaultWith = ['fiscalYear', 'productVariant', 'warehouse'];
+    protected array $defaultWith = ['fiscalYear', 'product', 'warehouse'];
 
       /**
      * إنشاء رصيد افتتاحي لمنتج (بدون دفعة)

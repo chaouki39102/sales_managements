@@ -54,7 +54,7 @@ class DashboardService
     public function getSalesChart(string $period = 'month'): array
     {
         $data = [];
-        
+
         if ($period === 'year') {
             for ($month = 1; $month <= 12; $month++) {
                 $total = CommercialDocument::whereYear('document_date', Carbon::now()->year)
@@ -140,8 +140,7 @@ class DashboardService
     public function getInventorySummary(): array
     {
         $totalProducts = Product::count();
-        $lowStockProducts = Product::whereHas('variants', fn($q) => $q->whereRaw('quantity <= minimum_stock'))->count();
-        
+        $lowStockProducts = Product::whereColumn('current_stock', '<=', 'min_stock_alert')->count();
         $stockIn = StockMovement::whereYear('created_at', Carbon::now()->year)
             ->whereMonth('created_at', Carbon::now()->month)
             ->where('movement_type_id', 1)

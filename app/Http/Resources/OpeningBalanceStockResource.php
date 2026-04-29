@@ -19,16 +19,16 @@ class OpeningBalanceStockResource extends JsonResource
             'average_cost_price' => $this->average_cost_price,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
-            
+
             'relations' => [
                 'fiscalYear' => $this->whenLoaded('fiscalYear', fn() => [
                     'id' => $this->fiscalYear->id,
                     'name' => $this->fiscalYear->name,
                 ]),
-                'productVariant' => $this->whenLoaded('productVariant', fn() => [
-                    'id' => $this->productVariant->id,
-                    'ref' => $this->productVariant->ref,
-                    'variant_name' => $this->productVariant->variant_name,
+                'product' => $this->whenLoaded('product', fn() => [
+                    'id' => $this->product->id,
+                    'name' => $this->product->name,
+                    'ref' => $this->product->ref,
                 ]),
                 'warehouse' => $this->whenLoaded('warehouse', fn() => [
                     'id' => $this->warehouse->id,

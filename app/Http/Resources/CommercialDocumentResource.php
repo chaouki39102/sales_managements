@@ -5,11 +5,6 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * Commercial Document Resource
- *
- * @package App\Http\Resources
- */
 class CommercialDocumentResource extends JsonResource
 {
     public function toArray(Request $request): array
@@ -86,10 +81,10 @@ class CommercialDocumentResource extends JsonResource
                         'total_ht' => $line->total_ht,
                         'total_tva' => $line->total_tva,
                         'total_ttc' => $line->total_ttc,
-                        'productVariant' => $line->whenLoaded('productVariant', fn() => [
-                            'id' => $line->productVariant->id,
-                            'sku' => $line->productVariant->sku,
-                            'name' => $line->productVariant->name,
+                        'product' => $line->whenLoaded('product', fn() => [
+                            'id' => $line->product->id,
+                            'name' => $line->product->name,
+                            'ref' => $line->product->ref,
                         ]),
                     ])
                 ),

@@ -29,7 +29,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         'warehouse',
         'currency',
         'documentStatus',
-        'lines.productVariant'
+        'lines.product',
     ];
 
     protected function beforeCreate(array $data, $request): array
@@ -169,7 +169,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     private function createDocumentLines(CommercialDocument $document, array $lines): void
     {
         $lineOrder = 1;
-        
+
         foreach ($lines as $lineData) {
             $lineData['commercial_document_id'] = $document->id;
             $lineData['line_order'] = $lineOrder++;
@@ -184,7 +184,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     {
         $quantity = $lineData['quantity'] ?? 1;
         $unitPrice = $lineData['unit_price_ht'] ?? 0;
-        
+
         $lineData['total_ht'] = $quantity * $unitPrice;
 
         if (!empty($lineData['discount_percentage'])) {
@@ -192,7 +192,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         $afterDiscount = $lineData['total_ht'] - ($lineData['discount_amount'] ?? 0);
-        
+
         $tvaRate = $lineData['tva_rate'] ?? 0;
         $lineData['total_tva'] = $afterDiscount * ($tvaRate / 100);
         $lineData['total_ttc'] = $afterDiscount + $lineData['total_tva'];
@@ -224,11 +224,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     private function createStockMovements(CommercialDocument $document): void
     {
         foreach ($document->lines as $line) {
-            if (!$line->productVariant) {
+            if (!$line->product) {
                 continue;
             }
 
-            $movementType = match ($document->documentType->code) {
+            $movementType = match ($document->documentType?->code) {
                 'invoice', 'delivery_note' => 'out',
                 'purchase_invoice' => 'in',
                 default => null,
@@ -245,11 +245,12 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'commercial_document_id' => $document->id,
                 'commercial_document_line_id' => $line->id,
                 'quantity' => $line->quantity,
-                'unit_cost' => $line->unit_price_ht,
+                'unit_price' => $line->unit_price_ht,
                 'movement_date' => $document->document_date,
             ]);
         }
     }
+
 
     private function getStockMovementTypeId(string $type): int
     {

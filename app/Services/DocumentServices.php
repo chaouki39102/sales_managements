@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\DocumentType;
 use App\Models\CommercialDocumentLine;
-use App\Models\ProductVariant;
 use App\Models\Expense;
 use App\Models\ProductLot;
 use App\Models\FiscalYear;
@@ -15,7 +14,6 @@ use App\Models\InventoryValuationMethod;
 use App\Models\TreasuryAccountType;
 use App\Models\FiscalStamp;
 use App\Models\DocumentBaseOperation;
-use Illuminate\Http\Request;
 
 class DocumentTypeService extends \App\Core\Services\BaseService
 {
@@ -28,17 +26,10 @@ class CommercialDocumentLineService extends \App\Core\Services\BaseService
 {
     protected string $model = CommercialDocumentLine::class;
     protected string $resourceName = 'commercial_document_line';
-    protected array $defaultWith = ['commercialDocument', 'productVariant', 'stockLot'];
+    protected array $defaultWith = ['commercialDocument', 'product', 'stockLot']; // ✅ تم التعديل
 }
 
-class ProductVariantService extends \App\Core\Services\BaseService
-{
-    protected string $model = ProductVariant::class;
-    protected string $resourceName = 'product_variant';
-    protected array $defaultWith = ['product', 'unit', 'tva'];
-
-    public function getLowStock() { return $this->model::lowStock()->get(); }
-}
+// تم حذف ProductVariantService بالكامل (لأن ProductVariant لم يعد موجوداً)
 
 class ExpenseService extends \App\Core\Services\BaseService
 {
@@ -54,7 +45,7 @@ class ProductLotService extends \App\Core\Services\BaseService
 {
     protected string $model = ProductLot::class;
     protected string $resourceName = 'product_lot';
-    protected array $defaultWith = ['productVariant', 'warehouse'];
+    protected array $defaultWith = ['product', 'warehouse']; // ✅ تم التعديل
 
     public function getAvailable() { return $this->model::available()->get(); }
     public function getExpiringSoon(int $days = 30) { return $this->model::expiringSoon($days)->get(); }
@@ -85,7 +76,7 @@ class StockMovementService extends \App\Core\Services\BaseService
 {
     protected string $model = StockMovement::class;
     protected string $resourceName = 'stock_movement';
-    protected array $defaultWith = ['productVariant', 'warehouse', 'stockMovementType'];
+    protected array $defaultWith = ['product', 'warehouse', 'stockMovementType']; // ✅ تم التعديل
 
     public function getIncoming() { return $this->model::incoming()->get(); }
     public function getOutgoing() { return $this->model::outgoing()->get(); }
@@ -101,7 +92,7 @@ class InventoryValuationMethodService extends \App\Core\Services\BaseService
 {
     protected string $model = InventoryValuationMethod::class;
     protected string $resourceName = 'inventory_valuation_method';
-    protected array $defaultWith = ['productVariants'];
+    protected array $defaultWith = ['products']; // ✅ تم التعديل (كان productVariants)
 }
 
 class TreasuryAccountTypeService extends \App\Core\Services\BaseService

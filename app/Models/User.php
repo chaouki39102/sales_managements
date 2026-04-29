@@ -210,8 +210,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(Expense::class, 'created_by');
     }
+    public function companies()
+    {
+        return $this->belongsToMany(Company::class)->withPivot('is_default');
+    }
+
 
     // -------------------- Mutators --------------------
+
 
     public function setPasswordAttribute($value)
     {
@@ -223,6 +229,10 @@ class User extends Authenticatable
     }
 
     // -------------------- Accessors --------------------
+    public function getDefaultCompanyAttribute()
+    {
+        return $this->companies()->wherePivot('is_default', true)->first();
+    }ا
 
     public function getFullAddressAttribute(): string
     {
