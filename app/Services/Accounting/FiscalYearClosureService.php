@@ -185,7 +185,7 @@ class FiscalYearClosureService
             ->where('fiscal_year_id', $oldYear->id)
             ->where('is_validated', true)
             ->select(
-                'product_variant_id',
+                'product_id',
                 'warehouse_id',
                 DB::raw('SUM(
                     CASE
@@ -200,7 +200,7 @@ class FiscalYearClosureService
                 ) as final_quantity'),
                 DB::raw('AVG(cost_price) as avg_cost_price')
             )
-            ->groupBy('product_variant_id', 'warehouse_id')
+            ->groupBy('product_id', 'warehouse_id')
             ->having('final_quantity', '>', 0)
             ->get();
 
@@ -208,7 +208,7 @@ class FiscalYearClosureService
         foreach ($stockBalances as $balance) {
             $openingBalances[] = [
                 'fiscal_year_id' => $newYear->id,
-                'product_variant_id' => $balance->product_variant_id,
+                'product_id' => $balance->product_id,
                 'warehouse_id' => $balance->warehouse_id,
                 'opening_quantity' => $balance->final_quantity,
                 'opening_value' => $balance->final_quantity * $balance->avg_cost_price,

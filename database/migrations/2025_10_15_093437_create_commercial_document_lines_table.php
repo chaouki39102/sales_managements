@@ -20,7 +20,7 @@ return new class extends Migration
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();
 
-            // --- الربط بالمنتج (بديل لـ product_variant_id المحذوف) ---
+            // --- الربط بالمنتج (بديل لـ product_id المحذوف) ---
             $table->foreignId('product_id')
                 ->constrained('products')
                 ->restrictOnDelete()
@@ -44,6 +44,10 @@ return new class extends Migration
             $table->decimal('total_ht', 15, 4)->comment('المجموع الصافي قبل الضريبة');
             $table->decimal('total_tva', 15, 4)->default(0.00);
             $table->decimal('total_ttc', 15, 4)->comment('المجموع النهائي شامل الضريبة');
+
+            $table->json('additional_costs')->nullable()->comment('تكاليف إضافية مرتبطة بالسطر (مثل الشحن، التعبئة، إلخ)');
+            $table->decimal('total_additional_cost', 15, 4)->default(0)->comment('مجموع التكاليف');
+            $table->decimal('total_discount_amount', 15, 4)->default(0)->comment('مجموع الخصومات');
 
             // --- إدارة الدفعات (Lots) ---
             // نستخدم unsignedBigInteger لتجنب مشاكل الدائرية في البداية

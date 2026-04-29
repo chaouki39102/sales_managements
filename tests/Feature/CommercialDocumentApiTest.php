@@ -93,7 +93,7 @@ class CommercialDocumentApiTest extends TestCase
                 'document_date' => now()->toDateString(),
                 'lines' => [
                     [
-                        'product_variant_id' => 1,
+                        'product_id' => 1,
                         'quantity' => 10,
                         'unit_price_ht' => 100,
                         'tva_rate' => 19,

@@ -25,7 +25,7 @@ class ProductLot extends Model
     // -------------------- Fillable --------------------
     protected $fillable = [
         'lot_number',
-        'product_variant_id',
+        'product_id',
         'warehouse_id',
         'manufacturing_date',
         'expiration_date',
@@ -69,7 +69,7 @@ class ProductLot extends Model
 
     /** @var array الفلاتر المسموحة */
     public static array $filterable = [
-        'product_variant_id',
+        'product_id',
         'warehouse_id',
         'active',
     ];
@@ -89,7 +89,7 @@ class ProductLot extends Model
 
     /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'productVariant',
+        'product',
         'warehouse',
         'stockMovement',
         'commercialDocumentLines',
@@ -122,9 +122,9 @@ class ProductLot extends Model
 
     // -------------------- Relations --------------------
 
-    public function productVariant(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);
     }
 
     public function warehouse(): BelongsTo

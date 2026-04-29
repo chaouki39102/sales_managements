@@ -27,7 +27,7 @@ class StockMovement extends Model
 
     // -------------------- Fillable --------------------
     protected $fillable = [
-        'product_variant_id',
+        'product_id',
         'warehouse_id',
         'fiscal_year_id',
         'stock_movement_type_id',
@@ -78,7 +78,7 @@ class StockMovement extends Model
 
     /** @var array الفلاتر المسموحة */
     public static array $filterable = [
-        'product_variant_id',
+        'product_id',
         'warehouse_id',
         'fiscal_year_id',
         'stock_movement_type_id',
@@ -102,7 +102,7 @@ class StockMovement extends Model
 
     /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'productVariant',
+        'product',
         'warehouse',
         'fiscalYear',
         'stockMovementType',
@@ -140,9 +140,9 @@ class StockMovement extends Model
 
     // -------------------- Relations --------------------
 
-    public function productVariant(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);    
     }
 
     public function warehouse(): BelongsTo

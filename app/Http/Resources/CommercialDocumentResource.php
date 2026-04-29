@@ -75,7 +75,7 @@ class CommercialDocumentResource extends JsonResource
                 'lines' => $this->whenLoaded('lines', fn() =>
                     $this->lines->map(fn($line) => [
                         'id' => $line->id,
-                        'product_variant_id' => $line->product_variant_id,
+                        'product_id' => $line->product_id,
                         'line_order' => $line->line_order,
                         'description' => $line->description,
                         'quantity' => $line->quantity,

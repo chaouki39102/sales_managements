@@ -10,7 +10,7 @@ class QuantityDiscountResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id, 'product_variant_id' => $this->product_variant_id, 'min_quantity' => $this->min_quantity,
+            'id' => $this->id, 'product_id' => $this->product_id, 'min_quantity' => $this->min_quantity,
             'max_quantity' => $this->max_quantity, 'discount_per_unit' => $this->discount_per_unit,
             'discount_percentage' => $this->discount_percentage, 'tier_order' => $this->tier_order,
             'active' => $this->active, 'valid_from' => $this->valid_from?->toIso8601String(),

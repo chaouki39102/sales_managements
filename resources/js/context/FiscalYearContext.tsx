@@ -7,6 +7,7 @@ import React, {
   createContext, useContext, useState,
   useEffect, useCallback, useMemo,
 } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api/client';
 import type { FiscalYear } from '@/types';
@@ -26,14 +27,14 @@ const FiscalYearContext = createContext<FiscalYearContextType | undefined>(undef
 
 // ── Provider ───────────────────────────────────────
 export function FiscalYearProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [selectedYear, setSelectedYearState] = useState<FiscalYear | null>(null);
   const qc = useQueryClient();
 
   const { data: years = [], isLoading } = useQuery<FiscalYear[]>({
     queryKey: ['fiscal-years'],
-    queryFn:  () => apiClient
-      .get('/fiscal-years', { params: { per_page: 50 } })
-      .then(r => r.data.data),
+    queryFn:  () => apiClient.get('/fiscal-years', { params: { per_page: 50 } }).then(r => r.data.data),
+    enabled: isAuthenticated && !authLoading, // 🔑 لن يُرسل الطلب إلا بعد تسجيل الدخول
     staleTime: 5 * 60_000,
     retry: 1,
   });

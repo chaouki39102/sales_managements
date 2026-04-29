@@ -3,40 +3,35 @@
 namespace App\Services;
 
 use App\Models\Product;
-use App\Models\ProductVariant;
-use App\Models\ProductVariantPrice;
+use App\Models\ProductPackaging;
+use App\Models\ProductPrice;
 use App\Models\QuantityDiscount;
 use App\Core\Exceptions\BusinessRuleException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
-/**
- * Product Service
- *
- * إدارة كاملة للمنتجات مع:
- * - إدارة المتغيرات (Variants) — إنشاء / تحديث / حذف
- * - إدارة مستويات الأسعار (ProductVariantPrice)
- * - إدارة تخفيضات الكميات (QuantityDiscount)
- * - التحقق من قواعد العمل
- *
- * @package App\Services
- */
 class ProductService extends \App\Core\Services\BaseService
 {
-    protected string $model = Product::class;
+    protected string $model        = Product::class;
     protected string $resourceName = 'product';
-    protected array $defaultWith = ['family', 'brand', 'productType'];
-    protected array $showWith    = ['variants.prices', 'variants.quantityDiscounts'];
+
+    protected array $defaultWith = [
+        'family', 'brand', 'productType', 'tva', 'unit',
+    ];
+
+    protected array $showWith = [
+        'family', 'brand', 'productType', 'tva', 'unit', 'valuationMethod',
+        'packagings',
+        'prices.priceLevel',
+        'quantityDiscounts.priceLevel',
+    ];
 
     // =========================================================
-    // Hooks — قبل / بعد العمليات
+    // Hooks
     // =========================================================
 
-    /**
-     * قبل الإنشاء: توليد الـ slug تلقائياً
-     */
     protected function beforeCreate(array $data, $request): array
     {
         if (empty($data['slug']) && isset($data['name'])) {
@@ -45,246 +40,219 @@ class ProductService extends \App\Core\Services\BaseService
         return $data;
     }
 
-    /**
-     * بعد إنشاء المنتج داخل Transaction:
-     * نُنشئ المتغيرات وأسعارها وخصوماتها.
-     */
     protected function afterCreate(Model $item, array $data, $request): void
     {
-        if (!empty($data['variants'])) {
-            $this->syncVariants($item, $data['variants']);
+        if (!empty($data['packagings'])) {
+            $this->syncPackagings($item, $data['packagings']);
+        }
+        if (!empty($data['prices'])) {
+            $this->syncPrices($item, $data['prices'], (float)($data['purchase_price_ht'] ?? 0));
+        }
+        if (isset($data['quantity_discounts'])) {
+            $this->syncDiscounts($item, $data['quantity_discounts'], (bool)($data['manages_quantity_discounts'] ?? false));
         }
     }
 
-    /**
-     * قبل التحديث: قواعد العمل + slug
-     */
     protected function beforeUpdate(Model $item, array $data, $request): void
     {
-        // لا يمكن تعطيل منتج له متغيرات نشطة
-        if (isset($data['active']) && !$data['active'] && $item->variants()->where('active', true)->exists()) {
-            throw new BusinessRuleException('لا يمكن تعطيل منتج له متغيرات نشطة', 409);
+        // التخفيف: لا نمنع تعطيل المنتج، فقط نسجل تحذيراً
+        if (isset($data['active']) && !(bool)$data['active']) {
+            if ($item->stockMovements()->where('is_validated', true)->exists()) {
+                Log::warning('محاولة تعطيل منتج له حركات مخزون مؤكدة', [
+                    'product_id' => $item->id,
+                    'user_id' => auth()->id(),
+                ]);
+                // يمكنك اختيارياً إضافة رسالة إعلامية للمستخدم عبر session أو استثناء مخصص
+                // throw new BusinessRuleException('لا يمكن تعطيل منتج له حركات مخزون مؤكدة', 409);
+                // لكننا سنسمح بذلك مع تسجيل التحذير فقط.
+            }
         }
 
-        if (isset($data['name']) && $data['name'] !== $item->name) {
+        if (isset($data['name']) && $data['name'] !== $item->name && empty($data['slug'])) {
             $data['slug'] = $this->generateUniqueSlug($data['name'], $item->id);
         }
     }
 
-    /**
-     * تجهيز البيانات للتحديث:
-     * نفصل variants عن بيانات المنتج الأساسية.
-     */
     protected function prepareDataForUpdate(Model $item, array $data, $request): array
     {
-        // نزيل variants من البيانات لأنها تُعالَج منفصلاً في afterUpdate
-        unset($data['variants']);
+        unset($data['packagings'], $data['prices'], $data['quantity_discounts']);
         return $data;
     }
 
-    /**
-     * بعد تحديث المنتج داخل Transaction:
-     * نزامن المتغيرات.
-     */
     protected function afterUpdate(Model $item, array $data, $request): void
     {
-        // $data هنا البيانات الأصلية (قبل prepareDataForUpdate)
-        // نمرر $request->input('variants') مباشرة
-        $variants = $request?->input('variants') ?? $data['variants'] ?? null;
+        $packagings = $request?->input('packagings');
+        $prices     = $request?->input('prices');
+        $discounts  = $request?->input('quantity_discounts');
 
-        if (!is_null($variants)) {
-            $this->syncVariants($item, $variants);
+        if (!is_null($packagings)) {
+            $this->syncPackagings($item, $packagings);
+        }
+
+        if (!is_null($prices)) {
+            $purchasePrice = (float)($request->input('purchase_price_ht') ?? $item->fresh()->purchase_price_ht);
+            $this->syncPrices($item, $prices, $purchasePrice);
+        }
+
+        if (!is_null($discounts)) {
+            $managesDiscounts = (bool)($request->input('manages_quantity_discounts') ?? $item->manages_quantity_discounts);
+            $this->syncDiscounts($item, $discounts, $managesDiscounts);
         }
     }
 
-    /**
-     * قبل الحذف: لا نحذف منتجاً له معاملات تجارية
-     */
     protected function beforeDelete(Model $item): void
     {
-        if ($item->variants()->whereHas('commercialDocumentLines')->exists()) {
+        // الحذف الفعلي ممنوع إذا كانت هناك سجلات مرتبطة (يبقى كما هو)
+        if ($item->stockMovements()->exists()) {
+            throw new BusinessRuleException('لا يمكن حذف منتج له حركات مخزون', 409);
+        }
+        if ($item->lots()->exists()) {
+            throw new BusinessRuleException('لا يمكن حذف منتج له دفعات مخزون', 409);
+        }
+        if ($item->documentLines()->exists()) {
             throw new BusinessRuleException('لا يمكن حذف منتج مرتبط بوثائق تجارية', 409);
         }
-    }
-
-    // =========================================================
-    // Variant Sync — القلب النابض
-    // =========================================================
-
-    /**
-     * مزامنة المتغيرات (إنشاء / تحديث / حذف)
-     *
-     * الاستراتيجية:
-     * - المتغيرات التي لها id موجود → UPDATE
-     * - المتغيرات بدون id → CREATE
-     * - المتغيرات الموجودة في DB لكن غائبة من الطلب → DELETE (soft)
-     */
-    private function syncVariants(Product $product, array $variantsData): void
-    {
-        $incomingIds = collect($variantsData)
-            ->pluck('id')
-            ->filter()
-            ->values()
-            ->toArray();
-
-        // 1. حذف المتغيرات المحذوفة من الفورم
-        $product->variants()
-            ->whereNotIn('id', $incomingIds)
-            ->each(function (ProductVariant $variant) {
-                // حذف ناعم إن كان SoftDeletes مفعلاً، وإلا قوة
-                $variant->prices()->delete();
-                $variant->quantityDiscounts()->delete();
-                $variant->delete();
-            });
-
-        // 2. إنشاء أو تحديث كل متغير
-        foreach ($variantsData as $vData) {
-            if (!empty($vData['id'])) {
-                $variant = $product->variants()->find($vData['id']);
-                if ($variant) {
-                    $this->updateVariant($variant, $vData);
-                }
-            } else {
-                $this->createVariant($product, $vData);
-            }
+        if ($item->openingBalances()->exists()) {
+            throw new BusinessRuleException('لا يمكن حذف منتج له أرصدة افتتاحية', 409);
         }
     }
 
-    /**
-     * إنشاء متغير جديد مع أسعاره وخصوماته
-     */
-    private function createVariant(Product $product, array $data): ProductVariant
+    // =========================================================
+    // Packagings Sync
+    // =========================================================
+
+    private function syncPackagings(Product $product, array $data): void
     {
-        $variant = $product->variants()->create($this->prepareVariantData($data));
+        if (empty($data)) return;
 
-        $this->syncVariantPrices($variant, $data['prices'] ?? []);
-        $this->syncQuantityDiscounts($variant, $data['quantity_discounts'] ?? [], $data['manages_quantity_discounts'] ?? false);
+        $incomingIds = collect($data)->pluck('id')->filter()->toArray();
 
-        return $variant;
-    }
+        // حذف التعبئات الغائبة (هذا السلوك قد يكون مقصوداً، لكن يمكن تعديله لتعطيلها بدلاً من الحذف)
+        $product->packagings()->whereNotIn('id', $incomingIds)->delete();
 
-    /**
-     * تحديث متغير موجود
-     */
-    private function updateVariant(ProductVariant $variant, array $data): ProductVariant
-    {
-        $variant->update($this->prepareVariantData($data));
+        $hasDefault = collect($data)->contains(fn($p) => !empty($p['is_default']));
 
-        $this->syncVariantPrices($variant, $data['prices'] ?? []);
-        $this->syncQuantityDiscounts($variant, $data['quantity_discounts'] ?? [], $data['manages_quantity_discounts'] ?? false);
+        foreach ($data as $idx => $pData) {
+            $attrs = [
+                'code'          => strtoupper(trim($pData['code'])),
+                'label'         => trim($pData['label']),
+                'quantity'      => isset($pData['quantity']) ? max(0.0001, (float)$pData['quantity']) : 1,
+                'barcode'       => $pData['barcode'] ?? null,
+                'is_default'    => (bool)($pData['is_default'] ?? false),
+                'active'        => (bool)($pData['active'] ?? true),
+                'display_order' => (int)($pData['display_order'] ?? $idx),
+            ];
 
-        return $variant->refresh();
-    }
+            if (!empty($pData['id'])) {
+                $product->packagings()->where('id', $pData['id'])->update($attrs);
+            } else {
+                $product->packagings()->create($attrs);
+            }
+        }
 
-    /**
-     * تجهيز بيانات المتغير (تحويل الأسماء من Frontend → DB)
-     */
-    private function prepareVariantData(array $data): array
-    {
-        return [
-            'ref'                        => $data['ref'],
-            'variant_name'               => $data['variant_name'] ?? null,
-            'barcode'                    => $data['barcode'] ?? null,
-            'last_purchase_price'        => isset($data['last_purchase_price']) && $data['last_purchase_price'] !== ''
-                                            ? (float) $data['last_purchase_price'] : null,
-            'default_selling_price_ht'   => isset($data['default_selling_price_ht']) && $data['default_selling_price_ht'] !== ''
-                                            ? (float) $data['default_selling_price_ht'] : 0,
-            'tva_id'                     => $data['tva_id'] ?? null,
-            'unit_id'                    => $data['unit_id'] ?? null,
-            'min_stock_alert'            => $data['min_stock_alert'] ?? 0,
-            'manages_stock'              => $data['manages_stock'] ?? true,
-            'allow_negative_stock'       => $data['allow_negative_stock'] ?? false,
-            'has_lots'                   => $data['has_lots'] ?? false,
-            'has_expiration_date'        => $data['has_expiration_date'] ?? false,
-            'manages_quantity_discounts' => $data['manages_quantity_discounts'] ?? false,
-            'weight'                     => $data['weight'] ?? null,
-            'volume'                     => $data['volume'] ?? null,
-            'length'                     => $data['length'] ?? null,
-            'width'                      => $data['width'] ?? null,
-            'height'                     => $data['height'] ?? null,
-            'variant_attributes'         => $data['variant_attributes'] ?? null,
-            'valuation_method_id'        => $data['valuation_method_id'] ?? null,
-            'active'                     => $data['active'] ?? true,
-        ];
+        if (!$hasDefault) {
+            $smallest = $product->packagings()->orderBy('quantity')->first();
+            $smallest?->update(['is_default' => true]);
+        }
     }
 
     // =========================================================
     // Prices Sync
     // =========================================================
 
-    /**
-     * مزامنة أسعار المستويات للمتغير
-     */
-    private function syncVariantPrices(ProductVariant $variant, array $pricesData): void
+    private function syncPrices(Product $product, array $data, float $purchasePriceHt): void
     {
-        if (empty($pricesData)) {
-            return;
-        }
+        if (empty($data)) return;
 
-        foreach ($pricesData as $priceData) {
-            if (!isset($priceData['price_level_id'])) {
-                continue;
-            }
+        foreach ($data as $pData) {
+            if (empty($pData['price_level_id'])) continue;
 
-            $price = (float) ($priceData['price'] ?? 0);
+            $method = $pData['pricing_method'] ?? 'fixed';
 
-            // إذا السعر فارغ / صفر، احذف السجل إن وجد
-            if ($price <= 0) {
-                $variant->prices()
-                    ->where('price_level_id', $priceData['price_level_id'])
-                    ->delete();
-                continue;
-            }
+            $price  = $method === 'fixed'  ? ((float)($pData['price']  ?? 0)) : null;
+            $rate   = $method === 'rate'   ? ((float)($pData['rate']   ?? 0)) : null;
+            $margin = $method === 'margin' ? ((float)($pData['margin'] ?? 0)) : null;
 
-            $variant->prices()->updateOrCreate(
-                ['price_level_id' => $priceData['price_level_id']],
+            $product->prices()->updateOrCreate(
+                ['price_level_id' => (int)$pData['price_level_id']],
                 [
-                    'price'      => $price,
-                    'valid_from' => !empty($priceData['valid_from']) ? $priceData['valid_from'] : now()->toDateString(),
-                    'valid_to'   => !empty($priceData['valid_to'])   ? $priceData['valid_to']   : null,
-                    'active'     => $priceData['active'] ?? true,
+                    'pricing_method' => $method,
+                    'price'          => $price,
+                    'rate'           => $rate,
+                    'margin'         => $margin,
+                    'active'         => (bool)($pData['active'] ?? true),
                 ]
             );
         }
     }
 
     // =========================================================
-    // Quantity Discounts Sync
+    // Discounts Sync — تعديل: لا نحذف، نعطل فقط
     // =========================================================
 
-    /**
-     * مزامنة تخفيضات الكميات للمتغير
-     */
-    private function syncQuantityDiscounts(ProductVariant $variant, array $discountsData, bool $manages): void
+    private function syncDiscounts(Product $product, array $data, bool $managesDiscounts): void
     {
-        if (!$manages) {
-            // إذا التخفيضات غير مفعلة → احذف الكل
-            $variant->quantityDiscounts()->delete();
+        if (!$managesDiscounts) {
+            // بدلاً من delete()، نعطل الخصومات الحالية
+            $product->quantityDiscounts()->update(['active' => false]);
             return;
         }
 
-        // حذف الكل وإعادة إنشاء (أبسط وأضمن)
-        $variant->quantityDiscounts()->delete();
+        // إذا كانت الخصومات مفعلة، نقوم بمزامنتها (ما زلنا نستخدم حذف وإعادة إنشاء للتبسيط)
+        // لكن يمكن تحسينها لاحقاً.
+        $product->quantityDiscounts()->delete();
 
-        foreach ($discountsData as $idx => $disc) {
-            if (empty($disc['min_quantity'])) {
-                continue;
-            }
-            if (empty($disc['discount_percentage']) && empty($disc['discount_per_unit'])) {
-                continue;
-            }
+        foreach ($data as $idx => $dData) {
+            if (empty($dData['price_level_id'])) continue;
+            if (!isset($dData['min_qty']) || $dData['min_qty'] === '') continue;
+            if (empty($dData['discount_amount']) && empty($dData['discount_percentage'])) continue;
 
-            $variant->quantityDiscounts()->create([
-                'min_quantity'        => (float) $disc['min_quantity'],
-                'max_quantity'        => isset($disc['max_quantity']) && $disc['max_quantity'] !== '' ? (float) $disc['max_quantity'] : null,
-                'discount_percentage' => isset($disc['discount_percentage']) && $disc['discount_percentage'] !== '' ? (float) $disc['discount_percentage'] : null,
-                'discount_per_unit'   => isset($disc['discount_per_unit']) && $disc['discount_per_unit'] !== '' ? (float) $disc['discount_per_unit'] : null,
-                'tier_order'          => $idx + 1,
-                'active'              => $disc['active'] ?? true,
-                'valid_from'          => now()->toDateString(),
-                'valid_to'            => null,
+            $product->quantityDiscounts()->create([
+                'price_level_id'      => (int)$dData['price_level_id'],
+                'min_qty'             => (float)$dData['min_qty'],
+                'max_qty'             => isset($dData['max_qty']) && $dData['max_qty'] !== '' ? (float)$dData['max_qty'] : null,
+                'discount_amount'     => isset($dData['discount_amount']) && $dData['discount_amount'] !== '' ? (float)$dData['discount_amount'] : null,
+                'discount_percentage' => isset($dData['discount_percentage']) && $dData['discount_percentage'] !== '' ? (float)$dData['discount_percentage'] : null,
+                'tier_order'          => (int)($dData['tier_order'] ?? $idx + 1),
+                'is_blocked'          => (bool)($dData['is_blocked'] ?? false),
+                'active'              => (bool)($dData['active'] ?? true),
             ]);
         }
+    }
+
+    // =========================================================
+    // Public Helpers
+    // =========================================================
+
+    public function findById($id, array $with = null): Model
+    {
+        return $this->model::with($with ?? $this->showWith)->findOrFail($id);
+    }
+
+    public function getActiveProducts()
+    {
+        return $this->model::where('active', true)
+            ->with($this->defaultWith)
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function getByFamily(int $familyId)
+    {
+        return $this->model::where('family_id', $familyId)
+            ->where('active', true)
+            ->with($this->defaultWith)
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function getByBrand(int $brandId)
+    {
+        return $this->model::where('brand_id', $brandId)
+            ->where('active', true)
+            ->with($this->defaultWith)
+            ->orderBy('name')
+            ->get();
     }
 
     // =========================================================
@@ -293,60 +261,15 @@ class ProductService extends \App\Core\Services\BaseService
 
     private function generateUniqueSlug(string $name, ?int $excludeId = null): string
     {
-        $slug = Str::slug($name);
-        $query = Product::where('slug', 'like', $slug . '%');
-
-        if ($excludeId) {
-            $query->where('id', '!=', $excludeId);
-        }
-
+        $slug     = Str::slug($name);
+        $query    = Product::where('slug', 'like', $slug . '%');
+        if ($excludeId) $query->where('id', '!=', $excludeId);
         $existing = $query->pluck('slug');
 
-        if (!$existing->contains($slug)) {
-            return $slug;
-        }
+        if (!$existing->contains($slug)) return $slug;
 
-        $counter = 1;
-        while ($existing->contains($slug . '-' . $counter)) {
-            $counter++;
-        }
-
-        return $slug . '-' . $counter;
-    }
-
-    // =========================================================
-    // Convenience Methods (للكنترولر)
-    // =========================================================
-
-    public function getActiveProducts()
-    {
-        return $this->model::active()->with($this->defaultWith)->get();
-    }
-
-    public function getByFamily(int $familyId)
-    {
-        return $this->model::byFamily($familyId)->active()->with($this->defaultWith)->get();
-    }
-
-    public function getByBrand(int $brandId)
-    {
-        return $this->model::byBrand($brandId)->active()->with($this->defaultWith)->get();
-    }
-
-    public function getWithVariants()
-    {
-        return $this->model::withVariants()->active()->with(array_merge($this->defaultWith, ['variants']))->get();
-    }
-
-    /**
-     * جلب منتج بكل علاقاته للعرض/التعديل
-     */
-    public function findById($id, array $with = null): Model
-    {
-        $relations = $with ?? array_unique(array_merge(
-            $this->defaultWith,
-            $this->showWith
-        ));
-        return $this->model::with($relations)->findOrFail($id);
+        $i = 1;
+        while ($existing->contains("{$slug}-{$i}")) $i++;
+        return "{$slug}-{$i}";
     }
 }

@@ -90,7 +90,7 @@ class CommercialDocumentLineResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id, 'commercial_document_id' => $this->commercial_document_id, 'product_variant_id' => $this->product_variant_id,
+            'id' => $this->id, 'commercial_document_id' => $this->commercial_document_id, 'product_id' => $this->product_id,
             'line_order' => $this->line_order, 'description' => $this->description, 'quantity' => $this->quantity,
             'delivered_quantity' => $this->delivered_quantity, 'returned_quantity' => $this->returned_quantity,
             'unit_price_ht' => $this->unit_price_ht, 'discount_percentage' => $this->discount_percentage,
@@ -140,7 +140,7 @@ class ProductLotResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id, 'lot_number' => $this->lot_number, 'product_variant_id' => $this->product_variant_id,
+            'id' => $this->id, 'lot_number' => $this->lot_number, 'product_id' => $this->product_id,
             'warehouse_id' => $this->warehouse_id, 'manufacturing_date' => $this->manufacturing_date?->toIso8601String(),
             'expiration_date' => $this->expiration_date?->toIso8601String(), 'purchase_date' => $this->purchase_date?->toIso8601String(),
             'purchase_price' => $this->purchase_price, 'original_quantity' => $this->original_quantity,
@@ -186,7 +186,7 @@ class StockMovementResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id, 'product_variant_id' => $this->product_variant_id, 'warehouse_id' => $this->warehouse_id,
+            'id' => $this->id, 'product_id' => $this->product_id, 'warehouse_id' => $this->warehouse_id,
             'fiscal_year_id' => $this->fiscal_year_id, 'stock_movement_type_id' => $this->stock_movement_type_id,
             'commercial_document_line_id' => $this->commercial_document_line_id, 'movement_date' => $this->movement_date?->toIso8601String(),
             'quantity' => $this->quantity, 'unit_price' => $this->unit_price, 'total_price' => $this->total_price,

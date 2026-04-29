@@ -39,13 +39,13 @@ class Unit extends Model
     public static array $filterable = ['active'];
     public static array $sortable = ['id', 'name', 'display_order'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['productVariants'];
+    public static array $allowedIncludes = ['products'];
     public static string $defaultSort = 'display_order';
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['units', 'lookups'];
 
-    public function productVariants(): HasMany
+    public function products(): HasMany
     {
-        return $this->hasMany(ProductVariant::class);
+        return $this->hasMany(Product::class);
     }
 }

@@ -1,97 +1,155 @@
 <?php
+// app/Observers/StockMovementObserver.php
 
 namespace App\Observers;
 
 use App\Models\StockMovement;
-use App\Models\StockLot;
-use Illuminate\Support\Facades\Log;
+use App\Models\ProductLot;
+use App\Services\InventoryValuationService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
-/**
- * 🤖 Observer محسّن لإنشاء دفعات المخزون
- * * يجب تسجيل هذا الـ Observer في App/Providers/EventServiceProvider
- */
 class StockMovementObserver
 {
-    private const MAX_LEGAL_MARGIN = 5.00;
+    protected InventoryValuationService $valuationService;
+    private const MAX_LEGAL_MARGIN = 5.00; // هامش الربح القانوني 5%
+
+    public function __construct(InventoryValuationService $valuationService)
+    {
+        $this->valuationService = $valuationService;
+    }
 
     /**
-     * 🎯 بعد إنشاء حركة مخزون
+     * قبل إنشاء الحركة: حساب سعر التكلفة للحركات الخارجة
+     */
+    public function creating(StockMovement $movement): void
+    {
+        if (!$movement->stockMovementType) return;
+
+        // حركات الخروج (مبيعات)
+        if ($movement->stockMovementType->direction < 0) {
+            $movement->cost_price = $this->valuationService->getCostPriceForSale(
+                $movement->product,
+                $movement->warehouse_id,
+                $movement->quantity
+            );
+            $movement->unit_price = $movement->cost_price;
+            $movement->total_price = $movement->quantity * $movement->cost_price;
+        }
+
+        // حركات الإدخال (شراء): نضمن unit_price = cost_price
+        if ($movement->stockMovementType->direction > 0) {
+            $movement->cost_price = $movement->unit_price;
+            $movement->total_price = $movement->quantity * $movement->unit_price;
+        }
+    }
+
+    /**
+     * بعد إنشاء الحركة: تحديث التكلفة، إنشاء الدفعات، إدارة الأرصدة
      */
     public function created(StockMovement $movement): void
     {
         try {
-            // فقط عمليات الإدخال (Direction = 1)
-            if ($movement->stockMovementType?->direction === 1) {
-                $this->createStockLot($movement);
-            }
+            DB::transaction(function () use ($movement) {
+                // 1. تحديث PMP لحركات الإدخال
+                if ($movement->stockMovementType->direction > 0) {
+                    $this->valuationService->updateCostAfterPurchase($movement);
+                }
+
+                // 2. إنشاء دفعة جديدة (لحركات الإدخال فقط)
+                if ($movement->stockMovementType->direction > 0) {
+                    $this->createProductLot($movement);
+                }
+
+                // 3. تحديث أرصدة الدفعات لحركات الخروج (FIFO/LIFO)
+                if ($movement->stockMovementType->direction < 0) {
+                    $method = $movement->product->valuationMethod->method ?? 'weighted_average';
+                    if (in_array($method, ['fifo', 'lifo'])) {
+                        $this->valuationService->updateLotBalancesAfterSale(
+                            $movement->product,
+                            $movement->warehouse_id,
+                            $movement->quantity,
+                            $method
+                        );
+                    }
+                }
+
+                // 4. تحديث حقل stock_balance_after
+                $this->updateStockBalanceAfter($movement);
+            });
         } catch (\Exception $e) {
-            Log::error("فشل إنشاء دفعة للحركة {$movement->id}: " . $e->getMessage());
-            // 🔥 إعادة رمي الخطأ لإيقاف المعاملة التي أنشأت الحركة
+            Log::error("خطأ في Observer حركة المخزون {$movement->id}: " . $e->getMessage());
             throw $e;
         }
     }
 
     /**
-     * 📦 إنشاء دفعة جديدة (محمية من الأخطاء)
+     * إنشاء دفعة (Lot) لحركة الإدخال
      */
-    private function createStockLot(StockMovement $movement): void
+    private function createProductLot(StockMovement $movement): void
     {
-        // استخدام معاملة داخلية لضمان أن إنشاء الدفعة والربط يتم دفعة واحدة
-        DB::transaction(function () use ($movement) {
-            $variant = $movement->productVariant;
+        $product = $movement->product;
+        $purchasePrice = $movement->unit_price;
 
-            // 🔥 1. التحقق من صحة البيانات
-            if ($movement->quantity <= 0 || $movement->unit_price <= 0) {
-                // هذا يجب أن يُمنع بواسطة قيود التطبيق/القاعدة، لكنه أمان إضافي
-                return;
-            }
+        // حساب السعر القانوني (سعر البيع الأدنى = سعر الشراء + 5%)
+        $legalSellingPrice = round($purchasePrice * (1 + self::MAX_LEGAL_MARGIN / 100), 4);
 
-            $purchasePrice = $movement->unit_price;
+        // توليد رقم دفعة فريد
+        $lotNumber = $this->generateLotNumber($product, $movement);
 
-            // 🔥 2. حساب السعر القانوني (5%)
-            $legalSellingPrice = round(
-                $purchasePrice * (1 + (self::MAX_LEGAL_MARGIN / 100)),
-                4
-            );
+        $lot = ProductLot::create([
+            'lot_number' => $lotNumber,
+            'product_id' => $product->id,
+            'warehouse_id' => $movement->warehouse_id,
+            'purchase_date' => $movement->movement_date,
+            'purchase_price' => $purchasePrice,
+            'legal_selling_price' => $legalSellingPrice,
+            'margin_percentage' => self::MAX_LEGAL_MARGIN,
+            'original_quantity' => $movement->quantity,
+            'remaining_quantity' => $movement->quantity,
+            'stock_movement_id' => $movement->id,
+            'expiration_date' => $movement->expiration_date ?? null,
+            'active' => true,
+        ]);
 
-            // 🔥 3. إنشاء الدفعة
-            $lot = StockLot::create([
-                'lot_number' => $this->generateLotNumber($variant, $movement),
-                'product_variant_id' => $variant->id,
-                'warehouse_id' => $movement->warehouse_id,
-                'purchase_date' => $movement->movement_date,
-                'purchase_price' => $purchasePrice,
-                'original_quantity' => $movement->quantity,
-                'remaining_quantity' => $movement->quantity,
-                'legal_selling_price' => $legalSellingPrice,
-                'margin_percentage' => self::MAX_LEGAL_MARGIN,
-                'stock_movement_id' => $movement->id,
-                'expiration_date' => $movement->expiration_date,
-                'active' => true,
-            ]);
+        // ربط الحركة بالدفعة
+        $movement->update(['stock_lot_id' => $lot->id]);
 
-            // 🔥 4. ربط الحركة بالدفعة
-            $movement->update(['stock_lot_id' => $lot->id]);
-
-            Log::info("✅ تم إنشاء دفعة: {$lot->lot_number} | الكمية: {$lot->original_quantity}");
-        });
+        Log::info("✅ تم إنشاء دفعة: {$lot->lot_number} للمنتج {$product->name}");
     }
 
     /**
-     * 🔢 توليد رقم دفعة فريد (محسّن)
+     * توليد رقم دفعة فريد
      */
-    private function generateLotNumber($variant, StockMovement $movement): string
+    private function generateLotNumber($product, StockMovement $movement): string
     {
         $date = $movement->movement_date->format('Ymd');
-        $variantCode = $variant->ref ?? str_pad($variant->id, 6, '0', STR_PAD_LEFT);
+        $productCode = $product->ref ?? str_pad($product->id, 6, '0', STR_PAD_LEFT);
 
-        // 🔥 استخدام القفل لضمان عدم تكرار الترقيم المتسلسل
-        $sequence = DB::table('product_lots')
-            ->where('product_variant_id', $variant->id)
+        $sequence = ProductLot::where('product_id', $product->id)
             ->whereDate('purchase_date', $movement->movement_date)
             ->count() + 1;
 
-        return sprintf("LOT-%s-%s-%03d", $variantCode, $date, $sequence);
+        return sprintf("LOT-%s-%s-%03d", $productCode, $date, $sequence);
+    }
+
+    /**
+     * تحديث رصيد المخزون بعد الحركة (بالتتابع)
+     */
+    private function updateStockBalanceAfter(StockMovement $movement): void
+    {
+        $direction = $movement->stockMovementType->direction;
+        $quantityImpact = $direction * $movement->quantity;
+
+        // حساب الرصيد السابق
+        $previousBalance = StockMovement::where('product_id', $movement->product_id)
+            ->where('warehouse_id', $movement->warehouse_id)
+            ->where('id', '<', $movement->id)
+            ->orderBy('id', 'desc')
+            ->value('stock_balance_after') ?? 0;
+
+        $newBalance = max(0, $previousBalance + $quantityImpact);
+        $movement->stock_balance_after = $newBalance;
+        $movement->saveQuietly();
     }
 }

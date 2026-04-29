@@ -19,9 +19,7 @@ use App\Core\Traits\Auditable;
 #[Cacheable]
 class Brand extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable;
 
     protected $table = 'brands';
 
@@ -60,13 +58,10 @@ class Brand extends Model
     protected static function boot()
     {
         parent::boot();
-
         static::creating(function ($brand) {
             if (empty($brand->slug)) {
                 $brand->slug = Str::slug($brand->name);
             }
         });
     }
-
-
 }

@@ -61,6 +61,9 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->name('fk_docs_status_id');
 
+            $table->foreignId('fiscal_stamp_id')->nullable()
+                ->constrained('fiscal_stamps')->nullOnDelete();
+
             $table->boolean('is_locked')->default(false)->index();
             $table->timestamp('validated_at')->nullable();
             $table->foreignId('validated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_validated_by');

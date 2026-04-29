@@ -24,7 +24,7 @@ class Attachment extends Model
 
     protected $table = 'attachments';
 
-    protected $fillable = [
+        protected $fillable = [
         'file_name',
         'file_path',
         'file_type',
@@ -80,7 +80,6 @@ class Attachment extends Model
     public function getFileSizeFormatted(): string
     {
         $bytes = $this->file_size;
-
         if ($bytes >= 1073741824) {
             return number_format($bytes / 1073741824, 2) . ' GB';
         } elseif ($bytes >= 1048576) {
@@ -88,9 +87,9 @@ class Attachment extends Model
         } elseif ($bytes >= 1024) {
             return number_format($bytes / 1024, 2) . ' KB';
         }
-
         return $bytes . ' bytes';
     }
+
 }
 
 
@@ -191,9 +190,7 @@ use App\Core\Traits\Auditable;
 #[Cacheable]
 class Brand extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable;
 
     protected $table = 'brands';
 
@@ -232,15 +229,12 @@ class Brand extends Model
     protected static function boot()
     {
         parent::boot();
-
         static::creating(function ($brand) {
             if (empty($brand->slug)) {
                 $brand->slug = Str::slug($brand->name);
             }
         });
     }
-
-
 }
 
 
@@ -332,43 +326,31 @@ class Check extends Model
     {
         return $query->where('status', 'pending');
     }
-
     public function scopeCleared(Builder $query): Builder
     {
         return $query->where('status', 'cleared');
     }
-
     public function scopeBounced(Builder $query): Builder
     {
         return $query->where('status', 'bounced');
     }
-
     public function scopeDueToday(Builder $query): Builder
     {
-        return $query->where('due_date', now()->toDateString())
-            ->where('status', 'pending');
+        return $query->where('due_date', now()->toDateString())->where('status', 'pending');
     }
-
     public function scopeOverdue(Builder $query): Builder
     {
-        return $query->where('due_date', '<', now())
-            ->where('status', 'pending');
+        return $query->where('due_date', '<', now())->where('status', 'pending');
     }
 
     public function markAsCleared(): bool
     {
-        return $this->update([
-            'status' => 'cleared',
-            'cleared_date' => now(),
-        ]);
+        return $this->update(['status' => 'cleared', 'cleared_date' => now()]);
     }
 
     public function markAsBounced(string $reason): bool
     {
-        return $this->update([
-            'status' => 'bounced',
-            'bounce_reason' => $reason,
-        ]);
+        return $this->update(['status' => 'bounced', 'bounce_reason' => $reason]);
     }
 
     public function isOverdue(): bool
@@ -716,7 +698,7 @@ class CommercialDocumentLine extends Model
     // -------------------- Fillable --------------------
     protected $fillable = [
         'commercial_document_id',
-        'product_variant_id',
+        'product_id',
         'line_order',
         'description',
         'quantity',
@@ -725,6 +707,9 @@ class CommercialDocumentLine extends Model
         'unit_price_ht',
         'discount_percentage',
         'discount_amount',
+        'additional_costs',
+        'total_additional_cost',
+        'total_discount_amount',
         'tva_rate',
         'total_ht',
         'total_tva',
@@ -737,6 +722,9 @@ class CommercialDocumentLine extends Model
 
     // -------------------- Casts --------------------
     protected $casts = [
+        'additional_costs' => 'array',
+        'total_additional_cost' => 'decimal:4',
+        'total_discount_amount' => 'decimal:4',
         'line_order' => 'integer',
         'quantity' => 'decimal:3',
         'delivered_quantity' => 'decimal:3',
@@ -764,7 +752,7 @@ class CommercialDocumentLine extends Model
     /** @var array الفلاتر المسموحة */
     public static array $filterable = [
         'commercial_document_id',
-        'product_variant_id',
+        'product_id',
         'stock_lot_id',
         'is_auto_split',
     ];
@@ -822,9 +810,9 @@ class CommercialDocumentLine extends Model
         return $this->belongsTo(CommercialDocument::class);
     }
 
-    public function productVariant(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);
     }
 
     public function stockLot(): BelongsTo
@@ -2216,8 +2204,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
-// Core System
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HashesId;
 use App\Core\Traits\HasStandardizedConfiguration;
@@ -2228,30 +2214,26 @@ class InventoryValuationMethod extends Model
     use HasFactory, HashesId, HasStandardizedConfiguration;
 
     protected $fillable = [
-        'name',
-        'method',
-        'is_default',
+        'name', 'method', 'is_default',
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
     ];
 
-    // --- Core Config ---
     public static array $searchableFields = ['name', 'method'];
     public static array $filterable = ['is_default', 'method'];
     public static array $sortable = ['id', 'name', 'method'];
-    public static array $allowedIncludes = ['productVariants'];
-    public static ?int $cacheTtl = 86400; // 1 day
+    public static array $allowedIncludes = ['products']; // ✅ تعديل: بدلاً من productVariants
+    public static ?int $cacheTtl = 86400;
     public static array $cacheTags = ['inventory_valuation_methods', 'api'];
 
-    // --- العلاقات ---
-    public function productVariants(): HasMany
+    // ✅ العلاقة مع المنتجات مباشرة
+    public function products(): HasMany
     {
-        return $this->hasMany(ProductVariant::class, 'valuation_method_id');
+        return $this->hasMany(Product::class, 'valuation_method_id');
     }
 }
-
 
 
 
@@ -2704,12 +2686,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * OpeningBalanceStock Model
- *
- * Table: opening_balances_stock
- * Opening stock balances per fiscal year
- */
 #[Cacheable]
 class OpeningBalanceStock extends Model
 {
@@ -2718,11 +2694,7 @@ class OpeningBalanceStock extends Model
     protected $table = 'opening_balances_stock';
 
     protected $fillable = [
-        'fiscal_year_id',
-        'product_variant_id',
-        'warehouse_id',
-        'opening_quantity',
-        'opening_value',
+        'fiscal_year_id', 'product_id', 'warehouse_id', 'opening_quantity', 'opening_value',
     ];
 
     protected $casts = [
@@ -2733,11 +2705,11 @@ class OpeningBalanceStock extends Model
     ];
 
     public static array $searchableFields = [];
-    public static array $filterable = ['fiscal_year_id', 'product_variant_id', 'warehouse_id'];
+    public static array $filterable = ['fiscal_year_id', 'product_id', 'warehouse_id'];
     public static array $sortable = ['id', 'opening_quantity', 'opening_value'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['fiscalYear', 'productVariant', 'warehouse'];
-    public static string $defaultSort = 'product_variant_id';
+    public static array $allowedIncludes = ['fiscalYear', 'product', 'warehouse']; // ✅ تعديل
+    public static string $defaultSort = 'product_id';
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['opening_balances_stock'];
 
@@ -2746,9 +2718,10 @@ class OpeningBalanceStock extends Model
         return $this->belongsTo(FiscalYear::class);
     }
 
-    public function productVariant(): BelongsTo
+    // ✅ العلاقة مع المنتج مباشرة (بدلاً من productVariant)
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);
     }
 
     public function warehouse(): BelongsTo
@@ -2761,12 +2734,9 @@ class OpeningBalanceStock extends Model
         if ($this->opening_quantity <= 0) {
             return 0;
         }
-
         return $this->opening_value / $this->opening_quantity;
     }
 }
-
-
 
 
 
@@ -3545,14 +3515,14 @@ class PriceLevel extends Model
     public static array $filterable = ['active', 'is_percentage'];
     public static array $sortable = ['id', 'name', 'display_order'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['productVariantPrices', 'parties'];
+    public static array $allowedIncludes = ['productPrices', 'parties'];
     public static string $defaultSort = 'display_order';
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['price_levels', 'lookups'];
 
-    public function productVariantPrices(): HasMany
+    public function productPrices(): HasMany
     {
-        return $this->hasMany(ProductVariantPrice::class);
+        return $this->hasMany(ProductPrice::class);
     }
 
     public function parties(): HasMany
@@ -3587,112 +3557,152 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 
 /**
- * Product Model
+ * Product — النموذج الموحد (منتج + SKU في جدول واحد)
  *
- * Table: products
- * Stores general product information (parent level)
+ * العلاقات:
+ *   packagings       → product_packagings   (Colisages)
+ *   prices           → product_prices       (Tarifs)
+ *   quantityDiscounts→ quantity_discounts   (Tx Remise)
+ *   stockMovements   → stock_movements
+ *   lots             → product_lots
+ *   documentLines    → commercial_document_lines
+ *   openingBalances  → opening_balances_stock
  */
 #[Cacheable]
 class Product extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable;
 
     protected $table = 'products';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        // معلومات أساسية
         'name',
         'slug',
+        'ref',
+        'barcode',
         'description',
+
+        // تصنيف
         'family_id',
         'brand_id',
         'product_type_id',
+
+        // ضريبة ووحدة
+        'tva_id',
+        'unit_id',
+
+        // تسعير
+        'purchase_price_ht',
+
+        // مخزون
+        'manages_stock',
+        'allow_negative_stock',
+        'has_lots',
+        'has_expiration_date',
+        'min_stock_alert',
+        'max_stock_alert',
+        'manages_quantity_discounts',
+
+        // تقييم المخزون
+        'valuation_method_id',
+
+        // أبعاد
+        'weight',
+        'volume',
+        'length',
+        'width',
+        'height',
+
+        // بيانات مرنة
         'specifications',
         'images',
         'meta_title',
         'meta_description',
         'meta_keywords',
+
         'active',
-        ];
+    ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
-        'specifications' => 'array',
-        'images' => 'array',
-        'meta_keywords' => 'array',
-        'active' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'deleted_at' => 'datetime',
+        'specifications'             => 'array',
+        'images'                     => 'array',
+        'meta_keywords'              => 'array',
+        'active'                     => 'boolean',
+        'manages_stock'              => 'boolean',
+        'allow_negative_stock'       => 'boolean',
+        'has_lots'                   => 'boolean',
+        'has_expiration_date'        => 'boolean',
+        'manages_quantity_discounts' => 'boolean',
+        'purchase_price_ht'          => 'decimal:4',
+        'min_stock_alert'            => 'decimal:4',
+        'max_stock_alert'            => 'decimal:4',
+        'weight'                     => 'decimal:2',
+        'volume'                     => 'decimal:2',
+        'length'                     => 'decimal:2',
+        'width'                      => 'decimal:2',
+        'height'                     => 'decimal:2',
+        'created_at'                 => 'datetime',
+        'updated_at'                 => 'datetime',
+        'deleted_at'                 => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
+    protected $appends = ['current_stock', 'is_low_stock'];
 
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'name',
-        'description',
-        'meta_title',
-        'meta_description',
-    ];
+    // ── Configuration ──
 
-    /** @var array الفلاتر المسموحة */
+    public static array $searchableFields = ['name', 'ref', 'barcode', 'description'];
+
     public static array $filterable = [
         'family_id',
         'brand_id',
         'product_type_id',
+        'tva_id',
+        'unit_id',
+        'valuation_method_id',
+        'manages_stock',
+        'has_lots',
+        'has_expiration_date',
+        'manages_quantity_discounts',
         'active',
     ];
 
-    /** @var array حقول الترتيب */
     public static array $sortable = [
         'id',
         'name',
+        'ref',
+        'purchase_price_ht',
         'created_at',
         'updated_at',
     ];
 
-    /** @var array العلاقات المحملة دائماً */
-    public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
+    public static array $defaultWith  = [];
     public static array $allowedIncludes = [
         'family',
         'brand',
         'productType',
-        'variants',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
+        'tva',
+        'unit',
+        'valuationMethod',
+        'packagings',
+        'prices',
+        'prices.priceLevel',
+        'quantityDiscounts',
+        'quantityDiscounts.priceLevel',
+        'stockMovements',
+        'lots',
+        'documentLines',
+        'openingBalances',
     ];
 
-    /** @var string حقل الترتيب الافتراضي */
-    public static string $defaultSort = 'name';
-
-    /** @var string اتجاه الترتيب الافتراضي */
+    public static string $defaultSort          = 'name';
     public static string $defaultSortDirection = 'asc';
+    public static int    $defaultPerPage        = 15;
+    public static int    $perPageLimit          = 100;
+    public static ?int   $cacheTtl              = 300;
+    public static array  $cacheTags             = ['products'];
 
-    /** @var int عدد السجلات في الصفحة */
-    public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
-    public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
-    public static ?int $cacheTtl = 300;
-
-    /** @var array تاجات الكاش */
-    public static array $cacheTags = ['products'];
-
-    /** @var array الموديلات المرتبطة */
-    public static array $cacheInvalidateRelations = ['variants'];
-
-    /** @var array Scopes التلقائية */
-    public static array $scopes = [];
-
-    // -------------------- Relations --------------------
+    // ── Relations ──
 
     public function family(): BelongsTo
     {
@@ -3709,52 +3719,259 @@ class Product extends Model
         return $this->belongsTo(ProductType::class);
     }
 
-    public function variants(): HasMany
+    public function tva(): BelongsTo
     {
-        return $this->hasMany(ProductVariant::class);
+        return $this->belongsTo(Tva::class);
     }
 
-    // -------------------- Scopes --------------------
-
-    public function scopeWithVariants(Builder $query): Builder
+    public function unit(): BelongsTo
     {
-        return $query->has('variants');
+        return $this->belongsTo(Unit::class);
     }
 
-    public function scopeByFamily(Builder $query, int $familyId): Builder
+    public function valuationMethod(): BelongsTo
     {
-        return $query->where('family_id', $familyId);
+        return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id');
     }
 
-    public function scopeByBrand(Builder $query, int $brandId): Builder
+    /** Colisages — وحدات التعبئة */
+    public function packagings(): HasMany
     {
-        return $query->where('brand_id', $brandId);
+        return $this->hasMany(ProductPackaging::class)->orderBy('display_order');
     }
 
-    // -------------------- Helpers --------------------
-
-    public function hasVariants(): bool
+    /** Tarifs — مستويات الأسعار */
+    public function prices(): HasMany
     {
-        return $this->variants()->exists();
+        return $this->hasMany(ProductPrice::class);
     }
 
-    public function getMainImage(): ?string
+    /** Tx Remise — تخفيضات الكميات */
+    public function quantityDiscounts(): HasMany
     {
-        return $this->images[0] ?? null;
+        return $this->hasMany(QuantityDiscount::class)
+            ->orderBy('price_level_id')
+            ->orderBy('tier_order');
     }
 
-    protected static function boot()
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
+    }
+
+    public function lots(): HasMany
+    {
+        return $this->hasMany(ProductLot::class);
+    }
+
+    public function documentLines(): HasMany
+    {
+        return $this->hasMany(CommercialDocumentLine::class);
+    }
+
+    public function openingBalances(): HasMany
+    {
+        return $this->hasMany(OpeningBalanceStock::class);
+    }
+
+    // ── Scopes ──
+
+    public function scopeByFamily(Builder $q, int $familyId): Builder
+    {
+        return $q->where('family_id', $familyId);
+    }
+
+    public function scopeByBrand(Builder $q, int $brandId): Builder
+    {
+        return $q->where('brand_id', $brandId);
+    }
+
+    public function scopeManagesStock(Builder $q): Builder
+    {
+        return $q->where('manages_stock', true);
+    }
+
+    public function scopeLowStock(Builder $q): Builder
+    {
+        return $q->whereColumn(
+            'min_stock_alert',
+            '>=',
+            // subquery: آخر stock_balance_after لهذا المنتج
+            StockMovement::selectRaw('COALESCE(stock_balance_after, 0)')
+                ->whereColumn('product_id', 'products.id')
+                ->latest('movement_date')
+                ->latest('id')
+                ->limit(1)
+                ->getQuery()
+        );
+    }
+
+    // ── Accessors ──
+
+    public function getCurrentStockAttribute(): float
+    {
+        return (float) ($this->stockMovements()
+            ->latest('movement_date')
+            ->latest('id')
+            ->value('stock_balance_after') ?? 0);
+    }
+
+    public function getIsLowStockAttribute(): bool
+    {
+        if (!$this->manages_stock) return false;
+        return $this->current_stock <= (float) $this->min_stock_alert;
+    }
+
+    // ── Business Logic ──
+
+    /**
+     * حساب سعر البيع HT لمستوى سعر معين
+     * (بدون price_computed في DB — الحساب يتم هنا)
+     */
+    public function computedPrice(int $priceLevelId): float
+    {
+        $pp = $this->prices()
+            ->where('price_level_id', $priceLevelId)
+            ->where('active', true)
+            ->first();
+
+        if (!$pp) return 0.0;
+
+        return $pp->computePrice((float) $this->purchase_price_ht);
+    }
+
+    /**
+     * سعر البيع مع التعبئة
+     * سعر الفاردو = سعر الوحدة × معامل التعبئة
+     */
+    public function priceForPackaging(int $priceLevelId, int $packagingId): float
+    {
+        $unitPrice = $this->computedPrice($priceLevelId);
+        if (!$unitPrice) return 0.0;
+
+        $packaging = $this->packagings()->find($packagingId);
+        return $packaging
+            ? round($unitPrice * (float) $packaging->quantity, 4)
+            : $unitPrice;
+    }
+
+    /**
+     * التخفيض المنطبق على كمية لتعريفة معينة
+     */
+    public function applicableDiscount(int $priceLevelId, float $qty): ?QuantityDiscount
+    {
+        if (!$this->manages_quantity_discounts) return null;
+
+        return $this->quantityDiscounts()
+            ->where('price_level_id', $priceLevelId)
+            ->where('active', true)
+            ->where('is_blocked', false)
+            ->where('min_qty', '<=', $qty)
+            ->where(function ($q) use ($qty) {
+                $q->whereNull('max_qty')->orWhere('max_qty', '>=', $qty);
+            })
+            ->orderBy('tier_order')
+            ->first();
+    }
+
+    /**
+     * السعر النهائي بعد تطبيق خصم الكمية
+     */
+    public function finalPrice(int $priceLevelId, float $qty = 1, ?int $packagingId = null): float
+    {
+        $basePrice = $packagingId
+            ? $this->priceForPackaging($priceLevelId, $packagingId)
+            : $this->computedPrice($priceLevelId);
+
+        if (!$basePrice) return 0.0;
+
+        $discount = $this->applicableDiscount($priceLevelId, $qty);
+        if (!$discount) return $basePrice;
+
+        return $discount->calculateDiscountedPrice($basePrice);
+    }
+
+    /**
+     * الوحدة الأساسية (is_default أو الأصغر quantity)
+     */
+    public function defaultPackaging(): ?ProductPackaging
+    {
+        return $this->packagings()
+            ->where('is_default', true)
+            ->first()
+            ?? $this->packagings()->orderBy('quantity')->first();
+    }
+
+    // app/Models/Product.php
+
+    /**
+     * حساب كمية المخزون في تاريخ محدد
+     */
+    public function stockOnDate(int $warehouseId, string $date, bool $includeUnvalidated = false): float
+    {
+        $query = $this->stockMovements()
+            ->where('warehouse_id', $warehouseId)
+            ->where('movement_date', '<=', $date);
+
+        if (!$includeUnvalidated) {
+            $query->where('is_validated', true);
+        }
+
+        return $query->get()->sum(function ($movement) {
+            $direction = $movement->stockMovementType->direction;
+            return $direction * $movement->quantity;
+        });
+    }
+
+    /**
+     * الحصول على سعر التكلفة (PMP) في تاريخ محدد
+     */
+    public function costPriceOnDate(int $warehouseId, string $date): float
+    {
+        $movements = $this->stockMovements()
+            ->where('warehouse_id', $warehouseId)
+            ->where('is_validated', true)
+            ->where('movement_date', '<=', $date)
+            ->orderBy('movement_date')
+            ->get();
+
+        $totalValue = 0;
+        $totalQuantity = 0;
+
+        foreach ($movements as $movement) {
+            $direction = $movement->stockMovementType->direction;
+            $quantity = $direction * $movement->quantity;
+
+            if ($quantity > 0) {
+                // إدخال: نضيف القيمة والكمية
+                $totalValue += $movement->quantity * $movement->unit_price;
+                $totalQuantity += $movement->quantity;
+            } else {
+                // خروج: نطرح من المتوسط المرجح الحالي
+                $currentPMP = $totalQuantity > 0 ? $totalValue / $totalQuantity : 0;
+                $outValue = abs($quantity) * $currentPMP;
+                $totalValue -= $outValue;
+                $totalQuantity += $quantity; // quantity سالبة
+            }
+        }
+
+        return $totalQuantity > 0 ? round($totalValue / $totalQuantity, 4) : 0;
+    }
+
+    // ── Boot ──
+
+    protected static function boot(): void
     {
         parent::boot();
 
-        static::creating(function ($product) {
+        static::creating(function (Product $product) {
             if (empty($product->slug)) {
                 $product->slug = Str::slug($product->name);
             }
         });
 
-        static::updating(function ($product) {
-            if ($product->isDirty('name')) {
+        static::updating(function (Product $product) {
+            if ($product->isDirty('name') && !$product->isDirty('slug')) {
                 $product->slug = Str::slug($product->name);
             }
         });
@@ -3790,7 +4007,7 @@ class ProductLot extends Model
     // -------------------- Fillable --------------------
     protected $fillable = [
         'lot_number',
-        'product_variant_id',
+        'product_id',
         'warehouse_id',
         'manufacturing_date',
         'expiration_date',
@@ -3834,7 +4051,7 @@ class ProductLot extends Model
 
     /** @var array الفلاتر المسموحة */
     public static array $filterable = [
-        'product_variant_id',
+        'product_id',
         'warehouse_id',
         'active',
     ];
@@ -3854,7 +4071,7 @@ class ProductLot extends Model
 
     /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'productVariant',
+        'product',
         'warehouse',
         'stockMovement',
         'commercialDocumentLines',
@@ -3887,9 +4104,9 @@ class ProductLot extends Model
 
     // -------------------- Relations --------------------
 
-    public function productVariant(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);
     }
 
     public function warehouse(): BelongsTo
@@ -3991,6 +4208,159 @@ class ProductLot extends Model
 
 
 
+// ===== ملف: ProductPackaging.php =====
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Core\Traits\HasStandardizedConfiguration;
+
+// ═══════════════════════════════════════════════════════════
+// ProductPackaging — وحدات التعبئة (Colisages)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Table: product_packagings
+ *
+ * UN=1 / FD=6 / PLT=480
+ * سعر التعبئة = product.computedPrice(level) × quantity
+ */
+class ProductPackaging extends Model
+{
+    use HasStandardizedConfiguration;
+
+    protected $table = 'product_packagings';
+
+    protected $fillable = [
+        'product_id', 'code', 'label',
+        'quantity', 'barcode',
+        'is_default', 'active', 'display_order',
+    ];
+
+    protected $casts = [
+        'quantity'      => 'decimal:4',
+        'is_default'    => 'boolean',
+        'active'        => 'boolean',
+        'display_order' => 'integer',
+    ];
+
+    public static array $searchableFields = ['code', 'label', 'barcode'];
+    public static array $filterable       = ['product_id', 'active', 'is_default'];
+    public static array $sortable         = ['id', 'display_order', 'quantity'];
+    public static array $allowedIncludes  = ['product'];
+    public static string $defaultSort     = 'display_order';
+    public static array $cacheTags        = ['product_packagings', 'products'];
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * سعر هذه التعبئة لمستوى سعر معين
+     */
+    public function priceForLevel(int $priceLevelId): float
+    {
+        $unitPrice = $this->product->computedPrice($priceLevelId);
+        return round($unitPrice * (float) $this->quantity, 4);
+    }
+}
+
+
+
+
+// ===== ملف: ProductPrice.php =====
+namespace App\Models;
+
+use App\Core\Traits\HasStandardizedConfiguration;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+
+// ═══════════════════════════════════════════════════════════
+// ProductPrice — التعريفات (Tarifs)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Table: product_prices
+ *
+ * ثلاث طرق للتسعير — الحساب في PHP فقط (لا price_computed في DB):
+ *
+ *   fixed  → price_ht = price
+ *   rate   → price_ht = purchase_price_ht × (1 + rate/100)
+ *   margin → price_ht = purchase_price_ht + margin
+ */
+class ProductPrice extends Model
+{
+    use HasStandardizedConfiguration;
+
+    protected $table = 'product_prices';
+
+    protected $fillable = [
+        'product_id', 'price_level_id',
+        'pricing_method',
+        'price', 'rate', 'margin',
+        'active',
+    ];
+
+    protected $casts = [
+        'price'  => 'decimal:4',
+        'rate'   => 'decimal:4',
+        'margin' => 'decimal:4',
+        'active' => 'boolean',
+    ];
+
+    public static array $filterable      = ['product_id', 'price_level_id', 'active', 'pricing_method'];
+    public static array $sortable        = ['id', 'price_level_id'];
+    public static array $allowedIncludes = ['product', 'priceLevel'];
+    public static string $defaultSort    = 'price_level_id';
+    public static array $cacheTags       = ['product_prices', 'products'];
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function priceLevel(): BelongsTo
+    {
+        return $this->belongsTo(PriceLevel::class);
+    }
+
+    /**
+     * حساب سعر البيع HT بناءً على طريقة التسعير وسعر الشراء
+     *
+     * @param float $purchasePriceHt سعر الشراء من جدول products
+     */
+    public function computePrice(float $purchasePriceHt): float
+    {
+        return match ($this->pricing_method) {
+            'rate'   => round($purchasePriceHt * (1 + ((float)($this->rate   ?? 0)) / 100), 4),
+            'margin' => round($purchasePriceHt  +      (float)($this->margin ?? 0),         4),
+            default  => round((float)($this->price ?? 0), 4),
+        };
+    }
+
+    /**
+     * قيمة الهامش المحسوب (للعرض في الواجهة)
+     */
+    public function computedMargin(float $purchasePriceHt): float
+    {
+        return round($this->computePrice($purchasePriceHt) - $purchasePriceHt, 4);
+    }
+
+    /**
+     * نسبة الربح المحسوبة (للعرض في الواجهة)
+     */
+    public function computedRate(float $purchasePriceHt): float
+    {
+        if (!$purchasePriceHt) return 0.0;
+        return round((($this->computePrice($purchasePriceHt) / $purchasePriceHt) - 1) * 100, 4);
+    }
+}
+
+
+
+
 // ===== ملف: ProductType.php =====
 namespace App\Models;
 
@@ -4047,436 +4417,6 @@ class ProductType extends Model
 
 
 
-// ===== ملف: ProductVariant.php =====
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Builder;
-use App\Core\Attributes\Cacheable;
-use App\Core\Traits\HasStandardizedConfiguration;
-use App\Core\Traits\Auditable;
-
-/**
- * ProductVariant Model
- *
- * Table: product_variants
- * Represents sellable SKUs with unique pricing and inventory
- */
-#[Cacheable]
-class ProductVariant extends Model
-{
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        Auditable;
-
-    protected $table = 'product_variants';
-
-    // -------------------- Fillable --------------------
-    protected $fillable = [
-        'product_id',
-        'ref',
-        'barcode',
-        'variant_name',
-        'unit_id',
-        'tva_id',
-        'last_purchase_price',
-        'average_cost_price',
-        'default_selling_price_ht',
-        'manages_stock',
-        'allow_negative_stock',
-        'has_lots',
-        'has_expiration_date',
-        'min_stock_alert',
-        'max_stock_alert',
-        'manages_quantity_discounts',
-        'weight',
-        'volume',
-        'length',
-        'width',
-        'height',
-        'variant_attributes',
-        'valuation_method_id',
-        'active',
-    ];
-
-    // -------------------- Casts --------------------
-    protected $casts = [
-        'last_purchase_price' => 'decimal:4',
-        'average_cost_price' => 'decimal:4',
-        'default_selling_price_ht' => 'decimal:4',
-        'manages_stock' => 'boolean',
-        'allow_negative_stock' => 'boolean',
-        'has_lots' => 'boolean',
-        'has_expiration_date' => 'boolean',
-        'min_stock_alert' => 'decimal:4',
-        'max_stock_alert' => 'decimal:4',
-        'manages_quantity_discounts' => 'boolean',
-        'weight' => 'decimal:3',
-        'volume' => 'decimal:3',
-        'length' => 'decimal:4',
-        'width' => 'decimal:4',
-        'height' => 'decimal:4',
-        'variant_attributes' => 'array',
-        'active' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'deleted_at' => 'datetime',
-    ];
-
-    // -------------------- Appends --------------------
-    protected $appends = ['current_stock', 'is_low_stock'];
-
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'ref',
-        'barcode',
-        'variant_name',
-    ];
-
-    /** @var array الفلاتر المسموحة */
-    public static array $filterable = [
-        'product_id',
-        'unit_id',
-        'tva_id',
-        'valuation_method_id',
-        'manages_stock',
-        'has_lots',
-        'has_expiration_date',
-        'manages_quantity_discounts',
-        'active',
-    ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'ref',
-        'variant_name',
-        'default_selling_price_ht',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
-    public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
-    public static array $allowedIncludes = [
-        'product',
-        'unit',
-        'tva',
-        'valuationMethod',
-        'prices',
-        'quantityDiscounts',
-        'stockMovements',
-        'productLots',
-        'commercialDocumentLines',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
-    ];
-
-    /** @var string حقل الترتيب الافتراضي */
-    public static string $defaultSort = 'ref';
-
-    /** @var string اتجاه الترتيب الافتراضي */
-    public static string $defaultSortDirection = 'asc';
-
-    /** @var int عدد السجلات في الصفحة */
-    public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
-    public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
-    public static ?int $cacheTtl = 300;
-
-    /** @var array تاجات الكاش */
-    public static array $cacheTags = ['product_variants', 'products'];
-
-    /** @var array الموديلات المرتبطة */
-    public static array $cacheInvalidateRelations = [
-        'prices',
-        'stockMovements',
-        'productLots',
-    ];
-
-    /** @var array Scopes التلقائية */
-    public static array $scopes = [];
-
-    // -------------------- Relations --------------------
-
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class);
-    }
-
-    public function unit(): BelongsTo
-    {
-        return $this->belongsTo(Unit::class);
-    }
-
-    public function tva(): BelongsTo
-    {
-        return $this->belongsTo(Tva::class);
-    }
-
-    public function valuationMethod(): BelongsTo
-    {
-        return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id');
-    }
-
-    public function prices(): HasMany
-    {
-        return $this->hasMany(ProductVariantPrice::class);
-    }
-
-    public function quantityDiscounts(): HasMany
-    {
-        return $this->hasMany(QuantityDiscount::class);
-    }
-
-    public function stockMovements(): HasMany
-    {
-        return $this->hasMany(StockMovement::class);
-    }
-
-    public function productLots(): HasMany
-    {
-        return $this->hasMany(ProductLot::class);
-    }
-
-    public function commercialDocumentLines(): HasMany
-    {
-        return $this->hasMany(CommercialDocumentLine::class);
-    }
-
-    // -------------------- Scopes --------------------
-
-    public function scopeManagesStock(Builder $query): Builder
-    {
-        return $query->where('manages_stock', true);
-    }
-
-    public function scopeLowStock(Builder $query): Builder
-    {
-        return $query->whereRaw('
-            (SELECT COALESCE(SUM(stock_balance_after), 0)
-             FROM stock_movements
-             WHERE product_variant_id = product_variants.id
-             ORDER BY movement_date DESC, id DESC
-             LIMIT 1) <= min_stock_alert
-        ');
-    }
-
-    public function scopeOutOfStock(Builder $query): Builder
-    {
-        return $query->whereRaw('
-            (SELECT COALESCE(SUM(stock_balance_after), 0)
-             FROM stock_movements
-             WHERE product_variant_id = product_variants.id
-             ORDER BY movement_date DESC, id DESC
-             LIMIT 1) <= 0
-        ');
-    }
-
-    // -------------------- Accessors --------------------
-
-    /**
-     * Get current stock quantity across all warehouses
-     */
-    public function getCurrentStockAttribute(): float
-    {
-        return $this->stockMovements()
-            ->latest('movement_date')
-            ->latest('id')
-            ->value('stock_balance_after') ?? 0;
-    }
-
-    /**
-     * Check if stock is below minimum alert level
-     */
-    public function getIsLowStockAttribute(): bool
-    {
-        if (!$this->manages_stock) {
-            return false;
-        }
-
-        return $this->current_stock <= $this->min_stock_alert;
-    }
-
-    // -------------------- Helpers --------------------
-
-    /**
-     * Get stock by warehouse
-     */
-    public function getStockByWarehouse(int $warehouseId): float
-    {
-        return $this->stockMovements()
-            ->where('warehouse_id', $warehouseId)
-            ->latest('movement_date')
-            ->latest('id')
-            ->value('stock_balance_after') ?? 0;
-    }
-
-    /**
-     * Get price for specific price level
-     */
-    public function getPriceForLevel(int $priceLevelId): ?float
-    {
-        return $this->prices()
-            ->where('price_level_id', $priceLevelId)
-            ->where('active', true)
-            ->where('valid_from', '<=', now())
-            ->where(function ($q) {
-                $q->whereNull('valid_to')
-                    ->orWhere('valid_to', '>=', now());
-            })
-            ->value('price');
-    }
-
-    /**
-     * Get applicable quantity discount
-     */
-    public function getQuantityDiscount(float $quantity): ?QuantityDiscount
-    {
-        if (!$this->manages_quantity_discounts) {
-            return null;
-        }
-
-        return $this->quantityDiscounts()
-            ->where('active', true)
-            ->where('min_quantity', '<=', $quantity)
-            ->where(function ($q) use ($quantity) {
-                $q->whereNull('max_quantity')
-                    ->orWhere('max_quantity', '>=', $quantity);
-            })
-            ->where('valid_from', '<=', now())
-            ->where(function ($q) {
-                $q->whereNull('valid_to')
-                    ->orWhere('valid_to', '>=', now());
-            })
-            ->orderBy('tier_order')
-            ->first();
-    }
-
-    /**
-     * Calculate final price with quantity discount
-     */
-    public function calculateFinalPrice(float $quantity, ?int $priceLevelId = null): float
-    {
-        $basePrice = $priceLevelId
-            ? $this->getPriceForLevel($priceLevelId)
-            : $this->default_selling_price_ht;
-
-        if (!$basePrice) {
-            return 0;
-        }
-
-        $discount = $this->getQuantityDiscount($quantity);
-        if (!$discount) {
-            return $basePrice;
-        }
-
-        if ($discount->discount_percentage) {
-            return $basePrice * (1 - $discount->discount_percentage / 100);
-        }
-
-        return max(0, $basePrice - $discount->discount_per_unit);
-    }
-}
-
-
-
-
-// ===== ملف: ProductVariantPrice.php =====
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
-use App\Core\Attributes\Cacheable;
-use App\Core\Traits\HasStandardizedConfiguration;
-
-/**
- * ProductVariantPrice Model
- *
- * Table: product_variant_prices
- * Manages different pricing levels for product variants
- */
-#[Cacheable]
-class ProductVariantPrice extends Model
-{
-    use HasStandardizedConfiguration;
-
-    protected $table = 'product_variant_prices';
-
-    protected $fillable = [
-        'product_variant_id',
-        'price_level_id',
-        'price',
-        'valid_from',
-        'valid_to',
-        'active',
-    ];
-
-    protected $casts = [
-        'price' => 'decimal:4',
-        'valid_from' => 'date',
-        'valid_to' => 'date',
-        'active' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-    ];
-
-    public static array $searchableFields = [];
-    public static array $filterable = ['product_variant_id', 'price_level_id', 'active'];
-    public static array $sortable = ['id', 'price', 'valid_from'];
-    public static array $defaultWith = [];
-    public static array $allowedIncludes = ['productVariant', 'priceLevel'];
-    public static string $defaultSort = 'valid_from';
-    public static string $defaultSortDirection = 'desc';
-    public static ?int $cacheTtl = 300;
-    public static array $cacheTags = ['product_variant_prices'];
-
-    public function productVariant(): BelongsTo
-    {
-        return $this->belongsTo(ProductVariant::class);
-    }
-
-    public function priceLevel(): BelongsTo
-    {
-        return $this->belongsTo(PriceLevel::class);
-    }
-
-    public function scopeValid(Builder $query, $date = null): Builder
-    {
-        $date = $date ?? now();
-
-        return $query->where('active', true)
-            ->where('valid_from', '<=', $date)
-            ->where(function ($q) use ($date) {
-                $q->whereNull('valid_to')
-                    ->orWhere('valid_to', '>=', $date);
-            });
-    }
-
-    public function isValid($date = null): bool
-    {
-        $date = $date ?? now();
-
-        return $this->active
-            && $this->valid_from <= $date
-            && (is_null($this->valid_to) || $this->valid_to >= $date);
-    }
-}
-
-
-
-
 // ===== ملف: QuantityDiscount.php =====
 namespace App\Models;
 
@@ -4486,13 +4426,16 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
+// ═══════════════════════════════════════════════════════════
+// QuantityDiscount — تخفيضات الكميات (Tx Remise)
+// ═══════════════════════════════════════════════════════════
+
 /**
- * QuantityDiscount Model
- *
  * Table: quantity_discounts
- * Volume-based discounts for product variants
+ *
+ * كل تعريفة + منتج لها شرائح مستقلة.
+ * الكميات دائماً بالوحدة الأساسية.
  */
-#[Cacheable]
 class QuantityDiscount extends Model
 {
     use HasStandardizedConfiguration;
@@ -4500,78 +4443,71 @@ class QuantityDiscount extends Model
     protected $table = 'quantity_discounts';
 
     protected $fillable = [
-        'product_variant_id',
-        'min_quantity',
-        'max_quantity',
-        'discount_per_unit',
-        'discount_percentage',
-        'tier_order',
-        'active',
-        'valid_from',
-        'valid_to',
+        'product_id', 'price_level_id',
+        'min_qty', 'max_qty',
+        'discount_amount', 'discount_percentage',
+        'tier_order', 'is_blocked', 'active',
     ];
 
     protected $casts = [
-        'min_quantity' => 'decimal:4',
-        'max_quantity' => 'decimal:4',
-        'discount_per_unit' => 'decimal:4',
-        'discount_percentage' => 'decimal:2',
-        'tier_order' => 'integer',
-        'active' => 'boolean',
-        'valid_from' => 'date',
-        'valid_to' => 'date',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'min_qty'             => 'decimal:4',
+        'max_qty'             => 'decimal:4',
+        'discount_amount'     => 'decimal:4',
+        'discount_percentage' => 'decimal:4',
+        'tier_order'          => 'integer',
+        'is_blocked'          => 'boolean',
+        'active'              => 'boolean',
     ];
 
-    public static array $searchableFields = [];
-    public static array $filterable = ['product_variant_id', 'active'];
-    public static array $sortable = ['id', 'min_quantity', 'tier_order'];
-    public static array $defaultWith = [];
-    public static array $allowedIncludes = ['productVariant'];
-    public static string $defaultSort = 'tier_order';
-    public static ?int $cacheTtl = 300;
-    public static array $cacheTags = ['quantity_discounts'];
+    public static array $filterable      = ['product_id', 'price_level_id', 'active', 'is_blocked'];
+    public static array $sortable        = ['id', 'min_qty', 'tier_order'];
+    public static array $allowedIncludes = ['product', 'priceLevel'];
+    public static string $defaultSort    = 'tier_order';
+    public static array $cacheTags       = ['quantity_discounts', 'products'];
 
-    public function productVariant(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);
     }
 
-    public function scopeValid(Builder $query, $date = null): Builder
+    public function priceLevel(): BelongsTo
     {
-        $date = $date ?? now();
-
-        return $query->where('active', true)
-            ->where('valid_from', '<=', $date)
-            ->where(function ($q) use ($date) {
-                $q->whereNull('valid_to')
-                    ->orWhere('valid_to', '>=', $date);
-            });
+        return $this->belongsTo(PriceLevel::class);
     }
 
-    public function scopeForQuantity(Builder $query, float $quantity): Builder
+    /**
+     * هل هذه الشريحة تنطبق على الكمية المعطاة؟
+     */
+    public function appliesTo(float $qty): bool
     {
-        return $query->where('min_quantity', '<=', $quantity)
-            ->where(function ($q) use ($quantity) {
-                $q->whereNull('max_quantity')
-                    ->orWhere('max_quantity', '>=', $quantity);
-            });
+        return $this->active
+            && !$this->is_blocked
+            && $qty >= (float) $this->min_qty
+            && (is_null($this->max_qty) || $qty <= (float) $this->max_qty);
     }
 
-    public function appliesTo(float $quantity): bool
-    {
-        return $quantity >= $this->min_quantity
-            && (is_null($this->max_quantity) || $quantity <= $this->max_quantity);
-    }
-
-    public function calculateDiscount(float $basePrice, float $quantity): float
+    /**
+     * حساب السعر النهائي بعد تطبيق الخصم
+     *
+     * الأولوية: discount_percentage > discount_amount
+     */
+    public function calculateDiscountedPrice(float $unitPrice): float
     {
         if ($this->discount_percentage) {
-            return $basePrice * $quantity * ($this->discount_percentage / 100);
+            return round($unitPrice * (1 - (float) $this->discount_percentage / 100), 4);
         }
+        if ($this->discount_amount) {
+            return round(max(0, $unitPrice - (float) $this->discount_amount), 4);
+        }
+        return $unitPrice;
+    }
 
-        return $this->discount_per_unit * $quantity;
+    /**
+     * قيمة الخصم على الوحدة (للعرض)
+     */
+    public function discountValue(float $unitPrice): float
+    {
+        return round($unitPrice - $this->calculateDiscountedPrice($unitPrice), 4);
     }
 }
 
@@ -4794,7 +4730,7 @@ class StockMovement extends Model
 
     // -------------------- Fillable --------------------
     protected $fillable = [
-        'product_variant_id',
+        'product_id',
         'warehouse_id',
         'fiscal_year_id',
         'stock_movement_type_id',
@@ -4845,7 +4781,7 @@ class StockMovement extends Model
 
     /** @var array الفلاتر المسموحة */
     public static array $filterable = [
-        'product_variant_id',
+        'product_id',
         'warehouse_id',
         'fiscal_year_id',
         'stock_movement_type_id',
@@ -4869,7 +4805,7 @@ class StockMovement extends Model
 
     /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'productVariant',
+        'product',
         'warehouse',
         'fiscalYear',
         'stockMovementType',
@@ -4907,9 +4843,9 @@ class StockMovement extends Model
 
     // -------------------- Relations --------------------
 
-    public function productVariant(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);    
     }
 
     public function warehouse(): BelongsTo
@@ -5293,14 +5229,14 @@ class Tva extends Model
     public static array $filterable = ['active', 'is_default'];
     public static array $sortable = ['id', 'name', 'rate', 'display_order'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['productVariants'];
+    public static array $allowedIncludes = ['products'];
     public static string $defaultSort = 'display_order';
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['tvas', 'lookups'];
 
-    public function productVariants(): HasMany
+    public function products(): HasMany
     {
-        return $this->hasMany(ProductVariant::class);
+        return $this->hasMany(Product::class);
     }
 
     public function scopeDefault(Builder $query): Builder
@@ -5359,14 +5295,14 @@ class Unit extends Model
     public static array $filterable = ['active'];
     public static array $sortable = ['id', 'name', 'display_order'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['productVariants'];
+    public static array $allowedIncludes = ['products'];
     public static string $defaultSort = 'display_order';
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['units', 'lookups'];
 
-    public function productVariants(): HasMany
+    public function products(): HasMany
     {
-        return $this->hasMany(ProductVariant::class);
+        return $this->hasMany(Product::class);
     }
 }
 

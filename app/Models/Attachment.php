@@ -19,7 +19,7 @@ class Attachment extends Model
 
     protected $table = 'attachments';
 
-    protected $fillable = [
+        protected $fillable = [
         'file_name',
         'file_path',
         'file_type',
@@ -75,7 +75,6 @@ class Attachment extends Model
     public function getFileSizeFormatted(): string
     {
         $bytes = $this->file_size;
-
         if ($bytes >= 1073741824) {
             return number_format($bytes / 1073741824, 2) . ' GB';
         } elseif ($bytes >= 1048576) {
@@ -83,7 +82,7 @@ class Attachment extends Model
         } elseif ($bytes >= 1024) {
             return number_format($bytes / 1024, 2) . ' KB';
         }
-
         return $bytes . ' bytes';
     }
+
 }

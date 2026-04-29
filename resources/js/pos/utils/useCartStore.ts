@@ -43,11 +43,11 @@ export const useCartStore = create<CartState>()(
 
       addItem: (variant, qty = 1) => {
         set(state => {
-          const existing = state.items.find(i => i.product_variant_id === variant.id);
+          const existing = state.items.find(i => i.product_id === variant.id);
           if (existing) {
             return {
               items: state.items.map(i =>
-                i.product_variant_id === variant.id
+                i.product_id === variant.id
                   ? calcItemTotals({ ...i, quantity: i.quantity + qty })
                   : i
               ),
@@ -58,7 +58,7 @@ export const useCartStore = create<CartState>()(
           const priceTtc = priceHt * (1 + tvaRate / 100);
           const newItem: CartItem = {
             id:                  nanoid(8),
-            product_variant_id:  variant.id,
+            product_id:  variant.id,
             product_name:        variant.product?.name ?? '',
             variant_name:        variant.variant_name,
             barcode:             variant.barcode,

@@ -12,7 +12,7 @@ class OpeningBalanceStockResource extends JsonResource
         return [
             'id' => $this->id,
             'fiscal_year_id' => $this->fiscal_year_id,
-            'product_variant_id' => $this->product_variant_id,
+            'product_id' => $this->product_id,
             'warehouse_id' => $this->warehouse_id,
             'opening_quantity' => $this->opening_quantity,
             'opening_value' => $this->opening_value,

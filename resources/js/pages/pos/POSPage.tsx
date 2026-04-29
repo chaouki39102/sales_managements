@@ -273,7 +273,7 @@ export default function POSPage() {
             ) : (
               <div className={`pgrid ${view === 'list' ? 'lv' : ''}`}>
                 {filteredVariants.map(variant => {
-                  const inCart = pos.items.find(i => i.product_variant_id === variant.id);
+                  const inCart = pos.items.find(i => i.product_id === variant.id);
                   return (
                     <ProductCard
                       key={variant.id}

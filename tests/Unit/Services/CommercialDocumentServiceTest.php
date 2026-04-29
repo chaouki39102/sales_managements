@@ -63,13 +63,13 @@ class CommercialDocumentServiceTest extends TestCase
             'currency_id' => $currency->id,
             'lines' => [
                 [
-                    'product_variant_id' => 1,
+                    'product_id' => 1,
                     'quantity' => 10,
                     'unit_price_ht' => 100,
                     'tva_rate' => 19,
                 ],
                 [
-                    'product_variant_id' => 2,
+                    'product_id' => 2,
                     'quantity' => 5,
                     'unit_price_ht' => 50,
                     'tva_rate' => 19,

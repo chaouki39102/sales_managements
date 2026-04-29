@@ -72,43 +72,31 @@ class Check extends Model
     {
         return $query->where('status', 'pending');
     }
-
     public function scopeCleared(Builder $query): Builder
     {
         return $query->where('status', 'cleared');
     }
-
     public function scopeBounced(Builder $query): Builder
     {
         return $query->where('status', 'bounced');
     }
-
     public function scopeDueToday(Builder $query): Builder
     {
-        return $query->where('due_date', now()->toDateString())
-            ->where('status', 'pending');
+        return $query->where('due_date', now()->toDateString())->where('status', 'pending');
     }
-
     public function scopeOverdue(Builder $query): Builder
     {
-        return $query->where('due_date', '<', now())
-            ->where('status', 'pending');
+        return $query->where('due_date', '<', now())->where('status', 'pending');
     }
 
     public function markAsCleared(): bool
     {
-        return $this->update([
-            'status' => 'cleared',
-            'cleared_date' => now(),
-        ]);
+        return $this->update(['status' => 'cleared', 'cleared_date' => now()]);
     }
 
     public function markAsBounced(string $reason): bool
     {
-        return $this->update([
-            'status' => 'bounced',
-            'bounce_reason' => $reason,
-        ]);
+        return $this->update(['status' => 'bounced', 'bounce_reason' => $reason]);
     }
 
     public function isOverdue(): bool

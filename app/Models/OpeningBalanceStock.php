@@ -7,12 +7,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * OpeningBalanceStock Model
- *
- * Table: opening_balances_stock
- * Opening stock balances per fiscal year
- */
 #[Cacheable]
 class OpeningBalanceStock extends Model
 {
@@ -21,11 +15,7 @@ class OpeningBalanceStock extends Model
     protected $table = 'opening_balances_stock';
 
     protected $fillable = [
-        'fiscal_year_id',
-        'product_variant_id',
-        'warehouse_id',
-        'opening_quantity',
-        'opening_value',
+        'fiscal_year_id', 'product_id', 'warehouse_id', 'opening_quantity', 'opening_value',
     ];
 
     protected $casts = [
@@ -36,11 +26,11 @@ class OpeningBalanceStock extends Model
     ];
 
     public static array $searchableFields = [];
-    public static array $filterable = ['fiscal_year_id', 'product_variant_id', 'warehouse_id'];
+    public static array $filterable = ['fiscal_year_id', 'product_id', 'warehouse_id'];
     public static array $sortable = ['id', 'opening_quantity', 'opening_value'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['fiscalYear', 'productVariant', 'warehouse'];
-    public static string $defaultSort = 'product_variant_id';
+    public static array $allowedIncludes = ['fiscalYear', 'product', 'warehouse']; // ✅ تعديل
+    public static string $defaultSort = 'product_id';
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['opening_balances_stock'];
 
@@ -49,9 +39,10 @@ class OpeningBalanceStock extends Model
         return $this->belongsTo(FiscalYear::class);
     }
 
-    public function productVariant(): BelongsTo
+    // ✅ العلاقة مع المنتج مباشرة (بدلاً من productVariant)
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);
     }
 
     public function warehouse(): BelongsTo
@@ -64,8 +55,6 @@ class OpeningBalanceStock extends Model
         if ($this->opening_quantity <= 0) {
             return 0;
         }
-
         return $this->opening_value / $this->opening_quantity;
     }
 }
-

@@ -98,7 +98,7 @@ class ProductServiceTest extends TestCase
         
         $product->commercialDocumentLines()->create([
             'commercial_document_id' => 1,
-            'product_variant_id' => 1,
+            'product_id' => 1,
             'quantity' => 10,
             'unit_price_ht' => 100,
             'total_ht' => 1000,

@@ -18,7 +18,7 @@ function calcFiscalStamp(totalTtc: number): number {
 // ── Types ──────────────────────────────────────
 interface LineItem {
   id?:                   number;
-  product_variant_id:    string;
+  product_id:    string;
   description:           string;
   quantity:              number;
   unit_price_ht:         number;
@@ -179,7 +179,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
         apply_stamp:    parseFloat(existingDocument.total_stamp ?? 0) > 0,
         lines:          (existingDocument.lines ?? []).map((l: any) => ({
           id:                  l.id,
-          product_variant_id:  String(l.product_variant_id ?? ''),
+          product_id:  String(l.product_id ?? ''),
           description:         l.description ?? '',
           quantity:            parseFloat(l.quantity) || 1,
           unit_price_ht:       parseFloat(l.unit_price_ht) || 0,
@@ -237,7 +237,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
     setForm(f => ({
       ...f,
       lines: [...f.lines, {
-        product_variant_id: '', description: '',
+        product_id: '', description: '',
         quantity: 1, unit_price_ht: 0,
         discount_percentage: 0, tva_rate: defaultTva,
       }],
@@ -249,7 +249,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
     setForm(f => {
       const lines = [...f.lines];
       lines[idx] = { ...lines[idx], [field]: value };
-      if (field === 'product_variant_id' && value) {
+      if (field === 'product_id' && value) {
         const v = variants.find((vr: any) => String(vr.id) === String(value));
         if (v) {
           lines[idx]._productName = v.product?.name ?? '';
@@ -298,7 +298,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
       return false;
     }
     for (let i = 0; i < form.lines.length; i++) {
-      if (!form.lines[i].product_variant_id) {
+      if (!form.lines[i].product_id) {
         setLineErr(`السطر ${i + 1}: اختر منتجاً`);
         return false;
       }
@@ -328,7 +328,7 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
         total_stamp: totals.stamp,
         lines: form.lines.map(l => ({
           ...(l.id ? { id: l.id } : {}),
-          product_variant_id: parseInt(l.product_variant_id),
+          product_id: parseInt(l.product_id),
           description: l.description || null,
           quantity: l.quantity,
           unit_price_ht: l.unit_price_ht,
@@ -554,8 +554,8 @@ export default function CommercialDocumentModal({ open, documentType, existingDo
                         <td style={{ color: 'var(--t4)', fontSize: 11, textAlign: 'center' }}>{idx + 1}</td>
                         <td>
                           <select
-                            value={line.product_variant_id}
-                            onChange={e => updateLine(idx, 'product_variant_id', e.target.value)}
+                            value={line.product_id}
+                            onChange={e => updateLine(idx, 'product_id', e.target.value)}
                             style={{ width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)', fontSize: 12, fontFamily: 'Tajawal, sans-serif', outline: 'none' }}
                             disabled={isLoadingVariants || variants.length === 0 || isPending}
                           >

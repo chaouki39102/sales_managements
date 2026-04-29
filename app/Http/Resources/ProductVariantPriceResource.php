@@ -10,7 +10,7 @@ class ProductVariantPriceResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id, 'product_variant_id' => $this->product_variant_id, 'price_level_id' => $this->price_level_id,
+            'id' => $this->id, 'product_id' => $this->product_id, 'price_level_id' => $this->price_level_id,
             'price' => $this->price, 'valid_from' => $this->valid_from?->toIso8601String(),
             'valid_to' => $this->valid_to?->toIso8601String(), 'active' => $this->active,
             'created_at' => $this->created_at?->toIso8601String(), 'updated_at' => $this->updated_at?->toIso8601String(),

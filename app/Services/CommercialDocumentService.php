@@ -240,7 +240,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
             \App\Models\StockMovement::create([
                 'warehouse_id' => $document->warehouse_id,
-                'product_variant_id' => $line->product_variant_id,
+                'product_id' => $line->product_id,
                 'stock_movement_type_id' => $this->getStockMovementTypeId($movementType),
                 'commercial_document_id' => $document->id,
                 'commercial_document_line_id' => $line->id,

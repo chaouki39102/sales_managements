@@ -8,13 +8,16 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
+// ═══════════════════════════════════════════════════════════
+// QuantityDiscount — تخفيضات الكميات (Tx Remise)
+// ═══════════════════════════════════════════════════════════
+
 /**
- * QuantityDiscount Model
- *
  * Table: quantity_discounts
- * Volume-based discounts for product variants
+ *
+ * كل تعريفة + منتج لها شرائح مستقلة.
+ * الكميات دائماً بالوحدة الأساسية.
  */
-#[Cacheable]
 class QuantityDiscount extends Model
 {
     use HasStandardizedConfiguration;
@@ -22,77 +25,70 @@ class QuantityDiscount extends Model
     protected $table = 'quantity_discounts';
 
     protected $fillable = [
-        'product_variant_id',
-        'min_quantity',
-        'max_quantity',
-        'discount_per_unit',
-        'discount_percentage',
-        'tier_order',
-        'active',
-        'valid_from',
-        'valid_to',
+        'product_id', 'price_level_id',
+        'min_qty', 'max_qty',
+        'discount_amount', 'discount_percentage',
+        'tier_order', 'is_blocked', 'active',
     ];
 
     protected $casts = [
-        'min_quantity' => 'decimal:4',
-        'max_quantity' => 'decimal:4',
-        'discount_per_unit' => 'decimal:4',
-        'discount_percentage' => 'decimal:2',
-        'tier_order' => 'integer',
-        'active' => 'boolean',
-        'valid_from' => 'date',
-        'valid_to' => 'date',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'min_qty'             => 'decimal:4',
+        'max_qty'             => 'decimal:4',
+        'discount_amount'     => 'decimal:4',
+        'discount_percentage' => 'decimal:4',
+        'tier_order'          => 'integer',
+        'is_blocked'          => 'boolean',
+        'active'              => 'boolean',
     ];
 
-    public static array $searchableFields = [];
-    public static array $filterable = ['product_variant_id', 'active'];
-    public static array $sortable = ['id', 'min_quantity', 'tier_order'];
-    public static array $defaultWith = [];
-    public static array $allowedIncludes = ['productVariant'];
-    public static string $defaultSort = 'tier_order';
-    public static ?int $cacheTtl = 300;
-    public static array $cacheTags = ['quantity_discounts'];
+    public static array $filterable      = ['product_id', 'price_level_id', 'active', 'is_blocked'];
+    public static array $sortable        = ['id', 'min_qty', 'tier_order'];
+    public static array $allowedIncludes = ['product', 'priceLevel'];
+    public static string $defaultSort    = 'tier_order';
+    public static array $cacheTags       = ['quantity_discounts', 'products'];
 
-    public function productVariant(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);
     }
 
-    public function scopeValid(Builder $query, $date = null): Builder
+    public function priceLevel(): BelongsTo
     {
-        $date = $date ?? now();
-
-        return $query->where('active', true)
-            ->where('valid_from', '<=', $date)
-            ->where(function ($q) use ($date) {
-                $q->whereNull('valid_to')
-                    ->orWhere('valid_to', '>=', $date);
-            });
+        return $this->belongsTo(PriceLevel::class);
     }
 
-    public function scopeForQuantity(Builder $query, float $quantity): Builder
+    /**
+     * هل هذه الشريحة تنطبق على الكمية المعطاة؟
+     */
+    public function appliesTo(float $qty): bool
     {
-        return $query->where('min_quantity', '<=', $quantity)
-            ->where(function ($q) use ($quantity) {
-                $q->whereNull('max_quantity')
-                    ->orWhere('max_quantity', '>=', $quantity);
-            });
+        return $this->active
+            && !$this->is_blocked
+            && $qty >= (float) $this->min_qty
+            && (is_null($this->max_qty) || $qty <= (float) $this->max_qty);
     }
 
-    public function appliesTo(float $quantity): bool
-    {
-        return $quantity >= $this->min_quantity
-            && (is_null($this->max_quantity) || $quantity <= $this->max_quantity);
-    }
-
-    public function calculateDiscount(float $basePrice, float $quantity): float
+    /**
+     * حساب السعر النهائي بعد تطبيق الخصم
+     *
+     * الأولوية: discount_percentage > discount_amount
+     */
+    public function calculateDiscountedPrice(float $unitPrice): float
     {
         if ($this->discount_percentage) {
-            return $basePrice * $quantity * ($this->discount_percentage / 100);
+            return round($unitPrice * (1 - (float) $this->discount_percentage / 100), 4);
         }
+        if ($this->discount_amount) {
+            return round(max(0, $unitPrice - (float) $this->discount_amount), 4);
+        }
+        return $unitPrice;
+    }
 
-        return $this->discount_per_unit * $quantity;
+    /**
+     * قيمة الخصم على الوحدة (للعرض)
+     */
+    public function discountValue(float $unitPrice): float
+    {
+        return round($unitPrice - $this->calculateDiscountedPrice($unitPrice), 4);
     }
 }

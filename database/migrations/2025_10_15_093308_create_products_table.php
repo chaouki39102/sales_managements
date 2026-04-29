@@ -7,30 +7,28 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
-    /**
-     * تشغيل التهجير: إنشاء جدول المنتجات بنسخته النهائية المدمجة.
-     */
     public function up(): void
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
 
-            // --- المعلومات الأساسية ---
+            // --- المعلومات الأساسية (بدون قيود UNIQUE قاسية) ---
             $table->string('name', 150);
-            $table->string('slug', 150)->unique();
-            $table->string('ref', 50)->nullable()->unique()->comment('SKU / مرجع المنتج');
-            $table->string('barcode', 50)->nullable()->unique()->comment('الباركود');
+            $table->string('slug', 150)->nullable()->index();          // فهرس عادي، وليس UNIQUE
+            $table->string('ref', 50)->nullable()->index()->comment('SKU / مرجع المنتج');   // فهرس عادي
+            $table->string('barcode', 50)->nullable()->index()->comment('الباركود');        // فهرس عادي
             $table->text('description')->nullable();
 
             // --- التصنيف والروابط الخارجية ---
             $table->foreignId('family_id')->nullable()->constrained('families')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('product_type_id')->constrained('product_types')->restrictOnDelete()->cascadeOnUpdate();
+            $table->foreignId('product_type_id')->nullable()->constrained('product_types')->nullOnDelete()->cascadeOnUpdate(); // أصبح nullable
             $table->foreignId('tva_id')->nullable()->constrained('tvas')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete()->cascadeOnUpdate();
 
             // --- التسعير (HT) ---
             $table->decimal('purchase_price_ht', 15, 4)->default(0)->comment('سعر الشراء الأساسي');
+            $table->decimal('current_cost_price', 15, 4)->default(0)->comment('آخر تكلفة محسوبة (PMP/FIFO/LIFO)');;
 
             // --- إعدادات المخزون ---
             $table->boolean('manages_stock')->default(true);
@@ -72,7 +70,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            // --- الفهارس (Indexes) ---
+            // --- الفهارس (Indexes) المحسّنة للبحث ---
             $table->index(['name', 'active']);
             $table->index(['ref', 'barcode', 'active'], 'idx_products_lookup');
             $table->index(['family_id', 'brand_id', 'active'], 'idx_products_filter');
@@ -84,9 +82,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * التراجع عن التهجير.
-     */
     public function down(): void
     {
         Schema::dropIfExists('products');

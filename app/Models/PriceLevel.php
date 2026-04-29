@@ -42,14 +42,14 @@ class PriceLevel extends Model
     public static array $filterable = ['active', 'is_percentage'];
     public static array $sortable = ['id', 'name', 'display_order'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['productVariantPrices', 'parties'];
+    public static array $allowedIncludes = ['productPrices', 'parties'];
     public static string $defaultSort = 'display_order';
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['price_levels', 'lookups'];
 
-    public function productVariantPrices(): HasMany
+    public function productPrices(): HasMany
     {
-        return $this->hasMany(ProductVariantPrice::class);
+        return $this->hasMany(ProductPrice::class);
     }
 
     public function parties(): HasMany

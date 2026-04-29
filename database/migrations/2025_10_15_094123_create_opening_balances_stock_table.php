@@ -21,7 +21,7 @@ return new class extends Migration
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();
 
-            // الربط بالمنتج مباشرة (بديل لـ product_variant_id)
+            // الربط بالمنتج مباشرة (بديل لـ product_id)
             $table->foreignId('product_id')
                 ->constrained('products')
                 ->restrictOnDelete()
@@ -37,6 +37,10 @@ return new class extends Migration
             $table->decimal('opening_quantity', 15, 3)->default(0);
             $table->decimal('opening_value', 15, 4)
                 ->comment('القيمة الإجمالية للمخزون الافتتاحي (PMP) عند بداية السنة');
+
+            $table->string('lot_number', 100)->nullable();
+            $table->date('manufacturing_date')->nullable();
+            $table->date('expiration_date')->nullable();
 
             $table->timestamps();
 

@@ -25,7 +25,7 @@ class CommercialDocumentLine extends Model
     // -------------------- Fillable --------------------
     protected $fillable = [
         'commercial_document_id',
-        'product_variant_id',
+        'product_id',
         'line_order',
         'description',
         'quantity',
@@ -34,6 +34,9 @@ class CommercialDocumentLine extends Model
         'unit_price_ht',
         'discount_percentage',
         'discount_amount',
+        'additional_costs',
+        'total_additional_cost',
+        'total_discount_amount',
         'tva_rate',
         'total_ht',
         'total_tva',
@@ -46,6 +49,9 @@ class CommercialDocumentLine extends Model
 
     // -------------------- Casts --------------------
     protected $casts = [
+        'additional_costs' => 'array',
+        'total_additional_cost' => 'decimal:4',
+        'total_discount_amount' => 'decimal:4',
         'line_order' => 'integer',
         'quantity' => 'decimal:3',
         'delivered_quantity' => 'decimal:3',
@@ -73,7 +79,7 @@ class CommercialDocumentLine extends Model
     /** @var array الفلاتر المسموحة */
     public static array $filterable = [
         'commercial_document_id',
-        'product_variant_id',
+        'product_id',
         'stock_lot_id',
         'is_auto_split',
     ];
@@ -131,9 +137,9 @@ class CommercialDocumentLine extends Model
         return $this->belongsTo(CommercialDocument::class);
     }
 
-    public function productVariant(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(Product::class);
     }
 
     public function stockLot(): BelongsTo

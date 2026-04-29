@@ -233,7 +233,7 @@ export interface ProductVariant {
 
 export interface ProductVariantPrice {
   id: number;
-  product_variant_id: number;
+  product_id: number;
   price_level_id: number;
   price: number;
   valid_from: string;
@@ -310,7 +310,7 @@ export interface CommercialDocument {
 export interface CommercialDocumentLine {
   id: number;
   commercial_document_id: number;
-  product_variant_id: number;
+  product_id: number;
   description: string | null;
   quantity: number;
   unit_price_ht: number;
@@ -344,7 +344,7 @@ export interface Payment {
 // ── Stock ─────────────────────────────────────────
 export interface StockMovement {
   id: number;
-  product_variant_id: number;
+  product_id: number;
   warehouse_id: number;
   fiscal_year_id: number;
   stock_movement_type_id: number;
@@ -430,7 +430,7 @@ export interface TopProduct {
 // ── POS (Cart) ────────────────────────────────────
 export interface CartItem {
   id: string;                    // unique cart item id
-  product_variant_id: number;
+  product_id: number;
   product_name: string;
   variant_name: string | null;
   barcode: string | null;

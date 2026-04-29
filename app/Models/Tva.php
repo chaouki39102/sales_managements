@@ -43,14 +43,14 @@ class Tva extends Model
     public static array $filterable = ['active', 'is_default'];
     public static array $sortable = ['id', 'name', 'rate', 'display_order'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['productVariants'];
+    public static array $allowedIncludes = ['products'];
     public static string $defaultSort = 'display_order';
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['tvas', 'lookups'];
 
-    public function productVariants(): HasMany
+    public function products(): HasMany
     {
-        return $this->hasMany(ProductVariant::class);
+        return $this->hasMany(Product::class);
     }
 
     public function scopeDefault(Builder $query): Builder
