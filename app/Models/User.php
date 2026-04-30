@@ -12,6 +12,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * User Model
@@ -210,11 +211,16 @@ class User extends Authenticatable
     {
         return $this->hasMany(Expense::class, 'created_by');
     }
-    public function companies()
+    public function companies(): BelongsToMany
     {
-        return $this->belongsToMany(Company::class)->withPivot('is_default');
+        return $this->belongsToMany(Company::class)
+            ->withPivot('is_default')
+            ->withTimestamps();
     }
-
+    public function defaultCompany(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id');
+    }
 
     // -------------------- Mutators --------------------
 
@@ -232,7 +238,7 @@ class User extends Authenticatable
     public function getDefaultCompanyAttribute()
     {
         return $this->companies()->wherePivot('is_default', true)->first();
-    }ا
+    }
 
     public function getFullAddressAttribute(): string
     {
@@ -263,5 +269,13 @@ class User extends Authenticatable
     public function isSuperAdmin(): bool
     {
         return $this->hasRole('super-admin');
+    }
+
+
+
+    public function hasAccessToCompany(int|Company $company): bool
+    {
+        $id = $company instanceof Company ? $company->id : $company;
+        return $this->companies()->where('companies.id', $id)->exists();
     }
 }

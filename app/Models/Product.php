@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
 /**
  * Product — النموذج الموحد (منتج + SKU في جدول واحد)
@@ -27,7 +28,7 @@ use App\Core\Traits\Auditable;
 #[Cacheable]
 class Product extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable;
+    use HasCompany, HasStandardizedConfiguration, SoftDeletes, Auditable;
 
     protected $table = 'products';
 
@@ -77,6 +78,7 @@ class Product extends Model
         'meta_description',
         'meta_keywords',
 
+        'company_id',
         'active',
     ];
 

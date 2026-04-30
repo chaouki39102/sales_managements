@@ -22,15 +22,15 @@ return new class extends Migration
             $table->string('ai', 50)->nullable()->comment('المادة الجبائية');
             // ✅ IMPROVEMENT: Added Algerian Legal Fields
             // ✅ CORRECTED: Use nullOnDelete() for nullable foreign keys
-            $table->foreignId('legal_form_id')->nullable()->constrained('legal_forms')->nullOnDelete()->cascadeOnUpdate()->name('fk_parties_legal_form_id');
+            $table->foreignId('legal_form_id')->nullable()->constrained('legal_forms')->nullOnDelete()->cascadeOnUpdate()->name('fk_companies_legal_form_id');
             $table->decimal('capital_amount', 15, 4)->nullable()->comment('رأس المال');
             $table->date('rc_date')->nullable()->comment('تاريخ السجل التجاري');
 
             // Contact information
             $table->text('address')->nullable();
             // ✅ CORRECTED: Use nullOnDelete() for nullable foreign keys
-            $table->foreignId('commune_id')->nullable()->constrained('communes')->nullOnDelete()->cascadeOnUpdate()->name('fk_parties_commune_id');
-            $table->foreignId('wilaya_id')->nullable()->constrained('wilayas')->nullOnDelete()->cascadeOnUpdate()->name('fk_parties_wilaya_id');
+            $table->foreignId('commune_id')->nullable()->constrained('communes')->nullOnDelete()->cascadeOnUpdate()->name('fk_companies_commune_id');
+            $table->foreignId('wilaya_id')->nullable()->constrained('wilayas')->nullOnDelete()->cascadeOnUpdate()->name('fk_companies_wilaya_id');
             $table->string('phone', 20)->nullable()->index();
             $table->string('mobile', 30)->nullable();
             $table->string('fax', 30)->nullable();

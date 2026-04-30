@@ -76,9 +76,13 @@ return new class extends Migration
             $table->decimal('total_price', 15, 4);
 
             // مصدر السعر — يوضح من أين جاء unit_price
-            $table->enum('price_source', ['purchase', 'sale', 'adjustment'])
-                ->default('purchase')
-                ->comment('purchase=شراء | sale=بيع | adjustment=تسوية');
+            // $table->enum('price_source', ['purchase', 'sale', 'adjustment'])
+            //     ->default('purchase')
+                // ->comment('purchase=شراء | sale=بيع | adjustment=تسوية');
+
+                $table->string('price_source', 30)->default('sale')
+                    ->comment('purchase=شراء | sale=بيع | adjustment=تسوية');
+
 
             // الرصيد بعد الحركة
             $table->decimal('stock_balance_after', 15, 4)

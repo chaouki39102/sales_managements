@@ -11,20 +11,20 @@ class GenderSeeder extends Seeder
     {
         DB::table('genders')->insert([
             [
-                'name' => 'male',
-                'label' => 'ذكر',
-                'active' => true,
+                'name'          => 'male',
+                'label'         => 'ذكر',
+                'active'        => true,
                 'display_order' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'created_at'    => now(),
+                'updated_at'    => now(),
             ],
             [
-                'name' => 'female',
-                'label' => 'أنثى',
-                'active' => true,
+                'name'          => 'female',
+                'label'         => 'أنثى',
+                'active'        => true,
                 'display_order' => 2,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'created_at'    => now(),
+                'updated_at'    => now(),
             ],
         ]);
     }

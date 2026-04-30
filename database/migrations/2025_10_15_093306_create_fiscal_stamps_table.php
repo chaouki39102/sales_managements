@@ -15,7 +15,7 @@ return new class extends Migration
             $table->decimal('min_amount', 15, 4)->comment('الحد الأدنى للمبلغ لتطبيق الطابع');
             $table->decimal('max_amount', 15, 4)->nullable()->comment('الحد الأقصى للمبلغ');
             $table->decimal('stamp_value', 15, 4)->comment('قيمة الطابع الجبائي');
-            $table->enum('type', ['fixed', 'percentage'])->default('fixed');
+            $table->enum('type', ['fixed', 'percentage'])->default('fixed')->comment('نوع الطابع: ثابت أو نسبة مئوية');
             $table->boolean('active')->default(true)->index();
             $table->date('valid_from');
             $table->date('valid_to')->nullable();

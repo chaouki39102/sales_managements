@@ -14,7 +14,8 @@ return new class extends Migration
         Schema::create('inventory_valuation_methods', function (Blueprint $table) {
             $table->id();
             $table->string('name', 50)->unique();
-            $table->enum('method', ['fifo', 'lifo', 'weighted_average']);
+            $table->enum('method', ['fifo', 'lifo', 'weighted_average'])->default('fifo')
+                ->comment('fifo | lifo | weighted_average');
             $table->boolean('is_default')->default(false);
             $table->timestamps();
         });

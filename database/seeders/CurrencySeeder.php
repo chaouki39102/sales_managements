@@ -18,7 +18,7 @@ class CurrencySeeder extends Seeder
                 'is_base_currency' => true,
                 'active' => true,
                 'created_at' => now(),
-                'updated_at' => now(),
+                'updated_at' => now()
             ],
             [
                 'name' => 'Euro',
@@ -28,7 +28,7 @@ class CurrencySeeder extends Seeder
                 'is_base_currency' => false,
                 'active' => true,
                 'created_at' => now(),
-                'updated_at' => now(),
+                'updated_at' => now()
             ],
             [
                 'name' => 'US Dollar',
@@ -38,7 +38,7 @@ class CurrencySeeder extends Seeder
                 'is_base_currency' => false,
                 'active' => true,
                 'created_at' => now(),
-                'updated_at' => now(),
+                'updated_at' => now()
             ],
         ]);
     }

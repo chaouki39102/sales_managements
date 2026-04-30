@@ -27,12 +27,6 @@ return new class extends Migration
             $table->unique(['name', 'rate']);
         });
 
-        // Insert default VAT rates for Algeria
-        DB::table('tvas')->insert([
-            ['name' => 'VAT 19%', 'rate' => 19.00, 'description' => 'Standard VAT rate', 'active' => true, 'is_default' => true, 'display_order' => 1, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'VAT 9%', 'rate' => 9.00, 'description' => 'Reduced VAT rate', 'active' => true, 'is_default' => false, 'display_order' => 2, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'VAT 0%', 'rate' => 0.00, 'description' => 'Zero VAT rate', 'active' => true, 'is_default' => false, 'display_order' => 3, 'created_at' => now(), 'updated_at' => now()],
-        ]);
     }
 
     public function down(): void
