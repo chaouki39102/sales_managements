@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * ProductLot Model
@@ -18,7 +19,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class ProductLot extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes;
+    use HasStandardizedConfiguration,
+        HasCompany,
+        SoftDeletes;
 
     protected $table = 'product_lots';
 

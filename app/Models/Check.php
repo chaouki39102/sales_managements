@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
 /**
  * Check Model
@@ -19,7 +20,10 @@ use App\Core\Traits\Auditable;
 #[Cacheable]
 class Check extends Model
 {
-    use HasStandardizedConfiguration, Auditable;
+    use
+        HasStandardizedConfiguration,
+        HasCompany,
+        Auditable;
 
     protected $table = 'checks';
 

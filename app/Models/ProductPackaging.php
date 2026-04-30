@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 // ═══════════════════════════════════════════════════════════
 // ProductPackaging — وحدات التعبئة (Colisages)
@@ -18,14 +19,21 @@ use App\Core\Traits\HasStandardizedConfiguration;
  */
 class ProductPackaging extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'product_packagings';
 
     protected $fillable = [
-        'product_id', 'code', 'label',
-        'quantity', 'barcode',
-        'is_default', 'active', 'display_order',
+        'product_id',
+        'code',
+        'label',
+        'quantity',
+        'barcode',
+        'is_default',
+        'active',
+        'display_order',
     ];
 
     protected $casts = [

@@ -11,6 +11,7 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
+use App\Models\Traits\HasCompany;
 
 /**
  * Expense Model
@@ -23,6 +24,7 @@ class Expense extends Model
 {
     use HasStandardizedConfiguration,
         SoftDeletes,
+        HasCompany,
         Auditable,
         BelongsToFiscalYear;
 

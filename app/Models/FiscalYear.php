@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * FiscalYear Model
@@ -18,7 +19,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class FiscalYear extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'fiscal_years';
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * NumberingSeries Model
@@ -18,7 +19,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class NumberingSeries extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'numbering_series';
 

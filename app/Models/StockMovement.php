@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\BelongsToFiscalYear;
+use App\Models\Traits\HasCompany;
 
 /**
  * StockMovement Model
@@ -20,6 +21,7 @@ use App\Models\Traits\BelongsToFiscalYear;
 class StockMovement extends Model
 {
     use HasStandardizedConfiguration,
+        HasCompany,
         SoftDeletes,
         BelongsToFiscalYear;
 
@@ -142,7 +144,7 @@ class StockMovement extends Model
 
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);    
+        return $this->belongsTo(Product::class);
     }
 
     public function warehouse(): BelongsTo

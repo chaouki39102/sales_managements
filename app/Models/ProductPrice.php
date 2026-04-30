@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -22,7 +23,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ProductPrice extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'product_prices';
 

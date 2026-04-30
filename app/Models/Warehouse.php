@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
 /**
  * Warehouse Model
@@ -21,6 +22,7 @@ use App\Core\Traits\Auditable;
 class Warehouse extends Model
 {
     use HasStandardizedConfiguration,
+        HasCompany,
         SoftDeletes,
         Auditable;
 

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 // ═══════════════════════════════════════════════════════════
 // QuantityDiscount — تخفيضات الكميات (Tx Remise)
@@ -20,7 +21,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
  */
 class QuantityDiscount extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'quantity_discounts';
 

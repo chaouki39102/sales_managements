@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * OpeningBalanceParty Model
@@ -16,7 +17,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class OpeningBalanceParty extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'opening_balances_parties';
 
