@@ -263,6 +263,7 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
 /**
  * Check Model
@@ -273,7 +274,10 @@ use App\Core\Traits\Auditable;
 #[Cacheable]
 class Check extends Model
 {
-    use HasStandardizedConfiguration, Auditable;
+    use
+        HasStandardizedConfiguration,
+        HasCompany,
+        Auditable;
 
     protected $table = 'checks';
 
@@ -375,6 +379,7 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
+use App\Models\Traits\HasCompany;
 
 /**
  * CommercialDocument Model
@@ -387,6 +392,7 @@ class CommercialDocument extends Model
 {
     use HasStandardizedConfiguration,
         SoftDeletes,
+        HasCompany,
         Auditable,
         BelongsToFiscalYear;
 
@@ -681,6 +687,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * CommercialDocumentLine Model
@@ -691,7 +698,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class CommercialDocumentLine extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+    HasStandardizedConfiguration;
 
     protected $table = 'commercial_document_lines';
 
@@ -772,7 +781,7 @@ class CommercialDocumentLine extends Model
     /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
         'commercialDocument',
-        'productVariant',
+        'product',
         'stockLot',
         'parentLine',
         'childLines',
@@ -935,6 +944,64 @@ class Commune extends Model
     public function warehouses(): HasMany
     {
         return $this->hasMany(Warehouse::class);
+    }
+}
+
+
+
+
+// ===== ملف: Company.php =====
+// app/Models/Company.php
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
+
+class Company extends Model
+{
+    protected $fillable = [
+        'name', 'commercial_name', 'slug', 'email', 'phone',
+        'address', 'nif', 'nis', 'rc', 'is_active',
+        'legal_form_id', 'wilaya_id', 'commune_id', 'owner_id',
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $company): void {
+            if (empty($company->slug)) {
+                $company->slug = Str::slug($company->name);
+            }
+        });
+    }
+
+    // ===== Relations =====
+
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)
+                    ->withPivot('is_default')
+                    ->withTimestamps();
+    }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
+    public function parties(): HasMany
+    {
+        return $this->hasMany(Party::class);
+    }
+
+    // ... باقي العلاقات
+
+    // ===== Accessors =====
+
+    public function getRouteKeyName(): string
+    {
+        return 'slug'; // Route Model Binding باستخدام slug
     }
 }
 
@@ -1498,6 +1565,7 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
+use App\Models\Traits\HasCompany;
 
 /**
  * Expense Model
@@ -1510,6 +1578,7 @@ class Expense extends Model
 {
     use HasStandardizedConfiguration,
         SoftDeletes,
+        HasCompany,
         Auditable,
         BelongsToFiscalYear;
 
@@ -1916,6 +1985,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * FiscalYear Model
@@ -1926,7 +1996,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class FiscalYear extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'fiscal_years';
 
@@ -2464,6 +2536,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * NumberingSeries Model
@@ -2474,7 +2547,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class NumberingSeries extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'numbering_series';
 
@@ -2618,6 +2693,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * OpeningBalanceParty Model
@@ -2628,7 +2704,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class OpeningBalanceParty extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'opening_balances_parties';
 
@@ -2685,11 +2763,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 #[Cacheable]
 class OpeningBalanceStock extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'opening_balances_stock';
 
@@ -2740,6 +2821,7 @@ class OpeningBalanceStock extends Model
 
 
 
+
 // ===== ملف: Party.php =====
 namespace App\Models;
 
@@ -2751,6 +2833,7 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
 /**
  * Party Model
@@ -2763,6 +2846,7 @@ class Party extends Model
 {
     use HasStandardizedConfiguration,
         SoftDeletes,
+        HasCompany,
         Auditable;
 
     protected $table = 'parties';
@@ -3134,6 +3218,7 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
+use App\Models\Traits\HasCompany;
 
 /**
  * Payment Model
@@ -3146,6 +3231,7 @@ class Payment extends Model
 {
     use HasStandardizedConfiguration,
         SoftDeletes,
+        HasCompany,
         Auditable,
         BelongsToFiscalYear;
 
@@ -3555,6 +3641,7 @@ use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
 /**
  * Product — النموذج الموحد (منتج + SKU في جدول واحد)
@@ -3571,7 +3658,7 @@ use App\Core\Traits\Auditable;
 #[Cacheable]
 class Product extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable;
+    use HasCompany, HasStandardizedConfiguration, SoftDeletes, Auditable;
 
     protected $table = 'products';
 
@@ -3990,6 +4077,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * ProductLot Model
@@ -4000,7 +4088,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class ProductLot extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes;
+    use HasStandardizedConfiguration,
+        HasCompany,
+        SoftDeletes;
 
     protected $table = 'product_lots';
 
@@ -4214,6 +4304,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 // ═══════════════════════════════════════════════════════════
 // ProductPackaging — وحدات التعبئة (Colisages)
@@ -4227,14 +4318,21 @@ use App\Core\Traits\HasStandardizedConfiguration;
  */
 class ProductPackaging extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'product_packagings';
 
     protected $fillable = [
-        'product_id', 'code', 'label',
-        'quantity', 'barcode',
-        'is_default', 'active', 'display_order',
+        'product_id',
+        'code',
+        'label',
+        'quantity',
+        'barcode',
+        'is_default',
+        'active',
+        'display_order',
     ];
 
     protected $casts = [
@@ -4273,6 +4371,7 @@ class ProductPackaging extends Model
 namespace App\Models;
 
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -4292,7 +4391,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ProductPrice extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'product_prices';
 
@@ -4425,6 +4526,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 // ═══════════════════════════════════════════════════════════
 // QuantityDiscount — تخفيضات الكميات (Tx Remise)
@@ -4438,7 +4540,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
  */
 class QuantityDiscount extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'quantity_discounts';
 
@@ -4712,6 +4816,7 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\BelongsToFiscalYear;
+use App\Models\Traits\HasCompany;
 
 /**
  * StockMovement Model
@@ -4723,6 +4828,7 @@ use App\Models\Traits\BelongsToFiscalYear;
 class StockMovement extends Model
 {
     use HasStandardizedConfiguration,
+        HasCompany,
         SoftDeletes,
         BelongsToFiscalYear;
 
@@ -4845,7 +4951,7 @@ class StockMovement extends Model
 
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);    
+        return $this->belongsTo(Product::class);
     }
 
     public function warehouse(): BelongsTo
@@ -5027,6 +5133,7 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
 /**
  * TreasuryAccount Model
@@ -5038,6 +5145,7 @@ use App\Core\Traits\Auditable;
 class TreasuryAccount extends Model
 {
     use HasStandardizedConfiguration,
+        HasCompany,
         SoftDeletes,
         Auditable;
 
@@ -5322,6 +5430,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * User Model
@@ -5520,8 +5629,19 @@ class User extends Authenticatable
     {
         return $this->hasMany(Expense::class, 'created_by');
     }
+    public function companies(): BelongsToMany
+    {
+        return $this->belongsToMany(Company::class)
+            ->withPivot('is_default')
+            ->withTimestamps();
+    }
+    public function defaultCompany(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id');
+    }
 
     // -------------------- Mutators --------------------
+
 
     public function setPasswordAttribute($value)
     {
@@ -5533,6 +5653,10 @@ class User extends Authenticatable
     }
 
     // -------------------- Accessors --------------------
+    public function getDefaultCompanyAttribute()
+    {
+        return $this->companies()->wherePivot('is_default', true)->first();
+    }
 
     public function getFullAddressAttribute(): string
     {
@@ -5564,6 +5688,14 @@ class User extends Authenticatable
     {
         return $this->hasRole('super-admin');
     }
+
+
+
+    public function hasAccessToCompany(int|Company $company): bool
+    {
+        $id = $company instanceof Company ? $company->id : $company;
+        return $this->companies()->where('companies.id', $id)->exists();
+    }
 }
 
 
@@ -5580,6 +5712,7 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
 /**
  * Warehouse Model
@@ -5591,6 +5724,7 @@ use App\Core\Traits\Auditable;
 class Warehouse extends Model
 {
     use HasStandardizedConfiguration,
+        HasCompany,
         SoftDeletes,
         Auditable;
 

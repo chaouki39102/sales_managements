@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * إضافة المفاتيح الأجنبية الدائرية (Circular Foreign Keys)  [نسخة مصححة]
  *
  * هذا الملف يستبدل 2025_10_23_135226_add_foreing_keys.php الذي كان يشير
- * إلى جداول محذوفة (product_variants, product_lots القديم).
+ * إلى جداول محذوفة (products, product_lots القديم).
  *
  * يجب تنفيذه بعد إنشاء كل الجداول التالية:
  *   - commercial_document_lines  (بعد fix_commercial_document_lines)

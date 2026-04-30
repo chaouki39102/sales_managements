@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
  * ═══════════════════════════════════════════════════════════════════
  * 2. InventoryValuationMethodSeeder
  * ═══════════════════════════════════════════════════════════════════
- * مطلوب لجدول product_variants
+ * مطلوب لجدول products
  */
 class InventoryValuationMethodSeeder extends Seeder
 {

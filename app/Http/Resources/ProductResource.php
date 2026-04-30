@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * ProductResource
  *
  * يعكس البنية الجديدة:
- * - لا product_variants
+ * - لا products
  * - prices بدون price_computed (الحساب في الواجهة أو عند الطلب)
  * - packagings (Colisages)
  * - quantity_discounts مرتبطة بـ price_level

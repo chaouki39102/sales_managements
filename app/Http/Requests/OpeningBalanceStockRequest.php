@@ -15,7 +15,7 @@ class StoreOpeningBalanceStockRequest extends FormRequest
     {
         return [
             'fiscal_year_id' => 'required|exists:fiscal_years,id',
-            'product_id' => 'required|exists:product_variants,id',
+            'product_id' => 'required|exists:products,id',
             'warehouse_id' => 'nullable|exists:warehouses,id',
             'opening_quantity' => 'required|numeric|min:0',
             'opening_value' => 'required|numeric|min:0',
@@ -34,7 +34,7 @@ class UpdateOpeningBalanceStockRequest extends FormRequest
     {
         return [
             'fiscal_year_id' => 'sometimes|exists:fiscal_years,id',
-            'product_id' => 'sometimes|exists:product_variants,id',
+            'product_id' => 'sometimes|exists:products,id',
             'warehouse_id' => 'nullable|exists:warehouses,id',
             'opening_quantity' => 'sometimes|numeric|min:0',
             'opening_value' => 'sometimes|numeric|min:0',
