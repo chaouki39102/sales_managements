@@ -34,6 +34,14 @@ return new class extends Migration
             // Security and access
             $table->boolean('is_public')->default(false)->index();
             $table->string('disk', 50)->default('local');
+            $table->foreignId('company_id')
+                ->nullable()
+                ->after('id')
+                ->constrained('companies')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->index('company_id');
 
             // Audit
             $table->foreignId('uploaded_by')->nullable()->constrained('users')->nullOnDelete();

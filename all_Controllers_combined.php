@@ -639,6 +639,11 @@ class CommuneController extends BaseApiController
 
 
 
+// ===== ملف: CompanyController.php =====
+
+
+
+
 // ===== ملف: CurrencyController.php =====
 namespace App\Http\Controllers\Api\V1;
 
@@ -2189,82 +2194,6 @@ class ProductTypeController extends BaseApiController
     protected function getModelClass(): string
     {
         return ProductType::class;
-    }
-}
-
-
-
-// ===== ملف: ProductVariantController.php =====
-namespace App\Http\Controllers\Api\V1;
-
-use App\Core\Http\Controllers\BaseApiController;
-use App\Http\Resources\ProductVariantResource;
-use App\Services\ProductVariantService;
-use App\Models\ProductVariant;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-
-class ProductVariantController extends BaseApiController
-{
-    protected string $resourceName = 'product_variant';
-    protected ?string $resourceClass = ProductVariantResource::class;
-
-    public function __construct(private ProductVariantService $service)
-    {
-        parent::__construct();
-    }
-
-    public function lowStock(Request $request): JsonResponse
-    {
-        try {
-            $variants = $this->service->getLowStock();
-            return $this->successResponse(ProductVariantResource::collection($variants), 'تم جلب المنتجات ذات المخزون المنخفض بنجاح');
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'lowStock');
-        }
-    }
-
-    protected function getService(): ProductVariantService
-    {
-        return $this->service;
-    }
-
-    protected function getModelClass(): string
-    {
-        return ProductVariant::class;
-    }
-}
-
-
-
-// ===== ملف: ProductVariantPriceController.php =====
-namespace App\Http\Controllers\Api\V1;
-
-use App\Core\Http\Controllers\BaseApiController;
-use App\Http\Resources\ProductVariantPriceResource;
-use App\Services\ProductVariantPriceService;
-use App\Models\ProductVariantPrice;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-
-class ProductVariantPriceController extends BaseApiController
-{
-    protected string $resourceName = 'product_variant_price';
-    protected ?string $resourceClass = ProductVariantPriceResource::class;
-
-    public function __construct(private ProductVariantPriceService $productVariantPriceService)
-    {
-        parent::__construct();
-    }
-
-    protected function getService(): ProductVariantPriceService
-    {
-        return $this->productVariantPriceService;
-    }
-
-    protected function getModelClass(): string
-    {
-        return ProductVariantPrice::class;
     }
 }
 

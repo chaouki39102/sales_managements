@@ -39,7 +39,6 @@ use App\Core\Exceptions\BusinessRuleException;
 abstract class BaseApiController extends Controller
 {
     use ApiResponders, HasApiList;
-
     // === الخصائص الأساسية ===
 
     /** @var string اسم المورد (للرسائل) */

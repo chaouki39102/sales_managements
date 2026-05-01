@@ -26,9 +26,9 @@ Authorization: Bearer {token}
 ```json
 {
   "name": "John Doe",
-  "email": "john@example.com",
-  "password": "password123",
-  "password_confirmation": "password123"
+  "email": "admin@mail.com",
+  "password": "password",
+  "password_confirmation": "password"
 }
 ```
 
@@ -41,7 +41,7 @@ Authorization: Bearer {token}
     "user": {
       "id": 1,
       "name": "John Doe",
-      "email": "john@example.com",
+      "email": "admin@mail.com",
       "created_at": "2026-04-14T10:30:00.000000Z",
       "updated_at": "2026-04-14T10:30:00.000000Z"
     },

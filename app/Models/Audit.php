@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * Audit Model
@@ -14,7 +15,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
  */
 class Audit extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+    HasCompany,
+    HasStandardizedConfiguration;
 
     protected $table = 'audits';
 

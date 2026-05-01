@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 /**
  * Notification Model
@@ -14,7 +15,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
  */
 class Notification extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+    HasCompany,
+    HasStandardizedConfiguration;
 
     protected $table = 'notifications';
 
