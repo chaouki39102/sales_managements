@@ -190,7 +190,16 @@ class Product extends Model
     {
         return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id');
     }
+    // app/Models/Product.php
+    public function barcodes(): HasMany
+    {
+        return $this->hasMany(Barcode::class);
+    }
 
+    public function primaryBarcode(): HasOne
+    {
+        return $this->hasOne(Barcode::class)->where('is_primary', true);
+    }
     /** Colisages — وحدات التعبئة */
     public function packagings(): HasMany
     {

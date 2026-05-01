@@ -256,8 +256,8 @@ class Company extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-                    ->withPivot(['is_default', 'role', 'invited_by', 'joined_at', 'is_active'])
-                    ->withTimestamps();
+            ->withPivot(['is_default', 'role', 'invited_by', 'joined_at', 'is_active'])
+            ->withTimestamps();
     }
 
     /** الأعضاء النشطون فقط */
@@ -321,14 +321,14 @@ class Company extends Model
     public function scopeOnTrial(Builder $query): Builder
     {
         return $query->whereNotNull('trial_ends_at')
-                     ->where('trial_ends_at', '>', now());
+            ->where('trial_ends_at', '>', now());
     }
 
     public function scopeTrialExpired(Builder $query): Builder
     {
         return $query->whereNotNull('trial_ends_at')
-                     ->where('trial_ends_at', '<=', now())
-                     ->where('plan', 'free');
+            ->where('trial_ends_at', '<=', now())
+            ->where('plan', 'free');
     }
 
     public function scopeOnPlan(Builder $query, string $plan): Builder
@@ -464,7 +464,9 @@ class Company extends Model
 
     public function addMember(int $userId, string $role = 'member', ?int $invitedBy = null): void
     {
-        abort_if($this->is_at_users_limit, 422,
+        abort_if(
+            $this->is_at_users_limit,
+            422,
             "وصلت الشركة للحد الأقصى من المستخدمين ({$this->max_users})."
         );
 
@@ -531,5 +533,16 @@ class Company extends Model
         $settings = $this->settings_json ?? [];
         data_set($settings, $key, $value);
         $this->update(['settings_json' => $settings]);
+    }
+    /**
+     * تحديد ما إذا كان المستخدم المعطى هو مدير (Admin) في هذه الشركة.
+     */
+    public function isAdmin(User $user): bool
+    {
+        $pivot = $this->users()
+            ->where('user_id', $user->id)
+            ->first()?->pivot;
+
+        return $pivot && in_array($pivot->role, ['owner', 'admin']);
     }
 }
