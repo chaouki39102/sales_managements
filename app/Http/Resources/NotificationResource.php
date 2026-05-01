@@ -15,10 +15,10 @@ class NotificationResource extends JsonResource
             'notifiable_type' => $this->notifiable_type,
             'notifiable_id' => $this->notifiable_id,
             'data' => $this->data,
+            'is_unread' => $this->isUnread(),
             'read_at' => $this->read_at?->toIso8601String(),
-            'is_unread' => $this->is_unread,
             'created_at' => $this->created_at?->toIso8601String(),
-            
+
             'relations' => [
                 'notifiable' => $this->whenLoaded('notifiable', fn() => [
                     'id' => $this->notifiable->id,

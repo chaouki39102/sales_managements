@@ -1,32 +1,49 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+
+// Auth
 use App\Http\Controllers\Api\V1\AuthController;
+
+// Company
+use App\Http\Controllers\Api\V1\CompanyController;
+
+// Tenant Resources
 use App\Http\Controllers\Api\V1\PartyController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\CommercialDocumentController;
+use App\Http\Controllers\Api\V1\CommercialDocumentLineController;
 use App\Http\Controllers\Api\V1\WarehouseController;
+use App\Http\Controllers\Api\V1\NumberingSeriesController;
+use App\Http\Controllers\Api\V1\OpeningBalanceStockController;
+use App\Http\Controllers\Api\V1\OpeningBalancePartyController;
+use App\Http\Controllers\Api\V1\CheckController;
+use App\Http\Controllers\Api\V1\TreasuryAccountController;
+use App\Http\Controllers\Api\V1\QuantityDiscountController;
+use App\Http\Controllers\Api\V1\ExpenseController;
+use App\Http\Controllers\Api\V1\ProductLotController;
+use App\Http\Controllers\Api\V1\FiscalYearController;
+use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\StockMovementController;
+use App\Http\Controllers\Api\V1\AuditController;
+use App\Http\Controllers\Api\V1\AttachmentController;
+use App\Http\Controllers\Api\V1\EmployeeController;
+use App\Http\Controllers\Api\V1\EmploymentContractController;
+use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\SettingController;
+use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\ReportController;
+
+// Lookup Controllers
 use App\Http\Controllers\Api\V1\CurrencyController;
 use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\BrandController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\PermissionController;
-use App\Http\Controllers\Api\V1\NumberingSeriesController;
-use App\Http\Controllers\Api\V1\AuditController;
-use App\Http\Controllers\Api\V1\AttachmentController;
-use App\Http\Controllers\Api\V1\EmploymentContractController;
-use App\Http\Controllers\Api\V1\EmployeeController;
-use App\Http\Controllers\Api\V1\NotificationController;
-use App\Http\Controllers\Api\V1\SettingController;
-use App\Http\Controllers\Api\V1\OpeningBalanceStockController;
-use App\Http\Controllers\Api\V1\OpeningBalancePartyController;
 use App\Http\Controllers\Api\V1\ExchangeRateController;
 use App\Http\Controllers\Api\V1\DocumentStatusController;
 use App\Http\Controllers\Api\V1\ExpenseCategoryController;
-use App\Http\Controllers\Api\V1\CheckController;
 use App\Http\Controllers\Api\V1\PaymentModeController;
-use App\Http\Controllers\Api\V1\TreasuryAccountController;
-use App\Http\Controllers\Api\V1\QuantityDiscountController;
 use App\Http\Controllers\Api\V1\PriceLevelController;
 use App\Http\Controllers\Api\V1\LegalFormController;
 use App\Http\Controllers\Api\V1\TvaController;
@@ -37,208 +54,318 @@ use App\Http\Controllers\Api\V1\StockMovementTypeController;
 use App\Http\Controllers\Api\V1\ProductTypeController;
 use App\Http\Controllers\Api\V1\PartyTypeController;
 use App\Http\Controllers\Api\V1\DocumentTypeController;
-use App\Http\Controllers\Api\V1\CommercialDocumentLineController;
-use App\Http\Controllers\Api\V1\ExpenseController;
-use App\Http\Controllers\Api\V1\ProductLotController;
-use App\Http\Controllers\Api\V1\FiscalYearController;
-use App\Http\Controllers\Api\V1\PaymentController;
-use App\Http\Controllers\Api\V1\StockMovementController;
 use App\Http\Controllers\Api\V1\GenderController;
 use App\Http\Controllers\Api\V1\InventoryValuationMethodController;
 use App\Http\Controllers\Api\V1\TreasuryAccountTypeController;
 use App\Http\Controllers\Api\V1\FiscalStampController;
 use App\Http\Controllers\Api\V1\DocumentBaseOperationController;
-use App\Http\Controllers\Api\V1\DashboardController;
-use App\Http\Controllers\Api\V1\ReportController;
-use App\Http\Controllers\Api\V1\CompanyController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes (Laravel 11)
+| API Routes (Laravel 11) — Multi-Tenancy
 |--------------------------------------------------------------------------
+|
+| هيكل الـ URL:
+|
+|   /api/v1/auth/*                        ← مصادقة (عام + محمي)
+|   /api/v1/companies/*                   ← إدارة شركات المستخدم
+|   /api/v1/admin/companies/*             ← Super Admin فقط
+|   /api/v1/{lookups}                     ← جداول البحث المشتركة
+|   /api/v1/{company_slug}/{resource}     ← بيانات معزولة حسب الشركة
+|
 */
 
 Route::prefix('v1')->group(function () {
-    // ========== Auth Routes (بدون حماية) ==========
+
+    // ═══════════════════════════════════════════
+    // ① المصادقة — Auth
+    // ═══════════════════════════════════════════
+
     Route::prefix('auth')->group(function () {
+        // بدون حماية
         Route::post('/register', [AuthController::class, 'register']);
-        Route::post('/login', [AuthController::class, 'login']);
-    });
+        Route::post('/login',    [AuthController::class, 'login']);
 
-    // ========== Auth Routes (محمية) ==========
-    Route::middleware('auth:sanctum')->prefix('auth')->group(function () {
-        Route::get('/me', [AuthController::class, 'me']);
-        Route::put('/update', [AuthController::class, 'update']);
-        Route::post('/change-password', [AuthController::class, 'changePassword']);
-        Route::post('/logout', [AuthController::class, 'logout']);
-    });
-
-    // ========== Routes عامة للشركات (بدون company slug) ==========
-    Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
-        Route::get('/', [CompanyController::class, 'index']);           // شركات المستخدم
-        Route::post('/', [CompanyController::class, 'store']);          // إنشاء شركة جديدة
-        Route::post('/switch', [CompanyController::class, 'switch']);   // تبديل الشركة النشطة
-        Route::get('/current', [CompanyController::class, 'current']);  // الشركة النشطة حالياً
-    });
-
-    // ========== Lookup Tables (مشتركة بين الشركات – لا تحتاج company) ==========
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::apiResource('currencies', CurrencyController::class);
-        Route::apiResource('families', FamilyController::class);
-        Route::apiResource('brands', BrandController::class);
-        Route::apiResource('roles', RoleController::class);
-        Route::apiResource('permissions', PermissionController::class);
-        Route::get('permissions/by-group', [PermissionController::class, 'byGroup']);
-
-
-
-        Route::apiResource('exchange-rates', ExchangeRateController::class);
-        Route::get('exchange-rates/latest', [ExchangeRateController::class, 'latest']);
-        Route::apiResource('document-statuses', DocumentStatusController::class);
-        Route::apiResource('expense-categories', ExpenseCategoryController::class);
-        Route::get('expense-categories/roots', [ExpenseCategoryController::class, 'roots']);
-        Route::apiResource('payment-modes', PaymentModeController::class);
-        Route::get('payment-modes/active', [PaymentModeController::class, 'active']);
-        Route::apiResource('price-levels', PriceLevelController::class);
-        Route::apiResource('legal-forms', LegalFormController::class);
-        Route::apiResource('tvas', TvaController::class);
-        Route::get('tvas/default', [TvaController::class, 'default']);
-        Route::apiResource('units', UnitController::class);
-        Route::apiResource('wilayas', WilayaController::class);
-        Route::apiResource('communes', CommuneController::class);
-        Route::apiResource('stock-movement-types', StockMovementTypeController::class);
-        Route::apiResource('product-types', ProductTypeController::class);
-        Route::apiResource('party-types', PartyTypeController::class);
-        Route::apiResource('document-types', DocumentTypeController::class);
-        Route::apiResource('genders', GenderController::class);
-        Route::apiResource('inventory-valuation-methods', InventoryValuationMethodController::class);
-        Route::apiResource('treasury-account-types', TreasuryAccountTypeController::class);
-        Route::apiResource('fiscal-stamps', FiscalStampController::class);
-        Route::apiResource('document-base-operations', DocumentBaseOperationController::class);
-    });
-
-    // ========== Tenant Resources (معزولة حسب الشركة) ==========
-    Route::middleware(['auth:sanctum', 'company'])
-        ->prefix('{company}')
-        ->group(function () {
-
-            // المرفقات (Attachments)
-            Route::apiResource('attachments', AttachmentController::class);
-            Route::get('attachments/{id}/download', [AttachmentController::class, 'download']);
-
-            // الأطراف (عملاء / موردين)
-            Route::apiResource('parties', PartyController::class);
-            Route::get('customers', [PartyController::class, 'customers']);
-            Route::get('suppliers', [PartyController::class, 'suppliers']);
-
-            // المنتجات (ملاحظة: تم حذف withVariants)
-            Route::apiResource('products', ProductController::class);
-            Route::get('products/active', [ProductController::class, 'active']);
-            Route::get('products/by-family/{familyId}', [ProductController::class, 'byFamily']);
-            Route::get('products/by-brand/{brandId}', [ProductController::class, 'byBrand']);
-
-            // المستندات التجارية
-            Route::apiResource('documents', CommercialDocumentController::class);
-            Route::get('documents/unpaid', [CommercialDocumentController::class, 'unpaid']);
-            Route::get('documents/overdue', [CommercialDocumentController::class, 'overdue']);
-            Route::post('documents/{id}/validate', [CommercialDocumentController::class, 'validateDocument']);
-            Route::post('documents/{id}/lock', [CommercialDocumentController::class, 'lock']);
-            Route::post('documents/{id}/unlock', [CommercialDocumentController::class, 'unlock']);
-            Route::post('documents/{id}/cancel', [CommercialDocumentController::class, 'cancel']);
-            Route::get('documents/{id}/qrcode', [CommercialDocumentController::class, 'generateQRCode']);
-
-            // المستودعات
-            Route::apiResource('warehouses', WarehouseController::class);
-
-            // سلاسل الترقيم
-            Route::apiResource('numbering-series', NumberingSeriesController::class);
-            Route::post('numbering-series/{id}/lock', [NumberingSeriesController::class, 'lock']);
-            Route::post('numbering-series/{id}/unlock', [NumberingSeriesController::class, 'unlock']);
-            Route::get('numbering-series/{id}/next-number', [NumberingSeriesController::class, 'getNextNumber']);
-            Route::get('numbering-series/{id}/preview-next-number', [NumberingSeriesController::class, 'previewNextNumber']);
-            Route::post('numbering-series/{id}/sync', [NumberingSeriesController::class, 'syncNumber']);
-
-            // الأرصدة الافتتاحية
-            Route::apiResource('opening-balance-stocks', OpeningBalanceStockController::class);
-            Route::apiResource('opening-balance-parties', OpeningBalancePartyController::class);
-
-            // الشيكات
-            Route::apiResource('checks', CheckController::class);
-            Route::get('checks/pending', [CheckController::class, 'pending']);
-            Route::get('checks/overdue', [CheckController::class, 'overdue']);
-            Route::post('checks/{id}/mark-cleared', [CheckController::class, 'markAsCleared']);
-            Route::post('checks/{id}/mark-bounced', [CheckController::class, 'markAsBounced']);
-
-            // الحسابات الخزينة
-            Route::apiResource('treasury-accounts', TreasuryAccountController::class);
-            Route::get('treasury-accounts/bank-accounts', [TreasuryAccountController::class, 'bankAccounts']);
-            Route::get('treasury-accounts/cash-accounts', [TreasuryAccountController::class, 'cashAccounts']);
-            Route::get('treasury-accounts/default', [TreasuryAccountController::class, 'default']);
-
-            // تخفيضات الكميات
-            Route::apiResource('quantity-discounts', QuantityDiscountController::class);
-
-            // أسطر المستندات
-            Route::apiResource('commercial-document-lines', CommercialDocumentLineController::class);
-
-            // المصروفات
-            Route::apiResource('expenses', ExpenseController::class);
-            Route::get('expenses/paid', [ExpenseController::class, 'paid']);
-            Route::get('expenses/unpaid', [ExpenseController::class, 'unpaid']);
-
-            // دفعات المنتجات (Lots)
-            Route::apiResource('product-lots', ProductLotController::class);
-            Route::get('product-lots/available', [ProductLotController::class, 'available']);
-            Route::get('product-lots/expiring', [ProductLotController::class, 'expiring']);
-
-            // السنوات المالية (لاحظ أن fiscal‑years لها company_id)
-            Route::apiResource('fiscal-years', FiscalYearController::class);
-            Route::get('fiscal-years/current', [FiscalYearController::class, 'current']);
-            Route::get('fiscal-years/open', [FiscalYearController::class, 'open']);
-            Route::post('fiscal-years/{id}/close', [FiscalYearController::class, 'close']);
-
-            // الدفعات (payments)
-            Route::apiResource('payments', PaymentController::class);
-            Route::get('payments/confirmed', [PaymentController::class, 'confirmed']);
-            Route::get('payments/pending', [PaymentController::class, 'pending']);
-
-            // حركات المخزون
-            Route::apiResource('stock-movements', StockMovementController::class);
-            Route::get('stock-movements/incoming', [StockMovementController::class, 'incoming']);
-            Route::get('stock-movements/outgoing', [StockMovementController::class, 'outgoing']);
-
-            // لوحة التحكم (خاصة بالشركة الحالية)
-            Route::get('dashboard', [DashboardController::class, 'index']);
-            Route::get('dashboard/sales-chart', [DashboardController::class, 'salesChart']);
-            Route::get('dashboard/top-products', [DashboardController::class, 'topProducts']);
-            Route::get('dashboard/top-customers', [DashboardController::class, 'topCustomers']);
-            Route::get('dashboard/recent-transactions', [DashboardController::class, 'recentTransactions']);
-            Route::get('dashboard/inventory', [DashboardController::class, 'inventory']);
-
-            // التقارير (خاصة بالشركة)
-            Route::get('reports/sales', [ReportController::class, 'sales']);
-            Route::get('reports/purchases', [ReportController::class, 'purchases']);
-            Route::get('reports/customers', [ReportController::class, 'customers']);
-            Route::get('reports/suppliers', [ReportController::class, 'suppliers']);
-            Route::get('reports/products', [ReportController::class, 'products']);
-            Route::get('reports/inventory', [ReportController::class, 'inventory']);
-            Route::get('reports/payments', [ReportController::class, 'payments']);
-            Route::get('reports/taxes', [ReportController::class, 'taxes']);
-
-
-            Route::apiResource('audits', AuditController::class);
-            Route::get('audits/user/{userId}', [AuditController::class, 'byUser']);
-            Route::get('audits/event/{event}', [AuditController::class, 'byEvent']);
-            Route::apiResource('employees', EmployeeController::class);
-            Route::get('employees/active', [EmployeeController::class, 'active']);
-            Route::apiResource('employment-contracts', EmploymentContractController::class);
-            Route::get('employment-contracts/employee/{employeeId}/active', [EmploymentContractController::class, 'active']);
-            Route::apiResource('notifications', NotificationController::class);
-            Route::get('notifications/unread', [NotificationController::class, 'unread']);
-            Route::post('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
-            Route::post('notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead']);
-            Route::apiResource('settings', SettingController::class);
-            Route::get('settings/group/{group}', [SettingController::class, 'byGroup']);
-            Route::get('settings/key/{key}/value', [SettingController::class, 'getValue']);
+        // محمية
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::get('/me',              [AuthController::class, 'me']);
+            Route::put('/update',          [AuthController::class, 'update']);
+            Route::post('/change-password',[AuthController::class, 'changePassword']);
+            Route::post('/logout',         [AuthController::class, 'logout']);
         });
+    });
+
+    // ═══════════════════════════════════════════
+    // ② إدارة شركات المستخدم
+    // ═══════════════════════════════════════════
+
+    Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
+
+        // عرض / إنشاء
+        Route::get('/',        [CompanyController::class, 'index']);
+        Route::post('/',       [CompanyController::class, 'store']);
+        Route::get('/current', [CompanyController::class, 'current']);
+        Route::post('/switch', [CompanyController::class, 'switch']);
+
+        // عرض / تعديل شركة محددة (مالك أو Super Admin)
+        Route::get('/{company}',    [CompanyController::class, 'show']);
+        Route::put('/{company}',    [CompanyController::class, 'update']);
+        Route::patch('/{company}',  [CompanyController::class, 'update']);
+
+        // إدارة الأعضاء (مالك / admin الشركة)
+        Route::get('/{company}/members',                         [CompanyController::class, 'members']);
+        Route::post('/{company}/members',                        [CompanyController::class, 'addMember']);
+        Route::delete('/{company}/members/{userId}',             [CompanyController::class, 'removeMember']);
+        Route::patch('/{company}/members/{userId}/role',         [CompanyController::class, 'changeMemberRole']);
+        Route::patch('/{company}/members/{userId}/deactivate',   [CompanyController::class, 'deactivateMemberRoute']);
+        Route::patch('/{company}/members/{userId}/activate',     [CompanyController::class, 'activateMemberRoute']);
+
+        // نقل الملكية (مالك أو Super Admin)
+        Route::post('/{company}/transfer-ownership', [CompanyController::class, 'transferOwnership']);
+    });
+
+    // ═══════════════════════════════════════════
+    // ③ Super Admin — إدارة كاملة لكل الشركات
+    // ═══════════════════════════════════════════
+
+    Route::middleware(['auth:sanctum', 'role:super-admin'])
+         ->prefix('admin/companies')
+         ->group(function () {
+
+        // إحصائيات
+        Route::get('/stats',                [CompanyController::class, 'stats']);
+
+        // تفعيل / إيقاف
+        Route::post('/{company}/suspend',   [CompanyController::class, 'suspend']);
+        Route::post('/{company}/unsuspend', [CompanyController::class, 'unsuspend']);
+        Route::post('/{company}/deactivate',[CompanyController::class, 'deactivate']);
+        Route::post('/{company}/activate',  [CompanyController::class, 'activate']);
+
+        // توثيق
+        Route::post('/{company}/verify',    [CompanyController::class, 'verify']);
+        Route::post('/{company}/unverify',  [CompanyController::class, 'unverify']);
+
+        // خطة الاشتراك والحدود
+        Route::patch('/{company}/plan',     [CompanyController::class, 'changePlan']);
+
+        // ملاحظات داخلية
+        Route::patch('/{company}/notes',    [CompanyController::class, 'updateNotes']);
+    });
+
+    // ═══════════════════════════════════════════
+    // ④ Lookup Tables — مشتركة بين كل الشركات
+    // ═══════════════════════════════════════════
+    //
+    // هذه الجداول بدون company_id — بيانات عامة يستفيد منها الجميع.
+    // currencies, wilayas, communes → مرجعية جغرافية وعملات
+    // units, tvas, price-levels, brands, families → كتالوج مشترك
+    //
+    // ملاحظة: إذا احتجت لاحقاً أن تكون families/brands per-company،
+    // انقلها لقسم Tenant Resources وأضف company_id لجداولها.
+
+    Route::middleware('auth:sanctum')->group(function () {
+
+        // مرجعيات الموقع
+        Route::apiResource('wilayas',  WilayaController::class)->only(['index', 'show']);
+        Route::apiResource('communes', CommuneController::class)->only(['index', 'show']);
+        Route::get('communes/by-wilaya/{wilaya}', [CommuneController::class, 'byWilaya']);
+
+        // مرجعيات الأشخاص
+        Route::apiResource('genders',     GenderController::class)->only(['index', 'show']);
+        Route::apiResource('legal-forms', LegalFormController::class)->only(['index', 'show']);
+
+        // عملات وأسعار الصرف
+        Route::apiResource('currencies',     CurrencyController::class);
+        Route::apiResource('exchange-rates', ExchangeRateController::class);
+        Route::get('exchange-rates/latest',  [ExchangeRateController::class, 'latest']);
+
+        // منتجات — كتالوج مشترك
+        Route::apiResource('families', FamilyController::class);
+        Route::apiResource('brands',   BrandController::class);
+        Route::apiResource('units',    UnitController::class);
+        Route::apiResource('tvas',     TvaController::class);
+        Route::get('tvas/default',     [TvaController::class, 'default']);
+
+        // أسعار وخصومات
+        Route::apiResource('price-levels', PriceLevelController::class);
+
+        // مستندات وتجارة
+        Route::apiResource('document-types',           DocumentTypeController::class)->only(['index', 'show']);
+        Route::apiResource('document-statuses',        DocumentStatusController::class);
+        Route::apiResource('document-base-operations', DocumentBaseOperationController::class)->only(['index', 'show']);
+        Route::apiResource('payment-modes',            PaymentModeController::class);
+        Route::get('payment-modes/active',             [PaymentModeController::class, 'active']);
+        Route::apiResource('fiscal-stamps',            FiscalStampController::class);
+
+        // مخزون
+        Route::apiResource('stock-movement-types',         StockMovementTypeController::class)->only(['index', 'show']);
+        Route::apiResource('inventory-valuation-methods',  InventoryValuationMethodController::class)->only(['index', 'show']);
+        Route::apiResource('product-types',                ProductTypeController::class)->only(['index', 'show']);
+
+        // أطراف
+        Route::apiResource('party-types',             PartyTypeController::class)->only(['index', 'show']);
+
+        // مالية
+        Route::apiResource('treasury-account-types', TreasuryAccountTypeController::class)->only(['index', 'show']);
+
+        // مصروفات
+        Route::apiResource('expense-categories', ExpenseCategoryController::class);
+        Route::get('expense-categories/roots',   [ExpenseCategoryController::class, 'roots']);
+
+        // صلاحيات وأدوار (Super Admin فقط يكتب — الجميع يقرأ)
+        Route::get('roles',                        [RoleController::class, 'index']);
+        Route::get('roles/{role}',                 [RoleController::class, 'show']);
+        Route::middleware('role:super-admin')->group(function () {
+            Route::post('roles',               [RoleController::class, 'store']);
+            Route::put('roles/{role}',         [RoleController::class, 'update']);
+            Route::delete('roles/{role}',      [RoleController::class, 'destroy']);
+        });
+
+        Route::get('permissions',          [PermissionController::class, 'index']);
+        Route::get('permissions/by-group', [PermissionController::class, 'byGroup']);
+        Route::get('permissions/{permission}', [PermissionController::class, 'show']);
+    });
+
+    // ═══════════════════════════════════════════
+    // ⑤ Tenant Resources — معزولة بـ company_slug
+    // ═══════════════════════════════════════════
+    //
+    // كل route هنا يمر بـ middleware 'company':
+    //   → يجلب الشركة بالـ slug
+    //   → يتحقق من عضوية المستخدم
+    //   → يضبط CompanyContextService (company_id)
+    //   → HasCompany Global Scope يفلتر تلقائياً
+
+    Route::middleware(['auth:sanctum', 'company'])
+         ->prefix('{company}')
+         ->group(function () {
+
+        // ── لوحة التحكم ──
+        Route::get('dashboard',                       [DashboardController::class, 'index']);
+        Route::get('dashboard/sales-chart',           [DashboardController::class, 'salesChart']);
+        Route::get('dashboard/top-products',          [DashboardController::class, 'topProducts']);
+        Route::get('dashboard/top-customers',         [DashboardController::class, 'topCustomers']);
+        Route::get('dashboard/recent-transactions',   [DashboardController::class, 'recentTransactions']);
+        Route::get('dashboard/inventory',             [DashboardController::class, 'inventory']);
+
+        // ── التقارير ──
+        Route::prefix('reports')->group(function () {
+            Route::get('sales',     [ReportController::class, 'sales']);
+            Route::get('purchases', [ReportController::class, 'purchases']);
+            Route::get('customers', [ReportController::class, 'customers']);
+            Route::get('suppliers', [ReportController::class, 'suppliers']);
+            Route::get('products',  [ReportController::class, 'products']);
+            Route::get('inventory', [ReportController::class, 'inventory']);
+            Route::get('payments',  [ReportController::class, 'payments']);
+            Route::get('taxes',     [ReportController::class, 'taxes']);
+        });
+
+        // ── الأطراف (عملاء / موردون) ──
+        Route::apiResource('parties', PartyController::class);
+        Route::get('customers', [PartyController::class, 'customers']);
+        Route::get('suppliers', [PartyController::class, 'suppliers']);
+
+        // ── المنتجات ──
+        Route::apiResource('products', ProductController::class);
+        Route::get('products/active',             [ProductController::class, 'active']);
+        Route::get('products/by-family/{family}', [ProductController::class, 'byFamily']);
+        Route::get('products/by-brand/{brand}',   [ProductController::class, 'byBrand']);
+
+        // ── المستودعات ──
+        Route::apiResource('warehouses', WarehouseController::class);
+
+        // ── المستندات التجارية ──
+        Route::apiResource('documents', CommercialDocumentController::class);
+        Route::get('documents/unpaid',               [CommercialDocumentController::class, 'unpaid']);
+        Route::get('documents/overdue',              [CommercialDocumentController::class, 'overdue']);
+        Route::post('documents/{document}/validate', [CommercialDocumentController::class, 'validateDocument']);
+        Route::post('documents/{document}/lock',     [CommercialDocumentController::class, 'lock']);
+        Route::post('documents/{document}/unlock',   [CommercialDocumentController::class, 'unlock']);
+        Route::post('documents/{document}/cancel',   [CommercialDocumentController::class, 'cancel']);
+        Route::get('documents/{document}/qrcode',    [CommercialDocumentController::class, 'generateQRCode']);
+
+        // ── أسطر المستندات ──
+        Route::apiResource('commercial-document-lines', CommercialDocumentLineController::class);
+
+        // ── سلاسل الترقيم ──
+        Route::apiResource('numbering-series', NumberingSeriesController::class);
+        Route::post('numbering-series/{series}/lock',         [NumberingSeriesController::class, 'lock']);
+        Route::post('numbering-series/{series}/unlock',       [NumberingSeriesController::class, 'unlock']);
+        Route::get('numbering-series/{series}/next-number',   [NumberingSeriesController::class, 'getNextNumber']);
+        Route::get('numbering-series/{series}/preview-next',  [NumberingSeriesController::class, 'previewNextNumber']);
+        Route::post('numbering-series/{series}/sync',         [NumberingSeriesController::class, 'syncNumber']);
+
+        // ── الأرصدة الافتتاحية ──
+        Route::apiResource('opening-balance-stocks',   OpeningBalanceStockController::class);
+        Route::apiResource('opening-balance-parties',  OpeningBalancePartyController::class);
+
+        // ── الشيكات ──
+        Route::apiResource('checks', CheckController::class);
+        Route::get('checks/pending',                    [CheckController::class, 'pending']);
+        Route::get('checks/overdue',                    [CheckController::class, 'overdue']);
+        Route::post('checks/{check}/mark-cleared',      [CheckController::class, 'markAsCleared']);
+        Route::post('checks/{check}/mark-bounced',      [CheckController::class, 'markAsBounced']);
+
+        // ── الحسابات الخزينة ──
+        Route::apiResource('treasury-accounts', TreasuryAccountController::class);
+        Route::get('treasury-accounts/bank-accounts', [TreasuryAccountController::class, 'bankAccounts']);
+        Route::get('treasury-accounts/cash-accounts', [TreasuryAccountController::class, 'cashAccounts']);
+        Route::get('treasury-accounts/default',       [TreasuryAccountController::class, 'default']);
+
+        // ── تخفيضات الكميات ──
+        Route::apiResource('quantity-discounts', QuantityDiscountController::class);
+
+        // ── المصروفات ──
+        Route::apiResource('expenses', ExpenseController::class);
+        Route::get('expenses/paid',   [ExpenseController::class, 'paid']);
+        Route::get('expenses/unpaid', [ExpenseController::class, 'unpaid']);
+
+        // ── دفعات المنتجات (Lots) ──
+        Route::apiResource('product-lots', ProductLotController::class);
+        Route::get('product-lots/available', [ProductLotController::class, 'available']);
+        Route::get('product-lots/expiring',  [ProductLotController::class, 'expiring']);
+
+        // ── السنوات المالية ──
+        Route::apiResource('fiscal-years', FiscalYearController::class);
+        Route::get('fiscal-years/current',          [FiscalYearController::class, 'current']);
+        Route::get('fiscal-years/open',             [FiscalYearController::class, 'open']);
+        Route::post('fiscal-years/{year}/close',    [FiscalYearController::class, 'close']);
+
+        // ── الدفعات ──
+        Route::apiResource('payments', PaymentController::class);
+        Route::get('payments/confirmed', [PaymentController::class, 'confirmed']);
+        Route::get('payments/pending',   [PaymentController::class, 'pending']);
+
+        // ── حركات المخزون ──
+        Route::apiResource('stock-movements', StockMovementController::class);
+        Route::get('stock-movements/incoming', [StockMovementController::class, 'incoming']);
+        Route::get('stock-movements/outgoing', [StockMovementController::class, 'outgoing']);
+
+        // ── المرفقات ──
+        Route::apiResource('attachments', AttachmentController::class);
+        Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download']);
+
+        // ── الموظفون ──
+        Route::apiResource('employees', EmployeeController::class);
+        Route::get('employees/active', [EmployeeController::class, 'active']);
+        Route::apiResource('employment-contracts', EmploymentContractController::class);
+        Route::get('employment-contracts/employee/{employee}/active',
+            [EmploymentContractController::class, 'active']);
+
+        // ── الإشعارات ──
+        Route::apiResource('notifications', NotificationController::class);
+        Route::get('notifications/unread',                   [NotificationController::class, 'unread']);
+        Route::post('notifications/{notification}/mark-read',[NotificationController::class, 'markAsRead']);
+        Route::post('notifications/mark-all-read',           [NotificationController::class, 'markAllAsRead']);
+
+        // ── الإعدادات ──
+        Route::apiResource('settings', SettingController::class);
+        Route::get('settings/group/{group}',  [SettingController::class, 'byGroup']);
+        Route::get('settings/key/{key}/value',[SettingController::class, 'getValue']);
+
+        // ── سجل المراجعة ──
+        Route::apiResource('audits', AuditController::class)->only(['index', 'show']);
+        Route::get('audits/user/{user}',      [AuditController::class, 'byUser']);
+        Route::get('audits/event/{event}',    [AuditController::class, 'byEvent']);
+    });
 });

@@ -8,6 +8,7 @@ use App\Services\NotificationService;
 use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class NotificationController extends BaseApiController
 {
@@ -19,9 +20,15 @@ class NotificationController extends BaseApiController
         parent::__construct();
     }
 
+    /**
+     * جلب الإشعارات غير المقروءة للمستخدم الحالي
+     */
     public function unread(Request $request): JsonResponse
     {
         try {
+            // ✅ التحقق من صلاحية viewAny (يفترض أن Policty تسمح للمستخدم بمشاهدة إشعاراته)
+            $this->authorizeAction('viewAny', Notification::class);
+
             $notifications = $this->notificationService->getUnread();
             return $this->successResponse(
                 NotificationResource::collection($notifications),
@@ -32,10 +39,17 @@ class NotificationController extends BaseApiController
         }
     }
 
+    /**
+     * تعليم إشعار معين كمقروء
+     */
     public function markAsRead(Request $request, int $id): JsonResponse
     {
         try {
             $notification = $this->notificationService->findById($id);
+
+            // ✅ التحقق من صلاحية التحديث (يجب أن يكون المستخدم مالك الإشعار)
+            $this->authorizeAction('update', $notification);
+
             $this->notificationService->markAsRead($notification);
             return $this->successResponse(
                 new NotificationResource($notification->fresh()),
@@ -46,9 +60,15 @@ class NotificationController extends BaseApiController
         }
     }
 
+    /**
+     * تعليم جميع الإشعارات كمقروءة للمستخدم الحالي
+     */
     public function markAllAsRead(Request $request): JsonResponse
     {
         try {
+            // ✅ التحقق من صلاحية التحديث على النموذج (ككل)
+            $this->authorizeAction('update', Notification::class);
+
             $this->notificationService->markAllAsRead();
             return $this->successResponse(null, 'تم تعليم جميع الإشعارات كمقروءة');
         } catch (\Throwable $e) {

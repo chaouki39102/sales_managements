@@ -7,6 +7,7 @@ use App\Models\ProductPackaging;
 use App\Models\ProductPrice;
 use App\Models\QuantityDiscount;
 use App\Core\Exceptions\BusinessRuleException;
+use App\Models\Company;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -34,6 +35,10 @@ class ProductService extends \App\Core\Services\BaseService
 
     protected function beforeCreate(array $data, $request): array
     {
+        $company = Company::find(session('current_company_id'));
+        if ($company && $company->products()->count() >= $company->max_products) {
+            throw new BusinessRuleException("وصلت الشركة للحد الأقصى من المنتجات ({$company->max_products})", 422);
+        }
         if (empty($data['slug']) && isset($data['name'])) {
             $data['slug'] = $this->generateUniqueSlug($data['name']);
         }
@@ -110,7 +115,7 @@ class ProductService extends \App\Core\Services\BaseService
             throw new BusinessRuleException('لا يمكن حذف منتج له دفعات مخزون', 409);
         }
         if ($item->documentLines()->exists()) {
-            throw new BusinessRuleException('لا يمكن حذف منتج مرتبط بوثائق تجارية', 409);
+            throw new BusinessRuleException('لا يمكن حذف منتج مرتبط بمستندات تجارية', 409);
         }
         if ($item->openingBalances()->exists()) {
             throw new BusinessRuleException('لا يمكن حذف منتج له أرصدة افتتاحية', 409);
