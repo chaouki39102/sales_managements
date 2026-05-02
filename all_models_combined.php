@@ -173,6 +173,107 @@ class Audit extends Model
 
 
 
+// ===== ملف: Barcode.php =====
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
+
+/**
+ * @property int $id
+ * @property int $company_id
+ * @property int $product_id
+ * @property string $barcode
+ * @property string|null $type
+ * @property bool $is_primary
+ * @property string|null $unit
+ * @property int|null $created_by
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Company $company
+ * @property-read \App\Models\Product $product
+ * @property-read \App\Models\User|null $creator
+ */
+class Barcode extends Model
+{
+    use HasFactory, HasCompany, HasStandardizedConfiguration;
+
+    protected $table = 'barcodes';
+
+    protected $fillable = [
+        'company_id',
+        'product_id',
+        'barcode',
+        'type',
+        'is_primary',
+        'unit',
+        'created_by',
+    ];
+
+    protected $casts = [
+        'is_primary' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    // -------------------- Configuration for HasStandardizedConfiguration --------------------
+    public static array $searchableFields = ['barcode', 'type', 'unit'];
+    public static array $filterable = ['product_id', 'is_primary', 'type', 'unit'];
+    public static array $sortable = ['id', 'barcode', 'created_at'];
+    public static array $defaultWith = ['product:id,name'];
+    public static array $allowedIncludes = ['product', 'creator', 'company'];
+    public static string $defaultSort = 'id';
+    public static string $defaultSortDirection = 'desc';
+    public static ?int $cacheTtl = 300;
+    public static array $cacheTags = ['barcodes'];
+
+    // -------------------- Relations --------------------
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    // -------------------- Boot --------------------
+    protected static function booted(): void
+    {
+        static::creating(function (self $barcode) {
+            // إذا كان الباركود جديداً وهو primary، نزيل الـ primary عن باقي باركودات المنتج
+            if ($barcode->is_primary) {
+                static::where('product_id', $barcode->product_id)
+                    ->where('company_id', $barcode->company_id)
+                    ->update(['is_primary' => false]);
+            }
+        });
+
+        static::updating(function (self $barcode) {
+            if ($barcode->isDirty('is_primary') && $barcode->is_primary) {
+                static::where('product_id', $barcode->product_id)
+                    ->where('company_id', $barcode->company_id)
+                    ->where('id', '!=', $barcode->id)
+                    ->update(['is_primary' => false]);
+            }
+        });
+    }
+}
+
+
+
+
 // ===== ملف: Brand.php =====
 namespace App\Models;
 
@@ -962,14 +1063,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use App\Core\Attributes\Cacheable;
+use App\Core\Traits\HasStandardizedConfiguration;
+use App\Core\Traits\Auditable;
 
 /**
  * Company Model
  *
  * Table: companies
  *
- * نموذج الشركة في بيئة Multi-Tenancy.
- * كل بيانات النظام مرتبطة بشركة عبر company_id.
+ * الشركة هي "الحاوي" في بيئة Multi-Tenancy — لا تستخدم HasCompany
+ * لأنها هي نفسها مرجع العزل وليست بيانات معزولة.
  *
  * خطط الاشتراك:
  *   free         → 3 مستخدمين  / 1 مستودع   / 500 منتج
@@ -978,20 +1082,30 @@ use Illuminate\Support\Str;
  *   enterprise   → بلا حدود
  *
  * حالات الشركة:
- *   is_active=true  + suspended_at=null  → نشطة طبيعية
- *   is_active=true  + suspended_at!=null → معلّقة مؤقتاً (Super Admin)
+ *   is_active=true  + suspended_at=null   → نشطة طبيعية
+ *   is_active=true  + suspended_at!=null  → معلّقة مؤقتاً (Super Admin)
  *   is_active=false + deactivated_at!=null → موقوفة نهائياً
  */
+#[Cacheable]
 class Company extends Model
 {
+    use HasStandardizedConfiguration, Auditable;
+
+    // ⚠️ لا SoftDeletes — الشركة إما نشطة أو موقوفة عبر is_active/suspended_at
+    // ⚠️ لا HasCompany — الشركة هي الـ tenant نفسها وليست بيانات تابعة له
+
     protected $table = 'companies';
 
+    // ── Fillable ──────────────────────────────────────────────────────────────
+
     protected $fillable = [
-        // بيانات الشركة الأساسية
+        // بيانات أساسية
         'name',
         'commercial_name',
         'slug',
         'activity',
+
+        // وثائق قانونية جزائرية
         'rc',
         'rc_date',
         'nif',
@@ -1014,18 +1128,18 @@ class Company extends Model
         'bank_name',
         'rib',
 
-        // إدارة
+        // إدارة الملكية
         'owner_id',
         'is_active',
 
-        // حالة الشركة
+        // حالة الشركة (Super Admin)
         'suspended_at',
         'suspension_reason',
         'suspended_by',
         'deactivated_at',
         'deactivated_by',
 
-        // خطة الاشتراك
+        // خطة الاشتراك والحدود
         'plan',
         'trial_ends_at',
         'max_users',
@@ -1039,103 +1153,166 @@ class Company extends Model
         'settings_json',
     ];
 
+    // ── Casts ─────────────────────────────────────────────────────────────────
+
     protected $casts = [
-        'is_active'     => 'boolean',
-        'capital_amount'=> 'decimal:4',
-        'rc_date'       => 'date',
-        'suspended_at'  => 'datetime',
-        'deactivated_at'=> 'datetime',
-        'trial_ends_at' => 'datetime',
-        'verified_at'   => 'datetime',
-        'max_users'     => 'integer',
-        'max_warehouses'=> 'integer',
-        'max_products'  => 'integer',
-        'settings_json' => 'array',
-        'created_at'    => 'datetime',
-        'updated_at'    => 'datetime',
+        'is_active'      => 'boolean',
+        'capital_amount' => 'decimal:4',
+        'rc_date'        => 'date',
+        'suspended_at'   => 'datetime',
+        'deactivated_at' => 'datetime',
+        'trial_ends_at'  => 'datetime',
+        'verified_at'    => 'datetime',
+        'max_users'      => 'integer',
+        'max_warehouses' => 'integer',
+        'max_products'   => 'integer',
+        'settings_json'  => 'array',
+        'created_at'     => 'datetime',
+        'updated_at'     => 'datetime',
     ];
 
-    // حدود كل خطة
+    protected $appends = [
+        'is_operational',
+        'is_suspended',
+        'is_verified',
+        'is_on_trial',
+        'trial_days_remaining',
+    ];
+
+    // ── HasStandardizedConfiguration ─────────────────────────────────────────
+    // ApiListService و ModelConfigService يقرآن هذه الخصائص تلقائياً
+
+    public static array $searchableFields = [
+        'name',
+        'commercial_name',
+        'nif',
+        'rc',
+        'email',
+        'phone',
+    ];
+
+    public static array $filterable = [
+        'is_active',
+        'plan',
+        'legal_form_id',
+        'wilaya_id',
+        'owner_id',
+    ];
+
+    public static array $sortable = [
+        'id',
+        'name',
+        'plan',
+        'created_at',
+        'trial_ends_at',
+    ];
+
+    public static array $defaultWith      = [];
+    public static array $allowedIncludes  = [
+        'owner',
+        'legalForm',
+        'wilaya',
+        'commune',
+        'activeUsers',
+        'suspendedBy',
+        'deactivatedBy',
+        'verifiedBy',
+    ];
+
+    public static string $defaultSort          = 'name';
+    public static string $defaultSortDirection = 'asc';
+    public static int    $defaultPerPage        = 20;
+    public static int    $perPageLimit          = 100;
+    public static ?int   $cacheTtl              = 300;
+    public static array  $cacheTags             = ['companies'];
+
+    // ── خطط الاشتراك ─────────────────────────────────────────────────────────
+
     public const PLANS = [
-        'free'         => ['max_users' => 3,  'max_warehouses' => 1, 'max_products' => 500],
-        'starter'      => ['max_users' => 10, 'max_warehouses' => 2, 'max_products' => 2000],
-        'professional' => ['max_users' => 25, 'max_warehouses' => 5, 'max_products' => 10000],
-        'enterprise'   => ['max_users' => 999,'max_warehouses' => 99,'max_products' => 999999],
+        'free'         => ['max_users' => 3,   'max_warehouses' => 1,  'max_products' => 500],
+        'starter'      => ['max_users' => 10,  'max_warehouses' => 2,  'max_products' => 2000],
+        'professional' => ['max_users' => 25,  'max_warehouses' => 5,  'max_products' => 10000],
+        'enterprise'   => ['max_users' => 999, 'max_warehouses' => 99, 'max_products' => 999999],
     ];
 
-    // ═══════════════════════════════════════════
-    // Boot
-    // ═══════════════════════════════════════════
+    public const MEMBER_ROLES = ['owner', 'admin', 'manager', 'member', 'viewer'];
+
+    // ── Boot ──────────────────────────────────────────────────────────────────
 
     protected static function booted(): void
     {
-        // توليد slug تلقائياً عند الإنشاء
         static::creating(function (self $company): void {
+            // توليد slug فريد تلقائياً
             if (empty($company->slug)) {
                 $company->slug = self::generateUniqueSlug($company->name);
             }
-            // تطبيق حدود الخطة الافتراضية عند الإنشاء
-            if (!empty($company->plan) && isset(self::PLANS[$company->plan])) {
-                $limits = self::PLANS[$company->plan];
-                $company->max_users      = $company->max_users      ?? $limits['max_users'];
-                $company->max_warehouses = $company->max_warehouses  ?? $limits['max_warehouses'];
-                $company->max_products   = $company->max_products    ?? $limits['max_products'];
+
+            // تطبيق حدود الخطة الافتراضية
+            $plan = $company->plan ?? 'free';
+            if (isset(self::PLANS[$plan])) {
+                $limits = self::PLANS[$plan];
+                $company->max_users      ??= $limits['max_users'];
+                $company->max_warehouses ??= $limits['max_warehouses'];
+                $company->max_products   ??= $limits['max_products'];
+            }
+
+            // فترة التجربة 14 يوم للخطة المجانية
+            if ($plan === 'free' && empty($company->trial_ends_at)) {
+                $company->trial_ends_at = now()->addDays(14);
             }
         });
     }
 
-    // ═══════════════════════════════════════════
-    // Relations
-    // ═══════════════════════════════════════════
+    // ── Route Model Binding ───────────────────────────────────────────────────
 
-    /** مالك الشركة */
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    // ── Relations ─────────────────────────────────────────────────────────────
+
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
     }
 
-    /** الشكل القانوني */
     public function legalForm(): BelongsTo
     {
         return $this->belongsTo(LegalForm::class);
     }
 
-    /** البلدية */
     public function commune(): BelongsTo
     {
         return $this->belongsTo(Commune::class);
     }
 
-    /** الولاية */
     public function wilaya(): BelongsTo
     {
         return $this->belongsTo(Wilaya::class);
     }
 
-    /** من علّق الشركة */
     public function suspendedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'suspended_by');
     }
 
-    /** من أوقف تفعيل الشركة */
     public function deactivatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'deactivated_by');
     }
 
-    /** من وثّق الشركة */
     public function verifiedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verified_by');
     }
 
-    /** المستخدمون الأعضاء (عبر pivot) */
+    /** كل أعضاء الشركة عبر pivot */
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-                    ->withPivot(['is_default', 'role', 'invited_by', 'joined_at', 'is_active'])
-                    ->withTimestamps();
+            ->withPivot(['is_default', 'role', 'invited_by', 'joined_at', 'is_active'])
+            ->withTimestamps();
     }
 
     /** الأعضاء النشطون فقط */
@@ -1144,139 +1321,117 @@ class Company extends Model
         return $this->users()->wherePivot('is_active', true);
     }
 
-    /** المنتجات */
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
     }
 
-    /** الأطراف (عملاء/موردون) */
     public function parties(): HasMany
     {
         return $this->hasMany(Party::class);
     }
 
-    /** المستودعات */
     public function warehouses(): HasMany
     {
         return $this->hasMany(Warehouse::class);
     }
 
-    /** السنوات المالية */
     public function fiscalYears(): HasMany
     {
         return $this->hasMany(FiscalYear::class);
     }
 
-    /** المستندات التجارية */
     public function commercialDocuments(): HasMany
     {
         return $this->hasMany(CommercialDocument::class);
     }
 
-    // ═══════════════════════════════════════════
-    // Scopes
-    // ═══════════════════════════════════════════
+    public function employees(): HasMany
+    {
+        return $this->hasMany(Employee::class);
+    }
 
-    /** الشركات النشطة غير المعلّقة */
+    // ── Scopes ────────────────────────────────────────────────────────────────
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true)->whereNull('suspended_at');
     }
 
-    /** الشركات المعلّقة مؤقتاً */
     public function scopeSuspended(Builder $query): Builder
     {
         return $query->whereNotNull('suspended_at');
     }
 
-    /** الشركات الموقوفة نهائياً */
     public function scopeDeactivated(Builder $query): Builder
     {
         return $query->where('is_active', false);
     }
 
-    /** الشركات الموثّقة */
     public function scopeVerified(Builder $query): Builder
     {
         return $query->whereNotNull('verified_at');
     }
 
-    /** الشركات في فترة التجربة */
     public function scopeOnTrial(Builder $query): Builder
     {
         return $query->whereNotNull('trial_ends_at')
-                     ->where('trial_ends_at', '>', now());
+            ->where('trial_ends_at', '>', now());
     }
 
-    /** الشركات التي انتهت تجربتها */
     public function scopeTrialExpired(Builder $query): Builder
     {
         return $query->whereNotNull('trial_ends_at')
-                     ->where('trial_ends_at', '<=', now())
-                     ->where('plan', 'free');
+            ->where('trial_ends_at', '<=', now())
+            ->where('plan', 'free');
     }
 
-    /** تصفية حسب الخطة */
     public function scopeOnPlan(Builder $query, string $plan): Builder
     {
         return $query->where('plan', $plan);
     }
 
-    // ═══════════════════════════════════════════
-    // Accessors & Computed Properties
-    // ═══════════════════════════════════════════
+    // ── Accessors ─────────────────────────────────────────────────────────────
 
-    /** هل الشركة نشطة فعلاً (نشطة + غير معلّقة) */
+    /** نشطة فعلاً: is_active=true وغير معلّقة */
     public function getIsOperationalAttribute(): bool
     {
         return $this->is_active && is_null($this->suspended_at);
     }
 
-    /** هل الشركة معلّقة */
     public function getIsSuspendedAttribute(): bool
     {
         return !is_null($this->suspended_at);
     }
 
-    /** هل الشركة موثّقة */
     public function getIsVerifiedAttribute(): bool
     {
         return !is_null($this->verified_at);
     }
 
-    /** هل في فترة التجربة */
     public function getIsOnTrialAttribute(): bool
     {
         return !is_null($this->trial_ends_at) && $this->trial_ends_at->isFuture();
     }
 
-    /** أيام المتبقية في التجربة */
     public function getTrialDaysRemainingAttribute(): ?int
     {
         if (!$this->is_on_trial) return null;
         return (int) now()->diffInDays($this->trial_ends_at);
     }
 
-    /** عدد المستخدمين الحاليين */
     public function getCurrentUsersCountAttribute(): int
     {
         return $this->activeUsers()->count();
     }
 
-    /** هل وصلت لحد المستخدمين */
     public function getIsAtUsersLimitAttribute(): bool
     {
         return $this->current_users_count >= $this->max_users;
     }
 
-    // ═══════════════════════════════════════════
-    // Actions — Super Admin
-    // ═══════════════════════════════════════════
+    // ── Actions — يستدعيها CompanyService ────────────────────────────────────
 
-    /**
-     * تعليق الشركة مؤقتاً
-     */
     public function suspend(string $reason, int $byUserId): void
     {
         $this->update([
@@ -1286,9 +1441,6 @@ class Company extends Model
         ]);
     }
 
-    /**
-     * رفع التعليق عن الشركة
-     */
     public function unsuspend(): void
     {
         $this->update([
@@ -1298,64 +1450,41 @@ class Company extends Model
         ]);
     }
 
-    /**
-     * إيقاف تفعيل الشركة نهائياً
-     */
     public function deactivate(int $byUserId): void
     {
         $this->update([
-            'is_active'       => false,
-            'deactivated_at'  => now(),
-            'deactivated_by'  => $byUserId,
+            'is_active'      => false,
+            'deactivated_at' => now(),
+            'deactivated_by' => $byUserId,
         ]);
     }
 
-    /**
-     * إعادة تفعيل الشركة
-     */
     public function activate(): void
     {
         $this->update([
-            'is_active'       => true,
-            'deactivated_at'  => null,
-            'deactivated_by'  => null,
-            'suspended_at'    => null,
+            'is_active'         => true,
+            'deactivated_at'    => null,
+            'deactivated_by'    => null,
+            'suspended_at'      => null,
             'suspension_reason' => null,
-            'suspended_by'    => null,
+            'suspended_by'      => null,
         ]);
     }
 
-    /**
-     * توثيق الشركة
-     */
     public function verify(int $byUserId): void
     {
-        $this->update([
-            'verified_at' => now(),
-            'verified_by' => $byUserId,
-        ]);
+        $this->update(['verified_at' => now(), 'verified_by' => $byUserId]);
     }
 
-    /**
-     * إلغاء التوثيق
-     */
     public function unverify(): void
     {
-        $this->update([
-            'verified_at' => null,
-            'verified_by' => null,
-        ]);
+        $this->update(['verified_at' => null, 'verified_by' => null]);
     }
 
-    /**
-     * نقل ملكية الشركة لمستخدم آخر
-     * يتأكد أن المالك الجديد عضو في الشركة، ويُحدّث دوره في الـ pivot
-     */
     public function transferOwnership(int $newOwnerId): void
     {
-        $newOwner = User::findOrFail($newOwnerId);
+        User::findOrFail($newOwnerId); // يرمي ModelNotFoundException إن لم يجد
 
-        // إضافة المالك الجديد كعضو إذا لم يكن موجوداً
         if (!$this->users()->where('users.id', $newOwnerId)->exists()) {
             $this->users()->attach($newOwnerId, [
                 'is_default' => false,
@@ -1367,7 +1496,6 @@ class Company extends Model
             $this->users()->updateExistingPivot($newOwnerId, ['role' => 'owner']);
         }
 
-        // تخفيض دور المالك القديم
         if ($this->owner_id && $this->owner_id !== $newOwnerId) {
             $this->users()->updateExistingPivot($this->owner_id, ['role' => 'admin']);
         }
@@ -1375,9 +1503,6 @@ class Company extends Model
         $this->update(['owner_id' => $newOwnerId]);
     }
 
-    /**
-     * ترقية خطة الشركة مع تطبيق الحدود الجديدة
-     */
     public function upgradePlan(string $plan, ?array $customLimits = null): void
     {
         abort_unless(array_key_exists($plan, self::PLANS), 422, 'خطة غير معروفة');
@@ -1392,14 +1517,13 @@ class Company extends Model
         ]);
     }
 
-    /**
-     * إضافة مستخدم للشركة أو تحديث دوره
-     */
     public function addMember(int $userId, string $role = 'member', ?int $invitedBy = null): void
     {
-        if ($this->is_at_users_limit) {
-            abort(422, "وصلت الشركة للحد الأقصى من المستخدمين ({$this->max_users}).");
-        }
+        abort_if(
+            $this->is_at_users_limit,
+            422,
+            "وصلت الشركة للحد الأقصى من المستخدمين ({$this->max_users})."
+        );
 
         $this->users()->syncWithoutDetaching([
             $userId => [
@@ -1411,54 +1535,35 @@ class Company extends Model
         ]);
     }
 
-    /**
-     * إزالة مستخدم من الشركة
-     * لا يحذف المستخدم — فقط يقطع العلاقة
-     */
     public function removeMember(int $userId): void
     {
         abort_if($userId === $this->owner_id, 422, 'لا يمكن إزالة مالك الشركة.');
-
         $this->users()->detach($userId);
     }
 
-    /**
-     * تعطيل عضو داخل الشركة مؤقتاً
-     */
     public function deactivateMember(int $userId): void
     {
         abort_if($userId === $this->owner_id, 422, 'لا يمكن تعطيل مالك الشركة.');
-
         $this->users()->updateExistingPivot($userId, ['is_active' => false]);
     }
 
-    /**
-     * تفعيل عضو داخل الشركة
-     */
     public function activateMember(int $userId): void
     {
         $this->users()->updateExistingPivot($userId, ['is_active' => true]);
     }
 
-    /**
-     * تغيير دور مستخدم داخل الشركة
-     */
     public function changeMemberRole(int $userId, string $role): void
     {
-        abort_if($userId === $this->owner_id && $role !== 'owner', 422,
+        abort_if(
+            $userId === $this->owner_id && $role !== 'owner',
+            422,
             'لا يمكن تغيير دور المالك — استخدم transferOwnership().'
         );
-
         $this->users()->updateExistingPivot($userId, ['role' => $role]);
     }
 
-    // ═══════════════════════════════════════════
-    // Helpers
-    // ═══════════════════════════════════════════
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /**
-     * توليد slug فريد
-     */
     public static function generateUniqueSlug(string $name): string
     {
         $base = Str::slug($name);
@@ -1473,30 +1578,27 @@ class Company extends Model
         return $slug;
     }
 
-    /**
-     * Route Model Binding عبر slug
-     */
-    public function getRouteKeyName(): string
-    {
-        return 'slug';
-    }
-
-    /**
-     * إعداد خاص من settings_json
-     */
     public function getSetting(string $key, mixed $default = null): mixed
     {
         return data_get($this->settings_json, $key, $default);
     }
 
-    /**
-     * تعيين إعداد في settings_json
-     */
     public function setSetting(string $key, mixed $value): void
     {
         $settings = $this->settings_json ?? [];
         data_set($settings, $key, $value);
         $this->update(['settings_json' => $settings]);
+    }
+    /**
+     * تحديد ما إذا كان المستخدم المعطى هو مدير (Admin) في هذه الشركة.
+     */
+    public function isAdmin(User $user): bool
+    {
+        $pivot = $this->users()
+            ->where('user_id', $user->id)
+            ->first()?->pivot;
+
+        return $pivot && in_array($pivot->role, ['owner', 'admin']);
     }
 }
 
@@ -2975,7 +3077,6 @@ class Notification extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'id',
         'type',
         'notifiable_type',
         'notifiable_id',
@@ -4316,6 +4417,11 @@ class Product extends Model
         return $this->belongsTo(Brand::class);
     }
 
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
     public function productType(): BelongsTo
     {
         return $this->belongsTo(ProductType::class);
@@ -4335,7 +4441,16 @@ class Product extends Model
     {
         return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id');
     }
+    // app/Models/Product.php
+    public function barcodes(): HasMany
+    {
+        return $this->hasMany(Barcode::class);
+    }
 
+    public function primaryBarcode(): HasOne
+    {
+        return $this->hasOne(Barcode::class)->where('is_primary', true);
+    }
     /** Colisages — وحدات التعبئة */
     public function packagings(): HasMany
     {
@@ -5027,6 +5142,146 @@ class ProductType extends Model
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+}
+
+
+
+
+// ===== ملف: ProductVariant.php =====
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Core\Traits\HasCompany;
+use App\Core\Traits\HasStandardizedConfiguration;
+
+/**
+ * @property int $id
+ * @property int $company_id
+ * @property int $product_id
+ * @property string|null $sku
+ * @property string|null $barcode
+ * @property string|null $price_type
+ * @property float|null $price_value
+ * @property float|null $stock
+ * @property bool|null $track_stock
+ * @property array|null $attributes
+ * @property string|null $image
+ * @property float|null $weight
+ * @property float|null $volume
+ * @property bool|null $active
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Company $company
+ * @property-read \App\Models\Product $product
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Barcode[] $barcodes
+ */
+class ProductVariant extends Model
+{
+    use HasFactory, SoftDeletes, HasCompany, HasStandardizedConfiguration;
+
+    protected $table = 'product_variants';
+
+    protected $fillable = [
+        'company_id',
+        'product_id',
+        'sku',
+        'barcode',
+        'price_type',
+        'price_value',
+        'stock',
+        'track_stock',
+        'attributes',
+        'image',
+        'weight',
+        'volume',
+        'active',
+        'created_by',
+        'updated_by',
+        'deleted_by',
+    ];
+
+    protected $casts = [
+        'price_value' => 'decimal:4',
+        'stock' => 'decimal:4',
+        'track_stock' => 'boolean',
+        'attributes' => 'array',
+        'weight' => 'decimal:2',
+        'volume' => 'decimal:2',
+        'active' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+    ];
+
+    // -------------------- Configuration for HasStandardizedConfiguration --------------------
+    public static array $searchableFields = ['sku', 'barcode', 'attributes'];
+    public static array $filterable = ['product_id', 'price_type', 'active', 'track_stock'];
+    public static array $sortable = ['id', 'sku', 'price_value', 'stock', 'created_at'];
+    public static array $defaultWith = ['product:id,name,ref'];
+    public static array $allowedIncludes = ['product', 'company', 'barcodes'];
+    public static string $defaultSort = 'id';
+    public static string $defaultSortDirection = 'asc';
+    public static ?int $cacheTtl = 300;
+    public static array $cacheTags = ['product_variants'];
+
+    // -------------------- Relations --------------------
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function barcodes()
+    {
+        return $this->hasMany(Barcode::class);
+    }
+
+    // -------------------- Accessors --------------------
+    public function getFinalPriceAttribute(): ?float
+    {
+        if (!$this->product || !$this->price_type) {
+            return $this->product?->price_ht ?? null;
+        }
+
+        $basePrice = $this->product->price_ht ?? 0;
+
+        if ($this->price_type === 'fixed') {
+            return $basePrice + ($this->price_value ?? 0);
+        }
+
+        if ($this->price_type === 'percentage') {
+            return $basePrice * (1 + ($this->price_value / 100));
+        }
+
+        return $basePrice;
+    }
+
+    public function getIsInStockAttribute(): bool
+    {
+        if ($this->track_stock === false) {
+            return true;
+        }
+        return ($this->stock ?? 0) > 0;
+    }
+
+    // -------------------- Boot --------------------
+    protected static function booted(): void
+    {
+        static::creating(function ($variant) {
+            if (empty($variant->active)) {
+                $variant->active = true;
+            }
+            if ($variant->track_stock === null) {
+                $variant->track_stock = true;
+            }
+        });
     }
 }
 
@@ -5933,11 +6188,14 @@ class Unit extends Model
 
 
 // ===== ملف: User.php =====
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -5945,63 +6203,48 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * User Model
  *
  * Table: users
  * Manages system users with authentication and profile management
+ *
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Company> $companies
  */
 #[Cacheable]
 class User extends Authenticatable
 {
-    use HasApiTokens,
-        HasFactory,
-        Notifiable,
-        HasRoles,
-        SoftDeletes,
-        HasStandardizedConfiguration;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes, HasStandardizedConfiguration;
+
+    // أدوار النظام العام (System Roles)
+    public const ROLE_SUPER_ADMIN = 'super-admin';
+    public const ROLE_ADMIN = 'admin';
+
+    // أدوار المستخدم داخل الشركة (Company Pivot Roles)
+    public const COMPANY_ROLE_OWNER = 'owner';
+    public const COMPANY_ROLE_ADMIN = 'admin';
+    public const COMPANY_ROLE_MEMBER = 'member';
 
     protected $table = 'users';
 
     // -------------------- Fillable --------------------
     protected $fillable = [
-        'name',
-        'email',
-        'email_verified_at',
-        'username',
-        'phone',
-        'avatar',
-        'bio',
-        'job_title',
-        'birth_date',
-        'gender_id',
-        'national_id',
-        'address',
-        'commune_id',
-        'wilaya_id',
-        'role_id',
-        'last_login_at',
-        'last_login_ip',
-        'register_ip',
-        'register_user_agent',
-        'active',
-        'created_by',
-        'updated_by',
-        'deleted_by',
+        'name', 'email', 'email_verified_at', 'username', 'phone', 'avatar',
+        'bio', 'job_title', 'birth_date', 'gender_id', 'national_id', 'address',
+        'commune_id', 'wilaya_id', 'role_id', 'last_login_at', 'last_login_ip',
+        'register_ip', 'register_user_agent', 'active', 'created_by', 'updated_by', 'deleted_by',
     ];
 
     // -------------------- Hidden --------------------
     protected $hidden = [
-        'password',
-        'remember_token',
-        'national_id',
+        'password', 'remember_token', 'national_id',
     ];
 
     // -------------------- Casts --------------------
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'password' => 'hashed',        // Laravel 10+ (أفضل من setPasswordAttribute)
         'birth_date' => 'date',
         'last_login_at' => 'datetime',
         'active' => 'boolean',
@@ -6016,76 +6259,35 @@ class User extends Authenticatable
     // -------------------- Spatie Permission --------------------
     protected $guard_name = 'web';
 
-    // -------------------- Configuration --------------------
+    // -------------------- Configuration (لـ HasStandardizedConfiguration) --------------------
 
-    /** @var array حقول البحث */
     public static array $searchableFields = [
-        'name',
-        'email',
-        'username',
-        'phone',
-        'job_title',
+        'name', 'email', 'username', 'phone', 'job_title',
     ];
 
-    /** @var array الفلاتر المسموحة */
     public static array $filterable = [
-        'gender_id',
-        'commune_id',
-        'wilaya_id',
-        'role_id',
-        'active',
+        'gender_id', 'commune_id', 'wilaya_id', 'role_id', 'active',
     ];
 
-    /** @var array حقول الترتيب */
     public static array $sortable = [
-        'id',
-        'name',
-        'email',
-        'created_at',
-        'last_login_at',
+        'id', 'name', 'email', 'created_at', 'last_login_at',
     ];
 
-    /** @var array العلاقات المحملة دائماً */
     public static array $defaultWith = [];
 
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'gender',
-        'commune',
-        'wilaya',
-        'role',
-        'roles',
-        'permissions',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
-        'commercialDocuments',
-        'payments',
-        'stockMovements',
+        'gender', 'commune', 'wilaya', 'role', 'roles', 'permissions',
+        'createdBy', 'updatedBy', 'deletedBy', 'commercialDocuments',
+        'payments', 'stockMovements', 'companies',
     ];
 
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'name';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'asc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 300;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['users'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
 
     // -------------------- Relations --------------------
@@ -6144,20 +6346,22 @@ class User extends Authenticatable
     {
         return $this->hasMany(Expense::class, 'created_by');
     }
+
     public function companies(): BelongsToMany
     {
         return $this->belongsToMany(Company::class)
-            ->withPivot('is_default')
+            ->withPivot('is_default', 'role', 'invited_by', 'joined_at', 'is_active')
             ->withTimestamps();
     }
+
     public function defaultCompany(): BelongsTo
     {
         return $this->belongsTo(Company::class, 'company_id');
     }
 
     // -------------------- Mutators --------------------
-
-
+    // ملاحظة: تم استبدال setPasswordAttribute بـ Cast 'hashed'، لذا يمكن حذفها.
+    // لكن نبقها للتوافق مع الإصدارات القديمة إن وجدت.
     public function setPasswordAttribute($value)
     {
         if (strlen($value) === 60 && str_starts_with($value, '$2y$')) {
@@ -6180,12 +6384,10 @@ class User extends Authenticatable
             $this->commune?->name,
             $this->wilaya?->name,
         ]);
-
         return implode(', ', $parts);
     }
 
-    // -------------------- Helpers --------------------
-
+    // -------------------- Helpers (محسّنة) --------------------
     public function updateLastLogin(): void
     {
         $this->update([
@@ -6196,20 +6398,60 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->hasRole('admin');
+        return $this->hasRole(self::ROLE_ADMIN);
     }
 
     public function isSuperAdmin(): bool
     {
-        return $this->hasRole('super-admin');
+        return $this->hasRole(self::ROLE_SUPER_ADMIN);
     }
 
-
-
+    /**
+     * تحديد ما إذا كان المستخدم لديه حق الوصول إلى شركة معينة (عضو نشط).
+     *
+     * @param int|Company $company
+     * @return bool
+     */
     public function hasAccessToCompany(int|Company $company): bool
     {
         $id = $company instanceof Company ? $company->id : $company;
-        return $this->companies()->where('companies.id', $id)->exists();
+
+        if ($this->relationLoaded('companies')) {
+            $member = $this->companies->firstWhere('id', $id);
+            return $member && $member->pivot->is_active;
+        }
+
+        return $this->companies()
+            ->where('companies.id', $id)
+            ->wherePivot('is_active', true)
+            ->exists();
+    }
+
+    /**
+     * تحديد ما إذا كان المستخدم هو المالك الأساسي للشركة.
+     */
+    public function isOwnerOf(Company $company): bool
+    {
+        return $this->id === $company->owner_id;
+    }
+
+    /**
+     * تحديد ما إذا كان المستخدم مديراً (Admin) في الشركة (مالك أو مدير).
+     */
+    public function isAdminOf(Company $company): bool
+    {
+        if ($this->relationLoaded('companies')) {
+            $member = $this->companies->firstWhere('id', $company->id);
+            return $member
+                && $member->pivot->is_active
+                && in_array($member->pivot->role, [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN]);
+        }
+
+        return $this->companies()
+            ->where('companies.id', $company->id)
+            ->wherePivot('is_active', true)
+            ->wherePivotIn('role', [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN])
+            ->exists();
     }
 }
 

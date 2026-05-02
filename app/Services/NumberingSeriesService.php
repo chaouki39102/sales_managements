@@ -33,8 +33,8 @@ class NumberingSeriesService extends \App\Core\Services\BaseService
     {
         return DB::transaction(function () use ($seriesId) {
             $series = NumberingSeries::where('id', $seriesId)
-                        ->lockForUpdate()
-                        ->first();
+                ->lockForUpdate()
+                ->first();
 
             if (!$series) {
                 abort(404, 'سلسلة الترقيم غير موجودة');
@@ -79,44 +79,70 @@ class NumberingSeriesService extends \App\Core\Services\BaseService
 
     /**
      * استخراج الجزء الرقمي من رقم مستند بناءً على صيغة السلسلة
-     * (تحليل ذكي: يفترض أن آخر جزء متغير هو الرقم)
+     * (تحليل ذكي + آمن + performant)
      */
     private function extractNumericPart(string $documentNumber, NumberingSeries $series): ?int
     {
-        // استراتيجية بسيطة: استبدال جميع الأجزاء الثابتة من الصيغة بفراغ
-        $pattern = $series->format;
+        static $compiledCache = [];
 
-        // إزالة البادئة واللاحقة
-        $pattern = str_replace('{PREFIX}', $series->prefix ?? '', $pattern);
-        $pattern = str_replace('{SUFFIX}', $series->suffix ?? '', $pattern);
-
-        // استبدال المتغيرات بعبارة (.*) لاستخراجها
-        $regex = $pattern;
-        $regex = str_replace(
-            ['{YY}', '{YYYY}', '{MM}', '{MONTH}', '{NUMBER}', '{NUMBER:\d+}'],
-            ['\d{2}', '\d{4}', '\d{2}', '\d{2}', '(\d+)', '(\d+)'],
-            $regex
+        $cacheKey = md5(
+            $series->format . '|' .
+                ($series->prefix ?? '') . '|' .
+                ($series->suffix ?? '')
         );
-        $regex = '#^' . $regex . '$#u';
 
+        // ===============================
+        // 1. بناء regex مرة واحدة فقط (Cache)
+        // ===============================
+        if (!isset($compiledCache[$cacheKey])) {
+
+            $pattern = $series->format;
+
+            // حماية prefix / suffix
+            $prefix = $series->prefix ? preg_quote($series->prefix, '#') : '';
+            $suffix = $series->suffix ? preg_quote($series->suffix, '#') : '';
+
+            $pattern = str_replace('{PREFIX}', $prefix, $pattern);
+            $pattern = str_replace('{SUFFIX}', $suffix, $pattern);
+
+            // المتغيرات الزمنية
+            $pattern = str_replace(
+                ['{YYYY}', '{YY}', '{MM}', '{MONTH}'],
+                ['\d{4}', '\d{2}', '\d{2}', '\d{2}'],
+                $pattern
+            );
+
+            // {NUMBER} و {NUMBER:4}
+            $pattern = preg_replace_callback('/\{NUMBER(?::(\d+))?\}/', function ($m) {
+                if (isset($m[1])) {
+                    return '(?P<number>\d{' . $m[1] . '})';
+                }
+                return '(?P<number>\d+)';
+            }, $pattern);
+
+            $compiledCache[$cacheKey] = '#^' . $pattern . '$#u';
+        }
+
+        $regex = $compiledCache[$cacheKey];
+
+        // ===============================
+        // 2. المحاولة الأساسية (مطابقة دقيقة)
+        // ===============================
         if (preg_match($regex, $documentNumber, $matches)) {
-            // المطابقة الأخيرة ((\d+)) = الرقم
-            $numberMatch = end($matches);
-            if (is_numeric($numberMatch)) {
-                return (int) $numberMatch;
+            if (isset($matches['number']) && is_numeric($matches['number'])) {
+                return (int) $matches['number'];
             }
         }
 
-        // إذا فشل التحليل الذكي، جرب استخراج أي رقم متسلسل
-        if (preg_match('/\d+/', $documentNumber, $m)) {
-            $parts = explode($m[0], $documentNumber);
-            // لنأخذ الجزء الأخير المطابق كرقم
-            $matches = [];
-            preg_match_all('/\d+/', $documentNumber, $matches);
-            $lastMatch = end($matches[0]);
-            return (int) $lastMatch;
+        // ===============================
+        // 3. fallback (أكثر أمان)
+        // آخر رقم فقط
+        // ===============================
+        if (preg_match('/(\d+)(?!.*\d)/', $documentNumber, $matches)) {
+            return (int) $matches[1];
         }
 
         return null;
     }
+    
 }

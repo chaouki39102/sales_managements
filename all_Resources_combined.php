@@ -176,6 +176,28 @@ class AuthResource extends JsonResource
 
 
 
+// ===== ملف: BarcodeResource.php =====
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class BarcodeResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return parent::toArray($request);
+    }
+}
+
+
+
+
 // ===== ملف: BrandResource.php =====
 namespace App\Http\Resources;
 
@@ -473,7 +495,6 @@ class CompanyResource extends JsonResource
             'email'           => $this->email,
             'phone'           => $this->phone,
             'address'         => $this->address,
-            'tax_number'      => $this->tax_number,
             'nif'             => $this->nif,
             'nis'             => $this->nis,
             'rc'              => $this->rc,
@@ -985,10 +1006,10 @@ class NotificationResource extends JsonResource
             'notifiable_type' => $this->notifiable_type,
             'notifiable_id' => $this->notifiable_id,
             'data' => $this->data,
+            'is_unread' => $this->isUnread(),
             'read_at' => $this->read_at?->toIso8601String(),
-            'is_unread' => $this->is_unread,
             'created_at' => $this->created_at?->toIso8601String(),
-            
+
             'relations' => [
                 'notifiable' => $this->whenLoaded('notifiable', fn() => [
                     'id' => $this->notifiable->id,
@@ -998,6 +1019,7 @@ class NotificationResource extends JsonResource
         ];
     }
 }
+
 
 
 
@@ -1583,6 +1605,43 @@ class ProductTypeResource extends JsonResource
             'manages_stock' => $this->manages_stock,
             'active' => $this->active,
             'display_order' => $this->display_order,
+            'created_at' => $this->created_at?->toIso8601String(),
+            'updated_at' => $this->updated_at?->toIso8601String(),
+        ];
+    }
+}
+
+
+
+
+// ===== ملف: ProductVariantResource.php =====
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class ProductVariantResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'sku' => $this->sku,
+            'barcode' => $this->barcode,
+            'price_type' => $this->price_type,
+            'price_value' => $this->price_value,
+            'final_price' => $this->final_price,
+            'stock' => $this->stock,
+            'track_stock' => (bool) $this->track_stock,
+            'is_in_stock' => $this->is_in_stock,
+            'attributes' => $this->attributes,
+            'image' => $this->image,
+            'weight' => $this->weight,
+            'volume' => $this->volume,
+            'active' => (bool) $this->active,
+            'product_id' => $this->product_id,
+            'product' => new ProductResource($this->whenLoaded('product')),
+            'barcodes' => BarcodeResource::collection($this->whenLoaded('barcodes')),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

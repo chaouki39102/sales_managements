@@ -16,7 +16,9 @@ use App\Core\Traits\HasStandardizedConfiguration;
 #[Cacheable]
 class Setting extends Model
 {
-    use HasStandardizedConfiguration;
+    use
+        HasCompany,
+        HasStandardizedConfiguration;
 
     protected $table = 'settings';
 

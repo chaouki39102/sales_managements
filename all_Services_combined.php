@@ -143,6 +143,44 @@ class AuthService extends \App\Core\Services\BaseService
 
 
 
+// ===== ملف: BarcodeService.php =====
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\Barcode;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+
+class BarcodeService extends \App\Core\Services\BaseService
+{
+    protected string $model = Barcode::class;
+    protected string $resourceName = 'barcode';
+
+    protected function beforeCreate(array $data, Request $request): array
+    {
+        $data['company_id'] = $this->getCurrentCompanyId();
+        $data['created_by'] = auth()->id();
+        return $data;
+    }
+
+    protected function beforeUpdate(array $data, Model $item, Request $request): array
+    {
+        // منع تغيير product_id بعد الإنشاء
+        unset($data['product_id']);
+        return $data;
+    }
+
+    private function getCurrentCompanyId(): int
+    {
+        // استخدم CompanyContextService كما في مشروعك
+        return app(\App\Services\CompanyContextService::class)->getCurrentCompanyId();
+    }
+}
+
+
+
+
 // ===== ملف: BrandService.php =====
 namespace App\Services;
 
@@ -553,6 +591,106 @@ class CommuneService extends \App\Core\Services\BaseService
 
 
 
+// ===== ملف: CompanyContextService.php =====
+// app/Services/CompanyContextService.php
+namespace App\Services;
+
+class CompanyContextService
+{
+    private ?int $companyId = null;
+
+    public function set(int $id): void
+    {
+        $this->companyId = $id;
+    }
+
+    public function get(): ?int
+    {
+        return $this->companyId;
+    }
+
+    public function has(): bool
+    {
+        return $this->companyId !== null;
+    }
+
+    public function clear(): void
+    {
+        $this->companyId = null;
+    }
+
+    /**
+     * تنفيذ كود ضمن سياق شركة مؤقت — مفيد للـ Jobs والـ Artisan Commands
+     */
+    public function runAs(int $companyId, callable $callback): mixed
+    {
+        $previous = $this->companyId;
+        $this->companyId = $companyId;
+
+        try {
+            return $callback();
+        } finally {
+            $this->companyId = $previous;
+        }
+    }
+}
+
+
+
+
+// ===== ملف: CompanyService.php =====
+// app/Services/CompanyService.php
+
+namespace App\Services;
+
+use App\Models\Company;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+class CompanyService extends \App\Core\Services\BaseService
+{
+    protected string $model = Company::class;
+    protected string $resourceName = 'company';
+    protected array $defaultWith = [];
+
+    /**
+     * قبل الإنشاء: تعيين slug و owner_id
+     */
+    protected function beforeCreate(array $data, $request): array
+    {
+        if (empty($data['slug']) && isset($data['name'])) {
+            $data['slug'] = Str::slug($data['name']) . '-' . uniqid();
+        }
+        $data['owner_id'] = auth()->id();
+        $data['is_active'] = $data['is_active'] ?? true;
+        return $data;
+    }
+
+    /**
+     * بعد الإنشاء: ربط المستخدم بالشركة كـ default
+     */
+    protected function afterCreate(Model $item, array $data, $request): void
+    {
+        // ربط المستخدم (owner) بالشركة كافتراضي
+        $user = auth()->user();
+        if ($user && !$user->companies->contains($item->id)) {
+            $user->companies()->attach($item->id, ['is_default' => true]);
+        }
+    }
+
+    /**
+     * جلب شركات المستخدم الحالي (للاستخدام في Controller)
+     */
+    public function getUserCompanies()
+    {
+        return auth()->user()->companies()->get();
+    }
+}
+
+
+
+
 // ===== ملف: CurrencyService.php =====
 namespace App\Services;
 
@@ -627,7 +765,7 @@ class DashboardService
     public function getSalesChart(string $period = 'month'): array
     {
         $data = [];
-        
+
         if ($period === 'year') {
             for ($month = 1; $month <= 12; $month++) {
                 $total = CommercialDocument::whereYear('document_date', Carbon::now()->year)
@@ -713,8 +851,7 @@ class DashboardService
     public function getInventorySummary(): array
     {
         $totalProducts = Product::count();
-        $lowStockProducts = Product::whereHas('variants', fn($q) => $q->whereRaw('quantity <= minimum_stock'))->count();
-        
+        $lowStockProducts = Product::whereColumn('current_stock', '<=', 'min_stock_alert')->count();
         $stockIn = StockMovement::whereYear('created_at', Carbon::now()->year)
             ->whereMonth('created_at', Carbon::now()->month)
             ->where('movement_type_id', 1)
@@ -733,6 +870,7 @@ class DashboardService
         ];
     }
 }
+
 
 
 
@@ -1598,6 +1736,7 @@ class PartyTypeService extends \App\Core\Services\BaseService
 // ===== ملف: NotificationService.php =====
 namespace App\Services;
 
+use App\Core\Exceptions\BusinessRuleException;
 use App\Models\Notification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -1609,19 +1748,35 @@ class NotificationService extends \App\Core\Services\BaseService
 
     public function getUnread()
     {
-        return $this->model::unread()->get();
+        $user = auth()->user();
+        if (!$user) {
+            return collect();
+        }
+        return $user->notifications()->unread()->get();
     }
 
     public function markAsRead(Model $notification): bool
     {
+        $user = auth()->user();
+        // التأكد أن هذا الإشعار يخص المستخدم الحالي
+        if (
+            $notification->notifiable_id != $user->id ||
+            $notification->notifiable_type !== get_class($user)
+        ) {
+            throw new BusinessRuleException('لا يمكنك تعليم هذا الإشعار كمقروء', 403);
+        }
         return $notification->markAsRead();
     }
 
     public function markAllAsRead(): void
     {
-        $this->model::unread()->update(['read_at' => now()]);
+        $user = auth()->user();
+        if ($user) {
+            $user->notifications()->unread()->update(['read_at' => now()]);
+        }
     }
 }
+
 
 
 
@@ -2213,6 +2368,7 @@ use App\Models\ProductPackaging;
 use App\Models\ProductPrice;
 use App\Models\QuantityDiscount;
 use App\Core\Exceptions\BusinessRuleException;
+use App\Models\Company;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -2240,6 +2396,10 @@ class ProductService extends \App\Core\Services\BaseService
 
     protected function beforeCreate(array $data, $request): array
     {
+        $company = Company::find(session('current_company_id'));
+        if ($company && $company->products()->count() >= $company->max_products) {
+            throw new BusinessRuleException("وصلت الشركة للحد الأقصى من المنتجات ({$company->max_products})", 422);
+        }
         if (empty($data['slug']) && isset($data['name'])) {
             $data['slug'] = $this->generateUniqueSlug($data['name']);
         }
@@ -2316,7 +2476,7 @@ class ProductService extends \App\Core\Services\BaseService
             throw new BusinessRuleException('لا يمكن حذف منتج له دفعات مخزون', 409);
         }
         if ($item->documentLines()->exists()) {
-            throw new BusinessRuleException('لا يمكن حذف منتج مرتبط بوثائق تجارية', 409);
+            throw new BusinessRuleException('لا يمكن حذف منتج مرتبط بمستندات تجارية', 409);
         }
         if ($item->openingBalances()->exists()) {
             throw new BusinessRuleException('لا يمكن حذف منتج له أرصدة افتتاحية', 409);
@@ -2482,6 +2642,7 @@ class ProductService extends \App\Core\Services\BaseService
 
 
 
+
 // ===== ملف: ProductTypeService.php =====
 namespace App\Services;
 
@@ -2491,6 +2652,56 @@ class ProductTypeService extends \App\Core\Services\BaseService
 {
     protected string $model = ProductType::class;
     protected string $resourceName = 'product_type';
+}
+
+
+
+
+// ===== ملف: ProductVariantService.php =====
+namespace App\Services;
+
+use App\Models\ProductVariant;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+
+class ProductVariantService extends \App\Core\Services\BaseService
+{
+    protected string $model = ProductVariant::class;
+    protected string $resourceName = 'product_variant';
+
+    protected function beforeCreate(array $data, Request $request): array
+    {
+        if (!isset($data['company_id'])) {
+            $data['company_id'] = app(CompanyContextService::class)->getCurrentCompanyId();
+        }
+        if (!isset($data['created_by'])) {
+            $data['created_by'] = auth()->id();
+        }
+        return $data;
+    }
+
+    protected function afterCreate(Model $item, array $data, $request): void
+    {
+        // إذا تم إرسال باركود في الطلب، يمكن إنشاء سجل باركود مرتبط بهذا المتغير
+        if (!empty($data['barcode'])) {
+            $barcode = new \App\Models\Barcode([
+                'company_id' => $item->company_id,
+                'product_id' => $item->product_id,
+                'variant_id' => $item->id,
+                'barcode'    => $data['barcode'],
+                'is_primary' => true,
+                'type'       => 'variant',
+                'created_by' => auth()->id(),
+            ]);
+            $barcode->save();
+        }
+    }
+
+    protected function beforeUpdate(array $data, Model $item, Request $request): array
+    {
+        unset($data['product_id'], $data['company_id']);
+        return $data;
+    }
 }
 
 

@@ -20,6 +20,10 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->boolean('is_default')->default(false)->index()
                 ->comment('التعريفة الافتراضية عند إنشاء زبون جديد');
+            $table->boolean('is_percentage')->default(false)
+                ->comment('هل التعريفة نسبية على سعر الشراء');
+            $table->decimal('value', 8, 2)->nullable()
+                ->comment('قيمة النسبة أو المبلغ الإضافي');
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();

@@ -640,6 +640,410 @@ class CommuneController extends BaseApiController
 
 
 // ===== ملف: CompanyController.php =====
+namespace App\Http\Controllers\Api\V1;
+
+use App\Core\Http\Controllers\BaseApiController;
+use App\Http\Requests\StoreCompanyRequest;
+use App\Http\Requests\UpdateCompanyRequest;
+use App\Http\Resources\CompanyResource;
+use App\Models\Company;
+use App\Services\CompanyService;
+use App\Services\CompanyContextService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+/**
+ * CompanyController
+ *
+ * يتبع نمط BaseApiController (البوّاب).
+ * كل المنطق في CompanyService.
+ */
+class CompanyController extends BaseApiController
+{
+    protected string  $resourceName = 'company';
+    protected ?string $resourceClass = CompanyResource::class;
+
+    public function __construct(
+        private readonly CompanyService        $companyService,
+        private readonly CompanyContextService $context,
+    ) {
+        parent::__construct();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // الإجباريات لـ BaseApiController
+    // ═══════════════════════════════════════════════════════════
+
+    protected function getService(): CompanyService
+    {
+        return $this->companyService;
+    }
+
+    protected function getModelClass(): string
+    {
+        return Company::class;
+    }
+
+    protected function getListConfig(): array
+    {
+        return [
+            'search_fields'    => Company::$searchableFields,
+            'filters'          => Company::$filterable,
+            'sorts'            => Company::$sortable,
+            'relations'        => Company::$allowedIncludes,
+            'default_includes' => Company::$defaultWith,
+            'default_sort'     => Company::$defaultSort,
+            'default_per_page' => Company::$defaultPerPage,
+            'per_page_limit'   => Company::$perPageLimit,
+            'cache_ttl'        => Company::$cacheTtl,
+            'cache_tags'       => Company::$cacheTags,
+        ];
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ① CRUD — مع دعم الفلاتر حسب صلاحيات المستخدم
+    // ═══════════════════════════════════════════════════════════
+
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('viewAny', Company::class);
+
+            $data = $this->apiListWithCallback(
+                Company::class,
+                function ($query) use ($request) {
+                    $user = auth()->user();
+
+                    // المستخدم العادي: فقط الشركات التي يملكها أو عضو فيها
+                    if (!$user->isSuperAdmin()) {
+                        $query->whereHas('members', fn($q) => $q->where('user_id', $user->id));
+                    }
+
+                    // فلاتر إضافية للسوبر أدمن
+                    if ($user->isSuperAdmin() && $request->filled('status')) {
+                        match ($request->status) {
+                            'active'      => $query->active(),
+                            'suspended'   => $query->suspended(),
+                            'deactivated' => $query->deactivated(),
+                            'verified'    => $query->verified(),
+                            'on_trial'    => $query->onTrial(),
+                            default       => null,
+                        };
+                    }
+
+                    $query->with(['owner:id,name,email']);
+                },
+                $request,
+                $this->getListConfig(),
+            );
+
+            return $this->successResponse($data, 'تم جلب قائمة الشركات');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'index');
+        }
+    }
+
+    public function store(StoreCompanyRequest $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('create', Company::class);
+            $company = $this->companyService->create($request->validated(), $request);
+            return $this->successResponse(new CompanyResource($company), 'تم إنشاء الشركة بنجاح', 201);
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'store');
+        }
+    }
+
+    public function show($id): JsonResponse
+    {
+        try {
+            $company = $this->companyService->findById($id);
+            $this->authorizeAction('view', $company);
+            $company->loadCount(['activeUsers', 'products', 'warehouses', 'parties'])
+                    ->load(['owner:id,name,email', 'legalForm:id,name', 'wilaya:id,name', 'commune:id,name']);
+            return $this->successResponse(new CompanyResource($company));
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'show');
+        }
+    }
+
+    public function update(UpdateCompanyRequest $request, $id): JsonResponse
+    {
+        try {
+            $company = $this->companyService->findById($id);
+            $this->authorizeAction('update', $company);
+            $company = $this->companyService->update($company, $request->validated(), $request);
+            return $this->successResponse(new CompanyResource($company), 'تم تحديث بيانات الشركة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'update');
+        }
+    }
+
+    public function destroy($id): JsonResponse
+    {
+        try {
+            $company = $this->companyService->findById($id);
+            $this->authorizeAction('delete', $company);
+            $this->companyService->delete($company);
+            return $this->successResponse(null, 'تم إيقاف الشركة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'destroy');
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ② شركات المستخدم الحالي
+    // ═══════════════════════════════════════════════════════════
+
+    public function myCompanies(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('viewAny', Company::class);
+            $data = $this->apiListWithCallback(
+                Company::class,
+                fn($query) => $query->whereHas('members', fn($q) => $q->where('user_id', auth()->id())),
+                $request,
+                $this->getListConfig(),
+            );
+            return $this->successResponse($data, 'تم جلب شركاتك');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'myCompanies');
+        }
+    }
+
+    public function current(): JsonResponse
+    {
+        try {
+            $companyId = $this->context->get();
+            if (!$companyId) {
+                return $this->errorResponse('لا توجد شركة نشطة حالياً', 404, 'NO_ACTIVE_COMPANY');
+            }
+            $company = $this->companyService->findById($companyId);
+            $this->authorizeAction('view', $company);
+            $company->load(['owner:id,name', 'legalForm:id,name', 'wilaya:id,name', 'commune:id,name']);
+            return $this->successResponse(new CompanyResource($company), 'الشركة النشطة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'current');
+        }
+    }
+
+    public function switch(Request $request): JsonResponse
+    {
+        try {
+            $request->validate(['company_id' => 'required|integer|exists:companies,id']);
+            $company = $this->companyService->findById($request->company_id);
+            $this->authorizeAction('switch', $company);
+            abort_if($company->is_suspended, 403, "الشركة معلّقة مؤقتاً: {$company->suspension_reason}");
+            abort_unless($company->is_active, 403, 'الشركة غير نشطة');
+            $this->companyService->switchContext(auth()->user(), $company, $this->context);
+            return $this->successResponse(new CompanyResource($company), "تم التبديل إلى شركة: {$company->name}");
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'switch');
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ③ إدارة الأعضاء (بدون تغيير جوهري)
+    // ═══════════════════════════════════════════════════════════
+
+    public function members(Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('manageMember', $company);
+            return $this->successResponse($this->companyService->getMembers($company), 'أعضاء الشركة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'members');
+        }
+    }
+
+    public function addMember(Request $request, Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('manageMember', $company);
+            $data = $request->validate([
+                'user_id' => 'required|integer|exists:users,id',
+                'role'    => ['nullable', 'string', Rule::in(['admin', 'manager', 'member', 'viewer'])],
+            ]);
+            $company->addMember($data['user_id'], $data['role'] ?? 'member', auth()->id());
+            return $this->successResponse(null, 'تمت إضافة العضو بنجاح', 201);
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'addMember');
+        }
+    }
+
+    public function removeMember(Company $company, int $userId): JsonResponse
+    {
+        try {
+            $this->authorizeAction('manageMember', $company);
+            $company->removeMember($userId);
+            return $this->successResponse(null, 'تمت إزالة العضو');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'removeMember');
+        }
+    }
+
+    public function changeMemberRole(Request $request, Company $company, int $userId): JsonResponse
+    {
+        try {
+            $this->authorizeAction('manageMember', $company);
+            $data = $request->validate(['role' => ['required', 'string', Rule::in(['admin', 'manager', 'member', 'viewer'])]]);
+            $company->changeMemberRole($userId, $data['role']);
+            return $this->successResponse(null, 'تم تغيير دور العضو');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'changeMemberRole');
+        }
+    }
+
+    public function deactivateMember(Company $company, int $userId): JsonResponse
+    {
+        try {
+            $this->authorizeAction('manageMember', $company);
+            $company->deactivateMember($userId);
+            return $this->successResponse(null, 'تم تعطيل العضو مؤقتاً');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'deactivateMember');
+        }
+    }
+
+    public function activateMember(Company $company, int $userId): JsonResponse
+    {
+        try {
+            $this->authorizeAction('manageMember', $company);
+            $company->activateMember($userId);
+            return $this->successResponse(null, 'تم إعادة تفعيل العضو');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'activateMember');
+        }
+    }
+
+    public function transferOwnership(Request $request, Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('transferOwnership', $company);
+            $data = $request->validate(['user_id' => 'required|integer|exists:users,id']);
+            $company->transferOwnership($data['user_id']);
+            return $this->successResponse(new CompanyResource($company->fresh(['owner:id,name,email'])), 'تم نقل الملكية بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'transferOwnership');
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ④ Super Admin Actions (موحدة باستخدام authorizeAction)
+    // ═══════════════════════════════════════════════════════════
+
+    public function stats(): JsonResponse
+    {
+        try {
+            $this->authorizeAction('superAdmin', Company::class);
+            return $this->successResponse($this->companyService->getStats(), 'إحصائيات الشركات');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'stats');
+        }
+    }
+
+    public function suspend(Request $request, Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('superAdmin', Company::class);
+            $data = $request->validate(['reason' => 'required|string|max:500']);
+            $company->suspend($data['reason'], auth()->id());
+            return $this->successResponse(new CompanyResource($company->fresh()), "تم تعليق شركة [{$company->name}]");
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'suspend');
+        }
+    }
+
+    public function unsuspend(Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('superAdmin', Company::class);
+            $company->unsuspend();
+            return $this->successResponse(new CompanyResource($company->fresh()), "تم رفع التعليق عن شركة [{$company->name}]");
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'unsuspend');
+        }
+    }
+
+    public function deactivate(Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('superAdmin', Company::class);
+            $company->deactivate(auth()->id());
+            return $this->successResponse(new CompanyResource($company->fresh()), "تم إيقاف تفعيل شركة [{$company->name}]");
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'deactivate');
+        }
+    }
+
+    public function activate(Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('superAdmin', Company::class);
+            $company->activate();
+            return $this->successResponse(new CompanyResource($company->fresh()), "تم إعادة تفعيل شركة [{$company->name}]");
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'activate');
+        }
+    }
+
+    public function verify(Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('superAdmin', Company::class);
+            $company->verify(auth()->id());
+            return $this->successResponse(new CompanyResource($company->fresh()), "تم توثيق شركة [{$company->name}]");
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'verify');
+        }
+    }
+
+    public function unverify(Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('superAdmin', Company::class);
+            $company->unverify();
+            return $this->successResponse(null, 'تم إلغاء توثيق الشركة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'unverify');
+        }
+    }
+
+    public function changePlan(Request $request, Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('superAdmin', Company::class);
+            $data = $request->validate([
+                'plan'           => ['required', 'string', Rule::in(array_keys(Company::PLANS))],
+                'max_users'      => 'nullable|integer|min:1',
+                'max_warehouses' => 'nullable|integer|min:1',
+                'max_products'   => 'nullable|integer|min:1',
+            ]);
+            $customLimits = array_filter([
+                'max_users'      => $data['max_users'] ?? null,
+                'max_warehouses' => $data['max_warehouses'] ?? null,
+                'max_products'   => $data['max_products'] ?? null,
+            ]);
+            $company->upgradePlan($data['plan'], $customLimits ?: null);
+            return $this->successResponse(new CompanyResource($company->fresh()), "تم تغيير خطة [{$company->name}] إلى {$data['plan']}");
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'changePlan');
+        }
+    }
+
+    public function updateNotes(Request $request, Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('superAdmin', Company::class);
+            $data = $request->validate(['notes' => 'nullable|string|max:5000']);
+            $company->update(['notes' => $data['notes']]);
+            return $this->successResponse(null, 'تم تحديث الملاحظات');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'updateNotes');
+        }
+    }
+}
 
 
 
@@ -1385,6 +1789,7 @@ use App\Services\NotificationService;
 use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class NotificationController extends BaseApiController
 {
@@ -1396,9 +1801,15 @@ class NotificationController extends BaseApiController
         parent::__construct();
     }
 
+    /**
+     * جلب الإشعارات غير المقروءة للمستخدم الحالي
+     */
     public function unread(Request $request): JsonResponse
     {
         try {
+            // ✅ التحقق من صلاحية viewAny (يفترض أن Policty تسمح للمستخدم بمشاهدة إشعاراته)
+            $this->authorizeAction('viewAny', Notification::class);
+
             $notifications = $this->notificationService->getUnread();
             return $this->successResponse(
                 NotificationResource::collection($notifications),
@@ -1409,10 +1820,17 @@ class NotificationController extends BaseApiController
         }
     }
 
+    /**
+     * تعليم إشعار معين كمقروء
+     */
     public function markAsRead(Request $request, int $id): JsonResponse
     {
         try {
             $notification = $this->notificationService->findById($id);
+
+            // ✅ التحقق من صلاحية التحديث (يجب أن يكون المستخدم مالك الإشعار)
+            $this->authorizeAction('update', $notification);
+
             $this->notificationService->markAsRead($notification);
             return $this->successResponse(
                 new NotificationResource($notification->fresh()),
@@ -1423,9 +1841,15 @@ class NotificationController extends BaseApiController
         }
     }
 
+    /**
+     * تعليم جميع الإشعارات كمقروءة للمستخدم الحالي
+     */
     public function markAllAsRead(Request $request): JsonResponse
     {
         try {
+            // ✅ التحقق من صلاحية التحديث على النموذج (ككل)
+            $this->authorizeAction('update', Notification::class);
+
             $this->notificationService->markAllAsRead();
             return $this->successResponse(null, 'تم تعليم جميع الإشعارات كمقروءة');
         } catch (\Throwable $e) {
@@ -1443,6 +1867,7 @@ class NotificationController extends BaseApiController
         return Notification::class;
     }
 }
+
 
 
 
@@ -1916,20 +2341,12 @@ class PriceLevelController extends BaseApiController
 namespace App\Http\Controllers\Api\V1;
 
 use App\Core\Http\Controllers\BaseApiController;
-use App\Http\Requests\StoreProductRequest;
-use App\Http\Requests\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Services\ProductService;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-/**
- * Product Controller — البوّاب
- *
- * مسؤوليته الوحيدة: استقبال الطلب، التحقق من الصلاحيات،
- * تفويض المنطق للـ ProductService، وإرجاع الرد.
- */
 class ProductController extends BaseApiController
 {
     protected string $resourceName = 'product';
@@ -1940,102 +2357,7 @@ class ProductController extends BaseApiController
         parent::__construct();
     }
 
-    // =========================================================
-    // CRUD مع دعم المتغيرات
-    // =========================================================
-
-    /**
-     * إنشاء منتج جديد مع متغيراته
-     */
-    public function store(Request $request): JsonResponse
-    {
-        try {
-            $this->authorizeAction('create', Product::class);
-
-            // التحقق عبر StoreProductRequest
-            $validated = app(StoreProductRequest::class)->validated();
-            // نضيف variants من الطلب الأصلي (لأنها غير موجودة في FormRequest)
-            $validated['variants'] = $request->input('variants', []);
-
-            $item = $this->productService->create($validated, $request);
-
-            // جلب المنتج مع علاقاته كاملة للرد
-            $item = $this->productService->findById($item->id);
-
-            return $this->successResponse(
-                new ProductResource($item),
-                'تم إنشاء المنتج بنجاح',
-                201
-            );
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'store');
-        }
-    }
-
-    /**
-     * عرض منتج مع كل متغيراته وأسعاره
-     */
-    public function show($id): JsonResponse
-    {
-        try {
-            $item = $this->productService->findById($id);
-            $this->authorizeAction('view', $item);
-
-            return $this->successResponse(new ProductResource($item));
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'show');
-        }
-    }
-
-    /**
-     * تحديث منتج مع مزامنة متغيراته
-     */
-    public function update(Request $request, $id): JsonResponse
-    {
-        try {
-            $item = $this->productService->findById($id);
-            $this->authorizeAction('update', $item);
-
-            // التحقق عبر UpdateProductRequest
-            $validated = app(UpdateProductRequest::class)->validated();
-            // نضيف variants من الطلب الأصلي
-            if ($request->has('variants')) {
-                $validated['variants'] = $request->input('variants');
-            }
-
-            $item = $this->productService->update($item, $validated, $request);
-
-            // إعادة جلب مع العلاقات
-            $item = $this->productService->findById($item->id);
-
-            return $this->successResponse(
-                new ProductResource($item),
-                'تم تحديث المنتج بنجاح'
-            );
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'update');
-        }
-    }
-
-    /**
-     * حذف منتج (soft delete)
-     */
-    public function destroy($id): JsonResponse
-    {
-        try {
-            $item = $this->productService->findById($id);
-            $this->authorizeAction('delete', $item);
-            $this->productService->delete($item);
-
-            return $this->successResponse(null, 'تم حذف المنتج بنجاح');
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'destroy');
-        }
-    }
-
-    // =========================================================
-    // Custom Actions
-    // =========================================================
+    // ========== دوال إضافية فقط (غير موجودة في BaseApiController) ==========
 
     public function active(Request $request): JsonResponse
     {
@@ -2070,20 +2392,24 @@ class ProductController extends BaseApiController
         }
     }
 
-    public function withVariants(Request $request): JsonResponse
+    // ========== تجاوز الإعدادات الخاصة بالقائمة ==========
+
+    protected function getListConfig(): array
     {
-        try {
-            $this->authorizeAction('viewAny', Product::class);
-            $products = $this->productService->getWithVariants();
-            return $this->successResponse(ProductResource::collection($products));
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'withVariants');
-        }
+        return [
+            'search_fields'   => Product::$searchableFields,
+            'filters'         => Product::$filterable,
+            'sorts'           => Product::$sortable,
+            'relations'       => Product::$allowedIncludes,
+            'default_includes'=> ['family', 'brand', 'productType', 'packagings'],
+            'default_sort'    => Product::$defaultSort,
+            'default_per_page'=> Product::$defaultPerPage ?? 15,
+            'per_page_limit'  => Product::$perPageLimit ?? 100,
+            'cache_tags'      => ['products'],
+        ];
     }
 
-    // =========================================================
-    // Required by BaseApiController
-    // =========================================================
+    // ========== الإجباريات لـ BaseApiController ==========
 
     protected function getService(): ProductService
     {
@@ -2093,21 +2419,6 @@ class ProductController extends BaseApiController
     protected function getModelClass(): string
     {
         return Product::class;
-    }
-
-    protected function getListConfig(): array
-    {
-        return [
-            'search_fields'   => Product::$searchableFields,
-            'filters'         => Product::$filterable,
-            'sorts'           => Product::$sortable,
-            'relations'       => Product::$allowedIncludes,
-            'default_includes'=> ['family', 'brand', 'productType', 'variants'],
-            'default_sort'    => Product::$defaultSort,
-            'default_per_page'=> Product::$defaultPerPage ?? 15,
-            'per_page_limit'  => Product::$perPageLimit ?? 100,
-            'cache_tags'      => ['products'],
-        ];
     }
 }
 
@@ -2196,6 +2507,138 @@ class ProductTypeController extends BaseApiController
         return ProductType::class;
     }
 }
+
+
+
+// ===== ملف: ProductVariantController.php =====
+namespace App\Http\Controllers\Api\V1;
+
+use App\Core\Http\Controllers\BaseApiController;
+use App\Http\Requests\StoreProductVariantRequest;
+use App\Http\Requests\UpdateProductVariantRequest;
+use App\Http\Resources\ProductVariantResource;
+use App\Models\ProductVariant;
+use App\Services\ProductVariantService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class ProductVariantController extends BaseApiController
+{
+    protected string $resourceName = 'product_variant';
+    protected ?string $resourceClass = ProductVariantResource::class;
+
+    public function __construct(private ProductVariantService $service)
+    {
+        parent::__construct();
+    }
+
+    protected function getService(): ProductVariantService
+    {
+        return $this->service;
+    }
+
+    protected function getModelClass(): string
+    {
+        return ProductVariant::class;
+    }
+
+    protected function getListConfig(): array
+    {
+        return [
+            'search_fields' => ProductVariant::$searchableFields,
+            'filters' => ProductVariant::$filterable,
+            'sorts' => ProductVariant::$sortable,
+            'relations' => ProductVariant::$allowedIncludes,
+            'default_includes' => ProductVariant::$defaultWith,
+            'default_sort' => ProductVariant::$defaultSort,
+            'default_per_page' => ProductVariant::$defaultPerPage,
+            'per_page_limit' => ProductVariant::$perPageLimit,
+            'cache_ttl' => ProductVariant::$cacheTtl,
+            'cache_tags' => ProductVariant::$cacheTags,
+        ];
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('viewAny', ProductVariant::class);
+            $data = $this->getListData($request);
+            return $this->successResponse($data, 'تم جلب قائمة المتغيرات');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'index');
+        }
+    }
+
+    public function show($id): JsonResponse
+    {
+        try {
+            $variant = $this->service->findById($id);
+            $this->authorizeAction('view', $variant);
+            return $this->successResponse(new ProductVariantResource($variant->load('product', 'barcodes')));
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'show');
+        }
+    }
+
+    public function store(StoreProductVariantRequest $request): JsonResponse
+    {
+        try {
+            $variant = $this->service->create($request->validated(), $request);
+            return $this->successResponse(
+                new ProductVariantResource($variant->load('product')),
+                'تم إنشاء المتغير بنجاح',
+                201
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'store');
+        }
+    }
+
+    public function update(UpdateProductVariantRequest $request, $id): JsonResponse
+    {
+        try {
+            $variant = $this->service->findById($id);
+            $this->authorizeAction('update', $variant);
+            $variant = $this->service->update($variant, $request->validated(), $request);
+            return $this->successResponse(
+                new ProductVariantResource($variant->load('product')),
+                'تم تحديث المتغير'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'update');
+        }
+    }
+
+    public function destroy($id): JsonResponse
+    {
+        try {
+            $variant = $this->service->findById($id);
+            $this->authorizeAction('delete', $variant);
+            $this->service->delete($variant);
+            return $this->successResponse(null, 'تم حذف المتغير');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'destroy');
+        }
+    }
+
+    // إضافي: جلب متغيرات منتج معين
+    public function indexByProduct(Request $request, $productId): JsonResponse
+    {
+        try {
+            $this->authorizeAction('viewAny', ProductVariant::class);
+            $data = $this->apiListWithCallback(
+                ProductVariant::class,
+                fn($query) => $query->where('product_id', $productId),
+                $request,
+                $this->getListConfig()
+            );
+            return $this->successResponse($data, 'تم جلب متغيرات المنتج');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'indexByProduct');
+        }
+    }
+}
+
 
 
 

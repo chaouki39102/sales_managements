@@ -113,7 +113,8 @@ class StockMovementObserver
         ]);
 
         // ربط الحركة بالدفعة
-        $movement->update(['stock_lot_id' => $lot->id]);
+        $movement->updateQuietly(['stock_lot_id' => $lot->id]);
+
 
         Log::info("✅ تم إنشاء دفعة: {$lot->lot_number} للمنتج {$product->name}");
     }

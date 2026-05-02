@@ -8,60 +8,114 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
+/**
+ * StoreAttachmentRequest
+ *
+ * المرفقات polymorphic — تُرفق لأي كيان (commercial_documents, parties, expenses...).
+ * الـ attachable_type و attachable_id يُحددان الكيان المرتبط.
+ *
+ * خريطة الـ attachable_type المقبولة:
+ *   commercial_document → App\Models\CommercialDocument
+ *   party               → App\Models\Party
+ *   expense             → App\Models\Expense
+ *   product             → App\Models\Product
+ *   employee            → App\Models\Employee
+ *   payment             → App\Models\Payment
+ */
 class StoreAttachmentRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    // الأنواع المدعومة — يقابل كل مفتاح morph alias في AppServiceProvider
+    private const ALLOWED_TYPES = [
+        'commercial_document',
+        'party',
+        'expense',
+        'product',
+        'employee',
+        'payment',
+        'check',
+        'treasury_account',
+    ];
+
+    // أقصى حجم للملف: 20 MB
+    private const MAX_FILE_SIZE_KB = 20480;
+
+    // امتدادات مسموحة
+    private const ALLOWED_EXTENSIONS = [
+        'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp',
+        'doc', 'docx', 'xls', 'xlsx', 'csv',
+        'txt', 'zip',
+    ];
+
+    public function authorize(): bool { return true; }
 
     public function rules(): array
     {
         return [
-            'file_name' => 'required|string|max:255',
-            'file_path' => 'required|string|max:500',
-            'file_type' => 'nullable|string|max:100',
-            'file_extension' => 'nullable|string|max:20',
-            'file_size' => 'nullable|integer|min:0',
-            'attachable_type' => 'nullable|string|max:150',
-            'attachable_id' => 'nullable|integer',
-            'title' => 'nullable|string|max:255',
-            'description' => 'nullable|string|max:500',
-            'category' => 'nullable|string|max:100',
-            'is_public' => 'nullable|boolean',
-            'disk' => 'nullable|string|max:50',
-            'uploaded_by' => 'nullable|integer|exists:users,id',
+            // الملف — يمكن رفع ملف جديد أو تمرير مسار موجود
+            'file'             => [
+                Rule::requiredIf(fn () => empty($this->input('file_path'))),
+                'file',
+                'max:' . self::MAX_FILE_SIZE_KB,
+                'mimes:' . implode(',', self::ALLOWED_EXTENSIONS),
+            ],
+            // مسار موجود مسبقاً (للحفظ بعد رفع منفصل via presigned URL)
+            'file_path'        => ['nullable', 'string', 'max:500',
+                                    Rule::requiredIf(fn () => empty($this->file('file')))],
+
+            // معلومات الملف (تُحسب تلقائياً من الملف إذا لم تُرسَل)
+            'file_name'        => 'nullable|string|max:255',
+            'file_type'        => 'nullable|string|max:50',
+            'file_extension'   => 'nullable|string|max:10',
+            'file_size'        => 'nullable|integer|min:0',
+
+            // الكيان المرتبط (Polymorphic)
+            'attachable_type'  => ['required', 'string', Rule::in(self::ALLOWED_TYPES)],
+            'attachable_id'    => 'required|integer|min:1',
+
+            // بيانات وصفية
+            'title'            => 'nullable|string|max:200',
+            'description'      => 'nullable|string|max:1000',
+            'category'         => 'nullable|string|max:50',
+
+            // خيارات الوصول
+            'is_public'        => 'nullable|boolean',
+            'disk'             => ['nullable', 'string', Rule::in(['local', 'public', 's3'])],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'file.required'              => 'الملف مطلوب',
+            'file.max'                   => 'حجم الملف يجب أن لا يتجاوز 20 ميجابايت',
+            'file.mimes'                 => 'نوع الملف غير مدعوم. الأنواع المقبولة: ' . implode(', ', self::ALLOWED_EXTENSIONS),
+            'attachable_type.required'   => 'نوع الكيان المرتبط مطلوب',
+            'attachable_type.in'         => 'نوع الكيان غير مدعوم',
+            'attachable_id.required'     => 'معرّف الكيان المرتبط مطلوب',
         ];
     }
 }
+
 
 class UpdateAttachmentRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    public function authorize(): bool { return true; }
 
     public function rules(): array
     {
         return [
-            'file_name' => 'sometimes|string|max:255',
-            'file_path' => 'sometimes|string|max:500',
-            'file_type' => 'nullable|string|max:100',
-            'file_extension' => 'nullable|string|max:20',
-            'file_size' => 'nullable|integer|min:0',
-            'attachable_type' => 'nullable|string|max:150',
-            'attachable_id' => 'nullable|integer',
-            'title' => 'nullable|string|max:255',
-            'description' => 'nullable|string|max:500',
-            'category' => 'nullable|string|max:100',
-            'is_public' => 'nullable|boolean',
-            'disk' => 'nullable|string|max:50',
-            'uploaded_by' => 'nullable|integer|exists:users,id',
+            // عند التحديث — فقط البيانات الوصفية قابلة للتعديل
+            // الملف نفسه لا يتغير (يُحذف القديم وينشأ جديد)
+            'title'       => 'sometimes|nullable|string|max:200',
+            'description' => 'sometimes|nullable|string|max:1000',
+            'category'    => 'sometimes|nullable|string|max:50',
+            'is_public'   => 'sometimes|nullable|boolean',
         ];
     }
 }
+
 
 
 
@@ -498,6 +552,172 @@ class UpdateExpenseCategoryRequest extends FormRequest
 
 
 
+// ===== ملف: Expenserequest.php =====
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreExpenseRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'expense_number'      => ['nullable', 'string', 'max:50',
+                                       Rule::unique('expenses', 'expense_number')->where('company_id', $companyId)],
+            'date'                => 'required|date',
+            'amount'              => 'required|numeric|min:0.0001',
+            'expense_category_id' => 'required|integer|exists:expense_categories,id',
+            'fiscal_year_id'      => 'required|integer|exists:fiscal_years,id',
+
+            // طريقة الدفع والخزينة — اختياريان (قد يكون مصروف غير مدفوع)
+            'payment_mode_id'     => 'nullable|integer|exists:payment_modes,id',
+            'treasury_account_id' => 'nullable|integer|exists:treasury_accounts,id',
+
+            // المورد المرتبط (اختياري)
+            'party_id'            => 'nullable|integer|exists:parties,id',
+
+            'description'         => 'nullable|string|max:1000',
+            'reference'           => 'nullable|string|max:100',
+
+            'status'              => ['nullable', 'string', Rule::in(['confirmed', 'pending', 'cancelled'])],
+            'is_paid'             => 'nullable|boolean',
+            'is_recurring'        => 'nullable|boolean',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'date.required'                => 'تاريخ المصروف مطلوب',
+            'amount.required'              => 'مبلغ المصروف مطلوب',
+            'amount.min'                   => 'المبلغ يجب أن يكون أكبر من الصفر',
+            'expense_category_id.required' => 'تصنيف المصروف مطلوب',
+            'fiscal_year_id.required'      => 'السنة المالية مطلوبة',
+            'expense_number.unique'        => 'رقم المصروف مستخدم بالفعل',
+            'status.in'                    => 'الحالة يجب أن تكون: confirmed أو pending أو cancelled',
+        ];
+    }
+}
+
+
+class UpdateExpenseRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $id        = $this->route('expense');
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'expense_number'      => ['nullable', 'string', 'max:50',
+                                       Rule::unique('expenses', 'expense_number')->ignore($id)->where('company_id', $companyId)],
+            'date'                => 'sometimes|date',
+            'amount'              => 'sometimes|numeric|min:0.0001',
+            'expense_category_id' => 'sometimes|integer|exists:expense_categories,id',
+            'fiscal_year_id'      => 'sometimes|integer|exists:fiscal_years,id',
+            'payment_mode_id'     => 'nullable|integer|exists:payment_modes,id',
+            'treasury_account_id' => 'nullable|integer|exists:treasury_accounts,id',
+            'party_id'            => 'nullable|integer|exists:parties,id',
+            'description'         => 'nullable|string|max:1000',
+            'reference'           => 'nullable|string|max:100',
+            'status'              => ['nullable', 'string', Rule::in(['confirmed', 'pending', 'cancelled'])],
+            'is_paid'             => 'nullable|boolean',
+            'is_recurring'        => 'nullable|boolean',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'amount.min'            => 'المبلغ يجب أن يكون أكبر من الصفر',
+            'expense_number.unique' => 'رقم المصروف مستخدم بالفعل',
+            'status.in'             => 'الحالة يجب أن تكون: confirmed أو pending أو cancelled',
+        ];
+    }
+}
+
+
+
+
+// ===== ملف: Fiscalyearrequest.php =====
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreFiscalYearRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'name'       => ['required', 'string', 'max:50',
+                              Rule::unique('fiscal_years', 'name')->where('company_id', $companyId)],
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after:start_date',
+            'is_current' => 'nullable|boolean',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.required'       => 'اسم السنة المالية مطلوب (مثال: 2025)',
+            'name.unique'         => 'توجد سنة مالية بهذا الاسم مسبقاً',
+            'start_date.required' => 'تاريخ البداية مطلوب',
+            'end_date.required'   => 'تاريخ النهاية مطلوب',
+            'end_date.after'      => 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية',
+        ];
+    }
+}
+
+
+class UpdateFiscalYearRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $id        = $this->route('fiscal_year');
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'name'          => ['sometimes', 'string', 'max:50',
+                                 Rule::unique('fiscal_years', 'name')->ignore($id)->where('company_id', $companyId)],
+            // لا يُسمح بتعديل التواريخ إذا كانت السنة مغلقة — يتحقق Controller
+            'start_date'    => 'sometimes|date',
+            'end_date'      => 'sometimes|date|after:start_date',
+            'is_current'    => 'nullable|boolean',
+            // closing_notes فقط عند الإغلاق — يُرسَل من FiscalYearController::close()
+            'closing_notes' => 'nullable|string|max:1000',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.unique'    => 'توجد سنة مالية بهذا الاسم مسبقاً',
+            'end_date.after' => 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية',
+        ];
+    }
+}
+
+
+
+
 // ===== ملف: NumberingSeriesRequest.php =====
 namespace App\Http\Requests;
 
@@ -689,6 +909,119 @@ class UpdatePaymentModeRequest extends FormRequest
 
 
 
+// ===== ملف: Paymentrequest.php =====
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StorePaymentRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            // رقم الدفعة — يولَّد تلقائياً إذا لم يُرسَل
+            'payment_number'      => ['nullable', 'string', 'max:50',
+                                       Rule::unique('payments', 'payment_number')->where('company_id', $companyId)],
+            'payment_date'        => 'required|date',
+            'amount'              => 'required|numeric|min:0.0001',
+
+            // العملة — اختياري، افتراضي DZD
+            'currency_id'         => 'nullable|integer|exists:currencies,id',
+            'amount_local'        => 'nullable|numeric|min:0',
+
+            // طريقة الدفع والحساب
+            'payment_mode_id'     => 'required|integer|exists:payment_modes,id',
+            'treasury_account_id' => 'required|integer|exists:treasury_accounts,id',
+
+            // الشيك المرتبط — مطلوب فقط إذا كانت طريقة الدفع شيك
+            'check_id'            => 'nullable|integer|exists:checks,id',
+
+            // الطرف (عميل أو مورد)
+            'party_id'            => 'nullable|integer|exists:parties,id',
+
+            // السنة المالية
+            'fiscal_year_id'      => 'required|integer|exists:fiscal_years,id',
+
+            // مرجع ومعلومات إضافية
+            'reference'           => 'nullable|string|max:100',
+            'bank_reference'      => 'nullable|string|max:150',
+            'notes'               => 'nullable|string|max:1000',
+
+            // الحالة
+            'status'              => ['nullable', 'string', Rule::in(['confirmed', 'pending', 'cancelled'])],
+
+            // ربط الدفعة بمستندات تجارية (جدول document_payment pivot)
+            'document_ids'        => 'nullable|array',
+            'document_ids.*'      => 'integer|exists:commercial_documents,id',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'payment_date.required'        => 'تاريخ الدفعة مطلوب',
+            'amount.required'              => 'مبلغ الدفعة مطلوب',
+            'amount.min'                   => 'مبلغ الدفعة يجب أن يكون أكبر من الصفر',
+            'payment_mode_id.required'     => 'طريقة الدفع مطلوبة',
+            'treasury_account_id.required' => 'الحساب المالي مطلوب',
+            'fiscal_year_id.required'      => 'السنة المالية مطلوبة',
+            'payment_number.unique'        => 'رقم الدفعة مستخدم بالفعل',
+            'status.in'                    => 'الحالة يجب أن تكون: confirmed أو pending أو cancelled',
+        ];
+    }
+}
+
+
+class UpdatePaymentRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $id        = $this->route('payment');
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'payment_number'      => ['nullable', 'string', 'max:50',
+                                       Rule::unique('payments', 'payment_number')->ignore($id)->where('company_id', $companyId)],
+            'payment_date'        => 'sometimes|date',
+            'amount'              => 'sometimes|numeric|min:0.0001',
+            'currency_id'         => 'nullable|integer|exists:currencies,id',
+            'amount_local'        => 'nullable|numeric|min:0',
+            'payment_mode_id'     => 'sometimes|integer|exists:payment_modes,id',
+            'treasury_account_id' => 'sometimes|integer|exists:treasury_accounts,id',
+            'check_id'            => 'nullable|integer|exists:checks,id',
+            'party_id'            => 'nullable|integer|exists:parties,id',
+            'fiscal_year_id'      => 'sometimes|integer|exists:fiscal_years,id',
+            'reference'           => 'nullable|string|max:100',
+            'bank_reference'      => 'nullable|string|max:150',
+            'notes'               => 'nullable|string|max:1000',
+            'status'              => ['nullable', 'string', Rule::in(['confirmed', 'pending', 'cancelled'])],
+            'document_ids'        => 'nullable|array',
+            'document_ids.*'      => 'integer|exists:commercial_documents,id',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'amount.min'              => 'مبلغ الدفعة يجب أن يكون أكبر من الصفر',
+            'payment_number.unique'   => 'رقم الدفعة مستخدم بالفعل',
+            'status.in'               => 'الحالة يجب أن تكون: confirmed أو pending أو cancelled',
+        ];
+    }
+}
+
+
+
+
 // ===== ملف: PermissionRequest.php =====
 namespace App\Http\Requests;
 
@@ -731,6 +1064,100 @@ class UpdatePermissionRequest extends FormRequest
         ];
     }
 }
+
+
+
+// ===== ملف: Productlotrequest.php =====
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreProductLotRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'lot_number'          => ['required', 'string', 'max:50',
+                                       Rule::unique('product_lots', 'lot_number')
+                                           ->where('product_id',   $this->input('product_id'))
+                                           ->where('company_id',   $companyId)],
+            'product_id'          => 'required|integer|exists:products,id',
+            'warehouse_id'        => 'required|integer|exists:warehouses,id',
+
+            'manufacturing_date'  => 'nullable|date',
+            'expiration_date'     => 'nullable|date|after_or_equal:manufacturing_date',
+            'purchase_date'       => 'required|date',
+
+            'purchase_price'      => 'required|numeric|min:0',
+            'legal_selling_price' => 'required|numeric|min:0',
+            'margin_percentage'   => 'nullable|numeric|min:0|max:100',
+
+            'original_quantity'   => 'required|numeric|min:0.0001',
+            // remaining_quantity = original_quantity عند الإنشاء — يحسبها الـ Service
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'lot_number.required'          => 'رقم الدفعة مطلوب',
+            'lot_number.unique'            => 'رقم الدفعة مستخدم بالفعل لهذا المنتج في شركتك',
+            'product_id.required'          => 'المنتج مطلوب',
+            'warehouse_id.required'        => 'المستودع مطلوب',
+            'purchase_date.required'       => 'تاريخ الشراء مطلوب',
+            'purchase_price.required'      => 'سعر الشراء مطلوب',
+            'legal_selling_price.required' => 'سعر البيع القانوني مطلوب',
+            'original_quantity.required'   => 'الكمية الأصلية مطلوبة',
+            'original_quantity.min'        => 'الكمية يجب أن تكون أكبر من الصفر',
+            'expiration_date.after_or_equal' => 'تاريخ الانتهاء يجب أن يكون بعد أو مساوياً لتاريخ الإنتاج',
+        ];
+    }
+}
+
+
+class UpdateProductLotRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $id        = $this->route('product_lot');
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'lot_number'          => ['sometimes', 'string', 'max:50',
+                                       Rule::unique('product_lots', 'lot_number')
+                                           ->ignore($id)
+                                           ->where('product_id', $this->input('product_id'))
+                                           ->where('company_id', $companyId)],
+            // product_id و warehouse_id لا تتغير بعد الإنشاء
+            'manufacturing_date'  => 'nullable|date',
+            'expiration_date'     => 'nullable|date',
+            'purchase_date'       => 'sometimes|date',
+            'purchase_price'      => 'sometimes|numeric|min:0',
+            'legal_selling_price' => 'sometimes|numeric|min:0',
+            'margin_percentage'   => 'nullable|numeric|min:0|max:100',
+            // remaining_quantity تتغير فقط عبر حركات المخزون — لا تُعدَّل مباشرة
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'lot_number.unique'       => 'رقم الدفعة مستخدم بالفعل لهذا المنتج',
+            'purchase_price.min'      => 'سعر الشراء يجب أن يكون صفراً أو أكثر',
+            'legal_selling_price.min' => 'سعر البيع القانوني يجب أن يكون صفراً أو أكثر',
+        ];
+    }
+}
+
 
 
 
@@ -861,6 +1288,221 @@ class UpdateSettingRequest extends FormRequest
         ];
     }
 }
+
+
+
+// ===== ملف: Stockmovementrequest.php =====
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+/**
+ * StoreStockMovementRequest
+ *
+ * حركات المخزون في الغالب تُنشأ تلقائياً من المستندات التجارية،
+ * لكن يمكن إنشاؤها يدوياً (جرد، تسوية، نقل...).
+ *
+ * الكميات دائماً بالوحدة الأساسية — التحويل يتم في الـ Service.
+ */
+class StoreStockMovementRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        return [
+            'product_id'              => 'required|integer|exists:products,id',
+            'warehouse_id'            => 'required|integer|exists:warehouses,id',
+            'stock_movement_type_id'  => 'required|integer|exists:stock_movement_types,id',
+            'fiscal_year_id'          => 'required|integer|exists:fiscal_years,id',
+
+            // وحدة التعبئة المستخدمة (اختياري — UN افتراضي)
+            'packaging_id'            => 'nullable|integer|exists:product_packagings,id',
+
+            'movement_date'           => 'required|date',
+
+            // الكمية بالوحدة الأساسية
+            'quantity'                => 'required|numeric|min:0.0001',
+            // الكمية بوحدة التعبئة — للعرض فقط
+            'packaging_quantity'      => 'nullable|numeric|min:0',
+
+            // الأسعار
+            'unit_price'              => 'required|numeric|min:0',
+            'cost_price'              => 'nullable|numeric|min:0',
+
+            // مصدر السعر
+            'price_source'            => ['nullable', 'string', Rule::in(['purchase', 'sale', 'adjustment'])],
+
+            // ربط بمستند تجاري (يُضبط تلقائياً من CommercialDocumentService)
+            'commercial_document_line_id' => 'nullable|integer|exists:commercial_document_lines,id',
+
+            // تتبع الدفعات (Lots)
+            'lot_number'              => 'nullable|string|max:100',
+            'expiration_date'         => 'nullable|date',
+            'stock_lot_id'            => 'nullable|integer|exists:product_lots,id',
+
+            'reason'                  => 'nullable|string|max:255',
+            'notes'                   => 'nullable|string|max:1000',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'product_id.required'             => 'المنتج مطلوب',
+            'warehouse_id.required'           => 'المستودع مطلوب',
+            'stock_movement_type_id.required' => 'نوع الحركة مطلوب',
+            'fiscal_year_id.required'         => 'السنة المالية مطلوبة',
+            'movement_date.required'          => 'تاريخ الحركة مطلوب',
+            'quantity.required'               => 'الكمية مطلوبة',
+            'quantity.min'                    => 'الكمية يجب أن تكون أكبر من الصفر',
+            'unit_price.required'             => 'سعر الوحدة مطلوب',
+            'price_source.in'                 => 'مصدر السعر يجب أن يكون: purchase أو sale أو adjustment',
+        ];
+    }
+}
+
+
+class UpdateStockMovementRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        return [
+            // حركات المخزون لا تُعدَّل في الغالب — فقط الحقول الوصفية
+            'reason'   => 'sometimes|nullable|string|max:255',
+            'notes'    => 'sometimes|nullable|string|max:1000',
+
+            // السماح بتعديل السعر في حالة التسويات اليدوية
+            'unit_price'  => 'sometimes|numeric|min:0',
+            'cost_price'  => 'nullable|numeric|min:0',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'unit_price.min' => 'سعر الوحدة يجب أن يكون صفراً أو أكثر',
+        ];
+    }
+}
+
+
+
+
+// ===== ملف: StoreBarcodeRequest.php =====
+declare(strict_types=1);
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreBarcodeRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        // نحتاج للمنتج قبل التحقق من الصلاحية، لذا نجلب المنتج من قاعدة البيانات
+        $product = \App\Models\Product::find($this->product_id);
+        if (!$product) {
+            return false;
+        }
+        return $this->user()->can('create', [\App\Models\Barcode::class, $product]);
+    }
+
+    public function rules(): array
+    {
+        return [
+            'product_id' => [
+                'required',
+                'integer',
+                // التحقق من أن المنتج موجود وينتمي لنفس الشركة النشطة
+                Rule::exists('products', 'id')->where(function ($query) {
+                    $query->where('company_id', $this->user()->current_company_id);
+                }),
+            ],
+            'barcode' => [
+                'required',
+                'string',
+                'max:255',
+                // أيضا التحقق من أن الباركود فريد ضمن نطاق الشركة نفسها (اختياري لكن مفيد)
+                Rule::unique('barcodes', 'barcode')->where(function ($query) {
+                    $query->where('company_id', $this->user()->current_company_id);
+                }),
+            ],
+            'type' => 'nullable|string|max:50',
+            'is_primary' => 'boolean',
+            'unit' => 'nullable|string|max:50',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'product_id.exists' => 'المنتج غير موجود أو لا يتبع شركتك.',
+            'barcode.unique' => 'هذا الباركود مسجل مسبقاً ضمن شركتك.',
+            'product_id.required' => 'المنتج مطلوب.',
+        ];
+    }
+
+    // يمكن إضافة prepareForValidation() لتعيين current_company_id تلقائياً إذا لم يكن موجوداً
+    protected function prepareForValidation(): void
+    {
+        // إذا لم يكن المستخدم يمتلك current_company_id في الجلسة، نجلبه من الـ service
+        if (!$this->user()->current_company_id) {
+            $companyId = app(\App\Services\CompanyContextService::class)->get();
+            $this->user()->current_company_id = $companyId;
+        }
+    }
+}
+
+
+
+
+// ===== ملف: StoreCompanyRequest.php =====
+// app/Http/Requests/StoreCompanyRequest.php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreCompanyRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name'            => 'required|string|max:255',
+            'commercial_name' => 'nullable|string|max:255',
+            'email'           => 'nullable|email|max:100',
+            'phone'           => 'nullable|string|max:20',
+            'address'         => 'nullable|string|max:500',
+            'tax_number'      => 'nullable|string|max:50',
+            'nif'             => 'nullable|string|max:50|unique:companies,nif',
+            'nis'             => 'nullable|string|max:50',
+            'rc'              => 'nullable|string|max:50',
+            'legal_form_id'   => 'nullable|exists:legal_forms,id',
+            'wilaya_id'       => 'nullable|exists:wilayas,id',
+            'commune_id'      => 'nullable|exists:communes,id',
+            'is_active'       => 'nullable|boolean',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'اسم الشركة مطلوب',
+            'nif.unique'    => 'رقم التعريف الجبائي موجود بالفعل',
+        ];
+    }
+}
+
 
 
 
@@ -1013,38 +1655,70 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * StoreProductRequest
+ *
+ * الإصلاح: قواعد unique الأصلية كانت global (unique:products,ref)
+ * مما يمنع شركتين مختلفتين من استخدام نفس ref/barcode/slug.
+ *
+ * الصحيح في بيئة Multi-Tenancy: الـ unique يكون بنطاق company_id
+ * باستخدام Rule::unique()->where('company_id', ...).
+ */
 class StoreProductRequest extends FormRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        return true;
+    }
 
     public function rules(): array
     {
+        // ✅ company_id من السياق — HasCompany يضبطه تلقائياً عند الحفظ،
+        //    لكن نحتاجه هنا للتحقق من الـ unique.
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
         return [
             // ── المنتج الأساسي ──
-            'name'             => 'required|string|max:150',
-            'slug'             => 'nullable|string|max:150|unique:products,slug',  // اختياري، فريد إذا وُجد
-            'ref'              => 'nullable|string|max:50|unique:products,ref',
-            'barcode'          => 'nullable|string|max:50|unique:products,barcode',
-            'description'      => 'nullable|string',
-            'family_id'        => 'nullable|integer|exists:families,id',
-            'brand_id'         => 'nullable|integer|exists:brands,id',
-            'product_type_id'  => 'required|integer|exists:product_types,id',
-            'tva_id'           => 'nullable|integer|exists:tvas,id',
-            'unit_id'          => 'nullable|integer|exists:units,id',
+            'name'            => 'required|string|max:150',
+
+            // ✅ إصلاح: unique مقيّد بـ company_id
+            'slug'    => [
+                'nullable', 'string', 'max:150',
+                Rule::unique('products', 'slug')
+                    ->where('company_id', $companyId),
+            ],
+            'ref'     => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('products', 'ref')
+                    ->where('company_id', $companyId),
+            ],
+            'barcode' => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('products', 'barcode')
+                    ->where('company_id', $companyId),
+            ],
+
+            'description'     => 'nullable|string',
+            'family_id'       => 'nullable|integer|exists:families,id',
+            'brand_id'        => 'nullable|integer|exists:brands,id',
+            'product_type_id' => 'required|integer|exists:product_types,id',
+            'tva_id'          => 'nullable|integer|exists:tvas,id',
+            'unit_id'         => 'nullable|integer|exists:units,id',
             'valuation_method_id' => 'nullable|integer|exists:inventory_valuation_methods,id',
-            'images'           => 'nullable|array',
-            'images.*'         => 'nullable|string',
-            'active'           => 'nullable|boolean',
+            'images'          => 'nullable|array',
+            'images.*'        => 'nullable|string',
+            'active'          => 'nullable|boolean',
 
             // ── التسعير والمخزون ──
-            'purchase_price_ht'           => 'nullable|numeric|min:0',
-            'manages_stock'               => 'nullable|boolean',
-            'allow_negative_stock'        => 'nullable|boolean',
-            'has_lots'                    => 'nullable|boolean',
-            'has_expiration_date'         => 'nullable|boolean',
-            'min_stock_alert'             => 'nullable|numeric|min:0',
-            'max_stock_alert'             => 'nullable|numeric|min:0',
-            'manages_quantity_discounts'  => 'nullable|boolean',
+            'purchase_price_ht'          => 'nullable|numeric|min:0',
+            'manages_stock'              => 'nullable|boolean',
+            'allow_negative_stock'       => 'nullable|boolean',
+            'has_lots'                   => 'nullable|boolean',
+            'has_expiration_date'        => 'nullable|boolean',
+            'min_stock_alert'            => 'nullable|numeric|min:0',
+            'max_stock_alert'            => 'nullable|numeric|min:0',
+            'manages_quantity_discounts' => 'nullable|boolean',
 
             // ── الأبعاد ──
             'weight' => 'nullable|numeric|min:0',
@@ -1054,53 +1728,97 @@ class StoreProductRequest extends FormRequest
             'height' => 'nullable|numeric|min:0',
 
             // ── وحدات التعبئة (Colisages) ──
-            'packagings'               => 'nullable|array',
-            'packagings.*.code'        => 'required_with:packagings.*.label|string|max:20',
-            'packagings.*.label'       => 'required_with:packagings.*.code|string|max:100',
-            'packagings.*.quantity'    => 'nullable|numeric|min:0.0001', // أصبح اختيارياً (القيمة الافتراضية 1)
-            'packagings.*.barcode'     => 'nullable|string|max:50|unique:product_packagings,barcode',
-            'packagings.*.is_default'  => 'nullable|boolean',
-            'packagings.*.active'      => 'nullable|boolean',
+            'packagings'                 => 'nullable|array',
+            'packagings.*.code'          => 'required_with:packagings.*.label|string|max:20',
+            'packagings.*.label'         => 'required_with:packagings.*.code|string|max:100',
+            'packagings.*.quantity'      => 'nullable|numeric|min:0.0001',
+            // ✅ إصلاح: unique مقيّد بـ company_id
+            'packagings.*.barcode'       => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('product_packagings', 'barcode')
+                    ->where('company_id', $companyId),
+            ],
+            'packagings.*.is_default'    => 'nullable|boolean',
+            'packagings.*.active'        => 'nullable|boolean',
             'packagings.*.display_order' => 'nullable|integer|min:0',
 
             // ── التعريفات (Tarifs) ──
-            'prices'                      => 'nullable|array',
-            'prices.*.price_level_id'     => 'required_with:prices.*|integer|exists:price_levels,id',
-            'prices.*.pricing_method'     => 'required_with:prices.*|in:fixed,rate,margin',
-            'prices.*.price'  => 'nullable|numeric|min:0',
-            'prices.*.rate'   => 'nullable|numeric|min:0',
-            'prices.*.margin' => 'nullable|numeric',
-            'prices.*.active' => 'nullable|boolean',
+            'prices'                  => 'nullable|array',
+            'prices.*.price_level_id' => 'required_with:prices.*|integer|exists:price_levels,id',
+            'prices.*.pricing_method' => 'required_with:prices.*|in:fixed,rate,margin',
+            'prices.*.price'          => 'nullable|numeric|min:0',
+            'prices.*.rate'           => 'nullable|numeric|min:0',
+            'prices.*.margin'         => 'nullable|numeric',
+            'prices.*.active'         => 'nullable|boolean',
 
             // ── تخفيضات الكميات (Tx Remise) ──
-            'quantity_discounts'                        => 'nullable|array',
-            'quantity_discounts.*.price_level_id'       => 'required_with:quantity_discounts.*|integer|exists:price_levels,id',
-            'quantity_discounts.*.min_qty'              => 'required_with:quantity_discounts.*.discount_amount,quantity_discounts.*.discount_percentage|numeric|min:0',
-            'quantity_discounts.*.max_qty'              => 'nullable|numeric|min:0|gt:quantity_discounts.*.min_qty',
-            'quantity_discounts.*.discount_amount'      => 'nullable|numeric|min:0',
-            'quantity_discounts.*.discount_percentage'  => 'nullable|numeric|min:0|max:100',
-            'quantity_discounts.*.is_blocked'           => 'nullable|boolean',
-            'quantity_discounts.*.active'               => 'nullable|boolean',
+            'quantity_discounts'                       => 'nullable|array',
+            'quantity_discounts.*.price_level_id'      => 'required_with:quantity_discounts.*|integer|exists:price_levels,id',
+            'quantity_discounts.*.min_qty'             => 'required_with:quantity_discounts.*.discount_amount,quantity_discounts.*.discount_percentage|numeric|min:0',
+            'quantity_discounts.*.max_qty'             => 'nullable|numeric|min:0|gt:quantity_discounts.*.min_qty',
+            'quantity_discounts.*.discount_amount'     => 'nullable|numeric|min:0',
+            'quantity_discounts.*.discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'quantity_discounts.*.is_blocked'          => 'nullable|boolean',
+            'quantity_discounts.*.active'              => 'nullable|boolean',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'name.required' => 'اسم المنتج مطلوب',
-            'product_type_id.required' => 'نوع المنتج مطلوب',
-            'ref.unique' => 'هذا المرجع مستخدم بالفعل',
-            'barcode.unique' => 'هذا الباركود مستخدم بالفعل',
-            'packagings.*.code.required_with' => 'رمز التعبئة مطلوب عند إضافة تعبئة',
-            'packagings.*.label.required_with' => 'تسمية التعبئة مطلوبة عند إضافة تعبئة',
-            'prices.*.price_level_id.required_with' => 'مستوى السعر مطلوب عند إضافة تعريف',
-            'prices.*.pricing_method.required_with' => 'طريقة التسعير مطلوبة عند إضافة تعريف',
-            'prices.*.pricing_method.in' => 'طريقة التسعير يجب أن تكون: fixed أو rate أو margin',
+            'name.required'                            => 'اسم المنتج مطلوب',
+            'product_type_id.required'                 => 'نوع المنتج مطلوب',
+            'ref.unique'                               => 'هذا المرجع مستخدم بالفعل في شركتك',
+            'barcode.unique'                           => 'هذا الباركود مستخدم بالفعل في شركتك',
+            'slug.unique'                              => 'هذا الـ slug مستخدم بالفعل في شركتك',
+            'packagings.*.code.required_with'          => 'رمز التعبئة مطلوب عند إضافة تعبئة',
+            'packagings.*.label.required_with'         => 'تسمية التعبئة مطلوبة عند إضافة تعبئة',
+            'packagings.*.barcode.unique'              => 'باركود التعبئة مستخدم بالفعل في شركتك',
+            'prices.*.price_level_id.required_with'   => 'مستوى السعر مطلوب عند إضافة تعريف',
+            'prices.*.pricing_method.required_with'   => 'طريقة التسعير مطلوبة عند إضافة تعريف',
+            'prices.*.pricing_method.in'              => 'طريقة التسعير يجب أن تكون: fixed أو rate أو margin',
             'quantity_discounts.*.min_qty.required_with' => 'الحد الأدنى للكمية مطلوب عند إضافة خصم',
-            'quantity_discounts.*.max_qty.gt' => 'الحد الأعلى يجب أن يكون أكبر من الحد الأدنى',
+            'quantity_discounts.*.max_qty.gt'         => 'الحد الأعلى يجب أن يكون أكبر من الحد الأدنى',
         ];
     }
 }
+
+
+
+
+// ===== ملف: StoreProductVariantRequest.php =====
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreProductVariantRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        $product = \App\Models\Product::find($this->product_id);
+        return $product && $this->user()->can('create', [\App\Models\ProductVariant::class, $product]);
+    }
+
+    public function rules(): array
+    {
+        return [
+            'product_id' => 'required|exists:products,id',
+            'sku' => 'nullable|string|max:100',
+            'barcode' => 'nullable|string|max:50|unique:barcodes,barcode', // سنتحقق من uniqueness مع الشركة لاحقاً
+            'price_type' => 'nullable|in:fixed,percentage',
+            'price_value' => 'nullable|numeric|min:0',
+            'stock' => 'nullable|numeric|min:0',
+            'track_stock' => 'nullable|boolean',
+            'attributes' => 'nullable|array',
+            'image' => 'nullable|string|max:255',
+            'weight' => 'nullable|numeric',
+            'volume' => 'nullable|numeric',
+            'active' => 'nullable|boolean',
+        ];
+    }
+}
+
 
 
 
@@ -1140,6 +1858,77 @@ class UpdateTreasuryAccountRequest extends FormRequest
         ];
     }
 }
+
+
+
+// ===== ملف: UpdateBarcodeRequest.php =====
+namespace App\Http\Requests;
+
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateBarcodeRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        return [
+            //
+        ];
+    }
+}
+
+
+
+
+// ===== ملف: UpdateCompanyRequest.php =====
+// app/Http/Requests/UpdateCompanyRequest.php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateCompanyRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        $companyId = $this->route('company');
+
+        return [
+            'name'            => 'sometimes|string|max:255',
+            'commercial_name' => 'nullable|string|max:255',
+            'email'           => 'nullable|email|max:100',
+            'phone'           => 'nullable|string|max:20',
+            'address'         => 'nullable|string|max:500',
+            'tax_number'      => 'nullable|string|max:50',
+            'nif'             => 'nullable|string|max:50|unique:companies,nif,' . $companyId,
+            'nis'             => 'nullable|string|max:50',
+            'rc'              => 'nullable|string|max:50',
+            'legal_form_id'   => 'nullable|exists:legal_forms,id',
+            'wilaya_id'       => 'nullable|exists:wilayas,id',
+            'commune_id'      => 'nullable|exists:communes,id',
+            'is_active'       => 'nullable|boolean',
+        ];
+    }
+}
+
 
 
 
@@ -1274,38 +2063,71 @@ class UpdatePartyRequest extends FormRequest
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
+/**
+ * UpdateProductRequest
+ *
+ * الإصلاح: نفس إصلاح StoreProductRequest — قواعد unique مقيّدة بـ company_id
+ * مع استثناء السجل الحالي (ignore).
+ */
 class UpdateProductRequest extends FormRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        return true;
+    }
 
     public function rules(): array
     {
         $id = $this->route('product');
-        return [
-            'name'             => 'sometimes|string|max:150',
-            'slug'             => "sometimes|string|max:150|unique:products,slug,{$id}",
-            'ref'              => "nullable|string|max:50|unique:products,ref,{$id}",
-            'barcode'          => "nullable|string|max:50|unique:products,barcode,{$id}",
-            'description'      => 'nullable|string',
-            'family_id'        => 'nullable|integer|exists:families,id',
-            'brand_id'         => 'nullable|integer|exists:brands,id',
-            'product_type_id'  => 'sometimes|integer|exists:product_types,id',
-            'tva_id'           => 'nullable|integer|exists:tvas,id',
-            'unit_id'          => 'nullable|integer|exists:units,id',
-            'valuation_method_id' => 'nullable|integer|exists:inventory_valuation_methods,id',
-            'images'           => 'nullable|array',
-            'images.*'         => 'nullable|string',
-            'active'           => 'nullable|boolean',
 
-            'purchase_price_ht'           => 'nullable|numeric|min:0',
-            'manages_stock'               => 'nullable|boolean',
-            'allow_negative_stock'        => 'nullable|boolean',
-            'has_lots'                    => 'nullable|boolean',
-            'has_expiration_date'         => 'nullable|boolean',
-            'min_stock_alert'             => 'nullable|numeric|min:0',
-            'max_stock_alert'             => 'nullable|numeric|min:0',
-            'manages_quantity_discounts'  => 'nullable|boolean',
+        // ✅ company_id من السياق
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'name'            => 'sometimes|string|max:150',
+
+            // ✅ إصلاح: unique مقيّد بـ company_id + ignore السجل الحالي
+            'slug'    => [
+                'sometimes', 'string', 'max:150',
+                Rule::unique('products', 'slug')
+                    ->ignore($id)
+                    ->where('company_id', $companyId),
+            ],
+            'ref'     => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('products', 'ref')
+                    ->ignore($id)
+                    ->where('company_id', $companyId),
+            ],
+            'barcode' => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('products', 'barcode')
+                    ->ignore($id)
+                    ->where('company_id', $companyId),
+            ],
+
+            'description'     => 'nullable|string',
+            'family_id'       => 'nullable|integer|exists:families,id',
+            'brand_id'        => 'nullable|integer|exists:brands,id',
+            'product_type_id' => 'sometimes|integer|exists:product_types,id',
+            'tva_id'          => 'nullable|integer|exists:tvas,id',
+            'unit_id'         => 'nullable|integer|exists:units,id',
+            'valuation_method_id' => 'nullable|integer|exists:inventory_valuation_methods,id',
+            'images'          => 'nullable|array',
+            'images.*'        => 'nullable|string',
+            'active'          => 'nullable|boolean',
+
+            'purchase_price_ht'          => 'nullable|numeric|min:0',
+            'manages_stock'              => 'nullable|boolean',
+            'allow_negative_stock'       => 'nullable|boolean',
+            'has_lots'                   => 'nullable|boolean',
+            'has_expiration_date'        => 'nullable|boolean',
+            'min_stock_alert'            => 'nullable|numeric|min:0',
+            'max_stock_alert'            => 'nullable|numeric|min:0',
+            'manages_quantity_discounts' => 'nullable|boolean',
 
             'weight' => 'nullable|numeric|min:0',
             'volume' => 'nullable|numeric|min:0',
@@ -1318,39 +2140,169 @@ class UpdateProductRequest extends FormRequest
             'packagings.*.code'          => 'required_with:packagings.*.label|string|max:20',
             'packagings.*.label'         => 'required_with:packagings.*.code|string|max:100',
             'packagings.*.quantity'      => 'nullable|numeric|min:0.0001',
-            'packagings.*.barcode'       => 'nullable|string|max:50|unique:product_packagings,barcode,' . $this->input('packagings.*.id'),
+            // ✅ إصلاح: unique مقيّد بـ company_id + ignore السجل الحالي
+            // ملاحظة: لا يمكن استخدام wildcard في ignore مع nested arrays — نتحقق في Service
+            'packagings.*.barcode'       => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('product_packagings', 'barcode')
+                    ->where('company_id', $companyId),
+            ],
             'packagings.*.is_default'    => 'nullable|boolean',
             'packagings.*.active'        => 'nullable|boolean',
             'packagings.*.display_order' => 'nullable|integer|min:0',
 
-            'prices'                      => 'sometimes|array',
-            'prices.*.price_level_id'     => 'required_with:prices.*|integer|exists:price_levels,id',
-            'prices.*.pricing_method'     => 'required_with:prices.*|in:fixed,rate,margin',
-            'prices.*.price'  => 'nullable|numeric|min:0',
-            'prices.*.rate'   => 'nullable|numeric|min:0',
-            'prices.*.margin' => 'nullable|numeric',
-            'prices.*.active' => 'nullable|boolean',
+            'prices'                  => 'sometimes|array',
+            'prices.*.price_level_id' => 'required_with:prices.*|integer|exists:price_levels,id',
+            'prices.*.pricing_method' => 'required_with:prices.*|in:fixed,rate,margin',
+            'prices.*.price'          => 'nullable|numeric|min:0',
+            'prices.*.rate'           => 'nullable|numeric|min:0',
+            'prices.*.margin'         => 'nullable|numeric',
+            'prices.*.active'         => 'nullable|boolean',
 
-            'quantity_discounts'                        => 'sometimes|array',
-            'quantity_discounts.*.price_level_id'       => 'required_with:quantity_discounts.*|integer|exists:price_levels,id',
-            'quantity_discounts.*.min_qty'              => 'required_with:quantity_discounts.*.discount_amount,quantity_discounts.*.discount_percentage|numeric|min:0',
-            'quantity_discounts.*.max_qty'              => 'nullable|numeric|min:0|gt:quantity_discounts.*.min_qty',
-            'quantity_discounts.*.discount_amount'      => 'nullable|numeric|min:0',
-            'quantity_discounts.*.discount_percentage'  => 'nullable|numeric|min:0|max:100',
-            'quantity_discounts.*.is_blocked'           => 'nullable|boolean',
-            'quantity_discounts.*.active'               => 'nullable|boolean',
+            'quantity_discounts'                       => 'sometimes|array',
+            'quantity_discounts.*.price_level_id'      => 'required_with:quantity_discounts.*|integer|exists:price_levels,id',
+            'quantity_discounts.*.min_qty'             => 'required_with:quantity_discounts.*.discount_amount,quantity_discounts.*.discount_percentage|numeric|min:0',
+            'quantity_discounts.*.max_qty'             => 'nullable|numeric|min:0|gt:quantity_discounts.*.min_qty',
+            'quantity_discounts.*.discount_amount'     => 'nullable|numeric|min:0',
+            'quantity_discounts.*.discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'quantity_discounts.*.is_blocked'          => 'nullable|boolean',
+            'quantity_discounts.*.active'              => 'nullable|boolean',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'ref.unique' => 'هذا المرجع مستخدم بالفعل',
-            'barcode.unique' => 'هذا الباركود مستخدم بالفعل',
-            'prices.*.pricing_method.in' => 'طريقة التسعير يجب أن تكون: fixed أو rate أو margin',
-            'packagings.*.barcode.unique' => 'باركود التعبئة مستخدم بالفعل',
-            'quantity_discounts.*.max_qty.gt' => 'الحد الأعلى للكمية يجب أن يكون أكبر من الحد الأدنى',
+            'ref.unique'                             => 'هذا المرجع مستخدم بالفعل في شركتك',
+            'barcode.unique'                         => 'هذا الباركود مستخدم بالفعل في شركتك',
+            'slug.unique'                            => 'هذا الـ slug مستخدم بالفعل في شركتك',
+            'packagings.*.barcode.unique'            => 'باركود التعبئة مستخدم بالفعل في شركتك',
+            'prices.*.pricing_method.in'             => 'طريقة التسعير يجب أن تكون: fixed أو rate أو margin',
+            'quantity_discounts.*.max_qty.gt'        => 'الحد الأعلى للكمية يجب أن يكون أكبر من الحد الأدنى',
         ];
     }
 }
+
+
+
+
+// ===== ملف: UpdateProductVariantRequest.php =====
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdateProductVariantRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user()->can('update', $this->route('variant'));
+    }
+
+    public function rules(): array
+    {
+        $variantId = $this->route('variant')->id;
+
+        return [
+            'sku' => 'nullable|string|max:100|unique:product_variants,sku,' . $variantId,
+            'barcode' => 'nullable|string|max:50',
+            'price_type' => 'nullable|in:fixed,percentage',
+            'price_value' => 'nullable|numeric|min:0',
+            'stock' => 'nullable|numeric|min:0',
+            'track_stock' => 'nullable|boolean',
+            'attributes' => 'nullable|array',
+            'image' => 'nullable|string|max:255',
+            'weight' => 'nullable|numeric',
+            'volume' => 'nullable|numeric',
+            'active' => 'nullable|boolean',
+        ];
+    }
+}
+
+
+
+
+// ===== ملف: Warehouserequest.php =====
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreWarehouseRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'name'         => ['required', 'string', 'max:100',
+                                Rule::unique('warehouses', 'name')->where('company_id', $companyId)],
+            'code'         => ['nullable', 'string', 'max:20',
+                                Rule::unique('warehouses', 'code')->where('company_id', $companyId)],
+            'address'      => 'nullable|string|max:500',
+            'wilaya_id'    => 'nullable|integer|exists:wilayas,id',
+            'commune_id'   => 'nullable|integer|exists:communes,id',
+            'phone'        => 'nullable|string|max:20',
+            'manager_name' => 'nullable|string|max:100',
+            'activity'     => 'nullable|string|max:500',
+            'rc'           => 'nullable|string|max:50',
+            'nif'          => 'nullable|string|max:50',
+            'nis'          => 'nullable|string|max:50',
+            'ai'           => 'nullable|string|max:50',
+            'active'       => 'nullable|boolean',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'اسم المستودع مطلوب',
+            'name.unique'   => 'هذا الاسم مستخدم بالفعل في مستودع آخر',
+            'code.unique'   => 'هذا الرمز مستخدم بالفعل في مستودع آخر',
+        ];
+    }
+}
+
+
+class UpdateWarehouseRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $id        = $this->route('warehouse');
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'name'         => ['sometimes', 'string', 'max:100',
+                                Rule::unique('warehouses', 'name')->ignore($id)->where('company_id', $companyId)],
+            'code'         => ['nullable', 'string', 'max:20',
+                                Rule::unique('warehouses', 'code')->ignore($id)->where('company_id', $companyId)],
+            'address'      => 'nullable|string|max:500',
+            'wilaya_id'    => 'nullable|integer|exists:wilayas,id',
+            'commune_id'   => 'nullable|integer|exists:communes,id',
+            'phone'        => 'nullable|string|max:20',
+            'manager_name' => 'nullable|string|max:100',
+            'activity'     => 'nullable|string|max:500',
+            'rc'           => 'nullable|string|max:50',
+            'nif'          => 'nullable|string|max:50',
+            'nis'          => 'nullable|string|max:50',
+            'ai'           => 'nullable|string|max:50',
+            'active'       => 'nullable|boolean',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.unique' => 'هذا الاسم مستخدم بالفعل في مستودع آخر',
+            'code.unique' => 'هذا الرمز مستخدم بالفعل في مستودع آخر',
+        ];
+    }
+}
+
 

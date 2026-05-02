@@ -6,6 +6,7 @@ use App\Models\CommercialDocument;
 use App\Core\Exceptions\BusinessRuleException;
 use App\Services\Tax\FiscalStampCalculator;
 use App\Core\Services\TAPCalculator;
+use App\Models\StockMovement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
@@ -223,30 +224,36 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function createStockMovements(CommercialDocument $document): void
     {
+        $valuationService = app(InventoryValuationService::class);
+
         foreach ($document->lines as $line) {
-            if (!$line->product) {
-                continue;
-            }
+            if (!$line->product) continue;
 
             $movementType = match ($document->documentType?->code) {
                 'invoice', 'delivery_note' => 'out',
                 'purchase_invoice' => 'in',
                 default => null,
             };
+            if (!$movementType) continue;
 
-            if (!$movementType) {
-                continue;
-            }
+            $costPrice = $movementType === 'out'
+                ? $valuationService->getCostPriceForSale($line->product, $document->warehouse_id, $line->quantity)
+                : $line->unit_price_ht; // للمشتريات، سعر الشراء هو التكلفة
 
-            \App\Models\StockMovement::create([
-                'warehouse_id' => $document->warehouse_id,
-                'product_id' => $line->product_id,
+            StockMovement::create([
+                'warehouse_id'           => $document->warehouse_id,
+                'product_id'             => $line->product_id,
                 'stock_movement_type_id' => $this->getStockMovementTypeId($movementType),
                 'commercial_document_id' => $document->id,
                 'commercial_document_line_id' => $line->id,
-                'quantity' => $line->quantity,
-                'unit_price' => $line->unit_price_ht,
-                'movement_date' => $document->document_date,
+                'quantity'               => $line->quantity,
+                'unit_price'             => $line->unit_price_ht,
+                'cost_price'             => $costPrice, // ✅ التعيين الصحيح
+                'total_price'            => $line->quantity * $costPrice,
+                'movement_date'          => $document->document_date,
+                'packaging_id'           => $line->packaging_id ?? null,
+                'price_source'           => $movementType === 'in' ? 'purchase' : 'sale',
+                'is_validated'           => true,
             ]);
         }
     }

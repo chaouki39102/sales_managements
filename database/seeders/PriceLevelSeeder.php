@@ -16,6 +16,8 @@ class PriceLevelSeeder extends Seeder
                 'is_default' => true,
                 'active' => true,
                 'display_order' => 1,
+                'is_percentage' => false,
+                'value' => null,
                 'created_at' => now(),
                 'updated_at' => now()
             ],
@@ -25,6 +27,8 @@ class PriceLevelSeeder extends Seeder
                 'is_default' => false,
                 'active' => true,
                 'display_order' => 2,
+                'is_percentage' => true,
+                'value' => -10.00, // خصم 10%
                 'created_at' => now(),
                 'updated_at' => now()
             ],
@@ -34,6 +38,8 @@ class PriceLevelSeeder extends Seeder
                 'is_default' => false,
                 'active' => true,
                 'display_order' => 3,
+                'is_percentage' => true,
+                'value' => -20.00,
                 'created_at' => now(),
                 'updated_at' => now()
             ],
@@ -43,6 +49,8 @@ class PriceLevelSeeder extends Seeder
                 'is_default' => false,
                 'active' => true,
                 'display_order' => 4,
+                'is_percentage' => false,
+                'value' => null,
                 'created_at' => now(),
                 'updated_at' => now()
             ],

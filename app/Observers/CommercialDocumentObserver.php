@@ -3,51 +3,41 @@
 namespace App\Observers;
 
 use App\Models\CommercialDocument;
+use App\Models\DocumentStatus;
 use App\Services\Tax\FiscalStampCalculator;
 use App\Services\Tax\TAPCalculator;
+use Illuminate\Support\Facades\Log;
 
-
-/**
- * مراقب لحساب المجاميع المالية تلقائياً
- * يعمل فقط عند وجود أسطر (lines) محملة
- */
 class CommercialDocumentObserver
 {
     /**
-     * يعمل قبل الحفظ (Create + Update)
+     * قبل الحفظ: حساب المجاميع المالية من الأسطر
      */
     public function saving(CommercialDocument $document): void
     {
-        // ✅ تحقق من وجود الأسطر
-        if (!$document->relationLoaded('lines') || $document->lines->isEmpty()) {
-            return; // لا أسطر = لا حسابات
+        // لا تحسب إذا لم تكن الأسطر محملة
+        if (!$document->relationLoaded('lines')) {
+            return;
         }
 
-        $this->calculateTotals($document);
+        // إذا كانت الأسطر فارغة، لا تفعل شيئاً
+        if ($document->lines->isEmpty()) {
+            return;
+        }
+
+        $this->calculateDocumentTotals($document);
     }
 
     /**
-     * حساب المجاميع المالية
+     * حساب إجماليات الوثيقة بناءً على الأسطر (التي حسبت نفسها مسبقاً)
      */
-    protected function calculateTotals(CommercialDocument $document): void
+    protected function calculateDocumentTotals(CommercialDocument $document): void
     {
-        $totalHT = 0;
-        $totalTVA = 0;
-        $totalTTC = 0;
-        $totalDiscount = 0;
+        $totalHT = $document->lines->sum('total_ht');
+        $totalTVA = $document->lines->sum('total_tva');
+        $totalDiscount = $document->lines->sum('discount_amount');
+        $totalTTC = $totalHT + $totalTVA;
 
-        // 1. حساب مجاميع الأسطر
-        foreach ($document->lines as $line) {
-            // تأكد من حساب كل سطر قبل الجمع
-            $line->calculateLineTotals();
-
-            $totalHT += $line->total_ht;
-            $totalTVA += $line->total_tva;
-            $totalTTC += $line->total_ttc;
-            $totalDiscount += $line->discount_amount;
-        }
-
-        // 2. تحديث الفاتورة
         $document->total_ht = $totalHT;
         $document->total_tva = $totalTVA;
         $document->total_discount = $totalDiscount;
@@ -63,16 +53,22 @@ class CommercialDocumentObserver
         $document->net_to_pay = $document->total_ttc + $document->total_stamp + $document->total_tap;
 
         // 6. حساب المتبقي
-        $document->remaining_amount = $document->net_to_pay - $document->paid_amount;
+        $document->remaining_amount = $document->net_to_pay - ($document->paid_amount ?? 0);
     }
 
     /**
-     * بعد الحفظ: تحديث حالة "مدفوعة بالكامل"
+     * بعد الحفظ: تحديث حالة الوثيقة تلقائياً
      */
     public function saved(CommercialDocument $document): void
     {
-        if ($document->remaining_amount <= 0 && $document->status !== 'paid') {
-            $document->updateQuietly(['status' => 'paid']); // بدون Triggers
+        // إذا تم دفع كامل المبلغ، نغير الحالة إلى "مدفوع"
+        if ($document->remaining_amount <= 0) {
+            $paidStatus = DocumentStatus::where('name', 'paid')->first();
+            if ($paidStatus && $document->document_status_id !== $paidStatus->id) {
+                // استخدام saveQuietly لتجنب استدعاء Observer مرة أخرى
+                $document->document_status_id = $paidStatus->id;
+                $document->saveQuietly();
+            }
         }
     }
 }

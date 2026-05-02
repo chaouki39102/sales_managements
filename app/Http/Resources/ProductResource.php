@@ -130,7 +130,7 @@ class ProductResource extends JsonResource
                     'rate'   => $pp->rate   !== null ? (float)$pp->rate   : null,
                     'margin' => $pp->margin !== null ? (float)$pp->margin : null,
                     // السعر المحسوب النهائي (للعرض والفاتورة)
-                    'price_ht' => $pp->computePrice($purchasePrice),
+                    // 'price_ht' => $pp->computePrice($purchasePrice),
                     'active'   => (bool)$pp->active,
                 ])->values()
             ),

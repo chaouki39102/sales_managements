@@ -59,7 +59,9 @@ use App\Http\Controllers\Api\V1\InventoryValuationMethodController;
 use App\Http\Controllers\Api\V1\TreasuryAccountTypeController;
 use App\Http\Controllers\Api\V1\FiscalStampController;
 use App\Http\Controllers\Api\V1\DocumentBaseOperationController;
-use App\Http\Controllers\BarcodeController;
+use App\Http\Controllers\Api\V1\BarcodeController;
+use App\Http\Controllers\Api\V1\ProductVariantController;
+use App\Http\Controllers\Api\V1\Admin\CompanyController as AdminCompanyController;
 
 /*
 |--------------------------------------------------------------------------
@@ -118,8 +120,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/{company}/members',                        [CompanyController::class, 'addMember']);
         Route::delete('/{company}/members/{userId}',             [CompanyController::class, 'removeMember']);
         Route::patch('/{company}/members/{userId}/role',         [CompanyController::class, 'changeMemberRole']);
-        Route::patch('/{company}/members/{userId}/deactivate',   [CompanyController::class, 'deactivateMemberRoute']);
-        Route::patch('/{company}/members/{userId}/activate',     [CompanyController::class, 'activateMemberRoute']);
+        Route::patch('/{company}/members/{userId}/deactivate',   [CompanyController::class, 'deactivateMember']);
+        Route::patch('/{company}/members/{userId}/activate',     [CompanyController::class, 'activateMember']);
 
         // نقل الملكية (مالك أو Super Admin)
         Route::post('/{company}/transfer-ownership', [CompanyController::class, 'transferOwnership']);
@@ -132,25 +134,15 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'role:super-admin'])
         ->prefix('admin/companies')
         ->group(function () {
-
-            // إحصائيات
-            Route::get('/stats',                [CompanyController::class, 'stats']);
-
-            // تفعيل / إيقاف
-            Route::post('/{company}/suspend',   [CompanyController::class, 'suspend']);
-            Route::post('/{company}/unsuspend', [CompanyController::class, 'unsuspend']);
-            Route::post('/{company}/deactivate', [CompanyController::class, 'deactivate']);
-            Route::post('/{company}/activate',  [CompanyController::class, 'activate']);
-
-            // توثيق
-            Route::post('/{company}/verify',    [CompanyController::class, 'verify']);
-            Route::post('/{company}/unverify',  [CompanyController::class, 'unverify']);
-
-            // خطة الاشتراك والحدود
-            Route::patch('/{company}/plan',     [CompanyController::class, 'changePlan']);
-
-            // ملاحظات داخلية
-            Route::patch('/{company}/notes',    [CompanyController::class, 'updateNotes']);
+            Route::get('/stats', [AdminCompanyController::class, 'stats']);
+            Route::post('/{company}/suspend', [AdminCompanyController::class, 'suspend']);
+            Route::post('/{company}/unsuspend', [AdminCompanyController::class, 'unsuspend']);
+            Route::post('/{company}/deactivate', [AdminCompanyController::class, 'deactivate']);
+            Route::post('/{company}/activate', [AdminCompanyController::class, 'activate']);
+            Route::post('/{company}/verify', [AdminCompanyController::class, 'verify']);
+            Route::post('/{company}/unverify', [AdminCompanyController::class, 'unverify']);
+            Route::patch('/{company}/plan', [AdminCompanyController::class, 'changePlan']);
+            Route::patch('/{company}/notes', [AdminCompanyController::class, 'updateNotes']);
         });
 
     // ═══════════════════════════════════════════
@@ -170,6 +162,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('wilayas',  WilayaController::class)->only(['index', 'show']);
         Route::apiResource('communes', CommuneController::class)->only(['index', 'show']);
         Route::get('communes/by-wilaya/{wilaya}', [CommuneController::class, 'byWilaya']);
+
 
         // مرجعيات الأشخاص
         Route::apiResource('genders',     GenderController::class)->only(['index', 'show']);
@@ -275,6 +268,10 @@ Route::prefix('v1')->group(function () {
             // ── الباركود ──
             Route::apiResource('barcodes', BarcodeController::class);
             Route::get('products/{product}/barcodes', [BarcodeController::class, 'indexByProduct']);
+
+            // ── متغيرات المنتج ──
+            Route::apiResource('product-variants', ProductVariantController::class);
+            Route::get('products/{product}/variants', [ProductVariantController::class, 'indexByProduct']);
 
             // ── المستودعات ──
             Route::apiResource('warehouses', WarehouseController::class);

@@ -12,6 +12,7 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Product — النموذج الموحد (منتج + SKU في جدول واحد)
@@ -51,6 +52,7 @@ class Product extends Model
 
         // تسعير
         'purchase_price_ht',
+        'current_cost_price',
 
         // مخزون
         'manages_stock',
@@ -171,6 +173,11 @@ class Product extends Model
         return $this->belongsTo(Brand::class);
     }
 
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
     public function productType(): BelongsTo
     {
         return $this->belongsTo(ProductType::class);
@@ -219,6 +226,8 @@ class Product extends Model
             ->orderBy('price_level_id')
             ->orderBy('tier_order');
     }
+
+
 
     public function stockMovements(): HasMany
     {

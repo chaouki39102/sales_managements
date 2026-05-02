@@ -19,11 +19,20 @@ class ProductService extends \App\Core\Services\BaseService
     protected string $resourceName = 'product';
 
     protected array $defaultWith = [
-        'family', 'brand', 'productType', 'tva', 'unit',
+        'family',
+        'brand',
+        'productType',
+        'tva',
+        'unit',
     ];
 
     protected array $showWith = [
-        'family', 'brand', 'productType', 'tva', 'unit', 'valuationMethod',
+        'family',
+        'brand',
+        'productType',
+        'tva',
+        'unit',
+        'valuationMethod',
         'packagings',
         'prices.priceLevel',
         'quantityDiscounts.priceLevel',
@@ -35,13 +44,17 @@ class ProductService extends \App\Core\Services\BaseService
 
     protected function beforeCreate(array $data, $request): array
     {
-        $company = Company::find(session('current_company_id'));
+        $companyId = app(\App\Services\CompanyContextService::class)->get();
+        $company = $companyId ? Company::find($companyId) : null;
+
         if ($company && $company->products()->count() >= $company->max_products) {
             throw new BusinessRuleException("وصلت الشركة للحد الأقصى من المنتجات ({$company->max_products})", 422);
         }
+
         if (empty($data['slug']) && isset($data['name'])) {
             $data['slug'] = $this->generateUniqueSlug($data['name']);
         }
+
         return $data;
     }
 

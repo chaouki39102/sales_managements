@@ -7,6 +7,7 @@ use App\Models\LoginAttempt;
 use App\Core\Exceptions\UnauthorizedException;
 use App\Core\Exceptions\BusinessRuleException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -76,12 +77,10 @@ class AuthService extends \App\Core\Services\BaseService
         if (!Hash::check($currentPassword, $user->password)) {
             throw new UnauthorizedException('كلمة المرور الحالية غير صحيحة');
         }
-
-        $user->update([
-            'password' => $newPassword,
-        ]);
-
-        $user->tokens()->delete();
+        DB::transaction(function () use ($user, $newPassword) {
+            $user->update(['password' => $newPassword]);
+            $user->tokens()->delete();
+        });
     }
 
     protected function afterCreateCommitted(Model $item, array $data, $request): void
