@@ -75,6 +75,7 @@ class Company extends Model
 
         // إدارة الملكية
         'owner_id',
+        'created_by',
         'is_active',
 
         // حالة الشركة (Super Admin)
@@ -182,6 +183,13 @@ class Company extends Model
 
     public const MEMBER_ROLES = ['owner', 'admin', 'manager', 'member', 'viewer'];
 
+    // ── Role Constants (اختصارات للاستخدام في Policy / Service) ──────────────
+    public const COMPANY_ROLE_OWNER   = 'owner';
+    public const COMPANY_ROLE_ADMIN   = 'admin';
+    public const COMPANY_ROLE_MANAGER = 'manager';
+    public const COMPANY_ROLE_MEMBER  = 'member';
+    public const COMPANY_ROLE_VIEWER  = 'viewer';
+
     // ── Boot ──────────────────────────────────────────────────────────────────
 
     protected static function booted(): void
@@ -190,6 +198,11 @@ class Company extends Model
             // توليد slug فريد تلقائياً
             if (empty($company->slug)) {
                 $company->slug = self::generateUniqueSlug($company->name);
+            }
+
+            // تعيين created_by تلقائياً من المستخدم الحالي
+            if (empty($company->created_by) && auth()->check()) {
+                $company->created_by = auth()->id();
             }
 
             // تطبيق حدود الخطة الافتراضية
@@ -512,11 +525,20 @@ class Company extends Model
     public static function generateUniqueSlug(string $name): string
     {
         $base = Str::slug($name);
+
+        // إذا كان الاسم عربياً بالكامل → Str::slug يُعيد string فارغ
+        if (empty($base)) {
+            $base = 'company-' . Str::random(6);
+        }
+
         $slug = $base;
         $i    = 1;
 
         while (static::where('slug', $slug)->exists()) {
-            $slug = "{$base}-{$i}";
+            // نضيف suffix عشوائي لتجنب التخمين بعد المحاولة الثالثة
+            $slug = $i <= 3
+                ? "{$base}-{$i}"
+                : "{$base}-" . Str::random(6);
             $i++;
         }
 

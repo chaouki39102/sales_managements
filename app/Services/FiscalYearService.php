@@ -23,6 +23,12 @@ class FiscalYearService extends \App\Core\Services\BaseService
         private FiscalYearClosureService $closureService
     ) {}
 
+        protected function getResourceName(): string
+    {
+        return 'fiscal_year';
+    }
+
+
     public function getCurrent(): ?FiscalYear
     {
         return FiscalYear::where('is_current', true)->first();

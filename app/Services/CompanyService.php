@@ -114,29 +114,31 @@ class CompanyService extends \App\Core\Services\BaseService
      * @throws BusinessRuleException إذا لم يكن المستخدم عضواً نشطاً
      */
     public function switchContext(User $user, Company $company): void
-    {
-        // 1. التحقق من العضوية النشطة
-        if (!$user->companies()
-            ->where('companies.id', $company->id) // نحدد الجدول للأمان
-            ->wherePivot('is_active', true)
-            ->exists()) {
-            throw new BusinessRuleException('أنت لست عضواً نشطاً في هذه الشركة، أو أن حسابك معطل داخلها.', 403);
-        }
-
-        // 2. ضبط السياق العام للتطبيق
-        //    نضمن حقن CompanyContextService عبر الخاصية، أو نحصل عليه من الـ Container
-        if (!$this->context) {
-            $this->context = app(CompanyContextService::class);
-        }
-        $this->context->set($company->id);
-
-        // 3. تحديث الشركة الافتراضية للمستخدم (لتجربة سلسة عند تسجيل الدخول القادم)
-        //    نجعل الشركة الحالية هي الـ default، ونلغي default عن باقي شركاته.
-        $user->companies()->updateExistingPivot($company->id, ['is_default' => true]);
-        $user->companies()
-            ->where('companies.id', '!=', $company->id) // يجب تحديد الجدول
-            ->update(['is_default' => false]);
+{
+    // 1. التحقق من العضوية النشطة
+    if (!$user->companies()
+        ->where('companies.id', $company->id)
+        ->wherePivot('is_active', true)
+        ->exists()) {
+        throw new BusinessRuleException('أنت لست عضواً نشطاً في هذه الشركة، أو أن حسابك معطل داخلها.', 403);
     }
+
+    // 2. ضبط السياق العام للتطبيق
+    if (!$this->context) {
+        $this->context = app(CompanyContextService::class);
+    }
+    $this->context->set($company->id);
+
+    // 3. تحديث الشركة الافتراضية في جدول الوسيط (company_user)
+    //    نجعل الشركة الحالية هي الـ default
+    $user->companies()->updateExistingPivot($company->id, ['is_default' => true]);
+
+    //    نزيل الـ default عن باقي شركات المستخدم عبر علاقة الوسيط
+    \DB::table('company_user')
+        ->where('user_id', $user->id)
+        ->where('company_id', '!=', $company->id)
+        ->update(['is_default' => false]);
+}
 
     // ═══════════════════════════════════════════════════════════
     // إدارة الأعضاء
