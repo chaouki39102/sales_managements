@@ -28,7 +28,7 @@ class CompanyController extends BaseApiController
         private readonly CompanyService        $companyService,
         private readonly CompanyContextService $context,
     ) {
-        parent::__construct();
+        //parent::__construct();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -65,55 +65,41 @@ class CompanyController extends BaseApiController
     // ① CRUD — مع دعم الفلاتر حسب صلاحيات المستخدم
     // ═══════════════════════════════════════════════════════════
 
-    public function index(Request $request): JsonResponse
-    {
-        try {
-            $this->authorizeAction('viewAny', Company::class);
+   public function index(Request $request): JsonResponse
+{
+    try {
+        $this->authorizeAction('viewAny', Company::class);
 
-            $data = $this->apiListWithCallback(
-                Company::class,
-                function ($query) use ($request) {
-                    $user = auth()->user();
+        $user = auth()->user();
 
-                    // المستخدم العادي: فقط الشركات التي يملكها أو عضو فيها
-                    if (!$user->isSuperAdmin()) {
-                        $query->whereHas('members', fn($q) => $q->where('user_id', $user->id));
-                    }
+        $query = Company::query()->with(['owner:id,name,email']);
 
-                    // فلاتر إضافية للسوبر أدمن
-                    if ($user->isSuperAdmin() && $request->filled('status')) {
-                        match ($request->status) {
-                            'active'      => $query->active(),
-                            'suspended'   => $query->suspended(),
-                            'deactivated' => $query->deactivated(),
-                            'verified'    => $query->verified(),
-                            'on_trial'    => $query->onTrial(),
-                            default       => null,
-                        };
-                    }
-
-                    $query->with(['owner:id,name,email']);
-                },
-                $request,
-                $this->getListConfig(),
-            );
-
-            return $this->successResponse($data, 'تم جلب قائمة الشركات');
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'index');
+        // إذا لم يكن Super Admin، اعرض فقط شركاته
+        if (!$user->isSuperAdmin()) {
+            $query->whereHas('users', fn($q) => $q->where('user_id', $user->id));
         }
-    }
 
-    public function store(StoreCompanyRequest $request): JsonResponse
-    {
-        try {
-            $this->authorizeAction('create', Company::class);
-            $company = $this->companyService->create($request->validated(), $request);
-            return $this->successResponse(new CompanyResource($company), 'تم إنشاء الشركة بنجاح', 201);
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'store');
+        // فلاتر إضافية للسوبر أدمن
+        if ($user->isSuperAdmin() && $request->filled('status')) {
+            match ($request->status) {
+                'active'      => $query->active(),
+                'suspended'   => $query->suspended(),
+                'deactivated' => $query->deactivated(),
+                'verified'    => $query->verified(),
+                'on_trial'    => $query->onTrial(),
+                default       => null,
+            };
         }
+
+        $perPage = min((int)$request->get('per_page', 20), 100);
+        $companies = $query->paginate($perPage);
+
+        return $this->successResponse(CompanyResource::collection($companies), 'تم جلب قائمة الشركات');
+    } catch (\Throwable $e) {
+        return $this->handleError($e, 'index');
     }
+}
+
 
     public function show($id): JsonResponse
     {
@@ -128,17 +114,7 @@ class CompanyController extends BaseApiController
         }
     }
 
-    public function update(UpdateCompanyRequest $request, $id): JsonResponse
-    {
-        try {
-            $company = $this->companyService->findById($id);
-            $this->authorizeAction('update', $company);
-            $company = $this->companyService->update($company, $request->validated(), $request);
-            return $this->successResponse(new CompanyResource($company), 'تم تحديث بيانات الشركة');
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'update');
-        }
-    }
+
 
     public function destroy($id): JsonResponse
     {

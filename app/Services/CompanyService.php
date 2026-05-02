@@ -23,9 +23,15 @@ use App\Core\Exceptions\BusinessRuleException;
  */
 class CompanyService extends \App\Core\Services\BaseService
 {
+
     protected string $model = Company::class;
     protected string $resourceName = 'company';
     protected array $defaultWith = [];
+    // app/Services/CompanyService.php
+    protected function getResourceName(): string
+    {
+        return 'company';
+    }
 
     /**
      * CompanyService constructor.
@@ -35,7 +41,7 @@ class CompanyService extends \App\Core\Services\BaseService
      */
     public function __construct(private ?CompanyContextService $context = null)
     {
-        parent::__construct(); // لضمان توافق أي منطق في BaseService مستقبلاً
+       // parent::__construct(); // لضمان توافق أي منطق في BaseService مستقبلاً
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -111,9 +117,9 @@ class CompanyService extends \App\Core\Services\BaseService
     {
         // 1. التحقق من العضوية النشطة
         if (!$user->companies()
-                ->where('companies.id', $company->id) // نحدد الجدول للأمان
-                ->wherePivot('is_active', true)
-                ->exists()) {
+            ->where('companies.id', $company->id) // نحدد الجدول للأمان
+            ->wherePivot('is_active', true)
+            ->exists()) {
             throw new BusinessRuleException('أنت لست عضواً نشطاً في هذه الشركة، أو أن حسابك معطل داخلها.', 403);
         }
 
@@ -167,9 +173,9 @@ class CompanyService extends \App\Core\Services\BaseService
             'verified_companies'  => Company::verified()->count(),
             'on_trial_companies'  => Company::onTrial()->count(),
             'plans_distribution'  => Company::select('plan', DB::raw('COUNT(*) as total'))
-                                        ->groupBy('plan')
-                                        ->pluck('total', 'plan')
-                                        ->toArray(),
+                ->groupBy('plan')
+                ->pluck('total', 'plan')
+                ->toArray(),
         ];
     }
-// }
+}

@@ -63,6 +63,11 @@ use App\Http\Controllers\Api\V1\BarcodeController;
 use App\Http\Controllers\Api\V1\ProductVariantController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController as AdminCompanyController;
 
+use App\Http\Requests\StoreCompanyRequest;
+use App\Http\Requests\UpdateCompanyRequest;
+use App\Models\Company;
+use Illuminate\Http\Request;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes (Laravel 11) — Multi-Tenancy
@@ -98,52 +103,56 @@ Route::prefix('v1')->group(function () {
         });
     });
 
-    // ═══════════════════════════════════════════
-    // ② إدارة شركات المستخدم
-    // ═══════════════════════════════════════════
+   // ═══════════════════════════════════════════
+// ② إدارة شركات المستخدم
+// ═══════════════════════════════════════════
 
-    Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
+Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
 
-        // عرض / إنشاء
-        Route::get('/',        [CompanyController::class, 'index']);
-        Route::post('/',       [CompanyController::class, 'store']);
-        Route::get('/current', [CompanyController::class, 'current']);
-        Route::post('/switch', [CompanyController::class, 'switch']);
+    Route::get('/',        [CompanyController::class, 'index']);
+    Route::post('/',       function (StoreCompanyRequest $request) {
+        return app(CompanyController::class)->store($request);
+    });
+    Route::get('/current', [CompanyController::class, 'current']);
+    Route::post('/switch', [CompanyController::class, 'switch']);
 
-        // عرض / تعديل شركة محددة (مالك أو Super Admin)
-        Route::get('/{company}',    [CompanyController::class, 'show']);
-        Route::put('/{company}',    [CompanyController::class, 'update']);
-        Route::patch('/{company}',  [CompanyController::class, 'update']);
-
-        // إدارة الأعضاء (مالك / admin الشركة)
-        Route::get('/{company}/members',                         [CompanyController::class, 'members']);
-        Route::post('/{company}/members',                        [CompanyController::class, 'addMember']);
-        Route::delete('/{company}/members/{userId}',             [CompanyController::class, 'removeMember']);
-        Route::patch('/{company}/members/{userId}/role',         [CompanyController::class, 'changeMemberRole']);
-        Route::patch('/{company}/members/{userId}/deactivate',   [CompanyController::class, 'deactivateMember']);
-        Route::patch('/{company}/members/{userId}/activate',     [CompanyController::class, 'activateMember']);
-
-        // نقل الملكية (مالك أو Super Admin)
-        Route::post('/{company}/transfer-ownership', [CompanyController::class, 'transferOwnership']);
+    Route::get('/{company}', function ($company) {
+        return app(CompanyController::class)->show($company);
+    });
+    Route::put('/{company}', function (UpdateCompanyRequest $request, $company) {
+        return app(CompanyController::class)->update($request, $company);
+    });
+    Route::patch('/{company}', function (UpdateCompanyRequest $request, $company) {
+        return app(CompanyController::class)->update($request, $company);
     });
 
-    // ═══════════════════════════════════════════
-    // ③ Super Admin — إدارة كاملة لكل الشركات
-    // ═══════════════════════════════════════════
+    Route::get('/{company}/members', fn(Company $company) => app(CompanyController::class)->members($company));
+    Route::post('/{company}/members', fn(Request $request, Company $company) => app(CompanyController::class)->addMember($request, $company));
+    Route::delete('/{company}/members/{userId}', fn(Company $company, int $userId) => app(CompanyController::class)->removeMember($company, $userId));
+    Route::patch('/{company}/members/{userId}/role', fn(Request $request, Company $company, int $userId) => app(CompanyController::class)->changeMemberRole($request, $company, $userId));
+    Route::patch('/{company}/members/{userId}/deactivate', fn(Company $company, int $userId) => app(CompanyController::class)->deactivateMember($company, $userId));
+    Route::patch('/{company}/members/{userId}/activate', fn(Company $company, int $userId) => app(CompanyController::class)->activateMember($company, $userId));
 
-    Route::middleware(['auth:sanctum', 'role:super-admin'])
-        ->prefix('admin/companies')
-        ->group(function () {
-            Route::get('/stats', [AdminCompanyController::class, 'stats']);
-            Route::post('/{company}/suspend', [AdminCompanyController::class, 'suspend']);
-            Route::post('/{company}/unsuspend', [AdminCompanyController::class, 'unsuspend']);
-            Route::post('/{company}/deactivate', [AdminCompanyController::class, 'deactivate']);
-            Route::post('/{company}/activate', [AdminCompanyController::class, 'activate']);
-            Route::post('/{company}/verify', [AdminCompanyController::class, 'verify']);
-            Route::post('/{company}/unverify', [AdminCompanyController::class, 'unverify']);
-            Route::patch('/{company}/plan', [AdminCompanyController::class, 'changePlan']);
-            Route::patch('/{company}/notes', [AdminCompanyController::class, 'updateNotes']);
-        });
+    Route::post('/{company}/transfer-ownership', fn(Request $request, Company $company) => app(CompanyController::class)->transferOwnership($request, $company));
+});
+
+// ═══════════════════════════════════════════
+// ③ Super Admin — إدارة كاملة لكل الشركات
+// ═══════════════════════════════════════════
+
+Route::middleware(['auth:sanctum', 'role:super-admin'])
+    ->prefix('admin/companies')
+    ->group(function () {
+        Route::get('/stats', fn() => app(AdminCompanyController::class)->stats());
+        Route::post('/{company}/suspend', fn(Request $request, Company $company) => app(AdminCompanyController::class)->suspend($request, $company));
+        Route::post('/{company}/unsuspend', fn(Company $company) => app(AdminCompanyController::class)->unsuspend($company));
+        Route::post('/{company}/deactivate', fn(Company $company) => app(AdminCompanyController::class)->deactivate($company));
+        Route::post('/{company}/activate', fn(Company $company) => app(AdminCompanyController::class)->activate($company));
+        Route::post('/{company}/verify', fn(Company $company) => app(AdminCompanyController::class)->verify($company));
+        Route::post('/{company}/unverify', fn(Company $company) => app(AdminCompanyController::class)->unverify($company));
+        Route::patch('/{company}/plan', fn(Request $request, Company $company) => app(AdminCompanyController::class)->changePlan($request, $company));
+        Route::patch('/{company}/notes', fn(Request $request, Company $company) => app(AdminCompanyController::class)->updateNotes($request, $company));
+    });
 
     // ═══════════════════════════════════════════
     // ④ Lookup Tables — مشتركة بين كل الشركات

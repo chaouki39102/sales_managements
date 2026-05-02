@@ -15,7 +15,7 @@ export default function LoginPage() {
 
     // redirect if already logged in
     useEffect(() => {
-        if (isAuthenticated) navigate("/dashboard", { replace: true });
+        if (isAuthenticated) navigate("/onboarding", { replace: true });
     }, [isAuthenticated, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -38,17 +38,21 @@ export default function LoginPage() {
         try {
             // 2. إرسال الطلب فقط إذا كانت البيانات صحيحة
             await login({ email, password });
-            navigate("/dashboard", { replace: true });
+            navigate("/onboarding", { replace: true });
         } catch (err: any) {
-            // إذا كان الخطأ من نوع 422 (Validation Error)
-            if (err.response?.status === 422) {
-                const errors = err.response.data.errors; // Laravel يضع الأخطاء في مفتاح errors
-
-                // إذا أردت عرض خطأ أول حقل فقط:
-                const firstField = Object.keys(errors)[0];
-                setError(errors[firstField][0]);
+            if (err.response) {
+                // الخادم رد برسالة خطأ
+                const msg =
+                    err.response.data?.message || err.response.statusText;
+                setError(`خطأ ${err.response.status}: ${msg}`);
+            } else if (err.request) {
+                // الطلب أُرسل ولكن لا توجد استجابة (مشكلة شبكة/CORS/الخادم معطل)
+                setError(
+                    "لا يمكن الاتصال بالخادم. تأكد من تشغيل الخادم وإعدادات CORS.",
+                );
+                console.error(err);
             } else {
-                setError("بيانات الدخول غير صحيحة");
+                setError(err.message || "بيانات الدخول غير صحيحة");
             }
         } finally {
             setLoading(false);
@@ -64,8 +68,6 @@ export default function LoginPage() {
                 direction: "rtl",
             }}
         >
-
-
             {/* ── Left decorative panel ── */}
             <div
                 style={{
@@ -241,7 +243,7 @@ export default function LoginPage() {
                 </div>
             </div>
 
-                        {/* ── Right login form ── */}
+            {/* ── Right login form ── */}
             <div
                 style={{
                     width: 440,

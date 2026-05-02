@@ -23,6 +23,10 @@ use Illuminate\Support\Facades\Hash;
  */
 class AuthService extends \App\Core\Services\BaseService
 {
+    protected function getResourceName(): string
+    {
+        return 'user'; // أو $this->resourceName إن أردت
+    }
     protected string $model = User::class;
     protected string $resourceName = 'user';
 

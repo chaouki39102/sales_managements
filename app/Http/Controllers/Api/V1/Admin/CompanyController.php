@@ -23,7 +23,7 @@ class CompanyController extends BaseApiController
 
     public function __construct(private CompanyService $companyService)
     {
-        parent::__construct();
+       // parent::__construct();
     }
 
     /**
