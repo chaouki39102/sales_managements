@@ -11,7 +11,7 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // جلب أول شركة موجودة (أو يمكن استخدام cache)
+        // جلب أول شركة موجودة
         $companyId = DB::table('companies')->value('id');
 
         if (!$companyId) {
@@ -19,6 +19,7 @@ class UserSeeder extends Seeder
             return;
         }
 
+        // إنشاء Super Admin - (الدور موجود وصحيح)
         $superAdmin = User::create([
             'name' => 'Super Admin',
             'email' => 'admin@mail.com',
@@ -29,6 +30,7 @@ class UserSeeder extends Seeder
         ]);
         $superAdmin->assignRole('super-admin');
 
+        // إنشاء Admin User
         $admin = User::create([
             'name' => 'Admin User',
             'email' => 'admin.user@mail.com',
@@ -37,6 +39,8 @@ class UserSeeder extends Seeder
             'email_verified_at' => now(),
             'company_id' => $companyId,
         ]);
-        $admin->assignRole('moderator');
+
+        // التعديل هنا: استبدال 'moderator' بـ 'admin' أو 'manager'
+        $admin->assignRole('admin');
     }
 }

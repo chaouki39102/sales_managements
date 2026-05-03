@@ -1025,7 +1025,13 @@ function UserFormModal({
                 job_title: user.job_title ?? "",
                 password: "",
                 role: user.roles?.[0]?.name ?? "",
-                permission_ids: user.permissions?.map((p) => p.id) ?? [],
+                // نجمع: الصلاحيات المباشرة + صلاحيات الدور المُعيَّن
+                // user.permissions = Direct Permissions (objects مع id)
+                // user.role_permissions = صلاحيات الدور (يرجعها UserResource)
+                permission_ids: [
+                    ...(user.permissions?.map((p: any) => p.id) ?? []),
+                    ...(user.role_permissions?.map((p: any) => p.id) ?? []),
+                ],
                 active: user.active ?? true,
             });
         } else {
@@ -1046,10 +1052,11 @@ function UserFormModal({
 
     const mutation = useMutation({
         mutationFn: async (data: typeof form) => {
-            const { permission_ids, ...payload } = data;
+            // نرسل كل البيانات بما فيها permission_ids
+            // UserService.afterUpdate يعالجها عبر syncPermissions
             if (isEdit)
-                return apiClient.put(`/${slug}/users/${user!.id}`, payload);
-            return apiClient.post(`/${slug}/users`, payload);
+                return apiClient.put(`/${slug}/users/${user!.id}`, data);
+            return apiClient.post(`/${slug}/users`, data);
         },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ["users", slug] });

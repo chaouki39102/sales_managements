@@ -23,18 +23,10 @@ const EmployeesPage = lazy(() => import("@/pages/users/EmployeesPage"));
 const FiscalYearsPage = lazy(() => import("@/pages/fiscal/FiscalYearsPage"));
 const TvaPage = lazy(() => import("@/pages/fiscal/TvaPage"));
 const DebtsPage = lazy(() => import("@/pages/debts/DebtsPage"));
-const DocumentTypesPage = lazy(
-    () => import("@/pages/settings/DocumentTypesPage"),
-);
-const CommercialDocumentsPage = lazy(
-    () => import("@/pages/documents/CommercialDocumentsPage"),
-);
-const NumberingSeriesPage = lazy(
-    () => import("@/pages/lookups/NumberingSeriesPage"),
-);
-const PaymentMethodsPage = lazy(
-    () => import("@/pages/settings/PaymentMethodsPage"),
-);
+const DocumentTypesPage = lazy(() => import("@/pages/settings/DocumentTypesPage"));
+const CommercialDocumentsPage = lazy(() => import("@/pages/documents/CommercialDocumentsPage"));
+const NumberingSeriesPage = lazy(() => import("@/pages/lookups/NumberingSeriesPage"));
+const PaymentMethodsPage = lazy(() => import("@/pages/settings/PaymentMethodsPage"));
 
 // Lookup pages
 const BrandsPage = lazy(() => import("@/pages/lookups/BrandsPage"));
@@ -44,47 +36,26 @@ const CurrenciesPage = lazy(() => import("@/pages/lookups/CurrenciesPage"));
 const WarehousesPage = lazy(() => import("@/pages/lookups/WarehousesPage"));
 const PriceLevelsPage = lazy(() => import("@/pages/lookups/PriceLevelsPage"));
 const TvasPage = lazy(() => import("@/pages/lookups/TvasPage"));
-const ExpenseCategoriesPage = lazy(
-    () => import("@/pages/lookups/ExpenseCategoriesPage"),
-);
-
+const ExpenseCategoriesPage = lazy(() => import("@/pages/lookups/ExpenseCategoriesPage"));
 const RolesPage = lazy(() => import("@/pages/users/RolesPage"));
 
+// ── Loader ────────────────────────────────────────────────────────────────────
 function Loader() {
     return (
-        <div
-            style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100vh",
-                background: "var(--bg0)",
-            }}
-        >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg0)" }}>
             <span className="ic ic-xl" style={{ color: "var(--em)" }}>
-                <i
-                    className="ti ti-loader"
-                    style={{ animation: "spin 1s linear infinite" }}
-                />
+                <i className="ti ti-loader" style={{ animation: "spin 1s linear infinite" }} />
             </span>
         </div>
     );
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading } = useAuth();
-    if (isLoading) return <Loader />;
-    if (!isAuthenticated) return <Navigate to="/login" replace />;
-    return <>{children}</>;
-}
-
+// ── ComingSoon ────────────────────────────────────────────────────────────────
 function ComingSoon() {
     return (
         <div className="page on">
             <div className="empty" style={{ paddingTop: 80 }}>
-                <div className="empty-ic">
-                    <i className="ti ti-hammer" />
-                </div>
+                <div className="empty-ic"><i className="ti ti-hammer" /></div>
                 <div className="empty-tx">هذه الصفحة قيد الإنشاء</div>
                 <div className="empty-sub">سيتم إضافتها قريباً</div>
             </div>
@@ -92,90 +63,102 @@ function ComingSoon() {
     );
 }
 
+// ── ProtectedRoute: يتطلب تسجيل دخول فقط ────────────────────────────────────
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+    const { isAuthenticated, isLoading } = useAuth();
+    if (isLoading) return <Loader />;
+    if (!isAuthenticated) return <Navigate to="/login" replace />;
+    return <>{children}</>;
+}
+
+// ── OnboardingRoute: يتطلب تسجيل دخول + لا شركة محددة ──────────────────────
+// إذا كان المستخدم مسجّلاً دخوله وعنده شركة محددة → ابعده للـ dashboard
+// إذا لم يكن مسجّلاً → ابعده للـ login
+function OnboardingRoute({ children }: { children: React.ReactNode }) {
+    const { isAuthenticated, isLoading, activeCompany } = useAuth();
+    if (isLoading) return <Loader />;
+    if (!isAuthenticated) return <Navigate to="/login" replace />;
+    // لو الشركة محددة بالفعل → لا حاجة للـ onboarding
+    if (activeCompany?.slug) return <Navigate to="/dashboard" replace />;
+    return <>{children}</>;
+}
+
+// ── AppRoute: يتطلب تسجيل دخول + شركة محددة ────────────────────────────────
+// إذا لم تكن هناك شركة محددة → أعده للـ onboarding ليختار شركة وسنة مالية
+function AppRoute({ children }: { children: React.ReactNode }) {
+    const { isAuthenticated, isLoading, activeCompany } = useAuth();
+    if (isLoading) return <Loader />;
+    if (!isAuthenticated) return <Navigate to="/login" replace />;
+    // لو لا توجد شركة محددة → يجب المرور بالـ onboarding أولاً
+    if (!activeCompany?.slug) return <Navigate to="/onboarding" replace />;
+    return <>{children}</>;
+}
+
+// ── AppRoutes ─────────────────────────────────────────────────────────────────
 export function AppRoutes() {
     return (
         <Suspense fallback={<Loader />}>
             <Routes>
+                {/* صفحة تسجيل الدخول */}
                 <Route path="/login" element={<LoginPage />} />
 
-                {/* 🆕 الإعداد الأولي (محمي، مستقل عن DashboardLayout) */}
+                {/* Onboarding: محمي + يُعيد التوجيه إن كانت الشركة محددة */}
                 <Route
                     path="/onboarding"
                     element={
-                        <ProtectedRoute>
+                        <OnboardingRoute>
                             <OnboardingPage />
-                        </ProtectedRoute>
+                        </OnboardingRoute>
                     }
                 />
 
-                {/* مسارات التطبيق (DashboardLayout) */}
+                {/* صفحات التطبيق: تتطلب شركة محددة */}
                 <Route
                     path="/"
                     element={
-                        <ProtectedRoute>
+                        <AppRoute>
                             <DashboardLayout />
-                        </ProtectedRoute>
+                        </AppRoute>
                     }
                 >
-                    <Route
-                        index
-                        element={<Navigate to="/dashboard" replace />}
-                    />
-                    <Route path="dashboard" element={<DashboardPage />} />
-                    <Route path="pos" element={<POSPage />} />
-                    <Route path="invoices" element={<InvoicesPage />} />
-                    <Route path="products" element={<ProductsPage />} />
-                    <Route
-                        path="documents/:typeCode"
-                        element={<CommercialDocumentsPage />}
-                    />
-                    <Route path="inventory" element={<InventoryPage />} />
-                    <Route path="clients" element={<ClientsPage />} />
-                    <Route path="suppliers" element={<SuppliersPage />} />
-                    <Route path="finance" element={<FinancePage />} />
-                    <Route path="expenses" element={<ExpensesPage />} />
-                    <Route path="debts" element={<DebtsPage />} />
-                    <Route path="tva" element={<TvaPage />} />
-                    <Route path="fiscal" element={<ComingSoon />} />
-                    <Route path="fiscalyears" element={<FiscalYearsPage />} />
-                    <Route path="reports" element={<ReportsPage />} />
-                    <Route path="balance" element={<ComingSoon />} />
-                    <Route path="users" element={<UsersPage />} />
-                    <Route path="roles" element={<RolesPage />} />
-
-                    <Route path="employees" element={<EmployeesPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
-                    <Route
-                        path="settings/document-types"
-                        element={<DocumentTypesPage />}
-                    />
+                    <Route index element={<Navigate to="/dashboard" replace />} />
+                    <Route path="dashboard"                element={<DashboardPage />} />
+                    <Route path="pos"                      element={<POSPage />} />
+                    <Route path="invoices"                 element={<InvoicesPage />} />
+                    <Route path="products"                 element={<ProductsPage />} />
+                    <Route path="documents/:typeCode"      element={<CommercialDocumentsPage />} />
+                    <Route path="inventory"                element={<InventoryPage />} />
+                    <Route path="clients"                  element={<ClientsPage />} />
+                    <Route path="suppliers"                element={<SuppliersPage />} />
+                    <Route path="finance"                  element={<FinancePage />} />
+                    <Route path="expenses"                 element={<ExpensesPage />} />
+                    <Route path="debts"                    element={<DebtsPage />} />
+                    <Route path="tva"                      element={<TvaPage />} />
+                    <Route path="fiscal"                   element={<ComingSoon />} />
+                    <Route path="fiscalyears"              element={<FiscalYearsPage />} />
+                    <Route path="reports"                  element={<ReportsPage />} />
+                    <Route path="balance"                  element={<ComingSoon />} />
+                    <Route path="users"                    element={<UsersPage />} />
+                    <Route path="roles"                    element={<RolesPage />} />
+                    <Route path="employees"                element={<EmployeesPage />} />
+                    <Route path="settings"                 element={<SettingsPage />} />
+                    <Route path="settings/document-types"  element={<DocumentTypesPage />} />
 
                     {/* Lookups */}
-                    <Route path="categories" element={<FamiliesPage />} />
-                    <Route path="brands" element={<BrandsPage />} />
-                    <Route path="units" element={<UnitsPage />} />
-                    <Route path="warehouses" element={<WarehousesPage />} />
-                    <Route path="currencies" element={<CurrenciesPage />} />
-                    <Route path="pricelevels" element={<PriceLevelsPage />} />
-                    <Route path="tvas" element={<TvasPage />} />
-                    <Route
-                        path="payment-methods"
-                        element={<PaymentMethodsPage />}
-                    />
-                    <Route
-                        path="numbering-series"
-                        element={<NumberingSeriesPage />}
-                    />
-                    <Route
-                        path="expense-categories"
-                        element={<ExpenseCategoriesPage />}
-                    />
+                    <Route path="categories"               element={<FamiliesPage />} />
+                    <Route path="brands"                   element={<BrandsPage />} />
+                    <Route path="units"                    element={<UnitsPage />} />
+                    <Route path="warehouses"               element={<WarehousesPage />} />
+                    <Route path="currencies"               element={<CurrenciesPage />} />
+                    <Route path="pricelevels"              element={<PriceLevelsPage />} />
+                    <Route path="tvas"                     element={<TvasPage />} />
+                    <Route path="payment-methods"          element={<PaymentMethodsPage />} />
+                    <Route path="numbering-series"         element={<NumberingSeriesPage />} />
+                    <Route path="expense-categories"       element={<ExpenseCategoriesPage />} />
                 </Route>
 
-                <Route
-                    path="*"
-                    element={<Navigate to="/dashboard" replace />}
-                />
+                {/* أي مسار غير معروف → dashboard */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
         </Suspense>
     );

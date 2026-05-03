@@ -94,6 +94,7 @@ class UserService extends \App\Core\Services\BaseService
     protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
     {
         unset($data['company_id']);
+        unset($data['permission_ids']); // تُعالج في afterUpdate، ليست عمود في DB
 
         // معالجة كلمة المرور
         if (!empty($data['password'])) {
@@ -112,8 +113,15 @@ class UserService extends \App\Core\Services\BaseService
 
     protected function afterUpdate(Model $item, array $data, ?Request $request): void
     {
-        if (isset($data['role'])) {
+        // مزامنة الدور
+        if (isset($data['role']) && $data['role']) {
             $item->syncRoles([$data['role']]);
+        }
+
+        // مزامنة الصلاحيات المباشرة (Direct Permissions)
+        // array_key_exists لأن [] تعني "إزالة كل الصلاحيات"
+        if (array_key_exists('permission_ids', $data)) {
+            $item->syncPermissions($data['permission_ids'] ?? []);
         }
 
         if ($request && $request->hasFile('avatar_file')) {

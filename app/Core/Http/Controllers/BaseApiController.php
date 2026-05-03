@@ -55,7 +55,7 @@ abstract class BaseApiController extends Controller
     public function __construct()
     {
         $rateLimit = config('api.rate_limit.requests', 60);
-       // $this->middleware("throttle:{$rateLimit},1")->except(['index', 'show']);
+        // $this->middleware("throttle:{$rateLimit},1")->except(['index', 'show']);
     }
 
     // === Authorization (المسؤولية الوحيدة للكنترولر) ===
@@ -78,7 +78,7 @@ abstract class BaseApiController extends Controller
     {
         try {
             // 1. التحقق من الصلاحيات
-          //  $this->authorizeAction('viewAny', $this->getModelClass());
+            //  $this->authorizeAction('viewAny', $this->getModelClass());
 
             // 2. تفويض جلب البيانات إلى Trait
             $data = $this->getListData($request);
@@ -393,7 +393,7 @@ abstract class BaseApiController extends Controller
 
         // إذا كان خطأ 4xx آخر (مثل 405 Method Not Allowed)
         if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpException && $e->getStatusCode() < 500) {
-             return 'authorization'; // أو 'client_error'
+            return 'authorization'; // أو 'client_error'
         }
 
         return 'server_error';
@@ -407,23 +407,31 @@ abstract class BaseApiController extends Controller
         switch ($errorType) {
             case 'not_found':
                 return $this->errorResponse(
-                    "{$this->resourceName} غير موجود", 404, 'NOT_FOUND'
+                    "{$this->resourceName} غير موجود",
+                    404,
+                    'NOT_FOUND'
                 );
 
             case 'business_rule':
                 return $this->errorResponse(
-                    $e->getMessage(), $e->getCode() ?: 409, 'BUSINESS_RULE_VIOLATION'
+                    $e->getMessage(),
+                    $e->getCode() ?: 409,
+                    'BUSINESS_RULE_VIOLATION'
                 );
 
             case 'authorization':
                 // للـ UnauthorizedException استخدم 401، للـ AuthorizationException استخدم 403
                 $statusCode = $e instanceof \App\Core\Exceptions\UnauthorizedException ? 401 : 403;
                 return $this->errorResponse(
-                    $e->getMessage() ?: 'ليس لديك الصلاحية', $statusCode, 'AUTHORIZATION_ERROR'
+                    $e->getMessage() ?: 'ليس لديك الصلاحية',
+                    $statusCode,
+                    'AUTHORIZATION_ERROR'
                 );
             case 'validation':
                 return $this->errorResponse(
-                    'خطأ في البيانات المدخلة', 422, 'VALIDATION_ERROR',
+                    'خطأ في البيانات المدخلة',
+                    422,
+                    'VALIDATION_ERROR',
                     $e instanceof ValidationException ? $e->errors() : []
                 );
 
@@ -435,5 +443,15 @@ abstract class BaseApiController extends Controller
                     'SERVER_ERROR'
                 );
         }
+    }
+
+    /**
+     * استخراج ID من المسار (مع دعم مرونة أسماء المعلمات)
+     */
+    protected function resolveId(string $paramName = 'id'): mixed
+    {
+        return request()->route($paramName)
+            ?? request()->route('id')
+            ?? null;
     }
 }
