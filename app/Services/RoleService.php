@@ -11,4 +11,9 @@ class RoleService extends \App\Core\Services\BaseService
     protected string $model = Role::class;
     protected string $resourceName = 'role';
     protected array $defaultWith = ['permissions'];
+
+       protected function getResourceName(): string
+    {
+        return 'role';
+    }
 }

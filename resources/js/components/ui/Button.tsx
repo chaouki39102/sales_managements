@@ -1,3 +1,4 @@
+// Note: The CSS classes like 'btn', 'btn-p', 'btn-r', etc., should be defined in your CSS files to style the button accordingly.
 // components/ui/Button.tsx
 import React from 'react';
 
@@ -9,6 +10,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   icon?: React.ReactNode;
   fullWidth?: boolean;
+  loading?: boolean;           // 🆕 إضافة
   children?: React.ReactNode;
 }
 
@@ -31,17 +33,29 @@ export default function Button({
   size = 'md',
   icon,
   fullWidth = false,
+  loading = false,            // 🆕
   children,
   className = '',
+  disabled: externalDisabled,
   ...props
 }: ButtonProps) {
+  const isDisabled = externalDisabled || loading;   // يعطل الزر أثناء التحميل
+
   return (
     <button
       className={`btn ${variantMap[variant]} ${sizeMap[size]} ${fullWidth ? 'btn-w' : ''} ${className}`}
-      {...props}
+      disabled={isDisabled}
+      {...props}    // لا نمرر loading هنا
     >
-      {icon && <span className="ic ic-xs">{icon}</span>}
-      {children}
+      {/* أيقونة التحميل أو الأيقونة العادية */}
+      {loading ? (
+        <span className="ic ic-xs" style={{ animation: 'spin 1s linear infinite' }}>
+          <i className="ti ti-loader" />
+        </span>
+      ) : icon ? (
+        <span className="ic ic-xs">{icon}</span>
+      ) : null}
+      {loading ? 'جارٍ التحميل...' : children}
     </button>
   );
 }

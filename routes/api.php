@@ -62,7 +62,7 @@ use App\Http\Controllers\Api\V1\DocumentBaseOperationController;
 use App\Http\Controllers\Api\V1\BarcodeController;
 use App\Http\Controllers\Api\V1\ProductVariantController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController as AdminCompanyController;
-
+use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Requests\StoreCompanyRequest;
 use App\Http\Requests\UpdateCompanyRequest;
 use App\Models\Company;
@@ -103,56 +103,56 @@ Route::prefix('v1')->group(function () {
         });
     });
 
-   // ═══════════════════════════════════════════
-// ② إدارة شركات المستخدم
-// ═══════════════════════════════════════════
+    // ═══════════════════════════════════════════
+    // ② إدارة شركات المستخدم
+    // ═══════════════════════════════════════════
 
-Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
+    Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
 
-    Route::get('/',        [CompanyController::class, 'index']);
-    Route::post('/',       function (StoreCompanyRequest $request) {
-        return app(CompanyController::class)->store($request);
+        Route::get('/',        [CompanyController::class, 'index']);
+        Route::post('/',       function (StoreCompanyRequest $request) {
+            return app(CompanyController::class)->store($request);
+        });
+        Route::get('/current', [CompanyController::class, 'current']);
+        Route::post('/switch', [CompanyController::class, 'switch']);
+
+        Route::get('/{company}', function ($company) {
+            return app(CompanyController::class)->show($company);
+        });
+        Route::put('/{company}', function (UpdateCompanyRequest $request, $company) {
+            return app(CompanyController::class)->update($request, $company);
+        });
+        Route::patch('/{company}', function (UpdateCompanyRequest $request, $company) {
+            return app(CompanyController::class)->update($request, $company);
+        });
+
+        Route::get('/{company}/members', fn(Company $company) => app(CompanyController::class)->members($company));
+        Route::post('/{company}/members', fn(Request $request, Company $company) => app(CompanyController::class)->addMember($request, $company));
+        Route::delete('/{company}/members/{userId}', fn(Company $company, int $userId) => app(CompanyController::class)->removeMember($company, $userId));
+        Route::patch('/{company}/members/{userId}/role', fn(Request $request, Company $company, int $userId) => app(CompanyController::class)->changeMemberRole($request, $company, $userId));
+        Route::patch('/{company}/members/{userId}/deactivate', fn(Company $company, int $userId) => app(CompanyController::class)->deactivateMember($company, $userId));
+        Route::patch('/{company}/members/{userId}/activate', fn(Company $company, int $userId) => app(CompanyController::class)->activateMember($company, $userId));
+
+        Route::post('/{company}/transfer-ownership', fn(Request $request, Company $company) => app(CompanyController::class)->transferOwnership($request, $company));
     });
-    Route::get('/current', [CompanyController::class, 'current']);
-    Route::post('/switch', [CompanyController::class, 'switch']);
 
-    Route::get('/{company}', function ($company) {
-        return app(CompanyController::class)->show($company);
-    });
-    Route::put('/{company}', function (UpdateCompanyRequest $request, $company) {
-        return app(CompanyController::class)->update($request, $company);
-    });
-    Route::patch('/{company}', function (UpdateCompanyRequest $request, $company) {
-        return app(CompanyController::class)->update($request, $company);
-    });
+    // ═══════════════════════════════════════════
+    // ③ Super Admin — إدارة كاملة لكل الشركات
+    // ═══════════════════════════════════════════
 
-    Route::get('/{company}/members', fn(Company $company) => app(CompanyController::class)->members($company));
-    Route::post('/{company}/members', fn(Request $request, Company $company) => app(CompanyController::class)->addMember($request, $company));
-    Route::delete('/{company}/members/{userId}', fn(Company $company, int $userId) => app(CompanyController::class)->removeMember($company, $userId));
-    Route::patch('/{company}/members/{userId}/role', fn(Request $request, Company $company, int $userId) => app(CompanyController::class)->changeMemberRole($request, $company, $userId));
-    Route::patch('/{company}/members/{userId}/deactivate', fn(Company $company, int $userId) => app(CompanyController::class)->deactivateMember($company, $userId));
-    Route::patch('/{company}/members/{userId}/activate', fn(Company $company, int $userId) => app(CompanyController::class)->activateMember($company, $userId));
-
-    Route::post('/{company}/transfer-ownership', fn(Request $request, Company $company) => app(CompanyController::class)->transferOwnership($request, $company));
-});
-
-// ═══════════════════════════════════════════
-// ③ Super Admin — إدارة كاملة لكل الشركات
-// ═══════════════════════════════════════════
-
-Route::middleware(['auth:sanctum', 'role:super-admin'])
-    ->prefix('admin/companies')
-    ->group(function () {
-        Route::get('/stats', fn() => app(AdminCompanyController::class)->stats());
-        Route::post('/{company}/suspend', fn(Request $request, Company $company) => app(AdminCompanyController::class)->suspend($request, $company));
-        Route::post('/{company}/unsuspend', fn(Company $company) => app(AdminCompanyController::class)->unsuspend($company));
-        Route::post('/{company}/deactivate', fn(Company $company) => app(AdminCompanyController::class)->deactivate($company));
-        Route::post('/{company}/activate', fn(Company $company) => app(AdminCompanyController::class)->activate($company));
-        Route::post('/{company}/verify', fn(Company $company) => app(AdminCompanyController::class)->verify($company));
-        Route::post('/{company}/unverify', fn(Company $company) => app(AdminCompanyController::class)->unverify($company));
-        Route::patch('/{company}/plan', fn(Request $request, Company $company) => app(AdminCompanyController::class)->changePlan($request, $company));
-        Route::patch('/{company}/notes', fn(Request $request, Company $company) => app(AdminCompanyController::class)->updateNotes($request, $company));
-    });
+    Route::middleware(['auth:sanctum', 'role:super-admin'])
+        ->prefix('admin/companies')
+        ->group(function () {
+            Route::get('/stats', fn() => app(AdminCompanyController::class)->stats());
+            Route::post('/{company}/suspend', fn(Request $request, Company $company) => app(AdminCompanyController::class)->suspend($request, $company));
+            Route::post('/{company}/unsuspend', fn(Company $company) => app(AdminCompanyController::class)->unsuspend($company));
+            Route::post('/{company}/deactivate', fn(Company $company) => app(AdminCompanyController::class)->deactivate($company));
+            Route::post('/{company}/activate', fn(Company $company) => app(AdminCompanyController::class)->activate($company));
+            Route::post('/{company}/verify', fn(Company $company) => app(AdminCompanyController::class)->verify($company));
+            Route::post('/{company}/unverify', fn(Company $company) => app(AdminCompanyController::class)->unverify($company));
+            Route::patch('/{company}/plan', fn(Request $request, Company $company) => app(AdminCompanyController::class)->changePlan($request, $company));
+            Route::patch('/{company}/notes', fn(Request $request, Company $company) => app(AdminCompanyController::class)->updateNotes($request, $company));
+        });
 
     // ═══════════════════════════════════════════
     // ④ Lookup Tables — مشتركة بين كل الشركات
@@ -380,5 +380,26 @@ Route::middleware(['auth:sanctum', 'role:super-admin'])
             Route::apiResource('audits', AuditController::class)->only(['index', 'show']);
             Route::get('audits/user/{user}',      [AuditController::class, 'byUser']);
             Route::get('audits/event/{event}',    [AuditController::class, 'byEvent']);
+
+
+            // إدارة المستخدمين
+            Route::apiResource('users', UserController::class);
+            Route::get('users/trashed', [UserController::class, 'trashed']);
+            Route::post('users/{user}/restore', [UserController::class, 'restore']);
+            Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete']);
+            Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
+            Route::post('users/{user}/toggle-active', [UserController::class, 'toggleActive']);
+            Route::post('users/{user}/assign-role', [UserController::class, 'assignRole']);
+            Route::get('users-by-role', [UserController::class, 'byRole']);
+            Route::get('users/active', [UserController::class, 'active']);
+            Route::get('users/inactive', [UserController::class, 'inactive']);
+
+
+            Route::get('roles', [RoleController::class, 'index']);
+            Route::get('roles/{role}', [RoleController::class, 'show']);
+
+            Route::get('permissions', [PermissionController::class, 'index']);
+            Route::get('permissions/by-group', [PermissionController::class, 'byGroup']);
+            Route::get('permissions/{permission}', [PermissionController::class, 'show']);
         });
 });

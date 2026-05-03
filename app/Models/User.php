@@ -44,7 +44,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name', 'email', 'email_verified_at', 'username', 'phone', 'avatar',
         'bio', 'job_title', 'birth_date', 'gender_id', 'national_id', 'address',
-        'commune_id', 'wilaya_id', 'role_id', 'last_login_at', 'last_login_ip',
+        'commune_id', 'wilaya_id', 'role_id', 'last_login_at', 'last_login_ip', 'company_id',
         'register_ip', 'register_user_agent', 'active', 'created_by', 'updated_by', 'deleted_by',
     ];
 

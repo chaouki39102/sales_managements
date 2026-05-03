@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use App\Core\Exceptions\BusinessRuleException;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Company Service
@@ -41,7 +42,7 @@ class CompanyService extends \App\Core\Services\BaseService
      */
     public function __construct(private ?CompanyContextService $context = null)
     {
-       // parent::__construct(); // لضمان توافق أي منطق في BaseService مستقبلاً
+        // parent::__construct(); // لضمان توافق أي منطق في BaseService مستقبلاً
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -129,15 +130,19 @@ class CompanyService extends \App\Core\Services\BaseService
     }
     $this->context->set($company->id);
 
-    // 3. تحديث الشركة الافتراضية في جدول الوسيط (company_user)
-    //    نجعل الشركة الحالية هي الـ default
-    $user->companies()->updateExistingPivot($company->id, ['is_default' => true]);
+    // 3. تحديث الشركة الافتراضية عبر `company_user` (بدون استعمال العلاقة مباشرة)
+    DB::table('company_user')
+        ->where('user_id', $user->id)
+        ->where('company_id', $company->id)
+        ->update(['is_default' => true]);
 
-    //    نزيل الـ default عن باقي شركات المستخدم عبر علاقة الوسيط
-    \DB::table('company_user')
+    DB::table('company_user')
         ->where('user_id', $user->id)
         ->where('company_id', '!=', $company->id)
         ->update(['is_default' => false]);
+
+    // 4. تحديث company_id في جدول users
+    $user->update(['company_id' => $company->id]);
 }
 
     // ═══════════════════════════════════════════════════════════

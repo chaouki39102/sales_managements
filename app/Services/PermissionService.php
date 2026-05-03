@@ -12,6 +12,13 @@ class PermissionService extends \App\Core\Services\BaseService
     protected string $resourceName = 'permission';
     protected array $defaultWith = ['roles'];
 
+       protected function getResourceName(): string
+    {
+        return 'permission';
+    }
+
+
+
     public function getByGroup(?string $group = null)
     {
         if ($group) {
