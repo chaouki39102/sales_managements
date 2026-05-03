@@ -8,4 +8,5 @@ class ProductLotService extends \App\Core\Services\BaseService
 {
     protected string $model = ProductLot::class;
     protected string $resourceName = 'product_lot';
+    protected function getResourceName(): string { return $this->resourceName; }
 }

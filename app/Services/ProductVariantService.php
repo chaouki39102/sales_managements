@@ -10,6 +10,7 @@ class ProductVariantService extends \App\Core\Services\BaseService
 {
     protected string $model = ProductVariant::class;
     protected string $resourceName = 'product_variant';
+    protected function getResourceName(): string { return $this->resourceName; }
 
     protected function beforeCreate(array $data, Request $request): array
     {

@@ -13,6 +13,7 @@ class FamilyService extends \App\Core\Services\BaseService
 {
     protected string $model = Family::class;
     protected string $resourceName = 'family';
+    protected function getResourceName(): string { return $this->resourceName; }
 
     protected function beforeCreate(array $data, $request): array
     {
@@ -29,7 +30,7 @@ class FamilyService extends \App\Core\Services\BaseService
     {
         $prefix = 'FAM';
         $last = $this->model::orderByDesc('code')->first();
-        
+
         if (!$last) {
             return $prefix . '001';
         }

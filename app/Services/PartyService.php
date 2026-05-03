@@ -22,6 +22,7 @@ class PartyService extends \App\Core\Services\BaseService
     protected string $model = Party::class;
     protected string $resourceName = 'party';
     protected array $defaultWith = ['partyType', 'legalForm', 'commune', 'wilaya'];
+    protected function getResourceName(): string { return $this->resourceName; }
 
     /**
      * Before creating - data preparation and validation

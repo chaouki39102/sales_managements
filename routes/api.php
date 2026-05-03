@@ -382,17 +382,23 @@ Route::prefix('v1')->group(function () {
             Route::get('audits/event/{event}',    [AuditController::class, 'byEvent']);
 
 
-            // إدارة المستخدمين
-            Route::apiResource('users', UserController::class);
-            Route::get('users/trashed', [UserController::class, 'trashed']);
-            Route::post('users/{user}/restore', [UserController::class, 'restore']);
-            Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete']);
-            Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
-            Route::post('users/{user}/toggle-active', [UserController::class, 'toggleActive']);
-            Route::post('users/{user}/assign-role', [UserController::class, 'assignRole']);
-            Route::get('users-by-role', [UserController::class, 'byRole']);
-            Route::get('users/active', [UserController::class, 'active']);
+            // api.php — داخل مجموعة {company_slug}
+
+            // ── ثابتة أولاً ──────────────────────────────────
+            Route::get('users/trashed',  [UserController::class, 'trashed']);
+            Route::get('users-by-role',  [UserController::class, 'byRole']);
+            Route::get('users/active',   [UserController::class, 'active']);
             Route::get('users/inactive', [UserController::class, 'inactive']);
+
+            // ── apiResource ───────────────────────────────────
+            Route::apiResource('users', UserController::class);
+
+            // ── عمليات على {user} ────────────────────────────
+            Route::post('users/{user}/restore',         [UserController::class, 'restore']);
+            Route::delete('users/{user}/force-delete',  [UserController::class, 'forceDelete']);
+            Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
+            Route::post('users/{user}/toggle-active',   [UserController::class, 'toggleActive']);
+            Route::post('users/{user}/assign-role',     [UserController::class, 'assignRole']);
 
 
             Route::get('roles', [RoleController::class, 'index']);

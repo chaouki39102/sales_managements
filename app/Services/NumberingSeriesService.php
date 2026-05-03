@@ -13,6 +13,7 @@ class NumberingSeriesService extends \App\Core\Services\BaseService
     protected string $model = NumberingSeries::class;
     protected string $resourceName = 'numbering_series';
     protected array $defaultWith = ['documentType', 'warehouse'];
+    protected function getResourceName(): string { return $this->resourceName; }
 
     public function unlock(Model $item): Model
     {
@@ -144,5 +145,5 @@ class NumberingSeriesService extends \App\Core\Services\BaseService
 
         return null;
     }
-    
+
 }

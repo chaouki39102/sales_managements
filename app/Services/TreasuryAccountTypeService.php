@@ -8,4 +8,5 @@ class TreasuryAccountTypeService extends \App\Core\Services\BaseService
 {
     protected string $model = TreasuryAccountType::class;
     protected string $resourceName = 'treasury_account_type';
+    protected function getResourceName(): string { return $this->resourceName; }
 }

@@ -10,5 +10,6 @@ class QuantityDiscountService extends \App\Core\Services\BaseService
     protected string $model = QuantityDiscount::class;
     protected string $resourceName = 'quantity_discount';
     protected array $defaultWith = ['product', 'priceLevel'];
-    
+    protected function getResourceName(): string { return $this->resourceName; }
+
 }

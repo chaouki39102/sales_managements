@@ -26,8 +26,8 @@ class SetCompanyContext
 
         // 2. جلب الشركة
         $company = Company::where('slug', $slug)
-                          ->where('is_active', true)
-                          ->firstOrFail();
+            ->where('is_active', true)
+            ->firstOrFail();
 
         // 3. التحقق من صلاحية المستخدم
         $user = Auth::user();

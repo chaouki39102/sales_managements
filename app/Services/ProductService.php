@@ -17,6 +17,7 @@ class ProductService extends \App\Core\Services\BaseService
 {
     protected string $model        = Product::class;
     protected string $resourceName = 'product';
+    protected function getResourceName(): string { return $this->resourceName; }
 
     protected array $defaultWith = [
         'family',

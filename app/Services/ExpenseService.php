@@ -8,4 +8,5 @@ class ExpenseService extends \App\Core\Services\BaseService
 {
     protected string $model = Expense::class;
     protected string $resourceName = 'expense';
+    protected function getResourceName(): string { return $this->resourceName; }
 }

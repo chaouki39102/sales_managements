@@ -11,6 +11,7 @@ class NotificationService extends \App\Core\Services\BaseService
 {
     protected string $model = Notification::class;
     protected string $resourceName = 'notification';
+    protected function getResourceName(): string { return $this->resourceName; }
 
     public function getUnread()
     {

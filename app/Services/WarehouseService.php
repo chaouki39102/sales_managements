@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class WarehouseService extends \App\Core\Services\BaseService
 {
+    protected function getResourceName(): string { return $this->resourceName; }
     protected string $model = Warehouse::class;
     protected string $resourceName = 'warehouse';
 
@@ -27,7 +28,7 @@ class WarehouseService extends \App\Core\Services\BaseService
     {
         $prefix = 'WH';
         $last = $this->model::orderByDesc('code')->first();
-        
+
         if (!$last) {
             return $prefix . '001';
         }

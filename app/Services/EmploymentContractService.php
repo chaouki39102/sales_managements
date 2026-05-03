@@ -10,6 +10,7 @@ class EmploymentContractService extends \App\Core\Services\BaseService
     protected string $model = EmploymentContract::class;
     protected string $resourceName = 'employment_contract';
     protected array $defaultWith = ['employee'];
+    protected function getResourceName(): string { return $this->resourceName; }
 
     public function getActiveContract(int $employeeId)
     {
