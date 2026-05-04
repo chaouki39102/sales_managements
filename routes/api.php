@@ -116,24 +116,26 @@ Route::prefix('v1')->group(function () {
     // ═══════════════════════════════════════════
     Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
 
-        // عرض وإنشاء (متاح للمستخدمين العاديين)
-        Route::get('/',        [CompanyController::class, 'index']);
-        Route::post('/',       function (StoreCompanyRequest $request) {
-            return app(CompanyController::class)->store($request);
-        });
+        // ── الثابتة أولاً (قبل {company} لتجنب التعارض) ─────────
         Route::get('/current', [CompanyController::class, 'current']);
         Route::post('/switch', [CompanyController::class, 'switch']);
 
-        // عرض وتعديل شركة محددة
-        Route::get('/{company}', function ($company) {
-            return app(CompanyController::class)->show($company);
-        });
-        Route::put('/{company}', function (UpdateCompanyRequest $request, $company) {
-            return app(CompanyController::class)->update($request, $company);
-        });
-        Route::patch('/{company}', function (UpdateCompanyRequest $request, $company) {
-            return app(CompanyController::class)->update($request, $company);
-        });
+        // ── CRUD الأساسي ──────────────────────────────────────
+        Route::get('/',  [CompanyController::class, 'index']);
+        Route::post('/', [CompanyController::class, 'store']);
+
+        // ── شركة محددة بـ slug أو id (resolveCompany يتعامل مع الاثنين) ──
+        Route::get('/{company}',   [CompanyController::class, 'show']);
+        Route::put('/{company}',   [CompanyController::class, 'update']);
+        Route::patch('/{company}', [CompanyController::class, 'update']);
+        Route::delete('/{company}', [CompanyController::class, 'destroy']);
+
+        // ── إجراءات Super Admin على شركة ─────────────────────
+        Route::post('/{company}/suspend',    [CompanyController::class, 'suspend']);
+        Route::post('/{company}/unsuspend',  [CompanyController::class, 'unsuspend']);
+        Route::post('/{company}/verify',     [CompanyController::class, 'verify']);
+        Route::post('/{company}/unverify',   [CompanyController::class, 'unverify']);
+        Route::patch('/{company}/plan',      [CompanyController::class, 'upgradePlan']);
 
         // إدارة الأعضاء (المالك ومدير الشركة فقط)
         Route::get('/{company}/members', fn(Company $company) => app(CompanyController::class)->members($company));

@@ -87,6 +87,8 @@ class AuthController extends BaseApiController
      */
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user()->load('roles'); // ← تحميل الأدوار
+
         return $this->successResponse(
             new UserResource($request->user()),
             'تم استرجاع البيانات بنجاح'

@@ -23,8 +23,22 @@ class CompanyController extends BaseApiController
         private readonly CompanyContextService $context,
     ) {}
 
-    protected function getService(): CompanyService  { return $this->companyService; }
-    protected function getModelClass(): string        { return Company::class; }
+    protected function getService(): CompanyService
+    {
+        return $this->companyService;
+    }
+    protected function getModelClass(): string
+    {
+        return Company::class;
+    }
+
+    // ─── مساعد: يقبل id رقمي أو slug نصي ──────────────────────
+    private function resolveCompany(string|int $identifier): Company
+    {
+        return is_numeric($identifier)
+            ? Company::findOrFail((int) $identifier)
+            : Company::where('slug', $identifier)->firstOrFail();
+    }
 
     protected function getListConfig(): array
     {
@@ -76,10 +90,10 @@ class CompanyController extends BaseApiController
                 $s = $request->search;
                 $query->where(function ($q) use ($s) {
                     $q->where('name', 'like', "%{$s}%")
-                      ->orWhere('commercial_name', 'like', "%{$s}%")
-                      ->orWhere('email', 'like', "%{$s}%")
-                      ->orWhere('nif', 'like', "%{$s}%")
-                      ->orWhere('slug', 'like', "%{$s}%");
+                        ->orWhere('commercial_name', 'like', "%{$s}%")
+                        ->orWhere('email', 'like', "%{$s}%")
+                        ->orWhere('nif', 'like', "%{$s}%")
+                        ->orWhere('slug', 'like', "%{$s}%");
                 });
             }
 
@@ -99,87 +113,86 @@ class CompanyController extends BaseApiController
     // ② store — إنشاء شركة جديدة
     // ═══════════════════════════════════════════════════════════
 
-// app/Http/Controllers/Api/V1/CompanyController.php
 
-public function store(Request $request): JsonResponse
-{
-    $data = $request->validate([
-        'name'            => 'required|string|max:255',
-        'commercial_name' => 'nullable|string|max:255',
-        'email'           => 'nullable|email|max:100',
-        'phone'           => 'nullable|string|max:20',
-        'mobile'          => 'nullable|string|max:30',
-        'address'         => 'nullable|string|max:500',
-        'nif'             => 'nullable|string|max:50|unique:companies,nif',
-        'nis'             => 'nullable|string|max:50',
-        'rc'              => 'nullable|string|max:50',
-        'ai'              => 'nullable|string|max:50',
-        'activity'        => 'nullable|string|max:500',
-        'legal_form_id'   => 'nullable|exists:legal_forms,id',
-        'wilaya_id'       => 'nullable|exists:wilayas,id',
-        'commune_id'      => 'nullable|exists:communes,id',
-        'is_active'       => 'nullable|boolean',
-        // حقول Super Admin
-        'plan'            => 'nullable|string|in:free,starter,professional,enterprise',
-        'max_users'       => 'nullable|integer|min:1',
-        'max_warehouses'  => 'nullable|integer|min:1',
-        'max_products'    => 'nullable|integer|min:1',
-        'notes'           => 'nullable|string|max:5000',
-    ]);
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name'            => 'required|string|max:255',
+            'commercial_name' => 'nullable|string|max:255',
+            'email'           => 'nullable|email|max:100',
+            'phone'           => 'nullable|string|max:20',
+            'mobile'          => 'nullable|string|max:30',
+            'address'         => 'nullable|string|max:500',
+            'nif'             => 'nullable|string|max:50|unique:companies,nif',
+            'nis'             => 'nullable|string|max:50',
+            'rc'              => 'nullable|string|max:50',
+            'ai'              => 'nullable|string|max:50',
+            'activity'        => 'nullable|string|max:500',
+            'legal_form_id'   => 'nullable|exists:legal_forms,id',
+            'wilaya_id'       => 'nullable|exists:wilayas,id',
+            'commune_id'      => 'nullable|exists:communes,id',
+            'is_active'       => 'nullable|boolean',
+            // حقول Super Admin
+            'plan'            => 'nullable|string|in:free,starter,professional,enterprise',
+            'max_users'       => 'nullable|integer|min:1',
+            'max_warehouses'  => 'nullable|integer|min:1',
+            'max_products'    => 'nullable|integer|min:1',
+            'notes'           => 'nullable|string|max:5000',
+        ]);
 
-    // السماح لـ Super Admin فقط بتمرير حقول إضافية
-    if (!auth()->user()->isSuperAdmin()) {
-        unset($data['plan'], $data['max_users'], $data['max_warehouses'], $data['max_products'], $data['notes']);
+        // السماح لـ Super Admin فقط بتمرير حقول إضافية
+        if (!auth()->user()->isSuperAdmin()) {
+            unset($data['plan'], $data['max_users'], $data['max_warehouses'], $data['max_products'], $data['notes']);
+        }
+
+        try {
+            $this->authorizeAction('create', Company::class);
+            $company = $this->companyService->create($data, $request);
+            return $this->successResponse(new CompanyResource($company->load('owner:id,name,email')), 'تم إنشاء الشركة', 201);
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'store');
+        }
     }
 
-    try {
-        $this->authorizeAction('create', Company::class);
-        $company = $this->companyService->create($data, $request);
-        return $this->successResponse(new CompanyResource($company->load('owner:id,name,email')), 'تم إنشاء الشركة', 201);
-    } catch (\Throwable $e) {
-        return $this->handleError($e, 'store');
+    public function update(Request $request, $id): JsonResponse
+    {
+        $company = $this->resolveCompany($id);
+        $this->authorizeAction('update', $company);
+
+        $data = $request->validate([
+            'name'            => 'sometimes|string|max:255',
+            'commercial_name' => 'nullable|string|max:255',
+            'email'           => 'nullable|email|max:100',
+            'phone'           => 'nullable|string|max:20',
+            'mobile'          => 'nullable|string|max:30',
+            'address'         => 'nullable|string|max:500',
+            'nif'             => "nullable|string|max:50|unique:companies,nif,{$company->id}",
+            'nis'             => 'nullable|string|max:50',
+            'rc'              => 'nullable|string|max:50',
+            'ai'              => 'nullable|string|max:50',
+            'activity'        => 'nullable|string|max:500',
+            'legal_form_id'   => 'nullable|exists:legal_forms,id',
+            'wilaya_id'       => 'nullable|exists:wilayas,id',
+            'commune_id'      => 'nullable|exists:communes,id',
+            'is_active'       => 'nullable|boolean',
+            'plan'            => 'nullable|string|in:free,starter,professional,enterprise',
+            'max_users'       => 'nullable|integer|min:1',
+            'max_warehouses'  => 'nullable|integer|min:1',
+            'max_products'    => 'nullable|integer|min:1',
+            'notes'           => 'nullable|string|max:5000',
+        ]);
+
+        if (!auth()->user()->isSuperAdmin()) {
+            unset($data['plan'], $data['max_users'], $data['max_warehouses'], $data['max_products'], $data['notes']);
+        }
+
+        try {
+            $company = $this->companyService->update($company, $data, $request);
+            return $this->successResponse(new CompanyResource($company->load('owner:id,name,email')), 'تم تحديث الشركة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'update');
+        }
     }
-}
-
-public function update(Request $request, $id): JsonResponse
-{
-    $company = $this->companyService->findById($id);
-    $this->authorizeAction('update', $company);
-
-    $data = $request->validate([
-        'name'            => 'sometimes|string|max:255',
-        'commercial_name' => 'nullable|string|max:255',
-        'email'           => 'nullable|email|max:100',
-        'phone'           => 'nullable|string|max:20',
-        'mobile'          => 'nullable|string|max:30',
-        'address'         => 'nullable|string|max:500',
-        'nif'             => "nullable|string|max:50|unique:companies,nif,{$id}",
-        'nis'             => 'nullable|string|max:50',
-        'rc'              => 'nullable|string|max:50',
-        'ai'              => 'nullable|string|max:50',
-        'activity'        => 'nullable|string|max:500',
-        'legal_form_id'   => 'nullable|exists:legal_forms,id',
-        'wilaya_id'       => 'nullable|exists:wilayas,id',
-        'commune_id'      => 'nullable|exists:communes,id',
-        'is_active'       => 'nullable|boolean',
-        'plan'            => 'nullable|string|in:free,starter,professional,enterprise',
-        'max_users'       => 'nullable|integer|min:1',
-        'max_warehouses'  => 'nullable|integer|min:1',
-        'max_products'    => 'nullable|integer|min:1',
-        'notes'           => 'nullable|string|max:5000',
-    ]);
-
-    if (!auth()->user()->isSuperAdmin()) {
-        unset($data['plan'], $data['max_users'], $data['max_warehouses'], $data['max_products'], $data['notes']);
-    }
-
-    try {
-        $company = $this->companyService->update($company, $data, $request);
-        return $this->successResponse(new CompanyResource($company->load('owner:id,name,email')), 'تم تحديث الشركة');
-    } catch (\Throwable $e) {
-        return $this->handleError($e, 'update');
-    }
-}
     // ═══════════════════════════════════════════════════════════
     // ③ show — عرض شركة واحدة
     // ═══════════════════════════════════════════════════════════
@@ -187,7 +200,7 @@ public function update(Request $request, $id): JsonResponse
     public function show($id): JsonResponse
     {
         try {
-            $company = $this->companyService->findById($id);
+            $company = $this->resolveCompany($id);
             $this->authorizeAction('view', $company);
 
             $company
@@ -212,7 +225,7 @@ public function update(Request $request, $id): JsonResponse
     public function destroy($id): JsonResponse
     {
         try {
-            $company = $this->companyService->findById($id);
+            $company = $this->resolveCompany($id);
             $this->authorizeAction('delete', $company);
             $company->deactivate(auth()->id());
             return $this->successResponse(null, 'تم تعطيل الشركة');
@@ -228,7 +241,7 @@ public function update(Request $request, $id): JsonResponse
     public function suspend(Request $request, $id): JsonResponse
     {
         try {
-            $company = $this->companyService->findById($id);
+            $company = $this->resolveCompany($id);
             $this->authorizeAction('suspend', $company);
             $data = $request->validate(['reason' => 'nullable|string|max:500']);
             $company->suspend($data['reason'] ?? 'قرار إداري', auth()->id());
@@ -241,7 +254,7 @@ public function update(Request $request, $id): JsonResponse
     public function unsuspend($id): JsonResponse
     {
         try {
-            $company = $this->companyService->findById($id);
+            $company = $this->resolveCompany($id);
             $this->authorizeAction('suspend', $company);
             $company->unsuspend();
             return $this->successResponse(new CompanyResource($company), 'تم رفع التعليق');
@@ -253,7 +266,7 @@ public function update(Request $request, $id): JsonResponse
     public function verify($id): JsonResponse
     {
         try {
-            $company = $this->companyService->findById($id);
+            $company = $this->resolveCompany($id);
             $this->authorizeAction('verify', $company);
             $company->verify(auth()->id());
             return $this->successResponse(new CompanyResource($company), 'تم توثيق الشركة');
@@ -265,7 +278,7 @@ public function update(Request $request, $id): JsonResponse
     public function unverify($id): JsonResponse
     {
         try {
-            $company = $this->companyService->findById($id);
+            $company = $this->resolveCompany($id);
             $this->authorizeAction('verify', $company);
             $company->unverify();
             return $this->successResponse(new CompanyResource($company), 'تم إلغاء التوثيق');
@@ -277,7 +290,7 @@ public function update(Request $request, $id): JsonResponse
     public function upgradePlan(Request $request, $id): JsonResponse
     {
         try {
-            $company = $this->companyService->findById($id);
+            $company = $this->resolveCompany($id);
             $this->authorizeAction('upgrade', $company);
             $data = $request->validate([
                 'plan'           => ['required', 'string', Rule::in(array_keys(Company::PLANS))],

@@ -1,530 +1,540 @@
-// ════════════════════════════════════════════════════════════
-// components/modals/CompanyFormDrawer.tsx
-// Drawer لإنشاء / تعديل الشركة — يستخدم المكونات الموجودة
-// ════════════════════════════════════════════════════════════
+// resources/js/components/company/CompanyFormDrawer.tsx
+// ════════════════════════════════════════════════
+// مودال إضافة / تعديل شركة — يدعم slug أو id
+// ════════════════════════════════════════════════
 import React, { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api/client';
+import { useAuth } from '@/context/AuthContext';
 
-// ── Types ──────────────────────────────────────────────────
-export interface CompanyFormData {
-  id?: number;
+// ── Types ──────────────────────────────────────
+interface Company {
+  id: number;
   name: string;
-  commercial_name: string;
-  email: string;
-  phone: string;
-  mobile: string;
-  address: string;
-  activity: string;
-  nif: string;
-  nis: string;
-  rc: string;
-  ai: string;
-  plan: 'free' | 'starter' | 'professional' | 'enterprise';
-  max_users: number;
-  max_products: number;
-  max_warehouses: number;
-  notes: string;
-  is_active: boolean;
-  slug?: string;
+  commercial_name?: string;
+  slug: string;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+  address?: string;
+  nif?: string;
+  nis?: string;
+  rc?: string;
+  ai?: string;
+  activity?: string;
+  legal_form_id?: number;
+  wilaya_id?: number;
+  commune_id?: number;
+  is_active?: boolean;
+  plan?: string;
+  notes?: string;
 }
 
-interface CompanyFormDrawerProps {
+interface Props {
   open: boolean;
-  company?: CompanyFormData | null;  // null = إنشاء جديد
-  isSuperAdmin?: boolean;
+  company?: Company | null;   // null = إنشاء جديد
   onClose: () => void;
-  onSuccess?: (company: CompanyFormData) => void;
+  onSaved?: (company: Company) => void;
 }
 
-const PLANS = [
-  { value: 'free',         label: 'مجاني',        users: 3,   products: 500,    warehouses: 1 },
-  { value: 'starter',      label: 'Starter',      users: 10,  products: 2000,   warehouses: 2 },
-  { value: 'professional', label: 'Professional', users: 25,  products: 10000,  warehouses: 5 },
-  { value: 'enterprise',   label: 'Enterprise',   users: 999, products: 999999, warehouses: 99 },
-] as const;
+// ── Helper ─────────────────────────────────────
+// استخراج رسالة الخطأ بأمان من أي شكل
+function extractErrorMessage(error: unknown, fallback = 'حدث خطأ'): string {
+  if (!error) return fallback;
+  const e = error as any;
 
-const EMPTY: CompanyFormData = {
-  name: '', commercial_name: '', email: '', phone: '', mobile: '',
-  address: '', activity: '', nif: '', nis: '', rc: '', ai: '',
-  plan: 'free', max_users: 3, max_products: 500, max_warehouses: 1,
-  notes: '', is_active: true,
+  // أخطاء validation من Laravel { errors: { field: [msgs] } }
+  const errs = e?.response?.data?.errors;
+  if (errs && typeof errs === 'object') {
+    const msgs = Object.values(errs).flat() as string[];
+    if (msgs.length > 0) return msgs.join(' — ');
+  }
+
+  // رسالة عادية
+  const msg = e?.response?.data?.message ?? e?.message;
+  if (msg && typeof msg === 'string') return msg;
+
+  return fallback;
+}
+
+// ── Form Fields ────────────────────────────────
+const inputCls: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', borderRadius: 10,
+  border: '1px solid var(--b3)', background: 'var(--bg3)',
+  color: 'var(--t1)', fontFamily: 'Tajawal,sans-serif',
+  fontSize: 13, outline: 'none', transition: 'border-color .14s',
 };
 
-// ── Helper components ──────────────────────────────────────
-
-function Field({
-  label, children, required,
-}: { label: string; children: React.ReactNode; required?: boolean }) {
+function Field({ label, children, req }: { label: string; children: React.ReactNode; req?: boolean }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <label style={{
-        fontSize: 11, fontWeight: 700, color: 'var(--t4)',
-        textTransform: 'uppercase', letterSpacing: 0.8,
-        display: 'flex', alignItems: 'center', gap: 3,
-      }}>
-        {label}
-        {required && <span style={{ color: 'var(--red)', fontSize: 13 }}>*</span>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: .8 }}>
+        {label}{req && <span style={{ color: 'var(--red)', marginRight: 3 }}>*</span>}
       </label>
       {children}
     </div>
   );
 }
 
-const inp: React.CSSProperties = {
-  width: '100%', padding: '9px 12px', borderRadius: 10,
-  border: '1px solid var(--b3)', background: 'var(--bg3)',
-  color: 'var(--t1)', fontFamily: 'Tajawal, sans-serif', fontSize: 13,
-  outline: 'none', transition: '.14s',
-};
-
-function SectionDivider({ label, icon }: { label: string; icon: string }) {
+function Input({ value, onChange, placeholder, type = 'text', dir }: {
+  value: string; onChange: (v: string) => void;
+  placeholder?: string; type?: string; dir?: 'ltr' | 'rtl';
+}) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 8,
-      fontSize: 10, fontWeight: 800, color: 'var(--t4)',
-      textTransform: 'uppercase', letterSpacing: 1,
-      borderBottom: '1px solid var(--b1)', paddingBottom: 8,
-      marginTop: 4,
-    }}>
-      <i className={`ti ${icon}`} style={{ color: 'var(--em)', fontSize: 13 }} />
-      {label}
-    </div>
+    <input
+      type={type} value={value} placeholder={placeholder}
+      onChange={e => onChange(e.target.value)}
+      style={{ ...inputCls, direction: dir }}
+      onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+      onBlur={e => (e.target.style.borderColor = 'var(--b3)')}
+    />
   );
 }
 
-// ── Main Component ──────────────────────────────────────────
-export default function CompanyFormDrawer({
-  open, company, isSuperAdmin = false, onClose, onSuccess,
-}: CompanyFormDrawerProps) {
-  const isEdit = !!company?.id;
+// ── Main Component ─────────────────────────────
+export default function CompanyFormDrawer({ open, company, onClose, onSaved }: Props) {
+  const isEdit = !!company;
   const qc = useQueryClient();
-  const nameRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState<CompanyFormData>(EMPTY);
-  const [showDocs, setShowDocs] = useState(false);
-  const [error, setError] = useState('');
+  const { user } = useAuth() as any;
+  const isSuperAdmin = user?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
 
-  // ── تعبئة الفورم عند الفتح
+  const nameRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<'basic' | 'legal' | 'admin'>('basic');
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    name: '', commercial_name: '', email: '', phone: '', mobile: '',
+    address: '', nif: '', nis: '', rc: '', ai: '', activity: '',
+    legal_form_id: '', wilaya_id: '', commune_id: '',
+    is_active: true, plan: 'free',
+    max_users: '', max_warehouses: '', max_products: '',
+    notes: '',
+  });
+
+  // ── تهيئة الفورم عند الفتح ──────────────────
   useEffect(() => {
     if (!open) return;
     setError('');
-    setShowDocs(false);
-    setForm(company ? { ...EMPTY, ...company } : EMPTY);
-    setTimeout(() => nameRef.current?.focus(), 100);
+    setTab('basic');
+
+    if (company) {
+      setForm({
+        name:             company.name             ?? '',
+        commercial_name:  company.commercial_name  ?? '',
+        email:            company.email            ?? '',
+        phone:            company.phone            ?? '',
+        mobile:           company.mobile           ?? '',
+        address:          company.address          ?? '',
+        nif:              company.nif              ?? '',
+        nis:              company.nis              ?? '',
+        rc:               company.rc               ?? '',
+        ai:               company.ai               ?? '',
+        activity:         company.activity         ?? '',
+        legal_form_id:    String(company.legal_form_id ?? ''),
+        wilaya_id:        String(company.wilaya_id     ?? ''),
+        commune_id:       String(company.commune_id    ?? ''),
+        is_active:        company.is_active        ?? true,
+        plan:             company.plan             ?? 'free',
+        max_users:        '',
+        max_warehouses:   '',
+        max_products:     '',
+        notes:            company.notes            ?? '',
+      });
+    } else {
+      setForm({
+        name: '', commercial_name: '', email: '', phone: '', mobile: '',
+        address: '', nif: '', nis: '', rc: '', ai: '', activity: '',
+        legal_form_id: '', wilaya_id: '', commune_id: '',
+        is_active: true, plan: 'free',
+        max_users: '', max_warehouses: '', max_products: '',
+        notes: '',
+      });
+    }
+    setTimeout(() => nameRef.current?.focus(), 80);
   }, [open, company]);
 
-  // ── ESC للإغلاق
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', h);
-    return () => document.removeEventListener('keydown', h);
-  }, [onClose]);
-
-  const f = <K extends keyof CompanyFormData>(k: K) =>
-    (v: CompanyFormData[K]) => setForm(prev => ({ ...prev, [k]: v }));
-
-  // ── تحديث الحدود تلقائياً عند تغيير الخطة (إذا لم تكن مخصصة)
-  const handlePlanChange = (plan: CompanyFormData['plan']) => {
-    const p = PLANS.find(x => x.value === plan);
-    if (!p) return;
-    setForm(prev => ({
-      ...prev, plan,
-      max_users: p.users,
-      max_products: p.products,
-      max_warehouses: p.warehouses,
-    }));
-  };
-
-  // ── Mutation
+  // ── Mutation ─────────────────────────────────
   const mutation = useMutation({
-    mutationFn: async (data: CompanyFormData) => {
-      const payload: Record<string, unknown> = {
-        name:            data.name,
-        commercial_name: data.commercial_name || undefined,
-        email:           data.email           || undefined,
-        phone:           data.phone           || undefined,
-        address:         data.address         || undefined,
-        activity:        data.activity        || undefined,
-        nif:             data.nif             || undefined,
-        nis:             data.nis             || undefined,
-        rc:              data.rc              || undefined,
-        ai:              data.ai              || undefined,
-        is_active:       data.is_active,
-      };
+    mutationFn: async () => {
+      // ① فصل حقول Super Admin عن الحقول الأساسية
+      const ADMIN_FIELDS = ['plan', 'max_users', 'max_warehouses', 'max_products', 'notes'];
+      const basicPayload: Record<string, any> = {};
+      const adminPayload: Record<string, any> = {};
 
-      // حقول Super Admin فقط
-      if (isSuperAdmin) {
-        payload.plan           = data.plan;
-        payload.max_users      = data.max_users;
-        payload.max_products   = data.max_products;
-        payload.max_warehouses = data.max_warehouses;
-        payload.notes          = data.notes || undefined;
-      }
+      Object.entries(form).forEach(([k, v]) => {
+        if (v === '' || v === null || v === undefined) return;
+        if (ADMIN_FIELDS.includes(k)) adminPayload[k] = v;
+        else basicPayload[k] = v;
+      });
 
-      if (isEdit && company?.slug) {
-        const res = await apiClient.put(`/companies/${company.slug}`, payload);
-        return res.data?.data ?? res.data;
+      ['legal_form_id', 'wilaya_id', 'commune_id'].forEach(k => {
+        if (basicPayload[k]) basicPayload[k] = Number(basicPayload[k]);
+      });
+      ['max_users', 'max_warehouses', 'max_products'].forEach(k => {
+        if (adminPayload[k]) adminPayload[k] = Number(adminPayload[k]);
+      });
+
+      if (isEdit) {
+        const identifier = company!.slug ?? company!.id;
+
+        // ② تحديث البيانات الأساسية
+        const res = await apiClient.put(`/companies/${identifier}`, basicPayload);
+        const saved = res.data?.data ?? res.data;
+
+        // ③ تحديث الخطة — endpoint منفصل لأن PUT لا يحفظها
+        if (isSuperAdmin) {
+          const planChanged = form.plan !== (company!.plan ?? 'free');
+          const limitsExist = adminPayload.max_users || adminPayload.max_warehouses || adminPayload.max_products;
+
+          if (planChanged || limitsExist) {
+            await apiClient.patch(`/companies/${identifier}/plan`, {
+              plan:           adminPayload.plan ?? form.plan,
+              max_users:      adminPayload.max_users      || undefined,
+              max_warehouses: adminPayload.max_warehouses || undefined,
+              max_products:   adminPayload.max_products   || undefined,
+            });
+          }
+
+          // ④ الملاحظات الداخلية
+          if (adminPayload.notes !== undefined) {
+            await apiClient.patch(`/admin/companies/${company!.id}/notes`, {
+              notes: adminPayload.notes,
+            });
+          }
+        }
+
+        return saved;
       } else {
-        const res = await apiClient.post('/companies', payload);
+        // إنشاء جديد — نجمع كل الحقول
+        const res = await apiClient.post('/companies', { ...basicPayload, ...adminPayload });
         return res.data?.data ?? res.data;
       }
     },
-    onSuccess: (data) => {
+    onSuccess: (saved: Company) => {
       qc.invalidateQueries({ queryKey: ['companies'] });
-      onSuccess?.(data);
+      onSaved?.(saved);
       onClose();
     },
-    onError: (e: any) => {
-      const msg = e?.response?.data?.message
-        ?? e?.response?.data?.errors
-          ? Object.values(e.response.data.errors).flat().join(' — ')
-          : 'حدث خطأ غير متوقع';
-      setError(typeof msg === 'string' ? msg : 'حدث خطأ غير متوقع');
+    onError: (e: unknown) => {
+      setError(extractErrorMessage(e, isEdit ? 'فشل تحديث الشركة' : 'فشل إنشاء الشركة'));
     },
   });
 
+  // ── Keyboard close ────────────────────────────
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => e.key === 'Escape' && !mutation.isPending && onClose();
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [mutation.isPending, onClose]);
+
   if (!open) return null;
+
+  const f = <K extends keyof typeof form>(k: K) =>
+    (v: (typeof form)[K]) => setForm(p => ({ ...p, [k]: v }));
+
+  const tabs = [
+    { key: 'basic', label: 'المعلومات الأساسية', icon: 'ti-building' },
+    { key: 'legal', label: 'الوثائق القانونية',  icon: 'ti-file-certificate' },
+    ...(isSuperAdmin ? [{ key: 'admin', label: 'إدارة (Super Admin)', icon: 'ti-shield' }] : []),
+  ] as const;
 
   return (
     <>
+      <style>{`
+        @keyframes drawerIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+        @keyframes ovFade   { from{opacity:0} to{opacity:1} }
+        @keyframes spin     { to{transform:rotate(360deg)} }
+      `}</style>
+
       {/* Overlay */}
       <div
         style={{
           position: 'fixed', inset: 0, zIndex: 10001,
-          background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(5px)',
-          animation: 'ovIn .18s ease',
+          background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16, animation: 'ovFade .18s ease',
         }}
-        onClick={onClose}
-      />
-
-      {/* Drawer */}
-      <div style={{
-        position: 'fixed', top: 0, left: 0, bottom: 0,
-        zIndex: 10002, width: '100%', maxWidth: 500,
-        background: 'var(--bg2)', borderRight: '1px solid var(--b2)',
-        display: 'flex', flexDirection: 'column',
-        boxShadow: '4px 0 32px rgba(0,0,0,.25)',
-        animation: 'drawerIn .25s cubic-bezier(.34,1.4,.64,1)',
-        direction: 'rtl',
-      }}>
-
-        {/* ── Header */}
+        onClick={e => { if (e.target === e.currentTarget && !mutation.isPending) onClose(); }}
+      >
         <div style={{
-          padding: '18px 20px 14px',
-          borderBottom: '1px solid var(--b2)',
-          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
-          background: 'var(--bg2)',
+          background: 'var(--bg2)', borderRadius: 20, width: '100%', maxWidth: 640,
+          border: '1px solid var(--b3)', boxShadow: '0 24px 64px rgba(0,0,0,.3)',
+          maxHeight: '92vh', display: 'flex', flexDirection: 'column',
+          animation: 'drawerIn .22s cubic-bezier(.34,1.4,.64,1)',
         }}>
+
+          {/* Header */}
           <div style={{
-            width: 40, height: 40, borderRadius: 11,
-            background: 'var(--emb)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, color: 'var(--em)', flexShrink: 0,
+            padding: '16px 20px', borderBottom: '1px solid var(--b2)',
+            display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
           }}>
-            <i className={`ti ti-${isEdit ? 'building-community' : 'building-plus'}`} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)' }}>
-              {isEdit ? `تعديل: ${company?.name}` : 'شركة جديدة'}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>
-              {isEdit ? 'تحديث بيانات الشركة' : 'إضافة شركة إلى النظام'}
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: 30, height: 30, borderRadius: 8,
-              border: '1px solid var(--b2)', background: 'var(--bg3)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', color: 'var(--t3)', fontSize: 14,
-              flexShrink: 0, transition: '.14s',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'var(--redb)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg3)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--t3)';
-            }}
-          >
-            <i className="ti ti-x" />
-          </button>
-        </div>
-
-        {/* ── Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-          {/* Error */}
-          {error && (
             <div style={{
-              padding: '9px 14px', borderRadius: 10,
-              background: 'var(--redb)', border: '1px solid var(--redbo)',
-              color: 'var(--red)', fontSize: 12,
-              display: 'flex', alignItems: 'center', gap: 8,
+              width: 40, height: 40, borderRadius: 10, background: 'var(--emb)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, color: 'var(--em)',
             }}>
-              <i className="ti ti-alert-circle" style={{ flexShrink: 0 }} />
-              {error}
+              <i className={`ti ${isEdit ? 'ti-building-cog' : 'ti-building-plus'}`} />
             </div>
-          )}
-
-          {/* ── المعلومات الأساسية */}
-          <SectionDivider label="المعلومات الأساسية" icon="ti-building" />
-
-          <Field label="اسم الشركة" required>
-            <input
-              ref={nameRef}
-              value={form.name}
-              onChange={e => { f('name')(e.target.value); setError(''); }}
-              style={inp}
-              placeholder="شركة الأمل للتجارة"
-              onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--b3)')}
-            />
-          </Field>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <Field label="الاسم التجاري">
-              <input value={form.commercial_name} onChange={e => f('commercial_name')(e.target.value)}
-                style={inp} placeholder="الاسم التجاري"
-                onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-            </Field>
-            <Field label="قطاع النشاط">
-              <input value={form.activity} onChange={e => f('activity')(e.target.value)}
-                style={inp} placeholder="تجارة — خدمات..."
-                onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-            </Field>
-          </div>
-
-          {/* ── التواصل */}
-          <SectionDivider label="معلومات التواصل" icon="ti-phone" />
-
-          <Field label="البريد الإلكتروني">
-            <input type="email" value={form.email} onChange={e => f('email')(e.target.value)}
-              style={{ ...inp, direction: 'ltr' }} placeholder="contact@company.dz"
-              onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-          </Field>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <Field label="الهاتف">
-              <input value={form.phone} onChange={e => f('phone')(e.target.value)}
-                style={{ ...inp, direction: 'ltr' }} placeholder="023 xx xx xx"
-                onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-            </Field>
-            <Field label="الجوال">
-              <input value={form.mobile} onChange={e => f('mobile')(e.target.value)}
-                style={{ ...inp, direction: 'ltr' }} placeholder="06 xx xx xx xx"
-                onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-            </Field>
-          </div>
-
-          <Field label="العنوان">
-            <input value={form.address} onChange={e => f('address')(e.target.value)}
-              style={inp} placeholder="الشارع، البلدية، الولاية"
-              onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-          </Field>
-
-          {/* ── الوثائق القانونية */}
-          <button
-            onClick={() => setShowDocs(v => !v)}
-            style={{
-              padding: '9px 14px', borderRadius: 10, width: '100%',
-              border: '1px dashed var(--b3)', background: 'transparent',
-              color: 'var(--t4)', fontSize: 12, fontWeight: 700,
-              cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              transition: '.13s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg3)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--t2)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--t4)'; }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <i className="ti ti-file-certificate" style={{ fontSize: 13 }} />
-              الوثائق القانونية والجبائية
-              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: 'var(--bg4)', color: 'var(--t4)' }}>اختياري</span>
-            </span>
-            <i className={`ti ti-chevron-${showDocs ? 'up' : 'down'}`} style={{ fontSize: 12 }} />
-          </button>
-
-          {showDocs && (
-            <div style={{
-              background: 'var(--bg3)', borderRadius: 12,
-              border: '1px solid var(--b1)', padding: '14px 14px 4px',
-              display: 'flex', flexDirection: 'column', gap: 12,
-            }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <Field label="رقم NIF">
-                  <input value={form.nif} onChange={e => f('nif')(e.target.value)}
-                    style={{ ...inp, direction: 'ltr' }} placeholder="رقم التعريف الجبائي"
-                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-                </Field>
-                <Field label="رقم NIS">
-                  <input value={form.nis} onChange={e => f('nis')(e.target.value)}
-                    style={{ ...inp, direction: 'ltr' }} placeholder="رقم إحصائي"
-                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-                </Field>
-                <Field label="رقم RC">
-                  <input value={form.rc} onChange={e => f('rc')(e.target.value)}
-                    style={{ ...inp, direction: 'ltr' }} placeholder="السجل التجاري"
-                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-                </Field>
-                <Field label="رقم AI">
-                  <input value={form.ai} onChange={e => f('ai')(e.target.value)}
-                    style={{ ...inp, direction: 'ltr' }} placeholder="المادة الجبائية"
-                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-                </Field>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)' }}>
+                {isEdit ? `تعديل: ${company!.name}` : 'شركة جديدة'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>
+                {isEdit ? `slug: ${company!.slug}` : 'ملء البيانات الأساسية للبدء'}
               </div>
             </div>
-          )}
+            <button
+              onClick={onClose}
+              disabled={mutation.isPending}
+              style={{
+                width: 30, height: 30, borderRadius: 8, border: '1px solid var(--b2)',
+                background: 'var(--bg3)', cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', color: 'var(--t3)',
+                fontSize: 14, transition: '.13s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--redb)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg3)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--t3)'; }}
+            >
+              <i className="ti ti-x" />
+            </button>
+          </div>
 
-          {/* ── إعدادات Super Admin */}
-          {isSuperAdmin && (
-            <>
-              <SectionDivider label="إعدادات Super Admin" icon="ti-star" />
-
-              {/* حالة الشركة */}
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 14px', borderRadius: 10,
-                background: 'var(--bg3)', border: '1px solid var(--b1)',
+          {/* Tabs */}
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--b2)', padding: '0 20px', flexShrink: 0 }}>
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)} style={{
+                padding: '10px 16px', background: 'none', border: 'none',
+                borderBottom: `2px solid ${tab === t.key ? 'var(--em)' : 'transparent'}`,
+                color: tab === t.key ? 'var(--em)' : 'var(--t4)',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontFamily: 'Tajawal,sans-serif', transition: '.13s', whiteSpace: 'nowrap',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <i className="ti ti-toggle-right" style={{ color: 'var(--em)', fontSize: 14 }} />
-                  حالة الشركة
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <i className={`ti ${t.icon}`} style={{ fontSize: 14 }} />{t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Body */}
+          <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+
+            {/* Error */}
+            {error && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 10, marginBottom: 14,
+                background: 'var(--redb)', border: '1px solid var(--redbo)',
+                color: 'var(--red)', fontSize: 12,
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+              }}>
+                <i className="ti ti-alert-circle" style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>{error}</span>
+                <button onClick={() => setError('')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', marginRight: 'auto', fontSize: 15, padding: 0 }}>×</button>
+              </div>
+            )}
+
+            {/* ── TAB: المعلومات الأساسية ── */}
+            {tab === 'basic' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Field label="اسم الشركة" req>
+                    <input
+                      ref={nameRef} value={form.name}
+                      onChange={e => f('name')(e.target.value)}
+                      placeholder="مثال: شركة الأمل للتجارة"
+                      style={inputCls}
+                      onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                      onBlur={e => (e.target.style.borderColor = 'var(--b3)')}
+                    />
+                  </Field>
+                  <Field label="الاسم التجاري">
+                    <Input value={form.commercial_name} onChange={f('commercial_name')} placeholder="Amel Trade" />
+                  </Field>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Field label="البريد الإلكتروني">
+                    <Input type="email" value={form.email} onChange={f('email')} placeholder="info@company.dz" dir="ltr" />
+                  </Field>
+                  <Field label="رقم الهاتف">
+                    <Input value={form.phone} onChange={f('phone')} placeholder="023 000 000" dir="ltr" />
+                  </Field>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Field label="الموبايل">
+                    <Input value={form.mobile} onChange={f('mobile')} placeholder="0550 000 000" dir="ltr" />
+                  </Field>
+                  <Field label="النشاط التجاري">
+                    <Input value={form.activity} onChange={f('activity')} placeholder="تجارة الجملة، صناعة..." />
+                  </Field>
+                </div>
+
+                <Field label="العنوان">
+                  <textarea
+                    value={form.address}
+                    onChange={e => f('address')(e.target.value)}
+                    placeholder="الشارع، الحي، الولاية..."
+                    rows={2}
+                    style={{ ...inputCls, resize: 'vertical' }}
+                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')}
+                  />
+                </Field>
+
+                {/* حالة الشركة */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                  borderRadius: 10, background: 'var(--bg3)', border: '1px solid var(--b1)',
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t2)', flex: 1 }}>حالة الشركة</span>
+                  <div
+                    className={`sw ${form.is_active ? 'on' : ''}`}
+                    onClick={() => f('is_active')(!form.is_active)}
+                    style={{ cursor: 'pointer' }}
+                  />
                   <span style={{
-                    fontSize: 11, fontWeight: 700,
+                    fontSize: 12, fontWeight: 700, minWidth: 50,
                     color: form.is_active ? 'var(--em)' : 'var(--red)',
                   }}>
                     {form.is_active ? 'نشطة' : 'موقوفة'}
                   </span>
-                  <div
-                    className={`sw ${form.is_active ? 'on' : ''}`}
-                    onClick={() => f('is_active')(!form.is_active)}
-                  />
                 </div>
               </div>
-
-              {/* الخطة */}
-              <Field label="خطة الاشتراك">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-                  {PLANS.map(p => (
-                    <button
-                      key={p.value}
-                      onClick={() => handlePlanChange(p.value as CompanyFormData['plan'])}
-                      style={{
-                        padding: '8px 0', borderRadius: 10, fontSize: 11, fontWeight: 700,
-                        border: `1.5px solid ${form.plan === p.value ? 'var(--em)' : 'var(--b2)'}`,
-                        background: form.plan === p.value ? 'var(--emb)' : 'var(--bg3)',
-                        color: form.plan === p.value ? 'var(--em)' : 'var(--t3)',
-                        cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', transition: '.13s',
-                      }}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              {/* الحدود */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                <Field label="حد المستخدمين">
-                  <input type="number" min={1} value={form.max_users}
-                    onChange={e => f('max_users')(Number(e.target.value))}
-                    style={{ ...inp, direction: 'ltr', textAlign: 'center' }}
-                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-                </Field>
-                <Field label="حد المنتجات">
-                  <input type="number" min={1} value={form.max_products}
-                    onChange={e => f('max_products')(Number(e.target.value))}
-                    style={{ ...inp, direction: 'ltr', textAlign: 'center' }}
-                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-                </Field>
-                <Field label="حد المستودعات">
-                  <input type="number" min={1} value={form.max_warehouses}
-                    onChange={e => f('max_warehouses')(Number(e.target.value))}
-                    style={{ ...inp, direction: 'ltr', textAlign: 'center' }}
-                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
-                </Field>
-              </div>
-
-              {/* ملاحظات داخلية */}
-              <Field label="ملاحظات داخلية (مرئية لك فقط)">
-                <textarea
-                  value={form.notes}
-                  onChange={e => f('notes')(e.target.value)}
-                  rows={2}
-                  style={{ ...inp, resize: 'vertical', minHeight: 60 }}
-                  placeholder="ملاحظات خاصة بهذه الشركة..."
-                  onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                  onBlur={e => (e.target.style.borderColor = 'var(--b3)')}
-                />
-              </Field>
-            </>
-          )}
-        </div>
-
-        {/* ── Footer */}
-        <div style={{
-          padding: '14px 20px', borderTop: '1px solid var(--b2)',
-          display: 'flex', gap: 8, alignItems: 'center',
-          background: 'var(--bg3)', borderRadius: '0 0 0 0', flexShrink: 0,
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700,
-              border: '1px solid var(--b3)', background: 'var(--bg2)',
-              color: 'var(--t2)', cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
-            }}
-          >
-            إلغاء
-          </button>
-          <button
-            onClick={() => {
-              if (!form.name.trim()) { setError('اسم الشركة إلزامي'); return; }
-              mutation.mutate(form);
-            }}
-            disabled={mutation.isPending || !form.name.trim()}
-            style={{
-              flex: 1, padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 800,
-              border: 'none', background: form.name.trim() ? 'var(--em)' : 'var(--b3)',
-              color: form.name.trim() ? '#fff' : 'var(--t4)',
-              cursor: mutation.isPending || !form.name.trim() ? 'not-allowed' : 'pointer',
-              fontFamily: 'Tajawal, sans-serif', boxShadow: form.name.trim() ? 'var(--emglow)' : 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              transition: 'all .14s',
-            }}
-          >
-            {mutation.isPending ? (
-              <><i className="ti ti-loader" style={{ animation: 'spin .8s linear infinite' }} />جارٍ الحفظ...</>
-            ) : (
-              <><i className={`ti ti-${isEdit ? 'device-floppy' : 'building-plus'}`} />{isEdit ? 'حفظ التغييرات' : 'إنشاء الشركة'}</>
             )}
-          </button>
+
+            {/* ── TAB: الوثائق القانونية ── */}
+            {tab === 'legal' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{
+                  padding: '10px 14px', borderRadius: 10,
+                  background: 'var(--blueb)', border: '1px solid var(--bluebo)',
+                  color: 'var(--blue)', fontSize: 12, display: 'flex', gap: 8,
+                }}>
+                  <i className="ti ti-info-circle" style={{ flexShrink: 0 }} />
+                  أدخل الأرقام الضريبية والتجارية الخاصة بالشركة (اختياري)
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Field label="NIF — رقم التعريف الجبائي">
+                    <Input value={form.nif} onChange={f('nif')} placeholder="000000000000000" dir="ltr" />
+                  </Field>
+                  <Field label="NIS — رقم الإحصاء">
+                    <Input value={form.nis} onChange={f('nis')} placeholder="000000000000000" dir="ltr" />
+                  </Field>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Field label="RC — السجل التجاري">
+                    <Input value={form.rc} onChange={f('rc')} placeholder="00/00-000000B00" dir="ltr" />
+                  </Field>
+                  <Field label="AI — مقالة الضريبة">
+                    <Input value={form.ai} onChange={f('ai')} placeholder="00000000000" dir="ltr" />
+                  </Field>
+                </div>
+
+                <Field label="الشكل القانوني">
+                  <select value={form.legal_form_id} onChange={e => f('legal_form_id')(e.target.value)}
+                    style={{ ...inputCls, cursor: 'pointer' }}>
+                    <option value="">اختر الشكل القانوني</option>
+                    <option value="1">مؤسسة فردية</option>
+                    <option value="2">SARL</option>
+                    <option value="3">SPA</option>
+                    <option value="4">SNC</option>
+                    <option value="5">EURL</option>
+                  </select>
+                </Field>
+              </div>
+            )}
+
+            {/* ── TAB: Super Admin ── */}
+            {tab === 'admin' && isSuperAdmin && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{
+                  padding: '10px 14px', borderRadius: 10,
+                  background: 'var(--purb)', border: '1px solid var(--purbo)',
+                  color: 'var(--purple)', fontSize: 12, display: 'flex', gap: 8,
+                }}>
+                  <i className="ti ti-shield-check" style={{ flexShrink: 0 }} />
+                  هذه الإعدادات مرئية للـ Super Admin فقط
+                </div>
+
+                <Field label="خطة الاشتراك">
+                  <select value={form.plan} onChange={e => f('plan')(e.target.value)}
+                    style={{ ...inputCls, cursor: 'pointer' }}>
+                    <option value="free">مجاني</option>
+                    <option value="starter">مبتدئ</option>
+                    <option value="professional">احترافي</option>
+                    <option value="enterprise">مؤسسي</option>
+                  </select>
+                </Field>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+                  <Field label="حد المستخدمين">
+                    <Input value={form.max_users} onChange={f('max_users')} placeholder="3" dir="ltr" />
+                  </Field>
+                  <Field label="حد المستودعات">
+                    <Input value={form.max_warehouses} onChange={f('max_warehouses')} placeholder="1" dir="ltr" />
+                  </Field>
+                  <Field label="حد المنتجات">
+                    <Input value={form.max_products} onChange={f('max_products')} placeholder="500" dir="ltr" />
+                  </Field>
+                </div>
+
+                <Field label="ملاحظات (داخلية)">
+                  <textarea
+                    value={form.notes}
+                    onChange={e => f('notes')(e.target.value)}
+                    placeholder="ملاحظات للإدارة..."
+                    rows={3}
+                    style={{ ...inputCls, resize: 'vertical' }}
+                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')}
+                  />
+                </Field>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{
+            padding: '14px 20px', borderTop: '1px solid var(--b2)', flexShrink: 0,
+            display: 'flex', gap: 10, justifyContent: 'flex-end',
+            background: 'var(--bg3)', borderRadius: '0 0 20px 20px',
+          }}>
+            <button
+              onClick={onClose}
+              disabled={mutation.isPending}
+              style={{
+                padding: '9px 20px', borderRadius: 10, border: '1px solid var(--b3)',
+                background: 'var(--bg4)', color: 'var(--t2)', fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'Tajawal,sans-serif',
+              }}
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending || !form.name.trim()}
+              style={{
+                padding: '9px 22px', borderRadius: 10, border: 'none',
+                background: form.name.trim() ? 'var(--em)' : 'var(--bg4)',
+                color: form.name.trim() ? '#fff' : 'var(--t4)',
+                fontSize: 13, fontWeight: 800, cursor: mutation.isPending || !form.name.trim() ? 'not-allowed' : 'pointer',
+                fontFamily: 'Tajawal,sans-serif', boxShadow: form.name.trim() ? 'var(--emglow)' : 'none',
+                display: 'flex', alignItems: 'center', gap: 7, transition: '.13s',
+              }}
+            >
+              {mutation.isPending && (
+                <i className="ti ti-loader" style={{ animation: 'spin .8s linear infinite' }} />
+              )}
+              {mutation.isPending
+                ? (isEdit ? 'جارٍ الحفظ...' : 'جارٍ الإنشاء...')
+                : (isEdit ? 'حفظ التغييرات' : 'إنشاء الشركة')
+              }
+            </button>
+          </div>
+
         </div>
       </div>
-
-      <style>{`
-        @keyframes ovIn    { from{opacity:0} to{opacity:1} }
-        @keyframes drawerIn { from{opacity:0;transform:translateX(-40px)} to{opacity:1;transform:none} }
-        @keyframes spin    { to{transform:rotate(360deg)} }
-      `}</style>
     </>
   );
 }
