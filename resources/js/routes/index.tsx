@@ -38,6 +38,7 @@ const PriceLevelsPage = lazy(() => import("@/pages/lookups/PriceLevelsPage"));
 const TvasPage = lazy(() => import("@/pages/lookups/TvasPage"));
 const ExpenseCategoriesPage = lazy(() => import("@/pages/lookups/ExpenseCategoriesPage"));
 const RolesPage = lazy(() => import("@/pages/users/RolesPage"));
+const CompaniesPage = lazy(() => import("@/pages/admin/CompaniesPage"));
 
 // ── Loader ────────────────────────────────────────────────────────────────────
 function Loader() {
@@ -91,6 +92,14 @@ function AppRoute({ children }: { children: React.ReactNode }) {
     if (!isAuthenticated) return <Navigate to="/login" replace />;
     // لو لا توجد شركة محددة → يجب المرور بالـ onboarding أولاً
     if (!activeCompany?.slug) return <Navigate to="/onboarding" replace />;
+    return <>{children}</>;
+}
+
+// ── SuperAdminRoute: يتطلب دور super-admin ──────────────────────────────────
+function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+    const { user } = useAuth() as any;
+    const isSuperAdmin = user?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
+    if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
     return <>{children}</>;
 }
 
@@ -155,6 +164,16 @@ export function AppRoutes() {
                     <Route path="payment-methods"          element={<PaymentMethodsPage />} />
                     <Route path="numbering-series"         element={<NumberingSeriesPage />} />
                     <Route path="expense-categories"       element={<ExpenseCategoriesPage />} />
+
+                    {/* Super Admin فقط */}
+                    <Route
+                        path="admin/companies"
+                        element={
+                            <SuperAdminRoute>
+                                <CompaniesPage />
+                            </SuperAdminRoute>
+                        }
+                    />
                 </Route>
 
                 {/* أي مسار غير معروف → dashboard */}

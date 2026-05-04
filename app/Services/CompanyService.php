@@ -11,150 +11,135 @@ use Illuminate\Support\Facades\DB;
 use App\Core\Exceptions\BusinessRuleException;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Company Service
- *
- * مسؤول عن جميع عمليات إدارة الشركات:
- * - إنشاء شركة جديدة وربطها بالمالك
- * - إدارة تبديل السياق (Multi-Tenancy) بالتعاون مع CompanyContextService
- * - جلب أعضاء الشركة وأدوارهم
- * - توفير إحصائيات عامة للـ Super Admin
- *
- * @package App\Services
- */
 class CompanyService extends \App\Core\Services\BaseService
 {
-
-    protected string $model = Company::class;
+    protected string $model        = Company::class;
     protected string $resourceName = 'company';
-    protected array $defaultWith = [];
-    // app/Services/CompanyService.php
+    protected array  $defaultWith  = [];
+
     protected function getResourceName(): string
     {
         return 'company';
     }
 
-    /**
-     * CompanyService constructor.
-     * يحقن CompanyContextService للتحكم في سياق الشركة النشطة.
-     *
-     * @param CompanyContextService|null $context
-     */
-    public function __construct(private ?CompanyContextService $context = null)
-    {
-        // parent::__construct(); // لضمان توافق أي منطق في BaseService مستقبلاً
-    }
+    public function __construct(private ?CompanyContextService $context = null) {}
 
-    // ═══════════════════════════════════════════════════════════
-    // Hooks (تجاوزات BaseService)
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════
+    // Hooks
+    // ═══════════════════════════════════════════
 
     protected function beforeCreate(array $data, $request): array
     {
-        // توليد slug فريد تلقائياً إن لم يُقدم
         if (empty($data['slug']) && isset($data['name'])) {
             $data['slug'] = Str::slug($data['name']) . '-' . uniqid();
         }
-
-        // تعيين المالك والمعلومات الأساسية
-        $data['owner_id'] = auth()->id();
+        $data['owner_id']  = auth()->id();
         $data['is_active'] = $data['is_active'] ?? true;
-
         return $data;
     }
 
-    /**
-     * بعد إنشاء الشركة (داخل Transaction)
-     * يربط المستخدم المالك بالشركة عبر الـ Pivot.
-     */
     protected function afterCreate(Model $item, array $data, $request): void
     {
         $user = auth()->user();
         if ($user && !$user->companies->contains($item->id)) {
-            // إرفاق المستخدم وضبطه كافتراضي لهذه الشركة
             $user->companies()->attach($item->id, [
                 'is_default' => true,
-                'role' => Company::COMPANY_ROLE_OWNER // 'owner'
+                'role'       => Company::COMPANY_ROLE_OWNER,
+                'is_active'  => true,
+                'joined_at'  => now(),
             ]);
         }
     }
 
-    /**
-     * بعد Commit: عمليات خارجية (مثل إرسال إيميل ترحيبي)
-     */
     protected function afterCreateCommitted(Model $item, array $data, $request): void
     {
-        // TODO: إرسال بريد ترحيب للمالك
         Log::info("New company created: {$item->name} by User#" . auth()->id());
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // دوال عامة مساعدة
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════
+    // تبديل السياق — switchContext
+    // ═══════════════════════════════════════════
+
+    public function switchContext(User $user, Company $company): void
+    {
+        // ① super-admin يتجاوز كل التحقق — لديه صلاحية الوصول لأي شركة
+        if ($user->hasRole(User::ROLE_SUPER_ADMIN)) {
+            $this->applyContext($user, $company);
+            return;
+        }
+
+        // ② التحقق من العضوية النشطة للمستخدمين العاديين
+        $membership = DB::table('company_user')
+            ->where('user_id',    $user->id)
+            ->where('company_id', $company->id)
+            ->first();
+
+        if (!$membership) {
+            throw new BusinessRuleException(
+                'أنت لست عضواً في هذه الشركة.',
+                403
+            );
+        }
+
+        if (!$membership->is_active) {
+            throw new BusinessRuleException(
+                'حسابك معطّل داخل هذه الشركة. تواصل مع المسؤول.',
+                403
+            );
+        }
+
+        if (!$company->is_active) {
+            throw new BusinessRuleException(
+                'هذه الشركة غير مفعّلة حالياً.',
+                403
+            );
+        }
+
+        $this->applyContext($user, $company);
+    }
 
     /**
-     * جلب شركات المستخدم الحالي فقط.
+     * تطبيق السياق فعلياً بعد التحقق
      */
+    private function applyContext(User $user, Company $company): void
+    {
+        // ضبط CompanyContextService
+        if (!$this->context) {
+            $this->context = app(CompanyContextService::class);
+        }
+        $this->context->set($company->id);
+
+        // تحديث is_default في الـ pivot (إن كان المستخدم عضواً)
+        $isMember = DB::table('company_user')
+            ->where('user_id',    $user->id)
+            ->where('company_id', $company->id)
+            ->exists();
+
+        if ($isMember) {
+            DB::table('company_user')
+                ->where('user_id', $user->id)
+                ->where('company_id', $company->id)
+                ->update(['is_default' => true]);
+
+            DB::table('company_user')
+                ->where('user_id', $user->id)
+                ->where('company_id', '!=', $company->id)
+                ->update(['is_default' => false]);
+        }
+
+        // تحديث company_id في جدول users
+        $user->update(['company_id' => $company->id]);
+    }
+
+    // ═══════════════════════════════════════════
+    // دوال مساعدة
+    // ═══════════════════════════════════════════
+
     public function getUserCompanies()
     {
         return auth()->user()->companies()->get();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // إدارة السياق المتعدد (Multi-Tenancy Context)
-    // ═══════════════════════════════════════════════════════════
-
-    /**
-     * تبديل السياق إلى شركة معينة.
-     *
-     * يتحقق من عضوية المستخدم، ثم يضبط CompanyContextService ويُحدِّث
-     * الشركة الافتراضية للمستخدم.
-     *
-     * @param User    $user    المستخدم الحالي
-     * @param Company $company الشركة المستهدفة
-     * @throws BusinessRuleException إذا لم يكن المستخدم عضواً نشطاً
-     */
-    public function switchContext(User $user, Company $company): void
-{
-    // 1. التحقق من العضوية النشطة
-    if (!$user->companies()
-        ->where('companies.id', $company->id)
-        ->wherePivot('is_active', true)
-        ->exists()) {
-        throw new BusinessRuleException('أنت لست عضواً نشطاً في هذه الشركة، أو أن حسابك معطل داخلها.', 403);
-    }
-
-    // 2. ضبط السياق العام للتطبيق
-    if (!$this->context) {
-        $this->context = app(CompanyContextService::class);
-    }
-    $this->context->set($company->id);
-
-    // 3. تحديث الشركة الافتراضية عبر `company_user` (بدون استعمال العلاقة مباشرة)
-    DB::table('company_user')
-        ->where('user_id', $user->id)
-        ->where('company_id', $company->id)
-        ->update(['is_default' => true]);
-
-    DB::table('company_user')
-        ->where('user_id', $user->id)
-        ->where('company_id', '!=', $company->id)
-        ->update(['is_default' => false]);
-
-    // 4. تحديث company_id في جدول users
-    $user->update(['company_id' => $company->id]);
-}
-
-    // ═══════════════════════════════════════════════════════════
-    // إدارة الأعضاء
-    // ═══════════════════════════════════════════════════════════
-
-    /**
-     * جلب أعضاء شركة معينة مع أدوارهم وحالتهم.
-     *
-     * @param Company $company
-     * @return \Illuminate\Support\Collection
-     */
     public function getMembers(Company $company)
     {
         return $company->users()
@@ -162,15 +147,6 @@ class CompanyService extends \App\Core\Services\BaseService
             ->get();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // إحصائيات (لـ Super Admin فقط)
-    // ═══════════════════════════════════════════════════════════
-
-    /**
-     * إحصائيات عامة عن كل الشركات في النظام.
-     *
-     * @return array
-     */
     public function getStats(): array
     {
         return [

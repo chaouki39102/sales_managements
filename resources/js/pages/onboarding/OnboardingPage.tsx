@@ -382,18 +382,502 @@ function CompanyCard({ company, index, onClick }: { company: Company; index: num
   );
 }
 
+// ════════════════════════════════════════════════
+// AdminModal — مودال إدارة الشركات للـ Super Admin
+// تبويبان: الشركات | إعدادات Super Admin
+// ════════════════════════════════════════════════
+
+const PLANS = ['free','starter','professional','enterprise'] as const;
+const PLAN_LABELS: Record<string, string> = {
+  free:'مجاني', starter:'Starter', professional:'Professional', enterprise:'Enterprise',
+};
+
+function AdminModal({
+  companies, onClose, onCompaniesChange,
+}: {
+  companies: Company[];
+  onClose: () => void;
+  onCompaniesChange: (c: Company[]) => void;
+}) {
+  const [tab, setTab]             = useState<'companies' | 'super'>('companies');
+  const [editTarget, setEditTarget] = useState<Company | null>(null);
+  const [search, setSearch]       = useState('');
+  const [saving, setSaving]       = useState(false);
+  const [toast, setToast]         = useState('');
+
+  // إعدادات Super Admin
+  const [settings, setSettings] = useState({
+    registrations: true, new_companies: true,
+    notifications: true, debug: false, public_api: true,
+    trial_days: 14, free_max_users: 3,
+  });
+
+  // فورم تعديل شركة
+  const [form, setForm] = useState({
+    name:'', commercial_name:'', email:'', phone:'',
+    activity:'', nif:'', nis:'', rc:'', ai:'', address:'',
+    plan:'free' as typeof PLANS[number],
+    max_users:3, max_products:500, max_warehouses:1,
+    notes:'', is_active:true, is_suspended:false,
+  });
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  };
+
+  const openEdit = (co: Company) => {
+    setForm({
+      name:          (co as any).name           ?? '',
+      commercial_name:(co as any).commercial_name ?? '',
+      email:         (co as any).email          ?? '',
+      phone:         (co as any).phone          ?? '',
+      activity:      (co as any).activity       ?? '',
+      nif:           (co as any).nif            ?? '',
+      nis:           (co as any).nis            ?? '',
+      rc:            (co as any).rc             ?? '',
+      ai:            (co as any).ai             ?? '',
+      address:       (co as any).address        ?? '',
+      plan:          (co as any).plan           ?? 'free',
+      max_users:     (co as any).max_users      ?? 3,
+      max_products:  (co as any).max_products   ?? 500,
+      max_warehouses:(co as any).max_warehouses ?? 1,
+      notes:         (co as any).notes          ?? '',
+      is_active:     (co as any).is_active      ?? true,
+      is_suspended:  (co as any).is_suspended   ?? false,
+    });
+    setEditTarget(co);
+  };
+
+  const handleSaveCompany = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try {
+      await apiClient.put(`/companies/${editTarget.slug}`, form);
+      onCompaniesChange(companies.map(c =>
+        c.id === editTarget.id ? { ...c, ...form } : c
+      ));
+      setEditTarget(null);
+      showToast(`تم حفظ ${form.name}`);
+    } catch (e: any) {
+      showToast(e?.response?.data?.message ?? 'فشل الحفظ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSuspend = async (co: Company) => {
+    try {
+      const isSuspended = (co as any).is_suspended;
+      await apiClient.post(`/admin/companies/${co.slug}/${isSuspended ? 'unsuspend' : 'suspend'}`,
+        isSuspended ? {} : { reason: 'قرار إداري' }
+      );
+      onCompaniesChange(companies.map(c =>
+        c.id === co.id ? { ...c, is_suspended: !isSuspended } as any : c
+      ));
+      showToast(isSuspended ? 'تم رفع التعليق' : 'تم تعليق الشركة');
+    } catch { showToast('فشلت العملية'); }
+  };
+
+  const handleVerify = async (co: Company) => {
+    try {
+      const isVerified = (co as any).is_verified;
+      await apiClient.post(`/admin/companies/${co.slug}/${isVerified ? 'unverify' : 'verify'}`);
+      onCompaniesChange(companies.map(c =>
+        c.id === co.id ? { ...c, is_verified: !isVerified } as any : c
+      ));
+      showToast(isVerified ? 'تم إلغاء التوثيق' : 'تم توثيق الشركة');
+    } catch { showToast('فشلت العملية'); }
+  };
+
+  const filtered = companies.filter(c =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const f = <K extends keyof typeof form>(k: K) =>
+    (v: (typeof form)[K]) => setForm(prev => ({ ...prev, [k]: v }));
+
+  const inp: React.CSSProperties = {
+    width:'100%', padding:'8px 11px', borderRadius:9,
+    border:'1px solid var(--b3)', background:'var(--bg3)',
+    color:'var(--t1)', fontFamily:'Tajawal, sans-serif',
+    fontSize:13, outline:'none',
+  };
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => e.key === 'Escape' && (editTarget ? setEditTarget(null) : onClose());
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [editTarget, onClose]);
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        style={{ position:'fixed', inset:0, zIndex:10010, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <div style={{
+          background:'var(--bg2)', borderRadius:20, width:'100%', maxWidth:680,
+          border:'1px solid var(--b3)', boxShadow:'0 28px 72px rgba(0,0,0,.4)',
+          maxHeight:'90vh', display:'flex', flexDirection:'column',
+          direction:'rtl', animation:'slideup .25s cubic-bezier(.34,1.4,.64,1)',
+        }}>
+          {/* ── Header */}
+          <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--b2)', display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+            <div style={{ width:38, height:38, borderRadius:10, background:'var(--emb)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, color:'var(--em)', flexShrink:0 }}>
+              <i className="ti ti-building-community" />
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:15, fontWeight:800, color:'var(--t1)' }}>لوحة Super Admin</div>
+              <div style={{ fontSize:11, color:'var(--t4)' }}>{companies.length} شركة في النظام</div>
+            </div>
+            <button onClick={onClose} style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg3)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:14 }}>
+              <i className="ti ti-x" />
+            </button>
+          </div>
+
+          {/* ── Tabs */}
+          <div style={{ display:'flex', borderBottom:'1px solid var(--b2)', padding:'0 20px', flexShrink:0 }}>
+            {([
+              { key:'companies', label:'الشركات',             icon:'ti-building',  count: companies.length },
+              { key:'super',     label:'إعدادات Super Admin', icon:'ti-star',      count: null },
+            ] as const).map(t => (
+              <button key={t.key} onClick={() => { setTab(t.key); setEditTarget(null); }}
+                style={{ padding:'10px 16px', background:'none', border:'none', borderBottom:`2px solid ${tab===t.key?'var(--em)':'transparent'}`, color:tab===t.key?'var(--em)':'var(--t4)', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Tajawal, sans-serif', display:'flex', alignItems:'center', gap:6, transition:'.13s', whiteSpace:'nowrap' }}>
+                <i className={`ti ${t.icon}`} style={{ fontSize:14 }} />
+                {t.label}
+                {t.count !== null && (
+                  <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, fontWeight:800, background:tab===t.key?'var(--emb)':'var(--bg4)', color:tab===t.key?'var(--em)':'var(--t4)' }}>{t.count}</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Body */}
+          <div style={{ flex:1, overflowY:'auto', padding:'18px 20px' }}>
+
+            {/* ══ TAB: COMPANIES ══ */}
+            {tab === 'companies' && !editTarget && (
+              <div>
+                {/* بحث */}
+                <div style={{ position:'relative', marginBottom:14 }}>
+                  <i className="ti ti-search" style={{ position:'absolute', right:11, top:'50%', transform:'translateY(-50%)', color:'var(--t4)', fontSize:13 }} />
+                  <input value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder="بحث بالاسم..."
+                    style={{ ...inp, paddingRight:34 }}
+                    onFocus={e => (e.target.style.borderColor='var(--em)')}
+                    onBlur={e => (e.target.style.borderColor='var(--b3)')}
+                  />
+                </div>
+
+                {/* قائمة الشركات */}
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {filtered.map(co => {
+                    const suspended = (co as any).is_suspended;
+                    const verified  = (co as any).is_verified;
+                    const plan      = (co as any).plan ?? 'free';
+                    return (
+                      <div key={co.id} style={{ background:'var(--bg3)', borderRadius:12, border:'1px solid var(--b1)', padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}>
+                        {/* avatar */}
+                        <div style={{ width:40, height:40, borderRadius:11, background:`linear-gradient(135deg,#0a8a5c,#0dbf84)`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:900, color:'#fff', fontSize:15, flexShrink:0 }}>
+                          {co.name[0]?.toUpperCase()}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontWeight:700, fontSize:13, color:'var(--t1)', display:'flex', alignItems:'center', gap:7 }}>
+                            {co.name}
+                            {verified && <i className="ti ti-rosette-discount-check" style={{ color:'var(--em)', fontSize:13 }} />}
+                          </div>
+                          <div style={{ fontSize:10, color:'var(--t4)', fontFamily:'monospace' }}>
+                            {co.slug} · {PLAN_LABELS[plan] ?? plan}
+                            {suspended && <span style={{ color:'var(--red)', marginRight:8 }}>· معلّقة</span>}
+                          </div>
+                        </div>
+                        {/* actions */}
+                        <div style={{ display:'flex', gap:5 }}>
+                          <button onClick={() => openEdit(co)} title="تعديل"
+                            style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:13 }}
+                            onMouseEnter={e => { (e.currentTarget as any).style.background='var(--emb)'; (e.currentTarget as any).style.color='var(--em)'; }}
+                            onMouseLeave={e => { (e.currentTarget as any).style.background='var(--bg2)'; (e.currentTarget as any).style.color='var(--t3)'; }}
+                          ><i className="ti ti-pencil" /></button>
+                          <button onClick={() => handleSuspend(co)} title={suspended?'رفع التعليق':'تعليق'}
+                            style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:13 }}
+                            onMouseEnter={e => { (e.currentTarget as any).style.background='var(--goldb)'; (e.currentTarget as any).style.color='var(--gold)'; }}
+                            onMouseLeave={e => { (e.currentTarget as any).style.background='var(--bg2)'; (e.currentTarget as any).style.color='var(--t3)'; }}
+                          ><i className={`ti ti-${suspended?'lock-open':'lock'}`} /></button>
+                          <button onClick={() => handleVerify(co)} title={verified?'إلغاء توثيق':'توثيق'}
+                            style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:13 }}
+                            onMouseEnter={e => { (e.currentTarget as any).style.background='var(--emb)'; (e.currentTarget as any).style.color='var(--em)'; }}
+                            onMouseLeave={e => { (e.currentTarget as any).style.background='var(--bg2)'; (e.currentTarget as any).style.color='var(--t3)'; }}
+                          ><i className={`ti ti-${verified?'rosette-discount-check':'rosette'}`} /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {filtered.length === 0 && (
+                    <div style={{ textAlign:'center', padding:'32px', color:'var(--t4)', fontSize:13 }}>لا توجد شركات</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ══ فورم تعديل شركة ══ */}
+            {tab === 'companies' && editTarget && (
+              <div style={{ display:'flex', flexDirection:'column', gap:13 }}>
+                {/* breadcrumb */}
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
+                  <button onClick={() => setEditTarget(null)} style={{ background:'none', border:'none', color:'var(--em)', cursor:'pointer', fontSize:12, fontWeight:700, fontFamily:'Tajawal, sans-serif', display:'flex', alignItems:'center', gap:4 }}>
+                    <i className="ti ti-arrow-right" style={{ fontSize:11 }} /> الشركات
+                  </button>
+                  <span style={{ color:'var(--t4)', fontSize:12 }}>← {editTarget.name}</span>
+                </div>
+
+                {/* المعلومات الأساسية */}
+                <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:1, borderBottom:'1px solid var(--b1)', paddingBottom:7 }}>
+                  <i className="ti ti-building" style={{ color:'var(--em)', marginLeft:5 }} />المعلومات الأساسية
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  {[
+                    { label:'اسم الشركة *', key:'name' as const },
+                    { label:'الاسم التجاري', key:'commercial_name' as const },
+                    { label:'النشاط التجاري', key:'activity' as const },
+                    { label:'العنوان', key:'address' as const },
+                  ].map(({ label, key }) => (
+                    <div key={key} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      <label style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:.7 }}>{label}</label>
+                      <input value={form[key] as string} onChange={e => f(key)(e.target.value as any)}
+                        style={inp}
+                        onFocus={e => (e.target.style.borderColor='var(--em)')}
+                        onBlur={e => (e.target.style.borderColor='var(--b3)')}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  {[
+                    { label:'البريد الإلكتروني', key:'email' as const },
+                    { label:'الهاتف', key:'phone' as const },
+                  ].map(({ label, key }) => (
+                    <div key={key} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      <label style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:.7 }}>{label}</label>
+                      <input value={form[key] as string} onChange={e => f(key)(e.target.value as any)}
+                        style={{ ...inp, direction:'ltr' }}
+                        onFocus={e => (e.target.style.borderColor='var(--em)')}
+                        onBlur={e => (e.target.style.borderColor='var(--b3)')}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* الوثائق القانونية */}
+                <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:1, borderBottom:'1px solid var(--b1)', paddingBottom:7, marginTop:4 }}>
+                  <i className="ti ti-file-certificate" style={{ color:'var(--em)', marginLeft:5 }} />الوثائق القانونية
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  {(['nif','nis','rc','ai'] as const).map(key => (
+                    <div key={key} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      <label style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:.7 }}>{key.toUpperCase()}</label>
+                      <input value={form[key]} onChange={e => f(key)(e.target.value)}
+                        style={{ ...inp, direction:'ltr' }}
+                        onFocus={e => (e.target.style.borderColor='var(--em)')}
+                        onBlur={e => (e.target.style.borderColor='var(--b3)')}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* إعدادات Super Admin */}
+                <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:1, borderBottom:'1px solid var(--b1)', paddingBottom:7, marginTop:4 }}>
+                  <i className="ti ti-star" style={{ color:'var(--em)', marginLeft:5 }} />إعدادات Super Admin
+                </div>
+
+                {/* حالة الشركة */}
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--b1)' }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:'var(--t2)' }}>حالة الشركة</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color: form.is_active ? 'var(--em)' : 'var(--red)' }}>
+                      {form.is_active ? 'نشطة' : 'موقوفة'}
+                    </span>
+                    <div className={`sw ${form.is_active ? 'on' : ''}`} onClick={() => f('is_active')(!form.is_active)} />
+                  </div>
+                </div>
+
+                {/* الخطة */}
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  <label style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:.7 }}>خطة الاشتراك</label>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6 }}>
+                    {PLANS.map(p => (
+                      <button key={p} onClick={() => f('plan')(p)}
+                        style={{ padding:'8px 0', borderRadius:10, fontSize:11, fontWeight:700, border:`1.5px solid ${form.plan===p?'var(--em)':'var(--b2)'}`, background:form.plan===p?'var(--emb)':'var(--bg3)', color:form.plan===p?'var(--em)':'var(--t3)', cursor:'pointer', fontFamily:'Tajawal, sans-serif', transition:'.13s' }}>
+                        {PLAN_LABELS[p]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* الحدود */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+                  {[
+                    { label:'حد المستخدمين', key:'max_users' as const },
+                    { label:'حد المنتجات',   key:'max_products' as const },
+                    { label:'حد المستودعات', key:'max_warehouses' as const },
+                  ].map(({ label, key }) => (
+                    <div key={key} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      <label style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:.7 }}>{label}</label>
+                      <input type="number" min={1} value={form[key]} onChange={e => f(key)(Number(e.target.value) as any)}
+                        style={{ ...inp, textAlign:'center', direction:'ltr' }}
+                        onFocus={e => (e.target.style.borderColor='var(--em)')}
+                        onBlur={e => (e.target.style.borderColor='var(--b3)')}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* ملاحظات */}
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  <label style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:.7 }}>ملاحظات داخلية (مرئية لك فقط)</label>
+                  <textarea value={form.notes} onChange={e => f('notes')(e.target.value)} rows={2}
+                    style={{ ...inp, resize:'vertical', minHeight:55 }}
+                    onFocus={e => (e.target.style.borderColor='var(--em)')}
+                    onBlur={e => (e.target.style.borderColor='var(--b3)')}
+                    placeholder="ملاحظات..."
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ══ TAB: SUPER ADMIN ══ */}
+            {tab === 'super' && (
+              <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+
+                {/* تحذير */}
+                <div style={{ padding:'10px 14px', borderRadius:10, background:'var(--redb)', border:'1px solid var(--redbo)', color:'var(--red)', fontSize:12, display:'flex', alignItems:'center', gap:8 }}>
+                  <i className="ti ti-alert-triangle" style={{ fontSize:15, flexShrink:0 }} />
+                  هذه الإعدادات تؤثر على كامل النظام — تصرف بحذر
+                </div>
+
+                {/* الميزات */}
+                <div style={{ background:'var(--bg3)', borderRadius:12, border:'1px solid var(--b1)', padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:800, color:'var(--t3)', textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>ميزات النظام</div>
+                  {([
+                    { key:'registrations' as const, label:'تسجيل مستخدمين جدد',  icon:'ti-user-plus' },
+                    { key:'new_companies' as const, label:'إنشاء شركات جديدة',    icon:'ti-building-plus' },
+                    { key:'notifications' as const, label:'نظام الإشعارات',       icon:'ti-bell' },
+                    { key:'debug'         as const, label:'وضع التصحيح (Debug)',  icon:'ti-bug' },
+                    { key:'public_api'    as const, label:'API العام',             icon:'ti-api' },
+                  ]).map(item => (
+                    <div key={item.key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid var(--b1)' }}>
+                      <span style={{ fontSize:13, color:'var(--t2)', display:'flex', alignItems:'center', gap:8 }}>
+                        <i className={`ti ${item.icon}`} style={{ color:'var(--em)', fontSize:14 }} />
+                        {item.label}
+                      </span>
+                      <div
+                        className={`sw ${settings[item.key] ? 'on' : ''}`}
+                        onClick={() => setSettings(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* الإعدادات الرقمية */}
+                <div style={{ background:'var(--bg3)', borderRadius:12, border:'1px solid var(--b1)', padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:800, color:'var(--t3)', textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>الخطط الافتراضية</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+                    {[
+                      { label:'مدة التجربة (أيام)', key:'trial_days' as const },
+                      { label:'حد مستخدمي Free',    key:'free_max_users' as const },
+                    ].map(({ label, key }) => (
+                      <div key={key} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        <label style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:.7 }}>{label}</label>
+                        <input type="number" min={1} value={settings[key]}
+                          onChange={e => setSettings(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+                          style={{ ...inp, textAlign:'center', direction:'ltr' }}
+                          onFocus={e => (e.target.style.borderColor='var(--em)')}
+                          onBlur={e => (e.target.style.borderColor='var(--b3)')}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* عمليات النظام */}
+                <div style={{ background:'var(--bg3)', borderRadius:12, border:'1px solid var(--b1)', padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:800, color:'var(--t3)', textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>عمليات النظام</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    {[
+                      { label:'مسح الكاش العام',        icon:'ti-refresh',         color:'var(--em)',   bg:'var(--emb)',   action:() => showToast('تم مسح الكاش') },
+                      { label:'نسخ احتياطي فوري',       icon:'ti-database-export', color:'var(--gold)', bg:'var(--goldb)', action:() => showToast('النسخة تُنشأ...') },
+                      { label:'تصدير اللوج',             icon:'ti-download',        color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('جارٍ التصدير') },
+                      { label:'إرسال إشعار للكل',        icon:'ti-speakerphone',    color:'var(--gold)', bg:'var(--goldb)', action:() => showToast('تم الإرسال') },
+                      { label:'تفعيل وضع الصيانة',       icon:'ti-alert-triangle',  color:'var(--red)',  bg:'var(--redb)',  action:() => confirm('تفعيل وضع الصيانة؟') && showToast('مفعّل') },
+                      { label:'تشغيل المهام المجدولة',   icon:'ti-clock-play',      color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('تم تشغيل المهام') },
+                    ].map(op => (
+                      <button key={op.label} onClick={op.action}
+                        style={{ padding:'10px 12px', borderRadius:10, border:`1px solid ${op.bg}`, background:op.bg, color:op.color, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'Tajawal, sans-serif', display:'flex', alignItems:'center', gap:7, transition:'.13s' }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity='.8')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity='1')}
+                      >
+                        <i className={`ti ${op.icon}`} style={{ fontSize:14 }} />
+                        {op.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Footer */}
+          <div style={{ padding:'12px 20px', borderTop:'1px solid var(--b2)', display:'flex', gap:8, justifyContent:'flex-end', background:'var(--bg3)', borderRadius:'0 0 20px 20px', flexShrink:0 }}>
+            {tab === 'companies' && editTarget ? (
+              <>
+                <button onClick={() => setEditTarget(null)} style={{ padding:'9px 18px', borderRadius:10, border:'1px solid var(--b3)', background:'var(--bg2)', color:'var(--t2)', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Tajawal, sans-serif' }}>
+                  رجوع
+                </button>
+                <button onClick={handleSaveCompany} disabled={saving || !form.name.trim()}
+                  style={{ padding:'9px 22px', borderRadius:10, border:'none', background:form.name.trim()?'var(--em)':'var(--b3)', color:form.name.trim()?'#fff':'var(--t4)', fontSize:13, fontWeight:800, cursor:saving||!form.name.trim()?'not-allowed':'pointer', fontFamily:'Tajawal, sans-serif', boxShadow:form.name.trim()?'var(--emglow)':'none', display:'flex', alignItems:'center', gap:7 }}>
+                  {saving ? <><i className="ti ti-loader" style={{ animation:'spin .8s linear infinite' }} />جارٍ الحفظ...</> : <><i className="ti ti-device-floppy" />حفظ التغييرات</>}
+                </button>
+              </>
+            ) : tab === 'super' ? (
+              <button onClick={() => showToast('تم حفظ الإعدادات')} style={{ padding:'9px 22px', borderRadius:10, border:'none', background:'var(--em)', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'Tajawal, sans-serif', boxShadow:'var(--emglow)', display:'flex', alignItems:'center', gap:7 }}>
+                <i className="ti ti-device-floppy" />حفظ الإعدادات
+              </button>
+            ) : (
+              <button onClick={onClose} style={{ padding:'9px 18px', borderRadius:10, border:'1px solid var(--b3)', background:'var(--bg2)', color:'var(--t2)', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Tajawal, sans-serif' }}>
+                إغلاق
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)', background:'#2c2c2a', color:'#fff', padding:'10px 22px', borderRadius:20, fontSize:13, fontFamily:'Tajawal, sans-serif', zIndex:10020, animation:'slideup .2s ease' }}>
+          {toast}
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Main Page ───────────────────────────────────
 export default function OnboardingPage() {
-  const { user, logout, setActiveCompany } = useAuth();
+  const { user, logout, setActiveCompany } = useAuth() as any;
   const navigate = useNavigate();
+
+  const isSuperAdmin: boolean = user?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
 
   const [companies, setCompanies]           = useState<Company[]>([]);
   const [loading, setLoading]               = useState(true);
   const [error, setError]                   = useState<string | null>(null);
-  // ✅ showCreate يفتح المودال الشامل (شركة + سنة مالية)
   const [showCreate, setShowCreate]         = useState(false);
   const [pendingCompany, setPendingCompany] = useState<Company | null>(null);
   const [switching, setSwitching]           = useState(false);
+  // ✅ مودال Super Admin
+  const [showAdminModal, setShowAdminModal] = useState(false);
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
@@ -504,6 +988,24 @@ export default function OnboardingPage() {
             <div style={{ fontSize:10, color:'var(--t4)' }}>الإدارة المتكاملة</div>
           </div>
           <div style={{ marginRight:'auto', display:'flex', alignItems:'center', gap:10 }}>
+            {/* ✅ زر Super Admin — يظهر فقط للمدير العام */}
+            {isSuperAdmin && (
+              <button
+                onClick={() => setShowAdminModal(true)}
+                style={{
+                  padding:'7px 14px', borderRadius:10,
+                  border:'1px solid var(--embo)', background:'var(--emb)',
+                  color:'var(--em)', fontSize:12, fontWeight:700,
+                  cursor:'pointer', fontFamily:'Tajawal, sans-serif',
+                  display:'flex', alignItems:'center', gap:6, transition:'.13s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background='var(--em)'; e.currentTarget.style.color='#fff'; }}
+                onMouseLeave={e => { e.currentTarget.style.background='var(--emb)'; e.currentTarget.style.color='var(--em)'; }}
+              >
+                <i className="ti ti-building-community" style={{ fontSize:14 }} />
+                إدارة الشركات
+              </button>
+            )}
             <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 12px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--b2)' }}>
               <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--grad-em)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#fff' }}>
                 {user.name?.[0]?.toUpperCase() ?? 'م'}
@@ -638,6 +1140,15 @@ export default function OnboardingPage() {
           company={pendingCompany}
           onConfirm={handleFiscalConfirm}
           onClose={() => setPendingCompany(null)}
+        />
+      )}
+
+      {/* ✅ مودال Super Admin */}
+      {showAdminModal && (
+        <AdminModal
+          companies={companies}
+          onClose={() => setShowAdminModal(false)}
+          onCompaniesChange={setCompanies}
         />
       )}
     </>

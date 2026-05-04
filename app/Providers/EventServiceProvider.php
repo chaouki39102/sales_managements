@@ -25,7 +25,6 @@ class EventServiceProvider extends ServiceProvider
     {
         // parent::boot();
         StockMovement::observe(StockMovementObserver::class);
-        StockMovement::observe(StockMovementObserver::class);
         CommercialDocumentLine::observe(CommercialDocumentLineObserver::class);
     }
 }

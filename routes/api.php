@@ -161,6 +161,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/{company}/unverify', fn(Company $company) => app(AdminCompanyController::class)->unverify($company));
             Route::patch('/{company}/plan', fn(Request $request, Company $company) => app(AdminCompanyController::class)->changePlan($request, $company));
             Route::patch('/{company}/notes', fn(Request $request, Company $company) => app(AdminCompanyController::class)->updateNotes($request, $company));
+
+            Route::patch(
+                '/{company}/upgrade-plan',
+                fn(Request $request, Company $company) =>
+                app(CompanyController::class)->upgradePlan($request, $company->id)
+            );
         });
 
         // إدارة جميع المستخدمين (عبر كل الشركات)
@@ -406,7 +412,7 @@ Route::prefix('v1')->group(function () {
                 Route::apiResource('users', UserController::class);
                 Route::post('users/{user}/restore',        [UserController::class, 'restore']);
                 Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete']);
-                Route::post('users/{user}/change-password',[UserController::class, 'changePassword']);
+                Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
                 Route::post('users/{user}/toggle-active',  [UserController::class, 'toggleActive']);
                 Route::post('users/{user}/assign-role',    [UserController::class, 'assignRole']);
 

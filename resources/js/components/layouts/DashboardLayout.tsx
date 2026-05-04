@@ -81,6 +81,13 @@ const NAV_GROUPS = [
       { name: 'فئات المصروفات',  href: 'expense-categories',      icon: 'ti-category'     },
     ],
   },
+  {
+    label: 'Super Admin',
+    superAdminOnly: true,
+    items: [
+      { name: 'إدارة الشركات', href: 'admin/companies', icon: 'ti-building-community' },
+    ],
+  },
 ];
 
 const LABEL_COLORS = ['var(--em)','var(--blue)','var(--purple)','var(--gold)','var(--orange)','var(--teal)'];
@@ -123,6 +130,7 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   'numbering-series':        { title: 'سلاسل الترقيم',      path: 'نظام ← سلاسل الترقيم'   },
   'payment-methods':         { title: 'طرق الدفع',           path: 'نظام ← طرق الدفع'       },
   'expense-categories':      { title: 'فئات المصروفات',     path: 'نظام ← فئات المصروفات'  },
+  'admin/companies':         { title: 'إدارة الشركات',      path: 'Super Admin ← الشركات'  },
 };
 
 // ════════════════════════════════════════════════
@@ -304,7 +312,8 @@ function NoFiscalYearModal({ onCreated }: { onCreated: () => void }) {
 // DashboardLayout
 // ════════════════════════════════════════════════
 export default function DashboardLayout() {
-  const { user, logout, activeCompany } = useAuth();
+  const { user, logout, activeCompany } = useAuth() as any;
+  const isSuperAdmin = user?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
   const location                        = useLocation();
   const navigate                        = useNavigate();
   const { dark, toggle: toggleTheme }   = useTheme();
@@ -352,7 +361,7 @@ export default function DashboardLayout() {
           </div>
         )}
 
-        {NAV_GROUPS.map((group, idx) => (
+        {NAV_GROUPS.filter(g => !(g as any).superAdminOnly || isSuperAdmin).map((group, idx) => (
           <div className="sb-sec" key={group.label}>
             <div className="sb-lbl" style={{ color: LABEL_COLORS[idx] }}>{group.label}</div>
             {group.items.map(item => {
