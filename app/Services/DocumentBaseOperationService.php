@@ -8,4 +8,6 @@ class DocumentBaseOperationService extends \App\Core\Services\BaseService
 {
     protected string $model = DocumentBaseOperation::class;
     protected string $resourceName = 'document_base_operation';
+    protected function getResourceName(): string { return $this->resourceName; }
+
 }

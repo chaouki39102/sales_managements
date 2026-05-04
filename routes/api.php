@@ -217,25 +217,17 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('genders',     GenderController::class)->only(['index', 'show']);
         Route::apiResource('legal-forms', LegalFormController::class)->only(['index', 'show']);
 
-        // العملات
-        Route::apiResource('currencies',     CurrencyController::class)->only(['index', 'show']);
-        Route::apiResource('exchange-rates', ExchangeRateController::class)->only(['index', 'show']);
-        Route::get('exchange-rates/latest',  [ExchangeRateController::class, 'latest']);
+        // العملات (global — لا company_id)
+        Route::apiResource('currencies', CurrencyController::class)->only(['index', 'show']);
 
-        // المنتجات — كتالوج
-        Route::apiResource('families', FamilyController::class)->only(['index', 'show']);
-        Route::apiResource('brands',   BrandController::class)->only(['index', 'show']);
-        Route::apiResource('units',    UnitController::class)->only(['index', 'show']);
-        Route::apiResource('tvas',     TvaController::class)->only(['index', 'show']);
-        Route::get('tvas/default',     [TvaController::class, 'default']);
-        Route::apiResource('price-levels', PriceLevelController::class)->only(['index', 'show']);
+        // المنتجات — كتالوج (global — لا company_id)
+        Route::apiResource('tvas', TvaController::class)->only(['index', 'show']);
+        Route::get('tvas/default', [TvaController::class, 'default']);
 
-        // المستندات والتجارة
+        // المستندات والتجارة (global)
         Route::apiResource('document-types',           DocumentTypeController::class)->only(['index', 'show']);
         Route::apiResource('document-statuses',        DocumentStatusController::class)->only(['index', 'show']);
         Route::apiResource('document-base-operations', DocumentBaseOperationController::class)->only(['index', 'show']);
-        Route::apiResource('payment-modes',            PaymentModeController::class)->only(['index', 'show']);
-        Route::get('payment-modes/active',             [PaymentModeController::class, 'active']);
         Route::apiResource('fiscal-stamps',            FiscalStampController::class)->only(['index', 'show']);
 
         // المخزون
@@ -249,16 +241,6 @@ Route::prefix('v1')->group(function () {
         // المالية
         Route::apiResource('treasury-account-types', TreasuryAccountTypeController::class)->only(['index', 'show']);
 
-        // المصروفات
-        Route::apiResource('expense-categories', ExpenseCategoryController::class)->only(['index', 'show']);
-        Route::get('expense-categories/roots',   [ExpenseCategoryController::class, 'roots']);
-
-        // الأدوار والصلاحيات (قراءة فقط)
-        Route::get('roles',             [RoleController::class, 'index']);
-        Route::get('roles/{role}',      [RoleController::class, 'show']);
-        Route::get('permissions',       [PermissionController::class, 'index']);
-        Route::get('permissions/by-group', [PermissionController::class, 'byGroup']);
-        Route::get('permissions/{permission}', [PermissionController::class, 'show']);
     });
 
     // ═══════════════════════════════════════════
@@ -289,6 +271,18 @@ Route::prefix('v1')->group(function () {
                 Route::get('payments',  [ReportController::class, 'payments']);
                 Route::get('taxes',     [ReportController::class, 'taxes']);
             });
+
+            // عائلات وماركات وأسعار ووحدات (tenant — مرتبطة بالشركة)
+            Route::apiResource('families',         FamilyController::class)->only(['index', 'show']);
+            Route::apiResource('brands',           BrandController::class)->only(['index', 'show']);
+            Route::apiResource('units',            UnitController::class)->only(['index', 'show']);
+            Route::apiResource('price-levels',     PriceLevelController::class)->only(['index', 'show']);
+            Route::apiResource('payment-modes',    PaymentModeController::class)->only(['index', 'show']);
+            Route::get('payment-modes/active',     [PaymentModeController::class, 'active']);
+            Route::apiResource('exchange-rates',   ExchangeRateController::class)->only(['index', 'show']);
+            Route::get('exchange-rates/latest',    [ExchangeRateController::class, 'latest']);
+            Route::apiResource('expense-categories', ExpenseCategoryController::class)->only(['index', 'show']);
+            Route::get('expense-categories/roots', [ExpenseCategoryController::class, 'roots']);
 
             // منتجات — عرض
             Route::get('products',                       [ProductController::class, 'index']);
@@ -377,6 +371,48 @@ Route::prefix('v1')->group(function () {
             // ⑤-ب: موارد خاصة بالمالك / المدير
             // ────────────────────────────────────
             Route::middleware('can:manage-company')->group(function () {
+                // وحدات — كتابة
+                Route::post('units',           [UnitController::class, 'store']);
+                Route::put('units/{unit}',     [UnitController::class, 'update']);
+                Route::patch('units/{unit}',   [UnitController::class, 'update']);
+                Route::delete('units/{unit}',  [UnitController::class, 'destroy']);
+
+                // عائلات — كتابة
+                Route::post('families',              [FamilyController::class, 'store']);
+                Route::put('families/{family}',      [FamilyController::class, 'update']);
+                Route::patch('families/{family}',    [FamilyController::class, 'update']);
+                Route::delete('families/{family}',   [FamilyController::class, 'destroy']);
+
+                // ماركات — كتابة
+                Route::post('brands',                [BrandController::class, 'store']);
+                Route::put('brands/{brand}',         [BrandController::class, 'update']);
+                Route::patch('brands/{brand}',       [BrandController::class, 'update']);
+                Route::delete('brands/{brand}',      [BrandController::class, 'destroy']);
+
+                // مستويات الأسعار — كتابة
+                Route::post('price-levels',              [PriceLevelController::class, 'store']);
+                Route::put('price-levels/{priceLevel}',  [PriceLevelController::class, 'update']);
+                Route::patch('price-levels/{priceLevel}',[PriceLevelController::class, 'update']);
+                Route::delete('price-levels/{priceLevel}',[PriceLevelController::class, 'destroy']);
+
+                // وسائل الدفع — كتابة
+                Route::post('payment-modes',               [PaymentModeController::class, 'store']);
+                Route::put('payment-modes/{paymentMode}',  [PaymentModeController::class, 'update']);
+                Route::patch('payment-modes/{paymentMode}',[PaymentModeController::class, 'update']);
+                Route::delete('payment-modes/{paymentMode}',[PaymentModeController::class, 'destroy']);
+
+                // أسعار الصرف — كتابة
+                Route::post('exchange-rates',                  [ExchangeRateController::class, 'store']);
+                Route::put('exchange-rates/{exchangeRate}',    [ExchangeRateController::class, 'update']);
+                Route::patch('exchange-rates/{exchangeRate}',  [ExchangeRateController::class, 'update']);
+                Route::delete('exchange-rates/{exchangeRate}', [ExchangeRateController::class, 'destroy']);
+
+                // فئات المصروفات — كتابة
+                Route::post('expense-categories',                    [ExpenseCategoryController::class, 'store']);
+                Route::put('expense-categories/{category}',          [ExpenseCategoryController::class, 'update']);
+                Route::patch('expense-categories/{category}',        [ExpenseCategoryController::class, 'update']);
+                Route::delete('expense-categories/{category}',       [ExpenseCategoryController::class, 'destroy']);
+
                 // منتجات — كتابة
                 Route::post('products',                    [ProductController::class, 'store']);
                 Route::put('products/{product}',           [ProductController::class, 'update']);

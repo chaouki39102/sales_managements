@@ -13,4 +13,6 @@ class CurrencyService extends \App\Core\Services\BaseService
 {
     protected string $model = Currency::class;
     protected string $resourceName = 'currency';
+    protected function getResourceName(): string { return $this->resourceName; }
+
 }

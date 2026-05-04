@@ -14,6 +14,8 @@ class BarcodeService extends \App\Core\Services\BaseService
 {
     protected string $model        = Barcode::class;
     protected string $resourceName = 'barcode';
+    protected function getResourceName(): string { return $this->resourceName; }
+
 
     // barcodes.company_id  → companies        (cascadeOnDelete)
     // barcodes.product_id  → products         (cascadeOnDelete)

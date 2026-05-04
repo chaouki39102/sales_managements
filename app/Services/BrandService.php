@@ -13,6 +13,8 @@ class BrandService extends \App\Core\Services\BaseService
 {
     protected string $model = Brand::class;
     protected string $resourceName = 'brand';
+    protected function getResourceName(): string { return $this->resourceName; }
+    
 
     protected function beforeCreate(array $data, $request): array
     {

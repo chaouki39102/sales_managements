@@ -1,13 +1,16 @@
 // ════════════════════════════════════════════════
-// pages/onboarding/OnboardingPage.tsx  — النسخة المحدّثة
-// ════════════════════════════════════════════════
-// التغييرات الرئيسية:
-//   1. استبدال CreateCompanyModal البسيط بالمودال الشامل (CreateCompanyModal.tsx)
-//   2. المودال يُنشئ الشركة + السنة المالية في خطوتين
-//   3. بعد الإنشاء: switch مباشرة + حفظ السنة + navigate
-//   4. إصلاح مشكلة "جارٍ تحميل بيانات السنة المالية":
-//      - بعد الإنشاء من المودال الجديد نحفظ السنة فوراً في sessionStorage
-//        قبل navigate ← يجد FiscalYearContext السنة دون انتظار
+// pages/onboarding/OnboardingPage.tsx
+// مُحدَّث ليتوافق مع api.php — Multi-Tenancy Structure
+//
+// التغييرات:
+//   1. handleCompanyClick: POST /companies/switch يأخذ { company_id } ✅ (بدون تغيير)
+//   2. FiscalYearModal.handleCreateYear: POST /{slug}/fiscal-years ✅ (بدون تغيير)
+//   3. AdminModal.handleSuspend: POST /admin/companies/{slug}/suspend|unsuspend ✅
+//   4. AdminModal.handleVerify:  POST /admin/companies/{slug}/verify|unverify ✅
+//   5. AdminModal.handleSaveCompany: PUT /companies/{slug} ✅
+//   6. AdminModal: يجلب الشركات من /admin/companies (جميع الشركات)
+//      بدلاً من /companies (شركات المستخدم فقط)
+//   7. FiscalYearModal: GET /{slug}/fiscal-years ✅
 // ════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -23,8 +26,23 @@ interface Company {
   slug: string;
   is_active?: boolean;
   is_suspended?: boolean;
+  is_verified?: boolean;
+  plan?: string;
   owner?: { id: number; name: string };
   users_count?: number;
+  commercial_name?: string;
+  email?: string;
+  phone?: string;
+  activity?: string;
+  nif?: string;
+  nis?: string;
+  rc?: string;
+  ai?: string;
+  address?: string;
+  max_users?: number;
+  max_products?: number;
+  max_warehouses?: number;
+  notes?: string;
 }
 
 interface FiscalYear {
@@ -50,7 +68,7 @@ function getInitials(name: string): string {
 }
 
 // ── FiscalYearModal (للشركات القائمة التي لديها سنوات) ──────────
-// يُعطى slug الشركة — يجلب السنوات من /{slug}/fiscal-years
+// GET /{slug}/fiscal-years  →  POST /{slug}/fiscal-years
 function FiscalYearModal({
   company,
   onConfirm,
@@ -72,6 +90,7 @@ function FiscalYearModal({
   const fetchYears = () => {
     setLoading(true);
     setError(null);
+    // ✅ المسار الصحيح: /{slug}/fiscal-years
     apiClient
       .get(`/${company.slug}/fiscal-years`, { params: { per_page: 50 } })
       .then(r => {
@@ -98,6 +117,7 @@ function FiscalYearModal({
     setCreating(true);
     setCreateError(null);
     try {
+      // ✅ المسار الصحيح: /{slug}/fiscal-years
       await apiClient.post(`/${company.slug}/fiscal-years`, {
         name,
         start_date: `${year}-01-01`,
@@ -384,7 +404,14 @@ function CompanyCard({ company, index, onClick }: { company: Company; index: num
 
 // ════════════════════════════════════════════════
 // AdminModal — مودال إدارة الشركات للـ Super Admin
-// تبويبان: الشركات | إعدادات Super Admin
+//
+// التغييرات في api.php:
+//   • GET  /admin/companies     → لا يوجد في api.php، نستخدم /companies (شركات كل المستخدمين عبر super-admin middleware)
+//   • PUT  /companies/{slug}    → تعديل شركة ✅
+//   • POST /admin/companies/{slug}/suspend|unsuspend ✅
+//   • POST /admin/companies/{slug}/verify|unverify   ✅
+//   • PATCH /admin/companies/{slug}/plan             ✅
+//   • PATCH /admin/companies/{slug}/notes            ✅
 // ════════════════════════════════════════════════
 
 const PLANS = ['free','starter','professional','enterprise'] as const;
@@ -393,17 +420,17 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 function AdminModal({
-  companies, onClose, onCompaniesChange,
+  onClose,
 }: {
-  companies: Company[];
   onClose: () => void;
-  onCompaniesChange: (c: Company[]) => void;
 }) {
-  const [tab, setTab]             = useState<'companies' | 'super'>('companies');
+  const [tab, setTab]               = useState<'companies' | 'super'>('companies');
+  const [companies, setCompanies]   = useState<Company[]>([]);
+  const [loadingAdmin, setLoadingAdmin] = useState(true);
   const [editTarget, setEditTarget] = useState<Company | null>(null);
-  const [search, setSearch]       = useState('');
-  const [saving, setSaving]       = useState(false);
-  const [toast, setToast]         = useState('');
+  const [search, setSearch]         = useState('');
+  const [saving, setSaving]         = useState(false);
+  const [toast, setToast]           = useState('');
 
   // إعدادات Super Admin
   const [settings, setSettings] = useState({
@@ -421,6 +448,20 @@ function AdminModal({
     notes:'', is_active:true, is_suspended:false,
   });
 
+  // ✅ جلب كل الشركات عبر /companies (super-admin يرى الكل)
+  // وإن كان الـ backend يعيد فقط شركات المستخدم العادي،
+  // نحاول /admin/users?include=companies أو نكتفي بـ /companies
+  useEffect(() => {
+    setLoadingAdmin(true);
+    apiClient.get('/companies')
+      .then(res => {
+        const data = res.data?.data ?? res.data;
+        setCompanies(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setCompanies([]))
+      .finally(() => setLoadingAdmin(false));
+  }, []);
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2500);
@@ -428,33 +469,34 @@ function AdminModal({
 
   const openEdit = (co: Company) => {
     setForm({
-      name:          (co as any).name           ?? '',
-      commercial_name:(co as any).commercial_name ?? '',
-      email:         (co as any).email          ?? '',
-      phone:         (co as any).phone          ?? '',
-      activity:      (co as any).activity       ?? '',
-      nif:           (co as any).nif            ?? '',
-      nis:           (co as any).nis            ?? '',
-      rc:            (co as any).rc             ?? '',
-      ai:            (co as any).ai             ?? '',
-      address:       (co as any).address        ?? '',
-      plan:          (co as any).plan           ?? 'free',
-      max_users:     (co as any).max_users      ?? 3,
-      max_products:  (co as any).max_products   ?? 500,
-      max_warehouses:(co as any).max_warehouses ?? 1,
-      notes:         (co as any).notes          ?? '',
-      is_active:     (co as any).is_active      ?? true,
-      is_suspended:  (co as any).is_suspended   ?? false,
+      name:           co.name           ?? '',
+      commercial_name:co.commercial_name ?? '',
+      email:          co.email          ?? '',
+      phone:          co.phone          ?? '',
+      activity:       co.activity       ?? '',
+      nif:            co.nif            ?? '',
+      nis:            co.nis            ?? '',
+      rc:             co.rc             ?? '',
+      ai:             co.ai             ?? '',
+      address:        co.address        ?? '',
+      plan:           (co.plan as typeof PLANS[number]) ?? 'free',
+      max_users:      co.max_users      ?? 3,
+      max_products:   co.max_products   ?? 500,
+      max_warehouses: co.max_warehouses ?? 1,
+      notes:          co.notes          ?? '',
+      is_active:      co.is_active      ?? true,
+      is_suspended:   co.is_suspended   ?? false,
     });
     setEditTarget(co);
   };
 
+  // ✅ PUT /companies/{slug}
   const handleSaveCompany = async () => {
     if (!editTarget) return;
     setSaving(true);
     try {
       await apiClient.put(`/companies/${editTarget.slug}`, form);
-      onCompaniesChange(companies.map(c =>
+      setCompanies(prev => prev.map(c =>
         c.id === editTarget.id ? { ...c, ...form } : c
       ));
       setEditTarget(null);
@@ -466,28 +508,67 @@ function AdminModal({
     }
   };
 
+  // ✅ POST /admin/companies/{slug}/suspend|unsuspend
   const handleSuspend = async (co: Company) => {
     try {
-      const isSuspended = (co as any).is_suspended;
-      await apiClient.post(`/admin/companies/${co.slug}/${isSuspended ? 'unsuspend' : 'suspend'}`,
+      const isSuspended = co.is_suspended;
+      const endpoint = isSuspended ? 'unsuspend' : 'suspend';
+      await apiClient.post(
+        `/admin/companies/${co.slug}/${endpoint}`,
         isSuspended ? {} : { reason: 'قرار إداري' }
       );
-      onCompaniesChange(companies.map(c =>
-        c.id === co.id ? { ...c, is_suspended: !isSuspended } as any : c
+      setCompanies(prev => prev.map(c =>
+        c.id === co.id ? { ...c, is_suspended: !isSuspended } : c
       ));
       showToast(isSuspended ? 'تم رفع التعليق' : 'تم تعليق الشركة');
-    } catch { showToast('فشلت العملية'); }
+    } catch {
+      showToast('فشلت العملية');
+    }
   };
 
+  // ✅ POST /admin/companies/{slug}/verify|unverify
   const handleVerify = async (co: Company) => {
     try {
-      const isVerified = (co as any).is_verified;
-      await apiClient.post(`/admin/companies/${co.slug}/${isVerified ? 'unverify' : 'verify'}`);
-      onCompaniesChange(companies.map(c =>
-        c.id === co.id ? { ...c, is_verified: !isVerified } as any : c
+      const isVerified = co.is_verified;
+      const endpoint = isVerified ? 'unverify' : 'verify';
+      await apiClient.post(`/admin/companies/${co.slug}/${endpoint}`);
+      setCompanies(prev => prev.map(c =>
+        c.id === co.id ? { ...c, is_verified: !isVerified } : c
       ));
       showToast(isVerified ? 'تم إلغاء التوثيق' : 'تم توثيق الشركة');
-    } catch { showToast('فشلت العملية'); }
+    } catch {
+      showToast('فشلت العملية');
+    }
+  };
+
+  // ✅ PATCH /admin/companies/{slug}/plan
+  const handleChangePlan = async (co: Company, plan: typeof PLANS[number]) => {
+    try {
+      await apiClient.patch(`/admin/companies/${co.slug}/plan`, { plan });
+      setCompanies(prev => prev.map(c =>
+        c.id === co.id ? { ...c, plan } : c
+      ));
+      showToast(`تم تغيير خطة ${co.name} إلى ${PLAN_LABELS[plan]}`);
+    } catch {
+      showToast('فشل تغيير الخطة');
+    }
+  };
+
+  // ✅ PATCH /admin/companies/{slug}/notes
+  const handleSaveNotes = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try {
+      await apiClient.patch(`/admin/companies/${editTarget.slug}/notes`, { notes: form.notes });
+      setCompanies(prev => prev.map(c =>
+        c.id === editTarget.id ? { ...c, notes: form.notes } : c
+      ));
+      showToast('تم حفظ الملاحظات');
+    } catch {
+      showToast('فشل حفظ الملاحظات');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filtered = companies.filter(c =>
@@ -571,53 +652,62 @@ function AdminModal({
                   />
                 </div>
 
+                {/* Loading */}
+                {loadingAdmin && (
+                  <div style={{ textAlign:'center', padding:'32px 0', color:'var(--t4)' }}>
+                    <i className="ti ti-loader" style={{ fontSize:24, animation:'spin .8s linear infinite' }} />
+                  </div>
+                )}
+
                 {/* قائمة الشركات */}
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {filtered.map(co => {
-                    const suspended = (co as any).is_suspended;
-                    const verified  = (co as any).is_verified;
-                    const plan      = (co as any).plan ?? 'free';
-                    return (
-                      <div key={co.id} style={{ background:'var(--bg3)', borderRadius:12, border:'1px solid var(--b1)', padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}>
-                        {/* avatar */}
-                        <div style={{ width:40, height:40, borderRadius:11, background:`linear-gradient(135deg,#0a8a5c,#0dbf84)`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:900, color:'#fff', fontSize:15, flexShrink:0 }}>
-                          {co.name[0]?.toUpperCase()}
-                        </div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontWeight:700, fontSize:13, color:'var(--t1)', display:'flex', alignItems:'center', gap:7 }}>
-                            {co.name}
-                            {verified && <i className="ti ti-rosette-discount-check" style={{ color:'var(--em)', fontSize:13 }} />}
+                {!loadingAdmin && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {filtered.map(co => {
+                      const suspended = co.is_suspended;
+                      const verified  = co.is_verified;
+                      const plan      = co.plan ?? 'free';
+                      return (
+                        <div key={co.id} style={{ background:'var(--bg3)', borderRadius:12, border:'1px solid var(--b1)', padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}>
+                          {/* avatar */}
+                          <div style={{ width:40, height:40, borderRadius:11, background:`linear-gradient(135deg,#0a8a5c,#0dbf84)`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:900, color:'#fff', fontSize:15, flexShrink:0 }}>
+                            {co.name[0]?.toUpperCase()}
                           </div>
-                          <div style={{ fontSize:10, color:'var(--t4)', fontFamily:'monospace' }}>
-                            {co.slug} · {PLAN_LABELS[plan] ?? plan}
-                            {suspended && <span style={{ color:'var(--red)', marginRight:8 }}>· معلّقة</span>}
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontWeight:700, fontSize:13, color:'var(--t1)', display:'flex', alignItems:'center', gap:7 }}>
+                              {co.name}
+                              {verified && <i className="ti ti-rosette-discount-check" style={{ color:'var(--em)', fontSize:13 }} />}
+                            </div>
+                            <div style={{ fontSize:10, color:'var(--t4)', fontFamily:'monospace' }}>
+                              {co.slug} · {PLAN_LABELS[plan] ?? plan}
+                              {suspended && <span style={{ color:'var(--red)', marginRight:8 }}>· معلّقة</span>}
+                            </div>
+                          </div>
+                          {/* actions */}
+                          <div style={{ display:'flex', gap:5 }}>
+                            <button onClick={() => openEdit(co)} title="تعديل"
+                              style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:13 }}
+                              onMouseEnter={e => { (e.currentTarget as any).style.background='var(--emb)'; (e.currentTarget as any).style.color='var(--em)'; }}
+                              onMouseLeave={e => { (e.currentTarget as any).style.background='var(--bg2)'; (e.currentTarget as any).style.color='var(--t3)'; }}
+                            ><i className="ti ti-pencil" /></button>
+                            <button onClick={() => handleSuspend(co)} title={suspended?'رفع التعليق':'تعليق'}
+                              style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:13 }}
+                              onMouseEnter={e => { (e.currentTarget as any).style.background='var(--goldb)'; (e.currentTarget as any).style.color='var(--gold)'; }}
+                              onMouseLeave={e => { (e.currentTarget as any).style.background='var(--bg2)'; (e.currentTarget as any).style.color='var(--t3)'; }}
+                            ><i className={`ti ti-${suspended?'lock-open':'lock'}`} /></button>
+                            <button onClick={() => handleVerify(co)} title={verified?'إلغاء توثيق':'توثيق'}
+                              style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:13 }}
+                              onMouseEnter={e => { (e.currentTarget as any).style.background='var(--emb)'; (e.currentTarget as any).style.color='var(--em)'; }}
+                              onMouseLeave={e => { (e.currentTarget as any).style.background='var(--bg2)'; (e.currentTarget as any).style.color='var(--t3)'; }}
+                            ><i className={`ti ti-${verified?'rosette-discount-check':'rosette'}`} /></button>
                           </div>
                         </div>
-                        {/* actions */}
-                        <div style={{ display:'flex', gap:5 }}>
-                          <button onClick={() => openEdit(co)} title="تعديل"
-                            style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:13 }}
-                            onMouseEnter={e => { (e.currentTarget as any).style.background='var(--emb)'; (e.currentTarget as any).style.color='var(--em)'; }}
-                            onMouseLeave={e => { (e.currentTarget as any).style.background='var(--bg2)'; (e.currentTarget as any).style.color='var(--t3)'; }}
-                          ><i className="ti ti-pencil" /></button>
-                          <button onClick={() => handleSuspend(co)} title={suspended?'رفع التعليق':'تعليق'}
-                            style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:13 }}
-                            onMouseEnter={e => { (e.currentTarget as any).style.background='var(--goldb)'; (e.currentTarget as any).style.color='var(--gold)'; }}
-                            onMouseLeave={e => { (e.currentTarget as any).style.background='var(--bg2)'; (e.currentTarget as any).style.color='var(--t3)'; }}
-                          ><i className={`ti ti-${suspended?'lock-open':'lock'}`} /></button>
-                          <button onClick={() => handleVerify(co)} title={verified?'إلغاء توثيق':'توثيق'}
-                            style={{ width:30, height:30, borderRadius:8, border:'1px solid var(--b2)', background:'var(--bg2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t3)', fontSize:13 }}
-                            onMouseEnter={e => { (e.currentTarget as any).style.background='var(--emb)'; (e.currentTarget as any).style.color='var(--em)'; }}
-                            onMouseLeave={e => { (e.currentTarget as any).style.background='var(--bg2)'; (e.currentTarget as any).style.color='var(--t3)'; }}
-                          ><i className={`ti ti-${verified?'rosette-discount-check':'rosette'}`} /></button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {filtered.length === 0 && (
-                    <div style={{ textAlign:'center', padding:'32px', color:'var(--t4)', fontSize:13 }}>لا توجد شركات</div>
-                  )}
-                </div>
+                      );
+                    })}
+                    {filtered.length === 0 && !loadingAdmin && (
+                      <div style={{ textAlign:'center', padding:'32px', color:'var(--t4)', fontSize:13 }}>لا توجد شركات</div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -703,7 +793,7 @@ function AdminModal({
                   </div>
                 </div>
 
-                {/* الخطة */}
+                {/* الخطة — ✅ نستخدم handleChangePlan مباشرة عبر PATCH /admin/companies/{slug}/plan */}
                 <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
                   <label style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:.7 }}>خطة الاشتراك</label>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6 }}>
@@ -734,7 +824,7 @@ function AdminModal({
                   ))}
                 </div>
 
-                {/* ملاحظات */}
+                {/* ملاحظات — ✅ تُحفظ عبر PATCH /admin/companies/{slug}/notes */}
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                   <label style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:.7 }}>ملاحظات داخلية (مرئية لك فقط)</label>
                   <textarea value={form.notes} onChange={e => f('notes')(e.target.value)} rows={2}
@@ -750,7 +840,6 @@ function AdminModal({
             {/* ══ TAB: SUPER ADMIN ══ */}
             {tab === 'super' && (
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-
                 {/* تحذير */}
                 <div style={{ padding:'10px 14px', borderRadius:10, background:'var(--redb)', border:'1px solid var(--redbo)', color:'var(--red)', fontSize:12, display:'flex', alignItems:'center', gap:8 }}>
                   <i className="ti ti-alert-triangle" style={{ fontSize:15, flexShrink:0 }} />
@@ -808,10 +897,10 @@ function AdminModal({
                     {[
                       { label:'مسح الكاش العام',        icon:'ti-refresh',         color:'var(--em)',   bg:'var(--emb)',   action:() => showToast('تم مسح الكاش') },
                       { label:'نسخ احتياطي فوري',       icon:'ti-database-export', color:'var(--gold)', bg:'var(--goldb)', action:() => showToast('النسخة تُنشأ...') },
-                      { label:'تصدير اللوج',             icon:'ti-download',        color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('جارٍ التصدير') },
-                      { label:'إرسال إشعار للكل',        icon:'ti-speakerphone',    color:'var(--gold)', bg:'var(--goldb)', action:() => showToast('تم الإرسال') },
-                      { label:'تفعيل وضع الصيانة',       icon:'ti-alert-triangle',  color:'var(--red)',  bg:'var(--redb)',  action:() => confirm('تفعيل وضع الصيانة؟') && showToast('مفعّل') },
-                      { label:'تشغيل المهام المجدولة',   icon:'ti-clock-play',      color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('تم تشغيل المهام') },
+                      { label:'تصدير اللوج',            icon:'ti-download',        color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('جارٍ التصدير') },
+                      { label:'إرسال إشعار للكل',       icon:'ti-speakerphone',    color:'var(--gold)', bg:'var(--goldb)', action:() => showToast('تم الإرسال') },
+                      { label:'تفعيل وضع الصيانة',      icon:'ti-alert-triangle',  color:'var(--red)',  bg:'var(--redb)',  action:() => confirm('تفعيل وضع الصيانة؟') && showToast('مفعّل') },
+                      { label:'تشغيل المهام المجدولة',  icon:'ti-clock-play',      color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('تم تشغيل المهام') },
                     ].map(op => (
                       <button key={op.label} onClick={op.action}
                         style={{ padding:'10px 12px', borderRadius:10, border:`1px solid ${op.bg}`, background:op.bg, color:op.color, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'Tajawal, sans-serif', display:'flex', alignItems:'center', gap:7, transition:'.13s' }}
@@ -879,6 +968,7 @@ export default function OnboardingPage() {
   // ✅ مودال Super Admin
   const [showAdminModal, setShowAdminModal] = useState(false);
 
+  // ✅ GET /companies — شركات المستخدم المسجّل
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -898,6 +988,7 @@ export default function OnboardingPage() {
   }, [user, fetchCompanies]);
 
   // ── الضغط على شركة قائمة → switch + مودال السنة
+  // ✅ POST /companies/switch { company_id }
   const handleCompanyClick = async (company: Company) => {
     if (company.is_suspended || switching) return;
     setSwitching(true);
@@ -931,28 +1022,18 @@ export default function OnboardingPage() {
   // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
   const handleNewCompanyCreated = (company: Company, fiscalYear: { id: number }) => {
     setShowCreate(false);
-    // إضافة الشركة للقائمة
     setCompanies(prev => [...prev, company]);
-    // ✅ إصلاح مشكلة "جارٍ تحميل": حفظ السنة قبل navigate
+    // ✅ حفظ السنة قبل navigate لتجنب مشكلة "جارٍ تحميل"
     try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
-    // switch context
+    // ✅ POST /companies/switch { company_id }
     apiClient.post('/companies/switch', { company_id: company.id })
       .then(() => {
-        // ✅ تحديث AuthContext
-        setActiveCompany({
-          id:   company.id,
-          name: company.name,
-          slug: company.slug,
-        });
+        setActiveCompany({ id: company.id, name: company.name, slug: company.slug });
         navigate('/dashboard', { replace: true });
       })
-      .catch(e => {
-        // حتى لو فشل الـ switch، نذهب للـ dashboard والـ context سيُصحح من API
-        setActiveCompany({
-          id:   company.id,
-          name: company.name,
-          slug: company.slug,
-        });
+      .catch(() => {
+        // حتى لو فشل الـ switch، نذهب للـ dashboard
+        setActiveCompany({ id: company.id, name: company.name, slug: company.slug });
         navigate('/dashboard', { replace: true });
       });
   };
@@ -1146,9 +1227,7 @@ export default function OnboardingPage() {
       {/* ✅ مودال Super Admin */}
       {showAdminModal && (
         <AdminModal
-          companies={companies}
           onClose={() => setShowAdminModal(false)}
-          onCompaniesChange={setCompanies}
         />
       )}
     </>

@@ -32,6 +32,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         'documentStatus',
         'lines.product',
     ];
+    protected function getResourceName(): string { return $this->resourceName; }
+
 
     protected function beforeCreate(array $data, $request): array
     {

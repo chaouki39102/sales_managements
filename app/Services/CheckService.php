@@ -11,6 +11,8 @@ class CheckService extends \App\Core\Services\BaseService
     protected string $model = Check::class;
     protected string $resourceName = 'check';
     protected array $defaultWith = ['party', 'payments'];
+    protected function getResourceName(): string { return $this->resourceName; }
+    
 
     public function getPending()
     {

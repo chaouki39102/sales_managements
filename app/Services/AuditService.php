@@ -10,6 +10,8 @@ class AuditService extends \App\Core\Services\BaseService
     protected string $model = Audit::class;
     protected string $resourceName = 'audit';
     protected array $defaultWith = ['user'];
+    protected function getResourceName(): string { return $this->resourceName; }
+    
 
     public function getByUser(int $userId)
     {

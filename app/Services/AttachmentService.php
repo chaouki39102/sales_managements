@@ -10,6 +10,8 @@ class AttachmentService extends \App\Core\Services\BaseService
     protected string $model = Attachment::class;
     protected string $resourceName = 'attachment';
     protected array $defaultWith = ['uploadedBy'];
+    protected function getResourceName(): string { return $this->resourceName; }
+    
 
     public function getFilePath(Attachment $attachment): string
     {
