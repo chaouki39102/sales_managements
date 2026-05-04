@@ -12,37 +12,41 @@ class RoleService extends \App\Core\Services\BaseService
     protected string $resourceName = 'role';
     protected array  $defaultWith  = ['permissions'];
 
-    // ✅ الإصلاح: نخزن permission_ids هنا على الـ Service (PHP property عادية)
-    // بدل تخزينها على الـ model كـ attribute، لأن Eloquent يحاول كتابة
-    // أي attribute غير معروف في قاعدة البيانات وهو ما سبب الخطأ
-    private ?array $pendingPermissionIds = null;
-
     protected function getResourceName(): string
     {
         return 'role';
     }
 
-    protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
+    // ═══════════════════════════════════════════
+    // تجاوز update() لحل مشكلة permission_ids
+    // ═══════════════════════════════════════════
+    // BaseService::update() يحذف permission_ids في prepareDataForUpdate
+    // ثم يمرر $data بدونها لـ afterUpdate.
+    // الحل: نستخرج permission_ids قبل parent::update() ونطبقها بعده.
+
+    public function update(Model $item, array $data, Request $request = null): Model
     {
-        if (array_key_exists('permission_ids', $data)) {
-            // ✅ نخزّنها على الـ Service لا على الـ model
-            $this->pendingPermissionIds = $data['permission_ids'] ?? [];
-            unset($data['permission_ids']);
-        } else {
-            $this->pendingPermissionIds = null;
+        $permissionIds = array_key_exists('permission_ids', $data)
+            ? ($data['permission_ids'] ?? [])
+            : null;
+
+        $item = parent::update($item, $data, $request);
+
+        if ($permissionIds !== null) {
+            $item->syncPermissions($permissionIds);
         }
 
-        return parent::prepareDataForUpdate($item, $data, $request);
+        return $item->fresh($this->defaultWith);
     }
 
-    protected function afterUpdate(Model $item, array $data, ?Request $request): void
-    {
-        if ($this->pendingPermissionIds !== null) {
-            $item->syncPermissions($this->pendingPermissionIds);
-            $this->pendingPermissionIds = null; // تنظيف بعد الاستخدام
-        }
+    // ═══════════════════════════════════════════
+    // Hooks
+    // ═══════════════════════════════════════════
 
-        $item->load('permissions');
+    protected function beforeCreate(array $data, ?Request $request): array
+    {
+        $data['guard_name'] ??= 'web';
+        return $data;
     }
 
     protected function afterCreate(Model $item, array $data, ?Request $request): void
@@ -53,9 +57,15 @@ class RoleService extends \App\Core\Services\BaseService
         $item->load('permissions');
     }
 
-    protected function beforeCreate(array $data, ?Request $request): array
+    protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
     {
-        $data['guard_name'] ??= 'web';
-        return $data;
+        unset($data['permission_ids']); // تُعالج في update() المُتجاوَز
+        return parent::prepareDataForUpdate($item, $data, $request);
+    }
+
+    protected function afterUpdate(Model $item, array $data, ?Request $request): void
+    {
+        // permission_ids تُعالج في update() المُتجاوَز — لا شيء هنا
+        $item->load('permissions');
     }
 }

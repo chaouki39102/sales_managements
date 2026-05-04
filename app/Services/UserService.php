@@ -23,6 +23,31 @@ class UserService extends \App\Core\Services\BaseService
     }
 
     // ═══════════════════════════════════════════
+    // تجاوز update() لحل مشكلة permission_ids
+    // ═══════════════════════════════════════════
+    // المشكلة: BaseService::update() يحذف permission_ids في prepareDataForUpdate
+    // ثم يمرر $data بدونها لـ afterUpdate — فلا تُحفظ الصلاحيات أبداً.
+    // الحل: نتجاوز update() ونعالج permission_ids قبل استدعاء الـ parent.
+
+    public function update(Model $item, array $data, Request $request = null): Model
+    {
+        // نستخرج permission_ids قبل أن يأخذها BaseService ويفقدها
+        $permissionIds = array_key_exists('permission_ids', $data)
+            ? ($data['permission_ids'] ?? [])
+            : null; // null = لم تُرسل (لا تغيير)
+
+        // نستدعي الـ parent الذي يعالج باقي الحقول
+        $item = parent::update($item, $data, $request);
+
+        // نطبق الصلاحيات بعد الحفظ مباشرة
+        if ($permissionIds !== null) {
+            $item->syncPermissions($permissionIds);
+        }
+
+        return $item->fresh($this->defaultWith);
+    }
+
+    // ═══════════════════════════════════════════
     // Hooks
     // ═══════════════════════════════════════════
 
@@ -33,15 +58,12 @@ class UserService extends \App\Core\Services\BaseService
         $data['created_by'] = auth()->id();
         $data['active']     ??= true;
 
-        // تشفير كلمة المرور
         if (!empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         }
 
-        // التحقق من البريد الفريد داخل الشركة
         $this->validateUniqueEmail($data['email'], $companyId);
 
-        // التحقق من اسم المستخدم الفريد (إن وُجد)
         if (!empty($data['username'])) {
             $this->validateUniqueUsername($data['username']);
         }
@@ -51,12 +73,14 @@ class UserService extends \App\Core\Services\BaseService
 
     protected function afterCreate(Model $item, array $data, ?Request $request): void
     {
-        // إسناد الدور
         if (!empty($data['role'])) {
             $item->syncRoles([$data['role']]);
         }
 
-        // رفع الصورة الرمزية إن وُجدت
+        if (isset($data['permission_ids']) && is_array($data['permission_ids'])) {
+            $item->syncPermissions($data['permission_ids']);
+        }
+
         if (!empty($data['avatar_file'])) {
             $this->handleAvatarUpload($item, $data['avatar_file']);
         }
@@ -70,22 +94,18 @@ class UserService extends \App\Core\Services\BaseService
 
     protected function beforeUpdate(Model $item, array $data, ?Request $request): void
     {
-        // منع تغيير الشركة
         if (isset($data['company_id']) && (int)$data['company_id'] !== (int)$item->company_id) {
             throw new BusinessRuleException('لا يمكن تغيير الشركة المرتبطة بالمستخدم.', 422);
         }
 
-        // لا يمكن تغيير دور نفسك
         if ($request && auth()->id() === $item->id && isset($data['role'])) {
             throw new BusinessRuleException('لا يمكنك تغيير دورك الخاص.', 422);
         }
 
-        // التحقق من البريد إذا تغير
         if (isset($data['email']) && $data['email'] !== $item->email) {
             $this->validateUniqueEmail($data['email'], $item->company_id, $item->id);
         }
 
-        // التحقق من اسم المستخدم إذا تغير
         if (isset($data['username']) && $data['username'] !== $item->username) {
             $this->validateUniqueUsername($data['username'], $item->id);
         }
@@ -94,16 +114,14 @@ class UserService extends \App\Core\Services\BaseService
     protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
     {
         unset($data['company_id']);
-        unset($data['permission_ids']); // تُعالج في afterUpdate، ليست عمود في DB
+        unset($data['permission_ids']); // تُعالج في update() المُتجاوَز
 
-        // معالجة كلمة المرور
         if (!empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         } else {
             unset($data['password']);
         }
 
-        // معالجة الصورة الرمزية (لا تمرر إلى DB مباشرة)
         unset($data['avatar_file']);
 
         $data['updated_by'] = auth()->id();
@@ -113,16 +131,12 @@ class UserService extends \App\Core\Services\BaseService
 
     protected function afterUpdate(Model $item, array $data, ?Request $request): void
     {
-        // مزامنة الدور
+        // الدور
         if (isset($data['role']) && $data['role']) {
             $item->syncRoles([$data['role']]);
         }
 
-        // مزامنة الصلاحيات المباشرة (Direct Permissions)
-        // array_key_exists لأن [] تعني "إزالة كل الصلاحيات"
-        if (array_key_exists('permission_ids', $data)) {
-            $item->syncPermissions($data['permission_ids'] ?? []);
-        }
+        // permission_ids تُعالج في update() المُتجاوَز — لا شيء هنا
 
         if ($request && $request->hasFile('avatar_file')) {
             $this->handleAvatarUpload($item, $request->file('avatar_file'));
@@ -148,42 +162,31 @@ class UserService extends \App\Core\Services\BaseService
     // العمليات المتقدمة
     // ═══════════════════════════════════════════
 
-    /**
-     * تغيير كلمة المرور.
-     */
     public function changePassword(User $user, string $newPassword): void
     {
         $user->update([
-            'password' => Hash::make($newPassword),
+            'password'   => Hash::make($newPassword),
             'updated_by' => auth()->id(),
         ]);
     }
 
-    /**
-     * تبديل حالة التفعيل (active ↔ inactive).
-     */
     public function toggleActive(User $user): User
     {
         if ($user->id === auth()->id()) {
             throw new BusinessRuleException('لا يمكنك تعطيل حسابك الخاص.', 422);
         }
 
-        $user->active = !$user->active;
+        $user->active     = !$user->active;
         $user->updated_by = auth()->id();
         $user->save();
 
         return $user->fresh($this->defaultWith);
     }
 
-    /**
-     * تحديث البروفايل الشخصي (المستخدم نفسه يعدل بياناته).
-     * يسمح فقط بحقول معينة.
-     */
     public function updateProfile(User $user, array $data): User
     {
-        $allowed = ['name', 'username', 'phone', 'bio', 'avatar', 'birth_date',
-                    'gender_id', 'address', 'commune_id', 'wilaya_id'];
-
+        $allowed  = ['name', 'username', 'phone', 'bio', 'avatar', 'birth_date',
+                     'gender_id', 'address', 'commune_id', 'wilaya_id'];
         $filtered = array_intersect_key($data, array_flip($allowed));
 
         if (isset($filtered['username']) && $filtered['username'] !== $user->username) {
@@ -195,25 +198,16 @@ class UserService extends \App\Core\Services\BaseService
         return $user->fresh($this->defaultWith);
     }
 
-    /**
-     * رفع أو تحديث الصورة الرمزية.
-     */
     public function updateAvatar(User $user, $file): string
     {
-        // حذف القديم إن وجد
         if ($user->avatar) {
             Storage::disk('public')->delete($user->avatar);
         }
-
         $path = $file->store('avatars', 'public');
         $user->update(['avatar' => $path]);
-
         return Storage::disk('public')->url($path);
     }
 
-    /**
-     * تحديث آخر تسجيل دخول.
-     */
     public function updateLastLogin(User $user): void
     {
         $user->update([
@@ -222,9 +216,6 @@ class UserService extends \App\Core\Services\BaseService
         ]);
     }
 
-    /**
-     * استعادة مستخدم محذوف.
-     */
     public function restoreUser(int $id): User
     {
         $user = User::withTrashed()->findOrFail($id);
@@ -236,13 +227,9 @@ class UserService extends \App\Core\Services\BaseService
         return $user->fresh($this->defaultWith);
     }
 
-    /**
-     * حذف نهائي.
-     */
     public function forceDeleteUser(int $id): void
     {
         $user = User::withTrashed()->findOrFail($id);
-        // حذف الصورة الرمزية إن وجدت
         if ($user->avatar) {
             Storage::disk('public')->delete($user->avatar);
         }

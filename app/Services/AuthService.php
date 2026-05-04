@@ -10,22 +10,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
-/**
- * Authentication Service
- *
- * مسؤول عن جميع عمليات المصادقة والتفويض:
- * - تسجيل مستخدم جديد
- * - تسجيل الدخول
- * - إدارة كلمات المرور
- * - إنشاء التوكنات
- *
- * @package App\Services
- */
 class AuthService extends \App\Core\Services\BaseService
 {
     protected function getResourceName(): string
     {
-        return 'user'; // أو $this->resourceName إن أردت
+        return 'user';
     }
     protected string $model = User::class;
     protected string $resourceName = 'user';
@@ -33,9 +22,6 @@ class AuthService extends \App\Core\Services\BaseService
     protected int $maxLoginAttempts = 5;
     protected int $lockoutMinutes = 15;
 
-    /**
-     * تسجيل مستخدم جديد
-     */
     public function register(array $data): User
     {
         if (User::where('email', $data['email'])->exists()) {
@@ -43,15 +29,12 @@ class AuthService extends \App\Core\Services\BaseService
         }
 
         return $this->create([
-            'name' => $data['name'],
-            'email' => $data['email'],
+            'name'     => $data['name'],
+            'email'    => $data['email'],
             'password' => $data['password'],
         ]);
     }
 
-    /**
-     * تسجيل الدخول
-     */
     public function login(string $email, string $password): User
     {
         if (LoginAttempt::isLockedOut($email, $this->maxLoginAttempts, $this->lockoutMinutes)) {
@@ -70,12 +53,12 @@ class AuthService extends \App\Core\Services\BaseService
 
         LoginAttempt::record($email, true);
 
+        // ✅ تسجيل وقت وعنوان آخر دخول
+        $user->updateLastLogin();
+
         return $user;
     }
 
-    /**
-     * تغيير كلمة المرور
-     */
     public function changePassword(User $user, string $currentPassword, string $newPassword): void
     {
         if (!Hash::check($currentPassword, $user->password)) {
