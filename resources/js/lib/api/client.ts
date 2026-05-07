@@ -190,17 +190,19 @@ client.interceptors.request.use(
     const originalUrl = config.url ?? '';
 
     // 7-b. إضافة slug تلقائيًا لجميع مسارات tenant
+    // المقارنة مع active slug فقط — آمنة لأن أي مسار بـ slug مختلف
+    // يُرسَل يدوياً فقط من OnboardingPage حيث slug=null أصلاً
     if (slug && !isPublicPath(originalUrl)) {
       if (!originalUrl.startsWith(`/${slug}/`)) {
         config.url = `/${slug}${originalUrl}`;
-        // للتتبع أثناء التطوير (يمكن إزالته لاحقاً)
         if (import.meta.env.DEV) {
           console.debug(`🌐 Tenant request: ${config.method?.toUpperCase()} ${config.baseURL ?? ''}${config.url}`);
         }
       }
     } else if (!slug && !isPublicPath(originalUrl)) {
-      // تحذير إذا كان الطلب يحتاج slug ولم نجده
-      if (import.meta.env.DEV) {
+      // تحذير فقط إذا لم يكن المسار يحتوي slug مضمَّناً (مثل طلبات OnboardingPage/DataSeedingModal)
+      const hasEmbeddedSlug = /^\/[a-z0-9][a-z0-9-]{2,}[a-z0-9]\//.test(originalUrl);
+      if (import.meta.env.DEV && !hasEmbeddedSlug) {
         console.warn(`⚠️ No active company slug for request: ${config.method?.toUpperCase()} ${originalUrl}`);
       }
     }

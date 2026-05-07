@@ -742,10 +742,9 @@ export function CreateCompanyModal({ onCreated, onClose }: CreateCompanyModalPro
   const handleFiscalDone = useCallback((fy: FiscalYear) => {
     setFiscalYear(fy);
     setStep('success');
-    // تأخير قصير لإظهار رسالة النجاح قبل الإغلاق
-    setTimeout(() => {
-      if (company) onCreated(company, fy);
-    }, 1200);
+    // نستدعي onCreated فوراً — التأخير كان يسبب فقدان navigate state في SetupHub
+    // StepSuccess تعرض رسالة النجاح لكن onCreated يُطلق الـ navigate فوراً
+    if (company) onCreated(company, fy);
   }, [company, onCreated]);
 
   return (

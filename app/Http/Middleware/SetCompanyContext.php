@@ -19,15 +19,25 @@ class SetCompanyContext
     public function handle(Request $request, Closure $next): Response
     {
         // 1. جلب slug من الـ route
-        $slug = $request->route('company');
-        if (!$slug) {
+        // SubstituteBindings قد يُحوِّل {company} إلى Company Model قبل وصولنا
+        // لذا نتعامل مع الحالتين: raw slug أو Model جاهز
+        $raw = $request->route()->originalParameter('company') ?? $request->route('company');
+
+        if (!$raw) {
             abort(404);
         }
 
         // 2. جلب الشركة
-        $company = Company::where('slug', $slug)
-            ->where('is_active', true)
-            ->firstOrFail();
+        if ($raw instanceof Company) {
+            $company = $raw;
+            if (!$company->is_active) {
+                abort(404);
+            }
+        } else {
+            $company = Company::where('slug', $raw)
+                ->where('is_active', true)
+                ->firstOrFail();
+        }
 
         // 3. التحقق من صلاحية المستخدم
         /** @var User $user */

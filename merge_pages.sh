@@ -2,7 +2,7 @@
 
 set -e
 
-ROOT="resources/js/pages"
+ROOT="resources/"
 OUTPUT="merged-pages.md"
 
 > "$OUTPUT"
@@ -69,40 +69,10 @@ merge_section "🧩 COMPONENTS" \
   \( -path "*/components/*" \) "${EXCLUDE[@]}"
 
 # PAGES
-merge_section "📄 PAGES" \
-  \( -path "*/pages/*" \) "${EXCLUDE[@]}"
 
-# HOOKS
-merge_section "🧠 HOOKS" \
-  \( -path "*/hooks/*" \) "${EXCLUDE[@]}"
-
-# CONTEXT
-merge_section "🌐 CONTEXT" \
-  \( -path "*/context/*" \) "${EXCLUDE[@]}"
 
 # LIB / API
-merge_section "🔌 API / LIB" \
-  \( -path "*/lib/*" \) "${EXCLUDE[@]}"
 
-# POS
-merge_section "🛒 POS MODULE" \
-  \( -path "*/pos/*" \) "${EXCLUDE[@]}"
-
-# CONFIG
-merge_section "⚙️ CONFIG" \
-  \( -path "*/config/*" \) "${EXCLUDE[@]}"
-
-# TYPES
-merge_section "📘 TYPES" \
-  \( -path "*/types/*" \) "${EXCLUDE[@]}"
-
-# ROOT FILES
-merge_section "🚀 ROOT FILES" \
-  \( -iname "app.jsx" -o -iname "App.tsx" -o -iname "bootstrap.js" \) "${EXCLUDE[@]}"
-
-# VIEWS
-merge_section "🧾 VIEWS" \
-  \( -iname "*.blade.php" \) "${EXCLUDE[@]}"
 
 
 

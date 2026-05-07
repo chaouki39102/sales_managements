@@ -18,6 +18,7 @@ import apiClient from '@/lib/api/client';
 import { useAuth } from '@/context/AuthContext';
 // ✅ المودال الجديد الشامل
 import { CreateCompanyModal } from '@/components/modals/CreateCompanyModal';
+import DataSeedingModal from '@/components/modals/DataSeedingModal';
 
 // ── Types ──────────────────────────────────────
 interface Company {
@@ -967,6 +968,8 @@ export default function OnboardingPage() {
   const [switching, setSwitching]           = useState(false);
   // ✅ مودال Super Admin
   const [showAdminModal, setShowAdminModal] = useState(false);
+  // ✅ مودال إعداد البيانات الأولية — يظهر بعد إنشاء شركة جديدة
+  const [seedingCompany, setSeedingCompany] = useState<{ slug: string; name: string; id: number } | null>(null);
 
   // ✅ GET /companies — شركات المستخدم المسجّل
   const fetchCompanies = useCallback(async () => {
@@ -1020,22 +1023,50 @@ export default function OnboardingPage() {
   };
 
   // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
-  const handleNewCompanyCreated = (company: Company, fiscalYear: { id: number }) => {
+  // يجب استدعاء switch أولاً حتى يُسجَّل المستخدم كعضو نشط في company_user
+  // وبالتالي يتجاوز middleware SetCompanyContext عند طلبات الـ seeding
+  const handleNewCompanyCreated = async (company: Company, fiscalYear: { id: number }) => {
     setShowCreate(false);
     setCompanies(prev => [...prev, company]);
-    // ✅ حفظ السنة قبل navigate لتجنب مشكلة "جارٍ تحميل"
     try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
-    // ✅ POST /companies/switch { company_id }
-    apiClient.post('/companies/switch', { company_id: company.id })
-      .then(() => {
-        setActiveCompany({ id: company.id, name: company.name, slug: company.slug });
-        navigate('/dashboard', { replace: true });
-      })
-      .catch(() => {
-        // حتى لو فشل الـ switch، نذهب للـ dashboard
-        setActiveCompany({ id: company.id, name: company.name, slug: company.slug });
-        navigate('/dashboard', { replace: true });
-      });
+
+    // ✅ switch أولاً → يُسجَّل العضو في DB → middleware يقبل طلبات الـ seeding
+    try {
+      await apiClient.post('/companies/switch', { company_id: company.id });
+    } catch {}
+
+    setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });
+  };
+
+  // ✅ عند اكتمال الـ seeding → تفعيل الشركة ثم الانتقال
+  const handleSeedingComplete = async () => {
+    if (!seedingCompany) return;
+    try {
+      await apiClient.post('/companies/switch', { company_id: seedingCompany.id });
+    } catch {}
+
+    setActiveCompany({
+      id: seedingCompany.id,
+      name: seedingCompany.name,
+      slug: seedingCompany.slug,
+    });
+    setSeedingCompany(null);
+    navigate('/dashboard', { replace: true });
+  };
+
+  const handleSeedingSkip = async () => {
+    if (!seedingCompany) return;
+    try {
+      await apiClient.post('/companies/switch', { company_id: seedingCompany.id });
+    } catch {}
+
+    setActiveCompany({
+      id: seedingCompany.id,
+      name: seedingCompany.name,
+      slug: seedingCompany.slug,
+    });
+    setSeedingCompany(null);
+    navigate('/dashboard', { replace: true });
   };
 
   if (!user) return null;
@@ -1228,6 +1259,16 @@ export default function OnboardingPage() {
       {showAdminModal && (
         <AdminModal
           onClose={() => setShowAdminModal(false)}
+        />
+      )}
+
+      {/* ✅ مودال إعداد البيانات الأولية — يظهر بعد إنشاء شركة جديدة */}
+      {seedingCompany && (
+        <DataSeedingModal
+          companySlug={seedingCompany.slug}
+          companyName={seedingCompany.name}
+          onClose={handleSeedingSkip}
+          onComplete={handleSeedingComplete}
         />
       )}
     </>

@@ -4,7 +4,7 @@
 SOURCE_DIR=${1:-.}
 
 # اسم الملف الناتج
-OUTPUT_FILE="merged-files.ts"
+OUTPUT_FILE="merged-ui.ts"
 
 # حذف الملف القديم إن وجد
 > "$OUTPUT_FILE"

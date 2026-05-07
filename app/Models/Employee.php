@@ -88,6 +88,15 @@ class Employee extends Model
     {
         return $this->hasMany(EmploymentContract::class);
     }
+    // في Employee.php
+    protected static function booted()
+    {
+        static::creating(function ($employee) {
+            if (auth()->check()) {
+                $employee->created_by = auth()->id();
+            }
+        });
+    }
 
     // -------------------- Accessors --------------------
 

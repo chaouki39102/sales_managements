@@ -266,9 +266,9 @@ const saveMutation = useMutation({
 });
 
     const handleSave = () => {
-        if (!form.first_name.trim() || !form.last_name.trim()) {
-            setError('الاسم واللقب مطلوبان');
-            return;
+        if (!form.first_name.trim() || !form.last_name.trim() || !form.matricule.trim()) {
+        setError('الاسم واللقب ورقم التسجيل حقول مطلوبة');
+        return;
         }
         saveMutation.mutate(form);
     };

@@ -35,8 +35,12 @@ class DocumentTypeResource extends JsonResource
             ],
 
             'computed' => [
-                'affects_stock_in' => $this->affects_stock_in(),
-                'affects_stock_out' => $this->affects_stock_out(),
+                'affects_stock_in'  => method_exists($this->resource, 'affects_stock_in')
+                    ? $this->resource->affects_stock_in()
+                    : ($this->affects_stock_direction === 'in'),
+                'affects_stock_out' => method_exists($this->resource, 'affects_stock_out')
+                    ? $this->resource->affects_stock_out()
+                    : ($this->affects_stock_direction === 'out'),
             ],
         ];
     }

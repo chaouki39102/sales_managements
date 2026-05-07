@@ -1,277 +1,227 @@
-// components/ui/Table.tsx
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 
-/* ─── Column definition ─── */
-export interface TableColumn<T = Record<string, unknown>> {
+export interface TableColumn<T> {
   key: string;
-  label: string;
+  header: string;
+  render?: (row: T, index: number) => React.ReactNode;
   sortable?: boolean;
-  width?: string;
-  align?: 'right' | 'center' | 'left';
-  /** Custom cell renderer */
-  render?: (value: unknown, row: T, rowIndex: number) => React.ReactNode;
-  /** Extra td className e.g. "s" | "m" | "e" | "r" | "g" | "b" */
-  tdClass?: string;
+  width?: string | number;
+  align?: 'start' | 'center' | 'end';
 }
 
-export interface TableAction<T = Record<string, unknown>> {
-  label: string;
-  icon?: React.ReactNode;
-  onClick: (row: T) => void;
-  variant?: 'default' | 'danger';
-}
-
-export interface TableProps<T = Record<string, unknown>> {
+interface TableProps<T> {
   columns: TableColumn<T>[];
   data: T[];
-  keyField?: string;           // unique row key (default: "id")
+  rowKey: keyof T | ((row: T) => string | number);
   loading?: boolean;
-  emptyIcon?: string;          // tabler icon e.g. "ti-table-off"
-  emptyText?: string;
-  actions?: TableAction<T>[];
+  emptyMessage?: string;
+  selectable?: boolean;
+  selectedKeys?: Set<string | number>;
+  onSelectionChange?: (keys: Set<string | number>) => void;
+  sortKey?: string;
+  sortDir?: 'asc' | 'desc';
+  onSort?: (key: string) => void;
   onRowClick?: (row: T) => void;
-  pageSize?: number;           // 0 = no pagination
-  defaultSort?: { key: string; dir: 'asc' | 'desc' };
   stickyHeader?: boolean;
-  striped?: boolean;
+  className?: string;
 }
 
-type SortDir = 'asc' | 'desc' | null;
-
-function SortIcon({ dir }: { dir: SortDir }) {
+function SortIcon({ active, dir }: { active: boolean; dir?: 'asc' | 'desc' }) {
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 1, marginRight: 4, opacity: dir ? 1 : 0.3, verticalAlign: 'middle' }}>
-      <svg width="8" height="5" viewBox="0 0 8 5" fill="none">
-        <path d="M4 0L7.5 4.5H0.5L4 0Z" fill={dir === 'asc' ? 'currentColor' : 'var(--t4)'} />
-      </svg>
-      <svg width="8" height="5" viewBox="0 0 8 5" fill="none">
-        <path d="M4 5L0.5 0.5H7.5L4 5Z" fill={dir === 'desc' ? 'currentColor' : 'var(--t4)'} />
-      </svg>
-    </span>
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: active ? 1 : 0.4 }}>
+      <path d={dir === 'desc' || !active ? "M3 4.5l3-3 3 3" : "M3 7.5l3 3 3-3"} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+      {!active && <path d="M3 7.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>}
+    </svg>
   );
 }
 
-function SkeletonRow({ cols }: { cols: number }) {
-  return (
-    <tr>
-      {Array.from({ length: cols }).map((_, i) => (
-        <td key={i}>
-          <div style={{
-            height: 14, borderRadius: 4,
-            background: 'var(--bg4)',
-            width: i === 0 ? '70%' : i % 2 === 0 ? '50%' : '60%',
-            animation: 'skPulse 1.4s ease-in-out infinite',
-          }} />
-        </td>
-      ))}
-    </tr>
-  );
-}
-
-export default function Table<T extends Record<string, unknown>>({
-  columns,
-  data,
-  keyField = 'id',
-  loading = false,
-  emptyIcon = 'ti-table-off',
-  emptyText = 'لا توجد بيانات',
-  actions,
-  onRowClick,
-  pageSize = 15,
-  defaultSort,
-  stickyHeader = false,
-  striped = false,
-}: TableProps<T>) {
-  const [sortKey, setSortKey] = useState<string>(defaultSort?.key ?? '');
-  const [sortDir, setSortDir] = useState<SortDir>(defaultSort?.dir ?? null);
-  const [page, setPage] = useState(1);
-
-  /* ── Sorting ── */
-  const sorted = useMemo(() => {
-    if (!sortKey || !sortDir) return data;
-    return [...data].sort((a, b) => {
-      const av = a[sortKey] ?? '';
-      const bv = b[sortKey] ?? '';
-      const cmp = typeof av === 'number' && typeof bv === 'number'
-        ? av - bv
-        : String(av).localeCompare(String(bv), 'ar');
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [data, sortKey, sortDir]);
-
-  /* ── Pagination ── */
-  const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
-  const currentPage = Math.min(page, totalPages);
-  const rows = pageSize > 0
-    ? sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-    : sorted;
-
-  /* ── Sort toggle ── */
-  function toggleSort(key: string) {
-    if (sortKey !== key) { setSortKey(key); setSortDir('asc'); setPage(1); return; }
-    if (sortDir === 'asc') { setSortDir('desc'); return; }
-    setSortKey(''); setSortDir(null);
-  }
-
-  /* ── Derived ── */
-  const hasActions = actions && actions.length > 0;
-  const colCount = columns.length + (hasActions ? 1 : 0);
-  const isEmpty = !loading && data.length === 0;
-
+function TableSkeleton({ cols, rows }: { cols: number; rows: number }) {
   return (
     <>
-      <style>{`
-        @keyframes skPulse{0%,100%{opacity:.4}50%{opacity:1}}
-        .tbl-wrap table tbody tr.clickable:hover{background:var(--bg3);cursor:pointer;}
-        .tbl-wrap table tbody tr.striped-row:nth-child(even){background:var(--bg3);}
-        .tbl-action-btn{
-          padding:4px 9px;border-radius:var(--r1);border:1px solid var(--b2);
-          background:var(--bg3);color:var(--t3);font-size:11.5px;font-weight:700;
-          cursor:pointer;font-family:'Tajawal',sans-serif;transition:.13s;
-          display:inline-flex;align-items:center;gap:4px;
-        }
-        .tbl-action-btn:hover{background:var(--bg4);color:var(--t1);}
-        .tbl-action-btn.danger:hover{background:var(--redb);border-color:var(--redbo);color:var(--red);}
-        .tbl-pg-btn{
-          width:30px;height:30px;border-radius:var(--r1);border:1px solid var(--b2);
-          background:var(--bg3);color:var(--t3);font-size:12px;font-weight:700;
-          cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.13s;
-        }
-        .tbl-pg-btn:hover:not(:disabled){background:var(--bg4);color:var(--t1);}
-        .tbl-pg-btn:disabled{opacity:.35;cursor:not-allowed;}
-        .tbl-pg-btn.on{background:var(--em);border-color:var(--em);color:#fff;}
-      `}</style>
-
-      <div className="tbl-wrap">
-        <div className="tw">
-          <table>
-            <thead>
-              <tr>
-                {columns.map(col => {
-                  const dir: SortDir = sortKey === col.key ? sortDir : null;
-                  return (
-                    <th
-                      key={col.key}
-                      style={{
-                        width: col.width,
-                        textAlign: col.align ?? 'right',
-                        cursor: col.sortable ? 'pointer' : 'default',
-                        userSelect: 'none',
-                        position: stickyHeader ? 'sticky' : undefined,
-                        top: stickyHeader ? 0 : undefined,
-                        zIndex: stickyHeader ? 1 : undefined,
-                      }}
-                      onClick={() => col.sortable && toggleSort(col.key)}
-                    >
-                      {col.sortable && <SortIcon dir={dir} />}
-                      {col.label}
-                    </th>
-                  );
-                })}
-                {hasActions && <th style={{ textAlign: 'center', width: '1%', whiteSpace: 'nowrap' }}>إجراءات</th>}
-              </tr>
-            </thead>
-
-            <tbody>
-              {/* Loading skeleton */}
-              {loading && Array.from({ length: pageSize || 5 }).map((_, i) => (
-                <SkeletonRow key={i} cols={colCount} />
-              ))}
-
-              {/* Empty state */}
-              {isEmpty && (
-                <tr>
-                  <td colSpan={colCount}>
-                    <div className="empty" style={{ padding: '40px 20px' }}>
-                      <div className="empty-ic"><i className={`ti ${emptyIcon}`} /></div>
-                      <div className="empty-tx">{emptyText}</div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-
-              {/* Data rows */}
-              {!loading && rows.map((row, ri) => (
-                <tr
-                  key={String(row[keyField] ?? ri)}
-                  className={[
-                    onRowClick ? 'clickable' : '',
-                    striped ? 'striped-row' : '',
-                  ].join(' ')}
-                  onClick={() => onRowClick?.(row)}
-                >
-                  {columns.map(col => {
-                    const val = row[col.key];
-                    return (
-                      <td
-                        key={col.key}
-                        className={col.tdClass}
-                        style={{ textAlign: col.align ?? 'right' }}
-                      >
-                        {col.render ? col.render(val, row, ri) : (val as React.ReactNode)}
-                      </td>
-                    );
-                  })}
-                  {hasActions && (
-                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', gap: 5, justifyContent: 'center' }}>
-                        {actions!.map((act, ai) => (
-                          <button
-                            key={ai}
-                            className={`tbl-action-btn ${act.variant === 'danger' ? 'danger' : ''}`}
-                            onClick={e => { e.stopPropagation(); act.onClick(row); }}
-                          >
-                            {act.icon && <span className="ic ic-xs">{act.icon}</span>}
-                            {act.label}
-                          </button>
-                        ))}
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {pageSize > 0 && !isEmpty && !loading && totalPages > 1 && (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 14px', borderTop: '1px solid var(--b1)',
-            background: 'var(--bg3)', borderRadius: '0 0 var(--r3) var(--r3)',
-          }}>
-            <span style={{ fontSize: 12, color: 'var(--t4)' }}>
-              {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, sorted.length)} من {sorted.length}
-            </span>
-
-            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-              <button className="tbl-pg-btn" disabled={currentPage === 1} onClick={() => setPage(1)}>«</button>
-              <button className="tbl-pg-btn" disabled={currentPage === 1} onClick={() => setPage(p => p - 1)}>‹</button>
-
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let p: number;
-                if (totalPages <= 5) p = i + 1;
-                else if (currentPage <= 3) p = i + 1;
-                else if (currentPage >= totalPages - 2) p = totalPages - 4 + i;
-                else p = currentPage - 2 + i;
-                return (
-                  <button
-                    key={p}
-                    className={`tbl-pg-btn ${p === currentPage ? 'on' : ''}`}
-                    onClick={() => setPage(p)}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-
-              <button className="tbl-pg-btn" disabled={currentPage === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
-              <button className="tbl-pg-btn" disabled={currentPage === totalPages} onClick={() => setPage(totalPages)}>»</button>
-            </div>
-          </div>
-        )}
-      </div>
+      {Array.from({ length: rows }).map((_, ri) => (
+        <tr key={ri} className="tbl-row">
+          {Array.from({ length: cols }).map((_, ci) => (
+            <td key={ci} className="tbl-cell">
+              <div className="tbl-skel" style={{ width: `${60 + Math.random() * 30}%` }} />
+            </td>
+          ))}
+        </tr>
+      ))}
     </>
   );
 }
+
+function Table<T extends object>({
+  columns,
+  data,
+  rowKey,
+  loading = false,
+  emptyMessage = 'لا توجد بيانات',
+  selectable = false,
+  selectedKeys,
+  onSelectionChange,
+  sortKey,
+  sortDir,
+  onSort,
+  onRowClick,
+  stickyHeader = false,
+  className = '',
+}: TableProps<T>) {
+
+  const getKey = (row: T): string | number =>
+    typeof rowKey === 'function' ? rowKey(row) : row[rowKey] as string | number;
+
+  const allKeys = data.map(getKey);
+  const allSelected = allKeys.length > 0 && allKeys.every(k => selectedKeys?.has(k));
+  const someSelected = !allSelected && allKeys.some(k => selectedKeys?.has(k));
+
+  const toggleAll = () => {
+    if (!onSelectionChange) return;
+    if (allSelected) onSelectionChange(new Set());
+    else onSelectionChange(new Set(allKeys));
+  };
+
+  const toggleRow = (key: string | number) => {
+    if (!onSelectionChange || !selectedKeys) return;
+    const next = new Set(selectedKeys);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    onSelectionChange(next);
+  };
+
+  const effectiveCols = selectable
+    ? [{ key: '__select__', header: '', width: 44 } as TableColumn<T>, ...columns]
+    : columns;
+
+  return (
+    <div className={`tbl-outer ${className}`}>
+      <table className="tbl" role="grid">
+        <thead className={`tbl-head ${stickyHeader ? 'sticky' : ''}`}>
+          <tr>
+            {effectiveCols.map(col => {
+              if (col.key === '__select__') return (
+                <th key="__select__" className="tbl-th tbl-th--select">
+                  <input
+                    type="checkbox"
+                    className="tbl-checkbox"
+                    checked={allSelected}
+                    ref={el => { if (el) el.indeterminate = someSelected; }}
+                    onChange={toggleAll}
+                    aria-label="تحديد الكل"
+                  />
+                </th>
+              );
+              const isSorted = sortKey === col.key;
+              return (
+                <th
+                  key={col.key}
+                  className={`tbl-th ${col.sortable ? 'sortable' : ''} align-${col.align ?? 'start'}`}
+                  style={{ width: col.width }}
+                  onClick={col.sortable && onSort ? () => onSort(col.key) : undefined}
+                  aria-sort={isSorted ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+                >
+                  <span className="tbl-th__inner">
+                    {col.header}
+                    {col.sortable && <SortIcon active={isSorted} dir={isSorted ? sortDir : undefined} />}
+                  </span>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+
+        <tbody>
+          {loading ? (
+            <TableSkeleton cols={effectiveCols.length} rows={5} />
+          ) : data.length === 0 ? (
+            <tr>
+              <td colSpan={effectiveCols.length} className="tbl-empty">
+                <div className="tbl-empty__inner">
+                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none" className="tbl-empty__icon">
+                    <rect x="4" y="8" width="32" height="24" rx="4" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M4 14h32" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M12 22h8M12 27h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <span>{emptyMessage}</span>
+                </div>
+              </td>
+            </tr>
+          ) : (
+            data.map((row, i) => {
+              const key = getKey(row);
+              const isSelected = selectedKeys?.has(key);
+              return (
+                <tr
+                  key={key}
+                  className={`tbl-row ${isSelected ? 'selected' : ''} ${onRowClick ? 'clickable' : ''}`}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  aria-selected={selectable ? isSelected : undefined}
+                >
+                  {effectiveCols.map(col => {
+                    if (col.key === '__select__') return (
+                      <td key="__select__" className="tbl-cell tbl-cell--select" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="tbl-checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleRow(key)}
+                          aria-label={`تحديد الصف ${i + 1}`}
+                        />
+                      </td>
+                    );
+                    return (
+                      <td key={col.key} className={`tbl-cell align-${col.align ?? 'start'}`}>
+                        {col.render ? col.render(row, i) : (row as Record<string, unknown>)[col.key] as React.ReactNode}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+
+      <style>{`
+        .tbl-outer { width: 100%; overflow-x: auto; border-radius: 10px; border: 1px solid var(--color-border-tertiary); }
+        .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .tbl-head { background: var(--color-background-secondary); }
+        .tbl-head.sticky { position: sticky; top: 0; z-index: 2; }
+        .tbl-th {
+          padding: 10px 14px; font-size: 12px; font-weight: 500;
+          color: var(--color-text-secondary); text-align: start;
+          border-bottom: 1px solid var(--color-border-secondary);
+          white-space: nowrap; user-select: none;
+        }
+        .tbl-th.sortable { cursor: pointer; }
+        .tbl-th.sortable:hover { color: var(--color-text-primary); background: var(--color-background-tertiary); }
+        .tbl-th.align-center { text-align: center; }
+        .tbl-th.align-end    { text-align: end; }
+        .tbl-th--select { width: 44px; padding: 10px 12px; }
+        .tbl-th__inner { display: inline-flex; align-items: center; gap: 5px; }
+        .tbl-row { border-bottom: 1px solid var(--color-border-tertiary); transition: background .1s; }
+        .tbl-row:last-child { border-bottom: none; }
+        .tbl-row:hover { background: var(--color-background-secondary); }
+        .tbl-row.selected { background: color-mix(in srgb, var(--color-text-info, #3b82f6) 6%, transparent); }
+        .tbl-row.clickable { cursor: pointer; }
+        .tbl-cell { padding: 12px 14px; color: var(--color-text-primary); vertical-align: middle; }
+        .tbl-cell.align-center { text-align: center; }
+        .tbl-cell.align-end    { text-align: end; }
+        .tbl-cell--select { padding: 12px 12px; width: 44px; }
+        .tbl-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: var(--color-text-info, #3b82f6); }
+        .tbl-empty { padding: 48px 20px; text-align: center; color: var(--color-text-secondary); }
+        .tbl-empty__inner { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .tbl-empty__icon { color: var(--color-text-tertiary); }
+        .tbl-skel {
+          height: 13px; border-radius: 4px;
+          background: linear-gradient(90deg, var(--color-background-secondary) 25%, var(--color-background-tertiary) 50%, var(--color-background-secondary) 75%);
+          background-size: 400px 100%;
+          animation: tbl-shimmer 1.4s infinite linear;
+        }
+        @keyframes tbl-shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+      `}</style>
+    </div>
+  );
+}
+
+export default Table;

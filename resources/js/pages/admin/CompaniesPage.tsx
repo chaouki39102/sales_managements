@@ -1,16 +1,11 @@
 // ════════════════════════════════════════════════════════════
-// pages/admin/CompaniesPage.tsx
-// إدارة الشركات — Super Admin
-// يستخدم: Card, Badge, Button, PageHeader, AlertBar,
-//          EmptyState, KpiCard, Switch, SearchInput
-//          + CompanyFormDrawer (مكوّن جديد)
+// pages/admin/CompaniesPage.tsx — إدارة الشركات (Super Admin)
 // ════════════════════════════════════════════════════════════
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api/client';
 import { useAuth } from '@/context/AuthContext';
 
-// ── UI Components (موجودة لديك) ──────────────────────────
 import Card         from '@/components/ui/Card';
 import Badge        from '@/components/ui/Badge';
 import Button       from '@/components/ui/Button';
@@ -20,9 +15,6 @@ import EmptyState   from '@/components/ui/EmptyState';
 import KpiCard      from '@/components/ui/KpiCard';
 import SearchInput  from '@/components/ui/SearchInput';
 import Switch       from '@/components/ui/Switch';
-
-// ── Drawer جديد ───────────────────────────────────────────
-import CompanyFormDrawer, { CompanyFormData } from '@/components/modals/CompanyFormDrawer';
 
 // ════════════════════════════════════════════════════════════
 // Types
@@ -37,10 +29,7 @@ interface Company {
   mobile?: string;
   address?: string;
   activity?: string;
-  nif?: string;
-  nis?: string;
-  rc?: string;
-  ai?: string;
+  nif?: string; nis?: string; rc?: string; ai?: string;
   is_active: boolean;
   is_suspended: boolean;
   is_operational: boolean;
@@ -53,6 +42,7 @@ interface Company {
   max_warehouses: number;
   notes?: string;
   owner?: { id: number; name: string };
+  owner_id?: number;
   created_at?: string;
 }
 
@@ -60,7 +50,7 @@ type StatusFilter = 'all' | 'active' | 'suspended' | 'deactivated' | 'trial' | '
 type Tab = 'companies' | 'super';
 
 // ════════════════════════════════════════════════════════════
-// Helpers
+// Constants
 // ════════════════════════════════════════════════════════════
 const AV_COLORS = [
   'linear-gradient(135deg,#0a8a5c,#0dbf84)',
@@ -70,186 +60,547 @@ const AV_COLORS = [
   'linear-gradient(135deg,#0d7a8c,#22d3ee)',
   'linear-gradient(135deg,#c43a0a,#fb923c)',
 ];
-const avColor = (id: number) => AV_COLORS[id % AV_COLORS.length];
+const avColor  = (id: number) => AV_COLORS[id % AV_COLORS.length];
 const initials = (name: string) =>
   name.trim().split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 
-const PLAN_LABELS: Record<string, string> = {
-  free: 'مجاني', starter: 'Starter',
-  professional: 'Professional', enterprise: 'Enterprise',
-};
-const PLAN_COLORS: Record<string, { color: string; bg: string }> = {
-  free:         { color: 'var(--t4)',     bg: 'var(--bg4)' },
-  starter:      { color: 'var(--blue)',   bg: 'var(--blueb)' },
-  professional: { color: 'var(--em)',     bg: 'var(--emb)' },
-  enterprise:   { color: 'var(--gold)',   bg: 'var(--goldb)' },
+const PLAN_META: Record<string, { label: string; color: string; bg: string }> = {
+  free:         { label: 'مجاني',       color: 'var(--t4)',    bg: 'var(--bg4)' },
+  starter:      { label: 'Starter',     color: 'var(--blue)',  bg: 'var(--blueb)' },
+  professional: { label: 'Pro',         color: 'var(--em)',    bg: 'var(--emb)' },
+  enterprise:   { label: 'Enterprise',  color: 'var(--gold)',  bg: 'var(--goldb)' },
 };
 
-function statusInfo(co: Company): { label: string; color: string; bg: string; dot?: boolean } {
-  if (co.is_suspended)       return { label: 'معلّقة',  color: 'var(--red)',    bg: 'var(--redb)',  dot: true };
-  if (!co.is_active)         return { label: 'موقوفة',  color: 'var(--t4)',     bg: 'var(--bg4)' };
-  if (co.is_on_trial)        return { label: `تجريبية · ${co.trial_days_remaining ?? '?'} يوم`, color: 'var(--gold)', bg: 'var(--goldb)' };
-  if (co.is_verified)        return { label: 'موثّقة',  color: 'var(--em)',     bg: 'var(--emb)',   dot: true };
-  return                            { label: 'نشطة',    color: 'var(--blue)',   bg: 'var(--blueb)', dot: true };
-}
+const PLANS = ['free', 'starter', 'professional', 'enterprise'] as const;
 
-function companyToForm(co: Company): CompanyFormData {
-  return {
-    id: co.id, slug: co.slug,
-    name: co.name, commercial_name: co.commercial_name ?? '',
-    email: co.email ?? '', phone: co.phone ?? '', mobile: co.mobile ?? '',
-    address: co.address ?? '', activity: co.activity ?? '',
-    nif: co.nif ?? '', nis: co.nis ?? '', rc: co.rc ?? '', ai: co.ai ?? '',
-    plan: co.plan, max_users: co.max_users,
-    max_products: co.max_products, max_warehouses: co.max_warehouses,
-    notes: co.notes ?? '', is_active: co.is_active,
-  };
+function statusInfo(co: Company) {
+  if (co.is_suspended)  return { label: 'معلّقة',   color: 'var(--red)',   bg: 'var(--redb)',  icon: 'ti-lock' };
+  if (!co.is_active)    return { label: 'موقوفة',   color: 'var(--t4)',    bg: 'var(--bg4)',   icon: 'ti-minus-circle' };
+  if (co.is_on_trial)   return { label: `تجريبية · ${co.trial_days_remaining ?? '?'} يوم`, color: 'var(--gold)', bg: 'var(--goldb)', icon: 'ti-clock' };
+  if (co.is_verified)   return { label: 'موثّقة',   color: 'var(--em)',    bg: 'var(--emb)',   icon: 'ti-rosette-discount-check' };
+  return                       { label: 'نشطة',     color: 'var(--blue)',  bg: 'var(--blueb)', icon: 'ti-circle-check' };
 }
 
 // ════════════════════════════════════════════════════════════
-// Sub-components
+// Style helpers
 // ════════════════════════════════════════════════════════════
+const actionBtn = (): React.CSSProperties => ({
+  width: 30, height: 30, borderRadius: 8,
+  border: '1px solid var(--b2)', background: 'var(--bg3)',
+  cursor: 'pointer', display: 'flex', alignItems: 'center',
+  justifyContent: 'center', color: 'var(--t3)',
+  transition: '.13s', flexShrink: 0,
+});
+const hoverBtn = (e: React.MouseEvent, bg: string, color: string) => {
+  const el = e.currentTarget as HTMLButtonElement;
+  el.style.background = bg;
+  el.style.color = color;
+  el.style.borderColor = color + '44';
+};
+const inp: React.CSSProperties = {
+  width: '100%', padding: '8px 11px', borderRadius: 9,
+  border: '1px solid var(--b3)', background: 'var(--bg3)',
+  color: 'var(--t1)', fontFamily: 'Tajawal, sans-serif',
+  fontSize: 13, outline: 'none',
+};
 
-/** Avatar الشركة */
-function CompanyAvatar({ name, id, size = 44 }: { name: string; id: number; size?: number }) {
+// ════════════════════════════════════════════════════════════
+// CompanyAvatar
+// ════════════════════════════════════════════════════════════
+function CompanyAvatar({ name, id, size = 42 }: { name: string; id: number; size?: number }) {
   return (
     <div style={{
-      width: size, height: size, borderRadius: size * 0.28, flexShrink: 0,
-      background: avColor(id), display: 'flex', alignItems: 'center',
-      justifyContent: 'center', fontSize: size * 0.35, fontWeight: 900,
-      color: '#fff', letterSpacing: -1,
+      width: size, height: size, borderRadius: size * 0.28,
+      flexShrink: 0, background: avColor(id),
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.33, fontWeight: 900, color: '#fff', letterSpacing: -1,
     }}>
       {initials(name)}
     </div>
   );
 }
 
-/** صف شركة في الجدول */
+// ════════════════════════════════════════════════════════════
+// EditCompanyDrawer — درج تعديل الشركة
+// ════════════════════════════════════════════════════════════
+function EditCompanyDrawer({
+  company, onClose, onSaved,
+}: {
+  company: Company;
+  onClose: () => void;
+  onSaved: (updated: Partial<Company>) => void;
+}) {
+  const [tab, setTab]     = useState<'basic' | 'legal' | 'admin' | 'danger'>('basic');
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
+  const [toast, setToast]   = useState('');
+
+  const [form, setForm] = useState({
+    name:            company.name            ?? '',
+    commercial_name: company.commercial_name ?? '',
+    email:           company.email           ?? '',
+    phone:           company.phone           ?? '',
+    mobile:          company.mobile          ?? '',
+    activity:        company.activity        ?? '',
+    address:         company.address         ?? '',
+    nif:             company.nif             ?? '',
+    nis:             company.nis             ?? '',
+    rc:              company.rc              ?? '',
+    ai:              company.ai              ?? '',
+    plan:            company.plan            ?? 'free',
+    max_users:       company.max_users       ?? 3,
+    max_products:    company.max_products    ?? 500,
+    max_warehouses:  company.max_warehouses  ?? 1,
+    notes:           company.notes           ?? '',
+    is_active:       company.is_active       ?? true,
+  });
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
+  const f = <K extends keyof typeof form>(k: K) => (v: (typeof form)[K]) => setForm(p => ({ ...p, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true); setError('');
+    try {
+      const { plan, max_users, max_products, max_warehouses, notes, is_active, ...basic } = form;
+
+      // ① البيانات الأساسية
+      await apiClient.put(`/companies/${company.slug}`, { ...basic, is_active });
+
+      // ② الخطة — إن تغيّرت
+      if (
+        plan !== company.plan ||
+        max_users !== company.max_users ||
+        max_products !== company.max_products ||
+        max_warehouses !== company.max_warehouses
+      ) {
+        await apiClient.patch(`/companies/${company.slug}/plan`, {
+          plan, max_users, max_products, max_warehouses,
+        });
+      }
+
+      // ③ الملاحظات الداخلية
+      if (notes !== (company.notes ?? '')) {
+        await apiClient.patch(`/admin/companies/${company.id}/notes`, { notes });
+      }
+
+      onSaved({ ...form });
+      showToast('✅ تم الحفظ بنجاح');
+      setTimeout(onClose, 600);
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'فشل الحفظ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSuspend = async () => {
+    const isSusp = company.is_suspended;
+    try {
+      if (isSusp) {
+        await apiClient.post(`/companies/${company.slug}/unsuspend`);
+      } else {
+        const reason = prompt('سبب التعليق:') ?? 'قرار إداري';
+        await apiClient.post(`/companies/${company.slug}/suspend`, { reason });
+      }
+      onSaved({ is_suspended: !isSusp });
+      showToast(isSusp ? 'تم رفع التعليق' : 'تم تعليق الشركة');
+    } catch { setError('فشلت العملية'); }
+  };
+
+  const handleVerify = async () => {
+    try {
+      if (company.is_verified) {
+        await apiClient.post(`/companies/${company.slug}/unverify`);
+        onSaved({ is_verified: false });
+        showToast('تم إلغاء التوثيق');
+      } else {
+        await apiClient.post(`/companies/${company.slug}/verify`);
+        onSaved({ is_verified: true });
+        showToast('✅ تم توثيق الشركة');
+      }
+    } catch { setError('فشلت العملية'); }
+  };
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  const TABS = [
+    { key: 'basic',  label: 'أساسي',   icon: 'ti-building' },
+    { key: 'legal',  label: 'قانوني',  icon: 'ti-file-certificate' },
+    { key: 'admin',  label: 'الخطة',   icon: 'ti-star' },
+    { key: 'danger', label: 'إجراءات', icon: 'ti-shield' },
+  ] as const;
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(6px)' }}
+        onClick={onClose}
+      />
+
+      {/* Drawer */}
+      <div style={{
+        position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 9001,
+        width: 420, background: 'var(--bg2)',
+        boxShadow: '4px 0 40px rgba(0,0,0,.3)',
+        display: 'flex', flexDirection: 'column', direction: 'rtl',
+        animation: 'slideFromRight .22s cubic-bezier(.34,1.2,.64,1)',
+      }}>
+        <style>{`@keyframes slideFromRight { from{transform:translateX(-30px);opacity:0} to{transform:none;opacity:1} }`}</style>
+
+        {/* Header */}
+        <div style={{
+          padding: '16px 18px', borderBottom: '1px solid var(--b2)',
+          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+          background: 'var(--bg3)',
+        }}>
+          <CompanyAvatar name={company.name} id={company.id} size={40} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {company.name}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>{company.slug}</div>
+          </div>
+          <button onClick={onClose} style={{ ...actionBtn(), width: 32, height: 32 }}>
+            <i className="ti ti-x" style={{ fontSize: 15 }} />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--b2)', padding: '0 4px', flexShrink: 0, overflowX: 'auto' }}>
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} style={{
+              padding: '9px 14px', background: 'none', border: 'none',
+              borderBottom: `2px solid ${tab === t.key ? 'var(--em)' : 'transparent'}`,
+              color: tab === t.key ? 'var(--em)' : 'var(--t4)',
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', gap: 5,
+              transition: '.12s', whiteSpace: 'nowrap',
+            }}>
+              <i className={`ti ${t.icon}`} style={{ fontSize: 13 }} />
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 18px 0' }}>
+
+          {error && (
+            <div style={{ padding: '10px 13px', borderRadius: 10, background: 'var(--redb)', color: 'var(--red)', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <i className="ti ti-alert-circle" style={{ flexShrink: 0 }} />
+              {error}
+              <button onClick={() => setError('')} style={{ marginRight: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 14 }}>×</button>
+            </div>
+          )}
+
+          {/* ── أساسي ── */}
+          {tab === 'basic' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+              <DF label="الاسم الرسمي" req>
+                <input value={form.name} onChange={e => f('name')(e.target.value)} style={inp}
+                  onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                  onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
+              </DF>
+              <DF label="الاسم التجاري">
+                <input value={form.commercial_name} onChange={e => f('commercial_name')(e.target.value)} style={inp}
+                  onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                  onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
+              </DF>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <DF label="البريد الإلكتروني">
+                  <input value={form.email} onChange={e => f('email')(e.target.value)} style={inp} dir="ltr"
+                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
+                </DF>
+                <DF label="الهاتف">
+                  <input value={form.phone} onChange={e => f('phone')(e.target.value)} style={inp} dir="ltr"
+                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
+                </DF>
+              </div>
+              <DF label="النشاط التجاري">
+                <input value={form.activity} onChange={e => f('activity')(e.target.value)} style={inp}
+                  onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                  onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
+              </DF>
+              <DF label="العنوان">
+                <textarea value={form.address} onChange={e => f('address')(e.target.value)} rows={2}
+                  style={{ ...inp, resize: 'vertical' }}
+                  onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                  onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
+              </DF>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 13px', borderRadius: 10, background: 'var(--bg3)', border: '1px solid var(--b2)' }}>
+                <span style={{ fontSize: 13, color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="ti ti-power" style={{ color: form.is_active ? 'var(--em)' : 'var(--t4)' }} />
+                  حالة الشركة
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: form.is_active ? 'var(--em)' : 'var(--t4)', fontWeight: 700 }}>
+                    {form.is_active ? 'نشطة' : 'موقوفة'}
+                  </span>
+                  <Switch checked={form.is_active} onChange={() => f('is_active')(!form.is_active)} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── قانوني ── */}
+          {tab === 'legal' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+              {[
+                { key: 'nif' as const, label: 'NIF — رقم التعريف الجبائي' },
+                { key: 'nis' as const, label: 'NIS — رقم الإحصاء' },
+                { key: 'rc'  as const, label: 'RC — السجل التجاري' },
+                { key: 'ai'  as const, label: 'AI — رقم المادة' },
+              ].map(({ key, label }) => (
+                <DF key={key} label={label}>
+                  <input value={form[key]} onChange={e => f(key)(e.target.value)} style={{ ...inp, direction: 'ltr', textAlign: 'left' }}
+                    onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
+                </DF>
+              ))}
+            </div>
+          )}
+
+          {/* ── الخطة ── */}
+          {tab === 'admin' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ padding: '10px 13px', borderRadius: 10, background: 'var(--emb)', border: '1px solid var(--embo)', color: 'var(--em)', fontSize: 12, display: 'flex', gap: 8 }}>
+                <i className="ti ti-shield-check" />
+                هذه الإعدادات مقتصرة على Super Admin
+              </div>
+
+              <DF label="خطة الاشتراك">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+                  {PLANS.map(p => {
+                    const meta = PLAN_META[p];
+                    const active = form.plan === p;
+                    return (
+                      <button key={p} onClick={() => f('plan')(p)} style={{
+                        padding: '10px 8px', borderRadius: 10, cursor: 'pointer',
+                        fontFamily: 'Tajawal, sans-serif', fontSize: 12, fontWeight: 700,
+                        border: `1.5px solid ${active ? meta.color : 'var(--b2)'}`,
+                        background: active ? meta.bg : 'var(--bg3)',
+                        color: active ? meta.color : 'var(--t3)',
+                        transition: '.13s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      }}>
+                        {active && <i className="ti ti-check" style={{ fontSize: 12 }} />}
+                        {meta.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </DF>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                {([
+                  { key: 'max_users'      as const, label: 'حد المستخدمين', icon: 'ti-users' },
+                  { key: 'max_products'   as const, label: 'حد المنتجات',   icon: 'ti-package' },
+                  { key: 'max_warehouses' as const, label: 'حد المستودعات', icon: 'ti-building-warehouse' },
+                ] as const).map(({ key, label, icon }) => (
+                  <DF key={key} label={label}>
+                    <div style={{ position: 'relative' }}>
+                      <i className={`ti ${icon}`} style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--t4)', pointerEvents: 'none' }} />
+                      <input type="number" min={1} value={form[key]}
+                        onChange={e => f(key)(Number(e.target.value) as any)}
+                        style={{ ...inp, paddingRight: 28, textAlign: 'center', direction: 'ltr' }}
+                        onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                        onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
+                    </div>
+                  </DF>
+                ))}
+              </div>
+
+              <DF label="ملاحظات داخلية">
+                <textarea value={form.notes} onChange={e => f('notes')(e.target.value)} rows={3}
+                  placeholder="ملاحظات مرئية للـ Super Admin فقط..."
+                  style={{ ...inp, resize: 'vertical' }}
+                  onFocus={e => (e.target.style.borderColor = 'var(--em)')}
+                  onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
+              </DF>
+            </div>
+          )}
+
+          {/* ── إجراءات ── */}
+          {tab === 'danger' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ padding: '10px 13px', borderRadius: 10, background: 'var(--redb)', border: '1px solid var(--redbo)', color: 'var(--red)', fontSize: 12, display: 'flex', gap: 8 }}>
+                <i className="ti ti-alert-triangle" style={{ flexShrink: 0, fontSize: 14 }} />
+                هذه الإجراءات تؤثر مباشرة على وصول الشركة للنظام
+              </div>
+
+              {/* تعليق / رفع */}
+              <div style={{ padding: '14px', borderRadius: 12, background: 'var(--bg3)', border: '1px solid var(--b2)' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', marginBottom: 6 }}>
+                  {company.is_suspended ? 'الشركة معلّقة حالياً' : 'تعليق الشركة مؤقتاً'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 12 }}>
+                  {company.is_suspended
+                    ? 'رفع التعليق سيُعيد الوصول لجميع أعضاء الشركة'
+                    : 'تعليق الشركة يمنع جميع أعضائها من الدخول'}
+                </div>
+                <button onClick={handleSuspend} style={{
+                  padding: '9px 16px', borderRadius: 9, border: 'none', cursor: 'pointer',
+                  fontFamily: 'Tajawal, sans-serif', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7,
+                  background: company.is_suspended ? 'var(--emb)' : 'var(--goldb)',
+                  color: company.is_suspended ? 'var(--em)' : 'var(--gold)',
+                }}>
+                  <i className={`ti ti-${company.is_suspended ? 'lock-open' : 'lock'}`} />
+                  {company.is_suspended ? 'رفع التعليق' : 'تعليق الشركة'}
+                </button>
+              </div>
+
+              {/* توثيق */}
+              <div style={{ padding: '14px', borderRadius: 12, background: 'var(--bg3)', border: '1px solid var(--b2)' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', marginBottom: 6 }}>
+                  {company.is_verified ? 'الشركة موثّقة' : 'توثيق الشركة'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 12 }}>
+                  التوثيق يُضيف شارة موثّقة ويمنح ثقة إضافية للمستخدمين
+                </div>
+                <button onClick={handleVerify} style={{
+                  padding: '9px 16px', borderRadius: 9, border: 'none', cursor: 'pointer',
+                  fontFamily: 'Tajawal, sans-serif', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7,
+                  background: company.is_verified ? 'var(--redb)' : 'var(--emb)',
+                  color: company.is_verified ? 'var(--red)' : 'var(--em)',
+                }}>
+                  <i className={`ti ti-${company.is_verified ? 'rosette-discount-check-off' : 'rosette-discount-check'}`} />
+                  {company.is_verified ? 'إلغاء التوثيق' : 'توثيق الشركة'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 18px', borderTop: '1px solid var(--b2)', flexShrink: 0, display: 'flex', gap: 8, justifyContent: 'flex-end', background: 'var(--bg3)' }}>
+          <button onClick={onClose} style={{ padding: '9px 18px', borderRadius: 10, border: '1px solid var(--b3)', background: 'var(--bg4)', color: 'var(--t2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
+            إغلاق
+          </button>
+          {tab !== 'danger' && (
+            <button onClick={handleSave} disabled={saving || !form.name.trim()} style={{
+              padding: '9px 22px', borderRadius: 10, border: 'none',
+              background: form.name.trim() ? 'var(--em)' : 'var(--bg4)',
+              color: form.name.trim() ? '#fff' : 'var(--t4)',
+              fontSize: 13, fontWeight: 800, cursor: saving || !form.name.trim() ? 'not-allowed' : 'pointer',
+              fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', gap: 7,
+              boxShadow: form.name.trim() ? 'var(--emglow)' : 'none',
+            }}>
+              {saving && <i className="ti ti-loader" style={{ animation: 'spin .8s linear infinite' }} />}
+              {saving ? 'جارٍ الحفظ...' : 'حفظ التغييرات'}
+            </button>
+          )}
+        </div>
+
+        {/* Toast */}
+        {toast && (
+          <div style={{ position: 'absolute', bottom: 70, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg0)', color: 'var(--t1)', padding: '9px 18px', borderRadius: 20, fontSize: 12, fontWeight: 700, fontFamily: 'Tajawal, sans-serif', border: '1px solid var(--b2)', whiteSpace: 'nowrap', boxShadow: 'var(--shadow2)', zIndex: 1 }}>
+            {toast}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function DF({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: .8 }}>
+        {label}{req && <span style={{ color: 'var(--red)', marginRight: 3 }}>*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// CompanyRow
+// ════════════════════════════════════════════════════════════
 function CompanyRow({
-  co, onEdit, onSuspend, onVerify, onDelete, loading,
+  co, onEdit, onSuspend, onVerify, onDelete,
 }: {
   co: Company;
   onEdit: () => void;
   onSuspend: () => void;
   onVerify: () => void;
   onDelete: () => void;
-  loading?: boolean;
 }) {
-  const si = statusInfo(co);
-  const pc = PLAN_COLORS[co.plan] ?? PLAN_COLORS.free;
+  const si   = statusInfo(co);
+  const meta = PLAN_META[co.plan] ?? PLAN_META.free;
 
   return (
-    <div
-      className="u-row"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '2.2fr 1.4fr 1fr 1fr 140px',
-        padding: '13px 18px',
-        borderBottom: '1px solid var(--b1)',
-        background: 'var(--bg2)',
-        transition: '.13s',
-        alignItems: 'center',
-        direction: 'rtl',
-      }}
-    >
+    <div className="u-row" style={{
+      display: 'grid',
+      gridTemplateColumns: '2.4fr 1.4fr 1fr 1fr 130px',
+      padding: '12px 18px',
+      borderBottom: '1px solid var(--b1)',
+      background: 'var(--bg2)', transition: '.13s',
+      alignItems: 'center', direction: 'rtl',
+    }}>
       {/* الشركة */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <CompanyAvatar name={co.name} id={co.id} />
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 7 }}>
-            {co.name}
-            {co.is_verified && (
-              <i className="ti ti-rosette-discount-check" style={{ color: 'var(--em)', fontSize: 14 }} />
-            )}
+          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</span>
+            {co.is_verified && <i className="ti ti-rosette-discount-check" style={{ color: 'var(--em)', fontSize: 13, flexShrink: 0 }} />}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace', marginTop: 1 }}>
+          <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace', marginTop: 2 }}>
             {co.slug}
-            {co.owner && <span style={{ marginRight: 8 }}>· {co.owner.name}</span>}
+            {co.owner && <span style={{ marginRight: 8, fontFamily: 'Tajawal, sans-serif' }}>· {co.owner.name}</span>}
           </div>
         </div>
       </div>
 
       {/* البريد / الهاتف */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {co.email && (
-          <div style={{ fontSize: 11, color: 'var(--t2)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {co.email}
-          </div>
-        )}
-        {co.phone && (
-          <div style={{ fontSize: 10, color: 'var(--t4)', direction: 'ltr' }}>{co.phone}</div>
-        )}
+        {co.email && <div style={{ fontSize: 11, color: 'var(--t2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{co.email}</div>}
+        {co.phone && <div style={{ fontSize: 10, color: 'var(--t4)', direction: 'ltr' }}>{co.phone}</div>}
+        {!co.email && !co.phone && <div style={{ fontSize: 11, color: 'var(--t4)', opacity: .5 }}>—</div>}
       </div>
 
       {/* الخطة */}
       <div>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-          color: pc.color, background: pc.bg,
-        }}>
-          {PLAN_LABELS[co.plan] ?? co.plan}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, color: meta.color, background: meta.bg }}>
+          {meta.label}
         </span>
       </div>
 
       {/* الحالة */}
       <div>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-          color: si.color, background: si.bg,
-        }}>
-          {si.dot && (
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: si.color, display: 'inline-block' }} />
-          )}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, color: si.color, background: si.bg }}>
+          <i className={`ti ${si.icon}`} style={{ fontSize: 11 }} />
           {si.label}
         </span>
       </div>
 
       {/* Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
-        {/* تعديل */}
-        <button
-          onClick={onEdit}
-          title="تعديل"
-          style={actionBtn()}
+        <button onClick={onEdit} title="تعديل" style={actionBtn()}
           onMouseEnter={e => hoverBtn(e, 'var(--emb)', 'var(--em)')}
-          onMouseLeave={e => hoverBtn(e, 'var(--bg3)', 'var(--t3)')}
-        >
-          <i className="ti ti-pencil" style={{ fontSize: 13 }} />
+          onMouseLeave={e => hoverBtn(e, 'var(--bg3)', 'var(--t3)')}>
+          <i className="ti ti-settings" style={{ fontSize: 13 }} />
         </button>
-
-        {/* تعليق / رفع */}
-        <button
-          onClick={onSuspend}
-          title={co.is_suspended ? 'رفع التعليق' : 'تعليق مؤقت'}
-          style={actionBtn()}
+        <button onClick={onSuspend} title={co.is_suspended ? 'رفع التعليق' : 'تعليق'} style={actionBtn()}
           onMouseEnter={e => hoverBtn(e, 'var(--goldb)', 'var(--gold)')}
-          onMouseLeave={e => hoverBtn(e, 'var(--bg3)', 'var(--t3)')}
-        >
+          onMouseLeave={e => hoverBtn(e, 'var(--bg3)', 'var(--t3)')}>
           <i className={`ti ti-${co.is_suspended ? 'lock-open' : 'lock'}`} style={{ fontSize: 13 }} />
         </button>
-
-        {/* توثيق */}
-        <button
-          onClick={onVerify}
-          title={co.is_verified ? 'إلغاء التوثيق' : 'توثيق'}
-          style={actionBtn()}
+        <button onClick={onVerify} title={co.is_verified ? 'إلغاء التوثيق' : 'توثيق'} style={actionBtn()}
           onMouseEnter={e => hoverBtn(e, 'var(--emb)', 'var(--em)')}
-          onMouseLeave={e => hoverBtn(e, 'var(--bg3)', 'var(--t3)')}
-        >
+          onMouseLeave={e => hoverBtn(e, 'var(--bg3)', 'var(--t3)')}>
           <i className={`ti ti-${co.is_verified ? 'rosette-discount-check' : 'rosette'}`} style={{ fontSize: 13 }} />
         </button>
-
-        {/* حذف */}
-        <button
-          onClick={onDelete}
-          title="تعطيل"
-          disabled={loading}
-          style={actionBtn()}
+        <button onClick={onDelete} title="تعطيل/حذف" style={actionBtn()}
           onMouseEnter={e => hoverBtn(e, 'var(--redb)', 'var(--red)')}
-          onMouseLeave={e => hoverBtn(e, 'var(--bg3)', 'var(--t3)')}
-        >
+          onMouseLeave={e => hoverBtn(e, 'var(--bg3)', 'var(--t3)')}>
           <i className="ti ti-trash" style={{ fontSize: 13 }} />
         </button>
       </div>
@@ -257,124 +608,74 @@ function CompanyRow({
   );
 }
 
-// style helpers
-const actionBtn = (): React.CSSProperties => ({
-  width: 28, height: 28, borderRadius: 7,
-  border: '1px solid var(--b2)', background: 'var(--bg3)',
-  cursor: 'pointer', display: 'flex', alignItems: 'center',
-  justifyContent: 'center', color: 'var(--t3)', transition: '.13s',
-  flexShrink: 0,
-});
-const hoverBtn = (e: React.MouseEvent, bg: string, color: string) => {
-  (e.currentTarget as HTMLButtonElement).style.background = bg;
-  (e.currentTarget as HTMLButtonElement).style.color = color;
-};
-
 // ════════════════════════════════════════════════════════════
-// Super Admin Tab — إعدادات حرجة
+// SuperAdminTab
 // ════════════════════════════════════════════════════════════
 function SuperAdminTab() {
   const [settings, setSettings] = useState({
-    registrations: true,
-    new_companies: true,
-    notifications: true,
-    debug: false,
-    public_api: true,
-    free_trial_days: 14,
-    free_max_users: 3,
-    starter_max_products: 2000,
+    registrations: true, new_companies: true,
+    notifications: true, debug: false, public_api: true,
+    free_trial_days: 14, free_max_users: 3, starter_max_products: 2000,
   });
   const [saved, setSaved] = useState(false);
-
-  const toggle = (k: keyof typeof settings) =>
-    setSettings(prev => ({ ...prev, [k]: !prev[k] }));
-
-  const handleSave = () => {
-    // TODO: apiClient.post('/admin/settings', settings)
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-  };
+  const toggle = (k: keyof typeof settings) => setSettings(p => ({ ...p, [k]: !p[k] }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: 'slideIn .2s ease' }}>
-
-      {/* تحذير */}
       <AlertBar variant="red">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <i className="ti ti-alert-triangle" style={{ fontSize: 16, flexShrink: 0 }} />
-          <span>هذه الإعدادات تؤثر على كامل النظام — تصرف بحذر</span>
+          هذه الإعدادات تؤثر على كامل النظام — تصرف بحذر
         </div>
       </AlertBar>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-
-        {/* إدارة النظام */}
-        <Card title="إدارة النظام" noHeader={false}>
+        {/* ميزات النظام */}
+        <Card title="ميزات النظام" noHeader={false}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {([
-              { key: 'registrations',  label: 'تسجيل مستخدمين جدد',   icon: 'ti-user-plus' },
-              { key: 'new_companies',  label: 'إنشاء شركات جديدة',     icon: 'ti-building-plus' },
-              { key: 'notifications',  label: 'نظام الإشعارات',        icon: 'ti-bell' },
-              { key: 'debug',          label: 'وضع التصحيح (Debug)',    icon: 'ti-bug' },
-              { key: 'public_api',     label: 'API العام',              icon: 'ti-api' },
+              { key: 'registrations', label: 'تسجيل مستخدمين جدد',  icon: 'ti-user-plus' },
+              { key: 'new_companies', label: 'إنشاء شركات جديدة',    icon: 'ti-building-plus' },
+              { key: 'notifications', label: 'نظام الإشعارات',       icon: 'ti-bell' },
+              { key: 'debug',         label: 'وضع التصحيح (Debug)',  icon: 'ti-bug' },
+              { key: 'public_api',    label: 'API العام',             icon: 'ti-api' },
             ] as { key: keyof typeof settings; label: string; icon: string }[]).map(item => (
-              <div key={item.key} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '11px 0', borderBottom: '1px solid var(--b1)',
-              }}>
+              <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid var(--b1)' }}>
                 <span style={{ fontSize: 13, color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <i className={`ti ${item.icon}`} style={{ color: 'var(--em)', fontSize: 14 }} />
                   {item.label}
                 </span>
-                <Switch
-                  checked={settings[item.key] as boolean}
-                  onChange={() => toggle(item.key)}
-                />
+                <Switch checked={settings[item.key] as boolean} onChange={() => toggle(item.key)} />
               </div>
             ))}
           </div>
         </Card>
 
-        {/* إعدادات الخطط */}
+        {/* الخطط الافتراضية */}
         <Card title="الخطط الافتراضية" noHeader={false}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {[
-              { key: 'free_trial_days',       label: 'مدة التجربة المجانية (أيام)', min: 1, max: 90 },
-              { key: 'free_max_users',         label: 'حد المستخدمين — Free',        min: 1, max: 10 },
-              { key: 'starter_max_products',   label: 'حد المنتجات — Starter',       min: 100, max: 9999 },
-            ].map(f => (
-              <div key={f.key}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: .8, display: 'block', marginBottom: 5 }}>
-                  {f.label}
-                </label>
-                <input
-                  type="number"
-                  min={f.min}
-                  max={f.max}
-                  value={settings[f.key as keyof typeof settings] as number}
-                  onChange={e => setSettings(prev => ({ ...prev, [f.key]: Number(e.target.value) }))}
-                  style={{
-                    width: '100%', padding: '9px 12px', borderRadius: 10,
-                    border: '1px solid var(--b3)', background: 'var(--bg3)',
-                    color: 'var(--t1)', fontFamily: 'Tajawal, sans-serif', fontSize: 13,
-                    outline: 'none', direction: 'ltr',
-                  }}
+              { key: 'free_trial_days',      label: 'مدة التجربة (أيام)',    min: 1,   max: 90 },
+              { key: 'free_max_users',        label: 'حد المستخدمين — Free', min: 1,   max: 10 },
+              { key: 'starter_max_products',  label: 'حد المنتجات — Starter', min: 100, max: 9999 },
+            ].map(fi => (
+              <div key={fi.key}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: .8, display: 'block', marginBottom: 5 }}>{fi.label}</label>
+                <input type="number" min={fi.min} max={fi.max}
+                  value={settings[fi.key as keyof typeof settings] as number}
+                  onChange={e => setSettings(p => ({ ...p, [fi.key]: Number(e.target.value) }))}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid var(--b3)', background: 'var(--bg3)', color: 'var(--t1)', fontFamily: 'Tajawal, sans-serif', fontSize: 13, outline: 'none', direction: 'ltr' }}
                   onFocus={e => (e.target.style.borderColor = 'var(--em)')}
-                  onBlur={e => (e.target.style.borderColor = 'var(--b3)')}
-                />
+                  onBlur={e => (e.target.style.borderColor = 'var(--b3)')} />
               </div>
             ))}
-            <button
-              onClick={handleSave}
-              style={{
-                padding: '9px', borderRadius: 10, border: 'none',
-                background: saved ? 'var(--emb)' : 'var(--em)',
-                color: saved ? 'var(--em)' : '#fff',
-                fontSize: 13, fontWeight: 800, cursor: 'pointer',
-                fontFamily: 'Tajawal, sans-serif', transition: 'all .2s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
+            <button onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2500); }} style={{
+              padding: '9px', borderRadius: 10, border: 'none',
+              background: saved ? 'var(--emb)' : 'var(--em)',
+              color: saved ? 'var(--em)' : '#fff', fontSize: 13, fontWeight: 800,
+              cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
               <i className={`ti ti-${saved ? 'check' : 'device-floppy'}`} />
               {saved ? 'تم الحفظ' : 'حفظ الإعدادات'}
             </button>
@@ -385,68 +686,50 @@ function SuperAdminTab() {
         <Card title="عمليات النظام" noHeader={false}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[
-              { label: 'مسح الكاش العام',           icon: 'ti-refresh',        color: 'var(--em)',   bg: 'var(--emb)',    action: () => alert('تم مسح الكاش') },
-              { label: 'تشغيل المهام المجدولة',      icon: 'ti-clock-play',     color: 'var(--blue)', bg: 'var(--blueb)',  action: () => alert('تم تشغيل المهام') },
-              { label: 'تصدير ملفات اللوج',          icon: 'ti-download',       color: 'var(--blue)', bg: 'var(--blueb)',  action: () => alert('جارٍ التصدير...') },
-              { label: 'نسخ احتياطي فوري',           icon: 'ti-database-export',color: 'var(--gold)', bg: 'var(--goldb)',  action: () => alert('النسخة تُنشأ...') },
-              { label: 'إرسال إشعار لكل المستخدمين', icon: 'ti-speakerphone',   color: 'var(--gold)', bg: 'var(--goldb)',  action: () => alert('تم الإرسال') },
-              { label: 'تفعيل وضع الصيانة',          icon: 'ti-alert-triangle', color: 'var(--red)',  bg: 'var(--redb)',   action: () => confirm('تفعيل وضع الصيانة؟') && alert('وضع الصيانة مفعّل') },
+              { label: 'مسح الكاش العام',          icon: 'ti-refresh',        color: 'var(--em)',   bg: 'var(--emb)',   action: () => alert('تم مسح الكاش') },
+              { label: 'تشغيل المهام المجدولة',     icon: 'ti-clock-play',     color: 'var(--blue)', bg: 'var(--blueb)', action: () => alert('تم تشغيل المهام') },
+              { label: 'تصدير ملفات اللوج',         icon: 'ti-download',       color: 'var(--blue)', bg: 'var(--blueb)', action: () => alert('جارٍ التصدير...') },
+              { label: 'نسخ احتياطي فوري',          icon: 'ti-database-export',color: 'var(--gold)', bg: 'var(--goldb)', action: () => alert('النسخة تُنشأ...') },
+              { label: 'إرسال إشعار للكل',          icon: 'ti-speakerphone',   color: 'var(--gold)', bg: 'var(--goldb)', action: () => alert('تم الإرسال') },
+              { label: 'تفعيل وضع الصيانة',         icon: 'ti-alert-triangle', color: 'var(--red)',  bg: 'var(--redb)',  action: () => confirm('تفعيل وضع الصيانة؟') && alert('مفعّل') },
             ].map(op => (
-              <button
-                key={op.label}
-                onClick={op.action}
-                style={{
-                  padding: '10px 14px', borderRadius: 10, width: '100%',
-                  border: `1px solid ${op.bg}`, background: op.bg,
-                  color: op.color, fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
-                  display: 'flex', alignItems: 'center', gap: 9,
-                  transition: '.13s', textAlign: 'right',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '.85')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-              >
-                <i className={`ti ${op.icon}`} style={{ fontSize: 15, flexShrink: 0 }} />
+              <button key={op.label} onClick={op.action} style={{
+                padding: '10px 14px', borderRadius: 10, width: '100%',
+                border: `1px solid ${op.bg}`, background: op.bg,
+                color: op.color, fontSize: 12, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+                display: 'flex', alignItems: 'center', gap: 9, transition: '.13s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '.85')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+                <i className={`ti ${op.icon}`} style={{ fontSize: 14, flexShrink: 0 }} />
                 {op.label}
               </button>
             ))}
           </div>
         </Card>
 
-        {/* إحصائيات النظام */}
+        {/* إحصائيات */}
         <Card title="إحصائيات النظام" noHeader={false}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
-              { label: 'إجمالي المستخدمين',   value: '—', icon: 'ti-users' },
-              { label: 'إجمالي الفواتير',      value: '—', icon: 'ti-file-invoice' },
-              { label: 'إجمالي المنتجات',      value: '—', icon: 'ti-package' },
-              { label: 'محاولات الدخول اليوم', value: '—', icon: 'ti-login' },
+              { label: 'إجمالي المستخدمين',   icon: 'ti-users' },
+              { label: 'إجمالي الفواتير',      icon: 'ti-file-invoice' },
+              { label: 'إجمالي المنتجات',      icon: 'ti-package' },
+              { label: 'محاولات الدخول اليوم', icon: 'ti-login' },
             ].map(s => (
-              <div key={s.label} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 12px', borderRadius: 10,
-                background: 'var(--bg3)', border: '1px solid var(--b1)',
-              }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 9,
-                  background: 'var(--emb)', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, color: 'var(--em)', flexShrink: 0,
-                }}>
+              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--bg3)', border: '1px solid var(--b1)' }}>
+                <div style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--emb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: 'var(--em)', flexShrink: 0 }}>
                   <i className={`ti ${s.icon}`} />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div>
                   <div style={{ fontSize: 10, color: 'var(--t4)', marginBottom: 2 }}>{s.label}</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)' }}>{s.value}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)' }}>—</div>
                 </div>
               </div>
             ))}
-            <div style={{ fontSize: 10, color: 'var(--t4)', textAlign: 'center', marginTop: 4 }}>
-              للإحصائيات الحية — اربط endpoint <code>/admin/stats</code>
-            </div>
           </div>
         </Card>
-
       </div>
     </div>
   );
@@ -458,21 +741,20 @@ function SuperAdminTab() {
 export default function CompaniesPage() {
   const { user } = useAuth() as any;
   const qc = useQueryClient();
-  const isSuperAdmin: boolean = user?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
 
   const [tab, setTab]                   = useState<Tab>('companies');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch]             = useState('');
-  const [drawerOpen, setDrawerOpen]     = useState(false);
-  const [editTarget, setEditTarget]     = useState<CompanyFormData | null>(null);
+  const [editTarget, setEditTarget]     = useState<Company | null>(null);
 
-  // ── Queries ────────────────────────────────────────────────
+  // ── Query ──────────────────────────────────────────────────
   const { data: companies = [], isLoading, isError, refetch } = useQuery<Company[]>({
-    queryKey: ['companies', statusFilter, search],
+    queryKey: ['admin-companies', statusFilter, search],
     queryFn: async () => {
-      const params: Record<string, string> = { per_page: '100', include: 'owner' };
-      if (search)             params.search = search;
+      const params: Record<string, string> = { per_page: '200', include: 'owner' };
+      if (search)               params.search = search;
       if (statusFilter !== 'all') params.status = statusFilter;
+      // super-admin يرى كل الشركات بدون فلتر الـ company context
       const res = await apiClient.get('/companies', { params });
       const raw = res.data?.data ?? res.data;
       return Array.isArray(raw) ? raw : (raw?.data ?? []);
@@ -486,7 +768,7 @@ export default function CompaniesPage() {
       suspended
         ? apiClient.post(`/companies/${slug}/unsuspend`)
         : apiClient.post(`/companies/${slug}/suspend`, { reason: 'قرار إداري' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['companies'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-companies'] }),
   });
 
   const verify = useMutation({
@@ -494,25 +776,20 @@ export default function CompaniesPage() {
       verified
         ? apiClient.post(`/companies/${slug}/unverify`)
         : apiClient.post(`/companies/${slug}/verify`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['companies'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-companies'] }),
   });
 
   const destroy = useMutation({
     mutationFn: (slug: string) => apiClient.delete(`/companies/${slug}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['companies'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-companies'] }),
   });
 
-  // ── Open drawer ────────────────────────────────────────────
-  const openAdd  = () => { setEditTarget(null);              setDrawerOpen(true); };
-  const openEdit = useCallback((co: Company) => { setEditTarget(companyToForm(co)); setDrawerOpen(true); }, []);
-
   // ── KPIs ───────────────────────────────────────────────────
-  const total      = companies.length;
-  const active     = companies.filter(c => c.is_operational).length;
-  const suspended  = companies.filter(c => c.is_suspended).length;
-  const onTrial    = companies.filter(c => c.is_on_trial).length;
+  const total     = companies.length;
+  const active    = companies.filter(c => c.is_operational).length;
+  const suspended = companies.filter(c => c.is_suspended).length;
+  const onTrial   = companies.filter(c => c.is_on_trial).length;
 
-  // ── Status filter buttons ──────────────────────────────────
   const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
     { key: 'all',         label: 'الكل' },
     { key: 'active',      label: 'نشطة' },
@@ -525,7 +802,8 @@ export default function CompaniesPage() {
   return (
     <>
       <style>{`
-        @keyframes slideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+        @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+        @keyframes spin { to{transform:rotate(360deg)} }
         .u-row:hover { background: var(--bg3) !important; }
       `}</style>
 
@@ -537,83 +815,39 @@ export default function CompaniesPage() {
           subtitle={`${total} شركة · ${active} نشطة · ${suspended} معلّقة`}
           actions={
             tab === 'companies' ? (
-              <Button
-                variant="primary"
-                icon={<i className="ti ti-building-plus" />}
-                onClick={openAdd}
-              >
-                شركة جديدة
+              <Button variant="secondary" icon={<i className="ti ti-refresh" />} onClick={() => refetch()}>
+                تحديث
               </Button>
             ) : undefined
           }
         />
 
         {/* ── KPIs ── */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4,1fr)',
-          gap: 10, marginBottom: 22,
-        }}>
-          <KpiCard
-            label="إجمالي الشركات"
-            value={total}
-            icon="ti-building"
-            color="var(--em)"
-            bg="var(--emb)"
-          />
-          <KpiCard
-            label="نشطة"
-            value={active}
-            icon="ti-check"
-            color="var(--blue)"
-            bg="var(--blueb)"
-          />
-          <KpiCard
-            label="معلّقة"
-            value={suspended}
-            icon="ti-lock"
-            color="var(--red)"
-            bg="var(--redb)"
-          />
-          <KpiCard
-            label="تجريبية"
-            value={onTrial}
-            icon="ti-clock"
-            color="var(--gold)"
-            bg="var(--goldb)"
-          />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
+          <KpiCard label="إجمالي الشركات" value={total}     icon="ti-building"       color="var(--em)"   bg="var(--emb)" />
+          <KpiCard label="نشطة"            value={active}    icon="ti-circle-check"   color="var(--blue)" bg="var(--blueb)" />
+          <KpiCard label="معلّقة"           value={suspended} icon="ti-lock"           color="var(--red)"  bg="var(--redb)" />
+          <KpiCard label="تجريبية"          value={onTrial}   icon="ti-clock"          color="var(--gold)" bg="var(--goldb)" />
         </div>
 
-        {/* ── Main Tabs ── */}
-        <div style={{
-          display: 'flex', borderBottom: '1px solid var(--b2)',
-          marginBottom: 20, gap: 0, overflowX: 'auto',
-        }}>
+        {/* ── Tabs ── */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--b2)', marginBottom: 20, gap: 0, overflowX: 'auto' }}>
           {([
-            { key: 'companies', label: 'الشركات',             icon: 'ti-building',  count: total },
-            { key: 'super',     label: 'إعدادات Super Admin', icon: 'ti-star',      count: null },
+            { key: 'companies', label: 'الشركات',             icon: 'ti-building', count: total },
+            { key: 'super',     label: 'إعدادات Super Admin', icon: 'ti-star',     count: null },
           ] as const).map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                padding: '10px 20px', background: 'none', border: 'none',
-                borderBottom: `2px solid ${tab === t.key ? 'var(--em)' : 'transparent'}`,
-                color: tab === t.key ? 'var(--em)' : 'var(--t4)',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 7,
-                fontFamily: 'Tajawal, sans-serif', transition: '.13s',
-                whiteSpace: 'nowrap',
-              }}
-            >
+            <button key={t.key} onClick={() => setTab(t.key)} style={{
+              padding: '10px 20px', background: 'none', border: 'none',
+              borderBottom: `2px solid ${tab === t.key ? 'var(--em)' : 'transparent'}`,
+              color: tab === t.key ? 'var(--em)' : 'var(--t4)',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', gap: 7,
+              transition: '.13s', whiteSpace: 'nowrap',
+            }}>
               <i className={`ti ${t.icon}`} style={{ fontSize: 15 }} />
               {t.label}
               {t.count !== null && (
-                <span style={{
-                  fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 800,
-                  background: tab === t.key ? 'var(--emb)' : 'var(--bg4)',
-                  color: tab === t.key ? 'var(--em)' : 'var(--t4)',
-                }}>
+                <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 800, background: tab === t.key ? 'var(--emb)' : 'var(--bg4)', color: tab === t.key ? 'var(--em)' : 'var(--t4)' }}>
                   {t.count}
                 </span>
               )}
@@ -621,52 +855,39 @@ export default function CompaniesPage() {
           ))}
         </div>
 
-        {/* ══════════ TAB: COMPANIES ══════════ */}
+        {/* ══ TAB: COMPANIES ══ */}
         {tab === 'companies' && (
           <div style={{ animation: 'slideIn .2s ease' }}>
 
             {/* Toolbar */}
             <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ flex: 1, minWidth: 220 }}>
-                <SearchInput
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="بحث بالاسم، البريد، NIF..."
-                />
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <SearchInput value={search} onChange={setSearch} placeholder="بحث بالاسم، البريد، NIF..." />
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {STATUS_FILTERS.map(f => (
-                  <button
-                    key={f.key}
-                    onClick={() => setStatusFilter(f.key)}
-                    style={{
-                      padding: '7px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', transition: '.13s',
-                      background: statusFilter === f.key ? 'var(--em)' : 'var(--bg3)',
-                      border: `1px solid ${statusFilter === f.key ? 'var(--em)' : 'var(--b2)'}`,
-                      color: statusFilter === f.key ? '#fff' : 'var(--t3)',
-                    }}
-                  >
+                  <button key={f.key} onClick={() => setStatusFilter(f.key)} style={{
+                    padding: '7px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', transition: '.13s',
+                    background: statusFilter === f.key ? 'var(--em)' : 'var(--bg3)',
+                    border: `1px solid ${statusFilter === f.key ? 'var(--em)' : 'var(--b2)'}`,
+                    color: statusFilter === f.key ? '#fff' : 'var(--t3)',
+                  }}>
                     {f.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Error */}
             {isError && (
               <AlertBar variant="red">
                 فشل تحميل الشركات.{' '}
-                <button
-                  onClick={() => refetch()}
-                  style={{ fontWeight: 700, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}
-                >
+                <button onClick={() => refetch()} style={{ fontWeight: 700, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>
                   إعادة المحاولة
                 </button>
               </AlertBar>
             )}
 
-            {/* Loading */}
             {isLoading && (
               <div className="empty">
                 <div className="empty-ic"><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /></div>
@@ -674,39 +895,27 @@ export default function CompaniesPage() {
               </div>
             )}
 
-            {/* Empty */}
             {!isLoading && companies.length === 0 && (
-              <EmptyState icon="ti-building" text="لا توجد شركات" sub="أضف شركتك الأولى" />
+              <EmptyState icon="ti-building" text="لا توجد شركات" sub={search ? 'لا توجد نتائج للبحث' : 'لم تُسجَّل أي شركة بعد'} />
             )}
 
-            {/* Table */}
             {!isLoading && companies.length > 0 && (
               <Card padding={0}>
-                {/* Table header */}
-                <div style={{
-                  display: 'grid', gridTemplateColumns: '2.2fr 1.4fr 1fr 1fr 140px',
-                  padding: '10px 18px', borderBottom: '1px solid var(--b2)',
-                  background: 'var(--bg3)', direction: 'rtl',
-                }}>
+                {/* Header */}
+                <div style={{ display: 'grid', gridTemplateColumns: '2.4fr 1.4fr 1fr 1fr 130px', padding: '10px 18px', borderBottom: '1px solid var(--b2)', background: 'var(--bg3)', direction: 'rtl' }}>
                   {['الشركة', 'التواصل', 'الخطة', 'الحالة', ''].map((h, i) => (
-                    <div key={i} style={{ fontSize: 10, fontWeight: 800, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: .8 }}>
-                      {h}
-                    </div>
+                    <div key={i} style={{ fontSize: 10, fontWeight: 800, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: .8 }}>{h}</div>
                   ))}
                 </div>
 
-                {/* Rows */}
-                {companies.map((co, i) => (
+                {companies.map(co => (
                   <CompanyRow
                     key={co.id}
                     co={co}
-                    onEdit={() => openEdit(co)}
+                    onEdit={() => setEditTarget(co)}
                     onSuspend={() => suspend.mutate({ slug: co.slug, suspended: co.is_suspended })}
                     onVerify={() => verify.mutate({ slug: co.slug, verified: co.is_verified })}
-                    onDelete={() => {
-                      if (confirm(`تعطيل شركة "${co.name}"؟`)) destroy.mutate(co.slug);
-                    }}
-                    loading={destroy.isPending}
+                    onDelete={() => confirm(`تعطيل شركة "${co.name}"؟`) && destroy.mutate(co.slug)}
                   />
                 ))}
               </Card>
@@ -714,19 +923,21 @@ export default function CompaniesPage() {
           </div>
         )}
 
-        {/* ══════════ TAB: SUPER ADMIN ══════════ */}
+        {/* ══ TAB: SUPER ADMIN ══ */}
         {tab === 'super' && <SuperAdminTab />}
-
       </div>
 
-      {/* ── Drawer ── */}
-      <CompanyFormDrawer
-        open={drawerOpen}
-        company={editTarget}
-        isSuperAdmin={isSuperAdmin}
-        onClose={() => setDrawerOpen(false)}
-        onSuccess={() => qc.invalidateQueries({ queryKey: ['companies'] })}
-      />
+      {/* ── Drawer تعديل الشركة ── */}
+      {editTarget && (
+        <EditCompanyDrawer
+          company={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={(updated) => {
+            qc.invalidateQueries({ queryKey: ['admin-companies'] });
+            setEditTarget(null);
+          }}
+        />
+      )}
     </>
   );
 }

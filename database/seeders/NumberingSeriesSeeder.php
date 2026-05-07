@@ -1,6 +1,5 @@
 <?php
 
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -10,14 +9,32 @@ class NumberingSeriesSeeder extends Seeder
 {
     public function run(): void
     {
-        $companyId   = DB::table('companies')->first()->id;
-        $warehouseId = DB::table('warehouses')->where('company_id', $companyId)->first()->id;
-        $year        = date('Y');
+        $companyId = config('seeding.company_id');
 
+        if (!$companyId) {
+            throw new \RuntimeException('seeding.company_id غير محدد');
+        }
+
+        // لا نُدرج إن كانت سلاسل الترقيم موجودة لهذه الشركة
+        if (DB::table('numbering_series')->where('company_id', $companyId)->exists()) {
+            return;
+        }
+
+        // المستودع الخاص بهذه الشركة — يجب تشغيل WarehouseSeeder أولاً
+        $warehouseId = DB::table('warehouses')
+            ->where('company_id', $companyId)
+            ->value('id');
+
+        if (!$warehouseId) {
+            throw new \RuntimeException('لا يوجد مستودع للشركة ' . $companyId . ' — شغّل WarehouseSeeder أولاً');
+        }
+
+        $year = date('Y');
         $documentTypes = DB::table('document_types')->get();
 
+        $rows = [];
         foreach ($documentTypes as $docType) {
-            DB::table('numbering_series')->insert([
+            $rows[] = [
                 'company_id'       => $companyId,
                 'document_type_id' => $docType->id,
                 'warehouse_id'     => $warehouseId,
@@ -34,7 +51,11 @@ class NumberingSeriesSeeder extends Seeder
                 'is_locked'        => false,
                 'created_at'       => now(),
                 'updated_at'       => now(),
-            ]);
+            ];
+        }
+
+        if (!empty($rows)) {
+            DB::table('numbering_series')->insert($rows);
         }
     }
 }

@@ -14,7 +14,12 @@ class StoreEmployeeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'matricule' => 'nullable|string|max:50|unique:employees,matricule',
+            'matricule' => [
+                'required',
+                'string',
+                'max:20',
+                'unique:employees,matricule,NULL,id,company_id,' . auth()->user()->current_company_id
+            ],
             'user_id' => 'nullable|exists:users,id',
             'first_name' => 'required|string|max:100',
             'last_name' => 'required|string|max:100',

@@ -5,7 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FiscalYearProvider } from "@/context/FiscalYearContext";
 import { AuthProvider } from "@/context/AuthContext";
-import { AppRoutes } from "@/routes/index";
+import AppRoutes from "@/routes/index";
 
 // CSS — الترتيب مهم جداً
 import "../css/theme/tokens.css";

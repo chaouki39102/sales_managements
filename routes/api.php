@@ -62,6 +62,7 @@ use App\Http\Controllers\Api\V1\TreasuryAccountTypeController;
 use App\Http\Controllers\Api\V1\FiscalStampController;
 use App\Http\Controllers\Api\V1\DocumentBaseOperationController;
 use App\Http\Controllers\Api\V1\BarcodeController;
+use App\Http\Controllers\Api\V1\CompanySeedController;
 use App\Http\Controllers\Api\V1\ProductVariantController;
 
 use App\Http\Requests\StoreCompanyRequest;
@@ -154,6 +155,8 @@ Route::prefix('v1')->group(function () {
 
         // الشركات
         Route::prefix('companies')->group(function () {
+            Route::get('/',          fn() => app(AdminCompanyController::class)->index(request()));
+            Route::get('/{company}', fn(Company $company) => app(AdminCompanyController::class)->show($company));
             Route::get('/stats', fn() => app(AdminCompanyController::class)->stats());
             Route::post('/{company}/suspend', fn(Request $request, Company $company) => app(AdminCompanyController::class)->suspend($request, $company));
             Route::post('/{company}/unsuspend', fn(Company $company) => app(AdminCompanyController::class)->unsuspend($company));
@@ -249,6 +252,10 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'company'])
         ->prefix('{company}')
         ->group(function () {
+
+
+              // ── بذر البيانات الأولية ──────────────────────
+        Route::post('seeds/{seeder}', [App\Http\Controllers\Api\V1\CompanySeedController::class, 'run']);
 
             // ────────────────────────────────────
             // ⑤-أ: موارد متاحة لكل أعضاء الشركة (قراءة)
@@ -371,6 +378,8 @@ Route::prefix('v1')->group(function () {
             // ⑤-ب: موارد خاصة بالمالك / المدير
             // ────────────────────────────────────
             Route::middleware('can:manage-company')->group(function () {
+
+
                 // وحدات — كتابة
                 Route::post('units',           [UnitController::class, 'store']);
                 Route::put('units/{unit}',     [UnitController::class, 'update']);
@@ -531,11 +540,10 @@ Route::prefix('v1')->group(function () {
                 Route::post('checks/{check}/mark-bounced',   [CheckController::class, 'markAsBounced']);
 
                 // حسابات الخزينة
-                Route::apiResource('treasury-accounts', TreasuryAccountController::class);
                 Route::get('treasury-accounts/bank-accounts', [TreasuryAccountController::class, 'bankAccounts']);
                 Route::get('treasury-accounts/cash-accounts', [TreasuryAccountController::class, 'cashAccounts']);
                 Route::get('treasury-accounts/default',       [TreasuryAccountController::class, 'default']);
-
+                Route::apiResource('treasury-accounts', TreasuryAccountController::class);
                 // المصروفات
                 Route::apiResource('expenses', ExpenseController::class);
                 Route::get('expenses/paid',   [ExpenseController::class, 'paid']);

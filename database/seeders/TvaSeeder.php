@@ -9,7 +9,7 @@ class TvaSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('tvas')->insert([
+        DB::table('tvas')->upsert([
             [
                 'name'          => 'TVA 0%',
                 'rate'          => 0.00,
@@ -35,11 +35,11 @@ class TvaSeeder extends Seeder
                 'rate'          => 19.00,
                 'description'   => 'المعدل العادي للضريبة على القيمة المضافة',
                 'active'        => true,
-                'is_default'    => true,  // ← المعدل الرئيسي في الجزائر
+                'is_default'    => true,
                 'display_order' => 3,
                 'created_at'    => now(),
                 'updated_at'    => now(),
             ],
-        ]);
+        ], ['name', 'rate']); // unique constraint
     }
 }

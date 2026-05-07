@@ -308,6 +308,223 @@ function NoFiscalYearModal({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+
+// ════════════════════════════════════════════════
+// CompanySwitcher — تبديل الشركة من الـ Sidebar
+// ════════════════════════════════════════════════
+function CompanySwitcher() {
+  const { user, activeCompany, setActiveCompany } = useAuth() as any;
+  const navigate = useNavigate();
+  const [open, setOpen]         = useState(false);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [loading, setLoading]   = useState(false);
+  const [switching, setSwitching] = useState<number | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // إغلاق عند النقر خارجاً
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  // جلب الشركات عند الفتح
+  const fetchCompanies = async () => {
+    if (companies.length > 0) return; // cached
+    setLoading(true);
+    try {
+      const res = await apiClient.get('/companies');
+      const raw = res.data?.data ?? res.data;
+      setCompanies(Array.isArray(raw) ? raw : (raw?.data ?? []));
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  };
+
+  const handleOpen = () => {
+    setOpen(v => !v);
+    fetchCompanies();
+  };
+
+  const handleSwitch = async (co: any) => {
+    if (co.id === activeCompany?.id) { setOpen(false); return; }
+    setSwitching(co.id);
+    try {
+      await apiClient.post('/companies/switch', { company_id: co.id });
+      setActiveCompany({ id: co.id, name: co.name, slug: co.slug });
+      setOpen(false);
+      // نحذف السنة المالية المخزّنة ونوجّه للـ onboarding لاختيار السنة
+      sessionStorage.removeItem('selected_fiscal_year');
+      navigate('/onboarding', { replace: true });
+    } catch { /* silent */ }
+    finally { setSwitching(null); }
+  };
+
+  const initials = (name: string) =>
+    name.trim().split(' ').slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? '').join('');
+
+  const AV_COLORS = [
+    'linear-gradient(135deg,#0a8a5c,#0dbf84)',
+    'linear-gradient(135deg,#1a4fd6,#60a5fa)',
+    'linear-gradient(135deg,#6920d4,#a78bfa)',
+    'linear-gradient(135deg,#b87d0a,#fbbf24)',
+    'linear-gradient(135deg,#0d7a8c,#22d3ee)',
+    'linear-gradient(135deg,#c43a0a,#fb923c)',
+  ];
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      {/* ─── بطاقة الشركة الحالية ─── */}
+      <button
+        onClick={handleOpen}
+        title="تبديل الشركة"
+        style={{
+          width: '100%', border: 'none', cursor: 'pointer',
+          padding: '10px 12px', borderRadius: 12, display: 'block',
+          background: 'var(--bg3, rgba(255,255,255,.05))',
+          outline: 'none', fontFamily: 'Tajawal, sans-serif',
+          transition: 'background .15s',
+        }}
+        onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = 'var(--bg4, rgba(255,255,255,.09))')}
+        onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'var(--bg3, rgba(255,255,255,.05))')}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, direction: 'rtl' }}>
+          {/* أيقونة الشركة */}
+          <div style={{
+            width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+            background: 'linear-gradient(135deg, var(--em, #0a8a5c), var(--em3, #0dbf84))',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 15, fontWeight: 900, color: '#fff',
+          }}>
+            {(activeCompany?.name ?? '؟')[0]?.toUpperCase()}
+          </div>
+          {/* الاسم والـ slug */}
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
+            <div style={{
+              fontSize: 13, fontWeight: 800,
+              color: 'var(--t1, #fff)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              lineHeight: 1.3, marginBottom: 3,
+            }}>
+              {activeCompany?.name ?? 'اختر شركة'}
+            </div>
+            <div style={{
+              fontSize: 10, color: 'var(--t4, rgba(255,255,255,.45))',
+              fontFamily: 'monospace', letterSpacing: .3,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              display: 'flex', alignItems: 'center', gap: 3,
+            }}>
+              <i className="ti ti-building" style={{ fontSize: 9 }} />
+              {activeCompany?.slug ?? '—'}
+            </div>
+          </div>
+          <i
+            className={`ti ti-chevron-${open ? 'up' : 'down'}`}
+            style={{ fontSize: 12, color: 'var(--t4)', flexShrink: 0, transition: '.2s' }}
+          />
+        </div>
+      </button>
+
+      {/* Popover */}
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', right: 0, left: 0, zIndex: 500,
+          background: 'var(--bg2)', border: '1px solid var(--b2)',
+          borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,.3)',
+          overflow: 'hidden', direction: 'rtl',
+          animation: 'fadeInPop .15s ease',
+        }}>
+          <style>{`@keyframes fadeInPop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
+
+          {/* Header */}
+          <div style={{ padding: '10px 13px', borderBottom: '1px solid var(--b1)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-building-community" style={{ color: 'var(--em)', fontSize: 13 }} />
+            <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: .7 }}>
+              تبديل الشركة
+            </span>
+          </div>
+
+          {/* Loading */}
+          {loading && (
+            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--t4)', fontSize: 12 }}>
+              <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', marginLeft: 6 }} />
+              جارٍ التحميل...
+            </div>
+          )}
+
+          {/* List */}
+          {!loading && companies.map((co: any, i: number) => {
+            const isActive   = co.id === activeCompany?.id;
+            const isSwitching = switching === co.id;
+            const suspended  = co.is_suspended;
+
+            return (
+              <button
+                key={co.id}
+                onClick={() => !suspended && handleSwitch(co)}
+                disabled={suspended || isSwitching}
+                style={{
+                  width: '100%', padding: '10px 13px', background: isActive ? 'var(--emb)' : 'none',
+                  border: 'none', borderBottom: '1px solid var(--b1)', cursor: suspended ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 10, direction: 'rtl',
+                  opacity: suspended ? .5 : 1, transition: '.13s',
+                  fontFamily: 'Tajawal, sans-serif',
+                }}
+                onMouseEnter={e => { if (!isActive && !suspended) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg3)'; }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = isActive ? 'var(--emb)' : 'none'; }}
+              >
+                {/* Avatar */}
+                <div style={{
+                  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                  background: AV_COLORS[co.id % AV_COLORS.length],
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 900, color: '#fff',
+                }}>
+                  {initials(co.name)}
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? 'var(--em)' : 'var(--t1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {co.name}
+                    {suspended && <span style={{ color: 'var(--red)', marginRight: 5, fontSize: 10 }}>معلّقة</span>}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>{co.slug}</div>
+                </div>
+
+                {/* State */}
+                {isSwitching ? (
+                  <i className="ti ti-loader" style={{ animation: 'spin .8s linear infinite', color: 'var(--em)', fontSize: 13, flexShrink: 0 }} />
+                ) : isActive ? (
+                  <i className="ti ti-check" style={{ color: 'var(--em)', fontSize: 13, flexShrink: 0 }} />
+                ) : (
+                  <i className="ti ti-arrow-left" style={{ color: 'var(--t4)', fontSize: 11, flexShrink: 0 }} />
+                )}
+              </button>
+            );
+          })}
+
+          {/* Footer — إضافة شركة */}
+          <button
+            onClick={() => { setOpen(false); navigate('/onboarding'); }}
+            style={{
+              width: '100%', padding: '10px 13px', background: 'none', border: 'none',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+              direction: 'rtl', fontFamily: 'Tajawal, sans-serif', borderTop: '1px solid var(--b2)',
+            }}
+            onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = 'var(--bg3)')}
+            onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'none')}
+          >
+            <i className="ti ti-plus" style={{ color: 'var(--em)', fontSize: 13 }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--em)' }}>إضافة / إدارة الشركات</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ════════════════════════════════════════════════
 // DashboardLayout
 // ════════════════════════════════════════════════
@@ -354,12 +571,10 @@ export default function DashboardLayout() {
           </div>
         </div>
 
-        {activeCompany && (
-          <div className="sb-co">
-            <div className="sb-co-name">{activeCompany.name}</div>
-            <div className="sb-co-info">{activeCompany.slug}</div>
-          </div>
-        )}
+        {/* ─── Company Switcher with visible spacing ─── */}
+        <div style={{ padding: '4px 10px 8px', borderBottom: '1px solid var(--b1, rgba(255,255,255,.07))' }}>
+          <CompanySwitcher />
+        </div>
 
         {NAV_GROUPS.filter(g => !(g as any).superAdminOnly || isSuperAdmin).map((group, idx) => (
           <div className="sb-sec" key={group.label}>
@@ -385,13 +600,75 @@ export default function DashboardLayout() {
         ))}
 
         <div className="sb-foot">
-          <div className="sb-user" onClick={logout} title="تسجيل الخروج">
-            <div className="sb-av">{userInitial}</div>
-            <div>
-              <div className="sb-uname">{user?.name ?? 'المستخدم'}</div>
-              <div className="sb-urole">{(user as any)?.role ?? 'مدير النظام'}</div>
+          {/* ─── بطاقة المستخدم ─── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 12px 8px', direction: 'rtl',
+          }}>
+            {/* الأفاتار */}
+            <div style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              background: 'linear-gradient(135deg, var(--blue,#1a4fd6), #60a5fa)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 15, fontWeight: 900, color: '#fff',
+            }}>
+              {userInitial}
             </div>
-            <div className="sb-dot" title="متصل" />
+            {/* الاسم والدور */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 13, fontWeight: 800, color: 'var(--t1)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {user?.name ?? 'المستخدم'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>
+                {(user as any)?.role ?? 'مدير النظام'}
+              </div>
+            </div>
+            {/* مؤشر الاتصال */}
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: 'var(--em, #0dbf84)',
+              boxShadow: '0 0 6px var(--em, #0dbf84)',
+              flexShrink: 0,
+            }} title="متصل" />
+          </div>
+
+          {/* ─── زر تسجيل الخروج ─── */}
+          <div style={{ padding: '0 10px 12px' }}>
+            <button
+              onClick={logout}
+              style={{
+                width: '100%',
+                display: 'flex', alignItems: 'center', gap: 9,
+                padding: '10px 14px',
+                background: 'transparent',
+                border: '1.5px solid rgba(239,68,68,.3)',
+                borderRadius: 10,
+                color: '#ef4444',
+                fontSize: 13, fontWeight: 700,
+                fontFamily: 'Tajawal, sans-serif',
+                cursor: 'pointer',
+                direction: 'rtl',
+                transition: 'all .18s',
+              }}
+              onMouseEnter={e => {
+                const b = e.currentTarget as HTMLButtonElement;
+                b.style.background = '#ef4444';
+                b.style.borderColor = '#ef4444';
+                b.style.color = '#fff';
+              }}
+              onMouseLeave={e => {
+                const b = e.currentTarget as HTMLButtonElement;
+                b.style.background = 'transparent';
+                b.style.borderColor = 'rgba(239,68,68,.3)';
+                b.style.color = '#ef4444';
+              }}
+            >
+              <i className="ti ti-logout" style={{ fontSize: 16 }} />
+              <span>تسجيل الخروج</span>
+            </button>
           </div>
         </div>
       </nav>
