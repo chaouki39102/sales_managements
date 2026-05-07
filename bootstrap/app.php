@@ -15,15 +15,16 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
+    // bootstrap/app.php
     ->withMiddleware(function (Middleware $middleware): void {
-        // تفعيل الـ API ليكون State-aware (يفهم الـ Cookies)
         $middleware->statefulApi();
-
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
         $middleware->alias([
-            'company' => SetCompanyContext::class,
+            'company'       => \App\Http\Middleware\SetCompanyContext::class,
+            'api.auth'      => \App\Http\Middleware\ApiAuthenticate::class,   // ← اختياري مع sanctum
+            'super-admin'   => \App\Http\Middleware\SuperAdminOnly::class,    // ← جديد
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
