@@ -572,3 +572,6 @@ Route::prefix('v1')->group(function () {
             Route::get('settings/key/{key}/value', [SettingController::class, 'getValue']);
         });
 });
+
+// ⑥ ADMIN PANEL — تحت /api/admin، محمي بـ auth:sanctum و role:super-admin
+require base_path('routes/api_admin.php');
