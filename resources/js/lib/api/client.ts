@@ -180,6 +180,18 @@ function isPublicPath(path: string): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 6-c. الكشف عن URL يحمل slug مضمَّناً بالفعل: /{word}/...
+//      يُستخدم لتجنب حقن slug مكرَّر ولإسكات تحذير "No active slug"
+// ─────────────────────────────────────────────────────────────────────────────
+
+function isPreSluggedUrl(path: string): boolean {
+  // يطابق /{slug}/{resource} — مقطعان على الأقل بعد /
+  // مثال: /alhday-69fb717c0e4ec/seeds/currencies → true
+  // مثال: /fiscal-years → false
+  return /^\/[^/]+\/.+/.test(path.split('?')[0]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 7. REQUEST interceptor (✅ التعديل الأساسي)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -193,16 +205,22 @@ client.interceptors.request.use(
     // المقارنة مع active slug فقط — آمنة لأن أي مسار بـ slug مختلف
     // يُرسَل يدوياً فقط من OnboardingPage حيث slug=null أصلاً
     if (slug && !isPublicPath(originalUrl)) {
-      if (!originalUrl.startsWith(`/${slug}/`)) {
+      if (!originalUrl.startsWith(`/${slug}/`) && !isPreSluggedUrl(originalUrl)) {
         config.url = `/${slug}${originalUrl}`;
         if (import.meta.env.DEV) {
           console.debug(`🌐 Tenant request: ${config.method?.toUpperCase()} ${config.baseURL ?? ''}${config.url}`);
         }
       }
+<<<<<<< HEAD
     } else if (!slug && !isPublicPath(originalUrl)) {
       // تحذير فقط إذا لم يكن المسار يحتوي slug مضمَّناً (مثل طلبات OnboardingPage/DataSeedingModal)
       const hasEmbeddedSlug = /^\/[a-z0-9][a-z0-9-]{2,}[a-z0-9]\//.test(originalUrl);
       if (import.meta.env.DEV && !hasEmbeddedSlug) {
+=======
+    } else if (!slug && !isPublicPath(originalUrl) && !isPreSluggedUrl(originalUrl)) {
+      // تحذير فقط إذا كان URL لا يحمل slug مضمَّناً
+      if (import.meta.env.DEV) {
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         console.warn(`⚠️ No active company slug for request: ${config.method?.toUpperCase()} ${originalUrl}`);
       }
     }

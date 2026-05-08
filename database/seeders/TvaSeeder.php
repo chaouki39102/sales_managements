@@ -9,8 +9,15 @@ class TvaSeeder extends Seeder
 {
     public function run(): void
     {
+<<<<<<< HEAD
         DB::table('tvas')->upsert([
+=======
+        $companyId = config('seeding.company_id') ?? DB::table('companies')->value('id');
+
+        DB::table('tvas')->insert([
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             [
+                'company_id'    => $companyId,
                 'name'          => 'TVA 0%',
                 'rate'          => 0.00,
                 'description'   => 'معفى من الضريبة على القيمة المضافة',
@@ -21,6 +28,7 @@ class TvaSeeder extends Seeder
                 'updated_at'    => now(),
             ],
             [
+                'company_id'    => $companyId,
                 'name'          => 'TVA 9%',
                 'rate'          => 9.00,
                 'description'   => 'المعدل المخفض للضريبة على القيمة المضافة',
@@ -31,6 +39,7 @@ class TvaSeeder extends Seeder
                 'updated_at'    => now(),
             ],
             [
+                'company_id'    => $companyId,
                 'name'          => 'TVA 19%',
                 'rate'          => 19.00,
                 'description'   => 'المعدل العادي للضريبة على القيمة المضافة',

@@ -8,22 +8,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * OpeningBalanceParty Model
- *
- * Table: opening_balances_parties
- * Opening balances for parties (customers/suppliers)
- */
 #[Cacheable]
 class OpeningBalanceParty extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'opening_balances_parties';
 
     protected $fillable = [
+        'company_id',
         'fiscal_year_id',
         'party_id',
         'opening_balance',

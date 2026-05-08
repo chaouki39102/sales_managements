@@ -11,23 +11,15 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
 
-/**
- * Check Model
- *
- * Table: checks
- * Manages check payments and their lifecycle
- */
 #[Cacheable]
 class Check extends Model
 {
-    use
-        HasStandardizedConfiguration,
-        HasCompany,
-        Auditable;
+    use HasStandardizedConfiguration, HasCompany, Auditable;
 
     protected $table = 'checks';
 
     protected $fillable = [
+        'company_id',
         'check_number',
         'check_date',
         'due_date',

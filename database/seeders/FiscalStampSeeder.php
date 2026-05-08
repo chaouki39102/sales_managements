@@ -9,8 +9,16 @@ class FiscalStampSeeder extends Seeder
 {
     public function run(): void
     {
+<<<<<<< HEAD
         DB::table('fiscal_stamps')->upsert([
             [
+=======
+        $companyId = config('seeding.company_id') ?? DB::table('companies')->value('id');
+
+        DB::table('fiscal_stamps')->insert([
+            [
+                'company_id'   => $companyId,
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
                 'name'         => 'Timbre 100 DA',
                 'min_amount'   => 0.00,
                 'max_amount'   => 1000.00,
@@ -23,6 +31,10 @@ class FiscalStampSeeder extends Seeder
                 'updated_at'   => now(),
             ],
             [
+<<<<<<< HEAD
+=======
+                'company_id'   => $companyId,
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
                 'name'         => 'Timbre 300 DA',
                 'min_amount'   => 1000.01,
                 'max_amount'   => 5000.00,
@@ -35,6 +47,10 @@ class FiscalStampSeeder extends Seeder
                 'updated_at'   => now(),
             ],
             [
+<<<<<<< HEAD
+=======
+                'company_id'   => $companyId,
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
                 'name'         => 'Timbre 1000 DA',
                 'min_amount'   => 5000.01,
                 'max_amount'   => null,

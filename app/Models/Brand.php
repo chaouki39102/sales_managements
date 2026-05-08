@@ -9,21 +9,17 @@ use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
-/**
- * Brand Model
- *
- * Table: brands
- * Product brands/manufacturers
- */
 #[Cacheable]
 class Brand extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
 
     protected $table = 'brands';
 
     protected $fillable = [
+        'company_id',
         'name',
         'slug',
         'description',

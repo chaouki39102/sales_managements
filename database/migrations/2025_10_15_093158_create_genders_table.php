@@ -2,33 +2,22 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Migration for genders lookup table
- *
- * Replaces ENUM gender field with a proper lookup table
- * for better flexibility and maintainability
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
+return new class extends Migration {
+    public function up(): void {
         Schema::create('genders', function (Blueprint $table) {
             $table->id();
-            $table->string('name', 50)->unique();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->string('name', 50);
             $table->string('label', 100);
-            $table->boolean('active')->default(true)->index();
+            $table->boolean('is_active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
+            $table->unique(['company_id', 'name']);
         });
-
-
     }
-
-    public function down(): void
-    {
+    public function down(): void {
         Schema::dropIfExists('genders');
     }
 };

@@ -9,19 +9,23 @@ class GenderSeeder extends Seeder
 {
     public function run(): void
     {
+        $companyId = config('seeding.company_id') ?? DB::table('companies')->value('id');
+
         DB::table('genders')->insert([
             [
+                'company_id'    => $companyId,
                 'name'          => 'male',
                 'label'         => 'ذكر',
-                'active'        => true,
+                'is_active'     => true,
                 'display_order' => 1,
                 'created_at'    => now(),
                 'updated_at'    => now(),
             ],
             [
+                'company_id'    => $companyId,
                 'name'          => 'female',
                 'label'         => 'أنثى',
-                'active'        => true,
+                'is_active'     => true,
                 'display_order' => 2,
                 'created_at'    => now(),
                 'updated_at'    => now(),

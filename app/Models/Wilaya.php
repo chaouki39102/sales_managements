@@ -7,12 +7,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * Wilaya Model
- *
- * Table: wilayas
- * Algerian provinces (wilayas)
- */
 #[Cacheable]
 class Wilaya extends Model
 {
@@ -47,23 +41,8 @@ class Wilaya extends Model
     public static ?int $cacheTtl = 86400;
     public static array $cacheTags = ['wilayas', 'geography'];
 
-    public function communes(): HasMany
-    {
-        return $this->hasMany(Commune::class);
-    }
-
-    public function users(): HasMany
-    {
-        return $this->hasMany(User::class);
-    }
-
-    public function parties(): HasMany
-    {
-        return $this->hasMany(Party::class);
-    }
-
-    public function warehouses(): HasMany
-    {
-        return $this->hasMany(Warehouse::class);
-    }
+    public function communes(): HasMany { return $this->hasMany(Commune::class); }
+    public function users(): HasMany { return $this->hasMany(User::class); }
+    public function parties(): HasMany { return $this->hasMany(Party::class); }
+    public function warehouses(): HasMany { return $this->hasMany(Warehouse::class); }
 }

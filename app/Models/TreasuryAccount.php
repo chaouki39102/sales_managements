@@ -12,23 +12,15 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
 
-/**
- * TreasuryAccount Model
- *
- * Table: treasury_accounts
- * Manages bank and cash accounts
- */
 #[Cacheable]
 class TreasuryAccount extends Model
 {
-    use HasStandardizedConfiguration,
-        HasCompany,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, HasCompany, SoftDeletes, Auditable;
 
     protected $table = 'treasury_accounts';
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'treasury_account_type_id',
@@ -37,7 +29,7 @@ class TreasuryAccount extends Model
         'rib',
         'iban',
         'swift_bic',
-        'currency',
+        'currency_id',
         'initial_balance',
         'current_balance',
         'is_default',
@@ -56,7 +48,7 @@ class TreasuryAccount extends Model
     ];
 
     public static array $searchableFields = ['name', 'code', 'bank_name', 'account_number', 'rib', 'iban'];
-    public static array $filterable = ['treasury_account_type_id', 'is_default', 'active', 'currency'];
+    public static array $filterable = ['treasury_account_type_id', 'is_default', 'active', 'currency_id'];
     public static array $sortable = ['id', 'name', 'code', 'current_balance'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['treasuryAccountType', 'payments', 'paymentModes', 'expenses', 'createdBy', 'updatedBy', 'deletedBy'];
@@ -64,57 +56,22 @@ class TreasuryAccount extends Model
     public static ?int $cacheTtl = 300;
     public static array $cacheTags = ['treasury_accounts'];
 
-    public function treasuryAccountType(): BelongsTo
-    {
-        return $this->belongsTo(TreasuryAccountType::class);
-    }
+    public function treasuryAccountType(): BelongsTo { return $this->belongsTo(TreasuryAccountType::class); }
+    public function payments(): HasMany { return $this->hasMany(Payment::class); }
+    public function paymentModes(): HasMany { return $this->hasMany(PaymentMode::class); }
+    public function expenses(): HasMany { return $this->hasMany(Expense::class); }
 
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
-    }
-
-    public function paymentModes(): HasMany
-    {
-        return $this->hasMany(PaymentMode::class);
-    }
-
-    public function expenses(): HasMany
-    {
-        return $this->hasMany(Expense::class);
-    }
-
-    public function scopeDefault(Builder $query): Builder
-    {
-        return $query->where('is_default', true);
-    }
-
+    public function scopeDefault(Builder $query): Builder { return $query->where('is_default', true); }
     public function scopeBankAccounts(Builder $query): Builder
     {
-        return $query->whereHas('treasuryAccountType', function ($q) {
-            $q->where('name', 'bank');
-        });
+        return $query->whereHas('treasuryAccountType', fn($q) => $q->where('name', 'bank'));
     }
-
     public function scopeCashAccounts(Builder $query): Builder
     {
-        return $query->whereHas('treasuryAccountType', function ($q) {
-            $q->where('name', 'cash');
-        });
+        return $query->whereHas('treasuryAccountType', fn($q) => $q->where('name', 'cash'));
     }
 
-    public function isBankAccount(): bool
-    {
-        return $this->treasuryAccountType?->name === 'bank';
-    }
-
-    public function isCashAccount(): bool
-    {
-        return $this->treasuryAccountType?->name === 'cash';
-    }
-
-    public function updateBalance(float $amount): bool
-    {
-        return $this->increment('current_balance', $amount);
-    }
+    public function isBankAccount(): bool { return $this->treasuryAccountType?->name === 'bank'; }
+    public function isCashAccount(): bool { return $this->treasuryAccountType?->name === 'cash'; }
+    public function updateBalance(float $amount): bool { return $this->increment('current_balance', $amount); }
 }

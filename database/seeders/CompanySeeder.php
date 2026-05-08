@@ -9,8 +9,10 @@ class CompanySeeder extends Seeder
 {
     public function run(): void
     {
-        $legalFormId = DB::table('legal_forms')->where('code', 'EURL')->value('id');
-        $wilayaId    = DB::table('wilayas')->where('code', 39)->value('id'); // الوادي
+        $wilayaId = DB::table('wilayas')->where('code', 39)->value('id'); // الوادي
+
+        // جلب المستخدم الأول الذي أُنشئ في UserSeeder
+        $superAdminId = DB::table('users')->where('email', 'admin@mail.com')->value('id');
 
         $companyId = DB::table('companies')->insertGetId([
             'name'            => 'Mon Entreprise',
@@ -18,32 +20,44 @@ class CompanySeeder extends Seeder
             'slug'            => 'mon-entreprise',
             'activity'        => 'Commerce et distribution',
             'nif'             => '000000000000000',
-            'legal_form_id'   => $legalFormId,
             'wilaya_id'       => $wilayaId,
             'phone'           => '032000000',
             'email'           => 'contact@monentreprise.dz',
+            'owner_id'        => $superAdminId,
             'is_active'       => true,
             'created_at'      => now(),
             'updated_at'      => now(),
         ]);
 
-        // ربط المستخدم super-admin بالشركة
-        $superAdminId = DB::table('users')->where('email', 'admin@mail.com')->value('id');
+        // ضبط company_id في config لاستخدامه في Seeders اللاحقة
+        config(['seeding.company_id' => $companyId]);
 
+        // ربط المستخدمين بالشركة عبر company_user
         if ($superAdminId) {
             DB::table('company_user')->insert([
                 'company_id' => $companyId,
                 'user_id'    => $superAdminId,
                 'is_default' => true,
+                'role'       => 'super-admin',
+                'joined_at'  => now(),
+                'is_active'  => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+        }
 
-            // تعيين owner_id
-            DB::table('companies')
-                ->where('id', $companyId)
-                ->update(['owner_id' => $superAdminId]);
+        $adminId = DB::table('users')->where('email', 'admin.user@mail.com')->value('id');
+        if ($adminId) {
+            DB::table('company_user')->insert([
+                'company_id' => $companyId,
+                'user_id'    => $adminId,
+                'is_default' => true,
+                'role'       => 'admin',
+                'joined_at'  => now(),
+                'is_active'  => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
     }
 }
-

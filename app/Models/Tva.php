@@ -7,21 +7,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * Tva Model
- *
- * Table: tvas
- * VAT (Value Added Tax) rates
- */
 #[Cacheable]
 class Tva extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'tvas';
 
     protected $fillable = [
+        'company_id',
         'name',
         'rate',
         'description',
@@ -60,8 +56,6 @@ class Tva extends Model
 
     public static function getDefaultRate(): ?float
     {
-        return static::where('is_default', true)
-            ->where('active', true)
-            ->value('rate');
+        return static::where('is_default', true)->where('active', true)->value('rate');
     }
 }

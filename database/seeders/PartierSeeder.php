@@ -23,7 +23,8 @@ class PartierSeeder extends Seeder
 {
     public function run(): void
     {
-        $companyId = DB::table('companies')->value('id');
+        $companyId = config('seeding.company_id') ?? DB::table('companies')->first()->id;
+        
 
         if (! $companyId) {
             $this->command->warn('PartierSeeder: لا توجد شركة — نفّذ CompanySeeder أولاً.');

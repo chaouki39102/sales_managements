@@ -7,39 +7,35 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * Currency Model
- *
- * Table: currencies
- * Manages different currencies used in the system
- */
 #[Cacheable]
 class Currency extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'currencies';
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'symbol',
         'decimal_places',
         'is_base_currency',
-        'active',
+        'is_active',
     ];
 
     protected $casts = [
         'decimal_places' => 'integer',
         'is_base_currency' => 'boolean',
-        'active' => 'boolean',
+        'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
     public static array $searchableFields = ['name', 'code', 'symbol'];
-    public static array $filterable = ['active', 'is_base_currency'];
+    public static array $filterable = ['is_active', 'is_base_currency'];
     public static array $sortable = ['id', 'name', 'code'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['commercialDocuments', 'payments', 'exchangeRatesFrom', 'exchangeRatesTo'];
@@ -75,7 +71,7 @@ class Currency extends Model
     public static function getBaseCurrency(): ?self
     {
         return static::where('is_base_currency', true)
-            ->where('active', true)
+            ->where('is_active', true)
             ->first();
     }
 

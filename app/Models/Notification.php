@@ -7,25 +7,17 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * Notification Model
- *
- * Table: notifications
- * System notifications
- */
 class Notification extends Model
 {
-    use
-    HasCompany,
-    HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'notifications';
 
     public $incrementing = false;
-
     protected $keyType = 'string';
 
     protected $fillable = [
+        'company_id',
         'type',
         'notifiable_type',
         'notifiable_id',
@@ -67,19 +59,13 @@ class Notification extends Model
 
     public function markAsRead(): bool
     {
-        if ($this->read_at) {
-            return false;
-        }
-
+        if ($this->read_at) return false;
         return $this->forceFill(['read_at' => now()])->save();
     }
 
     public function markAsUnread(): bool
     {
-        if (!$this->read_at) {
-            return false;
-        }
-
+        if (!$this->read_at) return false;
         return $this->forceFill(['read_at' => null])->save();
     }
 

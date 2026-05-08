@@ -13,25 +13,15 @@ use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
 
-/**
- * Expense Model
- *
- * Table: expenses
- * Tracks business expenses and operational costs
- */
 #[Cacheable]
 class Expense extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        HasCompany,
-        Auditable,
-        BelongsToFiscalYear;
+    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, BelongsToFiscalYear;
 
     protected $table = 'expenses';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'expense_number',
         'date',
         'amount',
@@ -48,7 +38,6 @@ class Expense extends Model
         'is_recurring',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'date' => 'date',
         'amount' => 'decimal:4',
@@ -60,77 +49,25 @@ class Expense extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'expense_number',
-        'description',
-        'reference',
-    ];
-
-    /** @var array الفلاتر المسموحة */
+    public static array $searchableFields = ['expense_number', 'description', 'reference'];
     public static array $filterable = [
-        'expense_category_id',
-        'fiscal_year_id',
-        'payment_mode_id',
-        'treasury_account_id',
-        'party_id',
-        'status',
-        'is_paid',
-        'is_recurring',
+        'expense_category_id', 'fiscal_year_id', 'payment_mode_id',
+        'treasury_account_id', 'party_id', 'status', 'is_paid', 'is_recurring'
     ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'expense_number',
-        'date',
-        'amount',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $sortable = ['id', 'expense_number', 'date', 'amount', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'expenseCategory',
-        'fiscalYear',
-        'paymentMode',
-        'treasuryAccount',
-        'party',
-        'attachments',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
+        'expenseCategory', 'fiscalYear', 'paymentMode', 'treasuryAccount',
+        'party', 'attachments', 'createdBy', 'updatedBy', 'deletedBy'
     ];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'date';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'desc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 0;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['expenses'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
-
-    // -------------------- Relations --------------------
 
     public function expenseCategory(): BelongsTo
     {
@@ -161,8 +98,6 @@ class Expense extends Model
     {
         return $this->morphMany(Attachment::class, 'attachable');
     }
-
-    // -------------------- Scopes --------------------
 
     public function scopePaid(Builder $query): Builder
     {

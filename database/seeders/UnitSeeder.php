@@ -9,11 +9,15 @@ class UnitSeeder extends Seeder
 {
     public function run(): void
     {
+<<<<<<< HEAD
         $companyId = config('seeding.company_id');
 
         if (!$companyId) {
             throw new \RuntimeException('seeding.company_id غير محدد');
         }
+=======
+        $companyId = config('seeding.company_id') ?? DB::table('companies')->first()?->id;
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 
         $units = [
             ['name' => 'Unité',       'symbol' => 'UN',  'description' => 'وحدة'],
@@ -32,6 +36,7 @@ class UnitSeeder extends Seeder
 
         $order = 1;
         foreach ($units as $unit) {
+<<<<<<< HEAD
             // تحقق إن كانت الوحدة موجودة لهذه الشركة تحديداً
             $exists = DB::table('units')
                 ->where('company_id', $companyId)
@@ -52,6 +57,18 @@ class UnitSeeder extends Seeder
             }
 
             $order++;
+=======
+            DB::table('units')->insert([
+                'company_id' => $companyId,
+                'name' => $unit['name'],
+                'symbol' => $unit['symbol'],
+                'description' => $unit['description'],
+                'active' => true,
+                'display_order' => $order++,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         }
     }
 }

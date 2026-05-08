@@ -7,21 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * DocumentType Model
- *
- * Table: document_types
- * Defines types of commercial documents
- */
 #[Cacheable]
 class DocumentType extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'document_types';
 
     protected $fillable = [
+        'company_id',
         'name',
         'name_latin',
         'code',

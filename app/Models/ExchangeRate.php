@@ -1,26 +1,23 @@
 <?php
 
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * ExchangeRate Model
- *
- * Table: exchange_rates
- * Currency exchange rates
- */
 #[Cacheable]
 class ExchangeRate extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'exchange_rates';
 
     protected $fillable = [
+        'company_id',
         'from_currency_id',
         'to_currency_id',
         'rate',

@@ -11,23 +11,17 @@ use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
-/**
- * Family Model
- *
- * Table: families
- * Hierarchical product categories/families
- */
 #[Cacheable]
 class Family extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
 
     protected $table = 'families';
 
     protected $fillable = [
+        'company_id',
         'name',
         'slug',
         'description',

@@ -4,21 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
-    /**
-     * Get the migration connection name.
-     */
-    public function getConnection(): ?string
-    {
+return new class extends Migration {
+    public function getConnection(): ?string {
         return config('telescope.storage.database.connection');
     }
 
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
+    public function up(): void {
         $schema = Schema::connection($this->getConnection());
 
         $schema->create('telescope_entries', function (Blueprint $table) {
@@ -30,7 +21,6 @@ return new class extends Migration
             $table->string('type', 20);
             $table->longText('content');
             $table->dateTime('created_at')->nullable();
-
             $table->unique('uuid');
             $table->index('batch_id');
             $table->index('family_hash');
@@ -41,14 +31,9 @@ return new class extends Migration
         $schema->create('telescope_entries_tags', function (Blueprint $table) {
             $table->uuid('entry_uuid');
             $table->string('tag');
-
             $table->primary(['entry_uuid', 'tag']);
             $table->index('tag');
-
-            $table->foreign('entry_uuid')
-                ->references('uuid')
-                ->on('telescope_entries')
-                ->cascadeOnDelete();
+            $table->foreign('entry_uuid')->references('uuid')->on('telescope_entries')->cascadeOnDelete();
         });
 
         $schema->create('telescope_monitoring', function (Blueprint $table) {
@@ -56,13 +41,8 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
+    public function down(): void {
         $schema = Schema::connection($this->getConnection());
-
         $schema->dropIfExists('telescope_entries_tags');
         $schema->dropIfExists('telescope_entries');
         $schema->dropIfExists('telescope_monitoring');

@@ -10,22 +10,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * NumberingSeries Model
- *
- * Table: numbering_series
- * Manages automatic numbering sequences for documents
- */
 #[Cacheable]
 class NumberingSeries extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'numbering_series';
 
     protected $fillable = [
+        'company_id',
         'document_type_id',
         'warehouse_id',
         'prefix',
@@ -94,7 +87,6 @@ class NumberingSeries extends Model
         $currentYear = now()->year;
         $currentMonth = now()->month;
 
-        // Check if reset is needed
         if ($this->reset_yearly && $this->current_year != $currentYear) {
             $this->resetSequence($currentYear, $currentMonth);
         } elseif ($this->reset_monthly && $this->current_month != $currentMonth) {
@@ -103,7 +95,6 @@ class NumberingSeries extends Model
 
         $nextNumber = $this->last_number + 1;
 
-        // Check max_number constraint
         if ($this->max_number && $nextNumber > $this->max_number) {
             throw new \Exception("Numbering series has reached its maximum number ({$this->max_number})");
         }
@@ -137,7 +128,6 @@ class NumberingSeries extends Model
     protected function formatNumber(int $number): string
     {
         $paddedNumber = str_pad($number, $this->padding, '0', STR_PAD_LEFT);
-
         $formatted = $this->format;
         $formatted = str_replace('{PREFIX}', $this->prefix, $formatted);
         $formatted = str_replace('{SUFFIX}', $this->suffix ?? '', $formatted);

@@ -9,6 +9,7 @@ class NumberingSeriesSeeder extends Seeder
 {
     public function run(): void
     {
+<<<<<<< HEAD
         $companyId = config('seeding.company_id');
 
         if (!$companyId) {
@@ -31,6 +32,13 @@ class NumberingSeriesSeeder extends Seeder
 
         $year = date('Y');
         $documentTypes = DB::table('document_types')->get();
+=======
+        $companyId   = config('seeding.company_id') ?? DB::table('companies')->value('id');
+        $warehouseId = DB::table('warehouses')->where('company_id', $companyId)->value('id');
+        $year        = date('Y');
+
+        $documentTypes = DB::table('document_types')->where('company_id', $companyId)->get();
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 
         $rows = [];
         foreach ($documentTypes as $docType) {

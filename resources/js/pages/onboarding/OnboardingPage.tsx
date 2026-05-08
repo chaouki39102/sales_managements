@@ -1022,14 +1022,20 @@ export default function OnboardingPage() {
     navigate('/dashboard', { replace: true });
   };
 
+<<<<<<< HEAD
   // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
   // يجب استدعاء switch أولاً حتى يُسجَّل المستخدم كعضو نشط في company_user
   // وبالتالي يتجاوز middleware SetCompanyContext عند طلبات الـ seeding
   const handleNewCompanyCreated = async (company: Company, fiscalYear: { id: number }) => {
+=======
+   // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
+  const handleNewCompanyCreated = (company: Company, fiscalYear: { id: number }) => {
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
     setShowCreate(false);
     setCompanies(prev => [...prev, company]);
     try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
 
+<<<<<<< HEAD
     // ✅ switch أولاً → يُسجَّل العضو في DB → middleware يقبل طلبات الـ seeding
     try {
       await apiClient.post('/companies/switch', { company_id: company.id });
@@ -1039,6 +1045,13 @@ export default function OnboardingPage() {
   };
 
   // ✅ عند اكتمال الـ seeding → تفعيل الشركة ثم الانتقال
+=======
+    // 🚫 لا نُفعّل الشركة الآن، بل نفتح مودال البذر فقط
+    setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });
+  };
+
+  // ✅ عند اكتمال أو تخطي الـ seeding → تفعيل الشركة ثم الانتقال
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
   const handleSeedingComplete = async () => {
     if (!seedingCompany) return;
     try {

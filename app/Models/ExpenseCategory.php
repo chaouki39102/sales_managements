@@ -10,23 +10,17 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
-/**
- * ExpenseCategory Model
- *
- * Table: expense_categories
- * Categorizes business expenses
- */
 #[Cacheable]
 class ExpenseCategory extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
 
     protected $table = 'expense_categories';
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',

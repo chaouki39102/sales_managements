@@ -32,7 +32,6 @@ class LoginAttempt extends Model
     public static function record(string $email, bool $success, ?string $ip = null): self
     {
         $user = User::where('email', $email)->first();
-
         return static::create([
             'user_id' => $user?->id,
             'email' => $email,

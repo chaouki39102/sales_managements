@@ -14,12 +14,6 @@ use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
 
-/**
- * CommercialDocument Model
- *
- * Table: commercial_documents
- * Manages all commercial documents (invoices, quotes, orders, etc.)
- */
 #[Cacheable]
 class CommercialDocument extends Model
 {
@@ -31,8 +25,8 @@ class CommercialDocument extends Model
 
     protected $table = 'commercial_documents';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'document_type_id',
         'numbering_series_id',
         'document_number',
@@ -70,9 +64,9 @@ class CommercialDocument extends Model
         'qr_code_data',
         'is_exported_to_accounting',
         'exported_at',
+        'fiscal_stamp_id',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'exchange_rate' => 'decimal:8',
         'document_date' => 'date',
@@ -100,210 +94,57 @@ class CommercialDocument extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'document_number',
-        'notes',
-        'internal_notes',
-    ];
-
-    /** @var array الفلاتر المسموحة */
+    public static array $searchableFields = ['document_number', 'notes', 'internal_notes'];
     public static array $filterable = [
-        'document_type_id',
-        'party_id',
-        'warehouse_id',
-        'fiscal_year_id',
-        'currency_id',
-        'document_status_id',
-        'is_locked',
-        'is_proforma',
-        'is_exported_to_accounting',
+        'document_type_id', 'party_id', 'warehouse_id', 'fiscal_year_id',
+        'currency_id', 'document_status_id', 'is_locked', 'is_proforma', 'is_exported_to_accounting'
     ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'document_number',
-        'document_date',
-        'total_ttc',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $sortable = ['id', 'document_number', 'document_date', 'total_ttc', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'documentType',
-        'numberingSeries',
-        'user',
-        'party',
-        'warehouse',
-        'fiscalYear',
-        'currency',
-        'documentStatus',
-        'validatedBy',
-        'sourceDocument',
-        'cancellationOfDocument',
-        'lines',
-        'payments',
-        'stockMovements',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
+        'documentType', 'numberingSeries', 'user', 'party', 'warehouse', 'fiscalYear',
+        'currency', 'documentStatus', 'validatedBy', 'sourceDocument', 'cancellationOfDocument',
+        'lines', 'payments', 'stockMovements', 'createdBy', 'updatedBy', 'deletedBy'
     ];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'document_date';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'desc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
-    public static ?int $cacheTtl = 0; // No cache for transactional data
-
-    /** @var array تاجات الكاش */
+    public static ?int $cacheTtl = 0;
     public static array $cacheTags = ['commercial_documents'];
-
-    /** @var array الموديلات المرتبطة */
-    public static array $cacheInvalidateRelations = [
-        'lines',
-        'payments',
-        'stockMovements',
-    ];
-
-    /** @var array Scopes التلقائية */
+    public static array $cacheInvalidateRelations = ['lines', 'payments', 'stockMovements'];
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
-
-    public function documentType(): BelongsTo
-    {
-        return $this->belongsTo(DocumentType::class);
-    }
-
-    public function numberingSeries(): BelongsTo
-    {
-        return $this->belongsTo(NumberingSeries::class);
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function party(): BelongsTo
-    {
-        return $this->belongsTo(Party::class);
-    }
-
-    public function warehouse(): BelongsTo
-    {
-        return $this->belongsTo(Warehouse::class);
-    }
-
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FiscalYear::class);
-    }
-
-    public function currency(): BelongsTo
-    {
-        return $this->belongsTo(Currency::class);
-    }
-
-    public function documentStatus(): BelongsTo
-    {
-        return $this->belongsTo(DocumentStatus::class);
-    }
-
-    public function validatedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'validated_by');
-    }
-
-    public function sourceDocument(): BelongsTo
-    {
-        return $this->belongsTo(CommercialDocument::class, 'source_document_id');
-    }
-
-    public function cancellationOfDocument(): BelongsTo
-    {
-        return $this->belongsTo(CommercialDocument::class, 'cancellation_of_document_id');
-    }
-
-    public function lines(): HasMany
-    {
-        return $this->hasMany(CommercialDocumentLine::class);
-    }
-
+    public function documentType(): BelongsTo { return $this->belongsTo(DocumentType::class); }
+    public function numberingSeries(): BelongsTo { return $this->belongsTo(NumberingSeries::class); }
+    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function party(): BelongsTo { return $this->belongsTo(Party::class); }
+    public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
+    public function fiscalYear(): BelongsTo { return $this->belongsTo(FiscalYear::class); }
+    public function currency(): BelongsTo { return $this->belongsTo(Currency::class); }
+    public function documentStatus(): BelongsTo { return $this->belongsTo(DocumentStatus::class); }
+    public function validatedBy(): BelongsTo { return $this->belongsTo(User::class, 'validated_by'); }
+    public function sourceDocument(): BelongsTo { return $this->belongsTo(CommercialDocument::class, 'source_document_id'); }
+    public function cancellationOfDocument(): BelongsTo { return $this->belongsTo(CommercialDocument::class, 'cancellation_of_document_id'); }
+    public function lines(): HasMany { return $this->hasMany(CommercialDocumentLine::class); }
     public function payments(): BelongsToMany
     {
         return $this->belongsToMany(Payment::class, 'document_payment')
             ->withPivot('amount_applied', 'notes')
             ->withTimestamps();
     }
-
-    public function stockMovements(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    public function stockMovements(): HasManyThrough
     {
-        return $this->hasManyThrough(
-            StockMovement::class,
-            CommercialDocumentLine::class,
-            'commercial_document_id',
-            'commercial_document_line_id'
-        );
+        return $this->hasManyThrough(StockMovement::class, CommercialDocumentLine::class, 'commercial_document_id', 'commercial_document_line_id');
     }
 
-    // -------------------- Scopes --------------------
+    public function scopeLocked(Builder $query): Builder { return $query->where('is_locked', true); }
+    public function scopeUnlocked(Builder $query): Builder { return $query->where('is_locked', false); }
+    public function scopeValidated(Builder $query): Builder { return $query->whereNotNull('validated_at'); }
+    public function scopeUnpaid(Builder $query): Builder { return $query->where('remaining_amount', '>', 0); }
+    public function scopeOverdue(Builder $query): Builder { return $query->where('due_date', '<', now())->where('remaining_amount', '>', 0); }
 
-    public function scopeLocked(Builder $query): Builder
-    {
-        return $query->where('is_locked', true);
-    }
-
-    public function scopeUnlocked(Builder $query): Builder
-    {
-        return $query->where('is_locked', false);
-    }
-
-    public function scopeValidated(Builder $query): Builder
-    {
-        return $query->whereNotNull('validated_at');
-    }
-
-    public function scopeUnpaid(Builder $query): Builder
-    {
-        return $query->where('remaining_amount', '>', 0);
-    }
-
-    public function scopeOverdue(Builder $query): Builder
-    {
-        return $query->where('due_date', '<', now())
-            ->where('remaining_amount', '>', 0);
-    }
-
-    // -------------------- Helpers --------------------
-
-    public function isFullyPaid(): bool
-    {
-        return $this->remaining_amount <= 0;
-    }
-
-    public function isOverdue(): bool
-    {
-        return $this->due_date && $this->due_date->isPast() && !$this->isFullyPaid();
-    }
-
-    public function canBeModified(): bool
-    {
-        return !$this->is_locked && !$this->validated_at;
-    }
+    public function isFullyPaid(): bool { return $this->remaining_amount <= 0; }
+    public function isOverdue(): bool { return $this->due_date && $this->due_date->isPast() && !$this->isFullyPaid(); }
+    public function canBeModified(): bool { return !$this->is_locked && !$this->validated_at; }
 }

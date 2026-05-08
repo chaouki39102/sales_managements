@@ -8,12 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * Commune Model
- *
- * Table: communes
- * Algerian municipalities (communes)
- */
 #[Cacheable]
 class Commune extends Model
 {

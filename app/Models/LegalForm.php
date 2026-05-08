@@ -6,21 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * LegalForm Model
- *
- * Table: legal_forms
- * Legal forms for companies (SARL, EURL, SPA, etc.)
- */
 #[Cacheable]
 class LegalForm extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'legal_forms';
 
     protected $fillable = [
+        'company_id',
         'code',
         'name',
         'description',

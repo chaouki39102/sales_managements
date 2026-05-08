@@ -16,47 +16,31 @@ use Spatie\Permission\Traits\HasRoles;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * User Model
- *
- * Table: users
- * Manages system users with authentication and profile management
- *
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Company> $companies
- */
 #[Cacheable]
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes, HasStandardizedConfiguration;
 
-    // أدوار النظام العام (System Roles)
     public const ROLE_SUPER_ADMIN = 'super-admin';
     public const ROLE_ADMIN = 'admin';
-
-    // أدوار المستخدم داخل الشركة (Company Pivot Roles)
     public const COMPANY_ROLE_OWNER = 'owner';
     public const COMPANY_ROLE_ADMIN = 'admin';
     public const COMPANY_ROLE_MEMBER = 'member';
 
     protected $table = 'users';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
         'name', 'email', 'email_verified_at', 'username', 'phone', 'avatar',
         'bio', 'job_title', 'birth_date', 'gender_id', 'national_id', 'address',
-        'commune_id', 'wilaya_id', 'role_id', 'last_login_at', 'last_login_ip', 'company_id',
+        'commune_id', 'wilaya_id', 'role_id', 'last_login_at', 'last_login_ip',
         'register_ip', 'register_user_agent', 'active', 'created_by', 'updated_by', 'deleted_by',
     ];
 
-    // -------------------- Hidden --------------------
-    protected $hidden = [
-        'password', 'remember_token', 'national_id',
-    ];
+    protected $hidden = ['password', 'remember_token', 'national_id'];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',        // Laravel 10+ (أفضل من setPasswordAttribute)
+        'password' => 'hashed',
         'birth_date' => 'date',
         'last_login_at' => 'datetime',
         'active' => 'boolean',
@@ -65,34 +49,19 @@ class User extends Authenticatable
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Appends --------------------
     protected $appends = ['full_address'];
 
-    // -------------------- Spatie Permission --------------------
     protected $guard_name = 'web';
 
-    // -------------------- Configuration (لـ HasStandardizedConfiguration) --------------------
-
-    public static array $searchableFields = [
-        'name', 'email', 'username', 'phone', 'job_title',
-    ];
-
-    public static array $filterable = [
-        'gender_id', 'commune_id', 'wilaya_id', 'role_id', 'active',
-    ];
-
-    public static array $sortable = [
-        'id', 'name', 'email', 'created_at', 'last_login_at',
-    ];
-
+    public static array $searchableFields = ['name', 'email', 'username', 'phone', 'job_title'];
+    public static array $filterable = ['gender_id', 'commune_id', 'wilaya_id', 'role_id', 'active'];
+    public static array $sortable = ['id', 'name', 'email', 'created_at', 'last_login_at'];
     public static array $defaultWith = [];
-
     public static array $allowedIncludes = [
         'gender', 'commune', 'wilaya', 'role', 'roles', 'permissions',
         'createdBy', 'updatedBy', 'deletedBy', 'commercialDocuments',
-        'payments', 'stockMovements', 'companies',
+        'payments', 'stockMovements', 'companies'
     ];
-
     public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
     public static int $defaultPerPage = 15;
@@ -102,62 +71,17 @@ class User extends Authenticatable
     public static array $cacheInvalidateRelations = [];
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
-
-    public function gender(): BelongsTo
-    {
-        return $this->belongsTo(Gender::class);
-    }
-
-    public function commune(): BelongsTo
-    {
-        return $this->belongsTo(Commune::class);
-    }
-
-    public function wilaya(): BelongsTo
-    {
-        return $this->belongsTo(Wilaya::class);
-    }
-
-    public function role(): BelongsTo
-    {
-        return $this->belongsTo(\Spatie\Permission\Models\Role::class);
-    }
-
-    public function createdBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function updatedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
-
-    public function deletedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'deleted_by');
-    }
-
-    public function commercialDocuments(): HasMany
-    {
-        return $this->hasMany(CommercialDocument::class);
-    }
-
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
-    }
-
-    public function stockMovements(): HasMany
-    {
-        return $this->hasMany(StockMovement::class);
-    }
-
-    public function expenses(): HasMany
-    {
-        return $this->hasMany(Expense::class, 'created_by');
-    }
+    public function gender(): BelongsTo { return $this->belongsTo(Gender::class); }
+    public function commune(): BelongsTo { return $this->belongsTo(Commune::class); }
+    public function wilaya(): BelongsTo { return $this->belongsTo(Wilaya::class); }
+    public function role(): BelongsTo { return $this->belongsTo(\Spatie\Permission\Models\Role::class); }
+    public function createdBy(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
+    public function updatedBy(): BelongsTo { return $this->belongsTo(User::class, 'updated_by'); }
+    public function deletedBy(): BelongsTo { return $this->belongsTo(User::class, 'deleted_by'); }
+    public function commercialDocuments(): HasMany { return $this->hasMany(CommercialDocument::class); }
+    public function payments(): HasMany { return $this->hasMany(Payment::class); }
+    public function stockMovements(): HasMany { return $this->hasMany(StockMovement::class); }
+    public function expenses(): HasMany { return $this->hasMany(Expense::class, 'created_by'); }
 
     public function companies(): BelongsToMany
     {
@@ -166,14 +90,8 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
-    public function defaultCompany(): BelongsTo
-    {
-        return $this->belongsTo(Company::class, 'company_id');
-    }
+    public function defaultCompany(): BelongsTo { return $this->belongsTo(Company::class, 'company_id'); }
 
-    // -------------------- Mutators --------------------
-    // ملاحظة: تم استبدال setPasswordAttribute بـ Cast 'hashed'، لذا يمكن حذفها.
-    // لكن نبقها للتوافق مع الإصدارات القديمة إن وجدت.
     public function setPasswordAttribute($value)
     {
         if (strlen($value) === 60 && str_starts_with($value, '$2y$')) {
@@ -183,82 +101,39 @@ class User extends Authenticatable
         $this->attributes['password'] = \Illuminate\Support\Facades\Hash::make($value);
     }
 
-    // -------------------- Accessors --------------------
-    public function getDefaultCompanyAttribute()
-    {
-        return $this->companies()->wherePivot('is_default', true)->first();
-    }
-
+    public function getDefaultCompanyAttribute() { return $this->companies()->wherePivot('is_default', true)->first(); }
     public function getFullAddressAttribute(): string
     {
-        $parts = array_filter([
-            $this->address,
-            $this->commune?->name,
-            $this->wilaya?->name,
-        ]);
+        $parts = array_filter([$this->address, $this->commune?->name, $this->wilaya?->name]);
         return implode(', ', $parts);
     }
 
-    // -------------------- Helpers (محسّنة) --------------------
     public function updateLastLogin(): void
     {
-        $this->update([
-            'last_login_at' => now(),
-            'last_login_ip' => request()->ip(),
-        ]);
+        $this->update(['last_login_at' => now(), 'last_login_ip' => request()->ip()]);
     }
 
-    public function isAdmin(): bool
-    {
-        return $this->hasRole(self::ROLE_ADMIN);
-    }
+    public function isAdmin(): bool { return $this->hasRole(self::ROLE_ADMIN); }
+    public function isSuperAdmin(): bool { return $this->hasRole(self::ROLE_SUPER_ADMIN); }
 
-    public function isSuperAdmin(): bool
-    {
-        return $this->hasRole(self::ROLE_SUPER_ADMIN);
-    }
-
-    /**
-     * تحديد ما إذا كان المستخدم لديه حق الوصول إلى شركة معينة (عضو نشط).
-     *
-     * @param int|Company $company
-     * @return bool
-     */
     public function hasAccessToCompany(int|Company $company): bool
     {
         $id = $company instanceof Company ? $company->id : $company;
-
         if ($this->relationLoaded('companies')) {
             $member = $this->companies->firstWhere('id', $id);
             return $member && $member->pivot->is_active;
         }
-
-        return $this->companies()
-            ->where('companies.id', $id)
-            ->wherePivot('is_active', true)
-            ->exists();
+        return $this->companies()->where('companies.id', $id)->wherePivot('is_active', true)->exists();
     }
 
-    /**
-     * تحديد ما إذا كان المستخدم هو المالك الأساسي للشركة.
-     */
-    public function isOwnerOf(Company $company): bool
-    {
-        return $this->id === $company->owner_id;
-    }
+    public function isOwnerOf(Company $company): bool { return $this->id === $company->owner_id; }
 
-    /**
-     * تحديد ما إذا كان المستخدم مديراً (Admin) في الشركة (مالك أو مدير).
-     */
     public function isAdminOf(Company $company): bool
     {
         if ($this->relationLoaded('companies')) {
             $member = $this->companies->firstWhere('id', $company->id);
-            return $member
-                && $member->pivot->is_active
-                && in_array($member->pivot->role, [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN]);
+            return $member && $member->pivot->is_active && in_array($member->pivot->role, [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN]);
         }
-
         return $this->companies()
             ->where('companies.id', $company->id)
             ->wherePivot('is_active', true)

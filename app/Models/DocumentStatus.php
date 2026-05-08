@@ -4,30 +4,27 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * DocumentStatus Model
- *
- * Table: document_statuses
- * Manages commercial document statuses
- */
 #[Cacheable]
 class DocumentStatus extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'document_statuses';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'color',
+        'is_active',
     ];
 
     protected $casts = [
+        'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -44,10 +41,5 @@ class DocumentStatus extends Model
     public function commercialDocuments(): HasMany
     {
         return $this->hasMany(CommercialDocument::class);
-    }
-
-    public function scopeByName(Builder $query, string $name): Builder
-    {
-        return $query->where('name', $name);
     }
 }

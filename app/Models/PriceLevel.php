@@ -6,23 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * PriceLevel Model
- *
- * Table: price_levels
- * Different pricing tiers for products
- */
 #[Cacheable]
 class PriceLevel extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'price_levels';
 
     protected $fillable = [
+        'company_id',
         'name',
         'description',
+        'is_default',
         'is_percentage',
         'value',
         'active',
@@ -30,6 +27,7 @@ class PriceLevel extends Model
     ];
 
     protected $casts = [
+        'is_default' => 'boolean',
         'is_percentage' => 'boolean',
         'value' => 'decimal:2',
         'active' => 'boolean',
@@ -39,7 +37,7 @@ class PriceLevel extends Model
     ];
 
     public static array $searchableFields = ['name', 'description'];
-    public static array $filterable = ['active', 'is_percentage'];
+    public static array $filterable = ['active', 'is_percentage', 'is_default'];
     public static array $sortable = ['id', 'name', 'display_order'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['productPrices', 'parties'];
@@ -62,7 +60,6 @@ class PriceLevel extends Model
         if ($this->is_percentage) {
             return $basePrice * (1 + $this->value / 100);
         }
-
         return $basePrice + $this->value;
     }
 }

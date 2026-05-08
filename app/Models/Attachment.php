@@ -6,20 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * Attachment Model
- *
- * Table: attachments
- * Polymorphic file attachments
- */
 class Attachment extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'attachments';
 
-        protected $fillable = [
+    protected $fillable = [
+        'company_id',
         'file_name',
         'file_path',
         'file_type',
@@ -84,5 +80,4 @@ class Attachment extends Model
         }
         return $bytes . ' bytes';
     }
-
 }

@@ -6,21 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * PartyType Model
- *
- * Table: party_types
- * Lookup table for party types (customer, supplier, both)
- */
 #[Cacheable]
 class PartyType extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'party_types';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'description',

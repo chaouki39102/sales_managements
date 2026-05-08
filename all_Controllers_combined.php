@@ -197,6 +197,8 @@ class AuthController extends BaseApiController
      */
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user()->load('roles'); // ← تحميل الأدوار
+
         return $this->successResponse(
             new UserResource($request->user()),
             'تم استرجاع البيانات بنجاح'
@@ -809,12 +811,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-/**
- * CompanyController
- *
- * يتبع نمط BaseApiController (البوّاب).
- * كل المنطق في CompanyService.
- */
 class CompanyController extends BaseApiController
 {
     protected string  $resourceName = 'company';
@@ -823,22 +819,23 @@ class CompanyController extends BaseApiController
     public function __construct(
         private readonly CompanyService        $companyService,
         private readonly CompanyContextService $context,
-    ) {
-        //parent::__construct();
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // الإجباريات لـ BaseApiController
-    // ═══════════════════════════════════════════════════════════
+    ) {}
 
     protected function getService(): CompanyService
     {
         return $this->companyService;
     }
-
     protected function getModelClass(): string
     {
         return Company::class;
+    }
+
+    // ─── مساعد: يقبل id رقمي أو slug نصي ──────────────────────
+    private function resolveCompany(string|int $identifier): Company
+    {
+        return is_numeric($identifier)
+            ? Company::findOrFail((int) $identifier)
+            : Company::where('slug', $identifier)->firstOrFail();
     }
 
     protected function getListConfig(): array
@@ -858,87 +855,268 @@ class CompanyController extends BaseApiController
     }
 
     // ═══════════════════════════════════════════════════════════
-    // ① CRUD — مع دعم الفلاتر حسب صلاحيات المستخدم
+    // ① index — قائمة الشركات
     // ═══════════════════════════════════════════════════════════
 
-   public function index(Request $request): JsonResponse
-{
-    try {
-        $this->authorizeAction('viewAny', Company::class);
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('viewAny', Company::class);
 
-        $user = auth()->user();
+            $user  = auth()->user();
+            $query = Company::query()->with(['owner:id,name,email']);
 
-        $query = Company::query()->with(['owner:id,name,email']);
+            // إذا لم يكن Super Admin → شركاته فقط
+            if (!$user->isSuperAdmin()) {
+                $query->whereHas('users', fn($q) => $q->where('user_id', $user->id));
+            }
 
-        // إذا لم يكن Super Admin، اعرض فقط شركاته
-        if (!$user->isSuperAdmin()) {
-            $query->whereHas('users', fn($q) => $q->where('user_id', $user->id));
+            // فلاتر الحالة للـ Super Admin
+            if ($user->isSuperAdmin() && $request->filled('status')) {
+                match ($request->status) {
+                    'active'      => $query->active(),
+                    'suspended'   => $query->suspended(),
+                    'deactivated' => $query->deactivated(),
+                    'verified'    => $query->verified(),
+                    'trial'       => $query->onTrial(),
+                    default       => null,
+                };
+            }
+
+            // بحث
+            if ($request->filled('search')) {
+                $s = $request->search;
+                $query->where(function ($q) use ($s) {
+                    $q->where('name', 'like', "%{$s}%")
+                        ->orWhere('commercial_name', 'like', "%{$s}%")
+                        ->orWhere('email', 'like', "%{$s}%")
+                        ->orWhere('nif', 'like', "%{$s}%")
+                        ->orWhere('slug', 'like', "%{$s}%");
+                });
+            }
+
+            $perPage   = min((int) $request->get('per_page', 20), 100);
+            $companies = $query->orderBy('name')->paginate($perPage);
+
+            return $this->successResponse(
+                CompanyResource::collection($companies),
+                'تم جلب قائمة الشركات'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'index');
         }
-
-        // فلاتر إضافية للسوبر أدمن
-        if ($user->isSuperAdmin() && $request->filled('status')) {
-            match ($request->status) {
-                'active'      => $query->active(),
-                'suspended'   => $query->suspended(),
-                'deactivated' => $query->deactivated(),
-                'verified'    => $query->verified(),
-                'on_trial'    => $query->onTrial(),
-                default       => null,
-            };
-        }
-
-        $perPage = min((int)$request->get('per_page', 20), 100);
-        $companies = $query->paginate($perPage);
-
-        return $this->successResponse(CompanyResource::collection($companies), 'تم جلب قائمة الشركات');
-    } catch (\Throwable $e) {
-        return $this->handleError($e, 'index');
     }
-}
 
+    // ═══════════════════════════════════════════════════════════
+    // ② store — إنشاء شركة جديدة
+    // ═══════════════════════════════════════════════════════════
+
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name'            => 'required|string|max:255',
+            'commercial_name' => 'nullable|string|max:255',
+            'email'           => 'nullable|email|max:100',
+            'phone'           => 'nullable|string|max:20',
+            'mobile'          => 'nullable|string|max:30',
+            'address'         => 'nullable|string|max:500',
+            'nif'             => 'nullable|string|max:50|unique:companies,nif',
+            'nis'             => 'nullable|string|max:50',
+            'rc'              => 'nullable|string|max:50',
+            'ai'              => 'nullable|string|max:50',
+            'activity'        => 'nullable|string|max:500',
+            'legal_form_id'   => 'nullable|exists:legal_forms,id',
+            'wilaya_id'       => 'nullable|exists:wilayas,id',
+            'commune_id'      => 'nullable|exists:communes,id',
+            'is_active'       => 'nullable|boolean',
+            // حقول Super Admin
+            'plan'            => 'nullable|string|in:free,starter,professional,enterprise',
+            'max_users'       => 'nullable|integer|min:1',
+            'max_warehouses'  => 'nullable|integer|min:1',
+            'max_products'    => 'nullable|integer|min:1',
+            'notes'           => 'nullable|string|max:5000',
+        ]);
+
+        // السماح لـ Super Admin فقط بتمرير حقول إضافية
+        if (!auth()->user()->isSuperAdmin()) {
+            unset($data['plan'], $data['max_users'], $data['max_warehouses'], $data['max_products'], $data['notes']);
+        }
+
+        try {
+            $this->authorizeAction('create', Company::class);
+            $company = $this->companyService->create($data, $request);
+            return $this->successResponse(new CompanyResource($company->load('owner:id,name,email')), 'تم إنشاء الشركة', 201);
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'store');
+        }
+    }
+
+    public function update(Request $request, $id): JsonResponse
+    {
+        $company = $this->resolveCompany($id);
+        $this->authorizeAction('update', $company);
+
+        $data = $request->validate([
+            'name'            => 'sometimes|string|max:255',
+            'commercial_name' => 'nullable|string|max:255',
+            'email'           => 'nullable|email|max:100',
+            'phone'           => 'nullable|string|max:20',
+            'mobile'          => 'nullable|string|max:30',
+            'address'         => 'nullable|string|max:500',
+            'nif'             => "nullable|string|max:50|unique:companies,nif,{$company->id}",
+            'nis'             => 'nullable|string|max:50',
+            'rc'              => 'nullable|string|max:50',
+            'ai'              => 'nullable|string|max:50',
+            'activity'        => 'nullable|string|max:500',
+            'legal_form_id'   => 'nullable|exists:legal_forms,id',
+            'wilaya_id'       => 'nullable|exists:wilayas,id',
+            'commune_id'      => 'nullable|exists:communes,id',
+            'is_active'       => 'nullable|boolean',
+            'plan'            => 'nullable|string|in:free,starter,professional,enterprise',
+            'max_users'       => 'nullable|integer|min:1',
+            'max_warehouses'  => 'nullable|integer|min:1',
+            'max_products'    => 'nullable|integer|min:1',
+            'notes'           => 'nullable|string|max:5000',
+        ]);
+
+        if (!auth()->user()->isSuperAdmin()) {
+            unset($data['plan'], $data['max_users'], $data['max_warehouses'], $data['max_products'], $data['notes']);
+        }
+
+        try {
+            $company = $this->companyService->update($company, $data, $request);
+            return $this->successResponse(new CompanyResource($company->load('owner:id,name,email')), 'تم تحديث الشركة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'update');
+        }
+    }
+    // ═══════════════════════════════════════════════════════════
+    // ③ show — عرض شركة واحدة
+    // ═══════════════════════════════════════════════════════════
 
     public function show($id): JsonResponse
     {
         try {
-            $company = $this->companyService->findById($id);
+            $company = $this->resolveCompany($id);
             $this->authorizeAction('view', $company);
-            $company->loadCount(['activeUsers', 'products', 'warehouses', 'parties'])
-                    ->load(['owner:id,name,email', 'legalForm:id,name', 'wilaya:id,name', 'commune:id,name']);
+
+            $company
+                ->loadCount(['activeUsers', 'products', 'warehouses', 'parties'])
+                ->load(['owner:id,name,email', 'legalForm:id,name', 'wilaya:id,name', 'commune:id,name']);
+
             return $this->successResponse(new CompanyResource($company));
         } catch (\Throwable $e) {
             return $this->handleError($e, 'show');
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // ④ update — تحديث شركة (مالك أو Super Admin)
+    // ═══════════════════════════════════════════════════════════
 
+
+    // ═══════════════════════════════════════════════════════════
+    // ⑤ destroy — تعطيل شركة (ليس حذفاً نهائياً)
+    // ═══════════════════════════════════════════════════════════
 
     public function destroy($id): JsonResponse
     {
         try {
-            $company = $this->companyService->findById($id);
+            $company = $this->resolveCompany($id);
             $this->authorizeAction('delete', $company);
-            $this->companyService->delete($company);
-            return $this->successResponse(null, 'تم إيقاف الشركة');
+            $company->deactivate(auth()->id());
+            return $this->successResponse(null, 'تم تعطيل الشركة');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'destroy');
         }
     }
 
     // ═══════════════════════════════════════════════════════════
-    // ② شركات المستخدم الحالي
+    // ⑥ Super Admin actions
+    // ═══════════════════════════════════════════════════════════
+
+    public function suspend(Request $request, $id): JsonResponse
+    {
+        try {
+            $company = $this->resolveCompany($id);
+            $this->authorizeAction('suspend', $company);
+            $data = $request->validate(['reason' => 'nullable|string|max:500']);
+            $company->suspend($data['reason'] ?? 'قرار إداري', auth()->id());
+            return $this->successResponse(new CompanyResource($company), 'تم تعليق الشركة مؤقتاً');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'suspend');
+        }
+    }
+
+    public function unsuspend($id): JsonResponse
+    {
+        try {
+            $company = $this->resolveCompany($id);
+            $this->authorizeAction('suspend', $company);
+            $company->unsuspend();
+            return $this->successResponse(new CompanyResource($company), 'تم رفع التعليق');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'unsuspend');
+        }
+    }
+
+    public function verify($id): JsonResponse
+    {
+        try {
+            $company = $this->resolveCompany($id);
+            $this->authorizeAction('verify', $company);
+            $company->verify(auth()->id());
+            return $this->successResponse(new CompanyResource($company), 'تم توثيق الشركة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'verify');
+        }
+    }
+
+    public function unverify($id): JsonResponse
+    {
+        try {
+            $company = $this->resolveCompany($id);
+            $this->authorizeAction('verify', $company);
+            $company->unverify();
+            return $this->successResponse(new CompanyResource($company), 'تم إلغاء التوثيق');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'unverify');
+        }
+    }
+
+    public function upgradePlan(Request $request, $id): JsonResponse
+    {
+        try {
+            $company = $this->resolveCompany($id);
+            $this->authorizeAction('upgrade', $company);
+            $data = $request->validate([
+                'plan'           => ['required', 'string', Rule::in(array_keys(Company::PLANS))],
+                'max_users'      => 'nullable|integer|min:1',
+                'max_warehouses' => 'nullable|integer|min:1',
+                'max_products'   => 'nullable|integer|min:1',
+            ]);
+            $company->upgradePlan($data['plan'], array_filter([
+                'max_users'      => $data['max_users']      ?? null,
+                'max_warehouses' => $data['max_warehouses'] ?? null,
+                'max_products'   => $data['max_products']   ?? null,
+            ]));
+            return $this->successResponse(new CompanyResource($company), 'تم تحديث الخطة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'upgradePlan');
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ⑦ Company context & members (بدون تغيير)
     // ═══════════════════════════════════════════════════════════
 
     public function myCompanies(Request $request): JsonResponse
     {
         try {
             $this->authorizeAction('viewAny', Company::class);
-            $data = $this->apiListWithCallback(
-                Company::class,
-                fn($query) => $query->whereHas('members', fn($q) => $q->where('user_id', auth()->id())),
-                $request,
-                $this->getListConfig(),
-            );
-            return $this->successResponse($data, 'تم جلب شركاتك');
+            $companies = auth()->user()->companies()->with('owner:id,name')->get();
+            return $this->successResponse(CompanyResource::collection($companies), 'شركاتك');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'myCompanies');
         }
@@ -948,9 +1126,7 @@ class CompanyController extends BaseApiController
     {
         try {
             $companyId = $this->context->get();
-            if (!$companyId) {
-                return $this->errorResponse('لا توجد شركة نشطة حالياً', 404, 'NO_ACTIVE_COMPANY');
-            }
+            if (!$companyId) return $this->errorResponse('لا توجد شركة نشطة', 404, 'NO_ACTIVE_COMPANY');
             $company = $this->companyService->findById($companyId);
             $this->authorizeAction('view', $company);
             $company->load(['owner:id,name', 'legalForm:id,name', 'wilaya:id,name', 'commune:id,name']);
@@ -966,18 +1142,14 @@ class CompanyController extends BaseApiController
             $request->validate(['company_id' => 'required|integer|exists:companies,id']);
             $company = $this->companyService->findById($request->company_id);
             $this->authorizeAction('switch', $company);
-            abort_if($company->is_suspended, 403, "الشركة معلّقة مؤقتاً: {$company->suspension_reason}");
+            abort_if($company->is_suspended, 403, "الشركة معلّقة: {$company->suspension_reason}");
             abort_unless($company->is_active, 403, 'الشركة غير نشطة');
-            $this->companyService->switchContext(auth()->user(), $company, $this->context);
-            return $this->successResponse(new CompanyResource($company), "تم التبديل إلى شركة: {$company->name}");
+            $this->companyService->switchContext(auth()->user(), $company);
+            return $this->successResponse(new CompanyResource($company), "تم التبديل إلى: {$company->name}");
         } catch (\Throwable $e) {
             return $this->handleError($e, 'switch');
         }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    // ③ إدارة الأعضاء (بدون تغيير جوهري)
-    // ═══════════════════════════════════════════════════════════
 
     public function members(Company $company): JsonResponse
     {
@@ -995,10 +1167,10 @@ class CompanyController extends BaseApiController
             $this->authorizeAction('manageMember', $company);
             $data = $request->validate([
                 'user_id' => 'required|integer|exists:users,id',
-                'role'    => ['nullable', 'string', Rule::in(['admin', 'manager', 'member', 'viewer'])],
+                'role'    => ['nullable', 'string', Rule::in(Company::MEMBER_ROLES)],
             ]);
             $company->addMember($data['user_id'], $data['role'] ?? 'member', auth()->id());
-            return $this->successResponse(null, 'تمت إضافة العضو بنجاح', 201);
+            return $this->successResponse(null, 'تمت إضافة العضو', 201);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'addMember');
         }
@@ -1019,9 +1191,9 @@ class CompanyController extends BaseApiController
     {
         try {
             $this->authorizeAction('manageMember', $company);
-            $data = $request->validate(['role' => ['required', 'string', Rule::in(['admin', 'manager', 'member', 'viewer'])]]);
+            $data = $request->validate(['role' => ['required', 'string', Rule::in(Company::MEMBER_ROLES)]]);
             $company->changeMemberRole($userId, $data['role']);
-            return $this->successResponse(null, 'تم تغيير دور العضو');
+            return $this->successResponse(null, 'تم تغيير الدور');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'changeMemberRole');
         }
@@ -1032,7 +1204,7 @@ class CompanyController extends BaseApiController
         try {
             $this->authorizeAction('manageMember', $company);
             $company->deactivateMember($userId);
-            return $this->successResponse(null, 'تم تعطيل العضو مؤقتاً');
+            return $this->successResponse(null, 'تم تعطيل العضو');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'deactivateMember');
         }
@@ -1055,12 +1227,11 @@ class CompanyController extends BaseApiController
             $this->authorizeAction('transferOwnership', $company);
             $data = $request->validate(['user_id' => 'required|integer|exists:users,id']);
             $company->transferOwnership($data['user_id']);
-            return $this->successResponse(new CompanyResource($company->fresh(['owner:id,name,email'])), 'تم نقل الملكية بنجاح');
+            return $this->successResponse(new CompanyResource($company->fresh(['owner:id,name,email'])), 'تم نقل الملكية');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'transferOwnership');
         }
     }
-
 }
 
 
@@ -2836,8 +3007,22 @@ class RoleController extends BaseApiController
     }
 
     // ══════════════════════════════════════════
-    // CRUD — يستدعي RoleService مباشرة
+    // نفس مشكلة UserController: /{company}/{role}
+    // Laravel يمرر {company} كـ $id بدل {role}
+    // الحل: قراءة {role} من الـ route بالاسم
     // ══════════════════════════════════════════
+
+    public function show($id): JsonResponse
+    {
+        try {
+            $roleId = request()->route('role') ?? $id;
+            $role = $this->roleService->findById($roleId);
+            $this->authorizeAction('view', $role);
+            return $this->successResponse(new RoleResource($role));
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'show');
+        }
+    }
 
     public function store(Request $request): JsonResponse
     {
@@ -2845,11 +3030,11 @@ class RoleController extends BaseApiController
             $this->authorizeAction('create', Role::class);
 
             $data = $request->validate([
-                'name'           => 'required|string|max:100|unique:roles,name',
-                'display_name'   => 'nullable|string|max:150',
-                'description'    => 'nullable|string|max:500',
-                'guard_name'     => 'nullable|string|max:50',
-                'permission_ids' => 'nullable|array',
+                'name'             => 'required|string|max:100|unique:roles,name',
+                'display_name'     => 'nullable|string|max:150',
+                'description'      => 'nullable|string|max:500',
+                'guard_name'       => 'nullable|string|max:50',
+                'permission_ids'   => 'nullable|array',
                 'permission_ids.*' => 'integer|exists:permissions,id',
             ]);
 
@@ -2863,13 +3048,15 @@ class RoleController extends BaseApiController
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            $role = $this->roleService->findById($id);
+            // الإصلاح: نقرأ {role} بالاسم بدل الاعتماد على الترتيب
+            $roleId = $request->route('role') ?? $id;
+            $role = $this->roleService->findById($roleId);
             $this->authorizeAction('update', $role);
 
             $data = $request->validate([
-                'display_name'   => 'nullable|string|max:150',
-                'description'    => 'nullable|string|max:500',
-                'permission_ids' => 'nullable|array',
+                'display_name'     => 'nullable|string|max:150',
+                'description'      => 'nullable|string|max:500',
+                'permission_ids'   => 'nullable|array',
                 'permission_ids.*' => 'integer|exists:permissions,id',
             ]);
 
@@ -2883,14 +3070,17 @@ class RoleController extends BaseApiController
     public function destroy($id): JsonResponse
     {
         try {
-            $role = $this->roleService->findById($id);
+            // الإصلاح: request() helper بدل $request parameter
+            $roleId = request()->route('role') ?? $id;
+            $role = $this->roleService->findById($roleId);
             $this->authorizeAction('delete', $role);
             $this->roleService->delete($role);
             return $this->successResponse(null, 'تم حذف الدور');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'destroy');
         }
-    }}
+    }
+}
 
 
 

@@ -379,6 +379,10 @@ Route::prefix('v1')->group(function () {
             // ────────────────────────────────────
             Route::middleware('can:manage-company')->group(function () {
 
+<<<<<<< HEAD
+=======
+            Route::post('seeds/{seeder}', [CompanySeedController::class, 'run']);
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 
                 // وحدات — كتابة
                 Route::post('units',           [UnitController::class, 'store']);

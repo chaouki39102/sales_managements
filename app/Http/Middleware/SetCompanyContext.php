@@ -2,12 +2,12 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Company;
 use App\Models\User;
 use App\Services\CompanyContextService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class SetCompanyContext
@@ -18,6 +18,7 @@ class SetCompanyContext
 
     public function handle(Request $request, Closure $next): Response
     {
+<<<<<<< HEAD
         // 1. جلب slug من الـ route
         // SubstituteBindings قد يُحوِّل {company} إلى Company Model قبل وصولنا
         // لذا نتعامل مع الحالتين: raw slug أو Model جاهز
@@ -40,15 +41,23 @@ class SetCompanyContext
         }
 
         // 3. التحقق من صلاحية المستخدم
+=======
+        // 1. الحصول على الشركة من الـ Route (تم حلها بواسطة Route::bind)
+        $company = $request->route('company');
+
+        // 2. التأكد من أن الشركة نشطة (اختياري حسب الحاجة)
+        if (!$company->is_active) {
+            abort(404);
+        }
+
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         /** @var User $user */
         $user = Auth::user();
 
-        // ③-أ Super Admin: يتجاوز كل التحقق — له صلاحية الوصول لأي شركة
+        // 3. Super Admin يتجاوز كل قيود العضوية
         if (!$user->hasRole(User::ROLE_SUPER_ADMIN)) {
-
-            // ③-ب المستخدمون العاديون: يجب أن يكونوا أعضاء نشطين
-            $membership = \Illuminate\Support\Facades\DB::table('company_user')
-                ->where('user_id',    $user->id)
+            $membership = DB::table('company_user')
+                ->where('user_id', $user->id)
                 ->where('company_id', $company->id)
                 ->first();
 

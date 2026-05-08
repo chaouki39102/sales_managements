@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
@@ -8,22 +9,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * Setting Model
- *
- * Table: settings
- * System-wide configuration settings
- */
 #[Cacheable]
 class Setting extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'settings';
 
     protected $fillable = [
+        'company_id',
         'key',
         'group',
         'value',
@@ -52,59 +46,31 @@ class Setting extends Model
     public static ?int $cacheTtl = 7200;
     public static array $cacheTags = ['settings'];
 
-    public function scopeByGroup(Builder $query, string $group): Builder
-    {
-        return $query->where('group', $group);
-    }
-
-    public function scopePublic(Builder $query): Builder
-    {
-        return $query->where('is_public', true);
-    }
-
-    public function scopeEditable(Builder $query): Builder
-    {
-        return $query->where('is_editable', true);
-    }
+    public function scopeByGroup(Builder $query, string $group): Builder { return $query->where('group', $group); }
+    public function scopePublic(Builder $query): Builder { return $query->where('is_public', true); }
+    public function scopeEditable(Builder $query): Builder { return $query->where('is_editable', true); }
 
     public static function get(string $key, $default = null)
     {
-        return Cache::tags(['settings'])->remember(
-            "setting:{$key}",
-            now()->addHours(24),
-            function () use ($key, $default) {
-                $setting = static::where('key', $key)->first();
-                return $setting ? $setting->getTypedValue() : $default;
-            }
-        );
+        return Cache::tags(['settings'])->remember("setting:{$key}", now()->addHours(24), function () use ($key, $default) {
+            $setting = static::where('key', $key)->first();
+            return $setting ? $setting->getTypedValue() : $default;
+        });
     }
 
     public static function set(string $key, $value): bool
     {
         $setting = static::where('key', $key)->first();
-
-        if (!$setting) {
-            return false;
-        }
-
-        if (!$setting->is_editable) {
-            return false;
-        }
-
+        if (!$setting || !$setting->is_editable) return false;
         $setting->value = $value;
         $result = $setting->save();
-
-        if ($result) {
-            Cache::tags(['settings'])->forget("setting:{$key}");
-        }
-
+        if ($result) Cache::tags(['settings'])->forget("setting:{$key}");
         return $result;
     }
 
     public function getTypedValue()
     {
         $value = $this->value;
-
         return match ($this->type) {
             'integer', 'int' => is_array($value) ? (int)($value[0] ?? 0) : (int)$value,
             'float', 'double' => is_array($value) ? (float)($value[0] ?? 0) : (float)$value,
@@ -117,14 +83,7 @@ class Setting extends Model
     protected static function boot()
     {
         parent::boot();
-
-        static::saved(function ($setting) {
-            Cache::tags(['settings'])->forget("setting:{$setting->key}");
-        });
-
-        static::deleted(function ($setting) {
-            Cache::tags(['settings'])->forget("setting:{$setting->key}");
-        });
+        static::saved(fn($s) => Cache::tags(['settings'])->forget("setting:{$s->key}"));
+        static::deleted(fn($s) => Cache::tags(['settings'])->forget("setting:{$s->key}"));
     }
 }
-

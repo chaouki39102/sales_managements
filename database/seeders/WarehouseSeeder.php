@@ -9,6 +9,7 @@ class WarehouseSeeder extends Seeder
 {
     public function run(): void
     {
+<<<<<<< HEAD
         $companyId = config('seeding.company_id');
 
         if (!$companyId) {
@@ -22,13 +23,22 @@ class WarehouseSeeder extends Seeder
 
         // الولاية اختيارية — لا نوقف التنفيذ إن لم توجد
         $wilayaId = DB::table('wilayas')->where('code', 39)->value('id');
+=======
+        $companyId = config('seeding.company_id') ?? DB::table('companies')->value('id');
+        $wilayaId  = DB::table('wilayas')->where('code', 39)->value('id');
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 
         DB::table('warehouses')->insert([
             'company_id'   => $companyId,
             'name'         => 'Dépôt Principal',
             'code'         => 'DP01',
+<<<<<<< HEAD
             'address'      => 'Cité 08 Mai, Eloued',
             'wilaya_id'    => $wilayaId ?? null,
+=======
+            'address'      => 'Zgoum, Eloued',
+            'wilaya_id'    => $wilayaId,
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             'phone'        => '029123456',
             'manager_name' => 'ABDESSADOK',
             'activity'     => 'Stockage et distribution',

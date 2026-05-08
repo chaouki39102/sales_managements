@@ -7,21 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * PaymentMode Model
- *
- * Table: payment_modes
- * Payment methods (cash, check, transfer, etc.)
- */
 #[Cacheable]
 class PaymentMode extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'payment_modes';
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',

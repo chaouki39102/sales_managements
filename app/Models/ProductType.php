@@ -6,21 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * ProductType Model
- *
- * Table: product_types
- * Defines types of products (stockable, service, consumable)
- */
 #[Cacheable]
 class ProductType extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'product_types';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'description',

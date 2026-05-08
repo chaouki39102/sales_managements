@@ -6,20 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * EmploymentContract Model
- *
- * Table: employment_contracts
- */
 #[Cacheable]
 class EmploymentContract extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'employment_contracts';
 
     protected $fillable = [
+        'company_id',
         'employee_id',
         'contract_type',
         'start_date',
@@ -59,4 +56,3 @@ class EmploymentContract extends Model
         return $query->where('is_active', true);
     }
 }
-

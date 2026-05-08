@@ -18,10 +18,20 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+<<<<<<< HEAD
         // ✅ تحليل {company} بالـ slug وليس بالـ id
         // يُصلح خطأ "No query results for model Company"
         // عند استخدام Route::prefix('{company}') مع SubstituteBindings
         Route::bind('company', function (string $value) {
+=======
+        // ═══════════════════════════════════════════
+        // Explicit Route Model Binding: {company} → Company by slug
+        // ═══════════════════════════════════════════
+        Route::bind('company', function ($value) {
+            if ($value instanceof Company) {
+                return $value;
+            }
+>>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             return Company::where('slug', $value)->firstOrFail();
         });
 
@@ -29,7 +39,6 @@ class AppServiceProvider extends ServiceProvider
 
         // ✅ Super Admin (Spatie role) يتجاوز كل الصلاحيات بأمان
         Gate::before(function ($user, $ability) {
-            // التحقق فقط باستخدام Spatie hasRole (يتجنب in_array على null)
             if (method_exists($user, 'hasRole') && $user->hasRole('super-admin')) {
                 return true;
             }

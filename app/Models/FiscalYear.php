@@ -10,23 +10,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * FiscalYear Model
- *
- * Table: fiscal_years
- * Manages fiscal/financial years for accounting periods
- */
 #[Cacheable]
 class FiscalYear extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'fiscal_years';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'name',
         'start_date',
         'end_date',
@@ -37,7 +29,6 @@ class FiscalYear extends Model
         'closing_notes',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
@@ -48,65 +39,22 @@ class FiscalYear extends Model
         'updated_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
     public static array $searchableFields = ['name'];
-
-    /** @var array الفلاتر المسموحة */
-    public static array $filterable = [
-        'is_closed',
-        'is_current',
-    ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'name',
-        'start_date',
-        'end_date',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $filterable = ['is_closed', 'is_current'];
+    public static array $sortable = ['id', 'name', 'start_date', 'end_date', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'closedBy',
-        'commercialDocuments',
-        'stockMovements',
-        'payments',
-        'expenses',
-        'openingBalancesStock',
-        'openingBalancesParties',
+        'closedBy', 'commercialDocuments', 'stockMovements', 'payments',
+        'expenses', 'openingBalancesStock', 'openingBalancesParties'
     ];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'start_date';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'desc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 3600;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['fiscal_years'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
-
-    // -------------------- Relations --------------------
 
     public function closedBy(): BelongsTo
     {
@@ -143,8 +91,6 @@ class FiscalYear extends Model
         return $this->hasMany(OpeningBalanceParty::class);
     }
 
-    // -------------------- Scopes --------------------
-
     public function scopeCurrent(Builder $query): Builder
     {
         return $query->where('is_current', true);
@@ -160,14 +106,11 @@ class FiscalYear extends Model
         return $query->where('is_closed', true);
     }
 
-    // -------------------- Helpers --------------------
-
     public function close(int $userId, ?string $notes = null): bool
     {
         if ($this->is_closed) {
             return false;
         }
-
         return $this->update([
             'is_closed' => true,
             'closed_at' => now(),
@@ -179,9 +122,7 @@ class FiscalYear extends Model
 
     public function setCurrent(): bool
     {
-        // Set all other years as non-current
         static::where('id', '!=', $this->id)->update(['is_current' => false]);
-
         return $this->update(['is_current' => true]);
     }
 

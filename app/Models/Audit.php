@@ -7,21 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * Audit Model
- *
- * Table: audits
- * Comprehensive audit trail
- */
 class Audit extends Model
 {
-    use
-    HasCompany,
-    HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'audits';
 
     protected $fillable = [
+        'company_id',
         'user_id',
         'user_type',
         'event',

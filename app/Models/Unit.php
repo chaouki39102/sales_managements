@@ -6,21 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * Unit Model
- *
- * Table: units
- * Units of measurement for products
- */
 #[Cacheable]
 class Unit extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'units';
 
     protected $fillable = [
+        'company_id',
         'name',
         'symbol',
         'description',

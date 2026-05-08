@@ -6,21 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * StockMovementType Model
- *
- * Table: stock_movement_types
- * Defines types of stock movements
- */
 #[Cacheable]
 class StockMovementType extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'stock_movement_types';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'description',
@@ -51,18 +47,7 @@ class StockMovementType extends Model
         return $this->hasMany(StockMovement::class);
     }
 
-    public function isIncoming(): bool
-    {
-        return $this->direction === 1;
-    }
-
-    public function isOutgoing(): bool
-    {
-        return $this->direction === -1;
-    }
-
-    public function isNeutral(): bool
-    {
-        return $this->direction === 0;
-    }
+    public function isIncoming(): bool { return $this->direction === 1; }
+    public function isOutgoing(): bool { return $this->direction === -1; }
+    public function isNeutral(): bool { return $this->direction === 0; }
 }
