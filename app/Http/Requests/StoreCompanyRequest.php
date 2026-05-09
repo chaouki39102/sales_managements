@@ -27,7 +27,7 @@ class StoreCompanyRequest extends FormRequest
             'legal_form_id'   => 'nullable|exists:legal_forms,id',
             'wilaya_id'       => 'nullable|exists:wilayas,id',
             'commune_id'      => 'nullable|exists:communes,id',
-            'is_active'       => 'nullable|boolean',
+            'active'       => 'nullable|boolean',
         ];
     }
 

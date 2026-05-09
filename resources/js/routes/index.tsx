@@ -1,19 +1,17 @@
-// ════════════════════════════════════════════════
-// routes/index.tsx — محدَّث بمسارات Super Admin
-// ════════════════════════════════════════════════
+// routes/index.tsx
 import React, { lazy, Suspense } from "react";
-import { Navigate, Route, Routes, Outlet } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 
-// ── Admin pages ──────────────────────────────────────────────────────
+// Admin pages
 const AdminLayout         = lazy(() => import("@/components/layouts/AdminLayout"));
 const AdminDashboardPage  = lazy(() => import("@/pages/admin/AdminDashboardPage"));
 const AdminCompaniesPage  = lazy(() => import("@/pages/admin/AdminCompaniesPage"));
 const AdminUsersPage      = lazy(() => import("@/pages/admin/AdminUsersPage"));
 const AdminPlansPage      = lazy(() => import("@/pages/admin/AdminPlansPage"));
 
-// ── Lazy pages ────────────────────────────────────────────────────────
+// Lazy pages
 const LoginPage                = lazy(() => import("@/pages/auth/LoginPage"));
 const OnboardingPage           = lazy(() => import("@/pages/onboarding/OnboardingPage"));
 const DashboardPage            = lazy(() => import("@/pages/dashboard/DashboardPage"));
@@ -46,7 +44,7 @@ const TvasPage                 = lazy(() => import("@/pages/lookups/TvasPage"));
 const ExpenseCategoriesPage    = lazy(() => import("@/pages/lookups/ExpenseCategoriesPage"));
 const RolesPage                = lazy(() => import("@/pages/users/RolesPage"));
 
-// ── Loader ────────────────────────────────────────────────────────────
+// Loader
 function PageLoader() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg0)" }}>
@@ -55,6 +53,7 @@ function PageLoader() {
   );
 }
 
+// Coming Soon fallback
 function ComingSoon() {
   return (
     <div className="page on">
@@ -67,66 +66,84 @@ function ComingSoon() {
   );
 }
 
-// ── Guards ────────────────────────────────────────────────────────────
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading)       return <PageLoader />;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
+// ═════════════════════════════════════════════════════
+// 1. OnboardingRoute – العقل المدبّر للتوجيه بعد الدخول
+// ═════════════════════════════════════════════════════
 function OnboardingRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, activeCompany } = useAuth();
-  if (isLoading)         return <PageLoader />;
-  if (!isAuthenticated)   return <Navigate to="/login" replace />;
+  const { isAuthenticated, isLoading, activeCompany, user } = useAuth();
+
+  const isSuperAdmin =
+    (user as any)?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
+
+  if (isLoading) return <PageLoader />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  // Super Admin → لوحة الإدارة فوراً
+  if (isSuperAdmin) return <Navigate to="/admin" replace />;
+
+  // مستخدم عادي لديه شركة نشطة → لوحة التحكم
   if (activeCompany?.slug) return <Navigate to="/dashboard" replace />;
+
+  // غير ذلك → أظهر واجهة الاختيار (Onboarding)
   return <>{children}</>;
 }
 
+// ═════════════════════════════════════════════════════
+// 2. AppRoute – يضمن وجود شركة نشطة (لغير السوبر أدمن)
+// ═════════════════════════════════════════════════════
 function AppRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, activeCompany } = useAuth();
-  if (isLoading)          return <PageLoader />;
-  if (!isAuthenticated)    return <Navigate to="/login" replace />;
+  const { isAuthenticated, isLoading, activeCompany, user } = useAuth();
+
+  const isSuperAdmin = (user as any)?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
+
+  if (isLoading) return <PageLoader />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  // Super Admin يمكنه المرور بدون شركة نشطة
+  if (isSuperAdmin && !activeCompany?.slug) return <>{children}</>;
+
+  // مستخدم عادي بدون شركة → Onboarding
   if (!activeCompany?.slug) return <Navigate to="/onboarding" replace />;
+
   return <>{children}</>;
 }
 
-/**
- * ✅ AdminRoute — جديد
- * يتطلب تسجيل دخول + دور super-admin فقط.
- * لا يتطلب activeCompany لأن السوبر أدمن يعمل بدون سياق شركة.
- */
+// ═════════════════════════════════════════════════════
+// 3. AdminRoute – يحمي لوحة الإدارة للمشرف العام فقط
+// ═════════════════════════════════════════════════════
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
-  if (isLoading)        return <PageLoader />;
-  if (!isAuthenticated)  return <Navigate to="/login" replace />;
 
-  const isSuperAdmin = (user as any)?.roles?.some((r: any) => r.name === 'super-admin')
-    ?? (user as any)?.role === 'super_admin'
-    ?? false;
+  if (isLoading) return <PageLoader />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
 
+  const isSuperAdmin = (user as any)?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
+
   return <>{children}</>;
 }
 
-// ── AppRoutes ─────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════
+// 4. التوجيهات الرئيسية
+// ═════════════════════════════════════════════════════
 export default function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-
-        {/* تسجيل الدخول */}
+        {/* Public */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Onboarding */}
-        <Route path="/onboarding" element={<OnboardingRoute><OnboardingPage /></OnboardingRoute>} />
+        {/* Onboarding – يحوي التوجيه الذكي */}
+        <Route
+          path="/onboarding"
+          element={
+            <OnboardingRoute>
+              <OnboardingPage />
+            </OnboardingRoute>
+          }
+        />
 
-        {/* ══════════════════════════════════════════════════════
-            ✅ مسارات Super Admin  —  /admin/*
-            بدون AppRoute وبدون DashboardLayout
-            بدون slug وبدون SetCompanyContext
-            ══════════════════════════════════════════════════ */}
+        {/* لوحة الإدارة للمشرف العام */}
         <Route
           path="/admin"
           element={
@@ -135,49 +152,53 @@ export default function AppRoutes() {
             </AdminRoute>
           }
         >
-          <Route index          element={<AdminDashboardPage />} />
+          <Route index element={<AdminDashboardPage />} />
           <Route path="companies" element={<AdminCompaniesPage />} />
-          <Route path="users"     element={<AdminUsersPage />} />
-          <Route path="plans"     element={<AdminPlansPage />} />
-          <Route path="activity"  element={<ComingSoon />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="plans" element={<AdminPlansPage />} />
+          <Route path="activity" element={<ComingSoon />} />
         </Route>
 
-        {/* ══════════════════════════════════════════════════════
-            مسارات التطبيق العادي (تتطلب شركة نشطة)
-            ══════════════════════════════════════════════════ */}
-        <Route element={<AppRoute><DashboardLayout /></AppRoute>}>
-          <Route index                       element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard"            element={<DashboardPage />} />
-          <Route path="pos"                  element={<POSPage />} />
-          <Route path="invoices"             element={<InvoicesPage />} />
-          <Route path="products"             element={<ProductsPage />} />
-          <Route path="documents/:typeCode"  element={<CommercialDocumentsPage />} />
-          <Route path="inventory"            element={<InventoryPage />} />
-          <Route path="clients"             element={<ClientsPage />} />
-          <Route path="suppliers"           element={<SuppliersPage />} />
-          <Route path="finance"             element={<FinancePage />} />
-          <Route path="expenses"            element={<ExpensesPage />} />
-          <Route path="debts"               element={<DebtsPage />} />
-          <Route path="tva"                 element={<TvaPage />} />
-          <Route path="fiscal"              element={<ComingSoon />} />
-          <Route path="fiscalyears"         element={<FiscalYearsPage />} />
-          <Route path="reports"             element={<ReportsPage />} />
-          <Route path="balance"             element={<ComingSoon />} />
-          <Route path="users"               element={<UsersPage />} />
-          <Route path="roles"               element={<RolesPage />} />
-          <Route path="employees"           element={<EmployeesPage />} />
-          <Route path="settings"            element={<SettingsPage />} />
+        {/* التطبيق الرئيسي (يتطلب شركة نشطة) */}
+        <Route
+          element={
+            <AppRoute>
+              <DashboardLayout />
+            </AppRoute>
+          }
+        >
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="pos" element={<POSPage />} />
+          <Route path="invoices" element={<InvoicesPage />} />
+          <Route path="products" element={<ProductsPage />} />
+          <Route path="documents/:typeCode" element={<CommercialDocumentsPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="clients" element={<ClientsPage />} />
+          <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="finance" element={<FinancePage />} />
+          <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="debts" element={<DebtsPage />} />
+          <Route path="tva" element={<TvaPage />} />
+          <Route path="fiscal" element={<ComingSoon />} />
+          <Route path="fiscalyears" element={<FiscalYearsPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+          <Route path="balance" element={<ComingSoon />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="roles" element={<RolesPage />} />
+          <Route path="employees" element={<EmployeesPage />} />
+          <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/document-types" element={<DocumentTypesPage />} />
-          <Route path="categories"          element={<FamiliesPage />} />
-          <Route path="brands"              element={<BrandsPage />} />
-          <Route path="units"               element={<UnitsPage />} />
-          <Route path="warehouses"          element={<WarehousesPage />} />
-          <Route path="currencies"          element={<CurrenciesPage />} />
-          <Route path="pricelevels"         element={<PriceLevelsPage />} />
-          <Route path="tvas"                element={<TvasPage />} />
-          <Route path="payment-methods"     element={<PaymentMethodsPage />} />
-          <Route path="numbering-series"    element={<NumberingSeriesPage />} />
-          <Route path="expense-categories"  element={<ExpenseCategoriesPage />} />
+          <Route path="categories" element={<FamiliesPage />} />
+          <Route path="brands" element={<BrandsPage />} />
+          <Route path="units" element={<UnitsPage />} />
+          <Route path="warehouses" element={<WarehousesPage />} />
+          <Route path="currencies" element={<CurrenciesPage />} />
+          <Route path="pricelevels" element={<PriceLevelsPage />} />
+          <Route path="tvas" element={<TvasPage />} />
+          <Route path="payment-methods" element={<PaymentMethodsPage />} />
+          <Route path="numbering-series" element={<NumberingSeriesPage />} />
+          <Route path="expense-categories" element={<ExpenseCategoriesPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

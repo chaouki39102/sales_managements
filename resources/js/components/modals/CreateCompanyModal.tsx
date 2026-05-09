@@ -22,7 +22,7 @@ interface Company {
   rc?: string;
   ai?: string;
   activity?: string;
-  is_active?: boolean;
+  active?: boolean;
   is_suspended?: boolean;
 }
 

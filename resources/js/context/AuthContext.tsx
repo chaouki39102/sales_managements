@@ -8,7 +8,7 @@ import type { User, LoginCredentials } from '@/types';
 // ── Storage key للشركة النشطة ──────────────────
 const ACTIVE_COMPANY_KEY = 'active_company';
 
-interface ActiveCompany {
+export interface ActiveCompany {
   id:   number;
   name: string;
   slug: string;
@@ -18,11 +18,11 @@ interface AuthContextValue {
   user:            User | null;
   isAuthenticated: boolean;
   isLoading:       boolean;
-  activeCompany:   ActiveCompany | null;   // ✅ الشركة النشطة
-  login:           (creds: LoginCredentials) => Promise<void>;
+  activeCompany:   ActiveCompany | null;
+  login:           (creds: LoginCredentials) => Promise<User>;   // ✅ يُعيد المستخدم
   logout:          () => Promise<void>;
   updateUser:      (data: Partial<User>) => void;
-  setActiveCompany:(company: ActiveCompany) => void;  // ✅ يُستدعى بعد switch
+  setActiveCompany:(company: ActiveCompany) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -58,13 +58,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setIsLoading(false));
   }, []);
 
-  // ── Login ─────────────────────────────────────
-  const login = useCallback(async (creds: LoginCredentials) => {
+  // ── Login (returns user to allow role‑based redirect) ──
+const login = useCallback(async (creds: LoginCredentials): Promise<User> => {
+    // 1. تسجيل الدخول
     const res = await apiClient.post<{ data: { user: User; token: string } }>('/auth/login', creds);
-    const { user: u, token } = res.data.data;
+    const { token } = res.data.data;
     setAuthToken(token);
-    setUser(u);
-  }, []);
+
+    // 2. جلب المستخدم الكامل من /auth/me
+    const meRes = await apiClient.get<{ data: User }>('/auth/me');
+    const fullUser = meRes.data.data;
+    setUser(fullUser);            // ← الآن يحتوي fullUser.roles
+
+    return fullUser;
+}, []);
 
   // ── Logout ────────────────────────────────────
   const logout = useCallback(async () => {
@@ -80,7 +87,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(u => u ? { ...u, ...data } : null);
   }, []);
 
-  // ── setActiveCompany — يُستدعى من OnboardingPage بعد switch ──
   const setActiveCompany = useCallback((company: ActiveCompany) => {
     setActiveCompanyState(company);
     saveActiveCompany(company);

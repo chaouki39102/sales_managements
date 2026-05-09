@@ -10,31 +10,23 @@ class ExpenseCategoryResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'code' => $this->code,
-            'description' => $this->description,
-            'parent_id' => $this->parent_id,
-            'active' => $this->active,
+            'id'            => $this->id,
+            'company_id'    => $this->company_id,
+            'name'          => $this->name,
+            'code'          => $this->code,
+            'description'   => $this->description,
+            'parent_id'     => $this->parent_id,
+            'active'        => $this->active,
             'display_order' => $this->display_order,
-            'is_root' => $this->is_root,
-            'has_children' => $this->has_children,
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
-            
-            'relations' => [
-                'parent' => $this->whenLoaded('parent', fn() => [
-                    'id' => $this->parent->id,
-                    'name' => $this->parent->name,
-                ]),
-                'children' => $this->whenLoaded('children', fn() => 
-                    $this->children->map(fn($c) => [
-                        'id' => $c->id,
-                        'name' => $c->name,
-                        'code' => $c->code,
-                    ])
-                ),
-            ],
+            'created_by'    => $this->created_by,
+            'updated_by'    => $this->updated_by,
+            'created_at'    => $this->created_at,
+            'updated_at'    => $this->updated_at,
+            'deleted_at'    => $this->deleted_at,
+
+            // Relations
+            'parent'        => new ExpenseCategoryResource($this->whenLoaded('parent')),
+            'children'      => ExpenseCategoryResource::collection($this->whenLoaded('children')),
         ];
     }
 }

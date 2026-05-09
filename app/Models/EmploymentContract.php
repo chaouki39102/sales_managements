@@ -24,20 +24,20 @@ class EmploymentContract extends Model
         'base_salary',
         'job_title',
         'department',
-        'is_active',
+        'active',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
         'base_salary' => 'decimal:4',
-        'is_active' => 'boolean',
+        'active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
     public static array $searchableFields = ['job_title', 'department'];
-    public static array $filterable = ['employee_id', 'contract_type', 'is_active'];
+    public static array $filterable = ['employee_id', 'contract_type', 'active'];
     public static array $sortable = ['id', 'start_date', 'end_date', 'base_salary'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['employee'];
@@ -53,6 +53,6 @@ class EmploymentContract extends Model
 
     public function scopeActive($query)
     {
-        return $query->where('is_active', true);
+        return $query->where('active', true);
     }
 }

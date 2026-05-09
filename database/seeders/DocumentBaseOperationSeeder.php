@@ -9,14 +9,6 @@ class DocumentBaseOperationSeeder extends Seeder
 {
     public function run(): void
     {
-<<<<<<< HEAD
-        DB::table('document_base_operations')->upsert([
-            ['name' => 'sale',       'label' => 'مبيعات',   'description' => 'عمليات البيع للعملاء', 'active' => true, 'display_order' => 1, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'purchase',   'label' => 'مشتريات',  'description' => 'عمليات الشراء من الموردين', 'active' => true, 'display_order' => 2, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'transfer',   'label' => 'نقل',      'description' => 'نقل المخزون بين المستودعات', 'active' => true, 'display_order' => 3, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'adjustment', 'label' => 'تعديل',    'description' => 'تعديلات المخزون', 'active' => true, 'display_order' => 4, 'created_at' => now(), 'updated_at' => now()],
-        ], ['name']);
-=======
         $companyId = config('seeding.company_id') ?? DB::table('companies')->value('id');
 
         DB::table('document_base_operations')->insert([
@@ -25,7 +17,7 @@ class DocumentBaseOperationSeeder extends Seeder
                 'name'          => 'sale',
                 'label'         => 'مبيعات',
                 'description'   => 'عمليات البيع للعملاء',
-                'is_active'     => true,
+                'active'     => true,
                 'display_order' => 1,
                 'created_at'    => now(),
                 'updated_at'    => now(),
@@ -35,7 +27,7 @@ class DocumentBaseOperationSeeder extends Seeder
                 'name'          => 'purchase',
                 'label'         => 'مشتريات',
                 'description'   => 'عمليات الشراء من الموردين',
-                'is_active'     => true,
+                'active'     => true,
                 'display_order' => 2,
                 'created_at'    => now(),
                 'updated_at'    => now(),
@@ -45,7 +37,7 @@ class DocumentBaseOperationSeeder extends Seeder
                 'name'          => 'transfer',
                 'label'         => 'نقل',
                 'description'   => 'نقل المخزون بين المستودعات',
-                'is_active'     => true,
+                'active'     => true,
                 'display_order' => 3,
                 'created_at'    => now(),
                 'updated_at'    => now(),
@@ -55,12 +47,11 @@ class DocumentBaseOperationSeeder extends Seeder
                 'name'          => 'adjustment',
                 'label'         => 'تعديل',
                 'description'   => 'تعديلات المخزون',
-                'is_active'     => true,
+                'active'     => true,
                 'display_order' => 4,
                 'created_at'    => now(),
                 'updated_at'    => now(),
             ],
         ]);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
     }
 }

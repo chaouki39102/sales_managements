@@ -21,7 +21,7 @@ class StoreEmploymentContractRequest extends FormRequest
             'base_salary' => 'nullable|numeric|min:0',
             'job_title' => 'nullable|string|max:150',
             'department' => 'nullable|string|max:150',
-            'is_active' => 'nullable|boolean',
+            'active' => 'nullable|boolean',
         ];
     }
 }
@@ -43,7 +43,7 @@ class UpdateEmploymentContractRequest extends FormRequest
             'base_salary' => 'nullable|numeric|min:0',
             'job_title' => 'nullable|string|max:150',
             'department' => 'nullable|string|max:150',
-            'is_active' => 'nullable|boolean',
+            'active' => 'nullable|boolean',
         ];
     }
 }

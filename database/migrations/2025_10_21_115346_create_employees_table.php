@@ -21,6 +21,7 @@ return new class extends Migration {
             $table->date('hire_date')->nullable();
             $table->date('termination_date')->nullable();
             $table->string('employment_status', 30)->default('active')->index()->comment('active | suspended | terminated');
+            $table->boolean('active')->default(true);
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();

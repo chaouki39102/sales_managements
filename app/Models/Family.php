@@ -1,5 +1,6 @@
 <?php
 
+// app/Models/Family.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +29,9 @@ class Family extends Model
         'parent_id',
         'active',
         'display_order',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [

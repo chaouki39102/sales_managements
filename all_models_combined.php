@@ -11,20 +11,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * Attachment Model
- *
- * Table: attachments
- * Polymorphic file attachments
- */
 class Attachment extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'attachments';
 
-        protected $fillable = [
+    protected $fillable = [
+        'company_id',
         'file_name',
         'file_path',
         'file_type',
@@ -89,9 +85,7 @@ class Attachment extends Model
         }
         return $bytes . ' bytes';
     }
-
 }
-
 
 
 
@@ -103,21 +97,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * Audit Model
- *
- * Table: audits
- * Comprehensive audit trail
- */
 class Audit extends Model
 {
-    use
-    HasCompany,
-    HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'audits';
 
     protected $fillable = [
+        'company_id',
         'user_id',
         'user_type',
         'event',
@@ -172,7 +159,6 @@ class Audit extends Model
 
 
 
-
 // ===== ملف: Barcode.php =====
 declare(strict_types=1);
 
@@ -184,21 +170,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * @property int $id
- * @property int $company_id
- * @property int $product_id
- * @property string $barcode
- * @property string|null $type
- * @property bool $is_primary
- * @property string|null $unit
- * @property int|null $created_by
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Company $company
- * @property-read \App\Models\Product $product
- * @property-read \App\Models\User|null $creator
- */
 class Barcode extends Model
 {
     use HasFactory, HasCompany, HasStandardizedConfiguration;
@@ -208,6 +179,7 @@ class Barcode extends Model
     protected $fillable = [
         'company_id',
         'product_id',
+        'variant_id',
         'barcode',
         'type',
         'is_primary',
@@ -221,18 +193,16 @@ class Barcode extends Model
         'updated_at' => 'datetime',
     ];
 
-    // -------------------- Configuration for HasStandardizedConfiguration --------------------
     public static array $searchableFields = ['barcode', 'type', 'unit'];
-    public static array $filterable = ['product_id', 'is_primary', 'type', 'unit'];
+    public static array $filterable = ['product_id', 'variant_id', 'is_primary', 'type', 'unit'];
     public static array $sortable = ['id', 'barcode', 'created_at'];
     public static array $defaultWith = ['product:id,name'];
-    public static array $allowedIncludes = ['product', 'creator', 'company'];
+    public static array $allowedIncludes = ['product', 'variant', 'creator', 'company'];
     public static string $defaultSort = 'id';
     public static string $defaultSortDirection = 'desc';
     public static ?int $cacheTtl = 300;
     public static array $cacheTags = ['barcodes'];
 
-    // -------------------- Relations --------------------
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
@@ -243,16 +213,19 @@ class Barcode extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    // -------------------- Boot --------------------
     protected static function booted(): void
     {
         static::creating(function (self $barcode) {
-            // إذا كان الباركود جديداً وهو primary، نزيل الـ primary عن باقي باركودات المنتج
             if ($barcode->is_primary) {
                 static::where('product_id', $barcode->product_id)
                     ->where('company_id', $barcode->company_id)
@@ -273,7 +246,6 @@ class Barcode extends Model
 
 
 
-
 // ===== ملف: Brand.php =====
 namespace App\Models;
 
@@ -284,21 +256,17 @@ use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
-/**
- * Brand Model
- *
- * Table: brands
- * Product brands/manufacturers
- */
 #[Cacheable]
 class Brand extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
 
     protected $table = 'brands';
 
     protected $fillable = [
+        'company_id',
         'name',
         'slug',
         'description',
@@ -343,7 +311,6 @@ class Brand extends Model
 
 
 
-
 // ===== ملف: Cache.php =====
 namespace App\Models;
 
@@ -353,7 +320,6 @@ class Cache extends Model
 {
     //
 }
-
 
 
 
@@ -369,23 +335,15 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
 
-/**
- * Check Model
- *
- * Table: checks
- * Manages check payments and their lifecycle
- */
 #[Cacheable]
 class Check extends Model
 {
-    use
-        HasStandardizedConfiguration,
-        HasCompany,
-        Auditable;
+    use HasStandardizedConfiguration, HasCompany, Auditable;
 
     protected $table = 'checks';
 
     protected $fillable = [
+        'company_id',
         'check_number',
         'check_date',
         'due_date',
@@ -469,7 +427,6 @@ class Check extends Model
 
 
 
-
 // ===== ملف: CommercialDocument.php =====
 namespace App\Models;
 
@@ -485,12 +442,6 @@ use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
 
-/**
- * CommercialDocument Model
- *
- * Table: commercial_documents
- * Manages all commercial documents (invoices, quotes, orders, etc.)
- */
 #[Cacheable]
 class CommercialDocument extends Model
 {
@@ -502,8 +453,8 @@ class CommercialDocument extends Model
 
     protected $table = 'commercial_documents';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'document_type_id',
         'numbering_series_id',
         'document_number',
@@ -541,9 +492,9 @@ class CommercialDocument extends Model
         'qr_code_data',
         'is_exported_to_accounting',
         'exported_at',
+        'fiscal_stamp_id',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'exchange_rate' => 'decimal:8',
         'document_date' => 'date',
@@ -571,214 +522,60 @@ class CommercialDocument extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'document_number',
-        'notes',
-        'internal_notes',
-    ];
-
-    /** @var array الفلاتر المسموحة */
+    public static array $searchableFields = ['document_number', 'notes', 'internal_notes'];
     public static array $filterable = [
-        'document_type_id',
-        'party_id',
-        'warehouse_id',
-        'fiscal_year_id',
-        'currency_id',
-        'document_status_id',
-        'is_locked',
-        'is_proforma',
-        'is_exported_to_accounting',
+        'document_type_id', 'party_id', 'warehouse_id', 'fiscal_year_id',
+        'currency_id', 'document_status_id', 'is_locked', 'is_proforma', 'is_exported_to_accounting'
     ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'document_number',
-        'document_date',
-        'total_ttc',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $sortable = ['id', 'document_number', 'document_date', 'total_ttc', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'documentType',
-        'numberingSeries',
-        'user',
-        'party',
-        'warehouse',
-        'fiscalYear',
-        'currency',
-        'documentStatus',
-        'validatedBy',
-        'sourceDocument',
-        'cancellationOfDocument',
-        'lines',
-        'payments',
-        'stockMovements',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
+        'documentType', 'numberingSeries', 'user', 'party', 'warehouse', 'fiscalYear',
+        'currency', 'documentStatus', 'validatedBy', 'sourceDocument', 'cancellationOfDocument',
+        'lines', 'payments', 'stockMovements', 'createdBy', 'updatedBy', 'deletedBy'
     ];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'document_date';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'desc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
-    public static ?int $cacheTtl = 0; // No cache for transactional data
-
-    /** @var array تاجات الكاش */
+    public static ?int $cacheTtl = 0;
     public static array $cacheTags = ['commercial_documents'];
-
-    /** @var array الموديلات المرتبطة */
-    public static array $cacheInvalidateRelations = [
-        'lines',
-        'payments',
-        'stockMovements',
-    ];
-
-    /** @var array Scopes التلقائية */
+    public static array $cacheInvalidateRelations = ['lines', 'payments', 'stockMovements'];
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
-
-    public function documentType(): BelongsTo
-    {
-        return $this->belongsTo(DocumentType::class);
-    }
-
-    public function numberingSeries(): BelongsTo
-    {
-        return $this->belongsTo(NumberingSeries::class);
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function party(): BelongsTo
-    {
-        return $this->belongsTo(Party::class);
-    }
-
-    public function warehouse(): BelongsTo
-    {
-        return $this->belongsTo(Warehouse::class);
-    }
-
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FiscalYear::class);
-    }
-
-    public function currency(): BelongsTo
-    {
-        return $this->belongsTo(Currency::class);
-    }
-
-    public function documentStatus(): BelongsTo
-    {
-        return $this->belongsTo(DocumentStatus::class);
-    }
-
-    public function validatedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'validated_by');
-    }
-
-    public function sourceDocument(): BelongsTo
-    {
-        return $this->belongsTo(CommercialDocument::class, 'source_document_id');
-    }
-
-    public function cancellationOfDocument(): BelongsTo
-    {
-        return $this->belongsTo(CommercialDocument::class, 'cancellation_of_document_id');
-    }
-
-    public function lines(): HasMany
-    {
-        return $this->hasMany(CommercialDocumentLine::class);
-    }
-
+    public function documentType(): BelongsTo { return $this->belongsTo(DocumentType::class); }
+    public function numberingSeries(): BelongsTo { return $this->belongsTo(NumberingSeries::class); }
+    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function party(): BelongsTo { return $this->belongsTo(Party::class); }
+    public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
+    public function fiscalYear(): BelongsTo { return $this->belongsTo(FiscalYear::class); }
+    public function currency(): BelongsTo { return $this->belongsTo(Currency::class); }
+    public function documentStatus(): BelongsTo { return $this->belongsTo(DocumentStatus::class); }
+    public function validatedBy(): BelongsTo { return $this->belongsTo(User::class, 'validated_by'); }
+    public function sourceDocument(): BelongsTo { return $this->belongsTo(CommercialDocument::class, 'source_document_id'); }
+    public function cancellationOfDocument(): BelongsTo { return $this->belongsTo(CommercialDocument::class, 'cancellation_of_document_id'); }
+    public function lines(): HasMany { return $this->hasMany(CommercialDocumentLine::class); }
     public function payments(): BelongsToMany
     {
         return $this->belongsToMany(Payment::class, 'document_payment')
             ->withPivot('amount_applied', 'notes')
             ->withTimestamps();
     }
-
-    public function stockMovements(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    public function stockMovements(): HasManyThrough
     {
-        return $this->hasManyThrough(
-            StockMovement::class,
-            CommercialDocumentLine::class,
-            'commercial_document_id',
-            'commercial_document_line_id'
-        );
+        return $this->hasManyThrough(StockMovement::class, CommercialDocumentLine::class, 'commercial_document_id', 'commercial_document_line_id');
     }
 
-    // -------------------- Scopes --------------------
+    public function scopeLocked(Builder $query): Builder { return $query->where('is_locked', true); }
+    public function scopeUnlocked(Builder $query): Builder { return $query->where('is_locked', false); }
+    public function scopeValidated(Builder $query): Builder { return $query->whereNotNull('validated_at'); }
+    public function scopeUnpaid(Builder $query): Builder { return $query->where('remaining_amount', '>', 0); }
+    public function scopeOverdue(Builder $query): Builder { return $query->where('due_date', '<', now())->where('remaining_amount', '>', 0); }
 
-    public function scopeLocked(Builder $query): Builder
-    {
-        return $query->where('is_locked', true);
-    }
-
-    public function scopeUnlocked(Builder $query): Builder
-    {
-        return $query->where('is_locked', false);
-    }
-
-    public function scopeValidated(Builder $query): Builder
-    {
-        return $query->whereNotNull('validated_at');
-    }
-
-    public function scopeUnpaid(Builder $query): Builder
-    {
-        return $query->where('remaining_amount', '>', 0);
-    }
-
-    public function scopeOverdue(Builder $query): Builder
-    {
-        return $query->where('due_date', '<', now())
-            ->where('remaining_amount', '>', 0);
-    }
-
-    // -------------------- Helpers --------------------
-
-    public function isFullyPaid(): bool
-    {
-        return $this->remaining_amount <= 0;
-    }
-
-    public function isOverdue(): bool
-    {
-        return $this->due_date && $this->due_date->isPast() && !$this->isFullyPaid();
-    }
-
-    public function canBeModified(): bool
-    {
-        return !$this->is_locked && !$this->validated_at;
-    }
+    public function isFullyPaid(): bool { return $this->remaining_amount <= 0; }
+    public function isOverdue(): bool { return $this->due_date && $this->due_date->isPast() && !$this->isFullyPaid(); }
+    public function canBeModified(): bool { return !$this->is_locked && !$this->validated_at; }
 }
-
 
 
 
@@ -793,23 +590,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * CommercialDocumentLine Model
- *
- * Table: commercial_document_lines
- * Stores line items for commercial documents
- */
 #[Cacheable]
 class CommercialDocumentLine extends Model
 {
-    use
-        HasCompany,
-    HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'commercial_document_lines';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'commercial_document_id',
         'product_id',
         'line_order',
@@ -833,9 +622,9 @@ class CommercialDocumentLine extends Model
         'line_attributes',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'additional_costs' => 'array',
+        'line_attributes' => 'array',
         'total_additional_cost' => 'decimal:4',
         'total_discount_amount' => 'decimal:4',
         'line_order' => 'integer',
@@ -850,134 +639,38 @@ class CommercialDocumentLine extends Model
         'total_tva' => 'decimal:4',
         'total_ttc' => 'decimal:4',
         'is_auto_split' => 'boolean',
-        'line_attributes' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'description',
-    ];
-
-    /** @var array الفلاتر المسموحة */
-    public static array $filterable = [
-        'commercial_document_id',
-        'product_id',
-        'stock_lot_id',
-        'is_auto_split',
-    ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'line_order',
-        'quantity',
-        'total_ttc',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $searchableFields = ['description'];
+    public static array $filterable = ['commercial_document_id', 'product_id', 'stock_lot_id', 'is_auto_split'];
+    public static array $sortable = ['id', 'line_order', 'quantity', 'total_ttc', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
-    public static array $allowedIncludes = [
-        'commercialDocument',
-        'product',
-        'stockLot',
-        'parentLine',
-        'childLines',
-        'stockMovements',
-    ];
-
-    /** @var string حقل الترتيب الافتراضي */
+    public static array $allowedIncludes = ['commercialDocument', 'product', 'stockLot', 'parentLine', 'childLines', 'stockMovements'];
     public static string $defaultSort = 'line_order';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'asc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 50;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 200;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 0;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['commercial_document_lines'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
+    public function commercialDocument(): BelongsTo { return $this->belongsTo(CommercialDocument::class); }
+    public function product(): BelongsTo { return $this->belongsTo(Product::class); }
+    public function stockLot(): BelongsTo { return $this->belongsTo(ProductLot::class, 'stock_lot_id'); }
+    public function parentLine(): BelongsTo { return $this->belongsTo(CommercialDocumentLine::class, 'parent_line_id'); }
+    public function childLines(): HasMany { return $this->hasMany(CommercialDocumentLine::class, 'parent_line_id'); }
+    public function stockMovements(): HasMany { return $this->hasMany(StockMovement::class, 'commercial_document_line_id'); }
 
-    public function commercialDocument(): BelongsTo
-    {
-        return $this->belongsTo(CommercialDocument::class);
-    }
+    public function scopeParentLines(Builder $query): Builder { return $query->whereNull('parent_line_id'); }
+    public function scopeChildLines(Builder $query): Builder { return $query->whereNotNull('parent_line_id'); }
 
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class);
-    }
-
-    public function stockLot(): BelongsTo
-    {
-        return $this->belongsTo(ProductLot::class, 'stock_lot_id');
-    }
-
-    public function parentLine(): BelongsTo
-    {
-        return $this->belongsTo(CommercialDocumentLine::class, 'parent_line_id');
-    }
-
-    public function childLines(): HasMany
-    {
-        return $this->hasMany(CommercialDocumentLine::class, 'parent_line_id');
-    }
-
-    public function stockMovements(): HasMany
-    {
-        return $this->hasMany(StockMovement::class, 'commercial_document_line_id');
-    }
-
-    // -------------------- Scopes --------------------
-
-    public function scopeParentLines(Builder $query): Builder
-    {
-        return $query->whereNull('parent_line_id');
-    }
-
-    public function scopeChildLines(Builder $query): Builder
-    {
-        return $query->whereNotNull('parent_line_id');
-    }
-
-    // -------------------- Helpers --------------------
-
-    public function getRemainingQuantity(): float
-    {
-        return $this->quantity - $this->delivered_quantity - $this->returned_quantity;
-    }
-
-    public function isFullyDelivered(): bool
-    {
-        return $this->getRemainingQuantity() <= 0;
-    }
-
-    public function hasDiscount(): bool
-    {
-        return $this->discount_percentage > 0 || $this->discount_amount > 0;
-    }
+    public function getRemainingQuantity(): float { return $this->quantity - $this->delivered_quantity - $this->returned_quantity; }
+    public function isFullyDelivered(): bool { return $this->getRemainingQuantity() <= 0; }
+    public function hasDiscount(): bool { return $this->discount_percentage > 0 || $this->discount_amount > 0; }
 }
-
 
 
 
@@ -990,12 +683,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * Commune Model
- *
- * Table: communes
- * Algerian municipalities (communes)
- */
 #[Cacheable]
 class Commune extends Model
 {
@@ -1053,7 +740,6 @@ class Commune extends Model
 
 
 
-
 // ===== ملف: Company.php =====
 namespace App\Models;
 
@@ -1067,167 +753,54 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 
-/**
- * Company Model
- *
- * Table: companies
- *
- * الشركة هي "الحاوي" في بيئة Multi-Tenancy — لا تستخدم HasCompany
- * لأنها هي نفسها مرجع العزل وليست بيانات معزولة.
- *
- * خطط الاشتراك:
- *   free         → 3 مستخدمين  / 1 مستودع   / 500 منتج
- *   starter      → 10 مستخدمين / 2 مستودع   / 2,000 منتج
- *   professional → 25 مستخدمين / 5 مستودعات / 10,000 منتج
- *   enterprise   → بلا حدود
- *
- * حالات الشركة:
- *   is_active=true  + suspended_at=null   → نشطة طبيعية
- *   is_active=true  + suspended_at!=null  → معلّقة مؤقتاً (Super Admin)
- *   is_active=false + deactivated_at!=null → موقوفة نهائياً
- */
 #[Cacheable]
 class Company extends Model
 {
     use HasStandardizedConfiguration, Auditable;
 
-    // ⚠️ لا SoftDeletes — الشركة إما نشطة أو موقوفة عبر is_active/suspended_at
-    // ⚠️ لا HasCompany — الشركة هي الـ tenant نفسها وليست بيانات تابعة له
-
     protected $table = 'companies';
 
-    // ── Fillable ──────────────────────────────────────────────────────────────
-
     protected $fillable = [
-        // بيانات أساسية
-        'name',
-        'commercial_name',
-        'slug',
-        'activity',
-
-        // وثائق قانونية جزائرية
-        'rc',
-        'rc_date',
-        'nif',
-        'nis',
-        'ai',
-        'legal_form_id',
-        'capital_amount',
-
-        // معلومات الاتصال
-        'address',
-        'commune_id',
-        'wilaya_id',
-        'phone',
-        'mobile',
-        'fax',
-        'email',
-        'avatar',
-
-        // معلومات مصرفية
-        'bank_name',
-        'rib',
-
-        // إدارة الملكية
-        'owner_id',
-        'created_by',
-        'is_active',
-
-        // حالة الشركة (Super Admin)
-        'suspended_at',
-        'suspension_reason',
-        'suspended_by',
-        'deactivated_at',
-        'deactivated_by',
-
-        // خطة الاشتراك والحدود
-        'plan',
-        'trial_ends_at',
-        'max_users',
-        'max_warehouses',
-        'max_products',
-
-        // توثيق وإدارة داخلية
-        'verified_at',
-        'verified_by',
-        'notes',
-        'settings_json',
+        'name', 'commercial_name', 'slug', 'activity',
+        'rc', 'rc_date', 'nif', 'nis', 'ai', 'legal_form_id', 'capital_amount',
+        'address', 'commune_id', 'wilaya_id', 'phone', 'mobile', 'fax', 'email', 'avatar',
+        'bank_name', 'rib',
+        'owner_id', 'created_by', 'active',
+        'suspended_at', 'suspension_reason', 'suspended_by',
+        'deactivated_at', 'deactivated_by',
+        'plan', 'trial_ends_at', 'max_users', 'max_warehouses', 'max_products',
+        'verified_at', 'verified_by', 'notes', 'settings_json',
     ];
-
-    // ── Casts ─────────────────────────────────────────────────────────────────
 
     protected $casts = [
-        'is_active'      => 'boolean',
+        'active' => 'boolean',
         'capital_amount' => 'decimal:4',
-        'rc_date'        => 'date',
-        'suspended_at'   => 'datetime',
+        'rc_date' => 'date',
+        'suspended_at' => 'datetime',
         'deactivated_at' => 'datetime',
-        'trial_ends_at'  => 'datetime',
-        'verified_at'    => 'datetime',
-        'max_users'      => 'integer',
+        'trial_ends_at' => 'datetime',
+        'verified_at' => 'datetime',
+        'max_users' => 'integer',
         'max_warehouses' => 'integer',
-        'max_products'   => 'integer',
-        'settings_json'  => 'array',
-        'created_at'     => 'datetime',
-        'updated_at'     => 'datetime',
+        'max_products' => 'integer',
+        'settings_json' => 'array',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
-    protected $appends = [
-        'is_operational',
-        'is_suspended',
-        'is_verified',
-        'is_on_trial',
-        'trial_days_remaining',
-    ];
+    protected $appends = ['is_operational', 'is_suspended', 'is_verified', 'is_on_trial', 'trial_days_remaining'];
 
-    // ── HasStandardizedConfiguration ─────────────────────────────────────────
-    // ApiListService و ModelConfigService يقرآن هذه الخصائص تلقائياً
-
-    public static array $searchableFields = [
-        'name',
-        'commercial_name',
-        'nif',
-        'rc',
-        'email',
-        'phone',
-    ];
-
-    public static array $filterable = [
-        'is_active',
-        'plan',
-        'legal_form_id',
-        'wilaya_id',
-        'owner_id',
-    ];
-
-    public static array $sortable = [
-        'id',
-        'name',
-        'plan',
-        'created_at',
-        'trial_ends_at',
-    ];
-
-    public static array $defaultWith      = [];
-    public static array $allowedIncludes  = [
-        'owner',
-        'legalForm',
-        'wilaya',
-        'commune',
-        'activeUsers',
-        'suspendedBy',
-        'deactivatedBy',
-        'verifiedBy',
-    ];
-
-    public static string $defaultSort          = 'name';
+    public static array $searchableFields = ['name', 'commercial_name', 'nif', 'rc', 'email', 'phone'];
+    public static array $filterable = ['active', 'plan', 'legal_form_id', 'wilaya_id', 'owner_id'];
+    public static array $sortable = ['id', 'name', 'plan', 'created_at', 'trial_ends_at'];
+    public static array $defaultWith = [];
+    public static array $allowedIncludes = ['owner', 'legalForm', 'wilaya', 'commune', 'activeUsers', 'suspendedBy', 'deactivatedBy', 'verifiedBy'];
+    public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
-    public static int    $defaultPerPage        = 20;
-    public static int    $perPageLimit          = 100;
-    public static ?int   $cacheTtl              = 300;
-    public static array  $cacheTags             = ['companies'];
-
-    // ── خطط الاشتراك ─────────────────────────────────────────────────────────
+    public static int $defaultPerPage = 20;
+    public static int $perPageLimit = 100;
+    public static ?int $cacheTtl = 300;
+    public static array $cacheTags = ['companies'];
 
     public const PLANS = [
         'free'         => ['max_users' => 3,   'max_warehouses' => 1,  'max_products' => 500],
@@ -1237,30 +810,21 @@ class Company extends Model
     ];
 
     public const MEMBER_ROLES = ['owner', 'admin', 'manager', 'member', 'viewer'];
-
-    // ── Role Constants (اختصارات للاستخدام في Policy / Service) ──────────────
     public const COMPANY_ROLE_OWNER   = 'owner';
     public const COMPANY_ROLE_ADMIN   = 'admin';
     public const COMPANY_ROLE_MANAGER = 'manager';
     public const COMPANY_ROLE_MEMBER  = 'member';
     public const COMPANY_ROLE_VIEWER  = 'viewer';
 
-    // ── Boot ──────────────────────────────────────────────────────────────────
-
     protected static function booted(): void
     {
         static::creating(function (self $company): void {
-            // توليد slug فريد تلقائياً
             if (empty($company->slug)) {
                 $company->slug = self::generateUniqueSlug($company->name);
             }
-
-            // تعيين created_by تلقائياً من المستخدم الحالي
             if (empty($company->created_by) && auth()->check()) {
                 $company->created_by = auth()->id();
             }
-
-            // تطبيق حدود الخطة الافتراضية
             $plan = $company->plan ?? 'free';
             if (isset(self::PLANS[$plan])) {
                 $limits = self::PLANS[$plan];
@@ -1268,22 +832,16 @@ class Company extends Model
                 $company->max_warehouses ??= $limits['max_warehouses'];
                 $company->max_products   ??= $limits['max_products'];
             }
-
-            // فترة التجربة 14 يوم للخطة المجانية
             if ($plan === 'free' && empty($company->trial_ends_at)) {
                 $company->trial_ends_at = now()->addDays(14);
             }
         });
     }
 
-    // ── Route Model Binding ───────────────────────────────────────────────────
-
     public function getRouteKeyName(): string
     {
         return 'slug';
     }
-
-    // ── Relations ─────────────────────────────────────────────────────────────
 
     public function owner(): BelongsTo
     {
@@ -1320,18 +878,16 @@ class Company extends Model
         return $this->belongsTo(User::class, 'verified_by');
     }
 
-    /** كل أعضاء الشركة عبر pivot */
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-            ->withPivot(['is_default', 'role', 'invited_by', 'joined_at', 'is_active'])
+            ->withPivot(['is_default', 'role', 'invited_by', 'joined_at', 'active'])
             ->withTimestamps();
     }
 
-    /** الأعضاء النشطون فقط */
     public function activeUsers(): BelongsToMany
     {
-        return $this->users()->wherePivot('is_active', true);
+        return $this->users()->wherePivot('active', true);
     }
 
     public function products(): HasMany
@@ -1364,11 +920,9 @@ class Company extends Model
         return $this->hasMany(Employee::class);
     }
 
-    // ── Scopes ────────────────────────────────────────────────────────────────
-
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('is_active', true)->whereNull('suspended_at');
+        return $query->where('active', true)->whereNull('suspended_at');
     }
 
     public function scopeSuspended(Builder $query): Builder
@@ -1378,7 +932,7 @@ class Company extends Model
 
     public function scopeDeactivated(Builder $query): Builder
     {
-        return $query->where('is_active', false);
+        return $query->where('active', false);
     }
 
     public function scopeVerified(Builder $query): Builder
@@ -1388,15 +942,12 @@ class Company extends Model
 
     public function scopeOnTrial(Builder $query): Builder
     {
-        return $query->whereNotNull('trial_ends_at')
-            ->where('trial_ends_at', '>', now());
+        return $query->whereNotNull('trial_ends_at')->where('trial_ends_at', '>', now());
     }
 
     public function scopeTrialExpired(Builder $query): Builder
     {
-        return $query->whereNotNull('trial_ends_at')
-            ->where('trial_ends_at', '<=', now())
-            ->where('plan', 'free');
+        return $query->whereNotNull('trial_ends_at')->where('trial_ends_at', '<=', now())->where('plan', 'free');
     }
 
     public function scopeOnPlan(Builder $query, string $plan): Builder
@@ -1404,12 +955,9 @@ class Company extends Model
         return $query->where('plan', $plan);
     }
 
-    // ── Accessors ─────────────────────────────────────────────────────────────
-
-    /** نشطة فعلاً: is_active=true وغير معلّقة */
     public function getIsOperationalAttribute(): bool
     {
-        return $this->is_active && is_null($this->suspended_at);
+        return $this->active && is_null($this->suspended_at);
     }
 
     public function getIsSuspendedAttribute(): bool
@@ -1443,8 +991,6 @@ class Company extends Model
         return $this->current_users_count >= $this->max_users;
     }
 
-    // ── Actions — يستدعيها CompanyService ────────────────────────────────────
-
     public function suspend(string $reason, int $byUserId): void
     {
         $this->update([
@@ -1466,7 +1012,7 @@ class Company extends Model
     public function deactivate(int $byUserId): void
     {
         $this->update([
-            'is_active'      => false,
+            'active'      => false,
             'deactivated_at' => now(),
             'deactivated_by' => $byUserId,
         ]);
@@ -1475,7 +1021,7 @@ class Company extends Model
     public function activate(): void
     {
         $this->update([
-            'is_active'         => true,
+            'active'         => true,
             'deactivated_at'    => null,
             'deactivated_by'    => null,
             'suspended_at'      => null,
@@ -1496,32 +1042,27 @@ class Company extends Model
 
     public function transferOwnership(int $newOwnerId): void
     {
-        User::findOrFail($newOwnerId); // يرمي ModelNotFoundException إن لم يجد
-
+        User::findOrFail($newOwnerId);
         if (!$this->users()->where('users.id', $newOwnerId)->exists()) {
             $this->users()->attach($newOwnerId, [
                 'is_default' => false,
                 'role'       => 'owner',
                 'joined_at'  => now(),
-                'is_active'  => true,
+                'active'  => true,
             ]);
         } else {
             $this->users()->updateExistingPivot($newOwnerId, ['role' => 'owner']);
         }
-
         if ($this->owner_id && $this->owner_id !== $newOwnerId) {
             $this->users()->updateExistingPivot($this->owner_id, ['role' => 'admin']);
         }
-
         $this->update(['owner_id' => $newOwnerId]);
     }
 
     public function upgradePlan(string $plan, ?array $customLimits = null): void
     {
         abort_unless(array_key_exists($plan, self::PLANS), 422, 'خطة غير معروفة');
-
         $limits = array_merge(self::PLANS[$plan], $customLimits ?? []);
-
         $this->update([
             'plan'           => $plan,
             'max_users'      => $limits['max_users'],
@@ -1532,18 +1073,13 @@ class Company extends Model
 
     public function addMember(int $userId, string $role = 'member', ?int $invitedBy = null): void
     {
-        abort_if(
-            $this->is_at_users_limit,
-            422,
-            "وصلت الشركة للحد الأقصى من المستخدمين ({$this->max_users})."
-        );
-
+        abort_if($this->is_at_users_limit, 422, "وصلت الشركة للحد الأقصى من المستخدمين ({$this->max_users}).");
         $this->users()->syncWithoutDetaching([
             $userId => [
                 'role'       => $role,
                 'invited_by' => $invitedBy,
                 'joined_at'  => now(),
-                'is_active'  => true,
+                'active'  => true,
             ],
         ]);
     }
@@ -1557,46 +1093,32 @@ class Company extends Model
     public function deactivateMember(int $userId): void
     {
         abort_if($userId === $this->owner_id, 422, 'لا يمكن تعطيل مالك الشركة.');
-        $this->users()->updateExistingPivot($userId, ['is_active' => false]);
+        $this->users()->updateExistingPivot($userId, ['active' => false]);
     }
 
     public function activateMember(int $userId): void
     {
-        $this->users()->updateExistingPivot($userId, ['is_active' => true]);
+        $this->users()->updateExistingPivot($userId, ['active' => true]);
     }
 
     public function changeMemberRole(int $userId, string $role): void
     {
-        abort_if(
-            $userId === $this->owner_id && $role !== 'owner',
-            422,
-            'لا يمكن تغيير دور المالك — استخدم transferOwnership().'
-        );
+        abort_if($userId === $this->owner_id && $role !== 'owner', 422, 'لا يمكن تغيير دور المالك — استخدم transferOwnership().');
         $this->users()->updateExistingPivot($userId, ['role' => $role]);
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     public static function generateUniqueSlug(string $name): string
     {
         $base = Str::slug($name);
-
-        // إذا كان الاسم عربياً بالكامل → Str::slug يُعيد string فارغ
         if (empty($base)) {
             $base = 'company-' . Str::random(6);
         }
-
         $slug = $base;
-        $i    = 1;
-
+        $i = 1;
         while (static::where('slug', $slug)->exists()) {
-            // نضيف suffix عشوائي لتجنب التخمين بعد المحاولة الثالثة
-            $slug = $i <= 3
-                ? "{$base}-{$i}"
-                : "{$base}-" . Str::random(6);
+            $slug = $i <= 3 ? "{$base}-{$i}" : "{$base}-" . Str::random(6);
             $i++;
         }
-
         return $slug;
     }
 
@@ -1611,15 +1133,10 @@ class Company extends Model
         data_set($settings, $key, $value);
         $this->update(['settings_json' => $settings]);
     }
-    /**
-     * تحديد ما إذا كان المستخدم المعطى هو مدير (Admin) في هذه الشركة.
-     */
+
     public function isAdmin(User $user): bool
     {
-        $pivot = $this->users()
-            ->where('user_id', $user->id)
-            ->first()?->pivot;
-
+        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
         return $pivot && in_array($pivot->role, ['owner', 'admin']);
     }
 }
@@ -1634,21 +1151,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * Currency Model
- *
- * Table: currencies
- * Manages different currencies used in the system
- */
 #[Cacheable]
 class Currency extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'currencies';
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'symbol',
@@ -1714,25 +1227,24 @@ class Currency extends Model
 
 
 
-
 // ===== ملف: DocumentBaseOperation.php =====
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
-// Core System
 use App\Core\Attributes\Cacheable;
-use App\Core\Traits\HashesId;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 #[Cacheable]
 class DocumentBaseOperation extends Model
 {
-    use HasFactory, HashesId, HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
+
+    protected $table = 'document_base_operations';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'description',
@@ -1745,15 +1257,13 @@ class DocumentBaseOperation extends Model
         'display_order' => 'integer',
     ];
 
-    // --- Core Config ---
     public static array $searchableFields = ['name', 'label'];
     public static array $filterable = ['active'];
     public static array $sortable = ['id', 'name', 'label', 'display_order'];
     public static array $allowedIncludes = ['documentTypes'];
-    public static ?int $cacheTtl = 86400; // 1 day
+    public static ?int $cacheTtl = 86400;
     public static array $cacheTags = ['document_base_operations', 'api'];
 
-    // --- العلاقات ---
     public function documentTypes(): HasMany
     {
         return $this->hasMany(DocumentType::class);
@@ -1762,23 +1272,17 @@ class DocumentBaseOperation extends Model
 
 
 
-
 // ===== ملف: DocumentPayment.php =====
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
-/**
- * DocumentPayment Pivot Model
- *
- * Table: document_payment
- * Many-to-many relationship between documents and payments
- */
 class DocumentPayment extends Pivot
 {
     protected $table = 'document_payment';
 
     protected $fillable = [
+        'company_id',
         'commercial_document_id',
         'payment_id',
         'amount_applied',
@@ -1794,36 +1298,32 @@ class DocumentPayment extends Pivot
 
 
 
-
 // ===== ملف: DocumentStatus.php =====
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * DocumentStatus Model
- *
- * Table: document_statuses
- * Manages commercial document statuses
- */
 #[Cacheable]
 class DocumentStatus extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'document_statuses';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'color',
+        'active',
     ];
 
     protected $casts = [
+        'active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -1841,13 +1341,7 @@ class DocumentStatus extends Model
     {
         return $this->hasMany(CommercialDocument::class);
     }
-
-    public function scopeByName(Builder $query, string $name): Builder
-    {
-        return $query->where('name', $name);
-    }
 }
-
 
 
 
@@ -1859,21 +1353,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * DocumentType Model
- *
- * Table: document_types
- * Defines types of commercial documents
- */
 #[Cacheable]
 class DocumentType extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'document_types';
 
     protected $fillable = [
+        'company_id',
         'name',
         'name_latin',
         'code',
@@ -1937,7 +1427,6 @@ class DocumentType extends Model
 
 
 
-
 // ===== ملف: Employee.php =====
 namespace App\Models;
 
@@ -1948,29 +1437,17 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
-use App\Models\Traits\HasCompany; // ✅ مضاف
+use App\Models\Traits\HasCompany;
 
-/**
- * Employee Model
- *
- * Table: employees
- *
- * ملاحظة: جدول employees يحتوي على company_id من migration الإنشاء،
- * لذا يجب أن يستخدم HasCompany trait لضمان عزل البيانات تلقائياً
- * عبر الـ Global Scope في بيئة Multi-Tenancy.
- */
 #[Cacheable]
 class Employee extends Model
 {
-    use HasStandardizedConfiguration,
-        HasCompany,   // ✅ مضاف — يطبق CompanyScope تلقائياً
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, HasCompany, SoftDeletes, Auditable;
 
     protected $table = 'employees';
 
     protected $fillable = [
-        'company_id',   // ✅ مضاف — مطلوب لـ HasCompany
+        'company_id',
         'matricule',
         'user_id',
         'first_name',
@@ -1983,34 +1460,33 @@ class Employee extends Model
         'hire_date',
         'termination_date',
         'employment_status',
+        'active',
         'created_by',
         'updated_by',
         'deleted_by',
     ];
 
     protected $casts = [
-        'birth_date'        => 'date',
-        'hire_date'         => 'date',
-        'termination_date'  => 'date',
-        'created_at'        => 'datetime',
-        'updated_at'        => 'datetime',
-        'deleted_at'        => 'datetime',
+        'birth_date' => 'date',
+        'hire_date' => 'date',
+        'termination_date' => 'date',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     public static array $searchableFields = ['matricule', 'first_name', 'last_name', 'nss'];
-    public static array $filterable       = ['gender_id', 'employment_status', 'company_id']; // ✅ أضفنا company_id
-    public static array $sortable         = ['id', 'matricule', 'first_name', 'last_name', 'hire_date'];
-    public static array $defaultWith      = [];
-    public static array $allowedIncludes  = ['user', 'gender', 'contracts', 'company']; // ✅ أضفنا company
-    public static string $defaultSort     = 'first_name';
-    public static ?int $cacheTtl          = 600;
-    public static array $cacheTags        = ['employees'];
-
-    // -------------------- Relations --------------------
+    public static array $filterable = ['gender_id', 'employment_status', 'company_id'];
+    public static array $sortable = ['id', 'matricule', 'first_name', 'last_name', 'hire_date'];
+    public static array $defaultWith = [];
+    public static array $allowedIncludes = ['user', 'gender', 'contracts', 'company'];
+    public static string $defaultSort = 'first_name';
+    public static ?int $cacheTtl = 600;
+    public static array $cacheTags = ['employees'];
 
     public function company(): BelongsTo
     {
-        return $this->belongsTo(Company::class); // ✅ علاقة مضافة
+        return $this->belongsTo(Company::class);
     }
 
     public function user(): BelongsTo
@@ -2027,22 +1503,26 @@ class Employee extends Model
     {
         return $this->hasMany(EmploymentContract::class);
     }
-
-    // -------------------- Accessors --------------------
+    // في Employee.php
+    protected static function booted()
+    {
+        static::creating(function ($employee) {
+            if (auth()->check()) {
+                $employee->created_by = auth()->id();
+            }
+        });
+    }
 
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
     }
 
-    // -------------------- Scopes --------------------
-
     public function scopeActive($query)
     {
         return $query->where('employment_status', 'active');
     }
 }
-
 
 
 
@@ -2053,20 +1533,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * EmploymentContract Model
- *
- * Table: employment_contracts
- */
 #[Cacheable]
 class EmploymentContract extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'employment_contracts';
 
     protected $fillable = [
+        'company_id',
         'employee_id',
         'contract_type',
         'start_date',
@@ -2074,20 +1551,20 @@ class EmploymentContract extends Model
         'base_salary',
         'job_title',
         'department',
-        'is_active',
+        'active',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
         'base_salary' => 'decimal:4',
-        'is_active' => 'boolean',
+        'active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
     public static array $searchableFields = ['job_title', 'department'];
-    public static array $filterable = ['employee_id', 'contract_type', 'is_active'];
+    public static array $filterable = ['employee_id', 'contract_type', 'active'];
     public static array $sortable = ['id', 'start_date', 'end_date', 'base_salary'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['employee'];
@@ -2103,36 +1580,31 @@ class EmploymentContract extends Model
 
     public function scopeActive($query)
     {
-        return $query->where('is_active', true);
+        return $query->where('active', true);
     }
 }
 
 
 
-
-
 // ===== ملف: ExchangeRate.php =====
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * ExchangeRate Model
- *
- * Table: exchange_rates
- * Currency exchange rates
- */
 #[Cacheable]
 class ExchangeRate extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'exchange_rates';
 
     protected $fillable = [
+        'company_id',
         'from_currency_id',
         'to_currency_id',
         'rate',
@@ -2187,7 +1659,6 @@ class ExchangeRate extends Model
 
 
 
-
 // ===== ملف: Expense.php =====
 namespace App\Models;
 
@@ -2202,25 +1673,15 @@ use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
 
-/**
- * Expense Model
- *
- * Table: expenses
- * Tracks business expenses and operational costs
- */
 #[Cacheable]
 class Expense extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        HasCompany,
-        Auditable,
-        BelongsToFiscalYear;
+    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, BelongsToFiscalYear;
 
     protected $table = 'expenses';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'expense_number',
         'date',
         'amount',
@@ -2237,7 +1698,6 @@ class Expense extends Model
         'is_recurring',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'date' => 'date',
         'amount' => 'decimal:4',
@@ -2249,77 +1709,25 @@ class Expense extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'expense_number',
-        'description',
-        'reference',
-    ];
-
-    /** @var array الفلاتر المسموحة */
+    public static array $searchableFields = ['expense_number', 'description', 'reference'];
     public static array $filterable = [
-        'expense_category_id',
-        'fiscal_year_id',
-        'payment_mode_id',
-        'treasury_account_id',
-        'party_id',
-        'status',
-        'is_paid',
-        'is_recurring',
+        'expense_category_id', 'fiscal_year_id', 'payment_mode_id',
+        'treasury_account_id', 'party_id', 'status', 'is_paid', 'is_recurring'
     ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'expense_number',
-        'date',
-        'amount',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $sortable = ['id', 'expense_number', 'date', 'amount', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'expenseCategory',
-        'fiscalYear',
-        'paymentMode',
-        'treasuryAccount',
-        'party',
-        'attachments',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
+        'expenseCategory', 'fiscalYear', 'paymentMode', 'treasuryAccount',
+        'party', 'attachments', 'createdBy', 'updatedBy', 'deletedBy'
     ];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'date';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'desc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 0;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['expenses'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
-
-    // -------------------- Relations --------------------
 
     public function expenseCategory(): BelongsTo
     {
@@ -2351,8 +1759,6 @@ class Expense extends Model
         return $this->morphMany(Attachment::class, 'attachable');
     }
 
-    // -------------------- Scopes --------------------
-
     public function scopePaid(Builder $query): Builder
     {
         return $query->where('is_paid', true);
@@ -2376,7 +1782,6 @@ class Expense extends Model
 
 
 
-
 // ===== ملف: ExpenseCategory.php =====
 namespace App\Models;
 
@@ -2388,23 +1793,17 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
-/**
- * ExpenseCategory Model
- *
- * Table: expense_categories
- * Categorizes business expenses
- */
 #[Cacheable]
 class ExpenseCategory extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
 
     protected $table = 'expense_categories';
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',
@@ -2463,7 +1862,6 @@ class ExpenseCategory extends Model
 
 
 
-
 // ===== ملف: Family.php =====
 namespace App\Models;
 
@@ -2476,23 +1874,17 @@ use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
+use App\Models\Traits\HasCompany;
 
-/**
- * Family Model
- *
- * Table: families
- * Hierarchical product categories/families
- */
 #[Cacheable]
 class Family extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
 
     protected $table = 'families';
 
     protected $fillable = [
+        'company_id',
         'name',
         'slug',
         'description',
@@ -2562,24 +1954,23 @@ class Family extends Model
 
 
 
-
 // ===== ملف: FiscalStamp.php =====
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
-// Core System
 use App\Core\Attributes\Cacheable;
-use App\Core\Traits\HashesId;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 #[Cacheable]
 class FiscalStamp extends Model
 {
-    use HasFactory, HashesId, HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
+
+    protected $table = 'fiscal_stamps';
 
     protected $fillable = [
+        'company_id',
         'name',
         'min_amount',
         'max_amount',
@@ -2599,15 +1990,13 @@ class FiscalStamp extends Model
         'valid_to' => 'date',
     ];
 
-    // --- Core Config ---
     public static array $searchableFields = ['name', 'stamp_value', 'type'];
     public static array $filterable = ['active', 'type', 'valid_from', 'valid_to'];
     public static array $sortable = ['id', 'name', 'stamp_value', 'min_amount'];
     public static array $allowedIncludes = [];
-    public static ?int $cacheTtl = 86400; // 1 day
+    public static ?int $cacheTtl = 86400;
     public static array $cacheTags = ['fiscal_stamps', 'api'];
 }
-
 
 
 
@@ -2622,23 +2011,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * FiscalYear Model
- *
- * Table: fiscal_years
- * Manages fiscal/financial years for accounting periods
- */
 #[Cacheable]
 class FiscalYear extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'fiscal_years';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'name',
         'start_date',
         'end_date',
@@ -2649,7 +2030,6 @@ class FiscalYear extends Model
         'closing_notes',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
@@ -2660,65 +2040,22 @@ class FiscalYear extends Model
         'updated_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
     public static array $searchableFields = ['name'];
-
-    /** @var array الفلاتر المسموحة */
-    public static array $filterable = [
-        'is_closed',
-        'is_current',
-    ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'name',
-        'start_date',
-        'end_date',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $filterable = ['is_closed', 'is_current'];
+    public static array $sortable = ['id', 'name', 'start_date', 'end_date', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'closedBy',
-        'commercialDocuments',
-        'stockMovements',
-        'payments',
-        'expenses',
-        'openingBalancesStock',
-        'openingBalancesParties',
+        'closedBy', 'commercialDocuments', 'stockMovements', 'payments',
+        'expenses', 'openingBalancesStock', 'openingBalancesParties'
     ];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'start_date';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'desc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 3600;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['fiscal_years'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
-
-    // -------------------- Relations --------------------
 
     public function closedBy(): BelongsTo
     {
@@ -2755,8 +2092,6 @@ class FiscalYear extends Model
         return $this->hasMany(OpeningBalanceParty::class);
     }
 
-    // -------------------- Scopes --------------------
-
     public function scopeCurrent(Builder $query): Builder
     {
         return $query->where('is_current', true);
@@ -2772,14 +2107,11 @@ class FiscalYear extends Model
         return $query->where('is_closed', true);
     }
 
-    // -------------------- Helpers --------------------
-
     public function close(int $userId, ?string $notes = null): bool
     {
         if ($this->is_closed) {
             return false;
         }
-
         return $this->update([
             'is_closed' => true,
             'closed_at' => now(),
@@ -2791,9 +2123,7 @@ class FiscalYear extends Model
 
     public function setCurrent(): bool
     {
-        // Set all other years as non-current
         static::where('id', '!=', $this->id)->update(['is_current' => false]);
-
         return $this->update(['is_current' => true]);
     }
 
@@ -2805,36 +2135,29 @@ class FiscalYear extends Model
 
 
 
-
 // ===== ملف: Gender.php =====
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * Gender Model
- *
- * Table: genders
- * Represents gender lookup data
- */
 #[Cacheable]
 class Gender extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'genders';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'active',
         'display_order',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'active' => 'boolean',
         'display_order' => 'integer',
@@ -2842,60 +2165,25 @@ class Gender extends Model
         'updated_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
     public static array $searchableFields = ['name', 'label'];
-
-    /** @var array الفلاتر المسموحة */
     public static array $filterable = ['active'];
-
-    /** @var array حقول الترتيب */
     public static array $sortable = ['id', 'name', 'display_order', 'created_at'];
-
-    /** @var array العلاقات المحملة دائماً */
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'display_order';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'asc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
-    public static ?int $cacheTtl = 3600; // 1 hour for lookup tables
-
-    /** @var array تاجات الكاش */
+    public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['genders', 'lookups'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = ['active'];
 
-    // -------------------- Relations --------------------
-
-    /**
-     * Get users with this gender
-     */
     public function users()
     {
         return $this->hasMany(User::class);
     }
 
-    /**
-     * Get employees with this gender
-     */
     public function employees()
     {
         return $this->hasMany(Employee::class);
@@ -2904,38 +2192,42 @@ class Gender extends Model
 
 
 
-
 // ===== ملف: InventoryValuationMethod.php =====
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
-use App\Core\Traits\HashesId;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 #[Cacheable]
 class InventoryValuationMethod extends Model
 {
-    use HasFactory, HashesId, HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
+
+    protected $table = 'inventory_valuation_methods';
 
     protected $fillable = [
-        'name', 'method', 'is_default',
+        'company_id',
+        'name',
+        'method',
+        'is_default',
+        'active',
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
+        'active' => 'boolean',
     ];
 
     public static array $searchableFields = ['name', 'method'];
     public static array $filterable = ['is_default', 'method'];
     public static array $sortable = ['id', 'name', 'method'];
-    public static array $allowedIncludes = ['products']; // ✅ تعديل: بدلاً من productVariants
+    public static array $allowedIncludes = ['products'];
     public static ?int $cacheTtl = 86400;
     public static array $cacheTags = ['inventory_valuation_methods', 'api'];
 
-    // ✅ العلاقة مع المنتجات مباشرة
     public function products(): HasMany
     {
         return $this->hasMany(Product::class, 'valuation_method_id');
@@ -2956,7 +2248,6 @@ class Job extends Model
 
 
 
-
 // ===== ملف: LegalForm.php =====
 namespace App\Models;
 
@@ -2964,21 +2255,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * LegalForm Model
- *
- * Table: legal_forms
- * Legal forms for companies (SARL, EURL, SPA, etc.)
- */
 #[Cacheable]
 class LegalForm extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'legal_forms';
 
     protected $fillable = [
+        'company_id',
         'code',
         'name',
         'description',
@@ -3007,7 +2294,6 @@ class LegalForm extends Model
         return $this->hasMany(Party::class);
     }
 }
-
 
 
 
@@ -3044,7 +2330,6 @@ class LoginAttempt extends Model
     public static function record(string $email, bool $success, ?string $ip = null): self
     {
         $user = User::where('email', $email)->first();
-
         return static::create([
             'user_id' => $user?->id,
             'email' => $email,
@@ -3079,25 +2364,17 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * Notification Model
- *
- * Table: notifications
- * System notifications
- */
 class Notification extends Model
 {
-    use
-    HasCompany,
-    HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'notifications';
 
     public $incrementing = false;
-
     protected $keyType = 'string';
 
     protected $fillable = [
+        'company_id',
         'type',
         'notifiable_type',
         'notifiable_id',
@@ -3139,19 +2416,13 @@ class Notification extends Model
 
     public function markAsRead(): bool
     {
-        if ($this->read_at) {
-            return false;
-        }
-
+        if ($this->read_at) return false;
         return $this->forceFill(['read_at' => now()])->save();
     }
 
     public function markAsUnread(): bool
     {
-        if (!$this->read_at) {
-            return false;
-        }
-
+        if (!$this->read_at) return false;
         return $this->forceFill(['read_at' => null])->save();
     }
 
@@ -3160,7 +2431,6 @@ class Notification extends Model
         return is_null($this->read_at);
     }
 }
-
 
 
 
@@ -3175,22 +2445,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * NumberingSeries Model
- *
- * Table: numbering_series
- * Manages automatic numbering sequences for documents
- */
 #[Cacheable]
 class NumberingSeries extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'numbering_series';
 
     protected $fillable = [
+        'company_id',
         'document_type_id',
         'warehouse_id',
         'prefix',
@@ -3259,7 +2522,6 @@ class NumberingSeries extends Model
         $currentYear = now()->year;
         $currentMonth = now()->month;
 
-        // Check if reset is needed
         if ($this->reset_yearly && $this->current_year != $currentYear) {
             $this->resetSequence($currentYear, $currentMonth);
         } elseif ($this->reset_monthly && $this->current_month != $currentMonth) {
@@ -3268,7 +2530,6 @@ class NumberingSeries extends Model
 
         $nextNumber = $this->last_number + 1;
 
-        // Check max_number constraint
         if ($this->max_number && $nextNumber > $this->max_number) {
             throw new \Exception("Numbering series has reached its maximum number ({$this->max_number})");
         }
@@ -3302,7 +2563,6 @@ class NumberingSeries extends Model
     protected function formatNumber(int $number): string
     {
         $paddedNumber = str_pad($number, $this->padding, '0', STR_PAD_LEFT);
-
         $formatted = $this->format;
         $formatted = str_replace('{PREFIX}', $this->prefix, $formatted);
         $formatted = str_replace('{SUFFIX}', $this->suffix ?? '', $formatted);
@@ -3322,7 +2582,6 @@ class NumberingSeries extends Model
 
 
 
-
 // ===== ملف: OpeningBalanceParty.php =====
 namespace App\Models;
 
@@ -3332,22 +2591,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * OpeningBalanceParty Model
- *
- * Table: opening_balances_parties
- * Opening balances for parties (customers/suppliers)
- */
 #[Cacheable]
 class OpeningBalanceParty extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'opening_balances_parties';
 
     protected $fillable = [
+        'company_id',
         'fiscal_year_id',
         'party_id',
         'opening_balance',
@@ -3392,7 +2644,6 @@ class OpeningBalanceParty extends Model
 
 
 
-
 // ===== ملف: OpeningBalanceStock.php =====
 namespace App\Models;
 
@@ -3405,19 +2656,27 @@ use App\Models\Traits\HasCompany;
 #[Cacheable]
 class OpeningBalanceStock extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'opening_balances_stock';
 
     protected $fillable = [
-        'fiscal_year_id', 'product_id', 'warehouse_id', 'opening_quantity', 'opening_value',
+        'company_id',
+        'fiscal_year_id',
+        'product_id',
+        'warehouse_id',
+        'opening_quantity',
+        'opening_value',
+        'lot_number',
+        'manufacturing_date',
+        'expiration_date',
     ];
 
     protected $casts = [
         'opening_quantity' => 'decimal:3',
         'opening_value' => 'decimal:4',
+        'manufacturing_date' => 'date',
+        'expiration_date' => 'date',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -3426,7 +2685,7 @@ class OpeningBalanceStock extends Model
     public static array $filterable = ['fiscal_year_id', 'product_id', 'warehouse_id'];
     public static array $sortable = ['id', 'opening_quantity', 'opening_value'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['fiscalYear', 'product', 'warehouse']; // ✅ تعديل
+    public static array $allowedIncludes = ['fiscalYear', 'product', 'warehouse'];
     public static string $defaultSort = 'product_id';
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['opening_balances_stock'];
@@ -3436,7 +2695,6 @@ class OpeningBalanceStock extends Model
         return $this->belongsTo(FiscalYear::class);
     }
 
-    // ✅ العلاقة مع المنتج مباشرة (بدلاً من productVariant)
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
@@ -3458,7 +2716,6 @@ class OpeningBalanceStock extends Model
 
 
 
-
 // ===== ملف: Party.php =====
 namespace App\Models;
 
@@ -3472,24 +2729,15 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
 
-/**
- * Party Model
- *
- * Table: parties
- * Manages customers, suppliers, and business partners
- */
 #[Cacheable]
 class Party extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        HasCompany,
-        Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable;
 
     protected $table = 'parties';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'party_type_id',
         'code',
         'name',
@@ -3529,7 +2777,6 @@ class Party extends Model
         'active',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'capital_amount' => 'decimal:4',
         'rc_date' => 'date',
@@ -3548,244 +2795,72 @@ class Party extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Hidden --------------------
-    protected $hidden = [];
-
-    // -------------------- Appends --------------------
-    protected $appends = [];
-
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'name',
-        'commercial_name',
-        'code',
-        'nif',
-        'rc',
-        'email',
-        'phone',
-        'mobile',
-        'address',
-    ];
-
-    /** @var array الفلاتر المسموحة */
+    public static array $searchableFields = ['name', 'commercial_name', 'code', 'nif', 'rc', 'email', 'phone', 'mobile', 'address'];
     public static array $filterable = [
-        'party_type_id',
-        'legal_form_id',
-        'commune_id',
-        'wilaya_id',
-        'default_price_level_id',
-        'is_tva_exempt',
-        'is_taxable',
-        'is_final_consumer',
-        'is_vat_registered',
-        'active',
+        'party_type_id', 'legal_form_id', 'commune_id', 'wilaya_id', 'default_price_level_id',
+        'is_tva_exempt', 'is_taxable', 'is_final_consumer', 'is_vat_registered', 'active'
     ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'code',
-        'name',
-        'commercial_name',
-        'created_at',
-        'updated_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $sortable = ['id', 'code', 'name', 'commercial_name', 'created_at', 'updated_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'partyType',
-        'legalForm',
-        'commune',
-        'wilaya',
-        'defaultPriceLevel',
-        'commercialDocuments',
-        'payments',
-        'openingBalances',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
+        'partyType', 'legalForm', 'commune', 'wilaya', 'defaultPriceLevel',
+        'commercialDocuments', 'payments', 'openingBalances', 'createdBy', 'updatedBy', 'deletedBy'
     ];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'name';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'asc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 300;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['parties'];
-
-    /** @var array الموديلات المرتبطة */
-    public static array $cacheInvalidateRelations = [
-        'commercialDocuments',
-        'payments',
-    ];
-
-    /** @var array Scopes التلقائية */
+    public static array $cacheInvalidateRelations = ['commercialDocuments', 'payments'];
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
+    public function partyType(): BelongsTo { return $this->belongsTo(PartyType::class); }
+    public function legalForm(): BelongsTo { return $this->belongsTo(LegalForm::class); }
+    public function commune(): BelongsTo { return $this->belongsTo(Commune::class); }
+    public function wilaya(): BelongsTo { return $this->belongsTo(Wilaya::class); }
+    public function defaultPriceLevel(): BelongsTo { return $this->belongsTo(PriceLevel::class, 'default_price_level_id'); }
+    public function commercialDocuments(): HasMany { return $this->hasMany(CommercialDocument::class); }
+    public function payments(): HasMany { return $this->hasMany(Payment::class); }
+    public function openingBalances(): HasMany { return $this->hasMany(OpeningBalanceParty::class); }
+    public function checks(): HasMany { return $this->hasMany(Check::class); }
 
-    /**
-     * Get the party type
-     */
-    public function partyType(): BelongsTo
-    {
-        return $this->belongsTo(PartyType::class);
-    }
-
-    /**
-     * Get the legal form
-     */
-    public function legalForm(): BelongsTo
-    {
-        return $this->belongsTo(LegalForm::class);
-    }
-
-    /**
-     * Get the commune
-     */
-    public function commune(): BelongsTo
-    {
-        return $this->belongsTo(Commune::class);
-    }
-
-    /**
-     * Get the wilaya
-     */
-    public function wilaya(): BelongsTo
-    {
-        return $this->belongsTo(Wilaya::class);
-    }
-
-    /**
-     * Get the default price level
-     */
-    public function defaultPriceLevel(): BelongsTo
-    {
-        return $this->belongsTo(PriceLevel::class, 'default_price_level_id');
-    }
-
-    /**
-     * Get commercial documents for this party
-     */
-    public function commercialDocuments(): HasMany
-    {
-        return $this->hasMany(CommercialDocument::class);
-    }
-
-    /**
-     * Get payments for this party
-     */
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
-    }
-
-    /**
-     * Get opening balances
-     */
-    public function openingBalances(): HasMany
-    {
-        return $this->hasMany(OpeningBalanceParty::class);
-    }
-
-    /**
-     * Get checks issued by this party
-     */
-    public function checks(): HasMany
-    {
-        return $this->hasMany(Check::class);
-    }
-
-    // -------------------- Scopes --------------------
-
-    /**
-     * Scope for customers only
-     */
     public function scopeCustomers(Builder $query): Builder
     {
-        return $query->whereHas('partyType', function ($q) {
-            $q->whereIn('name', ['client', 'both']);
-        });
+        return $query->whereHas('partyType', fn($q) => $q->whereIn('name', ['client', 'both']));
     }
 
-    /**
-     * Scope for suppliers only
-     */
     public function scopeSuppliers(Builder $query): Builder
     {
-        return $query->whereHas('partyType', function ($q) {
-            $q->whereIn('name', ['supplier', 'both']);
-        });
+        return $query->whereHas('partyType', fn($q) => $q->whereIn('name', ['supplier', 'both']));
     }
 
-    /**
-     * Scope for VAT registered parties
-     */
     public function scopeVatRegistered(Builder $query): Builder
     {
         return $query->where('is_vat_registered', true);
     }
 
-    // -------------------- Accessors --------------------
-
-    /**
-     * Get full address
-     */
     public function getFullAddressAttribute(): string
     {
-        $parts = array_filter([
-            $this->address,
-            $this->commune?->name,
-            $this->wilaya?->name,
-        ]);
-
+        $parts = array_filter([$this->address, $this->commune?->name, $this->wilaya?->name]);
         return implode(', ', $parts);
     }
 
-    /**
-     * Get current balance (to be calculated from transactions)
-     */
     public function getCurrentBalanceAttribute(): float
     {
-        // يمكن حساب الرصيد الحالي من المستندات والمدفوعات
-        return 0.00; // TODO: Implement balance calculation
+        return 0.00; // سيتم تنفيذه لاحقاً
     }
 
-    // -------------------- Helpers --------------------
-
-    /**
-     * Check if party is a customer
-     */
     public function isCustomer(): bool
     {
         return in_array($this->partyType?->name, ['client', 'both']);
     }
 
-    /**
-     * Check if party is a supplier
-     */
     public function isSupplier(): bool
     {
         return in_array($this->partyType?->name, ['supplier', 'both']);
     }
 }
-
 
 
 
@@ -3796,21 +2871,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * PartyType Model
- *
- * Table: party_types
- * Lookup table for party types (customer, supplier, both)
- */
 #[Cacheable]
 class PartyType extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'party_types';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'description',
@@ -3842,7 +2913,6 @@ class PartyType extends Model
 
 
 
-
 // ===== ملف: Payment.php =====
 namespace App\Models;
 
@@ -3857,25 +2927,15 @@ use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
 
-/**
- * Payment Model
- *
- * Table: payments
- * Manages all payment transactions
- */
 #[Cacheable]
 class Payment extends Model
 {
-    use HasStandardizedConfiguration,
-        SoftDeletes,
-        HasCompany,
-        Auditable,
-        BelongsToFiscalYear;
+    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, BelongsToFiscalYear;
 
     protected $table = 'payments';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'payment_number',
         'payment_date',
         'amount',
@@ -3896,7 +2956,6 @@ class Payment extends Model
         'user_id',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'payment_date' => 'date',
         'amount' => 'decimal:4',
@@ -3909,116 +2968,33 @@ class Payment extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'payment_number',
-        'reference',
-        'bank_reference',
-        'notes',
-    ];
-
-    /** @var array الفلاتر المسموحة */
+    public static array $searchableFields = ['payment_number', 'reference', 'bank_reference', 'notes'];
     public static array $filterable = [
-        'payment_mode_id',
-        'treasury_account_id',
-        'check_id',
-        'party_id',
-        'fiscal_year_id',
-        'currency_id',
-        'user_id',
-        'status',
-        'is_reconciled',
+        'payment_mode_id', 'treasury_account_id', 'check_id', 'party_id',
+        'fiscal_year_id', 'currency_id', 'user_id', 'status', 'is_reconciled'
     ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'payment_number',
-        'payment_date',
-        'amount',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $sortable = ['id', 'payment_number', 'payment_date', 'amount', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'currency',
-        'paymentMode',
-        'treasuryAccount',
-        'check',
-        'party',
-        'fiscalYear',
-        'user',
-        'commercialDocuments',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
+        'currency', 'paymentMode', 'treasuryAccount', 'check', 'party',
+        'fiscalYear', 'user', 'commercialDocuments', 'createdBy', 'updatedBy', 'deletedBy'
     ];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'payment_date';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'desc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 0;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['payments'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = ['commercialDocuments'];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
-
-    public function currency(): BelongsTo
-    {
-        return $this->belongsTo(Currency::class);
-    }
-
-    public function paymentMode(): BelongsTo
-    {
-        return $this->belongsTo(PaymentMode::class);
-    }
-
-    public function treasuryAccount(): BelongsTo
-    {
-        return $this->belongsTo(TreasuryAccount::class);
-    }
-
-    public function check(): BelongsTo
-    {
-        return $this->belongsTo(Check::class);
-    }
-
-    public function party(): BelongsTo
-    {
-        return $this->belongsTo(Party::class);
-    }
-
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FiscalYear::class);
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
+    public function currency(): BelongsTo { return $this->belongsTo(Currency::class); }
+    public function paymentMode(): BelongsTo { return $this->belongsTo(PaymentMode::class); }
+    public function treasuryAccount(): BelongsTo { return $this->belongsTo(TreasuryAccount::class); }
+    public function check(): BelongsTo { return $this->belongsTo(Check::class); }
+    public function party(): BelongsTo { return $this->belongsTo(Party::class); }
+    public function fiscalYear(): BelongsTo { return $this->belongsTo(FiscalYear::class); }
+    public function user(): BelongsTo { return $this->belongsTo(User::class); }
 
     public function commercialDocuments(): BelongsToMany
     {
@@ -4027,29 +3003,10 @@ class Payment extends Model
             ->withTimestamps();
     }
 
-    // -------------------- Scopes --------------------
-
-    public function scopeConfirmed(Builder $query): Builder
-    {
-        return $query->where('status', 'confirmed');
-    }
-
-    public function scopePending(Builder $query): Builder
-    {
-        return $query->where('status', 'pending');
-    }
-
-    public function scopeReconciled(Builder $query): Builder
-    {
-        return $query->where('is_reconciled', true);
-    }
-
-    public function scopeUnreconciled(Builder $query): Builder
-    {
-        return $query->where('is_reconciled', false);
-    }
-
-    // -------------------- Helpers --------------------
+    public function scopeConfirmed(Builder $query): Builder { return $query->where('status', 'confirmed'); }
+    public function scopePending(Builder $query): Builder { return $query->where('status', 'pending'); }
+    public function scopeReconciled(Builder $query): Builder { return $query->where('is_reconciled', true); }
+    public function scopeUnreconciled(Builder $query): Builder { return $query->where('is_reconciled', false); }
 
     public function getTotalApplied(): float
     {
@@ -4069,7 +3026,6 @@ class Payment extends Model
 
 
 
-
 // ===== ملف: PaymentMode.php =====
 namespace App\Models;
 
@@ -4078,21 +3034,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * PaymentMode Model
- *
- * Table: payment_modes
- * Payment methods (cash, check, transfer, etc.)
- */
 #[Cacheable]
 class PaymentMode extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'payment_modes';
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',
@@ -4139,24 +3091,18 @@ class PaymentMode extends Model
 
 
 
-
 // ===== ملف: Permission.php =====
 namespace App\Models;
-
 
 use Spatie\Permission\Models\Permission as SpatiePermission;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * Permission Model (extends Spatie)
- *
- * Table: permissions
- */
 class Permission extends SpatiePermission
 {
     use HasStandardizedConfiguration;
 
     protected $fillable = [
+        'company_id',
         'name',
         'guard_name',
         'display_name',
@@ -4165,7 +3111,7 @@ class Permission extends SpatiePermission
     ];
 
     public static array $searchableFields = ['name', 'display_name', 'description'];
-    public static array $filterable = ['guard_name', 'group'];
+    public static array $filterable = ['guard_name', 'group', 'company_id'];
     public static array $sortable = ['id', 'name', 'display_name', 'group'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['roles'];
@@ -4181,7 +3127,6 @@ class Permission extends SpatiePermission
 
 
 
-
 // ===== ملف: PersonalAccessToken.php =====
 namespace App\Models;
 
@@ -4194,7 +3139,6 @@ class PersonalAccessToken extends Model
 
 
 
-
 // ===== ملف: PriceLevel.php =====
 namespace App\Models;
 
@@ -4202,23 +3146,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * PriceLevel Model
- *
- * Table: price_levels
- * Different pricing tiers for products
- */
 #[Cacheable]
 class PriceLevel extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'price_levels';
 
     protected $fillable = [
+        'company_id',
         'name',
         'description',
+        'is_default',
         'is_percentage',
         'value',
         'active',
@@ -4226,6 +3167,7 @@ class PriceLevel extends Model
     ];
 
     protected $casts = [
+        'is_default' => 'boolean',
         'is_percentage' => 'boolean',
         'value' => 'decimal:2',
         'active' => 'boolean',
@@ -4235,7 +3177,7 @@ class PriceLevel extends Model
     ];
 
     public static array $searchableFields = ['name', 'description'];
-    public static array $filterable = ['active', 'is_percentage'];
+    public static array $filterable = ['active', 'is_percentage', 'is_default'];
     public static array $sortable = ['id', 'name', 'display_order'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['productPrices', 'parties'];
@@ -4258,11 +3200,9 @@ class PriceLevel extends Model
         if ($this->is_percentage) {
             return $basePrice * (1 + $this->value / 100);
         }
-
         return $basePrice + $this->value;
     }
 }
-
 
 
 
@@ -4272,6 +3212,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
@@ -4279,20 +3220,7 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
-/**
- * Product — النموذج الموحد (منتج + SKU في جدول واحد)
- *
- * العلاقات:
- *   packagings       → product_packagings   (Colisages)
- *   prices           → product_prices       (Tarifs)
- *   quantityDiscounts→ quantity_discounts   (Tx Remise)
- *   stockMovements   → stock_movements
- *   lots             → product_lots
- *   documentLines    → commercial_document_lines
- *   openingBalances  → opening_balances_stock
- */
 #[Cacheable]
 class Product extends Model
 {
@@ -4301,373 +3229,159 @@ class Product extends Model
     protected $table = 'products';
 
     protected $fillable = [
-        // معلومات أساسية
-        'name',
-        'slug',
-        'ref',
-        'barcode',
-        'description',
-
-        // تصنيف
-        'family_id',
-        'brand_id',
-        'product_type_id',
-
-        // ضريبة ووحدة
-        'tva_id',
-        'unit_id',
-
-        // تسعير
-        'purchase_price_ht',
-        'current_cost_price',
-
-        // مخزون
-        'manages_stock',
-        'allow_negative_stock',
-        'has_lots',
-        'has_expiration_date',
-        'min_stock_alert',
-        'max_stock_alert',
-        'manages_quantity_discounts',
-
-        // تقييم المخزون
+        'company_id',
+        'name', 'slug', 'ref', 'barcode', 'description',
+        'family_id', 'brand_id', 'product_type_id',
+        'tva_id', 'unit_id',
+        'purchase_price_ht', 'current_cost_price',
+        'manages_stock', 'allow_negative_stock', 'has_lots', 'has_expiration_date',
+        'min_stock_alert', 'max_stock_alert', 'manages_quantity_discounts',
         'valuation_method_id',
-
-        // أبعاد
-        'weight',
-        'volume',
-        'length',
-        'width',
-        'height',
-
-        // بيانات مرنة
-        'specifications',
-        'images',
-        'meta_title',
-        'meta_description',
-        'meta_keywords',
-
+        'weight', 'volume', 'length', 'width', 'height',
+        'specifications', 'images', 'meta_title', 'meta_description', 'meta_keywords',
         'active',
     ];
 
     protected $casts = [
-        'specifications'             => 'array',
-        'images'                     => 'array',
-        'meta_keywords'              => 'array',
-        'active'                     => 'boolean',
-        'manages_stock'              => 'boolean',
-        'allow_negative_stock'       => 'boolean',
-        'has_lots'                   => 'boolean',
-        'has_expiration_date'        => 'boolean',
+        'specifications' => 'array',
+        'images' => 'array',
+        'meta_keywords' => 'array',
+        'active' => 'boolean',
+        'manages_stock' => 'boolean',
+        'allow_negative_stock' => 'boolean',
+        'has_lots' => 'boolean',
+        'has_expiration_date' => 'boolean',
         'manages_quantity_discounts' => 'boolean',
-        'purchase_price_ht'          => 'decimal:4',
-        'min_stock_alert'            => 'decimal:4',
-        'max_stock_alert'            => 'decimal:4',
-        'weight'                     => 'decimal:2',
-        'volume'                     => 'decimal:2',
-        'length'                     => 'decimal:2',
-        'width'                      => 'decimal:2',
-        'height'                     => 'decimal:2',
-        'created_at'                 => 'datetime',
-        'updated_at'                 => 'datetime',
-        'deleted_at'                 => 'datetime',
+        'purchase_price_ht' => 'decimal:4',
+        'current_cost_price' => 'decimal:4',
+        'min_stock_alert' => 'decimal:4',
+        'max_stock_alert' => 'decimal:4',
+        'weight' => 'decimal:2',
+        'volume' => 'decimal:2',
+        'length' => 'decimal:2',
+        'width' => 'decimal:2',
+        'height' => 'decimal:2',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     protected $appends = ['current_stock', 'is_low_stock'];
 
-    // ── Configuration ──
-
     public static array $searchableFields = ['name', 'ref', 'barcode', 'description'];
-
     public static array $filterable = [
-        'family_id',
-        'brand_id',
-        'product_type_id',
-        'tva_id',
-        'unit_id',
-        'valuation_method_id',
-        'manages_stock',
-        'has_lots',
-        'has_expiration_date',
-        'manages_quantity_discounts',
-        'active',
+        'family_id', 'brand_id', 'product_type_id', 'tva_id', 'unit_id', 'valuation_method_id',
+        'manages_stock', 'has_lots', 'has_expiration_date', 'manages_quantity_discounts', 'active'
     ];
-
-    public static array $sortable = [
-        'id',
-        'name',
-        'ref',
-        'purchase_price_ht',
-        'created_at',
-        'updated_at',
-    ];
-
-    public static array $defaultWith  = [];
+    public static array $sortable = ['id', 'name', 'ref', 'purchase_price_ht', 'created_at', 'updated_at'];
+    public static array $defaultWith = [];
     public static array $allowedIncludes = [
-        'family',
-        'brand',
-        'productType',
-        'tva',
-        'unit',
-        'valuationMethod',
-        'packagings',
-        'prices',
-        'prices.priceLevel',
-        'quantityDiscounts',
-        'quantityDiscounts.priceLevel',
-        'stockMovements',
-        'lots',
-        'documentLines',
-        'openingBalances',
+        'family', 'brand', 'productType', 'tva', 'unit', 'valuationMethod',
+        'packagings', 'prices', 'prices.priceLevel', 'quantityDiscounts', 'quantityDiscounts.priceLevel',
+        'stockMovements', 'lots', 'documentLines', 'openingBalances', 'barcodes', 'primaryBarcode'
     ];
-
-    public static string $defaultSort          = 'name';
+    public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
-    public static int    $defaultPerPage        = 15;
-    public static int    $perPageLimit          = 100;
-    public static ?int   $cacheTtl              = 300;
-    public static array  $cacheTags             = ['products'];
+    public static int $defaultPerPage = 15;
+    public static int $perPageLimit = 100;
+    public static ?int $cacheTtl = 300;
+    public static array $cacheTags = ['products'];
 
-    // ── Relations ──
+    // Relations
+    public function family(): BelongsTo { return $this->belongsTo(Family::class); }
+    public function brand(): BelongsTo { return $this->belongsTo(Brand::class); }
+    public function variants() { return $this->hasMany(ProductVariant::class); }
+    public function productType(): BelongsTo { return $this->belongsTo(ProductType::class); }
+    public function tva(): BelongsTo { return $this->belongsTo(Tva::class); }
+    public function unit(): BelongsTo { return $this->belongsTo(Unit::class); }
+    public function valuationMethod(): BelongsTo { return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id'); }
+    public function barcodes(): HasMany { return $this->hasMany(Barcode::class); }
+    public function primaryBarcode(): HasOne { return $this->hasOne(Barcode::class)->where('is_primary', true); }
+    public function packagings(): HasMany { return $this->hasMany(ProductPackaging::class)->orderBy('display_order'); }
+    public function prices(): HasMany { return $this->hasMany(ProductPrice::class); }
+    public function quantityDiscounts(): HasMany { return $this->hasMany(QuantityDiscount::class)->orderBy('price_level_id')->orderBy('tier_order'); }
+    public function stockMovements(): HasMany { return $this->hasMany(StockMovement::class); }
+    public function lots(): HasMany { return $this->hasMany(ProductLot::class); }
+    public function documentLines(): HasMany { return $this->hasMany(CommercialDocumentLine::class); }
+    public function openingBalances(): HasMany { return $this->hasMany(OpeningBalanceStock::class); }
 
-    public function family(): BelongsTo
-    {
-        return $this->belongsTo(Family::class);
-    }
-
-    public function brand(): BelongsTo
-    {
-        return $this->belongsTo(Brand::class);
-    }
-
-    public function variants()
-    {
-        return $this->hasMany(ProductVariant::class);
-    }
-
-    public function productType(): BelongsTo
-    {
-        return $this->belongsTo(ProductType::class);
-    }
-
-    public function tva(): BelongsTo
-    {
-        return $this->belongsTo(Tva::class);
-    }
-
-    public function unit(): BelongsTo
-    {
-        return $this->belongsTo(Unit::class);
-    }
-
-    public function valuationMethod(): BelongsTo
-    {
-        return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id');
-    }
-    // app/Models/Product.php
-    public function barcodes(): HasMany
-    {
-        return $this->hasMany(Barcode::class);
-    }
-
-    public function primaryBarcode(): HasOne
-    {
-        return $this->hasOne(Barcode::class)->where('is_primary', true);
-    }
-    /** Colisages — وحدات التعبئة */
-    public function packagings(): HasMany
-    {
-        return $this->hasMany(ProductPackaging::class)->orderBy('display_order');
-    }
-
-    /** Tarifs — مستويات الأسعار */
-    public function prices(): HasMany
-    {
-        return $this->hasMany(ProductPrice::class);
-    }
-
-    /** Tx Remise — تخفيضات الكميات */
-    public function quantityDiscounts(): HasMany
-    {
-        return $this->hasMany(QuantityDiscount::class)
-            ->orderBy('price_level_id')
-            ->orderBy('tier_order');
-    }
-
-
-
-    public function stockMovements(): HasMany
-    {
-        return $this->hasMany(StockMovement::class);
-    }
-
-    public function lots(): HasMany
-    {
-        return $this->hasMany(ProductLot::class);
-    }
-
-    public function documentLines(): HasMany
-    {
-        return $this->hasMany(CommercialDocumentLine::class);
-    }
-
-    public function openingBalances(): HasMany
-    {
-        return $this->hasMany(OpeningBalanceStock::class);
-    }
-
-    // ── Scopes ──
-
-    public function scopeByFamily(Builder $q, int $familyId): Builder
-    {
-        return $q->where('family_id', $familyId);
-    }
-
-    public function scopeByBrand(Builder $q, int $brandId): Builder
-    {
-        return $q->where('brand_id', $brandId);
-    }
-
-    public function scopeManagesStock(Builder $q): Builder
-    {
-        return $q->where('manages_stock', true);
-    }
-
+    // Scopes
+    public function scopeByFamily(Builder $q, int $familyId): Builder { return $q->where('family_id', $familyId); }
+    public function scopeByBrand(Builder $q, int $brandId): Builder { return $q->where('brand_id', $brandId); }
+    public function scopeManagesStock(Builder $q): Builder { return $q->where('manages_stock', true); }
     public function scopeLowStock(Builder $q): Builder
     {
-        return $q->whereColumn(
-            'min_stock_alert',
-            '>=',
-            // subquery: آخر stock_balance_after لهذا المنتج
+        return $q->whereColumn('min_stock_alert', '>=',
             StockMovement::selectRaw('COALESCE(stock_balance_after, 0)')
                 ->whereColumn('product_id', 'products.id')
-                ->latest('movement_date')
-                ->latest('id')
-                ->limit(1)
-                ->getQuery()
+                ->latest('movement_date')->latest('id')->limit(1)
         );
     }
 
-    // ── Accessors ──
-
+    // Accessors
     public function getCurrentStockAttribute(): float
     {
-        return (float) ($this->stockMovements()
-            ->latest('movement_date')
-            ->latest('id')
-            ->value('stock_balance_after') ?? 0);
+        return (float) ($this->stockMovements()->latest('movement_date')->latest('id')->value('stock_balance_after') ?? 0);
     }
-
     public function getIsLowStockAttribute(): bool
     {
         if (!$this->manages_stock) return false;
         return $this->current_stock <= (float) $this->min_stock_alert;
     }
 
-    // ── Business Logic ──
-
-    /**
-     * حساب سعر البيع HT لمستوى سعر معين
-     * (بدون price_computed في DB — الحساب يتم هنا)
-     */
+    // Business Logic
     public function computedPrice(int $priceLevelId): float
     {
-        $pp = $this->prices()
-            ->where('price_level_id', $priceLevelId)
-            ->where('active', true)
-            ->first();
-
+        $pp = $this->prices()->where('price_level_id', $priceLevelId)->where('active', true)->first();
         if (!$pp) return 0.0;
-
         return $pp->computePrice((float) $this->purchase_price_ht);
     }
 
-    /**
-     * سعر البيع مع التعبئة
-     * سعر الفاردو = سعر الوحدة × معامل التعبئة
-     */
     public function priceForPackaging(int $priceLevelId, int $packagingId): float
     {
         $unitPrice = $this->computedPrice($priceLevelId);
         if (!$unitPrice) return 0.0;
-
         $packaging = $this->packagings()->find($packagingId);
-        return $packaging
-            ? round($unitPrice * (float) $packaging->quantity, 4)
-            : $unitPrice;
+        return $packaging ? round($unitPrice * (float) $packaging->quantity, 4) : $unitPrice;
     }
 
-    /**
-     * التخفيض المنطبق على كمية لتعريفة معينة
-     */
     public function applicableDiscount(int $priceLevelId, float $qty): ?QuantityDiscount
     {
         if (!$this->manages_quantity_discounts) return null;
-
         return $this->quantityDiscounts()
             ->where('price_level_id', $priceLevelId)
             ->where('active', true)
             ->where('is_blocked', false)
             ->where('min_qty', '<=', $qty)
-            ->where(function ($q) use ($qty) {
-                $q->whereNull('max_qty')->orWhere('max_qty', '>=', $qty);
-            })
+            ->where(fn($q) => $q->whereNull('max_qty')->orWhere('max_qty', '>=', $qty))
             ->orderBy('tier_order')
             ->first();
     }
 
-    /**
-     * السعر النهائي بعد تطبيق خصم الكمية
-     */
     public function finalPrice(int $priceLevelId, float $qty = 1, ?int $packagingId = null): float
     {
-        $basePrice = $packagingId
-            ? $this->priceForPackaging($priceLevelId, $packagingId)
-            : $this->computedPrice($priceLevelId);
-
+        $basePrice = $packagingId ? $this->priceForPackaging($priceLevelId, $packagingId) : $this->computedPrice($priceLevelId);
         if (!$basePrice) return 0.0;
-
         $discount = $this->applicableDiscount($priceLevelId, $qty);
         if (!$discount) return $basePrice;
-
         return $discount->calculateDiscountedPrice($basePrice);
     }
 
-    /**
-     * الوحدة الأساسية (is_default أو الأصغر quantity)
-     */
     public function defaultPackaging(): ?ProductPackaging
     {
-        return $this->packagings()
-            ->where('is_default', true)
-            ->first()
+        return $this->packagings()->where('is_default', true)->first()
             ?? $this->packagings()->orderBy('quantity')->first();
     }
 
-    // app/Models/Product.php
-
-    /**
-     * حساب كمية المخزون في تاريخ محدد
-     */
     public function stockOnDate(int $warehouseId, string $date, bool $includeUnvalidated = false): float
     {
         $query = $this->stockMovements()
             ->where('warehouse_id', $warehouseId)
             ->where('movement_date', '<=', $date);
-
-        if (!$includeUnvalidated) {
-            $query->where('is_validated', true);
-        }
-
-        return $query->get()->sum(function ($movement) {
-            $direction = $movement->stockMovementType->direction;
-            return $direction * $movement->quantity;
-        });
+        if (!$includeUnvalidated) $query->where('is_validated', true);
+        return $query->get()->sum(fn($mov) => $mov->stockMovementType->direction * $mov->quantity);
     }
 
-    /**
-     * الحصول على سعر التكلفة (PMP) في تاريخ محدد
-     */
     public function costPriceOnDate(int $warehouseId, string $date): float
     {
         $movements = $this->stockMovements()
@@ -4676,42 +3390,29 @@ class Product extends Model
             ->where('movement_date', '<=', $date)
             ->orderBy('movement_date')
             ->get();
-
-        $totalValue = 0;
-        $totalQuantity = 0;
-
-        foreach ($movements as $movement) {
-            $direction = $movement->stockMovementType->direction;
-            $quantity = $direction * $movement->quantity;
-
+        $totalValue = 0; $totalQuantity = 0;
+        foreach ($movements as $mov) {
+            $direction = $mov->stockMovementType->direction;
+            $quantity = $direction * $mov->quantity;
             if ($quantity > 0) {
-                // إدخال: نضيف القيمة والكمية
-                $totalValue += $movement->quantity * $movement->unit_price;
-                $totalQuantity += $movement->quantity;
+                $totalValue += $mov->quantity * $mov->unit_price;
+                $totalQuantity += $mov->quantity;
             } else {
-                // خروج: نطرح من المتوسط المرجح الحالي
                 $currentPMP = $totalQuantity > 0 ? $totalValue / $totalQuantity : 0;
                 $outValue = abs($quantity) * $currentPMP;
                 $totalValue -= $outValue;
-                $totalQuantity += $quantity; // quantity سالبة
+                $totalQuantity += $quantity;
             }
         }
-
         return $totalQuantity > 0 ? round($totalValue / $totalQuantity, 4) : 0;
     }
-
-    // ── Boot ──
 
     protected static function boot(): void
     {
         parent::boot();
-
         static::creating(function (Product $product) {
-            if (empty($product->slug)) {
-                $product->slug = Str::slug($product->name);
-            }
+            if (empty($product->slug)) $product->slug = Str::slug($product->name);
         });
-
         static::updating(function (Product $product) {
             if ($product->isDirty('name') && !$product->isDirty('slug')) {
                 $product->slug = Str::slug($product->name);
@@ -4719,7 +3420,6 @@ class Product extends Model
         });
     }
 }
-
 
 
 
@@ -4734,23 +3434,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * ProductLot Model
- *
- * Table: product_lots
- * Manages product batches/lots with FIFO tracking
- */
 #[Cacheable]
 class ProductLot extends Model
 {
-    use HasStandardizedConfiguration,
-        HasCompany,
-        SoftDeletes;
+    use HasStandardizedConfiguration, HasCompany, SoftDeletes;
 
     protected $table = 'product_lots';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'lot_number',
         'product_id',
         'warehouse_id',
@@ -4767,7 +3459,6 @@ class ProductLot extends Model
         'active',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'manufacturing_date' => 'date',
         'expiration_date' => 'date',
@@ -4783,173 +3474,53 @@ class ProductLot extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Appends --------------------
     protected $appends = ['is_depleted', 'is_expired'];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'lot_number',
-        'supplier_lot_number',
-    ];
-
-    /** @var array الفلاتر المسموحة */
-    public static array $filterable = [
-        'product_id',
-        'warehouse_id',
-        'active',
-    ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'lot_number',
-        'purchase_date',
-        'expiration_date',
-        'remaining_quantity',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $searchableFields = ['lot_number', 'supplier_lot_number'];
+    public static array $filterable = ['product_id', 'warehouse_id', 'active'];
+    public static array $sortable = ['id', 'lot_number', 'purchase_date', 'expiration_date', 'remaining_quantity', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
-    public static array $allowedIncludes = [
-        'product',
-        'warehouse',
-        'stockMovement',
-        'commercialDocumentLines',
-        'stockMovements',
-    ];
-
-    /** @var string حقل الترتيب الافتراضي */
+    public static array $allowedIncludes = ['product', 'warehouse', 'stockMovement', 'commercialDocumentLines', 'stockMovements'];
     public static string $defaultSort = 'purchase_date';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'asc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 20;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 300;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['product_lots'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
+    public function product(): BelongsTo { return $this->belongsTo(Product::class); }
+    public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
+    public function stockMovement(): BelongsTo { return $this->belongsTo(StockMovement::class); }
+    public function commercialDocumentLines() { return $this->hasMany(CommercialDocumentLine::class, 'stock_lot_id'); }
+    public function stockMovements() { return $this->hasMany(StockMovement::class, 'stock_lot_id'); }
 
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class);
-    }
-
-    public function warehouse(): BelongsTo
-    {
-        return $this->belongsTo(Warehouse::class);
-    }
-
-    public function stockMovement(): BelongsTo
-    {
-        return $this->belongsTo(StockMovement::class);
-    }
-
-    public function commercialDocumentLines()
-    {
-        return $this->hasMany(CommercialDocumentLine::class, 'stock_lot_id');
-    }
-
-    public function stockMovements()
-    {
-        return $this->hasMany(StockMovement::class, 'stock_lot_id');
-    }
-
-    // -------------------- Scopes --------------------
-
-    public function scopeAvailable(Builder $query): Builder
-    {
-        return $query->where('remaining_quantity', '>', 0)
-            ->where('active', true);
-    }
-
-    public function scopeDepleted(Builder $query): Builder
-    {
-        return $query->where('remaining_quantity', '<=', 0);
-    }
-
-    public function scopeExpired(Builder $query): Builder
-    {
-        return $query->whereNotNull('expiration_date')
-            ->where('expiration_date', '<', now());
-    }
-
+    public function scopeAvailable(Builder $query): Builder { return $query->where('remaining_quantity', '>', 0)->where('active', true); }
+    public function scopeDepleted(Builder $query): Builder { return $query->where('remaining_quantity', '<=', 0); }
+    public function scopeExpired(Builder $query): Builder { return $query->whereNotNull('expiration_date')->where('expiration_date', '<', now()); }
     public function scopeExpiringSoon(Builder $query, int $days = 30): Builder
     {
-        return $query->whereNotNull('expiration_date')
-            ->whereBetween('expiration_date', [now(), now()->addDays($days)]);
+        return $query->whereNotNull('expiration_date')->whereBetween('expiration_date', [now(), now()->addDays($days)]);
     }
+    public function scopeFifoOrder(Builder $query): Builder { return $query->orderBy('purchase_date')->orderBy('id'); }
 
-    public function scopeFifoOrder(Builder $query): Builder
-    {
-        return $query->orderBy('purchase_date')->orderBy('id');
-    }
-
-    // -------------------- Accessors --------------------
-
-    public function getIsDepletedAttribute(): bool
-    {
-        return $this->remaining_quantity <= 0;
-    }
-
-    public function getIsExpiredAttribute(): bool
-    {
-        return $this->expiration_date && $this->expiration_date->isPast();
-    }
-
-    public function getTotalCostAttribute(): float
-    {
-        return $this->original_quantity * $this->purchase_price;
-    }
-
-    public function getRemainingValueAttribute(): float
-    {
-        return $this->remaining_quantity * $this->purchase_price;
-    }
-
-    // -------------------- Helpers --------------------
+    public function getIsDepletedAttribute(): bool { return $this->remaining_quantity <= 0; }
+    public function getIsExpiredAttribute(): bool { return $this->expiration_date && $this->expiration_date->isPast(); }
+    public function getTotalCostAttribute(): float { return $this->original_quantity * $this->purchase_price; }
+    public function getRemainingValueAttribute(): float { return $this->remaining_quantity * $this->purchase_price; }
 
     public function decreaseQuantity(float $quantity): bool
     {
-        if ($this->remaining_quantity < $quantity) {
-            return false;
-        }
-
+        if ($this->remaining_quantity < $quantity) return false;
         return $this->decrement('remaining_quantity', $quantity);
     }
-
-    public function increaseQuantity(float $quantity): bool
-    {
-        return $this->increment('remaining_quantity', $quantity);
-    }
-
+    public function increaseQuantity(float $quantity): bool { return $this->increment('remaining_quantity', $quantity); }
     public function isExpiringSoon(int $days = 30): bool
     {
-        return $this->expiration_date
-            && $this->expiration_date->isFuture()
-            && $this->expiration_date->diffInDays(now()) <= $days;
+        return $this->expiration_date && $this->expiration_date->isFuture() && $this->expiration_date->diffInDays(now()) <= $days;
     }
 }
-
 
 
 
@@ -4961,25 +3532,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-// ═══════════════════════════════════════════════════════════
-// ProductPackaging — وحدات التعبئة (Colisages)
-// ═══════════════════════════════════════════════════════════
-
-/**
- * Table: product_packagings
- *
- * UN=1 / FD=6 / PLT=480
- * سعر التعبئة = product.computedPrice(level) × quantity
- */
 class ProductPackaging extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'product_packagings';
 
     protected $fillable = [
+        'company_id',
         'product_id',
         'code',
         'label',
@@ -4991,34 +3551,30 @@ class ProductPackaging extends Model
     ];
 
     protected $casts = [
-        'quantity'      => 'decimal:4',
-        'is_default'    => 'boolean',
-        'active'        => 'boolean',
+        'quantity' => 'decimal:4',
+        'is_default' => 'boolean',
+        'active' => 'boolean',
         'display_order' => 'integer',
     ];
 
     public static array $searchableFields = ['code', 'label', 'barcode'];
-    public static array $filterable       = ['product_id', 'active', 'is_default'];
-    public static array $sortable         = ['id', 'display_order', 'quantity'];
-    public static array $allowedIncludes  = ['product'];
-    public static string $defaultSort     = 'display_order';
-    public static array $cacheTags        = ['product_packagings', 'products'];
+    public static array $filterable = ['product_id', 'active', 'is_default'];
+    public static array $sortable = ['id', 'display_order', 'quantity'];
+    public static array $allowedIncludes = ['product'];
+    public static string $defaultSort = 'display_order';
+    public static array $cacheTags = ['product_packagings', 'products'];
 
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
     }
 
-    /**
-     * سعر هذه التعبئة لمستوى سعر معين
-     */
     public function priceForLevel(int $priceLevelId): float
     {
         $unitPrice = $this->product->computedPrice($priceLevelId);
         return round($unitPrice * (float) $this->quantity, 4);
     }
 }
-
 
 
 
@@ -5030,90 +3586,59 @@ use App\Models\Traits\HasCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-
-// ═══════════════════════════════════════════════════════════
-// ProductPrice — التعريفات (Tarifs)
-// ═══════════════════════════════════════════════════════════
-
-/**
- * Table: product_prices
- *
- * ثلاث طرق للتسعير — الحساب في PHP فقط (لا price_computed في DB):
- *
- *   fixed  → price_ht = price
- *   rate   → price_ht = purchase_price_ht × (1 + rate/100)
- *   margin → price_ht = purchase_price_ht + margin
- */
 class ProductPrice extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'product_prices';
 
     protected $fillable = [
-        'product_id', 'price_level_id',
+        'company_id',
+        'product_id',
+        'price_level_id',
         'pricing_method',
-        'price', 'rate', 'margin',
+        'price',
+        'rate',
+        'margin',
         'active',
     ];
 
     protected $casts = [
-        'price'  => 'decimal:4',
-        'rate'   => 'decimal:4',
+        'price' => 'decimal:4',
+        'rate' => 'decimal:4',
         'margin' => 'decimal:4',
         'active' => 'boolean',
     ];
 
-    public static array $filterable      = ['product_id', 'price_level_id', 'active', 'pricing_method'];
-    public static array $sortable        = ['id', 'price_level_id'];
+    public static array $filterable = ['product_id', 'price_level_id', 'active', 'pricing_method'];
+    public static array $sortable = ['id', 'price_level_id'];
     public static array $allowedIncludes = ['product', 'priceLevel'];
-    public static string $defaultSort    = 'price_level_id';
-    public static array $cacheTags       = ['product_prices', 'products'];
+    public static string $defaultSort = 'price_level_id';
+    public static array $cacheTags = ['product_prices', 'products'];
 
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class);
-    }
+    public function product(): BelongsTo { return $this->belongsTo(Product::class); }
+    public function priceLevel(): BelongsTo { return $this->belongsTo(PriceLevel::class); }
 
-    public function priceLevel(): BelongsTo
-    {
-        return $this->belongsTo(PriceLevel::class);
-    }
-
-    /**
-     * حساب سعر البيع HT بناءً على طريقة التسعير وسعر الشراء
-     *
-     * @param float $purchasePriceHt سعر الشراء من جدول products
-     */
     public function computePrice(float $purchasePriceHt): float
     {
         return match ($this->pricing_method) {
-            'rate'   => round($purchasePriceHt * (1 + ((float)($this->rate   ?? 0)) / 100), 4),
-            'margin' => round($purchasePriceHt  +      (float)($this->margin ?? 0),         4),
+            'rate'   => round($purchasePriceHt * (1 + ((float)($this->rate ?? 0)) / 100), 4),
+            'margin' => round($purchasePriceHt + ((float)($this->margin ?? 0)), 4),
             default  => round((float)($this->price ?? 0), 4),
         };
     }
 
-    /**
-     * قيمة الهامش المحسوب (للعرض في الواجهة)
-     */
     public function computedMargin(float $purchasePriceHt): float
     {
         return round($this->computePrice($purchasePriceHt) - $purchasePriceHt, 4);
     }
 
-    /**
-     * نسبة الربح المحسوبة (للعرض في الواجهة)
-     */
     public function computedRate(float $purchasePriceHt): float
     {
         if (!$purchasePriceHt) return 0.0;
         return round((($this->computePrice($purchasePriceHt) / $purchasePriceHt) - 1) * 100, 4);
     }
 }
-
 
 
 
@@ -5124,21 +3649,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * ProductType Model
- *
- * Table: product_types
- * Defines types of products (stockable, service, consumable)
- */
 #[Cacheable]
 class ProductType extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'product_types';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'description',
@@ -5172,7 +3693,6 @@ class ProductType extends Model
 
 
 
-
 // ===== ملف: ProductVariant.php =====
 namespace App\Models;
 
@@ -5182,27 +3702,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * @property int $id
- * @property int $company_id
- * @property int $product_id
- * @property string|null $sku
- * @property string|null $barcode
- * @property string|null $price_type
- * @property float|null $price_value
- * @property float|null $stock
- * @property bool|null $track_stock
- * @property array|null $attributes
- * @property string|null $image
- * @property float|null $weight
- * @property float|null $volume
- * @property bool|null $active
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Company $company
- * @property-read \App\Models\Product $product
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Barcode[] $barcodes
- */
 class ProductVariant extends Model
 {
     use HasFactory, SoftDeletes, HasCompany, HasStandardizedConfiguration;
@@ -5241,7 +3740,6 @@ class ProductVariant extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Configuration for HasStandardizedConfiguration --------------------
     public static array $searchableFields = ['sku', 'barcode', 'attributes'];
     public static array $filterable = ['product_id', 'price_type', 'active', 'track_stock'];
     public static array $sortable = ['id', 'sku', 'price_value', 'stock', 'created_at'];
@@ -5252,64 +3750,39 @@ class ProductVariant extends Model
     public static ?int $cacheTtl = 300;
     public static array $cacheTags = ['product_variants'];
 
-    // -------------------- Relations --------------------
-    public function company()
-    {
-        return $this->belongsTo(Company::class);
-    }
+    public function company() { return $this->belongsTo(Company::class); }
+    public function product() { return $this->belongsTo(Product::class); }
+    public function barcodes() { return $this->hasMany(Barcode::class); }
 
-    public function product()
-    {
-        return $this->belongsTo(Product::class);
-    }
-
-    public function barcodes()
-    {
-        return $this->hasMany(Barcode::class);
-    }
-
-    // -------------------- Accessors --------------------
     public function getFinalPriceAttribute(): ?float
     {
         if (!$this->product || !$this->price_type) {
-            return $this->product?->price_ht ?? null;
+            return $this->product?->purchase_price_ht ?? null;
         }
-
-        $basePrice = $this->product->price_ht ?? 0;
-
+        $basePrice = $this->product->purchase_price_ht ?? 0;
         if ($this->price_type === 'fixed') {
             return $basePrice + ($this->price_value ?? 0);
         }
-
         if ($this->price_type === 'percentage') {
             return $basePrice * (1 + ($this->price_value / 100));
         }
-
         return $basePrice;
     }
 
     public function getIsInStockAttribute(): bool
     {
-        if ($this->track_stock === false) {
-            return true;
-        }
+        if ($this->track_stock === false) return true;
         return ($this->stock ?? 0) > 0;
     }
 
-    // -------------------- Boot --------------------
     protected static function booted(): void
     {
         static::creating(function ($variant) {
-            if (empty($variant->active)) {
-                $variant->active = true;
-            }
-            if ($variant->track_stock === null) {
-                $variant->track_stock = true;
-            }
+            if (empty($variant->active)) $variant->active = true;
+            if ($variant->track_stock === null) $variant->track_stock = true;
         });
     }
 }
-
 
 
 
@@ -5318,78 +3791,55 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-// ═══════════════════════════════════════════════════════════
-// QuantityDiscount — تخفيضات الكميات (Tx Remise)
-// ═══════════════════════════════════════════════════════════
-
-/**
- * Table: quantity_discounts
- *
- * كل تعريفة + منتج لها شرائح مستقلة.
- * الكميات دائماً بالوحدة الأساسية.
- */
 class QuantityDiscount extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'quantity_discounts';
 
     protected $fillable = [
-        'product_id', 'price_level_id',
-        'min_qty', 'max_qty',
-        'discount_amount', 'discount_percentage',
-        'tier_order', 'is_blocked', 'active',
+        'company_id',
+        'product_id',
+        'price_level_id',
+        'min_qty',
+        'max_qty',
+        'discount_amount',
+        'discount_percentage',
+        'tier_order',
+        'is_blocked',
+        'active',
     ];
 
     protected $casts = [
-        'min_qty'             => 'decimal:4',
-        'max_qty'             => 'decimal:4',
-        'discount_amount'     => 'decimal:4',
+        'min_qty' => 'decimal:4',
+        'max_qty' => 'decimal:4',
+        'discount_amount' => 'decimal:4',
         'discount_percentage' => 'decimal:4',
-        'tier_order'          => 'integer',
-        'is_blocked'          => 'boolean',
-        'active'              => 'boolean',
+        'tier_order' => 'integer',
+        'is_blocked' => 'boolean',
+        'active' => 'boolean',
     ];
 
-    public static array $filterable      = ['product_id', 'price_level_id', 'active', 'is_blocked'];
-    public static array $sortable        = ['id', 'min_qty', 'tier_order'];
+    public static array $filterable = ['product_id', 'price_level_id', 'active', 'is_blocked'];
+    public static array $sortable = ['id', 'min_qty', 'tier_order'];
     public static array $allowedIncludes = ['product', 'priceLevel'];
-    public static string $defaultSort    = 'tier_order';
-    public static array $cacheTags       = ['quantity_discounts', 'products'];
+    public static string $defaultSort = 'tier_order';
+    public static array $cacheTags = ['quantity_discounts', 'products'];
 
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class);
-    }
+    public function product(): BelongsTo { return $this->belongsTo(Product::class); }
+    public function priceLevel(): BelongsTo { return $this->belongsTo(PriceLevel::class); }
 
-    public function priceLevel(): BelongsTo
-    {
-        return $this->belongsTo(PriceLevel::class);
-    }
-
-    /**
-     * هل هذه الشريحة تنطبق على الكمية المعطاة؟
-     */
     public function appliesTo(float $qty): bool
     {
-        return $this->active
-            && !$this->is_blocked
+        return $this->active && !$this->is_blocked
             && $qty >= (float) $this->min_qty
             && (is_null($this->max_qty) || $qty <= (float) $this->max_qty);
     }
 
-    /**
-     * حساب السعر النهائي بعد تطبيق الخصم
-     *
-     * الأولوية: discount_percentage > discount_amount
-     */
     public function calculateDiscountedPrice(float $unitPrice): float
     {
         if ($this->discount_percentage) {
@@ -5401,15 +3851,11 @@ class QuantityDiscount extends Model
         return $unitPrice;
     }
 
-    /**
-     * قيمة الخصم على الوحدة (للعرض)
-     */
     public function discountValue(float $unitPrice): float
     {
         return round($unitPrice - $this->calculateDiscountedPrice($unitPrice), 4);
     }
 }
-
 
 
 
@@ -5419,60 +3865,35 @@ namespace App\Models;
 use Spatie\Permission\Models\Role as SpatieRole;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * Role Model (يمتد من Spatie)
- *
- * Table: roles
- */
 class Role extends SpatieRole
 {
     use HasStandardizedConfiguration;
 
     protected $fillable = [
+        'company_id',
         'name',
         'guard_name',
         'display_name',
         'description',
     ];
 
-    // -------------------- التكوين --------------------
-
-    /** @var array حقول البحث */
     public static array $searchableFields = ['name', 'display_name', 'description'];
-
-    /** @var array الفلاتر المسموحة */
-    public static array $filterable = ['guard_name'];
-
-    /** @var array حقول الترتيب */
+    public static array $filterable = ['guard_name', 'company_id'];
     public static array $sortable = ['id', 'name', 'display_name'];
-
-    /** @var array العلاقات المحملة دائماً */
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = ['permissions', 'users'];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'name';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'asc';
-
-    /** @var int مدة الكاش بالثواني */
-    public static ?int $cacheTtl = 3600; // ساعة واحدة
-
-    /** @var array تاجات الكاش */
+    public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['roles', 'permissions'];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
 }
 
 
 
-
 // ===== ملف: Setting.php =====
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
@@ -5480,22 +3901,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-/**
- * Setting Model
- *
- * Table: settings
- * System-wide configuration settings
- */
 #[Cacheable]
 class Setting extends Model
 {
-    use
-        HasCompany,
-        HasStandardizedConfiguration;
+    use HasCompany, HasStandardizedConfiguration;
 
     protected $table = 'settings';
 
     protected $fillable = [
+        'company_id',
         'key',
         'group',
         'value',
@@ -5524,59 +3938,31 @@ class Setting extends Model
     public static ?int $cacheTtl = 7200;
     public static array $cacheTags = ['settings'];
 
-    public function scopeByGroup(Builder $query, string $group): Builder
-    {
-        return $query->where('group', $group);
-    }
-
-    public function scopePublic(Builder $query): Builder
-    {
-        return $query->where('is_public', true);
-    }
-
-    public function scopeEditable(Builder $query): Builder
-    {
-        return $query->where('is_editable', true);
-    }
+    public function scopeByGroup(Builder $query, string $group): Builder { return $query->where('group', $group); }
+    public function scopePublic(Builder $query): Builder { return $query->where('is_public', true); }
+    public function scopeEditable(Builder $query): Builder { return $query->where('is_editable', true); }
 
     public static function get(string $key, $default = null)
     {
-        return Cache::tags(['settings'])->remember(
-            "setting:{$key}",
-            now()->addHours(24),
-            function () use ($key, $default) {
-                $setting = static::where('key', $key)->first();
-                return $setting ? $setting->getTypedValue() : $default;
-            }
-        );
+        return Cache::tags(['settings'])->remember("setting:{$key}", now()->addHours(24), function () use ($key, $default) {
+            $setting = static::where('key', $key)->first();
+            return $setting ? $setting->getTypedValue() : $default;
+        });
     }
 
     public static function set(string $key, $value): bool
     {
         $setting = static::where('key', $key)->first();
-
-        if (!$setting) {
-            return false;
-        }
-
-        if (!$setting->is_editable) {
-            return false;
-        }
-
+        if (!$setting || !$setting->is_editable) return false;
         $setting->value = $value;
         $result = $setting->save();
-
-        if ($result) {
-            Cache::tags(['settings'])->forget("setting:{$key}");
-        }
-
+        if ($result) Cache::tags(['settings'])->forget("setting:{$key}");
         return $result;
     }
 
     public function getTypedValue()
     {
         $value = $this->value;
-
         return match ($this->type) {
             'integer', 'int' => is_array($value) ? (int)($value[0] ?? 0) : (int)$value,
             'float', 'double' => is_array($value) ? (float)($value[0] ?? 0) : (float)$value,
@@ -5589,18 +3975,10 @@ class Setting extends Model
     protected static function boot()
     {
         parent::boot();
-
-        static::saved(function ($setting) {
-            Cache::tags(['settings'])->forget("setting:{$setting->key}");
-        });
-
-        static::deleted(function ($setting) {
-            Cache::tags(['settings'])->forget("setting:{$setting->key}");
-        });
+        static::saved(fn($s) => Cache::tags(['settings'])->forget("setting:{$s->key}"));
+        static::deleted(fn($s) => Cache::tags(['settings'])->forget("setting:{$s->key}"));
     }
 }
-
-
 
 
 
@@ -5616,37 +3994,32 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
 
-/**
- * StockMovement Model
- *
- * Table: stock_movements
- * Tracks all inventory movements with FIFO support
- */
 #[Cacheable]
 class StockMovement extends Model
 {
-    use HasStandardizedConfiguration,
-        HasCompany,
-        SoftDeletes,
-        BelongsToFiscalYear;
+    use HasStandardizedConfiguration, HasCompany, SoftDeletes, BelongsToFiscalYear;
 
     protected $table = 'stock_movements';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'product_id',
         'warehouse_id',
+        'packaging_id',
         'fiscal_year_id',
         'stock_movement_type_id',
         'commercial_document_line_id',
         'movement_date',
         'quantity',
+        'packaging_quantity',
         'unit_price',
         'cost_price',
         'total_price',
+        'price_source',
         'stock_balance_after',
         'lot_number',
         'expiration_date',
+        'stock_lot_id',
         'reason',
         'notes',
         'user_id',
@@ -5654,18 +4027,17 @@ class StockMovement extends Model
         'is_validated',
         'validated_by',
         'validated_at',
-        'stock_lot_id',
         'created_by',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'movement_date' => 'datetime',
-        'quantity' => 'decimal:3',
+        'quantity' => 'decimal:4',
+        'packaging_quantity' => 'decimal:4',
         'unit_price' => 'decimal:4',
         'cost_price' => 'decimal:4',
         'total_price' => 'decimal:4',
-        'stock_balance_after' => 'decimal:3',
+        'stock_balance_after' => 'decimal:4',
         'expiration_date' => 'date',
         'is_validated' => 'boolean',
         'validated_at' => 'datetime',
@@ -5674,178 +4046,57 @@ class StockMovement extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'lot_number',
-        'reason',
-        'notes',
-    ];
-
-    /** @var array الفلاتر المسموحة */
+    public static array $searchableFields = ['lot_number', 'reason', 'notes'];
     public static array $filterable = [
-        'product_id',
-        'warehouse_id',
-        'fiscal_year_id',
-        'stock_movement_type_id',
-        'commercial_document_line_id',
-        'user_id',
-        'stock_lot_id',
-        'is_validated',
+        'product_id', 'warehouse_id', 'fiscal_year_id', 'stock_movement_type_id',
+        'commercial_document_line_id', 'user_id', 'stock_lot_id', 'is_validated'
     ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'movement_date',
-        'quantity',
-        'total_price',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $sortable = ['id', 'movement_date', 'quantity', 'total_price', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
     public static array $allowedIncludes = [
-        'product',
-        'warehouse',
-        'fiscalYear',
-        'stockMovementType',
-        'commercialDocumentLine',
-        'user',
-        'parentMovement',
-        'validatedBy',
-        'stockLot',
-        'createdBy',
+        'product', 'warehouse', 'packaging', 'fiscalYear', 'stockMovementType',
+        'commercialDocumentLine', 'user', 'parentMovement', 'validatedBy', 'stockLot', 'createdBy'
     ];
-
-    /** @var string حقل الترتيب الافتراضي */
     public static string $defaultSort = 'movement_date';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'desc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 20;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
-    public static ?int $cacheTtl = 0; // No cache for transactional data
-
-    /** @var array تاجات الكاش */
+    public static ?int $cacheTtl = 0;
     public static array $cacheTags = ['stock_movements'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
+    public function product(): BelongsTo { return $this->belongsTo(Product::class); }
+    public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
+    public function packaging(): BelongsTo { return $this->belongsTo(ProductPackaging::class, 'packaging_id'); }
+    public function fiscalYear(): BelongsTo { return $this->belongsTo(FiscalYear::class); }
+    public function stockMovementType(): BelongsTo { return $this->belongsTo(StockMovementType::class); }
+    public function commercialDocumentLine(): BelongsTo { return $this->belongsTo(CommercialDocumentLine::class); }
+    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function parentMovement(): BelongsTo { return $this->belongsTo(StockMovement::class, 'parent_movement_id'); }
+    public function validatedBy(): BelongsTo { return $this->belongsTo(User::class, 'validated_by'); }
+    public function stockLot(): BelongsTo { return $this->belongsTo(ProductLot::class, 'stock_lot_id'); }
+    public function createdBy(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
 
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class);
-    }
-
-    public function warehouse(): BelongsTo
-    {
-        return $this->belongsTo(Warehouse::class);
-    }
-
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FiscalYear::class);
-    }
-
-    public function stockMovementType(): BelongsTo
-    {
-        return $this->belongsTo(StockMovementType::class);
-    }
-
-    public function commercialDocumentLine(): BelongsTo
-    {
-        return $this->belongsTo(CommercialDocumentLine::class);
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function parentMovement(): BelongsTo
-    {
-        return $this->belongsTo(StockMovement::class, 'parent_movement_id');
-    }
-
-    public function validatedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'validated_by');
-    }
-
-    public function stockLot(): BelongsTo
-    {
-        return $this->belongsTo(ProductLot::class, 'stock_lot_id');
-    }
-
-    public function createdBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    // -------------------- Scopes --------------------
-
-    public function scopeValidated(Builder $query): Builder
-    {
-        return $query->where('is_validated', true);
-    }
-
-    public function scopeUnvalidated(Builder $query): Builder
-    {
-        return $query->where('is_validated', false);
-    }
-
+    public function scopeValidated(Builder $query): Builder { return $query->where('is_validated', true); }
+    public function scopeUnvalidated(Builder $query): Builder { return $query->where('is_validated', false); }
     public function scopeIncoming(Builder $query): Builder
     {
-        return $query->whereHas('stockMovementType', function ($q) {
-            $q->where('direction', 1);
-        });
+        return $query->whereHas('stockMovementType', fn($q) => $q->where('direction', 1));
     }
-
     public function scopeOutgoing(Builder $query): Builder
     {
-        return $query->whereHas('stockMovementType', function ($q) {
-            $q->where('direction', -1);
-        });
+        return $query->whereHas('stockMovementType', fn($q) => $q->where('direction', -1));
     }
-
     public function scopeByDateRange(Builder $query, $startDate, $endDate): Builder
     {
         return $query->whereBetween('movement_date', [$startDate, $endDate]);
     }
 
-    // -------------------- Helpers --------------------
-
-    public function isIncoming(): bool
-    {
-        return $this->stockMovementType?->direction === 1;
-    }
-
-    public function isOutgoing(): bool
-    {
-        return $this->stockMovementType?->direction === -1;
-    }
-
-    public function isAdjustment(): bool
-    {
-        return $this->stockMovementType?->direction === 0;
-    }
+    public function isIncoming(): bool { return $this->stockMovementType?->direction === 1; }
+    public function isOutgoing(): bool { return $this->stockMovementType?->direction === -1; }
+    public function isAdjustment(): bool { return $this->stockMovementType?->direction === 0; }
 }
-
 
 
 
@@ -5856,21 +4107,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * StockMovementType Model
- *
- * Table: stock_movement_types
- * Defines types of stock movements
- */
 #[Cacheable]
 class StockMovementType extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'stock_movement_types';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'description',
@@ -5901,22 +4148,10 @@ class StockMovementType extends Model
         return $this->hasMany(StockMovement::class);
     }
 
-    public function isIncoming(): bool
-    {
-        return $this->direction === 1;
-    }
-
-    public function isOutgoing(): bool
-    {
-        return $this->direction === -1;
-    }
-
-    public function isNeutral(): bool
-    {
-        return $this->direction === 0;
-    }
+    public function isIncoming(): bool { return $this->direction === 1; }
+    public function isOutgoing(): bool { return $this->direction === -1; }
+    public function isNeutral(): bool { return $this->direction === 0; }
 }
-
 
 
 
@@ -5933,23 +4168,15 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
 
-/**
- * TreasuryAccount Model
- *
- * Table: treasury_accounts
- * Manages bank and cash accounts
- */
 #[Cacheable]
 class TreasuryAccount extends Model
 {
-    use HasStandardizedConfiguration,
-        HasCompany,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, HasCompany, SoftDeletes, Auditable;
 
     protected $table = 'treasury_accounts';
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'treasury_account_type_id',
@@ -5958,7 +4185,7 @@ class TreasuryAccount extends Model
         'rib',
         'iban',
         'swift_bic',
-        'currency',
+        'currency_id',
         'initial_balance',
         'current_balance',
         'is_default',
@@ -5977,7 +4204,7 @@ class TreasuryAccount extends Model
     ];
 
     public static array $searchableFields = ['name', 'code', 'bank_name', 'account_number', 'rib', 'iban'];
-    public static array $filterable = ['treasury_account_type_id', 'is_default', 'active', 'currency'];
+    public static array $filterable = ['treasury_account_type_id', 'is_default', 'active', 'currency_id'];
     public static array $sortable = ['id', 'name', 'code', 'current_balance'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['treasuryAccountType', 'payments', 'paymentModes', 'expenses', 'createdBy', 'updatedBy', 'deletedBy'];
@@ -5985,82 +4212,46 @@ class TreasuryAccount extends Model
     public static ?int $cacheTtl = 300;
     public static array $cacheTags = ['treasury_accounts'];
 
-    public function treasuryAccountType(): BelongsTo
-    {
-        return $this->belongsTo(TreasuryAccountType::class);
-    }
+    public function treasuryAccountType(): BelongsTo { return $this->belongsTo(TreasuryAccountType::class); }
+    public function payments(): HasMany { return $this->hasMany(Payment::class); }
+    public function paymentModes(): HasMany { return $this->hasMany(PaymentMode::class); }
+    public function expenses(): HasMany { return $this->hasMany(Expense::class); }
 
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
-    }
-
-    public function paymentModes(): HasMany
-    {
-        return $this->hasMany(PaymentMode::class);
-    }
-
-    public function expenses(): HasMany
-    {
-        return $this->hasMany(Expense::class);
-    }
-
-    public function scopeDefault(Builder $query): Builder
-    {
-        return $query->where('is_default', true);
-    }
-
+    public function scopeDefault(Builder $query): Builder { return $query->where('is_default', true); }
     public function scopeBankAccounts(Builder $query): Builder
     {
-        return $query->whereHas('treasuryAccountType', function ($q) {
-            $q->where('name', 'bank');
-        });
+        return $query->whereHas('treasuryAccountType', fn($q) => $q->where('name', 'bank'));
     }
-
     public function scopeCashAccounts(Builder $query): Builder
     {
-        return $query->whereHas('treasuryAccountType', function ($q) {
-            $q->where('name', 'cash');
-        });
+        return $query->whereHas('treasuryAccountType', fn($q) => $q->where('name', 'cash'));
     }
 
-    public function isBankAccount(): bool
-    {
-        return $this->treasuryAccountType?->name === 'bank';
-    }
-
-    public function isCashAccount(): bool
-    {
-        return $this->treasuryAccountType?->name === 'cash';
-    }
-
-    public function updateBalance(float $amount): bool
-    {
-        return $this->increment('current_balance', $amount);
-    }
+    public function isBankAccount(): bool { return $this->treasuryAccountType?->name === 'bank'; }
+    public function isCashAccount(): bool { return $this->treasuryAccountType?->name === 'cash'; }
+    public function updateBalance(float $amount): bool { return $this->increment('current_balance', $amount); }
 }
-
 
 
 
 // ===== ملف: TreasuryAccountType.php =====
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
-// Core System
 use App\Core\Attributes\Cacheable;
-use App\Core\Traits\HashesId;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
 #[Cacheable]
 class TreasuryAccountType extends Model
 {
-    use HasFactory, HashesId, HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
+
+    protected $table = 'treasury_account_types';
 
     protected $fillable = [
+        'company_id',
         'name',
         'label',
         'description',
@@ -6073,21 +4264,18 @@ class TreasuryAccountType extends Model
         'display_order' => 'integer',
     ];
 
-    // --- Core Config ---
     public static array $searchableFields = ['name', 'label'];
     public static array $filterable = ['active'];
     public static array $sortable = ['id', 'name', 'label', 'display_order'];
     public static array $allowedIncludes = ['treasuryAccounts'];
-    public static ?int $cacheTtl = 86400; // 1 day
+    public static ?int $cacheTtl = 86400;
     public static array $cacheTags = ['treasury_account_types', 'api'];
 
-    // --- العلاقات ---
     public function treasuryAccounts(): HasMany
     {
         return $this->hasMany(TreasuryAccount::class);
     }
 }
-
 
 
 
@@ -6099,21 +4287,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * Tva Model
- *
- * Table: tvas
- * VAT (Value Added Tax) rates
- */
 #[Cacheable]
 class Tva extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'tvas';
 
     protected $fillable = [
+        'company_id',
         'name',
         'rate',
         'description',
@@ -6152,12 +4336,9 @@ class Tva extends Model
 
     public static function getDefaultRate(): ?float
     {
-        return static::where('is_default', true)
-            ->where('active', true)
-            ->value('rate');
+        return static::where('is_default', true)->where('active', true)->value('rate');
     }
 }
-
 
 
 
@@ -6168,21 +4349,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
+use App\Models\Traits\HasCompany;
 
-/**
- * Unit Model
- *
- * Table: units
- * Units of measurement for products
- */
 #[Cacheable]
 class Unit extends Model
 {
-    use HasStandardizedConfiguration;
+    use HasStandardizedConfiguration, HasCompany;
 
     protected $table = 'units';
 
     protected $fillable = [
+        'company_id',
         'name',
         'symbol',
         'description',
@@ -6214,7 +4391,6 @@ class Unit extends Model
 
 
 
-
 // ===== ملف: User.php =====
 declare(strict_types=1);
 
@@ -6232,47 +4408,31 @@ use Spatie\Permission\Traits\HasRoles;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * User Model
- *
- * Table: users
- * Manages system users with authentication and profile management
- *
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Company> $companies
- */
 #[Cacheable]
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes, HasStandardizedConfiguration;
 
-    // أدوار النظام العام (System Roles)
     public const ROLE_SUPER_ADMIN = 'super-admin';
     public const ROLE_ADMIN = 'admin';
-
-    // أدوار المستخدم داخل الشركة (Company Pivot Roles)
     public const COMPANY_ROLE_OWNER = 'owner';
     public const COMPANY_ROLE_ADMIN = 'admin';
     public const COMPANY_ROLE_MEMBER = 'member';
 
     protected $table = 'users';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
         'name', 'email', 'email_verified_at', 'username', 'phone', 'avatar',
         'bio', 'job_title', 'birth_date', 'gender_id', 'national_id', 'address',
-        'commune_id', 'wilaya_id', 'role_id', 'last_login_at', 'last_login_ip', 'company_id',
+        'commune_id', 'wilaya_id', 'role_id', 'last_login_at', 'last_login_ip',
         'register_ip', 'register_user_agent', 'active', 'created_by', 'updated_by', 'deleted_by',
     ];
 
-    // -------------------- Hidden --------------------
-    protected $hidden = [
-        'password', 'remember_token', 'national_id',
-    ];
+    protected $hidden = ['password', 'remember_token', 'national_id'];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',        // Laravel 10+ (أفضل من setPasswordAttribute)
+        'password' => 'hashed',
         'birth_date' => 'date',
         'last_login_at' => 'datetime',
         'active' => 'boolean',
@@ -6281,34 +4441,19 @@ class User extends Authenticatable
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Appends --------------------
     protected $appends = ['full_address'];
 
-    // -------------------- Spatie Permission --------------------
     protected $guard_name = 'web';
 
-    // -------------------- Configuration (لـ HasStandardizedConfiguration) --------------------
-
-    public static array $searchableFields = [
-        'name', 'email', 'username', 'phone', 'job_title',
-    ];
-
-    public static array $filterable = [
-        'gender_id', 'commune_id', 'wilaya_id', 'role_id', 'active',
-    ];
-
-    public static array $sortable = [
-        'id', 'name', 'email', 'created_at', 'last_login_at',
-    ];
-
+    public static array $searchableFields = ['name', 'email', 'username', 'phone', 'job_title'];
+    public static array $filterable = ['gender_id', 'commune_id', 'wilaya_id', 'role_id', 'active'];
+    public static array $sortable = ['id', 'name', 'email', 'created_at', 'last_login_at'];
     public static array $defaultWith = [];
-
     public static array $allowedIncludes = [
         'gender', 'commune', 'wilaya', 'role', 'roles', 'permissions',
         'createdBy', 'updatedBy', 'deletedBy', 'commercialDocuments',
-        'payments', 'stockMovements', 'companies',
+        'payments', 'stockMovements', 'companies'
     ];
-
     public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
     public static int $defaultPerPage = 15;
@@ -6318,78 +4463,27 @@ class User extends Authenticatable
     public static array $cacheInvalidateRelations = [];
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
-
-    public function gender(): BelongsTo
-    {
-        return $this->belongsTo(Gender::class);
-    }
-
-    public function commune(): BelongsTo
-    {
-        return $this->belongsTo(Commune::class);
-    }
-
-    public function wilaya(): BelongsTo
-    {
-        return $this->belongsTo(Wilaya::class);
-    }
-
-    public function role(): BelongsTo
-    {
-        return $this->belongsTo(\Spatie\Permission\Models\Role::class);
-    }
-
-    public function createdBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function updatedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
-
-    public function deletedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'deleted_by');
-    }
-
-    public function commercialDocuments(): HasMany
-    {
-        return $this->hasMany(CommercialDocument::class);
-    }
-
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
-    }
-
-    public function stockMovements(): HasMany
-    {
-        return $this->hasMany(StockMovement::class);
-    }
-
-    public function expenses(): HasMany
-    {
-        return $this->hasMany(Expense::class, 'created_by');
-    }
+    public function gender(): BelongsTo { return $this->belongsTo(Gender::class); }
+    public function commune(): BelongsTo { return $this->belongsTo(Commune::class); }
+    public function wilaya(): BelongsTo { return $this->belongsTo(Wilaya::class); }
+    public function role(): BelongsTo { return $this->belongsTo(\Spatie\Permission\Models\Role::class); }
+    public function createdBy(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
+    public function updatedBy(): BelongsTo { return $this->belongsTo(User::class, 'updated_by'); }
+    public function deletedBy(): BelongsTo { return $this->belongsTo(User::class, 'deleted_by'); }
+    public function commercialDocuments(): HasMany { return $this->hasMany(CommercialDocument::class); }
+    public function payments(): HasMany { return $this->hasMany(Payment::class); }
+    public function stockMovements(): HasMany { return $this->hasMany(StockMovement::class); }
+    public function expenses(): HasMany { return $this->hasMany(Expense::class, 'created_by'); }
 
     public function companies(): BelongsToMany
     {
         return $this->belongsToMany(Company::class)
-            ->withPivot('is_default', 'role', 'invited_by', 'joined_at', 'is_active')
+            ->withPivot('is_default', 'role', 'invited_by', 'joined_at', 'active')
             ->withTimestamps();
     }
 
-    public function defaultCompany(): BelongsTo
-    {
-        return $this->belongsTo(Company::class, 'company_id');
-    }
+    public function defaultCompany(): BelongsTo { return $this->belongsTo(Company::class, 'company_id'); }
 
-    // -------------------- Mutators --------------------
-    // ملاحظة: تم استبدال setPasswordAttribute بـ Cast 'hashed'، لذا يمكن حذفها.
-    // لكن نبقها للتوافق مع الإصدارات القديمة إن وجدت.
     public function setPasswordAttribute($value)
     {
         if (strlen($value) === 60 && str_starts_with($value, '$2y$')) {
@@ -6399,90 +4493,46 @@ class User extends Authenticatable
         $this->attributes['password'] = \Illuminate\Support\Facades\Hash::make($value);
     }
 
-    // -------------------- Accessors --------------------
-    public function getDefaultCompanyAttribute()
-    {
-        return $this->companies()->wherePivot('is_default', true)->first();
-    }
-
+    public function getDefaultCompanyAttribute() { return $this->companies()->wherePivot('is_default', true)->first(); }
     public function getFullAddressAttribute(): string
     {
-        $parts = array_filter([
-            $this->address,
-            $this->commune?->name,
-            $this->wilaya?->name,
-        ]);
+        $parts = array_filter([$this->address, $this->commune?->name, $this->wilaya?->name]);
         return implode(', ', $parts);
     }
 
-    // -------------------- Helpers (محسّنة) --------------------
     public function updateLastLogin(): void
     {
-        $this->update([
-            'last_login_at' => now(),
-            'last_login_ip' => request()->ip(),
-        ]);
+        $this->update(['last_login_at' => now(), 'last_login_ip' => request()->ip()]);
     }
 
-    public function isAdmin(): bool
-    {
-        return $this->hasRole(self::ROLE_ADMIN);
-    }
+    public function isAdmin(): bool { return $this->hasRole(self::ROLE_ADMIN); }
+    public function isSuperAdmin(): bool { return $this->hasRole(self::ROLE_SUPER_ADMIN); }
 
-    public function isSuperAdmin(): bool
-    {
-        return $this->hasRole(self::ROLE_SUPER_ADMIN);
-    }
-
-    /**
-     * تحديد ما إذا كان المستخدم لديه حق الوصول إلى شركة معينة (عضو نشط).
-     *
-     * @param int|Company $company
-     * @return bool
-     */
     public function hasAccessToCompany(int|Company $company): bool
     {
         $id = $company instanceof Company ? $company->id : $company;
-
         if ($this->relationLoaded('companies')) {
             $member = $this->companies->firstWhere('id', $id);
-            return $member && $member->pivot->is_active;
+            return $member && $member->pivot->active;
         }
-
-        return $this->companies()
-            ->where('companies.id', $id)
-            ->wherePivot('is_active', true)
-            ->exists();
+        return $this->companies()->where('companies.id', $id)->wherePivot('active', true)->exists();
     }
 
-    /**
-     * تحديد ما إذا كان المستخدم هو المالك الأساسي للشركة.
-     */
-    public function isOwnerOf(Company $company): bool
-    {
-        return $this->id === $company->owner_id;
-    }
+    public function isOwnerOf(Company $company): bool { return $this->id === $company->owner_id; }
 
-    /**
-     * تحديد ما إذا كان المستخدم مديراً (Admin) في الشركة (مالك أو مدير).
-     */
     public function isAdminOf(Company $company): bool
     {
         if ($this->relationLoaded('companies')) {
             $member = $this->companies->firstWhere('id', $company->id);
-            return $member
-                && $member->pivot->is_active
-                && in_array($member->pivot->role, [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN]);
+            return $member && $member->pivot->active && in_array($member->pivot->role, [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN]);
         }
-
         return $this->companies()
             ->where('companies.id', $company->id)
-            ->wherePivot('is_active', true)
+            ->wherePivot('active', true)
             ->wherePivotIn('role', [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN])
             ->exists();
     }
 }
-
 
 
 
@@ -6499,24 +4549,15 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
 
-/**
- * Warehouse Model
- *
- * Table: warehouses
- * Manages inventory storage locations
- */
 #[Cacheable]
 class Warehouse extends Model
 {
-    use HasStandardizedConfiguration,
-        HasCompany,
-        SoftDeletes,
-        Auditable;
+    use HasStandardizedConfiguration, HasCompany, SoftDeletes, Auditable;
 
     protected $table = 'warehouses';
 
-    // -------------------- Fillable --------------------
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'address',
@@ -6532,7 +4573,6 @@ class Warehouse extends Model
         'active',
     ];
 
-    // -------------------- Casts --------------------
     protected $casts = [
         'active' => 'boolean',
         'created_at' => 'datetime',
@@ -6540,120 +4580,33 @@ class Warehouse extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // -------------------- Configuration --------------------
-
-    /** @var array حقول البحث */
-    public static array $searchableFields = [
-        'name',
-        'code',
-        'phone',
-        'manager_name',
-        'nif',
-        'rc',
-        'address',
-    ];
-
-    /** @var array الفلاتر المسموحة */
-    public static array $filterable = [
-        'commune_id',
-        'wilaya_id',
-        'active',
-    ];
-
-    /** @var array حقول الترتيب */
-    public static array $sortable = [
-        'id',
-        'name',
-        'code',
-        'created_at',
-    ];
-
-    /** @var array العلاقات المحملة دائماً */
+    public static array $searchableFields = ['name', 'code', 'phone', 'manager_name', 'nif', 'rc', 'address'];
+    public static array $filterable = ['commune_id', 'wilaya_id', 'active'];
+    public static array $sortable = ['id', 'name', 'code', 'created_at'];
     public static array $defaultWith = [];
-
-    /** @var array العلاقات المسموحة */
-    public static array $allowedIncludes = [
-        'commune',
-        'wilaya',
-        'commercialDocuments',
-        'stockMovements',
-        'productLots',
-        'numberingSeries',
-        'createdBy',
-        'updatedBy',
-        'deletedBy',
-    ];
-
-    /** @var string حقل الترتيب الافتراضي */
+    public static array $allowedIncludes = ['commune', 'wilaya', 'commercialDocuments', 'stockMovements', 'productLots', 'numberingSeries', 'createdBy', 'updatedBy', 'deletedBy'];
     public static string $defaultSort = 'name';
-
-    /** @var string اتجاه الترتيب الافتراضي */
     public static string $defaultSortDirection = 'asc';
-
-    /** @var int عدد السجلات في الصفحة */
     public static int $defaultPerPage = 15;
-
-    /** @var int الحد الأقصى للسجلات */
     public static int $perPageLimit = 100;
-
-    /** @var int|null مدة الكاش بالثواني */
     public static ?int $cacheTtl = 600;
-
-    /** @var array تاجات الكاش */
     public static array $cacheTags = ['warehouses'];
-
-    /** @var array الموديلات المرتبطة */
     public static array $cacheInvalidateRelations = [];
-
-    /** @var array Scopes التلقائية */
     public static array $scopes = [];
 
-    // -------------------- Relations --------------------
-
-    public function commune(): BelongsTo
-    {
-        return $this->belongsTo(Commune::class);
-    }
-
-    public function wilaya(): BelongsTo
-    {
-        return $this->belongsTo(Wilaya::class);
-    }
-
-    public function commercialDocuments(): HasMany
-    {
-        return $this->hasMany(CommercialDocument::class);
-    }
-
-    public function stockMovements(): HasMany
-    {
-        return $this->hasMany(StockMovement::class);
-    }
-
-    public function productLots(): HasMany
-    {
-        return $this->hasMany(ProductLot::class);
-    }
-
-    public function numberingSeries(): HasMany
-    {
-        return $this->hasMany(NumberingSeries::class);
-    }
-
-    // -------------------- Accessors --------------------
+    public function commune(): BelongsTo { return $this->belongsTo(Commune::class); }
+    public function wilaya(): BelongsTo { return $this->belongsTo(Wilaya::class); }
+    public function commercialDocuments(): HasMany { return $this->hasMany(CommercialDocument::class); }
+    public function stockMovements(): HasMany { return $this->hasMany(StockMovement::class); }
+    public function productLots(): HasMany { return $this->hasMany(ProductLot::class); }
+    public function numberingSeries(): HasMany { return $this->hasMany(NumberingSeries::class); }
 
     public function getFullAddressAttribute(): string
     {
-        $parts = array_filter([
-            $this->address,
-            $this->commune?->name,
-            $this->wilaya?->name,
-        ]);
-
+        $parts = array_filter([$this->address, $this->commune?->name, $this->wilaya?->name]);
         return implode(', ', $parts);
     }
 }
-
 
 
 
@@ -6665,12 +4618,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 
-/**
- * Wilaya Model
- *
- * Table: wilayas
- * Algerian provinces (wilayas)
- */
 #[Cacheable]
 class Wilaya extends Model
 {
@@ -6705,25 +4652,9 @@ class Wilaya extends Model
     public static ?int $cacheTtl = 86400;
     public static array $cacheTags = ['wilayas', 'geography'];
 
-    public function communes(): HasMany
-    {
-        return $this->hasMany(Commune::class);
-    }
-
-    public function users(): HasMany
-    {
-        return $this->hasMany(User::class);
-    }
-
-    public function parties(): HasMany
-    {
-        return $this->hasMany(Party::class);
-    }
-
-    public function warehouses(): HasMany
-    {
-        return $this->hasMany(Warehouse::class);
-    }
+    public function communes(): HasMany { return $this->hasMany(Commune::class); }
+    public function users(): HasMany { return $this->hasMany(User::class); }
+    public function parties(): HasMany { return $this->hasMany(Party::class); }
+    public function warehouses(): HasMany { return $this->hasMany(Warehouse::class); }
 }
-
 

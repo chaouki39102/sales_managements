@@ -32,6 +32,7 @@ class Employee extends Model
         'hire_date',
         'termination_date',
         'employment_status',
+        'active',
         'created_by',
         'updated_by',
         'deleted_by',

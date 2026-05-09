@@ -25,7 +25,7 @@ interface Company {
   id: number;
   name: string;
   slug: string;
-  is_active?: boolean;
+  active?: boolean;
   is_suspended?: boolean;
   is_verified?: boolean;
   plan?: string;
@@ -381,7 +381,7 @@ function CompanyCard({ company, index, onClick }: { company: Company; index: num
         <div style={{ fontSize:11, color:'var(--t4)', display:'flex', alignItems:'center', gap:8 }}>
           {suspended ? (
             <span style={{ color:'var(--red)', fontWeight:700 }}>🔴 معلّقة</span>
-          ) : company.is_active === false ? (
+          ) : company.active === false ? (
             <span style={{ color:'var(--t4)' }}>غير نشطة</span>
           ) : (
             <span style={{ color:'var(--em)', fontWeight:700, display:'flex', alignItems:'center', gap:4 }}>
@@ -446,7 +446,7 @@ function AdminModal({
     activity:'', nif:'', nis:'', rc:'', ai:'', address:'',
     plan:'free' as typeof PLANS[number],
     max_users:3, max_products:500, max_warehouses:1,
-    notes:'', is_active:true, is_suspended:false,
+    notes:'', active:true, is_suspended:false,
   });
 
   // ✅ جلب كل الشركات عبر /companies (super-admin يرى الكل)
@@ -485,7 +485,7 @@ function AdminModal({
       max_products:   co.max_products   ?? 500,
       max_warehouses: co.max_warehouses ?? 1,
       notes:          co.notes          ?? '',
-      is_active:      co.is_active      ?? true,
+      active:      co.active      ?? true,
       is_suspended:   co.is_suspended   ?? false,
     });
     setEditTarget(co);
@@ -787,10 +787,10 @@ function AdminModal({
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--b1)' }}>
                   <span style={{ fontSize:13, fontWeight:700, color:'var(--t2)' }}>حالة الشركة</span>
                   <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <span style={{ fontSize:11, fontWeight:700, color: form.is_active ? 'var(--em)' : 'var(--red)' }}>
-                      {form.is_active ? 'نشطة' : 'موقوفة'}
+                    <span style={{ fontSize:11, fontWeight:700, color: form.active ? 'var(--em)' : 'var(--red)' }}>
+                      {form.active ? 'نشطة' : 'موقوفة'}
                     </span>
-                    <div className={`sw ${form.is_active ? 'on' : ''}`} onClick={() => f('is_active')(!form.is_active)} />
+                    <div className={`sw ${form.active ? 'on' : ''}`} onClick={() => f('active')(!form.active)} />
                   </div>
                 </div>
 
@@ -1022,36 +1022,17 @@ export default function OnboardingPage() {
     navigate('/dashboard', { replace: true });
   };
 
-<<<<<<< HEAD
-  // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
-  // يجب استدعاء switch أولاً حتى يُسجَّل المستخدم كعضو نشط في company_user
-  // وبالتالي يتجاوز middleware SetCompanyContext عند طلبات الـ seeding
-  const handleNewCompanyCreated = async (company: Company, fiscalYear: { id: number }) => {
-=======
    // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
   const handleNewCompanyCreated = (company: Company, fiscalYear: { id: number }) => {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
     setShowCreate(false);
     setCompanies(prev => [...prev, company]);
     try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
 
-<<<<<<< HEAD
-    // ✅ switch أولاً → يُسجَّل العضو في DB → middleware يقبل طلبات الـ seeding
-    try {
-      await apiClient.post('/companies/switch', { company_id: company.id });
-    } catch {}
-
-    setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });
-  };
-
-  // ✅ عند اكتمال الـ seeding → تفعيل الشركة ثم الانتقال
-=======
     // 🚫 لا نُفعّل الشركة الآن، بل نفتح مودال البذر فقط
     setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });
   };
 
   // ✅ عند اكتمال أو تخطي الـ seeding → تفعيل الشركة ثم الانتقال
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
   const handleSeedingComplete = async () => {
     if (!seedingCompany) return;
     try {

@@ -15,7 +15,7 @@ class WarehouseFactory extends Factory
             'address' => $this->faker->address,
             'phone' => $this->faker->phoneNumber,
             'is_primary' => true,
-            'is_active' => true,
+            'active' => true,
         ];
     }
 

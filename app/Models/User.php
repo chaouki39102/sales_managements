@@ -86,7 +86,7 @@ class User extends Authenticatable
     public function companies(): BelongsToMany
     {
         return $this->belongsToMany(Company::class)
-            ->withPivot('is_default', 'role', 'invited_by', 'joined_at', 'is_active')
+            ->withPivot('is_default', 'role', 'invited_by', 'joined_at', 'active')
             ->withTimestamps();
     }
 
@@ -121,9 +121,9 @@ class User extends Authenticatable
         $id = $company instanceof Company ? $company->id : $company;
         if ($this->relationLoaded('companies')) {
             $member = $this->companies->firstWhere('id', $id);
-            return $member && $member->pivot->is_active;
+            return $member && $member->pivot->active;
         }
-        return $this->companies()->where('companies.id', $id)->wherePivot('is_active', true)->exists();
+        return $this->companies()->where('companies.id', $id)->wherePivot('active', true)->exists();
     }
 
     public function isOwnerOf(Company $company): bool { return $this->id === $company->owner_id; }
@@ -132,11 +132,11 @@ class User extends Authenticatable
     {
         if ($this->relationLoaded('companies')) {
             $member = $this->companies->firstWhere('id', $company->id);
-            return $member && $member->pivot->is_active && in_array($member->pivot->role, [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN]);
+            return $member && $member->pivot->active && in_array($member->pivot->role, [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN]);
         }
         return $this->companies()
             ->where('companies.id', $company->id)
-            ->wherePivot('is_active', true)
+            ->wherePivot('active', true)
             ->wherePivotIn('role', [self::COMPANY_ROLE_OWNER, self::COMPANY_ROLE_ADMIN])
             ->exists();
     }

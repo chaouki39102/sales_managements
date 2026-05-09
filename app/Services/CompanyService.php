@@ -34,7 +34,7 @@ class CompanyService extends \App\Core\Services\BaseService
             $data['slug'] = Str::slug($data['name']) . '-' . uniqid();
         }
         $data['owner_id']  = auth()->id();
-        $data['is_active'] = $data['is_active'] ?? true;
+        $data['active'] = $data['active'] ?? true;
         return $data;
     }
 
@@ -45,7 +45,7 @@ class CompanyService extends \App\Core\Services\BaseService
             $user->companies()->attach($item->id, [
                 'is_default' => true,
                 'role'       => Company::COMPANY_ROLE_OWNER,
-                'is_active'  => true,
+                'active'  => true,
                 'joined_at'  => now(),
             ]);
         }
@@ -81,14 +81,14 @@ class CompanyService extends \App\Core\Services\BaseService
             );
         }
 
-        if (!$membership->is_active) {
+        if (!$membership->active) {
             throw new BusinessRuleException(
                 'حسابك معطّل داخل هذه الشركة. تواصل مع المسؤول.',
                 403
             );
         }
 
-        if (!$company->is_active) {
+        if (!$company->active) {
             throw new BusinessRuleException(
                 'هذه الشركة غير مفعّلة حالياً.',
                 403
@@ -143,7 +143,7 @@ class CompanyService extends \App\Core\Services\BaseService
     public function getMembers(Company $company)
     {
         return $company->users()
-            ->withPivot(['role', 'is_active', 'joined_at'])
+            ->withPivot(['role', 'active', 'joined_at'])
             ->get();
     }
 

@@ -303,7 +303,7 @@ class SetCompanyContext
 
         // 2. جلب الشركة
         $company = Company::where('slug', $slug)
-                          ->where('is_active', true)
+                          ->where('active', true)
                           ->firstOrFail();
 
         // 3. التحقق من صلاحية المستخدم
@@ -361,7 +361,7 @@ class Company extends Model
 {
     protected $fillable = [
         'name', 'commercial_name', 'slug', 'email', 'phone',
-        'address', 'nif', 'nis', 'rc', 'is_active',
+        'address', 'nif', 'nis', 'rc', 'active',
         'legal_form_id', 'wilaya_id', 'commune_id', 'owner_id',
     ];
 
@@ -630,7 +630,7 @@ class AssignCompanyToExistingRecords extends Command
         if ($this->option('create-default')) {
             $company = Company::firstOrCreate(
                 ['slug' => 'default'],
-                ['name' => 'الشركة الافتراضية', 'is_active' => true]
+                ['name' => 'الشركة الافتراضية', 'active' => true]
             );
             $this->info("الشركة الافتراضية: [{$company->id}] {$company->name}");
             return $company->id;

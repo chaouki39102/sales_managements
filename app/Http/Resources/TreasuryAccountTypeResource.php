@@ -10,11 +10,15 @@ class TreasuryAccountTypeResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'code' => $this->code,
-            'name' => $this->name,
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
+            'id'            => $this->id,
+            'company_id'    => $this->company_id,
+            'name'          => $this->name,
+            'label'         => $this->label,
+            'description'   => $this->description,
+            'active'        => $this->active,
+            'display_order' => $this->display_order,
+            'created_at'    => $this->created_at,
+            'updated_at'    => $this->updated_at,
         ];
     }
 }

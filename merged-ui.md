@@ -4443,7 +4443,7 @@ interface Company {
   legal_form_id?: number;
   wilaya_id?: number;
   commune_id?: number;
-  is_active?: boolean;
+  active?: boolean;
   plan?: string;
   notes?: string;
 }
@@ -4523,7 +4523,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
     name: '', commercial_name: '', email: '', phone: '', mobile: '',
     address: '', nif: '', nis: '', rc: '', ai: '', activity: '',
     legal_form_id: '', wilaya_id: '', commune_id: '',
-    is_active: true, plan: 'free',
+    active: true, plan: 'free',
     max_users: '', max_warehouses: '', max_products: '',
     notes: '',
   });
@@ -4550,7 +4550,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
         legal_form_id:    String(company.legal_form_id ?? ''),
         wilaya_id:        String(company.wilaya_id     ?? ''),
         commune_id:       String(company.commune_id    ?? ''),
-        is_active:        company.is_active        ?? true,
+        active:        company.active        ?? true,
         plan:             company.plan             ?? 'free',
         max_users:        '',
         max_warehouses:   '',
@@ -4562,7 +4562,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
         name: '', commercial_name: '', email: '', phone: '', mobile: '',
         address: '', nif: '', nis: '', rc: '', ai: '', activity: '',
         legal_form_id: '', wilaya_id: '', commune_id: '',
-        is_active: true, plan: 'free',
+        active: true, plan: 'free',
         max_users: '', max_warehouses: '', max_products: '',
         notes: '',
       });
@@ -4805,15 +4805,15 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
                 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t2)', flex: 1 }}>حالة الشركة</span>
                   <div
-                    className={`sw ${form.is_active ? 'on' : ''}`}
-                    onClick={() => f('is_active')(!form.is_active)}
+                    className={`sw ${form.active ? 'on' : ''}`}
+                    onClick={() => f('active')(!form.active)}
                     style={{ cursor: 'pointer' }}
                   />
                   <span style={{
                     fontSize: 12, fontWeight: 700, minWidth: 50,
-                    color: form.is_active ? 'var(--em)' : 'var(--red)',
+                    color: form.active ? 'var(--em)' : 'var(--red)',
                   }}>
-                    {form.is_active ? 'نشطة' : 'موقوفة'}
+                    {form.active ? 'نشطة' : 'موقوفة'}
                   </span>
                 </div>
               </div>
@@ -4984,7 +4984,7 @@ interface Company {
   rc?: string;
   ai?: string;
   activity?: string;
-  is_active?: boolean;
+  active?: boolean;
   is_suspended?: boolean;
 }
 

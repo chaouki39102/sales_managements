@@ -30,7 +30,7 @@ interface Company {
   address?: string;
   activity?: string;
   nif?: string; nis?: string; rc?: string; ai?: string;
-  is_active: boolean;
+  active: boolean;
   is_suspended: boolean;
   is_operational: boolean;
   is_verified: boolean;
@@ -75,7 +75,7 @@ const PLANS = ['free', 'starter', 'professional', 'enterprise'] as const;
 
 function statusInfo(co: Company) {
   if (co.is_suspended)  return { label: 'معلّقة',   color: 'var(--red)',   bg: 'var(--redb)',  icon: 'ti-lock' };
-  if (!co.is_active)    return { label: 'موقوفة',   color: 'var(--t4)',    bg: 'var(--bg4)',   icon: 'ti-minus-circle' };
+  if (!co.active)    return { label: 'موقوفة',   color: 'var(--t4)',    bg: 'var(--bg4)',   icon: 'ti-minus-circle' };
   if (co.is_on_trial)   return { label: `تجريبية · ${co.trial_days_remaining ?? '?'} يوم`, color: 'var(--gold)', bg: 'var(--goldb)', icon: 'ti-clock' };
   if (co.is_verified)   return { label: 'موثّقة',   color: 'var(--em)',    bg: 'var(--emb)',   icon: 'ti-rosette-discount-check' };
   return                       { label: 'نشطة',     color: 'var(--blue)',  bg: 'var(--blueb)', icon: 'ti-circle-check' };
@@ -152,7 +152,7 @@ function EditCompanyDrawer({
     max_products:    company.max_products    ?? 500,
     max_warehouses:  company.max_warehouses  ?? 1,
     notes:           company.notes           ?? '',
-    is_active:       company.is_active       ?? true,
+    active:       company.active       ?? true,
   });
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
@@ -162,10 +162,10 @@ function EditCompanyDrawer({
     if (!form.name.trim()) return;
     setSaving(true); setError('');
     try {
-      const { plan, max_users, max_products, max_warehouses, notes, is_active, ...basic } = form;
+      const { plan, max_users, max_products, max_warehouses, notes, active, ...basic } = form;
 
       // ① البيانات الأساسية
-      await apiClient.put(`/companies/${company.slug}`, { ...basic, is_active });
+      await apiClient.put(`/companies/${company.slug}`, { ...basic, active });
 
       // ② الخطة — إن تغيّرت
       if (
@@ -337,14 +337,14 @@ function EditCompanyDrawer({
               </DF>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 13px', borderRadius: 10, background: 'var(--bg3)', border: '1px solid var(--b2)' }}>
                 <span style={{ fontSize: 13, color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="ti ti-power" style={{ color: form.is_active ? 'var(--em)' : 'var(--t4)' }} />
+                  <i className="ti ti-power" style={{ color: form.active ? 'var(--em)' : 'var(--t4)' }} />
                   حالة الشركة
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: form.is_active ? 'var(--em)' : 'var(--t4)', fontWeight: 700 }}>
-                    {form.is_active ? 'نشطة' : 'موقوفة'}
+                  <span style={{ fontSize: 11, color: form.active ? 'var(--em)' : 'var(--t4)', fontWeight: 700 }}>
+                    {form.active ? 'نشطة' : 'موقوفة'}
                   </span>
-                  <Switch checked={form.is_active} onChange={() => f('is_active')(!form.is_active)} />
+                  <Switch checked={form.active} onChange={() => f('active')(!form.active)} />
                 </div>
               </div>
             </div>

@@ -85,15 +85,15 @@ class AuthController extends BaseApiController
     /**
      * الحصول على بيانات المستخدم الحالي
      */
-    public function me(Request $request): JsonResponse
-    {
-        $user = $request->user()->load('roles'); // ← تحميل الأدوار
+public function me(Request $request): JsonResponse
+{
+    $user = $request->user()->load('roles');   // حمّل العلاقة
 
-        return $this->successResponse(
-            new UserResource($request->user()),
-            'تم استرجاع البيانات بنجاح'
-        );
-    }
+    return $this->successResponse(
+        new UserResource($user),                // ← مرر المتغير الصحيح
+        'تم استرجاع البيانات بنجاح'
+    );
+}
 
     /**
      * تحديث بيانات المستخدم

@@ -24,7 +24,7 @@ class CompanySeeder extends Seeder
             'phone'           => '032000000',
             'email'           => 'contact@monentreprise.dz',
             'owner_id'        => $superAdminId,
-            'is_active'       => true,
+            'active'       => true,
             'created_at'      => now(),
             'updated_at'      => now(),
         ]);
@@ -40,7 +40,7 @@ class CompanySeeder extends Seeder
                 'is_default' => true,
                 'role'       => 'super-admin',
                 'joined_at'  => now(),
-                'is_active'  => true,
+                'active'  => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -54,7 +54,7 @@ class CompanySeeder extends Seeder
                 'is_default' => true,
                 'role'       => 'admin',
                 'joined_at'  => now(),
-                'is_active'  => true,
+                'active'  => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

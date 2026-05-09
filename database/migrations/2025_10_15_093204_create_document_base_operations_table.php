@@ -12,7 +12,7 @@ return new class extends Migration {
             $table->string('name', 50);
             $table->string('label', 100);
             $table->text('description')->nullable();
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
             $table->unique(['company_id', 'name']);

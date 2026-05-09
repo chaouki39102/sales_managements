@@ -30,7 +30,7 @@ return new class extends Migration {
             $table->string('bank_name', 100)->nullable();
             $table->string('rib', 30)->nullable()->comment('Bank account number');
             $table->foreignId('owner_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->boolean('is_active')->default(true);
+            $table->boolean('active')->default(true);
 
             // إدارة الحالة والخطط
             $table->timestamp('suspended_at')->nullable()->comment('تاريخ التعليق المؤقت');
@@ -70,12 +70,12 @@ return new class extends Migration {
             $table->string('role', 30)->default('member');
             $table->foreignId('invited_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('joined_at')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->boolean('active')->default(true);
             $table->timestamps();
 
             $table->unique(['company_id', 'user_id']);
             $table->index(['company_id', 'role']);
-            $table->index(['company_id', 'is_active']);
+            $table->index(['company_id', 'active']);
         });
     }
 

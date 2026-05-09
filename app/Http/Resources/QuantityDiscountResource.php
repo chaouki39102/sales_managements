@@ -10,30 +10,23 @@ class QuantityDiscountResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'product_id' => $this->product_id,
-            'min_quantity' => $this->min_qty,
-            'max_quantity' => $this->max_qty,
-            'discount_per_unit' => $this->discount_amount,
-            'discount_percentage' => $this->discount_percentage,
-            'tier_order' => $this->tier_order,
-            'active' => $this->active,
-            'valid_from' => $this->valid_from?->toIso8601String(),
-            'valid_to' => $this->valid_to?->toIso8601String(),
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
+            'id'                 => $this->id,
+            'company_id'         => $this->company_id,
+            'product_id'         => $this->product_id,
+            'price_level_id'     => $this->price_level_id,
+            'min_qty'            => $this->min_qty,
+            'max_qty'            => $this->max_qty,
+            'discount_amount'    => $this->discount_amount,
+            'discount_percentage'=> $this->discount_percentage,
+            'tier_order'         => $this->tier_order,
+            'is_blocked'         => $this->is_blocked,
+            'active'             => $this->active,
+            'created_at'         => $this->created_at,
+            'updated_at'         => $this->updated_at,
 
-            'relations' => [
-                'product' => $this->whenLoaded('product', fn() => [
-                    'id' => $this->product->id,
-                    'name' => $this->product->name,
-                    'ref' => $this->product->ref,
-                ]),
-                'priceLevel' => $this->whenLoaded('priceLevel', fn() => [
-                    'id' => $this->priceLevel->id,
-                    'name' => $this->priceLevel->name,
-                ]),
-            ],
+            // Relations
+            'price_level'        => new PriceLevelResource($this->whenLoaded('priceLevel')),
+            'product'            => new ProductResource($this->whenLoaded('product')),
         ];
     }
 }

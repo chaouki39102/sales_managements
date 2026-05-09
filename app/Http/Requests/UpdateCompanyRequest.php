@@ -43,7 +43,7 @@ class UpdateCompanyRequest extends FormRequest
             'commune_id'      => 'nullable|exists:communes,id',
 
             // ── حالة ──
-            'is_active'       => 'nullable|boolean',
+            'active'       => 'nullable|boolean',
         ];
 
         // ── حقول Super Admin فقط ──────────────────────────────

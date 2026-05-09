@@ -20,12 +20,12 @@ class InventoryValuationMethod extends Model
         'name',
         'method',
         'is_default',
-        'is_active',
+        'active',
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
-        'is_active' => 'boolean',
+        'active' => 'boolean',
     ];
 
     public static array $searchableFields = ['name', 'method'];

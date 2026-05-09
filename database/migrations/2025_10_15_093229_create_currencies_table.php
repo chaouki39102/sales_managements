@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->string('symbol', 10);
             $table->unsignedTinyInteger('decimal_places')->default(2);
             $table->boolean('is_base_currency')->default(false)->index();
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->timestamps();
             $table->unique(['company_id', 'code']);
         });

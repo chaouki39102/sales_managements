@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->decimal('base_salary', 15, 4)->comment('الراتب الأساسي');
             $table->string('job_title');
             $table->string('department')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->boolean('active')->default(true);
             $table->timestamps();
 
             $table->index('company_id');

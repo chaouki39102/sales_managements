@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
-import type { AdminCompany, AdminUser } from '@/lib/api/admin';
+import type { AdminCompany, AdminUser, AdminStats, PaginatedResponse } from '@/lib/api/admin';
 
 // ── Keys ──────────────────────────────────────────────────────────────
 export const adminKeys = {
@@ -17,36 +17,60 @@ export const adminKeys = {
   plans:          () => [...adminKeys.all, 'plans'] as const,
 };
 
+// ── helper: يسحب data من { success, message, data } أو يُعيد القيمة مباشرة ──
+// الـ apiGet في client قد يُعيد الـ response كاملاً أو data فقط حسب الإعداد
+function unwrap<T>(res: any): T {
+  if (res && typeof res === 'object' && 'data' in res && 'success' in res) {
+    return res.data as T;
+  }
+  return res as T;
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────
 export function useAdminDashboard() {
-  return useQuery({
+  return useQuery<AdminStats>({
     queryKey: adminKeys.dashboard(),
-    queryFn:  adminApi.getDashboard,
+    queryFn:  async () => {
+      const res = await adminApi.getDashboard();
+      // ✅ يتعامل مع كلا الحالتين:
+      // • apiGet يُعيد { success, message, data: {...} }  → يسحب data
+      // • apiGet يُعيد { companies, users, ... }          → يُعيد مباشرة
+      return unwrap<AdminStats>(res);
+    },
     staleTime: 2 * 60 * 1000,
   });
 }
 
 // ── Companies ─────────────────────────────────────────────────────────
 export function useAdminCompanies(params?: Record<string, unknown>) {
-  return useQuery({
+  return useQuery<PaginatedResponse<AdminCompany>>({
     queryKey: adminKeys.companies(params),
-    queryFn:  () => adminApi.getCompanies(params),
+    queryFn:  async () => {
+      const res = await adminApi.getCompanies(params);
+      return unwrap<PaginatedResponse<AdminCompany>>(res);
+    },
     staleTime: 60_000,
   });
 }
 
 export function useAdminCompany(id: number) {
-  return useQuery({
+  return useQuery<AdminCompany>({
     queryKey: adminKeys.company(id),
-    queryFn:  () => adminApi.getCompany(id),
+    queryFn:  async () => {
+      const res = await adminApi.getCompany(id);
+      return unwrap<AdminCompany>(res);
+    },
     enabled:  !!id,
   });
 }
 
 export function useAdminCompanyUsers(id: number) {
-  return useQuery({
+  return useQuery<PaginatedResponse<AdminUser>>({
     queryKey: adminKeys.companyUsers(id),
-    queryFn:  () => adminApi.getCompanyUsers(id),
+    queryFn:  async () => {
+      const res = await adminApi.getCompanyUsers(id);
+      return unwrap<PaginatedResponse<AdminUser>>(res);
+    },
     enabled:  !!id,
   });
 }
@@ -91,7 +115,9 @@ export function useAdminCompanyMutations() {
   });
 
   const changePlan = useMutation({
-    mutationFn: ({ id, ...data }: { id: number; plan: string; max_users?: number; max_warehouses?: number; max_products?: number }) =>
+    mutationFn: ({
+      id, ...data
+    }: { id: number; plan: string; max_users?: number; max_warehouses?: number; max_products?: number }) =>
       adminApi.changePlan(id, data),
     onSuccess: invalidate,
   });
@@ -107,14 +133,20 @@ export function useAdminCompanyMutations() {
     onSuccess: invalidate,
   });
 
-  return { suspend, unsuspend, verify, unverify, activate, deactivate, changePlan, deleteCompany, updateNotes };
+  return {
+    suspend, unsuspend, verify, unverify,
+    activate, deactivate, changePlan, deleteCompany, updateNotes,
+  };
 }
 
 // ── Users ─────────────────────────────────────────────────────────────
 export function useAdminUsers(params?: Record<string, unknown>) {
-  return useQuery({
+  return useQuery<PaginatedResponse<AdminUser>>({
     queryKey: adminKeys.users(params),
-    queryFn:  () => adminApi.getUsers(params),
+    queryFn:  async () => {
+      const res = await adminApi.getUsers(params);
+      return unwrap<PaginatedResponse<AdminUser>>(res);
+    },
     staleTime: 60_000,
   });
 }
@@ -129,7 +161,9 @@ export function useAdminUserMutations() {
   });
 
   const resetPassword = useMutation({
-    mutationFn: ({ id, password, password_confirmation }: { id: number; password: string; password_confirmation: string }) =>
+    mutationFn: ({
+      id, password, password_confirmation,
+    }: { id: number; password: string; password_confirmation: string }) =>
       adminApi.resetPassword(id, password, password_confirmation),
   });
 
@@ -140,6 +174,7 @@ export function useAdminUserMutations() {
 
   const impersonate = useMutation({
     mutationFn: (id: number) => adminApi.impersonateStart(id),
+    // ✅ بعد الانتحال: الـ UI يتولى تخزين token وإعادة التوجيه
   });
 
   return { toggleActive, resetPassword, deleteUser, impersonate };
@@ -149,7 +184,10 @@ export function useAdminUserMutations() {
 export function useAdminPlans() {
   return useQuery({
     queryKey: adminKeys.plans(),
-    queryFn:  adminApi.getPlans,
+    queryFn:  async () => {
+      const res = await adminApi.getPlans();
+      return unwrap(res);
+    },
     staleTime: 10 * 60 * 1000,
   });
 }

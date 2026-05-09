@@ -1,10 +1,10 @@
 // pages/auth/LoginPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
-    const { login, isAuthenticated } = useAuth();
+    const { login } = useAuth();
     const navigate = useNavigate();
 
     const [email, setEmail] = useState("");
@@ -13,20 +13,13 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [showPass, setShowPass] = useState(false);
 
-    // redirect if already logged in
-    useEffect(() => {
-        if (isAuthenticated) navigate("/onboarding", { replace: true });
-    }, [isAuthenticated, navigate]);
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // 1. تحقق محلي (Client-side Validation)
         if (!email || !password) {
             setError("يرجى إدخال البريد الإلكتروني وكلمة المرور");
             return;
         }
-
         if (password.length < 8) {
             setError("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
             return;
@@ -36,19 +29,16 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            // 2. إرسال الطلب فقط إذا كانت البيانات صحيحة
-            await login({ email, password });
-            navigate("/onboarding", { replace: true });
+            await login({ email, password });        // يخزّن المستخدم الكامل
+            navigate("/onboarding", { replace: true }); // الجميع يذهب إلى onboarding
         } catch (err: any) {
             if (err.response) {
-                // الخادم رد برسالة خطأ
                 const msg =
                     err.response.data?.message || err.response.statusText;
                 setError(`خطأ ${err.response.status}: ${msg}`);
             } else if (err.request) {
-                // الطلب أُرسل ولكن لا توجد استجابة (مشكلة شبكة/CORS/الخادم معطل)
                 setError(
-                    "لا يمكن الاتصال بالخادم. تأكد من تشغيل الخادم وإعدادات CORS.",
+                    "لا يمكن الاتصال بالخادم. تأكد من تشغيل الخادم وإعدادات CORS."
                 );
                 console.error(err);
             } else {
@@ -84,7 +74,6 @@ export default function LoginPage() {
                 }}
                 className="login-panel"
             >
-                {/* Background circles */}
                 {[
                     { size: 300, top: -80, left: -80, opacity: 0.08 },
                     { size: 200, bottom: -40, right: -40, opacity: 0.06 },
@@ -101,8 +90,8 @@ export default function LoginPage() {
                             opacity: c.opacity,
                             top: c.top,
                             left: c.left,
-                            bottom: (c as { bottom?: number }).bottom,
-                            right: (c as { right?: number }).right,
+                            bottom: (c as any).bottom,
+                            right: (c as any).right,
                             pointerEvents: "none",
                         }}
                     />
@@ -157,7 +146,6 @@ export default function LoginPage() {
                         الوطنية.
                     </p>
 
-                    {/* Professional Features List */}
                     <div
                         style={{
                             display: "flex",
@@ -167,30 +155,12 @@ export default function LoginPage() {
                         }}
                     >
                         {[
-                            {
-                                icon: "ti-receipt-2",
-                                text: "فوترة إلكترونية متوافقة مع النظام الجبائي",
-                            },
-                            {
-                                icon: "ti-building-warehouse",
-                                text: "إدارة مخزون احترافية ومتعددة المستودعات",
-                            },
-                            {
-                                icon: "ti-calculator",
-                                text: "حسابات TVA دقيقة مع إصدار تلقائي لـ G50/G12",
-                            },
-                            {
-                                icon: "ti-chart-pie",
-                                text: "لوحات تحكم تفاعلية لتقارير الأداء اللحظية",
-                            },
-                            {
-                                icon: "ti-shield-check",
-                                text: "أمان بيانات متطور مع نسخ احتياطي دوري",
-                            },
-                            {
-                                icon: "ti-users",
-                                text: "إدارة متكاملة لبيانات العملاء والموردين",
-                            },
+                            { icon: "ti-receipt-2", text: "فوترة إلكترونية متوافقة مع النظام الجبائي" },
+                            { icon: "ti-building-warehouse", text: "إدارة مخزون احترافية ومتعددة المستودعات" },
+                            { icon: "ti-calculator", text: "حسابات TVA دقيقة مع إصدار تلقائي لـ G50/G12" },
+                            { icon: "ti-chart-pie", text: "لوحات تحكم تفاعلية لتقارير الأداء اللحظية" },
+                            { icon: "ti-shield-check", text: "أمان بيانات متطور مع نسخ احتياطي دوري" },
+                            { icon: "ti-users", text: "إدارة متكاملة لبيانات العملاء والموردين" },
                         ].map(({ icon, text }) => (
                             <div
                                 key={text}
@@ -223,7 +193,6 @@ export default function LoginPage() {
                         ))}
                     </div>
 
-                    {/* Support Footer */}
                     <div
                         style={{
                             marginTop: 48,
@@ -233,10 +202,7 @@ export default function LoginPage() {
                         }}
                     >
                         <p style={{ fontSize: 13, margin: 0, opacity: 0.9 }}>
-                            <i
-                                className="ti ti-headset"
-                                style={{ marginLeft: 8 }}
-                            />
+                            <i className="ti ti-headset" style={{ marginLeft: 8 }} />
                             دعم فني متخصص لمساعدتك 24/7
                         </p>
                     </div>
@@ -257,7 +223,6 @@ export default function LoginPage() {
                 className="login-form-panel"
             >
                 <div style={{ width: "100%", maxWidth: 360 }}>
-                    {/* Header */}
                     <div style={{ marginBottom: 32 }}>
                         <div
                             style={{
@@ -285,18 +250,10 @@ export default function LoginPage() {
                                 ب
                             </div>
                             <div>
-                                <div
-                                    style={{
-                                        fontWeight: 900,
-                                        fontSize: 16,
-                                        color: "var(--t1)",
-                                    }}
-                                >
+                                <div style={{ fontWeight: 900, fontSize: 16, color: "var(--t1)" }}>
                                     بيزنس بلاس
                                 </div>
-                                <div
-                                    style={{ fontSize: 11, color: "var(--t4)" }}
-                                >
+                                <div style={{ fontSize: 11, color: "var(--t4)" }}>
                                     نظام إدارة الأعمال
                                 </div>
                             </div>
@@ -316,7 +273,6 @@ export default function LoginPage() {
                         </p>
                     </div>
 
-                    {/* Form */}
                     <form
                         onSubmit={handleSubmit}
                         style={{
@@ -325,7 +281,6 @@ export default function LoginPage() {
                             gap: 16,
                         }}
                     >
-                        {/* Email */}
                         <div className="fg">
                             <label className="req">البريد الإلكتروني</label>
                             <div className="inp-row">
@@ -357,7 +312,6 @@ export default function LoginPage() {
                             </div>
                         </div>
 
-                        {/* Password */}
                         <div className="fg">
                             <div
                                 style={{
@@ -398,9 +352,7 @@ export default function LoginPage() {
                                 <input
                                     type={showPass ? "text" : "password"}
                                     value={password}
-                                    onChange={(e) =>
-                                        setPassword(e.target.value)
-                                    }
+                                    onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
                                     autoComplete="current-password"
                                     style={{
@@ -425,14 +377,11 @@ export default function LoginPage() {
                                         padding: 0,
                                     }}
                                 >
-                                    <i
-                                        className={`ti ${showPass ? "ti-eye-off" : "ti-eye"}`}
-                                    />
+                                    <i className={`ti ${showPass ? "ti-eye-off" : "ti-eye"}`} />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Error */}
                         {error && (
                             <div
                                 className="al al-r"
@@ -441,17 +390,13 @@ export default function LoginPage() {
                                     padding: "10px 14px",
                                 }}
                             >
-                                <span
-                                    className="ic ic-xs"
-                                    style={{ flexShrink: 0 }}
-                                >
+                                <span className="ic ic-xs" style={{ flexShrink: 0 }}>
                                     <i className="ti ti-alert-circle" />
                                 </span>
                                 <div style={{ fontSize: 13 }}>{error}</div>
                             </div>
                         )}
 
-                        {/* Submit */}
                         <button
                             type="submit"
                             disabled={loading}
@@ -460,9 +405,7 @@ export default function LoginPage() {
                                 padding: "12px 20px",
                                 borderRadius: "var(--r2)",
                                 border: "none",
-                                background: loading
-                                    ? "var(--bg4)"
-                                    : "var(--em)",
+                                background: loading ? "var(--bg4)" : "var(--em)",
                                 color: loading ? "var(--t4)" : "#fff",
                                 fontSize: 14,
                                 fontWeight: 800,
@@ -486,8 +429,7 @@ export default function LoginPage() {
                                             borderRadius: "50%",
                                             border: "2px solid rgba(255,255,255,.3)",
                                             borderTopColor: "#fff",
-                                            animation:
-                                                "spin .7s linear infinite",
+                                            animation: "spin .7s linear infinite",
                                         }}
                                     />
                                     جاري الدخول...
@@ -501,7 +443,6 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    {/* Footer */}
                     <div
                         style={{
                             marginTop: 32,
@@ -545,12 +486,12 @@ export default function LoginPage() {
             </div>
 
             <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 768px) {
-          .login-panel { display: none !important; }
-          .login-form-panel { width: 100% !important; }
-        }
-      `}</style>
+                @keyframes spin { to { transform: rotate(360deg); } }
+                @media (max-width: 768px) {
+                    .login-panel { display: none !important; }
+                    .login-form-panel { width: 100% !important; }
+                }
+            `}</style>
         </div>
     );
 }

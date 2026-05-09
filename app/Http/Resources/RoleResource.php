@@ -9,34 +9,17 @@ class RoleResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        // الصلاحيات مباشرة في المستوى الأول (ليس داخل relations)
-        // لأن الفرونت يقرأ: role.permissions ?? role.relations?.permissions
-        // وكلاهما يعمل، لكن نوحّد على permissions مباشرة
-        $permissions = $this->whenLoaded('permissions', fn() =>
-            $this->permissions->map(fn($p) => [
-                'id'           => $p->id,
-                'name'         => $p->name,
-                'display_name' => $p->display_name,
-                'group'        => $p->group,
-            ])
-        );
-
         return [
             'id'           => $this->id,
+            'company_id'   => $this->company_id,
             'name'         => $this->name,
             'guard_name'   => $this->guard_name,
             'display_name' => $this->display_name,
             'description'  => $this->description,
-            'created_at'   => $this->created_at?->toIso8601String(),
-            'updated_at'   => $this->updated_at?->toIso8601String(),
-
-            // ① في المستوى الأول — يستخدمه RoleFormModal و PermMatrix
-            'permissions'  => $permissions,
-
-            // ② داخل relations أيضاً للتوافق مع الكود القديم
-            'relations'    => [
-                'permissions' => $permissions,
-            ],
+            'permissions'  => PermissionResource::collection($this->whenLoaded('permissions')),
+            'created_at'   => $this->created_at?->toDateTimeString(),
+            'updated_at'   => $this->updated_at?->toDateTimeString(),
         ];
     }
 }
+

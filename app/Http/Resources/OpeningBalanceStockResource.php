@@ -10,31 +10,21 @@ class OpeningBalanceStockResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'fiscal_year_id' => $this->fiscal_year_id,
-            'product_id' => $this->product_id,
-            'warehouse_id' => $this->warehouse_id,
-            'opening_quantity' => $this->opening_quantity,
-            'opening_value' => $this->opening_value,
-            'average_cost_price' => $this->average_cost_price,
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
-
-            'relations' => [
-                'fiscalYear' => $this->whenLoaded('fiscalYear', fn() => [
-                    'id' => $this->fiscalYear->id,
-                    'name' => $this->fiscalYear->name,
-                ]),
-                'product' => $this->whenLoaded('product', fn() => [
-                    'id' => $this->product->id,
-                    'name' => $this->product->name,
-                    'ref' => $this->product->ref,
-                ]),
-                'warehouse' => $this->whenLoaded('warehouse', fn() => [
-                    'id' => $this->warehouse->id,
-                    'name' => $this->warehouse->name,
-                ]),
-            ],
+            'id'                 => $this->id,
+            'company_id'         => $this->company_id,
+            'fiscal_year_id'     => $this->fiscal_year_id,
+            'fiscal_year'        => new FiscalYearResource($this->whenLoaded('fiscalYear')),
+            'product_id'         => $this->product_id,
+            'product'            => new ProductResource($this->whenLoaded('product')),
+            'warehouse_id'       => $this->warehouse_id,
+            'warehouse'          => new WarehouseResource($this->whenLoaded('warehouse')),
+            'opening_quantity'   => $this->opening_quantity,
+            'opening_value'      => $this->opening_value,
+            'lot_number'         => $this->lot_number,
+            'manufacturing_date' => $this->manufacturing_date?->toDateString(),
+            'expiration_date'    => $this->expiration_date?->toDateString(),
+            'created_at'         => $this->created_at?->toDateTimeString(),
+            'updated_at'         => $this->updated_at?->toDateTimeString(),
         ];
     }
 }

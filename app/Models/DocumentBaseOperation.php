@@ -20,17 +20,17 @@ class DocumentBaseOperation extends Model
         'name',
         'label',
         'description',
-        'is_active',
+        'active',
         'display_order',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'active' => 'boolean',
         'display_order' => 'integer',
     ];
 
     public static array $searchableFields = ['name', 'label'];
-    public static array $filterable = ['is_active'];
+    public static array $filterable = ['active'];
     public static array $sortable = ['id', 'name', 'label', 'display_order'];
     public static array $allowedIncludes = ['documentTypes'];
     public static ?int $cacheTtl = 86400;

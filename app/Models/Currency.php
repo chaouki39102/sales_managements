@@ -23,19 +23,19 @@ class Currency extends Model
         'symbol',
         'decimal_places',
         'is_base_currency',
-        'is_active',
+        'active',
     ];
 
     protected $casts = [
         'decimal_places' => 'integer',
         'is_base_currency' => 'boolean',
-        'is_active' => 'boolean',
+        'active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
     public static array $searchableFields = ['name', 'code', 'symbol'];
-    public static array $filterable = ['is_active', 'is_base_currency'];
+    public static array $filterable = ['active', 'is_base_currency'];
     public static array $sortable = ['id', 'name', 'code'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['commercialDocuments', 'payments', 'exchangeRatesFrom', 'exchangeRatesTo'];
@@ -71,7 +71,7 @@ class Currency extends Model
     public static function getBaseCurrency(): ?self
     {
         return static::where('is_base_currency', true)
-            ->where('is_active', true)
+            ->where('active', true)
             ->first();
     }
 

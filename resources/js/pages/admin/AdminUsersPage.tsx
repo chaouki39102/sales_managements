@@ -79,13 +79,13 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: () => void })
             onClick={() => { muts.toggleActive.mutate(user.id); onClose(); }}
             style={{
               display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8,
-              border: '1px solid', borderColor: user.is_active ? '#ef444433' : '#10b98133',
-              background: user.is_active ? '#ef44440d' : '#10b9810d',
-              color: user.is_active ? '#ef4444' : '#10b981', cursor: 'pointer', fontSize: 12,
+              border: '1px solid', borderColor: user.active ? '#ef444433' : '#10b98133',
+              background: user.active ? '#ef44440d' : '#10b9810d',
+              color: user.active ? '#ef4444' : '#10b981', cursor: 'pointer', fontSize: 12,
             }}
           >
-            <i className={`ti ${user.is_active ? 'ti-user-off' : 'ti-user-check'}`} style={{ fontSize: 14 }} />
-            {user.is_active ? 'تعطيل المستخدم' : 'تفعيل المستخدم'}
+            <i className={`ti ${user.active ? 'ti-user-off' : 'ti-user-check'}`} style={{ fontSize: 14 }} />
+            {user.active ? 'تعطيل المستخدم' : 'تفعيل المستخدم'}
           </button>
 
           <button
@@ -130,7 +130,7 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: () => void })
                 ['الاسم', user.name],
                 ['البريد الإلكتروني', user.email],
                 ['الدور', user.role],
-                ['الحالة', user.is_active ? '✓ نشط' : '✗ معطل'],
+                ['الحالة', user.active ? '✓ نشط' : '✗ معطل'],
                 ['الشركات', `${user.companies_count ?? 0} شركة`],
                 ['تاريخ الإنشاء', new Date(user.created_at).toLocaleDateString('ar-DZ')],
               ].map(([k, v]) => (
@@ -307,9 +307,9 @@ export default function AdminUsersPage() {
                   <td style={{ padding: '10px 14px' }}>
                     <span style={{
                       fontSize: 11, padding: '3px 9px', borderRadius: 10, fontWeight: 600,
-                      background: u.is_active ? '#10b9811a' : '#6b72801a',
-                      color: u.is_active ? '#10b981' : '#6b7280',
-                    }}>{u.is_active ? 'نشط' : 'معطل'}</span>
+                      background: u.active ? '#10b9811a' : '#6b72801a',
+                      color: u.active ? '#10b981' : '#6b7280',
+                    }}>{u.active ? 'نشط' : 'معطل'}</span>
                   </td>
                   <td style={{ padding: '10px 14px', color: 'var(--tx2)', fontSize: 12 }}>
                     {new Date(u.created_at).toLocaleDateString('ar-DZ')}

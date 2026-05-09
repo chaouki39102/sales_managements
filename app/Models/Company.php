@@ -24,7 +24,7 @@ class Company extends Model
         'rc', 'rc_date', 'nif', 'nis', 'ai', 'legal_form_id', 'capital_amount',
         'address', 'commune_id', 'wilaya_id', 'phone', 'mobile', 'fax', 'email', 'avatar',
         'bank_name', 'rib',
-        'owner_id', 'created_by', 'is_active',
+        'owner_id', 'created_by', 'active',
         'suspended_at', 'suspension_reason', 'suspended_by',
         'deactivated_at', 'deactivated_by',
         'plan', 'trial_ends_at', 'max_users', 'max_warehouses', 'max_products',
@@ -32,7 +32,7 @@ class Company extends Model
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'active' => 'boolean',
         'capital_amount' => 'decimal:4',
         'rc_date' => 'date',
         'suspended_at' => 'datetime',
@@ -50,7 +50,7 @@ class Company extends Model
     protected $appends = ['is_operational', 'is_suspended', 'is_verified', 'is_on_trial', 'trial_days_remaining'];
 
     public static array $searchableFields = ['name', 'commercial_name', 'nif', 'rc', 'email', 'phone'];
-    public static array $filterable = ['is_active', 'plan', 'legal_form_id', 'wilaya_id', 'owner_id'];
+    public static array $filterable = ['active', 'plan', 'legal_form_id', 'wilaya_id', 'owner_id'];
     public static array $sortable = ['id', 'name', 'plan', 'created_at', 'trial_ends_at'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['owner', 'legalForm', 'wilaya', 'commune', 'activeUsers', 'suspendedBy', 'deactivatedBy', 'verifiedBy'];
@@ -140,13 +140,13 @@ class Company extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-            ->withPivot(['is_default', 'role', 'invited_by', 'joined_at', 'is_active'])
+            ->withPivot(['is_default', 'role', 'invited_by', 'joined_at', 'active'])
             ->withTimestamps();
     }
 
     public function activeUsers(): BelongsToMany
     {
-        return $this->users()->wherePivot('is_active', true);
+        return $this->users()->wherePivot('active', true);
     }
 
     public function products(): HasMany
@@ -181,7 +181,7 @@ class Company extends Model
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('is_active', true)->whereNull('suspended_at');
+        return $query->where('active', true)->whereNull('suspended_at');
     }
 
     public function scopeSuspended(Builder $query): Builder
@@ -191,7 +191,7 @@ class Company extends Model
 
     public function scopeDeactivated(Builder $query): Builder
     {
-        return $query->where('is_active', false);
+        return $query->where('active', false);
     }
 
     public function scopeVerified(Builder $query): Builder
@@ -216,7 +216,7 @@ class Company extends Model
 
     public function getIsOperationalAttribute(): bool
     {
-        return $this->is_active && is_null($this->suspended_at);
+        return $this->active && is_null($this->suspended_at);
     }
 
     public function getIsSuspendedAttribute(): bool
@@ -271,7 +271,7 @@ class Company extends Model
     public function deactivate(int $byUserId): void
     {
         $this->update([
-            'is_active'      => false,
+            'active'      => false,
             'deactivated_at' => now(),
             'deactivated_by' => $byUserId,
         ]);
@@ -280,7 +280,7 @@ class Company extends Model
     public function activate(): void
     {
         $this->update([
-            'is_active'         => true,
+            'active'         => true,
             'deactivated_at'    => null,
             'deactivated_by'    => null,
             'suspended_at'      => null,
@@ -307,7 +307,7 @@ class Company extends Model
                 'is_default' => false,
                 'role'       => 'owner',
                 'joined_at'  => now(),
-                'is_active'  => true,
+                'active'  => true,
             ]);
         } else {
             $this->users()->updateExistingPivot($newOwnerId, ['role' => 'owner']);
@@ -338,7 +338,7 @@ class Company extends Model
                 'role'       => $role,
                 'invited_by' => $invitedBy,
                 'joined_at'  => now(),
-                'is_active'  => true,
+                'active'  => true,
             ],
         ]);
     }
@@ -352,12 +352,12 @@ class Company extends Model
     public function deactivateMember(int $userId): void
     {
         abort_if($userId === $this->owner_id, 422, 'لا يمكن تعطيل مالك الشركة.');
-        $this->users()->updateExistingPivot($userId, ['is_active' => false]);
+        $this->users()->updateExistingPivot($userId, ['active' => false]);
     }
 
     public function activateMember(int $userId): void
     {
-        $this->users()->updateExistingPivot($userId, ['is_active' => true]);
+        $this->users()->updateExistingPivot($userId, ['active' => true]);
     }
 
     public function changeMemberRole(int $userId, string $role): void

@@ -20,11 +20,11 @@ class DocumentStatus extends Model
         'name',
         'label',
         'color',
-        'is_active',
+        'active',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

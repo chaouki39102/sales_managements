@@ -9,13 +9,9 @@ class TvaSeeder extends Seeder
 {
     public function run(): void
     {
-<<<<<<< HEAD
-        DB::table('tvas')->upsert([
-=======
         $companyId = config('seeding.company_id') ?? DB::table('companies')->value('id');
 
-        DB::table('tvas')->insert([
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
+        DB::table('tvas')->upsert([
             [
                 'company_id'    => $companyId,
                 'name'          => 'TVA 0%',
@@ -49,6 +45,6 @@ class TvaSeeder extends Seeder
                 'created_at'    => now(),
                 'updated_at'    => now(),
             ],
-        ], ['name', 'rate']); // unique constraint
+        ], ['company_id', 'name', 'rate']); // المفتاح الفريد المركب
     }
 }

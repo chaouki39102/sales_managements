@@ -3,31 +3,48 @@
 namespace App\Services;
 
 use App\Models\ProductVariant;
+use App\Models\Barcode;
+use App\Core\Services\BaseService;
+use App\Services\CompanyContextService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
-class ProductVariantService extends \App\Core\Services\BaseService
+class ProductVariantService extends BaseService
 {
     protected string $model = ProductVariant::class;
-    protected string $resourceName = 'product_variant';
-    protected function getResourceName(): string { return $this->resourceName; }
 
-    protected function beforeCreate(array $data, Request $request): array
+    protected function getResourceName(): string
     {
+        return 'product_variant';
+    }
+
+    /**
+     * تنفيذ منطق قبل الإنشاء
+     */
+    protected function beforeCreate(array $data, ?Request $request): array
+    {
+        // استخدام parent إذا كنت تريد تنفيذ أي منطق عام مضاف في BaseService مستقبلاً
+        $data = parent::beforeCreate($data, $request);
+
         if (!isset($data['company_id'])) {
             $data['company_id'] = app(CompanyContextService::class)->get();
         }
-        if (!isset($data['created_by'])) {
+
+        if (!isset($data['created_by']) && auth()->check()) {
             $data['created_by'] = auth()->id();
         }
+
         return $data;
     }
 
-    protected function afterCreate(Model $item, array $data, $request): void
+    /**
+     * تنفيذ منطق بعد الإنشاء (داخل الترانزاكشن)
+     */
+    protected function afterCreate(Model $item, array $data, ?Request $request): void
     {
-        // إذا تم إرسال باركود في الطلب، يمكن إنشاء سجل باركود مرتبط بهذا المتغير
+        // إضافة الباركود إذا وجد
         if (!empty($data['barcode'])) {
-            $barcode = new \App\Models\Barcode([
+            Barcode::create([
                 'company_id' => $item->company_id,
                 'product_id' => $item->product_id,
                 'variant_id' => $item->id,
@@ -36,13 +53,19 @@ class ProductVariantService extends \App\Core\Services\BaseService
                 'type'       => 'variant',
                 'created_by' => auth()->id(),
             ]);
-            $barcode->save();
         }
     }
 
-    protected function beforeUpdate(array $data, Model $item, Request $request): array
+    /**
+     * تصحيح توقيع الدالة لتتطابق مع BaseService
+     */
+    protected function beforeUpdate(Model $item, array $data, ?Request $request): void
     {
-        unset($data['product_id'], $data['company_id']);
-        return $data;
+        // استدعاء الأب مهم جداً لأنه يحتوي على فحص عدم تغيير الـ company_id
+        parent::beforeUpdate($item, $data, $request);
+
+        // أي منطق إضافي قبل التحديث يوضع هنا
+        // ملاحظة: لا حاجة لعمل unset لـ product_id هنا لأن دالة prepareDataForUpdate
+        // في الكلاس الأب تقوم بتنظيف البيانات تلقائياً بناءً على الأعمدة.
     }
 }

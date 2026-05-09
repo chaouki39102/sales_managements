@@ -31,48 +31,19 @@ class ProductVariantController extends BaseApiController
         return ProductVariant::class;
     }
 
-    protected function getListConfig(): array
-    {
-        return [
-            'search_fields' => ProductVariant::$searchableFields,
-            'filters' => ProductVariant::$filterable,
-            'sorts' => ProductVariant::$sortable,
-            'relations' => ProductVariant::$allowedIncludes,
-            'default_includes' => ProductVariant::$defaultWith,
-            'default_sort' => ProductVariant::$defaultSort,
-            'default_per_page' => ProductVariant::$defaultPerPage,
-            'per_page_limit' => ProductVariant::$perPageLimit,
-            'cache_ttl' => ProductVariant::$cacheTtl,
-            'cache_tags' => ProductVariant::$cacheTags,
-        ];
-    }
+    // ملاحظة: تم إزالة index و show و destroy لأن BaseApiController
+    // يقوم بالمهمة تلقائياً وبنفس المنطق الذي كتبته، إلا إذا أردت تخصيصاً شديداً.
 
-    public function index(Request $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         try {
-            $this->authorizeAction('viewAny', ProductVariant::class);
-            $data = $this->getListData($request);
-            return $this->successResponse($data, 'تم جلب قائمة المتغيرات');
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'index');
-        }
-    }
+            $this->authorizeAction('create', $this->getModelClass());
 
-    public function show($id): JsonResponse
-    {
-        try {
-            $variant = $this->service->findById($id);
-            $this->authorizeAction('view', $variant);
-            return $this->successResponse(new ProductVariantResource($variant->load('product', 'barcodes')));
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'show');
-        }
-    }
+            // تصحيح: استخدام الـ FormRequest يدوياً للحصول على البيانات المفلترة والتوافق مع الأب
+            $validatedData = app(StoreProductVariantRequest::class)->validated();
 
-    public function store(StoreProductVariantRequest $request): JsonResponse
-    {
-        try {
-            $variant = $this->service->create($request->validated(), $request);
+            $variant = $this->service->create($validatedData, $request);
+
             return $this->successResponse(
                 new ProductVariantResource($variant->load('product')),
                 'تم إنشاء المتغير بنجاح',
@@ -83,12 +54,17 @@ class ProductVariantController extends BaseApiController
         }
     }
 
-    public function update(UpdateProductVariantRequest $request, $id): JsonResponse
+    public function update(Request $request, $id): JsonResponse
     {
         try {
             $variant = $this->service->findById($id);
             $this->authorizeAction('update', $variant);
-            $variant = $this->service->update($variant, $request->validated(), $request);
+
+            // تصحيح: استخدام الـ FormRequest يدوياً
+            $validatedData = app(UpdateProductVariantRequest::class)->validated();
+
+            $variant = $this->service->update($variant, $validatedData, $request);
+
             return $this->successResponse(
                 new ProductVariantResource($variant->load('product')),
                 'تم تحديث المتغير'
@@ -98,19 +74,6 @@ class ProductVariantController extends BaseApiController
         }
     }
 
-    public function destroy($id): JsonResponse
-    {
-        try {
-            $variant = $this->service->findById($id);
-            $this->authorizeAction('delete', $variant);
-            $this->service->delete($variant);
-            return $this->successResponse(null, 'تم حذف المتغير');
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'destroy');
-        }
-    }
-
-    // إضافي: جلب متغيرات منتج معين
     public function indexByProduct(Request $request, $productId): JsonResponse
     {
         try {

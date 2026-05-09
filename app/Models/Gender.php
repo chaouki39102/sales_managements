@@ -18,19 +18,19 @@ class Gender extends Model
         'company_id',
         'name',
         'label',
-        'is_active',
+        'active',
         'display_order',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'active' => 'boolean',
         'display_order' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
     public static array $searchableFields = ['name', 'label'];
-    public static array $filterable = ['is_active'];
+    public static array $filterable = ['active'];
     public static array $sortable = ['id', 'name', 'display_order', 'created_at'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = [];

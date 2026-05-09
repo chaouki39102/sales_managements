@@ -18,7 +18,7 @@ const PLANS = ['starter', 'professional', 'enterprise', 'custom'];
 
 function statusBadge(co: AdminCompany) {
   if (co.is_suspended) return { label: 'موقوف', color: '#ef4444', bg: '#ef44441a' };
-  if (!co.is_active)   return { label: 'غير نشط', color: '#6b7280', bg: '#6b72801a' };
+  if (!co.active)   return { label: 'غير نشط', color: '#6b7280', bg: '#6b72801a' };
   return                      { label: 'نشط',     color: '#10b981', bg: '#10b9811a' };
 }
 
@@ -93,7 +93,7 @@ function CompanyDrawer({ company, onClose }: { company: AdminCompany; onClose: (
             <Btn icon="ti-ban" label="تعليق" color="#ef4444"
               onClick={() => setShowSuspendForm(v => !v)} />
           )}
-          {company.is_active
+          {company.active
             ? <Btn icon="ti-toggle-left" label="إيقاف" color="#f59e0b" onClick={() => { muts.deactivate.mutate(company.id); onClose(); }} />
             : <Btn icon="ti-toggle-right" label="تفعيل" color="#10b981" onClick={() => { muts.activate.mutate(company.id); onClose(); }} />
           }
@@ -180,9 +180,9 @@ function CompanyDrawer({ company, onClose }: { company: AdminCompany; onClose: (
                   </div>
                   <span style={{
                     fontSize: 10, padding: '2px 7px', borderRadius: 10,
-                    background: u.is_active ? '#10b9811a' : '#ef44441a',
-                    color: u.is_active ? '#10b981' : '#ef4444',
-                  }}>{u.is_active ? 'نشط' : 'معطل'}</span>
+                    background: u.active ? '#10b9811a' : '#ef44441a',
+                    color: u.active ? '#10b981' : '#ef4444',
+                  }}>{u.active ? 'نشط' : 'معطل'}</span>
                 </div>
               ))}
               {(!usersData?.data || usersData.data.length === 0) && (

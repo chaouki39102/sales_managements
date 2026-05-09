@@ -12,7 +12,7 @@ return new class extends Migration {
             $table->string('name', 50);
             $table->enum('method', ['fifo', 'lifo', 'weighted_average'])->default('fifo');
             $table->boolean('is_default')->default(false);
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->timestamps();
             $table->unique(['company_id', 'name']);
         });

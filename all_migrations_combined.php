@@ -9,18 +9,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -32,19 +22,11 @@ return new class extends Migration {
             $table->timestamps();
             $table->softDeletes();
         });
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('password_reset_tokens', function (Blueprint $table) {
             $table->string('email')->primary();
             $table->string('token');
             $table->timestamp('created_at')->nullable();
         });
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('sessions', function (Blueprint $table) {
             $table->string('id')->primary();
             $table->foreignId('user_id')->nullable()->index();
@@ -54,16 +36,7 @@ return new class extends Migration {
             $table->integer('last_activity')->index();
         });
     }
-<<<<<<< HEAD
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('users');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
@@ -78,43 +51,20 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('cache', function (Blueprint $table) {
             $table->string('key')->primary();
             $table->mediumText('value');
             $table->bigInteger('expiration')->index();
         });
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('cache_locks', function (Blueprint $table) {
             $table->string('key')->primary();
             $table->string('owner');
             $table->bigInteger('expiration')->index();
         });
     }
-<<<<<<< HEAD
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('cache');
         Schema::dropIfExists('cache_locks');
     }
@@ -128,18 +78,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('jobs', function (Blueprint $table) {
             $table->id();
             $table->string('queue')->index();
@@ -149,10 +89,6 @@ return new class extends Migration {
             $table->unsignedInteger('available_at');
             $table->unsignedInteger('created_at');
         });
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('job_batches', function (Blueprint $table) {
             $table->string('id')->primary();
             $table->string('name');
@@ -165,10 +101,6 @@ return new class extends Migration {
             $table->integer('created_at');
             $table->integer('finished_at')->nullable();
         });
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('failed_jobs', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
@@ -179,16 +111,7 @@ return new class extends Migration {
             $table->timestamp('failed_at')->useCurrent();
         });
     }
-<<<<<<< HEAD
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('jobs');
         Schema::dropIfExists('job_batches');
         Schema::dropIfExists('failed_jobs');
@@ -203,46 +126,22 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
             $table->string('name', 150);
             $table->string('commercial_name', 150)->nullable();
             $table->string('slug')->unique();
-<<<<<<< HEAD
-
-            // Business and Legal Information (Original & New)
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->text('activity')->nullable()->comment('Commercial activity description');
             $table->string('rc', 50)->nullable()->comment('السجل التجاري');
             $table->string('nif', 50)->unique()->nullable()->comment('Numéro d\'Identification Fiscale رقم التعريف الجبائي');
             $table->string('nis', 50)->nullable()->comment('رقم التعريف الإحصائي');
             $table->string('ai', 50)->nullable()->comment('المادة الجبائية');
-<<<<<<< HEAD
-            // ✅ IMPROVEMENT: Added Algerian Legal Fields
-            // ✅ CORRECTED: Use nullOnDelete() for nullable foreign keys
-            $table->foreignId('legal_form_id')->nullable()->constrained('legal_forms')->nullOnDelete()->cascadeOnUpdate()->name('fk_companies_legal_form_id');
-            $table->decimal('capital_amount', 15, 4)->nullable()->comment('رأس المال');
-            $table->date('rc_date')->nullable()->comment('تاريخ السجل التجاري');
-
-            // Contact information
-            $table->text('address')->nullable();
-            // ✅ CORRECTED: Use nullOnDelete() for nullable foreign keys
-=======
             $table->foreignId('legal_form_id')->nullable()->constrained('legal_forms')->nullOnDelete()->cascadeOnUpdate()->name('fk_companies_legal_form_id');
             $table->decimal('capital_amount', 15, 4)->nullable()->comment('رأس المال');
             $table->date('rc_date')->nullable()->comment('تاريخ السجل التجاري');
             $table->text('address')->nullable();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->foreignId('commune_id')->nullable()->constrained('communes')->nullOnDelete()->cascadeOnUpdate()->name('fk_companies_commune_id');
             $table->foreignId('wilaya_id')->nullable()->constrained('wilayas')->nullOnDelete()->cascadeOnUpdate()->name('fk_companies_wilaya_id');
             $table->string('phone', 20)->nullable()->index();
@@ -250,22 +149,10 @@ return new class extends Migration {
             $table->string('fax', 30)->nullable();
             $table->string('email', 100)->nullable()->unique();
             $table->string('avatar')->nullable();
-<<<<<<< HEAD
-
-            // Banking information
-            $table->string('bank_name', 100)->nullable();
-            $table->string('rib', 30)->nullable()->comment('Bank account number');
-
-
-
-            $table->foreignId('owner_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-=======
             $table->string('bank_name', 100)->nullable();
             $table->string('rib', 30)->nullable()->comment('Bank account number');
             $table->foreignId('owner_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->boolean('is_active')->default(true);
+            $table->boolean('active')->default(true);
 
             // إدارة الحالة والخطط
             $table->timestamp('suspended_at')->nullable()->comment('تاريخ التعليق المؤقت');
@@ -295,7 +182,6 @@ return new class extends Migration {
             $table->index('suspended_at');
             $table->index('verified_at');
             $table->index('trial_ends_at');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         });
 
         Schema::create('company_user', function (Blueprint $table) {
@@ -303,30 +189,19 @@ return new class extends Migration {
             $table->foreignId('company_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->boolean('is_default')->default(false);
-<<<<<<< HEAD
-            $table->timestamps();
-
-            $table->unique(['company_id', 'user_id']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->string('role', 30)->default('member');
             $table->foreignId('invited_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('joined_at')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->boolean('active')->default(true);
             $table->timestamps();
 
             $table->unique(['company_id', 'user_id']);
             $table->index(['company_id', 'role']);
-            $table->index(['company_id', 'is_active']);
+            $table->index(['company_id', 'active']);
         });
     }
 
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('company_user');
         Schema::dropIfExists('companies');
     }
@@ -338,35 +213,6 @@ return new class extends Migration {
 // ===== ملف: 2025_10_15_093158_create_genders_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for genders lookup table
- *
- * Replaces ENUM gender field with a proper lookup table
- * for better flexibility and maintainability
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('genders', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 50)->unique();
-            $table->string('label', 100);
-            $table->boolean('active')->default(true)->index();
-            $table->unsignedSmallInteger('display_order')->default(0);
-            $table->timestamps();
-        });
-
-
-    }
-
-    public function down(): void
-    {
-=======
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -376,14 +222,13 @@ return new class extends Migration {
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('name', 50);
             $table->string('label', 100);
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
             $table->unique(['company_id', 'name']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('genders');
     }
 };
@@ -394,36 +239,6 @@ return new class extends Migration {
 // ===== ملف: 2025_10_15_093204_create_document_base_operations_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for document_base_operations lookup table
- *
- * Defines base operations for commercial documents
- * Replaces the ENUM base_operation field in document_types table
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('document_base_operations', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 50)->unique();
-            $table->string('label', 100);
-            $table->text('description')->nullable();
-            $table->boolean('active')->default(true)->index();
-            $table->unsignedSmallInteger('display_order')->default(0);
-            $table->timestamps();
-        });
-
-
-    }
-
-    public function down(): void
-    {
-=======
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -434,14 +249,13 @@ return new class extends Migration {
             $table->string('name', 50);
             $table->string('label', 100);
             $table->text('description')->nullable();
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
             $table->unique(['company_id', 'name']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('document_base_operations');
     }
 };
@@ -452,24 +266,6 @@ return new class extends Migration {
 // ===== ملف: 2025_10_15_093204_create_party_types_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for party_types lookup table
- *
- * Defines types of parties (customers, suppliers, both)
- * Replaces the ENUM type field in the parties table
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('party_types', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 50)->unique();
-=======
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -478,31 +274,15 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('name', 50);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('label', 100);
             $table->text('description')->nullable();
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
-<<<<<<< HEAD
-        });
-
-        // Insert default values
-        DB::table('party_types')->insert([
-            ['name' => 'client', 'label' => 'Customer', 'description' => 'Customer party type', 'active' => true, 'display_order' => 1, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'supplier', 'label' => 'Supplier', 'description' => 'Supplier party type', 'active' => true, 'display_order' => 2, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'both', 'label' => 'Customer & Supplier', 'description' => 'Both customer and supplier', 'active' => true, 'display_order' => 3, 'created_at' => now(), 'updated_at' => now()],
-        ]);
-    }
-
-    public function down(): void
-    {
-=======
             $table->unique(['company_id', 'name']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('party_types');
     }
 };
@@ -513,24 +293,6 @@ return new class extends Migration {
 // ===== ملف: 2025_10_15_093205_create_product_types_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for product_types lookup table
- *
- * Defines types of products (stockable, service, consumable)
- * Replaces the ENUM type field in the products table
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('product_types', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 50)->unique();
-=======
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -539,32 +301,16 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('name', 50);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('label', 100);
             $table->text('description')->nullable();
             $table->boolean('manages_stock')->default(true);
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
-<<<<<<< HEAD
-        });
-
-        // Insert default values
-        DB::table('product_types')->insert([
-            ['name' => 'stockable', 'label' => 'Stockable Product', 'description' => 'Physical product with inventory tracking', 'manages_stock' => true, 'active' => true, 'display_order' => 1, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'service', 'label' => 'Service', 'description' => 'Non-physical service item', 'manages_stock' => false, 'active' => true, 'display_order' => 2, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'consumable', 'label' => 'Consumable', 'description' => 'Consumable product without strict inventory tracking', 'manages_stock' => false, 'active' => true, 'display_order' => 3, 'created_at' => now(), 'updated_at' => now()],
-        ]);
-    }
-
-    public function down(): void
-    {
-=======
             $table->unique(['company_id', 'name']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('product_types');
     }
 };
@@ -577,20 +323,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for wilayas table
- *
- * Stores Algerian provinces (wilayas) for geographic organization
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('wilayas', function (Blueprint $table) {
             $table->id();
             $table->unsignedSmallInteger('code')->unique()->comment('Official wilaya code');
@@ -600,22 +334,12 @@ return new class extends Migration {
             $table->decimal('longitude', 10, 7)->nullable();
             $table->boolean('active')->default(true)->index();
             $table->timestamps();
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->index('name');
             $table->index('arabic_name');
             $table->index(['latitude', 'longitude']);
         });
     }
-<<<<<<< HEAD
-
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('wilayas');
     }
 };
@@ -628,57 +352,24 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for communes table
- *
- * Stores Algerian municipalities (communes) linked to wilayas
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('communes', function (Blueprint $table) {
             $table->id();
             $table->string('post_code', 10)->nullable()->index();
             $table->string('name', 100);
             $table->string('arabic_name', 100);
-<<<<<<< HEAD
-
-            // ✅ CORRECTED: Added explicit table name and cascadeOnUpdate
-            // cascadeOnDelete is correct here, as a commune cannot exist without a wilaya.
-            $table->foreignId('wilaya_id')
-                  ->constrained('wilayas') // تحديد اسم الجدول الأب بوضوح
-                  ->cascadeOnDelete()      // (صحيح) احذف البلدية إذا حذفت الولاية
-                  ->cascadeOnUpdate();      // (مضاف) حدث المفتاح إذا تغير ID الولاية
-
-=======
             $table->foreignId('wilaya_id')->constrained('wilayas')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
             $table->boolean('active')->default(true)->index();
             $table->timestamps();
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->index('name');
             $table->index('arabic_name');
             $table->index(['latitude', 'longitude']);
         });
     }
-<<<<<<< HEAD
-
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('communes');
     }
 };
@@ -691,36 +382,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for price_levels table
- *
- * Defines different pricing tiers for products (retail, wholesale, etc.)
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('price_levels', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100)->unique()
-                ->comment('مثال: Détail, Gros, Semi-Gros');
-            $table->text('description')->nullable();
-            $table->boolean('is_default')->default(false)->index()
-                ->comment('التعريفة الافتراضية عند إنشاء زبون جديد');
-            $table->boolean('is_percentage')->default(false)
-                ->comment('هل التعريفة نسبية على سعر الشراء');
-            $table->decimal('value', 8, 2)->nullable()
-                ->comment('قيمة النسبة أو المبلغ الإضافي');
-            $table->boolean('active')->default(true)->index();
-            $table->unsignedSmallInteger('display_order')->default(0);
-            $table->timestamps();
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('price_levels', function (Blueprint $table) {
@@ -738,7 +399,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('price_levels');
     }
 };
@@ -749,24 +409,6 @@ return new class extends Migration {
 // ===== ملف: 2025_10_15_093217_create_stock_movement_types_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for stock_movement_types lookup table
- *
- * Defines types of stock movements (in, out, adjustment)
- * Replaces the ENUM movement_type field in stock_movements table
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('stock_movement_types', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 50)->unique();
-=======
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -775,32 +417,16 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('name', 50);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('label', 100);
             $table->text('description')->nullable();
             $table->smallInteger('direction')->default(0)->comment('-1 for out, 0 for neutral, 1 for in');
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
-<<<<<<< HEAD
-        });
-
-        // Insert default values
-        DB::table('stock_movement_types')->insert([
-            ['name' => 'in', 'label' => 'Stock In', 'description' => 'Incoming stock', 'direction' => 1, 'active' => true, 'display_order' => 1, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'out', 'label' => 'Stock Out', 'description' => 'Outgoing stock', 'direction' => -1, 'active' => true, 'display_order' => 2, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'adjustment', 'label' => 'Adjustment', 'description' => 'Stock adjustment', 'direction' => 0, 'active' => true, 'display_order' => 3, 'created_at' => now(), 'updated_at' => now()],
-        ]);
-    }
-
-    public function down(): void
-    {
-=======
             $table->unique(['company_id', 'name']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('stock_movement_types');
     }
 };
@@ -811,24 +437,6 @@ return new class extends Migration {
 // ===== ملف: 2025_10_15_093218_create_treasury_account_types_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for treasury_account_types lookup table
- *
- * Defines types of treasury accounts (bank, cash)
- * Replaces the ENUM type field in treasury_accounts table
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('treasury_account_types', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 50)->unique();
-=======
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -837,30 +445,15 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('name', 50);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('label', 100);
             $table->text('description')->nullable();
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
-<<<<<<< HEAD
-        });
-
-        // Insert default values
-        DB::table('treasury_account_types')->insert([
-            ['name' => 'bank', 'label' => 'Bank Account', 'description' => 'Bank account type', 'active' => true, 'display_order' => 1, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'cash', 'label' => 'Cash', 'description' => 'Cash account type', 'active' => true, 'display_order' => 2, 'created_at' => now(), 'updated_at' => now()],
-        ]);
-    }
-
-    public function down(): void
-    {
-=======
             $table->unique(['company_id', 'name']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('treasury_account_types');
     }
 };
@@ -873,52 +466,28 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for Spatie Permission package tables
- *
- * Manages roles and permissions for user access control
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         $tableNames = config('permission.table_names');
         $columnNames = config('permission.column_names');
         $teams = config('permission.teams');
 
         Schema::create($tableNames['permissions'], function (Blueprint $table) {
             $table->id();
-<<<<<<< HEAD
-            $table->string('name', 125); // Default length is 255, 125 is often enough
-=======
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('name', 125);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('guard_name', 125);
             $table->string('display_name')->nullable();
             $table->string('group', 100)->nullable()->index();
             $table->text('description')->nullable();
             $table->timestamps();
-<<<<<<< HEAD
-
-            $table->unique(['name', 'guard_name']);
-=======
             $table->unique(['company_id', 'name', 'guard_name']);
             $table->index('company_id');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         });
 
         Schema::create($tableNames['roles'], function (Blueprint $table) use ($teams, $columnNames) {
             $table->id();
-<<<<<<< HEAD
-=======
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             if ($teams) {
                 $table->foreignId($columnNames['team_foreign_key'])->nullable()->index();
             }
@@ -927,53 +496,16 @@ return new class extends Migration {
             $table->string('display_name')->nullable();
             $table->text('description')->nullable();
             $table->timestamps();
-<<<<<<< HEAD
-
-            if ($teams) {
-                $table->unique([$columnNames['team_foreign_key'], 'name', 'guard_name']);
-            } else {
-                $table->unique(['name', 'guard_name']);
-            }
-=======
             if ($teams) {
                 $table->unique([$columnNames['team_foreign_key'], 'company_id', 'name', 'guard_name']);
             } else {
                 $table->unique(['company_id', 'name', 'guard_name']);
             }
             $table->index('company_id');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         });
 
         Schema::create($tableNames['model_has_permissions'], function (Blueprint $table) use ($tableNames, $columnNames, $teams) {
             $permissionColumn = $columnNames['permission_pivot_key'] ?? 'permission_id';
-<<<<<<< HEAD
-
-            // ✅ CORRECTED: Added cascadeOnUpdate
-            $table->foreignId($permissionColumn)
-                ->constrained($tableNames['permissions'])
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->string('model_type');
-            $table->unsignedBigInteger($columnNames['model_morph_key']);
-            $table->index([$columnNames['model_morph_key'], 'model_type'], 'model_has_permissions_model_id_model_type_index');
-
-            if ($teams) {
-                $table->foreignId($columnNames['team_foreign_key']);
-                $table->index($columnNames['team_foreign_key'], 'model_has_permissions_team_foreign_key_index');
-                $table->primary([
-                    $columnNames['team_foreign_key'],
-                    $permissionColumn,
-                    $columnNames['model_morph_key'],
-                    'model_type'
-                ], 'model_has_permissions_permission_model_type_primary');
-            } else {
-                $table->primary([
-                    $permissionColumn,
-                    $columnNames['model_morph_key'],
-                    'model_type'
-                ], 'model_has_permissions_permission_model_type_primary');
-=======
             $table->foreignId($permissionColumn)->constrained($tableNames['permissions'])->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('model_type');
             $table->unsignedBigInteger($columnNames['model_morph_key']);
@@ -987,40 +519,11 @@ return new class extends Migration {
                 $table->primary([$columnNames['team_foreign_key'], $permissionColumn, $columnNames['model_morph_key'], 'model_type'], 'model_has_permissions_permission_model_type_primary');
             } else {
                 $table->primary([$permissionColumn, $columnNames['model_morph_key'], 'model_type'], 'model_has_permissions_permission_model_type_primary');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             }
         });
 
         Schema::create($tableNames['model_has_roles'], function (Blueprint $table) use ($tableNames, $columnNames, $teams) {
             $roleColumn = $columnNames['role_pivot_key'] ?? 'role_id';
-<<<<<<< HEAD
-
-            // ✅ CORRECTED: Added cascadeOnUpdate
-            $table->foreignId($roleColumn)
-                ->constrained($tableNames['roles'])
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->string('model_type');
-            $table->unsignedBigInteger($columnNames['model_morph_key']);
-            $table->index([$columnNames['model_morph_key'], 'model_type'], 'model_has_roles_model_id_model_type_index');
-
-            if ($teams) {
-                $table->foreignId($columnNames['team_foreign_key']);
-                $table->index($columnNames['team_foreign_key'], 'model_has_roles_team_foreign_key_index');
-                $table->primary([
-                    $columnNames['team_foreign_key'],
-                    $roleColumn,
-                    $columnNames['model_morph_key'],
-                    'model_type'
-                ], 'model_has_roles_role_model_type_primary');
-            } else {
-                $table->primary([
-                    $roleColumn,
-                    $columnNames['model_morph_key'],
-                    'model_type'
-                ], 'model_has_roles_role_model_type_primary');
-=======
             $table->foreignId($roleColumn)->constrained($tableNames['roles'])->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('model_type');
             $table->unsignedBigInteger($columnNames['model_morph_key']);
@@ -1034,43 +537,12 @@ return new class extends Migration {
                 $table->primary([$columnNames['team_foreign_key'], $roleColumn, $columnNames['model_morph_key'], 'model_type'], 'model_has_roles_role_model_type_primary');
             } else {
                 $table->primary([$roleColumn, $columnNames['model_morph_key'], 'model_type'], 'model_has_roles_role_model_type_primary');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             }
         });
 
         Schema::create($tableNames['role_has_permissions'], function (Blueprint $table) use ($tableNames, $columnNames) {
             $permissionColumn = $columnNames['permission_pivot_key'] ?? 'permission_id';
             $roleColumn = $columnNames['role_pivot_key'] ?? 'role_id';
-<<<<<<< HEAD
-
-            // ✅ CORRECTED: Added cascadeOnUpdate
-            $table->foreignId($permissionColumn)
-                ->constrained($tableNames['permissions'])
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // ✅ CORRECTED: Added cascadeOnUpdate
-            $table->foreignId($roleColumn)
-                ->constrained($tableNames['roles'])
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->primary([
-                $permissionColumn,
-                $roleColumn
-            ], 'role_has_permissions_permission_id_role_id_primary');
-        });
-
-        app('cache')
-            ->store(config('permission.cache.store') != 'default' ? config('permission.cache.store') : null)
-            ->forget(config('permission.cache.key'));
-    }
-
-    public function down(): void
-    {
-        $tableNames = config('permission.table_names');
-
-=======
             $table->foreignId($permissionColumn)->constrained($tableNames['permissions'])->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId($roleColumn)->constrained($tableNames['roles'])->cascadeOnDelete()->cascadeOnUpdate();
             $table->unsignedBigInteger('company_id')->nullable();
@@ -1085,7 +557,6 @@ return new class extends Migration {
 
     public function down(): void {
         $tableNames = config('permission.table_names');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists($tableNames['role_has_permissions']);
         Schema::dropIfExists($tableNames['model_has_roles']);
         Schema::dropIfExists($tableNames['model_has_permissions']);
@@ -1102,50 +573,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('fiscal_years', function (Blueprint $table) {
-            $table->id();
-
-            // ✅ company_id مباشرة هنا — لا حاجة لـ migration منفصل
-            $table->foreignId('company_id')
-                ->constrained('companies')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // ✅ name ليس unique عالمياً — الـ unique المركب أسفله يكفي
-            $table->string('name', 50)->comment('e.g., 2025, FY2025');
-
-            $table->date('start_date');
-            $table->date('end_date');
-            $table->boolean('is_closed')->default(false)->index();
-            $table->timestamp('closed_at')->nullable(); // ✅ timestamp بدلاً من date
-            $table->foreignId('closed_by')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-            $table->boolean('is_current')->default(false)->index();
-            $table->text('closing_notes')->nullable();
-
-            $table->timestamps();
-
-            // ✅ unique مركب: نفس الاسم مسموح في شركات مختلفة
-            $table->unique(['company_id', 'name'], 'fiscal_years_company_name_unique');
-
-            // فهارس للأداء
-            $table->index(['company_id', 'is_current'],        'idx_fy_company_current');
-            $table->index(['company_id', 'start_date', 'end_date'], 'idx_fy_company_dates');
-            $table->index(['start_date', 'end_date'],           'idx_fy_dates');
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('fiscal_years', function (Blueprint $table) {
@@ -1166,7 +593,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('fiscal_years');
     }
 };
@@ -1180,21 +606,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('currencies', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100);
-            $table->string('code', 3)->unique()->comment('ISO 4217 code like DZD, EUR, USD');
-            $table->string('symbol', 10);
-            $table->unsignedTinyInteger('decimal_places')->default(2);
-            $table->boolean('is_base_currency')->default(false)->index();
-            $table->boolean('active')->default(true)->index();
-            $table->timestamps();
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('currencies', function (Blueprint $table) {
@@ -1205,22 +616,15 @@ return new class extends Migration {
             $table->string('symbol', 10);
             $table->unsignedTinyInteger('decimal_places')->default(2);
             $table->boolean('is_base_currency')->default(false)->index();
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->timestamps();
             $table->unique(['company_id', 'code']);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         });
         if (DB::getDriverName() !== 'sqlite') {
             DB::statement("ALTER TABLE currencies COMMENT 'لإدارة العملات المختلفة المستخدمة في النظام'");
         }
     }
-<<<<<<< HEAD
-
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('currencies');
     }
 };
@@ -1234,37 +638,17 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('legal_forms', function (Blueprint $table) {
-            $table->id();
-            $table->string('code', 20)->unique()->comment('مثل: SARL, EURL, SPA');
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('legal_forms', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('code', 20);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('name', 150);
             $table->text('description')->nullable();
             $table->boolean('requires_capital')->default(true);
             $table->boolean('active')->default(true)->index();
             $table->timestamps();
-<<<<<<< HEAD
-        });
-        if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("ALTER TABLE legal_forms COMMENT 'يحتوي على الأشكال القانونية للشركات حسب القانون الجزائري'");
-        }
-    }
-
-    public function down(): void
-    {
-=======
             $table->unique(['company_id', 'code']);
         });
         if (DB::getDriverName() !== 'sqlite') {
@@ -1272,7 +656,6 @@ return new class extends Migration {
         }
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('legal_forms');
     }
 };
@@ -1285,53 +668,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('warehouses', function (Blueprint $table) {
-            $table->id();
-
-            // ✅ name و code ليسا unique عالمياً — الـ unique المركب أسفله يكفي
-            $table->string('name', 100);
-            $table->string('code', 20)->nullable();
-            $table->text('address')->nullable();
-
-            $table->foreignId('commune_id')
-                ->nullable()->constrained('communes')
-                ->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('wilaya_id')
-                ->nullable()->constrained('wilayas')
-                ->nullOnDelete()->cascadeOnUpdate();
-
-            $table->string('phone', 20)->nullable();
-            $table->string('manager_name', 100)->nullable();
-
-            $table->text('activity')->nullable();
-            $table->string('rc',  50)->nullable();
-            $table->string('nif', 50)->nullable();
-            $table->string('nis', 50)->nullable();
-            $table->string('ai',  50)->nullable();
-
-            $table->boolean('active')->default(true)->index();
-
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // ✅ unique مركب: نفس الاسم / الكود مسموح في شركات مختلفة
-            // (company_id يُضاف في migration add_company_id_to_core_tables)
-            // الفهارس العادية هنا — الـ unique المركب في migration منفصل بعد إضافة company_id
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('warehouses', function (Blueprint $table) {
@@ -1360,7 +696,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('warehouses');
     }
 };
@@ -1374,74 +709,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('parties', function (Blueprint $table) {
-            $table->id();
-
-            $table->foreignId('party_type_id')
-                ->constrained('party_types')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate()
-                ->name('fk_parties_party_type_id');
-
-            // Identification
-            // ✅ code: unique عالمي مقبول — كود داخلي لا يتكرر حتى بين الشركات
-            $table->string('code', 50)->nullable()->unique()->index();
-            $table->string('name', 150);
-            $table->string('commercial_name', 150)->nullable();
-            // ✅ slug: unique عالمي مقبول للـ routing
-            $table->string('slug')->unique();
-
-            // Legal
-            $table->text('activity')->nullable();
-            $table->string('rc',  50)->nullable();
-            // ✅ nif: index فقط — الـ unique المركب مع company_id يأتي لاحقاً
-            $table->string('nif', 50)->nullable()->index()->comment('رقم التعريف الجبائي');
-            $table->string('nis', 50)->nullable();
-            $table->string('ai',  50)->nullable();
-            $table->foreignId('legal_form_id')
-                ->nullable()->constrained('legal_forms')
-                ->nullOnDelete()->cascadeOnUpdate()
-                ->name('fk_parties_legal_form_id');
-            $table->decimal('capital_amount', 15, 4)->nullable();
-            $table->date('rc_date')->nullable();
-
-            // Contact
-            $table->text('address')->nullable();
-            $table->foreignId('commune_id')
-                ->nullable()->constrained('communes')
-                ->nullOnDelete()->cascadeOnUpdate()
-                ->name('fk_parties_commune_id');
-            $table->foreignId('wilaya_id')
-                ->nullable()->constrained('wilayas')
-                ->nullOnDelete()->cascadeOnUpdate()
-                ->name('fk_parties_wilaya_id');
-            $table->string('phone',  20)->nullable()->index();
-            $table->string('mobile', 30)->nullable();
-            $table->string('fax',    30)->nullable();
-            // ✅ email: index فقط — الـ unique المركب مع company_id يأتي لاحقاً
-            $table->string('email', 100)->nullable()->index();
-            $table->string('avatar')->nullable();
-
-            // Banking
-            $table->string('bank_name', 100)->nullable();
-            $table->string('rib', 30)->nullable();
-
-            // Financial
-            $table->decimal('initial_balance', 15, 4)->default(0.00);
-            $table->decimal('credit_limit',    15, 4)->default(0.00);
-            $table->foreignId('default_price_level_id')
-                ->nullable()->constrained('price_levels')
-                ->nullOnDelete()->cascadeOnUpdate()
-                ->name('fk_parties_price_level_id');
-            $table->unsignedInteger('credit_days')->nullable();
-
-            // Tax
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('parties', function (Blueprint $table) {
@@ -1474,38 +741,19 @@ return new class extends Migration {
             $table->decimal('credit_limit', 15, 4)->default(0.00);
             $table->foreignId('default_price_level_id')->nullable()->constrained('price_levels')->nullOnDelete()->cascadeOnUpdate()->name('fk_parties_price_level_id');
             $table->unsignedInteger('credit_days')->nullable();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->boolean('is_tva_exempt')->default(false)->index();
             $table->boolean('is_taxable')->default(true)->index();
             $table->string('tax_option', 50)->nullable();
             $table->string('cnas_number', 50)->nullable();
-<<<<<<< HEAD
-            $table->string('tax_regime', 50)->nullable()
-                    ->comment('forfaitaire | réel');
-            $table->boolean('is_final_consumer')->default(false);
-            $table->boolean('is_vat_registered')->default(false);
-            $table->date('vat_registration_date')->nullable();
-
-            $table->json('additional_data')->nullable();
-
-            // Status & Audit
-=======
             $table->string('tax_regime', 50)->nullable()->comment('forfaitaire | réel');
             $table->boolean('is_final_consumer')->default(false);
             $table->boolean('is_vat_registered')->default(false);
             $table->date('vat_registration_date')->nullable();
             $table->json('additional_data')->nullable();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->boolean('active')->default(true)->index();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate()->name('fk_parties_created_by');
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate()->name('fk_parties_updated_by');
             $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate()->name('fk_parties_deleted_by');
-<<<<<<< HEAD
-
-            $table->timestamps();
-            $table->softDeletes();
-
-=======
             $table->timestamps();
             $table->softDeletes();
 
@@ -1513,7 +761,6 @@ return new class extends Migration {
             $table->unique(['company_id', 'slug']);
             $table->unique(['company_id', 'nif']);
             $table->unique(['company_id', 'email']);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->index(['name', 'commercial_name']);
             $table->index(['party_type_id', 'active']);
 
@@ -1527,12 +774,7 @@ return new class extends Migration {
         }
     }
 
-<<<<<<< HEAD
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('parties');
     }
 };
@@ -1545,43 +787,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for families table
- *
- * Manages hierarchical product categories/families
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('families', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100);
-            $table->string('slug')->unique()->nullable();
-            $table->text('description')->nullable();
-
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('parent_id')->nullable()->constrained('families')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->boolean('active')->default(true)->index();
-            $table->unsignedSmallInteger('display_order')->default(0);
-
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            $table->index(['parent_id', 'active']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('families', function (Blueprint $table) {
@@ -1603,7 +808,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('families');
     }
 };
@@ -1616,48 +820,18 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for brands table
- *
- * Manages product brands/manufacturers
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('brands', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100)->unique();
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('brands', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('name', 100);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('slug')->unique();
             $table->text('description')->nullable();
             $table->string('logo')->nullable();
             $table->string('website', 255)->nullable();
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
-<<<<<<< HEAD
-
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->timestamps();
-            $table->softDeletes();
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
@@ -1667,7 +841,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('brands');
     }
 };
@@ -1680,39 +853,16 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for units table (renamed from unites)
- *
- * Manages units of measurement for products
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('units', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100)->unique();
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('units', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('name', 100);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('symbol', 20)->nullable()->comment('Unit symbol (e.g., kg, m, l)');
             $table->text('description')->nullable();
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
-<<<<<<< HEAD
-            $table->timestamps();
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->timestamps();
@@ -1720,7 +870,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('units');
     }
 };
@@ -1731,22 +880,6 @@ return new class extends Migration {
 // ===== ملف: 2025_10_15_093302_create_tvas_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * Migration for tvas table
- *
- * Manages VAT (Value Added Tax) rates
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('tvas', function (Blueprint $table) {
-            $table->id();
-=======
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -1754,7 +887,6 @@ return new class extends Migration {
         Schema::create('tvas', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('name', 100);
             $table->decimal('rate', 8, 2)->default(0.00)->comment('VAT rate percentage');
             $table->text('description')->nullable();
@@ -1762,21 +894,10 @@ return new class extends Migration {
             $table->boolean('is_default')->default(false)->index()->comment('Default VAT rate');
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
-<<<<<<< HEAD
-
-            $table->unique(['name', 'rate']);
-        });
-
-    }
-
-    public function down(): void
-    {
-=======
             $table->unique(['company_id', 'name', 'rate']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('tvas');
     }
 };
@@ -1790,20 +911,11 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('fiscal_stamps', function (Blueprint $table) {
-            $table->id();
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('fiscal_stamps', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('name');
             $table->decimal('min_amount', 15, 4)->comment('الحد الأدنى للمبلغ لتطبيق الطابع');
             $table->decimal('max_amount', 15, 4)->nullable()->comment('الحد الأقصى للمبلغ');
@@ -1816,17 +928,9 @@ return new class extends Migration {
         });
         if (DB::getDriverName() !== 'sqlite') {
             DB::statement("ALTER TABLE fiscal_stamps COMMENT 'لإدارة قيم وقواعد تطبيق الطابع الجبائي'");
-<<<<<<< HEAD
-    }
-    }
-
-    public function down(): void
-    {
-=======
         }
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('fiscal_stamps');
     }
 };
@@ -1839,30 +943,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('inventory_valuation_methods', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 50)->unique();
-            $table->enum('method', ['fifo', 'lifo', 'weighted_average'])->default('fifo')
-                ->comment('fifo | lifo | weighted_average');
-            $table->boolean('is_default')->default(false);
-            $table->timestamps();
-        });
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('inventory_valuation_methods', function (Blueprint $table) {
@@ -1871,13 +951,12 @@ return new class extends Migration {
             $table->string('name', 50);
             $table->enum('method', ['fifo', 'lifo', 'weighted_average'])->default('fifo');
             $table->boolean('is_default')->default(false);
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->timestamps();
             $table->unique(['company_id', 'name']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('inventory_valuation_methods');
     }
 };
@@ -1888,37 +967,6 @@ return new class extends Migration {
 // ===== ملف: 2025_10_15_093308_create_products_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('products', function (Blueprint $table) {
-            $table->id();
-
-            // --- المعلومات الأساسية (بدون قيود UNIQUE قاسية) ---
-            $table->string('name', 150);
-            $table->string('slug', 150)->nullable()->index();          // فهرس عادي، وليس UNIQUE
-            $table->string('ref', 50)->nullable()->index()->comment('SKU / مرجع المنتج');   // فهرس عادي
-            $table->string('barcode', 50)->nullable()->index()->comment('الباركود');        // فهرس عادي
-            $table->text('description')->nullable();
-
-            // --- التصنيف والروابط الخارجية ---
-            $table->foreignId('family_id')->nullable()->constrained('families')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('product_type_id')->nullable()->constrained('product_types')->nullOnDelete()->cascadeOnUpdate(); // أصبح nullable
-            $table->foreignId('tva_id')->nullable()->constrained('tvas')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete()->cascadeOnUpdate();
-
-            // --- التسعير (HT) ---
-            $table->decimal('purchase_price_ht', 15, 4)->default(0)->comment('سعر الشراء الأساسي');
-            $table->decimal('current_cost_price', 15, 4)->default(0)->comment('آخر تكلفة محسوبة (PMP/FIFO/LIFO)');;
-
-            // --- إعدادات المخزون ---
-=======
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -1939,7 +987,6 @@ return new class extends Migration {
             $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete()->cascadeOnUpdate();
             $table->decimal('purchase_price_ht', 15, 4)->default(0)->comment('سعر الشراء الأساسي');
             $table->decimal('current_cost_price', 15, 4)->default(0)->comment('آخر تكلفة محسوبة (PMP/FIFO/LIFO)');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->boolean('manages_stock')->default(true);
             $table->boolean('allow_negative_stock')->default(false);
             $table->boolean('has_lots')->default(false);
@@ -1947,58 +994,21 @@ return new class extends Migration {
             $table->decimal('min_stock_alert', 15, 4)->default(0);
             $table->decimal('max_stock_alert', 15, 4)->default(0);
             $table->boolean('manages_quantity_discounts')->default(false);
-<<<<<<< HEAD
-
-            // --- المواصفات الفيزيائية ---
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->decimal('weight', 8, 2)->nullable();
             $table->decimal('volume', 8, 2)->nullable();
             $table->decimal('length', 8, 2)->nullable();
             $table->decimal('width', 8, 2)->nullable();
             $table->decimal('height', 8, 2)->nullable();
-<<<<<<< HEAD
-
-            $table->foreignId('valuation_method_id')
-                ->nullable()
-                ->constrained('inventory_valuation_methods')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-
-            // --- الحقول المرنة والبيانات الوصفية ---
-            $table->json('specifications')->nullable()->comment('خصائص تقنية مرنة');
-            $table->json('images')->nullable();
-
-            // SEO
-            $table->string('meta_title', 200)->nullable();
-            $table->text('meta_description')->nullable();
-            $table->json('meta_keywords')->nullable();
-
-            // --- الحالة والرقابة ---
-=======
             $table->foreignId('valuation_method_id')->nullable()->constrained('inventory_valuation_methods')->nullOnDelete()->cascadeOnUpdate();
             $table->json('specifications')->nullable()->comment('خصائص تقنية مرنة');
             $table->json('images')->nullable();
             $table->string('meta_title', 200)->nullable();
             $table->text('meta_description')->nullable();
             $table->json('meta_keywords')->nullable();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->boolean('active')->default(true)->index();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete();
-<<<<<<< HEAD
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // --- الفهارس (Indexes) المحسّنة للبحث ---
-            $table->index(['name', 'active']);
-            $table->index(['ref', 'barcode', 'active'], 'idx_products_lookup');
-            $table->index(['family_id', 'brand_id', 'active'], 'idx_products_filter');
-
-            // FullText Search - مراعاة MariaDB/MySQL و SQLite
-=======
             $table->timestamps();
             $table->softDeletes();
 
@@ -2007,19 +1017,12 @@ return new class extends Migration {
             $table->index(['company_id', 'ref', 'barcode'], 'idx_products_lookup');
             $table->index(['company_id', 'family_id', 'brand_id', 'active'], 'idx_products_filter');
 
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             if (app()->environment() !== 'testing' && DB::getDriverName() !== 'sqlite') {
                 $table->fullText(['name', 'description']);
             }
         });
     }
-<<<<<<< HEAD
-
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('products');
     }
 };
@@ -2032,27 +1035,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for document_types table
- *
- * Defines types of commercial documents (invoices, quotes, orders, etc.)
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('document_types', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100)->unique();
-            $table->string('name_latin', 100)->unique();
-            $table->string('code', 20)->unique()->comment('Short code for document type');
-            $table->text('description')->nullable();
-
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used restrictOnDelete)
-            $table->foreignId('document_base_operation_id')->constrained('document_base_operations')->restrictOnDelete()->cascadeOnUpdate();
-
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('document_types', function (Blueprint $table) {
@@ -2063,7 +1045,6 @@ return new class extends Migration {
             $table->string('code', 20);
             $table->text('description')->nullable();
             $table->foreignId('document_base_operation_id')->constrained('document_base_operations')->restrictOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->smallInteger('affects_stock_direction')->default(0)->comment('-1 for stock out, 0 for no effect, 1 for stock in');
             $table->boolean('requires_party')->default(true)->comment('Requires customer/supplier');
             $table->boolean('affects_accounting')->default(true);
@@ -2072,13 +1053,6 @@ return new class extends Migration {
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
-<<<<<<< HEAD
-        });
-    }
-
-    public function down(): void
-    {
-=======
 
             $table->unique(['company_id', 'name']);
             $table->unique(['company_id', 'name_latin']);
@@ -2086,7 +1060,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('document_types');
     }
 };
@@ -2100,28 +1073,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('numbering_series', function (Blueprint $table) {
-            $table->id();
-
-            $table->foreignId('document_type_id')
-                ->constrained('document_types')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate()
-                ->name('fk_series_document_type_id');
-
-            $table->foreignId('warehouse_id')
-                ->nullable()
-                ->constrained('warehouses')
-                ->nullOnDelete()
-                ->cascadeOnUpdate()
-                ->name('fk_series_warehouse_id');
-
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('numbering_series', function (Blueprint $table) {
@@ -2129,7 +1080,6 @@ return new class extends Migration {
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('document_type_id')->constrained('document_types')->cascadeOnDelete()->cascadeOnUpdate()->name('fk_series_document_type_id');
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete()->cascadeOnUpdate()->name('fk_series_warehouse_id');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('prefix', 20);
             $table->string('suffix', 20)->nullable();
             $table->string('format', 100)->comment('{PREFIX}{YY}{MONTH}{NUMBER:6}');
@@ -2144,18 +1094,9 @@ return new class extends Migration {
             $table->date('reset_date')->nullable();
             $table->boolean('active')->default(true)->index();
             $table->boolean('is_locked')->default(false)->index();
-<<<<<<< HEAD
-
-            $table->timestamps();
-
-            // ✅ الـ unique يشمل company_id — يُضاف كـ unique مركب بعد إضافة company_id
-            // لذا لا نضع unique هنا بل في migration add_company_id_to_core_tables
-            // نترك index عادي فقط
-=======
             $table->timestamps();
 
             $table->unique(['company_id', 'document_type_id', 'warehouse_id', 'prefix'], 'numbering_series_company_unique');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->index(['document_type_id', 'warehouse_id', 'prefix'], 'idx_series_lookup');
         });
 
@@ -2163,13 +1104,7 @@ return new class extends Migration {
             DB::statement("ALTER TABLE numbering_series COMMENT 'يدير سلاسل الترقيم التلقائي للمستندات المختلفة'");
         }
     }
-<<<<<<< HEAD
-
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('numbering_series');
     }
 };
@@ -2182,29 +1117,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('document_statuses', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 50)->unique(); // draft, validated, paid, cancelled
-            $table->string('label', 100);
-            $table->string('color', 20)->nullable(); // للواجهة
-            $table->timestamps();
-        });
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('document_statuses', function (Blueprint $table) {
@@ -2213,13 +1125,12 @@ return new class extends Migration {
             $table->string('name', 50);
             $table->string('label', 100);
             $table->string('color', 20)->nullable();
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->timestamps();
             $table->unique(['company_id', 'name']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('document_statuses');
     }
 };
@@ -2233,26 +1144,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for commercial_documents table
- *
- * Manages all commercial documents, simplified for TVA and Stamp Tax only.
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('commercial_documents', function (Blueprint $table) {
-            $table->id();
-
-            // === Document Identification ===
-            $table->foreignId('document_type_id')->constrained('document_types')->restrictOnDelete()->cascadeOnUpdate()->name('fk_docs_document_type_id');
-            $table->foreignId('numbering_series_id')->constrained('numbering_series')->restrictOnDelete()->cascadeOnUpdate()->name('fk_docs_numbering_series_id');
-            $table->string('document_number', 50)->unique();
-
-            // === Related Entities & Context ===
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('commercial_documents', function (Blueprint $table) {
@@ -2261,27 +1152,16 @@ return new class extends Migration {
             $table->foreignId('document_type_id')->constrained('document_types')->restrictOnDelete()->cascadeOnUpdate()->name('fk_docs_document_type_id');
             $table->foreignId('numbering_series_id')->constrained('numbering_series')->restrictOnDelete()->cascadeOnUpdate()->name('fk_docs_numbering_series_id');
             $table->string('document_number', 50);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->foreignId('user_id')->constrained('users')->restrictOnDelete()->cascadeOnUpdate()->name('fk_docs_user_id');
             $table->foreignId('party_id')->nullable()->constrained('parties')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_party_id');
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete()->cascadeOnUpdate()->name('fk_docs_warehouse_id');
             $table->foreignId('fiscal_year_id')->constrained('fiscal_years')->restrictOnDelete()->cascadeOnUpdate()->name('fk_docs_fiscal_year_id');
             $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete()->cascadeOnUpdate()->name('fk_docs_currency_id');
             $table->decimal('exchange_rate', 15, 8)->default(1.00);
-<<<<<<< HEAD
-
-            // === Dates ===
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->date('document_date');
             $table->timestampTz('issued_at')->nullable()->comment('Datetime with timezone for legal issuance time');
             $table->date('due_date')->nullable();
             $table->date('delivery_date')->nullable();
-<<<<<<< HEAD
-
-            // === Financial Totals (TVA + Stamp ONLY) ===
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->decimal('total_ht', 15, 4)->default(0.00)->comment('Total excluding tax');
             $table->decimal('total_tva', 15, 4)->default(0.00)->comment('Total VAT');
             $table->decimal('total_discount', 15, 4)->default(0.00)->comment('Total discount');
@@ -2290,69 +1170,18 @@ return new class extends Migration {
             $table->decimal('net_to_pay', 15, 4)->default(0.00)->comment('Final amount to pay');
             $table->decimal('paid_amount', 15, 4)->default(0.00)->comment('Amount already paid');
             $table->decimal('remaining_amount', 15, 4)->default(0.00)->comment('Amount remaining');
-<<<<<<< HEAD
-
-            // === Additional Information ===
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->text('notes')->nullable();
             $table->text('internal_notes')->nullable()->comment('Internal notes not printed');
             $table->json('payment_terms')->nullable();
             $table->json('shipping_info')->nullable();
             $table->json('legal_mentions')->nullable()->comment('Mandatory legal text for invoices');
-<<<<<<< HEAD
-
-            // === Status & Lifecycle ===
-            $table->foreignId('document_status_id')
-                ->nullable()
-                ->constrained('document_statuses')
-                ->nullOnDelete()
-                ->cascadeOnUpdate()
-                ->name('fk_docs_status_id');
-
-            $table->foreignId('fiscal_stamp_id')->nullable()
-                ->constrained('fiscal_stamps')->nullOnDelete();
-
-=======
             $table->foreignId('document_status_id')->nullable()->constrained('document_statuses')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_status_id');
             $table->foreignId('fiscal_stamp_id')->nullable()->constrained('fiscal_stamps')->nullOnDelete();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->boolean('is_locked')->default(false)->index();
             $table->timestamp('validated_at')->nullable();
             $table->foreignId('validated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_validated_by');
             $table->boolean('is_proforma')->default(false)->comment('Is this a proforma invoice?');
             $table->text('cancellation_reason')->nullable();
-<<<<<<< HEAD
-
-            // === Document Relationships ===
-            $table->foreignId('source_document_id')->nullable()->constrained('commercial_documents')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_source_document_id')->comment('e.g., the Sales Order that generated this Invoice');
-            $table->foreignId('cancellation_of_document_id')->nullable()->constrained('commercial_documents')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_cancellation_of_id')->comment('For credit notes, links to the original invoice');
-
-            // === Compliance & Extras ===
-            $table->string('qr_code_data', 500)->nullable()
-                ->comment('QR code data for mobile scanning');
-
-            $table->boolean('is_exported_to_accounting')->default(false)
-                ->index()->comment('Exported to accounting system?');
-            $table->timestamp('exported_at')->nullable();
-
-            // === Audit ===
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_created_by');
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_updated_by');
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_deleted_by');
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // === Indexes ===
-            $table->index(['party_id', 'document_type_id', 'document_date', 'document_status_id'], 'idx_docs_by_party_type_date_status');
-            $table->index(['document_status_id', 'due_date', 'remaining_amount'], 'idx_docs_due_by_status_date_amount');
-            $table->index(['document_status_id', 'document_date', 'party_id'], 'idx_status_date_party');
-            $table->index(['warehouse_id', 'document_date', 'document_status_id'], 'idx_warehouse_date_status');
-        });
-
-        // ✅ CHECK constraints
-=======
             $table->foreignId('source_document_id')->nullable()->constrained('commercial_documents')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_source_document_id');
             $table->foreignId('cancellation_of_document_id')->nullable()->constrained('commercial_documents')->nullOnDelete()->cascadeOnUpdate()->name('fk_docs_cancellation_of_id');
             $table->string('qr_code_data', 500)->nullable();
@@ -2371,7 +1200,6 @@ return new class extends Migration {
             $table->index(['company_id', 'warehouse_id', 'document_date', 'document_status_id'], 'idx_warehouse_date_status');
         });
 
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         if (DB::getDriverName() !== 'sqlite') {
             DB::statement('ALTER TABLE commercial_documents ADD CONSTRAINT chk_payment_amounts CHECK (paid_amount <= total_ttc)');
             DB::statement('ALTER TABLE commercial_documents ADD CONSTRAINT chk_remaining_amount CHECK (remaining_amount >= 0)');
@@ -2381,13 +1209,7 @@ return new class extends Migration {
             DB::statement("ALTER TABLE commercial_documents COMMENT 'الجدول الرئيسي للمستندات التجارية (فواتير، إلخ) - نظام مبسط (TVA وطابع جبائي فقط)'");
         }
     }
-<<<<<<< HEAD
-
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('commercial_documents');
     }
 };
@@ -2400,40 +1222,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    /**
-     * تشغيل التهجير: إنشاء جدول أسطر الوثائق التجارية المرتبط بالمنتجات مباشرة.
-     */
-    public function up(): void
-    {
-        Schema::create('commercial_document_lines', function (Blueprint $table) {
-            $table->id();
-
-            // --- الربط بالوثيقة الأم ---
-            $table->foreignId('commercial_document_id')
-                ->constrained('commercial_documents')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // --- الربط بالمنتج (بديل لـ product_id المحذوف) ---
-            $table->foreignId('product_id')
-                ->constrained('products')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            // --- تفاصيل السطر ---
-            $table->unsignedSmallInteger('line_order')->default(0)->comment('ترتيب العرض');
-            $table->text('description')->nullable()->comment('وصف إضافي للسطر');
-
-            // --- الكميات ---
-            $table->decimal('quantity', 15, 3);
-            $table->decimal('delivered_quantity', 15, 3)->default(0)->comment('الكمية المستلمة/المسلمة');
-            $table->decimal('returned_quantity', 15, 3)->default(0)->comment('الكمية المرتجعة');
-
-            // --- التسعير والضرائب ---
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('commercial_document_lines', function (Blueprint $table) {
@@ -2446,55 +1234,10 @@ return new class extends Migration {
             $table->decimal('quantity', 15, 3);
             $table->decimal('delivered_quantity', 15, 3)->default(0)->comment('الكمية المستلمة/المسلمة');
             $table->decimal('returned_quantity', 15, 3)->default(0)->comment('الكمية المرتجعة');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->decimal('unit_price_ht', 15, 4)->comment('سعر الوحدة قبل الضريبة');
             $table->decimal('discount_percentage', 8, 2)->default(0.00);
             $table->decimal('discount_amount', 15, 4)->default(0.00);
             $table->decimal('tva_rate', 8, 2)->comment('نسبة القيمة المضافة');
-<<<<<<< HEAD
-
-            $table->decimal('total_ht', 15, 4)->comment('المجموع الصافي قبل الضريبة');
-            $table->decimal('total_tva', 15, 4)->default(0.00);
-            $table->decimal('total_ttc', 15, 4)->comment('المجموع النهائي شامل الضريبة');
-
-            $table->json('additional_costs')->nullable()->comment('تكاليف إضافية مرتبطة بالسطر (مثل الشحن، التعبئة، إلخ)');
-            $table->decimal('total_additional_cost', 15, 4)->default(0)->comment('مجموع التكاليف');
-            $table->decimal('total_discount_amount', 15, 4)->default(0)->comment('مجموع الخصومات');
-
-            // --- إدارة الدفعات (Lots) ---
-            // نستخدم unsignedBigInteger لتجنب مشاكل الدائرية في البداية
-            $table->unsignedBigInteger('stock_lot_id')->nullable();
-
-            // --- دعم تجزئة الأسطر (Auto-Split) ---
-            $table->boolean('is_auto_split')->default(false)->index();
-            $table->unsignedBigInteger('parent_line_id')->nullable();
-
-            $table->foreign('parent_line_id')
-                ->references('id')
-                ->on('commercial_document_lines')
-                ->restrictOnDelete();
-
-            // --- بيانات إضافية مرنة ---
-            $table->json('line_attributes')->nullable()->comment('خصائص إضافية للسطر');
-
-            $table->timestamps();
-
-            // --- الفهارس (Indexes) ---
-            // تحسين البحث عن أسطر وثيقة معينة مرتبة
-            $table->index(['commercial_document_id', 'line_order'], 'idx_cdl_doc_order');
-            // تحسين التقارير المبنية على المنتجات
-            $table->index('product_id', 'idx_cdl_product');
-            // فهرس لدفعات المخزون
-            $table->index('stock_lot_id', 'idx_cdl_lot');
-        });
-    }
-
-    /**
-     * التراجع عن التهجير.
-     */
-    public function down(): void
-    {
-=======
             $table->decimal('total_ht', 15, 4)->comment('المجموع الصافي قبل الضريبة');
             $table->decimal('total_tva', 15, 4)->default(0.00);
             $table->decimal('total_ttc', 15, 4)->comment('المجموع النهائي شامل الضريبة');
@@ -2514,7 +1257,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('commercial_document_lines');
     }
 };
@@ -2527,59 +1269,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('treasury_accounts', function (Blueprint $table) {
-            $table->id();
-
-            $table->string('name', 100);
-            // ✅ code: index فقط — الـ unique المركب مع company_id يأتي لاحقاً
-            $table->string('code', 20)->nullable()->index();
-
-            $table->foreignId('treasury_account_type_id')
-                ->constrained('treasury_account_types')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            // Bank details
-            $table->string('bank_name',     100)->nullable();
-            $table->string('account_number', 50)->nullable();
-            $table->string('rib',  30)->nullable();
-            $table->string('iban', 34)->nullable();
-            $table->string('swift_bic', 11)->nullable();
-
-            // Financial
-            $table->foreignId('currency_id')
-                ->nullable()
-                ->constrained('currencies')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-            $table->decimal('initial_balance', 15, 4)->default(0.00);
-            $table->decimal('current_balance', 15, 4)->default(0.00);
-
-            // Settings
-            $table->boolean('is_default')->default(false)->index();
-            $table->boolean('active')->default(true)->index();
-            $table->text('notes')->nullable();
-
-            // Audit
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            $table->index(['treasury_account_type_id', 'active']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('treasury_accounts', function (Blueprint $table) {
@@ -2610,7 +1299,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('treasury_accounts');
     }
 };
@@ -2623,27 +1311,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for payment_modes table
- *
- * Defines payment methods (cash, check, transfer, etc.)
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('payment_modes', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100)->unique();
-            $table->string('code', 20)->unique()->nullable();
-            $table->text('description')->nullable();
-
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used nullOnDelete)
-            $table->foreignId('treasury_account_id')->nullable()->constrained('treasury_accounts')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->boolean('requires_reference')->default(false)->comment('Requires check number, transfer reference, etc.');
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('payment_modes', function (Blueprint $table) {
@@ -2654,25 +1321,16 @@ return new class extends Migration {
             $table->text('description')->nullable();
             $table->foreignId('treasury_account_id')->nullable()->constrained('treasury_accounts')->nullOnDelete()->cascadeOnUpdate();
             $table->boolean('requires_reference')->default(false);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->boolean('is_cash')->default(false)->index();
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->timestamps();
-<<<<<<< HEAD
-        });
-    }
-
-    public function down(): void
-    {
-=======
 
             $table->unique(['company_id', 'name']);
             $table->unique(['company_id', 'code']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('payment_modes');
     }
 };
@@ -2685,61 +1343,15 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('checks', function (Blueprint $table) {
-            $table->id();
-
-            // ✅ check_number: index فقط — الـ unique المركب مع company_id يأتي لاحقاً
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('checks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('check_number', 50)->index();
             $table->date('check_date')->comment('Issue date');
             $table->date('due_date')->nullable()->comment('Due date for post-dated checks');
             $table->decimal('amount', 15, 4);
-<<<<<<< HEAD
-
-            // Bank details
-            $table->string('bank_name',     100)->nullable();
-            $table->string('account_number', 50)->nullable();
-            $table->string('drawer_name',   150)->nullable();
-
-            $table->foreignId('party_id')
-                ->nullable()->constrained('parties')
-                ->nullOnDelete()->cascadeOnUpdate();
-
-            // Status
-            $table->string('status', 50)->default('pending')->index()
-                ->comment('pending, cleared, bounced, cancelled');
-            $table->date('cleared_date')->nullable();
-            $table->text('bounce_reason')->nullable();
-
-            $table->text('notes')->nullable();
-            $table->json('metadata')->nullable();
-
-            // Audit
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->timestamps();
-
-            $table->index(['status', 'due_date']);
-            $table->index(['party_id', 'status']);
-            $table->index('check_date');
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->string('bank_name', 100)->nullable();
             $table->string('account_number', 50)->nullable();
             $table->string('drawer_name', 150)->nullable();
@@ -2760,7 +1372,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('checks');
     }
 };
@@ -2773,55 +1384,15 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for payments table
- *
- * Manages payment transactions
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('payments', function (Blueprint $table) {
-            $table->id();
-
-            // Payment details
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('payment_number', 50)->unique()->nullable();
             $table->date('payment_date');
             $table->decimal('amount', 15, 4);
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete()->cascadeOnUpdate()->name('fk_payments_currency_id');
-<<<<<<< HEAD
-            $table->decimal('amount_local', 15, 4)->nullable()->comment('Amount in base currency if payment is in foreign currency');
-
-            // Payment method
-            $table->foreignId('payment_mode_id')->constrained('payment_modes')->restrictOnDelete()->cascadeOnUpdate();
-            $table->foreignId('treasury_account_id')->constrained('treasury_accounts')->restrictOnDelete()->cascadeOnUpdate();
-
-            // Check reference (if applicable)
-            $table->foreignId('check_id')->nullable()->constrained('checks')->nullOnDelete()->cascadeOnUpdate();
-
-            // Party relationship
-            $table->foreignId('party_id')->nullable()->constrained('parties')->nullOnDelete()->cascadeOnUpdate();
-
-            // ⭐⭐ (تصحيح) ⭐⭐
-            // تمت إضافة السنة المالية لربط الدفعات بالسنوات
-            $table->foreignId('fiscal_year_id')->constrained('fiscal_years')->restrictOnDelete()->cascadeOnUpdate();
-
-            // Payment information
-            $table->string('reference', 100)->nullable()->comment('Check number, transfer reference, etc.');
-            $table->string('bank_reference', 150)->nullable()->comment('Bank transaction reference');
-            $table->text('notes')->nullable();
-
-            // Status
-=======
             $table->decimal('amount_local', 15, 4)->nullable()->comment('Amount in base currency');
             $table->foreignId('payment_mode_id')->constrained('payment_modes')->restrictOnDelete()->cascadeOnUpdate();
             $table->foreignId('treasury_account_id')->constrained('treasury_accounts')->restrictOnDelete()->cascadeOnUpdate();
@@ -2831,39 +1402,10 @@ return new class extends Migration {
             $table->string('reference', 100)->nullable()->comment('Check number, transfer reference, etc.');
             $table->string('bank_reference', 150)->nullable()->comment('Bank transaction reference');
             $table->text('notes')->nullable();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('status', 50)->default('confirmed')->index()->comment('confirmed, pending, cancelled');
             $table->boolean('is_reconciled')->default(false)->index();
             $table->date('reconciliation_date')->nullable();
             $table->timestampTz('clearing_date')->nullable()->comment('Date the payment cleared the bank');
-<<<<<<< HEAD
-
-            // User tracking
-            $table->foreignId('user_id')->constrained('users')->restrictOnDelete()->cascadeOnUpdate();
-
-            // Audit
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // Indexes
-            $table->index(['payment_date', 'status']);
-            $table->index(['party_id', 'payment_date']);
-            $table->index(['treasury_account_id', 'payment_date']);
-            $table->index(['status', 'payment_date', 'treasury_account_id'], 'idx_payment_status_date_account');
-
-            // ⭐⭐ (تصحيح) ⭐⭐
-            // فهرس للسنة المالية
-            $table->index(['fiscal_year_id', 'payment_date']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->foreignId('user_id')->constrained('users')->restrictOnDelete()->cascadeOnUpdate();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
@@ -2879,7 +1421,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('payments');
     }
 };
@@ -2887,47 +1428,11 @@ return new class extends Migration {
 
 
 
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 // ===== ملف: 2025_10_15_094120_create_document_payment_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for document_payment pivot table
- *
- * Implements flexible many-to-many relationship between documents and payments
- * Allows a single payment to be split across multiple documents
- * and a single document to be paid by multiple payments
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('document_payment', function (Blueprint $table) {
-            $table->id();
-
-            // ✅ CORRECTED: Added cascadeOnUpdate (user correctly used cascadeOnDelete)
-            $table->foreignId('commercial_document_id')->constrained('commercial_documents')->cascadeOnDelete()->cascadeOnUpdate();
-            $table->foreignId('payment_id')->constrained('payments')->cascadeOnDelete()->cascadeOnUpdate();
-
-            $table->decimal('amount_applied', 15, 4)->comment('Amount of payment applied to this document');
-            $table->text('notes')->nullable();
-            $table->timestamps();
-
-            // Indexes
-            $table->index(['commercial_document_id', 'payment_id']);
-            $table->index('payment_id');
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('document_payment', function (Blueprint $table) {
@@ -2943,7 +1448,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('document_payment');
     }
 };
@@ -2957,36 +1461,16 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('exchange_rates', function (Blueprint $table) {
-            $table->id();
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('exchange_rates', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->foreignId('from_currency_id')->constrained('currencies')->cascadeOnDelete();
             $table->foreignId('to_currency_id')->constrained('currencies')->cascadeOnDelete();
             $table->decimal('rate', 15, 8);
             $table->date('rate_date')->index();
             $table->timestamps();
-<<<<<<< HEAD
-            $table->unique(['from_currency_id', 'to_currency_id', 'rate_date']);
-        });
-        if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("ALTER TABLE exchange_rates COMMENT 'لتخزين أسعار صرف العملات اليومية'");
-    }
-    }
-
-    public function down(): void
-    {
-=======
             $table->unique(['company_id', 'from_currency_id', 'to_currency_id', 'rate_date']);
         });
         if (DB::getDriverName() !== 'sqlite') {
@@ -2994,7 +1478,6 @@ return new class extends Migration {
         }
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('exchange_rates');
     }
 };
@@ -3007,63 +1490,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * جدول الأرصدة الافتتاحية للمخزون - Opening Balances Stock
- * تم التعديل للربط المباشر بـ product_id
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('opening_balances_stock', function (Blueprint $table) {
-            $table->id();
-
-            // الربط بالسنة المالية
-            $table->foreignId('fiscal_year_id')
-                ->constrained('fiscal_years')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // الربط بالمنتج مباشرة (بديل لـ product_id)
-            $table->foreignId('product_id')
-                ->constrained('products')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            // الربط بالمستودع
-            $table->foreignId('warehouse_id')
-                ->constrained('warehouses')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            // بيانات الرصيد
-            $table->decimal('opening_quantity', 15, 3)->default(0);
-            $table->decimal('opening_value', 15, 4)
-                ->comment('القيمة الإجمالية للمخزون الافتتاحي (PMP) عند بداية السنة');
-
-            $table->string('lot_number', 100)->nullable();
-            $table->date('manufacturing_date')->nullable();
-            $table->date('expiration_date')->nullable();
-
-            $table->timestamps();
-
-            // --- القيود والفهارس ---
-
-            // ضمان عدم تكرار الرصيد الافتتاحي لنفس المنتج في نفس المستودع خلال نفس السنة المالية
-            $table->unique(
-                ['fiscal_year_id', 'product_id', 'warehouse_id'],
-                'obs_year_product_wh_unique'
-            );
-
-            // فهرس لتحسين سرعة التقارير المخزنية
-            $table->index(['product_id', 'warehouse_id'], 'idx_obs_product_warehouse');
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('opening_balances_stock', function (Blueprint $table) {
@@ -3084,7 +1510,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('opening_balances_stock');
     }
 };
@@ -3097,27 +1522,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for expense_categories table
- *
- * Categorizes business expenses for better tracking and reporting
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('expense_categories', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100)->unique();
-            $table->string('code', 20)->unique()->nullable();
-            $table->text('description')->nullable();
-            $table->foreignId('parent_id')
-                ->nullable()
-                ->constrained('expense_categories')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('expense_categories', function (Blueprint $table) {
@@ -3127,7 +1531,6 @@ return new class extends Migration {
             $table->string('code', 20)->nullable();
             $table->text('description')->nullable();
             $table->foreignId('parent_id')->nullable()->constrained('expense_categories')->nullOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->boolean('active')->default(true)->index();
             $table->unsignedSmallInteger('display_order')->default(0);
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
@@ -3136,21 +1539,12 @@ return new class extends Migration {
             $table->timestamps();
             $table->softDeletes();
 
-<<<<<<< HEAD
-            $table->index(['parent_id', 'active']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->unique(['company_id', 'name']);
             $table->unique(['company_id', 'code']);
             $table->index(['parent_id', 'active']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('expense_categories');
     }
 };
@@ -3163,76 +1557,15 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for expenses table
- *
- * Tracks business expenses and operational costs
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('expenses', function (Blueprint $table) {
-            $table->id();
-
-            // Expense details
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('expenses', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('expense_number', 50)->unique()->nullable();
             $table->date('date');
             $table->decimal('amount', 15, 4);
             $table->foreignId('expense_category_id')->constrained('expense_categories')->restrictOnDelete();
-<<<<<<< HEAD
-
-            // ⭐ السنة المالية ⭐
-            $table->foreignId('fiscal_year_id')->constrained('fiscal_years')->restrictOnDelete()->cascadeOnUpdate();
-
-            // Payment information
-            $table->foreignId('payment_mode_id')->nullable()->constrained('payment_modes')->nullOnDelete();
-            $table->foreignId('treasury_account_id')->nullable()->constrained('treasury_accounts')->nullOnDelete();
-
-            // Supplier/Party (optional)
-            $table->foreignId('party_id')->nullable()->constrained('parties')->nullOnDelete();
-
-            // Description and reference
-            $table->text('description')->nullable();
-            $table->string('reference', 100)->nullable()->comment('Invoice number, receipt number, etc.');
-
-            // Attachments tracking
-            $table->boolean('has_attachments')->default(false);
-
-            // Status
-            $table->string('status', 50)->default('confirmed')->index();
-            $table->boolean('is_paid')->default(true)->index();
-            $table->boolean('is_recurring')->default(false);
-
-            // Audit
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // Indexes
-            $table->index(['date', 'status']);
-            $table->index(['expense_category_id', 'date']);
-            $table->index(['party_id', 'date']);
-
-            // ⭐ فهرس للسنة المالية ⭐
-            $table->index(['fiscal_year_id', 'date']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->foreignId('fiscal_year_id')->constrained('fiscal_years')->restrictOnDelete()->cascadeOnUpdate();
             $table->foreignId('payment_mode_id')->nullable()->constrained('payment_modes')->nullOnDelete();
             $table->foreignId('treasury_account_id')->nullable()->constrained('treasury_accounts')->nullOnDelete();
@@ -3256,7 +1589,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('expenses');
     }
 };
@@ -3264,48 +1596,11 @@ return new class extends Migration {
 
 
 
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 // ===== ملف: 2025_10_15_094133_create_opening_balances_parties_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * (جدول جديد)
- * إنشاء جدول الأرصدة الافتتاحية للأطراف (عملاء وموردون)
- * لتسجيل رصيد الدين/المستحقات في بداية كل سنة مالية
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('opening_balances_parties', function (Blueprint $table) {
-            $table->id();
-
-            // الربط بالسنة المالية (يحذف الرصيد إذا حذفت السنة)
-            $table->foreignId('fiscal_year_id')->constrained('fiscal_years')->cascadeOnDelete();
-
-            // الربط بالمتعامل (يمنع حذف متعامل له رصيد افتتاحي)
-            $table->foreignId('party_id')->constrained('parties')->restrictOnDelete();
-
-            // الرصيد الافتتاحي
-            $table->decimal('opening_balance', 15, 4);
-            $table->enum('balance_type', ['debit', 'credit'])->comment('debit = رصيد مدين, credit = رصيد دائن');
-
-            $table->timestamps();
-
-            // ضمان عدم تكرار المتعامل في نفس السنة
-            $table->unique(['fiscal_year_id', 'party_id'], 'opening_party_unique');
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('opening_balances_parties', function (Blueprint $table) {
@@ -3320,7 +1615,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('opening_balances_parties');
     }
 };
@@ -3333,67 +1627,16 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for attachments table
- *
- * Polymorphic attachment system for any entity
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('attachments', function (Blueprint $table) {
-            $table->id();
-
-            // File information
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('attachments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('file_name');
             $table->string('file_path');
             $table->string('file_type', 50)->nullable()->comment('MIME type');
             $table->string('file_extension', 10)->nullable();
             $table->unsignedBigInteger('file_size')->nullable()->comment('Size in bytes');
-<<<<<<< HEAD
-
-            // Polymorphic relationship
-            $table->morphs('attachable');
-
-            // Attachment metadata
-            $table->string('title', 200)->nullable();
-            $table->text('description')->nullable();
-            $table->string('category', 50)->nullable()->index();
-
-            // Security and access
-            $table->boolean('is_public')->default(false)->index();
-            $table->string('disk', 50)->default('local');
-            $table->foreignId('company_id')
-                ->nullable()
-                ->after('id')
-                ->constrained('companies')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->index('company_id');
-
-            // Audit
-            $table->foreignId('uploaded_by')->nullable()->constrained('users')->nullOnDelete();
-
-            $table->timestamps();
-
-            // Indexes
-            $table->index(['attachable_type', 'attachable_id', 'category']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->morphs('attachable');
             $table->string('title', 200)->nullable();
             $table->text('description')->nullable();
@@ -3408,7 +1651,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('attachments');
     }
 };
@@ -3421,46 +1663,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for audits table
- *
- * Comprehensive audit trail for tracking all changes in the system
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('audits', function (Blueprint $table) {
-            $table->id();
-
-            // User information
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('user_type', 100)->nullable();
-
-            // Event information
-            $table->string('event', 50)->index()->comment('created, updated, deleted, etc.');
-
-            // Auditable model (polymorphic)
-            $table->string('auditable_type');
-            $table->unsignedBigInteger('auditable_id');
-
-            // Changed data
-            $table->json('old_values')->nullable();
-            $table->json('new_values')->nullable();
-
-            // Request information
-            $table->text('url')->nullable();
-            $table->ipAddress('ip_address')->nullable();
-            $table->string('user_agent', 1023)->nullable();
-
-            // Additional context
-            $table->json('tags')->nullable();
-
-            $table->timestamps();
-
-            // Indexes
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('audits', function (Blueprint $table) {
@@ -3480,18 +1682,11 @@ return new class extends Migration {
             $table->timestamps();
 
             $table->index('company_id');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->index(['auditable_type', 'auditable_id']);
             $table->index(['user_id', 'created_at']);
         });
     }
-<<<<<<< HEAD
-
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('audits');
     }
 };
@@ -3504,29 +1699,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('settings', function (Blueprint $table) {
-            $table->id();
-
-            // ✅ company_id nullable:
-            //   NULL  = إعداد عام للنظام (مشترك بين كل الشركات)
-            //   !NULL = إعداد خاص بشركة معينة (يتجاوز الإعداد العام)
-            $table->foreignId('company_id')
-                ->nullable()
-                ->constrained('companies')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->string('key',   100);
-            $table->string('group',  50)->default('general')->index();
-            $table->json('value')->nullable();
-            $table->string('type', 50)->default('string')
-                ->comment('string, integer, boolean, json');
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('settings', function (Blueprint $table) {
@@ -3536,30 +1708,16 @@ return new class extends Migration {
             $table->string('group', 50)->default('general')->index();
             $table->json('value')->nullable();
             $table->string('type', 50)->default('string')->comment('string, integer, boolean, json');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->text('description')->nullable();
             $table->boolean('is_public')->default(false);
             $table->boolean('is_editable')->default(true);
             $table->unsignedSmallInteger('display_order')->default(0);
-<<<<<<< HEAD
-
             $table->timestamps();
-
-            // ✅ unique مركب: نفس المفتاح مسموح لكل شركة + نسخة عامة (NULL)
-=======
-            $table->timestamps();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->unique(['company_id', 'key'], 'settings_company_key_unique');
             $table->index(['group', 'key']);
         });
     }
-<<<<<<< HEAD
-
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('settings');
     }
 };
@@ -3572,47 +1730,23 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for notifications table
- *
- * Laravel's built-in notification system
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('notifications', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->string('type');
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('notifications', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('type');
             $table->foreignId('company_id')->nullable()->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->morphs('notifiable');
             $table->json('data');
             $table->timestamp('read_at')->nullable();
             $table->timestamps();
 
-<<<<<<< HEAD
-            $table->index(['notifiable_type', 'notifiable_id', 'read_at']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->index('company_id');
             $table->index(['company_id', 'notifiable_type', 'notifiable_id'], 'notifications_company_notifiable_idx');
             $table->index(['notifiable_type', 'notifiable_id', 'read_at']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('notifications');
     }
 };
@@ -3625,20 +1759,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * Migration for personal_access_tokens table
- *
- * Laravel Sanctum API authentication tokens
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('personal_access_tokens', function (Blueprint $table) {
             $table->id();
             $table->morphs('tokenable');
@@ -3648,18 +1770,9 @@ return new class extends Migration {
             $table->timestamp('last_used_at')->nullable();
             $table->timestamp('expires_at')->nullable()->index();
             $table->timestamps();
-<<<<<<< HEAD
-
-        });
-    }
-
-    public function down(): void
-    {
-=======
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('personal_access_tokens');
     }
 };
@@ -3672,73 +1785,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('employees', function (Blueprint $table) {
-            $table->id();
-
-            // ✅ company_id مباشرة — الموظف ينتمي لشركة
-            $table->foreignId('company_id')
-                ->constrained('companies')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // ✅ matricule: unique مركب مع company_id — رقم التسجيل فريد داخل الشركة
-            $table->string('matricule', 20)->index()
-                ->comment('رقم التسجيل الداخلي');
-
-            $table->foreignId('user_id')
-                ->nullable()->constrained('users')
-                ->nullOnDelete()->cascadeOnUpdate();
-
-            // Personal
-            $table->string('first_name')->nullable();
-            $table->string('last_name')->nullable();
-
-            // ✅ nss: index فقط — unique مركب مع company_id يأتي لاحقاً
-            $table->string('nss', 20)->nullable()->index()
-                ->comment('رقم الضمان الاجتماعي');
-
-            $table->date('birth_date')->nullable();
-
-            $table->foreignId('gender_id')
-                ->nullable()
-                ->constrained('genders')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-
-            // Banking
-            $table->string('rib',       30)->nullable();
-            $table->string('bank_name', 100)->nullable();
-
-            // Administrative
-            $table->date('hire_date')->nullable();
-            $table->date('termination_date')->nullable();
-
-            // ✅ employment_status: string بدلاً من enum للمرونة
-            $table->string('employment_status', 30)->default('active')->index()
-                ->comment('active | suspended | terminated');
-
-            // Audit
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // ✅ unique مركبة — رقم التسجيل ورقم الضمان فريدان داخل الشركة
-            $table->unique(['company_id', 'matricule'], 'employees_company_matricule_unique');
-            $table->unique(['company_id', 'nss'],       'employees_company_nss_unique');
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('employees', function (Blueprint $table) {
@@ -3756,6 +1802,7 @@ return new class extends Migration {
             $table->date('hire_date')->nullable();
             $table->date('termination_date')->nullable();
             $table->string('employment_status', 30)->default('active')->index()->comment('active | suspended | terminated');
+            $table->boolean('active')->default(true);
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
@@ -3767,7 +1814,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('employees');
     }
 };
@@ -3780,23 +1826,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('employment_contracts', function (Blueprint $table) {
-            $table->id();
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('employment_contracts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->foreignId('employee_id')->constrained()->cascadeOnDelete();
             $table->enum('contract_type', ['cdi', 'cdd', 'pre_emploi', 'stage']);
             $table->date('start_date');
@@ -3804,24 +1838,13 @@ return new class extends Migration {
             $table->decimal('base_salary', 15, 4)->comment('الراتب الأساسي');
             $table->string('job_title');
             $table->string('department')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->boolean('active')->default(true);
             $table->timestamps();
-<<<<<<< HEAD
-        });
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-=======
 
             $table->index('company_id');
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('employment_contracts');
     }
 };
@@ -3834,29 +1857,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-public function up(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->string('password')->nullable()->change();
-    });
-}
-
-    /**
-     * Reverse the migrations.
-     */
-public function down(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->string('password')->nullable(false)->change();
-    });
-}
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::table('users', function (Blueprint $table) {
@@ -3868,7 +1868,6 @@ return new class extends Migration {
             $table->string('password')->nullable(false)->change();
         });
     }
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 };
 
 
@@ -3879,15 +1878,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::create('login_attempts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
@@ -3896,59 +1888,28 @@ return new class extends Migration {
             $table->text('user_agent')->nullable();
             $table->boolean('success')->default(false)->index();
             $table->timestamp('attempted_at')->index();
-<<<<<<< HEAD
-
-            $table->index(['email', 'attempted_at']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->index(['email', 'attempted_at']);
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('login_attempts');
     }
 };
 
 
 
-<<<<<<< HEAD
-=======
 
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 // ===== ملف: 2026_04_23_182757_create_telescope_entries_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    /**
-     * Get the migration connection name.
-     */
-    public function getConnection(): ?string
-    {
-        return config('telescope.storage.database.connection');
-    }
-
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-=======
 return new class extends Migration {
     public function getConnection(): ?string {
         return config('telescope.storage.database.connection');
     }
 
     public function up(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         $schema = Schema::connection($this->getConnection());
 
         $schema->create('telescope_entries', function (Blueprint $table) {
@@ -3960,10 +1921,6 @@ return new class extends Migration {
             $table->string('type', 20);
             $table->longText('content');
             $table->dateTime('created_at')->nullable();
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->unique('uuid');
             $table->index('batch_id');
             $table->index('family_hash');
@@ -3974,20 +1931,9 @@ return new class extends Migration {
         $schema->create('telescope_entries_tags', function (Blueprint $table) {
             $table->uuid('entry_uuid');
             $table->string('tag');
-<<<<<<< HEAD
-
-            $table->primary(['entry_uuid', 'tag']);
-            $table->index('tag');
-
-            $table->foreign('entry_uuid')
-                ->references('uuid')
-                ->on('telescope_entries')
-                ->cascadeOnDelete();
-=======
             $table->primary(['entry_uuid', 'tag']);
             $table->index('tag');
             $table->foreign('entry_uuid')->references('uuid')->on('telescope_entries')->cascadeOnDelete();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         });
 
         $schema->create('telescope_monitoring', function (Blueprint $table) {
@@ -3995,18 +1941,8 @@ return new class extends Migration {
         });
     }
 
-<<<<<<< HEAD
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        $schema = Schema::connection($this->getConnection());
-
-=======
     public function down(): void {
         $schema = Schema::connection($this->getConnection());
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         $schema->dropIfExists('telescope_entries_tags');
         $schema->dropIfExists('telescope_entries');
         $schema->dropIfExists('telescope_monitoring');
@@ -4021,46 +1957,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('product_packagings', function (Blueprint $table) {
-            $table->id();
-
-            $table->foreignId('product_id')
-                ->constrained('products')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->string('code',  20)->comment('UN / FD / PLT');
-            $table->string('label', 100)->comment('قارورة / فاردو / باليطة');
-
-            $table->decimal('quantity', 15, 4)->default(1)
-                ->comment('عدد الوحدات الأساسية في هذه التعبئة');
-
-            // ✅ barcode: index فقط — شركتان مختلفتان قد يكون لهما نفس الباركود
-            $table->string('barcode', 50)->nullable()->index()
-                ->comment('باركود خاص بهذه التعبئة');
-
-            $table->boolean('is_default')->default(false)
-                ->comment('الوحدة الأساسية (quantity=1)');
-            $table->boolean('active')->default(true);
-            $table->unsignedSmallInteger('display_order')->default(0);
-
-            $table->timestamps();
-
-            // unique مركب: كود التعبئة فريد داخل المنتج الواحد
-            $table->unique(['product_id', 'code'], 'product_packaging_code_unique');
-            $table->index(['product_id', 'active']);
-            $table->index(['product_id', 'is_default']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('product_packagings', function (Blueprint $table) {
@@ -4083,7 +1979,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('product_packagings');
     }
 };
@@ -4094,87 +1989,6 @@ return new class extends Migration {
 // ===== ملف: 2026_04_28_184054_create_product_prices_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
-
-/**
- * جدول أسعار المنتجات — Tarifs
- *
- * ثلاث طرق لتحديد سعر البيع HT لكل تعريفة:
- *
- *   fixed  → السعر مُدخَل مباشرة
- *            price_ht = price
- *
- *   rate   → نسبة ربح فوق سعر الشراء
- *            price_ht = purchase_price_ht × (1 + rate/100)
- *
- *   margin → هامش ربح ثابت بالدج
- *            price_ht = purchase_price_ht + margin
- *
- * الحساب يتم في PHP (ProductPrice::computePrice()) وليس في DB.
- * لا يوجد عمود price_computed لتجنب مشكلة تزامن البيانات.
- *
- * مثال:
- *   منتج A | Détail | fixed  | price=250.00
- *   منتج A | Gros   | rate   | rate=15.00   (15% فوق الشراء)
- *   منتج B | Détail | margin | margin=50.00
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('product_prices', function (Blueprint $table) {
-            $table->id();
-
-            $table->foreignId('product_id')
-                ->constrained('products')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->foreignId('price_level_id')
-                ->constrained('price_levels')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // طريقة التسعير
-            $table->enum('pricing_method', ['fixed', 'rate', 'margin'])
-                ->default('fixed')
-                ->comment('fixed=سعر مباشر | rate=نسبة% فوق الشراء | margin=هامش ثابت دج');
-
-            // قيم الإدخال — فقط الحقل المناسب للطريقة يُملأ، الباقي NULL
-            $table->decimal('price', 15, 4)->nullable()
-                ->comment('Prix de Vente HT — للطريقة fixed فقط');
-            $table->decimal('rate', 8, 4)->nullable()
-                ->comment('Taux % — للطريقة rate فقط');
-            $table->decimal('margin', 15, 4)->nullable()
-                ->comment('Marge دج — للطريقة margin فقط');
-
-            $table->boolean('active')->default(true)->index();
-            $table->timestamps();
-
-            // قيد: منتج × تعريفة = سجل واحد فقط
-            $table->unique(['product_id', 'price_level_id'], 'product_price_level_unique');
-            $table->index(['product_id', 'active']);
-        });
-
-        // قيد CHECK: التحقق أن الحقل المناسب مملوء حسب الطريقة
-        if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("
-                ALTER TABLE product_prices
-                ADD CONSTRAINT chk_pricing_method
-                CHECK (
-                    (pricing_method = 'fixed'  AND price  IS NOT NULL AND price  >= 0) OR
-                    (pricing_method = 'rate'   AND rate   IS NOT NULL AND rate   >= 0) OR
-                    (pricing_method = 'margin' AND margin IS NOT NULL)
-                )
-            ");
-        }
-    }
-
-    public function down(): void
-    {
-=======
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -4201,7 +2015,6 @@ return new class extends Migration {
         }
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('product_prices');
     }
 };
@@ -4212,105 +2025,6 @@ return new class extends Migration {
 // ===== ملف: 2026_04_28_184333_create_quantity_discounts_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
-
-/**
- * جدول تخفيضات الكميات — Tx Remise
- *
- * الخصم يُطبَّق على سعر البيع المحسوب في PHP وليس على price_computed (محذوف).
- *
- * كل تعريفة (price_level) لها شرائح تخفيض مستقلة لكل منتج.
- *
- * مثال:
- *   منتج A | Détail | من 20  إلى 95  → خصم 2%
- *   منتج A | Détail | من 96  إلى 479 → خصم 5%
- *   منتج A | Détail | من 480 → ∞     → خصم 8%
- *   منتج A | Gros   | من 100 → ∞     → خصم 3%
- *
- * الحساب النهائي في PHP:
- *   سعر_البيع  = ProductPrice::computePrice(product, price_level)
- *   الخصم      = QuantityDiscount::findDiscount(product, price_level, quantity)
- *   السعر_النهائي = سعر_البيع × (1 - discount_percentage/100)
- *              أو = سعر_البيع - discount_amount
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('quantity_discounts', function (Blueprint $table) {
-            $table->id();
-
-            $table->foreignId('product_id')
-                ->constrained('products')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // الخصم مرتبط بتعريفة محددة
-            $table->foreignId('price_level_id')
-                ->constrained('price_levels')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // نطاق الكميات (بالوحدة الأساسية دائماً)
-            $table->decimal('min_qty', 15, 4)->unsigned()
-                ->comment('Qte De — الحد الأدنى للكمية');
-            $table->decimal('max_qty', 15, 4)->nullable()->unsigned()
-                ->comment('Qte À — الحد الأعلى (NULL = بلا حد أعلى)');
-
-            // نوع الخصم — واحد منهما على الأقل يجب أن يكون مملوءاً
-            $table->decimal('discount_amount', 15, 4)->nullable()->unsigned()
-                ->comment('Montant Remise — خصم ثابت بالدج لكل وحدة');
-            $table->decimal('discount_percentage', 8, 4)->nullable()->unsigned()
-                ->comment('Tx Remise % — نسبة خصم من سعر البيع');
-
-            // ترتيب الشريحة (للعرض والترتيب في الواجهة)
-            $table->unsignedTinyInteger('tier_order')->default(0);
-
-            // تجميد الشريحة مؤقتاً دون حذفها
-            $table->boolean('is_blocked')->default(false)
-                ->comment('Bloqué — تجميد هذه الشريحة مؤقتاً');
-
-            $table->boolean('active')->default(true)->index();
-            $table->timestamps();
-
-            // فهارس
-            $table->index(
-                ['product_id', 'price_level_id', 'active'],
-                'qty_disc_prod_level_active_idx'
-            );
-            $table->index(['min_qty', 'max_qty'], 'qty_disc_range_idx');
-        });
-
-        // قيود CHECK
-        if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("
-                ALTER TABLE quantity_discounts
-                ADD CONSTRAINT chk_qty_range
-                CHECK (max_qty IS NULL OR max_qty > min_qty)
-            ");
-            DB::statement("
-                ALTER TABLE quantity_discounts
-                ADD CONSTRAINT chk_discount_not_empty
-                CHECK (
-                    discount_amount IS NOT NULL OR discount_percentage IS NOT NULL
-                )
-            ");
-            DB::statement("
-                ALTER TABLE quantity_discounts
-                ADD CONSTRAINT chk_discount_values
-                CHECK (
-                    (discount_amount     IS NULL OR discount_amount     >= 0) AND
-                    (discount_percentage IS NULL OR (discount_percentage >= 0 AND discount_percentage <= 100))
-                )
-            ");
-        }
-    }
-
-    public function down(): void
-    {
-=======
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -4341,7 +2055,6 @@ return new class extends Migration {
         }
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('quantity_discounts');
     }
 };
@@ -4354,148 +2067,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * جدول حركات المخزون  [مرتبط بـ product_id مباشرة]
- *
- * الـ circular FKs التالية تُضاف في migration منفصل (add_foreign_keys_new):
- *   - commercial_document_line_id  → commercial_document_lines
- *   - stock_lot_id                 → product_lots
- *
- * price_source: يوضح مصدر السعر المسجَّل في unit_price
- *   purchase  → سعر شراء (فاتورة شراء، إدخال مخزون)
- *   sale      → سعر بيع  (فاتورة بيع، إخراج مخزون)
- *   adjustment→ تسوية يدوية أو جرد
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('stock_movements', function (Blueprint $table) {
-            $table->id();
-
-            // المنتج والمستودع
-            $table->foreignId('product_id')
-                ->constrained('products')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->foreignId('warehouse_id')
-                ->constrained('warehouses')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            // وحدة التعبئة المستخدمة في الحركة
-            $table->foreignId('packaging_id')
-                ->nullable()
-                ->constrained('product_packagings')
-                ->nullOnDelete()
-                ->cascadeOnUpdate()
-                ->comment('التعبئة المستخدمة — UN / FD / PLT');
-
-            // السنة المالية
-            $table->foreignId('fiscal_year_id')
-                ->constrained('fiscal_years')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            // نوع الحركة
-            $table->foreignId('stock_movement_type_id')
-                ->constrained('stock_movement_types')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            // الوثيقة التجارية المرتبطة (FK يُضاف في add_foreign_keys_new)
-            $table->unsignedBigInteger('commercial_document_line_id')
-                ->nullable()
-                ->comment('FK يُضاف لاحقاً — circular dependency');
-
-            // تفاصيل الحركة
-            $table->dateTime('movement_date');
-
-            // الكميات — دائماً بالوحدة الأساسية
-            $table->decimal('quantity', 15, 4)
-                ->comment('الكمية بالوحدة الأساسية');
-            $table->decimal('packaging_quantity', 15, 4)->nullable()
-                ->comment('الكمية بوحدة التعبئة — للعرض فقط');
-
-            // الأسعار
-            $table->decimal('unit_price', 15, 4)
-                ->comment('سعر الوحدة الأساسية وقت الحركة');
-            $table->decimal('cost_price', 15, 4)
-                ->comment('سعر التكلفة (PMP أو FIFO) وقت الحركة');
-            $table->decimal('total_price', 15, 4);
-
-            // مصدر السعر — يوضح من أين جاء unit_price
-            // $table->enum('price_source', ['purchase', 'sale', 'adjustment'])
-            //     ->default('purchase')
-                // ->comment('purchase=شراء | sale=بيع | adjustment=تسوية');
-
-                $table->string('price_source', 30)->default('sale')
-                    ->comment('purchase=شراء | sale=بيع | adjustment=تسوية');
-
-
-            // الرصيد بعد الحركة
-            $table->decimal('stock_balance_after', 15, 4)
-                ->comment('الرصيد بالوحدة الأساسية بعد الحركة');
-
-            // تتبع الدفعات (Lots)
-            $table->string('lot_number', 100)->nullable();
-            $table->date('expiration_date')->nullable();
-            $table->unsignedBigInteger('stock_lot_id')->nullable()->index()
-                ->comment('FK يُضاف لاحقاً — circular dependency');
-
-            // معلومات إضافية
-            $table->string('reason', 255)->nullable();
-            $table->text('notes')->nullable();
-
-            // المستخدم المنفِّذ
-            $table->foreignId('user_id')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-
-            // حركة أب (للتحويلات والإلغاءات)
-            $table->foreignId('parent_movement_id')
-                ->nullable()
-                ->constrained('stock_movements')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-
-            // التحقق والاعتماد
-            $table->boolean('is_validated')->default(false)->index();
-            $table->foreignId('validated_by')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete();
-            $table->timestamp('validated_at')->nullable();
-
-            // المنشئ
-            $table->foreignId('created_by')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // فهارس
-            $table->index(
-                ['product_id', 'warehouse_id', 'movement_date'],
-                'stock_mov_prod_wh_date_idx'
-            );
-            $table->index(['movement_date', 'stock_movement_type_id']);
-            $table->index(['warehouse_id', 'movement_date']);
-            $table->index(['fiscal_year_id', 'movement_date']);
-            $table->index('lot_number');
-        });
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('stock_movements', function (Blueprint $table) {
@@ -4537,7 +2108,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('stock_movements');
     }
 };
@@ -4551,81 +2121,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('product_lots', function (Blueprint $table) {
-            $table->id();
-
-            // ✅ lot_number: index فقط — الـ unique المركب مع company_id يأتي لاحقاً
-            $table->string('lot_number', 50)->index();
-
-            $table->foreignId('product_id')
-                ->constrained('products')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->foreignId('warehouse_id')
-                ->constrained('warehouses')
-                ->restrictOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->date('manufacturing_date')->nullable()->index();
-            $table->date('expiration_date')->nullable()->index();
-            $table->date('purchase_date')->index();
-
-            $table->decimal('purchase_price',      15, 4);
-            $table->decimal('legal_selling_price', 15, 4);
-            $table->decimal('margin_percentage',    8, 4)->default(5.00);
-            $table->decimal('original_quantity',   15, 4);
-            $table->decimal('remaining_quantity',  15, 4)->index();
-
-            // أعمدة محسوبة — MySQL/MariaDB فقط
-            if (DB::getDriverName() !== 'sqlite') {
-                $table->boolean('is_depleted')
-                    ->storedAs('CASE WHEN remaining_quantity <= 0 THEN 1 ELSE 0 END')
-                    ->index();
-                $table->decimal('total_cost', 15, 4)
-                    ->storedAs('original_quantity * purchase_price');
-                $table->decimal('remaining_value', 15, 4)
-                    ->storedAs('remaining_quantity * purchase_price');
-            } else {
-                $table->boolean('is_depleted')->default(false)->index();
-                $table->decimal('total_cost',      15, 4)->nullable();
-                $table->decimal('remaining_value', 15, 4)->nullable();
-            }
-
-            // FK دائري — يُضاف في migration منفصل
-            $table->unsignedBigInteger('stock_movement_id')->nullable()
-                ->comment('FK يُضاف لاحقاً — circular dependency');
-
-            $table->string('supplier_lot_number', 100)->nullable();
-            $table->boolean('active')->default(true)->index();
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            $table->index(
-                ['product_id', 'warehouse_id', 'is_depleted', 'purchase_date'],
-                'idx_fifo_lookup'
-            );
-            $table->index(['active', 'remaining_quantity'], 'idx_active_stock');
-        });
-
-        if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("
-                ALTER TABLE product_lots
-                ADD CONSTRAINT chk_quantities
-                CHECK (remaining_quantity >= 0 AND remaining_quantity <= original_quantity)
-            ");
-        }
-    }
-
-    public function down(): void
-    {
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('product_lots', function (Blueprint $table) {
@@ -4669,7 +2164,6 @@ return new class extends Migration {
         }
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('product_lots');
     }
 };
@@ -4682,70 +2176,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * إضافة المفاتيح الأجنبية الدائرية (Circular Foreign Keys)  [نسخة مصححة]
- *
- * هذا الملف يستبدل 2025_10_23_135226_add_foreing_keys.php الذي كان يشير
- * إلى جداول محذوفة (products, product_lots القديم).
- *
- * يجب تنفيذه بعد إنشاء كل الجداول التالية:
- *   - commercial_document_lines  (بعد fix_commercial_document_lines)
- *   - stock_movements            (النسخة الجديدة مرتبطة بـ product_id)
- *   - product_lots               (النسخة الجديدة)
- *
- * الدائريات الثلاث:
- *   1. commercial_document_lines.stock_lot_id   → product_lots
- *   2. stock_movements.commercial_document_line_id → commercial_document_lines
- *   3. stock_movements.stock_lot_id             → product_lots
- *   4. product_lots.stock_movement_id           → stock_movements
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        // 1. ربط stock_lot_id في commercial_document_lines → product_lots
-        Schema::table('commercial_document_lines', function (Blueprint $table) {
-            $table->foreign('stock_lot_id')
-                ->references('id')
-                ->on('product_lots')
-                ->restrictOnDelete()   // لا تحذف الـ lot إذا كان في سطر وثيقة
-                ->cascadeOnUpdate();
-        });
-
-        // 2. ربط commercial_document_line_id في stock_movements → commercial_document_lines
-        Schema::table('stock_movements', function (Blueprint $table) {
-            $table->foreign('commercial_document_line_id')
-                ->references('id')
-                ->on('commercial_document_lines')
-                ->nullOnDelete()       // اجعل الحركة بلا وثيقة إذا حُذف السطر
-                ->cascadeOnUpdate();
-
-            // 3. ربط stock_lot_id في stock_movements → product_lots
-            $table->foreign('stock_lot_id')
-                ->references('id')
-                ->on('product_lots')
-                ->restrictOnDelete()   // لا تحذف الـ lot إذا كان له حركة
-                ->cascadeOnUpdate();
-        });
-
-        // 4. ربط stock_movement_id في product_lots → stock_movements
-        Schema::table('product_lots', function (Blueprint $table) {
-            $table->foreign('stock_movement_id')
-                ->references('id')
-                ->on('stock_movements')
-                ->nullOnDelete()       // اجعل الـ lot بلا حركة إذا حُذفت الحركة
-                ->cascadeOnUpdate();
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('commercial_document_lines', function (Blueprint $table) {
-            $table->dropForeign(['stock_lot_id']);
-        });
-
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::table('commercial_document_lines', function (Blueprint $table) {
@@ -4763,15 +2193,10 @@ return new class extends Migration {
         Schema::table('commercial_document_lines', function (Blueprint $table) {
             $table->dropForeign(['stock_lot_id']);
         });
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::table('stock_movements', function (Blueprint $table) {
             $table->dropForeign(['commercial_document_line_id']);
             $table->dropForeign(['stock_lot_id']);
         });
-<<<<<<< HEAD
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::table('product_lots', function (Blueprint $table) {
             $table->dropForeign(['stock_movement_id']);
         });
@@ -4781,576 +2206,19 @@ return new class extends Migration {
 
 
 
-<<<<<<< HEAD
-// ===== ملف: 2026_04_29_223217_add_company_id_to_core_tables.php =====
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * إضافة company_id لكل الجداول الأساسية
- * + الـ Unique Constraints المركبة لبيئة Multi-Tenancy
- *
- * ملاحظة: fiscal_years تحتوي بالفعل على company_id من migration الإنشاء
- *         لذا لن تُعاد إضافتها هنا.
- *         employees لها company_id من migration الإنشاء أيضاً.
- *         settings لها company_id من migration الإنشاء أيضاً.
- */
-return new class extends Migration
-{
-    private array $tables = [
-        'users',
-        'products',
-        'product_packagings',
-        'product_prices',
-        'quantity_discounts',
-        'product_lots',
-        'stock_movements',
-        'commercial_documents',
-        'commercial_document_lines',
-        'parties',
-        'warehouses',
-        // 'fiscal_years',
-        'payments',
-        'expenses',
-        'treasury_accounts',
-        'opening_balances_stock',
-        'opening_balances_parties',
-        'numbering_series',
-        'checks',
-    ];
-
-    public function up(): void
-    {
-        // ═══════════════════════════════════════════════
-        // 1. إضافة company_id لكل الجداول
-        // ═══════════════════════════════════════════════
-        foreach ($this->tables as $tableName) {
-            if (Schema::hasColumn($tableName, 'company_id')) {
-                continue; // fiscal_years و employees و settings — تخطي
-            }
-
-            Schema::table($tableName, function (Blueprint $table) use ($tableName) {
-                $table->foreignId('company_id')
-                    ->after('id')
-                    ->constrained('companies')
-                    ->cascadeOnDelete()
-                    ->cascadeOnUpdate();
-
-                $table->index('company_id', "idx_{$tableName}_company_id");
-            });
-        }
-
-        // ═══════════════════════════════════════════════
-        // 2. Composite Indexes للأداء
-        // ═══════════════════════════════════════════════
-        Schema::table('products', function (Blueprint $table) {
-            $table->index(['company_id', 'active'],                   'idx_products_company_active');
-            $table->index(['company_id', 'family_id', 'active'],      'idx_products_company_family_active');
-        });
-
-        Schema::table('commercial_documents', function (Blueprint $table) {
-            $table->index(['company_id', 'document_date'],                        'idx_docs_company_date');
-            $table->index(['company_id', 'party_id', 'document_status_id'],       'idx_docs_company_party_status');
-        });
-
-        Schema::table('stock_movements', function (Blueprint $table) {
-            $table->index(['company_id', 'product_id', 'movement_date'],   'idx_sm_company_product_date');
-            $table->index(['company_id', 'warehouse_id', 'movement_date'], 'idx_sm_company_wh_date');
-        });
-
-        Schema::table('product_lots', function (Blueprint $table) {
-            $table->index(['company_id', 'product_id', 'purchase_date'], 'idx_lots_company_product_date');
-        });
-
-        Schema::table('parties', function (Blueprint $table) {
-            $table->index(['company_id', 'party_type_id', 'active'], 'idx_parties_company_type_active');
-        });
-
-        Schema::table('payments', function (Blueprint $table) {
-            $table->index(['company_id', 'payment_date', 'status'], 'idx_payments_company_date_status');
-        });
-
-        Schema::table('expenses', function (Blueprint $table) {
-            $table->index(['company_id', 'date', 'status'], 'idx_expenses_company_date_status');
-        });
-
-        Schema::table('treasury_accounts', function (Blueprint $table) {
-            $table->index(['company_id', 'active'], 'idx_ta_company_active');
-        });
-
-        // Schema::table('fiscal_years', function (Blueprint $table) {
-        //     $table->index(['company_id', 'is_current'],            'idx_fy_company_current');
-        //     $table->index(['company_id', 'start_date', 'end_date'], 'idx_fy_company_dates');
-        // });
-
-        // ═══════════════════════════════════════════════
-        // 3. Unique Constraints المركبة — Multi-Tenancy
-        // ═══════════════════════════════════════════════
-
-        // warehouses
-        Schema::table('warehouses', function (Blueprint $table) {
-            $table->unique(['company_id', 'name'], 'warehouses_company_name_unique');
-            $table->unique(['company_id', 'code'], 'warehouses_company_code_unique');
-        });
-
-        // parties
-        Schema::table('parties', function (Blueprint $table) {
-            $table->unique(['company_id', 'nif'],   'parties_company_nif_unique');
-            $table->unique(['company_id', 'email'], 'parties_company_email_unique');
-        });
-
-        // treasury_accounts
-        Schema::table('treasury_accounts', function (Blueprint $table) {
-            $table->unique(['company_id', 'code'], 'treasury_accounts_company_code_unique');
-        });
-
-        // checks
-        Schema::table('checks', function (Blueprint $table) {
-            $table->unique(['company_id', 'check_number'], 'checks_company_number_unique');
-        });
-
-        // product_lots
-        Schema::table('product_lots', function (Blueprint $table) {
-            $table->unique(['company_id', 'lot_number'], 'product_lots_company_lot_unique');
-        });
-
-        // numbering_series — الـ unique الصحيح يشمل company_id
-        Schema::table('numbering_series', function (Blueprint $table) {
-            $table->unique(
-                ['company_id', 'document_type_id', 'warehouse_id', 'prefix'],
-                'numbering_series_company_unique'
-            );
-        });
-
-        // product_packagings — barcode فريد داخل الشركة
-        Schema::table('product_packagings', function (Blueprint $table) {
-            $table->unique(['company_id', 'barcode'], 'packagings_company_barcode_unique');
-        });
-    }
-
-    public function down(): void
-    {
-        // حذف الـ Unique Constraints أولاً
-        Schema::table('product_packagings', fn ($t) => $t->dropUnique('packagings_company_barcode_unique'));
-        Schema::table('numbering_series',   fn ($t) => $t->dropUnique('numbering_series_company_unique'));
-        Schema::table('product_lots',       fn ($t) => $t->dropUnique('product_lots_company_lot_unique'));
-        Schema::table('checks',             fn ($t) => $t->dropUnique('checks_company_number_unique'));
-        Schema::table('treasury_accounts',  fn ($t) => $t->dropUnique('treasury_accounts_company_code_unique'));
-        Schema::table('parties',            function ($t) {
-            $t->dropUnique('parties_company_nif_unique');
-            $t->dropUnique('parties_company_email_unique');
-        });
-        Schema::table('warehouses', function ($t) {
-            $t->dropUnique('warehouses_company_name_unique');
-            $t->dropUnique('warehouses_company_code_unique');
-        });
-
-        // حذف company_id
-        foreach ($this->tables as $tableName) {
-            if (!Schema::hasColumn($tableName, 'company_id')) {
-                continue;
-            }
-            // fiscal_years و employees و settings — لها company_id من الإنشاء، لا نحذفها هنا
-            if (in_array($tableName, ['fiscal_years', 'employees', 'settings'])) {
-                continue;
-            }
-            Schema::table($tableName, function (Blueprint $table) {
-                $table->dropForeign(['company_id']);
-                $table->dropColumn('company_id');
-            });
-        }
-    }
-};
-
-
-
-
-// ===== ملف: 2026_04_30_183627_add_company_id_to_audits_table.php =====
-// database/migrations/2026_04_30_000001_add_company_id_to_audits_table.php
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::table('audits', function (Blueprint $table) {
-            $table->foreignId('company_id')
-                ->nullable()
-                ->after('id')
-                ->constrained('companies')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->index('company_id');
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('audits', function (Blueprint $table) {
-            $table->dropForeign(['company_id']);
-            $table->dropColumn('company_id');
-        });
-    }
-};
-
-
-
-
-// ===== ملف: 2026_04_30_183725_add_company_id_to_notifications_table.php =====
-// database/migrations/2026_04_30_000002_add_company_id_to_notifications_table.php
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::table('notifications', function (Blueprint $table) {
-            // إضافة company_id مع فهرس لتحسين الأداء
-            $table->foreignId('company_id')
-                ->nullable()
-                ->after('type')
-                ->constrained('companies')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            $table->index('company_id');
-
-            // إضافة فهرس مركب لتسريع استعلامات الإشعارات لشركة معينة
-            $table->index(['company_id', 'notifiable_type', 'notifiable_id'], 'notifications_company_notifiable_idx');
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('notifications', function (Blueprint $table) {
-            $table->dropIndex('notifications_company_notifiable_idx');
-            $table->dropForeign(['company_id']);
-            $table->dropColumn('company_id');
-        });
-    }
-};
-
-
-
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 // ===== ملف: 2026_04_30_190443_add_profile_columns_to_users_table.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-/**
- * إضافة الأعمدة لجدول users
- *
- * جدول users الأصلي يحتوي فقط على الحقول الأساسية (name, email, password, active).
- * هذا الـ migration يضيف باقي الحقول التي يتوقعها الـ User model في $fillable:
- *   - بيانات الملف الشخصي  (username, phone, avatar, bio, job_title)
- *   - بيانات شخصية        (birth_date, gender_id, national_id)
- *   - العنوان              (address, commune_id, wilaya_id)
- *   - الدور الافتراضي      (role_id) — للعرض السريع، الـ Spatie هي المرجع الرسمي
- *   - تتبع الدخول          (last_login_at, last_login_ip)
- *   - بيانات التسجيل       (register_ip, register_user_agent)
- *   - حقول المراجعة        (created_by, updated_by, deleted_by)
- *   - company_id           (المستخدم قد ينتمي لشركة افتراضية)
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::table('users', function (Blueprint $table) {
-
-            // --- بيانات الملف الشخصي ---
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::table('users', function (Blueprint $table) {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('username', 50)->nullable()->unique()->after('name');
             $table->string('phone', 20)->nullable()->index()->after('email');
             $table->string('avatar')->nullable()->after('phone');
             $table->text('bio')->nullable()->after('avatar');
             $table->string('job_title', 100)->nullable()->after('bio');
-<<<<<<< HEAD
-
-            // --- بيانات شخصية ---
-            $table->date('birth_date')->nullable()->after('job_title');
-            $table->foreignId('gender_id')
-                ->nullable()
-                ->after('birth_date')
-                ->constrained('genders')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-            $table->string('national_id', 20)->nullable()->after('gender_id');
-
-            // --- العنوان ---
-            $table->text('address')->nullable()->after('national_id');
-            $table->foreignId('commune_id')
-                ->nullable()
-                ->after('address')
-                ->constrained('communes')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-            $table->foreignId('wilaya_id')
-                ->nullable()
-                ->after('commune_id')
-                ->constrained('wilayas')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-
-            // --- الدور الافتراضي (للعرض السريع فقط — Spatie هي المرجع) ---
-            // nullable unsignedBigInteger بدلاً من FK لتجنب مشكلة الدائرية مع Spatie roles
-            $table->unsignedBigInteger('role_id')->nullable()->after('wilaya_id')->index();
-
-            // --- تتبع الدخول ---
-            $table->timestamp('last_login_at')->nullable()->after('role_id');
-            $table->string('last_login_ip', 45)->nullable()->after('last_login_at');
-
-            // --- بيانات التسجيل ---
-            $table->string('register_ip', 45)->nullable()->after('last_login_ip');
-            $table->text('register_user_agent')->nullable()->after('register_ip');
-
-            // --- حقول المراجعة ---
-            $table->foreignId('created_by')
-                ->nullable()
-                ->after('active')
-                ->constrained('users')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-            $table->foreignId('updated_by')
-                ->nullable()
-                ->after('created_by')
-                ->constrained('users')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-            $table->foreignId('deleted_by')
-                ->nullable()
-                ->after('updated_by')
-                ->constrained('users')
-                ->nullOnDelete()
-                ->cascadeOnUpdate();
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('users', function (Blueprint $table) {
-            // حذف المفاتيح الأجنبية أولاً
-            $table->dropForeign(['gender_id']);
-            $table->dropForeign(['commune_id']);
-            $table->dropForeign(['wilaya_id']);
-            $table->dropForeign(['created_by']);
-            $table->dropForeign(['updated_by']);
-            $table->dropForeign(['deleted_by']);
-
-            // حذف الأعمدة
-            $table->dropColumn([
-                'username',
-                'phone',
-                'avatar',
-                'bio',
-                'job_title',
-                'birth_date',
-                'gender_id',
-                'national_id',
-                'address',
-                'commune_id',
-                'wilaya_id',
-                'role_id',
-                'last_login_at',
-                'last_login_ip',
-                'register_ip',
-                'register_user_agent',
-                'created_by',
-                'updated_by',
-                'deleted_by',
-            ]);
-        });
-    }
-};
-
-
-
-
-// ===== ملف: 2026_05_01_131128_enhance_companies_table.php =====
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-/**
- * تحسين جدول companies لدعم تحكم كامل من Super Admin
- *
- * يضيف:
- *  ① حقول الحالة والتعليق  (suspended_at, suspension_reason, deactivated_at, deactivated_by)
- *  ② حقول الخطة والحدود    (plan, max_users, max_warehouses, max_products, trial_ends_at)
- *  ③ حقول التوثيق والإدارة (verified_at, verified_by, notes, settings_json)
- *  ④ تحسين جدول company_user (role, invited_by, joined_at, is_active)
- */
-return new class extends Migration
-{
-    public function up(): void
-    {
-        // ═══════════════════════════════════════
-        // 1. تحسين جدول companies
-        // ═══════════════════════════════════════
-        Schema::table('companies', function (Blueprint $table) {
-
-            // ── ① حقول الحالة والتعليق ──
-            // الفرق بين is_active و suspended:
-            //   is_active = false   → الشركة مُغلقة نهائياً (مالك قرر)
-            //   suspended_at = now  → مُعلّقة مؤقتاً بقرار Super Admin (فواتير متأخرة...)
-            $table->timestamp('suspended_at')
-                  ->nullable()
-                  ->after('is_active')
-                  ->comment('تاريخ التعليق المؤقت — null تعني غير معلّقة');
-
-            $table->string('suspension_reason', 500)
-                  ->nullable()
-                  ->after('suspended_at')
-                  ->comment('سبب التعليق — يظهر لمالك الشركة');
-
-            $table->foreignId('suspended_by')
-                  ->nullable()
-                  ->after('suspension_reason')
-                  ->constrained('users')
-                  ->nullOnDelete()
-                  ->comment('المشرف الذي علّق الشركة');
-
-            $table->timestamp('deactivated_at')
-                  ->nullable()
-                  ->after('suspended_by')
-                  ->comment('تاريخ إيقاف التفعيل النهائي');
-
-            $table->foreignId('deactivated_by')
-                  ->nullable()
-                  ->after('deactivated_at')
-                  ->constrained('users')
-                  ->nullOnDelete()
-                  ->comment('المشرف الذي أوقف تفعيل الشركة');
-
-            // ── ② حقول الخطة والحدود ──
-            $table->string('plan', 30)
-                  ->default('free')
-                  ->after('deactivated_by')
-                  ->comment('نوع الخطة: free | starter | professional | enterprise');
-
-            $table->timestamp('trial_ends_at')
-                  ->nullable()
-                  ->after('plan')
-                  ->comment('تاريخ انتهاء الفترة التجريبية');
-
-            $table->unsignedSmallInteger('max_users')
-                  ->default(3)
-                  ->after('trial_ends_at')
-                  ->comment('الحد الأقصى لعدد المستخدمين حسب الخطة');
-
-            $table->unsignedSmallInteger('max_warehouses')
-                  ->default(1)
-                  ->after('max_users')
-                  ->comment('الحد الأقصى لعدد المستودعات');
-
-            $table->unsignedInteger('max_products')
-                  ->default(500)
-                  ->after('max_warehouses')
-                  ->comment('الحد الأقصى لعدد المنتجات');
-
-            // ── ③ حقول التوثيق والإدارة الداخلية ──
-            $table->timestamp('verified_at')
-                  ->nullable()
-                  ->after('max_products')
-                  ->comment('تاريخ توثيق الشركة من Super Admin');
-
-            $table->foreignId('verified_by')
-                  ->nullable()
-                  ->after('verified_at')
-                  ->constrained('users')
-                  ->nullOnDelete()
-                  ->comment('المشرف الذي وثّق الشركة');
-
-            $table->text('notes')
-                  ->nullable()
-                  ->after('verified_by')
-                  ->comment('ملاحظات داخلية — مرئية لـ Super Admin فقط');
-
-            // إعدادات مرنة JSON — مثل: تفعيل ميزات معينة لهذه الشركة تحديداً
-            $table->json('settings_json')
-                  ->nullable()
-                  ->after('notes')
-                  ->comment('إعدادات خاصة بالشركة (feature flags, overrides...)');
-
-            // ── فهارس ──
-            $table->index('plan',         'idx_companies_plan');
-            $table->index('suspended_at', 'idx_companies_suspended');
-            $table->index('verified_at',  'idx_companies_verified');
-            $table->index('trial_ends_at','idx_companies_trial');
-        });
-
-        // ═══════════════════════════════════════
-        // 2. تحسين جدول company_user (Pivot)
-        // ═══════════════════════════════════════
-        Schema::table('company_user', function (Blueprint $table) {
-
-            // دور المستخدم داخل هذه الشركة تحديداً
-            // (مستقل عن دوره في Spatie — المستخدم قد يكون admin في شركة وموظف في أخرى)
-            $table->string('role', 30)
-                  ->default('member')
-                  ->after('is_default')
-                  ->comment('دور المستخدم في هذه الشركة: owner | admin | manager | member | viewer');
-
-            // من قام بالدعوة
-            $table->foreignId('invited_by')
-                  ->nullable()
-                  ->after('role')
-                  ->constrained('users')
-                  ->nullOnDelete()
-                  ->comment('المستخدم الذي أضاف هذا العضو');
-
-            // تاريخ قبول الدعوة/الانضمام الفعلي
-            $table->timestamp('joined_at')
-                  ->nullable()
-                  ->after('invited_by')
-                  ->comment('تاريخ الانضمام الفعلي — null تعني دعوة معلّقة');
-
-            // إمكانية إلغاء تفعيل عضو داخل شركة بدون حذفه نهائياً
-            $table->boolean('is_active')
-                  ->default(true)
-                  ->after('joined_at')
-                  ->comment('هل العضو مفعّل في هذه الشركة؟');
-
-            $table->index(['company_id', 'role'],      'idx_cu_company_role');
-            $table->index(['company_id', 'is_active'],  'idx_cu_company_active');
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('company_user', function (Blueprint $table) {
-            $table->dropForeign(['invited_by']);
-            $table->dropColumn(['role', 'invited_by', 'joined_at', 'is_active']);
-        });
-
-        Schema::table('companies', function (Blueprint $table) {
-            $table->dropForeign(['suspended_by']);
-            $table->dropForeign(['deactivated_by']);
-            $table->dropForeign(['verified_by']);
-            $table->dropColumn([
-                'suspended_at', 'suspension_reason', 'suspended_by',
-                'deactivated_at', 'deactivated_by',
-                'plan', 'trial_ends_at', 'max_users', 'max_warehouses', 'max_products',
-                'verified_at', 'verified_by',
-                'notes', 'settings_json',
-=======
             $table->date('birth_date')->nullable()->after('job_title');
             $table->foreignId('gender_id')->nullable()->after('birth_date')->constrained('genders')->nullOnDelete()->cascadeOnUpdate();
             $table->string('national_id', 20)->nullable()->after('gender_id');
@@ -5374,7 +2242,6 @@ return new class extends Migration
                 'birth_date', 'gender_id', 'national_id', 'address',
                 'commune_id', 'wilaya_id', 'role_id',
                 'last_login_at', 'last_login_ip', 'register_ip', 'register_user_agent',
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             ]);
         });
     }
@@ -5388,27 +2255,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-{
-        Schema::create('product_variants', function (Blueprint $table) {
-            $table->id();
-
-            // المفاتيح الأجنبية (إجبارية للربط)
-            $table->foreignId('company_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-
-            // حقول اختيارية (كلها nullable)
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('product_variants', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('sku', 100)->nullable();
             $table->string('barcode', 50)->nullable();
             $table->enum('price_type', ['fixed', 'percentage'])->nullable();
@@ -5420,29 +2272,6 @@ return new class extends Migration {
             $table->decimal('weight', 10, 2)->nullable();
             $table->decimal('volume', 10, 2)->nullable();
             $table->boolean('active')->nullable();
-<<<<<<< HEAD
-
-            // حقول المراجعة
-            $table->foreignId('created_by')->nullable()->constrained('users');
-            $table->foreignId('updated_by')->nullable()->constrained('users');
-            $table->foreignId('deleted_by')->nullable()->constrained('users');
-
-            $table->timestamps();
-            $table->softDeletes();
-
-            // القيود الفريدة المركبة (ضمن نطاق الشركة)
-            $table->unique(['company_id', 'sku'], 'pv_company_sku_unique');
-            $table->unique(['company_id', 'barcode'], 'pv_company_barcode_unique');
-
-            // فهارس الأداء
-            $table->index(['product_id', 'active']);
-            $table->index(['company_id', 'active']);
-        });
-    }
-
-    public function down(): void
-    {
-=======
             $table->foreignId('created_by')->nullable()->constrained('users');
             $table->foreignId('updated_by')->nullable()->constrained('users');
             $table->foreignId('deleted_by')->nullable()->constrained('users');
@@ -5456,7 +2285,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('product_variants');
     }
 };
@@ -5465,35 +2293,10 @@ return new class extends Migration {
 
 
 // ===== ملف: 2026_05_02_200521_create_barcodes_table.php =====
-<<<<<<< HEAD
-// database/migrations/YYYY_MM_DD_HHMMSS_create_barcodes_table.php
-
-=======
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('barcodes', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('company_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('variant_id')
-                ->nullable()
-                ->after('product_id')
-                ->constrained('product_variants')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // ✅ باركود اختياري (nullable) وفريد فقط عندما لا يكون NULL
-            $table->string('barcode')->nullable()->unique();
-
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('barcodes', function (Blueprint $table) {
@@ -5502,30 +2305,18 @@ return new class extends Migration {
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('barcode')->nullable()->unique();
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->string('type', 50)->nullable()->comment('primary, unit, box, supplier, etc.');
             $table->boolean('is_primary')->default(false);
             $table->string('unit', 50)->nullable()->comment('piece, kg, box, pack');
             $table->foreignId('created_by')->nullable()->constrained('users');
             $table->timestamps();
 
-<<<<<<< HEAD
-            // فهارس إضافية للأداء
-            $table->index(['company_id', 'barcode']);      // مفيد للبحث
-=======
             $table->index(['company_id', 'barcode']);
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
             $table->index(['company_id', 'product_id']);
             $table->index(['company_id', 'variant_id']);
         });
     }
-<<<<<<< HEAD
-
-    public function down(): void
-    {
-=======
     public function down(): void {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         Schema::dropIfExists('barcodes');
     }
 };
@@ -5533,526 +2324,48 @@ return new class extends Migration {
 
 
 
-<<<<<<< HEAD
-// ===== ملف: 2026_05_02_233401_add_created_by_to_companies.php =====
-=======
 // ===== ملف: 2026_05_07_000100_create_company_wilaya_table.php =====
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::table('companies', function (Blueprint $table) {
-            // أضف العمود فقط إذا لم يكن موجوداً
-            if (!Schema::hasColumn('companies', 'created_by')) {
-                $table->unsignedBigInteger('created_by')->nullable()->after('owner_id');
-                $table->foreign('created_by')->references('id')->on('users')->nullOnDelete();
-            }
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('companies', function (Blueprint $table) {
-            if (Schema::hasColumn('companies', 'created_by')) {
-                $table->dropForeign(['created_by']);
-                $table->dropColumn('created_by');
-            }
-        });
-    }
-};
-
-
-
-// ===== ملف: 2026_05_02_233401_add_updated_by_to_companies.php =====
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::table('companies', function (Blueprint $table) {
-            // أضف العمود فقط إذا لم يكن موجوداً
-            if (!Schema::hasColumn('companies', 'updated_by')) {
-                $table->unsignedBigInteger('updated_by')->nullable()->after('owner_id');
-                $table->foreign('updated_by')->references('id')->on('users')->nullOnDelete();
-            }
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('companies', function (Blueprint $table) {
-            if (Schema::hasColumn('companies', 'updated_by')) {
-                $table->dropForeign(['updated_by']);
-                $table->dropColumn('updated_by');
-            }
-        });
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('company_wilaya', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
             $table->foreignId('wilaya_id')->constrained('wilayas')->cascadeOnDelete();
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->timestamps();
             $table->unique(['company_id', 'wilaya_id']);
         });
     }
     public function down(): void {
         Schema::dropIfExists('company_wilaya');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
     }
 };
 
 
 
 
-<<<<<<< HEAD
-// ===== ملف: 2026_05_04_115447_fix_multitenancy_and_audit_columns.php =====
-// ════════════════════════════════════════════════════════════════════════
-// 2026_05_04_000001_fix_multitenancy_and_audit_columns.php
-//
-// Migration إصلاحي شامل لمشاكل الـ Multi-Tenancy و BaseService
-//
-// يعالج 3 فئات من المشاكل:
-//
-// ① جداول Tenant تفتقد company_id (لم تُضَف في add_company_id migration)
-//    → brands, expense_categories, families, employment_contracts,
-//      payment_modes, price_levels, exchange_rates,
-//      document_payment, product_prices, quantity_discounts
-//
-// ② جداول tenant لديها company_id لكن تفتقد created_by/updated_by
-//    → يسبب خطأ SQL عند استخدام BaseService.prepareDataForUpdate
-//    → attachments, fiscal_years, notifications, numbering_series,
-//      product_lots, product_packagings, settings,
-//      checks, stock_movements, barcodes
-//
-// ③ جدول companies يفتقد updated_by (تم اكتشافه في الجلسة السابقة)
-//    → سبب الخطأ: SQLSTATE[HY000]: no such column: updated_by
-// ════════════════════════════════════════════════════════════════════════
-
-=======
 // ===== ملف: 2026_05_07_000101_create_company_commune_table.php =====
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-<<<<<<< HEAD
-return new class extends Migration
-{
-    // ── ① جداول تحتاج company_id (tenant tables بدون عزل) ─────────────
-    private array $needsCompanyId = [
-        'brands',
-        'families',
-        'expense_categories',
-        'price_levels',
-        'payment_modes',
-        'document_payment',
-        'exchange_rates',
-        'product_prices',
-        'quantity_discounts',
-        'opening_balances_stock',
-        'opening_balances_parties',
-        'employment_contracts',
-    ];
-
-    // ── ② جداول لديها company_id لكن تفتقد created_by/updated_by ──────
-    private array $needsAuditCols = [
-        'attachments',
-        'fiscal_years',
-        'notifications',
-        'numbering_series',
-        'product_lots',
-        'product_packagings',
-        'settings',
-        'checks',
-        'barcodes',
-        'stock_movements',
-    ];
-
-    public function up(): void
-    {
-        // ════════════════════════════════════════
-        // ① إضافة company_id للجداول الناقصة
-        // ════════════════════════════════════════
-        foreach ($this->needsCompanyId as $table) {
-            if (!Schema::hasTable($table)) continue;
-            if (Schema::hasColumn($table, 'company_id')) continue;
-
-            Schema::table($table, function (Blueprint $t) use ($table) {
-                $t->foreignId('company_id')
-                    ->nullable()
-                    ->after('id')
-                    ->constrained('companies')
-                    ->cascadeOnDelete()
-                    ->cascadeOnUpdate();
-
-                $t->index('company_id', "idx_{$table}_company_id");
-            });
-        }
-
-        // ════════════════════════════════════════
-        // ② إضافة created_by/updated_by/deleted_by
-        // ════════════════════════════════════════
-        foreach ($this->needsAuditCols as $table) {
-            if (!Schema::hasTable($table)) continue;
-
-            Schema::table($table, function (Blueprint $t) use ($table) {
-
-                if (!Schema::hasColumn($table, 'created_by')) {
-                    $t->foreignId('created_by')
-                        ->nullable()
-                        ->constrained('users')
-                        ->nullOnDelete()
-                        ->cascadeOnUpdate();
-                }
-
-                if (!Schema::hasColumn($table, 'updated_by')) {
-                    $t->foreignId('updated_by')
-                        ->nullable()
-                        ->constrained('users')
-                        ->nullOnDelete()
-                        ->cascadeOnUpdate();
-                }
-
-                // deleted_by فقط إذا كان الجدول يدعم SoftDeletes
-                if (
-                    Schema::hasColumn($table, 'deleted_at') &&
-                    !Schema::hasColumn($table, 'deleted_by')
-                ) {
-                    $t->foreignId('deleted_by')
-                        ->nullable()
-                        ->constrained('users')
-                        ->nullOnDelete()
-                        ->cascadeOnUpdate();
-                }
-            });
-        }
-
-        // ════════════════════════════════════════
-        // ③ إصلاح جدول companies
-        // ════════════════════════════════════════
-        Schema::table('companies', function (Blueprint $t) {
-
-            if (!Schema::hasColumn('companies', 'created_by')) {
-                $t->foreignId('created_by')
-                    ->nullable()
-                    ->after('owner_id')
-                    ->constrained('users')
-                    ->nullOnDelete()
-                    ->cascadeOnUpdate();
-            }
-
-            if (!Schema::hasColumn('companies', 'updated_by')) {
-                $t->foreignId('updated_by')
-                    ->nullable()
-                    ->after('owner_id')
-                    ->constrained('users')
-                    ->nullOnDelete()
-                    ->cascadeOnUpdate();
-            }
-
-            if (!Schema::hasColumn('companies', 'deleted_by')) {
-                $t->foreignId('deleted_by')
-                    ->nullable()
-                    ->after('owner_id')
-                    ->constrained('users')
-                    ->nullOnDelete()
-                    ->cascadeOnUpdate();
-            }
-        });
-
-        // ════════════════════════════════════════
-        // ④ Unique Constraints للجداول الجديدة
-        // ════════════════════════════════════════
-        $uniques = [
-            'brands'        => ['company_id', 'name', 'brands_company_name_unique'],
-            'families'      => ['company_id', 'name', 'families_company_name_unique'],
-            'price_levels'  => ['company_id', 'name', 'price_levels_company_name_unique'],
-            'payment_modes' => ['company_id', 'name', 'payment_modes_company_name_unique'],
-        ];
-
-        foreach ($uniques as $table => [$col1, $col2, $name]) {
-            if (!Schema::hasColumn($table, $col1)) continue;
-            try {
-                Schema::table($table, fn($t) => $t->unique([$col1, $col2], $name));
-            } catch (\Exception $e) {
-                // Unique already exists — skip
-            }
-        }
-    }
-
-    public function down(): void
-    {
-        // ③ companies
-        Schema::table('companies', function (Blueprint $t) {
-            foreach (['created_by', 'updated_by', 'deleted_by'] as $col) {
-                if (Schema::hasColumn('companies', $col)) {
-                    try { $t->dropForeign([$col]); } catch (\Exception $e) {}
-                    $t->dropColumn($col);
-                }
-            }
-        });
-
-        // ② audit cols
-        foreach (array_reverse($this->needsAuditCols) as $table) {
-            if (!Schema::hasTable($table)) continue;
-            Schema::table($table, function (Blueprint $t) use ($table) {
-                foreach (['deleted_by', 'updated_by', 'created_by'] as $col) {
-                    if (Schema::hasColumn($table, $col)) {
-                        try { $t->dropForeign([$col]); } catch (\Exception $e) {}
-                        $t->dropColumn($col);
-                    }
-                }
-            });
-        }
-
-        // ④ drop uniques first
-        $uniques = [
-            'brands'        => 'brands_company_name_unique',
-            'families'      => 'families_company_name_unique',
-            'price_levels'  => 'price_levels_company_name_unique',
-            'payment_modes' => 'payment_modes_company_name_unique',
-        ];
-        foreach ($uniques as $table => $name) {
-            if (Schema::hasTable($table)) {
-                try { Schema::table($table, fn($t) => $t->dropUnique($name)); } catch (\Exception $e) {}
-            }
-        }
-
-        // ① company_id
-        foreach (array_reverse($this->needsCompanyId) as $table) {
-            if (!Schema::hasTable($table)) continue;
-            if (!Schema::hasColumn($table, 'company_id')) continue;
-            Schema::table($table, function (Blueprint $t) use ($table) {
-                try { $t->dropForeign(['company_id']); } catch (\Exception $e) {}
-                $t->dropColumn('company_id');
-            });
-        }
-    }
-};
-
-
-
-
-// ===== ملف: 2026_05_04_120000_make_roles_permissions_units_tenant.php =====
-// ════════════════════════════════════════════════════════════════════════
-// 2026_05_04_120000_make_roles_permissions_units_tenant.php
-//
-// تحويل roles / permissions / units إلى جداول Tenant
-//
-// المشكلة:
-//   - roles و permissions كانت مشتركة بين كل الشركات (Spatie global)
-//     → شركة A ترى أدوار شركة B — خطأ أمني
-//   - units كانت global بينما الشركات قد تحتاج وحدات مخصصة
-//
-// الحل:
-//   ① إضافة company_id لـ roles, permissions, model_has_roles,
-//     model_has_permissions, role_has_permissions
-//   ② إضافة company_id لـ units
-//   ③ Unique constraints محدّثة لتشمل company_id
-// ════════════════════════════════════════════════════════════════════════
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        // ════════════════════════════════════════
-        // ① roles
-        // ════════════════════════════════════════
-        Schema::table('roles', function (Blueprint $t) {
-
-            if (!Schema::hasColumn('roles', 'company_id')) {
-                $t->foreignId('company_id')
-                    ->nullable()
-                    ->after('id')
-                    ->constrained('companies')
-                    ->cascadeOnDelete()
-                    ->cascadeOnUpdate();
-
-                $t->index('company_id', 'idx_roles_company_id');
-            }
-
-            // إزالة unique constraint القديم (name + guard_name فقط)
-            // ثم إعادته مع company_id
-            try {
-                $t->dropUnique(['name', 'guard_name']);
-            } catch (\Exception $e) {}
-
-            try {
-                $t->unique(['company_id', 'name', 'guard_name'], 'roles_company_name_guard_unique');
-            } catch (\Exception $e) {}
-        });
-
-        // ════════════════════════════════════════
-        // ② permissions
-        // ════════════════════════════════════════
-        Schema::table('permissions', function (Blueprint $t) {
-
-            if (!Schema::hasColumn('permissions', 'company_id')) {
-                $t->foreignId('company_id')
-                    ->nullable()
-                    ->after('id')
-                    ->constrained('companies')
-                    ->cascadeOnDelete()
-                    ->cascadeOnUpdate();
-
-                $t->index('company_id', 'idx_permissions_company_id');
-            }
-
-            try {
-                $t->dropUnique(['name', 'guard_name']);
-            } catch (\Exception $e) {}
-
-            try {
-                $t->unique(['company_id', 'name', 'guard_name'], 'permissions_company_name_guard_unique');
-            } catch (\Exception $e) {}
-        });
-
-        // ════════════════════════════════════════
-        // ③ جداول pivot الخاصة بـ Spatie
-        //    نضيف company_id للفلترة السريعة
-        //    (ليس FK — لأن الـ pivot لا تحتاج cascade مستقل)
-        // ════════════════════════════════════════
-        Schema::table('role_has_permissions', function (Blueprint $t) {
-            if (!Schema::hasColumn('role_has_permissions', 'company_id')) {
-                $t->unsignedBigInteger('company_id')->nullable()->after('role_id');
-                $t->index('company_id', 'idx_rhp_company_id');
-            }
-        });
-
-        Schema::table('model_has_roles', function (Blueprint $t) {
-            if (!Schema::hasColumn('model_has_roles', 'company_id')) {
-                $t->unsignedBigInteger('company_id')->nullable()->after('role_id');
-                $t->index('company_id', 'idx_mhr_company_id');
-            }
-        });
-
-        Schema::table('model_has_permissions', function (Blueprint $t) {
-            if (!Schema::hasColumn('model_has_permissions', 'company_id')) {
-                $t->unsignedBigInteger('company_id')->nullable()->after('permission_id');
-                $t->index('company_id', 'idx_mhp_company_id');
-            }
-        });
-
-        // ════════════════════════════════════════
-        // ④ units
-        // ════════════════════════════════════════
-        Schema::table('units', function (Blueprint $t) {
-
-            if (!Schema::hasColumn('units', 'company_id')) {
-                $t->foreignId('company_id')
-                    ->nullable()          // null = وحدة نظام (للجميع)
-                    ->after('id')
-                    ->constrained('companies')
-                    ->cascadeOnDelete()
-                    ->cascadeOnUpdate();
-
-                $t->index('company_id', 'idx_units_company_id');
-            }
-
-            // audit columns
-            if (!Schema::hasColumn('units', 'created_by')) {
-                $t->foreignId('created_by')
-                    ->nullable()
-                    ->constrained('users')
-                    ->nullOnDelete()
-                    ->cascadeOnUpdate();
-            }
-
-            if (!Schema::hasColumn('units', 'updated_by')) {
-                $t->foreignId('updated_by')
-                    ->nullable()
-                    ->constrained('users')
-                    ->nullOnDelete()
-                    ->cascadeOnUpdate();
-            }
-
-            // unique: نفس الاسم لا يتكرر في نفس الشركة
-            try {
-                $t->unique(['company_id', 'name'], 'units_company_name_unique');
-            } catch (\Exception $e) {}
-        });
-    }
-
-    public function down(): void
-    {
-        // ④ units
-        Schema::table('units', function (Blueprint $t) {
-            try { $t->dropUnique('units_company_name_unique'); } catch (\Exception $e) {}
-            foreach (['updated_by', 'created_by'] as $col) {
-                if (Schema::hasColumn('units', $col)) {
-                    try { $t->dropForeign([$col]); } catch (\Exception $e) {}
-                    $t->dropColumn($col);
-                }
-            }
-            if (Schema::hasColumn('units', 'company_id')) {
-                try { $t->dropIndex('idx_units_company_id'); } catch (\Exception $e) {}
-                try { $t->dropForeign(['company_id']); } catch (\Exception $e) {}
-                $t->dropColumn('company_id');
-            }
-        });
-
-        // ③ pivot tables
-        foreach (['model_has_permissions' => 'idx_mhp_company_id', 'model_has_roles' => 'idx_mhr_company_id', 'role_has_permissions' => 'idx_rhp_company_id'] as $table => $index) {
-            Schema::table($table, function (Blueprint $t) use ($table, $index) {
-                if (Schema::hasColumn($table, 'company_id')) {
-                    try { $t->dropIndex($index); } catch (\Exception $e) {}
-                    $t->dropColumn('company_id');
-                }
-            });
-        }
-
-        // ② permissions
-        Schema::table('permissions', function (Blueprint $t) {
-            try { $t->dropUnique('permissions_company_name_guard_unique'); } catch (\Exception $e) {}
-            if (Schema::hasColumn('permissions', 'company_id')) {
-                try { $t->dropIndex('idx_permissions_company_id'); } catch (\Exception $e) {}
-                try { $t->dropForeign(['company_id']); } catch (\Exception $e) {}
-                $t->dropColumn('company_id');
-            }
-            try { $t->unique(['name', 'guard_name']); } catch (\Exception $e) {}
-        });
-
-        // ① roles
-        Schema::table('roles', function (Blueprint $t) {
-            try { $t->dropUnique('roles_company_name_guard_unique'); } catch (\Exception $e) {}
-            if (Schema::hasColumn('roles', 'company_id')) {
-                try { $t->dropIndex('idx_roles_company_id'); } catch (\Exception $e) {}
-                try { $t->dropForeign(['company_id']); } catch (\Exception $e) {}
-                $t->dropColumn('company_id');
-            }
-            try { $t->unique(['name', 'guard_name']); } catch (\Exception $e) {}
-        });
-=======
 return new class extends Migration {
     public function up(): void {
         Schema::create('company_commune', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
             $table->foreignId('commune_id')->constrained('communes')->cascadeOnDelete();
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('active')->default(true)->index();
             $table->timestamps();
             $table->unique(['company_id', 'commune_id']);
         });
     }
     public function down(): void {
         Schema::dropIfExists('company_commune');
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
     }
 };
 

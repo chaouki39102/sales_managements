@@ -67,7 +67,7 @@ class AssignCompanyToExistingRecords extends Command
         if ($this->option('create-default')) {
             $company = Company::firstOrCreate(
                 ['slug' => 'default'],
-                ['name' => 'الشركة الافتراضية', 'is_active' => true]
+                ['name' => 'الشركة الافتراضية', 'active' => true]
             );
             $this->info("الشركة الافتراضية: [{$company->id}] {$company->name}");
             return $company->id;

@@ -34,36 +34,16 @@ class BarcodeController extends BaseApiController
         return Barcode::class;
     }
 
-    protected function getListConfig(): array
-    {
-        return [
-            'search_fields' => Barcode::$searchableFields,
-            'filters' => Barcode::$filterable,
-            'sorts' => Barcode::$sortable,
-            'relations' => Barcode::$allowedIncludes,
-            'default_includes' => Barcode::$defaultWith,
-            'default_sort' => Barcode::$defaultSort,
-            'default_per_page' => Barcode::$defaultPerPage,
-            'per_page_limit' => Barcode::$perPageLimit,
-            'cache_ttl' => Barcode::$cacheTtl,
-            'cache_tags' => Barcode::$cacheTags,
-        ];
-    }
-
-    /**
-     * GET /api/v1/products/{product}/barcodes
-     * قائمة باركودات منتج معين
-     */
-    public function indexByProduct(Request $request, Product $product): JsonResponse
+    public function indexByProduct(Request $request, $productId): JsonResponse
     {
         try {
+            $product = Product::findOrFail($productId);
             $this->authorizeAction('viewAny', Barcode::class);
-            // التأكد من وصول المستخدم للمنتج
             $this->authorizeAction('view', $product);
 
             $data = $this->apiListWithCallback(
                 Barcode::class,
-                fn($query) => $query->where('product_id', $product->id),
+                fn($query) => $query->where('product_id', $productId),
                 $request,
                 $this->getListConfig(),
             );
@@ -74,17 +54,15 @@ class BarcodeController extends BaseApiController
         }
     }
 
-    /**
-     * POST /api/v1/barcodes
-     * إضافة باركود جديد
-     */
-    public function store(StoreBarcodeRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         try {
-            $product = Product::findOrFail($request->product_id);
+            $validatedData = app(StoreBarcodeRequest::class)->validated();
+
+            $product = Product::findOrFail($validatedData['product_id']);
             $this->authorizeAction('create', [Barcode::class, $product]);
 
-            $barcode = $this->barcodeService->create($request->validated(), $request);
+            $barcode = $this->barcodeService->create($validatedData, $request);
 
             return $this->successResponse(
                 new BarcodeResource($barcode->load('product')),
@@ -96,30 +74,33 @@ class BarcodeController extends BaseApiController
         }
     }
 
-    /**
-     * PUT|PATCH /api/v1/barcodes/{barcode}
-     */
-    public function update(UpdateBarcodeRequest $request, Barcode $barcode): JsonResponse
-    {
-        try {
-            $this->authorizeAction('update', $barcode);
-            $barcode = $this->barcodeService->update($barcode, $request->validated(), $request);
+// تغيير السطر 102 ليصبح:
+public function update(Request $request, $id): JsonResponse
+{
+    try {
+        // جلب الموديل يدوياً أو عبر السيرفس ليتوافق مع التوقيع
+        $barcode = $this->barcodeService->findById($id);
 
-            return $this->successResponse(
-                new BarcodeResource($barcode->load('product')),
-                'تم تحديث الباركود'
-            );
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'update');
-        }
+        $this->authorizeAction('update', $barcode);
+
+        // استخدام الـ Validation يدوياً بما أننا لم نمرره في التوقيع
+        $validatedData = app(UpdateBarcodeRequest::class)->validated();
+
+        $barcode = $this->barcodeService->update($barcode, $validatedData, $request);
+
+        return $this->successResponse(
+            new BarcodeResource($barcode->load('product')),
+            'تم تحديث الباركود'
+        );
+    } catch (\Throwable $e) {
+        return $this->handleError($e, 'update');
     }
+}
 
-    /**
-     * DELETE /api/v1/barcodes/{barcode}
-     */
-    public function destroy(Barcode $barcode): JsonResponse
+    public function destroy($id): JsonResponse
     {
         try {
+            $barcode = $this->barcodeService->findById($id);
             $this->authorizeAction('delete', $barcode);
             $this->barcodeService->delete($barcode);
 

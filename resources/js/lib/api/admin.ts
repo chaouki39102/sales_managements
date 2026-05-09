@@ -13,7 +13,7 @@ export interface AdminCompany {
   phone?: string;
   address?: string;
   plan: string;
-  is_active: boolean;
+  active: boolean;
   is_suspended: boolean;
   suspended_reason?: string;
   verified_at?: string;
@@ -31,7 +31,7 @@ export interface AdminUser {
   name: string;
   email: string;
   role: string;
-  is_active: boolean;
+  active: boolean;
   companies_count?: number;
   created_at: string;
 }

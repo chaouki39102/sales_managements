@@ -10,27 +10,16 @@ class OpeningBalancePartyResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'fiscal_year_id' => $this->fiscal_year_id,
-            'party_id' => $this->party_id,
+            'id'              => $this->id,
+            'company_id'      => $this->company_id,
+            'fiscal_year_id'  => $this->fiscal_year_id,
+            'fiscal_year'     => new FiscalYearResource($this->whenLoaded('fiscalYear')),
+            'party_id'        => $this->party_id,
+            'party'           => new PartyResource($this->whenLoaded('party')),
             'opening_balance' => $this->opening_balance,
-            'balance_type' => $this->balance_type,
-            'is_debit' => $this->is_debit,
-            'is_credit' => $this->is_credit,
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
-            
-            'relations' => [
-                'fiscalYear' => $this->whenLoaded('fiscalYear', fn() => [
-                    'id' => $this->fiscalYear->id,
-                    'name' => $this->fiscalYear->name,
-                ]),
-                'party' => $this->whenLoaded('party', fn() => [
-                    'id' => $this->party->id,
-                    'name' => $this->party->name,
-                    'code' => $this->party->code,
-                ]),
-            ],
+            'balance_type'    => $this->balance_type, // debit | credit
+            'created_at'      => $this->created_at?->toDateTimeString(),
+            'updated_at'      => $this->updated_at?->toDateTimeString(),
         ];
     }
 }

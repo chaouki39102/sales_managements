@@ -131,7 +131,7 @@ class CompanyController extends BaseApiController
             'legal_form_id'   => 'nullable|exists:legal_forms,id',
             'wilaya_id'       => 'nullable|exists:wilayas,id',
             'commune_id'      => 'nullable|exists:communes,id',
-            'is_active'       => 'nullable|boolean',
+            'active'       => 'nullable|boolean',
             // حقول Super Admin
             'plan'            => 'nullable|string|in:free,starter,professional,enterprise',
             'max_users'       => 'nullable|integer|min:1',
@@ -174,7 +174,7 @@ class CompanyController extends BaseApiController
             'legal_form_id'   => 'nullable|exists:legal_forms,id',
             'wilaya_id'       => 'nullable|exists:wilayas,id',
             'commune_id'      => 'nullable|exists:communes,id',
-            'is_active'       => 'nullable|boolean',
+            'active'       => 'nullable|boolean',
             'plan'            => 'nullable|string|in:free,starter,professional,enterprise',
             'max_users'       => 'nullable|integer|min:1',
             'max_warehouses'  => 'nullable|integer|min:1',
@@ -345,7 +345,7 @@ class CompanyController extends BaseApiController
             $company = $this->companyService->findById($request->company_id);
             $this->authorizeAction('switch', $company);
             abort_if($company->is_suspended, 403, "الشركة معلّقة: {$company->suspension_reason}");
-            abort_unless($company->is_active, 403, 'الشركة غير نشطة');
+            abort_unless($company->active, 403, 'الشركة غير نشطة');
             $this->companyService->switchContext(auth()->user(), $company);
             return $this->successResponse(new CompanyResource($company), "تم التبديل إلى: {$company->name}");
         } catch (\Throwable $e) {

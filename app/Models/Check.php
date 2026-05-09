@@ -1,5 +1,6 @@
 <?php
 
+// app/Models/Check.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -33,6 +34,8 @@ class Check extends Model
         'bounce_reason',
         'notes',
         'metadata',
+        'created_by',
+        'updated_by',
     ];
 
     protected $casts = [
@@ -98,5 +101,15 @@ class Check extends Model
     public function isOverdue(): bool
     {
         return $this->status === 'pending' && $this->due_date->isPast();
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 }

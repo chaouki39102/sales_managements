@@ -211,16 +211,9 @@ client.interceptors.request.use(
           console.debug(`🌐 Tenant request: ${config.method?.toUpperCase()} ${config.baseURL ?? ''}${config.url}`);
         }
       }
-<<<<<<< HEAD
-    } else if (!slug && !isPublicPath(originalUrl)) {
-      // تحذير فقط إذا لم يكن المسار يحتوي slug مضمَّناً (مثل طلبات OnboardingPage/DataSeedingModal)
-      const hasEmbeddedSlug = /^\/[a-z0-9][a-z0-9-]{2,}[a-z0-9]\//.test(originalUrl);
-      if (import.meta.env.DEV && !hasEmbeddedSlug) {
-=======
     } else if (!slug && !isPublicPath(originalUrl) && !isPreSluggedUrl(originalUrl)) {
       // تحذير فقط إذا كان URL لا يحمل slug مضمَّناً
       if (import.meta.env.DEV) {
->>>>>>> d15eb8d (new commit add multi tenency for all the system tables)
         console.warn(`⚠️ No active company slug for request: ${config.method?.toUpperCase()} ${originalUrl}`);
       }
     }
