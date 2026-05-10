@@ -33,7 +33,7 @@ class User extends Authenticatable
         'name', 'email', 'email_verified_at', 'username', 'phone', 'avatar',
         'bio', 'job_title', 'birth_date', 'gender_id', 'national_id', 'address',
         'commune_id', 'wilaya_id', 'role_id', 'last_login_at', 'last_login_ip',
-        'register_ip', 'register_user_agent', 'active', 'created_by', 'updated_by', 'deleted_by',
+        'register_ip', 'register_user_agent', 'active', 'created_by', 'updated_by', 'deleted_by','password',
     ];
 
     protected $hidden = ['password', 'remember_token', 'national_id'];
@@ -92,14 +92,7 @@ class User extends Authenticatable
 
     public function defaultCompany(): BelongsTo { return $this->belongsTo(Company::class, 'company_id'); }
 
-    public function setPasswordAttribute($value)
-    {
-        if (strlen($value) === 60 && str_starts_with($value, '$2y$')) {
-            $this->attributes['password'] = $value;
-            return;
-        }
-        $this->attributes['password'] = \Illuminate\Support\Facades\Hash::make($value);
-    }
+
 
     public function getDefaultCompanyAttribute() { return $this->companies()->wherePivot('is_default', true)->first(); }
     public function getFullAddressAttribute(): string

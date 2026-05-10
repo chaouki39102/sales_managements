@@ -1,6 +1,6 @@
 // pages/auth/LoginPage.tsx
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
@@ -451,6 +451,22 @@ export default function LoginPage() {
                             textAlign: "center",
                         }}
                     >
+
+                        <p style={{ fontSize: 13, color: "var(--t4)", margin: "0 0 16px" }}>
+                            ليس لديك حساب؟{" "}
+                            <Link
+                                to="/register"
+                                style={{
+                                    color: "var(--em)",
+                                    fontWeight: 700,
+                                    textDecoration: "none",
+                                }}
+                            >
+                                إنشاء حساب جديد
+                                <i className="ti ti-arrow-left" style={{ marginRight: 4, fontSize: 13 }} />
+                            </Link>
+                        </p>
+
                         <div
                             style={{
                                 fontSize: 11,

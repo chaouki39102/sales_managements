@@ -14,6 +14,7 @@ const AdminPlansPage      = lazy(() => import("@/pages/admin/AdminPlansPage"));
 
 // Lazy pages
 const LoginPage                = lazy(() => import("@/pages/auth/LoginPage"));
+const RegisterPage             = lazy(() => import("@/pages/auth/RegisterPage"));
 const OnboardingPage           = lazy(() => import("@/pages/onboarding/OnboardingPage"));
 const DashboardPage            = lazy(() => import("@/pages/dashboard/DashboardPage"));
 const POSPage                  = lazy(() => import("@/pages/pos/POSPage"));
@@ -133,6 +134,8 @@ export default function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+
 
         {/* Onboarding – يحوي التوجيه الذكي */}
         <Route
