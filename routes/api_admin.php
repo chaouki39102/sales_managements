@@ -13,16 +13,23 @@ use Illuminate\Support\Facades\Route;
 | Admin API Routes — Super Admin Only
 |--------------------------------------------------------------------------
 |
-| يُضمَّن من api.php داخل Route::prefix('v1'):
-|   require base_path('routes/api_admin.php');
+| يُضمَّن من api.php داخل Route::prefix('v1') مباشرةً:
 |
-| ✅ 'super-admin' مطابق لما هو مسجّل في bootstrap/app.php
-| ✅ 'auth:sanctum' وليس 'api.auth'
+|   Route::prefix('v1')->group(function () {
+|       ...
+|       require base_path('routes/api_admin.php');  // ← هنا فقط
+|       ...
+|   });
+|
+| ⚠️  الخطأ الشائع: وضع require داخل group فرعي (مثل middleware أو prefix آخر)
+|     يجعل المسارات ترث middleware غلط أو prefix غير صحيح.
+|
+| ✅ النتيجة: /api/v1/admin/*
 |
 */
 
 Route::prefix('admin')
-    ->middleware(['auth:sanctum', 'super.admin'])
+    ->middleware(['auth:sanctum', 'super.admin'])  // ← 'super.admin' كما هو مسجّل في bootstrap/app.php
     ->name('admin.')
     ->group(function () {
 
@@ -44,6 +51,10 @@ Route::prefix('admin')
             Route::post('{company}/deactivate',           [AdminCompanyController::class, 'deactivate']);
             Route::post('{company}/verify',               [AdminCompanyController::class, 'verify']);
             Route::post('{company}/unverify',             [AdminCompanyController::class, 'unverify']);
+
+            // ⚠️ في api_admin.php القديم كان 'change-plan' لكن في AdminCompanyController هو changePlan
+            // تحقق: Route::post vs Route::put — الـ controller يستخدم POST أو PUT؟
+            // AdminCompanyController::changePlan ← نستخدم POST
             Route::post('{company}/change-plan',          [AdminCompanyController::class, 'changePlan']);
             Route::patch('{company}/notes',               [AdminCompanyController::class, 'updateNotes']);
 
@@ -74,8 +85,8 @@ Route::prefix('admin')
         });
 
         // ── Impersonate ────────────────────────────────────────────
-        Route::post('impersonate/stop', [AdminImpersonateController::class, 'stop']);
-        Route::post('impersonate/{user}', [AdminImpersonateController::class, 'start']);
+        Route::post('impersonate/stop',    [AdminImpersonateController::class, 'stop']);
+        Route::post('impersonate/{user}',  [AdminImpersonateController::class, 'start']);
 
         // ── سجل النشاط ─────────────────────────────────────────────
         Route::get('activity-log',      [AdminActivityController::class, 'index']);
