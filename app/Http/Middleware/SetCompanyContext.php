@@ -9,6 +9,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class SetCompanyContext
@@ -19,6 +20,12 @@ class SetCompanyContext
 
     public function handle(Request $request, Closure $next): Response
     {
+            // 🔍 DEBUG مؤقت — احذفه بعد التشخيص
+    Log::info('SetCompanyContext DEBUG', [
+        'user_id'    => Auth::id(),
+        'user_email' => Auth::user()?->email,
+        'slug'       => $request->route()->originalParameter('company') ?? $request->route('company'),
+    ]);
         // 1. جلب slug من الـ route
         // SubstituteBindings قد يُحوِّل {company} إلى Company Model قبل وصولنا
         // لذا نتعامل مع الحالتين: raw slug أو Model جاهز
