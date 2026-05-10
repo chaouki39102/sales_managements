@@ -1,54 +1,57 @@
-// ════════════════════════════════════════════════
-// hooks/useAdmin.ts  —  React Query hooks للـ Super Admin
-// ════════════════════════════════════════════════
+// hooks/useAdmin.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
-import type { AdminCompany, AdminUser, AdminStats, PaginatedResponse } from '@/lib/api/admin';
+import type {
+  AdminCompany,
+  AdminUser,
+  AdminPlan,
+  AdminStats,
+  ActivityLog,
+  PaginatedResponse,
+  AdminCompaniesParams,
+  AdminUsersParams,
+  AdminActivityParams,
+} from '@/types/admin';
 
-// ── Keys ──────────────────────────────────────────────────────────────
 export const adminKeys = {
-  all:            ['admin'] as const,
-  dashboard:      () => [...adminKeys.all, 'dashboard'] as const,
-  companies:      (p?: object) => [...adminKeys.all, 'companies', p ?? {}] as const,
-  company:        (id: number) => [...adminKeys.all, 'company', id] as const,
-  companyUsers:   (id: number) => [...adminKeys.all, 'company-users', id] as const,
-  users:          (p?: object) => [...adminKeys.all, 'users', p ?? {}] as const,
-  user:           (id: number) => [...adminKeys.all, 'user', id] as const,
-  plans:          () => [...adminKeys.all, 'plans'] as const,
+  all: ['admin'] as const,
+  dashboard: () => [...adminKeys.all, 'dashboard'] as const,
+  companies: (params?: AdminCompaniesParams) => [...adminKeys.all, 'companies', params ?? {}] as const,
+  company: (id: number) => [...adminKeys.all, 'company', id] as const,
+  companyUsers: (id: number) => [...adminKeys.all, 'company-users', id] as const,
+  users: (params?: AdminUsersParams) => [...adminKeys.all, 'users', params ?? {}] as const,
+  user: (id: number) => [...adminKeys.all, 'user', id] as const,
+  plans: () => [...adminKeys.all, 'plans'] as const,
+  activity: (params?: AdminActivityParams) => [...adminKeys.all, 'activity', params ?? {}] as const,
 };
 
-// ── helper: يسحب data من { success, message, data } أو يُعيد القيمة مباشرة ──
-// الـ apiGet في client قد يُعيد الـ response كاملاً أو data فقط حسب الإعداد
+// ✅ دالة استخراج البيانات الصحيحة (تتعامل مع شكل successResponse في Laravel)
 function unwrap<T>(res: any): T {
-  if (res && typeof res === 'object' && 'data' in res && 'success' in res) {
+  if (res && typeof res === 'object' && 'data' in res && 'meta' in res) {
+    // هذا هو الشكل الكامل القادم من successResponse (يحتوي على data, meta, links, status, message)
+    // نعيد الكائن كما هو لأن الصفحات تنتظر { data: [], meta: {} }
+    return res as T;
+  }
+  if (res && typeof res === 'object' && 'data' in res && !('meta' in res)) {
     return res.data as T;
   }
   return res as T;
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────
+// Dashboard
 export function useAdminDashboard() {
   return useQuery<AdminStats>({
     queryKey: adminKeys.dashboard(),
-    queryFn:  async () => {
-      const res = await adminApi.getDashboard();
-      // ✅ يتعامل مع كلا الحالتين:
-      // • apiGet يُعيد { success, message, data: {...} }  → يسحب data
-      // • apiGet يُعيد { companies, users, ... }          → يُعيد مباشرة
-      return unwrap<AdminStats>(res);
-    },
+    queryFn: async () => unwrap<AdminStats>(await adminApi.getDashboard()),
     staleTime: 2 * 60 * 1000,
   });
 }
 
-// ── Companies ─────────────────────────────────────────────────────────
-export function useAdminCompanies(params?: Record<string, unknown>) {
+// Companies
+export function useAdminCompanies(params?: AdminCompaniesParams) {
   return useQuery<PaginatedResponse<AdminCompany>>({
     queryKey: adminKeys.companies(params),
-    queryFn:  async () => {
-      const res = await adminApi.getCompanies(params);
-      return unwrap<PaginatedResponse<AdminCompany>>(res);
-    },
+    queryFn: async () => unwrap<PaginatedResponse<AdminCompany>>(await adminApi.getCompanies(params)),
     staleTime: 60_000,
   });
 }
@@ -56,97 +59,51 @@ export function useAdminCompanies(params?: Record<string, unknown>) {
 export function useAdminCompany(id: number) {
   return useQuery<AdminCompany>({
     queryKey: adminKeys.company(id),
-    queryFn:  async () => {
-      const res = await adminApi.getCompany(id);
-      return unwrap<AdminCompany>(res);
-    },
-    enabled:  !!id,
+    queryFn: async () => unwrap<AdminCompany>(await adminApi.getCompany(id)),
+    enabled: !!id,
   });
 }
 
 export function useAdminCompanyUsers(id: number) {
   return useQuery<PaginatedResponse<AdminUser>>({
     queryKey: adminKeys.companyUsers(id),
-    queryFn:  async () => {
-      const res = await adminApi.getCompanyUsers(id);
-      return unwrap<PaginatedResponse<AdminUser>>(res);
-    },
-    enabled:  !!id,
+    queryFn: async () => unwrap<PaginatedResponse<AdminUser>>(await adminApi.getCompanyUsers(id)),
+    enabled: !!id,
   });
 }
 
-// ── Company Mutations ─────────────────────────────────────────────────
 export function useAdminCompanyMutations() {
   const qc = useQueryClient();
-
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: adminKeys.all });
-  };
-
-  const suspend = useMutation({
-    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
-      adminApi.suspendCompany(id, reason),
-    onSuccess: invalidate,
-  });
-
-  const unsuspend = useMutation({
-    mutationFn: (id: number) => adminApi.unsuspendCompany(id),
-    onSuccess:  invalidate,
-  });
-
-  const verify = useMutation({
-    mutationFn: (id: number) => adminApi.verifyCompany(id),
-    onSuccess:  invalidate,
-  });
-
-  const unverify = useMutation({
-    mutationFn: (id: number) => adminApi.unverifyCompany(id),
-    onSuccess:  invalidate,
-  });
-
-  const activate = useMutation({
-    mutationFn: (id: number) => adminApi.activateCompany(id),
-    onSuccess:  invalidate,
-  });
-
-  const deactivate = useMutation({
-    mutationFn: (id: number) => adminApi.deactivateCompany(id),
-    onSuccess:  invalidate,
-  });
-
-  const changePlan = useMutation({
-    mutationFn: ({
-      id, ...data
-    }: { id: number; plan: string; max_users?: number; max_warehouses?: number; max_products?: number }) =>
-      adminApi.changePlan(id, data),
-    onSuccess: invalidate,
-  });
-
-  const deleteCompany = useMutation({
-    mutationFn: (id: number) => adminApi.deleteCompany(id),
-    onSuccess:  invalidate,
-  });
-
-  const updateNotes = useMutation({
-    mutationFn: ({ id, notes }: { id: number; notes: string }) =>
-      adminApi.updateNotes(id, notes),
-    onSuccess: invalidate,
-  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: adminKeys.all });
 
   return {
-    suspend, unsuspend, verify, unverify,
-    activate, deactivate, changePlan, deleteCompany, updateNotes,
+    suspend: useMutation({
+      mutationFn: ({ id, reason }: { id: number; reason: string }) => adminApi.suspendCompany(id, reason),
+      onSuccess: invalidate,
+    }),
+    unsuspend: useMutation({ mutationFn: (id: number) => adminApi.unsuspendCompany(id), onSuccess: invalidate }),
+    verify: useMutation({ mutationFn: (id: number) => adminApi.verifyCompany(id), onSuccess: invalidate }),
+    unverify: useMutation({ mutationFn: (id: number) => adminApi.unverifyCompany(id), onSuccess: invalidate }),
+    activate: useMutation({ mutationFn: (id: number) => adminApi.activateCompany(id), onSuccess: invalidate }),
+    deactivate: useMutation({ mutationFn: (id: number) => adminApi.deactivateCompany(id), onSuccess: invalidate }),
+    changePlan: useMutation({
+      mutationFn: ({ id, ...data }: { id: number; plan: string; max_users?: number; max_warehouses?: number; max_products?: number }) =>
+        adminApi.changePlan(id, data),
+      onSuccess: invalidate,
+    }),
+    deleteCompany: useMutation({ mutationFn: (id: number) => adminApi.deleteCompany(id), onSuccess: invalidate }),
+    updateNotes: useMutation({
+      mutationFn: ({ id, notes }: { id: number; notes: string }) => adminApi.updateNotes(id, notes),
+      onSuccess: invalidate,
+    }),
   };
 }
 
-// ── Users ─────────────────────────────────────────────────────────────
-export function useAdminUsers(params?: Record<string, unknown>) {
+// Users
+export function useAdminUsers(params?: AdminUsersParams) {
   return useQuery<PaginatedResponse<AdminUser>>({
     queryKey: adminKeys.users(params),
-    queryFn:  async () => {
-      const res = await adminApi.getUsers(params);
-      return unwrap<PaginatedResponse<AdminUser>>(res);
-    },
+    queryFn: async () => unwrap<PaginatedResponse<AdminUser>>(await adminApi.getUsers(params)),
     staleTime: 60_000,
   });
 }
@@ -155,39 +112,45 @@ export function useAdminUserMutations() {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: adminKeys.all });
 
-  const toggleActive = useMutation({
-    mutationFn: (id: number) => adminApi.toggleUserActive(id),
-    onSuccess:  invalidate,
-  });
-
-  const resetPassword = useMutation({
-    mutationFn: ({
-      id, password, password_confirmation,
-    }: { id: number; password: string; password_confirmation: string }) =>
-      adminApi.resetPassword(id, password, password_confirmation),
-  });
-
-  const deleteUser = useMutation({
-    mutationFn: (id: number) => adminApi.deleteUser(id),
-    onSuccess:  invalidate,
-  });
-
-  const impersonate = useMutation({
-    mutationFn: (id: number) => adminApi.impersonateStart(id),
-    // ✅ بعد الانتحال: الـ UI يتولى تخزين token وإعادة التوجيه
-  });
-
-  return { toggleActive, resetPassword, deleteUser, impersonate };
+  return {
+    toggleActive: useMutation({ mutationFn: (id: number) => adminApi.toggleUserActive(id), onSuccess: invalidate }),
+    resetPassword: useMutation({
+      mutationFn: ({ id, password, password_confirmation }: { id: number; password: string; password_confirmation: string }) =>
+        adminApi.resetPassword(id, password, password_confirmation),
+    }),
+    deleteUser: useMutation({ mutationFn: (id: number) => adminApi.deleteUser(id), onSuccess: invalidate }),
+    impersonate: useMutation({ mutationFn: (id: number) => adminApi.impersonateStart(id) }),
+  };
 }
 
-// ── Plans ─────────────────────────────────────────────────────────────
+// Plans
 export function useAdminPlans() {
-  return useQuery({
+  return useQuery<AdminPlan[]>({
     queryKey: adminKeys.plans(),
-    queryFn:  async () => {
-      const res = await adminApi.getPlans();
-      return unwrap(res);
-    },
+    queryFn: async () => unwrap<AdminPlan[]>(await adminApi.getPlans()),
     staleTime: 10 * 60 * 1000,
+  });
+}
+
+// Activity
+export function useAdminActivity(params?: AdminActivityParams) {
+  return useQuery<PaginatedResponse<ActivityLog>>({
+    queryKey: adminKeys.activity(params),
+    queryFn: async () => unwrap<PaginatedResponse<ActivityLog>>(await adminApi.getActivityLogs(params)),
+    staleTime: 30_000,
+  });
+}
+
+export function useAdminActivityExport() {
+  return useMutation({
+    mutationFn: async (params?: AdminActivityParams) => {
+      const blob = await adminApi.exportActivityLogs(params);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `activity_${new Date().toISOString().slice(0, 19)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
   });
 }

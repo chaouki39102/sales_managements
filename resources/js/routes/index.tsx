@@ -3,6 +3,7 @@ import React, { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
+import AdminActivityPage from "@/pages/admin/AdminActivityPage";
 
 // Admin pages
 const AdminLayout         = lazy(() => import("@/components/layouts/AdminLayout"));
@@ -157,6 +158,8 @@ export default function AppRoutes() {
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="plans" element={<AdminPlansPage />} />
           <Route path="activity" element={<ComingSoon />} />
+          <Route path="activity" element={<AdminActivityPage />} />
+
         </Route>
 
         {/* التطبيق الرئيسي (يتطلب شركة نشطة) */}

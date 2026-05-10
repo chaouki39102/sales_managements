@@ -3,49 +3,87 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Core\Http\Controllers\Traits\ApiResponders;
-use App\Models\Company;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
-    use ApiResponders;
-
-    public function index(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
-        try {
-            $stats = [
+        // ── إحصائيات الشركات ──────────────────────────────────────
+        $companiesTotal     = DB::table('companies')->whereNull('deleted_at')->count();
+        $companiesActive    = DB::table('companies')->whereNull('deleted_at')
+                                ->where('active', true)->whereNull('suspended_at')->count();
+        $companiesSuspended = DB::table('companies')->whereNull('deleted_at')
+                                ->whereNotNull('suspended_at')->count();
+        $companiesVerified  = DB::table('companies')->whereNull('deleted_at')
+                                ->whereNotNull('verified_at')->count();
+
+        $byPlan = DB::table('companies')
+            ->whereNull('deleted_at')
+            ->select('plan', DB::raw('count(*) as total'))
+            ->groupBy('plan')
+            ->pluck('total', 'plan')
+            ->toArray();
+
+        // ── إحصائيات المستخدمين ────────────────────────────────────
+        $usersTotal        = DB::table('users')->whereNull('deleted_at')->count();
+        $usersActive       = DB::table('users')->whereNull('deleted_at')->where('active', true)->count();
+        $usersNewThisMonth = DB::table('users')
+            ->whereNull('deleted_at')
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->count();
+
+        // ── أحدث الشركات ──────────────────────────────────────────
+        $recentCompanies = DB::table('companies')
+            ->whereNull('deleted_at')
+            ->select('id', 'name', 'slug', 'email', 'phone', 'plan',
+                     'active', 'suspended_at', 'verified_at', 'owner_id', 'created_at')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get()
+            ->map(function ($co) {
+                $co->users_count = DB::table('company_user')
+                    ->where('company_id', $co->id)
+                    ->where('active', true)
+                    ->count();
+                $co->is_suspended = !is_null($co->suspended_at);
+
+                // بيانات المالك
+                $co->owner = $co->owner_id
+                    ? DB::table('users')->where('id', $co->owner_id)
+                        ->select('id', 'name', 'email')->first()
+                    : null;
+
+                return $co;
+            });
+
+        // ── أحدث المستخدمين ───────────────────────────────────────
+        $recentUsers = DB::table('users')
+            ->whereNull('deleted_at')
+            ->select('id', 'name', 'email', 'active', 'created_at')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        return response()->json([
+            'data' => [
                 'companies' => [
-                    'total'     => Company::count(),
-                    'active'    => Company::where('active', true)->where('is_suspended', false)->count(),
-                    'suspended' => Company::where('is_suspended', true)->count(),
-                    'verified'  => Company::whereNotNull('verified_at')->count(),
-                    'by_plan'   => Company::groupBy('plan')
-                        ->selectRaw('plan, count(*) as count')
-                        ->pluck('count', 'plan'),
+                    'total'     => $companiesTotal,
+                    'active'    => $companiesActive,
+                    'suspended' => $companiesSuspended,
+                    'verified'  => $companiesVerified,
+                    'by_plan'   => $byPlan,
                 ],
                 'users' => [
-                    'total'  => User::count(),
-                    'active' => User::where('active', true)->count(),
-                    'new_this_month' => User::whereMonth('created_at', now()->month)
-                        ->whereYear('created_at', now()->year)
-                        ->count(),
+                    'total'          => $usersTotal,
+                    'active'         => $usersActive,
+                    'new_this_month' => $usersNewThisMonth,
                 ],
-                'recent_companies' => Company::latest()
-                    ->take(5)
-                    ->with('owner:id,name,email')
-                    ->get(['id', 'name', 'slug', 'plan', 'active', 'created_at', 'owner_id']),
-                'recent_users' => User::latest()
-                    ->take(5)
-                    ->withCount('companies')
-                    ->get(['id', 'name', 'email', 'active', 'created_at']),
-            ];
-
-            return $this->successResponse($stats, 'إحصائيات النظام');
-        } catch (\Throwable $e) {
-            return $this->errorResponse('فشل جلب الإحصائيات', 500, 'SERVER_ERROR');
-        }
+                'recent_companies' => $recentCompanies,
+                'recent_users'     => $recentUsers,
+            ],
+        ]);
     }
 }

@@ -1,194 +1,69 @@
-// ════════════════════════════════════════════════
 // pages/admin/AdminDashboardPage.tsx
-// ════════════════════════════════════════════════
 import { useAdminDashboard } from '@/hooks/useAdmin';
 import { useNavigate } from 'react-router-dom';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import KpiCard from '@/components/ui/KpiCard';
+import Button from '@/components/ui/Button';
+import Badge from '@/components/ui/Badge';
+import AlertBar from '@/components/ui/AlertBar';
 
 const PLAN_LABELS: Record<string, string> = {
-  starter:      'مبتدئ',
-  professional: 'احترافي',
-  enterprise:   'مؤسسة',
-  custom:       'مخصص',
+  free: 'مجاني', starter: 'مبتدئ', professional: 'احترافي', enterprise: 'مؤسسة', custom: 'مخصص',
 };
-
 const PLAN_COLORS: Record<string, string> = {
-  starter:      '#6366f1',
-  professional: '#0ea5e9',
-  enterprise:   '#f59e0b',
-  custom:       '#8b5cf6',
+  free: '#6b7280', starter: '#6366f1', professional: '#0ea5e9', enterprise: '#f59e0b', custom: '#8b5cf6',
 };
-
-function KpiCard({ label, value, sub, icon, color = 'var(--em)' }: {
-  label: string; value: number | string; sub?: string; icon: string; color?: string;
-}) {
-  return (
-    <div style={{
-      background: 'var(--bg1)', border: '1px solid var(--bd0)', borderRadius: 12,
-      padding: '16px 20px', display: 'flex', alignItems: 'flex-start', gap: 14,
-    }}>
-      <div style={{
-        width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-        background: color + '1a', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <i className={`ti ${icon}`} style={{ fontSize: 20, color }} />
-      </div>
-      <div>
-        <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--tx0)', lineHeight: 1.1 }}>{value}</div>
-        <div style={{ fontSize: 13, color: 'var(--tx1)', marginTop: 2 }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: 'var(--tx2)', marginTop: 1 }}>{sub}</div>}
-      </div>
-    </div>
-  );
-}
 
 export default function AdminDashboardPage() {
-  // ✅ أضفنا isError للتعامل مع فشل الطلب
-  const { data: s, isLoading, isError, refetch } = useAdminDashboard();
+  const { data: stats, isLoading, isError, refetch } = useAdminDashboard();
   const navigate = useNavigate();
 
-  // ── حالة التحميل ──────────────────────────────────────────
-  if (isLoading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-      <i className="ti ti-loader" style={{ fontSize: 28, color: 'var(--em)', animation: 'spin 1s linear infinite' }} />
-    </div>
-  );
+  if (isLoading) return <div className="empty"><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> جار التحميل...</div>;
+  if (isError) return <AlertBar variant="red">فشل تحميل البيانات. <Button onClick={() => refetch()}>إعادة المحاولة</Button></AlertBar>;
+  if (!stats) return null;
 
-  // ── حالة الخطأ ✅ ──────────────────────────────────────────
-  if (isError) return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', height: 220, gap: 12, color: 'var(--tx2)',
-    }}>
-      <i className="ti ti-wifi-off" style={{ fontSize: 36, opacity: .5 }} />
-      <p style={{ fontSize: 14, margin: 0 }}>تعذّر تحميل البيانات. تحقق من اتصالك أو صلاحياتك.</p>
-      <button
-        onClick={() => refetch()}
-        style={{
-          padding: '7px 20px', borderRadius: 8, border: '1px solid var(--bd0)',
-          background: 'var(--bg1)', cursor: 'pointer', fontSize: 13, color: 'var(--tx1)',
-        }}
-      >
-        إعادة المحاولة
-      </button>
-    </div>
-  );
-
-  // ── لا بيانات (edge case) ──────────────────────────────────
-  if (!s) return null;
+  const { companies, users, recent_companies } = stats;
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-
-      {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--tx0)', margin: 0 }}>لوحة تحكم النظام</h1>
-        <p style={{ fontSize: 13, color: 'var(--tx2)', marginTop: 4 }}>نظرة شاملة على كامل المنصة</p>
+    <div>
+      <PageHeader title="لوحة تحكم النظام" description="نظرة شاملة على كامل المنصة" />
+      <div className="kpis">
+        <KpiCard variant="green" icon="ti-building-store" label="إجمالي الشركات" value={companies.total} />
+        <KpiCard variant="blue" icon="ti-circle-check" label="شركات نشطة" value={companies.active} />
+        <KpiCard variant="red" icon="ti-ban" label="موقوفة" value={companies.suspended} />
+        <KpiCard variant="purple" icon="ti-users" label="إجمالي المستخدمين" value={users.total} />
+        <KpiCard variant="gold" icon="ti-user-plus" label="مستخدمون جدد" value={users.new_this_month} sub="هذا الشهر" />
       </div>
 
-      {/* KPI Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 28 }}>
-        <KpiCard label="إجمالي الشركات"    value={s.companies.total}          icon="ti-building-store" color="#0ea5e9" />
-        <KpiCard label="شركات نشطة"         value={s.companies.active}         icon="ti-circle-check"   color="#10b981" />
-        <KpiCard label="شركات موقوفة"       value={s.companies.suspended}      icon="ti-ban"            color="#ef4444" />
-        <KpiCard label="إجمالي المستخدمين"  value={s.users.total}              icon="ti-users"          color="#8b5cf6" />
-        <KpiCard label="مستخدمون جدد"       value={s.users.new_this_month}     icon="ti-user-plus"      color="#f59e0b" sub="هذا الشهر" />
-      </div>
-
-      {/* Two columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-
-        {/* Plans breakdown */}
-        <div style={{ background: 'var(--bg1)', border: '1px solid var(--bd0)', borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--tx0)', marginBottom: 16 }}>
-            <i className="ti ti-credit-card" style={{ marginLeft: 8, color: 'var(--em)' }} />
-            توزيع الخطط
-          </div>
-
-          {/* ✅ تحقق من وجود by_plan قبل المحاولة */}
-          {s.companies.by_plan && Object.keys(s.companies.by_plan).length > 0
-            ? Object.entries(s.companies.by_plan).map(([plan, count]) => {
-                const total = s.companies.total || 1;
-                const pct   = Math.round((count / total) * 100);
-                const color = PLAN_COLORS[plan] ?? '#6b7280';
-                return (
-                  <div key={plan} style={{ marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 13, color: 'var(--tx1)' }}>{PLAN_LABELS[plan] ?? plan}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--tx0)' }}>{count} شركة</span>
-                    </div>
-                    <div style={{ height: 6, background: 'var(--bg0)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width .4s' }} />
-                    </div>
-                  </div>
-                );
-              })
-            : (
-              <div style={{ fontSize: 13, color: 'var(--tx2)', textAlign: 'center', padding: '20px 0' }}>
-                لا توجد شركات بعد
-              </div>
-            )
-          }
-        </div>
-
-        {/* Recent companies */}
-        <div style={{ background: 'var(--bg1)', border: '1px solid var(--bd0)', borderRadius: 12, padding: 20 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16,
-          }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--tx0)' }}>
-              <i className="ti ti-building-store" style={{ marginLeft: 8, color: 'var(--em)' }} />
-              أحدث الشركات
-            </div>
-            <button
-              onClick={() => navigate('/admin/companies')}
-              style={{ fontSize: 12, color: 'var(--em)', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              عرض الكل ←
-            </button>
-          </div>
-
-          {/* ✅ تحقق من وجود recent_companies */}
-          {s.recent_companies && s.recent_companies.length > 0
-            ? s.recent_companies.slice(0, 5).map(co => (
-                <div key={co.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
-                  borderBottom: '1px solid var(--bd0)',
-                }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: 8, background: 'var(--em-bg)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 700, color: 'var(--em)', flexShrink: 0,
-                  }}>
-                    {co.name[0]}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: 500, color: 'var(--tx0)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {co.name}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--tx2)' }}>
-                      {PLAN_LABELS[co.plan] ?? co.plan} · {(co as any).users_count ?? 0} مستخدم
-                    </div>
-                  </div>
-                  <span style={{
-                    fontSize: 10, padding: '2px 7px', borderRadius: 10, fontWeight: 600,
-                    background: co.is_suspended ? '#ef44441a' : co.active ? '#10b9811a' : '#6b72801a',
-                    color:      co.is_suspended ? '#ef4444'   : co.active ? '#10b981'   : '#6b7280',
-                  }}>
-                    {co.is_suspended ? 'موقوف' : co.active ? 'نشط' : 'غير نشط'}
-                  </span>
+      <div className="g2">
+        <Card title="توزيع الخطط">
+          {Object.entries(companies.by_plan).map(([plan, count]) => {
+            const total = companies.total || 1;
+            const pct = Math.round((count / total) * 100);
+            const color = PLAN_COLORS[plan] || '#6b7280';
+            return (
+              <div key={plan} style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>{PLAN_LABELS[plan] || plan}</span>
+                  <span>{count} شركة ({pct}%)</span>
                 </div>
-              ))
-            : (
-              <div style={{ fontSize: 13, color: 'var(--tx2)', textAlign: 'center', padding: '20px 0' }}>
-                لا توجد شركات مسجّلة بعد
+                <div className="pb"><div className="pb-f" style={{ width: `${pct}%`, background: color }} /></div>
               </div>
-            )
-          }
-        </div>
+            );
+          })}
+        </Card>
 
+        <Card title="أحدث الشركات" actions={<Button size="sm" onClick={() => navigate('/admin/companies')}>عرض الكل →</Button>}>
+          {recent_companies.slice(0, 5).map(co => (
+            <div key={co.id} className="sr">
+              <div><strong>{co.name}</strong><br />/{co.slug}</div>
+              <Badge variant={co.is_suspended ? 'danger' : co.active ? 'success' : 'gray'}>
+                {co.is_suspended ? 'موقوف' : co.active ? 'نشط' : 'غير نشط'}
+              </Badge>
+            </div>
+          ))}
+        </Card>
       </div>
     </div>
   );

@@ -24,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'company'       => \App\Http\Middleware\SetCompanyContext::class,
             'api.auth'      => \App\Http\Middleware\ApiAuthenticate::class,   // ← اختياري مع sanctum
-            'super-admin'   => \App\Http\Middleware\SuperAdminOnly::class,    // ← جديد
+            'super.admin'   => \App\Http\Middleware\SuperAdminOnly::class,    // ← جديد
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
