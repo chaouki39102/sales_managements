@@ -411,13 +411,31 @@ function handleForcedLogout(): void {
 
 function extractData<T>(response: any): T {
     const d = response?.data;
-    // الحالة 1: response.data مباشرة مصفوفة أو كائن
+
+    // الحالة 1: response.data مصفوفة مباشرة
     if (Array.isArray(d)) return d as T;
-    // الحالة 2: response.data.data (الشكل القياسي)
-    if (d && typeof d === "object" && "data" in d) {
-        return d.data as T;
+
+    if (d && typeof d === "object") {
+        // الحالة 2: { status/success, data: [...], meta: {...} }
+        // Laravel يُرجع هذا الشكل من successResponse مع paginator
+        // ✅ نُرجع d كاملاً (يحتوي data + meta) لأن الصفحات تتوقع { data, meta }
+        if ("meta" in d && "data" in d) {
+            return d as T;
+        }
+
+        // الحالة 3: { status/success, data: {...} } بدون meta (مورد واحد أو stats)
+        // نُرجع d.data فقط
+        if ("data" in d && ("status" in d || "success" in d || "message" in d)) {
+            return d.data as T;
+        }
+
+        // الحالة 4: { data: [...] } الشكل القياسي القديم
+        if ("data" in d) {
+            return d.data as T;
+        }
     }
-    // الحالة 3: أي شكل آخر
+
+    // الحالة 5: أي شكل آخر
     return d as T;
 }
 

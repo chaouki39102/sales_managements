@@ -13,23 +13,20 @@ use Illuminate\Support\Facades\Route;
 | Admin API Routes — Super Admin Only
 |--------------------------------------------------------------------------
 |
-| يُضمَّن من api.php داخل Route::prefix('v1') مباشرةً:
-|
-|   Route::prefix('v1')->group(function () {
-|       ...
-|       require base_path('routes/api_admin.php');  // ← هنا فقط
-|       ...
-|   });
-|
-| ⚠️  الخطأ الشائع: وضع require داخل group فرعي (مثل middleware أو prefix آخر)
-|     يجعل المسارات ترث middleware غلط أو prefix غير صحيح.
+| يُضمَّن من api.php قبل Route::prefix('v1') مباشرةً:
+|   require base_path('routes/api_admin.php');
 |
 | ✅ النتيجة: /api/v1/admin/*
 |
+| ✅ whereNumber('company') و whereNumber('user'):
+|    يُجبران Laravel على البحث بالـ id الرقمي وليس slug
+|    لأن Company::getRouteKeyName() يُرجع 'slug' افتراضياً
+|    مما يجعل /admin/companies/2/users يبحث عن slug='2' → 404
+|
 */
 
-Route::prefix('admin')
-    ->middleware(['auth:sanctum', 'super.admin'])  // ← 'super.admin' كما هو مسجّل في bootstrap/app.php
+Route::prefix('v1/admin')
+    ->middleware(['auth:sanctum', 'can:super.admin'])
     ->name('admin.')
     ->group(function () {
 
@@ -39,41 +36,40 @@ Route::prefix('admin')
 
         // ── الشركات ────────────────────────────────────────────────
         Route::prefix('companies')->name('companies.')->group(function () {
-            Route::get('/',       [AdminCompanyController::class, 'index']);
-            Route::post('/',      [AdminCompanyController::class, 'store']);
-            Route::get('{company}',    [AdminCompanyController::class, 'show']);
-            Route::put('{company}',    [AdminCompanyController::class, 'update']);
-            Route::delete('{company}', [AdminCompanyController::class, 'destroy']);
+            Route::get('/',  [AdminCompanyController::class, 'index']);
+            Route::post('/', [AdminCompanyController::class, 'store']);
 
-            Route::post('{company}/suspend',              [AdminCompanyController::class, 'suspend']);
-            Route::post('{company}/unsuspend',            [AdminCompanyController::class, 'unsuspend']);
-            Route::post('{company}/activate',             [AdminCompanyController::class, 'activate']);
-            Route::post('{company}/deactivate',           [AdminCompanyController::class, 'deactivate']);
-            Route::post('{company}/verify',               [AdminCompanyController::class, 'verify']);
-            Route::post('{company}/unverify',             [AdminCompanyController::class, 'unverify']);
+            // ✅ whereNumber يُجبر Laravel على استخدام id وليس slug
+            Route::get(   '{company}', [AdminCompanyController::class, 'show'])   ->whereNumber('company');
+            Route::put(   '{company}', [AdminCompanyController::class, 'update']) ->whereNumber('company');
+            Route::delete('{company}', [AdminCompanyController::class, 'destroy'])->whereNumber('company');
 
-            // ⚠️ في api_admin.php القديم كان 'change-plan' لكن في AdminCompanyController هو changePlan
-            // تحقق: Route::post vs Route::put — الـ controller يستخدم POST أو PUT؟
-            // AdminCompanyController::changePlan ← نستخدم POST
-            Route::post('{company}/change-plan',          [AdminCompanyController::class, 'changePlan']);
-            Route::patch('{company}/notes',               [AdminCompanyController::class, 'updateNotes']);
+            Route::post('{company}/suspend',    [AdminCompanyController::class, 'suspend'])    ->whereNumber('company');
+            Route::post('{company}/unsuspend',  [AdminCompanyController::class, 'unsuspend'])  ->whereNumber('company');
+            Route::post('{company}/activate',   [AdminCompanyController::class, 'activate'])   ->whereNumber('company');
+            Route::post('{company}/deactivate', [AdminCompanyController::class, 'deactivate']) ->whereNumber('company');
+            Route::post('{company}/verify',     [AdminCompanyController::class, 'verify'])     ->whereNumber('company');
+            Route::post('{company}/unverify',   [AdminCompanyController::class, 'unverify'])   ->whereNumber('company');
+            Route::post('{company}/change-plan',[AdminCompanyController::class, 'changePlan']) ->whereNumber('company');
+            Route::patch('{company}/notes',     [AdminCompanyController::class, 'updateNotes'])->whereNumber('company');
 
-            Route::get('{company}/users',                 [AdminCompanyController::class, 'users']);
-            Route::post('{company}/users',                [AdminCompanyController::class, 'addUser']);
-            Route::delete('{company}/users/{user}',       [AdminCompanyController::class, 'removeUser']);
-            Route::patch('{company}/users/{user}/toggle', [AdminCompanyController::class, 'toggleUserStatus']);
+            Route::get(   '{company}/users',              [AdminCompanyController::class, 'users'])            ->whereNumber('company');
+            Route::post(  '{company}/users',              [AdminCompanyController::class, 'addUser'])          ->whereNumber('company');
+            Route::delete('{company}/users/{user}',       [AdminCompanyController::class, 'removeUser'])       ->whereNumber('company')->whereNumber('user');
+            Route::patch( '{company}/users/{user}/toggle',[AdminCompanyController::class, 'toggleUserStatus']) ->whereNumber('company')->whereNumber('user');
         });
 
         // ── المستخدمون ─────────────────────────────────────────────
         Route::prefix('users')->name('users.')->group(function () {
-            Route::get('/',                      [AdminUserController::class, 'index']);
-            Route::post('/',                     [AdminUserController::class, 'store']);
-            Route::get('{user}',                 [AdminUserController::class, 'show']);
-            Route::put('{user}',                 [AdminUserController::class, 'update']);
-            Route::delete('{user}',              [AdminUserController::class, 'destroy']);
-            Route::post('{user}/reset-password', [AdminUserController::class, 'resetPassword']);
-            Route::post('{user}/toggle-active',  [AdminUserController::class, 'toggleActive']);
-            Route::get('{user}/companies',       [AdminUserController::class, 'companies']);
+            Route::get('/',  [AdminUserController::class, 'index']);
+            Route::post('/', [AdminUserController::class, 'store']);
+
+            Route::get(   '{user}',                [AdminUserController::class, 'show'])          ->whereNumber('user');
+            Route::put(   '{user}',                [AdminUserController::class, 'update'])        ->whereNumber('user');
+            Route::delete('{user}',                [AdminUserController::class, 'destroy'])       ->whereNumber('user');
+            Route::post(  '{user}/reset-password', [AdminUserController::class, 'resetPassword']) ->whereNumber('user');
+            Route::post(  '{user}/toggle-active',  [AdminUserController::class, 'toggleActive'])  ->whereNumber('user');
+            Route::get(   '{user}/companies',      [AdminUserController::class, 'companies'])     ->whereNumber('user');
         });
 
         // ── الخطط ──────────────────────────────────────────────────
@@ -85,10 +81,11 @@ Route::prefix('admin')
         });
 
         // ── Impersonate ────────────────────────────────────────────
-        Route::post('impersonate/stop',    [AdminImpersonateController::class, 'stop']);
-        Route::post('impersonate/{user}',  [AdminImpersonateController::class, 'start']);
+        // ⚠️ stop قبل {user} لتجنب التعارض
+        Route::post('impersonate/stop',   [AdminImpersonateController::class, 'stop']);
+        Route::post('impersonate/{user}', [AdminImpersonateController::class, 'start'])->whereNumber('user');
 
         // ── سجل النشاط ─────────────────────────────────────────────
         Route::get('activity-log',      [AdminActivityController::class, 'index']);
-        Route::get('activity-log/{id}', [AdminActivityController::class, 'show']);
+        Route::get('activity-log/{id}', [AdminActivityController::class, 'show'])->whereNumber('id');
     });

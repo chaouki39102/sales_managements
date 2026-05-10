@@ -82,6 +82,9 @@ use Illuminate\Http\Request;
 |
 */
 
+require base_path('routes/api_admin.php');
+
+
 Route::prefix('v1')->group(function () {
 
     // ═══════════════════════════════════════════
@@ -130,20 +133,34 @@ Route::prefix('v1')->group(function () {
         Route::patch('/{company}/plan',     [CompanyController::class, 'upgradePlan']);
 
         // إدارة الأعضاء
-        Route::get('/{company}/members',
-            fn(Company $company) => app(CompanyController::class)->members($company));
-        Route::post('/{company}/members',
-            fn(Request $request, Company $company) => app(CompanyController::class)->addMember($request, $company));
-        Route::delete('/{company}/members/{userId}',
-            fn(Company $company, int $userId) => app(CompanyController::class)->removeMember($company, $userId));
-        Route::patch('/{company}/members/{userId}/role',
-            fn(Request $request, Company $company, int $userId) => app(CompanyController::class)->changeMemberRole($request, $company, $userId));
-        Route::patch('/{company}/members/{userId}/deactivate',
-            fn(Company $company, int $userId) => app(CompanyController::class)->deactivateMember($company, $userId));
-        Route::patch('/{company}/members/{userId}/activate',
-            fn(Company $company, int $userId) => app(CompanyController::class)->activateMember($company, $userId));
-        Route::post('/{company}/transfer-ownership',
-            fn(Request $request, Company $company) => app(CompanyController::class)->transferOwnership($request, $company));
+        Route::get(
+            '/{company}/members',
+            fn(Company $company) => app(CompanyController::class)->members($company)
+        );
+        Route::post(
+            '/{company}/members',
+            fn(Request $request, Company $company) => app(CompanyController::class)->addMember($request, $company)
+        );
+        Route::delete(
+            '/{company}/members/{userId}',
+            fn(Company $company, int $userId) => app(CompanyController::class)->removeMember($company, $userId)
+        );
+        Route::patch(
+            '/{company}/members/{userId}/role',
+            fn(Request $request, Company $company, int $userId) => app(CompanyController::class)->changeMemberRole($request, $company, $userId)
+        );
+        Route::patch(
+            '/{company}/members/{userId}/deactivate',
+            fn(Company $company, int $userId) => app(CompanyController::class)->deactivateMember($company, $userId)
+        );
+        Route::patch(
+            '/{company}/members/{userId}/activate',
+            fn(Company $company, int $userId) => app(CompanyController::class)->activateMember($company, $userId)
+        );
+        Route::post(
+            '/{company}/transfer-ownership',
+            fn(Request $request, Company $company) => app(CompanyController::class)->transferOwnership($request, $company)
+        );
     });
 
     // ═══════════════════════════════════════════
@@ -236,7 +253,7 @@ Route::prefix('v1')->group(function () {
             Route::get('products/{product}/barcodes', [BarcodeController::class, 'indexByProduct']);
 
             Route::get('warehouses',           [WarehouseController::class, 'index']);
-            Route::get('warehouses/{warehouse}',[WarehouseController::class, 'show']);
+            Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show']);
 
             Route::get('parties',         [PartyController::class, 'index']);
             Route::get('parties/{party}', [PartyController::class, 'show']);
@@ -270,7 +287,7 @@ Route::prefix('v1')->group(function () {
             Route::get('roles/{role}',           [RoleController::class, 'show']);
             Route::get('permissions',            [PermissionController::class, 'index']);
             Route::get('permissions/by-group',   [PermissionController::class, 'byGroup']);
-            Route::get('permissions/{permission}',[PermissionController::class, 'show']);
+            Route::get('permissions/{permission}', [PermissionController::class, 'show']);
 
             Route::get('notifications',                             [NotificationController::class, 'index']);
             Route::get('notifications/{notification}',              [NotificationController::class, 'show']);
@@ -311,17 +328,17 @@ Route::prefix('v1')->group(function () {
                 Route::post('price-levels',               [PriceLevelController::class, 'store']);
                 Route::put('price-levels/{priceLevel}',   [PriceLevelController::class, 'update']);
                 Route::patch('price-levels/{priceLevel}', [PriceLevelController::class, 'update']);
-                Route::delete('price-levels/{priceLevel}',[PriceLevelController::class, 'destroy']);
+                Route::delete('price-levels/{priceLevel}', [PriceLevelController::class, 'destroy']);
 
                 Route::post('payment-modes',                [PaymentModeController::class, 'store']);
                 Route::put('payment-modes/{paymentMode}',   [PaymentModeController::class, 'update']);
                 Route::patch('payment-modes/{paymentMode}', [PaymentModeController::class, 'update']);
-                Route::delete('payment-modes/{paymentMode}',[PaymentModeController::class, 'destroy']);
+                Route::delete('payment-modes/{paymentMode}', [PaymentModeController::class, 'destroy']);
 
                 Route::post('exchange-rates',                 [ExchangeRateController::class, 'store']);
                 Route::put('exchange-rates/{exchangeRate}',   [ExchangeRateController::class, 'update']);
                 Route::patch('exchange-rates/{exchangeRate}', [ExchangeRateController::class, 'update']);
-                Route::delete('exchange-rates/{exchangeRate}',[ExchangeRateController::class, 'destroy']);
+                Route::delete('exchange-rates/{exchangeRate}', [ExchangeRateController::class, 'destroy']);
 
                 Route::post('expense-categories',               [ExpenseCategoryController::class, 'store']);
                 Route::put('expense-categories/{category}',     [ExpenseCategoryController::class, 'update']);
@@ -335,7 +352,7 @@ Route::prefix('v1')->group(function () {
 
                 Route::post('barcodes',            [BarcodeController::class, 'store']);
                 Route::put('barcodes/{barcode}',   [BarcodeController::class, 'update']);
-                Route::delete('barcodes/{barcode}',[BarcodeController::class, 'destroy']);
+                Route::delete('barcodes/{barcode}', [BarcodeController::class, 'destroy']);
 
                 Route::post('product-variants',              [ProductVariantController::class, 'store']);
                 Route::put('product-variants/{variant}',     [ProductVariantController::class, 'update']);
@@ -345,7 +362,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('warehouses',              [WarehouseController::class, 'store']);
                 Route::put('warehouses/{warehouse}',   [WarehouseController::class, 'update']);
                 Route::patch('warehouses/{warehouse}', [WarehouseController::class, 'update']);
-                Route::delete('warehouses/{warehouse}',[WarehouseController::class, 'destroy']);
+                Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy']);
 
                 Route::post('parties',            [PartyController::class, 'store']);
                 Route::put('parties/{party}',     [PartyController::class, 'update']);
@@ -359,7 +376,7 @@ Route::prefix('v1')->group(function () {
                 Route::apiResource('users',                UserController::class);
                 Route::post('users/{user}/restore',        [UserController::class, 'restore']);
                 Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete']);
-                Route::post('users/{user}/change-password',[UserController::class, 'changePassword']);
+                Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
                 Route::post('users/{user}/toggle-active',  [UserController::class, 'toggleActive']);
                 Route::post('users/{user}/assign-role',    [UserController::class, 'assignRole']);
 
@@ -439,7 +456,7 @@ Route::prefix('v1')->group(function () {
                 Route::delete('product-lots/{lot}',        [ProductLotController::class, 'destroy']);
 
                 Route::post('stock-movements',             [StockMovementController::class, 'store']);
-                Route::delete('stock-movements/{movement}',[StockMovementController::class, 'destroy']);
+                Route::delete('stock-movements/{movement}', [StockMovementController::class, 'destroy']);
             });
 
             // ── ⑤-د: فردية (المستخدم نفسه) ─────────────────────
@@ -450,7 +467,6 @@ Route::prefix('v1')->group(function () {
             Route::get('settings/group/{group}',    [SettingController::class, 'byGroup']);
             Route::get('settings/key/{key}/value',  [SettingController::class, 'getValue']);
         });
-        require base_path('routes/api_admin.php');
 });
 
 // ═══════════════════════════════════════════════
