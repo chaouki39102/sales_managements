@@ -73,22 +73,35 @@ class UserService extends \App\Core\Services\BaseService
 
     protected function afterCreate(Model $item, array $data, ?Request $request): void
     {
+        $companyId = $this->getCurrentCompanyId();
+
+        // 1. ربط المستخدم بالشركة الحالية عبر company_user
+        $item->companies()->attach($companyId, [
+            'role'       => $data['role'] ?? 'member',
+            'is_default' => false,
+            'joined_at'  => now(),
+            'active'     => true,
+        ]);
+
+        // 2. تعيين الدور المحاسبي (Spatie) باستخدام CompanyRoleService
         if (!empty($data['role'])) {
-            $item->syncRoles([$data['role']]);
+            app(\App\Services\CompanyRoleService::class)
+                ->assignRole($item, $data['role'], $companyId);
         }
 
+        // 3. الصلاحيات المباشرة (إن وجدت)
         if (isset($data['permission_ids']) && is_array($data['permission_ids'])) {
             $item->syncPermissions($data['permission_ids']);
         }
 
+        // 4. رفع الصورة (إن وجدت)
         if (!empty($data['avatar_file'])) {
             $this->handleAvatarUpload($item, $data['avatar_file']);
         }
 
-        Log::info('User created', [
+        Log::info('User created and attached to company', [
             'user_id'    => $item->id,
-            'company_id' => $item->company_id,
-            'created_by' => auth()->id(),
+            'company_id' => $companyId,
         ]);
     }
 
@@ -185,8 +198,18 @@ class UserService extends \App\Core\Services\BaseService
 
     public function updateProfile(User $user, array $data): User
     {
-        $allowed  = ['name', 'username', 'phone', 'bio', 'avatar', 'birth_date',
-                     'gender_id', 'address', 'commune_id', 'wilaya_id'];
+        $allowed  = [
+            'name',
+            'username',
+            'phone',
+            'bio',
+            'avatar',
+            'birth_date',
+            'gender_id',
+            'address',
+            'commune_id',
+            'wilaya_id'
+        ];
         $filtered = array_intersect_key($data, array_flip($allowed));
 
         if (isset($filtered['username']) && $filtered['username'] !== $user->username) {
@@ -240,7 +263,17 @@ class UserService extends \App\Core\Services\BaseService
     // ═══════════════════════════════════════════
     // دوال الاستعلام
     // ═══════════════════════════════════════════
+    public function findById($id, array $with = null): Model
+    {
+        $relations = $with ?? array_unique(array_merge($this->defaultWith, $this->showWith));
+        $companyId = $this->getCurrentCompanyId();
 
+        return User::whereHas('companies', function ($q) use ($companyId) {
+            $q->where('companies.id', $companyId);
+        })
+            ->with($relations)
+            ->findOrFail($id);
+    }
     public function getByRole(string $roleName)
     {
         return User::role($roleName)

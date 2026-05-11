@@ -29,6 +29,20 @@ class UserController extends BaseApiController
         return User::class;
     }
 
+    public function index(Request $request): JsonResponse
+{
+    $companyId = app(\App\Services\CompanyContextService::class)->get();
+
+    $users = User::whereHas('companies', function ($q) use ($companyId) {
+        $q->where('companies.id', $companyId);
+    })->paginate($request->get('per_page', 15));
+
+    return $this->successResponse(
+        UserResource::collection($users),
+        'تم جلب المستخدمين بنجاح'
+    );
+}
+
     // ─────────────────────────────────────────────────────────────────
     // السبب الجذري للمشكلة:
     //
@@ -152,18 +166,29 @@ class UserController extends BaseApiController
     }
 
     public function assignRole(Request $request, $id): JsonResponse
-    {
-        try {
-            $userId = $request->route('user') ?? $id;
-            $user = $this->userService->findById($userId);
-            $this->authorizeAction('update', $user);
-            $data = $request->validate(['role' => 'required|string|exists:roles,name']);
-            $user->syncRoles([$data['role']]);
-            return $this->successResponse(new UserResource($user->load('roles')), 'تم تعيين الدور');
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'assignRole');
-        }
+{
+    try {
+        $userId = $request->route('user') ?? $id;
+        $user   = $this->userService->findById($userId);
+        $this->authorizeAction('update', $user);
+
+        $companyId = app(\App\Services\CompanyContextService::class)->get();
+
+        $data = $request->validate([
+            'role' => 'required|string|exists:roles,name',
+        ]);
+
+        app(\App\Services\CompanyRoleService::class)
+            ->assignRole($user, $data['role'], $companyId);
+
+        return $this->successResponse(
+            new UserResource($user->load('roles')),
+            'تم تعيين الدور'
+        );
+    } catch (\Throwable $e) {
+        return $this->handleError($e, 'assignRole');
     }
+}
 
     // ─── المحذوفات ──────────────────────────────────────────────────
 

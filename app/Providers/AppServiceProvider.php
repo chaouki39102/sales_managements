@@ -16,23 +16,36 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CompanyContextService::class);
     }
 
-    public function boot(): void
-    {
-        // ✅ تحليل {company} بالـ slug وليس بالـ id
-        // يُصلح خطأ "No query results for model Company"
-        // عند استخدام Route::prefix('{company}') مع SubstituteBindings
-        Route::bind('company', function (string $value) {
-            return Company::where('slug', $value)->firstOrFail();
-        });
+public function boot(): void
+{
+    // ✅ تحليل {company} بالـ slug وليس بالـ id
+    Route::bind('company', function (string $value) {
+        return Company::where('slug', $value)->firstOrFail();
+    });
 
-        Gate::policy(Company::class, CompanyPolicy::class);
+    // ✅ Super Admin (Spatie role) يتجاوز كل الصلاحيات
+    Gate::before(function ($user, $ability) {
+        if (method_exists($user, 'hasRole') && $user->hasRole('super-admin')) {
+            return true;
+        }
 
-        // ✅ Super Admin (Spatie role) يتجاوز كل الصلاحيات بأمان
-        Gate::before(function ($user, $ability) {
-            if (method_exists($user, 'hasRole') && $user->hasRole('super-admin')) {
-                return true;
+        // ✅ مالك الشركة الحالية يمتلك صلاحيات مطلقة داخل شركته
+        try {
+            $companyId = app(CompanyContextService::class)->get();
+            if ($companyId) {
+                $company = Company::find($companyId);
+                if ($company && $company->owner_id === $user->id) {
+                    return true; // السماح بكل شيء
+                }
             }
-            return null;
-        });
-    }
+        } catch (\RuntimeException $e) {
+            // لا يوجد سياق شركة حالياً – تجاهل
+        }
+
+        return null; // لم نتخذ قراراً – نستمر في فحص Policies
+    });
+
+    Gate::policy(Company::class, CompanyPolicy::class);
+    \App\Models\Company::observe(\App\Observers\CompanyObserver::class);
+}
 }

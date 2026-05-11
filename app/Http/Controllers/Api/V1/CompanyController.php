@@ -148,13 +148,15 @@ class CompanyController extends BaseApiController
 
         try {
             $this->authorizeAction('create', Company::class);
-            $company = $this->companyService->create($data, $request);
-            // أضف هذا:
-            $user = auth()->user();
 
-            // ربط المالك بالشركة في company_user إن لم يكن موجوداً
+            // ✅ نضمن حفظ owner_id
+            $data['owner_id'] = auth()->id();
+
+            $company = $this->companyService->create($data, $request);
+
+            // ربط المالك في company_user
             DB::table('company_user')->insertOrIgnore([
-                'user_id'    => $user->id,
+                'user_id'    => auth()->id(),
                 'company_id' => $company->id,
                 'role'       => 'owner',
                 'active'     => true,
@@ -162,7 +164,13 @@ class CompanyController extends BaseApiController
                 'updated_at' => now(),
             ]);
 
-            return $this->successResponse(new CompanyResource($company->load('owner:id,name,email')), 'تم إنشاء الشركة', 201);
+            // ✅ CompanyObserver سيتولى بذر الأدوار وتعيين admin تلقائياً
+
+            return $this->successResponse(
+                new CompanyResource($company->load('owner:id,name,email')),
+                'تم إنشاء الشركة',
+                201
+            );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'store');
         }

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use App\Core\Exceptions\BusinessRuleException;
+use Illuminate\Support\Facades\Schema;
 
 abstract class BaseService
 {
@@ -26,10 +27,23 @@ abstract class BaseService
     // ═══════════════════════════════════════════════
 
     public function findById($id, array $with = null): Model
-    {
-        $relations = $with ?? array_unique(array_merge($this->defaultWith, $this->showWith));
-        return $this->model::with($relations)->findOrFail($id);
+{
+    $relations = $with ?? array_unique(array_merge($this->defaultWith, $this->showWith));
+
+    $query = $this->model::with($relations);
+
+    // تطبيق فلتر company_id إذا كان السياق موجوداً
+    try {
+        $context = app(\App\Services\CompanyContextService::class);
+        if ($context->has()) {
+            $query->where('company_id', $context->get());
+        }
+    } catch (\RuntimeException $e) {
+        // لا يوجد سياق شركة – لا نضيف الفلتر
     }
+
+    return $query->findOrFail($id);
+}
 
     public function findMany(array $ids, array $with = null): \Illuminate\Database\Eloquent\Collection
     {
@@ -244,7 +258,28 @@ abstract class BaseService
     // 6. Hooks (قابلة للتجاوز في الـ subclasses)
     // ═══════════════════════════════════════════════
 
-    protected function beforeCreate(array $data, ?Request $request): array { return $data; }
+protected function beforeCreate(array $data, ?Request $request): array
+{
+    // إزالة أي حقول غير موجودة في الجدول لتفادي الأخطاء
+    $tableColumns = [];
+    try {
+        $tableColumns = $this->modelHasColumn('id') // مجرد استدعاء للتحقق من وجود الجدول
+            ? Schema::getColumnListing((new $this->model)->getTable())
+            : [];
+    } catch (\Throwable $e) {
+        // إذا حدث خطأ، نمرر البيانات كما هي
+        return $data;
+    }
+
+    $validatedData = [];
+    foreach ($data as $key => $value) {
+        if (in_array($key, $tableColumns)) {
+            $validatedData[$key] = $value;
+        }
+    }
+
+    return $validatedData;
+}
     protected function afterCreate(Model $item, array $data, ?Request $request): void {}
     protected function afterCreateCommitted(Model $item, array $data, ?Request $request): void {}
 

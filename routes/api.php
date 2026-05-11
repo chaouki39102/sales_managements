@@ -34,7 +34,7 @@ use App\Http\Controllers\Api\V1\BarcodeController;
 use App\Http\Controllers\Api\V1\CompanySeedController;
 use App\Http\Controllers\Api\V1\ProductVariantController;
 
-// Tenant Lookup Controllers (نُقلت من العامة إلى هنا)
+// Tenant Lookup Controllers
 use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\BrandController;
 use App\Http\Controllers\Api\V1\UnitController;
@@ -43,7 +43,7 @@ use App\Http\Controllers\Api\V1\PaymentModeController;
 use App\Http\Controllers\Api\V1\ExpenseCategoryController;
 use App\Http\Controllers\Api\V1\ExchangeRateController;
 
-// Global Lookup Controllers (بقيت عالمية لأنها لا تحمل company_id)
+// Global Lookup Controllers
 use App\Http\Controllers\Api\V1\WilayaController;
 use App\Http\Controllers\Api\V1\CommuneController;
 use App\Http\Controllers\Api\V1\CurrencyController;
@@ -68,22 +68,19 @@ use Illuminate\Http\Request;
 /*
 | API Routes (Laravel 11) — Multi-Tenancy Professional Structure
 |--------------------------------------------------------------------------
-|
-| ① /api/v1/auth/*                     ← المصادقة
-| ② /api/v1/companies/*                ← إدارة شركات المستخدم
-| ③ /api/v1/admin/*                    ← Super Admin (في api_admin.php)
-| ④ /api/v1/lookups/*                  ← جداول مرجعية عالمية حقيقية (wilayas, communes)
-| ⑤ /api/v1/{company}/{resource}       ← بيانات معزولة بالشركة (جميع جداول company_id)
-|
+| ① /api/v1/auth/*
+| ② /api/v1/companies/*
+| ③ /api/v1/admin/*               ← in api_admin.php
+| ④ /api/v1/lookups/*             ← wilayas, communes only
+| ⑤ /api/v1/{company}/{resource}  ← tenant data
 */
-
 
 require base_path('routes/api_admin.php');
 
 Route::prefix('v1')->group(function () {
 
     // ═══════════════════════════════════════════
-    // ① AUTH — المصادقة + الملف الشخصي
+    // ① AUTH
     // ═══════════════════════════════════════════
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
@@ -105,7 +102,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // ═══════════════════════════════════════════
-    // ② USER COMPANIES — إدارة شركات المستخدم
+    // ② USER COMPANIES
     // ═══════════════════════════════════════════
     Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
         Route::get('/current', [CompanyController::class, 'current']);
@@ -156,11 +153,11 @@ Route::prefix('v1')->group(function () {
     });
 
     // ═══════════════════════════════════════════
-    // ③ SUPER ADMIN — api_admin.php
+    // ③ SUPER ADMIN (api_admin.php)
     // ═══════════════════════════════════════════
 
     // ═══════════════════════════════════════════
-    // ④ LOOKUP TABLES — فقط العالمية الحقيقية
+    // ④ GLOBAL LOOKUPS (only wilayas, communes)
     // ═══════════════════════════════════════════
     Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('wilayas',  WilayaController::class)->only(['index', 'show']);
@@ -169,7 +166,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // ═══════════════════════════════════════════
-    // ⑤ TENANT RESOURCES — معزولة بـ company
+    // ⑤ TENANT RESOURCES
     // ═══════════════════════════════════════════
     Route::middleware(['auth:sanctum', 'company'])
         ->prefix('{company}')
@@ -177,7 +174,7 @@ Route::prefix('v1')->group(function () {
 
             Route::post('seeds/{seeder}', [CompanySeedController::class, 'run']);
 
-            // ── ⑤-أ: موارد لكل أعضاء الشركة (قراءة) ──────────
+            // ── ⑤-أ: لكل أعضاء الشركة (قراءة) ──────────
             Route::get('dashboard',                     [DashboardController::class, 'index']);
             Route::get('dashboard/sales-chart',         [DashboardController::class, 'salesChart']);
             Route::get('dashboard/top-products',        [DashboardController::class, 'topProducts']);
@@ -196,7 +193,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('taxes',     [ReportController::class, 'taxes']);
             });
 
-            // --- جداول مرجعية خاصة بالشركة (كانت عالمية سابقاً) ---
+            // جداول مرجعية (قراءة)
             Route::apiResource('families',       FamilyController::class)->only(['index', 'show']);
             Route::apiResource('brands',         BrandController::class)->only(['index', 'show']);
             Route::apiResource('units',          UnitController::class)->only(['index', 'show']);
@@ -300,165 +297,59 @@ Route::prefix('v1')->group(function () {
             Route::middleware('can:update_company')->group(function () {
 
                 // جداول مرجعية - كتابة
-                Route::post('units',           [UnitController::class, 'store']);
-                Route::put('units/{unit}',     [UnitController::class, 'update']);
-                Route::patch('units/{unit}',   [UnitController::class, 'update']);
-                Route::delete('units/{unit}',  [UnitController::class, 'destroy']);
-
-                Route::post('families',             [FamilyController::class, 'store']);
-                Route::put('families/{family}',     [FamilyController::class, 'update']);
-                Route::patch('families/{family}',   [FamilyController::class, 'update']);
-                Route::delete('families/{family}',  [FamilyController::class, 'destroy']);
-
-                Route::post('brands',           [BrandController::class, 'store']);
-                Route::put('brands/{brand}',    [BrandController::class, 'update']);
-                Route::patch('brands/{brand}',  [BrandController::class, 'update']);
-                Route::delete('brands/{brand}', [BrandController::class, 'destroy']);
-
-                Route::post('price-levels',               [PriceLevelController::class, 'store']);
-                Route::put('price-levels/{priceLevel}',   [PriceLevelController::class, 'update']);
-                Route::patch('price-levels/{priceLevel}', [PriceLevelController::class, 'update']);
-                Route::delete('price-levels/{priceLevel}', [PriceLevelController::class, 'destroy']);
-
-                Route::post('payment-modes',                [PaymentModeController::class, 'store']);
-                Route::put('payment-modes/{paymentMode}',   [PaymentModeController::class, 'update']);
-                Route::patch('payment-modes/{paymentMode}', [PaymentModeController::class, 'update']);
-                Route::delete('payment-modes/{paymentMode}', [PaymentModeController::class, 'destroy']);
-
-                Route::post('exchange-rates',                 [ExchangeRateController::class, 'store']);
-                Route::put('exchange-rates/{exchangeRate}',   [ExchangeRateController::class, 'update']);
-                Route::patch('exchange-rates/{exchangeRate}', [ExchangeRateController::class, 'update']);
-                Route::delete('exchange-rates/{exchangeRate}', [ExchangeRateController::class, 'destroy']);
-
-                Route::post('expense-categories',               [ExpenseCategoryController::class, 'store']);
-                Route::put('expense-categories/{category}',     [ExpenseCategoryController::class, 'update']);
-                Route::patch('expense-categories/{category}',   [ExpenseCategoryController::class, 'update']);
-                Route::delete('expense-categories/{category}',  [ExpenseCategoryController::class, 'destroy']);
-
-                Route::post('tvas',         [TvaController::class, 'store']);
-                Route::put('tvas/{tva}',    [TvaController::class, 'update']);
-                Route::patch('tvas/{tva}',  [TvaController::class, 'update']);
-                Route::delete('tvas/{tva}', [TvaController::class, 'destroy']);
-
-                Route::post('document-types',               [DocumentTypeController::class, 'store']);
-                Route::put('document-types/{documentType}', [DocumentTypeController::class, 'update']);
-                Route::patch('document-types/{documentType}', [DocumentTypeController::class, 'update']);
-                Route::delete('document-types/{documentType}', [DocumentTypeController::class, 'destroy']);
-
-                Route::post('document-statuses',                  [DocumentStatusController::class, 'store']);
-                Route::put('document-statuses/{documentStatus}',  [DocumentStatusController::class, 'update']);
-                Route::patch('document-statuses/{documentStatus}',[DocumentStatusController::class, 'update']);
-                Route::delete('document-statuses/{documentStatus}',[DocumentStatusController::class, 'destroy']);
-
-                Route::post('document-base-operations',                       [DocumentBaseOperationController::class, 'store']);
-                Route::put('document-base-operations/{documentBaseOperation}', [DocumentBaseOperationController::class, 'update']);
-                Route::patch('document-base-operations/{documentBaseOperation}', [DocumentBaseOperationController::class, 'update']);
-                Route::delete('document-base-operations/{documentBaseOperation}', [DocumentBaseOperationController::class, 'destroy']);
-
-                Route::post('fiscal-stamps',               [FiscalStampController::class, 'store']);
-                Route::put('fiscal-stamps/{fiscalStamp}',  [FiscalStampController::class, 'update']);
-                Route::patch('fiscal-stamps/{fiscalStamp}',[FiscalStampController::class, 'update']);
-                Route::delete('fiscal-stamps/{fiscalStamp}',[FiscalStampController::class, 'destroy']);
-
-                Route::post('genders',          [GenderController::class, 'store']);
-                Route::put('genders/{gender}',  [GenderController::class, 'update']);
-                Route::patch('genders/{gender}',[GenderController::class, 'update']);
-                Route::delete('genders/{gender}',[GenderController::class, 'destroy']);
-
-                Route::post('legal-forms',              [LegalFormController::class, 'store']);
-                Route::put('legal-forms/{legalForm}',   [LegalFormController::class, 'update']);
-                Route::patch('legal-forms/{legalForm}', [LegalFormController::class, 'update']);
-                Route::delete('legal-forms/{legalForm}',[LegalFormController::class, 'destroy']);
-
-                Route::post('currencies',              [CurrencyController::class, 'store']);
-                Route::put('currencies/{currency}',    [CurrencyController::class, 'update']);
-                Route::patch('currencies/{currency}',  [CurrencyController::class, 'update']);
-                Route::delete('currencies/{currency}', [CurrencyController::class, 'destroy']);
-
-                Route::post('party-types',                [PartyTypeController::class, 'store']);
-                Route::put('party-types/{partyType}',     [PartyTypeController::class, 'update']);
-                Route::patch('party-types/{partyType}',   [PartyTypeController::class, 'update']);
-                Route::delete('party-types/{partyType}',  [PartyTypeController::class, 'destroy']);
-
-                Route::post('product-types',                [ProductTypeController::class, 'store']);
-                Route::put('product-types/{productType}',  [ProductTypeController::class, 'update']);
-                Route::patch('product-types/{productType}',[ProductTypeController::class, 'update']);
-                Route::delete('product-types/{productType}',[ProductTypeController::class, 'destroy']);
-
-                Route::post('treasury-account-types',                          [TreasuryAccountTypeController::class, 'store']);
-                Route::put('treasury-account-types/{treasuryAccountType}',      [TreasuryAccountTypeController::class, 'update']);
-                Route::patch('treasury-account-types/{treasuryAccountType}',    [TreasuryAccountTypeController::class, 'update']);
-                Route::delete('treasury-account-types/{treasuryAccountType}',   [TreasuryAccountTypeController::class, 'destroy']);
-
-                Route::post('stock-movement-types',                            [StockMovementTypeController::class, 'store']);
-                Route::put('stock-movement-types/{stockMovementType}',         [StockMovementTypeController::class, 'update']);
-                Route::patch('stock-movement-types/{stockMovementType}',       [StockMovementTypeController::class, 'update']);
-                Route::delete('stock-movement-types/{stockMovementType}',      [StockMovementTypeController::class, 'destroy']);
-
-                Route::post('inventory-valuation-methods',                                    [InventoryValuationMethodController::class, 'store']);
-                Route::put('inventory-valuation-methods/{inventoryValuationMethod}',           [InventoryValuationMethodController::class, 'update']);
-                Route::patch('inventory-valuation-methods/{inventoryValuationMethod}',         [InventoryValuationMethodController::class, 'update']);
-                Route::delete('inventory-valuation-methods/{inventoryValuationMethod}',        [InventoryValuationMethodController::class, 'destroy']);
+                Route::apiResource('units',                  UnitController::class,                  ['except' => ['index', 'show']]);
+                Route::apiResource('families',               FamilyController::class,                ['except' => ['index', 'show']]);
+                Route::apiResource('brands',                 BrandController::class,                 ['except' => ['index', 'show']]);
+                Route::apiResource('price-levels',           PriceLevelController::class,            ['except' => ['index', 'show']]);
+                Route::apiResource('payment-modes',          PaymentModeController::class,           ['except' => ['index', 'show']]);
+                Route::apiResource('exchange-rates',         ExchangeRateController::class,          ['except' => ['index', 'show']]);
+                Route::apiResource('expense-categories',     ExpenseCategoryController::class,       ['except' => ['index', 'show']]);
+                Route::apiResource('tvas',                   TvaController::class,                   ['except' => ['index', 'show']]);
+                Route::apiResource('document-types',         DocumentTypeController::class,          ['except' => ['index', 'show']]);
+                Route::apiResource('document-statuses',      DocumentStatusController::class,        ['except' => ['index', 'show']]);
+                Route::apiResource('document-base-operations', DocumentBaseOperationController::class, ['except' => ['index', 'show']]);
+                Route::apiResource('fiscal-stamps',          FiscalStampController::class,           ['except' => ['index', 'show']]);
+                Route::apiResource('genders',                GenderController::class,                ['except' => ['index', 'show']]);
+                Route::apiResource('legal-forms',            LegalFormController::class,             ['except' => ['index', 'show']]);
+                Route::apiResource('currencies',             CurrencyController::class,              ['except' => ['index', 'show']]);
+                Route::apiResource('party-types',            PartyTypeController::class,             ['except' => ['index', 'show']]);
+                Route::apiResource('product-types',          ProductTypeController::class,           ['except' => ['index', 'show']]);
+                Route::apiResource('treasury-account-types', TreasuryAccountTypeController::class,  ['except' => ['index', 'show']]);
+                Route::apiResource('stock-movement-types',   StockMovementTypeController::class,     ['except' => ['index', 'show']]);
+                Route::apiResource('inventory-valuation-methods', InventoryValuationMethodController::class, ['except' => ['index', 'show']]);
 
                 // منتجات وأطراف ومستودعات - كتابة
-                Route::post('products',              [ProductController::class, 'store']);
-                Route::put('products/{product}',     [ProductController::class, 'update']);
-                Route::patch('products/{product}',   [ProductController::class, 'update']);
-                Route::delete('products/{product}',  [ProductController::class, 'destroy']);
+                Route::apiResource('products',          ProductController::class,             ['except' => ['index', 'show']]);
+                Route::apiResource('barcodes',          BarcodeController::class,             ['except' => ['index', 'show']]);
+                Route::apiResource('product-variants',  ProductVariantController::class,      ['except' => ['index', 'show']]);
+                Route::apiResource('warehouses',        WarehouseController::class,           ['except' => ['index', 'show']]);
+                Route::apiResource('parties',           PartyController::class,               ['except' => ['index', 'show']]);
 
-                Route::post('barcodes',            [BarcodeController::class, 'store']);
-                Route::put('barcodes/{barcode}',   [BarcodeController::class, 'update']);
-                Route::delete('barcodes/{barcode}', [BarcodeController::class, 'destroy']);
-
-                Route::post('product-variants',              [ProductVariantController::class, 'store']);
-                Route::put('product-variants/{variant}',     [ProductVariantController::class, 'update']);
-                Route::patch('product-variants/{variant}',   [ProductVariantController::class, 'update']);
-                Route::delete('product-variants/{variant}',  [ProductVariantController::class, 'destroy']);
-
-                Route::post('warehouses',              [WarehouseController::class, 'store']);
-                Route::put('warehouses/{warehouse}',   [WarehouseController::class, 'update']);
-                Route::patch('warehouses/{warehouse}', [WarehouseController::class, 'update']);
-                Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy']);
-
-                Route::post('parties',            [PartyController::class, 'store']);
-                Route::put('parties/{party}',     [PartyController::class, 'update']);
-                Route::patch('parties/{party}',   [PartyController::class, 'update']);
-                Route::delete('parties/{party}',  [PartyController::class, 'destroy']);
-
+                // مستخدمون (بصلاحيات كاملة)
+                Route::apiResource('users', UserController::class);
                 Route::get('users/trashed',                [UserController::class, 'trashed']);
                 Route::get('users-by-role',                [UserController::class, 'byRole']);
                 Route::get('users/active',                 [UserController::class, 'active']);
                 Route::get('users/inactive',               [UserController::class, 'inactive']);
-                Route::apiResource('users',                UserController::class);
                 Route::post('users/{user}/restore',        [UserController::class, 'restore']);
                 Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete']);
                 Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
                 Route::post('users/{user}/toggle-active',  [UserController::class, 'toggleActive']);
                 Route::post('users/{user}/assign-role',    [UserController::class, 'assignRole']);
 
-                Route::post('roles',              [RoleController::class, 'store']);
-                Route::put('roles/{role}',        [RoleController::class, 'update']);
-                Route::patch('roles/{role}',      [RoleController::class, 'update']);
-                Route::delete('roles/{role}',     [RoleController::class, 'destroy']);
+                // أدوار وصلاحيات
+                Route::apiResource('roles',               RoleController::class,               ['except' => ['index', 'show']]);
+                Route::apiResource('permissions',         PermissionController::class,         ['except' => ['index', 'show']]);
 
-                Route::post('permissions',                [PermissionController::class, 'store']);
-                Route::put('permissions/{permission}',    [PermissionController::class, 'update']);
-                Route::patch('permissions/{permission}',  [PermissionController::class, 'update']);
-                Route::delete('permissions/{permission}', [PermissionController::class, 'destroy']);
+                // موظفون وعقود
+                Route::apiResource('employees',             EmployeeController::class,           ['except' => ['index', 'show']]);
+                Route::apiResource('employment-contracts',  EmploymentContractController::class, ['except' => ['index', 'show']]);
 
-                Route::post('employees',              [EmployeeController::class, 'store']);
-                Route::put('employees/{employee}',    [EmployeeController::class, 'update']);
-                Route::patch('employees/{employee}',  [EmployeeController::class, 'update']);
-                Route::delete('employees/{employee}', [EmployeeController::class, 'destroy']);
-
-                Route::post('employment-contracts',               [EmploymentContractController::class, 'store']);
-                Route::put('employment-contracts/{contract}',     [EmploymentContractController::class, 'update']);
-                Route::patch('employment-contracts/{contract}',   [EmploymentContractController::class, 'update']);
-                Route::delete('employment-contracts/{contract}',  [EmploymentContractController::class, 'destroy']);
-
+                // أرصدة افتتاحية
                 Route::apiResource('opening-balance-stocks',  OpeningBalanceStockController::class);
                 Route::apiResource('opening-balance-parties', OpeningBalancePartyController::class);
 
+                // سلاسل الترقيم
                 Route::apiResource('numbering-series', NumberingSeriesController::class);
                 Route::post('numbering-series/{series}/lock',        [NumberingSeriesController::class, 'lock']);
                 Route::post('numbering-series/{series}/unlock',      [NumberingSeriesController::class, 'unlock']);
@@ -466,6 +357,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('numbering-series/{series}/preview-next', [NumberingSeriesController::class, 'previewNextNumber']);
                 Route::post('numbering-series/{series}/sync',        [NumberingSeriesController::class, 'syncNumber']);
 
+                // تخفيضات الكميات
                 Route::apiResource('quantity-discounts', QuantityDiscountController::class);
             });
 

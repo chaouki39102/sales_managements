@@ -60,7 +60,7 @@ abstract class BaseApiController extends Controller
     protected string  $resourceName  = 'item';
     protected ?string $resourceClass = null;
     protected bool    $autoTransform = true;
-    
+
     public function __construct()
     {
         // يمكن أن يظل فارغًا أو تضع فيه الإعدادات التي تحتاجها
@@ -131,21 +131,29 @@ abstract class BaseApiController extends Controller
     }
 
     public function update(Request $request, $id): JsonResponse
-    {
-        try {
-            $resolvedId = $this->extractId($id);
-            $item = $this->getService()->findById($resolvedId);
-            $this->authorizeAction('update', $item);
-            $data = $this->getValidatedData($request, $resolvedId);
-            $item = $this->getService()->update($item, $data, $request);
-            return $this->successResponse(
-                $this->transformItem($item),
-                "تم تحديث {$this->resourceName} بنجاح"
-            );
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'update');
-        }
+{
+    try {
+        $resolvedId = $this->extractId($id);
+
+        // ✅ أضف هذين السطرين للتشخيص
+        \Log::info('UPDATE DEBUG', ['raw_id' => $id, 'resolved_id' => $resolvedId, 'resource' => $this->resourceName]);
+
+        $item = $this->getService()->findById($resolvedId);
+
+        // ✅ أضف هذا السطر للتشخيص
+        \Log::info('UPDATE AFTER FINDBYID', ['item_id' => $item->id, 'item_company' => $item->company_id]);
+
+        $this->authorizeAction('update', $item);
+        $data = $this->getValidatedData($request, $resolvedId);
+        $item = $this->getService()->update($item, $data, $request);
+        return $this->successResponse(
+            $this->transformItem($item),
+            "تم تحديث {$this->resourceName} بنجاح"
+        );
+    } catch (\Throwable $e) {
+        return $this->handleError($e, 'update');
     }
+}
 
     public function destroy($id): JsonResponse
     {
@@ -188,21 +196,32 @@ abstract class BaseApiController extends Controller
     /**
      * استخراج الـ ID من أي مصدر بأمان.
      */
-    protected function extractId(mixed $id): int|string
-    {
-        // حالة Route Model Binding: وصل Model كامل
-        if ($id instanceof Model) {
-            return $id->getKey();
+   protected function extractId(mixed $id): int|string
+{
+    // حالة Route Model Binding: وصل Model
+    if ($id instanceof Model) {
+        // هل هو من نفس نوع المورد الذي يديره هذا الكنترولر؟
+        try {
+            $expected = $this->getModelClass();
+            if ($id instanceof $expected) {
+                return $id->getKey();
+            }
+        } catch (\LogicException $e) {
+            // الكنترولر لم يعرّف getModelClass (مثل AuthController)
+            // نقع في الحالة التالية
         }
-
-        // حالة عادية: int أو string
-        if ($id !== null) {
-            return $id;
-        }
-
-        // حالة fallback: ابحث في route params
+        // ليس المورد المتوقع – على الأرجح هو Company model
+        // نبحث عن المعرف الحقيقي من route params
         return $this->resolveRouteId();
     }
+
+    // حالة عادية: int أو string
+    if ($id !== null) {
+        return $id;
+    }
+
+    return $this->resolveRouteId();
+}
 
     /**
      * يبحث عن ID في route params بأسماء شائعة.
@@ -213,34 +232,33 @@ abstract class BaseApiController extends Controller
      *   → يبحث عن 'invoice' أو 'id'
      */
     protected function resolveRouteId(string ...$paramNames): int|string
-    {
-        // إذا لم تُحدد أسماء، استخدم الاسم المشتق من اسم المورد + 'id'
-        if (empty($paramNames)) {
-            $paramNames = [
-                $this->resourceName,          // 'invoice'
-                str_singular($this->resourceName), // 'invoice' من 'invoices'
-                'id',                          // fallback
-            ];
-        }
-
-        $route = request()->route();
-
-        foreach ($paramNames as $name) {
-            $value = $route?->parameter($name);
-            if ($value !== null) {
-                return $value instanceof Model ? $value->getKey() : $value;
-            }
-        }
-
-        // آخر محاولة: أخذ آخر parameter في الـ route
-        $params = $route?->parameters() ?? [];
-        if (!empty($params)) {
-            $last = end($params);
-            return $last instanceof Model ? $last->getKey() : $last;
-        }
-
-        throw new \RuntimeException("Could not resolve ID from route for resource: {$this->resourceName}");
+{
+    if (empty($paramNames)) {
+        // لا تستخدم str_singular — استعمل أسماء route params المتوقعة فقط
+        $paramNames = [
+            $this->resourceName,   // مثال: 'expense_category'
+            'id',                   // احتياطي
+        ];
     }
+
+    $route = request()->route();
+
+    foreach ($paramNames as $name) {
+        $value = $route?->parameter($name);
+        if ($value !== null) {
+            return $value instanceof Model ? $value->getKey() : $value;
+        }
+    }
+
+    // آخر محاولة: آخر parameter في الـ route (الذي يحمل المعرّف الفعلي)
+    $params = $route?->parameters() ?? [];
+    if (!empty($params)) {
+        $last = end($params);
+        return $last instanceof Model ? $last->getKey() : $last;
+    }
+
+    throw new \RuntimeException("Could not resolve ID from route for resource: {$this->resourceName}");
+}
 
     // ══════════════════════════════════════════════════════════════
     // Abstract Methods — nullable لدعم AuthController وغيره
@@ -383,16 +401,18 @@ abstract class BaseApiController extends Controller
     {
         return match ($errorType) {
             'not_found' => $this->errorResponse(
-                "{$this->resourceName} غير موجود", 404, 'NOT_FOUND'
-            ),
+    "{$this->resourceName} غير موجود أو لا ينتمي لشركتك",
+    404,
+    'NOT_FOUND'
+),
             'business_rule' => $this->errorResponse(
                 $e->getMessage(), $e->getCode() ?: 409, 'BUSINESS_RULE_VIOLATION'
             ),
             'authorization' => $this->errorResponse(
-                $e->getMessage() ?: 'ليس لديك الصلاحية',
-                $e instanceof \App\Core\Exceptions\UnauthorizedException ? 401 : 403,
-                'AUTHORIZATION_ERROR'
-            ),
+    $e->getMessage() ?: 'عذراً، لا تمتلك الصلاحية الكافية لتنفيذ هذا الإجراء. يرجى التواصل مع مدير النظام.',
+    $e instanceof \App\Core\Exceptions\UnauthorizedException ? 401 : 403,
+    'AUTHORIZATION_ERROR'
+),
             'validation' => $this->errorResponse(
                 'خطأ في البيانات المدخلة', 422, 'VALIDATION_ERROR',
                 $e instanceof ValidationException ? $e->errors() : []

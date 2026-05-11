@@ -38,23 +38,25 @@ class CompanyService extends \App\Core\Services\BaseService
         return $data;
     }
 
-protected function afterCreate(Model $item, array $data, $request): void
-{
-    $user = auth()->user();
-    if ($user && !$user->companies->contains($item->id)) {
-        $user->companies()->attach($item->id, [
-            'is_default' => true,
-            'role'       => Company::COMPANY_ROLE_OWNER,
-            'active'     => true,
-            'joined_at'  => now(),
-        ]);
-    }
+    protected function afterCreate(Model $item, array $data, ?Request $request): void
+    {
+        // ربط المالك بالشركة في الجدول الوسيط
+        $ownerId = $data['owner_id'] ?? auth()->id();
 
-    // ✅ إعطاء مُنشئ الشركة دور admin تلقائياً
-    if ($user && !$user->hasRole('admin')) {
-        $user->assignRole('admin');
+        DB::table('company_user')->insertOrIgnore([
+            'user_id'    => $ownerId,
+            'company_id' => $item->id,
+            'role'       => 'owner',
+            'active'     => true,
+            'is_default' => true,
+            'joined_at'  => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // باقي المهام (بذر الأدوار وتعيين دور admin للمالك) يتولاها CompanyObserver تلقائياً
+        Log::info("Company created: {$item->name}, owner: {$ownerId}");
     }
-}
 
     protected function afterCreateCommitted(Model $item, array $data, $request): void
     {

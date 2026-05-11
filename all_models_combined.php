@@ -324,6 +324,7 @@ class Cache extends Model
 
 
 // ===== ملف: Check.php =====
+// app/Models/Check.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -357,6 +358,8 @@ class Check extends Model
         'bounce_reason',
         'notes',
         'metadata',
+        'created_by',
+        'updated_by',
     ];
 
     protected $casts = [
@@ -422,6 +425,16 @@ class Check extends Model
     public function isOverdue(): bool
     {
         return $this->status === 'pending' && $this->due_date->isPast();
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 }
 
@@ -1863,6 +1876,7 @@ class ExpenseCategory extends Model
 
 
 // ===== ملف: Family.php =====
+// app/Models/Family.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -1891,6 +1905,9 @@ class Family extends Model
         'parent_id',
         'active',
         'display_order',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [
@@ -4156,6 +4173,7 @@ class StockMovementType extends Model
 
 
 // ===== ملف: TreasuryAccount.php =====
+// app/Models/TreasuryAccount.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -4191,6 +4209,9 @@ class TreasuryAccount extends Model
         'is_default',
         'active',
         'notes',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [
@@ -4207,29 +4228,65 @@ class TreasuryAccount extends Model
     public static array $filterable = ['treasury_account_type_id', 'is_default', 'active', 'currency_id'];
     public static array $sortable = ['id', 'name', 'code', 'current_balance'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['treasuryAccountType', 'payments', 'paymentModes', 'expenses', 'createdBy', 'updatedBy', 'deletedBy'];
+    public static array $allowedIncludes = ['treasuryAccountType', 'currency', 'payments', 'paymentModes', 'expenses', 'createdBy', 'updatedBy', 'deletedBy'];
     public static string $defaultSort = 'name';
     public static ?int $cacheTtl = 300;
     public static array $cacheTags = ['treasury_accounts'];
 
-    public function treasuryAccountType(): BelongsTo { return $this->belongsTo(TreasuryAccountType::class); }
-    public function payments(): HasMany { return $this->hasMany(Payment::class); }
-    public function paymentModes(): HasMany { return $this->hasMany(PaymentMode::class); }
-    public function expenses(): HasMany { return $this->hasMany(Expense::class); }
+    public function treasuryAccountType(): BelongsTo
+    {
+        return $this->belongsTo(TreasuryAccountType::class);
+    }
 
-    public function scopeDefault(Builder $query): Builder { return $query->where('is_default', true); }
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(Currency::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function paymentModes(): HasMany
+    {
+        return $this->hasMany(PaymentMode::class);
+    }
+
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class);
+    }
+
+    public function scopeDefault(Builder $query): Builder
+    {
+        return $query->where('is_default', true);
+    }
+
     public function scopeBankAccounts(Builder $query): Builder
     {
         return $query->whereHas('treasuryAccountType', fn($q) => $q->where('name', 'bank'));
     }
+
     public function scopeCashAccounts(Builder $query): Builder
     {
         return $query->whereHas('treasuryAccountType', fn($q) => $q->where('name', 'cash'));
     }
 
-    public function isBankAccount(): bool { return $this->treasuryAccountType?->name === 'bank'; }
-    public function isCashAccount(): bool { return $this->treasuryAccountType?->name === 'cash'; }
-    public function updateBalance(float $amount): bool { return $this->increment('current_balance', $amount); }
+    public function isBankAccount(): bool
+    {
+        return $this->treasuryAccountType?->name === 'bank';
+    }
+
+    public function isCashAccount(): bool
+    {
+        return $this->treasuryAccountType?->name === 'cash';
+    }
+
+    public function updateBalance(float $amount): bool
+    {
+        return $this->increment('current_balance', $amount);
+    }
 }
 
 
@@ -4425,7 +4482,7 @@ class User extends Authenticatable
         'name', 'email', 'email_verified_at', 'username', 'phone', 'avatar',
         'bio', 'job_title', 'birth_date', 'gender_id', 'national_id', 'address',
         'commune_id', 'wilaya_id', 'role_id', 'last_login_at', 'last_login_ip',
-        'register_ip', 'register_user_agent', 'active', 'created_by', 'updated_by', 'deleted_by',
+        'register_ip', 'register_user_agent', 'active', 'created_by', 'updated_by', 'deleted_by','password',
     ];
 
     protected $hidden = ['password', 'remember_token', 'national_id'];
@@ -4484,14 +4541,7 @@ class User extends Authenticatable
 
     public function defaultCompany(): BelongsTo { return $this->belongsTo(Company::class, 'company_id'); }
 
-    public function setPasswordAttribute($value)
-    {
-        if (strlen($value) === 60 && str_starts_with($value, '$2y$')) {
-            $this->attributes['password'] = $value;
-            return;
-        }
-        $this->attributes['password'] = \Illuminate\Support\Facades\Hash::make($value);
-    }
+
 
     public function getDefaultCompanyAttribute() { return $this->companies()->wherePivot('is_default', true)->first(); }
     public function getFullAddressAttribute(): string
@@ -4533,6 +4583,7 @@ class User extends Authenticatable
             ->exists();
     }
 }
+
 
 
 
