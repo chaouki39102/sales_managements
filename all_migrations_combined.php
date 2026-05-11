@@ -467,14 +467,19 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    public function up(): void {
+    public function up(): void
+    {
         $tableNames = config('permission.table_names');
         $columnNames = config('permission.column_names');
         $teams = config('permission.teams');
 
         Schema::create($tableNames['permissions'], function (Blueprint $table) {
             $table->id();
-            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('company_id')
+                ->nullable()                          // ← السماح بالقيم الفارغة
+                ->constrained('companies')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
             $table->string('name', 125);
             $table->string('guard_name', 125);
             $table->string('display_name')->nullable();
@@ -487,7 +492,11 @@ return new class extends Migration {
 
         Schema::create($tableNames['roles'], function (Blueprint $table) use ($teams, $columnNames) {
             $table->id();
-            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('company_id')
+                ->nullable()                          // ← السماح بالقيم الفارغة
+                ->constrained('companies')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
             if ($teams) {
                 $table->foreignId($columnNames['team_foreign_key'])->nullable()->index();
             }
@@ -555,7 +564,8 @@ return new class extends Migration {
             ->forget(config('permission.cache.key'));
     }
 
-    public function down(): void {
+    public function down(): void
+    {
         $tableNames = config('permission.table_names');
         Schema::dropIfExists($tableNames['role_has_permissions']);
         Schema::dropIfExists($tableNames['model_has_roles']);
