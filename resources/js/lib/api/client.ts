@@ -161,17 +161,6 @@ const PUBLIC_PATH_PREFIXES = [
     "/wilayas",
     "/communes",
     "/genders",
-    "/currencies",
-    "/tvas",
-    "/document-types",
-    "/document-statuses",
-    "/document-base-operations",
-    "/fiscal-stamps",
-    "/stock-movement-types",
-    "/inventory-valuation-methods",
-    "/product-types",
-    "/party-types",
-    "/treasury-account-types",
     "/legal-forms",
 ];
 
@@ -185,11 +174,11 @@ function isPublicPath(path: string): boolean {
 //      يُستخدم لتجنب حقن slug مكرَّر ولإسكات تحذير "No active slug"
 // ─────────────────────────────────────────────────────────────────────────────
 
-function isPreSluggedUrl(path: string): boolean {
-    // يطابق /{slug}/{resource} — مقطعان على الأقل بعد /
-    // مثال: /alhday-69fb717c0e4ec/seeds/currencies → true
-    // مثال: /fiscal-years → false
-    return /^\/[^/]+\/.+/.test(path.split("?")[0]);
+function isPreSluggedUrl(path: string, slug: string | null): boolean {
+    if (!slug) return false;
+    const cleanPath = path.split("?")[0];
+    // ✅ يتحقق أن slug الشركة الفعلي موجود — يمنع /warehouses/5 من الاعتبار pre-slugged
+    return cleanPath.startsWith(`/${slug}/`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,7 +197,7 @@ client.interceptors.request.use(
         if (slug && !isPublicPath(originalUrl)) {
             if (
                 !originalUrl.startsWith(`/${slug}/`) &&
-                !isPreSluggedUrl(originalUrl)
+                !isPreSluggedUrl(originalUrl, slug)
             ) {
                 config.url = `/${slug}${originalUrl}`;
                 if (import.meta.env.DEV) {
@@ -220,7 +209,7 @@ client.interceptors.request.use(
         } else if (
             !slug &&
             !isPublicPath(originalUrl) &&
-            !isPreSluggedUrl(originalUrl)
+            !isPreSluggedUrl(originalUrl, slug)
         ) {
             // تحذير فقط إذا كان URL لا يحمل slug مضمَّناً
             if (import.meta.env.DEV) {

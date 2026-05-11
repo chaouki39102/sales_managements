@@ -27,138 +27,149 @@ use Database\Seeders\UnitSeeder;
 use Database\Seeders\WarehouseSeeder;
 use Database\Seeders\WilayaCommuneSeeder;
 
-/**
- * CompanySeedController
- *
- * يتحكم في بذر البيانات الأولية الخاصة بشركة محددة (Tenant).
- * جميع الجداول المعزولة تتطلب company_id، لذلك نمرره عبر config لاستخدامه داخل السيدرز.
- *
- * الطرق:
- *   run(Company, seeder)  – تشغيل سيدر واحد
- *   seedAll(Company)      – تشغيل جميع السيدرز بالترتيب الصحيح
- */
 class CompanySeedController extends Controller
 {
-    /**
-     * خريطة المفاتيح الواردة من الواجهة إلى [SeederClass, tableName].
-     * نستخدم اسم الجدول للتحقق من وجود بيانات مسبقة للشركة الحالية.
-     */
     private const SEEDERS = [
         'currencies'                  => [CurrencySeeder::class,                  'currencies'],
         'tvas'                        => [TvaSeeder::class,                        'tvas'],
         'units'                       => [UnitSeeder::class,                       'units'],
-        'legal-forms'                 => [LegalFormSeeder::class,                 'legal_forms'],
-        'fiscal-stamps'               => [FiscalStampSeeder::class,               'fiscal_stamps'],
-        'price-levels'                => [PriceLevelSeeder::class,                'price_levels'],
-        'party-types'                 => [PartyTypeSeeder::class,                 'party_types'],
-        'product-types'               => [ProductTypeSeeder::class,               'product_types'],
-        'stock-movement-types'        => [StockMovementTypeSeeder::class,         'stock_movement_types'],
-        'treasury-account-types'      => [TreasuryAccountTypeSeeder::class,       'treasury_account_types'],
-        'document-base-operations'    => [DocumentBaseOperationSeeder::class,     'document_base_operations'],
-        'document-statuses'           => [DocumentStatusSeeder::class,            'document_statuses'],
-        'document-types'              => [DocumentTypeSeeder::class,              'document_types'],
-        'inventory-valuation-methods' => [InventoryValuationMethodSeeder::class,  'inventory_valuation_methods'],
+        'legal-forms'                 => [LegalFormSeeder::class,                  'legal_forms'],
+        'fiscal-stamps'               => [FiscalStampSeeder::class,                'fiscal_stamps'],
+        'price-levels'                => [PriceLevelSeeder::class,                 'price_levels'],
+        'party-types'                 => [PartyTypeSeeder::class,                  'party_types'],
+        'product-types'               => [ProductTypeSeeder::class,                'product_types'],
+        'stock-movement-types'        => [StockMovementTypeSeeder::class,          'stock_movement_types'],
+        'treasury-account-types'      => [TreasuryAccountTypeSeeder::class,        'treasury_account_types'],
+        'document-base-operations'    => [DocumentBaseOperationSeeder::class,      'document_base_operations'],
+        'document-statuses'           => [DocumentStatusSeeder::class,             'document_statuses'],
+        'document-types'              => [DocumentTypeSeeder::class,               'document_types'],
+        'inventory-valuation-methods' => [InventoryValuationMethodSeeder::class,   'inventory_valuation_methods'],
         'warehouses'                  => [WarehouseSeeder::class,                  'warehouses'],
         'treasury-accounts'           => [TreasuryAccountSeeder::class,            'treasury_accounts'],
         'payment-modes'               => [PaymentModeSeeder::class,                'payment_modes'],
         'expense-categories'          => [ExpenseCategorySeeder::class,            'expense_categories'],
         'numbering-series'            => [NumberingSeriesSeeder::class,            'numbering_series'],
+        // ✅ إضافة wilayas-communes (كان مفقوداً)
+        'wilayas-communes'            => [WilayaCommuneSeeder::class,              'wilayas'],
     ];
 
-    /**
-     * تشغيل سيدر محدد داخل نطاق شركة.
-     *
-     * @param Company $company
-     * @param string  $seeder   المفتاح (كما في SEEDERS)
-     */
     public function run(Company $company, string $seeder): JsonResponse
     {
-        $this->authorize('manage', $company);
+        // ✅ الإصلاح: استبدال authorize('manage') بتحقق مباشر من الـ permission
+        // authorize('manage', $company) كانت تبحث عن CompanyPolicy@manage غير موجودة → 403
+        $user = request()->user();
 
-        if (! isset(self::SEEDERS[$seeder])) {
-            return response()->json(['message' => 'seeder غير معروف'], 404);
+        // السوبر أدمن يمر دائماً
+        if (!$user->hasRole('super-admin')) {
+            // تحقق أن المستخدم مالك الشركة أو عضو نشط
+            $membership = DB::table('company_user')
+                ->where('user_id', $user->id)
+                ->where('company_id', $company->id)
+                ->where('active', true)
+                ->first();
+
+            if (!$membership) {
+                return response()->json(['message' => 'ليس لديك صلاحية الوصول لهذه الشركة.'], 403);
+            }
+
+            // تحقق من permission manage_lookups أو update_company
+            if (!$user->can('manage_lookups') && !$user->can('update_company')) {
+                return response()->json(['message' => 'ليس لديك صلاحية بذر البيانات.'], 403);
+            }
+        }
+
+        if (!isset(self::SEEDERS[$seeder])) {
+            return response()->json(['message' => 'seeder غير معروف: ' . $seeder], 404);
         }
 
         [$class, $table] = self::SEEDERS[$seeder];
 
-        // ── التحقق من أن البيانات غير موجودة مسبقاً لهذه الشركة ──
-        if (DB::table($table)->where('company_id', $company->id)->exists()) {
-            return response()->json(['message' => 'البيانات موجودة مسبقاً للشركة']);
+        // التحقق من وجود بيانات مسبقة — تجاهل إذا كان الجدول عالمياً (wilayas, legal_forms...)
+        $globalTables = ['wilayas', 'communes', 'legal_forms'];
+        if (!in_array($table, $globalTables)) {
+            if (DB::table($table)->where('company_id', $company->id)->exists()) {
+                return response()->json(['message' => 'البيانات موجودة مسبقاً للشركة']);
+            }
+        } else {
+            // للجداول العالمية: تحقق بدون company_id
+            if (DB::table($table)->exists()) {
+                return response()->json(['message' => 'البيانات العالمية موجودة مسبقاً']);
+            }
         }
 
-        // تمرير company_id عبر config (تستخدمه جميع سيدرز الشركة)
         config(['seeding.company_id' => $company->id]);
 
         return $this->execute($class);
     }
 
-    /**
-     * تشغيل جميع السيدرز لشركة جديدة بالترتيب الصحيح الذي يحترم تبعيات المفاتيح الخارجية.
-     *
-     * @param Company $company
-     */
-    public function seedAll(Company $company): JsonResponse
-    {
-        $this->authorize('manage', $company);
+public function seedAll(Company $company): JsonResponse
+{
+    $user = request()->user();
 
-        // الترتيب مهم جداً (نوع الحساب قبل الحسابات، أنواع المستندات قبل السلاسل ...إلخ)
-        $ordered = [
-            'currencies',
-            'tvas',
-            'units',
-            'legal-forms',
-            'fiscal-stamps',
-            'price-levels',
-            'party-types',
-            'product-types',
-            'stock-movement-types',
-            'treasury-account-types',
-            'document-base-operations',
-            'document-statuses',
-            'document-types',
-            'inventory-valuation-methods',
-            'warehouses',
-            'treasury-accounts',
-            'payment-modes',
-            'expense-categories',
-            'numbering-series',
-        ];
+    if (!$user->hasRole('super-admin')) {
+        $membership = DB::table('company_user')
+            ->where('user_id', $user->id)
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->first();
 
-        $applied = [];
-        $skipped = [];
-
-        foreach ($ordered as $key) {
-            [$class, $table] = self::SEEDERS[$key];
-
-            if (DB::table($table)->where('company_id', $company->id)->exists()) {
-                $skipped[] = $key;
-                continue;
-            }
-
-            try {
-                config(['seeding.company_id' => $company->id]);
-                (new $class)->run();
-                $applied[] = $key;
-            } catch (\Throwable $e) {
-                logger()->error("SeedAll فشل ($key) للشركة {$company->id}: " . $e->getMessage());
-                return response()->json([
-                    'message' => "فشل تطبيق {$key}: " . $e->getMessage(),
-                    'applied' => $applied,
-                    'skipped' => $skipped,
-                ], 500);
-            }
+        if (!$membership) {
+            return response()->json(['message' => 'ليس لديك صلاحية الوصول لهذه الشركة.'], 403);
         }
-
-        return response()->json([
-            'message' => 'تم تطبيق جميع البيانات الأساسية بنجاح',
-            'applied' => $applied,
-            'skipped' => $skipped,
-        ]);
     }
 
-    /**
-     * تنفيذ سيدر واحد مع تغليف المعاملة.
-     */
+    $ordered = array_keys(self::SEEDERS);
+    $applied = [];
+    $skipped = [];
+
+    foreach ($ordered as $key) {
+        [$class, $table] = self::SEEDERS[$key];
+
+        $globalTables = ['wilayas', 'communes', 'legal_forms'];
+        $exists = in_array($table, $globalTables)
+            ? DB::table($table)->exists()
+            : DB::table($table)->where('company_id', $company->id)->exists();
+
+        if ($exists) {
+            $skipped[] = $key;
+            continue;
+        }
+
+        try {
+            config(['seeding.company_id' => $company->id]);
+            (new $class)->run();
+            $applied[] = $key;
+        } catch (\Throwable $e) {
+            logger()->error("SeedAll فشل ($key) للشركة {$company->id}: " . $e->getMessage());
+            return response()->json([
+                'message' => "فشل تطبيق {$key}: " . $e->getMessage(),
+                'applied' => $applied,
+                'skipped' => $skipped,
+            ], 500);
+        }
+    }
+
+    // ✅ تعيين دور admin للمالك بعد اكتمال السيد
+    $owner = \App\Models\User::find($company->owner_id);
+    if ($owner) {
+        $adminRole = \Spatie\Permission\Models\Role::where('name', 'admin')
+            ->where('company_id', $company->id)
+            ->first();
+
+        if ($adminRole && !$owner->hasRole($adminRole)) {
+            $owner->assignRole($adminRole);
+        }
+
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    return response()->json([
+        'message' => 'تم تطبيق جميع البيانات الأساسية بنجاح',
+        'applied' => $applied,
+        'skipped' => $skipped,
+    ]);
+}
+
     private function execute(string $class): JsonResponse
     {
         try {

@@ -807,9 +807,15 @@ function StepFiscalYear({
         setLoading(true);
         setError(null);
         try {
-            await apiClient.post("/companies/switch", {
-                company_id: company.id,
-            });
+            // ✅ تحديث sessionStorage بالشركة الجديدة قبل الطلب
+            sessionStorage.setItem(
+                "active_company",
+                JSON.stringify({
+                    id: company.id,
+                    name: company.name,
+                    slug: company.slug,
+                }),
+            );
 
             const res = await apiClient.post(`/${company.slug}/fiscal-years`, {
                 name: yearNum,

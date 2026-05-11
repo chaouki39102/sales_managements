@@ -20,12 +20,12 @@ class SetCompanyContext
 
     public function handle(Request $request, Closure $next): Response
     {
-            // 🔍 DEBUG مؤقت — احذفه بعد التشخيص
-    Log::info('SetCompanyContext DEBUG', [
-        'user_id'    => Auth::id(),
-        'user_email' => Auth::user()?->email,
-        'slug'       => $request->route()->originalParameter('company') ?? $request->route('company'),
-    ]);
+        // 🔍 DEBUG مؤقت — احذفه بعد التشخيص
+        Log::info('SetCompanyContext DEBUG', [
+            'user_id'    => Auth::id(),
+            'user_email' => Auth::user()?->email,
+            'slug'       => $request->route()->originalParameter('company') ?? $request->route('company'),
+        ]);
         // 1. جلب slug من الـ route
         // SubstituteBindings قد يُحوِّل {company} إلى Company Model قبل وصولنا
         // لذا نتعامل مع الحالتين: raw slug أو Model جاهز
@@ -46,6 +46,15 @@ class SetCompanyContext
                 ->where('active', true)
                 ->firstOrFail();
         }
+        \Log::info('SetCompanyContext DEBUG 2', [
+            'user_id'    => Auth::id(),
+            'company_id' => $company->id,
+            'membership' => DB::table('company_user')
+                ->where('user_id', Auth::id())
+                ->where('company_id', $company->id)
+                ->first(),
+        ]);
+
 
         // 3. التحقق من صلاحية المستخدم
         /** @var User $user */

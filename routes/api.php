@@ -308,7 +308,8 @@ Route::prefix('v1')->group(function () {
             });
 
             // ── ⑤-ب: للمالك/المدير ──────────────────────────────
-            Route::middleware('can:manage-company')->group(function () {
+            // ✅ إصلاح: استبدال manage-company (غير موجود) بـ update_company (موجود في Seeder)
+            Route::middleware('can:update_company')->group(function () {
 
                 Route::post('units',           [UnitController::class, 'store']);
                 Route::put('units/{unit}',     [UnitController::class, 'update']);
@@ -400,11 +401,7 @@ Route::prefix('v1')->group(function () {
                 Route::patch('employment-contracts/{contract}',   [EmploymentContractController::class, 'update']);
                 Route::delete('employment-contracts/{contract}',  [EmploymentContractController::class, 'destroy']);
 
-                Route::post('fiscal-years',              [FiscalYearController::class, 'store']);
-                Route::put('fiscal-years/{year}',        [FiscalYearController::class, 'update']);
-                Route::patch('fiscal-years/{year}',      [FiscalYearController::class, 'update']);
-                Route::delete('fiscal-years/{year}',     [FiscalYearController::class, 'destroy']);
-                Route::post('fiscal-years/{year}/close', [FiscalYearController::class, 'close']);
+                // ✅ fiscal-years نقلت لـ middleware خاص أدناه
 
                 Route::apiResource('opening-balance-stocks',  OpeningBalanceStockController::class);
                 Route::apiResource('opening-balance-parties', OpeningBalancePartyController::class);
@@ -419,8 +416,19 @@ Route::prefix('v1')->group(function () {
                 Route::apiResource('quantity-discounts', QuantityDiscountController::class);
             });
 
+            // ── ⑤-ب-٢: السنوات المالية (manage_fiscal_year) ─────
+            // ✅ منفصلة عن update_company — يملكها admin + manager
+            Route::middleware('can:manage_fiscal_year')->group(function () {
+                Route::post('fiscal-years',              [FiscalYearController::class, 'store']);
+                Route::put('fiscal-years/{year}',        [FiscalYearController::class, 'update']);
+                Route::patch('fiscal-years/{year}',      [FiscalYearController::class, 'update']);
+                Route::delete('fiscal-years/{year}',     [FiscalYearController::class, 'destroy']);
+                Route::post('fiscal-years/{year}/close', [FiscalYearController::class, 'close']);
+            });
+
             // ── ⑤-ج: للمالك والمدير والمحاسب ──────────────────
-            Route::middleware('can:manage-commercial-document')->group(function () {
+            // ✅ إصلاح: manage-commercial-document → create_sales_document (موجود في Seeder)
+            Route::middleware('can:create_sales_document')->group(function () {
                 Route::apiResource('documents', CommercialDocumentController::class);
                 Route::get('documents/unpaid',                    [CommercialDocumentController::class, 'unpaid']);
                 Route::get('documents/overdue',                   [CommercialDocumentController::class, 'overdue']);

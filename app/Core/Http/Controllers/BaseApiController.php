@@ -9,251 +9,276 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Validation\Validator;
+use Illuminate\Database\Eloquent\Model;
 
-// Traits
 use App\Core\Http\Controllers\Traits\ApiResponders;
 use App\Core\Http\Controllers\Traits\HasApiList;
-
 use App\Http\Controllers\Controller;
 use App\Core\Exceptions\BusinessRuleException;
 
 /**
- * Base API Controller - Thin Version (The Gatekeeper)
+ * BaseApiController — Multi-Tenancy Safe Version
  *
- * 🚪 المتحكم الأساسي النحيف - البوّاب (النسخة النهائية المحسّنة)
+ * ══════════════════════════════════════════════════════════════════
+ * المشكلة التي كانت موجودة في النسخة السابقة:
+ * ══════════════════════════════════════════════════════════════════
  *
- * ** الفلسفة المطبقة في الكونترولر:**
- * المتحكم هو "بوّاب" فقط. مسؤوليته الوحيدة:
- * 1. استقبال الطلب (Request)
- * 2. التحقق من الصلاحيات (Authorization)
- * 3. تفويض المنطق إلى الـ Service
- * 4. إرجاع الرد المُنسق (Response)
+ * النسخة السابقة غيّرت signature الدوال إلى:
+ *   show(Request $request, $companyOrId = null, $id = null)
  *
- * ✅ التحسين الرئيسي:
- * - الاعتماد الكلي على دالة `handleError` الذكية.
- * - إزالة كتل `catch` المكررة من دوال CRUD.
+ * هذا النهج خاطئ لأسباب:
  *
- * @package App\Core\Http\Controllers
+ * 1. يكسر Route Model Binding:
+ *    Laravel يعتمد على TYPE HINT لمعرفة أي معامل يجب resolve كـ Model.
+ *    عندما تكتب show($companyOrId, $id) بدون type hint، Laravel يُمرر
+ *    قيمة raw string/int للـ company بدلاً من Company model — وبالتالي
+ *    SubstituteBindings لا يعمل وستحصل على string بدل Model.
+ *
+ * 2. يكسر AuthController وكل Controller يرث BaseApiController:
+ *    AuthController::login() لا يعرف getService() ولا getModelClass()
+ *    → PHP Fatal Error إذا استُدعي index() من BaseApiController.
+ *
+ * 3. غير ضروري تماماً:
+ *    SetCompanyContext Middleware يضع الشركة في $request->_company
+ *    والـ ID يصل عبر request()->route('id') أو route model binding.
+ *    BaseApiController لا يحتاج أن يعرف بوجود {company} في الـ route.
+ *
+ * ══════════════════════════════════════════════════════════════════
+ * الحل الصحيح:
+ * ══════════════════════════════════════════════════════════════════
+ *
+ * 1. نُبقي signatures الأصلية كما هي ($id فقط).
+ * 2. الـ ID يُستخرج بذكاء من الـ route بأي اسم كان.
+ * 3. نضيف resolveRouteId() للكنترولرات الفرعية إذا احتاجت ID مرنة.
+ * 4. نجعل getService() و getModelClass() nullable — للكنترولرات
+ *    التي لا تحتاجهما (AuthController مثلاً).
  */
 abstract class BaseApiController extends Controller
 {
     use ApiResponders, HasApiList;
-    // === الخصائص الأساسية ===
 
-    /** @var string اسم المورد (للرسائل) */
-    protected string $resourceName = 'item';
-
-    /** @var string|null API Resource Class للتحويل */
+    protected string  $resourceName  = 'item';
     protected ?string $resourceClass = null;
-
-    /** @var bool تمكين التحويل التلقائي */
-    protected bool $autoTransform = true;
-
-    // === Constructor ===
-
+    protected bool    $autoTransform = true;
+    
     public function __construct()
     {
-        $rateLimit = config('api.rate_limit.requests', 60);
-        // $this->middleware("throttle:{$rateLimit},1")->except(['index', 'show']);
+        // يمكن أن يظل فارغًا أو تضع فيه الإعدادات التي تحتاجها
     }
+    // ══════════════════════════════════════════════════════════════
+    // Authorization
+    // ══════════════════════════════════════════════════════════════
 
-    // === Authorization (المسؤولية الوحيدة للكنترولر) ===
-
-    /**
-     * التحقق من الصلاحيات
-     * @throws AuthorizationException
-     */
     protected function authorizeAction(string $ability, $modelOrClass = null): void
     {
         $this->authorize($ability, $modelOrClass);
     }
 
-    // === CRUD Operations (البوّاب فقط) ===
+    // ══════════════════════════════════════════════════════════════
+    // CRUD — Signatures أصلية (لا تغيير)
+    //
+    // Multi-tenancy يعمل لأن:
+    // - SetCompanyContext يضع الشركة في Context قبل وصول الطلب هنا
+    // - الـ ID يُستخرج من route params بأي اسم عبر resolveRouteId()
+    // - BaseService يعمل scoped تلقائياً عبر CompanyContextService
+    // ══════════════════════════════════════════════════════════════
 
-    /**
-     * عرض قائمة الموارد
-     */
     public function index(Request $request): JsonResponse
     {
         try {
-            // 1. التحقق من الصلاحيات
-            //  $this->authorizeAction('viewAny', $this->getModelClass());
-
-            // 2. تفويض جلب البيانات إلى Trait
             $data = $this->getListData($request);
-
-            // 3. إرجاع الرد المُنسق
-            return $this->successResponse(
-                $data,
-                "تم جلب قائمة {$this->resourceName} بنجاح"
-            );
+            return $this->successResponse($data, "تم جلب قائمة {$this->resourceName} بنجاح");
         } catch (\Throwable $e) {
-            // handleError سيعالج أي خطأ
             return $this->handleError($e, 'index');
         }
     }
 
     /**
-     * عرض مورد واحد
+     * show($id) — الـ $id يأتي من Route Model Binding أو raw value.
+     *
+     * مثال tenant route: /{company}/units/{unit}
+     * Laravel يُمرر: show(Company $company, Unit $unit) للكنترولر الفرعي.
+     * لكن BaseApiController::show يستقبل $id فقط، وهذا يعمل لأن:
+     * - الكنترولر الفرعي يمكنه override show() إذا احتاج Company
+     * - أو يستخدم resolveRouteId() لجلب الـ ID من route params
      */
     public function show($id): JsonResponse
     {
         try {
-            // 1. جلب العنصر (عبر Service)
-            $item = $this->getService()->findById($id);
-
-            // 2. التحقق من الصلاحيات
+            $resolvedId = $this->extractId($id);
+            $item = $this->getService()->findById($resolvedId);
             $this->authorizeAction('view', $item);
-
-            // 3. تحويل ورد
-            return $this->successResponse(
-                $this->transformItem($item)
-            );
+            return $this->successResponse($this->transformItem($item));
         } catch (\Throwable $e) {
-            // ✅ handleError سيتعرف على ModelNotFoundException ويعيد 404
             return $this->handleError($e, 'show');
         }
     }
 
-    /**
-     * تخزين مورد جديد
-     */
     public function store(Request $request): JsonResponse
     {
         try {
-            // 1. التحقق من الصلاحيات
             $this->authorizeAction('create', $this->getModelClass());
-
-            // 2. استخراج البيانات المُتحقق منها (من Form Request)
             $data = $this->getValidatedData($request);
-
-            // 3. تفويض إنشاء العنصر إلى Service
             $item = $this->getService()->create($data, $request);
-
-            // 4. إرجاع الرد
             return $this->successResponse(
                 $this->transformItem($item),
                 "تم إنشاء {$this->resourceName} بنجاح",
                 201
             );
         } catch (\Throwable $e) {
-            // ✅ handleError سيتعرف على ValidationException ويعيد 422
             return $this->handleError($e, 'store');
         }
     }
 
-    /**
-     * تحديث مورد موجود
-     */
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            // 1. جلب العنصر (عبر Service)
-            $item = $this->getService()->findById($id);
-
-            // 2. التحقق من الصلاحيات
+            $resolvedId = $this->extractId($id);
+            $item = $this->getService()->findById($resolvedId);
             $this->authorizeAction('update', $item);
-
-            // 3. استخراج البيانات المُتحقق منها
-            $data = $this->getValidatedData($request, $id);
-
-            // 4. تفويض التحديث إلى Service
+            $data = $this->getValidatedData($request, $resolvedId);
             $item = $this->getService()->update($item, $data, $request);
-
-            // 5. إرجاع الرد
             return $this->successResponse(
                 $this->transformItem($item),
                 "تم تحديث {$this->resourceName} بنجاح"
             );
         } catch (\Throwable $e) {
-            // ✅ handleError سيعالج (404, 422, 403, 500)
             return $this->handleError($e, 'update');
         }
     }
 
-    /**
-     * حذف مورد
-     */
     public function destroy($id): JsonResponse
     {
         try {
-            // 1. جلب العنصر
-            $item = $this->getService()->findById($id);
-
-            // 2. التحقق من الصلاحيات
+            $resolvedId = $this->extractId($id);
+            $item = $this->getService()->findById($resolvedId);
             $this->authorizeAction('delete', $item);
-
-            // 3. تفويض الحذف إلى Service
             $this->getService()->delete($item);
-
-            // 4. إرجاع الرد
-            return $this->successResponse(
-                null,
-                "تم حذف {$this->resourceName} بنجاح"
-            );
+            return $this->successResponse(null, "تم حذف {$this->resourceName} بنجاح");
         } catch (\Throwable $e) {
-            // ✅ handleError سيعالج (404, 403, 500)
             return $this->handleError($e, 'destroy');
         }
     }
 
-    /**
-     * استعادة عنصر محذوف
-     */
     public function restore($id): JsonResponse
     {
         try {
-            // 1. جلب العنصر المحذوف
-            $item = $this->getService()->findTrashedById($id);
-
-            // 2. التحقق من الصلاحيات
+            $resolvedId = $this->extractId($id);
+            $item = $this->getService()->findTrashedById($resolvedId);
             $this->authorizeAction('restore', $item);
-
-            // 3. تفويض الاستعادة
             $item = $this->getService()->restore($item);
-
-            // 4. إرجاع الرد
             return $this->successResponse(
                 $this->transformItem($item),
                 "تم استعادة {$this->resourceName} بنجاح"
             );
         } catch (\Throwable $e) {
-            // ✅ handleError سيعالج (404, 403, 500)
             return $this->handleError($e, 'restore');
         }
     }
 
-    // === Helper Methods (مساعدات بسيطة فقط) ===
+    // ══════════════════════════════════════════════════════════════
+    // ID Resolution
+    //
+    // extractId() يتعامل مع كل الحالات:
+    // 1. $id هو Model مباشرة (Route Model Binding) → يُعيد $id->getKey()
+    // 2. $id هو int/string عادي → يُعيده مباشرة
+    // 3. $id هو null → يبحث في route params
+    // ══════════════════════════════════════════════════════════════
 
     /**
-     * الحصول على Service Class
-     * يجب على الكنترولر الفرعي تعريفه
-     * @return mixed
+     * استخراج الـ ID من أي مصدر بأمان.
      */
-    abstract protected function getService();
-
-    /**
-     * الحصول على Model Class
-     * @return string
-     */
-    abstract protected function getModelClass(): string;
-
-    /**
-     * استخراج البيانات المُتحقق منها
-     */
-    protected function getValidatedData(Request $request, $id = null): array
+    protected function extractId(mixed $id): int|string
     {
-        if ($request instanceof FormRequest) {
-            return $request->validated();
+        // حالة Route Model Binding: وصل Model كامل
+        if ($id instanceof Model) {
+            return $id->getKey();
         }
-        return $request->all();
+
+        // حالة عادية: int أو string
+        if ($id !== null) {
+            return $id;
+        }
+
+        // حالة fallback: ابحث في route params
+        return $this->resolveRouteId();
     }
 
     /**
-     * الحصول على بيانات القائمة (تفويض لـ Trait)
+     * يبحث عن ID في route params بأسماء شائعة.
+     * يمكن للكنترولر الفرعي تجاوزها لتحديد اسم المعامل.
+     *
+     * مثال:
+     *   Route: /{company}/invoices/{invoice}
+     *   → يبحث عن 'invoice' أو 'id'
      */
-    protected function getListData(Request $request)
+    protected function resolveRouteId(string ...$paramNames): int|string
+    {
+        // إذا لم تُحدد أسماء، استخدم الاسم المشتق من اسم المورد + 'id'
+        if (empty($paramNames)) {
+            $paramNames = [
+                $this->resourceName,          // 'invoice'
+                str_singular($this->resourceName), // 'invoice' من 'invoices'
+                'id',                          // fallback
+            ];
+        }
+
+        $route = request()->route();
+
+        foreach ($paramNames as $name) {
+            $value = $route?->parameter($name);
+            if ($value !== null) {
+                return $value instanceof Model ? $value->getKey() : $value;
+            }
+        }
+
+        // آخر محاولة: أخذ آخر parameter في الـ route
+        $params = $route?->parameters() ?? [];
+        if (!empty($params)) {
+            $last = end($params);
+            return $last instanceof Model ? $last->getKey() : $last;
+        }
+
+        throw new \RuntimeException("Could not resolve ID from route for resource: {$this->resourceName}");
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Abstract Methods — nullable لدعم AuthController وغيره
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * يجب تعريفه في الكنترولر الفرعي إذا استُخدم index/show/store/update/destroy.
+     * AuthController لا يحتاجه لأنه يعرّف كل method بنفسه.
+     */
+    protected function getService(): mixed
+    {
+        throw new \LogicException(
+            static::class . ' يجب أن يعرّف getService() أو يتجاوز الدوال التي تستخدمه.'
+        );
+    }
+
+    /**
+     * يجب تعريفه في الكنترولر الفرعي إذا استُخدمت store/authorize.
+     */
+    protected function getModelClass(): string
+    {
+        throw new \LogicException(
+            static::class . ' يجب أن يعرّف getModelClass() أو يتجاوز الدوال التي تستخدمه.'
+        );
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Helpers
+    // ══════════════════════════════════════════════════════════════
+
+    protected function getValidatedData(Request $request, $id = null): array
+    {
+        return $request instanceof FormRequest
+            ? $request->validated()
+            : $request->all();
+    }
+
+    protected function getListData(Request $request): mixed
     {
         return $this->apiListWithConfig(
             $this->getModelClass(),
@@ -262,196 +287,126 @@ abstract class BaseApiController extends Controller
         );
     }
 
-    /**
-     * إعدادات القائمة (يمكن تجاوزها)
-     */
     protected function getListConfig(): array
     {
-        return [
-            'cache_tags' => ['api', $this->resourceName],
-        ];
+        return ['cache_tags' => ['api', $this->resourceName]];
     }
 
-    /**
-     * تحويل العنصر باستخدام Resource
-     */
-    protected function transformItem($item)
+    protected function transformItem(mixed $item): mixed
     {
         if (!$this->autoTransform || !$this->resourceClass) {
             return $item;
         }
-
         if (!class_exists($this->resourceClass)) {
             Log::warning("Resource class not found: {$this->resourceClass}");
             return $item;
         }
-
         return new $this->resourceClass($item);
     }
 
-    /**
-     * مسح كاش الموديل
-     * تُستخدم من HandlesBulkOperations — يمكن تجاوزها في الكنترولر الفرعي
-     */
     protected function clearModelCache(): void
     {
         try {
             \Illuminate\Support\Facades\Cache::tags(['api', $this->resourceName])->flush();
         } catch (\Throwable $e) {
-            Log::warning("clearModelCache failed for {$this->resourceName}", [
-                'error' => $e->getMessage(),
-            ]);
+            Log::warning("clearModelCache failed for {$this->resourceName}", ['error' => $e->getMessage()]);
         }
     }
 
-    /**
-     * تسجيل عملية للـ Audit
-     * تُستخدم من HandlesBulkOperations — يمكن تجاوزها في الكنترولر الفرعي
-     */
-    protected function logOperation(string $operation, $item, array $context = []): void
+    protected function logOperation(string $operation, mixed $item, array $context = []): void
     {
         Log::info("Controller bulk operation: {$operation}", array_merge([
-            'resource'  => $this->resourceName,
-            'model'     => is_object($item) ? get_class($item) : $item,
-            'id'        => is_object($item) ? ($item->id ?? null) : null,
-            'user_id'   => auth()->id() ?? null,
+            'resource' => $this->resourceName,
+            'model'    => is_object($item) ? get_class($item) : $item,
+            'id'       => is_object($item) ? ($item->id ?? null) : null,
+            'user_id'  => auth()->id() ?? null,
         ], $context));
     }
 
-    // =======================================================
-    // ⭐ معالجة الأخطاء الموحدة (النسخة الذكية)
-    // =======================================================
+    // ══════════════════════════════════════════════════════════════
+    // Error Handling
+    // ══════════════════════════════════════════════════════════════
 
-    /**
-     * معالجة الأخطاء الموحدة
-     */
     protected function handleError(\Throwable $e, string $operation): JsonResponse
     {
         $errorType = $this->determineErrorType($e);
-        $logLevel = $this->getLogLevel($errorType);
 
         $context = [
-            'operation' => $operation,
-            'resource' => $this->resourceName,
+            'operation'     => $operation,
+            'resource'      => $this->resourceName,
             'error_message' => $e->getMessage(),
-            'user_id' => auth()->id() ?? null,
-            'url' => request()->fullUrl(),
-            'method' => request()->method(),
-            'ip' => request()->ip(),
+            'user_id'       => auth()->id() ?? null,
+            'url'           => request()->fullUrl(),
+            'method'        => request()->method(),
+            'ip'            => request()->ip(),
         ];
 
-        // ⚠️ Stack Trace فقط للأخطاء الحقيقية (5xx)
         if ($errorType === 'server_error') {
-            // نجعل الـ trace أقصر وأوضح
             $context['trace'] = array_slice($e->getTrace(), 0, 5);
         }
 
-        // تسجيل حسب المستوى
-        match ($logLevel) {
-            'info' => Log::info("API {$operation}: {$errorType}", $context),
+        match ($this->getLogLevel($errorType)) {
+            'info'    => Log::info("API {$operation}: {$errorType}", $context),
             'warning' => Log::warning("API {$operation}: {$errorType}", $context),
-            'error' => Log::error("API {$operation}: {$errorType}", $context),
+            'error'   => Log::error("API {$operation}: {$errorType}", $context),
         };
 
         return $this->buildErrorResponse($e, $errorType);
     }
 
-    /**
-     * تحديد مستوى التسجيل بناءً على نوع الخطأ
-     */
     protected function getLogLevel(string $errorType): string
     {
         return match ($errorType) {
-            'business_rule' => 'info',     // ✅ سلوك طبيعي
-            'validation' => 'info',        // ✅ بيانات خاطئة
-            'not_found' => 'info',         // ✅ عنصر غير موجود
-            'authorization' => 'warning',  // ⚠️ محاولة غير مصرح بها
-            'server_error' => 'error',     // 🔴 خطأ حقيقي (يحتاج تحقيق)
+            'business_rule' => 'info',
+            'validation'    => 'info',
+            'not_found'     => 'info',
+            'authorization' => 'warning',
+            default         => 'error',
         };
     }
 
-    /**
-     * تحديد نوع الخطأ بناءً على Exception
-     */
     protected function determineErrorType(\Throwable $e): string
     {
-        if ($e instanceof ModelNotFoundException) {
-            return 'not_found';
-        }
-        if ($e instanceof BusinessRuleException) {
-            return 'business_rule';
-        }
-        if ($e instanceof AuthorizationException) {
-            return 'authorization';
-        }
-        if ($e instanceof \App\Core\Exceptions\UnauthorizedException) {
-            return 'authorization';
-        }
-        if ($e instanceof ValidationException) {
-            return 'validation';
-        }
-
-        // إذا كان خطأ 4xx آخر (مثل 405 Method Not Allowed)
-        if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpException && $e->getStatusCode() < 500) {
-            return 'authorization'; // أو 'client_error'
-        }
-
-        return 'server_error';
+        return match (true) {
+            $e instanceof ModelNotFoundException                                                      => 'not_found',
+            $e instanceof BusinessRuleException                                                       => 'business_rule',
+            $e instanceof AuthorizationException                                                      => 'authorization',
+            $e instanceof \App\Core\Exceptions\UnauthorizedException                                 => 'authorization',
+            $e instanceof ValidationException                                                         => 'validation',
+            $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
+                && $e->getStatusCode() < 500                                                         => 'client_error',
+            default                                                                                   => 'server_error',
+        };
     }
 
-    /**
-     * بناء الرد المناسب لنوع الخطأ
-     */
     protected function buildErrorResponse(\Throwable $e, string $errorType): JsonResponse
     {
-        switch ($errorType) {
-            case 'not_found':
-                return $this->errorResponse(
-                    "{$this->resourceName} غير موجود",
-                    404,
-                    'NOT_FOUND'
-                );
-
-            case 'business_rule':
-                return $this->errorResponse(
-                    $e->getMessage(),
-                    $e->getCode() ?: 409,
-                    'BUSINESS_RULE_VIOLATION'
-                );
-
-            case 'authorization':
-                // للـ UnauthorizedException استخدم 401، للـ AuthorizationException استخدم 403
-                $statusCode = $e instanceof \App\Core\Exceptions\UnauthorizedException ? 401 : 403;
-                return $this->errorResponse(
-                    $e->getMessage() ?: 'ليس لديك الصلاحية',
-                    $statusCode,
-                    'AUTHORIZATION_ERROR'
-                );
-            case 'validation':
-                return $this->errorResponse(
-                    'خطأ في البيانات المدخلة',
-                    422,
-                    'VALIDATION_ERROR',
-                    $e instanceof ValidationException ? $e->errors() : []
-                );
-
-            case 'server_error':
-            default:
-                return $this->errorResponse(
-                    config('app.debug') ? $e->getMessage() : 'حدث خطأ غير متوقع في الخادم',
-                    500,
-                    'SERVER_ERROR'
-                );
-        }
-    }
-
-    /**
-     * استخراج ID من المسار (مع دعم مرونة أسماء المعلمات)
-     */
-    protected function resolveId(string $paramName = 'id'): mixed
-    {
-        return request()->route($paramName)
-            ?? request()->route('id')
-            ?? null;
+        return match ($errorType) {
+            'not_found' => $this->errorResponse(
+                "{$this->resourceName} غير موجود", 404, 'NOT_FOUND'
+            ),
+            'business_rule' => $this->errorResponse(
+                $e->getMessage(), $e->getCode() ?: 409, 'BUSINESS_RULE_VIOLATION'
+            ),
+            'authorization' => $this->errorResponse(
+                $e->getMessage() ?: 'ليس لديك الصلاحية',
+                $e instanceof \App\Core\Exceptions\UnauthorizedException ? 401 : 403,
+                'AUTHORIZATION_ERROR'
+            ),
+            'validation' => $this->errorResponse(
+                'خطأ في البيانات المدخلة', 422, 'VALIDATION_ERROR',
+                $e instanceof ValidationException ? $e->errors() : []
+            ),
+            'client_error' => $this->errorResponse(
+                $e->getMessage() ?: 'طلب غير صالح',
+                $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
+                    ? $e->getStatusCode() : 400,
+                'CLIENT_ERROR'
+            ),
+            default => $this->errorResponse(
+                config('app.debug') ? $e->getMessage() : 'حدث خطأ غير متوقع في الخادم',
+                500, 'SERVER_ERROR'
+            ),
+        };
     }
 }

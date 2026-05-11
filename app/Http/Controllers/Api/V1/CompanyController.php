@@ -11,6 +11,7 @@ use App\Services\CompanyService;
 use App\Services\CompanyContextService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class CompanyController extends BaseApiController
@@ -148,6 +149,19 @@ class CompanyController extends BaseApiController
         try {
             $this->authorizeAction('create', Company::class);
             $company = $this->companyService->create($data, $request);
+            // أضف هذا:
+            $user = auth()->user();
+
+            // ربط المالك بالشركة في company_user إن لم يكن موجوداً
+            DB::table('company_user')->insertOrIgnore([
+                'user_id'    => $user->id,
+                'company_id' => $company->id,
+                'role'       => 'owner',
+                'active'     => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             return $this->successResponse(new CompanyResource($company->load('owner:id,name,email')), 'تم إنشاء الشركة', 201);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'store');

@@ -1283,7 +1283,6 @@ class RolesAndPermissionsSeeder extends Seeder
 
 
 
-
 // ===== ملف: StockMovementTypeSeeder.php =====
 namespace Database\Seeders;
 
@@ -1328,6 +1327,8 @@ class TreasuryAccountSeeder extends Seeder
                 'name'                     => 'الصندوق الرئيسي',
                 'code'                     => 'CASH01',
                 'treasury_account_type_id' => $cashTypeId,
+                'bank_name'                => null,           // ← مهم
+                'account_number'           => null,           // ← مهم
                 'currency_id'              => $currencyId,
                 'initial_balance'          => 0.00,
                 'current_balance'          => 0.00,
@@ -1342,7 +1343,7 @@ class TreasuryAccountSeeder extends Seeder
                 'code'                     => 'BNA710',
                 'treasury_account_type_id' => $bankTypeId,
                 'bank_name'                => 'BNA',
-                'account_number'           => '00123456789',
+                'account_number'           => '00123456789',  // نص وليس عدد
                 'currency_id'              => $currencyId,
                 'initial_balance'          => 0.00,
                 'current_balance'          => 0.00,
@@ -1354,7 +1355,6 @@ class TreasuryAccountSeeder extends Seeder
         ]);
     }
 }
-
 
 
 

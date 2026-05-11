@@ -38,18 +38,23 @@ class CompanyService extends \App\Core\Services\BaseService
         return $data;
     }
 
-    protected function afterCreate(Model $item, array $data, $request): void
-    {
-        $user = auth()->user();
-        if ($user && !$user->companies->contains($item->id)) {
-            $user->companies()->attach($item->id, [
-                'is_default' => true,
-                'role'       => Company::COMPANY_ROLE_OWNER,
-                'active'  => true,
-                'joined_at'  => now(),
-            ]);
-        }
+protected function afterCreate(Model $item, array $data, $request): void
+{
+    $user = auth()->user();
+    if ($user && !$user->companies->contains($item->id)) {
+        $user->companies()->attach($item->id, [
+            'is_default' => true,
+            'role'       => Company::COMPANY_ROLE_OWNER,
+            'active'     => true,
+            'joined_at'  => now(),
+        ]);
     }
+
+    // ✅ إعطاء مُنشئ الشركة دور admin تلقائياً
+    if ($user && !$user->hasRole('admin')) {
+        $user->assignRole('admin');
+    }
+}
 
     protected function afterCreateCommitted(Model $item, array $data, $request): void
     {

@@ -1023,22 +1023,28 @@ export default function OnboardingPage() {
   };
 
    // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
-  const handleNewCompanyCreated = (company: Company, fiscalYear: { id: number }) => {
+  const handleNewCompanyCreated = async (company: Company, fiscalYear: { id: number }) => {
     setShowCreate(false);
     setCompanies(prev => [...prev, company]);
     try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
 
-    // 🚫 لا نُفعّل الشركة الآن، بل نفتح مودال البذر فقط
+    // ✅ تنفيذ switch أولاً حتى يعرف الباكند الشركة النشطة
+    // ثم كتابة active_company في sessionStorage حتى يضيف الـ interceptor الـ slug تلقائياً
+    try {
+      await apiClient.post('/companies/switch', { company_id: company.id });
+    } catch {}
+    try {
+      sessionStorage.setItem('active_company', JSON.stringify({ id: company.id, name: company.name, slug: company.slug }));
+    } catch {}
+
+    // فتح مودال البذر بعد تفعيل الشركة في الباكند
     setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });
   };
 
   // ✅ عند اكتمال أو تخطي الـ seeding → تفعيل الشركة ثم الانتقال
-  const handleSeedingComplete = async () => {
+  // الـ switch تم بالفعل في handleNewCompanyCreated — نكتفي بتحديث AuthContext
+  const handleSeedingComplete = () => {
     if (!seedingCompany) return;
-    try {
-      await apiClient.post('/companies/switch', { company_id: seedingCompany.id });
-    } catch {}
-
     setActiveCompany({
       id: seedingCompany.id,
       name: seedingCompany.name,
@@ -1048,12 +1054,8 @@ export default function OnboardingPage() {
     navigate('/dashboard', { replace: true });
   };
 
-  const handleSeedingSkip = async () => {
+  const handleSeedingSkip = () => {
     if (!seedingCompany) return;
-    try {
-      await apiClient.post('/companies/switch', { company_id: seedingCompany.id });
-    } catch {}
-
     setActiveCompany({
       id: seedingCompany.id,
       name: seedingCompany.name,
