@@ -160,8 +160,6 @@ const PUBLIC_PATH_PREFIXES = [
     "/admin",
     "/wilayas",
     "/communes",
-    "/genders",
-    "/legal-forms",
 ];
 
 function isPublicPath(path: string): boolean {
@@ -414,7 +412,10 @@ function extractData<T>(response: any): T {
 
         // الحالة 3: { status/success, data: {...} } بدون meta (مورد واحد أو stats)
         // نُرجع d.data فقط
-        if ("data" in d && ("status" in d || "success" in d || "message" in d)) {
+        if (
+            "data" in d &&
+            ("status" in d || "success" in d || "message" in d)
+        ) {
             return d.data as T;
         }
 

@@ -1,15 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-
-// Auth
 use App\Http\Controllers\Api\V1\AuthController;
-
-// Company Management
 use App\Http\Controllers\Api\V1\CompanyController;
 use App\Http\Controllers\Api\V1\UserController;
 
-// Tenant Resources
+// Tenant Resource Controllers
 use App\Http\Controllers\Api\V1\PartyController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\CommercialDocumentController;
@@ -34,56 +30,55 @@ use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\SettingController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\ReportController;
-
-// Lookup Controllers (Global)
-use App\Http\Controllers\Api\V1\CurrencyController;
-use App\Http\Controllers\Api\V1\FamilyController;
-use App\Http\Controllers\Api\V1\BrandController;
-use App\Http\Controllers\Api\V1\RoleController;
-use App\Http\Controllers\Api\V1\PermissionController;
-use App\Http\Controllers\Api\V1\ExchangeRateController;
-use App\Http\Controllers\Api\V1\DocumentStatusController;
-use App\Http\Controllers\Api\V1\ExpenseCategoryController;
-use App\Http\Controllers\Api\V1\PaymentModeController;
-use App\Http\Controllers\Api\V1\PriceLevelController;
-use App\Http\Controllers\Api\V1\LegalFormController;
-use App\Http\Controllers\Api\V1\TvaController;
-use App\Http\Controllers\Api\V1\UnitController;
-use App\Http\Controllers\Api\V1\CommuneController;
-use App\Http\Controllers\Api\V1\WilayaController;
-use App\Http\Controllers\Api\V1\StockMovementTypeController;
-use App\Http\Controllers\Api\V1\ProductTypeController;
-use App\Http\Controllers\Api\V1\PartyTypeController;
-use App\Http\Controllers\Api\V1\DocumentTypeController;
-use App\Http\Controllers\Api\V1\GenderController;
-use App\Http\Controllers\Api\V1\InventoryValuationMethodController;
-use App\Http\Controllers\Api\V1\TreasuryAccountTypeController;
-use App\Http\Controllers\Api\V1\FiscalStampController;
-use App\Http\Controllers\Api\V1\DocumentBaseOperationController;
 use App\Http\Controllers\Api\V1\BarcodeController;
 use App\Http\Controllers\Api\V1\CompanySeedController;
 use App\Http\Controllers\Api\V1\ProductVariantController;
+
+// Tenant Lookup Controllers (نُقلت من العامة إلى هنا)
+use App\Http\Controllers\Api\V1\FamilyController;
+use App\Http\Controllers\Api\V1\BrandController;
+use App\Http\Controllers\Api\V1\UnitController;
+use App\Http\Controllers\Api\V1\PriceLevelController;
+use App\Http\Controllers\Api\V1\PaymentModeController;
+use App\Http\Controllers\Api\V1\ExpenseCategoryController;
+use App\Http\Controllers\Api\V1\ExchangeRateController;
+
+// Global Lookup Controllers (بقيت عالمية لأنها لا تحمل company_id)
+use App\Http\Controllers\Api\V1\WilayaController;
+use App\Http\Controllers\Api\V1\CommuneController;
+use App\Http\Controllers\Api\V1\CurrencyController;
+use App\Http\Controllers\Api\V1\DocumentBaseOperationController;
+use App\Http\Controllers\Api\V1\DocumentStatusController;
+use App\Http\Controllers\Api\V1\DocumentTypeController;
+use App\Http\Controllers\Api\V1\FiscalStampController;
+use App\Http\Controllers\Api\V1\GenderController;
+use App\Http\Controllers\Api\V1\InventoryValuationMethodController;
+use App\Http\Controllers\Api\V1\LegalFormController;
+use App\Http\Controllers\Api\V1\PartyTypeController;
+use App\Http\Controllers\Api\V1\PermissionController;
+use App\Http\Controllers\Api\V1\ProductTypeController;
+use App\Http\Controllers\Api\V1\RoleController;
+use App\Http\Controllers\Api\V1\StockMovementTypeController;
+use App\Http\Controllers\Api\V1\TreasuryAccountTypeController;
+use App\Http\Controllers\Api\V1\TvaController;
 
 use App\Models\Company;
 use Illuminate\Http\Request;
 
 /*
-|--------------------------------------------------------------------------
 | API Routes (Laravel 11) — Multi-Tenancy Professional Structure
 |--------------------------------------------------------------------------
 |
-| هيكل الـ URL — 5 طبقات:
-|
-|   ① /api/v1/auth/*                     ← المصادقة
-|   ② /api/v1/companies/*                ← إدارة شركات المستخدم
-|   ③ /api/v1/admin/*                    ← Super Admin (في api_admin.php)
-|   ④ /api/v1/lookups/*                  ← جداول مرجعية
-|   ⑤ /api/v1/{company_slug}/{resource}  ← بيانات معزولة بالشركة
+| ① /api/v1/auth/*                     ← المصادقة
+| ② /api/v1/companies/*                ← إدارة شركات المستخدم
+| ③ /api/v1/admin/*                    ← Super Admin (في api_admin.php)
+| ④ /api/v1/lookups/*                  ← جداول مرجعية عالمية حقيقية (wilayas, communes)
+| ⑤ /api/v1/{company}/{resource}       ← بيانات معزولة بالشركة (جميع جداول company_id)
 |
 */
 
-require base_path('routes/api_admin.php');
 
+require base_path('routes/api_admin.php');
 
 Route::prefix('v1')->group(function () {
 
@@ -113,7 +108,6 @@ Route::prefix('v1')->group(function () {
     // ② USER COMPANIES — إدارة شركات المستخدم
     // ═══════════════════════════════════════════
     Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
-
         Route::get('/current', [CompanyController::class, 'current']);
         Route::post('/switch', [CompanyController::class, 'switch']);
 
@@ -125,14 +119,12 @@ Route::prefix('v1')->group(function () {
         Route::patch('/{company}',  [CompanyController::class, 'update']);
         Route::delete('/{company}', [CompanyController::class, 'destroy']);
 
-        // إجراءات الشركة (للمالك — CompanyController يتحقق داخلياً)
         Route::post('/{company}/suspend',   [CompanyController::class, 'suspend']);
         Route::post('/{company}/unsuspend', [CompanyController::class, 'unsuspend']);
         Route::post('/{company}/verify',    [CompanyController::class, 'verify']);
         Route::post('/{company}/unverify',  [CompanyController::class, 'unverify']);
         Route::patch('/{company}/plan',     [CompanyController::class, 'upgradePlan']);
 
-        // إدارة الأعضاء
         Route::get(
             '/{company}/members',
             fn(Company $company) => app(CompanyController::class)->members($company)
@@ -164,43 +156,20 @@ Route::prefix('v1')->group(function () {
     });
 
     // ═══════════════════════════════════════════
-    // ③ SUPER ADMIN — مُعرَّف بالكامل في api_admin.php
-    //    ✅ تم حذف المسارات المكررة من هنا
+    // ③ SUPER ADMIN — api_admin.php
     // ═══════════════════════════════════════════
 
     // ═══════════════════════════════════════════
-    // ④ LOOKUP TABLES — جداول مرجعية
+    // ④ LOOKUP TABLES — فقط العالمية الحقيقية
     // ═══════════════════════════════════════════
     Route::middleware('auth:sanctum')->group(function () {
-
         Route::apiResource('wilayas',  WilayaController::class)->only(['index', 'show']);
         Route::apiResource('communes', CommuneController::class)->only(['index', 'show']);
         Route::get('communes/by-wilaya/{wilaya}', [CommuneController::class, 'byWilaya']);
-
-        Route::apiResource('genders',     GenderController::class)->only(['index', 'show']);
-        Route::apiResource('legal-forms', LegalFormController::class)->only(['index', 'show']);
-
-        Route::apiResource('currencies', CurrencyController::class)->only(['index', 'show']);
-
-        Route::apiResource('tvas', TvaController::class)->only(['index', 'show']);
-        Route::get('tvas/default', [TvaController::class, 'default']);
-
-        Route::apiResource('document-types',           DocumentTypeController::class)->only(['index', 'show']);
-        Route::apiResource('document-statuses',        DocumentStatusController::class)->only(['index', 'show']);
-        Route::apiResource('document-base-operations', DocumentBaseOperationController::class)->only(['index', 'show']);
-        Route::apiResource('fiscal-stamps',            FiscalStampController::class)->only(['index', 'show']);
-
-        Route::apiResource('stock-movement-types',        StockMovementTypeController::class)->only(['index', 'show']);
-        Route::apiResource('inventory-valuation-methods', InventoryValuationMethodController::class)->only(['index', 'show']);
-        Route::apiResource('product-types',               ProductTypeController::class)->only(['index', 'show']);
-
-        Route::apiResource('party-types', PartyTypeController::class)->only(['index', 'show']);
-
-        Route::apiResource('treasury-account-types', TreasuryAccountTypeController::class)->only(['index', 'show']);
     });
 
     // ═══════════════════════════════════════════
-    // ⑤ TENANT RESOURCES — معزولة بـ company_slug
+    // ⑤ TENANT RESOURCES — معزولة بـ company
     // ═══════════════════════════════════════════
     Route::middleware(['auth:sanctum', 'company'])
         ->prefix('{company}')
@@ -227,6 +196,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('taxes',     [ReportController::class, 'taxes']);
             });
 
+            // --- جداول مرجعية خاصة بالشركة (كانت عالمية سابقاً) ---
             Route::apiResource('families',       FamilyController::class)->only(['index', 'show']);
             Route::apiResource('brands',         BrandController::class)->only(['index', 'show']);
             Route::apiResource('units',          UnitController::class)->only(['index', 'show']);
@@ -238,6 +208,25 @@ Route::prefix('v1')->group(function () {
             Route::apiResource('expense-categories', ExpenseCategoryController::class)->only(['index', 'show']);
             Route::get('expense-categories/roots',   [ExpenseCategoryController::class, 'roots']);
 
+            Route::apiResource('tvas', TvaController::class)->only(['index', 'show']);
+            Route::get('tvas/default', [TvaController::class, 'default']);
+
+            Route::apiResource('document-types',           DocumentTypeController::class)->only(['index', 'show']);
+            Route::apiResource('document-statuses',        DocumentStatusController::class)->only(['index', 'show']);
+            Route::apiResource('document-base-operations', DocumentBaseOperationController::class)->only(['index', 'show']);
+            Route::apiResource('fiscal-stamps',            FiscalStampController::class)->only(['index', 'show']);
+
+            Route::apiResource('genders',     GenderController::class)->only(['index', 'show']);
+            Route::apiResource('legal-forms', LegalFormController::class)->only(['index', 'show']);
+            Route::apiResource('currencies',  CurrencyController::class)->only(['index', 'show']);
+
+            Route::apiResource('party-types',               PartyTypeController::class)->only(['index', 'show']);
+            Route::apiResource('product-types',             ProductTypeController::class)->only(['index', 'show']);
+            Route::apiResource('treasury-account-types',    TreasuryAccountTypeController::class)->only(['index', 'show']);
+            Route::apiResource('stock-movement-types',      StockMovementTypeController::class)->only(['index', 'show']);
+            Route::apiResource('inventory-valuation-methods', InventoryValuationMethodController::class)->only(['index', 'show']);
+
+            // منتجات وأطراف ومستودعات (قراءة)
             Route::get('products',                    [ProductController::class, 'index']);
             Route::get('products/{product}',          [ProductController::class, 'show']);
             Route::get('products/active',             [ProductController::class, 'active']);
@@ -283,17 +272,17 @@ Route::prefix('v1')->group(function () {
             Route::get('fiscal-years/current', [FiscalYearController::class, 'current']);
             Route::get('fiscal-years/open',    [FiscalYearController::class, 'open']);
 
-            Route::get('roles',                  [RoleController::class, 'index']);
-            Route::get('roles/{role}',           [RoleController::class, 'show']);
-            Route::get('permissions',            [PermissionController::class, 'index']);
-            Route::get('permissions/by-group',   [PermissionController::class, 'byGroup']);
-            Route::get('permissions/{permission}', [PermissionController::class, 'show']);
+            Route::get('roles',                   [RoleController::class, 'index']);
+            Route::get('roles/{role}',            [RoleController::class, 'show']);
+            Route::get('permissions',             [PermissionController::class, 'index']);
+            Route::get('permissions/by-group',    [PermissionController::class, 'byGroup']);
+            Route::get('permissions/{permission}',[PermissionController::class, 'show']);
 
-            Route::get('notifications',                             [NotificationController::class, 'index']);
-            Route::get('notifications/{notification}',              [NotificationController::class, 'show']);
-            Route::get('notifications/unread',                      [NotificationController::class, 'unread']);
-            Route::post('notifications/{notification}/mark-read',   [NotificationController::class, 'markAsRead']);
-            Route::post('notifications/mark-all-read',              [NotificationController::class, 'markAllAsRead']);
+            Route::get('notifications',                              [NotificationController::class, 'index']);
+            Route::get('notifications/{notification}',               [NotificationController::class, 'show']);
+            Route::get('notifications/unread',                       [NotificationController::class, 'unread']);
+            Route::post('notifications/{notification}/mark-read',    [NotificationController::class, 'markAsRead']);
+            Route::post('notifications/mark-all-read',               [NotificationController::class, 'markAllAsRead']);
 
             Route::get('audits',               [AuditController::class, 'index']);
             Route::get('audits/{audit}',       [AuditController::class, 'show']);
@@ -307,10 +296,10 @@ Route::prefix('v1')->group(function () {
                 Route::post('/change-password', [AuthController::class, 'changePassword']);
             });
 
-            // ── ⑤-ب: للمالك/المدير ──────────────────────────────
-            // ✅ إصلاح: استبدال manage-company (غير موجود) بـ update_company (موجود في Seeder)
+            // ── ⑤-ب: للمالك/المدير (كتابة) ──────────────────
             Route::middleware('can:update_company')->group(function () {
 
+                // جداول مرجعية - كتابة
                 Route::post('units',           [UnitController::class, 'store']);
                 Route::put('units/{unit}',     [UnitController::class, 'update']);
                 Route::patch('units/{unit}',   [UnitController::class, 'update']);
@@ -346,6 +335,72 @@ Route::prefix('v1')->group(function () {
                 Route::patch('expense-categories/{category}',   [ExpenseCategoryController::class, 'update']);
                 Route::delete('expense-categories/{category}',  [ExpenseCategoryController::class, 'destroy']);
 
+                Route::post('tvas',         [TvaController::class, 'store']);
+                Route::put('tvas/{tva}',    [TvaController::class, 'update']);
+                Route::patch('tvas/{tva}',  [TvaController::class, 'update']);
+                Route::delete('tvas/{tva}', [TvaController::class, 'destroy']);
+
+                Route::post('document-types',               [DocumentTypeController::class, 'store']);
+                Route::put('document-types/{documentType}', [DocumentTypeController::class, 'update']);
+                Route::patch('document-types/{documentType}', [DocumentTypeController::class, 'update']);
+                Route::delete('document-types/{documentType}', [DocumentTypeController::class, 'destroy']);
+
+                Route::post('document-statuses',                  [DocumentStatusController::class, 'store']);
+                Route::put('document-statuses/{documentStatus}',  [DocumentStatusController::class, 'update']);
+                Route::patch('document-statuses/{documentStatus}',[DocumentStatusController::class, 'update']);
+                Route::delete('document-statuses/{documentStatus}',[DocumentStatusController::class, 'destroy']);
+
+                Route::post('document-base-operations',                       [DocumentBaseOperationController::class, 'store']);
+                Route::put('document-base-operations/{documentBaseOperation}', [DocumentBaseOperationController::class, 'update']);
+                Route::patch('document-base-operations/{documentBaseOperation}', [DocumentBaseOperationController::class, 'update']);
+                Route::delete('document-base-operations/{documentBaseOperation}', [DocumentBaseOperationController::class, 'destroy']);
+
+                Route::post('fiscal-stamps',               [FiscalStampController::class, 'store']);
+                Route::put('fiscal-stamps/{fiscalStamp}',  [FiscalStampController::class, 'update']);
+                Route::patch('fiscal-stamps/{fiscalStamp}',[FiscalStampController::class, 'update']);
+                Route::delete('fiscal-stamps/{fiscalStamp}',[FiscalStampController::class, 'destroy']);
+
+                Route::post('genders',          [GenderController::class, 'store']);
+                Route::put('genders/{gender}',  [GenderController::class, 'update']);
+                Route::patch('genders/{gender}',[GenderController::class, 'update']);
+                Route::delete('genders/{gender}',[GenderController::class, 'destroy']);
+
+                Route::post('legal-forms',              [LegalFormController::class, 'store']);
+                Route::put('legal-forms/{legalForm}',   [LegalFormController::class, 'update']);
+                Route::patch('legal-forms/{legalForm}', [LegalFormController::class, 'update']);
+                Route::delete('legal-forms/{legalForm}',[LegalFormController::class, 'destroy']);
+
+                Route::post('currencies',              [CurrencyController::class, 'store']);
+                Route::put('currencies/{currency}',    [CurrencyController::class, 'update']);
+                Route::patch('currencies/{currency}',  [CurrencyController::class, 'update']);
+                Route::delete('currencies/{currency}', [CurrencyController::class, 'destroy']);
+
+                Route::post('party-types',                [PartyTypeController::class, 'store']);
+                Route::put('party-types/{partyType}',     [PartyTypeController::class, 'update']);
+                Route::patch('party-types/{partyType}',   [PartyTypeController::class, 'update']);
+                Route::delete('party-types/{partyType}',  [PartyTypeController::class, 'destroy']);
+
+                Route::post('product-types',                [ProductTypeController::class, 'store']);
+                Route::put('product-types/{productType}',  [ProductTypeController::class, 'update']);
+                Route::patch('product-types/{productType}',[ProductTypeController::class, 'update']);
+                Route::delete('product-types/{productType}',[ProductTypeController::class, 'destroy']);
+
+                Route::post('treasury-account-types',                          [TreasuryAccountTypeController::class, 'store']);
+                Route::put('treasury-account-types/{treasuryAccountType}',      [TreasuryAccountTypeController::class, 'update']);
+                Route::patch('treasury-account-types/{treasuryAccountType}',    [TreasuryAccountTypeController::class, 'update']);
+                Route::delete('treasury-account-types/{treasuryAccountType}',   [TreasuryAccountTypeController::class, 'destroy']);
+
+                Route::post('stock-movement-types',                            [StockMovementTypeController::class, 'store']);
+                Route::put('stock-movement-types/{stockMovementType}',         [StockMovementTypeController::class, 'update']);
+                Route::patch('stock-movement-types/{stockMovementType}',       [StockMovementTypeController::class, 'update']);
+                Route::delete('stock-movement-types/{stockMovementType}',      [StockMovementTypeController::class, 'destroy']);
+
+                Route::post('inventory-valuation-methods',                                    [InventoryValuationMethodController::class, 'store']);
+                Route::put('inventory-valuation-methods/{inventoryValuationMethod}',           [InventoryValuationMethodController::class, 'update']);
+                Route::patch('inventory-valuation-methods/{inventoryValuationMethod}',         [InventoryValuationMethodController::class, 'update']);
+                Route::delete('inventory-valuation-methods/{inventoryValuationMethod}',        [InventoryValuationMethodController::class, 'destroy']);
+
+                // منتجات وأطراف ومستودعات - كتابة
                 Route::post('products',              [ProductController::class, 'store']);
                 Route::put('products/{product}',     [ProductController::class, 'update']);
                 Route::patch('products/{product}',   [ProductController::class, 'update']);
@@ -401,8 +456,6 @@ Route::prefix('v1')->group(function () {
                 Route::patch('employment-contracts/{contract}',   [EmploymentContractController::class, 'update']);
                 Route::delete('employment-contracts/{contract}',  [EmploymentContractController::class, 'destroy']);
 
-                // ✅ fiscal-years نقلت لـ middleware خاص أدناه
-
                 Route::apiResource('opening-balance-stocks',  OpeningBalanceStockController::class);
                 Route::apiResource('opening-balance-parties', OpeningBalancePartyController::class);
 
@@ -417,7 +470,6 @@ Route::prefix('v1')->group(function () {
             });
 
             // ── ⑤-ب-٢: السنوات المالية (manage_fiscal_year) ─────
-            // ✅ منفصلة عن update_company — يملكها admin + manager
             Route::middleware('can:manage_fiscal_year')->group(function () {
                 Route::post('fiscal-years',              [FiscalYearController::class, 'store']);
                 Route::put('fiscal-years/{year}',        [FiscalYearController::class, 'update']);
@@ -427,7 +479,6 @@ Route::prefix('v1')->group(function () {
             });
 
             // ── ⑤-ج: للمالك والمدير والمحاسب ──────────────────
-            // ✅ إصلاح: manage-commercial-document → create_sales_document (موجود في Seeder)
             Route::middleware('can:create_sales_document')->group(function () {
                 Route::apiResource('documents', CommercialDocumentController::class);
                 Route::get('documents/unpaid',                    [CommercialDocumentController::class, 'unpaid']);
@@ -476,8 +527,3 @@ Route::prefix('v1')->group(function () {
             Route::get('settings/key/{key}/value',  [SettingController::class, 'getValue']);
         });
 });
-
-// ═══════════════════════════════════════════════
-// ③ ADMIN PANEL — /api/v1/admin/*
-//    ✅ مصدر واحد للحقيقة — كل مسارات الأدمن هنا فقط
-// ═══════════════════════════════════════════════
