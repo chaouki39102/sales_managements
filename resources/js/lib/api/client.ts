@@ -166,6 +166,13 @@ function isPublicPath(path: string): boolean {
     const cleanPath = path.split("?")[0];
     return PUBLIC_PATH_PREFIXES.some((prefix) => cleanPath.startsWith(prefix));
 }
+/**
+ * تتحقق مما إذا كان الرابط يحمل slug مضمَّناً (يبدأ بـ /كلمة/...)
+ * تُستخدم لإسكات تحذير "No active company slug" عندما يكون slug محقوناً في الرابط.
+ */
+function urlLooksSlugged(path: string): boolean {
+    return /^\/[a-z0-9][a-z0-9-]*\//.test(path);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 6-c. الكشف عن URL يحمل slug مضمَّناً بالفعل: /{word}/...
@@ -207,14 +214,15 @@ client.interceptors.request.use(
         } else if (
             !slug &&
             !isPublicPath(originalUrl) &&
-            !isPreSluggedUrl(originalUrl, slug)
+            !urlLooksSlugged(originalUrl)
         ) {
             // تحذير فقط إذا كان URL لا يحمل slug مضمَّناً
-            if (import.meta.env.DEV) {
+                       if (import.meta.env.DEV) {
                 console.warn(
                     `⚠️ No active company slug for request: ${config.method?.toUpperCase()} ${originalUrl}`,
                 );
             }
+
         }
 
         // 7-c. Bearer token
