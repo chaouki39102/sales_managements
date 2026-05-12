@@ -82,17 +82,17 @@ merge_section "🌐 CONTEXT" \
 merge_section "🔌 API / LIB" \
   \( -path "*/lib/*" \) "${EXCLUDE[@]}"
 
-# POS
-merge_section "🛒 POS MODULE" \
-  \( -path "*/pos/*" \) "${EXCLUDE[@]}"
+  # TYPES
+merge_section "📘 TYPES" \
+  \( -path "*/types/*" \) "${EXCLUDE[@]}"
+
+
 
 # CONFIG
 merge_section "⚙️ CONFIG" \
   \( -path "*/config/*" \) "${EXCLUDE[@]}"
 
-# TYPES
-merge_section "📘 TYPES" \
-  \( -path "*/types/*" \) "${EXCLUDE[@]}"
+
 
 # ROOT FILES
 merge_section "🚀 ROOT FILES" \
@@ -101,5 +101,10 @@ merge_section "🚀 ROOT FILES" \
 # VIEWS
 merge_section "🧾 VIEWS" \
   \( -iname "*.blade.php" \) "${EXCLUDE[@]}"
+
+
+  # POS
+merge_section "🛒 POS MODULE" \
+  \( -path "*/pos/*" \) "${EXCLUDE[@]}"
 
 echo "✅ Done: $OUTPUT"

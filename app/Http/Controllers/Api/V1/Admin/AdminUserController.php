@@ -3,11 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Core\Http\Controllers\Traits\ApiResponders;
 use App\Http\Resources\UserResource;
 use App\Http\Resources\CompanyResource;
-use App\Http\Requests\StoreUserRequest;
-use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,19 +12,9 @@ use Illuminate\Support\Facades\Hash;
 
 class AdminUserController extends Controller
 {
-    use ApiResponders;
-
-    protected string $resourceName = 'user';
-    protected ?string $resourceClass = UserResource::class;
-
-    /**
-     * عرض قائمة المستخدمين
-     */
     public function index(Request $request): JsonResponse
     {
-        $query = User::query()
-            ->withCount('companies')
-            ->latest();
+        $query = User::query()->withCount('companies');
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -35,124 +22,126 @@ class AdminUserController extends Controller
                   ->orWhere('email', 'like', "%{$search}%");
             });
         }
-
         if ($request->has('active')) {
-            $query->where('active', filter_var($request->get('active'), FILTER_VALIDATE_BOOLEAN));
+            $query->where('active', filter_var($request->active, FILTER_VALIDATE_BOOLEAN));
         }
-
         if ($role = $request->get('role')) {
             $query->where('role', $role);
         }
 
-        $users = $query->paginate($request->get('per_page', 20));
+        $users = $query->latest()->paginate($request->get('per_page', 20));
+        $items = UserResource::collection($users);
 
-        return $this->successResponse($users, 'قائمة المستخدمين');
+        return response()->json([
+            'data'  => $items->collection,
+            'meta'  => [
+                'current_page' => $users->currentPage(),
+                'last_page'    => $users->lastPage(),
+                'per_page'     => $users->perPage(),
+                'total'        => $users->total(),
+                'from'         => $users->firstItem(),
+                'to'           => $users->lastItem(),
+            ],
+            'links' => [
+                'first' => $users->url(1),
+                'last'  => $users->url($users->lastPage()),
+                'prev'  => $users->previousPageUrl(),
+                'next'  => $users->nextPageUrl(),
+            ],
+        ]);
     }
 
-    /**
-     * إنشاء مستخدم جديد
-     */
-    public function store(StoreUserRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        try {
-            $user = User::create($request->validated());
+        $data = $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users',
+            'password' => 'required|string|min:8',
+            'role'     => 'nullable|in:super_admin,admin,user',
+        ]);
 
-            if ($request->filled('company_id')) {
-                $user->companies()->attach($request->company_id, [
-                    'role'       => 'member',
-                    'active'     => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+        $user = User::create([
+            'name'     => $data['name'],
+            'email'    => $data['email'],
+            'password' => Hash::make($data['password']),
+            'role'     => $data['role'] ?? 'user',
+            'active'   => true,
+        ]);
 
-            return $this->successResponse(new UserResource($user), 'تم إنشاء المستخدم', 201);
-        } catch (\Throwable $e) {
-            return $this->errorResponse('فشل الإنشاء: ' . $e->getMessage(), 500, 'SERVER_ERROR');
+        if ($request->filled('company_id')) {
+            $user->companies()->attach($request->company_id, [
+                'role'       => 'member',
+                'active'     => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
+
+        return response()->json([
+            'data' => new UserResource($user)
+        ], 201);
     }
 
-    /**
-     * عرض مستخدم محدد
-     */
     public function show(User $user): JsonResponse
     {
         $user->loadCount('companies');
-        return $this->successResponse(new UserResource($user));
+        return response()->json([
+            'data' => new UserResource($user)
+        ]);
     }
 
-    /**
-     * تحديث بيانات مستخدم
-     */
-    public function update(UpdateUserRequest $request, User $user): JsonResponse
+    public function update(Request $request, User $user): JsonResponse
     {
-        try {
-            $user->update($request->validated());
-            return $this->successResponse(new UserResource($user->fresh()), 'تم تحديث المستخدم');
-        } catch (\Throwable $e) {
-            return $this->errorResponse('فشل التحديث', 500, 'SERVER_ERROR');
-        }
+        $data = $request->validate([
+            'name'  => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $user->id,
+            'role'  => 'nullable|in:super_admin,admin,user',
+        ]);
+
+        $user->update($data);
+        return response()->json([
+            'data' => new UserResource($user->fresh())
+        ]);
     }
 
-    /**
-     * حذف مستخدم (soft delete)
-     */
     public function destroy(User $user): JsonResponse
     {
         if ($user->id === auth()->id()) {
-            return $this->errorResponse('لا يمكنك حذف حسابك الخاص', 422, 'AUTHORIZATION_ERROR');
+            return response()->json(['message' => 'لا يمكنك حذف حسابك الخاص'], 422);
         }
-
-        try {
-            $user->delete();
-            return $this->successResponse(null, 'تم حذف المستخدم');
-        } catch (\Throwable $e) {
-            return $this->errorResponse('فشل الحذف', 500, 'SERVER_ERROR');
-        }
+        $user->delete();
+        return response()->json(null, 204);
     }
 
-    /**
-     * إعادة تعيين كلمة المرور
-     */
     public function resetPassword(Request $request, User $user): JsonResponse
     {
         $data = $request->validate([
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        try {
-            $user->update(['password' => Hash::make($data['password'])]);
-            $user->tokens()->delete(); // إبطال جميع التوكنات
-            return $this->successResponse(null, 'تم تغيير كلمة المرور وإلغاء جميع الجلسات');
-        } catch (\Throwable $e) {
-            return $this->errorResponse('فشل تغيير كلمة المرور', 500, 'SERVER_ERROR');
-        }
+        $user->update(['password' => Hash::make($data['password'])]);
+        $user->tokens()->delete();
+        return response()->json(['message' => 'تم تغيير كلمة المرور وإلغاء جميع الجلسات']);
     }
 
-    /**
-     * تفعيل / تعطيل مستخدم
-     */
     public function toggleActive(User $user): JsonResponse
     {
         if ($user->id === auth()->id()) {
-            return $this->errorResponse('لا يمكنك تعطيل حسابك الخاص', 422, 'AUTHORIZATION_ERROR');
+            return response()->json(['message' => 'لا يمكنك تعطيل حسابك الخاص'], 422);
         }
 
-        try {
-            $user->update(['active' => !$user->active]);
-            $msg = $user->active ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم';
-            return $this->successResponse(new UserResource($user->fresh()), $msg);
-        } catch (\Throwable $e) {
-            return $this->errorResponse('فشل تغيير الحالة', 500, 'SERVER_ERROR');
-        }
+        $user->update(['active' => !$user->active]);
+        return response()->json([
+            'data'    => new UserResource($user->fresh()),
+            'message' => $user->active ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم'
+        ]);
     }
 
-    /**
-     * قائمة شركات المستخدم
-     */
     public function companies(User $user): JsonResponse
     {
         $companies = $user->companies()->withPivot(['role', 'active'])->get();
-        return $this->successResponse(CompanyResource::collection($companies), "شركات [{$user->name}]");
+        return response()->json([
+            'data' => CompanyResource::collection($companies)
+        ]);
     }
 }

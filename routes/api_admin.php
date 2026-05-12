@@ -1,91 +1,87 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
-use App\Models\Company;
-
-use App\Http\Controllers\Api\V1\AdminCompanyController;
-use App\Http\Controllers\Api\V1\UserController;
-use App\Http\Controllers\Api\V1\RoleController;
-use App\Http\Controllers\Api\V1\PermissionController;
-use App\Http\Controllers\Api\V1\AuditController;
-use App\Http\Controllers\Api\V1\SettingController;
-use App\Http\Controllers\Api\V1\CompanyController;
+use App\Http\Controllers\Api\V1\Admin\AdminCompanyController;
+use App\Http\Controllers\Api\V1\Admin\AdminUserController;
+use App\Http\Controllers\Api\V1\Admin\AdminDashboardController;
+use App\Http\Controllers\Api\V1\Admin\AdminActivityController;
+use App\Http\Controllers\Api\V1\Admin\AdminPlanController;
+use App\Http\Controllers\Api\V1\Admin\AdminImpersonateController;
+use App\Http\Controllers\Api\V1\Admin\AdminSystemSettingsController;
+use App\Http\Controllers\Api\V1\Admin\AdminMaintenanceController;
 
 /*
 |--------------------------------------------------------------------------
-| api_admin.php — Super Admin Routes فقط
-| يُستدعى من api.php عبر: require base_path('routes/api_admin.php');
-|
-| ⚠️  هذا الملف لا يحتوي على require لأي ملف آخر — تجنباً للحلقة اللانهائية
+| Super Admin API Routes — /api/v1/admin/*
 |--------------------------------------------------------------------------
 */
 
 Route::prefix('v1/admin')
-    ->middleware(['auth:sanctum', 'role:super-admin'])
+    ->middleware(['auth:sanctum', 'super.admin'])   // alias المسجل في bootstrap/app.php
+    ->name('admin.')
     ->group(function () {
 
-        // ── الشركات ─────────────────────────────────────────────
-        Route::prefix('companies')->group(function () {
+        // Dashboard
+        Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
-            Route::get('/stats',
-                fn() => app(AdminCompanyController::class)->stats());
+        // Companies
+        Route::prefix('companies')->name('companies.')->group(function () {
+            Route::get('/', [AdminCompanyController::class, 'index']);
+            Route::post('/', [AdminCompanyController::class, 'store']);
+            Route::get('{company}', [AdminCompanyController::class, 'show']);
+            Route::put('{company}', [AdminCompanyController::class, 'update']);
+            Route::delete('{company}', [AdminCompanyController::class, 'destroy']);
 
-            Route::post('/{company}/suspend',
-                fn(Request $request, Company $company) =>
-                app(AdminCompanyController::class)->suspend($request, $company));
+            // إجراءات خاصة
+            Route::post('{company}/suspend', [AdminCompanyController::class, 'suspend']);
+            Route::post('{company}/unsuspend', [AdminCompanyController::class, 'unsuspend']);
+            Route::post('{company}/activate', [AdminCompanyController::class, 'activate']);
+            Route::post('{company}/deactivate', [AdminCompanyController::class, 'deactivate']);
+            Route::post('{company}/verify', [AdminCompanyController::class, 'verify']);
+            Route::post('{company}/unverify', [AdminCompanyController::class, 'unverify']);
+            Route::post('{company}/change-plan', [AdminCompanyController::class, 'changePlan']);
+            Route::patch('{company}/notes', [AdminCompanyController::class, 'updateNotes']);
 
-            Route::post('/{company}/unsuspend',
-                fn(Company $company) =>
-                app(AdminCompanyController::class)->unsuspend($company));
-
-            Route::post('/{company}/deactivate',
-                fn(Company $company) =>
-                app(AdminCompanyController::class)->deactivate($company));
-
-            Route::post('/{company}/activate',
-                fn(Company $company) =>
-                app(AdminCompanyController::class)->activate($company));
-
-            Route::post('/{company}/verify',
-                fn(Company $company) =>
-                app(AdminCompanyController::class)->verify($company));
-
-            Route::post('/{company}/unverify',
-                fn(Company $company) =>
-                app(AdminCompanyController::class)->unverify($company));
-
-            Route::patch('/{company}/plan',
-                fn(Request $request, Company $company) =>
-                app(AdminCompanyController::class)->changePlan($request, $company));
-
-            Route::patch('/{company}/notes',
-                fn(Request $request, Company $company) =>
-                app(AdminCompanyController::class)->updateNotes($request, $company));
-
-            Route::patch('/{company}/upgrade-plan',
-                fn(Request $request, Company $company) =>
-                app(CompanyController::class)->upgradePlan($request, $company->id));
+            // مستخدمو الشركة
+            Route::get('{company}/users', [AdminCompanyController::class, 'users']);
+            Route::post('{company}/users', [AdminCompanyController::class, 'addUser']);
+            Route::delete('{company}/users/{user}', [AdminCompanyController::class, 'removeUser']);
+            Route::patch('{company}/users/{user}/toggle', [AdminCompanyController::class, 'toggleUserStatus']);
         });
 
-        // ── المستخدمون ───────────────────────────────────────────
-        Route::prefix('users')->group(function () {
-            Route::get('/',
-                fn() => app(UserController::class)->index(request()));
-            Route::get('/{user}',
-                fn($user) => app(UserController::class)->show($user));
-            Route::post('/{user}/toggle-active',
-                fn($user) => app(UserController::class)->toggleActive($user));
-            Route::delete('/{user}',
-                fn($user) => app(UserController::class)->destroy($user));
+        // Users
+        Route::prefix('users')->name('users.')->group(function () {
+            Route::get('/', [AdminUserController::class, 'index']);
+            Route::post('/', [AdminUserController::class, 'store']);
+            Route::get('{user}', [AdminUserController::class, 'show']);
+            Route::put('{user}', [AdminUserController::class, 'update']);
+            Route::delete('{user}', [AdminUserController::class, 'destroy']);
+            Route::post('{user}/reset-password', [AdminUserController::class, 'resetPassword']);
+            Route::post('{user}/toggle-active', [AdminUserController::class, 'toggleActive']);
+            Route::get('{user}/companies', [AdminUserController::class, 'companies']);
         });
 
-        // ── الأدوار والصلاحيات ───────────────────────────────────
-        Route::apiResource('roles',       RoleController::class);
-        Route::apiResource('permissions', PermissionController::class);
+        // Plans
+        Route::prefix('plans')->name('plans.')->group(function () {
+            Route::get('/', [AdminPlanController::class, 'index']);
+            Route::get('{plan}', [AdminPlanController::class, 'show']);
+        });
 
-        // ── إحصاءات وسجلات ──────────────────────────────────────
-        Route::get('stats',     fn() => app(AdminCompanyController::class)->stats());
-        Route::get('audit-log', fn() => app(AuditController::class)->index(request()));
-        Route::get('settings',  fn() => app(SettingController::class)->index(request()));
+        // Impersonate
+        Route::post('impersonate/stop', [AdminImpersonateController::class, 'stop']);
+        Route::post('impersonate/{user}', [AdminImpersonateController::class, 'start']);
+
+        // Activity Log
+        Route::get('activity-log', [AdminActivityController::class, 'index']);
+        Route::get('activity-log/{id}', [AdminActivityController::class, 'show']);
+
+        // System Settings
+        Route::get('settings', [AdminSystemSettingsController::class, 'index']);
+        Route::put('settings', [AdminSystemSettingsController::class, 'update']);
+
+        // Maintenance
+        Route::get('maintenance', [AdminMaintenanceController::class, 'status']);
+        Route::post('maintenance/enable', [AdminMaintenanceController::class, 'enable']);
+        Route::post('maintenance/disable', [AdminMaintenanceController::class, 'disable']);
+        Route::post('maintenance/cache-clear', [AdminMaintenanceController::class, 'clearCache']);
     });

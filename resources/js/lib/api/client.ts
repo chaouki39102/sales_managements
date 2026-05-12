@@ -160,6 +160,8 @@ const PUBLIC_PATH_PREFIXES = [
     "/admin",
     "/wilayas",
     "/communes",
+    "/genders",        // ✅ global — لا تحتاج slug
+    "/legal-forms",    // ✅ global — لا تحتاج slug
 ];
 
 function isPublicPath(path: string): boolean {

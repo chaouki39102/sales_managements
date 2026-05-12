@@ -5,7 +5,7 @@ import { ProductInput } from '@/types/product';
 export function useProducts(page = 1, perPage = 20, filters = {}, search = '', sort = 'name', order = 'asc') {
   return useQuery({
     queryKey: ['products', page, perPage, filters, search, sort, order],
-    queryFn: () => productService.getProducts({ page, per_page: perPage, ...filters, search, sort: `${order === 'desc' ? '-' : ''}${sort}`, include: 'family,brand,productType,variants' }),
+    queryFn: () => productService.getProducts({ page, per_page: perPage, ...filters, search, sort: `${order === 'desc' ? '-' : ''}${sort}`, include: 'family,brand,productType,packagings,prices' }),
     keepPreviousData: true,
   });
 }

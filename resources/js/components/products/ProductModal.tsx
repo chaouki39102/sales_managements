@@ -919,28 +919,8 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {Object.entries(form.specifications).map(([k, v]) => (
               <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  style={{ ...s.inp(), flex: 1, fontSize: 12, fontWeight: 600 }}
-                  defaultValue={k}
-                  onBlur={e => {
-                    const newKey = e.target.value.trim();
-                    if (!newKey || newKey === k) return;
-                    const sp = { ...form.specifications };
-                    const val = sp[k];
-                    delete sp[k];
-                    sp[newKey] = val;
-                    set('specifications', sp);
-                  }}
-                  placeholder="الخاصية"
-                />
-                <input
-                  style={{ ...s.inp(), flex: 1, fontSize: 12 }}
-                  value={v}
-                  onChange={e => {
-                    set('specifications', { ...form.specifications, [k]: e.target.value });
-                  }}
-                  placeholder="القيمة"
-                />
+                <div style={{ flex: 1, padding: '7px 10px', borderRadius: 'var(--r1)', background: 'var(--bg3)', fontSize: 12, fontWeight: 600 }}>{k}</div>
+                <div style={{ flex: 1, padding: '7px 10px', borderRadius: 'var(--r1)', background: 'var(--bg3)', fontSize: 12 }}>{v}</div>
                 <button onClick={() => {
                   const sp = { ...form.specifications };
                   delete sp[k];
@@ -1044,8 +1024,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         borderRadius: '16px 16px 0 0',
         boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
         display: 'flex', flexDirection: 'column',
-        height: '88vh',
-        maxHeight: '88vh',
+        maxHeight: '92vh',
         overflow: 'hidden',
       }}>
 
@@ -1128,7 +1107,6 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         <div ref={bodyRef} style={{
           flex: 1, overflowY: 'auto', padding: '20px',
           scrollbarWidth: 'thin',
-          minHeight: 420,
         }}>
           {apiError && (
             <div style={{

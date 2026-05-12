@@ -346,7 +346,8 @@ export default function LookupPage({
           })
           .catch(() => {});
       });
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endpoint]);
 
   const tableFields = fields.filter(f => f.showInTable !== false);
   const nameField   = fields[0]?.key ?? 'name';

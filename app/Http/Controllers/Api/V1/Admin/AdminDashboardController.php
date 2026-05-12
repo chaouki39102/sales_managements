@@ -10,14 +10,10 @@ class AdminDashboardController extends Controller
 {
     public function index(): JsonResponse
     {
-        // ── إحصائيات الشركات ──────────────────────────────────────
         $companiesTotal     = DB::table('companies')->whereNull('deleted_at')->count();
-        $companiesActive    = DB::table('companies')->whereNull('deleted_at')
-                                ->where('active', true)->whereNull('suspended_at')->count();
-        $companiesSuspended = DB::table('companies')->whereNull('deleted_at')
-                                ->whereNotNull('suspended_at')->count();
-        $companiesVerified  = DB::table('companies')->whereNull('deleted_at')
-                                ->whereNotNull('verified_at')->count();
+        $companiesActive    = DB::table('companies')->whereNull('deleted_at')->where('active', true)->whereNull('suspended_at')->count();
+        $companiesSuspended = DB::table('companies')->whereNull('deleted_at')->whereNotNull('suspended_at')->count();
+        $companiesVerified  = DB::table('companies')->whereNull('deleted_at')->whereNotNull('verified_at')->count();
 
         $byPlan = DB::table('companies')
             ->whereNull('deleted_at')
@@ -26,7 +22,6 @@ class AdminDashboardController extends Controller
             ->pluck('total', 'plan')
             ->toArray();
 
-        // ── إحصائيات المستخدمين ────────────────────────────────────
         $usersTotal        = DB::table('users')->whereNull('deleted_at')->count();
         $usersActive       = DB::table('users')->whereNull('deleted_at')->where('active', true)->count();
         $usersNewThisMonth = DB::table('users')
@@ -35,31 +30,21 @@ class AdminDashboardController extends Controller
             ->whereMonth('created_at', now()->month)
             ->count();
 
-        // ── أحدث الشركات ──────────────────────────────────────────
         $recentCompanies = DB::table('companies')
             ->whereNull('deleted_at')
-            ->select('id', 'name', 'slug', 'email', 'phone', 'plan',
-                     'active', 'suspended_at', 'verified_at', 'owner_id', 'created_at')
+            ->select('id', 'name', 'slug', 'email', 'phone', 'plan', 'active', 'suspended_at', 'verified_at', 'owner_id', 'created_at')
             ->orderByDesc('created_at')
             ->limit(10)
             ->get()
             ->map(function ($co) {
-                $co->users_count = DB::table('company_user')
-                    ->where('company_id', $co->id)
-                    ->where('active', true)
-                    ->count();
+                $co->users_count = DB::table('company_user')->where('company_id', $co->id)->where('active', true)->count();
                 $co->is_suspended = !is_null($co->suspended_at);
-
-                // بيانات المالك
                 $co->owner = $co->owner_id
-                    ? DB::table('users')->where('id', $co->owner_id)
-                        ->select('id', 'name', 'email')->first()
+                    ? DB::table('users')->where('id', $co->owner_id)->select('id', 'name', 'email')->first()
                     : null;
-
                 return $co;
             });
 
-        // ── أحدث المستخدمين ───────────────────────────────────────
         $recentUsers = DB::table('users')
             ->whereNull('deleted_at')
             ->select('id', 'name', 'email', 'active', 'created_at')

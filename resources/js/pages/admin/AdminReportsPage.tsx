@@ -5,7 +5,9 @@ import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { adminApi } from '@/lib/api/admin';
-import { LineChart } from '@/components/charts/LineChart';
+import LineChart from '@/components/charts/LineChart';
+
+
 
 export default function AdminReportsPage() {
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d');

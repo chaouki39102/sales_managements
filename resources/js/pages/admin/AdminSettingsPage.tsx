@@ -1,4 +1,7 @@
+// ════════════════════════════════════════════════
 // pages/admin/AdminSettingsPage.tsx
+// صفحة إعدادات النظام – تستخدم hooks و API
+// ════════════════════════════════════════════════
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PageHeader from '@/components/ui/PageHeader';
@@ -7,18 +10,7 @@ import Switch from '@/components/ui/Switch';
 import Button from '@/components/ui/Button';
 import AlertBar from '@/components/ui/AlertBar';
 import { adminApi } from '@/lib/api/admin';
-
-type SystemSettings = {
-  allow_registration: boolean;
-  allow_new_companies: boolean;
-  debug_mode: boolean;
-  public_api: boolean;
-  free_trial_days: number;
-  free_max_users: number;
-  starter_max_products: number;
-  maintenance_mode: boolean;
-  maintenance_message: string;
-};
+import { SystemSettings } from '@/types/admin';
 
 export default function AdminSettingsPage() {
   const qc = useQueryClient();
@@ -37,6 +29,15 @@ export default function AdminSettingsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-settings'] }),
   });
 
+  const maintenanceMutation = useMutation({
+    mutationFn: (action: 'enable' | 'disable') =>
+      action === 'enable' ? adminApi.enableMaintenance() : adminApi.disableMaintenance(),
+  });
+
+  const cacheMutation = useMutation({
+    mutationFn: () => adminApi.clearCache(),
+  });
+
   const handleChange = <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) => {
     if (!settings) return;
     const newSettings = { ...settings, [key]: value };
@@ -50,8 +51,7 @@ export default function AdminSettingsPage() {
     <div style={{ maxWidth: 980, margin: '0 auto' }}>
       <PageHeader title="إعدادات النظام" description="إدارة التكوين العام للمنصة" />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
-        {/* General */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <Card title="الإعدادات العامة">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="sr">
@@ -73,7 +73,6 @@ export default function AdminSettingsPage() {
           </div>
         </Card>
 
-        {/* Plans limits */}
         <Card title="الحدود الافتراضية للخطط">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div className="fg">
@@ -91,12 +90,14 @@ export default function AdminSettingsPage() {
           </div>
         </Card>
 
-        {/* Maintenance */}
         <Card title="وضع الصيانة">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Switch
               checked={settings.maintenance_mode}
-              onChange={val => handleChange('maintenance_mode', val)}
+              onChange={val => {
+                handleChange('maintenance_mode', val);
+                maintenanceMutation.mutate(val ? 'enable' : 'disable');
+              }}
               label="تفعيل وضع الصيانة (جميع المستخدمين العاديين سيرون صفحة الصيانة)"
             />
             {settings.maintenance_mode && (
@@ -113,13 +114,12 @@ export default function AdminSettingsPage() {
           </div>
         </Card>
 
-        {/* Danger Zone */}
         <Card title="منطقة الخطر">
           <AlertBar variant="red">
             هذه الإجراءات لا يمكن التراجع عنها. يُنصح بأخذ نسخة احتياطية أولاً.
           </AlertBar>
-          <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-            <Button variant="danger" onClick={() => { if (confirm('مسح كامل الكاش؟')) adminApi.clearCache(); }}>مسح الكاش</Button>
+          <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
+            <Button variant="danger" onClick={() => { if (confirm('مسح كامل الكاش؟')) cacheMutation.mutate(); }} loading={cacheMutation.isPending}>مسح الكاش</Button>
             <Button variant="danger" onClick={() => { if (confirm('إعادة تشغيل المهام المجدولة؟')) adminApi.runScheduler(); }}>تشغيل المهام</Button>
             <Button variant="danger" onClick={() => { if (confirm('تصدير آخر نسخة احتياطية؟')) adminApi.exportBackup(); }}>نسخ احتياطي</Button>
           </div>
@@ -130,10 +130,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-
-// Add to adminApi
-adminApi.getSystemSettings = () => apiGet<SystemSettings>('/admin/settings');
-adminApi.updateSystemSettings = (data) => apiPatch('/admin/settings', data);
-adminApi.clearCache = () => apiPost('/admin/system/clear-cache');
-adminApi.runScheduler = () => apiPost('/admin/system/run-jobs');
-adminApi.exportBackup = () => apiGet('/admin/system/backup', null, { responseType: 'blob' });
