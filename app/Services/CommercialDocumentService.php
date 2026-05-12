@@ -32,7 +32,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         'documentStatus',
         'lines.product',
     ];
-    protected function getResourceName(): string { return $this->resourceName; }
+    protected function getResourceName(): string
+    {
+        return $this->resourceName;
+    }
 
 
     protected function beforeCreate(array $data, $request): array
@@ -224,52 +227,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         ]);
     }
 
-    private function createStockMovements(CommercialDocument $document): void
-    {
-        $valuationService = app(InventoryValuationService::class);
-
-        foreach ($document->lines as $line) {
-            if (!$line->product) continue;
-
-            $movementType = match ($document->documentType?->code) {
-                'invoice', 'delivery_note' => 'out',
-                'purchase_invoice' => 'in',
-                default => null,
-            };
-            if (!$movementType) continue;
-
-            $costPrice = $movementType === 'out'
-                ? $valuationService->getCostPriceForSale($line->product, $document->warehouse_id, $line->quantity)
-                : $line->unit_price_ht; // للمشتريات، سعر الشراء هو التكلفة
-
-            StockMovement::create([
-                'warehouse_id'           => $document->warehouse_id,
-                'product_id'             => $line->product_id,
-                'stock_movement_type_id' => $this->getStockMovementTypeId($movementType),
-                'commercial_document_id' => $document->id,
-                'commercial_document_line_id' => $line->id,
-                'quantity'               => $line->quantity,
-                'unit_price'             => $line->unit_price_ht,
-                'cost_price'             => $costPrice, // ✅ التعيين الصحيح
-                'total_price'            => $line->quantity * $costPrice,
-                'movement_date'          => $document->document_date,
-                'packaging_id'           => $line->packaging_id ?? null,
-                'price_source'           => $movementType === 'in' ? 'purchase' : 'sale',
-                'is_validated'           => true,
-            ]);
-        }
-    }
 
 
-    private function getStockMovementTypeId(string $type): int
-    {
-        return match ($type) {
-            'in' => 1,
-            'out' => 2,
-            'adjustment' => 3,
-            default => 1,
-        };
-    }
+
+
 
     public function validateDocument(CommercialDocument $document, $request): void
     {
@@ -281,6 +242,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             'validated_at' => now(),
             'validated_by' => $request->user()->id ?? null,
         ]);
+        
+        // إنشاء حركات المخزون بعد الاعتماد
+        $this->createStockMovements($document);
     }
 
     public function lockDocument(CommercialDocument $document): void
@@ -318,5 +282,50 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     public function getOverdue()
     {
         return $this->model::overdue()->with(['party', 'documentType'])->get();
+    }
+
+
+    private function createStockMovements(CommercialDocument $document): void
+    {
+        if (!$document->documentType) return;
+
+        $direction = $document->documentType->affects_stock_direction;
+        if ($direction === 0) return; // لا يؤثر على المخزون
+
+        $valuationService = app(InventoryValuationService::class);
+
+        foreach ($document->lines as $line) {
+            if (!$line->product) continue;
+
+            $costPrice = $direction < 0
+                ? $valuationService->getCostPriceForSale($line->product, $document->warehouse_id, $line->quantity)
+                : $line->unit_price_ht; // مشتريات
+
+            StockMovement::create([
+                'warehouse_id' => $document->warehouse_id,
+                'product_id' => $line->product_id,
+                'stock_movement_type_id' => $this->getStockMovementTypeId($direction),
+                'commercial_document_id' => $document->id,
+                'commercial_document_line_id' => $line->id,
+                'quantity' => $line->quantity,
+                'unit_price' => $line->unit_price_ht,
+                'cost_price' => $costPrice,
+                'total_price' => $line->quantity * $costPrice,
+                'movement_date' => $document->document_date,
+                'packaging_id' => $line->packaging_id ?? null,
+                'price_source' => $direction < 0 ? 'sale' : 'purchase',
+                'is_validated' => true,
+            ]);
+        }
+    }
+
+    private function getStockMovementTypeId(int $direction): int
+    {
+        // يجب أن يكون لديك أنواع حركات للمخزون معرفة مسبقاً (in/out/adjustment)
+        return match (true) {
+            $direction > 0 => 1,  // وارد
+            $direction < 0 => 2,  // صادر
+            default => 3,          // تسوية
+        };
     }
 }
