@@ -1,21 +1,25 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
-const laravelPlugin = laravel.default || laravel;
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const laravelPlugin = laravel.default || laravel;
 
 export default defineConfig({
     plugins: [
         laravelPlugin({
-            input: ['resources/js/app.jsx', 'resources/css/app.css'],
-            buildDirectory: 'build',
+            input: ['resources/js/app.tsx', 'resources/css/app.css'],
             refresh: true,
         }),
-        react(),
+        react({
+            // إخبار الإضافة صراحة بعدم استخدام المحرك القديم
+            babel: {
+                compact: true,
+            }
+        }),
         tailwindcss(),
     ],
     resolve: {
@@ -23,11 +27,18 @@ export default defineConfig({
             '@': path.resolve(__dirname, './resources/js'),
         },
     },
-    build: {
-        outDir: 'public/build',
-        emptyOutDir: true,
+    // الحل المباشر لتحذير optimizeDeps
+    optimizeDeps: {
+        rolldownOptions: {
+            // توجيه Vite لاستخدام التسمية الجديدة للمحرك
+        }
     },
-    publicDir: false,
+    // لإخفاء تحذير esbuild، نحدد المحرك المفضل للـ SSR أيضاً
+    ssr: {
+        optimizeDeps: {
+            rolldownOptions: {}
+        }
+    },
     server: {
         port: 5173,
         host: '127.0.0.1',

@@ -13,7 +13,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Switch from '@/components/ui/Switch';
 import ProgressBar from '@/components/ui/ProgressBar';
 import ProductModal from '@/pages/products/ProductModal';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 
 // ═══════════════════════════════════════════════════════════════════════════

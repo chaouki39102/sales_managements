@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';

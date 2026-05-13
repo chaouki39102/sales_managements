@@ -1,10 +1,11 @@
 // pages/pos/POSPage.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePOS }           from '@/pos/hooks/usePOS';
-import { useVariants }      from '@/hooks/useProducts';
-import { useCustomers }     from '@/hooks/useData';
-import { usePaymentModes, useWarehouses, useCurrentFiscalYear } from '@/hooks/useData';
-import { useDocumentTypes } from '@/hooks/useData';
+import { useClients }                              from '@/lib/api/endpoints/parties';
+import { usePaymentModes, useWarehouses }          from '@/lib/api/endpoints/lookups';
+import { useGlobalDocumentTypes }                  from '@/lib/api/endpoints/lookups';
+import { useFiscalYear }                           from '@/context/FiscalYearContext';
+import apiClient                                   from '@/lib/api/core/client';
 import ProductCard          from '@/pos/components/ProductCard';
 import Cart                 from '@/pos/components/Cart';
 import PaymentModal         from '@/pos/components/PaymentModal';

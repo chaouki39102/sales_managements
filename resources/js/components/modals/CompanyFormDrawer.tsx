@@ -4,8 +4,9 @@
 // ════════════════════════════════════════════════
 import React, { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/coreclient';
 import { useAuth } from '@/context/AuthContext';
+import client from '@/lib/api/core/client';
 
 // ── Types ──────────────────────────────────────
 interface Company {
@@ -177,7 +178,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
         const identifier = company!.slug ?? company!.id;
 
         // ② تحديث البيانات الأساسية
-        const res = await apiClient.put(`/companies/${identifier}`, basicPayload);
+        const res = await client.put(`/companies/${identifier}`, basicPayload);
         const saved = res.data?.data ?? res.data;
 
         // ③ تحديث الخطة — endpoint منفصل لأن PUT لا يحفظها
@@ -186,7 +187,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
           const limitsExist = adminPayload.max_users || adminPayload.max_warehouses || adminPayload.max_products;
 
           if (planChanged || limitsExist) {
-            await apiClient.patch(`/companies/${identifier}/plan`, {
+            await client.patch(`/companies/${identifier}/plan`, {
               plan:           adminPayload.plan ?? form.plan,
               max_users:      adminPayload.max_users      || undefined,
               max_warehouses: adminPayload.max_warehouses || undefined,
@@ -196,7 +197,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
 
           // ④ الملاحظات الداخلية
           if (adminPayload.notes !== undefined) {
-            await apiClient.patch(`/admin/companies/${company!.id}/notes`, {
+            await client.patch(`/companies/${identifier}/notes`, {
               notes: adminPayload.notes,
             });
           }
@@ -205,7 +206,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
         return saved;
       } else {
         // إنشاء جديد — نجمع كل الحقول
-        const res = await apiClient.post('/companies', { ...basicPayload, ...adminPayload });
+        const res = await client.post('/companies', { ...basicPayload, ...adminPayload });
         return res.data?.data ?? res.data;
       }
     },

@@ -11,7 +11,7 @@ import KpiCard       from '@/components/ui/KpiCard';
 import Switch        from '@/components/ui/Switch';
 import EmptyState    from '@/components/ui/EmptyState';
 import AlertBar      from '@/components/ui/AlertBar';
-import apiClient     from '@/lib/api/client';
+import apiClient     from '@/lib/api/core/client';
 import type { TreasuryAccount, PaymentMode } from '@/types';
 
 // ─── helper: استخراج data بأمان من أي هيكل استجابة ───────────────────────────

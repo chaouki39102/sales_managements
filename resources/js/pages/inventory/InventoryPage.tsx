@@ -1,8 +1,8 @@
 // pages/inventory/InventoryPage.tsx
 import React, { useState } from 'react';
 import { useQuery }       from '@tanstack/react-query';
-import { useLowStockVariants } from '@/hooks/useProducts';
-import { useWarehouses, useFamilies } from '@/hooks/useData';
+import { useWarehouses, useFamilies } from '@/lib/api/endpoints/lookups';
+import apiClient from '@/lib/api/core/client';
 import { useModal }       from '@/hooks/useModal';
 import PageHeader         from '@/components/ui/PageHeader';
 import Card               from '@/components/ui/Card';
@@ -12,7 +12,7 @@ import Modal              from '@/components/ui/Modal';
 import KpiCard            from '@/components/ui/KpiCard';
 import ProgressBar        from '@/components/ui/ProgressBar';
 import AlertBar           from '@/components/ui/AlertBar';
-import { variantsApi }   from '@/lib/api';
+
 import type { ProductVariant } from '@/types';
 
 export default function InventoryPage() {

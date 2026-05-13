@@ -14,7 +14,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import AlertBar from '@/components/ui/AlertBar';
 import ProgressBar from '@/components/ui/ProgressBar';
 import EmptyState from '@/components/ui/EmptyState';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { FiscalYear } from '@/types';
 
 // ─────────────────────────────────────────────────────────────

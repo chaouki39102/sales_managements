@@ -5,7 +5,7 @@ import PageHeader  from '@/components/ui/PageHeader';
 import Card        from '@/components/ui/Card';
 import Button      from '@/components/ui/Button';
 import Switch      from '@/components/ui/Switch';
-import apiClient   from '@/lib/api/client';
+import apiClient   from '@/lib/api/core/client';
 import type { Setting } from '@/types';
 
 // ── Tab definitions ───────────────────────────────

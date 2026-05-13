@@ -12,7 +12,7 @@ import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
 import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { Employee } from '@/types';
 
 export default function EmployeesPage() {

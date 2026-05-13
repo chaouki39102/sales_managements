@@ -14,7 +14,7 @@
 // ════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 // ✅ المودال الجديد الشامل
 import { CreateCompanyModal } from '@/components/modals/CreateCompanyModal';

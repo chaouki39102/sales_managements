@@ -270,7 +270,7 @@ export function useCancelInvoice() {
 // Hook عام لصفحات الجداول البسيطة (CRUD)
 // ════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 export interface LookupState<T> {
   items:    T[];

@@ -1387,7 +1387,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useFiscalYear, FiscalYearSelector } from '@/context/FiscalYearContext';
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/hooks/useTheme';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -2175,7 +2175,7 @@ export default function DashboardLayout() {
 // ════════════════════════════════════════════════
 import React, { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 
 // ── Types ──────────────────────────────────────
@@ -2720,7 +2720,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
 //   الخطوة 2: السنة المالية الأولى (إلزامية)
 // ════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback } from "react";
-import apiClient from "@/lib/api/client";
+import apiClient from "@/lib/api/core/client";
 
 // ── Types ─────────────────────────────────────────────────────────
 interface Company {
@@ -4355,7 +4355,7 @@ export default CreateCompanyModal;
 // components/modals/DataSeedingModal.tsx — تصميم جديد عصري
 // ════════════════════════════════════════════════════════════════════
 import React, { useState, useCallback, useRef } from 'react';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 
@@ -9763,7 +9763,7 @@ export default function AdminUsersPage() {
 // ════════════════════════════════════════════════════════════
 import React, { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 
 import Card         from '@/components/ui/Card';
@@ -11225,7 +11225,7 @@ export default function LoginPage() {
 // pages/auth/RegisterPage.tsx
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import apiClient, { setAuthToken } from "@/lib/api/client";
+import apiClient, { setAuthToken } from "@/lib/api/core/client";
 import type { User } from "@/types";
 
 // ── Password strength helper ──────────────────────────────────────────────────
@@ -12526,7 +12526,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import ProgressBar from '@/components/ui/ProgressBar';
 import Avatar from '@/components/ui/Avatar';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { CommercialDocument } from '@/types';
 
 export default function DebtsPage() {
@@ -12859,7 +12859,7 @@ function DebtDetailModal({ open, doc, onClose }: {
 // ════════════════════════════════════════════════
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type { DocumentType } from '@/types';
 
@@ -13628,7 +13628,7 @@ function today(): string {
 import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import CommercialDocumentModal from './CommercialDocumentModal';
 import type { DocumentType } from '@/types';
@@ -14032,7 +14032,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // --------------- Types ---------------
 interface Expense {
@@ -14488,7 +14488,7 @@ import KpiCard       from '@/components/ui/KpiCard';
 import Switch        from '@/components/ui/Switch';
 import EmptyState    from '@/components/ui/EmptyState';
 import AlertBar      from '@/components/ui/AlertBar';
-import apiClient     from '@/lib/api/client';
+import apiClient     from '@/lib/api/core/client';
 import type { TreasuryAccount, PaymentMode } from '@/types';
 
 // ─── helper: استخراج data بأمان من أي هيكل استجابة ───────────────────────────
@@ -15265,7 +15265,7 @@ import KpiCard     from '@/components/ui/KpiCard';
 import EmptyState  from '@/components/ui/EmptyState';
 import AlertBar    from '@/components/ui/AlertBar';
 import Switch      from '@/components/ui/Switch';
-import apiClient   from '@/lib/api/client';
+import apiClient   from '@/lib/api/core/client';
 
 // ─── helper: استخراج البيانات من أي هيكل استجابة ────────────────────────────
 function extractList<T>(res: any): T[] {
@@ -15928,7 +15928,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import AlertBar from '@/components/ui/AlertBar';
 import ProgressBar from '@/components/ui/ProgressBar';
 import EmptyState from '@/components/ui/EmptyState';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { FiscalYear } from '@/types';
 
 // ─────────────────────────────────────────────────────────────
@@ -17814,7 +17814,7 @@ export default function FamiliesPage() {
 // ════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLookup } from '@/hooks/useLookup';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ── Types ──────────────────────────────────────
 export interface FieldDef {
@@ -18465,7 +18465,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // =============== Types ===============
 interface NumberingSeriesRecord {
@@ -19265,7 +19265,7 @@ export default function WarehousesPage() {
 // ════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 // ✅ المودال الجديد الشامل
 import { CreateCompanyModal } from '@/components/modals/CreateCompanyModal';
@@ -20993,7 +20993,7 @@ import Button from '@/components/ui/Button';
 import Switch from '@/components/ui/Switch';
 import Badge from '@/components/ui/Badge';
 import AlertBar from '@/components/ui/AlertBar';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -22056,7 +22056,7 @@ import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
 import ProgressBar from '@/components/ui/ProgressBar';
 import ProductModal from '@/components/products/ProductModal';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -22550,7 +22550,7 @@ import Button from '@/components/ui/Button';
 import KpiCard from '@/components/ui/KpiCard';
 import AlertBar from '@/components/ui/AlertBar';
 import ProgressBar from '@/components/ui/ProgressBar';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 
 // ─────────────────────────────────────────────────────────────
@@ -22903,7 +22903,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { DocumentType } from '@/types';
 
 // ===============================================
@@ -23362,7 +23362,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // --------------- Types ---------------
 interface PaymentMethod {
@@ -23780,7 +23780,7 @@ import PageHeader  from '@/components/ui/PageHeader';
 import Card        from '@/components/ui/Card';
 import Button      from '@/components/ui/Button';
 import Switch      from '@/components/ui/Switch';
-import apiClient   from '@/lib/api/client';
+import apiClient   from '@/lib/api/core/client';
 import type { Setting } from '@/types';
 
 // ── Tab definitions ───────────────────────────────
@@ -24195,7 +24195,7 @@ function BackupPanel() {
 // ════════════════════════════════════════════════════════════
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ════════════════════════════════════════════════════════════
 // Types
@@ -24760,7 +24760,7 @@ export default function SetupHub({ companySlug, onFinish }: Props) {
 // معالج الإعداد الأولي للمؤسسة — 4 خطوات
 // ════════════════════════════════════════════════
 import React, { useState, useCallback } from 'react';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ── Types ──────────────────────────────────────────
 interface CompanyForm {
@@ -25291,7 +25291,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { Party } from '@/types';
 
 export default function SuppliersPage() {
@@ -25578,7 +25578,7 @@ import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
 import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { Employee } from '@/types';
 
 export default function EmployeesPage() {
@@ -25924,7 +25924,7 @@ const saveMutation = useMutation({
 // ════════════════════════════════════════════════════════════
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -26173,7 +26173,7 @@ export default function RolesPage() {
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
-import apiClient from "@/lib/api/client";
+import apiClient from "@/lib/api/core/client";
 
 // ─── Types ─────────────────────────────────────
 interface Permission {
@@ -29636,7 +29636,7 @@ export function useCancelInvoice() {
 // Hook عام لصفحات الجداول البسيطة (CRUD)
 // ════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 export interface LookupState<T> {
   items:    T[];
@@ -30382,7 +30382,7 @@ export const useUIStore = cr<UIState>()(
 // context/AuthContext.tsx
 // ════════════════════════════════════════════════
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import apiClient, { setAuthToken, clearAuthToken, getAuthToken } from '@/lib/api/client';
+import apiClient, { setAuthToken, clearAuthToken, getAuthToken } from '@/lib/api/core/client';
 import type { User, LoginCredentials } from '@/types';
 
 // ── Storage key للشركة النشطة ──────────────────
@@ -30506,7 +30506,7 @@ import React, {
 } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { FiscalYear } from '@/types';
 
 // ── Types ───────────────────────────────────────
@@ -30725,8 +30725,8 @@ function _fmt(date: unknown): string {
 // الإصدار المُصلح: يعمل فقط بعد التوثيق
 // ════════════════════════════════════════════════
 import { useState, useEffect } from 'react';
-import apiClient from '@/lib/api/client';
-import { getAuthToken } from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
+import { getAuthToken } from '@/lib/api/core/client';
 
 const SETUP_KEY = 'setup_completed';
 
@@ -30811,7 +30811,7 @@ export { default } from './api/client';
 // lib/api/admin.ts — النسخة الكاملة
 // جميع endpoints الـ Super Admin
 // ════════════════════════════════════════════════
-import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '@/lib/api/client';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '@/lib/api/core/client';
 import type {
   AdminCompany, AdminUser, AdminPlan, AdminStats, ActivityLog,
   PaginatedResponse, AdminCompaniesParams, AdminUsersParams,

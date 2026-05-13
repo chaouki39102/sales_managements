@@ -5,7 +5,7 @@
 //   الخطوة 2: السنة المالية الأولى (إلزامية)
 // ════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback } from "react";
-import apiClient from "@/lib/api/client";
+import client from "@/lib/api/core/client";
 
 // ── Types ─────────────────────────────────────────────────────────
 interface Company {
@@ -232,7 +232,7 @@ function StepCompany({
             if (rc.trim()) payload.rc = rc.trim();
             if (ai.trim()) payload.ai = ai.trim();
 
-            const res = await apiClient.post("/companies", payload);
+            const res = await client.post("/companies", payload);
             const company: Company = res.data?.data ?? res.data;
             onNext(company);
         } catch (e: any) {
@@ -817,7 +817,7 @@ function StepFiscalYear({
                 }),
             );
 
-            const res = await apiClient.post(`/${company.slug}/fiscal-years`, {
+            const res = await client.post(`/${company.slug}/fiscal-years`, {
                 name: yearNum,
                 start_date: startDate,
                 end_date: endDate,

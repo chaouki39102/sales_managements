@@ -3634,7 +3634,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useFiscalYear, FiscalYearSelector } from '@/context/FiscalYearContext';
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/hooks/useTheme';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -4422,7 +4422,7 @@ export default function DashboardLayout() {
 // ════════════════════════════════════════════════
 import React, { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 
 // ── Types ──────────────────────────────────────
@@ -4967,7 +4967,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
 //   الخطوة 2: السنة المالية الأولى (إلزامية)
 // ════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback } from 'react';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ── Types ─────────────────────────────────────────────────────────
 interface Company {

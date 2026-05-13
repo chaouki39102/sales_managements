@@ -1,272 +1,248 @@
-// routes/index.tsx
-import React, { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
-import DashboardLayout from "@/components/layouts/DashboardLayout";
-import AdminActivityPage from "@/pages/admin/AdminActivityPage";
-import AdminReportsPage from "@/pages/admin/AdminReportsPage";
-import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
+// ════════════════════════════════════════════════════════════════════════════
+// routes/index.tsx — Routing الكامل للنظام
+// ════════════════════════════════════════════════════════════════════════════
+import React, { lazy, Suspense } from 'react';
+import { Navigate, Route, Routes, Outlet } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
+import { useActiveCompany } from '@/lib/store/appStore';
 
-// Admin pages
-const AdminLayout = lazy(() => import("@/components/layouts/AdminLayout"));
-const AdminDashboardPage = lazy(
-    () => import("@/pages/admin/AdminDashboardPage"),
-);
-const AdminCompaniesPage = lazy(
-    () => import("@/pages/admin/AdminCompaniesPage"),
-);
-const AdminUsersPage = lazy(() => import("@/pages/admin/AdminUsersPage"));
-const AdminPlansPage = lazy(() => import("@/pages/admin/AdminPlansPage"));
+// ── Layouts ────────────────────────────────────────────────────────────────
+const DashboardLayout = lazy(() => import('@/components/layouts/DashboardLayout'));
+const AdminLayout     = lazy(() => import('@/components/layouts/AdminLayout'));
 
-// Lazy pages
-const LoginPage = lazy(() => import("@/pages/auth/LoginPage"));
-const RegisterPage = lazy(() => import("@/pages/auth/RegisterPage"));
-const OnboardingPage = lazy(() => import("@/pages/onboarding/OnboardingPage"));
-const DashboardPage = lazy(() => import("@/pages/dashboard/DashboardPage"));
-const POSPage = lazy(() => import("@/pages/pos/POSPage"));
-const InvoicesPage = lazy(() => import("@/pages/invoices/InvoicesPage"));
-const ProductsPage = lazy(() => import("@/pages/products/ProductsPage"));
-const InventoryPage = lazy(() => import("@/pages/inventory/InventoryPage"));
-const ClientsPage = lazy(() => import("@/pages/clients/ClientsPage"));
-const SuppliersPage = lazy(() => import("@/pages/suppliers/SuppliersPage"));
-const FinancePage = lazy(() => import("@/pages/finance/FinancePage"));
-const ExpensesPage = lazy(() => import("@/pages/expenses/ExpensesPage"));
-const ReportsPage = lazy(() => import("@/pages/reports/ReportsPage"));
-const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage"));
-const UsersPage = lazy(() => import("@/pages/users/UsersPage"));
-const EmployeesPage = lazy(() => import("@/pages/users/EmployeesPage"));
-const FiscalYearsPage = lazy(() => import("@/pages/fiscal/FiscalYearsPage"));
-const TvaPage = lazy(() => import("@/pages/fiscal/TvaPage"));
-const DebtsPage = lazy(() => import("@/pages/debts/DebtsPage"));
-const DocumentTypesPage = lazy(
-    () => import("@/pages/settings/DocumentTypesPage"),
-);
-const CommercialDocumentsPage = lazy(
-    () => import("@/pages/documents/CommercialDocumentsPage"),
-);
-const NumberingSeriesPage = lazy(
-    () => import("@/pages/lookups/NumberingSeriesPage"),
-);
-const PaymentMethodsPage = lazy(
-    () => import("@/pages/settings/PaymentMethodsPage"),
-);
-const BrandsPage = lazy(() => import("@/pages/lookups/BrandsPage"));
-const FamiliesPage = lazy(() => import("@/pages/lookups/FamiliesPage"));
-const UnitsPage = lazy(() => import("@/pages/lookups/UnitsPage"));
-const CurrenciesPage = lazy(() => import("@/pages/lookups/CurrenciesPage"));
-const WarehousesPage = lazy(() => import("@/pages/lookups/WarehousesPage"));
-const PriceLevelsPage = lazy(() => import("@/pages/lookups/PriceLevelsPage"));
-const TvasPage = lazy(() => import("@/pages/lookups/TvasPage"));
-const ExpenseCategoriesPage = lazy(
-    () => import("@/pages/lookups/ExpenseCategoriesPage"),
-);
-const RolesPage = lazy(() => import("@/pages/users/RolesPage"));
+// ── Auth & Onboarding ──────────────────────────────────────────────────────
+const LoginPage      = lazy(() => import('@/pages/auth/LoginPage'));
+const RegisterPage   = lazy(() => import('@/pages/auth/RegisterPage'));
+const OnboardingPage = lazy(() => import('@/pages/onboarding/OnboardingPage'));
 
+// ── Dashboard ──────────────────────────────────────────────────────────────
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
+
+// ── Documents / POS ────────────────────────────────────────────────────────
+const CommercialDocumentsPage = lazy(() => import('@/pages/documents/CommercialDocumentsPage'));
+const InvoicesPage            = lazy(() => import('@/pages/invoices/InvoicesPage'));
+const POSPage                 = lazy(() => import('@/pages/pos/POSPage'));
+
+// ── Products / Inventory ───────────────────────────────────────────────────
+const ProductsPage   = lazy(() => import('@/pages/products/ProductsPage'));
+const InventoryPage  = lazy(() => import('@/pages/inventory/InventoryPage'));
+
+// ── Parties ────────────────────────────────────────────────────────────────
+const ClientsPage   = lazy(() => import('@/pages/clients/ClientsPage'));
+const SuppliersPage = lazy(() => import('@/pages/suppliers/SuppliersPage'));
+
+// ── Finance ────────────────────────────────────────────────────────────────
+const FinancePage  = lazy(() => import('@/pages/finance/FinancePage'));
+const ExpensesPage = lazy(() => import('@/pages/expenses/ExpensesPage'));
+const DebtsPage    = lazy(() => import('@/pages/debts/DebtsPage'));
+const TvaPage      = lazy(() => import('@/pages/fiscal/TvaPage'));
+
+// ── Fiscal / Reports ───────────────────────────────────────────────────────
+const FiscalYearsPage = lazy(() => import('@/pages/fiscal/FiscalYearsPage'));
+const ReportsPage     = lazy(() => import('@/pages/reports/ReportsPage'));
+
+// ── Users / Roles / Employees ─────────────────────────────────────────────
+const UsersPage     = lazy(() => import('@/pages/users/UsersPage'));
+const RolesPage     = lazy(() => import('@/pages/users/RolesPage'));
+const EmployeesPage = lazy(() => import('@/pages/users/EmployeesPage'));
+
+// ── Settings ───────────────────────────────────────────────────────────────
+const SettingsPage      = lazy(() => import('@/pages/settings/SettingsPage'));
+const DocumentTypesPage = lazy(() => import('@/pages/settings/DocumentTypesPage'));
+const PaymentMethodsPage= lazy(() => import('@/pages/settings/PaymentMethodsPage'));
+
+// ── Tenant Lookups ─────────────────────────────────────────────────────────
+const FamiliesPage          = lazy(() => import('@/pages/lookups/FamiliesPage'));
+const BrandsPage            = lazy(() => import('@/pages/lookups/BrandsPage'));
+const UnitsPage             = lazy(() => import('@/pages/lookups/UnitsPage'));
+const WarehousesPage        = lazy(() => import('@/pages/lookups/WarehousesPage'));
+const PriceLevelsPage       = lazy(() => import('@/pages/lookups/PriceLevelsPage'));
+const NumberingSeriesPage   = lazy(() => import('@/pages/lookups/NumberingSeriesPage'));
+const ExpenseCategoriesPage = lazy(() => import('@/pages/lookups/ExpenseCategoriesPage'));
+
+// ── Global Lookups ─────────────────────────────────────────────────────────
+const CurrenciesPage = lazy(() => import('@/pages/lookups/CurrenciesPage'));
+const TvasPage       = lazy(() => import('@/pages/lookups/TvasPage'));
+
+// ── Admin Panel ────────────────────────────────────────────────────────────
+const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'));
+const AdminCompaniesPage = lazy(() => import('@/pages/admin/AdminCompaniesPage'));
+const AdminUsersPage     = lazy(() => import('@/pages/admin/AdminUsersPage'));
+const AdminActivityPage  = lazy(() => import('@/pages/admin/AdminActivityPage'));
+const AdminSettingsPage  = lazy(() => import('@/pages/admin/AdminSettingsPage'));
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Loader
+// ─────────────────────────────────────────────────────────────────────────────
 function PageLoader() {
-    return (
-        <div
-            style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100vh",
-                background: "var(--bg0)",
-            }}
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100vh', background: 'var(--bg0)',
+    }}>
+      <span className="ic ic-xl" style={{ color: 'var(--em)' }}>
+        <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+      </span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Guards
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** يتطلب تسجيل دخول فقط */
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <PageLoader />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+/** تسجيل دخول + لا شركة نشطة */
+function RequireNoCompany({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const activeCompany = useActiveCompany();
+  if (isLoading) return <PageLoader />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (activeCompany?.slug) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
+/** تسجيل دخول + شركة نشطة */
+function RequireCompany({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const activeCompany = useActiveCompany();
+  if (isLoading) return <PageLoader />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!activeCompany?.slug) return <Navigate to="/onboarding" replace />;
+  return <>{children}</>;
+}
+
+/** Super Admin فقط */
+function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <PageLoader />;
+  const isSuperAdmin = (user as any)?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
+  if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AppRoutes
+// ─────────────────────────────────────────────────────────────────────────────
+export function AppRoutes() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+
+        {/* ① Auth */}
+        <Route path="/login"    element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+
+        {/* ② Onboarding */}
+        <Route
+          path="/onboarding"
+          element={
+            <RequireNoCompany>
+              <OnboardingPage />
+            </RequireNoCompany>
+          }
+        />
+
+        {/* ③ App — يتطلب شركة نشطة */}
+        <Route
+          element={
+            <RequireCompany>
+              <Suspense fallback={<PageLoader />}>
+                <DashboardLayout />
+              </Suspense>
+            </RequireCompany>
+          }
         >
-            <i
-                className="ti ti-loader"
-                style={{
-                    fontSize: 28,
-                    color: "var(--em)",
-                    animation: "spin 1s linear infinite",
-                }}
-            />
-        </div>
-    );
-}
+          <Route index element={<Navigate to="/dashboard" replace />} />
 
-// Coming Soon fallback
-function ComingSoon() {
-    return (
-        <div className="page on">
-            <div className="empty" style={{ paddingTop: 80 }}>
-                <div className="empty-ic">
-                    <i className="ti ti-hammer" />
-                </div>
-                <div className="empty-tx">هذه الصفحة قيد الإنشاء</div>
-                <div className="empty-sub">سيتم إضافتها قريباً</div>
-            </div>
-        </div>
-    );
-}
+          {/* Dashboard */}
+          <Route path="dashboard" element={<DashboardPage />} />
 
-// ═════════════════════════════════════════════════════
-// 1. OnboardingRoute – العقل المدبّر للتوجيه بعد الدخول
-// ═════════════════════════════════════════════════════
-function OnboardingRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading, activeCompany, user } = useAuth();
+          {/* POS */}
+          <Route path="pos"      element={<POSPage />} />
+          <Route path="invoices" element={<InvoicesPage />} />
 
-    const isSuperAdmin =
-        (user as any)?.roles?.some((r: any) => r.name === "super-admin") ??
-        false;
+          {/* Documents */}
+          <Route path="documents/:typeCode" element={<CommercialDocumentsPage />} />
 
-    if (isLoading) return <PageLoader />;
-    if (!isAuthenticated) return <Navigate to="/login" replace />;
+          {/* Products */}
+          <Route path="products"  element={<ProductsPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
 
-    // Super Admin → لوحة الإدارة فوراً
-    if (isSuperAdmin) return <Navigate to="/admin" replace />;
+          {/* Parties */}
+          <Route path="clients"   element={<ClientsPage />} />
+          <Route path="suppliers" element={<SuppliersPage />} />
 
-    // مستخدم عادي لديه شركة نشطة → لوحة التحكم
-    if (activeCompany?.slug) return <Navigate to="/dashboard" replace />;
+          {/* Finance */}
+          <Route path="finance"  element={<FinancePage />} />
+          <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="debts"    element={<DebtsPage />} />
+          <Route path="tva"      element={<TvaPage />} />
 
-    // غير ذلك → أظهر واجهة الاختيار (Onboarding)
-    return <>{children}</>;
-}
+          {/* Fiscal */}
+          <Route path="fiscalyears" element={<FiscalYearsPage />} />
 
-// ═════════════════════════════════════════════════════
-// 2. AppRoute – يضمن وجود شركة نشطة (لغير السوبر أدمن)
-// ═════════════════════════════════════════════════════
-function AppRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading, activeCompany, user } = useAuth();
+          {/* Reports */}
+          <Route path="reports" element={<ReportsPage />} />
 
-    const isSuperAdmin =
-        (user as any)?.roles?.some((r: any) => r.name === "super-admin") ??
-        false;
+          {/* HR */}
+          <Route path="employees" element={<EmployeesPage />} />
 
-    if (isLoading) return <PageLoader />;
-    if (!isAuthenticated) return <Navigate to="/login" replace />;
+          {/* Users */}
+          <Route path="users" element={<UsersPage />} />
+          <Route path="roles" element={<RolesPage />} />
 
-    // Super Admin يمكنه المرور بدون شركة نشطة
-    if (isSuperAdmin && !activeCompany?.slug) return <>{children}</>;
+          {/* Settings */}
+          <Route path="settings"                element={<SettingsPage />} />
+          <Route path="settings/document-types" element={<DocumentTypesPage />} />
+          <Route path="payment-methods"         element={<PaymentMethodsPage />} />
 
-    // مستخدم عادي بدون شركة → Onboarding
-    if (!activeCompany?.slug) return <Navigate to="/onboarding" replace />;
+          {/* Tenant Lookups */}
+          <Route path="categories"        element={<FamiliesPage />} />
+          <Route path="brands"            element={<BrandsPage />} />
+          <Route path="units"             element={<UnitsPage />} />
+          <Route path="warehouses"        element={<WarehousesPage />} />
+          <Route path="pricelevels"       element={<PriceLevelsPage />} />
+          <Route path="numbering-series"  element={<NumberingSeriesPage />} />
+          <Route path="expense-categories" element={<ExpenseCategoriesPage />} />
 
-    return <>{children}</>;
-}
+          {/* Global Lookups */}
+          <Route path="currencies" element={<CurrenciesPage />} />
+          <Route path="tvas"       element={<TvasPage />} />
+        </Route>
 
-// ═════════════════════════════════════════════════════
-// 3. AdminRoute – يحمي لوحة الإدارة للمشرف العام فقط
-// ═════════════════════════════════════════════════════
-function AdminRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading, user } = useAuth();
+        {/* ④ Admin Panel */}
+        <Route
+          path="/admin"
+          element={
+            <RequireSuperAdmin>
+              <RequireAuth>
+                <Suspense fallback={<PageLoader />}>
+                  <AdminLayout />
+                </Suspense>
+              </RequireAuth>
+            </RequireSuperAdmin>
+          }
+        >
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="companies" element={<AdminCompaniesPage />} />
+          <Route path="users"     element={<AdminUsersPage />} />
+          <Route path="activity"  element={<AdminActivityPage />} />
+          <Route path="settings"  element={<AdminSettingsPage />} />
+        </Route>
 
-    if (isLoading) return <PageLoader />;
-    if (!isAuthenticated) return <Navigate to="/login" replace />;
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
 
-    const isSuperAdmin =
-        (user as any)?.roles?.some((r: any) => r.name === "super-admin") ??
-        false;
-    if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
-
-    return <>{children}</>;
-}
-
-// ═════════════════════════════════════════════════════
-// 4. التوجيهات الرئيسية
-// ═════════════════════════════════════════════════════
-export default function AppRoutes() {
-    return (
-        <Suspense fallback={<PageLoader />}>
-            <Routes>
-                {/* Public */}
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-
-                {/* Onboarding – يحوي التوجيه الذكي */}
-                <Route
-                    path="/onboarding"
-                    element={
-                        <OnboardingRoute>
-                            <OnboardingPage />
-                        </OnboardingRoute>
-                    }
-                />
-
-                {/* لوحة الإدارة للمشرف العام */}
-                <Route
-                    path="/admin"
-                    element={
-                        <AdminRoute>
-                            <AdminLayout />
-                        </AdminRoute>
-                    }
-                >
-                    <Route index element={<AdminDashboardPage />} />
-                    <Route path="companies" element={<AdminCompaniesPage />} />
-                    <Route path="users" element={<AdminUsersPage />} />
-                    <Route path="plans" element={<AdminPlansPage />} />
-                    <Route path="activity" element={<AdminActivityPage />} />
-                    <Route path="settings" element={<AdminSettingsPage />} />
-                    <Route path="reports" element={<AdminReportsPage />} />
-                </Route>
-
-                {/* التطبيق الرئيسي (يتطلب شركة نشطة) */}
-                <Route
-                    element={
-                        <AppRoute>
-                            <DashboardLayout />
-                        </AppRoute>
-                    }
-                >
-                    <Route
-                        index
-                        element={<Navigate to="/dashboard" replace />}
-                    />
-                    <Route path="dashboard" element={<DashboardPage />} />
-                    <Route path="pos" element={<POSPage />} />
-                    <Route path="invoices" element={<InvoicesPage />} />
-                    <Route path="products" element={<ProductsPage />} />
-                    <Route
-                        path="documents/:typeCode"
-                        element={<CommercialDocumentsPage />}
-                    />
-                    <Route path="inventory" element={<InventoryPage />} />
-                    <Route path="clients" element={<ClientsPage />} />
-                    <Route path="suppliers" element={<SuppliersPage />} />
-                    <Route path="finance" element={<FinancePage />} />
-                    <Route path="expenses" element={<ExpensesPage />} />
-                    <Route path="debts" element={<DebtsPage />} />
-                    <Route path="tva" element={<TvaPage />} />
-                    <Route path="fiscal" element={<ComingSoon />} />
-                    <Route path="fiscalyears" element={<FiscalYearsPage />} />
-                    <Route path="reports" element={<ReportsPage />} />
-                    <Route path="balance" element={<ComingSoon />} />
-                    <Route path="users" element={<UsersPage />} />
-                    <Route path="roles" element={<RolesPage />} />
-                    <Route path="employees" element={<EmployeesPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
-                    <Route
-                        path="settings/document-types"
-                        element={<DocumentTypesPage />}
-                    />
-                    <Route path="categories" element={<FamiliesPage />} />
-                    <Route path="brands" element={<BrandsPage />} />
-                    <Route path="units" element={<UnitsPage />} />
-                    <Route path="warehouses" element={<WarehousesPage />} />
-                    <Route path="currencies" element={<CurrenciesPage />} />
-                    <Route path="pricelevels" element={<PriceLevelsPage />} />
-                    <Route path="tvas" element={<TvasPage />} />
-                    <Route
-                        path="payment-methods"
-                        element={<PaymentMethodsPage />}
-                    />
-                    <Route
-                        path="numbering-series"
-                        element={<NumberingSeriesPage />}
-                    />
-                    <Route
-                        path="expense-categories"
-                        element={<ExpenseCategoriesPage />}
-                    />
-                </Route>
-
-                <Route
-                    path="*"
-                    element={<Navigate to="/dashboard" replace />}
-                />
-            </Routes>
-        </Suspense>
-    );
+      </Routes>
+    </Suspense>
+  );
 }

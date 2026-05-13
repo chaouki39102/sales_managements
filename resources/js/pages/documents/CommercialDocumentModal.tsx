@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type { DocumentType } from '@/types';
 

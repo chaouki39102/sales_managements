@@ -1,6 +1,6 @@
 // resources/js/pages/suppliers/SuppliersPage.tsx
 import React, { useState, useEffect } from 'react';
-import { useSuppliers, useCreateParty, useUpdateParty } from '@/hooks/useData';
+import { useSuppliers, usePartyMutations } from '@/lib/api/endpoints/parties';
 import { useModal } from '@/hooks/useModal';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -14,7 +14,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { Party } from '@/types';
 
 export default function SuppliersPage() {

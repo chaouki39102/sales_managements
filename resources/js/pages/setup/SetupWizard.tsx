@@ -3,7 +3,7 @@
 // معالج الإعداد الأولي للمؤسسة — 4 خطوات
 // ════════════════════════════════════════════════
 import React, { useState, useCallback } from 'react';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ── Types ──────────────────────────────────────────
 interface CompanyForm {

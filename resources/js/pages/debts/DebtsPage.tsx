@@ -11,7 +11,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import ProgressBar from '@/components/ui/ProgressBar';
 import Avatar from '@/components/ui/Avatar';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { CommercialDocument } from '@/types';
 
 export default function DebtsPage() {

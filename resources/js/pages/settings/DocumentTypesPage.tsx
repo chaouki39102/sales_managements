@@ -12,7 +12,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import type { DocumentType } from '@/types';
 
 // ===============================================

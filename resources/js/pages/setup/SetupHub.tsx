@@ -5,7 +5,7 @@
 // ════════════════════════════════════════════════════════════
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ════════════════════════════════════════════════════════════
 // Types

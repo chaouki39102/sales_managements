@@ -12,7 +12,7 @@ import Button from '@/components/ui/Button';
 import KpiCard from '@/components/ui/KpiCard';
 import AlertBar from '@/components/ui/AlertBar';
 import ProgressBar from '@/components/ui/ProgressBar';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 
 // ─────────────────────────────────────────────────────────────

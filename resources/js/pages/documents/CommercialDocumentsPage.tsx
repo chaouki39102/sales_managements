@@ -5,7 +5,7 @@
 import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import CommercialDocumentModal from './CommercialDocumentModal';
 import type { DocumentType } from '@/types';

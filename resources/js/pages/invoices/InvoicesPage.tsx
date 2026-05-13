@@ -1,8 +1,10 @@
 // pages/invoices/InvoicesPage.tsx
 import React, { useState, useCallback, useMemo } from 'react';
-import { useInvoices, useCreateInvoice, useValidateInvoice, useCancelInvoice } from '@/hooks/useInvoices';
-import { useCustomers } from '@/hooks/useData';
-import { useWarehouses, useCurrentFiscalYear, useDocumentTypes, usePaymentModes } from '@/hooks/useData';
+import { useDocuments, useDocumentMutations }      from '@/lib/api/endpoints/document';
+import { useClients }                              from '@/lib/api/endpoints/parties';
+import { useWarehouses, usePaymentModes, useGlobalDocumentTypes } from '@/lib/api/endpoints/lookups';
+import { useFiscalYear }                           from '@/context/FiscalYearContext';
+
 import { useModal }     from '@/hooks/useModal';
 import PageHeader       from '@/components/ui/PageHeader';
 import Card             from '@/components/ui/Card';
@@ -13,7 +15,6 @@ import KpiCard          from '@/components/ui/KpiCard';
 import Avatar           from '@/components/ui/Avatar';
 import EmptyState       from '@/components/ui/EmptyState';
 import type { CommercialDocument, CommercialDocumentLine, Party } from '@/types';
-import type { InvoiceFilters } from '@/lib/api/invoices';
 
 // ── Status helpers ─────────────────────────────────
 const STATUS_BADGE: Record<string, { label: string; variant: Parameters<typeof Badge>[0]['variant'] }> = {
@@ -369,10 +370,10 @@ function InvoiceDetailModal({ open, invoice, onClose, onValidate, onCancel }: {
 function NewInvoiceModal({ open, onClose, customers }: {
   open: boolean; onClose: () => void; customers: Party[];
 }) {
-  const createMut = useCreateInvoice();
+  const createMut = useDocumentMutations();
   const { data: warehouses   } = useWarehouses();
-  const { data: fiscalYear   } = useCurrentFiscalYear();
-  const { data: docTypes     } = useDocumentTypes();
+  const { fiscalYear   } = useFiscalYear();
+  const { data: docTypes     } = useGlobalDocumentTypes();
   const { data: payModes     } = usePaymentModes();
 
   const [clientId, setClientId] = useState('');

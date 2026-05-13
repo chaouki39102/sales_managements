@@ -1,6 +1,6 @@
 // pages/clients/ClientsPage.tsx
 import React, { useState } from 'react';
-import { useCustomers, useCreateParty, useUpdateParty } from '@/hooks/useData';
+import { useClients, usePartyMutations } from '@/lib/api/endpoints/parties';
 import { useModal } from '@/hooks/useModal';
 import PageHeader   from '@/components/ui/PageHeader';
 import Card         from '@/components/ui/Card';
@@ -18,7 +18,7 @@ export default function ClientsPage() {
   const [editing,  setEditing] = useState<Party | null>(null);
   const modal = useModal();
 
-  const { data, isLoading } = useCustomers({ search: search || undefined, per_page: 30 });
+  const { data, isLoading } = useClients({ search: search || undefined, per_page: 30 });
   const clients = data?.data ?? [];
   const meta    = data?.meta;
 
@@ -28,7 +28,7 @@ export default function ClientsPage() {
   // Stats
   const withDebt    = clients.filter(c => (c.balance ?? 0) > 0).length;
   const totalDebt   = clients.reduce((s, c) => s + (c.balance ?? 0), 0);
-  const totalBusiness = clients.reduce((s, c) => s + (c.total_purchases ?? 0), 0);
+  const totalBusiness = clients.reduce((s, c) => s + (c.total_sales ?? 0), 0);
 
   return (
     <div className="page on" id="p-clients">
@@ -164,8 +164,7 @@ function ClientModal({ open, party, onClose }: {
   open: boolean; party: Party | null; onClose: () => void;
 }) {
   const isEdit    = !!party;
-  const createMut = useCreateParty();
-  const updateMut = useUpdateParty();
+  const { create: createMut, update: updateMut } = usePartyMutations();
 
   const [form, setForm] = useState({
     name:           party?.name            ?? '',

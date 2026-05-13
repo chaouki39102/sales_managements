@@ -5,8 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useFiscalYear, FiscalYearSelector } from '@/context/FiscalYearContext';
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/hooks/useTheme';
-import apiClient from '@/lib/api/client';
-
+import client from '@/lib/api/core/client';
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
   {
@@ -161,7 +160,7 @@ function NoFiscalYearModal({ onCreated }: { onCreated: () => void }) {
     setError('');
     try {
       // ✅ نفس endpoint الذي يستخدمه FiscalYearContext
-      await apiClient.post(`/${activeCompany.slug}/fiscal-years`, {
+      await client.post(`/${activeCompany.slug}/fiscal-years`, {
         name,
         start_date: `${y}-01-01`,
         end_date:   `${y}-12-31`,
@@ -335,7 +334,7 @@ function CompanySwitcher() {
     if (companies.length > 0) return; // cached
     setLoading(true);
     try {
-      const res = await apiClient.get('/companies');
+      const res = await client.get('/companies');
       const raw = res.data?.data ?? res.data;
       setCompanies(Array.isArray(raw) ? raw : (raw?.data ?? []));
     } catch { /* silent */ }
@@ -351,7 +350,7 @@ function CompanySwitcher() {
     if (co.id === activeCompany?.id) { setOpen(false); return; }
     setSwitching(co.id);
     try {
-      await apiClient.post('/companies/switch', { company_id: co.id });
+      await client.post('/companies/switch', { company_id: co.id });
       setActiveCompany({ id: co.id, name: co.name, slug: co.slug });
       setOpen(false);
       // نحذف السنة المالية المخزّنة ونوجّه للـ onboarding لاختيار السنة

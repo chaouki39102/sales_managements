@@ -2,7 +2,7 @@
 // components/modals/DataSeedingModal.tsx — تصميم جديد عصري
 // ════════════════════════════════════════════════════════════════════
 import React, { useState, useCallback, useRef } from 'react';
-import apiClient from '@/lib/api/client';
+import client from '@/lib/api/core/client';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 
@@ -122,7 +122,7 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
       setCurrentLabel(seed.label);
       setLogs(prev => prev.map(l => l.key === seed.key ? { ...l, status: 'running' } : l));
       try {
-        await apiClient.post(`/${companySlug}/seeds/${seed.endpoint}`);
+        await client.post(`/${companySlug}/seeds/${seed.endpoint}`);
         done++;
         setTotalDone(done);
         setLogs(prev => prev.map(l => l.key === seed.key ? { ...l, status: 'done' } : l));

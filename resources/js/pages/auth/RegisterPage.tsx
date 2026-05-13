@@ -1,7 +1,7 @@
 // pages/auth/RegisterPage.tsx
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import apiClient, { setAuthToken } from "@/lib/api/client";
+import apiClient, { setAuthToken } from "@/lib/api/core/client";
 import type { User } from "@/types";
 
 // ── Password strength helper ──────────────────────────────────────────────────

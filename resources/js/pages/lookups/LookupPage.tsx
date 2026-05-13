@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLookup } from '@/hooks/useLookup';
-import apiClient from '@/lib/api/client';
+import apiClient from '@/lib/api/core/client';
 
 // ── Types ──────────────────────────────────────
 export interface FieldDef {

@@ -2,7 +2,8 @@
 // pages/admin/AdminDashboardPage.tsx
 // لوحة تحكم احترافية للسوبر أدمن
 // ════════════════════════════════════════════════
-import { useAdminDashboard } from '@/hooks/useAdmin';
+import { useQuery } from '@tanstack/react-query';
+import apiClient from '@/lib/api/core/client';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -10,6 +11,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import AlertBar from '@/components/ui/AlertBar';
+import { useDashboardStats } from '../../../../merged-files';
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'مجاني', starter: 'مبتدئ', professional: 'احترافي', enterprise: 'مؤسسة', custom: 'مخصص',
@@ -26,7 +28,8 @@ const QUICK_ACTIONS = [
 ];
 
 export default function AdminDashboardPage() {
-  const { data: stats, isLoading, isError, refetch } = useAdminDashboard();
+//   const { data: stats, isLoading, isError, refetch } = useAdminDashboard();
+  const { data: stats, isLoading, isError, refetch } = useDashboardStats();
   const navigate = useNavigate();
 
   if (isLoading) return <div className="empty" style={{ padding: 60 }}><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 24, color: 'var(--em)' }} /> جار التحميل...</div>;

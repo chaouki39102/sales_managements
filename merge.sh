@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-architecture.md"
+OUTPUT="old-merged-pages.md"
 
 > "$OUTPUT"
 
@@ -58,53 +58,15 @@ EXCLUDE=(
 # الأقسام (مصححة)
 # =========================================
 
-# CSS
-merge_section "🎨 STYLES" \
-  \( -iname "*.css" \) "${EXCLUDE[@]}"
 
-# COMPONENTS
-merge_section "🧩 COMPONENTS" \
-  \( -path "*/components/*" \) "${EXCLUDE[@]}"
-
-# PAGES
-merge_section "📄 PAGES" \
-  \( -path "*/pages/*" \) "${EXCLUDE[@]}"
 
 # HOOKS
-merge_section "🧠 HOOKS" \
-  \( -path "*/hooks/*" \) "${EXCLUDE[@]}"
-
-# CONTEXT
-merge_section "🌐 CONTEXT" \
-  \( -path "*/context/*" \) "${EXCLUDE[@]}"
-
-# LIB / API
-merge_section "🔌 API / LIB" \
-  \( -path "*/lib/*" \) "${EXCLUDE[@]}"
-
-  # TYPES
-merge_section "📘 TYPES" \
-  \( -path "*/types/*" \) "${EXCLUDE[@]}"
+merge_section "🧠 pages" \
+  \( -path "*/pages/*" \) "${EXCLUDE[@]}"
 
 
-
-# CONFIG
-merge_section "⚙️ CONFIG" \
-  \( -path "*/config/*" \) "${EXCLUDE[@]}"
-
-
-
-# ROOT FILES
-merge_section "🚀 ROOT FILES" \
-  \( -iname "app.jsx" -o -iname "App.tsx" -o -iname "bootstrap.js" \) "${EXCLUDE[@]}"
-
-# VIEWS
-merge_section "🧾 VIEWS" \
-  \( -iname "*.blade.php" \) "${EXCLUDE[@]}"
-
-
-  # POS
-merge_section "🛒 POS MODULE" \
-  \( -path "*/pos/*" \) "${EXCLUDE[@]}"
+echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"
+echo "==================================================== */" >> "$OUTPUT"
+echo "" >> "$OUTPUT"
 
 echo "✅ Done: $OUTPUT"
