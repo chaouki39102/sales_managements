@@ -22,7 +22,10 @@ class PartyService extends \App\Core\Services\BaseService
     protected string $model = Party::class;
     protected string $resourceName = 'party';
     protected array $defaultWith = ['partyType', 'legalForm', 'commune', 'wilaya'];
-    protected function getResourceName(): string { return $this->resourceName; }
+    protected function getResourceName(): string
+    {
+        return $this->resourceName;
+    }
 
     /**
      * Before creating - data preparation and validation
@@ -193,16 +196,48 @@ class PartyService extends \App\Core\Services\BaseService
     /**
      * Get customers only
      */
-    public function getCustomers()
+    private function getCurrentCompanyId(): int
     {
-        return $this->model::customers()->active()->get();
+        return app(\App\Services\CompanyContextService::class)->get();
     }
 
-    /**
-     * Get suppliers only
-     */
-    public function getSuppliers()
+    public function getCustomers(array $params = [])
     {
-        return $this->model::suppliers()->active()->get();
+        return Party::where('company_id', $this->getCurrentCompanyId())
+            ->customers()
+            ->when(
+                !empty($params['search']),
+                fn($q) =>
+                $q->where(
+                    fn($q2) =>
+                    $q2->where('name', 'like', "%{$params['search']}%")
+                        ->orWhere('phone', 'like', "%{$params['search']}%")
+                        ->orWhere('nif', 'like', "%{$params['search']}%")
+                )
+            )
+            ->where('active', true)
+            ->with(['partyType'])
+            ->orderBy('name')
+            ->paginate($params['per_page'] ?? 30);  // ✅ paginate بدل get
+    }
+
+    public function getSuppliers(array $params = [])
+    {
+        return Party::where('company_id', $this->getCurrentCompanyId())
+            ->suppliers()
+            ->when(
+                !empty($params['search']),
+                fn($q) =>
+                $q->where(
+                    fn($q2) =>
+                    $q2->where('name', 'like', "%{$params['search']}%")
+                        ->orWhere('phone', 'like', "%{$params['search']}%")
+                        ->orWhere('nif', 'like', "%{$params['search']}%")
+                )
+            )
+            ->where('active', true)
+            ->with(['partyType'])
+            ->orderBy('name')
+            ->paginate($params['per_page'] ?? 30);  // ✅ paginate بدل get
     }
 }

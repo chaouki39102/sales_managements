@@ -1,6 +1,7 @@
 // pages/admin/AdminUsersPage.tsx
 import { useState, useMemo } from 'react';
-import { useAdminUsers, useAdminUserMutations } from '@/hooks/useAdmin';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '@/lib/api/core/client';
 import type { AdminUser } from '@/types/admin';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -28,7 +29,11 @@ export default function AdminUsersPage() {
     per_page: 20,
   }), [search, role, active, page]);
 
-  const { data, isLoading, isError, refetch } = useAdminUsers(params);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin', 'users', params],
+    queryFn:  () => apiClient.get('/admin/users', { params }).then(r => (r.data as any)?.data ?? r.data),
+    staleTime: 60_000,
+  });
 
   // ✅ client.ts → extractData يُرجع { data: [...], meta: {...} } مباشرة
   // AdminUserController::index يُرجع LengthAwarePaginator داخل successResponse
@@ -37,17 +42,36 @@ export default function AdminUsersPage() {
   const users = data?.data ?? [];
   const meta  = data?.meta;
 
-  const muts = useAdminUserMutations();
+  const qc = useQueryClient();
+  const inv = () => qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+
+  const muts = {
+    resetPassword: useMutation({
+      mutationFn: ({ id, password, password_confirmation }: { id: number; password: string; password_confirmation: string }) =>
+        apiClient.post(`/admin/users/${id}/reset-password`, { password, password_confirmation }),
+    }),
+    toggleActive: useMutation({
+      mutationFn: (id: number) => apiClient.post(`/admin/users/${id}/toggle-active`),
+      onSuccess: inv,
+    }),
+    impersonate: useMutation({
+      mutationFn: (id: number) => apiClient.post(`/admin/impersonate/${id}`).then(r => r.data),
+    }),
+    create: useMutation({
+      mutationFn: (data: Partial<AdminUser>) => apiClient.post('/admin/users', data),
+      onSuccess: inv,
+    }),
+    remove: useMutation({
+      mutationFn: (id: number) => apiClient.delete(`/admin/users/${id}`),
+      onSuccess: inv,
+    }),
+  };
 
   const handleResetPassword = async () => {
     if (!selected) return;
     if (pwd !== pwdConfirm) { alert('كلمتا المرور غير متطابقتين'); return; }
     if (pwd.length < 8)     { alert('كلمة المرور يجب أن تكون 8 أحرف على الأقل'); return; }
-    await muts.resetPassword.mutateAsync({
-      id: selected.id,
-      password: pwd,
-      password_confirmation: pwdConfirm,
-    });
+    await muts.resetPassword.mutateAsync({ id: selected.id, password: pwd, password_confirmation: pwdConfirm });
     setPwd('');
     setPwdConfirm('');
     alert('تم تغيير كلمة المرور وإلغاء جميع الجلسات');

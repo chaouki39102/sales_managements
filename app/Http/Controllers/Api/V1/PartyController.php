@@ -40,10 +40,10 @@ class PartyController extends BaseApiController
         try {
             $this->authorizeAction('viewAny', Party::class);
 
-            $customers = $this->partyService->getCustomers();
+            $result = $this->partyService->getCustomers($request->all());
 
             return $this->successResponse(
-                PartyResource::collection($customers),
+                PartyResource::collection($result),  // ✅ يدعم paginator تلقائياً
                 'تم جلب قائمة العملاء بنجاح'
             );
         } catch (\Throwable $e) {
@@ -51,18 +51,15 @@ class PartyController extends BaseApiController
         }
     }
 
-    /**
-     * Get suppliers only
-     */
     public function suppliers(Request $request): JsonResponse
     {
         try {
             $this->authorizeAction('viewAny', Party::class);
 
-            $suppliers = $this->partyService->getSuppliers();
+            $result = $this->partyService->getSuppliers($request->all());
 
             return $this->successResponse(
-                PartyResource::collection($suppliers),
+                PartyResource::collection($result),
                 'تم جلب قائمة الموردين بنجاح'
             );
         } catch (\Throwable $e) {

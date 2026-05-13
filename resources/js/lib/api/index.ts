@@ -17,7 +17,7 @@ export * from './endpoints/companies';
 export * from './endpoints/fiscalYears';
 export * from './endpoints/lookups';
 export * from './endpoints/seeds';
-export * from './endpoints/documents';      // ✅
+export * from './endpoints/document';      // ✅
 export * from './endpoints/parties';         // ✅
 export * from './endpoints/products';        // ✅
 export * from './endpoints/payments';        // ✅

@@ -1,7 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// lib/api/core/client.ts
-// Axios Instance — Multi-Tenant HTTP Client
-// slug يُقرأ من Zustand مباشرة (appActions.getActiveSlug)
+// lib/api/core/client.ts — FIXED
 // ════════════════════════════════════════════════════════════════════════════
 
 import axios, {
@@ -11,22 +9,14 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 
-// ─── Re-export من appStore لتجنب circular dependency ─────────────────────────
-// نستخدم دالة getter بدلاً من import مباشر للـ store
-// (appStore يُعرَّف بعد client.ts في ترتيب الـ modules)
-
+// ─── Slug getter (يُربط مرة واحدة عند init) ──────────────────────────────────
 let _getSlug: () => string | null = () => null;
 
-/**
- * يُستدعى مرة واحدة عند تهيئة التطبيق لربط Zustand بالـ Interceptor
- * app/main.tsx: connectSlugToInterceptor(() => appActions.getActiveSlug())
- */
 export function connectSlugToInterceptor(getter: () => string | null): void {
   _getSlug = getter;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface ApiErrorPayload {
   message: string;
   code?:   string;
@@ -54,9 +44,7 @@ export class ApiError extends Error {
 }
 
 // ─── Token storage ────────────────────────────────────────────────────────────
-
 const TOKEN_KEY = 'auth_token';
-
 export const tokenStorage = {
   get:   () => localStorage.getItem(TOKEN_KEY),
   set:   (t: string) => localStorage.setItem(TOKEN_KEY, t),
@@ -67,61 +55,50 @@ export const setAuthToken   = tokenStorage.set;
 export const clearAuthToken = tokenStorage.clear;
 export const getAuthToken   = tokenStorage.get;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Request ID ───────────────────────────────────────────────────────────────
+let _counter = 0;
+const newReqId = () => `${Date.now().toString(36)}-${(++_counter % 1_000_000).toString(36)}`;
 
-let _reqCounter = 0;
-const generateRequestId = () => {
-  _reqCounter = (_reqCounter + 1) % 1_000_000;
-  return `${Date.now().toString(36)}-${_reqCounter.toString(36)}`;
-};
+// ─── PUBLIC paths (لا يُضاف لها slug) ─────────────────────────────────────────
+// ✅ القاعدة: فقط المسارات الموجودة خارج Route::prefix('{company}') في api.php
+//
+// ❌ تمت إزالة: currencies, tvas, legal-forms, fiscal-stamps,
+//              document-types, document-statuses, document-base-operations,
+//              stock-movement-types, inventory-valuation-methods,
+//              product-types, party-types, treasury-account-types, genders
+//
+//    السبب: هذه كلها داخل /{company}/ في api.php → يجب أن يُضاف لها slug
+//    عند وضعها هنا كانت POST/PUT تذهب إلى /api/v1/currencies بدلاً من
+//    /api/v1/{slug}/currencies → 405 Method Not Allowed
+//
+// ✅ يبقى هنا فقط:
+//    /auth      → خارج {company} في api.php
+//    /companies → خارج {company} في api.php
+//    /admin     → api_admin.php خارج {company}
+//    /wilayas   → Route::apiResource('wilayas'...) خارج {company}
+//    /communes  → Route::apiResource('communes'...) خارج {company}
 
-// ─── Public paths (لا تحتاج slug) ────────────────────────────────────────────
-
-const PUBLIC_PATH_PREFIXES = [
+const PUBLIC_PREFIXES = [
   '/auth',
   '/companies',
   '/admin',
   '/wilayas',
   '/communes',
-  '/genders',
-  '/currencies',
-  '/tvas',
-  '/document-types',
-  '/document-statuses',
-  '/document-base-operations',
-  '/fiscal-stamps',
-  '/stock-movement-types',
-  '/inventory-valuation-methods',
-  '/product-types',
-  '/party-types',
-  '/treasury-account-types',
-  '/legal-forms',
 ] as const;
 
-const isPublicPath = (path: string) => {
-  const clean = path.split('?')[0];
-  return PUBLIC_PATH_PREFIXES.some(p => clean.startsWith(p));
-};
-
-// ─── 401 queue ────────────────────────────────────────────────────────────────
-
-type QueueItem = { resolve: (t: string) => void; reject: (e: unknown) => void };
-let _isRefreshing = false;
-let _failedQueue: QueueItem[] = [];
-
-const processQueue = (error: unknown, token: string | null) => {
-  _failedQueue.forEach(item => error || !token ? item.reject(error) : item.resolve(token!));
-  _failedQueue = [];
+const isPublicPath = (url: string): boolean => {
+  const path = url.split('?')[0];
+  return (PUBLIC_PREFIXES as readonly string[]).some(
+    p => path === p || path.startsWith(p + '/'),
+  );
 };
 
 // ─── In-flight deduplication ──────────────────────────────────────────────────
-
 const _pending = new Map<string, Promise<unknown>>();
 const reqKey   = (c: AxiosRequestConfig) =>
   `${c.method?.toUpperCase()}::${c.url}::${JSON.stringify(c.params ?? {})}`;
 
 // ─── Axios instance ───────────────────────────────────────────────────────────
-
 const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api/v1';
 
 const client: AxiosInstance = axios.create({
@@ -136,19 +113,18 @@ const client: AxiosInstance = axios.create({
 });
 
 // ─── REQUEST interceptor ──────────────────────────────────────────────────────
-
 client.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const slug        = _getSlug();
     const originalUrl = config.url ?? '';
 
-    // إضافة slug للمسارات tenant فقط
+    // أضف slug فقط للمسارات tenant (غير العامة)
     if (slug && !isPublicPath(originalUrl)) {
-      if (!originalUrl.startsWith(`/${slug}/`)) {
-        config.url = `/${slug}${originalUrl}`;
-        if (import.meta.env.DEV) {
-          console.debug(`🌐 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-        }
+      if (
+        !originalUrl.startsWith(`/${slug}/`) &&
+        originalUrl !== `/${slug}`
+      ) {
+        config.url = `/${slug}${originalUrl.startsWith('/') ? originalUrl : '/' + originalUrl}`;
       }
     }
 
@@ -156,11 +132,11 @@ client.interceptors.request.use(
     const token = tokenStorage.get();
     if (token) config.headers.Authorization = `Bearer ${token}`;
 
-    // Headers
+    // Headers إضافية
     if (slug) config.headers['X-Company-Slug'] = slug;
-    config.headers['X-Request-ID'] = generateRequestId();
+    config.headers['X-Request-ID'] = newReqId();
 
-    // Upload timeout
+    // رفع ملفات: timeout أطول
     if (config.data instanceof FormData) config.timeout = 60_000;
 
     return config;
@@ -168,10 +144,32 @@ client.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
+// ─── 401 queue ────────────────────────────────────────────────────────────────
+type QueueItem = { resolve: (t: string) => void; reject: (e: unknown) => void };
+let _isRefreshing = false;
+let _failedQueue:  QueueItem[] = [];
+
+const processQueue = (err: unknown, token: string | null) => {
+  _failedQueue.forEach(item =>
+    err || !token ? item.reject(err) : item.resolve(token!),
+  );
+  _failedQueue = [];
+};
+
+function handleForcedLogout(): void {
+  tokenStorage.clear();
+  try {
+    sessionStorage.clear();
+    localStorage.removeItem('app-store');
+  } catch {}
+  const ret =
+    window.location.pathname !== '/login'
+      ? window.location.pathname + window.location.search
+      : '/dashboard';
+  window.location.href = `/login?return=${encodeURIComponent(ret)}`;
+}
+
 // ─── RESPONSE interceptor ─────────────────────────────────────────────────────
-
-const ACTIVE_COMPANY_KEY = 'app-store'; // Zustand persist key
-
 client.interceptors.response.use(
   (res) => res,
 
@@ -184,116 +182,172 @@ client.interceptors.response.use(
       if (window.location.pathname === '/login')
         return Promise.reject(new ApiError(status, payload ?? { message: 'غير مصرح' }));
 
-      if (req._retry) { handleForcedLogout(); return Promise.reject(new ApiError(status, payload ?? { message: 'انتهت الجلسة' })); }
-
-      if (_isRefreshing) {
-        return new Promise<string>((resolve, reject) => _failedQueue.push({ resolve, reject }))
-          .then(t => { req.headers.Authorization = `Bearer ${t}`; return client(req); });
+      if (req._retry) {
+        handleForcedLogout();
+        return Promise.reject(new ApiError(status, payload ?? { message: 'انتهت الجلسة' }));
       }
 
+      if (_isRefreshing)
+        return new Promise<string>((resolve, reject) =>
+          _failedQueue.push({ resolve, reject }),
+        ).then(t => {
+          req.headers.Authorization = `Bearer ${t}`;
+          return client(req);
+        });
+
       _isRefreshing = req._retry = true;
-      try { throw new Error('no_refresh'); }
-      catch {
+      try {
+        throw new Error('no_refresh');
+      } catch {
         processQueue(new Error('expired'), null);
         handleForcedLogout();
-        return Promise.reject(new ApiError(401, { message: 'انتهت جلستك، يرجى تسجيل الدخول مجدداً' }));
-      } finally { _isRefreshing = false; }
+        return Promise.reject(
+          new ApiError(401, { message: 'انتهت جلستك، يرجى تسجيل الدخول مجدداً' }),
+        );
+      } finally {
+        _isRefreshing = false;
+      }
     }
 
     if (status === 403) {
       const code = payload?.code;
       if (code === 'COMPANY_SUSPENDED' || code === 'COMPANY_INACTIVE') {
-        try { sessionStorage.removeItem(ACTIVE_COMPANY_KEY); } catch {}
-        if (window.location.pathname !== '/onboarding') window.location.href = '/onboarding';
+        try { sessionStorage.removeItem('app-store'); } catch {}
+        if (window.location.pathname !== '/onboarding')
+          window.location.href = '/onboarding';
       }
       return Promise.reject(new ApiError(status, payload ?? { message: 'ممنوع' }));
     }
 
-    if (status === 422) return Promise.reject(new ApiError(status, payload ?? { message: 'خطأ تحقق' }));
-    if (status === 429) return Promise.reject(new ApiError(status, { message: 'تجاوزت الحد المسموح', code: 'RATE_LIMITED' }));
-    if (status && status >= 500) return Promise.reject(new ApiError(status, { message: payload?.message ?? 'خطأ في الخادم', code: 'SERVER_ERROR' }));
-    if (!error.response) return Promise.reject(new ApiError(0, {
-      message: error.code === 'ECONNABORTED' ? 'انتهت مهلة الطلب' : 'لا يوجد اتصال بالإنترنت',
-      code:    error.code === 'ECONNABORTED' ? 'TIMEOUT' : 'NETWORK_ERROR',
-    }));
+    if (status === 422)
+      return Promise.reject(new ApiError(status, payload ?? { message: 'خطأ في البيانات' }));
 
-    return Promise.reject(new ApiError(status ?? 0, payload ?? { message: 'خطأ غير متوقع' }));
+    if (status === 429)
+      return Promise.reject(
+        new ApiError(status, { message: 'تجاوزت الحد المسموح به', code: 'RATE_LIMITED' }),
+      );
+
+    if (status && status >= 500)
+      return Promise.reject(
+        new ApiError(status, {
+          message: payload?.message ?? 'خطأ في الخادم',
+          code:    'SERVER_ERROR',
+        }),
+      );
+
+    if (!error.response)
+      return Promise.reject(
+        new ApiError(0, {
+          message:
+            error.code === 'ECONNABORTED'
+              ? 'انتهت مهلة الطلب'
+              : 'لا يوجد اتصال بالإنترنت',
+          code:
+            error.code === 'ECONNABORTED' ? 'TIMEOUT' : 'NETWORK_ERROR',
+        }),
+      );
+
+    return Promise.reject(
+      new ApiError(status ?? 0, payload ?? { message: 'خطأ غير متوقع' }),
+    );
   },
 );
 
-// ─── Forced logout ────────────────────────────────────────────────────────────
+// ─── extractData ──────────────────────────────────────────────────────────────
+// Laravel يُعيد دائماً: { data: T, message?, meta?, links? }
+//
+// الحالات:
+//   { data: [...] }              → يُعيد [...]
+//   { data: { data: [], meta } } → يُعيد { data: [], meta } (Paginated)
+//   { data: { id, name, ... } }  → يُعيد { id, name, ... }
+//   { data: null }               → يُعيد null
+//   [...]                        → يُعيد [...] (نادر)
 
-function handleForcedLogout() {
-  tokenStorage.clear();
-  try {
-    sessionStorage.clear();
-    localStorage.removeItem(ACTIVE_COMPANY_KEY);
-  } catch {}
-  const ret = window.location.pathname !== '/login'
-    ? window.location.pathname + window.location.search
-    : '/dashboard';
-  window.location.href = `/login?return=${encodeURIComponent(ret)}`;
+export function extractData<T>(response: { data: unknown }): T {
+  const outer = response?.data;
+
+  // ① مصفوفة مباشرة
+  if (Array.isArray(outer)) return outer as T;
+
+  if (outer !== null && typeof outer === 'object') {
+    const obj = outer as Record<string, unknown>;
+
+    if ('data' in obj) {
+      const inner = obj.data;
+
+      // ② أ — مصفوفة: { data: [...] }
+      if (Array.isArray(inner)) return inner as T;
+
+      // ② ب — Paginated: { data: { data: [], meta: {} } }
+      if (inner !== null && typeof inner === 'object') {
+        const innerObj = inner as Record<string, unknown>;
+        if ('data' in innerObj && 'meta' in innerObj) return inner as T;
+        // ② ج — object عادي: { data: { id, name } }
+        return inner as T;
+      }
+
+      // ② د — قيمة بسيطة أو null
+      if (inner !== undefined) return inner as T;
+    }
+
+    // ③ لا يوجد 'data' — أعد الـ object كاملاً (مثل { token, user })
+    return outer as T;
+  }
+
+  // ④ قيمة بسيطة
+  return (outer ?? null) as T;
 }
 
-// ─── Response extractor ───────────────────────────────────────────────────────
-
-function extractData<T>(response: any): T {
-  const d = response?.data;
-  if (Array.isArray(d)) return d as T;
-  if (d && typeof d === 'object' && 'data' in d) return d.data as T;
-  return d as T;
-}
-
-// ─── Typed wrappers ───────────────────────────────────────────────────────────
-
+// ─── Typed API wrappers ───────────────────────────────────────────────────────
 export interface LaravelResponse<T> {
   data:   T;
   meta?:  import('./types').PaginationMeta;
   links?: import('./types').PaginationLinks;
 }
 
-export async function apiGet<T>(url: string, params?: Record<string, unknown>, config?: AxiosRequestConfig): Promise<T> {
+export async function apiGet<T>(
+  url: string,
+  params?: Record<string, unknown>,
+  config?: AxiosRequestConfig,
+): Promise<T> {
   const key = reqKey({ method: 'GET', url, params });
-  const existing = _pending.get(key);
-  if (existing) return existing as Promise<T>;
-  const p = client.get<LaravelResponse<T>>(url, { params, ...config })
+  const hit = _pending.get(key);
+  if (hit) return hit as Promise<T>;
+
+  const p = client
+    .get<LaravelResponse<T>>(url, { params, ...config })
     .then(res => extractData<T>(res))
     .finally(() => _pending.delete(key));
+
   _pending.set(key, p);
   return p;
 }
 
-export const apiPost   = async <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> =>
+export const apiPost = async <T>(
+  url: string,
+  data?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<T> =>
   extractData<T>(await client.post<LaravelResponse<T>>(url, data, config));
 
-export const apiPut    = async <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> =>
+export const apiPut = async <T>(
+  url: string,
+  data?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<T> =>
   extractData<T>(await client.put<LaravelResponse<T>>(url, data, config));
 
-export const apiPatch  = async <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> =>
+export const apiPatch = async <T>(
+  url: string,
+  data?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<T> =>
   extractData<T>(await client.patch<LaravelResponse<T>>(url, data, config));
 
-export const apiDelete = async (url: string, config?: AxiosRequestConfig): Promise<void> =>
-  void (await client.delete(url, config));
-
-export const apiUpload = async <T>(url: string, fd: FormData, onProgress?: (pct: number) => void): Promise<T> =>
-  extractData<T>(await client.post<LaravelResponse<T>>(url, fd, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 60_000,
-    onUploadProgress: e => { if (onProgress && e.total) onProgress(Math.round(e.loaded / e.total * 100)); },
-  }));
-
-// ─── Tenant-scoped factory ────────────────────────────────────────────────────
-
-export function tenantApi(slug: string) {
-  const p = (path: string) => `/${slug}/${path.replace(/^\//, '')}`;
-  return {
-    get:    <T>(path: string, params?: Record<string, unknown>) => apiGet<T>(p(path), params),
-    post:   <T>(path: string, data?: unknown)                   => apiPost<T>(p(path), data),
-    put:    <T>(path: string, data?: unknown)                   => apiPut<T>(p(path), data),
-    patch:  <T>(path: string, data?: unknown)                   => apiPatch<T>(p(path), data),
-    delete: (path: string)                                       => apiDelete(p(path)),
-    upload: <T>(path: string, fd: FormData, cb?: (p: number) => void) => apiUpload<T>(p(path), fd, cb),
-  };
-}
+export const apiDelete = async <T = void>(
+  url: string,
+  config?: AxiosRequestConfig,
+): Promise<T> =>
+  extractData<T>(await client.delete<LaravelResponse<T>>(url, config));
 
 export default client;

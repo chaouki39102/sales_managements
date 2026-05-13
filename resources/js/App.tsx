@@ -1,6 +1,14 @@
-// ════════════════════════════════════════════════
-// App.tsx — نقطة الدخول الرئيسية (الهيكل الجديد)
-// ════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+// App.tsx — FIXED
+// ترتيب Providers الصحيح:
+//   QueryClientProvider → BrowserRouter → AuthProvider → FiscalYearProvider
+//
+// المشاكل في النسخة القديمة:
+//   1. FiscalYearProvider خارج BrowserRouter → useNavigate يفشل
+//   2. AuthProvider خارج BrowserRouter → Navigate يفشل
+//   3. connectSlugToInterceptor خارج React → لا مشكلة لكن يجب قبل أي طلب
+// ════════════════════════════════════════════════════════════════════════════
+
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -19,20 +27,29 @@ import '../css/theme/pages.css';
 import '../css/theme/utilities.css';
 import '../css/theme/pos.css';
 
-// ربط Zustand بالـ Interceptor مرة واحدة عند بدء التطبيق
+// ✅ ربط Zustand بالـ Interceptor مرة واحدة عند تحميل الـ module
+// يجب أن يكون قبل أي طلب API
 connectSlugToInterceptor(() => appActions.getActiveSlug());
 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <FiscalYearProvider>
-          <BrowserRouter>
+      {/*
+        ✅ BrowserRouter أولاً — كل ما بداخله يمكنه استخدام useNavigate/Navigate
+        ✅ AuthProvider داخل BrowserRouter لأنه يستخدم navigation عند logout
+        ✅ FiscalYearProvider داخل AuthProvider لأنه يحتاج isAuthenticated
+      */}
+      <BrowserRouter>
+        <AuthProvider>
+          <FiscalYearProvider>
             <AppRoutes />
-          </BrowserRouter>
-        </FiscalYearProvider>
-      </AuthProvider>
-      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+          </FiscalYearProvider>
+        </AuthProvider>
+      </BrowserRouter>
+
+      {import.meta.env.DEV && (
+        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+      )}
     </QueryClientProvider>
   );
 }

@@ -2,6 +2,7 @@
 // types/index.ts — أنواع TypeScript المتكاملة
 // مطابقة لقاعدة البيانات
 // ════════════════════════════════════════════════
+export type * from '@/lib/api/core/types';
 
 // ── Common ────────────────────────────────────────
 export interface PaginatedResponse<T> {

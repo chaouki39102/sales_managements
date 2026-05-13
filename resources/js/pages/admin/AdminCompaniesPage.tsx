@@ -2,8 +2,9 @@
 // pages/admin/AdminCompaniesPage.tsx — النسخة الكاملة
 // ════════════════════════════════════════════════
 import { useState, useMemo, useCallback } from 'react';
-import { useAdminCompanies, useAdminCompanyMutations, useAdminCompanyUsers } from '@/hooks/useAdmin';
-import { adminApi } from '@/lib/api/admin';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '@/lib/api/core/client';
+import { useAdminCompanies, useAdminCompanyAction, useUpdateCompanyNotes, useChangePlan } from '@/lib/api/endpoints/companies';
 import type { AdminCompany, AdminUser } from '@/types/admin';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -56,7 +57,19 @@ function CompanyDrawer({
   co: AdminCompany;
   onClose: (refresh?: boolean) => void;
 }) {
-  const muts = useAdminCompanyMutations();
+  const companyAction = useAdminCompanyAction();
+  const updateNotes  = useUpdateCompanyNotes();
+  const changePlan   = useChangePlan();
+  const muts = {
+    suspend:    { mutateAsync: (p: { slug: string; payload?: any }) => companyAction.mutateAsync({ action: 'suspend',    ...p }), isPending: companyAction.isPending },
+    unsuspend:  { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'unsuspend',  ...p }), isPending: companyAction.isPending },
+    verify:     { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'verify',     ...p }), isPending: companyAction.isPending },
+    unverify:   { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'unverify',   ...p }), isPending: companyAction.isPending },
+    activate:   { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'activate',   ...p }), isPending: companyAction.isPending },
+    deactivate: { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'deactivate', ...p }), isPending: companyAction.isPending },
+    updateNotes,
+    changePlan,
+  };
   const [tab, setTab]   = useState<DTab>('info');
   const [notes, setNotes] = useState(co.notes ?? '');
   const [planForm, setPlanForm] = useState({
@@ -72,8 +85,12 @@ function CompanyDrawer({
   const [busy, setBusy]                 = useState<string | null>(null);
   const [flash, setFlash]               = useState<{ ok: boolean; msg: string } | null>(null);
 
-  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } =
-    useAdminCompanyUsers(co.id, tab === 'users');
+  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
+    queryKey: ['admin', 'companies', co.id, 'users'],
+    queryFn:  () => apiClient.get(`/admin/companies/${co.id}/users`).then(r => (r.data as any)?.data ?? r.data),
+    enabled:  tab === 'users',
+    staleTime: 60_000,
+  });
 
   const st = statusOf(co);
 

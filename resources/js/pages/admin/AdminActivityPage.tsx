@@ -1,6 +1,7 @@
 // pages/admin/AdminActivityPage.tsx
 import { useState, useMemo } from 'react';
-import { useAdminActivity, useAdminActivityExport } from '@/hooks/useAdmin';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import apiClient from '@/lib/api/core/client';
 import type { ActivityLog } from '@/types/admin';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -57,8 +58,14 @@ export default function AdminActivityPage() {
     [search, event, dateFrom, dateTo, page]
   );
 
-  const { data, isLoading, isError, refetch } = useAdminActivity(params);
-  const exportMutation = useAdminActivityExport();
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin', 'activity', params],
+    queryFn:  () => apiClient.get('/admin/activity-log', { params }).then(r => r.data),
+    staleTime: 60_000,
+  });
+  const exportMutation = useMutation({
+    mutationFn: (p: typeof params) => apiClient.get('/admin/activity-log/export', { params: p }),
+  });
   const logs = data?.data ?? [];
   const meta = data?.meta;
 

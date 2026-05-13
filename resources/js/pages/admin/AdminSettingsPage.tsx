@@ -9,14 +9,14 @@ import Card from '@/components/ui/Card';
 import Switch from '@/components/ui/Switch';
 import Button from '@/components/ui/Button';
 import AlertBar from '@/components/ui/AlertBar';
-import { adminApi } from '@/lib/api/admin';
-import { SystemSettings } from '@/types/admin';
+
+import type { SystemSettings } from '@/types/admin';
 
 export default function AdminSettingsPage() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery<SystemSettings>({
     queryKey: ['admin-settings'],
-    queryFn: () => adminApi.getSystemSettings(),
+    queryFn: () => apiClient.get('/admin/settings').then(r => (r.data as any)?.data ?? r.data),
   });
   const [settings, setSettings] = useState<SystemSettings | null>(null);
 
@@ -25,17 +25,17 @@ export default function AdminSettingsPage() {
   }, [data]);
 
   const updateMutation = useMutation({
-    mutationFn: (payload: Partial<SystemSettings>) => adminApi.updateSystemSettings(payload),
+    mutationFn: (payload: Partial<SystemSettings>) => apiClient.put('/admin/settings', payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-settings'] }),
   });
 
   const maintenanceMutation = useMutation({
     mutationFn: (action: 'enable' | 'disable') =>
-      action === 'enable' ? adminApi.enableMaintenance() : adminApi.disableMaintenance(),
+      apiClient.post(`/admin/maintenance/${action}`),
   });
 
   const cacheMutation = useMutation({
-    mutationFn: () => adminApi.clearCache(),
+    mutationFn: () => apiClient.post('/admin/maintenance/cache-clear'),
   });
 
   const handleChange = <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) => {

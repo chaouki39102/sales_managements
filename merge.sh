@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="old-merged-pages.md"
+OUTPUT="merged-pages.md"
 
 > "$OUTPUT"
 
