@@ -3,9 +3,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePOS }           from '@/pos/hooks/usePOS';
 import { useClients }                              from '@/lib/api/endpoints/parties';
 import { usePaymentModes, useWarehouses }          from '@/lib/api/endpoints/lookups';
-import { useGlobalDocumentTypes }                  from '@/lib/api/endpoints/lookups';
-import { useFiscalYear }                           from '@/context/FiscalYearContext';
-import apiClient                                   from '@/lib/api/core/client';
+import { useDocumentTypes }                        from '@/lib/api/endpoints/lookups';
+import { useVariantSearch }                        from '@/lib/api/endpoints/products';
+import { useSelectedFiscalYear }                   from '@/lib/api/endpoints/fiscalYears';
 import ProductCard          from '@/pos/components/ProductCard';
 import Cart                 from '@/pos/components/Cart';
 import PaymentModal         from '@/pos/components/PaymentModal';
@@ -26,14 +26,17 @@ export default function POSPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   // API data
-  const { data: variantsData, isLoading: loadingVariants } = useVariants({
-    search: pos.searchQuery || undefined,
-    page: 1,
-  });
-  const { data: customersData } = useCustomers({ active: true, per_page: 100 });
+  // ✅ useVariantSearch بدلاً من useVariants
+  const { data: variantsData, isLoading: loadingVariants } = useVariantSearch(
+    pos.searchQuery.length >= 2 ? pos.searchQuery : ' ',
+    { per_page: 100 }
+  );
+  // ✅ useClients بدلاً من useCustomers
+  const { data: customersData } = useClients({ active: true, per_page: 100 });
   const { data: paymentModes  } = usePaymentModes();
   const { data: warehouses    } = useWarehouses();
-  const { data: fiscalYear    } = useCurrentFiscalYear();
+  // ✅ useSelectedFiscalYear يعيد FiscalYear | null مباشرة (بدون { data })
+  const fiscalYear               = useSelectedFiscalYear();
   const { data: documentTypes } = useDocumentTypes();
 
   const variants  = variantsData?.data ?? [];

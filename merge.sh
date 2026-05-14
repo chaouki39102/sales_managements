@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-pages.md"
+OUTPUT="merged-lib.md"
 
 > "$OUTPUT"
 
@@ -61,8 +61,8 @@ EXCLUDE=(
 
 
 # HOOKS
-merge_section "🧠 pages" \
-  \( -path "*/pages/*" \) "${EXCLUDE[@]}"
+merge_section "🧠 lib" \
+  \( -path "*/lib/*" \) "${EXCLUDE[@]}"
 
 
 echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"

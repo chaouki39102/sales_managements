@@ -1,7 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 // context/AuthContext.tsx
-// Auth Context — الآن يقرأ من React Query + Zustand فقط
-// لا state محلية — single source of truth
+// ✅ مصحح: login يُعيد User لتمكين role-based redirect
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, { createContext, useContext } from 'react';
@@ -12,13 +11,14 @@ import type { User, ActiveCompany, LoginCredentials } from '@/lib/api/core/types
 // ─── Context type ─────────────────────────────────────────────────────────────
 
 interface AuthContextValue {
-  user:              User | null;
-  isAuthenticated:   boolean;
-  isLoading:         boolean;
-  activeCompany:     ActiveCompany | null;
-  login:             (creds: LoginCredentials) => Promise<void>;
-  logout:            () => Promise<void>;
-  setActiveCompany:  (company: ActiveCompany) => void;
+  user:             User | null;
+  isAuthenticated:  boolean;
+  isLoading:        boolean;
+  isSuperAdmin:     boolean;
+  activeCompany:    ActiveCompany | null;
+  login:            (creds: LoginCredentials) => Promise<User>;  // ✅ يُعيد User
+  logout:           () => Promise<void>;
+  setActiveCompany: (company: ActiveCompany) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -26,15 +26,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { data: user, isLoading } = useCurrentUser();
-  const activeCompany   = useActiveCompany();
-  const setActiveCompanyInStore = useAppStore(s => s.setActiveCompany);
+  const { data: user, isLoading }   = useCurrentUser();
+  const activeCompany               = useActiveCompany();
+  const setActiveCompanyInStore     = useAppStore(s => s.setActiveCompany);
 
   const loginMutation  = useLogin();
   const logoutMutation = useLogout();
 
-  const login = async (creds: LoginCredentials) => {
-    await loginMutation.mutateAsync(creds);
+  // ✅ يُعيد User للسماح بالـ redirect بناءً على الدور
+  const login = async (creds: LoginCredentials): Promise<User> => {
+    const result = await loginMutation.mutateAsync(creds);
+    return result.user;
   };
 
   const logout = async () => {
@@ -45,11 +47,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActiveCompanyInStore(company);
   };
 
+  // ✅ helper جاهز بدل تكرار منطق الـ role في كل مكان
+  const isSuperAdmin = user?.roles?.some(r => r.name === 'super-admin') ?? false;
+
   return (
     <AuthContext.Provider value={{
       user:            user ?? null,
       isAuthenticated: !!user,
       isLoading,
+      isSuperAdmin,
       activeCompany,
       login,
       logout,
@@ -68,5 +74,6 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
-export const useAuthUser         = () => useAuth().user;
-export const useIsAuthenticated  = () => useAuth().isAuthenticated;
+export const useAuthUser        = () => useAuth().user;
+export const useIsAuthenticated = () => useAuth().isAuthenticated;
+export const useIsSuperAdmin    = () => useAuth().isSuperAdmin;

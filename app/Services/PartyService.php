@@ -204,40 +204,40 @@ class PartyService extends \App\Core\Services\BaseService
     public function getCustomers(array $params = [])
     {
         return Party::where('company_id', $this->getCurrentCompanyId())
-            ->customers()
+            // ✅ فلترة بـ party_type_id مباشرة — لا نعتمد على party_types table
+            // party_type_id = 1 → زبون (كما يُرسله الـ Frontend)
+            ->where('party_type_id', 1)
             ->when(
                 !empty($params['search']),
-                fn($q) =>
-                $q->where(
-                    fn($q2) =>
-                    $q2->where('name', 'like', "%{$params['search']}%")
+                fn($q) => $q->where(
+                    fn($q2) => $q2
+                        ->where('name', 'like', "%{$params['search']}%")
                         ->orWhere('phone', 'like', "%{$params['search']}%")
                         ->orWhere('nif', 'like', "%{$params['search']}%")
                 )
             )
-            ->where('active', true)
-            ->with(['partyType'])
+            // active يمكن أن يكون null أو true — نقبل كليهما
+            ->where(fn($q) => $q->whereNull('active')->orWhere('active', true))
             ->orderBy('name')
-            ->paginate($params['per_page'] ?? 30);  // ✅ paginate بدل get
+            ->paginate($params['per_page'] ?? 30);
     }
 
     public function getSuppliers(array $params = [])
     {
         return Party::where('company_id', $this->getCurrentCompanyId())
-            ->suppliers()
+            // ✅ party_type_id = 2 → مورد
+            ->where('party_type_id', 2)
             ->when(
                 !empty($params['search']),
-                fn($q) =>
-                $q->where(
-                    fn($q2) =>
-                    $q2->where('name', 'like', "%{$params['search']}%")
+                fn($q) => $q->where(
+                    fn($q2) => $q2
+                        ->where('name', 'like', "%{$params['search']}%")
                         ->orWhere('phone', 'like', "%{$params['search']}%")
                         ->orWhere('nif', 'like', "%{$params['search']}%")
                 )
             )
-            ->where('active', true)
-            ->with(['partyType'])
+            ->where(fn($q) => $q->whereNull('active')->orWhere('active', true))
             ->orderBy('name')
-            ->paginate($params['per_page'] ?? 30);  // ✅ paginate بدل get
+            ->paginate($params['per_page'] ?? 30);
     }
 }

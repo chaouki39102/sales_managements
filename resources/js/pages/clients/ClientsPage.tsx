@@ -166,31 +166,52 @@ function ClientModal({ open, party, onClose }: {
   const isEdit    = !!party;
   const { create: createMut, update: updateMut } = usePartyMutations();
 
-  const [form, setForm] = useState({
-    name:           party?.name            ?? '',
-    commercial_name:party?.commercial_name ?? '',
-    phone:          party?.phone           ?? '',
-    mobile:         party?.mobile          ?? '',
-    email:          party?.email           ?? '',
-    address:        party?.address         ?? '',
-    nif:            party?.nif             ?? '',
-    nis:            party?.nis             ?? '',
-    rc:             party?.rc              ?? '',
-    ai:             party?.ai              ?? '',
-    credit_limit:   party?.credit_limit    ?? 0,
-    credit_days:    party?.credit_days     ?? 30,
-    is_tva_exempt:  party?.is_tva_exempt   ?? false,
-  });
+  const emptyForm = {
+    name: '', commercial_name: '', phone: '', mobile: '',
+    email: '', address: '', nif: '', nis: '', rc: '', ai: '',
+    credit_limit: 0, credit_days: 30, is_tva_exempt: false,
+  };
+
+  const [form, setForm] = useState(emptyForm);
+  const [error, setError] = useState('');
+
+  // إعادة تهيئة النموذج عند فتح المودال أو تغيير العنصر المحرر
+  React.useEffect(() => {
+    if (open) {
+      setForm(party ? {
+        name:            party.name            ?? '',
+        commercial_name: party.commercial_name ?? '',
+        phone:           party.phone           ?? '',
+        mobile:          party.mobile          ?? '',
+        email:           party.email           ?? '',
+        address:         party.address         ?? '',
+        nif:             party.nif             ?? '',
+        nis:             party.nis             ?? '',
+        rc:              party.rc              ?? '',
+        ai:              party.ai              ?? '',
+        credit_limit:    party.credit_limit    ?? 0,
+        credit_days:     party.credit_days     ?? 30,
+        is_tva_exempt:   party.is_tva_exempt   ?? false,
+      } : emptyForm);
+      setError('');
+    }
+  }, [open, party]);
 
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
-    if (isEdit) {
-      await updateMut.mutateAsync({ id: party!.id, data: { ...form, party_type_id: party!.party_type_id } });
-    } else {
-      await createMut.mutateAsync({ ...form, party_type_id: 1 }); // 1 = customer
+    if (!form.name.trim()) { setError('اسم الزبون مطلوب'); return; }
+    setError('');
+    try {
+      if (isEdit) {
+        await updateMut.mutateAsync({ id: party!.id, data: { ...form, party_type_id: party!.party_type_id } });
+      } else {
+        await createMut.mutateAsync({ ...form, party_type_id: 1 }); // 1 = customer
+      }
+      onClose();
+    } catch (err: any) {
+      setError(err?.message ?? err?.response?.data?.message ?? 'فشل الحفظ');
     }
-    onClose();
   };
 
   return (
@@ -207,6 +228,12 @@ function ClientModal({ open, party, onClose }: {
         </>
       }
     >
+      {error && (
+        <div style={{ padding:'8px 12px', marginBottom:12, background:'var(--red-bg,#fef2f2)',
+          border:'1px solid var(--red)', borderRadius:'var(--r2)', color:'var(--red)', fontSize:13 }}>
+          {error}
+        </div>
+      )}
       <div className="tabs" style={{ marginBottom: 16 }}>
         <div className="tab on">المعلومات الأساسية</div>
         <div className="tab">القانونية والمالية</div>

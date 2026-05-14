@@ -6,6 +6,7 @@
 // ════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback } from "react";
 import client from "@/lib/api/core/client";
+import { appActions } from '@/lib/store/appStore';
 
 // ── Types ─────────────────────────────────────────────────────────
 interface Company {
@@ -805,32 +806,23 @@ function StepFiscalYear({
             return;
         }
         setLoading(true);
-        setError(null);
-        try {
-            // ✅ تحديث sessionStorage بالشركة الجديدة قبل الطلب
-            sessionStorage.setItem(
-                "active_company",
-                JSON.stringify({
-                    id: company.id,
-                    name: company.name,
-                    slug: company.slug,
-                }),
-            );
+  setError(null);
+  try {
+    const res = await client.post(`/${company.slug}/fiscal-years`, {
+      name: yearNum,
+      start_date: startDate,
+      end_date: endDate,
+      is_current: true,
+    }, { _skipSlug: true } as any); // ✅ إضافة _skipSlug
 
-            const res = await client.post(`/${company.slug}/fiscal-years`, {
-                name: yearNum,
-                start_date: startDate,
-                end_date: endDate,
-                is_current: true,
-            });
-            const fy: FiscalYear = res.data?.data ?? res.data;
-            onDone(fy);
-        } catch (e: any) {
-            setError(e?.response?.data?.message ?? "فشل إنشاء السنة المالية");
-        } finally {
-            setLoading(false);
-        }
-    };
+    const fy: FiscalYear = res.data?.data ?? res.data;
+    onDone(fy);
+  } catch (e: any) {
+    setError(e?.response?.data?.message ?? "فشل إنشاء السنة المالية");
+  } finally {
+    setLoading(false);
+  }
+};
 
     const validYear =
         !isNaN(parseInt(yearNum)) &&

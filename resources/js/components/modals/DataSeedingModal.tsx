@@ -1,10 +1,13 @@
 // ════════════════════════════════════════════════════════════════════
-// components/modals/DataSeedingModal.tsx — تصميم جديد عصري
+// components/modals/DataSeedingModal.tsx
+// ✅ مصحح + تجربة بصرية جديدة:
+//   - السيدر الجاري يظهر أعلى القائمة في بطاقة بارزة
+//   - كل عنصر مكتمل يبقى مرئياً ويتراكم
+//   - auto-scroll للعنصر النشط
 // ════════════════════════════════════════════════════════════════════
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import client from '@/lib/api/core/client';
 import Modal from '@/components/ui/Modal';
-import Button from '@/components/ui/Button';
 
 interface SeedItem  { key: string; label: string; endpoint: string; }
 interface SeedGroup {
@@ -59,9 +62,8 @@ const SEED_GROUPS: SeedGroup[] = [
     icon: '💰', tabler: 'ti-cash',
     required: false, recommended: true,
     seeds: [
-      { key: 'treasury_account_types', label: 'أنواع حسابات الخزينة', endpoint: 'treasury-account-types' },
-      { key: 'treasury_accounts',      label: 'حسابات الخزينة',       endpoint: 'treasury-accounts' },
-      { key: 'payment_modes',          label: 'طرق الدفع',             endpoint: 'payment-modes' },
+      { key: 'treasury_accounts', label: 'حسابات الخزينة',   endpoint: 'treasury-accounts' },
+      { key: 'payment_modes',     label: 'طرق الدفع',         endpoint: 'payment-modes' },
     ],
   },
   {
@@ -94,65 +96,98 @@ interface Props {
 
 export default function DataSeedingModal({ companySlug, companyName, onClose, onComplete }: Props) {
   type Phase = 'select' | 'applying' | 'done';
-  const [phase, setPhase] = useState<Phase>('select');
-  const [enabled, setEnabled] = useState<Set<string>>(
+  const [phase, setPhase]           = useState<Phase>('select');
+  const [enabled, setEnabled]       = useState<Set<string>>(
     () => new Set(SEED_GROUPS.filter(g => g.required || g.recommended).map(g => g.id))
   );
-  const [logs, setLogs]           = useState<SeedLog[]>([]);
-  const [totalDone, setTotalDone] = useState(0);
+  const [logs, setLogs]             = useState<SeedLog[]>([]);
+  const [totalDone, setTotalDone]   = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const [hasErrors, setHasErrors] = useState(false);
-  const [currentLabel, setCurrentLabel] = useState('');
-  const logEndRef = useRef<HTMLDivElement>(null);
+  const [hasErrors, setHasErrors]   = useState(false);
+  const [currentKey, setCurrentKey] = useState('');
+
+  // ref لكل سجل — للـ auto-scroll
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const selectedGroups = SEED_GROUPS.filter(g => enabled.has(g.id));
   const selectedSeeds  = selectedGroups.flatMap(g => g.seeds);
   const progress = totalCount > 0 ? Math.round((totalDone / totalCount) * 100) : 0;
 
-  const handleApply = async () => {
-    if (selectedSeeds.length === 0) { onComplete(); return; }
-    setTotalCount(selectedSeeds.length);
-    setTotalDone(0);
-    setHasErrors(false);
-    setPhase('applying');
-    setLogs(selectedSeeds.map(s => ({ key: s.key, label: s.label, status: 'idle' })));
-
-    let done = 0, errors = false;
-    for (const seed of selectedSeeds) {
-      setCurrentLabel(seed.label);
-      setLogs(prev => prev.map(l => l.key === seed.key ? { ...l, status: 'running' } : l));
-      try {
-        await client.post(`/${companySlug}/seeds/${seed.endpoint}`);
-        done++;
-        setTotalDone(done);
-        setLogs(prev => prev.map(l => l.key === seed.key ? { ...l, status: 'done' } : l));
-      } catch (err: any) {
-        errors = true; done++;
-        setTotalDone(done);
-        setLogs(prev => prev.map(l =>
-          l.key === seed.key ? { ...l, status: 'error', message: err?.response?.data?.message ?? 'فشل' } : l
-        ));
-      }
-      setTimeout(() => logEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+  // scroll للعنصر النشط حين يتغير
+  useEffect(() => {
+    if (currentKey && itemRefs.current[currentKey]) {
+      itemRefs.current[currentKey]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-    setCurrentLabel(''); setHasErrors(errors); setPhase('done');
-  };
+  }, [currentKey]);
 
+const handleApply = async () => {
+  if (selectedSeeds.length === 0) { onComplete(); return; }
+  setTotalCount(selectedSeeds.length);
+  setTotalDone(0);
+  setHasErrors(false);
+  setPhase('applying');
+  setLogs(selectedSeeds.map(s => ({ key: s.key, label: s.label, status: 'idle' })));
+
+  let done = 0, errors = false;
+  // الحصول على التوكن من localStorage
+  const token = localStorage.getItem('auth_token');
+
+  for (const seed of selectedSeeds) {
+    setCurrentKey(seed.key);
+    setLogs(prev => prev.map(l => l.key === seed.key ? { ...l, status: 'running' } : l));
+    try {
+      // ✅ استخدام fetch مباشرة بدلاً من client.post
+      const response = await fetch(`/api/v1/${companySlug}/seeds/${seed.endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'فشل');
+      }
+
+      done++;
+      setTotalDone(done);
+      setLogs(prev => prev.map(l => l.key === seed.key ? { ...l, status: 'done' } : l));
+    } catch (err: any) {
+      errors = true;
+      done++;
+      setTotalDone(done);
+      setLogs(prev => prev.map(l =>
+        l.key === seed.key
+          ? { ...l, status: 'error', message: err?.message ?? 'فشل' }
+          : l
+      ));
+    }
+  }
+  setCurrentKey('');
+  setHasErrors(errors);
+  setPhase('done');
+};
   const toggleGroup = (id: string) => {
     const g = SEED_GROUPS.find(g => g.id === id);
     if (g?.required) return;
-    setEnabled(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setEnabled(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
   };
 
   const totalSelected = selectedSeeds.length;
   const totalAll      = SEED_GROUPS.flatMap(g => g.seeds).length;
 
-  // ── حساب عدد العناصر المحددة لكل مجموعة ──
-  const groupCount = (g: SeedGroup) => enabled.has(g.id) ? g.seeds.length : 0;
-
+  // ─────────────────────────────────────────────────────────
+  // PHASE: select
+  // ─────────────────────────────────────────────────────────
   const renderSelect = () => (
     <div>
-      {/* بطاقة الملخص */}
+      {/* ملخص */}
       <div style={{
         background: 'var(--emb, rgba(10,138,92,.08))',
         border: '1px solid var(--embo, rgba(10,138,92,.18))',
@@ -167,9 +202,7 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
           <i className="ti ti-database-import" style={{ color: '#fff', fontSize: 20 }} />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', marginBottom: 2 }}>
-            {companyName}
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', marginBottom: 2 }}>{companyName}</div>
           <div style={{ fontSize: 12, color: 'var(--t4)' }}>
             {totalSelected} عنصر من أصل {totalAll} • {selectedGroups.length} مجموعة محددة
           </div>
@@ -200,20 +233,15 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
                 animation: `slideInRow .25s ease ${idx * 0.04}s both`,
               }}
             >
-              {/* أيقونة */}
               <div style={{
                 width: 38, height: 38, borderRadius: 10, flexShrink: 0,
                 background: isOn ? 'var(--em)' : 'var(--bg4)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all .15s',
               }}>
-                <i className={`ti ${group.tabler}`} style={{
-                  fontSize: 18,
-                  color: isOn ? '#fff' : 'var(--t4)',
-                }} />
+                <i className={`ti ${group.tabler}`} style={{ fontSize: 18, color: isOn ? '#fff' : 'var(--t4)' }} />
               </div>
 
-              {/* نص */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)' }}>{group.label}</span>
@@ -237,14 +265,13 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
                 </div>
               </div>
 
-              {/* عداد + toggle */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                 {isOn && (
                   <span style={{
                     fontSize: 11, fontWeight: 800, color: 'var(--em)',
                     background: 'var(--emb)', padding: '2px 8px', borderRadius: 20,
                   }}>
-                    {groupCount(group)}
+                    {group.seeds.length}
                   </span>
                 )}
                 {group.required ? (
@@ -255,14 +282,11 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
                     <i className="ti ti-lock" style={{ fontSize: 11, color: '#fff' }} />
                   </div>
                 ) : (
-                  <div
-                    style={{
-                      width: 36, height: 20, borderRadius: 10,
-                      background: isOn ? 'var(--em)' : 'var(--b3)',
-                      position: 'relative', transition: 'background .2s',
-                      flexShrink: 0,
-                    }}
-                  >
+                  <div style={{
+                    width: 36, height: 20, borderRadius: 10,
+                    background: isOn ? 'var(--em)' : 'var(--b3)',
+                    position: 'relative', transition: 'background .2s', flexShrink: 0,
+                  }}>
                     <div style={{
                       width: 16, height: 16, borderRadius: '50%', background: '#fff',
                       position: 'absolute', top: 2,
@@ -287,95 +311,175 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
     </div>
   );
 
-  const renderApplying = () => (
-    <div style={{ direction: 'rtl' }}>
-      {/* رأس التقدم */}
-      <div style={{
-        background: 'var(--bg3)', borderRadius: 14, padding: '16px 18px', marginBottom: 16,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%', background: 'var(--em)',
-              animation: 'pulse 1.2s ease infinite',
-            }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>
-              {currentLabel || 'اكتمل'}
+  // ─────────────────────────────────────────────────────────
+  // PHASE: applying — التجربة البصرية الجديدة
+  // ─────────────────────────────────────────────────────────
+  const renderApplying = () => {
+    const currentLog = logs.find(l => l.status === 'running');
+    const doneLogs   = logs.filter(l => l.status === 'done' || l.status === 'error');
+    const idleLogs   = logs.filter(l => l.status === 'idle');
+
+    return (
+      <div style={{ direction: 'rtl' }}>
+
+        {/* ── شريط التقدم العلوي ── */}
+        <div style={{
+          background: 'var(--bg3)', borderRadius: 14, padding: '14px 18px', marginBottom: 14,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--t4)', fontWeight: 600 }}>
+              {totalDone} / {totalCount} عنصر
             </span>
+            <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--em)' }}>{progress}%</span>
           </div>
-          <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--em)' }}>
-            {progress}%
-          </span>
-        </div>
-
-        {/* شريط التقدم مخصص */}
-        <div style={{ height: 6, background: 'var(--b2)', borderRadius: 99, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', background: 'var(--em)', borderRadius: 99,
-            width: `${progress}%`, transition: 'width .4s ease',
-          }} />
-        </div>
-
-        <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 8, textAlign: 'left' }}>
-          {totalDone} / {totalCount} عنصر
-        </div>
-      </div>
-
-      {/* سجل العمليات */}
-      <div style={{ maxHeight: 260, overflowY: 'auto', borderRadius: 12, border: '1px solid var(--b1)' }}>
-        {logs.map((log, i) => (
-          <div
-            key={log.key}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
-              borderBottom: i < logs.length - 1 ? '1px solid var(--b1)' : 'none',
-              background: log.status === 'running' ? 'var(--emb, rgba(10,138,92,.04))' : 'transparent',
-              transition: 'background .2s',
-            }}
-          >
+          <div style={{ height: 7, background: 'var(--b2)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{
-              width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background:
-                log.status === 'done'    ? 'var(--emb)' :
-                log.status === 'error'   ? 'var(--redb)' :
-                log.status === 'running' ? 'var(--emb)' : 'var(--bg4)',
+              height: '100%', borderRadius: 99,
+              background: 'linear-gradient(90deg, var(--em), var(--em) 80%, rgba(10,138,92,.4))',
+              width: `${progress}%`,
+              transition: 'width .5s cubic-bezier(.4,0,.2,1)',
+              position: 'relative',
             }}>
-              {log.status === 'done' && <i className="ti ti-check" style={{ fontSize: 12, color: 'var(--em)' }} />}
-              {log.status === 'error' && <i className="ti ti-x" style={{ fontSize: 12, color: 'var(--red)' }} />}
-              {log.status === 'running' && (
-                <i className="ti ti-loader" style={{ fontSize: 12, color: 'var(--em)', animation: 'spin .7s linear infinite' }} />
-              )}
-              {log.status === 'idle' && <i className="ti ti-circle" style={{ fontSize: 12, color: 'var(--b3)' }} />}
+              {/* نبضة عند نهاية الشريط */}
+              <div style={{
+                position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
+                width: 10, height: 10, borderRadius: '50%',
+                background: 'var(--em)',
+                boxShadow: '0 0 0 3px var(--emb)',
+                animation: 'pingPulse 1.2s ease infinite',
+              }} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── بطاقة السيدر النشط (الأهم — دائماً في الأعلى) ── */}
+        {currentLog && (
+          <div style={{
+            borderRadius: 14,
+            border: '2px solid var(--em)',
+            background: 'var(--emb, rgba(10,138,92,.06))',
+            padding: '14px 18px',
+            marginBottom: 10,
+            display: 'flex', alignItems: 'center', gap: 14,
+            animation: 'slideInActive .3s cubic-bezier(.34,1.56,.64,1)',
+            boxShadow: '0 0 0 4px var(--embo, rgba(10,138,92,.08))',
+          }}>
+            {/* دائرة نبض */}
+            <div style={{
+              width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+              background: 'var(--em)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 0 6px var(--emb)',
+              animation: 'glowPulse 1.4s ease infinite',
+            }}>
+              <i className="ti ti-loader-2" style={{
+                fontSize: 20, color: '#fff',
+                animation: 'spin .8s linear infinite',
+              }} />
             </div>
 
-            <span style={{
-              flex: 1, fontSize: 12, fontWeight: log.status === 'running' ? 700 : 500,
-              color: log.status === 'error' ? 'var(--red)' : log.status === 'running' ? 'var(--t1)' : 'var(--t3)',
-            }}>
-              {log.label}
-            </span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 3, fontWeight: 600 }}>
+                جارٍ التطبيق الآن...
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--t1)' }}>
+                {currentLog.label}
+              </div>
+            </div>
 
-            {log.status === 'error' && log.message && (
-              <span style={{ fontSize: 10, color: 'var(--red)', maxWidth: 120, textAlign: 'left', opacity: .8 }}>
-                {log.message}
-              </span>
-            )}
-            {log.status === 'done' && (
-              <span style={{ fontSize: 10, color: 'var(--em)', fontWeight: 700 }}>✓</span>
-            )}
+            {/* مؤشر الخطوة */}
+            <div style={{ textAlign: 'center', direction: 'ltr' }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--em)', lineHeight: 1 }}>
+                {totalDone + 1}
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 700 }}>من {totalCount}</div>
+            </div>
           </div>
-        ))}
-        <div ref={logEndRef} />
+        )}
+
+        {/* ── قائمة العمليات المكتملة + المنتظرة ── */}
+        <div style={{
+          maxHeight: 240,
+          overflowY: 'auto',
+          borderRadius: 12,
+          border: '1px solid var(--b1)',
+        }}>
+          {logs.map((log, i) => {
+            const isRunning = log.status === 'running';
+            // نخفي العنصر النشط من القائمة (يظهر في البطاقة أعلى)
+            if (isRunning) return null;
+
+            return (
+              <div
+                key={log.key}
+                ref={el => { itemRefs.current[log.key] = el; }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
+                  borderBottom: i < logs.length - 1 ? '1px solid var(--b1)' : 'none',
+                  opacity: log.status === 'idle' ? 0.45 : 1,
+                  transition: 'opacity .3s, background .2s',
+                  animation: log.status === 'done' || log.status === 'error'
+                    ? 'itemComplete .35s cubic-bezier(.34,1.4,.64,1)'
+                    : 'none',
+                }}
+              >
+                {/* أيقونة الحالة */}
+                <div style={{
+                  width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background:
+                    log.status === 'done'  ? 'var(--emb)'  :
+                    log.status === 'error' ? 'var(--redb)' : 'var(--bg4)',
+                  transition: 'background .2s',
+                }}>
+                  {log.status === 'done'  && <i className="ti ti-check" style={{ fontSize: 13, color: 'var(--em)' }} />}
+                  {log.status === 'error' && <i className="ti ti-x"     style={{ fontSize: 13, color: 'var(--red)' }} />}
+                  {log.status === 'idle'  && <i className="ti ti-circle" style={{ fontSize: 13, color: 'var(--b3)' }} />}
+                </div>
+
+                {/* اسم العنصر */}
+                <span style={{
+                  flex: 1, fontSize: 12,
+                  fontWeight: log.status === 'done' ? 600 : 400,
+                  color:
+                    log.status === 'error' ? 'var(--red)' :
+                    log.status === 'done'  ? 'var(--t2)'  : 'var(--t4)',
+                  transition: 'color .2s',
+                }}>
+                  {log.label}
+                </span>
+
+                {/* رسالة خطأ أو علامة نجاح */}
+                {log.status === 'error' && log.message && (
+                  <span style={{
+                    fontSize: 10, color: 'var(--red)', maxWidth: 130,
+                    textAlign: 'left', opacity: .85, lineHeight: 1.3,
+                  }}>
+                    {log.message}
+                  </span>
+                )}
+                {log.status === 'done' && (
+                  <i className="ti ti-circle-check-filled" style={{ fontSize: 15, color: 'var(--em)', opacity: .7 }} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <style>{`
+          @keyframes spin          { to { transform: rotate(360deg); } }
+          @keyframes pingPulse     { 0%,100% { box-shadow: 0 0 0 3px var(--emb); } 50% { box-shadow: 0 0 0 6px transparent; } }
+          @keyframes glowPulse     { 0%,100% { box-shadow: 0 0 0 6px var(--emb); } 50% { box-shadow: 0 0 0 10px transparent; } }
+          @keyframes slideInActive { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: none; } }
+          @keyframes itemComplete  { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+        `}</style>
       </div>
+    );
+  };
 
-      <style>{`
-        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
-        @keyframes spin   { to { transform: rotate(360deg); } }
-      `}</style>
-    </div>
-  );
-
+  // ─────────────────────────────────────────────────────────
+  // PHASE: done
+  // ─────────────────────────────────────────────────────────
   const renderDone = () => (
     <div style={{ textAlign: 'center', padding: '12px 0 8px', direction: 'rtl' }}>
       {hasErrors ? (
@@ -387,12 +491,8 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
           }}>
             <i className="ti ti-alert-triangle" style={{ fontSize: 30, color: 'var(--gold, #b87d0a)' }} />
           </div>
-          <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--t1)', marginBottom: 6 }}>
-            اكتمل مع بعض الأخطاء
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--t4)', marginBottom: 16 }}>
-            بعض البيانات لم تُطبَّق، يمكنك إضافتها لاحقاً
-          </div>
+          <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--t1)', marginBottom: 6 }}>اكتمل مع بعض الأخطاء</div>
+          <div style={{ fontSize: 13, color: 'var(--t4)', marginBottom: 16 }}>بعض البيانات لم تُطبَّق، يمكنك إضافتها لاحقاً</div>
           <div style={{
             background: 'var(--redb)', border: '1px solid var(--redbo)', borderRadius: 10,
             padding: '10px 14px', marginBottom: 20, textAlign: 'right',
@@ -414,18 +514,15 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
           }}>
             <i className="ti ti-check" style={{ fontSize: 30, color: 'var(--em)' }} />
           </div>
-          <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--t1)', marginBottom: 6 }}>
-            تم الإعداد بنجاح!
-          </div>
+          <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--t1)', marginBottom: 6 }}>تم الإعداد بنجاح!</div>
           <div style={{ fontSize: 13, color: 'var(--t4)', marginBottom: 20 }}>
             تم تطبيق <strong style={{ color: 'var(--em)' }}>{totalDone}</strong> عنصر بنجاح على شركة {companyName}
           </div>
 
-          {/* إحصاء سريع */}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 20 }}>
             {[
               { label: 'المجموعات', value: selectedGroups.length, icon: 'ti-stack' },
-              { label: 'العناصر', value: totalDone, icon: 'ti-database' },
+              { label: 'العناصر',   value: totalDone,              icon: 'ti-database' },
             ].map(stat => (
               <div key={stat.label} style={{
                 background: 'var(--bg3)', borderRadius: 12, padding: '12px 20px',
@@ -458,6 +555,9 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
     </div>
   );
 
+  // ─────────────────────────────────────────────────────────
+  // Footer
+  // ─────────────────────────────────────────────────────────
   const renderFooter = () => {
     if (phase !== 'select') return null;
     return (
@@ -478,10 +578,13 @@ export default function DataSeedingModal({ companySlug, companyName, onClose, on
           disabled={selectedSeeds.length === 0}
           style={{
             flex: 2, padding: '10px', borderRadius: 10,
-            border: 'none', background: selectedSeeds.length > 0 ? 'var(--em)' : 'var(--b3)',
+            border: 'none',
+            background: selectedSeeds.length > 0 ? 'var(--em)' : 'var(--b3)',
             color: selectedSeeds.length > 0 ? '#fff' : 'var(--t4)',
-            fontSize: 13, fontWeight: 800, cursor: selectedSeeds.length > 0 ? 'pointer' : 'not-allowed',
-            fontFamily: 'inherit', boxShadow: selectedSeeds.length > 0 ? 'var(--emglow)' : 'none',
+            fontSize: 13, fontWeight: 800,
+            cursor: selectedSeeds.length > 0 ? 'pointer' : 'not-allowed',
+            fontFamily: 'inherit',
+            boxShadow: selectedSeeds.length > 0 ? 'var(--emglow)' : 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             transition: 'all .15s',
           }}

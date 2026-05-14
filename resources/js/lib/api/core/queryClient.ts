@@ -36,13 +36,12 @@ export const queryClient = new QueryClient({
 
   defaultOptions: {
     queries: {
-      // لا تُعيد الجلب تلقائياً إلا عند انتهاء الـ staleTime
       staleTime:            10 * MINUTE,
-      // احتفظ بالبيانات في الكاش لمدة أطول من staleTime
       gcTime:               30 * MINUTE,
-      // لا تُعيد الجلب عند focus/mount — يُقلل الطلبات الزائدة
+      // ✅ refetchOnMount: true — ضروري حتى يعمل invalidateQueries بشكل صحيح
+      // بدونه: بعد mutation + invalidate، القائمة لا تتحدث لأن الـ component لم يُعد mount
+      refetchOnMount:       true,
       refetchOnWindowFocus: false,
-      refetchOnMount:       false,
       refetchOnReconnect:   true,
       // إعادة المحاولة مرة واحدة فقط — بسرعة
       retry: (failureCount, error) => {

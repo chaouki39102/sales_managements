@@ -1,62 +1,64 @@
 // ════════════════════════════════════════════════════════════════════════════
 // lib/api/endpoints/auth.ts
-// Auth API — endpoints + React Query hooks
+// ✅ مصحح: useLogin يُعيد AuthResponse لتمكين redirect بناءً على role
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost, tokenStorage } from '../core/client';
-import { authKeys, companyKeys, tenantKeys } from '../core/queryKeys';
+import { authKeys } from '../core/queryKeys';
 import { appActions } from '../../store/appStore';
 import { clearAllCache } from '../core/queryClient';
 import type { User, LoginCredentials, AuthResponse } from '../core/types';
 
-// ─── API functions ────────────────────────────────────────────────────────────
+// ─── API ──────────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  me:     ()                       => apiGet<User>('/auth/me'),
+  me:     ()                        => apiGet<User>('/auth/me'),
   login:  (creds: LoginCredentials) => apiPost<AuthResponse>('/auth/login', creds),
-  logout: ()                       => apiPost<void>('/auth/logout'),
+  logout: ()                        => apiPost<void>('/auth/logout'),
 } as const;
 
-// ─── Hooks ───────────────────────────────────────────────────────────────────
+// ─── Hooks ────────────────────────────────────────────────────────────────────
 
-/**
- * جلب المستخدم الحالي — يُشغَّل فقط إذا كان هناك token
- */
 export function useCurrentUser() {
   return useQuery({
-    queryKey: authKeys.me,
-    queryFn:  authApi.me,
-    enabled:  !!tokenStorage.get(),
-    staleTime: Infinity, // لا تُعد الجلب تلقائياً — يُبطَل يدوياً عند logout
-    retry: false,
+    queryKey:  authKeys.me,
+    queryFn:   authApi.me,
+    enabled:   !!tokenStorage.get(),
+    staleTime: Infinity,
+    retry:     false,
   });
 }
 
 /**
- * تسجيل الدخول
+ * ✅ يُعيد AuthResponse (user + token) لتمكين redirect بناءً على الدور
+ *
+ * مثال:
+ *   const { mutateAsync: login } = useLogin();
+ *   const result = await login(creds);
+ *   if (result.user.roles?.some(r => r.name === 'super-admin')) {
+ *     navigate('/admin');
+ *   } else {
+ *     navigate('/dashboard');
+ *   }
  */
 export function useLogin() {
   const qc = useQueryClient();
 
-  return useMutation({
+  return useMutation<AuthResponse, Error, LoginCredentials>({
     mutationFn: authApi.login,
     onSuccess: ({ user, token }) => {
       tokenStorage.set(token);
-      // حفظ المستخدم مباشرة في الكاش بدون طلب إضافي
+      // ✅ حفظ المستخدم مباشرة في الكاش — لا طلب /auth/me إضافي
       qc.setQueryData(authKeys.me, user);
     },
   });
 }
 
-/**
- * تسجيل الخروج — يُنظف كل الحالة
- */
 export function useLogout() {
   return useMutation({
     mutationFn: authApi.logout,
     onSettled: () => {
-      // نُنظف حتى لو فشل الطلب
       tokenStorage.clear();
       appActions.reset();
       clearAllCache();

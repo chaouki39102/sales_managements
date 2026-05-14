@@ -8842,7 +8842,7 @@ function StockMovementModal({ open, onClose, type, variants }: {
 ```
 // pages/invoices/InvoicesPage.tsx
 import React, { useState, useCallback, useMemo } from 'react';
-import { useDocuments, useDocumentMutations }      from '@/lib/api/endpoints/document';
+import { useDocuments, useDocumentMutations }      from '@/lib/api/endpoints/documents';
 import { useClients }                              from '@/lib/api/endpoints/parties';
 import { useWarehouses, usePaymentModes, useGlobalDocumentTypes } from '@/lib/api/endpoints/lookups';
 import { useFiscalYear }                           from '@/context/FiscalYearContext';

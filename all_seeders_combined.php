@@ -993,293 +993,385 @@ class ProductTypeSeeder extends Seeder
 // ===== ملف: RolesAndPermissionsSeeder.php =====
 namespace Database\Seeders;
 
+use App\Services\CompanyRoleService;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
+/**
+ * RolesAndPermissionsSeeder
+ * ══════════════════════════════════════════════════════════════════
+ * مسؤول عن:
+ *  1. إنشاء جميع الصلاحيات العالمية (company_id = null)
+ *  2. إنشاء دور super-admin العالمي ومنحه كل الصلاحيات
+ *  3. بذر أدوار الشركة الأولى (seed) عبر CompanyRoleService
+ *  4. تعيين الأدوار للمستخدمين الأوليين
+ *
+ * ملاحظة: عند إنشاء شركة جديدة يتم استدعاء CompanyRoleService
+ *          تلقائياً من CompanyObserver::created()
+ * ══════════════════════════════════════════════════════════════════
+ */
 class RolesAndPermissionsSeeder extends Seeder
 {
+    public function __construct(private readonly CompanyRoleService $roleService)
+    {
+    }
+
     public function run(): void
     {
         $companyId = config('seeding.company_id');
 
+        // مسح الكاش أولاً
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 
-        // 1. إنشاء الصلاحيات (عالمية: company_id = null)
-        foreach ($this->getPermissions() as $perm) {
-            Permission::firstOrCreate(
-                ['name' => $perm['name'], 'guard_name' => 'web', 'company_id' => null],
-                [
-                    'display_name' => $perm['display_name'] ?? $perm['name'],
-                    'group'        => $perm['group'] ?? 'عام',
-                    'description'  => $perm['description'] ?? '',
-                ]
-            );
-        }
+        // ── الخطوة 1: إنشاء الصلاحيات العالمية ──────────────────
+        $this->seedPermissions();
 
-        $this->command->info('✅ تم إنشاء ' . Permission::count() . ' صلاحية');
+        // ── الخطوة 2: إنشاء دور super-admin العالمي ──────────────
+        $this->seedSuperAdmin();
 
-        // 2. إنشاء الأدوار
-        foreach ($this->getRoles() as $roleData) {
-            $isSuperAdmin  = $roleData['name'] === 'super-admin';
-            $roleCompanyId = $isSuperAdmin ? null : $companyId;
+        // ── الخطوة 3: بذر أدوار الشركة الأولى ───────────────────
+        $this->roleService->seedRoles($companyId);
+        $this->command->info("✅ تم إنشاء أدوار الشركة #{$companyId}");
 
-            Role::firstOrCreate(
-                ['name' => $roleData['name'], 'guard_name' => 'web', 'company_id' => $roleCompanyId],
-                ['display_name' => $roleData['display_name'], 'description' => $roleData['description'] ?? '']
-            );
-        }
+        // ── الخطوة 4: تعيين الأدوار للمستخدمين الأوليين ──────────
+        $this->assignInitialUsers($companyId);
 
-        $this->command->info('✅ تم إنشاء ' . Role::count() . ' أدوار');
-
-        // 3. تعيين الصلاحيات للأدوار
-        $allPerms = Permission::whereNull('company_id')->get();
-
-        Role::where('name', 'super-admin')->whereNull('company_id')->first()
-            ?->syncPermissions($allPerms);
-
-        foreach ($this->getRolePermissions() as $roleName => $permNames) {
-            if ($roleName === 'super-admin') {
-                continue;
-            }
-
-            $role = Role::where('name', $roleName)->where('company_id', $companyId)->first();
-            if (!$role) {
-                continue;
-            }
-
-            $perms = Permission::whereIn('name', $permNames)->whereNull('company_id')->get();
-            $role->syncPermissions($perms);
-            $this->command->line("  ↳ {$role->display_name}: {$perms->count()} صلاحية");
-        }
-
-        // 4. تعيين الأدوار للمستخدمين
-        $superAdmin = \App\Models\User::where('email', 'admin@mail.com')->first();
-        $superAdmin?->assignRole('super-admin');
-
-        $admin = \App\Models\User::where('email', 'admin.user@mail.com')->first();
-        $admin?->assignRole(Role::where('name', 'admin')->where('company_id', $companyId)->first());
-
-        // 5. مسح الكاش
+        // مسح الكاش في النهاية
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 
         $this->command->info('🎉 اكتمل الـ Seeder بنجاح!');
     }
 
+    // ─────────────────────────────────────────────────────────────
+
+    private function seedPermissions(): void
+    {
+        foreach ($this->getPermissions() as $perm) {
+            Permission::firstOrCreate(
+                [
+                    'name'       => $perm['name'],
+                    'guard_name' => 'web',
+                    'company_id' => null,          // عالمية دائماً
+                ],
+                [
+                    'display_name' => $perm['display_name'] ?? $perm['name'],
+                    'group'        => $perm['group']        ?? 'عام',
+                    'description'  => $perm['description']  ?? '',
+                ]
+            );
+        }
+
+        $this->command->info('✅ تم إنشاء ' . Permission::whereNull('company_id')->count() . ' صلاحية');
+    }
+
+    private function seedSuperAdmin(): void
+    {
+        $superAdmin = Role::firstOrCreate(
+            [
+                'name'       => 'super-admin',
+                'guard_name' => 'web',
+                'company_id' => null,             // عالمي
+            ],
+            [
+                'display_name' => 'مدير النظام',
+                'description'  => 'صلاحيات كاملة على كل شيء',
+            ]
+        );
+
+        // super-admin يحصل على كل الصلاحيات العالمية دائماً
+        $superAdmin->syncPermissions(Permission::whereNull('company_id')->get());
+
+        $this->command->info('✅ تم إعداد دور super-admin');
+    }
+
+    private function assignInitialUsers(int $companyId): void
+    {
+        // المستخدم العالمي (super-admin)
+        $superAdminUser = \App\Models\User::where('email', 'admin@mail.com')->first();
+        if ($superAdminUser) {
+            $superAdminRole = Role::where('name', 'super-admin')->whereNull('company_id')->first();
+            $superAdminUser->syncRoles([$superAdminRole]);
+            $this->command->line('  ↳ super-admin: admin@mail.com');
+        }
+
+        // مدير الشركة الأولى
+        $adminUser = \App\Models\User::where('email', 'admin.user@mail.com')->first();
+        if ($adminUser) {
+            $this->roleService->assignRole($adminUser, 'admin', $companyId);
+            $this->command->line('  ↳ admin: admin.user@mail.com');
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // قائمة الصلاحيات العالمية
+    // ─────────────────────────────────────────────────────────────
+
     private function getPermissions(): array
     {
         return [
+
+            // ══════════════════════════════════════════════════════
             // 1. المستخدمون
-            ['name' => 'view_any_user',       'display_name' => 'عرض قائمة المستخدمين',      'group' => 'المستخدمون', 'description' => 'عرض قائمة جميع مستخدمي الشركة'],
-            ['name' => 'view_user',           'display_name' => 'عرض مستخدم',               'group' => 'المستخدمون', 'description' => 'عرض تفاصيل مستخدم واحد'],
-            ['name' => 'create_user',         'display_name' => 'إنشاء مستخدم',             'group' => 'المستخدمون', 'description' => 'إضافة مستخدم جديد للشركة'],
-            ['name' => 'update_user',         'display_name' => 'تعديل مستخدم',             'group' => 'المستخدمون', 'description' => 'تعديل بيانات مستخدم موجود'],
-            ['name' => 'delete_user',         'display_name' => 'حذف مستخدم',               'group' => 'المستخدمون', 'description' => 'حذف مستخدم من الشركة'],
-            ['name' => 'restore_user',        'display_name' => 'استعادة مستخدم',           'group' => 'المستخدمون', 'description' => 'استعادة مستخدم محذوف'],
-            ['name' => 'force_delete_user',   'display_name' => 'حذف نهائي لمستخدم',        'group' => 'المستخدمون', 'description' => 'الحذف النهائي لمستخدم'],
-            ['name' => 'toggle_active_user',  'display_name' => 'تفعيل/تعطيل مستخدم',       'group' => 'المستخدمون', 'description' => 'تغيير حالة تفعيل المستخدم'],
-            ['name' => 'change_password_user','display_name' => 'تغيير كلمة مرور مستخدم',   'group' => 'المستخدمون', 'description' => 'تغيير كلمة مرور مستخدم آخر'],
-            ['name' => 'assign_role_user',    'display_name' => 'تعيين دور لمستخدم',        'group' => 'المستخدمون', 'description' => 'تغيير دور مستخدم داخل الشركة'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_user',        'display_name' => 'عرض قائمة المستخدمين',      'group' => 'المستخدمون', 'description' => 'عرض قائمة جميع مستخدمي الشركة'],
+            ['name' => 'view_user',            'display_name' => 'عرض مستخدم',                'group' => 'المستخدمون', 'description' => 'عرض تفاصيل مستخدم واحد'],
+            ['name' => 'create_user',          'display_name' => 'إنشاء مستخدم',              'group' => 'المستخدمون', 'description' => 'إضافة مستخدم جديد للشركة'],
+            ['name' => 'update_user',          'display_name' => 'تعديل مستخدم',              'group' => 'المستخدمون', 'description' => 'تعديل بيانات مستخدم موجود'],
+            ['name' => 'delete_user',          'display_name' => 'حذف مستخدم',                'group' => 'المستخدمون', 'description' => 'حذف مستخدم من الشركة'],
+            ['name' => 'restore_user',         'display_name' => 'استعادة مستخدم',            'group' => 'المستخدمون', 'description' => 'استعادة مستخدم محذوف'],
+            ['name' => 'force_delete_user',    'display_name' => 'حذف نهائي لمستخدم',         'group' => 'المستخدمون', 'description' => 'الحذف النهائي لمستخدم'],
+            ['name' => 'toggle_active_user',   'display_name' => 'تفعيل/تعطيل مستخدم',        'group' => 'المستخدمون', 'description' => 'تغيير حالة تفعيل المستخدم'],
+            ['name' => 'change_password_user', 'display_name' => 'تغيير كلمة مرور مستخدم',    'group' => 'المستخدمون', 'description' => 'تغيير كلمة مرور مستخدم آخر'],
+            ['name' => 'assign_role_user',     'display_name' => 'تعيين دور لمستخدم',         'group' => 'المستخدمون', 'description' => 'تغيير دور مستخدم داخل الشركة'],
+
+            // ══════════════════════════════════════════════════════
             // 2. الأطراف
-            ['name' => 'view_any_party',      'display_name' => 'عرض قائمة الأطراف',        'group' => 'الأطراف',    'description' => 'عرض قائمة العملاء والموردين'],
-            ['name' => 'view_party',          'display_name' => 'عرض طرف',                  'group' => 'الأطراف',    'description' => 'عرض تفاصيل عميل أو مورد'],
-            ['name' => 'create_party',        'display_name' => 'إنشاء طرف',                'group' => 'الأطراف',    'description' => 'إضافة عميل أو مورد جديد'],
-            ['name' => 'update_party',        'display_name' => 'تعديل طرف',                'group' => 'الأطراف',    'description' => 'تعديل بيانات عميل أو مورد'],
-            ['name' => 'delete_party',        'display_name' => 'حذف طرف',                  'group' => 'الأطراف',    'description' => 'حذف عميل أو مورد'],
-            ['name' => 'restore_party',       'display_name' => 'استعادة طرف',              'group' => 'الأطراف',    'description' => 'استعادة عميل أو مورد محذوف'],
-            ['name' => 'force_delete_party',  'display_name' => 'حذف نهائي لطرف',           'group' => 'الأطراف',    'description' => 'الحذف النهائي لعميل أو مورد'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_party',     'display_name' => 'عرض قائمة الأطراف',   'group' => 'الأطراف', 'description' => 'عرض قائمة العملاء والموردين'],
+            ['name' => 'view_party',         'display_name' => 'عرض طرف',             'group' => 'الأطراف', 'description' => 'عرض تفاصيل عميل أو مورد'],
+            ['name' => 'create_party',       'display_name' => 'إنشاء طرف',           'group' => 'الأطراف', 'description' => 'إضافة عميل أو مورد جديد'],
+            ['name' => 'update_party',       'display_name' => 'تعديل طرف',           'group' => 'الأطراف', 'description' => 'تعديل بيانات عميل أو مورد'],
+            ['name' => 'delete_party',       'display_name' => 'حذف طرف',             'group' => 'الأطراف', 'description' => 'حذف عميل أو مورد'],
+            ['name' => 'restore_party',      'display_name' => 'استعادة طرف',         'group' => 'الأطراف', 'description' => 'استعادة عميل أو مورد محذوف'],
+            ['name' => 'force_delete_party', 'display_name' => 'حذف نهائي لطرف',      'group' => 'الأطراف', 'description' => 'الحذف النهائي لعميل أو مورد'],
+
+            // ══════════════════════════════════════════════════════
             // 3. المنتجات
-            ['name' => 'view_any_product',         'display_name' => 'عرض قائمة المنتجات',      'group' => 'المنتجات',   'description' => 'عرض قائمة جميع المنتجات'],
-            ['name' => 'view_product',             'display_name' => 'عرض منتج',                'group' => 'المنتجات',   'description' => 'عرض تفاصيل منتج واحد'],
-            ['name' => 'create_product',           'display_name' => 'إنشاء منتج',              'group' => 'المنتجات',   'description' => 'إضافة منتج جديد'],
-            ['name' => 'update_product',           'display_name' => 'تعديل منتج',              'group' => 'المنتجات',   'description' => 'تعديل بيانات منتج موجود'],
-            ['name' => 'delete_product',           'display_name' => 'حذف منتج',                'group' => 'المنتجات',   'description' => 'حذف منتج'],
-            ['name' => 'restore_product',          'display_name' => 'استعادة منتج',            'group' => 'المنتجات',   'description' => 'استعادة منتج محذوف'],
-            ['name' => 'manage_product_prices',    'display_name' => 'إدارة أسعار المنتجات',    'group' => 'المنتجات',   'description' => 'تعديل أسعار المنتجات وتعريفاتها'],
-            ['name' => 'manage_product_variants',  'display_name' => 'إدارة متغيرات المنتجات',  'group' => 'المنتجات',   'description' => 'إدارة متغيرات وتعبئة المنتجات'],
-            ['name' => 'manage_barcodes',          'display_name' => 'إدارة الباركود',           'group' => 'المنتجات',   'description' => 'إضافة وتعديل وحذف الباركود'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_product',        'display_name' => 'عرض قائمة المنتجات',      'group' => 'المنتجات', 'description' => 'عرض قائمة جميع المنتجات'],
+            ['name' => 'view_product',            'display_name' => 'عرض منتج',                'group' => 'المنتجات', 'description' => 'عرض تفاصيل منتج واحد'],
+            ['name' => 'create_product',          'display_name' => 'إنشاء منتج',              'group' => 'المنتجات', 'description' => 'إضافة منتج جديد'],
+            ['name' => 'update_product',          'display_name' => 'تعديل منتج',              'group' => 'المنتجات', 'description' => 'تعديل بيانات منتج موجود'],
+            ['name' => 'delete_product',          'display_name' => 'حذف منتج',                'group' => 'المنتجات', 'description' => 'حذف منتج'],
+            ['name' => 'restore_product',         'display_name' => 'استعادة منتج',            'group' => 'المنتجات', 'description' => 'استعادة منتج محذوف'],
+            ['name' => 'manage_product_prices',   'display_name' => 'إدارة أسعار المنتجات',    'group' => 'المنتجات', 'description' => 'تعديل أسعار المنتجات وتعريفاتها'],
+            ['name' => 'manage_product_variants', 'display_name' => 'إدارة متغيرات المنتجات',  'group' => 'المنتجات', 'description' => 'إدارة متغيرات وتعبئة المنتجات'],
+            ['name' => 'manage_barcodes',         'display_name' => 'إدارة الباركود',           'group' => 'المنتجات', 'description' => 'إضافة وتعديل وحذف الباركود'],
+            ['name' => 'manage_quantity_discounts','display_name' => 'إدارة تخفيضات الكميات',  'group' => 'المنتجات', 'description' => 'إدارة تخفيضات الكميات للمنتجات'],
+
+            // ══════════════════════════════════════════════════════
             // 4. المستودعات
+            // ══════════════════════════════════════════════════════
             ['name' => 'view_any_warehouse', 'display_name' => 'عرض قائمة المستودعات', 'group' => 'المستودعات', 'description' => 'عرض قائمة جميع المستودعات'],
             ['name' => 'view_warehouse',     'display_name' => 'عرض مستودع',           'group' => 'المستودعات', 'description' => 'عرض تفاصيل مستودع'],
             ['name' => 'create_warehouse',   'display_name' => 'إنشاء مستودع',         'group' => 'المستودعات', 'description' => 'إضافة مستودع جديد'],
             ['name' => 'update_warehouse',   'display_name' => 'تعديل مستودع',         'group' => 'المستودعات', 'description' => 'تعديل بيانات مستودع'],
             ['name' => 'delete_warehouse',   'display_name' => 'حذف مستودع',           'group' => 'المستودعات', 'description' => 'حذف مستودع'],
+
+            // ══════════════════════════════════════════════════════
             // 5. المستندات التجارية
-            ['name' => 'view_any_commercial_document', 'display_name' => 'عرض قائمة المستندات',    'group' => 'المستندات', 'description' => 'عرض قائمة جميع المستندات التجارية'],
-            ['name' => 'view_commercial_document',     'display_name' => 'عرض مستند',              'group' => 'المستندات', 'description' => 'عرض تفاصيل مستند تجاري'],
-            ['name' => 'create_sales_document',        'display_name' => 'إنشاء مستند بيع',        'group' => 'المستندات', 'description' => 'إنشاء فاتورة بيع أو عرض سعر'],
-            ['name' => 'create_purchase_document',     'display_name' => 'إنشاء مستند شراء',       'group' => 'المستندات', 'description' => 'إنشاء فاتورة شراء أو أمر شراء'],
-            ['name' => 'update_commercial_document',   'display_name' => 'تعديل مستند',            'group' => 'المستندات', 'description' => 'تعديل مستند تجاري غير مؤكد'],
-            ['name' => 'delete_commercial_document',   'display_name' => 'حذف مستند',              'group' => 'المستندات', 'description' => 'حذف مستند تجاري'],
-            ['name' => 'validate_commercial_document', 'display_name' => 'تأكيد مستند',            'group' => 'المستندات', 'description' => 'تأكيد وإقفال مستند تجاري'],
-            ['name' => 'lock_commercial_document',     'display_name' => 'قفل/فتح مستند',          'group' => 'المستندات', 'description' => 'قفل أو فتح مستند تجاري'],
-            ['name' => 'cancel_commercial_document',   'display_name' => 'إلغاء مستند',            'group' => 'المستندات', 'description' => 'إلغاء مستند تجاري'],
-            ['name' => 'manage_numbering_series',      'display_name' => 'إدارة سلاسل الترقيم',    'group' => 'المستندات', 'description' => 'إدارة سلاسل ترقيم المستندات'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_commercial_document',  'display_name' => 'عرض قائمة المستندات',   'group' => 'المستندات', 'description' => 'عرض قائمة جميع المستندات التجارية'],
+            ['name' => 'view_commercial_document',      'display_name' => 'عرض مستند',             'group' => 'المستندات', 'description' => 'عرض تفاصيل مستند تجاري'],
+            ['name' => 'create_sales_document',         'display_name' => 'إنشاء مستند بيع',       'group' => 'المستندات', 'description' => 'إنشاء فاتورة بيع أو عرض سعر'],
+            ['name' => 'create_purchase_document',      'display_name' => 'إنشاء مستند شراء',      'group' => 'المستندات', 'description' => 'إنشاء فاتورة شراء أو أمر شراء'],
+            ['name' => 'update_commercial_document',    'display_name' => 'تعديل مستند',           'group' => 'المستندات', 'description' => 'تعديل مستند تجاري غير مؤكد'],
+            ['name' => 'delete_commercial_document',    'display_name' => 'حذف مستند',             'group' => 'المستندات', 'description' => 'حذف مستند تجاري'],
+            ['name' => 'validate_commercial_document',  'display_name' => 'تأكيد مستند',           'group' => 'المستندات', 'description' => 'تأكيد وإقفال مستند تجاري'],
+            ['name' => 'lock_commercial_document',      'display_name' => 'قفل/فتح مستند',         'group' => 'المستندات', 'description' => 'قفل أو فتح مستند تجاري'],
+            ['name' => 'cancel_commercial_document',    'display_name' => 'إلغاء مستند',           'group' => 'المستندات', 'description' => 'إلغاء مستند تجاري'],
+            ['name' => 'duplicate_commercial_document', 'display_name' => 'نسخ مستند',             'group' => 'المستندات', 'description' => 'نسخ مستند تجاري موجود'],
+            ['name' => 'manage_numbering_series',       'display_name' => 'إدارة سلاسل الترقيم',   'group' => 'المستندات', 'description' => 'إدارة سلاسل ترقيم المستندات'],
+
+            // ══════════════════════════════════════════════════════
             // 6. المدفوعات
+            // ══════════════════════════════════════════════════════
             ['name' => 'view_any_payment', 'display_name' => 'عرض قائمة المدفوعات', 'group' => 'المدفوعات', 'description' => 'عرض قائمة جميع المدفوعات'],
             ['name' => 'view_payment',     'display_name' => 'عرض دفعة',            'group' => 'المدفوعات', 'description' => 'عرض تفاصيل دفعة واحدة'],
             ['name' => 'create_payment',   'display_name' => 'إنشاء دفعة',          'group' => 'المدفوعات', 'description' => 'تسجيل دفعة جديدة'],
             ['name' => 'update_payment',   'display_name' => 'تعديل دفعة',          'group' => 'المدفوعات', 'description' => 'تعديل بيانات دفعة'],
             ['name' => 'delete_payment',   'display_name' => 'حذف دفعة',            'group' => 'المدفوعات', 'description' => 'حذف دفعة'],
+
+            // ══════════════════════════════════════════════════════
             // 7. الشيكات
-            ['name' => 'view_any_check',    'display_name' => 'عرض قائمة الشيكات',    'group' => 'الشيكات', 'description' => 'عرض قائمة جميع الشيكات'],
-            ['name' => 'view_check',        'display_name' => 'عرض شيك',              'group' => 'الشيكات', 'description' => 'عرض تفاصيل شيك'],
-            ['name' => 'create_check',      'display_name' => 'إنشاء شيك',            'group' => 'الشيكات', 'description' => 'تسجيل شيك جديد'],
-            ['name' => 'update_check',      'display_name' => 'تعديل شيك',            'group' => 'الشيكات', 'description' => 'تعديل بيانات شيك'],
-            ['name' => 'delete_check',      'display_name' => 'حذف شيك',              'group' => 'الشيكات', 'description' => 'حذف شيك'],
-            ['name' => 'manage_check_status','display_name' => 'إدارة حالة الشيكات', 'group' => 'الشيكات', 'description' => 'تحديث حالة الشيك'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_check',     'display_name' => 'عرض قائمة الشيكات',  'group' => 'الشيكات', 'description' => 'عرض قائمة جميع الشيكات'],
+            ['name' => 'view_check',         'display_name' => 'عرض شيك',            'group' => 'الشيكات', 'description' => 'عرض تفاصيل شيك'],
+            ['name' => 'create_check',       'display_name' => 'إنشاء شيك',          'group' => 'الشيكات', 'description' => 'تسجيل شيك جديد'],
+            ['name' => 'update_check',       'display_name' => 'تعديل شيك',          'group' => 'الشيكات', 'description' => 'تعديل بيانات شيك'],
+            ['name' => 'delete_check',       'display_name' => 'حذف شيك',            'group' => 'الشيكات', 'description' => 'حذف شيك'],
+            ['name' => 'manage_check_status','display_name' => 'إدارة حالة الشيكات', 'group' => 'الشيكات', 'description' => 'تحديث حالة الشيك (صُرف/مرتجع...)'],
+
+            // ══════════════════════════════════════════════════════
             // 8. المصروفات
+            // ══════════════════════════════════════════════════════
             ['name' => 'view_any_expense', 'display_name' => 'عرض قائمة المصروفات', 'group' => 'المصروفات', 'description' => 'عرض قائمة جميع المصروفات'],
             ['name' => 'view_expense',     'display_name' => 'عرض مصروف',           'group' => 'المصروفات', 'description' => 'عرض تفاصيل مصروف'],
             ['name' => 'create_expense',   'display_name' => 'إنشاء مصروف',         'group' => 'المصروفات', 'description' => 'تسجيل مصروف جديد'],
             ['name' => 'update_expense',   'display_name' => 'تعديل مصروف',         'group' => 'المصروفات', 'description' => 'تعديل بيانات مصروف'],
             ['name' => 'delete_expense',   'display_name' => 'حذف مصروف',           'group' => 'المصروفات', 'description' => 'حذف مصروف'],
+
+            // ══════════════════════════════════════════════════════
             // 9. الخزينة
-            ['name' => 'view_any_treasury_account', 'display_name' => 'عرض قائمة حسابات الخزينة', 'group' => 'الخزينة', 'description' => 'عرض قائمة جميع حسابات الخزينة والبنوك'],
-            ['name' => 'view_treasury_account',     'display_name' => 'عرض حساب خزينة',           'group' => 'الخزينة', 'description' => 'عرض تفاصيل حساب خزينة'],
-            ['name' => 'create_treasury_account',   'display_name' => 'إنشاء حساب خزينة',         'group' => 'الخزينة', 'description' => 'إضافة حساب خزينة أو بنك جديد'],
-            ['name' => 'update_treasury_account',   'display_name' => 'تعديل حساب خزينة',         'group' => 'الخزينة', 'description' => 'تعديل بيانات حساب خزينة'],
-            ['name' => 'delete_treasury_account',   'display_name' => 'حذف حساب خزينة',           'group' => 'الخزينة', 'description' => 'حذف حساب خزينة'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_treasury_account', 'display_name' => 'عرض حسابات الخزينة',    'group' => 'الخزينة', 'description' => 'عرض قائمة جميع حسابات الخزينة والبنوك'],
+            ['name' => 'view_treasury_account',     'display_name' => 'عرض حساب خزينة',        'group' => 'الخزينة', 'description' => 'عرض تفاصيل حساب خزينة'],
+            ['name' => 'create_treasury_account',   'display_name' => 'إنشاء حساب خزينة',      'group' => 'الخزينة', 'description' => 'إضافة حساب خزينة أو بنك جديد'],
+            ['name' => 'update_treasury_account',   'display_name' => 'تعديل حساب خزينة',      'group' => 'الخزينة', 'description' => 'تعديل بيانات حساب خزينة'],
+            ['name' => 'delete_treasury_account',   'display_name' => 'حذف حساب خزينة',        'group' => 'الخزينة', 'description' => 'حذف حساب خزينة'],
+
+            // ══════════════════════════════════════════════════════
             // 10. المخزون
-            ['name' => 'view_any_stock_movement', 'display_name' => 'عرض حركات المخزون',      'group' => 'المخزون', 'description' => 'عرض قائمة حركات المخزون'],
-            ['name' => 'view_stock_movement',     'display_name' => 'عرض حركة مخزون',        'group' => 'المخزون', 'description' => 'عرض تفاصيل حركة مخزون'],
-            ['name' => 'create_stock_movement',   'display_name' => 'إنشاء حركة مخزون',      'group' => 'المخزون', 'description' => 'تسجيل حركة مخزون يدوية'],
-            ['name' => 'delete_stock_movement',   'display_name' => 'حذف حركة مخزون',        'group' => 'المخزون', 'description' => 'حذف حركة مخزون'],
-            ['name' => 'view_any_product_lot',    'display_name' => 'عرض دفعات المنتجات',    'group' => 'المخزون', 'description' => 'عرض قائمة دفعات المنتجات'],
-            ['name' => 'manage_product_lot',      'display_name' => 'إدارة دفعات المنتجات',  'group' => 'المخزون', 'description' => 'إضافة وتعديل وحذف دفعات المنتجات'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_stock_movement', 'display_name' => 'عرض حركات المخزون',       'group' => 'المخزون', 'description' => 'عرض قائمة حركات المخزون'],
+            ['name' => 'view_stock_movement',     'display_name' => 'عرض حركة مخزون',         'group' => 'المخزون', 'description' => 'عرض تفاصيل حركة مخزون'],
+            ['name' => 'create_stock_movement',   'display_name' => 'إنشاء حركة مخزون',       'group' => 'المخزون', 'description' => 'تسجيل حركة مخزون يدوية'],
+            ['name' => 'delete_stock_movement',   'display_name' => 'حذف حركة مخزون',         'group' => 'المخزون', 'description' => 'حذف حركة مخزون'],
+            ['name' => 'view_any_product_lot',    'display_name' => 'عرض دفعات المنتجات',     'group' => 'المخزون', 'description' => 'عرض قائمة دفعات المنتجات'],
+            ['name' => 'manage_product_lot',      'display_name' => 'إدارة دفعات المنتجات',   'group' => 'المخزون', 'description' => 'إضافة وتعديل وحذف دفعات المنتجات'],
             ['name' => 'manage_opening_balances', 'display_name' => 'إدارة الأرصدة الافتتاحية','group' => 'المخزون', 'description' => 'إدارة أرصدة المخزون والأطراف الافتتاحية'],
+
+            // ══════════════════════════════════════════════════════
             // 11. الموظفون
-            ['name' => 'view_any_employee',          'display_name' => 'عرض قائمة الموظفين',  'group' => 'الموظفون', 'description' => 'عرض قائمة جميع الموظفين'],
-            ['name' => 'view_employee',              'display_name' => 'عرض موظف',            'group' => 'الموظفون', 'description' => 'عرض تفاصيل موظف'],
-            ['name' => 'create_employee',            'display_name' => 'إنشاء موظف',          'group' => 'الموظفون', 'description' => 'إضافة موظف جديد'],
-            ['name' => 'update_employee',            'display_name' => 'تعديل موظف',          'group' => 'الموظفون', 'description' => 'تعديل بيانات موظف'],
-            ['name' => 'delete_employee',            'display_name' => 'حذف موظف',            'group' => 'الموظفون', 'description' => 'حذف موظف'],
-            ['name' => 'manage_employment_contracts','display_name' => 'إدارة عقود العمل',    'group' => 'الموظفون', 'description' => 'إدارة عقود عمل الموظفين'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_employee',           'display_name' => 'عرض قائمة الموظفين', 'group' => 'الموظفون', 'description' => 'عرض قائمة جميع الموظفين'],
+            ['name' => 'view_employee',               'display_name' => 'عرض موظف',           'group' => 'الموظفون', 'description' => 'عرض تفاصيل موظف'],
+            ['name' => 'create_employee',             'display_name' => 'إنشاء موظف',         'group' => 'الموظفون', 'description' => 'إضافة موظف جديد'],
+            ['name' => 'update_employee',             'display_name' => 'تعديل موظف',         'group' => 'الموظفون', 'description' => 'تعديل بيانات موظف'],
+            ['name' => 'delete_employee',             'display_name' => 'حذف موظف',           'group' => 'الموظفون', 'description' => 'حذف موظف'],
+            ['name' => 'manage_employment_contracts', 'display_name' => 'إدارة عقود العمل',   'group' => 'الموظفون', 'description' => 'إدارة عقود عمل الموظفين'],
+
+            // ══════════════════════════════════════════════════════
             // 12. التقارير
-            ['name' => 'view_sales_report',     'display_name' => 'تقرير المبيعات',    'group' => 'التقارير', 'description' => 'عرض تقارير المبيعات'],
-            ['name' => 'view_purchase_report',  'display_name' => 'تقرير المشتريات',   'group' => 'التقارير', 'description' => 'عرض تقارير المشتريات'],
-            ['name' => 'view_inventory_report', 'display_name' => 'تقرير المخزون',     'group' => 'التقارير', 'description' => 'عرض تقارير المخزون والحركات'],
-            ['name' => 'view_financial_report', 'display_name' => 'التقارير المالية',  'group' => 'التقارير', 'description' => 'عرض التقارير المالية'],
-            ['name' => 'view_party_report',     'display_name' => 'تقارير الأطراف',    'group' => 'التقارير', 'description' => 'عرض تقارير العملاء والموردين'],
-            ['name' => 'view_dashboard',        'display_name' => 'عرض لوحة التحكم',  'group' => 'التقارير', 'description' => 'الوصول للوحة التحكم والإحصاءات العامة'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_sales_report',     'display_name' => 'تقرير المبيعات',   'group' => 'التقارير', 'description' => 'عرض تقارير المبيعات'],
+            ['name' => 'view_purchase_report',  'display_name' => 'تقرير المشتريات',  'group' => 'التقارير', 'description' => 'عرض تقارير المشتريات'],
+            ['name' => 'view_inventory_report', 'display_name' => 'تقرير المخزون',    'group' => 'التقارير', 'description' => 'عرض تقارير المخزون والحركات'],
+            ['name' => 'view_financial_report', 'display_name' => 'التقارير المالية', 'group' => 'التقارير', 'description' => 'عرض التقارير المالية'],
+            ['name' => 'view_party_report',     'display_name' => 'تقارير الأطراف',   'group' => 'التقارير', 'description' => 'عرض تقارير العملاء والموردين'],
+            ['name' => 'view_dashboard',        'display_name' => 'عرض لوحة التحكم', 'group' => 'التقارير', 'description' => 'الوصول للوحة التحكم والإحصاءات العامة'],
+
+            // ══════════════════════════════════════════════════════
             // 13. السنوات المالية
+            // ══════════════════════════════════════════════════════
             ['name' => 'view_any_fiscal_year', 'display_name' => 'عرض السنوات المالية', 'group' => 'السنوات المالية', 'description' => 'عرض قائمة السنوات المالية'],
             ['name' => 'manage_fiscal_year',   'display_name' => 'إدارة السنوات المالية','group' => 'السنوات المالية', 'description' => 'إنشاء وتعديل وإقفال السنوات المالية'],
+
+            // ══════════════════════════════════════════════════════
             // 14. الإعدادات
-            ['name' => 'manage_settings',    'display_name' => 'إدارة الإعدادات',       'group' => 'الإعدادات', 'description' => 'تعديل إعدادات الشركة العامة'],
-            ['name' => 'manage_lookups',     'display_name' => 'إدارة جداول البحث',     'group' => 'الإعدادات', 'description' => 'إدارة العملات، الوحدات، إلخ'],
-            ['name' => 'manage_attachments', 'display_name' => 'إدارة المرفقات',        'group' => 'الإعدادات', 'description' => 'رفع وحذف المرفقات'],
-            ['name' => 'view_audit_log',     'display_name' => 'عرض سجل المراجعة',     'group' => 'الإعدادات', 'description' => 'عرض سجل العمليات والتعديلات'],
+            // ══════════════════════════════════════════════════════
+            ['name' => 'manage_settings',    'display_name' => 'إدارة الإعدادات',     'group' => 'الإعدادات', 'description' => 'تعديل إعدادات الشركة العامة'],
+            ['name' => 'manage_lookups',     'display_name' => 'إدارة جداول البحث',   'group' => 'الإعدادات', 'description' => 'إدارة العملات، الوحدات، إلخ'],
+            ['name' => 'manage_attachments', 'display_name' => 'إدارة المرفقات',      'group' => 'الإعدادات', 'description' => 'رفع وحذف المرفقات'],
+            ['name' => 'view_audit_log',     'display_name' => 'عرض سجل المراجعة',   'group' => 'الإعدادات', 'description' => 'عرض سجل العمليات والتعديلات'],
+
+            // ══════════════════════════════════════════════════════
             // 15. الأدوار
+            // ══════════════════════════════════════════════════════
             ['name' => 'view_roles',   'display_name' => 'عرض الأدوار',   'group' => 'الأدوار', 'description' => 'عرض الأدوار والصلاحيات المرتبطة'],
             ['name' => 'manage_roles', 'display_name' => 'إدارة الأدوار', 'group' => 'الأدوار', 'description' => 'إنشاء وتعديل وحذف الأدوار وصلاحياتها'],
+
+            // ══════════════════════════════════════════════════════
             // 16. الشركة
+            // ══════════════════════════════════════════════════════
             ['name' => 'view_company',           'display_name' => 'عرض الشركة',         'group' => 'الشركة', 'description' => 'عرض بيانات الشركة الحالية'],
             ['name' => 'update_company',         'display_name' => 'تعديل الشركة',        'group' => 'الشركة', 'description' => 'تعديل بيانات الشركة الأساسية'],
             ['name' => 'manage_company_members', 'display_name' => 'إدارة أعضاء الشركة', 'group' => 'الشركة', 'description' => 'إضافة وإزالة الأعضاء وتغيير أدوارهم'],
             ['name' => 'transfer_ownership',     'display_name' => 'نقل ملكية الشركة',   'group' => 'الشركة', 'description' => 'نقل ملكية الشركة لمستخدم آخر'],
-        ];
-    }
 
-    private function getRoles(): array
-    {
-        return [
-            ['name' => 'super-admin', 'display_name' => 'مدير النظام',     'description' => 'صلاحيات كاملة على كل شيء'],
-            ['name' => 'admin',       'display_name' => 'مدير الشركة',     'description' => 'إدارة كاملة لجميع بيانات وموارد الشركة'],
-            ['name' => 'manager',     'display_name' => 'مدير العمليات',   'description' => 'إدارة المبيعات والمشتريات والمخزون والتقارير'],
-            ['name' => 'accountant',  'display_name' => 'محاسب',           'description' => 'إدارة المدفوعات والشيكات والمصروفات والتقارير المالية'],
-            ['name' => 'salesperson', 'display_name' => 'بائع',            'description' => 'إنشاء مستندات البيع وإدارة العملاء'],
-            ['name' => 'warehouse',   'display_name' => 'أمين المخزن',     'description' => 'إدارة المخزون وحركاته'],
-            ['name' => 'viewer',      'display_name' => 'مشاهد',           'description' => 'قراءة فقط بدون أي صلاحيات كتابة'],
-        ];
-    }
+            // ══════════════════════════════════════════════════════
+            // 17. التنبيهات
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_notification', 'display_name' => 'عرض التنبيهات',  'group' => 'التنبيهات', 'description' => 'عرض قائمة التنبيهات'],
+            ['name' => 'manage_notifications',  'display_name' => 'إدارة التنبيهات', 'group' => 'التنبيهات', 'description' => 'إدارة وحذف التنبيهات'],
 
-    private function getRolePermissions(): array
-    {
-        return [
-            'admin' => [
-                'view_any_user','view_user','create_user','update_user','delete_user','restore_user','force_delete_user','toggle_active_user','change_password_user','assign_role_user',
-                'view_any_party','view_party','create_party','update_party','delete_party','restore_party','force_delete_party',
-                'view_any_product','view_product','create_product','update_product','delete_product','restore_product','manage_product_prices','manage_product_variants','manage_barcodes',
-                'view_any_warehouse','view_warehouse','create_warehouse','update_warehouse','delete_warehouse',
-                'view_any_commercial_document','view_commercial_document','create_sales_document','create_purchase_document','update_commercial_document','delete_commercial_document','validate_commercial_document','lock_commercial_document','cancel_commercial_document','manage_numbering_series',
-                'view_any_payment','view_payment','create_payment','update_payment','delete_payment',
-                'view_any_check','view_check','create_check','update_check','delete_check','manage_check_status',
-                'view_any_expense','view_expense','create_expense','update_expense','delete_expense',
-                'view_any_treasury_account','view_treasury_account','create_treasury_account','update_treasury_account','delete_treasury_account',
-                'view_any_stock_movement','view_stock_movement','create_stock_movement','delete_stock_movement','view_any_product_lot','manage_product_lot','manage_opening_balances',
-                'view_any_employee','view_employee','create_employee','update_employee','delete_employee','manage_employment_contracts',
-                'view_sales_report','view_purchase_report','view_inventory_report','view_financial_report','view_party_report','view_dashboard',
-                'view_any_fiscal_year','manage_fiscal_year',
-                'manage_settings','manage_lookups','manage_attachments','view_audit_log',
-                'view_roles','manage_roles',
-                'view_company','update_company','manage_company_members','transfer_ownership',
-            ],
-            'manager' => [
-                'view_any_user','view_user',
-                'view_any_party','view_party','create_party','update_party','delete_party',
-                'view_any_product','view_product','create_product','update_product','delete_product','manage_product_prices','manage_product_variants','manage_barcodes',
-                'view_any_warehouse','view_warehouse','update_warehouse',
-                'view_any_commercial_document','view_commercial_document','create_sales_document','create_purchase_document','update_commercial_document','delete_commercial_document','validate_commercial_document','lock_commercial_document','cancel_commercial_document',
-                'view_any_payment','view_payment','create_payment','update_payment',
-                'view_any_check','view_check','create_check','update_check','manage_check_status',
-                'view_any_expense','view_expense','create_expense','update_expense',
-                'view_any_treasury_account','view_treasury_account',
-                'view_any_stock_movement','view_stock_movement','create_stock_movement','view_any_product_lot','manage_product_lot',
-                'view_any_employee','view_employee',
-                'view_sales_report','view_purchase_report','view_inventory_report','view_financial_report','view_party_report','view_dashboard',
-                'view_any_fiscal_year','manage_lookups','manage_attachments','view_roles','view_company',
-            ],
-            'accountant' => [
-                'view_any_party','view_party',
-                'view_any_product','view_product',
-                'view_any_warehouse','view_warehouse',
-                'view_any_commercial_document','view_commercial_document','validate_commercial_document',
-                'view_any_payment','view_payment','create_payment','update_payment','delete_payment',
-                'view_any_check','view_check','create_check','update_check','delete_check','manage_check_status',
-                'view_any_expense','view_expense','create_expense','update_expense','delete_expense',
-                'view_any_treasury_account','view_treasury_account','create_treasury_account','update_treasury_account',
-                'view_any_stock_movement','view_stock_movement','view_any_product_lot',
-                'view_sales_report','view_purchase_report','view_financial_report','view_party_report','view_dashboard',
-                'view_any_fiscal_year','manage_attachments','view_company',
-            ],
-            'salesperson' => [
-                'view_any_party','view_party','create_party','update_party',
-                'view_any_product','view_product',
-                'view_any_warehouse','view_warehouse',
-                'view_any_commercial_document','view_commercial_document','create_sales_document','update_commercial_document',
-                'view_any_payment','view_payment','create_payment',
-                'view_any_stock_movement','view_stock_movement',
-                'view_sales_report','view_party_report','view_dashboard',
-                'manage_attachments','view_company',
-            ],
-            'warehouse' => [
-                'view_any_product','view_product',
-                'view_any_warehouse','view_warehouse',
-                'view_any_commercial_document','view_commercial_document',
-                'view_any_stock_movement','view_stock_movement','create_stock_movement',
-                'view_any_product_lot','manage_product_lot',
-                'view_inventory_report','view_dashboard',
-                'manage_attachments','view_company',
-            ],
-            'viewer' => [
-                'view_any_party','view_party',
-                'view_any_product','view_product',
-                'view_any_warehouse','view_warehouse',
-                'view_any_commercial_document','view_commercial_document',
-                'view_any_payment','view_payment',
-                'view_any_check','view_check',
-                'view_any_expense','view_expense',
-                'view_any_treasury_account','view_treasury_account',
-                'view_any_stock_movement','view_stock_movement','view_any_product_lot',
-                'view_any_employee','view_employee',
-                'view_sales_report','view_purchase_report','view_inventory_report','view_financial_report','view_party_report','view_dashboard',
-                'view_any_fiscal_year','view_roles','view_company',
-            ],
+            // ══════════════════════════════════════════════════════
+            // 18. جداول البحث (Lookups)
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_any_currency',  'display_name' => 'عرض العملات',   'group' => 'جداول البحث'],
+            ['name' => 'create_currency',    'display_name' => 'إنشاء عملة',    'group' => 'جداول البحث'],
+            ['name' => 'update_currency',    'display_name' => 'تعديل عملة',    'group' => 'جداول البحث'],
+            ['name' => 'delete_currency',    'display_name' => 'حذف عملة',      'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_tva',  'display_name' => 'عرض TVA',   'group' => 'جداول البحث'],
+            ['name' => 'create_tva',    'display_name' => 'إنشاء TVA', 'group' => 'جداول البحث'],
+            ['name' => 'update_tva',    'display_name' => 'تعديل TVA', 'group' => 'جداول البحث'],
+            ['name' => 'delete_tva',    'display_name' => 'حذف TVA',   'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_unit', 'display_name' => 'عرض الوحدات', 'group' => 'جداول البحث'],
+            ['name' => 'create_unit',   'display_name' => 'إنشاء وحدة',  'group' => 'جداول البحث'],
+            ['name' => 'update_unit',   'display_name' => 'تعديل وحدة',  'group' => 'جداول البحث'],
+            ['name' => 'delete_unit',   'display_name' => 'حذف وحدة',    'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_family', 'display_name' => 'عرض العائلات', 'group' => 'جداول البحث'],
+            ['name' => 'create_family',   'display_name' => 'إنشاء عائلة',  'group' => 'جداول البحث'],
+            ['name' => 'update_family',   'display_name' => 'تعديل عائلة',  'group' => 'جداول البحث'],
+            ['name' => 'delete_family',   'display_name' => 'حذف عائلة',    'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_brand', 'display_name' => 'عرض العلامات التجارية', 'group' => 'جداول البحث'],
+            ['name' => 'create_brand',   'display_name' => 'إنشاء علامة تجارية',    'group' => 'جداول البحث'],
+            ['name' => 'update_brand',   'display_name' => 'تعديل علامة تجارية',    'group' => 'جداول البحث'],
+            ['name' => 'delete_brand',   'display_name' => 'حذف علامة تجارية',      'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_price_level', 'display_name' => 'عرض مستويات الأسعار', 'group' => 'جداول البحث'],
+            ['name' => 'create_price_level',   'display_name' => 'إنشاء مستوى سعر',     'group' => 'جداول البحث'],
+            ['name' => 'update_price_level',   'display_name' => 'تعديل مستوى سعر',     'group' => 'جداول البحث'],
+            ['name' => 'delete_price_level',   'display_name' => 'حذف مستوى سعر',       'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_payment_mode', 'display_name' => 'عرض طرق الدفع',   'group' => 'جداول البحث'],
+            ['name' => 'create_payment_mode',   'display_name' => 'إنشاء طريقة دفع', 'group' => 'جداول البحث'],
+            ['name' => 'update_payment_mode',   'display_name' => 'تعديل طريقة دفع', 'group' => 'جداول البحث'],
+            ['name' => 'delete_payment_mode',   'display_name' => 'حذف طريقة دفع',   'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_expense_category', 'display_name' => 'عرض فئات المصروفات', 'group' => 'جداول البحث'],
+            ['name' => 'create_expense_category',   'display_name' => 'إنشاء فئة مصروفات',  'group' => 'جداول البحث'],
+            ['name' => 'update_expense_category',   'display_name' => 'تعديل فئة مصروفات',  'group' => 'جداول البحث'],
+            ['name' => 'delete_expense_category',   'display_name' => 'حذف فئة مصروفات',    'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_exchange_rate', 'display_name' => 'عرض أسعار الصرف', 'group' => 'جداول البحث'],
+            ['name' => 'create_exchange_rate',   'display_name' => 'إنشاء سعر صرف',   'group' => 'جداول البحث'],
+            ['name' => 'update_exchange_rate',   'display_name' => 'تعديل سعر صرف',   'group' => 'جداول البحث'],
+            ['name' => 'delete_exchange_rate',   'display_name' => 'حذف سعر صرف',     'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_document_type', 'display_name' => 'عرض أنواع المستندات', 'group' => 'جداول البحث'],
+            ['name' => 'create_document_type',   'display_name' => 'إنشاء نوع مستند',     'group' => 'جداول البحث'],
+            ['name' => 'update_document_type',   'display_name' => 'تعديل نوع مستند',     'group' => 'جداول البحث'],
+            ['name' => 'delete_document_type',   'display_name' => 'حذف نوع مستند',       'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_document_status', 'display_name' => 'عرض حالات المستندات', 'group' => 'جداول البحث'],
+            ['name' => 'create_document_status',   'display_name' => 'إنشاء حالة مستند',    'group' => 'جداول البحث'],
+            ['name' => 'update_document_status',   'display_name' => 'تعديل حالة مستند',    'group' => 'جداول البحث'],
+            ['name' => 'delete_document_status',   'display_name' => 'حذف حالة مستند',      'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_gender', 'display_name' => 'عرض الجنسين', 'group' => 'جداول البحث'],
+            ['name' => 'create_gender',   'display_name' => 'إنشاء جنس',   'group' => 'جداول البحث'],
+            ['name' => 'update_gender',   'display_name' => 'تعديل جنس',   'group' => 'جداول البحث'],
+            ['name' => 'delete_gender',   'display_name' => 'حذف جنس',     'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_legal_form', 'display_name' => 'عرض الأشكال القانونية', 'group' => 'جداول البحث'],
+            ['name' => 'create_legal_form',   'display_name' => 'إنشاء شكل قانوني',      'group' => 'جداول البحث'],
+            ['name' => 'update_legal_form',   'display_name' => 'تعديل شكل قانوني',      'group' => 'جداول البحث'],
+            ['name' => 'delete_legal_form',   'display_name' => 'حذف شكل قانوني',        'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_party_type', 'display_name' => 'عرض أنواع الأطراف', 'group' => 'جداول البحث'],
+            ['name' => 'create_party_type',   'display_name' => 'إنشاء نوع طرف',     'group' => 'جداول البحث'],
+            ['name' => 'update_party_type',   'display_name' => 'تعديل نوع طرف',     'group' => 'جداول البحث'],
+            ['name' => 'delete_party_type',   'display_name' => 'حذف نوع طرف',       'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_product_type', 'display_name' => 'عرض أنواع المنتجات', 'group' => 'جداول البحث'],
+            ['name' => 'create_product_type',   'display_name' => 'إنشاء نوع منتج',     'group' => 'جداول البحث'],
+            ['name' => 'update_product_type',   'display_name' => 'تعديل نوع منتج',     'group' => 'جداول البحث'],
+            ['name' => 'delete_product_type',   'display_name' => 'حذف نوع منتج',       'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_treasury_account_type', 'display_name' => 'عرض أنواع حسابات الخزينة', 'group' => 'جداول البحث'],
+            ['name' => 'create_treasury_account_type',   'display_name' => 'إنشاء نوع حساب خزينة',     'group' => 'جداول البحث'],
+            ['name' => 'update_treasury_account_type',   'display_name' => 'تعديل نوع حساب خزينة',     'group' => 'جداول البحث'],
+            ['name' => 'delete_treasury_account_type',   'display_name' => 'حذف نوع حساب خزينة',       'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_stock_movement_type', 'display_name' => 'عرض أنواع حركات المخزون', 'group' => 'جداول البحث'],
+            ['name' => 'create_stock_movement_type',   'display_name' => 'إنشاء نوع حركة مخزون',    'group' => 'جداول البحث'],
+            ['name' => 'update_stock_movement_type',   'display_name' => 'تعديل نوع حركة مخزون',    'group' => 'جداول البحث'],
+            ['name' => 'delete_stock_movement_type',   'display_name' => 'حذف نوع حركة مخزون',      'group' => 'جداول البحث'],
+
+            ['name' => 'view_any_inventory_valuation_method', 'display_name' => 'عرض طرق تقييم المخزون', 'group' => 'جداول البحث'],
+            ['name' => 'create_inventory_valuation_method',   'display_name' => 'إنشاء طريقة تقييم',     'group' => 'جداول البحث'],
+            ['name' => 'update_inventory_valuation_method',   'display_name' => 'تعديل طريقة تقييم',     'group' => 'جداول البحث'],
+            ['name' => 'delete_inventory_valuation_method',   'display_name' => 'حذف طريقة تقييم',       'group' => 'جداول البحث'],
         ];
     }
 }
+
 
 
 
@@ -1488,31 +1580,47 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Super Admin — لا يحتاج company_id (الجدول لا يحتوي هذا العمود)
-        User::create([
-            'name'              => 'Super Admin',
-            'email'             => 'admin@mail.com',
-            'password'          => Hash::make('password'),
-            'active'            => true,
-            'email_verified_at' => now(),
-        ]);
+        // 1. التأكد من وجود الأدوار أولاً في قاعدة البيانات
+        // (خطوة احتياطية في حال لم يتم تشغيل RolesAndPermissionsSeeder)
+        $superAdminRole = Role::firstOrCreate(['name' => User::ROLE_SUPER_ADMIN, 'guard_name' => 'web']);
+        $adminRole      = Role::firstOrCreate(['name' => User::ROLE_ADMIN, 'guard_name' => 'web']);
 
-        // Admin User
-        User::create([
-            'name'              => 'Admin User',
-            'email'             => 'admin.user@mail.com',
-            'password'          => Hash::make('password'),
-            'active'            => true,
-            'email_verified_at' => now(),
-        ]);
+        // 2. إنشاء Super Admin
+        $superAdmin = User::updateOrCreate(
+            ['email' => 'admin@mail.com'],
+            [
+                'name'              => 'Super Admin',
+                'password'          => 'password', // التشفير يتم تلقائياً عبر الـ Model Cast
+                'active'            => true,
+                'email_verified_at' => now(),
+            ]
+        );
 
-        // ملاحظة: الأدوار تُسند بعد تشغيل RolesAndPermissionsSeeder عبر CompanySeeder
+        // إسناد الدور (assignRole تمسح الأدوار القديمة وتضع الجديد أو تضيفه حسب الإعداد)
+        if (!$superAdmin->hasRole(User::ROLE_SUPER_ADMIN)) {
+            $superAdmin->assignRole($superAdminRole);
+        }
+
+        // 3. إنشاء Admin User
+        $adminUser = User::updateOrCreate(
+            ['email' => 'admin.user@mail.com'],
+            [
+                'name'              => 'Admin User',
+                'password'          => 'password',
+                'active'            => true,
+                'email_verified_at' => now(),
+            ]
+        );
+
+        if (!$adminUser->hasRole(User::ROLE_ADMIN)) {
+            $adminUser->assignRole($adminRole);
+        }
     }
 }
 
@@ -1554,8 +1662,6 @@ class WarehouseSeeder extends Seeder
 // ===== ملف: WilayaCommuneSeeder.php =====
 namespace Database\Seeders;
 
-namespace Database\Seeders;
-
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -1564,6 +1670,9 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Seeder مدمج لضمان إدخال الولايات (Wilayas) أولاً ثم البلديات (Communes) بالترتيب الصحيح.
  * يقرأ البيانات من ملفات JSON موجودة في 'database/seeders/data/'.
+ *
+ * ✅ مصحح: إزالة $this->command->info() التي تتسبب بخطأ عند الاستدعاء من API
+ *    لأن $this->command تكون null خارج سياق CLI (artisan db:seed)
  */
 class WilayaCommuneSeeder extends Seeder
 {
@@ -1572,30 +1681,24 @@ class WilayaCommuneSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->command->info('Starting geographic data seeding (Wilayas and Communes)...');
-
         // تعطيل فحص المفاتيح الخارجية مؤقتاً لتنظيف الجداول
         Schema::disableForeignKeyConstraints();
 
-        // تنظيف الجداول
         if (Schema::hasTable('communes')) {
             DB::table('communes')->truncate();
         }
-        
+
         if (Schema::hasTable('wilayas')) {
             DB::table('wilayas')->truncate();
         }
 
-        // إعادة تفعيل فحص المفاتيح الخارجية
         Schema::enableForeignKeyConstraints();
 
-        // 1. تشغيل دالة إدخال الولايات
+        // 1. إدخال الولايات أولاً
         $this->seedWilayas();
 
-        // 2. تشغيل دالة إدخال البلديات (تعتمد على الولايات)
+        // 2. إدخال البلديات (تعتمد على الولايات)
         $this->seedCommunes();
-
-        $this->command->info('Geographic data seeding finished.');
     }
 
     // ===================================================================
@@ -1603,47 +1706,37 @@ class WilayaCommuneSeeder extends Seeder
     // ===================================================================
     private function seedWilayas(): void
     {
-        $this->command->line('Seeding Wilayas...');
-
-        // التحقق من وجود الجدول
         if (!Schema::hasTable('wilayas')) {
-            $this->command->error("جدول 'wilayas' غير موجود. يرجى تشغيل الـ migrations أولاً.");
             return;
         }
 
-        // التحقق من وجود الملف
         $jsonPath = database_path('seeders/data/wilayas.json');
         if (!File::exists($jsonPath)) {
-            $this->command->error("ملف البيانات 'wilayas.json' غير موجود في المسار: " . $jsonPath);
-            return;
+            throw new \RuntimeException("ملف البيانات 'wilayas.json' غير موجود في المسار: " . $jsonPath);
         }
 
-        // قراءة الملف
-        $json = File::get($jsonPath);
-        $wilayas = json_decode($json);
+        $wilayas = json_decode(File::get($jsonPath));
 
         if (is_null($wilayas)) {
-            $this->command->error("خطأ في قراءة ملف 'wilayas.json'. تأكد أن صيغة JSON صحيحة.");
-            return;
+            throw new \RuntimeException("خطأ في قراءة ملف 'wilayas.json'. تأكد أن صيغة JSON صحيحة.");
         }
 
         $data = [];
-
-        // تحضير البيانات للإدراج
         foreach ($wilayas as $wilaya) {
             $data[] = [
-                'code' => $wilaya->code,
-                'name' => $wilaya->name,
+                'code'        => $wilaya->code,
+                'name'        => $wilaya->name,
                 'arabic_name' => $wilaya->arabic_name,
-                'active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'active'      => true,
+                'created_at'  => now(),
+                'updated_at'  => now(),
             ];
         }
 
-        // إدراج جميع الولايات دفعة واحدة
         DB::table('wilayas')->insert($data);
-        $this->command->info(count($data) . " ولاية تم إضافتها بنجاح.");
+
+        // ✅ للـ CLI فقط: طباعة النتيجة إن كان السياق artisan
+        $this->log(count($data) . " ولاية تم إضافتها بنجاح.");
     }
 
     // ===================================================================
@@ -1651,56 +1744,43 @@ class WilayaCommuneSeeder extends Seeder
     // ===================================================================
     private function seedCommunes(): void
     {
-        $this->command->line('Seeding Communes...');
-
-        // التحقق من وجود الجدول
         if (!Schema::hasTable('communes')) {
-            $this->command->error("جدول 'communes' غير موجود. يرجى تشغيل الـ migrations أولاً.");
             return;
         }
 
-        // التحقق من وجود بيانات الولايات (الأهم)
         if (!Schema::hasTable('wilayas') || DB::table('wilayas')->count() === 0) {
-            $this->command->warn("جدول 'wilayas' فارغ. تم تخطي إدخال البلديات.");
-            return;
+            throw new \RuntimeException("جدول 'wilayas' فارغ. لا يمكن إدخال البلديات.");
         }
 
         // جلب كل الولايات مرة واحدة وربطها برمزها
         $wilayas = DB::table('wilayas')->pluck('id', 'code');
 
-        // قراءة ملف البلديات
         $jsonPath = database_path('seeders/data/communes.json');
-
-        // التحقق من وجود الملف
         if (!File::exists($jsonPath)) {
-            $this->command->error("ملف البيانات 'communes.json' غير موجود في المسار: " . $jsonPath);
-            return;
+            throw new \RuntimeException("ملف البيانات 'communes.json' غير موجود في المسار: " . $jsonPath);
         }
 
-        $json = File::get($jsonPath);
-        $communes = json_decode($json);
+        $communes = json_decode(File::get($jsonPath));
 
         if (is_null($communes)) {
-            $this->command->error("خطأ في قراءة ملف 'communes.json'. تأكد أن صيغة JSON صحيحة.");
-            return;
+            throw new \RuntimeException("خطأ في قراءة ملف 'communes.json'. تأكد أن صيغة JSON صحيحة.");
         }
 
-        $data = [];
+        $data         = [];
         $skippedCount = 0;
 
-        // تحضير بيانات البلديات
         foreach ($communes as $commune) {
             $wilayaId = $wilayas->get($commune->wilaya_id);
 
             if ($wilayaId) {
                 $data[] = [
-                    'name' => $commune->name,
+                    'name'        => $commune->name,
                     'arabic_name' => $commune->arabic_name,
-                    'post_code' => $commune->post_code,
-                    'wilaya_id' => $wilayaId,
-                    'active' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'post_code'   => $commune->post_code,
+                    'wilaya_id'   => $wilayaId,
+                    'active'      => true,
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
                 ];
             } else {
                 $skippedCount++;
@@ -1710,10 +1790,19 @@ class WilayaCommuneSeeder extends Seeder
         // إدراج جميع البلديات دفعة واحدة
         DB::table('communes')->insert($data);
 
-        $this->command->info(count($data) . " بلدية تم إضافتها بنجاح.");
-        if ($skippedCount > 0) {
-            $this->command->warn("تم تخطي " . $skippedCount . " بلدية لعدم العثور على رمز ولاية مطابق.");
+        $this->log(count($data) . " بلدية تم إضافتها بنجاح." .
+            ($skippedCount > 0 ? " (تم تخطي {$skippedCount} بلدية)" : ""));
+    }
+
+    /**
+     * ✅ طباعة آمنة — تعمل في CLI فقط، تُهمَل عند الاستدعاء من API
+     */
+    private function log(string $message): void
+    {
+        if (isset($this->command) && $this->command !== null) {
+            $this->command->info($message);
         }
     }
 }
+
 

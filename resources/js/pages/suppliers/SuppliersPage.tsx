@@ -13,8 +13,6 @@ import EmptyState from '@/components/ui/EmptyState';
 import ProgressBar from '@/components/ui/ProgressBar';
 import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
-import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/lib/api/core/client';
 import type { Party } from '@/types';
 
 export default function SuppliersPage() {
@@ -133,8 +131,7 @@ export default function SuppliersPage() {
 // ===============================================
 function SupplierModal({ open, party, onClose }: { open: boolean; party: Party | null; onClose: () => void }) {
     const isEdit = !!party;
-    const createMut = useCreateParty();
-    const updateMut = useUpdateParty();
+    const { create: createMut, update: updateMut } = usePartyMutations();
 
     const emptyForm = {
         name: '',
@@ -194,7 +191,7 @@ function SupplierModal({ open, party, onClose }: { open: boolean; party: Party |
             if (isEdit) {
                 await updateMut.mutateAsync({ id: party!.id, data: { ...form, party_type_id: 2 } });
             } else {
-                await createMut.mutateAsync({ ...form, party_type_id: 2 });
+                await createMut.mutateAsync({ ...form, party_type_id: 2 }); // 2 = supplier
             }
             onClose();
         } catch (err: any) {

@@ -16,6 +16,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
+import { appActions } from '@/lib/store/appStore';
 // ✅ المودال الجديد الشامل
 import { CreateCompanyModal } from '@/components/modals/CreateCompanyModal';
 import DataSeedingModal from '@/components/modals/DataSeedingModal';
@@ -1023,47 +1024,38 @@ export default function OnboardingPage() {
   };
 
    // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
-  const handleNewCompanyCreated = async (company: Company, fiscalYear: { id: number }) => {
-    setShowCreate(false);
-    setCompanies(prev => [...prev, company]);
-    try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
+const handleNewCompanyCreated = (company: Company, fiscalYear: { id: number }) => {
+  setShowCreate(false);
+  setCompanies(prev => [...prev, company]);
+  try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
 
-    // ✅ تنفيذ switch أولاً حتى يعرف الباكند الشركة النشطة
-    // ثم كتابة active_company في sessionStorage حتى يضيف الـ interceptor الـ slug تلقائياً
-    try {
-      await apiClient.post('/companies/switch', { company_id: company.id });
-    } catch {}
-    try {
-      sessionStorage.setItem('active_company', JSON.stringify({ id: company.id, name: company.name, slug: company.slug }));
-    } catch {}
+  // ✅ فقط افتح مودال السيدر، ولا تحدث activeCompany
+  setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });
+};
 
-    // فتح مودال البذر بعد تفعيل الشركة في الباكند
-    setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });
-  };
+const handleSeedingComplete = () => {
+  if (!seedingCompany) return;
+  // ✅ الآن نفعّل الشركة وننتقل إلى داشبورد
+  setActiveCompany({
+    id: seedingCompany.id,
+    name: seedingCompany.name,
+    slug: seedingCompany.slug,
+  });
+  setSeedingCompany(null);
+  navigate('/dashboard', { replace: true });
+};
+const handleSeedingSkip = () => {
+  if (!seedingCompany) return;
+  // ✅ نفس الشيء: نفعّل الشركة وننتقل
+  setActiveCompany({
+    id: seedingCompany.id,
+    name: seedingCompany.name,
+    slug: seedingCompany.slug,
+  });
+  setSeedingCompany(null);
+  navigate('/dashboard', { replace: true });
+};
 
-  // ✅ عند اكتمال أو تخطي الـ seeding → تفعيل الشركة ثم الانتقال
-  // الـ switch تم بالفعل في handleNewCompanyCreated — نكتفي بتحديث AuthContext
-  const handleSeedingComplete = () => {
-    if (!seedingCompany) return;
-    setActiveCompany({
-      id: seedingCompany.id,
-      name: seedingCompany.name,
-      slug: seedingCompany.slug,
-    });
-    setSeedingCompany(null);
-    navigate('/dashboard', { replace: true });
-  };
-
-  const handleSeedingSkip = () => {
-    if (!seedingCompany) return;
-    setActiveCompany({
-      id: seedingCompany.id,
-      name: seedingCompany.name,
-      slug: seedingCompany.slug,
-    });
-    setSeedingCompany(null);
-    navigate('/dashboard', { replace: true });
-  };
 
   if (!user) return null;
 
