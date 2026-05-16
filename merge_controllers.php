@@ -1,7 +1,7 @@
 <?php
 
-$dir = __DIR__ . '/app\Http\Controllers\API\V1';
-$outputFile = __DIR__ . '/all_Controllers_combined.php';
+$dir = __DIR__ . '/app\Http\Controllers\API\V1\Admin';
+$outputFile = __DIR__ . '/all_adminControllers_combined.php';
 
 $files = glob($dir . '/*.php');
 

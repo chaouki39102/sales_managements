@@ -61,7 +61,7 @@ EXCLUDE=(
 
 
 # HOOKS
-merge_section "🧠 lib" \
+merge_section "🧠 lib " \
   \( -path "*/lib/*" \) "${EXCLUDE[@]}"
 
 
