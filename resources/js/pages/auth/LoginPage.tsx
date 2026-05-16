@@ -29,8 +29,9 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            await login({ email, password });        // يخزّن المستخدم الكامل
-            navigate("/onboarding", { replace: true }); // الجميع يذهب إلى onboarding
+            const user = await login({ email, password });
+            const isSuperAdmin = user?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
+            navigate(isSuperAdmin ? '/admin/dashboard' : '/onboarding', { replace: true });
         } catch (err: any) {
             if (err.response) {
                 const msg =

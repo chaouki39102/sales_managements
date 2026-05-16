@@ -4,46 +4,40 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Hash;
 
+/**
+ * UserSeeder — إنتاج
+ * ══════════════════════════════════════════════════════════════════
+ * ينشئ حساب السوبر أدمن الأول فقط.
+ * لا يُنشئ أي شركة — مالك النظام ينشئ شركته من الواجهة.
+ *
+ * بيانات الدخول تُقرأ من .env:
+ *   SUPER_ADMIN_NAME=مدير النظام
+ *   SUPER_ADMIN_EMAIL=admin@mail.com
+ *   SUPER_ADMIN_PASSWORD=password
+ *
+ * الدور يُعيَّن لاحقاً في GlobalRolesAndPermissionsSeeder
+ * بعد إنشاء الصلاحيات.
+ * ══════════════════════════════════════════════════════════════════
+ */
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. التأكد من وجود الأدوار أولاً في قاعدة البيانات
-        // (خطوة احتياطية في حال لم يتم تشغيل RolesAndPermissionsSeeder)
-        $superAdminRole = Role::firstOrCreate(['name' => User::ROLE_SUPER_ADMIN, 'guard_name' => 'web']);
-        $adminRole      = Role::firstOrCreate(['name' => User::ROLE_ADMIN, 'guard_name' => 'web']);
+        $email    = env('SUPER_ADMIN_EMAIL',    'admin@mail.com')??'admin@mail.com';
+        $name     = env('SUPER_ADMIN_NAME',     'مدير النظام')??'مدير النظام';
+        $password = env('SUPER_ADMIN_PASSWORD', 'password')??'password';
 
-        // 2. إنشاء Super Admin
-        $superAdmin = User::updateOrCreate(
-            ['email' => 'admin@mail.com'],
+        User::firstOrCreate(
+            ['email' => $email],
             [
-                'name'              => 'Super Admin',
-                'password'          => 'password', // التشفير يتم تلقائياً عبر الـ Model Cast
-                'active'            => true,
+                'name'              => $name,
+                'password'          => Hash::make($password),
                 'email_verified_at' => now(),
             ]
         );
 
-        // إسناد الدور (assignRole تمسح الأدوار القديمة وتضع الجديد أو تضيفه حسب الإعداد)
-        if (!$superAdmin->hasRole(User::ROLE_SUPER_ADMIN)) {
-            $superAdmin->assignRole($superAdminRole);
-        }
-
-        // 3. إنشاء Admin User
-        $adminUser = User::updateOrCreate(
-            ['email' => 'admin.user@mail.com'],
-            [
-                'name'              => 'Admin User',
-                'password'          => 'password',
-                'active'            => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        if (!$adminUser->hasRole(User::ROLE_ADMIN)) {
-            $adminUser->assignRole($adminRole);
-        }
+        $this->command?->info("✅ حساب مدير النظام: {$email}");
     }
 }

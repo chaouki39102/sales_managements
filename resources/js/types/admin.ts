@@ -1,140 +1,122 @@
-// ════════════════════════════════════════════════
-// types/admin.ts — النسخة الكاملة
-// ════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+// types/admin.ts — أنواع لوحة تحكم السوبر أدمن
+// ════════════════════════════════════════════════════════════════════════════
 
 export interface AdminCompany {
-  id: number;
-  name: string;
-  commercial_name?: string;
-  slug: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  plan: string;
-  active: boolean;          // is_active من Laravel Resource
-  is_suspended: boolean;
-  suspended_reason?: string;
-  suspended_at?: string;
-  verified_at?: string | null;
-  notes?: string;
-  users_count: number;
-  max_users: number;
-  max_products: number;
-  max_warehouses: number;
-  trial_ends_at?: string | null;
-  on_trial?: boolean;
-  owner?: { id: number; name: string; email: string };
-  created_at: string;
-  updated_at?: string;
+  id:              number;
+  name:            string;
+  commercial_name?: string | null;
+  slug:            string;
+  email?:          string | null;
+  phone?:          string | null;
+  address?:        string | null;
+  activity?:       string | null;
+  nif?:            string | null;
+  nis?:            string | null;
+  rc?:             string | null;
+  ai?:             string | null;
+  plan:            string;
+  max_users:       number;
+  max_products:    number;
+  max_warehouses:  number;
+  users_count:     number;
+  active:          boolean;
+  is_suspended:    boolean;
+  suspended_at?:   string | null;
+  suspended_reason?: string | null;
+  verified_at?:    string | null;
+  notes?:          string | null;
+  owner_id?:       number | null;
+  owner?:          { id: number; name: string; email: string } | null;
+  created_at:      string;
+  updated_at:      string;
 }
 
 export interface AdminUser {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  active: boolean;          // is_active من Laravel Resource
+  id:              number;
+  name:            string;
+  email:           string;
+  avatar?:         string | null;
+  phone?:          string | null;
+  active:          boolean;
+  role?:           string;
   companies_count?: number;
-  avatar?: string;
-  phone?: string;
-  last_login_at?: string;
-  created_at: string;
-}
-
-export interface AdminStats {
-  companies: {
-    total: number;
-    active: number;
-    suspended: number;
-    inactive: number;
-    verified: number;
-    on_trial?: number;
-    by_plan: Record<string, number>;
-  };
-  users: {
-    total: number;
-    active: number;
-    new_this_month: number;
-    new_today?: number;
-  };
-  recent_companies: AdminCompany[];
-  recent_users: AdminUser[];
-}
-
-export interface AdminPlan {
-  key: string;
-  label: string;
-  max_users: number;
-  max_products: number;
-  max_warehouses: number;
-  companies_count?: number;
-  price?: number;
-  features?: string[];
+  companies?:      { id: number; name: string; slug: string; pivot?: { role: string; active: boolean } }[];
+  last_login_at?:  string | null;
+  created_at:      string;
 }
 
 export interface ActivityLog {
-  id: number;
-  event: string;
-  description: string;
-  causer?: { id: number; name: string; email: string };
+  id:           number;
+  event:        string;
+  description?: string;
   subject_type?: string;
-  subject_id?: number;
-  company?: { id: number; name: string };
-  ip_address?: string;
-  user_agent?: string;
-  old_values?: Record<string, unknown>;
-  new_values?: Record<string, unknown>;
-  created_at: string;
+  subject_id?:   number;
+  causer?:      { id: number; name: string; email: string } | null;
+  company?:     { id: number; name: string } | null;
+  ip_address?:  string | null;
+  old_values?:  Record<string, unknown> | null;
+  new_values?:  Record<string, unknown> | null;
+  created_at:   string;
+}
+
+export interface AdminPlan {
+  key:             string;
+  label:           string;
+  max_users:       number;
+  max_products:    number;
+  max_warehouses:  number;
+  companies_count: number;
 }
 
 export interface SystemSettings {
-  allow_registration: boolean;
-  allow_new_companies: boolean;
-  debug_mode: boolean;
-  public_api: boolean;
-  free_trial_days: number;
-  free_max_users: number;
+  allow_registration:   boolean;
+  allow_new_companies:  boolean;
+  debug_mode:           boolean;
+  public_api:           boolean;
+  maintenance_mode:     boolean;
+  maintenance_message:  string;
+  free_trial_days:      number;
+  free_max_users:       number;
   starter_max_products: number;
-  maintenance_mode: boolean;
-  maintenance_message: string;
 }
+
+export interface AdminDashboardStats {
+  companies: {
+    total:     number;
+    active:    number;
+    suspended: number;
+    verified:  number;
+    new_month?: number;
+    by_plan:   Record<string, number>;
+  };
+  users: {
+    total:         number;
+    active:        number;
+    new_this_month: number;
+  };
+  recent_companies: AdminCompany[];
+  recent_users:     AdminUser[];
+}
+
+export type AdminCompaniesParams = {
+  search?:   string;
+  status?:   'active' | 'suspended' | 'inactive' | 'verified' | 'unverified' | '';
+  plan?:     string;
+  sort_by?:  string;
+  sort_dir?: 'asc' | 'desc';
+  page?:     number;
+  per_page?: number;
+};
 
 export interface PaginatedResponse<T> {
   data: T[];
   meta: {
     current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    from?: number;
-    to?: number;
+    last_page:    number;
+    per_page:     number;
+    total:        number;
+    from:         number | null;
+    to:           number | null;
   };
-}
-
-export interface AdminCompaniesParams {
-  search?: string;
-  status?: 'active' | 'suspended' | 'inactive' | 'verified' | 'unverified';
-  plan?: string;
-  page?: number;
-  per_page?: number;
-  sort?: string;
-}
-
-export interface AdminUsersParams {
-  search?: string;
-  role?: string;
-  active?: string;
-  page?: number;
-  per_page?: number;
-}
-
-export interface AdminActivityParams {
-  search?: string;
-  event?: string;
-  date_from?: string;
-  date_to?: string;
-  causer_id?: number;
-  company_id?: number;
-  page?: number;
-  per_page?: number;
 }

@@ -109,11 +109,14 @@ const client: AxiosInstance = axios.create({
 // ─── Request interceptor ──────────────────────────────────────────────────────
 client.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const url  = config.url ?? '';
+    const url = config.url ?? '';
     const slug = _getSlug();
 
-    // أضف slug لكل tenant routes
-    if (!isPublicPath(url) && slug) {
+    // ✅ إذا كان الطلب يحوي _skipSlug == true، لا تعدل المسار
+    if ((config as any)._skipSlug) {
+      delete (config as any)._skipSlug;
+      // لا نضيف slug، ونستخدم المسار كما هو
+    } else if (!isPublicPath(url) && slug) {
       if (!url.startsWith(`/${slug}/`) && url !== `/${slug}`) {
         config.url = `/${slug}${url.startsWith('/') ? url : '/' + url}`;
       }

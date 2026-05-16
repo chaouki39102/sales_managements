@@ -65,6 +65,7 @@ const CurrenciesPage = lazy(() => import('@/pages/lookups/CurrenciesPage'));
 const TvasPage       = lazy(() => import('@/pages/lookups/TvasPage'));
 
 // ── Admin Panel ────────────────────────────────────────────────────────────
+const AdminBootPage      = lazy(() => import('@/pages/admin/AdminBootPage'));
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'));
 const AdminCompaniesPage = lazy(() => import('@/pages/admin/AdminCompaniesPage'));
 const AdminUsersPage     = lazy(() => import('@/pages/admin/AdminUsersPage'));
@@ -99,32 +100,36 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/** تسجيل دخول + لا شركة نشطة */
+/** تسجيل دخول + لا شركة نشطة + ليس super-admin */
 function RequireNoCompany({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
   const activeCompany = useActiveCompany();
   if (isLoading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  // السوبر أدمن لا يمر من هنا أبداً — له داشبورده الخاص
+  if (isSuperAdmin) return <Navigate to="/admin/dashboard" replace />;
   if (activeCompany?.slug) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
-/** تسجيل دخول + شركة نشطة */
+/** تسجيل دخول + شركة نشطة (مستخدم عادي فقط) */
 function RequireCompany({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
   const activeCompany = useActiveCompany();
   if (isLoading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  // السوبر أدمن له مساره الخاص
+  if (isSuperAdmin) return <Navigate to="/admin/dashboard" replace />;
   if (!activeCompany?.slug) return <Navigate to="/onboarding" replace />;
   return <>{children}</>;
 }
 
-/** Super Admin فقط */
+/** Super Admin فقط — يتحقق من Auth أولاً */
 function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
   if (isLoading) return <PageLoader />;
-  const isSuperAdmin = (user as any)?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
-  if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isSuperAdmin) return <Navigate to="/onboarding" replace />;
   return <>{children}</>;
 }
 
@@ -150,7 +155,19 @@ export function AppRoutes() {
           }
         />
 
-        {/* ③ App — يتطلب شركة نشطة */}
+        {/* ③ Admin Boot — إعداد النظام (يصل إليه السوبر أدمن يدوياً عند الحاجة) */}
+        <Route
+          path="/admin/boot"
+          element={
+            <RequireSuperAdmin>
+              <Suspense fallback={<PageLoader />}>
+                <AdminBootPage />
+              </Suspense>
+            </RequireSuperAdmin>
+          }
+        />
+
+        {/* ④ App — يتطلب شركة نشطة */}
         <Route
           element={
             <RequireCompany>
@@ -218,16 +235,14 @@ export function AppRoutes() {
           <Route path="tvas"       element={<TvasPage />} />
         </Route>
 
-        {/* ④ Admin Panel */}
+        {/* ⑤ Admin Panel */}
         <Route
           path="/admin"
           element={
             <RequireSuperAdmin>
-              <RequireAuth>
-                <Suspense fallback={<PageLoader />}>
-                  <AdminLayout />
-                </Suspense>
-              </RequireAuth>
+              <Suspense fallback={<PageLoader />}>
+                <AdminLayout />
+              </Suspense>
             </RequireSuperAdmin>
           }
         >
@@ -240,7 +255,7 @@ export function AppRoutes() {
         </Route>
 
         {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
 
       </Routes>
     </Suspense>

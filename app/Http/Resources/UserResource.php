@@ -38,8 +38,16 @@ class UserResource extends JsonResource
             'gender'              => new GenderResource($this->whenLoaded('gender')),
             'commune'             => new CommuneResource($this->whenLoaded('commune')),
             'wilaya'              => new WilayaResource($this->whenLoaded('wilaya')),
-            'roles'   => $this->whenLoaded('roles', fn() =>
-            $this->roles->map(fn($r) => ['id' => $r->id, 'name' => $r->name])),
+
+             // ✅ roles دائماً — حتى لو علاقة غير محملة تُعيد []
+            'roles' => $this->whenLoaded(
+                'roles',
+                fn () => $this->roles->map(fn ($r) => [
+                    'id'   => $r->id,
+                    'name' => $r->name,
+                ]),
+                []   // ← القيمة الافتراضية إذا لم تُحمَّل العلاقة
+            ),
         ];
     }
 }
