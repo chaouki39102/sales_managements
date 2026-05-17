@@ -1,7 +1,7 @@
 
 
 # =========================================
-# 🧠 pages
+# 🧠 pages 
 # =========================================
 
 ## FILE: resources/js/pages/admin/AdminActivityPage.tsx
@@ -178,588 +178,242 @@ export default function AdminActivityPage() {
 }
 ```
 
+## FILE: resources/js/pages/admin/AdminBootPage.tsx
+```
+// ════════════════════════════════════════════════════════════════════════════
+// pages/admin/AdminBootPage.tsx
+//
+// صفحة خاصة بالسوبر أدمن — يصل إليها بعد أول دخول
+// تعرض AdminBootModal مباشرة وعند اكتماله تنقله لـ /admin/dashboard
+//
+// Route: /admin/boot  (في RequireSuperAdmin guard)
+// ════════════════════════════════════════════════════════════════════════════
+import { useNavigate } from 'react-router-dom';
+import AdminBootModal from '@/components/modals/AdminBootModal';
+
+export default function AdminBootPage() {
+  const navigate = useNavigate();
+
+  return (
+    // خلفية بسيطة تحت المودال
+    <div style={{
+      minHeight: '100vh',
+      background: 'var(--bg0)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <AdminBootModal
+        onComplete={() => navigate('/admin/dashboard', { replace: true })}
+      />
+    </div>
+  );
+}
+```
+
 ## FILE: resources/js/pages/admin/AdminCompaniesPage.tsx
 ```
-// ════════════════════════════════════════════════
-// pages/admin/AdminCompaniesPage.tsx — النسخة الكاملة
-// ════════════════════════════════════════════════
-import { useState, useMemo, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/core/client';
-import { useAdminCompanies, useAdminCompanyAction, useUpdateCompanyNotes, useChangePlan } from '@/lib/api/endpoints/companies';
-import type { AdminCompany, AdminUser } from '@/types/admin';
+// pages/admin/AdminCompaniesPage.tsx
+import { useState, useMemo } from 'react';
+import { useAdminCompanies } from '@/hooks/admin';
+import { useDebounce } from '@/hooks/useDebounce';
+import CompanyDrawer from '@/components/admin/CompanyDrawer';
+import { Avatar, StatusBadge, EmptyState, Spinner, fmtDate } from '@/components/admin/shared';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import Badge from '@/components/ui/Badge';
 import SearchInput from '@/components/ui/SearchInput';
-import SelectInput from '@/components/forms/SelectInput';
-import Modal from '@/components/ui/Modal';
-import AlertBar from '@/components/ui/AlertBar';
-import { useDebounce } from '@/hooks/useDebounce';
+import type { AdminCompany, AdminCompaniesFilter } from '@/types/admin';
 
-// ── Constants ─────────────────────────────────────────────────
-const PLAN_LABELS: Record<string, string> = {
-  free: 'مجاني', starter: 'مبتدئ', professional: 'احترافي',
-  enterprise: 'مؤسسة', custom: 'مخصص',
+const PLANS: Record<string, string> = {
+  free: 'مجاني', starter: 'مبتدئ', professional: 'احترافي', enterprise: 'مؤسسة', custom: 'مخصص',
 };
 const PLAN_COLORS: Record<string, string> = {
-  free: '#6b7280', starter: '#6366f1', professional: '#0ea5e9',
-  enterprise: '#f59e0b', custom: '#8b5cf6',
+  free: '#6b7280', starter: '#6366f1', professional: '#0ea5e9', enterprise: '#f59e0b', custom: '#8b5cf6',
 };
-const PLANS = ['free', 'starter', 'professional', 'enterprise', 'custom'];
-const AV_GRAD = [
-  'linear-gradient(135deg,#0a8a5c,#0dbf84)',
-  'linear-gradient(135deg,#1a4fd6,#60a5fa)',
-  'linear-gradient(135deg,#6920d4,#a78bfa)',
-  'linear-gradient(135deg,#b87d0a,#fbbf24)',
-  'linear-gradient(135deg,#c43a0a,#fb923c)',
-];
 
-const avGrad = (id: number) => AV_GRAD[id % AV_GRAD.length];
-const initials = (name: string) =>
-  name.trim().split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
-
-// ── Status ────────────────────────────────────────────────────
-type StatusInfo = { label: string; color: string; bg: string; variant: 'success'|'danger'|'gray'|'warning' };
-function statusOf(co: AdminCompany): StatusInfo {
-  if (co.is_suspended)  return { label: 'معلّقة',   color: '#ef4444', bg: '#ef44441a', variant: 'danger'  };
-  if (!co.active)       return { label: 'غير نشطة', color: '#6b7280', bg: '#6b72801a', variant: 'gray'    };
-  if (co.verified_at)   return { label: 'موثّقة',   color: '#10b981', bg: '#10b9811a', variant: 'success' };
-  return                       { label: 'نشطة',     color: '#10b981', bg: '#10b9811a', variant: 'success' };
-}
-
-// ── Drawer Tab ────────────────────────────────────────────────
-type DTab = 'info' | 'plan' | 'users' | 'notes' | 'actions';
-
-// ── CompanyDrawer ─────────────────────────────────────────────
-function CompanyDrawer({
-  co, onClose,
-}: {
-  co: AdminCompany;
-  onClose: (refresh?: boolean) => void;
-}) {
-  const companyAction = useAdminCompanyAction();
-  const updateNotes  = useUpdateCompanyNotes();
-  const changePlan   = useChangePlan();
-  const muts = {
-    suspend:    { mutateAsync: (p: { slug: string; payload?: any }) => companyAction.mutateAsync({ action: 'suspend',    ...p }), isPending: companyAction.isPending },
-    unsuspend:  { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'unsuspend',  ...p }), isPending: companyAction.isPending },
-    verify:     { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'verify',     ...p }), isPending: companyAction.isPending },
-    unverify:   { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'unverify',   ...p }), isPending: companyAction.isPending },
-    activate:   { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'activate',   ...p }), isPending: companyAction.isPending },
-    deactivate: { mutateAsync: (p: { slug: string })               => companyAction.mutateAsync({ action: 'deactivate', ...p }), isPending: companyAction.isPending },
-    updateNotes,
-    changePlan,
-  };
-  const [tab, setTab]   = useState<DTab>('info');
-  const [notes, setNotes] = useState(co.notes ?? '');
-  const [planForm, setPlanForm] = useState({
-    plan: co.plan,
-    max_users:      co.max_users      ?? 0,
-    max_products:   co.max_products   ?? 0,
-    max_warehouses: co.max_warehouses ?? 0,
-  });
-  const [suspendReason, setSuspendReason] = useState('');
-  const [showSuspend, setShowSuspend]   = useState(false);
-  const [addEmail, setAddEmail]         = useState('');
-  const [addRole, setAddRole]           = useState('member');
-  const [busy, setBusy]                 = useState<string | null>(null);
-  const [flash, setFlash]               = useState<{ ok: boolean; msg: string } | null>(null);
-
-  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
-    queryKey: ['admin', 'companies', co.id, 'users'],
-    queryFn:  () => apiClient.get(`/admin/companies/${co.id}/users`).then(r => (r.data as any)?.data ?? r.data),
-    enabled:  tab === 'users',
-    staleTime: 60_000,
-  });
-
-  const st = statusOf(co);
-
-  const run = async (key: string, fn: () => Promise<unknown>, msg: string) => {
-    setBusy(key);
-    setFlash(null);
-    try {
-      await fn();
-      setFlash({ ok: true, msg });
-      onClose(true);
-    } catch (e: any) {
-      setFlash({ ok: false, msg: e?.message ?? 'حدث خطأ' });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const TAB_DEF: { key: DTab; label: string; icon: string }[] = [
-    { key: 'info',    label: 'المعلومات', icon: 'ti-info-circle'   },
-    { key: 'plan',    label: 'الخطة',     icon: 'ti-credit-card'   },
-    { key: 'users',   label: 'المستخدمون',icon: 'ti-users'         },
-    { key: 'notes',   label: 'ملاحظات',   icon: 'ti-notes'         },
-    { key: 'actions', label: 'إجراءات',   icon: 'ti-bolt'          },
-  ];
-
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,.45)', direction: 'rtl' }}
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div style={{ width: 500, background: 'var(--bg2)', display: 'flex', flexDirection: 'column', boxShadow: '-6px 0 28px rgba(0,0,0,.18)', maxHeight: '100vh' }}>
-
-        {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--b2)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: avGrad(co.id), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 800, flexShrink: 0 }}>
-            {initials(co.name)}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
-            <div style={{ fontSize: 11, color: 'var(--t4)' }}>/{co.slug} · {co.email ?? '—'}</div>
-          </div>
-          <Badge variant={st.variant}>{st.label}</Badge>
-          <button onClick={() => onClose()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--t4)', lineHeight: 1, padding: 4 }}>
-            <i className="ti ti-x" />
-          </button>
-        </div>
-
-        {/* Flash */}
-        {flash && (
-          <div style={{ padding: '8px 20px', background: flash.ok ? '#10b9811a' : '#ef44441a', color: flash.ok ? '#10b981' : '#ef4444', fontSize: 12, fontWeight: 600 }}>
-            {flash.ok ? '✓' : '✗'} {flash.msg}
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--b2)', padding: '0 14px', flexShrink: 0, overflowX: 'auto' }}>
-          {TAB_DEF.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)} style={{
-              padding: '9px 12px', border: 'none', background: 'none',
-              borderBottom: tab === t.key ? '2px solid #dc2626' : '2px solid transparent',
-              color: tab === t.key ? '#dc2626' : 'var(--t3)',
-              fontWeight: tab === t.key ? 700 : 500, fontSize: 11.5,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-              whiteSpace: 'nowrap', fontFamily: "'Tajawal', sans-serif",
-            }}>
-              <i className={`ti ${t.icon}`} style={{ fontSize: 13 }} />{t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
-
-          {/* ── INFO ── */}
-          {tab === 'info' && (
-            <div style={{ display: 'grid', gap: 0 }}>
-              {[
-                ['المالك',        co.owner?.name ?? '—'],
-                ['البريد',        co.email ?? '—'],
-                ['الهاتف',        co.phone ?? '—'],
-                ['العنوان',       co.address ?? '—'],
-                ['الخطة',         PLAN_LABELS[co.plan] ?? co.plan],
-                ['المستخدمون',    `${co.users_count} / ${co.max_users}`],
-                ['المنتجات (حد)', co.max_products === 0 ? 'غير محدود' : co.max_products],
-                ['المخازن (حد)',  co.max_warehouses === 0 ? 'غير محدود' : co.max_warehouses],
-                ['التوثيق',       co.verified_at ? `✓ موثّق — ${new Date(co.verified_at).toLocaleDateString('ar-DZ')}` : 'غير موثّق'],
-                ['تاريخ الإنشاء', new Date(co.created_at).toLocaleDateString('ar-DZ')],
-              ].map(([k, v]) => (
-                <div key={String(k)} style={{ display: 'flex', gap: 12, padding: '9px 0', borderBottom: '1px solid var(--b2)' }}>
-                  <span style={{ width: 120, fontSize: 12, color: 'var(--t4)', flexShrink: 0 }}>{k}</span>
-                  <span style={{ fontSize: 13, color: 'var(--t1)', fontWeight: 500 }}>{v}</span>
-                </div>
-              ))}
-              {co.is_suspended && co.suspended_reason && (
-                <div style={{ marginTop: 12, padding: '10px 14px', background: '#ef44441a', borderRadius: 8, border: '1px solid #ef44441a' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>سبب التعليق</div>
-                  <div style={{ fontSize: 12, color: 'var(--t2)' }}>{co.suspended_reason}</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── PLAN ── */}
-          {tab === 'plan' && (
-            <div style={{ display: 'grid', gap: 14 }}>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--t4)', display: 'block', marginBottom: 6 }}>الخطة</label>
-                <select
-                  value={planForm.plan}
-                  onChange={e => setPlanForm(p => ({ ...p, plan: e.target.value }))}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13 }}
-                >
-                  {PLANS.map(p => <option key={p} value={p}>{PLAN_LABELS[p]}</option>)}
-                </select>
-              </div>
-              {[
-                { key: 'max_users',      label: 'حد المستخدمين (0 = غير محدود)' },
-                { key: 'max_products',   label: 'حد المنتجات' },
-                { key: 'max_warehouses', label: 'حد المخازن' },
-              ].map(({ key, label }) => (
-                <div key={key}>
-                  <label style={{ fontSize: 12, color: 'var(--t4)', display: 'block', marginBottom: 6 }}>{label}</label>
-                  <input
-                    type="number" min={0}
-                    value={(planForm as any)[key]}
-                    onChange={e => setPlanForm(p => ({ ...p, [key]: parseInt(e.target.value) || 0 }))}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13, boxSizing: 'border-box' }}
-                  />
-                </div>
-              ))}
-              <Button
-                variant="primary"
-                loading={busy === 'plan'}
-                onClick={() => run('plan', () => muts.changePlan.mutateAsync({ id: co.id, ...planForm }), 'تم تحديث الخطة')}
-              >
-                حفظ تغييرات الخطة
-              </Button>
-            </div>
-          )}
-
-          {/* ── USERS ── */}
-          {tab === 'users' && (
-            <div>
-              {/* إضافة مستخدم */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px auto', gap: 8, marginBottom: 16, alignItems: 'flex-end' }}>
-                <div>
-                  <label style={{ fontSize: 11, color: 'var(--t4)', display: 'block', marginBottom: 4 }}>بريد المستخدم أو ID</label>
-                  <input
-                    value={addEmail} onChange={e => setAddEmail(e.target.value)}
-                    placeholder="user@example.com أو رقم"
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13, boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, color: 'var(--t4)', display: 'block', marginBottom: 4 }}>الدور</label>
-                  <select value={addRole} onChange={e => setAddRole(e.target.value)}
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13 }}>
-                    <option value="member">عضو</option>
-                    <option value="admin">مسؤول</option>
-                    <option value="owner">مالك</option>
-                  </select>
-                </div>
-                <Button size="sm" variant="primary" loading={busy === 'addUser'}
-                  onClick={async () => {
-                    if (!addEmail) return;
-                    setBusy('addUser');
-                    try {
-                      // البحث عن المستخدم بالبريد أو ID
-                      const userId = parseInt(addEmail) || 0;
-                      await adminApi.addCompanyUser(co.id, userId, addRole);
-                      setAddEmail('');
-                      refetchUsers();
-                      setFlash({ ok: true, msg: 'تم إضافة المستخدم' });
-                    } catch (e: any) {
-                      setFlash({ ok: false, msg: e?.message ?? 'فشل الإضافة' });
-                    } finally {
-                      setBusy(null);
-                    }
-                  }}
-                >إضافة</Button>
-              </div>
-
-              {usersLoading ? (
-                <div style={{ textAlign: 'center', padding: 24 }}>
-                  <i className="ti ti-loader" style={{ fontSize: 24, color: 'var(--em)', animation: 'spin 1s linear infinite' }} />
-                </div>
-              ) : (
-                <div>
-                  {(usersData?.data ?? []).map((u: AdminUser) => (
-                    <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--b2)' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: avGrad(u.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
-                        {initials(u.name)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--t4)' }}>{u.email}</div>
-                      </div>
-                      <Badge variant={u.active ? 'success' : 'gray'}>{u.active ? 'نشط' : 'معطل'}</Badge>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button
-                          title={u.active ? 'تعطيل' : 'تفعيل'}
-                          onClick={() => muts.toggleUser.mutate({ companyId: co.id, userId: u.id })}
-                          style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--b2)', background: 'none', cursor: 'pointer', color: 'var(--t3)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                          <i className={`ti ${u.active ? 'ti-user-off' : 'ti-user-check'}`} />
-                        </button>
-                        <button
-                          title="إزالة من الشركة"
-                          onClick={() => { if (confirm(`إزالة ${u.name} من الشركة؟`)) muts.removeUser.mutate({ companyId: co.id, userId: u.id }); }}
-                          style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid #ef444433', background: '#ef44440d', cursor: 'pointer', color: '#ef4444', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                          <i className="ti ti-user-minus" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {(!usersData?.data || usersData.data.length === 0) && (
-                    <div style={{ textAlign: 'center', color: 'var(--t4)', fontSize: 13, paddingTop: 24 }}>
-                      <i className="ti ti-users" style={{ fontSize: 28, display: 'block', opacity: .3, marginBottom: 8 }} />
-                      لا يوجد مستخدمون في هذه الشركة
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── NOTES ── */}
-          {tab === 'notes' && (
-            <div>
-              <textarea
-                value={notes} onChange={e => setNotes(e.target.value)}
-                rows={10} placeholder="ملاحظات خاصة بهذه الشركة..."
-                style={{ width: '100%', borderRadius: 8, border: '1px solid var(--b2)', padding: '10px 12px', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', background: 'var(--bg3)', color: 'var(--t1)', fontFamily: "'Tajawal', sans-serif" }}
-              />
-              <Button
-                variant="primary" style={{ marginTop: 10 }}
-                loading={busy === 'notes'}
-                onClick={() => run('notes', () => muts.updateNotes.mutateAsync({ id: co.id, notes }), 'تم حفظ الملاحظات')}
-              >
-                حفظ الملاحظات
-              </Button>
-            </div>
-          )}
-
-          {/* ── ACTIONS ── */}
-          {tab === 'actions' && (
-            <div style={{ display: 'grid', gap: 10 }}>
-              {/* التعليق */}
-              {!co.is_suspended ? (
-                <div style={{ border: '1px solid var(--b2)', borderRadius: 10, padding: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', marginBottom: 8 }}>
-                    <i className="ti ti-ban" style={{ color: '#ef4444', marginLeft: 6 }} />تعليق الشركة
-                  </div>
-                  <textarea
-                    value={suspendReason} onChange={e => setSuspendReason(e.target.value)}
-                    rows={2} placeholder="سبب التعليق (مطلوب)"
-                    style={{ width: '100%', borderRadius: 8, border: '1px solid var(--b2)', padding: '8px 10px', fontSize: 12, resize: 'none', boxSizing: 'border-box', background: 'var(--bg3)', color: 'var(--t1)', fontFamily: "'Tajawal', sans-serif" }}
-                  />
-                  <Button
-                    variant="danger" size="sm" style={{ marginTop: 8 }}
-                    loading={busy === 'suspend'}
-                    disabled={!suspendReason.trim()}
-                    onClick={() => run('suspend', () => muts.suspend.mutateAsync({ id: co.id, reason: suspendReason }), 'تم تعليق الشركة')}
-                  >
-                    تعليق الشركة
-                  </Button>
-                </div>
-              ) : (
-                <ActionRow
-                  icon="ti-player-play" label="رفع التعليق" color="#10b981"
-                  desc="إعادة تفعيل الشركة وإلغاء التعليق"
-                  loading={busy === 'unsuspend'}
-                  onClick={() => run('unsuspend', () => muts.unsuspend.mutateAsync(co.id), 'تم رفع التعليق')}
-                />
-              )}
-
-              {/* تفعيل / إيقاف */}
-              <ActionRow
-                icon={co.active ? 'ti-toggle-left' : 'ti-toggle-right'}
-                label={co.active ? 'إيقاف الشركة' : 'تفعيل الشركة'}
-                color={co.active ? '#f59e0b' : '#10b981'}
-                desc={co.active ? 'إيقاف نشاط الشركة مؤقتاً' : 'إعادة تفعيل الشركة'}
-                loading={busy === 'toggle'}
-                onClick={() => run('toggle',
-                  () => co.active
-                    ? muts.deactivate.mutateAsync(co.id)
-                    : muts.activate.mutateAsync(co.id),
-                  co.active ? 'تم إيقاف الشركة' : 'تم تفعيل الشركة'
-                )}
-              />
-
-              {/* التوثيق */}
-              <ActionRow
-                icon={co.verified_at ? 'ti-shield-x' : 'ti-shield-check'}
-                label={co.verified_at ? 'إلغاء التوثيق' : 'توثيق الشركة'}
-                color={co.verified_at ? '#6b7280' : '#0ea5e9'}
-                desc={co.verified_at ? 'إلغاء الشارة الموثّقة' : 'منح الشركة شارة التوثيق'}
-                loading={busy === 'verify'}
-                onClick={() => run('verify',
-                  () => co.verified_at
-                    ? muts.unverify.mutateAsync(co.id)
-                    : muts.verify.mutateAsync(co.id),
-                  co.verified_at ? 'تم إلغاء التوثيق' : 'تم التوثيق'
-                )}
-              />
-
-              {/* حذف */}
-              <div style={{ border: '1px solid #ef444433', borderRadius: 10, padding: 14, background: '#ef44440a' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>
-                  <i className="ti ti-trash" style={{ marginLeft: 6 }} />منطقة الخطر
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--t4)', marginBottom: 10 }}>
-                  حذف الشركة نهائياً مع جميع بياناتها. لا يمكن التراجع.
-                </div>
-                <Button
-                  variant="danger" size="sm"
-                  loading={busy === 'delete'}
-                  onClick={() => {
-                    if (confirm(`حذف شركة "${co.name}" نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`)) {
-                      run('delete', () => muts.deleteCompany.mutateAsync(co.id), 'تم حذف الشركة');
-                    }
-                  }}
-                >
-                  حذف الشركة نهائياً
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── ActionRow helper ──────────────────────────────────────────
-function ActionRow({ icon, label, desc, color, loading, onClick }: {
-  icon: string; label: string; desc: string; color: string; loading?: boolean; onClick: () => void;
-}) {
-  return (
-    <div style={{ border: '1px solid var(--b2)', borderRadius: 10, padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ width: 36, height: 36, borderRadius: 9, background: color + '1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <i className={`ti ${icon}`} style={{ fontSize: 17, color }} />
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{label}</div>
-        <div style={{ fontSize: 11, color: 'var(--t4)' }}>{desc}</div>
-      </div>
-      <Button size="sm" loading={loading} onClick={onClick}
-        style={{ borderColor: color + '40', color, background: color + '0d' }}>
-        تنفيذ
-      </Button>
-    </div>
-  );
-}
-
-// ── Main Page ─────────────────────────────────────────────────
 export default function AdminCompaniesPage() {
   const [rawSearch, setRawSearch] = useState('');
   const search = useDebounce(rawSearch, 350);
-  const [status, setStatus] = useState('');
-  const [plan,   setPlan]   = useState('');
-  const [page,   setPage]   = useState(1);
+  const [status,  setStatus]  = useState<AdminCompaniesFilter['status']>('');
+  const [plan,    setPlan]    = useState('');
+  const [sortBy,  setSortBy]  = useState<'name' | 'created_at' | 'users_count'>('created_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [page,    setPage]    = useState(1);
   const [selected, setSelected] = useState<AdminCompany | null>(null);
 
-  const params = useMemo(() => ({
-    search: search || undefined,
-    status: (status || undefined) as AdminCompaniesParams['status'],
-    plan:   plan   || undefined,
-    page, per_page: 20,
-  }), [search, status, plan, page]);
+  const filter = useMemo<AdminCompaniesFilter>(() => ({
+    search:   search || undefined,
+    status:   status || undefined,
+    plan:     plan   || undefined,
+    sort_by:  sortBy,
+    sort_dir: sortDir,
+    page,
+    per_page: 20,
+  }), [search, status, plan, sortBy, sortDir, page]);
 
-  const { data, isLoading, isError, refetch } = useAdminCompanies(params);
-  const companies = data?.data ?? [];
-  const meta      = data?.meta;
+  const { data, isLoading, isError, refetch } = useAdminCompanies(filter);
 
-  const closeDrawer = useCallback((refresh?: boolean) => {
-    setSelected(null);
-    if (refresh) refetch();
-  }, [refetch]);
+  const companies: AdminCompany[] = (data as any)?.data ?? [];
+  const meta = (data as any)?.meta;
+
+  const toggleSort = (col: typeof sortBy) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('desc'); }
+    setPage(1);
+  };
+
+  const SortIcon = ({ col }: { col: typeof sortBy }) =>
+    sortBy === col
+      ? <i className={`ti ti-sort-${sortDir === 'asc' ? 'ascending' : 'descending'}`} style={{ fontSize: 11 }} />
+      : <i className="ti ti-selector" style={{ fontSize: 11, opacity: .3 }} />;
 
   return (
     <div>
       <PageHeader
         title="الشركات"
-        subtitle={`${meta?.total ?? 0} شركة مسجّلة في المنصة`}
+        description={`${meta?.total ?? 0} شركة في المنصة`}
+        actions={
+          <Button variant="primary" icon={<i className="ti ti-refresh" />} onClick={() => refetch()}>
+            تحديث
+          </Button>
+        }
       />
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* ── فلاتر ─────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <SearchInput
           value={rawSearch}
           onChange={v => { setRawSearch(v); setPage(1); }}
-          placeholder="بحث بالاسم، slug، بريد..."
+          placeholder="بحث بالاسم أو البريد..."
+          style={{ flex: 1, minWidth: 200 }}
         />
-        <SelectInput
-          options={[
-            { label: 'كل الحالات',  value: '' },
-            { label: 'نشطة',        value: 'active' },
-            { label: 'موقوفة',      value: 'suspended' },
-            { label: 'غير نشطة',   value: 'inactive' },
-            { label: 'موثّقة',      value: 'verified' },
-            { label: 'غير موثّقة', value: 'unverified' },
-          ]}
-          value={status}
-          onChange={v => { setStatus(v); setPage(1); }}
-        />
-        <SelectInput
-          options={[
-            { label: 'كل الخطط', value: '' },
-            ...PLANS.map(p => ({ label: PLAN_LABELS[p], value: p })),
-          ]}
+
+        {([
+          { val: '',            label: 'كل الحالات' },
+          { val: 'active',      label: 'نشطة' },
+          { val: 'suspended',   label: 'موقوفة' },
+          { val: 'inactive',    label: 'غير نشطة' },
+          { val: 'verified',    label: 'موثّقة' },
+          { val: 'unverified',  label: 'غير موثقة' },
+        ] as { val: typeof status; label: string }[]).map(opt => (
+          <button
+            key={opt.val}
+            onClick={() => { setStatus(opt.val); setPage(1); }}
+            style={{
+              padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+              border: `1px solid ${status === opt.val ? 'var(--em)' : 'var(--b2)'}`,
+              background: status === opt.val ? 'var(--emb)' : 'var(--bg3)',
+              color: status === opt.val ? 'var(--em)' : 'var(--t3)',
+              cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+            }}
+          >{opt.label}</button>
+        ))}
+
+        <select
           value={plan}
-          onChange={v => { setPlan(v); setPage(1); }}
-        />
+          onChange={e => { setPlan(e.target.value); setPage(1); }}
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t2)', fontSize: 12, fontFamily: 'Tajawal, sans-serif' }}
+        >
+          <option value="">كل الخطط</option>
+          {Object.entries(PLANS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
       </div>
 
-      {isError && (
-        <AlertBar variant="red" style={{ marginBottom: 12 }}>
-          تعذّر تحميل البيانات.{' '}
-          <button onClick={() => refetch()} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>
-            إعادة المحاولة
-          </button>
-        </AlertBar>
-      )}
-
+      {/* ── الجدول ────────────────────────────────────────────────────────── */}
       <Card padding={0}>
+        {isError && (
+          <div style={{ padding: '12px 16px', background: '#ef44441a', color: '#ef4444', fontSize: 13 }}>
+            تعذّر تحميل البيانات.{' '}
+            <button onClick={() => refetch()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', textDecoration: 'underline' }}>
+              إعادة المحاولة
+            </button>
+          </div>
+        )}
+
         <div style={{ overflowX: 'auto' }}>
-          <table className="tw" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr>
-                <th>الشركة</th>
-                <th>المالك</th>
-                <th>الخطة</th>
-                <th>المستخدمون</th>
-                <th>الحالة</th>
-                <th>التوثيق</th>
-                <th>الإنشاء</th>
-                <th></th>
+              <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--b2)' }}>
+                {[
+                  { label: 'الشركة',     col: 'name'        as typeof sortBy },
+                  { label: 'الخطة',      col: null },
+                  { label: 'المستخدمون', col: 'users_count' as typeof sortBy },
+                  { label: 'الحالة',     col: null },
+                  { label: 'الإنشاء',    col: 'created_at'  as typeof sortBy },
+                  { label: '',           col: null },
+                ].map((th, i) => (
+                  <th
+                    key={i}
+                    onClick={() => th.col && toggleSort(th.col)}
+                    style={{
+                      padding: '10px 14px', textAlign: 'right', fontSize: 11, fontWeight: 800,
+                      color: 'var(--t4)', letterSpacing: .4, textTransform: 'uppercase',
+                      cursor: th.col ? 'pointer' : 'default', userSelect: 'none',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {th.label}{th.col && <SortIcon col={th.col} />}
+                    </span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center' }}>
-                  <i className="ti ti-loader" style={{ fontSize: 24, color: 'var(--em)', animation: 'spin 1s linear infinite' }} />
-                </td></tr>
+                <tr><td colSpan={6} style={{ padding: 40 }}><Spinner /></td></tr>
               ) : companies.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'var(--t4)' }}>
-                  <i className="ti ti-building-off" style={{ fontSize: 32, display: 'block', marginBottom: 8, opacity: .3 }} />
-                  لا توجد شركات مطابقة
+                <tr><td colSpan={6} style={{ padding: 40 }}>
+                  <EmptyState icon="ti-building-off" text="لا توجد شركات" />
                 </td></tr>
-              ) : companies.map(co => {
-                const st = statusOf(co);
-                return (
-                  <tr key={co.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 34, height: 34, borderRadius: 9, background: avGrad(co.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
-                          {initials(co.name)}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, color: 'var(--t1)', fontSize: 13 }}>{co.name}</div>
-                          <div style={{ fontSize: 10.5, color: 'var(--t4)' }}>/{co.slug}</div>
+              ) : companies.map(co => (
+                <tr
+                  key={co.id}
+                  onClick={() => setSelected(co)}
+                  style={{ borderBottom: '1px solid var(--b1)', cursor: 'pointer', transition: 'background .1s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+                >
+                  <td style={{ padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Avatar id={co.id} name={co.name} size={32} radius={9} />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{co.name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--t4)' }}>
+                          /{co.slug}
+                          {co.owner && ` · ${co.owner.name}`}
                         </div>
                       </div>
-                    </td>
-                    <td style={{ fontSize: 12, color: 'var(--t2)' }}>{co.owner?.name ?? '—'}</td>
-                    <td>
-                      <span style={{ fontSize: 10.5, padding: '3px 8px', borderRadius: 6, fontWeight: 700, background: (PLAN_COLORS[co.plan] ?? '#6b7280') + '1a', color: PLAN_COLORS[co.plan] ?? '#6b7280' }}>
-                        {PLAN_LABELS[co.plan] ?? co.plan}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: 12, color: 'var(--t2)' }}>{co.users_count} / {co.max_users}</td>
-                    <td><Badge variant={st.variant}>{st.label}</Badge></td>
-                    <td>
-                      {co.verified_at
-                        ? <span style={{ color: '#10b981', fontSize: 12 }}><i className="ti ti-shield-check" style={{ marginLeft: 4 }} />موثّق</span>
-                        : <span style={{ color: 'var(--t4)', fontSize: 12 }}>—</span>
-                      }
-                    </td>
-                    <td style={{ fontSize: 11, color: 'var(--t4)' }}>{new Date(co.created_at).toLocaleDateString('ar-DZ')}</td>
-                    <td>
-                      <Button size="xs" onClick={() => setSelected(co)}>إدارة</Button>
-                    </td>
-                  </tr>
-                );
-              })}
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                      background: (PLAN_COLORS[co.plan] || '#6b7280') + '22',
+                      color: PLAN_COLORS[co.plan] || '#6b7280',
+                    }}>
+                      {PLANS[co.plan] ?? co.plan}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--t2)', fontWeight: 600 }}>
+                    {co.users_count}
+                    <span style={{ fontSize: 10, color: 'var(--t4)', marginRight: 3 }}>/ {co.max_users || '∞'}</span>
+                  </td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <StatusBadge active={co.active} suspended={co.is_suspended} />
+                    {co.verified_at && (
+                      <i className="ti ti-shield-check" style={{ marginRight: 6, fontSize: 13, color: '#10b981' }} title="موثّق" />
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--t4)' }}>
+                    {fmtDate(co.created_at)}
+                  </td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <i className="ti ti-chevron-left" style={{ fontSize: 14, color: 'var(--t4)' }} />
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -770,15 +424,20 @@ export default function AdminCompaniesPage() {
             <span style={{ fontSize: 12, color: 'var(--t4)' }}>
               الصفحة {meta.current_page} من {meta.last_page} ({meta.total} شركة)
             </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>السابقة</Button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button size="sm" disabled={page === 1}              onClick={() => setPage(p => p - 1)}>السابقة</Button>
               <Button size="sm" disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}>التالية</Button>
             </div>
           </div>
         )}
       </Card>
 
-      {selected && <CompanyDrawer co={selected} onClose={closeDrawer} />}
+      {selected && (
+        <CompanyDrawer
+          company={selected}
+          onClose={refresh => { setSelected(null); if (refresh) refetch(); }}
+        />
+      )}
     </div>
   );
 }
@@ -997,134 +656,150 @@ export default function AdminReportsPage() {
 
 ## FILE: resources/js/pages/admin/AdminSettingsPage.tsx
 ```
-// ════════════════════════════════════════════════
 // pages/admin/AdminSettingsPage.tsx
-// صفحة إعدادات النظام – تستخدم hooks و API
-// ════════════════════════════════════════════════
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSystemSettings, useMaintenanceMutations } from '@/hooks/admin';
+import { maintenanceApi } from '@/lib/api/admin';
+import { SectionTitle, FlashBar } from '@/components/admin/shared';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
-import Switch from '@/components/ui/Switch';
-import Button from '@/components/ui/Button';
-import AlertBar from '@/components/ui/AlertBar';
-
 import type { SystemSettings } from '@/types/admin';
 
+// ─── Toggle ───────────────────────────────────────────────────────────────────
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button onClick={() => onChange(!checked)} style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: checked ? 'var(--em)' : 'var(--bg4)', position: 'relative', transition: '.2s', flexShrink: 0 }}>
+      <span style={{ position: 'absolute', top: 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: '.2s', right: checked ? 3 : 23, boxShadow: '0 1px 4px rgba(0,0,0,.2)' }} />
+    </button>
+  );
+}
+
+function Row({ label, sub, children }: { label: string; sub?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--b1)' }}>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 2 }}>{sub}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function NumField({ label, value, onChange, min = 0 }: { label: string; value: number; onChange: (v: number) => void; min?: number }) {
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--t4)', marginBottom: 6 }}>{label}</label>
+      <input type="number" value={value} min={min} onChange={e => onChange(parseInt(e.target.value) || 0)}
+        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13, boxSizing: 'border-box' as const }} />
+    </div>
+  );
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
 export default function AdminSettingsPage() {
-  const qc = useQueryClient();
-  const { data, isLoading } = useQuery<SystemSettings>({
-    queryKey: ['admin-settings'],
-    queryFn: () => apiClient.get('/admin/settings').then(r => (r.data as any)?.data ?? r.data),
-  });
+  const { data, isLoading, update } = useSystemSettings();
+  const maint = useMaintenanceMutations();
+
   const [settings, setSettings] = useState<SystemSettings | null>(null);
+  const [flash, setFlash]       = useState<{ ok: boolean; msg: string } | null>(null);
 
-  useEffect(() => {
-    if (data) setSettings(data);
-  }, [data]);
+  useEffect(() => { if (data) setSettings(data); }, [data]);
 
-  const updateMutation = useMutation({
-    mutationFn: (payload: Partial<SystemSettings>) => apiClient.put('/admin/settings', payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-settings'] }),
-  });
+  const flash$ = (ok: boolean, msg: string) => { setFlash({ ok, msg }); setTimeout(() => setFlash(null), 2500); };
 
-  const maintenanceMutation = useMutation({
-    mutationFn: (action: 'enable' | 'disable') =>
-      apiClient.post(`/admin/maintenance/${action}`),
-  });
-
-  const cacheMutation = useMutation({
-    mutationFn: () => apiClient.post('/admin/maintenance/cache-clear'),
-  });
-
-  const handleChange = <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) => {
+  const save = async <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) => {
     if (!settings) return;
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    updateMutation.mutate({ [key]: value });
+    const prev = settings;
+    setSettings({ ...settings, [key]: value });
+    try {
+      await update.mutateAsync({ [key]: value } as any);
+      flash$(true, 'تم الحفظ تلقائياً');
+    } catch {
+      setSettings(prev);
+      flash$(false, 'فشل الحفظ');
+    }
   };
 
-  if (isLoading || !settings) return <div style={{ padding: 40, textAlign: 'center' }}>جار التحميل...</div>;
+  if (isLoading || !settings) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 10, color: 'var(--t4)' }}>
+        <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> جارٍ التحميل...
+      </div>
+    );
+  }
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto' }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <PageHeader title="إعدادات النظام" description="إدارة التكوين العام للمنصة" />
 
+      {flash && <FlashBar ok={flash.ok} msg={flash.msg} />}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
         <Card title="الإعدادات العامة">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="sr">
-              <div className="sr-l">تسجيل مستخدمين جدد</div>
-              <Switch checked={settings.allow_registration} onChange={val => handleChange('allow_registration', val)} />
-            </div>
-            <div className="sr">
-              <div className="sr-l">إنشاء شركات جديدة (عبر واجهة المستخدم)</div>
-              <Switch checked={settings.allow_new_companies} onChange={val => handleChange('allow_new_companies', val)} />
-            </div>
-            <div className="sr">
-              <div className="sr-l">وضع التصحيح (Debug)</div>
-              <Switch checked={settings.debug_mode} onChange={val => handleChange('debug_mode', val)} />
-            </div>
-            <div className="sr">
-              <div className="sr-l">API العام (غير مصادق)</div>
-              <Switch checked={settings.public_api} onChange={val => handleChange('public_api', val)} />
-            </div>
-          </div>
+          <Row label="تسجيل مستخدمين جدد"       sub="السماح للزوار بإنشاء حسابات">
+            <Toggle checked={settings.allow_registration}  onChange={v => save('allow_registration', v)} />
+          </Row>
+          <Row label="إنشاء شركات جديدة"        sub="السماح للمستخدمين بإنشاء شركات">
+            <Toggle checked={settings.allow_new_companies} onChange={v => save('allow_new_companies', v)} />
+          </Row>
+          <Row label="وضع التصحيح (Debug)"      sub="أوقفه في الإنتاج">
+            <Toggle checked={settings.debug_mode}          onChange={v => save('debug_mode', v)} />
+          </Row>
+          <Row label="API العام"                sub="طلبات بدون مصادقة">
+            <Toggle checked={settings.public_api}          onChange={v => save('public_api', v)} />
+          </Row>
         </Card>
 
-        <Card title="الحدود الافتراضية للخطط">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div className="fg">
-              <label>مدة التجربة (أيام)</label>
-              <input type="number" value={settings.free_trial_days} onChange={e => handleChange('free_trial_days', Number(e.target.value))} min={1} max={90} />
-            </div>
-            <div className="fg">
-              <label>حد المستخدمين – خطة مجانية</label>
-              <input type="number" value={settings.free_max_users} onChange={e => handleChange('free_max_users', Number(e.target.value))} min={1} />
-            </div>
-            <div className="fg">
-              <label>حد المنتجات – خطة Starter</label>
-              <input type="number" value={settings.starter_max_products} onChange={e => handleChange('starter_max_products', Number(e.target.value))} min={100} />
-            </div>
+        <Card title="الحدود الافتراضية">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: '8px 0' }}>
+            <NumField label="مدة التجربة المجانية (أيام)" value={settings.free_trial_days}      onChange={v => save('free_trial_days', v)}      min={1} />
+            <NumField label="حد المستخدمين — مجاني"        value={settings.free_max_users}       onChange={v => save('free_max_users', v)}       min={1} />
+            <NumField label="حد المنتجات — Starter"        value={settings.starter_max_products} onChange={v => save('starter_max_products', v)} min={1} />
           </div>
         </Card>
 
         <Card title="وضع الصيانة">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <Switch
+          <Row label="تفعيل وضع الصيانة" sub="المستخدمون العاديون سيرون صفحة الصيانة">
+            <Toggle
               checked={settings.maintenance_mode}
-              onChange={val => {
-                handleChange('maintenance_mode', val);
-                maintenanceMutation.mutate(val ? 'enable' : 'disable');
+              onChange={v => {
+                save('maintenance_mode', v);
+                v ? maint.enable.mutate(settings.maintenance_message) : maint.disable.mutate();
               }}
-              label="تفعيل وضع الصيانة (جميع المستخدمين العاديين سيرون صفحة الصيانة)"
             />
-            {settings.maintenance_mode && (
-              <div className="fg">
-                <label>رسالة الصيانة (اختياري)</label>
-                <textarea
-                  value={settings.maintenance_message}
-                  onChange={e => handleChange('maintenance_message', e.target.value)}
-                  rows={2}
-                  placeholder="سيتم العرض للمستخدمين..."
-                />
-              </div>
-            )}
+          </Row>
+          {settings.maintenance_mode && (
+            <div style={{ paddingTop: 12 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--t4)', marginBottom: 6 }}>رسالة الصيانة</label>
+              <textarea
+                value={settings.maintenance_message}
+                onChange={e => setSettings(s => s ? { ...s, maintenance_message: e.target.value } : s)}
+                onBlur={e => save('maintenance_message', e.target.value)}
+                rows={2} placeholder="رسالة تُعرض للمستخدمين..."
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' as const, fontFamily: 'Tajawal, sans-serif' }}
+              />
+            </div>
+          )}
+        </Card>
+
+        <Card title="أدوات النظام">
+          <div style={{ padding: '8px 0', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {([
+              { label: 'مسح الكاش',                icon: 'ti-trash',           action: () => maint.clearCache.mutate(), pending: maint.clearCache.isPending },
+              { label: 'تشغيل المهام المجدولة',   icon: 'ti-clock-play',       action: () => maintenanceApi.enable(),   pending: false },
+              { label: 'نسخ احتياطي',              icon: 'ti-database-export',  action: () => {},                       pending: false },
+            ]).map(btn => (
+              <button key={btn.label} onClick={() => { if (confirm(`${btn.label}؟`)) btn.action(); }} disabled={btn.pending}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: '1px solid #ef444433', background: '#ef44440d', color: '#ef4444', fontSize: 12, fontWeight: 700, cursor: btn.pending ? 'not-allowed' : 'pointer', fontFamily: 'Tajawal, sans-serif', opacity: btn.pending ? .6 : 1 }}>
+                <i className={`ti ${btn.pending ? 'ti-loader' : btn.icon}`} style={{ animation: btn.pending ? 'spin 1s linear infinite' : 'none' }} />
+                {btn.label}
+              </button>
+            ))}
           </div>
         </Card>
 
-        <Card title="منطقة الخطر">
-          <AlertBar variant="red">
-            هذه الإجراءات لا يمكن التراجع عنها. يُنصح بأخذ نسخة احتياطية أولاً.
-          </AlertBar>
-          <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
-            <Button variant="danger" onClick={() => { if (confirm('مسح كامل الكاش؟')) cacheMutation.mutate(); }} loading={cacheMutation.isPending}>مسح الكاش</Button>
-            <Button variant="danger" onClick={() => { if (confirm('إعادة تشغيل المهام المجدولة؟')) adminApi.runScheduler(); }}>تشغيل المهام</Button>
-            <Button variant="danger" onClick={() => { if (confirm('تصدير آخر نسخة احتياطية؟')) adminApi.exportBackup(); }}>نسخ احتياطي</Button>
-          </div>
-        </Card>
-
-        {updateMutation.isPending && <div style={{ textAlign: 'center', padding: 8 }}>جاري الحفظ...</div>}
       </div>
     </div>
   );
@@ -1135,328 +810,168 @@ export default function AdminSettingsPage() {
 ```
 // pages/admin/AdminUsersPage.tsx
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/core/client';
-import type { AdminUser } from '@/types/admin';
+import { useAdminUsers } from '@/hooks/admin';
+import { useDebounce } from '@/hooks/useDebounce';
+import UserDrawer from '@/components/admin/UserDrawer';
+import { Avatar, StatusBadge, EmptyState, Spinner, fmtDate } from '@/components/admin/shared';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
-import SearchInput from '@/components/ui/SearchInput';
 import Button from '@/components/ui/Button';
-import Badge from '@/components/ui/Badge';
-import Modal from '@/components/ui/Modal';
-import SelectInput from '@/components/forms/SelectInput';
+import SearchInput from '@/components/ui/SearchInput';
+import type { AdminUser, AdminUsersFilter } from '@/types/admin';
+import { ROLES } from '@/constants/roles';
+
+const ROLE_BADGE: Record<string, { label: string; color: string }> = {
+  [ROLES.SUPER_ADMIN]: { label: 'Super Admin', color: '#ef4444' },
+  [ROLES.ADMIN]:       { label: 'Admin',        color: '#6366f1' },
+  manager:             { label: 'Manager',       color: '#0ea5e9' },
+  cashier:             { label: 'Cashier',       color: '#f59e0b' },
+  viewer:              { label: 'Viewer',        color: '#6b7280' },
+};
 
 export default function AdminUsersPage() {
-  const [search, setSearch]       = useState('');
-  const [role, setRole]           = useState('');
-  const [active, setActive]       = useState('');
-  const [page, setPage]           = useState(1);
-  const [selected, setSelected]   = useState<AdminUser | null>(null);
-  const [pwd, setPwd]             = useState('');
-  const [pwdConfirm, setPwdConfirm] = useState('');
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [rawSearch, setRawSearch] = useState('');
+  const search = useDebounce(rawSearch, 350);
+  const [role,     setRole]     = useState('');
+  const [active,   setActive]   = useState('');
+  const [page,     setPage]     = useState(1);
+  const [selected, setSelected] = useState<AdminUser | null>(null);
 
-  const params = useMemo(() => ({
-    search:   search   || undefined,
-    role:     role     || undefined,
-    active:   active   || undefined,
+  const filter = useMemo<AdminUsersFilter>(() => ({
+    search:   search  || undefined,
+    role:     role    || undefined,
+    active:   active  || undefined,
     page,
     per_page: 20,
   }), [search, role, active, page]);
 
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin', 'users', params],
-    queryFn:  () => apiClient.get('/admin/users', { params }).then(r => (r.data as any)?.data ?? r.data),
-    staleTime: 60_000,
-  });
+  const { data, isLoading, isError, refetch } = useAdminUsers(filter);
 
-  // ✅ client.ts → extractData يُرجع { data: [...], meta: {...} } مباشرة
-  // AdminUserController::index يُرجع LengthAwarePaginator داخل successResponse
-  // Laravel يُحوّله إلى { data:[...], meta:{...}, links:{...} }
-  // بعد extractData في client تصبح: { data:[...], meta:{...} }
-  const users = data?.data ?? [];
-  const meta  = data?.meta;
-
-  const qc = useQueryClient();
-  const inv = () => qc.invalidateQueries({ queryKey: ['admin', 'users'] });
-
-  const muts = {
-    resetPassword: useMutation({
-      mutationFn: ({ id, password, password_confirmation }: { id: number; password: string; password_confirmation: string }) =>
-        apiClient.post(`/admin/users/${id}/reset-password`, { password, password_confirmation }),
-    }),
-    toggleActive: useMutation({
-      mutationFn: (id: number) => apiClient.post(`/admin/users/${id}/toggle-active`),
-      onSuccess: inv,
-    }),
-    impersonate: useMutation({
-      mutationFn: (id: number) => apiClient.post(`/admin/impersonate/${id}`).then(r => r.data),
-    }),
-    create: useMutation({
-      mutationFn: (data: Partial<AdminUser>) => apiClient.post('/admin/users', data),
-      onSuccess: inv,
-    }),
-    remove: useMutation({
-      mutationFn: (id: number) => apiClient.delete(`/admin/users/${id}`),
-      onSuccess: inv,
-    }),
-  };
-
-  const handleResetPassword = async () => {
-    if (!selected) return;
-    if (pwd !== pwdConfirm) { alert('كلمتا المرور غير متطابقتين'); return; }
-    if (pwd.length < 8)     { alert('كلمة المرور يجب أن تكون 8 أحرف على الأقل'); return; }
-    await muts.resetPassword.mutateAsync({ id: selected.id, password: pwd, password_confirmation: pwdConfirm });
-    setPwd('');
-    setPwdConfirm('');
-    alert('تم تغيير كلمة المرور وإلغاء جميع الجلسات');
-  };
-
-  const handleImpersonate = async () => {
-    if (!selected) return;
-    const res = await muts.impersonate.mutateAsync(selected.id) as any;
-    // ✅ token يأتي من res.token (بعد extractData يُرجع data مباشرة)
-    const token = res?.token ?? res?.data?.token;
-    if (token) {
-      localStorage.setItem('auth_token', token);
-      window.location.href = '/dashboard';
-    }
-  };
-
-  // ── Loading ───────────────────────────────────────────────────────────────
-  if (isLoading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
-      <i className="ti ti-loader" style={{ fontSize: 28, color: 'var(--em)', animation: 'spin 1s linear infinite' }} />
-    </div>
-  );
-
-  // ── Error ─────────────────────────────────────────────────────────────────
-  if (isError) return (
-    <div style={{ textAlign: 'center', padding: 60, color: 'var(--t2)' }}>
-      <i className="ti ti-wifi-off" style={{ fontSize: 36, display: 'block', marginBottom: 12, opacity: .4 }} />
-      <p style={{ fontSize: 14, margin: '0 0 12px' }}>تعذّر تحميل المستخدمين</p>
-      <Button onClick={() => refetch()}>إعادة المحاولة</Button>
-    </div>
-  );
+  const users: AdminUser[] = (data as any)?.data ?? [];
+  const meta  = (data as any)?.meta;
 
   return (
     <div>
-      <PageHeader
-        title="المستخدمون"
-        subtitle={`${meta?.total ?? 0} مستخدم في المنصة`}
-      />
+      <PageHeader title="المستخدمون" description={`${meta?.total ?? 0} مستخدم في المنصة`} />
 
-      {/* ── فلاتر ──────────────────────────────────────────────────────────── */}
-      <div className="filters" style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* ── فلاتر ─────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         <SearchInput
-          value={search}
-          onChange={(v) => { setSearch(v); setPage(1); }}
-          placeholder="بحث بالاسم أو البريد"
+          value={rawSearch}
+          onChange={v => { setRawSearch(v); setPage(1); }}
+          placeholder="بحث بالاسم أو البريد..."
+          style={{ flex: 1, minWidth: 200 }}
         />
-        <SelectInput
-          options={[
-            { label: 'كل الأدوار',   value: '' },
-            { label: 'Super Admin',  value: 'super_admin' },
-            { label: 'Admin',        value: 'admin' },
-            { label: 'مستخدم',       value: 'user' },
-          ]}
-          value={role}
-          onChange={(v) => { setRole(v); setPage(1); }}
-        />
-        <SelectInput
-          options={[
-            { label: 'كل الحالات', value: '' },
-            { label: 'نشط',        value: '1' },
-            { label: 'معطل',       value: '0' },
-          ]}
-          value={active}
-          onChange={(v) => { setActive(v); setPage(1); }}
-        />
+        <select value={role} onChange={e => { setRole(e.target.value); setPage(1); }}
+          style={selectStyle}>
+          <option value="">كل الأدوار</option>
+          <option value="super-admin">Super Admin</option>
+          <option value="admin">Admin</option>
+          <option value="manager">Manager</option>
+          <option value="cashier">Cashier</option>
+        </select>
+        <select value={active} onChange={e => { setActive(e.target.value); setPage(1); }}
+          style={selectStyle}>
+          <option value="">كل الحالات</option>
+          <option value="1">نشط</option>
+          <option value="0">معطل</option>
+        </select>
       </div>
 
-      {/* ── الجدول ────────────────────────────────────────────────────────── */}
+      {isError && (
+        <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 8, background: '#ef44441a', color: '#ef4444', fontSize: 13 }}>
+          تعذّر التحميل.{' '}
+          <button onClick={() => refetch()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', textDecoration: 'underline' }}>
+            إعادة المحاولة
+          </button>
+        </div>
+      )}
+
       <Card padding={0}>
-        {users.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--t3)' }}>
-            <i className="ti ti-users" style={{ fontSize: 32, display: 'block', marginBottom: 8, opacity: .3 }} />
-            <p style={{ margin: 0, fontSize: 13 }}>لا يوجد مستخدمون</p>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tw" style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th>المستخدم</th>
-                  <th>الدور</th>
-                  <th>الشركات</th>
-                  <th>الحالة</th>
-                  <th>تاريخ الإنشاء</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <strong style={{ display: 'block', fontSize: 13 }}>{u.name}</strong>
-                      <small style={{ color: 'var(--t3)', fontSize: 11 }}>{u.email}</small>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--b2)' }}>
+                {['المستخدم', 'الدور', 'الشركات', 'آخر دخول', 'الحالة', 'الإنشاء', ''].map(h => (
+                  <th key={h} style={{ padding: '10px 14px', textAlign: 'right', fontSize: 11, fontWeight: 800, color: 'var(--t4)', letterSpacing: .4, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={7} style={{ padding: 40 }}><Spinner /></td></tr>
+              ) : users.length === 0 ? (
+                <tr><td colSpan={7} style={{ padding: 40 }}>
+                  <EmptyState icon="ti-users" text="لا يوجد مستخدمون" />
+                </td></tr>
+              ) : users.map(u => {
+                const rb = ROLE_BADGE[u.role ?? ''];
+                return (
+                  <tr
+                    key={u.id}
+                    onClick={() => setSelected(u)}
+                    style={{ borderBottom: '1px solid var(--b1)', cursor: 'pointer', transition: 'background .1s' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+                  >
+                    <td style={{ padding: '10px 14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Avatar id={u.id} name={u.name} size={32} />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{u.name}</div>
+                          <div style={{ fontSize: 10.5, color: 'var(--t4)' }}>{u.email}</div>
+                        </div>
+                      </div>
                     </td>
-                    <td>
-                      <Badge variant={
-                        u.role === 'super_admin' ? 'danger' :
-                        u.role === 'admin'       ? 'info'   : 'gray'
-                      }>
-                        {u.role}
-                      </Badge>
+                    <td style={{ padding: '10px 14px' }}>
+                      {rb ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: rb.color + '22', color: rb.color }}>{rb.label}</span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: 'var(--t4)' }}>{u.role ?? 'user'}</span>
+                      )}
                     </td>
-                    <td>{u.companies_count ?? 0}</td>
-                    <td>
-                      <Badge variant={u.active ? 'success' : 'gray'}>
-                        {u.active ? 'نشط' : 'معطل'}
-                      </Badge>
-                    </td>
-                    <td style={{ fontSize: 11, color: 'var(--t3)' }}>
-                      {new Date(u.created_at).toLocaleDateString('ar-DZ')}
-                    </td>
-                    <td>
-                      <Button
-                        size="xs"
-                        onClick={() => { setSelected(u); setDetailOpen(true); }}
-                      >
-                        إدارة
-                      </Button>
+                    <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--t2)', fontWeight: 600 }}>{u.companies_count ?? 0}</td>
+                    <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--t4)' }}>{fmtDate(u.last_login_at)}</td>
+                    <td style={{ padding: '10px 14px' }}><StatusBadge active={u.active} /></td>
+                    <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--t4)' }}>{fmtDate(u.created_at)}</td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <i className="ti ti-chevron-left" style={{ fontSize: 14, color: 'var(--t4)' }} />
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-        {/* ── Pagination ─────────────────────────────────────────────────── */}
         {meta && meta.last_page > 1 && (
-          <div style={{
-            padding: '12px 16px', borderTop: '1px solid var(--b2)',
-            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10,
-          }}>
-            <Button
-              size="sm"
-              disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              السابقة
-            </Button>
-            <span style={{ fontSize: 13, color: 'var(--t2)' }}>
-              {page} / {meta.last_page}
-              <span style={{ fontSize: 11, color: 'var(--t3)', marginRight: 6 }}>
-                ({meta.total} مستخدم)
-              </span>
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--b2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--t4)' }}>
+              الصفحة {meta.current_page} من {meta.last_page} ({meta.total} مستخدم)
             </span>
-            <Button
-              size="sm"
-              disabled={page === meta.last_page}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              التالية
-            </Button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button size="sm" disabled={page === 1}              onClick={() => setPage(p => p - 1)}>السابقة</Button>
+              <Button size="sm" disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}>التالية</Button>
+            </div>
           </div>
         )}
       </Card>
 
-      {/* ── Drawer تفاصيل المستخدم ────────────────────────────────────────── */}
-      <Modal
-        open={detailOpen}
-        onClose={() => { setDetailOpen(false); setSelected(null); }}
-        title={selected?.name ?? ''}
-        size="md"
-      >
-        {selected && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-            {/* معلومات */}
-            <div style={{
-              background: 'var(--bg1)', borderRadius: 10, padding: '12px 16px',
-              fontSize: 13, display: 'grid', gap: 6,
-            }}>
-              <div><span style={{ color: 'var(--t3)' }}>البريد: </span>{selected.email}</div>
-              <div><span style={{ color: 'var(--t3)' }}>الدور: </span>{selected.role}</div>
-              <div><span style={{ color: 'var(--t3)' }}>الشركات: </span>{selected.companies_count ?? 0}</div>
-              <div>
-                <span style={{ color: 'var(--t3)' }}>الحالة: </span>
-                <Badge variant={selected.active ? 'success' : 'gray'}>
-                  {selected.active ? 'نشط' : 'معطل'}
-                </Badge>
-              </div>
-            </div>
-
-            {/* إجراءات */}
-            <Button
-              variant={selected.active ? 'danger' : 'primary'}
-              onClick={() => muts.toggleActive.mutate(selected.id)}
-              disabled={muts.toggleActive.isPending}
-            >
-              {selected.active ? 'تعطيل المستخدم' : 'تفعيل المستخدم'}
-            </Button>
-
-            <Button
-              variant="secondary"
-              onClick={handleImpersonate}
-              disabled={muts.impersonate.isPending}
-            >
-              دخول كهذا المستخدم
-            </Button>
-
-            {/* إعادة تعيين كلمة المرور */}
-            <div style={{ borderTop: '1px solid var(--b2)', paddingTop: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--t2)' }}>
-                إعادة تعيين كلمة المرور
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <input
-                  type="password"
-                  placeholder="كلمة المرور الجديدة"
-                  value={pwd}
-                  onChange={(e) => setPwd(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--b2)', fontSize: 13 }}
-                />
-                <input
-                  type="password"
-                  placeholder="تأكيد كلمة المرور"
-                  value={pwdConfirm}
-                  onChange={(e) => setPwdConfirm(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--b2)', fontSize: 13 }}
-                />
-                <Button
-                  onClick={handleResetPassword}
-                  disabled={!pwd || muts.resetPassword.isPending}
-                >
-                  تغيير كلمة المرور
-                </Button>
-              </div>
-            </div>
-
-            {/* حذف */}
-            <div style={{ borderTop: '1px solid var(--b2)', paddingTop: 12 }}>
-              <Button
-                variant="danger"
-                onClick={() => {
-                  if (confirm(`هل تريد حذف المستخدم "${selected.name}" نهائياً؟`)) {
-                    muts.deleteUser.mutate(selected.id);
-                    setDetailOpen(false);
-                  }
-                }}
-                disabled={muts.deleteUser.isPending}
-              >
-                حذف المستخدم نهائياً
-              </Button>
-            </div>
-
-          </div>
-        )}
-      </Modal>
+      {selected && (
+        <UserDrawer
+          user={selected}
+          onClose={refresh => { setSelected(null); if (refresh) refetch(); }}
+        />
+      )}
     </div>
   );
 }
+
+const selectStyle: React.CSSProperties = {
+  padding: '6px 10px', borderRadius: 8, border: '1px solid var(--b2)',
+  background: 'var(--bg3)', color: 'var(--t2)', fontSize: 12,
+  fontFamily: 'Tajawal, sans-serif', cursor: 'pointer',
+};
 ```
 
 ## FILE: resources/js/pages/admin/CompaniesPage.tsx
@@ -2439,8 +1954,9 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            await login({ email, password });        // يخزّن المستخدم الكامل
-            navigate("/onboarding", { replace: true }); // الجميع يذهب إلى onboarding
+            const user = await login({ email, password });
+            const isSuperAdmin = user?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
+            navigate(isSuperAdmin ? '/admin/dashboard' : '/onboarding', { replace: true });
         } catch (err: any) {
             if (err.response) {
                 const msg =
@@ -3445,275 +2961,253 @@ const eyeBtn: React.CSSProperties = {
 
 ## FILE: resources/js/pages/clients/ClientsPage.tsx
 ```
-// pages/clients/ClientsPage.tsx
+// resources/js/pages/clients/ClientsPage.tsx
 import React, { useState } from 'react';
 import { useClients, usePartyMutations } from '@/lib/api/endpoints/parties';
 import { useModal } from '@/hooks/useModal';
-import PageHeader   from '@/components/ui/PageHeader';
-import Card         from '@/components/ui/Card';
-import Badge        from '@/components/ui/Badge';
-import Button       from '@/components/ui/Button';
-import Modal        from '@/components/ui/Modal';
-import KpiCard      from '@/components/ui/KpiCard';
-import Avatar       from '@/components/ui/Avatar';
-import EmptyState   from '@/components/ui/EmptyState';
-import ProgressBar  from '@/components/ui/ProgressBar';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import KpiCard from '@/components/ui/KpiCard';
+import Avatar from '@/components/ui/Avatar';
+import EmptyState from '@/components/ui/EmptyState';
+import ClientModal from '@/components/modals/ClientModal';
 import type { Party } from '@/types';
 
+// دالة مساعدة لتوليد slug من الاسم (احتياطي)
+const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/[^\u0621-\u064A\u0660-\u0669a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
 export default function ClientsPage() {
-  const [search,   setSearch]  = useState('');
-  const [editing,  setEditing] = useState<Party | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [editing, setEditing] = useState<Party | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const modal = useModal();
 
-  const { data, isLoading } = useClients({ search: search || undefined, per_page: 30 });
-  const clients = data?.data ?? [];
-  const meta    = data?.meta;
+  // جلب العملاء مع العلاقات المطلوبة
+  const { data, isLoading, refetch } = useClients({
+    search: search || undefined,
+    per_page: 10,
+    page: currentPage,
+    include: 'wilaya,commune,legalForm,defaultPriceLevel'
+  });
 
-  const openCreate = () => { setEditing(null); modal.openModal(); };
-  const openEdit   = (c: Party) => { setEditing(c); modal.openModal(); };
+  const clients = (data as any)?.data ?? (Array.isArray(data) ? data : []);
+  const meta = (data as any)?.meta;
 
-  // Stats
-  const withDebt    = clients.filter(c => (c.balance ?? 0) > 0).length;
-  const totalDebt   = clients.reduce((s, c) => s + (c.balance ?? 0), 0);
-  const totalBusiness = clients.reduce((s, c) => s + (c.total_sales ?? 0), 0);
+  // تطبيق الفلتر المحلي (حسب الحالة)
+  const filteredClients = clients.filter((c: Party) => {
+    if (statusFilter === 'active') return c.active === true;
+    if (statusFilter === 'inactive') return c.active === false;
+    return true;
+  });
+
+  // إحصائيات سريعة
+  const withDebt = clients.filter((c: Party) => (c.balance ?? 0) > 0).length;
+  const totalDebt = clients.reduce((s: number, c: Party) => s + (c.balance ?? 0), 0);
+  const totalBusiness = clients.reduce((s: number, c: Party) => s + (c.total_purchases ?? 0), 0);
+  const activeCount = clients.filter((c: Party) => c.active).length;
+
+  const openCreate = () => {
+    setEditing(null);
+    modal.openModal();
+  };
+
+  const openEdit = (c: Party) => {
+    setEditing(c);
+    modal.openModal();
+  };
+
+  // دوال حفظ البيانات
+  const { create: createMut, update: updateMut } = usePartyMutations();
+
+  const handleSubmit = async (formData: any) => {
+    if (!editing && !formData.slug) {
+      formData.slug = generateSlug(formData.name);
+    }
+    try {
+      if (editing) {
+        await updateMut.mutateAsync({ id: editing.id, data: formData });
+      } else {
+        await createMut.mutateAsync(formData);
+      }
+      await refetch(); // تحديث القائمة بعد الحفظ
+    } catch (err: any) {
+      console.error('Submit error:', err);
+      throw err;
+    }
+  };
+
+  // التنقل بين الصفحات
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= (meta?.last_page || 1)) {
+      setCurrentPage(page);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="empty">
+        <div className="empty-ic"><i className="ti ti-loader" /></div>
+        <div className="empty-tx">جاري التحميل...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="page on" id="p-clients">
-
       <PageHeader
         title="العملاء"
-        subtitle={`إدارة قاعدة العملاء — ${meta?.total ?? '...'} زبون`}
+        subtitle={`إدارة قاعدة العملاء — ${meta?.total ?? clients.length} زبون`}
         actions={
           <>
-            <Button size="sm" icon={<i className="ti ti-table-export"/>}>تصدير</Button>
-            <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus"/>} onClick={openCreate}>
+            <Button size="sm" icon={<i className="ti ti-table-export" />}>تصدير</Button>
+            <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus" />} onClick={openCreate}>
               زبون جديد
             </Button>
           </>
         }
       />
 
-      {/* KPIs */}
-      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
-        <KpiCard variant="green"  icon="ti-users"         label="إجمالي العملاء"    value={meta?.total ?? '—'} />
-        <KpiCard variant="blue"   icon="ti-trending-up"   label="إجمالي المشتريات"  value={totalBusiness.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
-        <KpiCard variant="red"    icon="ti-receipt"       label="ديون العملاء"      value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} زبون متأخر`} />
-        <KpiCard variant="gold"   icon="ti-star"          label="عملاء VIP"         value="—" />
+      {/* بطاقات الأداء */}
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
+        <KpiCard variant="green" icon="ti-users" label="إجمالي العملاء" value={meta?.total ?? clients.length} />
+        <KpiCard variant="blue" icon="ti-trending-up" label="إجمالي المشتريات" value={totalBusiness.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
+        <KpiCard variant="red" icon="ti-receipt" label="ديون العملاء" value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} زبون متأخر`} />
+        <KpiCard variant="gold" icon="ti-star" label="عملاء نشطون" value={activeCount} />
       </div>
 
-      {/* Search */}
-      <div className="filters">
+      {/* فلاتر البحث والحالة */}
+      <div className="filters" style={{ marginBottom: 16 }}>
         <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
-          <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
-          <input type="text" placeholder="ابحث بالاسم، الهاتف، NIF..." style={{ width: '100%' }}
-            onChange={e => setSearch(e.target.value)} />
+          <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
+          <input
+            type="text"
+            placeholder="ابحث بالاسم، الهاتف، NIF..."
+            style={{ width: '100%' }}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
         </div>
-        <select style={{ width: 140 }}>
-          <option>كل الأنواع</option>
-          <option>فرد</option>
-          <option>شركة</option>
-        </select>
-        <select style={{ width: 140 }}>
-          <option>كل الحالات</option>
-          <option>نشط</option>
-          <option>لديه دين</option>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value as any)}
+          style={{ width: 160 }}
+        >
+          <option value="all">جميع الحالات</option>
+          <option value="active">نشط فقط</option>
+          <option value="inactive">موقوف فقط</option>
         </select>
       </div>
 
-      {/* Grid of client cards */}
-      {isLoading ? (
-        <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
-      ) : clients.length === 0 ? (
-        <EmptyState icon="ti-users" text="لا يوجد عملاء" sub="أضف زبونك الأول" action={<Button variant="primary" onClick={openCreate}>زبون جديد</Button>} />
+      {/* جدول العملاء */}
+      {filteredClients.length === 0 ? (
+        <EmptyState
+          icon="ti-users"
+          text="لا يوجد عملاء"
+          sub="أضف زبونك الأول"
+          action={<Button variant="primary" onClick={openCreate}>زبون جديد</Button>}
+        />
       ) : (
-        <div className="g3">
-          {clients.map((c, i) => {
-            const hasDebt     = (c.balance ?? 0) > 0;
-            const avatarColor = ((i % 7) + 1) as 1|2|3|4|5|6|7;
-            const creditUsed  = c.credit_limit > 0 ? Math.min(100, ((c.balance ?? 0) / c.credit_limit) * 100) : 0;
+        <Card noHeader style={{ padding: 0 }}>
+          <div className="tw">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>العميل</th>
+                  <th>الهاتف</th>
+                  <th>الولاية / البلدية</th>
+                  <th>NIF</th>
+                  <th>الرصيد الحالي</th>
+                  <th>الحد الائتماني</th>
+                  <th>الحالة</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClients.map((c: Party, idx: number) => {
+                  const hasDebt = (c.balance ?? 0) > 0;
+                  const location = [c.wilaya?.name, c.commune?.name].filter(Boolean).join(' - ') || '—';
+                  const avatarColor = ((idx % 7) + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
-            return (
-              <Card key={c.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(c)}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-                  <Avatar initials={c.name[0]} color={avatarColor} size={42} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--t1)', marginBottom: 2 }}>{c.name}</div>
-                    {c.commercial_name && <div style={{ fontSize: 11.5, color: 'var(--t4)' }}>{c.commercial_name}</div>}
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                      <Badge variant={c.active ? 'success' : 'danger'}>{c.active ? 'نشط' : 'موقوف'}</Badge>
-                      {hasDebt && <Badge variant="danger">دين</Badge>}
-                    </div>
-                  </div>
-                </div>
+                  return (
+                    <tr key={c.id}>
+                      <td>{((currentPage - 1) * (meta?.per_page || 10) + idx + 1)}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Avatar
+                            initials={c.name?.[0] || '?'}
+                            color={avatarColor}
+                            size={32}
+                          />
+                          <div>
+                            <div className="s" style={{ fontWeight: 600 }}>{c.name || 'بدون اسم'}</div>
+                            {c.commercial_name && (
+                              <div style={{ fontSize: 11, color: 'var(--t4)' }}>{c.commercial_name}</div>
+                            )}
+                          </div>
+                        </div>
+                       </td>
+                      <td className="m">{c.phone || '—'}</td>
+                      <td style={{ fontSize: 12, color: 'var(--t4)' }}>{location}</td>
+                      <td className="m" style={{ fontSize: 11 }}>{c.nif || '—'}</td>
+                      <td className={hasDebt ? 'text-danger' : ''}>
+                        {c.balance?.toLocaleString()} دج
+                      </td>
+                      <td>{c.credit_limit ? `${c.credit_limit.toLocaleString()} دج` : '—'}</td>
+                      <td>
+                        <Badge variant={c.active ? 'success' : 'danger'}>
+                          {c.active ? 'نشط' : 'موقوف'}
+                        </Badge>
+                      </td>
+                      <td>
+                        <Button
+                          size="xs"
+                          icon={<i className="ti ti-pencil" />}
+                          onClick={() => openEdit(c)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
-                {/* Info rows */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--t3)' }}>
-                  {c.phone && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <i className="ti ti-phone" style={{ fontSize: 13, color: 'var(--t4)' }}/>
-                      <span>{c.phone}</span>
-                    </div>
-                  )}
-                  {c.nif && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <i className="ti ti-file-certificate" style={{ fontSize: 13, color: 'var(--t4)' }}/>
-                      <span style={{ fontFamily: 'monospace', fontSize: 11 }}>NIF: {c.nif}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Financials */}
-                <div style={{ marginTop: 10, padding: '8px 0', borderTop: '1px solid var(--b1)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 4 }}>
-                    <span style={{ color: 'var(--t4)' }}>إجمالي المشتريات</span>
-                    <span style={{ fontWeight: 700, color: 'var(--em)' }}>
-                      {(c.total_purchases ?? 0).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج
-                    </span>
-                  </div>
-                  {hasDebt && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
-                      <span style={{ color: 'var(--red)', fontWeight: 700 }}>دين مستحق</span>
-                      <span style={{ fontWeight: 800, color: 'var(--red)' }}>
-                        {(c.balance ?? 0).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج
-                      </span>
-                    </div>
-                  )}
-                  {c.credit_limit > 0 && (
-                    <div style={{ marginTop: 6 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--t4)', marginBottom: 3 }}>
-                        <span>حد الائتمان</span>
-                        <span>{creditUsed.toFixed(0)}%</span>
-                      </div>
-                      <ProgressBar value={creditUsed} color={creditUsed > 80 ? 'var(--red)' : creditUsed > 50 ? 'var(--gold)' : 'var(--em)'} height={4} />
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: 6, marginTop: 10 }} onClick={e => e.stopPropagation()}>
-                  <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(c)}>تعديل</Button>
-                  <Button size="xs" icon={<i className="ti ti-file-invoice"/>}>فواتيره</Button>
-                  {hasDebt && <Button size="xs" variant="danger" icon={<i className="ti ti-cash"/>}>تسوية</Button>}
-                </div>
-              </Card>
-            );
-          })}
+      {/* Pagination */}
+      {meta && meta.last_page > 1 && (
+        <div className="pagination" style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
+          <Button size="sm" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
+            السابق
+          </Button>
+          <span style={{ padding: '6px 12px', background: 'var(--bg3)', borderRadius: 6 }}>
+            صفحة {currentPage} من {meta.last_page}
+          </span>
+          <Button size="sm" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === meta.last_page}>
+            التالي
+          </Button>
         </div>
       )}
 
-      {/* Client modal */}
-      <ClientModal open={modal.open} party={editing} onClose={modal.closeModal} />
+      {/* مودال إضافة/تعديل العميل */}
+      <ClientModal
+        open={modal.open}
+        party={editing}
+        onClose={modal.closeModal}
+        onSaved={() => refetch()}
+        isSubmitting={createMut.isPending || updateMut.isPending}
+        onSubmit={handleSubmit}
+      />
     </div>
-  );
-}
-
-function ClientModal({ open, party, onClose }: {
-  open: boolean; party: Party | null; onClose: () => void;
-}) {
-  const isEdit    = !!party;
-  const { create: createMut, update: updateMut } = usePartyMutations();
-
-  const [form, setForm] = useState({
-    name:           party?.name            ?? '',
-    commercial_name:party?.commercial_name ?? '',
-    phone:          party?.phone           ?? '',
-    mobile:         party?.mobile          ?? '',
-    email:          party?.email           ?? '',
-    address:        party?.address         ?? '',
-    nif:            party?.nif             ?? '',
-    nis:            party?.nis             ?? '',
-    rc:             party?.rc              ?? '',
-    ai:             party?.ai              ?? '',
-    credit_limit:   party?.credit_limit    ?? 0,
-    credit_days:    party?.credit_days     ?? 30,
-    is_tva_exempt:  party?.is_tva_exempt   ?? false,
-  });
-
-  const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }));
-
-  const handleSave = async () => {
-    if (isEdit) {
-      await updateMut.mutateAsync({ id: party!.id, data: { ...form, party_type_id: party!.party_type_id } });
-    } else {
-      await createMut.mutateAsync({ ...form, party_type_id: 1 }); // 1 = customer
-    }
-    onClose();
-  };
-
-  return (
-    <Modal
-      open={open} onClose={onClose} size="lg"
-      title={isEdit ? `تعديل — ${party!.name}` : 'زبون جديد'}
-      footer={
-        <>
-          <Button onClick={onClose}>إلغاء</Button>
-          <Button variant="primary" icon={<i className="ti ti-device-floppy"/>} onClick={handleSave}
-            disabled={createMut.isPending || updateMut.isPending || !form.name.trim()}>
-            {(createMut.isPending || updateMut.isPending) ? 'جاري الحفظ...' : 'حفظ'}
-          </Button>
-        </>
-      }
-    >
-      <div className="tabs" style={{ marginBottom: 16 }}>
-        <div className="tab on">المعلومات الأساسية</div>
-        <div className="tab">القانونية والمالية</div>
-        <div className="tab">التجاري</div>
-      </div>
-
-      <div className="fgrid c3">
-        <div className="fg s2">
-          <label className="req">الاسم الكامل / الشركة</label>
-          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="الاسم واللقب أو اسم الشركة" />
-        </div>
-        <div className="fg">
-          <label>الاسم التجاري</label>
-          <input value={form.commercial_name} onChange={e => set('commercial_name', e.target.value)} placeholder="اختياري" />
-        </div>
-        <div className="fg">
-          <label>الهاتف</label>
-          <input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="0555 xx xx xx" type="tel" />
-        </div>
-        <div className="fg">
-          <label>الجوال</label>
-          <input value={form.mobile} onChange={e => set('mobile', e.target.value)} placeholder="0770 xx xx xx" type="tel" />
-        </div>
-        <div className="fg">
-          <label>البريد الإلكتروني</label>
-          <input value={form.email} onChange={e => set('email', e.target.value)} placeholder="exemple@mail.com" type="email" />
-        </div>
-        <div className="fg s3">
-          <label>العنوان</label>
-          <input value={form.address} onChange={e => set('address', e.target.value)} placeholder="العنوان الكامل" />
-        </div>
-        <div className="fg">
-          <label>NIF — رقم التعريف الجبائي</label>
-          <input value={form.nif} onChange={e => set('nif', e.target.value)} placeholder="000000000000000" style={{ fontFamily: 'monospace' }} />
-        </div>
-        <div className="fg">
-          <label>NIS — رقم إحصائي</label>
-          <input value={form.nis} onChange={e => set('nis', e.target.value)} style={{ fontFamily: 'monospace' }} />
-        </div>
-        <div className="fg">
-          <label>RC — السجل التجاري</label>
-          <input value={form.rc} onChange={e => set('rc', e.target.value)} style={{ fontFamily: 'monospace' }} />
-        </div>
-        <div className="fg">
-          <label>حد الائتمان (دج)</label>
-          <input type="number" value={form.credit_limit} onChange={e => set('credit_limit', +e.target.value)} min={0} />
-        </div>
-        <div className="fg">
-          <label>أجل الدفع (يوم)</label>
-          <input type="number" value={form.credit_days} onChange={e => set('credit_days', +e.target.value)} min={0} />
-        </div>
-        <div className="fg" style={{ justifyContent: 'flex-end' }}>
-          <label>معفى من TVA</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <div className={`sw ${form.is_tva_exempt ? 'on' : ''}`} onClick={() => set('is_tva_exempt', !form.is_tva_exempt)} />
-            <span style={{ fontSize: 12, color: 'var(--t3)' }}>{form.is_tva_exempt ? 'نعم' : 'لا'}</span>
-          </div>
-        </div>
-      </div>
-    </Modal>
   );
 }
 ```
@@ -10971,6 +10465,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
+import { appActions } from '@/lib/store/appStore';
 // ✅ المودال الجديد الشامل
 import { CreateCompanyModal } from '@/components/modals/CreateCompanyModal';
 import DataSeedingModal from '@/components/modals/DataSeedingModal';
@@ -11978,47 +11473,38 @@ export default function OnboardingPage() {
   };
 
    // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
-  const handleNewCompanyCreated = async (company: Company, fiscalYear: { id: number }) => {
-    setShowCreate(false);
-    setCompanies(prev => [...prev, company]);
-    try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
+const handleNewCompanyCreated = (company: Company, fiscalYear: { id: number }) => {
+  setShowCreate(false);
+  setCompanies(prev => [...prev, company]);
+  try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
 
-    // ✅ تنفيذ switch أولاً حتى يعرف الباكند الشركة النشطة
-    // ثم كتابة active_company في sessionStorage حتى يضيف الـ interceptor الـ slug تلقائياً
-    try {
-      await apiClient.post('/companies/switch', { company_id: company.id });
-    } catch {}
-    try {
-      sessionStorage.setItem('active_company', JSON.stringify({ id: company.id, name: company.name, slug: company.slug }));
-    } catch {}
+  // ✅ فقط افتح مودال السيدر، ولا تحدث activeCompany
+  setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });
+};
 
-    // فتح مودال البذر بعد تفعيل الشركة في الباكند
-    setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });
-  };
+const handleSeedingComplete = () => {
+  if (!seedingCompany) return;
+  // ✅ الآن نفعّل الشركة وننتقل إلى داشبورد
+  setActiveCompany({
+    id: seedingCompany.id,
+    name: seedingCompany.name,
+    slug: seedingCompany.slug,
+  });
+  setSeedingCompany(null);
+  navigate('/dashboard', { replace: true });
+};
+const handleSeedingSkip = () => {
+  if (!seedingCompany) return;
+  // ✅ نفس الشيء: نفعّل الشركة وننتقل
+  setActiveCompany({
+    id: seedingCompany.id,
+    name: seedingCompany.name,
+    slug: seedingCompany.slug,
+  });
+  setSeedingCompany(null);
+  navigate('/dashboard', { replace: true });
+};
 
-  // ✅ عند اكتمال أو تخطي الـ seeding → تفعيل الشركة ثم الانتقال
-  // الـ switch تم بالفعل في handleNewCompanyCreated — نكتفي بتحديث AuthContext
-  const handleSeedingComplete = () => {
-    if (!seedingCompany) return;
-    setActiveCompany({
-      id: seedingCompany.id,
-      name: seedingCompany.name,
-      slug: seedingCompany.slug,
-    });
-    setSeedingCompany(null);
-    navigate('/dashboard', { replace: true });
-  };
-
-  const handleSeedingSkip = () => {
-    if (!seedingCompany) return;
-    setActiveCompany({
-      id: seedingCompany.id,
-      name: seedingCompany.name,
-      slug: seedingCompany.slug,
-    });
-    setSeedingCompany(null);
-    navigate('/dashboard', { replace: true });
-  };
 
   if (!user) return null;
 
@@ -12234,9 +11720,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePOS }           from '@/pos/hooks/usePOS';
 import { useClients }                              from '@/lib/api/endpoints/parties';
 import { usePaymentModes, useWarehouses }          from '@/lib/api/endpoints/lookups';
-import { useGlobalDocumentTypes }                  from '@/lib/api/endpoints/lookups';
-import { useFiscalYear }                           from '@/context/FiscalYearContext';
-import apiClient                                   from '@/lib/api/core/client';
+import { useDocumentTypes }                        from '@/lib/api/endpoints/lookups';
+import { useVariantSearch }                        from '@/lib/api/endpoints/products';
+import { useSelectedFiscalYear }                   from '@/lib/api/endpoints/fiscalYears';
 import ProductCard          from '@/pos/components/ProductCard';
 import Cart                 from '@/pos/components/Cart';
 import PaymentModal         from '@/pos/components/PaymentModal';
@@ -12257,14 +11743,17 @@ export default function POSPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   // API data
-  const { data: variantsData, isLoading: loadingVariants } = useVariants({
-    search: pos.searchQuery || undefined,
-    page: 1,
-  });
-  const { data: customersData } = useCustomers({ active: true, per_page: 100 });
+  // ✅ useVariantSearch بدلاً من useVariants
+  const { data: variantsData, isLoading: loadingVariants } = useVariantSearch(
+    pos.searchQuery.length >= 2 ? pos.searchQuery : ' ',
+    { per_page: 100 }
+  );
+  // ✅ useClients بدلاً من useCustomers
+  const { data: customersData } = useClients({ active: true, per_page: 100 });
   const { data: paymentModes  } = usePaymentModes();
   const { data: warehouses    } = useWarehouses();
-  const { data: fiscalYear    } = useCurrentFiscalYear();
+  // ✅ useSelectedFiscalYear يعيد FiscalYear | null مباشرة (بدون { data })
+  const fiscalYear               = useSelectedFiscalYear();
   const { data: documentTypes } = useDocumentTypes();
 
   const variants  = variantsData?.data ?? [];
@@ -16996,8 +16485,6 @@ import EmptyState from '@/components/ui/EmptyState';
 import ProgressBar from '@/components/ui/ProgressBar';
 import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
-import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/lib/api/core/client';
 import type { Party } from '@/types';
 
 export default function SuppliersPage() {
@@ -17116,8 +16603,7 @@ export default function SuppliersPage() {
 // ===============================================
 function SupplierModal({ open, party, onClose }: { open: boolean; party: Party | null; onClose: () => void }) {
     const isEdit = !!party;
-    const createMut = useCreateParty();
-    const updateMut = useUpdateParty();
+    const { create: createMut, update: updateMut } = usePartyMutations();
 
     const emptyForm = {
         name: '',
@@ -17177,7 +16663,7 @@ function SupplierModal({ open, party, onClose }: { open: boolean; party: Party |
             if (isEdit) {
                 await updateMut.mutateAsync({ id: party!.id, data: { ...form, party_type_id: 2 } });
             } else {
-                await createMut.mutateAsync({ ...form, party_type_id: 2 });
+                await createMut.mutateAsync({ ...form, party_type_id: 2 }); // 2 = supplier
             }
             onClose();
         } catch (err: any) {

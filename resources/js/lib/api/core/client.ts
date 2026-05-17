@@ -112,9 +112,13 @@ client.interceptors.request.use(
       if (!url.startsWith(`/${slug}/`) && url !== `/${slug}`) {
         config.url = `/${slug}${url.startsWith('/') ? url : '/' + url}`;
       }
-    } else if (!isPublicPath(url) && !slug && import.meta.env.DEV) {
-      console.warn(`⚠️ Tenant request without slug: ${config.method?.toUpperCase()} ${url}`);
-    }
+   } else if (!isPublicPath(url) && !slug && import.meta.env.DEV) {
+  // لا نُحذِّر إذا كان الـ URL يحتوي على slug بالفعل (مثل FiscalYearModal)
+  const urlAlreadyHasSlug = /^\/[a-z0-9-]+-[a-f0-9]+\//.test(url);
+  if (!urlAlreadyHasSlug) {
+    console.warn(`⚠️ Tenant request without slug: ${config.method?.toUpperCase()} ${url}`);
+  }
+}
 
     const token = tokenStorage.get();
     if (token) config.headers.Authorization = `Bearer ${token}`;

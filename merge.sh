@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-lib.md"
+OUTPUT="merged-admin-components.md"
 
 > "$OUTPUT"
 
@@ -60,9 +60,9 @@ EXCLUDE=(
 
 
 
-# HOOKS
-merge_section "🧠 lib " \
-  \( -path "*/lib/*" \) "${EXCLUDE[@]}"
+# components
+merge_section "🧠 components\admin" \
+  \( -path "*/components/admin/*" \) "${EXCLUDE[@]}"
 
 
 echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"

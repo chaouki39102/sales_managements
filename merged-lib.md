@@ -156,6 +156,118 @@ export const adminApi = {
 } as const;
 ```
 
+## FILE: resources/js/lib/api/admin/companies.ts
+```
+// lib/api/admin/companies.ts
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '@/lib/api/core/client';
+import type { AdminCompany, AdminUser, Paginated, AdminCompaniesFilter, CompanyMembership } from '@/types/admin';
+
+const BASE = '/admin/companies';
+
+export const companiesApi = {
+  list:   (f?: AdminCompaniesFilter)   => apiGet<Paginated<AdminCompany>>(BASE, f as any),
+  show:   (id: number)                 => apiGet<AdminCompany>(`${BASE}/${id}`),
+  create: (d: Partial<AdminCompany>)   => apiPost<AdminCompany>(BASE, d),
+  update: (id: number, d: Partial<AdminCompany>) => apiPut<AdminCompany>(`${BASE}/${id}`, d),
+  remove: (id: number)                 => apiDelete(`${BASE}/${id}`),
+
+  // Actions
+  suspend:    (id: number, reason: string) => apiPost<AdminCompany>(`${BASE}/${id}/suspend`,    { reason }),
+  unsuspend:  (id: number)                 => apiPost<AdminCompany>(`${BASE}/${id}/unsuspend`),
+  activate:   (id: number)                 => apiPost<AdminCompany>(`${BASE}/${id}/activate`),
+  deactivate: (id: number)                 => apiPost<AdminCompany>(`${BASE}/${id}/deactivate`),
+  verify:     (id: number)                 => apiPost<AdminCompany>(`${BASE}/${id}/verify`),
+  unverify:   (id: number)                 => apiPost<AdminCompany>(`${BASE}/${id}/unverify`),
+  changePlan: (id: number, d: { plan: string; max_users?: number; max_products?: number; max_warehouses?: number }) =>
+                                            apiPost<AdminCompany>(`${BASE}/${id}/change-plan`, d),
+  updateNotes:(id: number, notes: string)  => apiPatch<void>(`${BASE}/${id}/notes`, { notes }),
+
+  // Members
+  listUsers:    (id: number, params?: any) => apiGet<Paginated<AdminUser>>(`${BASE}/${id}/users`, params),
+  addUser:      (id: number, userId: number, role?: string) =>
+                                            apiPost(`${BASE}/${id}/users`, { user_id: userId, role }),
+  removeUser:   (id: number, userId: number) => apiDelete(`${BASE}/${id}/users/${userId}`),
+  toggleUser:   (id: number, userId: number) => apiPatch(`${BASE}/${id}/users/${userId}/toggle`, {}),
+
+  // Seed
+  seed: (id: number) => apiPost<{ message: string; applied: string[]; skipped: string[] }>(`${BASE}/${id}/seed`),
+} as const;
+```
+
+## FILE: resources/js/lib/api/admin/index.ts
+```
+// lib/api/admin/index.ts
+export { companiesApi } from './companies';
+export { usersApi, impersonateApi } from './users';
+export { dashboardApi, plansApi, settingsApi, maintenanceApi, systemBootApi, activityApi } from './system';
+```
+
+## FILE: resources/js/lib/api/admin/system.ts
+```
+// lib/api/admin/system.ts
+import { apiGet, apiPost, apiPut } from '@/lib/api/core/client';
+import type { AdminDashboardStats, AdminPlan, SystemSettings } from '@/types/admin';
+
+export const dashboardApi = {
+  get: () => apiGet<AdminDashboardStats>('/admin/dashboard'),
+} as const;
+
+export const plansApi = {
+  list: () => apiGet<AdminPlan[]>('/admin/plans'),
+  show: (key: string) => apiGet<AdminPlan>(`/admin/plans/${key}`),
+} as const;
+
+export const settingsApi = {
+  get:    ()                             => apiGet<SystemSettings>('/admin/system/settings'),
+  update: (d: Partial<SystemSettings>)  => apiPut<SystemSettings>('/admin/system/settings', d),
+} as const;
+
+export const maintenanceApi = {
+  status:  ()              => apiGet<{ maintenance_mode: boolean }>('/admin/system/maintenance'),
+  enable:  (msg?: string)  => apiPost('/admin/system/maintenance/enable', { message: msg }),
+  disable: ()              => apiPost('/admin/system/maintenance/disable'),
+  cache:   ()              => apiPost('/admin/system/maintenance/cache-clear'),
+} as const;
+
+export const systemBootApi = {
+  status:      () => apiGet<{ is_ready: boolean; components: any[] }>('/admin/system/status'),
+  boot:        () => apiPost('/admin/system/boot'),
+  bootWilayas: () => apiPost('/admin/system/boot/wilayas'),
+  bootPerms:   () => apiPost('/admin/system/boot/permissions'),
+} as const;
+
+export const activityApi = {
+  list: (p?: any) => apiGet<any>('/admin/activity-log', p),
+  show: (id: number) => apiGet<any>(`/admin/activity-log/${id}`),
+} as const;
+```
+
+## FILE: resources/js/lib/api/admin/users.ts
+```
+// lib/api/admin/users.ts
+import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api/core/client';
+import type { AdminUser, AdminCompany, Paginated, AdminUsersFilter } from '@/types/admin';
+
+const BASE = '/admin/users';
+
+export const usersApi = {
+  list:          (f?: AdminUsersFilter)               => apiGet<Paginated<AdminUser>>(BASE, f as any),
+  show:          (id: number)                          => apiGet<AdminUser>(`${BASE}/${id}`),
+  create:        (d: Partial<AdminUser> & { password?: string }) => apiPost<AdminUser>(BASE, d),
+  update:        (id: number, d: Partial<AdminUser>)  => apiPut<AdminUser>(`${BASE}/${id}`, d),
+  remove:        (id: number)                          => apiDelete(`${BASE}/${id}`),
+  toggleActive:  (id: number)                          => apiPost<AdminUser>(`${BASE}/${id}/toggle-active`),
+  resetPassword: (id: number, password: string)        =>
+    apiPost(`${BASE}/${id}/reset-password`, { password, password_confirmation: password }),
+  companies:     (id: number)                          => apiGet<AdminCompany[]>(`${BASE}/${id}/companies`),
+} as const;
+
+export const impersonateApi = {
+  start: (id: number) => apiPost<{ token: string; user: AdminUser }>(`/admin/impersonate/${id}`),
+  stop:  ()           => apiPost('/admin/impersonate/stop'),
+} as const;
+```
+
 ## FILE: resources/js/lib/api/core/client.ts
 ```
 // ════════════════════════════════════════════════════════════════════════════
@@ -272,9 +384,13 @@ client.interceptors.request.use(
       if (!url.startsWith(`/${slug}/`) && url !== `/${slug}`) {
         config.url = `/${slug}${url.startsWith('/') ? url : '/' + url}`;
       }
-    } else if (!isPublicPath(url) && !slug && import.meta.env.DEV) {
-      console.warn(`⚠️ Tenant request without slug: ${config.method?.toUpperCase()} ${url}`);
-    }
+   } else if (!isPublicPath(url) && !slug && import.meta.env.DEV) {
+  // لا نُحذِّر إذا كان الـ URL يحتوي على slug بالفعل (مثل FiscalYearModal)
+  const urlAlreadyHasSlug = /^\/[a-z0-9-]+-[a-f0-9]+\//.test(url);
+  if (!urlAlreadyHasSlug) {
+    console.warn(`⚠️ Tenant request without slug: ${config.method?.toUpperCase()} ${url}`);
+  }
+}
 
     const token = tokenStorage.get();
     if (token) config.headers.Authorization = `Bearer ${token}`;

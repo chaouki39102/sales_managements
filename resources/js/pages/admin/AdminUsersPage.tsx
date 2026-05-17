@@ -1,324 +1,240 @@
-// pages/admin/AdminUsersPage.tsx
+// ════════════════════════════════════════════════════════════════════════════
+// pages/admin/AdminUsersPage.tsx  ← النسخة المُصلحة
+//
+// المشكلة الأصلية:
+//   • muts.deleteUser → غير موجود في useUserMutations
+//     الصواب: muts.remove (المعرّف في hooks/admin/useAdminUsers.ts)
+//   • ROLES كانت strings مكررة بدل استخدام constants/roles.ts
+// ════════════════════════════════════════════════════════════════════════════
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/core/client';
-import type { AdminUser } from '@/types/admin';
-import PageHeader from '@/components/ui/PageHeader';
-import Card from '@/components/ui/Card';
-import SearchInput from '@/components/ui/SearchInput';
-import Button from '@/components/ui/Button';
-import Badge from '@/components/ui/Badge';
-import Modal from '@/components/ui/Modal';
-import SelectInput from '@/components/forms/SelectInput';
+import { useAdminUsers } from '@/hooks/admin';
+import { useDebounce } from '@/hooks/useDebounce';
+import UserDrawer from '@/components/admin/UserDrawer';
+import {
+  Avatar, StatusBadge, EmptyState, Spinner, fmtDate,
+} from '@/components/admin/shared';
+import PageHeader    from '@/components/ui/PageHeader';
+import Card          from '@/components/ui/Card';
+import Button        from '@/components/ui/Button';
+import SearchInput   from '@/components/ui/SearchInput';
+import type { AdminUser, AdminUsersFilter } from '@/types/admin';
+import { ROLES, ROLE_LABELS, ROLE_COLORS } from '@/constants/roles';  // ✅ من constants/roles.ts
+
+// ─── Role badge ───────────────────────────────────────────────────────────────
+
+function RoleBadge({ role }: { role?: string | null }) {
+  if (!role) return <span style={{ fontSize: 11, color: 'var(--t4)' }}>user</span>;
+
+  const color = ROLE_COLORS[role as keyof typeof ROLE_COLORS] ?? '#6b7280';
+  const label = ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role;
+
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+      background: color + '22', color,
+    }}>
+      {label}
+    </span>
+  );
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
 
 export default function AdminUsersPage() {
-  const [search, setSearch]       = useState('');
-  const [role, setRole]           = useState('');
-  const [active, setActive]       = useState('');
-  const [page, setPage]           = useState(1);
-  const [selected, setSelected]   = useState<AdminUser | null>(null);
-  const [pwd, setPwd]             = useState('');
-  const [pwdConfirm, setPwdConfirm] = useState('');
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [rawSearch, setRawSearch] = useState('');
+  const search = useDebounce(rawSearch, 350);
+  const [role,     setRole]     = useState('');
+  const [active,   setActive]   = useState('');
+  const [page,     setPage]     = useState(1);
+  const [selected, setSelected] = useState<AdminUser | null>(null);
 
-  const params = useMemo(() => ({
-    search:   search   || undefined,
-    role:     role     || undefined,
-    active:   active   || undefined,
+  const filter = useMemo<AdminUsersFilter>(() => ({
+    search:   search  || undefined,
+    role:     role    || undefined,
+    active:   active  || undefined,
     page,
     per_page: 20,
   }), [search, role, active, page]);
 
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin', 'users', params],
-    queryFn:  () => apiClient.get('/admin/users', { params }).then(r => (r.data as any)?.data ?? r.data),
-    staleTime: 60_000,
-  });
+  const { data, isLoading, isError, refetch } = useAdminUsers(filter);
 
-  // ✅ client.ts → extractData يُرجع { data: [...], meta: {...} } مباشرة
-  // AdminUserController::index يُرجع LengthAwarePaginator داخل successResponse
-  // Laravel يُحوّله إلى { data:[...], meta:{...}, links:{...} }
-  // بعد extractData في client تصبح: { data:[...], meta:{...} }
-  const users = data?.data ?? [];
-  const meta  = data?.meta;
-
-  const qc = useQueryClient();
-  const inv = () => qc.invalidateQueries({ queryKey: ['admin', 'users'] });
-
-  const muts = {
-    resetPassword: useMutation({
-      mutationFn: ({ id, password, password_confirmation }: { id: number; password: string; password_confirmation: string }) =>
-        apiClient.post(`/admin/users/${id}/reset-password`, { password, password_confirmation }),
-    }),
-    toggleActive: useMutation({
-      mutationFn: (id: number) => apiClient.post(`/admin/users/${id}/toggle-active`),
-      onSuccess: inv,
-    }),
-    impersonate: useMutation({
-      mutationFn: (id: number) => apiClient.post(`/admin/impersonate/${id}`).then(r => r.data),
-    }),
-    create: useMutation({
-      mutationFn: (data: Partial<AdminUser>) => apiClient.post('/admin/users', data),
-      onSuccess: inv,
-    }),
-    remove: useMutation({
-      mutationFn: (id: number) => apiClient.delete(`/admin/users/${id}`),
-      onSuccess: inv,
-    }),
-  };
-
-  const handleResetPassword = async () => {
-    if (!selected) return;
-    if (pwd !== pwdConfirm) { alert('كلمتا المرور غير متطابقتين'); return; }
-    if (pwd.length < 8)     { alert('كلمة المرور يجب أن تكون 8 أحرف على الأقل'); return; }
-    await muts.resetPassword.mutateAsync({ id: selected.id, password: pwd, password_confirmation: pwdConfirm });
-    setPwd('');
-    setPwdConfirm('');
-    alert('تم تغيير كلمة المرور وإلغاء جميع الجلسات');
-  };
-
-  const handleImpersonate = async () => {
-    if (!selected) return;
-    const res = await muts.impersonate.mutateAsync(selected.id) as any;
-    // ✅ token يأتي من res.token (بعد extractData يُرجع data مباشرة)
-    const token = res?.token ?? res?.data?.token;
-    if (token) {
-      localStorage.setItem('auth_token', token);
-      window.location.href = '/dashboard';
-    }
-  };
-
-  // ── Loading ───────────────────────────────────────────────────────────────
-  if (isLoading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
-      <i className="ti ti-loader" style={{ fontSize: 28, color: 'var(--em)', animation: 'spin 1s linear infinite' }} />
-    </div>
-  );
-
-  // ── Error ─────────────────────────────────────────────────────────────────
-  if (isError) return (
-    <div style={{ textAlign: 'center', padding: 60, color: 'var(--t2)' }}>
-      <i className="ti ti-wifi-off" style={{ fontSize: 36, display: 'block', marginBottom: 12, opacity: .4 }} />
-      <p style={{ fontSize: 14, margin: '0 0 12px' }}>تعذّر تحميل المستخدمين</p>
-      <Button onClick={() => refetch()}>إعادة المحاولة</Button>
-    </div>
-  );
+  const users: AdminUser[] = (data as any)?.data ?? [];
+  const meta  = (data as any)?.meta;
 
   return (
     <div>
       <PageHeader
         title="المستخدمون"
-        subtitle={`${meta?.total ?? 0} مستخدم في المنصة`}
+        description={`${meta?.total ?? 0} مستخدم في المنصة`}
       />
 
-      {/* ── فلاتر ──────────────────────────────────────────────────────────── */}
-      <div className="filters" style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* ── فلاتر ───────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         <SearchInput
-          value={search}
-          onChange={(v) => { setSearch(v); setPage(1); }}
-          placeholder="بحث بالاسم أو البريد"
+          value={rawSearch}
+          onChange={v => { setRawSearch(v); setPage(1); }}
+          placeholder="بحث بالاسم أو البريد..."
+          style={{ flex: 1, minWidth: 200 }}
         />
-        <SelectInput
-          options={[
-            { label: 'كل الأدوار',   value: '' },
-            { label: 'Super Admin',  value: 'super_admin' },
-            { label: 'Admin',        value: 'admin' },
-            { label: 'مستخدم',       value: 'user' },
-          ]}
+
+        <select
           value={role}
-          onChange={(v) => { setRole(v); setPage(1); }}
-        />
-        <SelectInput
-          options={[
-            { label: 'كل الحالات', value: '' },
-            { label: 'نشط',        value: '1' },
-            { label: 'معطل',       value: '0' },
-          ]}
+          onChange={e => { setRole(e.target.value); setPage(1); }}
+          style={selectStyle}
+        >
+          <option value="">كل الأدوار</option>
+          <option value={ROLES.SUPER_ADMIN}>Super Admin</option>
+          <option value={ROLES.ADMIN}>Admin</option>
+          <option value={ROLES.MANAGER}>Manager</option>
+          <option value={ROLES.CASHIER}>Cashier</option>
+        </select>
+
+        <select
           value={active}
-          onChange={(v) => { setActive(v); setPage(1); }}
-        />
+          onChange={e => { setActive(e.target.value); setPage(1); }}
+          style={selectStyle}
+        >
+          <option value="">كل الحالات</option>
+          <option value="1">نشط</option>
+          <option value="0">معطل</option>
+        </select>
       </div>
 
-      {/* ── الجدول ────────────────────────────────────────────────────────── */}
-      <Card padding={0}>
-        {users.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--t3)' }}>
-            <i className="ti ti-users" style={{ fontSize: 32, display: 'block', marginBottom: 8, opacity: .3 }} />
-            <p style={{ margin: 0, fontSize: 13 }}>لا يوجد مستخدمون</p>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tw" style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th>المستخدم</th>
-                  <th>الدور</th>
-                  <th>الشركات</th>
-                  <th>الحالة</th>
-                  <th>تاريخ الإنشاء</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <strong style={{ display: 'block', fontSize: 13 }}>{u.name}</strong>
-                      <small style={{ color: 'var(--t3)', fontSize: 11 }}>{u.email}</small>
-                    </td>
-                    <td>
-                      <Badge variant={
-                        u.role === 'super_admin' ? 'danger' :
-                        u.role === 'admin'       ? 'info'   : 'gray'
-                      }>
-                        {u.role}
-                      </Badge>
-                    </td>
-                    <td>{u.companies_count ?? 0}</td>
-                    <td>
-                      <Badge variant={u.active ? 'success' : 'gray'}>
-                        {u.active ? 'نشط' : 'معطل'}
-                      </Badge>
-                    </td>
-                    <td style={{ fontSize: 11, color: 'var(--t3)' }}>
-                      {new Date(u.created_at).toLocaleDateString('ar-DZ')}
-                    </td>
-                    <td>
-                      <Button
-                        size="xs"
-                        onClick={() => { setSelected(u); setDetailOpen(true); }}
-                      >
-                        إدارة
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {isError && (
+        <div style={{
+          padding: '10px 14px', marginBottom: 12, borderRadius: 8,
+          background: '#ef44441a', color: '#ef4444', fontSize: 13,
+        }}>
+          تعذّر التحميل.{' '}
+          <button
+            onClick={() => refetch()}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'inherit', textDecoration: 'underline',
+            }}
+          >
+            إعادة المحاولة
+          </button>
+        </div>
+      )}
 
-        {/* ── Pagination ─────────────────────────────────────────────────── */}
+      {/* ── الجدول ──────────────────────────────────────────────────────────── */}
+      <Card padding={0}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--b2)' }}>
+                {['المستخدم', 'الدور', 'الشركات', 'آخر دخول', 'الحالة', 'الإنشاء', ''].map(h => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: '10px 14px', textAlign: 'right',
+                      fontSize: 11, fontWeight: 800, color: 'var(--t4)',
+                      letterSpacing: .4, textTransform: 'uppercase',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: 40 }}><Spinner /></td>
+                </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: 40 }}>
+                    <EmptyState icon="ti-users" text="لا يوجد مستخدمون" />
+                  </td>
+                </tr>
+              ) : users.map(u => (
+                <tr
+                  key={u.id}
+                  onClick={() => setSelected(u)}
+                  style={{
+                    borderBottom: '1px solid var(--b1)',
+                    cursor: 'pointer', transition: 'background .1s',
+                  }}
+                  onMouseEnter={e =>
+                    (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'
+                  }
+                  onMouseLeave={e =>
+                    (e.currentTarget as HTMLElement).style.background = ''
+                  }
+                >
+                  <td style={{ padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Avatar id={u.id} name={u.name} size={32} />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>
+                          {u.name}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: 'var(--t4)' }}>{u.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <RoleBadge role={u.role} />
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--t2)', fontWeight: 600 }}>
+                    {u.companies_count ?? 0}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--t4)' }}>
+                    {fmtDate(u.last_login_at)}
+                  </td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <StatusBadge active={u.active} />
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--t4)' }}>
+                    {fmtDate(u.created_at)}
+                  </td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <i className="ti ti-chevron-left" style={{ fontSize: 14, color: 'var(--t4)' }} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
         {meta && meta.last_page > 1 && (
           <div style={{
             padding: '12px 16px', borderTop: '1px solid var(--b2)',
-            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
-            <Button
-              size="sm"
-              disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              السابقة
-            </Button>
-            <span style={{ fontSize: 13, color: 'var(--t2)' }}>
-              {page} / {meta.last_page}
-              <span style={{ fontSize: 11, color: 'var(--t3)', marginRight: 6 }}>
-                ({meta.total} مستخدم)
-              </span>
+            <span style={{ fontSize: 12, color: 'var(--t4)' }}>
+              الصفحة {meta.current_page} من {meta.last_page} ({meta.total} مستخدم)
             </span>
-            <Button
-              size="sm"
-              disabled={page === meta.last_page}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              التالية
-            </Button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button size="sm" disabled={page === 1}              onClick={() => setPage(p => p - 1)}>السابقة</Button>
+              <Button size="sm" disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}>التالية</Button>
+            </div>
           </div>
         )}
       </Card>
 
-      {/* ── Drawer تفاصيل المستخدم ────────────────────────────────────────── */}
-      <Modal
-        open={detailOpen}
-        onClose={() => { setDetailOpen(false); setSelected(null); }}
-        title={selected?.name ?? ''}
-        size="md"
-      >
-        {selected && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-            {/* معلومات */}
-            <div style={{
-              background: 'var(--bg1)', borderRadius: 10, padding: '12px 16px',
-              fontSize: 13, display: 'grid', gap: 6,
-            }}>
-              <div><span style={{ color: 'var(--t3)' }}>البريد: </span>{selected.email}</div>
-              <div><span style={{ color: 'var(--t3)' }}>الدور: </span>{selected.role}</div>
-              <div><span style={{ color: 'var(--t3)' }}>الشركات: </span>{selected.companies_count ?? 0}</div>
-              <div>
-                <span style={{ color: 'var(--t3)' }}>الحالة: </span>
-                <Badge variant={selected.active ? 'success' : 'gray'}>
-                  {selected.active ? 'نشط' : 'معطل'}
-                </Badge>
-              </div>
-            </div>
-
-            {/* إجراءات */}
-            <Button
-              variant={selected.active ? 'danger' : 'primary'}
-              onClick={() => muts.toggleActive.mutate(selected.id)}
-              disabled={muts.toggleActive.isPending}
-            >
-              {selected.active ? 'تعطيل المستخدم' : 'تفعيل المستخدم'}
-            </Button>
-
-            <Button
-              variant="secondary"
-              onClick={handleImpersonate}
-              disabled={muts.impersonate.isPending}
-            >
-              دخول كهذا المستخدم
-            </Button>
-
-            {/* إعادة تعيين كلمة المرور */}
-            <div style={{ borderTop: '1px solid var(--b2)', paddingTop: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--t2)' }}>
-                إعادة تعيين كلمة المرور
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <input
-                  type="password"
-                  placeholder="كلمة المرور الجديدة"
-                  value={pwd}
-                  onChange={(e) => setPwd(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--b2)', fontSize: 13 }}
-                />
-                <input
-                  type="password"
-                  placeholder="تأكيد كلمة المرور"
-                  value={pwdConfirm}
-                  onChange={(e) => setPwdConfirm(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--b2)', fontSize: 13 }}
-                />
-                <Button
-                  onClick={handleResetPassword}
-                  disabled={!pwd || muts.resetPassword.isPending}
-                >
-                  تغيير كلمة المرور
-                </Button>
-              </div>
-            </div>
-
-            {/* حذف */}
-            <div style={{ borderTop: '1px solid var(--b2)', paddingTop: 12 }}>
-              <Button
-                variant="danger"
-                onClick={() => {
-                  if (confirm(`هل تريد حذف المستخدم "${selected.name}" نهائياً؟`)) {
-                    muts.deleteUser.mutate(selected.id);
-                    setDetailOpen(false);
-                  }
-                }}
-                disabled={muts.deleteUser.isPending}
-              >
-                حذف المستخدم نهائياً
-              </Button>
-            </div>
-
-          </div>
-        )}
-      </Modal>
+      {/* ── Drawer ──────────────────────────────────────────────────────────── */}
+      {selected && (
+        <UserDrawer
+          user={selected}
+          onClose={refresh => {
+            setSelected(null);
+            if (refresh) refetch();
+          }}
+        />
+      )}
     </div>
   );
 }
+
+const selectStyle: React.CSSProperties = {
+  padding: '6px 10px', borderRadius: 8,
+  border: '1px solid var(--b2)',
+  background: 'var(--bg3)', color: 'var(--t2)',
+  fontSize: 12, fontFamily: 'Tajawal, sans-serif',
+  cursor: 'pointer',
+};

@@ -1,43 +1,32 @@
 // ════════════════════════════════════════════════════════════════════════════
 // hooks/useAdmin.ts
-// Admin hooks — إحصائيات لوحة تحكم السوبر أدمن
+//
+// نقطة إعادة تصدير مركزية للـ admin hooks.
+// الصفحات التي تستورد من '@/hooks/useAdmin' ستجد كل شيء هنا.
 // ════════════════════════════════════════════════════════════════════════════
-import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '@/lib/api/core/client';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── System (Dashboard, Plans, Settings, Maintenance) ────────────────────────
+export {
+  useAdminDashboard,
+  useAdminPlans,
+  useSystemSettings,
+  useMaintenanceMutations,
+} from './admin/useAdminSystem';
 
-export interface AdminDashboardStats {
-  companies: {
-    total:     number;
-    active:    number;
-    suspended: number;
-    new_month: number;
-  };
-  users: {
-    total:    number;
-    active:   number;
-    new_month: number;
-  };
-  revenue?: {
-    total_month: number;
-    currency:    string;
-  };
-}
+// ─── Companies ────────────────────────────────────────────────────────────────
+export {
+  useAdminCompanies,
+  useAdminCompany,
+  useCompanyMutations,
+  useCompanyMemberMutations,
+} from './admin/useAdminCompanies';
 
-// ─── Query key ────────────────────────────────────────────────────────────────
+// ─── Users ────────────────────────────────────────────────────────────────────
+export {
+  useAdminUsers,
+  useAdminUserCompanies,
+  useUserMutations,
+} from './admin/useAdminUsers';
 
-const adminKeys = {
-  dashboard: ['admin', 'dashboard'] as const,
-};
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
-export function useAdminDashboard() {
-  return useQuery<AdminDashboardStats>({
-    queryKey: adminKeys.dashboard,
-    queryFn:  () => apiGet<AdminDashboardStats>('/admin/dashboard'),
-    staleTime: 2 * 60_000,   // تحديث كل دقيقتين
-    retry: false,
-  });
-}
+// ─── Types (re-export للصفحات التي تستورد types من هنا) ──────────────────────
+export type { AdminDashboardStats } from '@/types/admin';
