@@ -71,6 +71,8 @@ const AdminCompaniesPage = lazy(() => import('@/pages/admin/AdminCompaniesPage')
 const AdminUsersPage     = lazy(() => import('@/pages/admin/AdminUsersPage'));
 const AdminActivityPage  = lazy(() => import('@/pages/admin/AdminActivityPage'));
 const AdminSettingsPage  = lazy(() => import('@/pages/admin/AdminSettingsPage'));
+const AdminPlansPage     = lazy(() => import('@/pages/admin/AdminPlansPage'));
+const AdminReportsPage   = lazy(() => import('@/pages/admin/AdminReportsPage'));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Loader
@@ -252,6 +254,8 @@ export function AppRoutes() {
           <Route path="users"     element={<AdminUsersPage />} />
           <Route path="activity"  element={<AdminActivityPage />} />
           <Route path="settings"  element={<AdminSettingsPage />} />
+                    <Route path="plans"     element={<AdminPlansPage />} />
+                    <Route path="reports"   element={<AdminReportsPage />} />
         </Route>
 
         {/* Catch-all */}

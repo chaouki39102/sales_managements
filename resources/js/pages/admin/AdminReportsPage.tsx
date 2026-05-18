@@ -1,47 +1,180 @@
-// pages/admin/AdminReportsPage.tsx
+// ════════════════════════════════════════════════════════════════════════════
+// pages/admin/AdminReportsPage.tsx  ← النسخة المُصلحة
+//
+// مشكلة تسجيل الخروج عند فتح التقارير:
+//   الكود القديم كان يستدعي adminApi.getReports الذي كان غير موجود
+//   → TypeError → React يُعيد render → يُلقي خطأ غير معالَج
+//   → أو: كان يستدعي endpoint غير موجود → 404 أو 401 → forcedLogout()
+//
+// الحل:
+//   1. نستخدم useAdminDashboard فقط (الذي يعمل) لعرض إحصاءات مبسّطة
+//   2. بدل محاولة جلب تقارير من endpoint غير موجود → placeholder واضح
+//   3. retry: false في الـ query لتجنب تكرار الطلبات الفاشلة
+// ════════════════════════════════════════════════════════════════════════════
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useAdminDashboard } from '@/hooks/admin';
+import { Spinner } from '@/components/admin/shared';
 import PageHeader from '@/components/ui/PageHeader';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import { adminApi } from '@/lib/api/admin';
-import LineChart from '@/components/charts/LineChart';
+import Card       from '@/components/ui/Card';
 
+type Period = '7d' | '30d' | '90d';
 
+const PERIOD_LABELS: Record<Period, string> = {
+  '7d':  'آخر 7 أيام',
+  '30d': 'آخر 30 يوم',
+  '90d': 'آخر 90 يوم',
+};
 
 export default function AdminReportsPage() {
-  const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d');
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin-reports', period],
-    queryFn: () => adminApi.getReports(period),
-  });
+  const [period, setPeriod] = useState<Period>('30d');
 
-  if (isLoading) return <div style={{ padding: 40, textAlign: 'center' }}>تحميل التقارير...</div>;
+  // نستخدم داشبورد الذي يعمل بدل endpoint تقارير غير موجود
+  const { data: stats, isLoading, isError } = useAdminDashboard();
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      <PageHeader title="تقارير النظام" description="إحصائيات الاستخدام والنمو" />
+    <div>
+      <PageHeader
+        title="التقارير"
+        description="إحصاءات عامة عن المنصة"
+        actions={
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(Object.entries(PERIOD_LABELS) as [Period, string][]).map(([p, label]) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                style={{
+                  padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                  border: `1px solid ${period === p ? 'var(--em)' : 'var(--b2)'}`,
+                  background: period === p ? 'var(--emb)' : 'var(--bg3)',
+                  color: period === p ? 'var(--em)' : 'var(--t3)',
+                  cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-        <Button variant={period === '7d' ? 'primary' : 'default'} onClick={() => setPeriod('7d')}>آخر 7 أيام</Button>
-        <Button variant={period === '30d' ? 'primary' : 'default'} onClick={() => setPeriod('30d')}>آخر 30 يوم</Button>
-        <Button variant={period === '90d' ? 'primary' : 'default'} onClick={() => setPeriod('90d')}>آخر 90 يوم</Button>
-      </div>
+      {isLoading ? (
+        <Spinner />
+      ) : isError ? (
+        <div style={{
+          padding: 20, borderRadius: 10,
+          background: '#ef44441a', color: '#ef4444', fontSize: 13,
+        }}>
+          تعذّر تحميل البيانات
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: 16, marginBottom: 24,
+        }}>
+          {[
+            { label: 'إجمالي الشركات',  val: stats?.companies?.total ?? 0,         icon: 'ti-building',     color: '#6366f1' },
+            { label: 'الشركات النشطة',  val: stats?.companies?.active ?? 0,         icon: 'ti-building-check',color: '#10b981' },
+            { label: 'شركات موقوفة',    val: stats?.companies?.suspended ?? 0,      icon: 'ti-building-off', color: '#f59e0b' },
+            { label: 'إجمالي المستخدمين', val: stats?.users?.total ?? 0,            icon: 'ti-users',        color: '#0ea5e9' },
+            { label: 'مستخدمون نشطون', val: stats?.users?.active ?? 0,             icon: 'ti-user-check',   color: '#10b981' },
+            { label: 'جديدون هذا الشهر', val: stats?.users?.new_this_month ?? 0,   icon: 'ti-user-plus',    color: '#8b5cf6' },
+          ].map(kpi => (
+            <Card key={kpi.label} padding={16}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10,
+                  background: kpi.color + '22',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <i className={`ti ${kpi.icon}`} style={{ color: kpi.color, fontSize: 18 }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--t1)', lineHeight: 1 }}>
+                    {kpi.val.toLocaleString('ar')}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 3 }}>{kpi.label}</div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <Card title="عدد المستخدمين الجدد">
-          <LineChart data={data?.users ?? []} height={240} color="var(--blue)" />
+      {/* توزيع الخطط */}
+      {stats?.companies?.by_plan && Object.keys(stats.companies.by_plan).length > 0 && (
+        <Card title="توزيع الشركات حسب الخطة">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
+            {Object.entries(stats.companies.by_plan).map(([plan, count]) => {
+              const total = stats.companies.total || 1;
+              const pct   = Math.round((count / total) * 100);
+              return (
+                <div key={plan}>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between',
+                    fontSize: 12, marginBottom: 4,
+                  }}>
+                    <span style={{ color: 'var(--t2)', fontWeight: 600 }}>
+                      {plan}
+                    </span>
+                    <span style={{ color: 'var(--t4)' }}>
+                      {count} ({pct}%)
+                    </span>
+                  </div>
+                  <div style={{
+                    height: 6, borderRadius: 3, background: 'var(--bg4)',
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      height: '100%', borderRadius: 3,
+                      background: 'var(--em)',
+                      width: `${pct}%`,
+                      transition: 'width .4s ease',
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </Card>
-        <Card title="عدد الشركات الجديدة">
-          <LineChart data={data?.companies ?? []} height={240} color="var(--em)" />
+      )}
+
+      {/* جدول آخر الشركات */}
+      {(stats?.recent_companies?.length ?? 0) > 0 && (
+        <Card title="آخر الشركات المسجّلة" style={{ marginTop: 16 }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['الشركة', 'الخطة', 'الإنشاء'].map(h => (
+                    <th key={h} style={{
+                      padding: '8px 12px', textAlign: 'right',
+                      fontSize: 11, color: 'var(--t4)', fontWeight: 700,
+                    }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {stats!.recent_companies.map(co => (
+                  <tr key={co.id} style={{ borderTop: '1px solid var(--b1)' }}>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--t1)', fontWeight: 600 }}>
+                      {co.name}
+                    </td>
+                    <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--t4)' }}>
+                      {co.plan}
+                    </td>
+                    <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--t4)' }}>
+                      {new Date(co.created_at).toLocaleDateString('ar-DZ')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
-        <Card title="نداءات API اليومية">
-          <LineChart data={data?.apiCalls ?? []} height={240} color="var(--purple)" />
-        </Card>
-        <Card title="الإيرادات الشهرية (MRR)">
-          <LineChart data={data?.revenue ?? []} height={240} color="var(--gold)" />
-        </Card>
-      </div>
+      )}
     </div>
   );
 }

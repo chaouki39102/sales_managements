@@ -1,175 +1,112 @@
 // ════════════════════════════════════════════════════════════════════════════
-// lib/admin.ts — adminApi الموحّد
+// lib/admin.ts
+//
+// ⚠️  هذا الملف re-export + backward-compat فقط.
+//    المنطق الفعلي: lib/api/admin/*
+//    الصفحات الجديدة تستورد من '@/lib/api/admin' مباشرة.
 // ════════════════════════════════════════════════════════════════════════════
-import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from './api/core/client';
-import type {
-  AdminCompany,
-  AdminUser,
-  AdminPlan,
-  ActivityLog,
-  AdminDashboardStats,
-  AdminCompaniesFilter,
-  AdminUsersFilter,
-  Paginated,
-  SystemSettings,
-} from '@/types/admin';
 
-export type PaginatedResponse<T> = Paginated<T>;
+import { apiGet }          from './api/core/client';
+import {
+  companiesApi,
+  usersApi,
+  impersonateApi,
+  dashboardApi,
+  plansApi,
+  settingsApi,
+  maintenanceApi,
+  systemBootApi,
+  activityApi,
+} from './api/admin';
 
+// ─── Named re-exports ────────────────────────────────────────────────────────
+export {
+  companiesApi,
+  usersApi,
+  impersonateApi,
+  dashboardApi,
+  plansApi,
+  settingsApi,
+  maintenanceApi,
+  systemBootApi,
+  activityApi,
+};
+export { apiGetPaginated } from './api/admin';
+
+// ─── adminApi — wrapper بدون تكرار كود ───────────────────────────────────────
 export const adminApi = {
+  // Dashboard
+  getDashboard:      dashboardApi.get,
 
-  // ─── Dashboard ─────────────────────────────────────────────────────────────
-  getDashboard: () =>
-    apiGet<AdminDashboardStats>('/admin/dashboard'),
+  // Companies
+  getCompanies:      companiesApi.list,
+  getCompany:        companiesApi.show,
+  createCompany:     companiesApi.create,
+  updateCompany:     (id: number, d: Parameters<typeof companiesApi.update>[1]) => companiesApi.update(id, d),
+  deleteCompany:     companiesApi.remove,
+  suspendCompany:    companiesApi.suspend,
+  unsuspendCompany:  companiesApi.unsuspend,
+  activateCompany:   companiesApi.activate,
+  deactivateCompany: companiesApi.deactivate,
+  verifyCompany:     companiesApi.verify,
+  unverifyCompany:   companiesApi.unverify,
+  changePlan:        (id: number, d: Parameters<typeof companiesApi.changePlan>[1]) => companiesApi.changePlan(id, d),
+  updateNotes:       companiesApi.updateNotes,
+  getCompanyUsers:   companiesApi.listUsers,
+  addCompanyUser:    companiesApi.addUser,
+  removeCompanyUser: companiesApi.removeUser,
+  toggleCompanyUser: companiesApi.toggleUser,
+  seedCompany:       companiesApi.seed,
 
-  // ─── Companies ─────────────────────────────────────────────────────────────
-  getCompanies: (params?: AdminCompaniesFilter) =>
-    apiGet<PaginatedResponse<AdminCompany>>('/admin/companies', params as any),
+  // Users
+  getUsers:         usersApi.list,
+  getUser:          usersApi.show,
+  createUser:       usersApi.create,
+  updateUser:       (id: number, d: Parameters<typeof usersApi.update>[1]) => usersApi.update(id, d),
+  deleteUser:       usersApi.remove,
+  resetPassword:    usersApi.resetPassword,
+  toggleActive:     usersApi.toggleActive,
+  getUserCompanies: usersApi.companies,
 
-  getCompany: (id: number) =>
-    apiGet<AdminCompany>(`/admin/companies/${id}`),
+  // Impersonate
+  impersonate:     impersonateApi.start,
+  stopImpersonate: impersonateApi.stop,
 
-  createCompany: (data: Partial<AdminCompany>) =>
-    apiPost<AdminCompany>('/admin/companies', data),
+  // Plans
+  getPlans: plansApi.list,
+  getPlan:  plansApi.show,
 
-  updateCompany: (id: number, data: Partial<AdminCompany>) =>
-    apiPut<AdminCompany>(`/admin/companies/${id}`, data),
+  // Activity
+  getActivity:    activityApi.list,
+  getActivityLog: activityApi.show,
 
-  deleteCompany: (id: number) =>
-    apiDelete(`/admin/companies/${id}`),
+  // System
+  getSystemStatus:  systemBootApi.status,
+  bootSystem:       systemBootApi.boot,
+  bootWilayas:      systemBootApi.bootWilayas,
+  bootPermissions:  systemBootApi.bootPerms,
 
-  suspendCompany:    (id: number, reason: string) =>
-    apiPost<AdminCompany>(`/admin/companies/${id}/suspend`, { reason }),
-  unsuspendCompany:  (id: number) =>
-    apiPost<AdminCompany>(`/admin/companies/${id}/unsuspend`),
-  activateCompany:   (id: number) =>
-    apiPost<AdminCompany>(`/admin/companies/${id}/activate`),
-  deactivateCompany: (id: number) =>
-    apiPost<AdminCompany>(`/admin/companies/${id}/deactivate`),
-  verifyCompany:     (id: number) =>
-    apiPost<AdminCompany>(`/admin/companies/${id}/verify`),
-  unverifyCompany:   (id: number) =>
-    apiPost<AdminCompany>(`/admin/companies/${id}/unverify`),
-  changePlan: (id: number, data: {
-    plan: string;
-    max_users?: number;
-    max_products?: number;
-    max_warehouses?: number;
-  }) => apiPost<AdminCompany>(`/admin/companies/${id}/change-plan`, data),
-  updateNotes: (id: number, notes: string) =>
-    apiPatch<void>(`/admin/companies/${id}/notes`, { notes }),
+  // Settings
+  getSettings:    settingsApi.get,
+  updateSettings: settingsApi.update,
 
-  getCompanyUsers: (id: number, params?: { page?: number; per_page?: number }) =>
-    apiGet<PaginatedResponse<AdminUser>>(`/admin/companies/${id}/users`, params as any),
-  addCompanyUser:    (companyId: number, userId: number, role?: string) =>
-    apiPost(`/admin/companies/${companyId}/users`, { user_id: userId, role }),
-  removeCompanyUser: (companyId: number, userId: number) =>
-    apiDelete(`/admin/companies/${companyId}/users/${userId}`),
-  toggleCompanyUser: (companyId: number, userId: number) =>
-    apiPatch(`/admin/companies/${companyId}/users/${userId}/toggle`, {}),
-  seedCompany: (id: number) =>
-    apiPost<{ message: string; applied: string[]; skipped: string[] }>(
-      `/admin/companies/${id}/seed`
-    ),
+  // Maintenance
+  getMaintenance:     maintenanceApi.status,
+  enableMaintenance:  maintenanceApi.enable,
+  disableMaintenance: maintenanceApi.disable,
+  clearCache:         maintenanceApi.cache,
+  runScheduler:       maintenanceApi.scheduler,
+  exportBackup:       maintenanceApi.backup,
 
-  // ─── Users ─────────────────────────────────────────────────────────────────
-  getUsers: (params?: AdminUsersFilter) =>
-    apiGet<PaginatedResponse<AdminUser>>('/admin/users', params as any),
-
-  getUser: (id: number) =>
-    apiGet<AdminUser>(`/admin/users/${id}`),
-
-  createUser: (data: Partial<AdminUser> & { password?: string }) =>
-    apiPost<AdminUser>('/admin/users', data),
-
-  updateUser: (id: number, data: Partial<AdminUser>) =>
-    apiPut<AdminUser>(`/admin/users/${id}`, data),
-
-  deleteUser: (id: number) =>
-    apiDelete(`/admin/users/${id}`),
-
-  resetPassword: (id: number, password: string) =>
-    apiPost(`/admin/users/${id}/reset-password`, {
-      password,
-      password_confirmation: password,
-    }),
-
-  toggleActive: (id: number) =>
-    apiPost<AdminUser>(`/admin/users/${id}/toggle-active`),
-
-  getUserCompanies: (id: number) =>
-    apiGet<AdminCompany[]>(`/admin/users/${id}/companies`),
-
-  // ─── Impersonate ───────────────────────────────────────────────────────────
-  impersonate: (id: number) =>
-    apiPost<{ token: string; user: AdminUser }>(`/admin/impersonate/${id}`),
-
-  stopImpersonate: () =>
-    apiPost('/admin/impersonate/stop'),
-
-  // ─── Plans ─────────────────────────────────────────────────────────────────
-  getPlans: () =>
-    apiGet<AdminPlan[]>('/admin/plans'),
-
-  getPlan: (key: string) =>
-    apiGet<AdminPlan>(`/admin/plans/${key}`),
-
-  // ─── Activity ──────────────────────────────────────────────────────────────
-  getActivity: (params?: {
-    search?:    string;
-    event?:     string;
-    date_from?: string;
-    date_to?:   string;
-    page?:      number;
-    per_page?:  number;
-  }) => apiGet<PaginatedResponse<ActivityLog>>('/admin/activity-log', params as any),
-
-  getActivityLog: (id: number) =>
-    apiGet<ActivityLog>(`/admin/activity-log/${id}`),
-
-  // ─── System ────────────────────────────────────────────────────────────────
-  getSystemStatus: () =>
-    apiGet<{ is_ready: boolean; components: any[] }>('/admin/system/status'),
-
-  bootSystem:      () => apiPost('/admin/system/boot'),
-  bootWilayas:     () => apiPost('/admin/system/boot/wilayas'),
-  bootPermissions: () => apiPost('/admin/system/boot/permissions'),
-
-  // ─── Settings ──────────────────────────────────────────────────────────────
-  getSettings: () =>
-    apiGet<SystemSettings>('/admin/system/settings'),
-
-  updateSettings: (data: Partial<SystemSettings>) =>
-    apiPut<SystemSettings>('/admin/system/settings', data),
-
-  // ─── Maintenance ───────────────────────────────────────────────────────────
-  getMaintenance: () =>
-    apiGet<{ maintenance_mode: boolean; message?: string }>('/admin/system/maintenance'),
-
-  enableMaintenance:  (message?: string) =>
-    apiPost('/admin/system/maintenance/enable', { message }),
-  disableMaintenance: () =>
-    apiPost('/admin/system/maintenance/disable'),
-  clearCache: () =>
-    apiPost('/admin/system/maintenance/cache-clear'),
-
-  // ─── Reports ───────────────────────────────────────────────────────────────
+  // Reports
   getReports: (period: '7d' | '30d' | '90d') =>
     apiGet<{
       users:     { date: string; value: number }[];
       companies: { date: string; value: number }[];
-      apiCalls:  { date: string; value: number }[];
       revenue:   { date: string; value: number }[];
-    }>('/admin/reports', { period } as any),
-
-  // ─── Scheduler & Backup — المسارات الصحيحة ✅ ──────────────────────────────
-  // كانت خاطئة: '/admin/maintenance/scheduler' و '/admin/maintenance/backup'
-  runScheduler: () =>
-    apiPost<{ message: string }>('/admin/system/maintenance/scheduler'),
-
-  exportBackup: () =>
-    apiPost<{ message: string; path?: string }>('/admin/system/maintenance/backup'),
+    }>('/admin/reports', { period } as Record<string, unknown>),
 
 } as const;
 
 export default adminApi;
+export type { Paginated, AdminCompaniesFilter, AdminUsersFilter } from '@/types/admin';

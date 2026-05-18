@@ -1,10 +1,20 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/admin/AdminCompaniesPage.tsx  ← النسخة النظيفة
+// pages/admin/AdminCompaniesPage.tsx  ← النسخة المُصلحة
 //
-// التغييرات:
-//   • الصفحة نظيفة — تستخدم CompanyDrawer من components/admin/CompanyDrawer
-//   • PLANS وPLAN_COLORS مُحدَّدة مرة واحدة هنا
-//   • لا منطق أعمال مباشر في الصفحة
+// المشكلة الأصلية:
+//   useAdminCompanies يستخدم companiesApi.list → apiGetPaginated
+//   apiGetPaginated يُعيد { data:[...], meta:{...} } مباشرة
+//
+//   الكود القديم كان:
+//     const companies = (data as any)?.data ?? [];   ← يعمل ✅
+//     const meta      = (data as any)?.meta;          ← يعمل ✅
+//
+//   إذن مشكلة الصفحة الفارغة ليست في الـ parsing بل في
+//   أن الـ query كانت تُعيد error بسبب companiesApi.list
+//   الذي كان يستخدم apiGetPaginated الصحيح
+//   (لكن العمليات الأخرى كانت تُعيد 404 → تُلوث الـ cache)
+//
+//   الحل: الصفحة سليمة لكن نضيف error handling واضح
 // ════════════════════════════════════════════════════════════════════════════
 import { useState, useMemo } from 'react';
 import { useAdminCompanies } from '@/hooks/admin';
@@ -17,54 +27,20 @@ import PageHeader  from '@/components/ui/PageHeader';
 import Card        from '@/components/ui/Card';
 import Button      from '@/components/ui/Button';
 import SearchInput from '@/components/ui/SearchInput';
-import type { AdminCompany, AdminCompaniesFilter } from '@/types/admin';
-
-// ─── Plan display ─────────────────────────────────────────────────────────────
+import type { AdminCompany, AdminCompaniesFilter, Paginated } from '@/types/admin';
 
 const PLANS: Record<string, string> = {
-  free:         'مجاني',
-  starter:      'مبتدئ',
-  professional: 'احترافي',
-  enterprise:   'مؤسسة',
-  custom:       'مخصص',
+  free: 'مجاني', starter: 'مبتدئ', professional: 'احترافي',
+  enterprise: 'مؤسسة', custom: 'مخصص',
 };
-
 const PLAN_COLORS: Record<string, string> = {
-  free:         '#6b7280',
-  starter:      '#6366f1',
-  professional: '#0ea5e9',
-  enterprise:   '#f59e0b',
-  custom:       '#8b5cf6',
+  free: '#6b7280', starter: '#6366f1', professional: '#0ea5e9',
+  enterprise: '#f59e0b', custom: '#8b5cf6',
 };
-
-// ─── Sort icon ────────────────────────────────────────────────────────────────
-
-function SortIcon({
-  col,
-  active,
-  dir,
-}: {
-  col: string;
-  active: string;
-  dir: 'asc' | 'desc';
-}) {
-  if (col !== active) {
-    return <i className="ti ti-selector" style={{ fontSize: 11, opacity: .3 }} />;
-  }
-  return (
-    <i
-      className={`ti ti-sort-${dir === 'asc' ? 'ascending' : 'descending'}`}
-      style={{ fontSize: 11 }}
-    />
-  );
-}
-
-// ─── Main ────────────────────────────────────────────────────────────────────
 
 export default function AdminCompaniesPage() {
   const [rawSearch, setRawSearch] = useState('');
   const search = useDebounce(rawSearch, 350);
-
   const [status,  setStatus]  = useState<AdminCompaniesFilter['status']>('');
   const [plan,    setPlan]    = useState('');
   const [sortBy,  setSortBy]  = useState<'name' | 'created_at' | 'users_count'>('created_at');
@@ -82,10 +58,12 @@ export default function AdminCompaniesPage() {
     per_page: 20,
   }), [search, status, plan, sortBy, sortDir, page]);
 
-  const { data, isLoading, isError, refetch } = useAdminCompanies(filter);
+  const { data, isLoading, isError, error, refetch } = useAdminCompanies(filter);
 
-  const companies: AdminCompany[] = (data as any)?.data ?? [];
-  const meta = (data as any)?.meta;
+  // ✅ apiGetPaginated يُعيد { data:[...], meta:{...} } مباشرة — طبقة واحدة
+  const paginated = data as Paginated<AdminCompany> | undefined;
+  const companies = paginated?.data ?? [];
+  const meta      = paginated?.meta;
 
   const toggleSort = (col: typeof sortBy) => {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -93,14 +71,13 @@ export default function AdminCompaniesPage() {
     setPage(1);
   };
 
-  // ── جدول الأعمدة ──────────────────────────────────────────────────────────
-  const columns = [
-    { label: 'الشركة',     col: 'name'        as typeof sortBy | null },
-    { label: 'الخطة',      col: null },
-    { label: 'المستخدمون', col: 'users_count' as typeof sortBy | null },
-    { label: 'الحالة',     col: null },
-    { label: 'الإنشاء',    col: 'created_at'  as typeof sortBy | null },
-    { label: '',           col: null },
+  const FILTERS = [
+    { val: '' as const,            label: 'الكل' },
+    { val: 'active' as const,      label: 'نشطة' },
+    { val: 'suspended' as const,   label: 'موقوفة' },
+    { val: 'inactive' as const,    label: 'غير نشطة' },
+    { val: 'verified' as const,    label: 'موثّقة' },
+    { val: 'unverified' as const,  label: 'غير موثقة' },
   ];
 
   return (
@@ -109,36 +86,21 @@ export default function AdminCompaniesPage() {
         title="الشركات"
         description={`${meta?.total ?? 0} شركة في المنصة`}
         actions={
-          <Button
-            variant="primary"
-            icon={<i className="ti ti-refresh" />}
-            onClick={() => refetch()}
-          >
+          <Button variant="primary" icon={<i className="ti ti-refresh" />} onClick={() => refetch()}>
             تحديث
           </Button>
         }
       />
 
-      {/* ── فلاتر ───────────────────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', gap: 8, marginBottom: 14,
-        flexWrap: 'wrap', alignItems: 'center',
-      }}>
+      {/* ── فلاتر ─────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <SearchInput
           value={rawSearch}
           onChange={v => { setRawSearch(v); setPage(1); }}
-          placeholder="بحث بالاسم أو البريد..."
+          placeholder="بحث بالاسم أو السلاق..."
           style={{ flex: 1, minWidth: 200 }}
         />
-
-        {(([
-          { val: '',           label: 'كل الحالات' },
-          { val: 'active',     label: 'نشطة' },
-          { val: 'suspended',  label: 'موقوفة' },
-          { val: 'inactive',   label: 'غير نشطة' },
-          { val: 'verified',   label: 'موثّقة' },
-          { val: 'unverified', label: 'غير موثقة' },
-        ] as { val: typeof status; label: string }[])).map(opt => (
+        {FILTERS.map(opt => (
           <button
             key={opt.val}
             onClick={() => { setStatus(opt.val); setPage(1); }}
@@ -153,48 +115,50 @@ export default function AdminCompaniesPage() {
             {opt.label}
           </button>
         ))}
-
         <select
           value={plan}
           onChange={e => { setPlan(e.target.value); setPage(1); }}
           style={{
-            padding: '6px 10px', borderRadius: 8,
-            border: '1px solid var(--b2)', background: 'var(--bg3)',
-            color: 'var(--t2)', fontSize: 12, fontFamily: 'Tajawal, sans-serif',
+            padding: '6px 10px', borderRadius: 8, border: '1px solid var(--b2)',
+            background: 'var(--bg3)', color: 'var(--t2)', fontSize: 12,
+            fontFamily: 'Tajawal, sans-serif',
           }}
         >
           <option value="">كل الخطط</option>
-          {Object.entries(PLANS).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
+          {Object.entries(PLANS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </div>
 
-      {/* ── الجدول ──────────────────────────────────────────────────────────── */}
-      <Card padding={0}>
-        {isError && (
-          <div style={{
-            padding: '12px 16px', background: '#ef44441a',
-            color: '#ef4444', fontSize: 13,
-          }}>
-            تعذّر تحميل البيانات.{' '}
-            <button
-              onClick={() => refetch()}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'inherit', textDecoration: 'underline',
-              }}
-            >
-              إعادة المحاولة
-            </button>
-          </div>
-        )}
+      {/* ── Error ─────────────────────────────────────────────────────────── */}
+      {isError && (
+        <div style={{
+          padding: '12px 16px', marginBottom: 12, borderRadius: 8,
+          background: '#ef44441a', color: '#ef4444', fontSize: 13,
+        }}>
+          تعذّر تحميل البيانات: {(error as any)?.message ?? 'خطأ غير معروف'}.{' '}
+          <button
+            onClick={() => refetch()}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', textDecoration: 'underline' }}
+          >
+            إعادة المحاولة
+          </button>
+        </div>
+      )}
 
+      {/* ── الجدول ────────────────────────────────────────────────────────── */}
+      <Card padding={0}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--b2)' }}>
-                {columns.map((th, i) => (
+                {[
+                  { label: 'الشركة',     col: 'name'         as typeof sortBy | null },
+                  { label: 'الخطة',      col: null },
+                  { label: 'المستخدمون', col: 'users_count'  as typeof sortBy | null },
+                  { label: 'الحالة',     col: null },
+                  { label: 'الإنشاء',    col: 'created_at'   as typeof sortBy | null },
+                  { label: '',           col: null },
+                ].map((th, i) => (
                   <th
                     key={i}
                     onClick={() => th.col && toggleSort(th.col)}
@@ -206,22 +170,18 @@ export default function AdminCompaniesPage() {
                       userSelect: 'none', whiteSpace: 'nowrap',
                     }}
                   >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {th.label}
-                      {th.col && (
-                        <SortIcon col={th.col} active={sortBy} dir={sortDir} />
-                      )}
-                    </span>
+                    {th.label}
+                    {th.col && sortBy === th.col && (
+                      <i className={`ti ti-sort-${sortDir === 'asc' ? 'ascending' : 'descending'}`}
+                         style={{ marginRight: 4, fontSize: 10 }} />
+                    )}
                   </th>
                 ))}
               </tr>
             </thead>
-
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: 40 }}><Spinner /></td>
-                </tr>
+                <tr><td colSpan={6} style={{ padding: 40 }}><Spinner /></td></tr>
               ) : companies.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={{ padding: 40 }}>
@@ -236,70 +196,46 @@ export default function AdminCompaniesPage() {
                     borderBottom: '1px solid var(--b1)',
                     cursor: 'pointer', transition: 'background .1s',
                   }}
-                  onMouseEnter={e =>
-                    (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'
-                  }
-                  onMouseLeave={e =>
-                    (e.currentTarget as HTMLElement).style.background = ''
-                  }
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
                 >
-                  {/* الشركة */}
                   <td style={{ padding: '10px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <Avatar id={co.id} name={co.name} size={32} radius={9} />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>
-                          {co.name}
-                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{co.name}</div>
                         <div style={{ fontSize: 10, color: 'var(--t4)' }}>
-                          /{co.slug}
-                          {co.owner && ` · ${co.owner.name}`}
+                          /{co.slug}{co.owner ? ` · ${co.owner.name}` : ''}
                         </div>
                       </div>
                     </div>
                   </td>
-
-                  {/* الخطة */}
                   <td style={{ padding: '10px 14px' }}>
                     <span style={{
-                      fontSize: 11, fontWeight: 700, padding: '2px 8px',
-                      borderRadius: 99,
-                      background: (PLAN_COLORS[co.plan] || '#6b7280') + '22',
-                      color: PLAN_COLORS[co.plan] || '#6b7280',
+                      fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                      background: (PLAN_COLORS[co.plan] ?? '#6b7280') + '22',
+                      color: PLAN_COLORS[co.plan] ?? '#6b7280',
                     }}>
                       {PLANS[co.plan] ?? co.plan}
                     </span>
                   </td>
-
-                  {/* المستخدمون */}
-                  <td style={{
-                    padding: '10px 14px', fontSize: 13,
-                    color: 'var(--t2)', fontWeight: 600,
-                  }}>
-                    {co.users_count}
+                  <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--t2)', fontWeight: 600 }}>
+                    {co.users_count ?? 0}
                     <span style={{ fontSize: 10, color: 'var(--t4)', marginRight: 3 }}>
                       / {co.max_users || '∞'}
                     </span>
                   </td>
-
-                  {/* الحالة */}
                   <td style={{ padding: '10px 14px' }}>
                     <StatusBadge active={co.active} suspended={co.is_suspended} />
                     {co.verified_at && (
-                      <i
-                        className="ti ti-shield-check"
-                        style={{ marginRight: 6, fontSize: 13, color: '#10b981' }}
-                        title="موثّق"
-                      />
+                      <i className="ti ti-shield-check"
+                         style={{ marginRight: 6, fontSize: 12, color: '#10b981' }}
+                         title="موثّق" />
                     )}
                   </td>
-
-                  {/* الإنشاء */}
                   <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--t4)' }}>
                     {fmtDate(co.created_at)}
                   </td>
-
-                  {/* Chevron */}
                   <td style={{ padding: '10px 14px' }}>
                     <i className="ti ti-chevron-left" style={{ fontSize: 14, color: 'var(--t4)' }} />
                   </td>
@@ -326,15 +262,8 @@ export default function AdminCompaniesPage() {
         )}
       </Card>
 
-      {/* ── Drawer ──────────────────────────────────────────────────────────── */}
       {selected && (
-        <CompanyDrawer
-          company={selected}
-          onClose={refresh => {
-            setSelected(null);
-            if (refresh) refetch();
-          }}
-        />
+        <CompanyDrawer company={selected} onClose={refresh => { setSelected(null); if (refresh) refetch(); }} />
       )}
     </div>
   );

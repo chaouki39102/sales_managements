@@ -1,21 +1,29 @@
 // components/admin/CompanyDrawer/index.tsx
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DrawerShell, TabBar, FlashBar, Avatar, StatusBadge, ActionBtn, InfoRow, SectionTitle, EmptyState, Spinner, fmtDate, TabDef } from '../shared';
+import {
+  DrawerShell, TabBar, FlashBar, Avatar, StatusBadge, ActionBtn,
+  InfoRow, SectionTitle, EmptyState, Spinner, fmtDate,
+} from '../shared';
+import type { TabDef } from '../shared';
 import { companiesApi } from '@/lib/api/admin';
 import { useCompanyMutations } from '@/hooks/admin';
 import type { AdminCompany, AdminUser } from '@/types/admin';
 
 const PLANS: Record<string, string> = {
-  free: 'مجاني', starter: 'مبتدئ', professional: 'احترافي', enterprise: 'مؤسسة', custom: 'مخصص',
+  free:         'مجاني',
+  starter:      'مبتدئ',
+  professional: 'احترافي',
+  enterprise:   'مؤسسة',
+  custom:       'مخصص',
 };
 
 const TABS: TabDef[] = [
-  { key: 'info',    label: 'المعلومات', icon: 'ti-building'     },
-  { key: 'members', label: 'الأعضاء',  icon: 'ti-users'        },
-  { key: 'plan',    label: 'الخطة',    icon: 'ti-crown'        },
-  { key: 'notes',   label: 'ملاحظات',  icon: 'ti-notes'        },
-  { key: 'danger',  label: 'إجراءات',  icon: 'ti-bolt'         },
+  { key: 'info',    label: 'المعلومات', icon: 'ti-building' },
+  { key: 'members', label: 'الأعضاء',  icon: 'ti-users'    },
+  { key: 'plan',    label: 'الخطة',    icon: 'ti-crown'    },
+  { key: 'notes',   label: 'ملاحظات',  icon: 'ti-notes'    },
+  { key: 'danger',  label: 'إجراءات',  icon: 'ti-bolt'     },
 ];
 
 interface Props {
@@ -24,25 +32,86 @@ interface Props {
 }
 
 export default function CompanyDrawer({ company: co, onClose }: Props) {
-  const [tab,         setTab]         = useState('info');
-  const [flash,       setFlash]       = useState<{ ok: boolean; msg: string } | null>(null);
+  const [tab,           setTab]           = useState('info');
+  const [flash,         setFlash]         = useState<{ ok: boolean; msg: string } | null>(null);
   const [suspendReason, setSuspendReason] = useState('');
-  const [showSuspend, setShowSuspend] = useState(false);
-  const [notes,       setNotes]       = useState(co.notes ?? '');
-  const [planForm,    setPlanForm]    = useState({ plan: co.plan, max_users: co.max_users, max_products: co.max_products, max_warehouses: co.max_warehouses });
+  const [showSuspend,   setShowSuspend]   = useState(false);
+  const [notes,         setNotes]         = useState(co.notes ?? '');
+  const [planForm,      setPlanForm]      = useState({
+    plan:           co.plan,
+    max_users:      co.max_users,
+    max_products:   co.max_products,
+    max_warehouses: co.max_warehouses,
+  });
 
   const muts = useCompanyMutations();
   const close = (refresh = false) => onClose(refresh);
-  const flash$ = (ok: boolean, msg: string) => { setFlash({ ok, msg }); setTimeout(() => setFlash(null), 3000); };
 
-  // أعضاء الشركة
-  const { data: membersData, isLoading: mLoading, refetch: refetchMembers } = useQuery({
+  // ─── Flash helper ────────────────────────────────────────────────────────────
+  const flash$ = (ok: boolean, msg: string) => {
+    setFlash({ ok, msg });
+    setTimeout(() => setFlash(null), 4000);
+  };
+
+  // ─── Error helper — يستخرج رسالة الخطأ من ApiError أو أي كائن آخر ──────────
+  const errMsg = (e: unknown): string => {
+    if (!e) return 'حدث خطأ غير متوقع';
+    if (typeof e === 'object' && 'message' in e) return (e as Error).message;
+    return String(e);
+  };
+
+  // ─── Shorthand mutation caller مع onSuccess + onError ──────────────────────
+  const run = (
+    mutation: { mutate: (v: any, opts: any) => void; isPending: boolean },
+    value: any,
+    successMsg: string,
+    refreshOnSuccess = true,
+  ) => {
+    mutation.mutate(value, {
+      onSuccess: () => {
+        flash$(true, successMsg);
+        if (refreshOnSuccess) close(true);
+      },
+      onError: (e: unknown) => flash$(false, errMsg(e)),
+    });
+  };
+
+  // ─── أعضاء الشركة ────────────────────────────────────────────────────────────
+  const {
+    data:     membersData,
+    isLoading: mLoading,
+    refetch:  refetchMembers,
+  } = useQuery({
     queryKey: ['admin', 'companies', co.id, 'users'],
     queryFn:  () => companiesApi.listUsers(co.id),
     enabled:  tab === 'members',
     staleTime: 60_000,
   });
+
+  // listUsers يُعيد Paginated<AdminUser> من apiGetPaginated (raw response.data)
+  // البنية: { data: AdminUser[], meta: {...} }
   const members: AdminUser[] = (membersData as any)?.data ?? [];
+
+  // ─── Helpers لأعضاء الشركة (مع error handling) ───────────────────────────────
+  const handleToggleUser = async (u: AdminUser) => {
+    try {
+      await companiesApi.toggleUser(co.id, u.id);
+      refetchMembers();
+    } catch (e) {
+      flash$(false, errMsg(e));
+    }
+  };
+
+  const handleRemoveUser = async (u: AdminUser) => {
+    if (!confirm(`إزالة ${u.name}؟`)) return;
+    try {
+      await companiesApi.removeUser(co.id, u.id);
+      refetchMembers();
+      flash$(true, 'تم إزالة المستخدم');
+    } catch (e) {
+      flash$(false, errMsg(e));
+    }
+  };
 
   return (
     <DrawerShell
@@ -62,7 +131,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
       {flash && <FlashBar ok={flash.ok} msg={flash.msg} />}
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
-      {/* ══ INFO ══════════════════════════════════════════════════════════════ */}
+      {/* ══ INFO ═══════════════════════════════════════════════════════════════ */}
       {tab === 'info' && (
         <div style={{ padding: '16px 20px' }}>
           <InfoRow label="الاسم التجاري"  value={co.commercial_name ?? co.name} />
@@ -79,67 +148,85 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
           <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
             {co.is_suspended ? (
               <ActionBtn icon="ti-player-play" label="رفع التعليق" variant="success"
-                onClick={() => muts.unsuspend.mutate(co.id, { onSuccess: () => { flash$(true, 'تم رفع التعليق'); close(true); } })}
+                onClick={() => run(muts.unsuspend, co.id, 'تم رفع التعليق')}
                 loading={muts.unsuspend.isPending} />
             ) : (
               <ActionBtn icon="ti-ban" label="تعليق الشركة" variant="danger"
                 onClick={() => setShowSuspend(true)} />
             )}
+
             {co.active ? (
               <ActionBtn icon="ti-x" label="إيقاف التفعيل"
-                onClick={() => muts.deactivate.mutate(co.id, { onSuccess: () => { flash$(true, 'تم الإيقاف'); close(true); } })}
+                onClick={() => run(muts.deactivate, co.id, 'تم إيقاف التفعيل')}
                 loading={muts.deactivate.isPending} />
             ) : (
               <ActionBtn icon="ti-check" label="تفعيل" variant="success"
-                onClick={() => muts.activate.mutate(co.id, { onSuccess: () => { flash$(true, 'تم التفعيل'); close(true); } })}
+                onClick={() => run(muts.activate, co.id, 'تم التفعيل')}
                 loading={muts.activate.isPending} />
             )}
+
             {!co.verified_at ? (
               <ActionBtn icon="ti-shield-check" label="توثيق" variant="success"
-                onClick={() => muts.verify.mutate(co.id, { onSuccess: () => { flash$(true, 'تم التوثيق'); close(true); } })}
+                onClick={() => run(muts.verify, co.id, 'تم التوثيق')}
                 loading={muts.verify.isPending} />
             ) : (
               <ActionBtn icon="ti-shield-off" label="إلغاء التوثيق"
-                onClick={() => muts.unverify.mutate(co.id, { onSuccess: () => { flash$(true, 'تم الإلغاء'); close(true); } })}
+                onClick={() => run(muts.unverify, co.id, 'تم إلغاء التوثيق')}
                 loading={muts.unverify.isPending} />
             )}
           </div>
 
           {/* نموذج التعليق */}
           {showSuspend && (
-            <div style={{ marginTop: 14, padding: 14, borderRadius: 10, border: '1px solid #ef444433', background: '#ef44440a' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>سبب التعليق</div>
+            <div style={{
+              marginTop: 14, padding: 14, borderRadius: 10,
+              border: '1px solid #ef444433', background: '#ef44440a',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>
+                سبب التعليق
+              </div>
               <textarea
                 value={suspendReason}
                 onChange={e => setSuspendReason(e.target.value)}
                 rows={2} placeholder="أدخل سبب التعليق..."
-                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ef444433', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'Tajawal, sans-serif' }}
+                style={{
+                  width: '100%', padding: '8px 10px', borderRadius: 8,
+                  border: '1px solid #ef444433', background: 'var(--bg3)',
+                  color: 'var(--t1)', fontSize: 13, resize: 'vertical',
+                  boxSizing: 'border-box', fontFamily: 'Tajawal, sans-serif',
+                }}
               />
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <ActionBtn icon="ti-ban" label="تأكيد التعليق" variant="danger"
                   disabled={!suspendReason.trim()}
-                  onClick={() => muts.suspend.mutate(
+                  onClick={() => run(
+                    muts.suspend,
                     { id: co.id, reason: suspendReason },
-                    { onSuccess: () => { flash$(true, 'تم التعليق'); close(true); } }
+                    'تم التعليق',
                   )}
                   loading={muts.suspend.isPending} />
-                <ActionBtn icon="ti-x" label="إلغاء" onClick={() => setShowSuspend(false)} />
+                <ActionBtn icon="ti-x" label="إلغاء"
+                  onClick={() => { setShowSuspend(false); setSuspendReason(''); }} />
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ══ MEMBERS ═══════════════════════════════════════════════════════════ */}
+      {/* ══ MEMBERS ════════════════════════════════════════════════════════════ */}
       {tab === 'members' && (
         <div style={{ padding: '16px 20px' }}>
           <SectionTitle>أعضاء الشركة ({members.length})</SectionTitle>
+
           {mLoading ? <Spinner /> : members.length === 0 ? (
             <EmptyState icon="ti-users" text="لا يوجد أعضاء" />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {members.map(u => (
-                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'var(--bg3)' }}>
+                <div key={u.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 10px', borderRadius: 10, background: 'var(--bg3)',
+                }}>
                   <Avatar id={u.id} name={u.name} size={30} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>{u.name}</div>
@@ -148,16 +235,15 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
                   <StatusBadge active={u.active} />
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button title="تجميد/تفعيل"
-                      onClick={async () => { await companiesApi.toggleUser(co.id, u.id); refetchMembers(); }}
-                      style={iBtn}><i className="ti ti-user-pause" /></button>
+                      onClick={() => handleToggleUser(u)}
+                      style={iBtn}>
+                      <i className="ti ti-user-pause" />
+                    </button>
                     <button title="إزالة"
-                      onClick={async () => {
-                        if (!confirm(`إزالة ${u.name}؟`)) return;
-                        await companiesApi.removeUser(co.id, u.id);
-                        refetchMembers();
-                        flash$(true, 'تم الإزالة');
-                      }}
-                      style={{ ...iBtn, color: '#ef4444', borderColor: '#ef444433' }}><i className="ti ti-user-minus" /></button>
+                      onClick={() => handleRemoveUser(u)}
+                      style={{ ...iBtn, color: '#ef4444', borderColor: '#ef444433' }}>
+                      <i className="ti ti-user-minus" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -166,69 +252,110 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
         </div>
       )}
 
-      {/* ══ PLAN ══════════════════════════════════════════════════════════════ */}
+      {/* ══ PLAN ═══════════════════════════════════════════════════════════════ */}
       {tab === 'plan' && (
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <SectionTitle>تغيير الخطة</SectionTitle>
+
           <div>
             <label style={lbl}>الخطة</label>
-            <select value={planForm.plan} onChange={e => setPlanForm(f => ({ ...f, plan: e.target.value }))} style={sel}>
-              {Object.entries(PLANS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            <select
+              value={planForm.plan}
+              onChange={e => setPlanForm(f => ({ ...f, plan: e.target.value }))}
+              style={sel}
+            >
+              {Object.entries(PLANS).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
             </select>
           </div>
-          {[
-            { key: 'max_users',      label: 'حد المستخدمين (0 = غير محدود)' },
-            { key: 'max_products',   label: 'حد المنتجات (0 = غير محدود)' },
-            { key: 'max_warehouses', label: 'حد المستودعات (0 = غير محدود)' },
-          ].map(f => (
+
+          {([
+            { key: 'max_users',      label: 'حد المستخدمين (0 = غير محدود)'   },
+            { key: 'max_products',   label: 'حد المنتجات (0 = غير محدود)'     },
+            { key: 'max_warehouses', label: 'حد المستودعات (0 = غير محدود)'   },
+          ] as const).map(f => (
             <div key={f.key}>
               <label style={lbl}>{f.label}</label>
-              <input type="number" min={0}
-                value={(planForm as any)[f.key]}
-                onChange={e => setPlanForm(p => ({ ...p, [f.key]: parseInt(e.target.value) || 0 }))}
-                style={inp} />
+              <input
+                type="number" min={0}
+                value={planForm[f.key]}
+                onChange={e => setPlanForm(p => ({
+                  ...p,
+                  [f.key]: parseInt(e.target.value, 10) || 0,
+                }))}
+                style={inp}
+              />
             </div>
           ))}
+
           <ActionBtn icon="ti-crown" label="تطبيق الخطة"
-            onClick={() => muts.changePlan.mutate(
-              { id: co.id, ...planForm },
-              { onSuccess: () => { flash$(true, 'تم تغيير الخطة'); close(true); } }
+            onClick={() => run(
+              muts.changePlan,
+              {
+                id:             co.id,
+                plan:           planForm.plan,
+                // نُرسل null بدل 0 لكي يتجاهله array_filter في الباكاند
+                // أو نُرسل القيمة كما هي — الباكاند يتعامل معها
+                max_users:      planForm.max_users      || undefined,
+                max_products:   planForm.max_products   || undefined,
+                max_warehouses: planForm.max_warehouses || undefined,
+              },
+              'تم تغيير الخطة',
             )}
             loading={muts.changePlan.isPending} />
         </div>
       )}
 
-      {/* ══ NOTES ═════════════════════════════════════════════════════════════ */}
+      {/* ══ NOTES ══════════════════════════════════════════════════════════════ */}
       {tab === 'notes' && (
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SectionTitle>ملاحظات داخلية</SectionTitle>
           <textarea
-            value={notes} onChange={e => setNotes(e.target.value)}
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
             rows={8} placeholder="ملاحظات خاصة بالشركة..."
-            style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'Tajawal, sans-serif' }}
+            style={{
+              width: '100%', padding: '10px 12px', borderRadius: 10,
+              border: '1px solid var(--b2)', background: 'var(--bg3)',
+              color: 'var(--t1)', fontSize: 13, resize: 'vertical',
+              boxSizing: 'border-box', fontFamily: 'Tajawal, sans-serif',
+            }}
           />
+          {/* ملاحظات: لا نُغلق الـ drawer بعد الحفظ — نبقى في نفس التاب */}
           <ActionBtn icon="ti-device-floppy" label="حفظ الملاحظات"
-            onClick={() => muts.updateNotes.mutate(
+            onClick={() => run(
+              muts.updateNotes,
               { id: co.id, notes },
-              { onSuccess: () => flash$(true, 'تم الحفظ') }
+              'تم حفظ الملاحظات',
+              false, // لا نُغلق الدرور بعد الحفظ
             )}
             loading={muts.updateNotes.isPending} />
         </div>
       )}
 
-      {/* ══ DANGER ════════════════════════════════════════════════════════════ */}
+      {/* ══ DANGER ═════════════════════════════════════════════════════════════ */}
       {tab === 'danger' && (
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ padding: '10px 14px', borderRadius: 10, background: '#ef44441a', border: '1px solid #ef444433', fontSize: 12, color: '#ef4444' }}>
+          <div style={{
+            padding: '10px 14px', borderRadius: 10,
+            background: '#ef44441a', border: '1px solid #ef444433',
+            fontSize: 12, color: '#ef4444',
+          }}>
             هذه الإجراءات لا يمكن التراجع عنها.
           </div>
-          <ActionBtn icon="ti-database" label="بذر البيانات الأساسية" onClick={() =>
-            muts.seed.mutate(co.id, { onSuccess: () => flash$(true, 'تم البذر بنجاح') })}
+
+          <ActionBtn icon="ti-database" label="بذر البيانات الأساسية"
+            onClick={() => run(muts.seed, co.id, 'تم البذر بنجاح', false)}
             loading={muts.seed.isPending} />
+
           <ActionBtn icon="ti-trash" label="حذف الشركة نهائياً" variant="danger"
             onClick={() => {
               if (!confirm(`حذف شركة "${co.name}" نهائياً؟`)) return;
-              muts.remove.mutate(co.id, { onSuccess: () => close(true) });
+              muts.remove.mutate(co.id, {
+                onSuccess: () => close(true),
+                onError:   (e: unknown) => flash$(false, errMsg(e)),
+              });
             }}
             loading={muts.remove.isPending} />
         </div>
@@ -237,11 +364,27 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const iBtn: React.CSSProperties = {
   width: 28, height: 28, borderRadius: 7, border: '1px solid var(--b2)',
   background: 'none', cursor: 'pointer', color: 'var(--t3)', fontSize: 13,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
 };
-const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--t4)', marginBottom: 6 };
-const sel: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif' };
-const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', color: 'var(--t1)', fontSize: 13, boxSizing: 'border-box' };
+
+const lbl: React.CSSProperties = {
+  display: 'block', fontSize: 11, fontWeight: 700,
+  color: 'var(--t4)', marginBottom: 6,
+};
+
+const sel: React.CSSProperties = {
+  width: '100%', padding: '8px 10px', borderRadius: 8,
+  border: '1px solid var(--b2)', background: 'var(--bg3)',
+  color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+};
+
+const inp: React.CSSProperties = {
+  width: '100%', padding: '8px 10px', borderRadius: 8,
+  border: '1px solid var(--b2)', background: 'var(--bg3)',
+  color: 'var(--t1)', fontSize: 13, boxSizing: 'border-box',
+};

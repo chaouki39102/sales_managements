@@ -1,12 +1,4 @@
-// ════════════════════════════════════════════════════════════════════════════
-// hooks/admin/useAdminSystem.ts  ← النسخة المُصلحة الكاملة
-//
-// المشكلة الأصلية:
-//   • useAdminPlans كانت موجودة هنا لكن لم تُصدَّر من hooks/useAdmin.ts
-//   • useSystemSettings وuseMaintenanceMutations كانتا موجودتين لكن
-//     AdminSettingsPage كانت تستورد useSystemSettings من '@/hooks/admin'
-//     مباشرة وهو ما يعمل عبر hooks/admin/index.ts
-// ════════════════════════════════════════════════════════════════════════════
+// hooks/admin/useAdminSystem.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dashboardApi, plansApi, settingsApi, maintenanceApi } from '@/lib/api/admin';
 
@@ -14,10 +6,10 @@ import { dashboardApi, plansApi, settingsApi, maintenanceApi } from '@/lib/api/a
 
 export function useAdminDashboard() {
   return useQuery({
-    queryKey: ['admin', 'dashboard'],
-    queryFn:  dashboardApi.get,
+    queryKey:  ['admin', 'dashboard'],
+    queryFn:   dashboardApi.get,
     staleTime: 2 * 60_000,
-    retry: false,
+    retry:     false,
   });
 }
 
@@ -25,21 +17,21 @@ export function useAdminDashboard() {
 
 export function useAdminPlans() {
   return useQuery({
-    queryKey: ['admin', 'plans'],
-    queryFn:  plansApi.list,
+    queryKey:  ['admin', 'plans'],
+    queryFn:   plansApi.list,
     staleTime: 10 * 60_000,
   });
 }
 
-// ─── System Settings ─────────────────────────────────────────────────────────
+// ─── Settings ────────────────────────────────────────────────────────────────
 
 export function useSystemSettings() {
   const qc  = useQueryClient();
   const inv = () => qc.invalidateQueries({ queryKey: ['admin', 'settings'] });
 
   const query  = useQuery({
-    queryKey: ['admin', 'settings'],
-    queryFn:  settingsApi.get,
+    queryKey:  ['admin', 'settings'],
+    queryFn:   settingsApi.get,
     staleTime: 5 * 60_000,
   });
 
@@ -54,20 +46,27 @@ export function useSystemSettings() {
 // ─── Maintenance ─────────────────────────────────────────────────────────────
 
 export function useMaintenanceMutations() {
-  const qc  = useQueryClient();
-  const inv = () => qc.invalidateQueries({ queryKey: ['admin', 'settings'] });
+  const qc     = useQueryClient();
+  const invSet = () => qc.invalidateQueries({ queryKey: ['admin', 'settings'] });
 
   return {
-    enable:     useMutation({
+    enable:  useMutation({
       mutationFn: (msg?: string) => maintenanceApi.enable(msg),
-      onSuccess:  inv,
+      onSuccess:  invSet,
     }),
-    disable:    useMutation({
+    disable: useMutation({
       mutationFn: maintenanceApi.disable,
-      onSuccess:  inv,
+      onSuccess:  invSet,
     }),
+    // ✅ إصلاح: clearCache لا تحتاج invalidate — هي عملية على الباكاند فقط
     clearCache: useMutation({
       mutationFn: maintenanceApi.cache,
+    }),
+    runScheduler: useMutation({
+      mutationFn: maintenanceApi.scheduler,
+    }),
+    exportBackup: useMutation({
+      mutationFn: maintenanceApi.backup,
     }),
   };
 }

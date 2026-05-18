@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-admin-components.md"
+OUTPUT="merged-admin-files.md"
 
 > "$OUTPUT"
 
@@ -60,9 +60,21 @@ EXCLUDE=(
 
 
 
-# components
-merge_section "🧠 components\admin" \
-  \( -path "*/components/admin/*" \) "${EXCLUDE[@]}"
+# HOOKS
+merge_section "🧠 HOOKS" \
+  \( -path "*/hooks/*" \) "${EXCLUDE[@]}"
+
+# CONTEXT
+merge_section "🌐 CONTEXT" \
+  \( -path "*/context/*" \) "${EXCLUDE[@]}"
+
+# LIB / API
+merge_section "🔌 API / LIB" \
+  \( -path "*/lib/*" \) "${EXCLUDE[@]}"
+
+  # TYPES
+merge_section "📘 TYPES" \
+  \( -path "*/types/*" \) "${EXCLUDE[@]}"
 
 
 echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"
