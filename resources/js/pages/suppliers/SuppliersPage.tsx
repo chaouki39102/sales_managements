@@ -21,8 +21,9 @@ export default function SuppliersPage() {
     const modal = useModal();
 
     const { data, isLoading } = useSuppliers({ search: search || undefined, per_page: 30 });
-    const suppliers = data?.data ?? [];
-    const meta = data?.meta;
+    // استبدال السطر 30
+const suppliers = (data as any)?.data ?? (Array.isArray(data) ? data : []);
+const meta = (data as any)?.meta;
 
     const openCreate = () => { setEditing(null); modal.openModal(); };
     const openEdit = (c: Party) => { setEditing(c); modal.openModal(); };

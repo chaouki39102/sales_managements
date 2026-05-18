@@ -1,8 +1,9 @@
 // ════════════════════════════════════════════════
 // resources/js/pages/lookups/LookupPage.tsx
-// v3: يدعم cascade select (wilaya → commune)
+// v4: أزرار "حفظ وإغلاق" + "حفظ وجديد" (لإضافة + تعديل)
+// اختصارات: F1 حفظ وجديد، F2 حفظ وإغلاق، مع التركيز التلقائي
 // ════════════════════════════════════════════════
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLookup } from '@/hooks/useLookup';
 import apiClient from '@/lib/api/core/client';
 
@@ -178,12 +179,12 @@ function getCascadeParentLabel(field: FieldDef): string {
 // ════════════════════════════════════════════════
 // FormField
 // ════════════════════════════════════════════════
-function FormField({ field, value, onChange, formData }: {
-  field:    FieldDef;
-  value:    any;
+const FormField = React.forwardRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, {
+  field: FieldDef;
+  value: any;
   onChange: (v: any) => void;
   formData: Record<string, any>;
-}) {
+}>(({ field, value, onChange, formData }, ref) => {
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
     padding: '8px 12px', borderRadius: 'var(--r2)',
@@ -195,6 +196,7 @@ function FormField({ field, value, onChange, formData }: {
   if (field.type === 'remote-select') {
     // قيمة الأب من formData إذا كان cascade
     const parentValue = field.cascadeParent ? formData[field.cascadeParent] : undefined;
+    // remote-select لا يدعم ref مباشرة، نلفه بـ div ونمرر ref إلى select يدوياً
     return (
       <RemoteSelect
         field={field}
@@ -208,6 +210,7 @@ function FormField({ field, value, onChange, formData }: {
   if (field.type === 'textarea') {
     return (
       <textarea
+        ref={ref as React.Ref<HTMLTextAreaElement>}
         value={value ?? ''}
         onChange={e => onChange(e.target.value)}
         placeholder={field.placeholder}
@@ -219,7 +222,12 @@ function FormField({ field, value, onChange, formData }: {
 
   if (field.type === 'select') {
     return (
-      <select value={value ?? ''} onChange={e => onChange(e.target.value)} style={inputStyle}>
+      <select
+        ref={ref as React.Ref<HTMLSelectElement>}
+        value={value ?? ''}
+        onChange={e => onChange(e.target.value)}
+        style={inputStyle}
+      >
         <option value="">— اختر —</option>
         {field.options?.map(o => (
           <option key={o.value} value={o.value}>{o.label}</option>
@@ -230,6 +238,7 @@ function FormField({ field, value, onChange, formData }: {
 
   return (
     <input
+      ref={ref as React.Ref<HTMLInputElement>}
       type={field.type ?? 'text'}
       value={value ?? ''}
       onChange={e => onChange(e.target.value)}
@@ -237,7 +246,7 @@ function FormField({ field, value, onChange, formData }: {
       style={inputStyle}
     />
   );
-}
+});
 
 // ════════════════════════════════════════════════
 // Modal / ConfirmModal
@@ -325,6 +334,9 @@ export default function LookupPage({
   const [delItem,  setDelItem]  = useState<any | null>(null);
   const [toast,    setToast]    = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
+  // مرجع لأول حقل في النموذج (للتركيز التلقائي)
+  const firstFieldRef = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(null);
+
   // جلب labels الـ remote-select لعرضها في الجدول
   const [remoteLabels, setRemoteLabels] = useState<RemoteLabels>({});
   useEffect(() => {
@@ -348,6 +360,38 @@ export default function LookupPage({
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint]);
+
+  // دالة التركيز على أول حقل
+  const focusFirstField = () => {
+    setTimeout(() => {
+      if (firstFieldRef.current) {
+        firstFieldRef.current.focus();
+      }
+    }, 50);
+  };
+
+  // عند فتح مودل الإضافة أو بعد "حفظ وجديد" نعيد التركيز
+  useEffect(() => {
+    if (modal === 'add') {
+      focusFirstField();
+    }
+  }, [modal, formData]); // formData تتغير عند التفريغ
+
+  // ── اختصارات لوحة المفاتيح (F1, F2) ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!modal) return; // فقط عندما يكون المودل مفتوحاً
+      if (e.key === 'F1') {
+        e.preventDefault();
+        handleSaveAndNew();
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        handleSaveAndClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modal, saving, formData, editItem]); // إعادة ربط عند تغير الحالة
 
   const tableFields = fields.filter(f => f.showInTable !== false);
   const nameField   = fields[0]?.key ?? 'name';
@@ -378,7 +422,9 @@ export default function LookupPage({
     setModal('edit');
   }
 
-  async function handleSubmit() {
+  // دالة أساسية للحفظ مع خيار: true = حفظ وإغلاق، false = حفظ وجديد
+  async function performSubmit(closeAfterSave: boolean) {
+    // التحقق من الحقول المطلوبة
     for (const f of fields) {
       if (f.required && !formData[f.key]) {
         setFormErr(`حقل "${f.label}" إلزامي`);
@@ -390,14 +436,42 @@ export default function LookupPage({
       if (modal === 'add') {
         await create(formData);
         showToast(`تمت إضافة ${resource} بنجاح`);
-      } else if (editItem) {
+        if (closeAfterSave) {
+          setModal(null);
+        } else {
+          // حفظ وجديد: إعادة تعيين النموذج إلى القيم الفارغة
+          const defaults: Record<string, any> = {};
+          fields.forEach(f => { defaults[f.key] = ''; });
+          setFormData(defaults);
+          // التركيز على أول حقل بعد إعادة التعيين
+          focusFirstField();
+        }
+      } else if (modal === 'edit' && editItem) {
         await update(editItem.id, formData);
         showToast(`تم تعديل ${resource} بنجاح`);
+        if (closeAfterSave) {
+          setModal(null);
+        } else {
+          // حفظ وجديد في التعديل: نغلق مودل التعديل ونفتح مودل إضافة جديد
+          setModal('add');
+          const defaults: Record<string, any> = {};
+          fields.forEach(f => { defaults[f.key] = ''; });
+          setFormData(defaults);
+          setEditItem(null);
+          // التركيز سيتم تلقائياً عبر useEffect الخاص بـ modal === 'add'
+        }
       }
-      setModal(null);
     } catch (e: any) {
       setFormErr(e.message);
     }
+  }
+
+  function handleSaveAndClose() {
+    performSubmit(true);
+  }
+
+  function handleSaveAndNew() {
+    performSubmit(false);
   }
 
   async function handleDelete() {
@@ -578,7 +652,7 @@ export default function LookupPage({
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal - مع أزرار حفظ وإغلاق / حفظ وجديد (لكل من الإضافة والتعديل) */}
       {modal && (
         <Modal
           title={modal === 'add' ? `إضافة ${resource} جديد` : `تعديل ${resource}`}
@@ -586,7 +660,7 @@ export default function LookupPage({
           saving={saving}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {fields.map(f => (
+            {fields.map((f, idx) => (
               <div key={f.key}>
                 <label style={{
                   fontSize: 12, fontWeight: 700, color: 'var(--t2)',
@@ -596,6 +670,7 @@ export default function LookupPage({
                   {f.required && <span style={{ color: 'var(--red)', marginRight: 3 }}>*</span>}
                 </label>
                 <FormField
+                  ref={idx === 0 ? firstFieldRef : undefined}
                   field={f}
                   value={formData[f.key]}
                   onChange={v => setFormData(d => ({ ...d, [f.key]: v }))}
@@ -617,12 +692,25 @@ export default function LookupPage({
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
               <button className="btn" onClick={() => setModal(null)} disabled={saving}>إلغاء</button>
-              <button className="btn btn-p" onClick={handleSubmit} disabled={saving}>
+
+              {/* في الإضافة والتعديل: زر حفظ وإغلاق */}
+              <button className="btn btn-p" onClick={handleSaveAndClose} disabled={saving}>
                 {saving
                   ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
-                  : <i className={`ti ${modal === 'add' ? 'ti-plus' : 'ti-check'}`} />}
-                {modal === 'add' ? 'إضافة' : 'حفظ التعديلات'}
+                  : <i className="ti ti-device-floppy" />}
+                حفظ وإغلاق
               </button>
+
+              {/* زر حفظ وجديد (يعمل في الإضافة والتعديل) */}
+              <button className="btn btn-p" onClick={handleSaveAndNew} disabled={saving}>
+                {saving
+                  ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+                  : <i className="ti ti-copy" />}
+                حفظ وجديد
+              </button>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--t4)', textAlign: 'left', marginTop: 4 }}>
+              <i className="ti ti-keyboard" /> اختصار: <strong>F1</strong> حفظ وجديد · <strong>F2</strong> حفظ وإغلاق
             </div>
           </div>
         </Modal>
