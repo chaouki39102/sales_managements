@@ -4,65 +4,44 @@ namespace App\Core\Services;
 
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
-use App\Core\Exceptions\BusinessRuleException;
 use Illuminate\Support\Facades\Schema;
+use App\Core\Exceptions\BusinessRuleException;
 
 abstract class BaseService
 {
     protected string $model;
     protected array $defaultWith = [];
-    protected array $showWith = [];
+    protected array $showWith    = [];
 
-    /**
-     * اسم المورد (إجباري – يُستخدم في الكاش، الأحداث، والسجلات)
-     */
+    /** اسم المورد — يُستخدم في الكاش والأحداث والسجلات */
     abstract protected function getResourceName(): string;
 
-    // ═══════════════════════════════════════════════
-    // 1. عمليات القراءة الأساسية
-    // ═══════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 1. القراءة
+    // ═══════════════════════════════════════════════════════════════
 
     public function findById($id, array $with = null): Model
     {
         $relations = $with ?? array_unique(array_merge($this->defaultWith, $this->showWith));
 
         $query = $this->model::with($relations);
-
-        // تطبيق فلتر company_id إذا كان السياق موجوداً وإذا كان الجدول يدعمه
-        if ($this->modelHasColumn('company_id')) {
-            try {
-                $context = app(\App\Services\CompanyContextService::class);
-                if ($context->has()) {
-                    $query->where('company_id', $context->get());
-                }
-            } catch (\RuntimeException $e) {
-                Log::warning("CompanyContext not available for {$this->model}", ['error' => $e->getMessage()]);
-            }
-        }
+        $this->applyScopeToQuery($query);
 
         return $query->findOrFail($id);
     }
 
-    public function findMany(array $ids, array $with = null): \Illuminate\Database\Eloquent\Collection
+    public function findMany(array $ids, array $with = null): Collection
     {
         $query = $this->model::with($with ?? $this->defaultWith)
             ->whereIn('id', $ids);
 
-        // تطبيق فلتر company_id للأمان
-        if ($this->modelHasColumn('company_id')) {
-            try {
-                $context = app(\App\Services\CompanyContextService::class);
-                if ($context->has()) {
-                    $query->where('company_id', $context->get());
-                }
-            } catch (\RuntimeException $e) {
-                Log::warning("CompanyContext not available for findMany", ['error' => $e->getMessage()]);
-            }
-        }
+        $this->applyScopeToQuery($query);
 
         return $query->get();
     }
@@ -85,9 +64,9 @@ abstract class BaseService
         return $this->model::count();
     }
 
-    // ═══════════════════════════════════════════════
-    // 2. عمليات الإنشاء
-    // ═══════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 2. الإنشاء
+    // ═══════════════════════════════════════════════════════════════
 
     public function create(array $data, Request $request = null): Model
     {
@@ -103,9 +82,9 @@ abstract class BaseService
         return $item;
     }
 
-    public function bulkCreate(array $records, Request $request = null): \Illuminate\Database\Eloquent\Collection
+    public function bulkCreate(array $records, Request $request = null): Collection
     {
-        $created = new \Illuminate\Database\Eloquent\Collection();
+        $created = new Collection();
 
         DB::transaction(function () use ($records, $request, &$created) {
             foreach ($records as $data) {
@@ -123,9 +102,9 @@ abstract class BaseService
         return $created;
     }
 
-    // ═══════════════════════════════════════════════
-    // 3. عمليات التحديث
-    // ═══════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 3. التحديث
+    // ═══════════════════════════════════════════════════════════════
 
     public function update(Model $item, array $data, Request $request = null): Model
     {
@@ -145,7 +124,7 @@ abstract class BaseService
     public function bulkUpdate(array $ids, array $data, Request $request = null): int
     {
         $count   = 0;
-        $updated = new \Illuminate\Database\Eloquent\Collection();
+        $updated = new Collection();
 
         DB::transaction(function () use ($ids, $data, $request, &$count, &$updated) {
             $items = $this->findMany($ids);
@@ -166,18 +145,18 @@ abstract class BaseService
         return $count;
     }
 
-    // ═══════════════════════════════════════════════
-    // 4. عمليات الحذف والاستعادة
-    // ═══════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 4. الحذف والاستعادة
+    // ═══════════════════════════════════════════════════════════════
 
     public function delete(Model $item, Request $request = null): bool
     {
         $this->beforeDelete($item);
 
         $deleted = DB::transaction(function () use ($item) {
-            $deleted = $item->delete();
+            $result = $item->delete();
             $this->afterDelete($item);
-            return $deleted;
+            return $result;
         });
 
         $this->performPostCommitOperations($item, [], $request, 'delete');
@@ -187,7 +166,7 @@ abstract class BaseService
     public function bulkDelete(array $ids, Request $request = null): int
     {
         $count   = 0;
-        $deleted = new \Illuminate\Database\Eloquent\Collection();
+        $deleted = new Collection();
 
         DB::transaction(function () use ($ids, &$count, &$deleted) {
             $items = $this->findMany($ids);
@@ -212,11 +191,11 @@ abstract class BaseService
         $this->beforeDelete($item);
 
         $deleted = DB::transaction(function () use ($item) {
-            $deleted = method_exists($item, 'forceDelete')
+            $result = method_exists($item, 'forceDelete')
                 ? $item->forceDelete()
                 : $item->delete();
             $this->afterDelete($item);
-            return $deleted;
+            return $result;
         });
 
         $this->performPostCommitOperations($item, [], $request, 'delete');
@@ -238,9 +217,9 @@ abstract class BaseService
         return $item->fresh();
     }
 
-    // ═══════════════════════════════════════════════
-    // 5. Post-Commit Operations
-    // ═══════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 5. Post-Commit
+    // ═══════════════════════════════════════════════════════════════
 
     protected function performPostCommitOperations(
         Model    $item,
@@ -261,57 +240,46 @@ abstract class BaseService
                 default   => null,
             };
         } catch (\Throwable $e) {
-            Log::warning("Post-commit operations failed for [{$operation}]", [
+            Log::warning("Post-commit failed [{$operation}]", [
                 'resource' => $this->getResourceName(),
-                'id'       => $item->id,
+                'id'       => $item->id ?? null,
                 'error'    => $e->getMessage(),
             ]);
         }
     }
 
-    // ═══════════════════════════════════════════════
-    // 6. Hooks (قابلة للتجاوز في الـ subclasses)
-    // ═══════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 6. Hooks
+    // ═══════════════════════════════════════════════════════════════
 
-protected function beforeCreate(array $data, ?Request $request): array
-{
-    // إزالة أي حقول غير موجودة في الجدول لتفادي الأخطاء
-    $tableColumns = [];
-    try {
-        $tableColumns = $this->modelHasColumn('id') // مجرد استدعاء للتحقق من وجود الجدول
-            ? Schema::getColumnListing((new $this->model)->getTable())
-            : [];
-    } catch (\Throwable $e) {
-        // إذا حدث خطأ، نمرر البيانات كما هي
-        return $data;
-    }
-
-    $validatedData = [];
-    foreach ($data as $key => $value) {
-        if (in_array($key, $tableColumns)) {
-            $validatedData[$key] = $value;
+    protected function beforeCreate(array $data, ?Request $request): array
+    {
+        try {
+            $columns = Schema::getColumnListing((new $this->model)->getTable());
+        } catch (\Throwable $e) {
+            return $data;
         }
+
+        return array_intersect_key($data, array_flip($columns));
     }
 
-    return $validatedData;
-}
     protected function afterCreate(Model $item, array $data, ?Request $request): void {}
     protected function afterCreateCommitted(Model $item, array $data, ?Request $request): void {}
 
     protected function beforeUpdate(Model $item, array $data, ?Request $request): void
     {
-        if ($this->modelHasColumn('company_id') &&
+        if (
+            $this->modelHasColumn('company_id') &&
             isset($data['company_id']) &&
-            (int) $data['company_id'] !== (int) $item->company_id) {
+            (int) $data['company_id'] !== (int) $item->company_id
+        ) {
             throw new BusinessRuleException('لا يمكن تغيير الشركة المرتبطة بالسجل.', 422);
         }
     }
 
     protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
     {
-        if ($this->modelHasColumn('company_id')) {
-            unset($data['company_id']);
-        }
+        unset($data['company_id']);
 
         if ($this->modelHasColumn('updated_by') && auth()->check()) {
             $data['updated_by'] = auth()->id();
@@ -330,9 +298,9 @@ protected function beforeCreate(array $data, ?Request $request): array
     protected function afterRestore(Model $item): void {}
     protected function afterRestoreCommitted(Model $item): void {}
 
-    // ═══════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
     // 7. دوال مساعدة
-    // ═══════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
 
     protected function loadDefaultRelations(Model $item): Model
     {
@@ -360,56 +328,21 @@ protected function beforeCreate(array $data, ?Request $request): array
         return ["{$r}_list", "{$r}_all", "{$r}_count"];
     }
 
-    protected function logOperation(string $operation, Model $item): void
-    {
-        Log::info("Service [{$operation}] on [{$this->getResourceName()}]", [
-            'resource' => $this->getResourceName(),
-            'model'    => get_class($item),
-            'id'       => $item->id ?? null,
-            'user_id'  => auth()->id() ?? null,
-        ]);
-    }
-
-    protected function modelHasColumn(string $column): bool
-    {
-        static $columnsCache = [];
-
-        if (!isset($columnsCache[$this->model])) {
-            $columnsCache[$this->model] = \Illuminate\Support\Facades\Schema::getColumnListing(
-                (new $this->model)->getTable()
-            );
-        }
-
-        return in_array($column, $columnsCache[$this->model]);
-    }
-
     /**
-     * تطبيق scoping آمن على query
-     * يأخذ بعين الاعتبار company_id إذا كان موجوداً
-     */
-    protected function applyScopeToQuery(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
-    {
-        if ($this->modelHasColumn('company_id')) {
-            try {
-                $context = app(\App\Services\CompanyContextService::class);
-                if ($context->has()) {
-                    $query->where('company_id', $context->get());
-                }
-            } catch (\RuntimeException $e) {
-                Log::debug("CompanyContext unavailable", ['model' => $this->model]);
-            }
-        }
-        return $query;
-    }
-
-    /**
-     * تحسين Logging — يتضمن معلومات كاملة عن العملية
+     * ✅ دالة واحدة فقط — دُمجت نسختان كانتا متضاربتين
+     *
+     * المشكلة الأصلية:
+     *   كانت هناك نسختان من logOperation في نفس الكلاس:
+     *   - النسخة القديمة: تكتب في Log::info() الافتراضي
+     *   - النسخة الجديدة: تكتب في Log::channel('operations')
+     *   PHP يرفض تعريف نفس الدالة مرتين → Fatal Error → 500 على كل طلب
      */
     protected function logOperation(string $operation, Model $item, array $extra = []): void
     {
         $data = [
             'operation'  => $operation,
             'resource'   => $this->getResourceName(),
+            'model'      => get_class($item),
             'model_id'   => $item->id ?? null,
             'user_id'    => auth()->id() ?? null,
             'company_id' => $item->company_id ?? null,
@@ -417,5 +350,52 @@ protected function beforeCreate(array $data, ?Request $request): array
             ...$extra,
         ];
 
-        Log::channel('operations')->info("Service operation: {$operation}", $data);
+        // يكتب في قناة 'operations' إذا كانت مُعرَّفة، وإلا في الافتراضية
+        try {
+            Log::channel('operations')->info("Service: {$operation}", $data);
+        } catch (\Throwable $e) {
+            Log::info("Service [{$operation}] on [{$this->getResourceName()}]", $data);
+        }
     }
+
+    /**
+     * تطبيق company_id scoping على query بشكل آمن
+     */
+    protected function applyScopeToQuery(Builder $query): Builder
+    {
+        if (!$this->modelHasColumn('company_id')) {
+            return $query;
+        }
+
+        try {
+            $context = app(\App\Services\CompanyContextService::class);
+            if ($context->has()) {
+                $query->where('company_id', $context->get());
+            }
+        } catch (\RuntimeException $e) {
+            Log::debug('CompanyContext unavailable', ['model' => $this->model]);
+        }
+
+        return $query;
+    }
+
+    /**
+     * التحقق من وجود عمود في جدول الـ model — مع cache ثابت
+     */
+    protected function modelHasColumn(string $column): bool
+    {
+        static $cache = [];
+
+        $table = (new $this->model)->getTable();
+
+        if (!isset($cache[$table])) {
+            try {
+                $cache[$table] = Schema::getColumnListing($table);
+            } catch (\Throwable $e) {
+                return false;
+            }
+        }
+
+        return in_array($column, $cache[$table], true);
+    }
+}

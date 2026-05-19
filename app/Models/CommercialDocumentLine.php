@@ -40,6 +40,8 @@ class CommercialDocumentLine extends Model
         'is_auto_split',
         'parent_line_id',
         'line_attributes',
+        'packaging_id',
+
     ];
 
     protected $casts = [

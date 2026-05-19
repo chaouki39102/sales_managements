@@ -1,6 +1,21 @@
 // ════════════════════════════════════════════════════════════════════════════
-// context/AuthContext.tsx
-// ✅ مصحح: login يُعيد User لتمكين role-based redirect
+// context/AuthContext.tsx  ← النسخة المُصلحة
+//
+// المشكلة الأصلية:
+//   Zustand يحتفظ بالـ activeCompany/slug في sessionStorage (persist)
+//   → بعد انتهاء الجلسة، عند فتح صفحة Login:
+//     slug لا يزال موجوداً → FiscalYearProvider يُشغِّل query → 500
+//
+//   ملاحظة: useCurrentUser في auth.ts لديه retry:false وهو صحيح
+//   المشكلة الوحيدة: auth/me يُعيد 500 (خطأ PHP syntax في الباكاند)
+//   وليس 401 → الـ interceptor لا يُشغِّل forcedLogout → المشكلة في الباكاند
+//
+// الحل الصحيح هنا (frontend):
+//   FiscalYearContext الجديد يقرأ isAuthenticated قبل تشغيل أي query
+//   (انظر FiscalYearContext.tsx المُصلَح)
+//
+//   AuthContext: لا حاجة لتغييره — useLogout يستدعي appActions.reset()
+//   الذي يمسح الـ slug. المشكلة كانت أن FiscalYearContext لا ينتظر Auth.
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, { createContext, useContext } from 'react';
@@ -16,7 +31,7 @@ interface AuthContextValue {
   isLoading:        boolean;
   isSuperAdmin:     boolean;
   activeCompany:    ActiveCompany | null;
-  login:            (creds: LoginCredentials) => Promise<User>;  // ✅ يُعيد User
+  login:            (creds: LoginCredentials) => Promise<User>;
   logout:           () => Promise<void>;
   setActiveCompany: (company: ActiveCompany) => void;
 }
@@ -26,14 +41,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { data: user, isLoading }   = useCurrentUser();
-  const activeCompany               = useActiveCompany();
-  const setActiveCompanyInStore     = useAppStore(s => s.setActiveCompany);
+  const { data: user, isLoading } = useCurrentUser();
+  const activeCompany             = useActiveCompany();
+  const setActiveCompanyInStore   = useAppStore(s => s.setActiveCompany);
 
   const loginMutation  = useLogin();
   const logoutMutation = useLogout();
 
-  // ✅ يُعيد User للسماح بالـ redirect بناءً على الدور
   const login = async (creds: LoginCredentials): Promise<User> => {
     const result = await loginMutation.mutateAsync(creds);
     return result.user;
@@ -47,7 +61,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActiveCompanyInStore(company);
   };
 
-  // ✅ helper جاهز بدل تكرار منطق الـ role في كل مكان
   const isSuperAdmin = user?.roles?.some(r => r.name === 'super-admin') ?? false;
 
   return (

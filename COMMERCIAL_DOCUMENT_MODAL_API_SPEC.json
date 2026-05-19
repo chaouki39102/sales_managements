@@ -2,7 +2,7 @@
   "documentation": "CommercialDocumentModal Enhanced — Product Relationships Structure",
   "version": "2.1",
   "lastUpdated": "2026-05-19",
-  
+
   "productStructure": {
     "description": "البنية الكاملة للمنتج مع جميع العلاقات",
     "requiredIncludes": [
@@ -29,19 +29,19 @@
       "has_lots": true,
       "has_expiration_date": true,
       "manages_quantity_discounts": true,
-      
+
       "unit": {
         "id": 1,
         "name": "Unité",
         "symbol": "UN"
       },
-      
+
       "tva": {
         "id": 1,
         "name": "TVA 19%",
         "rate": 19
       },
-      
+
       "packagings": [
         {
           "id": 1,
@@ -62,7 +62,7 @@
           "display_order": 2
         }
       ],
-      
+
       "prices": [
         {
           "id": 1,
@@ -91,7 +91,7 @@
           }
         }
       ],
-      
+
       "quantityDiscounts": [
         {
           "id": 1,
@@ -124,7 +124,7 @@
           "tier_order": 3
         }
       ],
-      
+
       "lots": [
         {
           "id": 1,
@@ -141,7 +141,7 @@
       ]
     }
   },
-  
+
   "lineItemStructure": {
     "description": "بنية سطر المستند التجاري",
     "example": {
@@ -169,7 +169,7 @@
       }
     }
   },
-  
+
   "formStateStructure": {
     "description": "حالة النموذج الكاملة",
     "example": {
@@ -185,7 +185,7 @@
       "lines": "// مصفوفة من LineItems"
     }
   },
-  
+
   "queriesAndCaching": {
     "description": "الـ queries المستخدمة والـ caching",
     "queries": [
@@ -242,10 +242,10 @@
       }
     ]
   },
-  
+
   "calculationsMethods": {
     "description": "الحسابات الرئيسية في النموذج",
-    
+
     "calcLineTotal": {
       "description": "حساب إجمالي السطر",
       "logic": {
@@ -269,7 +269,7 @@
         "netToPay": "الإجمالي مع الطابع"
       }
     },
-    
+
     "calcFiscalStamp": {
       "description": "حساب الطابع الجبائي وفقاً لقانون 2024",
       "logic": {
@@ -279,7 +279,7 @@
       },
       "formula": "if ttc < 30000 then 0 else min(ceil(ttc × 0.01), 2500)"
     },
-    
+
     "findQuantityDiscount": {
       "description": "البحث عن خصم الكمية المناسب",
       "logic": {
@@ -288,7 +288,7 @@
         "step3": "العثور على أول خصم حيث quantity >= min_qty و quantity <= max_qty"
       }
     },
-    
+
     "calcSellingPrice": {
       "description": "حساب سعر البيع حسب طريقة التسعير",
       "logic": {
@@ -298,10 +298,10 @@
       }
     }
   },
-  
+
   "validationRules": {
     "description": "قواعد التحقق من البيانات",
-    
+
     "documentLevel": {
       "party_id": "إلزامي للمشتريات، اختياري للمبيعات",
       "document_date": "إلزامي، تنسيق YYYY-MM-DD",
@@ -310,7 +310,7 @@
       "currency_id": "إلزامي",
       "exchange_rate": "إلزامي، > 0"
     },
-    
+
     "lineLevel": {
       "product_id": "إلزامي",
       "quantity": "إلزامي، > 0",
@@ -319,7 +319,7 @@
       "discount_percentage": "اختياري، 0-100"
     }
   },
-  
+
   "apiPayloadForSubmit": {
     "description": "بنية البيانات عند إرسال المستند",
     "endpoint": "POST /api/v1/{company}/commercial-documents",
@@ -351,10 +351,10 @@
       ]
     }
   },
-  
+
   "errorHandling": {
     "description": "معالجة الأخطاء",
-    
+
     "validationError": {
       "response": 422,
       "structure": {
@@ -365,7 +365,7 @@
         }
       }
     },
-    
+
     "businessRuleError": {
       "response": 409,
       "structure": {
@@ -374,7 +374,7 @@
         "message": "لا يمكن إضافة المنتج..."
       }
     },
-    
+
     "notFoundError": {
       "response": 404,
       "structure": {
@@ -384,10 +384,10 @@
       }
     }
   },
-  
+
   "uiComponents": {
     "description": "المكونات الرئيسية للواجهة",
-    
+
     "sections": [
       "معلومات المستند",
       "التعبئات والكميات",
@@ -395,7 +395,7 @@
       "الضرائب والطابع",
       "الإجماليات"
     ],
-    
+
     "tables": [
       {
         "name": "LineItems Table",
@@ -414,7 +414,7 @@
       }
     ]
   },
-  
+
   "performanceOptimizations": {
     "description": "التحسينات المطبقة",
     "optimizations": [
@@ -425,7 +425,7 @@
       "Debounce على البحث"
     ]
   },
-  
+
   "notes": {
     "important": [
       "تأكد من أن API تُرجع جميع العلاقات المطلوبة",
