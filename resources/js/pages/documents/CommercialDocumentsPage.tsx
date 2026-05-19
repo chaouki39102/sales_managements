@@ -371,18 +371,26 @@ export default function CommercialDocumentsPage() {
         )}
       </div>
 
-      {(modal === 'add' || modal === 'edit') && (
+            {(modal === 'add' || modal === 'edit') && (
         <CommercialDocumentModal
           open={true}
           documentType={docType ?? null}
-          existingDocument={modal === 'edit' ? editDocFull : undefined}   // ✅ استخدام editDocFull بدلاً من activeDoc
-          onClose={() => { setModal(null); setActiveDoc(null); setEditDocFull(null); }}   // ✅ تنظيف عند الإغلاق
+          existingDocument={modal === 'edit' ? (() => {
+            if (!editDocFull) return undefined;
+            // ✅ تحويل التواريخ إلى صيغة YYYY-MM-DD
+            const formatDate = (d: string | undefined) => d ? d.split('T')[0] : '';
+            return {
+              ...editDocFull,
+              document_date: formatDate(editDocFull.document_date),
+              due_date: formatDate(editDocFull.due_date),
+            };
+          })() : undefined}
+          onClose={() => { setModal(null); setActiveDoc(null); setEditDocFull(null); }}
           onSaved={() => {
             showToast(modal === 'add' ? 'تم إنشاء المستند بنجاح' : 'تم تحديث المستند بنجاح');
             setModal(null);
             setActiveDoc(null);
             setEditDocFull(null);
-            // ✅ المفتاح الجزئي يُبطل كل الصفحات والفلاتر دفعة واحدة
             invalidateDocs();
           }}
         />
