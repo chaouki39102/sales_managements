@@ -80,7 +80,10 @@ class Product extends Model
     public static ?int $cacheTtl = 300;
     public static array $cacheTags = ['products'];
 
+
     // Relations
+    // app/Models/Product.php — أضف هذه الدالة
+
     public function family(): BelongsTo { return $this->belongsTo(Family::class); }
     public function brand(): BelongsTo { return $this->belongsTo(Brand::class); }
     public function variants() { return $this->hasMany(ProductVariant::class); }

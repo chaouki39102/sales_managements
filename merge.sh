@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-admin-files.md"
+OUTPUT="merged-files.md"
 
 > "$OUTPUT"
 

@@ -1,273 +1,245 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/admin/AdminActivityPage.tsx  ← النسخة المُصلحة
-//
-// المشكلة الأصلية:
-//   • import apiClient from '@/lib/api/core/client' — كان apiClient الـ default
-//     export ولكن الـ client.ts يُصدَّر كـ named export وليس default
-//
-// الحل:
-//   • استخدام activityApi من lib/api/admin/system.ts مباشرة
-//   • أو استيراد apiGet من core/client بدل apiClient
+// pages/admin/AdminActivityPage.tsx — النسخة الخارقة
+// ✅ سجل كامل مع فلاتر + تفاصيل JSON + بحث
 // ════════════════════════════════════════════════════════════════════════════
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { activityApi } from '@/lib/api/admin';      // ✅ بدل apiClient المباشر
-import { apiGet }       from '@/lib/api/core/client'; // ✅ للـ export mutation
+import { useQuery } from '@tanstack/react-query';
+import { adminApi } from '@/lib/admin';
+import { adminKeys } from '@/lib/api/core/queryKeys';
+import { useDebounce } from '@/hooks/useDebounce';
 import type { ActivityLog } from '@/types/admin';
-import PageHeader  from '@/components/ui/PageHeader';
-import Card        from '@/components/ui/Card';
-import SearchInput from '@/components/ui/SearchInput';
-import Button      from '@/components/ui/Button';
-import Badge       from '@/components/ui/Badge';
-import SelectInput from '@/components/forms/SelectInput';
-import DatePicker  from '@/components/ui/DatePicker';
-import Modal       from '@/components/ui/Modal';
-import AlertBar    from '@/components/ui/AlertBar';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const EVENT_OPTIONS = [
-  { label: 'الكل',                  value: '' },
-  { label: 'إنشاء (created)',        value: 'created' },
-  { label: 'تعديل (updated)',        value: 'updated' },
-  { label: 'حذف (deleted)',          value: 'deleted' },
-  { label: 'تسجيل دخول (login)',     value: 'login' },
-  { label: 'تعليق (suspended)',      value: 'suspended' },
-  { label: 'توثيق (verified)',       value: 'verified' },
-];
-
-const getBadgeVariant = (
-  event: string,
-): 'success' | 'danger' | 'warning' | 'info' | 'gray' => {
-  if (event === 'created') return 'success';
-  if (event === 'deleted') return 'danger';
-  if (event === 'updated') return 'warning';
-  if (event === 'login')   return 'info';
-  return 'gray';
+const EVENT_COLORS: Record<string, string> = {
+  created: '#10b981', updated: '#6366f1', deleted: '#ef4444',
+  restored: '#f59e0b', login: '#0ea5e9', logout: '#6b7280',
+  suspended: '#ef4444', unsuspended: '#10b981', verified: '#10b981',
 };
+const eventColor = (e: string) => EVENT_COLORS[e] ?? '#6b7280';
 
-const formatDateTime = (iso: string) =>
-  new Date(iso).toLocaleString('ar-DZ', {
-    year: 'numeric', month: 'numeric', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-
-// ─── Main ────────────────────────────────────────────────────────────────────
+const fmtDate = (d: string) => new Date(d).toLocaleString('ar-DZ', {
+  day: 'numeric', month: 'short', year: 'numeric',
+  hour: '2-digit', minute: '2-digit',
+});
 
 export default function AdminActivityPage() {
-  const [search,    setSearch]    = useState('');
-  const [event,     setEvent]     = useState('');
-  const [dateFrom,  setDateFrom]  = useState('');
-  const [dateTo,    setDateTo]    = useState('');
-  const [page,      setPage]      = useState(1);
-  const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
-  const [detailOpen,  setDetailOpen]  = useState(false);
+  const [search, setSearch] = useState('');
+  const [event,  setEvent]  = useState('');
+  const [from,   setFrom]   = useState('');
+  const [to,     setTo]     = useState('');
+  const [page,   setPage]   = useState(1);
+  const [detail, setDetail] = useState<ActivityLog | null>(null);
+  const dSearch = useDebounce(search, 400);
 
   const params = useMemo(() => ({
-    search:    search   || undefined,
-    event:     event    || undefined,
-    date_from: dateFrom || undefined,
-    date_to:   dateTo   || undefined,
-    page,
-    per_page: 20,
-  }), [search, event, dateFrom, dateTo, page]);
+    search:    dSearch || undefined,
+    event:     event   || undefined,
+    date_from: from    || undefined,
+    date_to:   to      || undefined,
+    page, per_page: 25,
+  }), [dSearch, event, from, to, page]);
 
-  // ✅ استخدام activityApi بدل apiClient
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey:  ['admin', 'activity', params],
-    queryFn:   () => activityApi.list(params),
+    queryKey: adminKeys.activity(params as any),
+    queryFn:  () => adminApi.getActivity(params as any),
     staleTime: 60_000,
+    placeholderData: (prev: any) => prev,
   });
 
-  // ✅ export mutation — apiGet للـ CSV export
-  const exportMutation = useMutation({
-    mutationFn: (p: typeof params) =>
-      apiGet<Blob>('/admin/activity-log/export', p as any),
-  });
-
-  const logs = (data as any)?.data ?? [];
+  const logs: ActivityLog[] = (data as any)?.data ?? [];
   const meta = (data as any)?.meta;
 
-  const handleViewDetails = (log: ActivityLog) => {
-    setSelectedLog(log);
-    setDetailOpen(true);
-  };
-
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-      <PageHeader
-        title="سجل النشاطات"
-        description="جميع الأحداث والعمليات التي تمت عبر المنصة"
-        actions={
-          <Button
-            variant="primary"
-            icon={<i className="ti ti-download" />}
-            onClick={() => exportMutation.mutate(params)}
-            loading={exportMutation.isPending}
-          >
-            تصدير CSV
-          </Button>
-        }
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* ── فلاتر ───────────────────────────────────────────────────────────── */}
-      <Card style={{ marginBottom: 20 }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1.2fr 1fr 1fr auto',
-          gap: 12, alignItems: 'flex-end',
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--t1)' }}>سجل النشاطات</div>
+          <div style={{ fontSize: 12, color: 'var(--t4)', marginTop: 2 }}>
+            {meta ? `${meta.total} حدث` : '—'}
+          </div>
+        </div>
+        <button className="btn" onClick={() => refetch()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <i className="ti ti-refresh" /> تحديث
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative' }}>
+          <i className="ti ti-search" style={{
+            position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+            color: 'var(--t4)', fontSize: 14, pointerEvents: 'none',
+          }} />
+          <input type="text" placeholder="بحث..." value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            style={{
+              width: '100%', padding: '8px 34px 8px 11px', borderRadius: 9, boxSizing: 'border-box',
+              border: '1.5px solid var(--b2)', background: 'var(--bg1)', color: 'var(--t1)',
+              fontSize: 13, fontFamily: 'Tajawal,sans-serif', outline: 'none',
+            }} />
+        </div>
+        <select value={event} onChange={e => { setEvent(e.target.value); setPage(1); }} style={{
+          padding: '8px 12px', borderRadius: 9, border: '1.5px solid var(--b2)',
+          background: 'var(--bg1)', color: 'var(--t1)', fontSize: 13,
+          fontFamily: 'Tajawal,sans-serif', cursor: 'pointer', outline: 'none',
         }}>
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="بحث في الحدث، المسؤول، IP..."
-            debounce={400}
-          />
-          <SelectInput
-            label="نوع الحدث"
-            options={EVENT_OPTIONS}
-            value={event}
-            onChange={setEvent}
-          />
-          <DatePicker label="من تاريخ" value={dateFrom} onChange={setDateFrom} />
-          <DatePicker label="إلى تاريخ" value={dateTo}   onChange={setDateTo}   />
-          <Button
-            variant="default"
-            icon={<i className="ti ti-filter" />}
-            onClick={() => setPage(1)}
+          <option value="">كل الأحداث</option>
+          {['created','updated','deleted','login','logout','suspended','verified'].map(e => (
+            <option key={e} value={e}>{e}</option>
+          ))}
+        </select>
+        <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPage(1); }} style={{
+          padding: '8px 11px', borderRadius: 9, border: '1.5px solid var(--b2)',
+          background: 'var(--bg1)', color: 'var(--t1)', fontSize: 13, outline: 'none',
+          fontFamily: 'Tajawal,sans-serif',
+        }} />
+        <input type="date" value={to} onChange={e => { setTo(e.target.value); setPage(1); }} style={{
+          padding: '8px 11px', borderRadius: 9, border: '1.5px solid var(--b2)',
+          background: 'var(--bg1)', color: 'var(--t1)', fontSize: 13, outline: 'none',
+          fontFamily: 'Tajawal,sans-serif',
+        }} />
+      </div>
+
+      {/* List */}
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--b1)', borderRadius: 14, overflow: 'hidden' }}>
+        {isLoading ? (
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--t4)' }}>
+            <i className="ti ti-loader-2" style={{ fontSize: 24, animation: 'spin .8s linear infinite', display: 'block', marginBottom: 8 }} />
+            جارٍ التحميل...
+          </div>
+        ) : isError ? (
+          <div style={{ padding: 40, textAlign: 'center' }}>
+            <button className="btn btn-p" onClick={() => refetch()}>إعادة المحاولة</button>
+          </div>
+        ) : logs.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--t4)', fontSize: 13 }}>
+            <i className="ti ti-activity" style={{ fontSize: 30, display: 'block', marginBottom: 8, opacity: .5 }} />
+            لا توجد نشاطات
+          </div>
+        ) : logs.map((log, i) => (
+          <div key={log.id}
+            onClick={() => setDetail(detail?.id === log.id ? null : log)}
+            style={{
+              padding: '12px 16px', borderBottom: i < logs.length - 1 ? '1px solid var(--b1)' : 'none',
+              cursor: 'pointer', transition: 'background .1s',
+              background: detail?.id === log.id ? 'var(--bg3)' : 'transparent',
+            }}
+            onMouseEnter={e => { if (detail?.id !== log.id) (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'; }}
+            onMouseLeave={e => { if (detail?.id !== log.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           >
-            تطبيق
-          </Button>
-        </div>
-      </Card>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+                background: eventColor(log.event) + '20',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: eventColor(log.event), fontSize: 13,
+              }}>
+                <i className={`ti ${
+                  log.event === 'created'  ? 'ti-plus'        :
+                  log.event === 'updated'  ? 'ti-pencil'      :
+                  log.event === 'deleted'  ? 'ti-trash'       :
+                  log.event === 'login'    ? 'ti-login'       :
+                  log.event === 'logout'   ? 'ti-logout'      :
+                  'ti-activity'
+                }`} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                    background: eventColor(log.event) + '20', color: eventColor(log.event),
+                  }}>{log.event}</span>
+                  <span style={{ fontSize: 13, color: 'var(--t1)', fontWeight: 600 }}>
+                    {log.description}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+                  {log.causer && (
+                    <span style={{ fontSize: 11, color: 'var(--t4)' }}>
+                      <i className="ti ti-user" style={{ marginLeft: 3 }} />
+                      {log.causer.name}
+                    </span>
+                  )}
+                  {log.company && (
+                    <span style={{ fontSize: 11, color: 'var(--t4)' }}>
+                      <i className="ti ti-building" style={{ marginLeft: 3 }} />
+                      {log.company.name}
+                    </span>
+                  )}
+                  {log.ip_address && (
+                    <span style={{ fontSize: 11, color: 'var(--t4)', fontFamily: 'monospace' }}>
+                      {log.ip_address}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 'auto' }}>
+                    {fmtDate(log.created_at)}
+                  </span>
+                </div>
+              </div>
+              <i className={`ti ti-chevron-${detail?.id === log.id ? 'up' : 'down'}`}
+                style={{ color: 'var(--t4)', fontSize: 13, marginTop: 4, flexShrink: 0 }} />
+            </div>
 
-      {/* ── الجدول ──────────────────────────────────────────────────────────── */}
-      <Card padding={0}>
-        {isError && (
-          <AlertBar variant="red">
-            تعذّر تحميل سجل النشاطات.{' '}
-            <button
-              onClick={() => refetch()}
-              style={{
-                textDecoration: 'underline', background: 'none',
-                border: 'none', cursor: 'pointer', color: 'inherit',
-              }}
-            >
-              إعادة المحاولة
-            </button>
-          </AlertBar>
-        )}
-
-        <div style={{ overflowX: 'auto' }}>
-          <table className="tw">
-            <thead>
-              <tr>
-                <th>الحدث</th>
-                <th>الوصف</th>
-                <th>المسؤول</th>
-                <th>الشركة</th>
-                <th>IP</th>
-                <th>التاريخ</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} style={{ padding: 40, textAlign: 'center' }}>
-                    <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-                  </td>
-                </tr>
-              ) : logs.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--t4)' }}>
-                    لا توجد سجلات
-                  </td>
-                </tr>
-              ) : logs.map((log: ActivityLog) => (
-                <tr key={log.id}>
-                  <td><Badge variant={getBadgeVariant(log.event)}>{log.event}</Badge></td>
-                  <td style={{ maxWidth: 320, whiteSpace: 'normal' }}>{log.description}</td>
-                  <td>{log.causer?.name || '—'}</td>
-                  <td>{log.company?.name || '—'}</td>
-                  <td>{log.ip_address || '—'}</td>
-                  <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-                    {formatDateTime(log.created_at)}
-                  </td>
-                  <td>
-                    <Button size="xs" onClick={() => handleViewDetails(log)}>تفاصيل</Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            {/* Detail */}
+            {detail?.id === log.id && (log.old_values || log.new_values) && (
+              <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }} onClick={e => e.stopPropagation()}>
+                {log.old_values && Object.keys(log.old_values).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>
+                      <i className="ti ti-minus" style={{ marginLeft: 4 }} />القيم القديمة
+                    </div>
+                    <pre style={{
+                      fontSize: 10.5, color: 'var(--t2)', background: 'var(--bg1)',
+                      padding: '8px 10px', borderRadius: 8, overflow: 'auto',
+                      border: '1px solid var(--b1)', maxHeight: 200,
+                      fontFamily: 'monospace', lineHeight: 1.5,
+                    }}>
+                      {JSON.stringify(log.old_values, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                {log.new_values && Object.keys(log.new_values).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981', marginBottom: 6 }}>
+                      <i className="ti ti-plus" style={{ marginLeft: 4 }} />القيم الجديدة
+                    </div>
+                    <pre style={{
+                      fontSize: 10.5, color: 'var(--t2)', background: 'var(--bg1)',
+                      padding: '8px 10px', borderRadius: 8, overflow: 'auto',
+                      border: '1px solid var(--b1)', maxHeight: 200,
+                      fontFamily: 'monospace', lineHeight: 1.5,
+                    }}>
+                      {JSON.stringify(log.new_values, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
 
         {/* Pagination */}
         {meta && meta.last_page > 1 && (
           <div style={{
-            padding: '12px 16px', borderTop: '1px solid var(--b2)',
+            padding: '12px 16px', borderTop: '1px solid var(--b1)',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
-            <span style={{ fontSize: 13, color: 'var(--t4)' }}>
-              الصفحة {meta.current_page} من {meta.last_page} ({meta.total} إجمالي)
+            <span style={{ fontSize: 12, color: 'var(--t4)' }}>
+              {meta.from}–{meta.to} من {meta.total}
             </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button disabled={page === 1}              onClick={() => setPage(p => p - 1)} size="sm">السابقة</Button>
-              <Button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)} size="sm">التالية</Button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button disabled={page === 1} onClick={() => setPage(1)} className="btn btn-xs">الأولى</button>
+              <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="btn btn-xs">←</button>
+              <span style={{ padding: '4px 10px', fontSize: 12, color: 'var(--t2)' }}>{page} / {meta.last_page}</span>
+              <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)} className="btn btn-xs">→</button>
+              <button disabled={page === meta.last_page} onClick={() => setPage(meta.last_page)} className="btn btn-xs">الأخيرة</button>
             </div>
           </div>
         )}
-      </Card>
+      </div>
 
-      {/* ── تفاصيل النشاط ───────────────────────────────────────────────────── */}
-      <Modal
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        title="تفاصيل النشاط"
-        size="lg"
-      >
-        {selectedLog && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div>
-              <strong>الحدث:</strong>{' '}
-              <Badge variant={getBadgeVariant(selectedLog.event)}>
-                {selectedLog.event}
-              </Badge>
-            </div>
-            <div><strong>الوصف:</strong> {selectedLog.description}</div>
-            <div>
-              <strong>المسؤول:</strong>{' '}
-              {selectedLog.causer?.name || '—'} ({selectedLog.causer?.email || '—'})
-            </div>
-            <div>
-              <strong>نوع الكيان:</strong>{' '}
-              {selectedLog.subject_type || '—'} (رقم {selectedLog.subject_id || '—'})
-            </div>
-            <div><strong>الشركة:</strong> {selectedLog.company?.name || '—'}</div>
-            <div><strong>عنوان IP:</strong> {selectedLog.ip_address || '—'}</div>
-            <div><strong>التاريخ:</strong> {formatDateTime(selectedLog.created_at)}</div>
-            <div>
-              <strong>البيانات القديمة:</strong>
-              <pre style={{
-                background: 'var(--bg3)', padding: 10, borderRadius: 8,
-                overflow: 'auto', fontSize: 12, maxHeight: 200,
-              }}>
-                {JSON.stringify(selectedLog.old_values, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <strong>البيانات الجديدة:</strong>
-              <pre style={{
-                background: 'var(--bg3)', padding: 10, borderRadius: 8,
-                overflow: 'auto', fontSize: 12, maxHeight: 200,
-              }}>
-                {JSON.stringify(selectedLog.new_values, null, 2)}
-              </pre>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
