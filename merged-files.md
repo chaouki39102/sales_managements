@@ -1014,8 +1014,23 @@ export const useUIStore = cr<UIState>()(
 ## FILE: resources/js/context/AuthContext.tsx
 ```
 // ════════════════════════════════════════════════════════════════════════════
-// context/AuthContext.tsx
-// ✅ مصحح: login يُعيد User لتمكين role-based redirect
+// context/AuthContext.tsx  ← النسخة المُصلحة
+//
+// المشكلة الأصلية:
+//   Zustand يحتفظ بالـ activeCompany/slug في sessionStorage (persist)
+//   → بعد انتهاء الجلسة، عند فتح صفحة Login:
+//     slug لا يزال موجوداً → FiscalYearProvider يُشغِّل query → 500
+//
+//   ملاحظة: useCurrentUser في auth.ts لديه retry:false وهو صحيح
+//   المشكلة الوحيدة: auth/me يُعيد 500 (خطأ PHP syntax في الباكاند)
+//   وليس 401 → الـ interceptor لا يُشغِّل forcedLogout → المشكلة في الباكاند
+//
+// الحل الصحيح هنا (frontend):
+//   FiscalYearContext الجديد يقرأ isAuthenticated قبل تشغيل أي query
+//   (انظر FiscalYearContext.tsx المُصلَح)
+//
+//   AuthContext: لا حاجة لتغييره — useLogout يستدعي appActions.reset()
+//   الذي يمسح الـ slug. المشكلة كانت أن FiscalYearContext لا ينتظر Auth.
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, { createContext, useContext } from 'react';
@@ -1031,7 +1046,7 @@ interface AuthContextValue {
   isLoading:        boolean;
   isSuperAdmin:     boolean;
   activeCompany:    ActiveCompany | null;
-  login:            (creds: LoginCredentials) => Promise<User>;  // ✅ يُعيد User
+  login:            (creds: LoginCredentials) => Promise<User>;
   logout:           () => Promise<void>;
   setActiveCompany: (company: ActiveCompany) => void;
 }
@@ -1041,14 +1056,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { data: user, isLoading }   = useCurrentUser();
-  const activeCompany               = useActiveCompany();
-  const setActiveCompanyInStore     = useAppStore(s => s.setActiveCompany);
+  const { data: user, isLoading } = useCurrentUser();
+  const activeCompany             = useActiveCompany();
+  const setActiveCompanyInStore   = useAppStore(s => s.setActiveCompany);
 
   const loginMutation  = useLogin();
   const logoutMutation = useLogout();
 
-  // ✅ يُعيد User للسماح بالـ redirect بناءً على الدور
   const login = async (creds: LoginCredentials): Promise<User> => {
     const result = await loginMutation.mutateAsync(creds);
     return result.user;
@@ -1062,7 +1076,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActiveCompanyInStore(company);
   };
 
-  // ✅ helper جاهز بدل تكرار منطق الـ role في كل مكان
   const isSuperAdmin = user?.roles?.some(r => r.name === 'super-admin') ?? false;
 
   return (
@@ -1097,18 +1110,39 @@ export const useIsSuperAdmin    = () => useAuth().isSuperAdmin;
 ## FILE: resources/js/context/FiscalYearContext.tsx
 ```
 // ════════════════════════════════════════════════════════════════════════════
-// context/FiscalYearContext.tsx
-// ✅ مصحح: useSelectedFiscalYear موجود في fiscalYears.ts
+// context/FiscalYearContext.tsx  ← النسخة المُصلحة
+//
+// المشكلة الأصلية:
+//   FiscalYearProvider كان يُشغَّل دائماً بمجرد وجود slug في Zustand
+//   حتى لو لم يكن المستخدم مسجّل دخوله بعد.
+//
+//   Zustand يحتفظ بالـ slug من الجلسة السابقة (persist) حتى بعد logout
+//   → بمجرد تحميل الصفحة: slug موجود → useFiscalYears يُشغَّل
+//   → يُرسل: GET /api/v1/el-houda.../fiscal-years?per_page=50
+//   → الـ token منتهي أو 500 في الباكاند
+//
+// الحل:
+//   1. FiscalYearContext يقرأ isAuthenticated من AuthContext
+//   2. useFiscalYears لا يُشغَّل إلا بعد التحقق من Auth
+//   3. إضافة enabled: !!slug && isAuthenticated في الـ query
+//
+// ملاحظة بخصوص 500 "Unclosed '{' on line 15":
+//   هذا خطأ PHP syntax في الباكاند — ليس مشكلة frontend.
+//   على الأرجح في BaseService.php من التعديلات الأخيرة.
+//   الحل: تحقق من السطر 15 في BaseService.php وأصلح الـ syntax error.
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { createContext, useContext, useCallback, useState, useRef, useEffect } from 'react';
-import {
-  useFiscalYears,
-  useSelectedFiscalYear,    // ✅ الآن موجود في fiscalYears.ts
-  useCloseFiscalYear,
-} from '@/lib/api/endpoints/fiscalYears';
-import { useAppStore } from '@/lib/store/appStore';
-import type { FiscalYear } from '@/lib/api/core/types';
+import React, {
+  createContext, useContext, useCallback,
+  useState, useRef, useEffect,
+} from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fiscalYearsApi }    from '@/lib/api/endpoints/fiscalYears';
+import { tenantKeys }        from '@/lib/api/core/queryKeys';
+import { useActiveSlug }     from '@/lib/store/appStore';
+import { useAppStore }       from '@/lib/store/appStore';
+import { useAuth }           from '@/context/AuthContext';  // ✅ نقرأ Auth
+import type { FiscalYear }   from '@/lib/api/core/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1127,17 +1161,52 @@ interface FiscalYearContextType {
 
 const FiscalYearContext = createContext<FiscalYearContextType | undefined>(undefined);
 
+// ─── useFiscalYears المُصلَح — لا يُشغَّل إلا بعد Auth ───────────────────────
+
+function useFiscalYearsAuth() {
+  const slug            = useActiveSlug();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // ✅ الشرط المزدوج: يجب أن يكون هناك slug + مستخدم مصادق عليه
+  const enabled = !!slug && isAuthenticated && !authLoading;
+
+  return useQuery({
+    queryKey:  tenantKeys.fiscalYears.all(slug ?? ''),
+    queryFn:   () => fiscalYearsApi.list(),
+    enabled,
+    staleTime: 5 * 60_000,
+    retry:     false,  // ✅ لا نُعيد المحاولة إذا فشل (يمنع loops)
+    select: (years) => ({
+      years,
+      current: years.find(y => y.is_current) ??
+               years.find(y => !y.is_closed)  ??
+               years[0] ??
+               null,
+      open:    years.filter(y => !y.is_closed),
+      closed:  years.filter(y => y.is_closed),
+    }),
+  });
+}
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function FiscalYearProvider({ children }: { children: React.ReactNode }) {
-  const { data, isLoading, refetch } = useFiscalYears();
-  const selectedYear    = useSelectedFiscalYear();       // ✅ من fiscalYears.ts
+  // ✅ استخدام useFiscalYearsAuth بدل useFiscalYears
+  const { data, isLoading, refetch } = useFiscalYearsAuth();
+  const selectedYearId    = useAppStore(s => s.selectedYearId);
   const setSelectedYearId = useAppStore(s => s.setSelectedYearId);
 
   const years   = data?.years   ?? [];
   const current = data?.current ?? null;
   const open    = data?.open    ?? [];
   const closed  = data?.closed  ?? [];
+
+  // ─── selectedYear: من Zustand id → يبحث في القائمة ──────────────────────
+  const selectedYear: FiscalYear | null = (() => {
+    if (!data) return null;
+    if (!selectedYearId) return current;
+    return years.find(y => y.id === selectedYearId) ?? current;
+  })();
 
   const setSelectedYear = useCallback((year: FiscalYear) => {
     setSelectedYearId(year.id);
@@ -1216,8 +1285,10 @@ export function FiscalYearSelector() {
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--em)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--b2)')}
       >
-        <i className={`ti ${selectedYear?.is_closed ? 'ti-lock' : 'ti-calendar-check'}`}
-           style={{ color: selectedYear?.is_closed ? 'var(--t4)' : 'var(--em)', fontSize: 13 }} />
+        <i
+          className={`ti ${selectedYear?.is_closed ? 'ti-lock' : 'ti-calendar-check'}`}
+          style={{ color: selectedYear?.is_closed ? 'var(--t4)' : 'var(--em)', fontSize: 13 }}
+        />
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--t1)' }}>
           {selectedYear?.name ?? 'اختر سنة'}
         </span>
@@ -1236,7 +1307,6 @@ export function FiscalYearSelector() {
           boxShadow: '0 8px 24px rgba(0,0,0,.2)',
           zIndex: 1000, overflow: 'hidden', direction: 'rtl',
         }}>
-          {/* مفتوحة */}
           {open.length > 0 && (
             <>
               <div style={{
@@ -1246,8 +1316,7 @@ export function FiscalYearSelector() {
               }}>مفتوحة</div>
               {open.map(year => (
                 <YearOption
-                  key={year.id}
-                  year={year}
+                  key={year.id} year={year}
                   selected={selectedYear?.id === year.id}
                   onClick={() => { setSelectedYear(year); setIsOpen(false); }}
                 />
@@ -1255,7 +1324,6 @@ export function FiscalYearSelector() {
             </>
           )}
 
-          {/* مقفلة */}
           {closed.length > 0 && (
             <>
               <div style={{
@@ -1266,8 +1334,7 @@ export function FiscalYearSelector() {
               }}>مقفلة</div>
               {closed.slice(0, 3).map(year => (
                 <YearOption
-                  key={year.id}
-                  year={year}
+                  key={year.id} year={year}
                   selected={selectedYear?.id === year.id}
                   onClick={() => { setSelectedYear(year); setIsOpen(false); }}
                 />
@@ -1280,7 +1347,6 @@ export function FiscalYearSelector() {
             </>
           )}
 
-          {/* رابط الإدارة */}
           <div style={{ borderTop: '1px solid var(--b1)' }}>
             <a
               href="/fiscalyears"
