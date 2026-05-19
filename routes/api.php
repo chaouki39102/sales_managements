@@ -80,23 +80,29 @@ require base_path('routes/api_admin.php');
 Route::prefix('v1')->group(function () {
 
     // ═══════════════════════════════════════════
-    // ① AUTH
+    // ① AUTH — مع Rate Limiting على المسارات الحساسة
     // ═══════════════════════════════════════════
     Route::prefix('auth')->group(function () {
-        Route::post('/register', [AuthController::class, 'register']);
-        Route::post('/login',    [AuthController::class, 'login']);
+        // 🔒 تسجيل وتسجيل دخول — حد أقصى 5 محاولات / 15 دقيقة
+        Route::post('/register', [AuthController::class, 'register'])
+            ->middleware('throttle:5,15'); // 5 محاولات كل 15 دقيقة
+        Route::post('/login', [AuthController::class, 'login'])
+            ->middleware('throttle:5,15');
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('/me',               [AuthController::class, 'me']);
             Route::put('/update',           [AuthController::class, 'update']);
-            Route::post('/change-password', [AuthController::class, 'changePassword']);
+            // 🔒 تغيير كلمة المرور — 3 محاولات / ساعة
+            Route::post('/change-password', [AuthController::class, 'changePassword'])
+                ->middleware('throttle:3,60');
             Route::post('/logout',          [AuthController::class, 'logout']);
 
             Route::prefix('profile')->group(function () {
                 Route::get('/',                   [UserController::class, 'profile']);
                 Route::put('/',                   [UserController::class, 'updateProfile']);
                 Route::post('/avatar',            [UserController::class, 'updateAvatar']);
-                Route::post('/change-password',   [AuthController::class, 'changePassword']);
+                Route::post('/change-password',   [AuthController::class, 'changePassword'])
+                    ->middleware('throttle:3,60');
             });
         });
     });

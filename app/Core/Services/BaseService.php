@@ -27,29 +27,44 @@ abstract class BaseService
     // ═══════════════════════════════════════════════
 
     public function findById($id, array $with = null): Model
-{
-    $relations = $with ?? array_unique(array_merge($this->defaultWith, $this->showWith));
+    {
+        $relations = $with ?? array_unique(array_merge($this->defaultWith, $this->showWith));
 
-    $query = $this->model::with($relations);
+        $query = $this->model::with($relations);
 
-    // تطبيق فلتر company_id إذا كان السياق موجوداً
-    try {
-        $context = app(\App\Services\CompanyContextService::class);
-        if ($context->has()) {
-            $query->where('company_id', $context->get());
+        // تطبيق فلتر company_id إذا كان السياق موجوداً وإذا كان الجدول يدعمه
+        if ($this->modelHasColumn('company_id')) {
+            try {
+                $context = app(\App\Services\CompanyContextService::class);
+                if ($context->has()) {
+                    $query->where('company_id', $context->get());
+                }
+            } catch (\RuntimeException $e) {
+                Log::warning("CompanyContext not available for {$this->model}", ['error' => $e->getMessage()]);
+            }
         }
-    } catch (\RuntimeException $e) {
-        // لا يوجد سياق شركة – لا نضيف الفلتر
-    }
 
-    return $query->findOrFail($id);
-}
+        return $query->findOrFail($id);
+    }
 
     public function findMany(array $ids, array $with = null): \Illuminate\Database\Eloquent\Collection
     {
-        return $this->model::with($with ?? $this->defaultWith)
-            ->whereIn('id', $ids)
-            ->get();
+        $query = $this->model::with($with ?? $this->defaultWith)
+            ->whereIn('id', $ids);
+
+        // تطبيق فلتر company_id للأمان
+        if ($this->modelHasColumn('company_id')) {
+            try {
+                $context = app(\App\Services\CompanyContextService::class);
+                if ($context->has()) {
+                    $query->where('company_id', $context->get());
+                }
+            } catch (\RuntimeException $e) {
+                Log::warning("CompanyContext not available for findMany", ['error' => $e->getMessage()]);
+            }
+        }
+
+        return $query->get();
     }
 
     public function findTrashedById($id): Model
@@ -367,4 +382,40 @@ protected function beforeCreate(array $data, ?Request $request): array
 
         return in_array($column, $columnsCache[$this->model]);
     }
-}
+
+    /**
+     * تطبيق scoping آمن على query
+     * يأخذ بعين الاعتبار company_id إذا كان موجوداً
+     */
+    protected function applyScopeToQuery(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        if ($this->modelHasColumn('company_id')) {
+            try {
+                $context = app(\App\Services\CompanyContextService::class);
+                if ($context->has()) {
+                    $query->where('company_id', $context->get());
+                }
+            } catch (\RuntimeException $e) {
+                Log::debug("CompanyContext unavailable", ['model' => $this->model]);
+            }
+        }
+        return $query;
+    }
+
+    /**
+     * تحسين Logging — يتضمن معلومات كاملة عن العملية
+     */
+    protected function logOperation(string $operation, Model $item, array $extra = []): void
+    {
+        $data = [
+            'operation'  => $operation,
+            'resource'   => $this->getResourceName(),
+            'model_id'   => $item->id ?? null,
+            'user_id'    => auth()->id() ?? null,
+            'company_id' => $item->company_id ?? null,
+            'timestamp'  => now()->toIso8601String(),
+            ...$extra,
+        ];
+
+        Log::channel('operations')->info("Service operation: {$operation}", $data);
+    }

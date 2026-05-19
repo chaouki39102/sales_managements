@@ -127,6 +127,46 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // ═══════════════════════════════════════════════════════════
+        // 🔒 قنوات logging محسّنة للعمليات الحرجة
+        // ═══════════════════════════════════════════════════════════
+
+        /**
+         * 📝 operations — لتسجيل جميع عمليات CRUD والتعديلات على البيانات
+         * يشمل: من قام، ماذا فعل، متى، على أي شركة
+         */
+        'operations' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/operations.log'),
+            'level' => 'info',
+            'days' => 30, // احتفظ بـ 30 يوم
+            'replace_placeholders' => true,
+        ],
+
+        /**
+         * 🔐 security — لتسجيل جميع أحداث الأمان
+         * يشمل: محاولات تسجيل دخول، تغييرات الصلاحيات، الوصول غير المصرح
+         */
+        'security' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/security.log'),
+            'level' => 'warning',
+            'days' => 60, // احتفظ بـ 60 يوم
+            'replace_placeholders' => true,
+        ],
+
+        /**
+         * ⚡ performance — لتسجيل مشاكل الأداء والـ slow queries
+         * يشمل: queries بطيئة، عمليات حسابية ثقيلة
+         */
+        'performance' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/performance.log'),
+            'level' => 'info',
+            'days' => 14,
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
