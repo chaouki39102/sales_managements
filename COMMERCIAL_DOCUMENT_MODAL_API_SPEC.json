@@ -1,0 +1,443 @@
+{
+  "documentation": "CommercialDocumentModal Enhanced — Product Relationships Structure",
+  "version": "2.1",
+  "lastUpdated": "2026-05-19",
+  
+  "productStructure": {
+    "description": "البنية الكاملة للمنتج مع جميع العلاقات",
+    "requiredIncludes": [
+      "unit",
+      "tva",
+      "packagings",
+      "prices.priceLevel",
+      "quantityDiscounts",
+      "lots"
+    ],
+    "example": {
+      "id": 1,
+      "name": "تفاح أحمر",
+      "ref": "APPLE-001",
+      "description": "تفاح أحمر مستورد",
+      "barcode": "1234567890123",
+      "purchase_price_ht": 500,
+      "current_cost_price": 500,
+      "family_id": 1,
+      "brand_id": 1,
+      "product_type_id": 1,
+      "active": true,
+      "manages_stock": true,
+      "has_lots": true,
+      "has_expiration_date": true,
+      "manages_quantity_discounts": true,
+      
+      "unit": {
+        "id": 1,
+        "name": "Unité",
+        "symbol": "UN"
+      },
+      
+      "tva": {
+        "id": 1,
+        "name": "TVA 19%",
+        "rate": 19
+      },
+      
+      "packagings": [
+        {
+          "id": 1,
+          "code": "UN",
+          "label": "وحدة",
+          "quantity": 1,
+          "is_default": true,
+          "barcode": "1234567890123",
+          "display_order": 1
+        },
+        {
+          "id": 2,
+          "code": "FD",
+          "label": "فاردو (50 وحدة)",
+          "quantity": 50,
+          "is_default": false,
+          "barcode": "1234567890124",
+          "display_order": 2
+        }
+      ],
+      
+      "prices": [
+        {
+          "id": 1,
+          "price_level_id": 1,
+          "pricing_method": "fixed",
+          "price": 1000,
+          "rate": null,
+          "margin": null,
+          "active": true,
+          "priceLevel": {
+            "id": 1,
+            "name": "سعر البيع"
+          }
+        },
+        {
+          "id": 2,
+          "price_level_id": 2,
+          "pricing_method": "rate",
+          "price": null,
+          "rate": 50,
+          "margin": null,
+          "active": true,
+          "priceLevel": {
+            "id": 2,
+            "name": "سعر الجملة"
+          }
+        }
+      ],
+      
+      "quantityDiscounts": [
+        {
+          "id": 1,
+          "price_level_id": 1,
+          "min_qty": 10,
+          "max_qty": 49,
+          "discount_amount": 50,
+          "discount_percentage": null,
+          "active": true,
+          "tier_order": 1
+        },
+        {
+          "id": 2,
+          "price_level_id": 1,
+          "min_qty": 50,
+          "max_qty": 99,
+          "discount_amount": 100,
+          "discount_percentage": null,
+          "active": true,
+          "tier_order": 2
+        },
+        {
+          "id": 3,
+          "price_level_id": 1,
+          "min_qty": 100,
+          "max_qty": null,
+          "discount_amount": null,
+          "discount_percentage": 10,
+          "active": true,
+          "tier_order": 3
+        }
+      ],
+      
+      "lots": [
+        {
+          "id": 1,
+          "lot_number": "APPLE-2026-001",
+          "expiration_date": "2026-12-31",
+          "quantity_available": 500
+        },
+        {
+          "id": 2,
+          "lot_number": "APPLE-2026-002",
+          "expiration_date": "2027-01-15",
+          "quantity_available": 300
+        }
+      ]
+    }
+  },
+  
+  "lineItemStructure": {
+    "description": "بنية سطر المستند التجاري",
+    "example": {
+      "id": null,
+      "product_id": 1,
+      "description": "تفاح أحمر مستورد",
+      "quantity": 5,
+      "unit_price_ht": 1000,
+      "price_per_pack": 5000,
+      "discount_percentage": 0,
+      "tva_rate": 19,
+      "packaging_id": "1",
+      "lot_id": "1",
+      "_product": "// المنتج كاملاً",
+      "_qty": 1,
+      "_computedTotals": {
+        "basePrice": 1000,
+        "grossAmount": 5000,
+        "discount": 0,
+        "ht": 5000,
+        "tva": 950,
+        "ttc": 5950,
+        "fiscalStamp": 0,
+        "netToPay": 5950
+      }
+    }
+  },
+  
+  "formStateStructure": {
+    "description": "حالة النموذج الكاملة",
+    "example": {
+      "party_id": "1",
+      "document_date": "2026-05-19",
+      "due_date": "2026-06-19",
+      "notes": "ملاحظات",
+      "warehouse_id": "1",
+      "fiscal_year_id": "1",
+      "currency_id": "1",
+      "exchange_rate": 1,
+      "apply_stamp": true,
+      "lines": "// مصفوفة من LineItems"
+    }
+  },
+  
+  "queriesAndCaching": {
+    "description": "الـ queries المستخدمة والـ caching",
+    "queries": [
+      {
+        "name": "parties",
+        "endpoint": "/api/v1/{company}/parties",
+        "params": {
+          "isPurchase": "true/false (حسب نوع المستند)"
+        },
+        "staleTime": "5 minutes",
+        "description": "الزبائن والموردين"
+      },
+      {
+        "name": "products",
+        "endpoint": "/api/v1/{company}/products",
+        "params": {
+          "include": "unit,tva,packagings,prices,prices.priceLevel,quantityDiscounts,lots"
+        },
+        "staleTime": "5 minutes",
+        "description": "المنتجات مع كل العلاقات"
+      },
+      {
+        "name": "warehouses",
+        "endpoint": "/api/v1/{company}/warehouses",
+        "staleTime": "10 minutes",
+        "description": "المستودعات"
+      },
+      {
+        "name": "currencies",
+        "endpoint": "/api/v1/{company}/currencies",
+        "staleTime": "30 minutes",
+        "description": "العملات"
+      },
+      {
+        "name": "fiscal-years",
+        "endpoint": "/api/v1/{company}/fiscal-years",
+        "params": {
+          "filter": "is_closed:0"
+        },
+        "staleTime": "5 minutes",
+        "description": "السنوات المالية المفتوحة"
+      },
+      {
+        "name": "price-levels",
+        "endpoint": "/api/v1/{company}/price-levels",
+        "staleTime": "30 minutes",
+        "description": "مستويات الأسعار"
+      },
+      {
+        "name": "tva-rates",
+        "endpoint": "/api/v1/{company}/tva-rates",
+        "staleTime": "30 minutes",
+        "description": "معدلات الضريبة"
+      }
+    ]
+  },
+  
+  "calculationsMethods": {
+    "description": "الحسابات الرئيسية في النموذج",
+    
+    "calcLineTotal": {
+      "description": "حساب إجمالي السطر",
+      "logic": {
+        "step1": "basePrice = quantity > 1 ? price_per_pack : unit_price_ht",
+        "step2": "grossAmount = basePrice × quantity",
+        "step3": "discount = grossAmount × (discount_percentage / 100)",
+        "step4": "ht = grossAmount - discount",
+        "step5": "tva = ht × (tva_rate / 100)",
+        "step6": "ttc = ht + tva",
+        "step7": "fiscalStamp = calcFiscalStamp(ttc)",
+        "step8": "netToPay = ttc + fiscalStamp"
+      },
+      "returns": {
+        "basePrice": "السعر الأساسي",
+        "grossAmount": "الكمية × السعر",
+        "discount": "الخصم بالدينار",
+        "ht": "الإجمالي HT",
+        "tva": "الضريبة",
+        "ttc": "الإجمالي TTC",
+        "fiscalStamp": "الطابع الجبائي",
+        "netToPay": "الإجمالي مع الطابع"
+      }
+    },
+    
+    "calcFiscalStamp": {
+      "description": "حساب الطابع الجبائي وفقاً لقانون 2024",
+      "logic": {
+        "condition": "إذا كان ttc < 30,000 دينار",
+        "return": 0,
+        "else": "1% من ttc، سقف 2,500 دينار"
+      },
+      "formula": "if ttc < 30000 then 0 else min(ceil(ttc × 0.01), 2500)"
+    },
+    
+    "findQuantityDiscount": {
+      "description": "البحث عن خصم الكمية المناسب",
+      "logic": {
+        "step1": "تصفية الخصومات حسب price_level_id والـ active",
+        "step2": "ترتيب تنازلي حسب min_qty",
+        "step3": "العثور على أول خصم حيث quantity >= min_qty و quantity <= max_qty"
+      }
+    },
+    
+    "calcSellingPrice": {
+      "description": "حساب سعر البيع حسب طريقة التسعير",
+      "logic": {
+        "if pricing_method is fixed": "price",
+        "if pricing_method is rate": "baseCost × (1 + rate / 100)",
+        "if pricing_method is margin": "baseCost + margin"
+      }
+    }
+  },
+  
+  "validationRules": {
+    "description": "قواعد التحقق من البيانات",
+    
+    "documentLevel": {
+      "party_id": "إلزامي للمشتريات، اختياري للمبيعات",
+      "document_date": "إلزامي، تنسيق YYYY-MM-DD",
+      "warehouse_id": "إلزامي",
+      "fiscal_year_id": "إلزامي، يجب أن يكون مفتوحاً",
+      "currency_id": "إلزامي",
+      "exchange_rate": "إلزامي، > 0"
+    },
+    
+    "lineLevel": {
+      "product_id": "إلزامي",
+      "quantity": "إلزامي، > 0",
+      "unit_price_ht": "إلزامي، >= 0",
+      "tva_rate": "إلزامي، يجب أن يكون معدل صحيح",
+      "discount_percentage": "اختياري، 0-100"
+    }
+  },
+  
+  "apiPayloadForSubmit": {
+    "description": "بنية البيانات عند إرسال المستند",
+    "endpoint": "POST /api/v1/{company}/commercial-documents",
+    "method": "POST",
+    "payload": {
+      "document_type_id": "معرّف نوع المستند",
+      "party_id": "معرّف الزبون/المورد (أو null)",
+      "warehouse_id": "معرّف المستودع",
+      "fiscal_year_id": "معرّف السنة المالية",
+      "currency_id": "معرّف العملة",
+      "exchange_rate": "سعر الصرف",
+      "document_date": "تاريخ المستند (YYYY-MM-DD)",
+      "due_date": "تاريخ الاستحقاق (YYYY-MM-DD أو null)",
+      "notes": "ملاحظات (أو null)",
+      "total_discount": "إجمالي الخصومات",
+      "total_stamp": "إجمالي الطابع",
+      "lines": [
+        {
+          "id": "معرّف السطر (اختياري للتحرير)",
+          "product_id": "معرّف المنتج",
+          "description": "وصف السطر (اختياري)",
+          "quantity": "الكمية",
+          "unit_price_ht": "سعر الوحدة HT",
+          "tva_rate": "معدل الضريبة",
+          "discount_percentage": "نسبة الخصم",
+          "packaging_id": "معرّف التعبئة (اختياري)",
+          "lot_id": "معرّف الكثير (اختياري)"
+        }
+      ]
+    }
+  },
+  
+  "errorHandling": {
+    "description": "معالجة الأخطاء",
+    
+    "validationError": {
+      "response": 422,
+      "structure": {
+        "status": "error",
+        "message": "رسالة الخطأ",
+        "errors": {
+          "field_name": ["رسالة الخطأ", "رسالة ثانية"]
+        }
+      }
+    },
+    
+    "businessRuleError": {
+      "response": 409,
+      "structure": {
+        "status": "error",
+        "code": "BUSINESS_RULE_VIOLATION",
+        "message": "لا يمكن إضافة المنتج..."
+      }
+    },
+    
+    "notFoundError": {
+      "response": 404,
+      "structure": {
+        "status": "error",
+        "code": "NOT_FOUND",
+        "message": "المستند غير موجود"
+      }
+    }
+  },
+  
+  "uiComponents": {
+    "description": "المكونات الرئيسية للواجهة",
+    
+    "sections": [
+      "معلومات المستند",
+      "التعبئات والكميات",
+      "الأسعار والخصومات",
+      "الضرائب والطابع",
+      "الإجماليات"
+    ],
+    
+    "tables": [
+      {
+        "name": "LineItems Table",
+        "columns": [
+          "#",
+          "المنتج",
+          "التعبئة",
+          "الكثير",
+          "الكمية",
+          "سعر الوحدة",
+          "خصم %",
+          "TVA %",
+          "الإجمالي",
+          "الإجراءات"
+        ]
+      }
+    ]
+  },
+  
+  "performanceOptimizations": {
+    "description": "التحسينات المطبقة",
+    "optimizations": [
+      "useMemo للحسابات المعقدة",
+      "useCallback للدوال المُعاد استخدامها",
+      "React Query مع staleTime صحيح",
+      "Lazy loading للمنتجات الكثيرة",
+      "Debounce على البحث"
+    ]
+  },
+  
+  "notes": {
+    "important": [
+      "تأكد من أن API تُرجع جميع العلاقات المطلوبة",
+      "اختبر مع منتجات معقدة (تعبئات متعددة، خصومات)",
+      "راجع الحسابات بعناية، خاصة الطابع الجبائي",
+      "تعامل مع حالات الخطأ بشكل صحيح"
+    ],
+    "futureImprovements": [
+      "تخزين مؤقت لأسعار المنتجات",
+      "معالجة الفسائل (bundles) إذا لزم الأمر",
+      "تصدير PDF للمستند",
+      "الطباعة المباشرة"
+    ]
+  }
+}
