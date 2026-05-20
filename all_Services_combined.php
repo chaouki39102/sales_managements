@@ -402,24 +402,50 @@ class BarcodeService extends \App\Core\Services\BaseService
 namespace App\Services;
 
 use App\Models\Brand;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 
-/**
- * Brand Service
- *
- * @package App\Services
- */
 class BrandService extends \App\Core\Services\BaseService
 {
-    protected string $model = Brand::class;
+    protected string $model        = Brand::class;
     protected string $resourceName = 'brand';
-    protected function getResourceName(): string { return $this->resourceName; }
-    
+
+    protected function getResourceName(): string
+    {
+        return $this->resourceName;
+    }
 
     protected function beforeCreate(array $data, $request): array
     {
-        if (empty($data['slug']) && isset($data['name'])) {
-            $data['slug'] = \Illuminate\Support\Str::slug($data['name']);
+        $data['company_id'] = $data['company_id'] ?? auth()->user()?->company_id;
+        return $data;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // التحكم الصارم في البيانات المرسلة للاستعلام لمنع تزمت SQLite
+    // ─────────────────────────────────────────────────────────────
+    protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
+    {
+        // 1. استدعاء الأب لتصفية company_id وحقن updated_by
+        $data = parent::prepareDataForUpdate($item, $data, $request);
+
+        // 2. إذا تم إرسال الاسم في طلب التحديث
+        if (isset($data['name'])) {
+            // نتحقق من الـ slug المتوقع عبر الدالة الساكنة المحدثة
+            $proposedSlug = Brand::uniqueSlug($data['name'], $item->company_id, $item->id);
+
+            if ($proposedSlug === $item->slug) {
+                // منع التحديث المتكرر لنفس القيم الحالية لتفادي حرج القيود في SQLite
+                unset($data['slug'], $data['name']);
+            } else {
+                // إذا كان هناك اسم جديد ينتج عنه slug مختلف فعلياً
+                $data['slug'] = $proposedSlug;
+            }
+        } else {
+            // في حال لم يرسل حقل الاسم، نتأكد من عدم العبث بالـ slug
+            unset($data['slug']);
         }
+
         return $data;
     }
 }
@@ -488,23 +514,16 @@ class CommercialDocumentLineService extends \App\Core\Services\BaseService
 namespace App\Services;
 
 use App\Models\CommercialDocument;
+use App\Models\NumberingSeries;
 use App\Core\Exceptions\BusinessRuleException;
 use App\Services\Tax\FiscalStampCalculator;
 use App\Core\Services\TAPCalculator;
 use App\Models\StockMovement;
+use App\Services\CompanyContextService;
+use App\Services\InventoryValuationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
-/**
- * Commercial Document Service
- *
- * إدارة الوثائق التجارية (فواتير، عروض أسعار، أوامر شراء، إلخ)
- * - حساب الضرائب (TVA, Timbre, TAP)
- * - إدارة المخزون
- * - التحقق من صحة البيانات
- *
- * @package App\Services
- */
 class CommercialDocumentService extends \App\Core\Services\BaseService
 {
     protected string $model = CommercialDocument::class;
@@ -517,21 +536,50 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         'documentStatus',
         'lines.product',
     ];
+
     protected function getResourceName(): string
     {
         return $this->resourceName;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Hooks
+    // ═══════════════════════════════════════════════════════════════
 
     protected function beforeCreate(array $data, $request): array
     {
-        $data = $this->prepareDocumentData($data);
-
-        if (!isset($data['document_number'])) {
-            $data['document_number'] = $this->generateDocumentNumber($data['document_type_id'] ?? null);
+        // 1. تعيين company_id من السياق إذا لم يُرسَل
+        if (empty($data['company_id'])) {
+            $data['company_id'] = app(CompanyContextService::class)->get();
         }
 
-        if (!isset($data['fiscal_year_id'])) {
+        // 2. تعيين user_id من المستخدم المسجّل
+        if (empty($data['user_id'])) {
+            $data['user_id'] = auth()->id();
+        }
+
+        // 3. تعيين issued_at و exchange_rate
+        $data = $this->prepareDocumentData($data);
+
+        // 4. تعيين numbering_series_id تلقائياً
+        if (empty($data['numbering_series_id'])) {
+            $series = $this->resolveNumberingSeries(
+                $data['document_type_id'] ?? null,
+                $data['company_id']
+            );
+            $data['numbering_series_id'] = $series->id;
+        }
+
+        // 5. توليد رقم الوثيقة
+        if (empty($data['document_number'])) {
+            $data['document_number'] = $this->generateDocumentNumber(
+                $data['document_type_id'] ?? null,
+                $data['company_id']         // ✅ مرّر company_id
+            );
+        }
+
+        // 6. تعيين السنة المالية إذا لم تُرسَل
+        if (empty($data['fiscal_year_id'])) {
             $data['fiscal_year_id'] = $this->getCurrentFiscalYearId();
         }
 
@@ -555,10 +603,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     {
         if ($item->documentStatus?->triggers_stock_movement) {
             $this->createStockMovements($item);
-        }
-
-        if ($item->documentStatus?->sends_notification) {
-            // Send notification
         }
     }
 
@@ -592,6 +636,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Private Helpers
+    // ═══════════════════════════════════════════════════════════════
+
     private function prepareDocumentData(array $data): array
     {
         if (!isset($data['exchange_rate']) && isset($data['currency_id'])) {
@@ -605,48 +653,78 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         return $data;
     }
 
-    private function generateDocumentNumber(?int $documentTypeId): string
+    /**
+     * جلب سلسلة ترقيم نشطة أو إنشاء واحدة تلقائياً
+     */
+    private function resolveNumberingSeries(?int $documentTypeId, int $companyId): NumberingSeries
     {
-        $prefix = match ($documentTypeId) {
-            1 => 'INV',
-            2 => 'QT',
-            3 => 'ORD',
-            4 => 'DN',
-            5 => 'CN',
-            default => 'DOC',
-        };
-
-        $year = date('Y');
-        $sequence = $this->getNextSequence($prefix . $year);
-
-        return sprintf('%s-%s-%06d', $prefix, $year, $sequence);
-    }
-
-    private function getNextSequence(string $prefix): int
-    {
-        $last = CommercialDocument::where('document_number', 'like', $prefix . '%')
-            ->orderByDesc('document_number')
+        $series = NumberingSeries::where('company_id', $companyId)
+            ->where('document_type_id', $documentTypeId)
+            ->where('is_locked', false)
             ->first();
 
-        if (!$last) {
-            return 1;
+        if ($series) {
+            return $series;
         }
 
-        $parts = explode('-', $last->document_number);
-        return (int) end($parts) + 1;
+        // إنشاء سلسلة افتراضية إن لم توجد (fallback آمن)
+        $prefix = $this->getPrefixForDocumentType($documentTypeId);
+
+        return NumberingSeries::create([
+            'company_id'       => $companyId,
+            'document_type_id' => $documentTypeId,
+            'name'             => $prefix . '-' . date('Y'),
+            'prefix'           => $prefix,
+            'current_number'   => 0,
+            'is_locked'        => false,
+        ]);
     }
+
+    private function getPrefixForDocumentType(?int $documentTypeId): string
+    {
+        return match ($documentTypeId) {
+            1  => 'INV',
+            2  => 'QT',
+            3  => 'ORD',
+            4  => 'DN',
+            5  => 'CN',
+            default => 'DOC',
+        };
+    }
+
+    /**
+     * توليد رقم وثيقة فريد scoped بالشركة
+     */
+ private function generateDocumentNumber(?int $documentTypeId, int $companyId): string
+{
+    $prefix = $this->getPrefixForDocumentType($documentTypeId);
+    $year   = date('Y');
+    $key    = $prefix . '-' . $year;
+
+    $last = CommercialDocument::where('company_id', $companyId)
+        ->where('document_number', 'like', $key . '%')
+        ->orderByDesc('document_number')
+        ->lockForUpdate()
+        ->first();
+
+    if ($last) {
+        $parts = explode('-', $last->document_number);
+        $seq = (int) end($parts) + 1;
+    } else {
+        $seq = 1;
+    }
+
+    return sprintf('%s-%s-%06d', $prefix, $year, $seq);
+}
 
     private function getCurrentFiscalYearId(): ?int
     {
-        $fiscalYear = \App\Models\FiscalYear::where('is_current', true)->first();
-        return $fiscalYear?->id;
+        return \App\Models\FiscalYear::where('is_current', true)->value('id');
     }
 
     private function getExchangeRate(int $currencyId): float
     {
-        if ($currencyId === 1) {
-            return 1.0;
-        }
+        if ($currencyId === 1) return 1.0;
 
         $rate = \App\Models\ExchangeRate::where('from_currency_id', $currencyId)
             ->where('to_currency_id', 1)
@@ -657,14 +735,23 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         return $rate?->rate ?? 1.0;
     }
 
+    /**
+     * إنشاء أسطر الوثيقة مع تعيين company_id وتنظيف packaging_id
+     */
     private function createDocumentLines(CommercialDocument $document, array $lines): void
     {
         $lineOrder = 1;
 
         foreach ($lines as $lineData) {
+            // الحقول الإلزامية للسطر
             $lineData['commercial_document_id'] = $document->id;
-            $lineData['line_order'] = $lineOrder++;
+            $lineData['company_id']             = $document->company_id;
+            $lineData['line_order']             = $lineOrder++;
 
+            // packaging_id غير موجود في migration الأسطر — أزِله
+            unset($lineData['packaging_id']);
+
+            // احسب الإجماليات
             $this->calculateLineTotals($lineData);
 
             $document->lines()->create($lineData);
@@ -673,62 +760,59 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function calculateLineTotals(array &$lineData): void
     {
-        $quantity = $lineData['quantity'] ?? 1;
-        $unitPrice = $lineData['unit_price_ht'] ?? 0;
+        $quantity  = (float) ($lineData['quantity']      ?? 1);
+        $unitPrice = (float) ($lineData['unit_price_ht'] ?? 0);
+        $discount  = (float) ($lineData['discount_percentage'] ?? 0);
+        $tvaRate   = (float) ($lineData['tva_rate']      ?? 0);
 
-        $lineData['total_ht'] = $quantity * $unitPrice;
+        $totalHt        = $quantity * $unitPrice;
+        $discountAmount = $totalHt * ($discount / 100);
+        $afterDiscount  = $totalHt - $discountAmount;
+        $totalTva       = $afterDiscount * ($tvaRate / 100);
+        $totalTtc       = $afterDiscount + $totalTva;
 
-        if (!empty($lineData['discount_percentage'])) {
-            $lineData['discount_amount'] = $lineData['total_ht'] * ($lineData['discount_percentage'] / 100);
-        }
-
-        $afterDiscount = $lineData['total_ht'] - ($lineData['discount_amount'] ?? 0);
-
-        $tvaRate = $lineData['tva_rate'] ?? 0;
-        $lineData['total_tva'] = $afterDiscount * ($tvaRate / 100);
-        $lineData['total_ttc'] = $afterDiscount + $lineData['total_tva'];
+        $lineData['total_ht']       = round($totalHt,        4);
+        $lineData['discount_amount'] = round($discountAmount, 4);
+        $lineData['total_tva']      = round($totalTva,       4);
+        $lineData['total_ttc']      = round($totalTtc,       4);
     }
 
     private function calculateTotals(CommercialDocument $document): void
     {
-        $lines = $document->lines;
+        $document->load('lines');
 
-        $totalHt = $lines->sum('total_ht');
-        $totalTva = $lines->sum('total_tva');
+        $lines        = $document->lines;
+        $totalHt      = $lines->sum('total_ht');
+        $totalTva     = $lines->sum('total_tva');
         $totalDiscount = $lines->sum('discount_amount');
-        $totalTtc = $totalHt + $totalTva;
-
-        $totalStamp = (new FiscalStampCalculator())->calculate($document);
-        $netToPay = $totalTtc + $totalStamp;
+        $totalTtc     = $totalHt + $totalTva;
+        $totalStamp   = (new FiscalStampCalculator())->calculate($document);
+        $netToPay     = $totalTtc + $totalStamp;
 
         $document->update([
-            'total_ht' => $totalHt,
-            'total_tva' => $totalTva,
-            'total_discount' => $totalDiscount,
-            'total_stamp' => $totalStamp,
-            'total_ttc' => $totalTtc,
-            'net_to_pay' => $netToPay,
+            'total_ht'         => $totalHt,
+            'total_tva'        => $totalTva,
+            'total_discount'   => $totalDiscount,
+            'total_stamp'      => $totalStamp,
+            'total_ttc'        => $totalTtc,
+            'net_to_pay'       => $netToPay,
             'remaining_amount' => $netToPay,
         ]);
     }
 
-
-
-
-
+    // ═══════════════════════════════════════════════════════════════
+    // Public Actions
+    // ═══════════════════════════════════════════════════════════════
 
     public function validateDocument(CommercialDocument $document, $request): void
     {
-        if ($document->validated_at) {
-            return;
-        }
+        if ($document->validated_at) return;
 
         $document->update([
             'validated_at' => now(),
-            'validated_by' => $request->user()->id ?? null,
+            'validated_by' => $request?->user()?->id,
         ]);
-        
-        // إنشاء حركات المخزون بعد الاعتماد
+
         $this->createStockMovements($document);
     }
 
@@ -750,13 +834,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
         $document->update([
             'cancellation_reason' => $reason,
-            'document_status_id' => $this->getCancelledStatusId(),
+            'document_status_id'  => $this->getCancelledStatusId(),
         ]);
-    }
-
-    private function getCancelledStatusId(): int
-    {
-        return \App\Models\DocumentStatus::where('is_cancelled', true)->value('id') ?? 6;
     }
 
     public function getUnpaid()
@@ -769,13 +848,17 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         return $this->model::overdue()->with(['party', 'documentType'])->get();
     }
 
+    private function getCancelledStatusId(): int
+    {
+        return \App\Models\DocumentStatus::where('is_cancelled', true)->value('id') ?? 6;
+    }
 
     private function createStockMovements(CommercialDocument $document): void
     {
         if (!$document->documentType) return;
 
         $direction = $document->documentType->affects_stock_direction;
-        if ($direction === 0) return; // لا يؤثر على المخزون
+        if ($direction === 0) return;
 
         $valuationService = app(InventoryValuationService::class);
 
@@ -783,34 +866,37 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             if (!$line->product) continue;
 
             $costPrice = $direction < 0
-                ? $valuationService->getCostPriceForSale($line->product, $document->warehouse_id, $line->quantity)
-                : $line->unit_price_ht; // مشتريات
+                ? $valuationService->getCostPriceForSale(
+                    $line->product,
+                    $document->warehouse_id,
+                    $line->quantity
+                )
+                : (float) $line->unit_price_ht;
 
             StockMovement::create([
-                'warehouse_id' => $document->warehouse_id,
-                'product_id' => $line->product_id,
-                'stock_movement_type_id' => $this->getStockMovementTypeId($direction),
-                'commercial_document_id' => $document->id,
+                'company_id'                  => $document->company_id,
+                'warehouse_id'                => $document->warehouse_id,
+                'product_id'                  => $line->product_id,
+                'stock_movement_type_id'      => $this->getStockMovementTypeId($direction),
+                'commercial_document_id'      => $document->id,
                 'commercial_document_line_id' => $line->id,
-                'quantity' => $line->quantity,
-                'unit_price' => $line->unit_price_ht,
-                'cost_price' => $costPrice,
-                'total_price' => $line->quantity * $costPrice,
-                'movement_date' => $document->document_date,
-                'packaging_id' => $line->packaging_id ?? null,
-                'price_source' => $direction < 0 ? 'sale' : 'purchase',
-                'is_validated' => true,
+                'quantity'                    => $line->quantity,
+                'unit_price'                  => $line->unit_price_ht,
+                'cost_price'                  => $costPrice,
+                'total_price'                 => $line->quantity * $costPrice,
+                'movement_date'               => $document->document_date,
+                'price_source'                => $direction < 0 ? 'sale' : 'purchase',
+                'is_validated'                => true,
             ]);
         }
     }
 
     private function getStockMovementTypeId(int $direction): int
     {
-        // يجب أن يكون لديك أنواع حركات للمخزون معرفة مسبقاً (in/out/adjustment)
         return match (true) {
-            $direction > 0 => 1,  // وارد
-            $direction < 0 => 2,  // صادر
-            default => 3,          // تسوية
+            $direction > 0 => 1,
+            $direction < 0 => 2,
+            default        => 3,
         };
     }
 }
@@ -1984,6 +2070,8 @@ class ExpenseService extends \App\Core\Services\BaseService
 namespace App\Services;
 
 use App\Models\Family;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 
 /**
  * Family Service
@@ -1998,26 +2086,30 @@ class FamilyService extends \App\Core\Services\BaseService
 
     protected function beforeCreate(array $data, $request): array
     {
-        if (empty($data['code'])) {
-            $data['code'] = $this->generateFamilyCode();
-        }
-        if (empty($data['slug']) && isset($data['name'])) {
-            $data['slug'] = \Illuminate\Support\Str::slug($data['name']);
-        }
+        // 💡 تم حذف سطر توليد الـ slug يدوياً هنا؛ لأن الموديل سيتولى توليده تلقائياً
+        // داخل حدث الـ creating الخاص بالـ Eloquent بعد أن يقوم تريت HasCompany بحقن معرف الشركة بأمان.
+
         return $data;
     }
 
-    private function generateFamilyCode(): string
+    protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
     {
-        $prefix = 'FAM';
-        $last = $this->model::orderByDesc('code')->first();
+        $data = parent::prepareDataForUpdate($item, $data, $request);
 
-        if (!$last) {
-            return $prefix . '001';
+        if (isset($data['name'])) {
+            $modelClass = $this->model;
+            $proposedSlug = $modelClass::uniqueSlug($data['name'], $item->company_id, $item->id);
+
+            if ($proposedSlug === $item->slug) {
+                unset($data['slug'], $data['name']);
+            } else {
+                $data['slug'] = $proposedSlug;
+            }
+        } else {
+            unset($data['slug']);
         }
 
-        $num = (int) substr($last->code, 3) + 1;
-        return $prefix . str_pad($num, 3, '0', STR_PAD_LEFT);
+        return $data;
     }
 }
 
@@ -2955,7 +3047,6 @@ use App\Models\Party;
 use App\Core\Exceptions\BusinessRuleException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
  * Party Service
@@ -2964,7 +3055,6 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * - RC, NIF, NIS, AI
  * - التحقق من صحة البيانات
  * - إدارة الأرصدة والحدود الائتمانية
- * - استخدام الثوابت بدلاً من الأرقام السحرية
  *
  * @package App\Services
  */
@@ -2973,117 +3063,84 @@ class PartyService extends \App\Core\Services\BaseService
     protected string $model = Party::class;
     protected string $resourceName = 'party';
     protected array $defaultWith = ['partyType', 'legalForm', 'commune', 'wilaya'];
-
     protected function getResourceName(): string
     {
         return $this->resourceName;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Customer methods
-    // ═══════════════════════════════════════════════════════════════
-
     /**
-     * Get customers only – استخدام الـ scope مع الثوابت
+     * Before creating - data preparation and validation
      */
-    public function getCustomers(array $params = [], array $includes = []): LengthAwarePaginator
-    {
-        $query = Party::where('company_id', $this->getCurrentCompanyId())
-            ->customers(); // ✅ Scope يطبق party_type_id = Party::TYPE_CUSTOMER
-
-        if (!empty($includes)) {
-            $query->with($includes);
-        }
-
-        // البحث
-        if (!empty($params['search'])) {
-            $search = $params['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('nif', 'like', "%{$search}}");
-            });
-        }
-
-        // الحالة النشطة
-        $query->active()->orderBy('name');
-
-        return $query->paginate($params['per_page'] ?? 30);
-    }
-
-    /**
-     * Get suppliers only
-     */
-    public function getSuppliers(array $params = [], array $includes = []): LengthAwarePaginator
-    {
-        $query = Party::where('company_id', $this->getCurrentCompanyId())
-            ->suppliers();
-
-        if (!empty($includes)) {
-            $query->with($includes);
-        }
-
-        if (!empty($params['search'])) {
-            $search = $params['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('nif', 'like', "%{$search}%");
-            });
-        }
-
-        $query->active()->orderBy('name');
-
-        return $query->paginate($params['per_page'] ?? 30);
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // Core CRUD methods (override from BaseService)
-    // ═══════════════════════════════════════════════════════════════
-
     protected function beforeCreate(array $data, $request): array
     {
+        // Generate unique code if not provided
         if (empty($data['code'])) {
             $data['code'] = $this->generatePartyCode($data['party_type_id']);
         }
 
+        // Generate slug from name
         if (!isset($data['slug']) && isset($data['name'])) {
             $data['slug'] = $this->generateSlug($data['name']);
         }
 
+        // Algerian-specific validations
         $this->validateAlgerianFields($data);
 
         return $data;
     }
 
+    /**
+     * After create - within transaction
+     */
     protected function afterCreate(Model $item, array $data, $request): void
     {
-        // أي منطق إضافي بعد الإنشاء (مثل سجل تدقيق)
+        // Any post-creation logic within transaction
+        // e.g., create opening balance if needed
     }
 
+    /**
+     * After database commit - external operations
+     */
     protected function afterCreateCommitted(Model $item, array $data, $request): void
     {
-        // إشعارات أو بريد إلكتروني
+        // Send welcome notification if needed
+        // Mail::send(new PartyCreatedNotification($item));
     }
 
+    /**
+     * Before update - business rules validation
+     */
     protected function beforeUpdate(Model $item, array $data, $request): void
     {
+        // Check if party is active before critical changes
         if ($item->active && isset($data['active']) && !$data['active']) {
+            // Check if party has active commercial documents
             if ($item->commercialDocuments()->where('status', 'confirmed')->exists()) {
                 throw new BusinessRuleException('لا يمكن إلغاء تفعيل متعامل لديه وثائق تجارية نشطة', 409);
             }
         }
 
+        // Validate Algerian fields if changed
         $this->validateAlgerianFields($data, $item);
     }
 
+    /**
+     * After update committed
+     */
     protected function afterUpdateCommitted(Model $item, array $data, $request): void
     {
-        // مسح الكاش المرتبط
+        // Clear related caches if critical data changed
+        if (isset($data['active']) || isset($data['credit_limit'])) {
+            // Additional cache clearing if needed
+        }
     }
 
+    /**
+     * Before delete - business rules
+     */
     protected function beforeDelete(Model $item): void
     {
+        // Check if party can be deleted
         if ($item->commercialDocuments()->exists()) {
             throw new BusinessRuleException('لا يمكن حذف متعامل لديه وثائق تجارية', 409);
         }
@@ -3093,18 +3150,12 @@ class PartyService extends \App\Core\Services\BaseService
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Helpers – توليد الأكواد و slug
-    // ═══════════════════════════════════════════════════════════════
-
+    /**
+     * Generate unique party code
+     */
     private function generatePartyCode(int $partyTypeId): string
     {
-        $prefix = match ($partyTypeId) {
-            Party::TYPE_CUSTOMER => 'CUS',
-            Party::TYPE_SUPPLIER => 'SUP',
-            Party::TYPE_BOTH     => 'BTH',
-            default => 'PRT',
-        };
+        $prefix = $partyTypeId === 1 ? 'CUS' : 'SUP'; // Assuming 1=customer, 2=supplier
 
         do {
             $code = $prefix . str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
@@ -3113,6 +3164,9 @@ class PartyService extends \App\Core\Services\BaseService
         return $code;
     }
 
+    /**
+     * Generate slug from name
+     */
     private function generateSlug(string $name): string
     {
         $slug = strtolower(str_replace([' ', '.', ','], '-', $name));
@@ -3128,18 +3182,18 @@ class PartyService extends \App\Core\Services\BaseService
         return $slug;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Algerian-specific validation (NIF, RC, NIS, AI)
-    // ═══════════════════════════════════════════════════════════════
-
+    /**
+     * Validate Algerian-specific fields
+     */
     private function validateAlgerianFields(array $data, ?Party $existingParty = null): void
     {
-        // NIF validation
+        // NIF validation (Algerian tax number - 15-16 digits usually)
         if (isset($data['nif']) && !empty($data['nif'])) {
             if (!preg_match('/^\d{15,16}$/', $data['nif'])) {
                 throw new BusinessRuleException('رقم التعريف الجبائي يجب أن يكون 15-16 رقم', 422);
             }
 
+            // Check uniqueness except for current party
             $query = Party::where('nif', $data['nif']);
             if ($existingParty) {
                 $query->where('id', '!=', $existingParty->id);
@@ -3149,14 +3203,14 @@ class PartyService extends \App\Core\Services\BaseService
             }
         }
 
-        // RC validation
+        // RC validation (Commercial Register)
         if (isset($data['rc']) && !empty($data['rc'])) {
             if (strlen($data['rc']) < 3 || strlen($data['rc']) > 50) {
                 throw new BusinessRuleException('رقم السجل التجاري غير صحيح', 422);
             }
         }
 
-        // NIS validation
+        // NIS validation (Statistical number)
         if (isset($data['nis']) && !empty($data['nis'])) {
             if (!preg_match('/^\d{10,15}$/', $data['nis'])) {
                 throw new BusinessRuleException('رقم التعريف الإحصائي يجب أن يكون 10-15 رقم', 422);
@@ -3174,15 +3228,58 @@ class PartyService extends \App\Core\Services\BaseService
             }
         }
 
-        // Credit limit non-negative
+        // Credit limit validation
         if (isset($data['credit_limit']) && $data['credit_limit'] < 0) {
             throw new BusinessRuleException('الحد الائتماني لا يمكن أن يكون سالباً', 422);
         }
     }
 
+    /**
+     * Get customers only
+     */
     private function getCurrentCompanyId(): int
     {
         return app(\App\Services\CompanyContextService::class)->get();
+    }
+
+    public function getCustomers(array $params = [])
+    {
+        return Party::where('company_id', $this->getCurrentCompanyId())
+            // ✅ فلترة بـ party_type_id مباشرة — لا نعتمد على party_types table
+            // party_type_id = 1 → زبون (كما يُرسله الـ Frontend)
+            ->where('party_type_id', 1)
+            ->when(
+                !empty($params['search']),
+                fn($q) => $q->where(
+                    fn($q2) => $q2
+                        ->where('name', 'like', "%{$params['search']}%")
+                        ->orWhere('phone', 'like', "%{$params['search']}%")
+                        ->orWhere('nif', 'like', "%{$params['search']}%")
+                )
+            )
+            // active يمكن أن يكون null أو true — نقبل كليهما
+            ->where(fn($q) => $q->whereNull('active')->orWhere('active', true))
+            ->orderBy('name')
+            ->paginate($params['per_page'] ?? 30);
+    }
+
+    public function getSuppliers(array $params = [])
+    {
+        return Party::where('company_id', $this->getCurrentCompanyId())
+            // ✅ party_type_id = 2 → مورد
+            ->where('party_type_id', 2)
+            ->when(
+                !empty($params['search']),
+                fn($q) => $q->where(
+                    fn($q2) => $q2
+                        ->where('name', 'like', "%{$params['search']}%")
+                        ->orWhere('phone', 'like', "%{$params['search']}%")
+                        ->orWhere('nif', 'like', "%{$params['search']}%")
+                )
+            )
+            ->where(fn($q) => $q->whereNull('active')->orWhere('active', true))
+            ->orderBy('name')
+            ->paginate($params['per_page'] ?? 30);
     }
 }
 

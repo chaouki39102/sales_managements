@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-files.md"
+OUTPUT="merged-UI-files.md"
 
 > "$OUTPUT"
 
@@ -60,21 +60,11 @@ EXCLUDE=(
 
 
 
-# HOOKS
-merge_section "🧠 HOOKS" \
-  \( -path "*/hooks/*" \) "${EXCLUDE[@]}"
+# COMPONENTS
+merge_section "🧠 COMPONENTS" \
+  \( -path "*/components/*" \) "${EXCLUDE[@]}"
 
-# CONTEXT
-merge_section "🌐 CONTEXT" \
-  \( -path "*/context/*" \) "${EXCLUDE[@]}"
 
-# LIB / API
-merge_section "🔌 API / LIB" \
-  \( -path "*/lib/*" \) "${EXCLUDE[@]}"
-
-  # TYPES
-merge_section "📘 TYPES" \
-  \( -path "*/types/*" \) "${EXCLUDE[@]}"
 
 
 echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"

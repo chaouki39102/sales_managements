@@ -81,14 +81,44 @@ class Family extends Model
         return $this->children()->exists();
     }
 
-    protected static function boot()
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('active', true);
+    }
+
+    protected static function boot(): void
     {
         parent::boot();
 
-        static::creating(function ($family) {
-            if (empty($family->slug)) {
-                $family->slug = Str::slug($family->name);
+        static::creating(function (self $model): void {
+            $model->slug = static::uniqueSlug($model->name, $model->company_id);
+        });
+
+        static::updating(function (self $model): void {
+            if ($model->isDirty('name')) {
+                $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
             }
         });
     }
+
+    public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
+    {
+        $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
+        $originalSlug = $slug;
+        $count = 1;
+
+        // 💡 تم تعديل الجدول هنا ليكون families بشكل صحيح
+        while (\Illuminate\Support\Facades\DB::table('families')
+            ->where('slug', $slug)
+            ->when($ignoreId, function ($query) use ($ignoreId) {
+                return $query->where('id', '!=', $ignoreId);
+            })
+            ->exists()
+        ) {
+            $slug = $originalSlug . '-' . $count++;
+        }
+
+        return $slug;
+    }
+    
 }

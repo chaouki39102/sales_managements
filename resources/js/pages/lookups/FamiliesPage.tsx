@@ -39,6 +39,7 @@ export default function FamiliesPage() {
           label: 'ترتيب العرض',
           type: 'number',
           showInTable: false,
+          autoOrder: true,          // ✅ يُحسب تلقائياً = items.length + 1
           placeholder: '0' },
 
         { key: 'description',

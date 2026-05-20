@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Family;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 
 /**
  * Family Service
@@ -17,25 +19,29 @@ class FamilyService extends \App\Core\Services\BaseService
 
     protected function beforeCreate(array $data, $request): array
     {
-        if (empty($data['code'])) {
-            $data['code'] = $this->generateFamilyCode();
-        }
-        if (empty($data['slug']) && isset($data['name'])) {
-            $data['slug'] = \Illuminate\Support\Str::slug($data['name']);
-        }
+        // 💡 تم حذف سطر توليد الـ slug يدوياً هنا؛ لأن الموديل سيتولى توليده تلقائياً
+        // داخل حدث الـ creating الخاص بالـ Eloquent بعد أن يقوم تريت HasCompany بحقن معرف الشركة بأمان.
+
         return $data;
     }
 
-    private function generateFamilyCode(): string
+    protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
     {
-        $prefix = 'FAM';
-        $last = $this->model::orderByDesc('code')->first();
+        $data = parent::prepareDataForUpdate($item, $data, $request);
 
-        if (!$last) {
-            return $prefix . '001';
+        if (isset($data['name'])) {
+            $modelClass = $this->model;
+            $proposedSlug = $modelClass::uniqueSlug($data['name'], $item->company_id, $item->id);
+
+            if ($proposedSlug === $item->slug) {
+                unset($data['slug'], $data['name']);
+            } else {
+                $data['slug'] = $proposedSlug;
+            }
+        } else {
+            unset($data['slug']);
         }
 
-        $num = (int) substr($last->code, 3) + 1;
-        return $prefix . str_pad($num, 3, '0', STR_PAD_LEFT);
+        return $data;
     }
 }
