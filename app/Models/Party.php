@@ -11,13 +11,13 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
-use Illuminate\Support\Str;
+use App\Models\Traits\HasTenantSlug;
 
 
 #[Cacheable]
 class Party extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, HasTenantSlug;
 
     protected $table = 'parties';
 
@@ -146,17 +146,4 @@ class Party extends Model
         return in_array($this->partyType?->name, ['supplier', 'both']);
     }
 
-    protected static function booted()
-{
-    static::saving(function ($party) {
-        if (empty($party->slug) && !empty($party->name)) {
-            $party->slug = Str::slug($party->name);
-            $original = $party->slug;
-            $counter = 1;
-            while (static::where('slug', $party->slug)->where('id', '!=', $party->id)->exists()) {
-                $party->slug = $original . '-' . $counter++;
-            }
-        }
-    });
-}
 }

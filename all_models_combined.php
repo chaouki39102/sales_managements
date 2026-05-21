@@ -258,11 +258,12 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantSlug;
 
 #[Cacheable]
 class Brand extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany, HasTenantSlug;
 
     protected $table = 'brands';
 
@@ -297,59 +298,59 @@ class Brand extends Model
     // ─────────────────────────────────────────────────────────────
     // boot() لضمان التنسيق والأتمتة التلقائية
     // ─────────────────────────────────────────────────────────────
-    protected static function boot(): void
-    {
-        parent::boot();
+    // protected static function boot(): void
+    // {
+    //     parent::boot();
 
-        static::creating(function (self $model): void {
-            $model->slug = static::uniqueSlug(
-                $model->name,
-                $model->company_id
-            );
-        });
+    //     static::creating(function (self $model): void {
+    //         $model->slug = static::uniqueSlug(
+    //             $model->name,
+    //             $model->company_id
+    //         );
+    //     });
 
-        static::updating(function (self $model): void {
-            if ($model->isDirty('name')) {
-                $model->slug = static::uniqueSlug(
-                    $model->name,
-                    $model->company_id,
-                    $model->id
-                );
-            }
-        });
-    }
+    //     static::updating(function (self $model): void {
+    //         if ($model->isDirty('name')) {
+    //             $model->slug = static::uniqueSlug(
+    //                 $model->name,
+    //                 $model->company_id,
+    //                 $model->id
+    //             );
+    //         }
+    //     });
+    // }
 
-    // ─────────────────────────────────────────────────────────────
-    // يُولِّد slug فريداً مطلقاً على مستوى قاعدة البيانات بالكامل
-    // ─────────────────────────────────────────────────────────────
-    public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
-    {
-        // 1. توليد الـ slug الأساسي من الاسم
-        $slug = Str::slug($name) ?: static::arabicSlug($name);
+    // // ─────────────────────────────────────────────────────────────
+    // // يُولِّد slug فريداً مطلقاً على مستوى قاعدة البيانات بالكامل
+    // // ─────────────────────────────────────────────────────────────
+    // public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
+    // {
+    //     // 1. توليد الـ slug الأساسي من الاسم
+    //     $slug = Str::slug($name) ?: static::arabicSlug($name);
 
-        $originalSlug = $slug;
-        $count = 1;
+    //     $originalSlug = $slug;
+    //     $count = 1;
 
-        // 2. استخدام DB نقي لتخطي الـ Global Scopes والـ SoftDeletes ورؤية الجدول كاملاً
-        while (DB::table('brands')
-            ->where('slug', $slug)
-            ->when($ignoreId, function ($query) use ($ignoreId) {
-                return $query->where('id', '!=', $ignoreId);
-            })
-            ->exists()
-        ) {
-            $slug = $originalSlug . '-' . $count;
-            $count++;
-        }
+    //     // 2. استخدام DB نقي لتخطي الـ Global Scopes والـ SoftDeletes ورؤية الجدول كاملاً
+    //     while (DB::table('brands')
+    //         ->where('slug', $slug)
+    //         ->when($ignoreId, function ($query) use ($ignoreId) {
+    //             return $query->where('id', '!=', $ignoreId);
+    //         })
+    //         ->exists()
+    //     ) {
+    //         $slug = $originalSlug . '-' . $count;
+    //         $count++;
+    //     }
 
-        return $slug;
-    }
+    //     return $slug;
+    // }
 
-    // دالة مساعدة لدعم الحروف العربية في الـ slug
-    protected static function arabicSlug(string $title): string
-    {
-        return preg_replace('/\s+/u', '-', trim(mb_strtolower($title)));
-    }
+    // // دالة مساعدة لدعم الحروف العربية في الـ slug
+    // protected static function arabicSlug(string $title): string
+    // {
+    //     return preg_replace('/\s+/u', '-', trim(mb_strtolower($title)));
+    // }
 
     // ─────────────────────────────────────────────────────────────
     // Relations
@@ -1292,39 +1293,7 @@ class Currency extends Model
         return number_format($amount, $this->decimal_places) . ' ' . $this->symbol;
     }
 
-    protected static function boot(): void
-{
-    parent::boot();
-
-    static::creating(function (self $model): void {
-        $model->slug = static::uniqueSlug($model->name, $model->company_id);
-    });
-
-    static::updating(function (self $model): void {
-        if ($model->isDirty('name')) {
-            $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
-        }
-    });
-}
-
-public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
-{
-    $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
-    $originalSlug = $slug;
-    $count = 1;
-
-    while (\Illuminate\Support\Facades\DB::table('currencies')
-        ->where('slug', $slug)
-        ->when($ignoreId, function ($query) use ($ignoreId) {
-            return $query->where('id', '!=', $ignoreId);
-        })
-        ->exists()
-    ) {
-        $slug = $originalSlug . '-' . $count++;
-    }
-
-    return $slug;
-}
+   
 }
 
 
@@ -1979,11 +1948,12 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantSlug;
 
 #[Cacheable]
 class Family extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany, HasTenantSlug;
 
     protected $table = 'families';
 
@@ -2052,41 +2022,41 @@ class Family extends Model
         return $query->where('active', true);
     }
 
-    protected static function boot(): void
-    {
-        parent::boot();
+    // protected static function boot(): void
+    // {
+    //     parent::boot();
 
-        static::creating(function (self $model): void {
-            $model->slug = static::uniqueSlug($model->name, $model->company_id);
-        });
+    //     static::creating(function (self $model): void {
+    //         $model->slug = static::uniqueSlug($model->name, $model->company_id);
+    //     });
 
-        static::updating(function (self $model): void {
-            if ($model->isDirty('name')) {
-                $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
-            }
-        });
-    }
+    //     static::updating(function (self $model): void {
+    //         if ($model->isDirty('name')) {
+    //             $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
+    //         }
+    //     });
+    // }
 
-    public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
-    {
-        $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
-        $originalSlug = $slug;
-        $count = 1;
+    // public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
+    // {
+    //     $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
+    //     $originalSlug = $slug;
+    //     $count = 1;
 
-        // 💡 تم تعديل الجدول هنا ليكون families بشكل صحيح
-        while (\Illuminate\Support\Facades\DB::table('families')
-            ->where('slug', $slug)
-            ->when($ignoreId, function ($query) use ($ignoreId) {
-                return $query->where('id', '!=', $ignoreId);
-            })
-            ->exists()
-        ) {
-            $slug = $originalSlug . '-' . $count++;
-        }
+    //     // 💡 تم تعديل الجدول هنا ليكون families بشكل صحيح
+    //     while (\Illuminate\Support\Facades\DB::table('families')
+    //         ->where('slug', $slug)
+    //         ->when($ignoreId, function ($query) use ($ignoreId) {
+    //             return $query->where('id', '!=', $ignoreId);
+    //         })
+    //         ->exists()
+    //     ) {
+    //         $slug = $originalSlug . '-' . $count++;
+    //     }
 
-        return $slug;
-    }
-    
+    //     return $slug;
+    // }
+
 }
 
 
@@ -2866,13 +2836,14 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantSlug;
 use Illuminate\Support\Str;
 
 
 #[Cacheable]
 class Party extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable;
+    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, HasTenantSlug;
 
     protected $table = 'parties';
 
@@ -3001,19 +2972,19 @@ class Party extends Model
         return in_array($this->partyType?->name, ['supplier', 'both']);
     }
 
-    protected static function booted()
-{
-    static::saving(function ($party) {
-        if (empty($party->slug) && !empty($party->name)) {
-            $party->slug = Str::slug($party->name);
-            $original = $party->slug;
-            $counter = 1;
-            while (static::where('slug', $party->slug)->where('id', '!=', $party->id)->exists()) {
-                $party->slug = $original . '-' . $counter++;
-            }
-        }
-    });
-}
+//     protected static function booted()
+// {
+//     static::saving(function ($party) {
+//         if (empty($party->slug) && !empty($party->name)) {
+//             $party->slug = Str::slug($party->name);
+//             $original = $party->slug;
+//             $counter = 1;
+//             while (static::where('slug', $party->slug)->where('id', '!=', $party->id)->exists()) {
+//                 $party->slug = $original . '-' . $counter++;
+//             }
+//         }
+//     });
+// }
 }
 
 
@@ -3243,39 +3214,7 @@ class PaymentMode extends Model
         return $this->hasMany(Expense::class);
     }
 
-    protected static function boot(): void
-{
-    parent::boot();
-
-    static::creating(function (self $model): void {
-        $model->slug = static::uniqueSlug($model->name, $model->company_id);
-    });
-
-    static::updating(function (self $model): void {
-        if ($model->isDirty('name')) {
-            $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
-        }
-    });
-}
-
-public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
-{
-    $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
-    $originalSlug = $slug;
-    $count = 1;
-
-    while (\Illuminate\Support\Facades\DB::table('payment_methods')
-        ->where('slug', $slug)
-        ->when($ignoreId, function ($query) use ($ignoreId) {
-            return $query->where('id', '!=', $ignoreId);
-        })
-        ->exists()
-    ) {
-        $slug = $originalSlug . '-' . $count++;
-    }
-
-    return $slug;
-}
+    
 }
 
 
@@ -3393,39 +3332,7 @@ class PriceLevel extends Model
         return $basePrice + $this->value;
     }
 
-    protected static function boot(): void
-{
-    parent::boot();
-
-    static::creating(function (self $model): void {
-        $model->slug = static::uniqueSlug($model->name, $model->company_id);
-    });
-
-    static::updating(function (self $model): void {
-        if ($model->isDirty('name')) {
-            $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
-        }
-    });
-}
-
-public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
-{
-    $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
-    $originalSlug = $slug;
-    $count = 1;
-
-    while (\Illuminate\Support\Facades\DB::table('price_lists')
-        ->where('slug', $slug)
-        ->when($ignoreId, function ($query) use ($ignoreId) {
-            return $query->where('id', '!=', $ignoreId);
-        })
-        ->exists()
-    ) {
-        $slug = $originalSlug . '-' . $count++;
-    }
-
-    return $slug;
-}
+   
 }
 
 
@@ -3445,11 +3352,12 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantSlug;
 
 #[Cacheable]
 class Product extends Model
 {
-    use HasCompany, HasStandardizedConfiguration, SoftDeletes, Auditable;
+    use HasCompany, HasStandardizedConfiguration, SoftDeletes, Auditable, HasTenantSlug;
 
     protected $table = 'products';
 
@@ -3635,18 +3543,7 @@ class Product extends Model
         return $totalQuantity > 0 ? round($totalValue / $totalQuantity, 4) : 0;
     }
 
-    protected static function boot(): void
-    {
-        parent::boot();
-        static::creating(function (Product $product) {
-            if (empty($product->slug)) $product->slug = Str::slug($product->name);
-        });
-        static::updating(function (Product $product) {
-            if ($product->isDirty('name') && !$product->isDirty('slug')) {
-                $product->slug = Str::slug($product->name);
-            }
-        });
-    }
+
 }
 
 

@@ -13,11 +13,12 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantSlug;
 
 #[Cacheable]
 class Product extends Model
 {
-    use HasCompany, HasStandardizedConfiguration, SoftDeletes, Auditable;
+    use HasCompany, HasStandardizedConfiguration, SoftDeletes, Auditable, HasTenantSlug;
 
     protected $table = 'products';
 
@@ -203,16 +204,5 @@ class Product extends Model
         return $totalQuantity > 0 ? round($totalValue / $totalQuantity, 4) : 0;
     }
 
-    protected static function boot(): void
-    {
-        parent::boot();
-        static::creating(function (Product $product) {
-            if (empty($product->slug)) $product->slug = Str::slug($product->name);
-        });
-        static::updating(function (Product $product) {
-            if ($product->isDirty('name') && !$product->isDirty('slug')) {
-                $product->slug = Str::slug($product->name);
-            }
-        });
-    }
+
 }

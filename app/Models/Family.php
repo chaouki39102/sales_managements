@@ -8,16 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantSlug;
 
 #[Cacheable]
 class Family extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany, HasTenantSlug;
 
     protected $table = 'families';
 
@@ -86,39 +86,5 @@ class Family extends Model
         return $query->where('active', true);
     }
 
-    protected static function boot(): void
-    {
-        parent::boot();
 
-        static::creating(function (self $model): void {
-            $model->slug = static::uniqueSlug($model->name, $model->company_id);
-        });
-
-        static::updating(function (self $model): void {
-            if ($model->isDirty('name')) {
-                $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
-            }
-        });
-    }
-
-    public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
-    {
-        $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
-        $originalSlug = $slug;
-        $count = 1;
-
-        // 💡 تم تعديل الجدول هنا ليكون families بشكل صحيح
-        while (\Illuminate\Support\Facades\DB::table('families')
-            ->where('slug', $slug)
-            ->when($ignoreId, function ($query) use ($ignoreId) {
-                return $query->where('id', '!=', $ignoreId);
-            })
-            ->exists()
-        ) {
-            $slug = $originalSlug . '-' . $count++;
-        }
-
-        return $slug;
-    }
-    
 }
