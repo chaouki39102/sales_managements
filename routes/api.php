@@ -85,7 +85,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         // 🔒 تسجيل وتسجيل دخول — حد أقصى 5 محاولات / 15 دقيقة
         Route::post('/register', [AuthController::class, 'register'])
-            ->middleware('throttle:5,15'); // 5 محاولات كل 15 دقيقة
+            ->middleware('throttle:5,15');
         Route::post('/login', [AuthController::class, 'login'])
             ->middleware('throttle:5,15');
 
@@ -231,10 +231,10 @@ Route::prefix('v1')->group(function () {
 
             // منتجات وأطراف ومستودعات (قراءة)
             Route::get('products',                    [ProductController::class, 'index']);
-            Route::get('products/{product}',          [ProductController::class, 'show']);
             Route::get('products/active',             [ProductController::class, 'active']);
             Route::get('products/by-family/{family}', [ProductController::class, 'byFamily']);
             Route::get('products/by-brand/{brand}',   [ProductController::class, 'byBrand']);
+            Route::get('products/{product}',          [ProductController::class, 'show']);
 
             Route::get('product-variants',              [ProductVariantController::class, 'index']);
             Route::get('product-variants/{variant}',    [ProductVariantController::class, 'show']);
@@ -244,7 +244,7 @@ Route::prefix('v1')->group(function () {
             Route::get('barcodes/{barcode}',          [BarcodeController::class, 'show']);
             Route::get('products/{product}/barcodes', [BarcodeController::class, 'indexByProduct']);
 
-            Route::get('warehouses',           [WarehouseController::class, 'index']);
+            Route::get('warehouses',             [WarehouseController::class, 'index']);
             Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show']);
 
             Route::get('parties',         [PartyController::class, 'index']);
@@ -252,38 +252,42 @@ Route::prefix('v1')->group(function () {
             Route::get('customers',       [PartyController::class, 'customers']);
             Route::get('suppliers',       [PartyController::class, 'suppliers']);
 
-            Route::get('product-lots',           [ProductLotController::class, 'index']);
-            Route::get('product-lots/{lot}',     [ProductLotController::class, 'show']);
+            // ✅ product-lots: المسارات المحددة قبل المورد لتجنب conflict
             Route::get('product-lots/available', [ProductLotController::class, 'available']);
             Route::get('product-lots/expiring',  [ProductLotController::class, 'expiring']);
+            Route::get('product-lots',           [ProductLotController::class, 'index']);
+            Route::get('product-lots/{lot}',     [ProductLotController::class, 'show']);
 
+            Route::get('employees/active',     [EmployeeController::class, 'active']);
             Route::get('employees',            [EmployeeController::class, 'index']);
             Route::get('employees/{employee}', [EmployeeController::class, 'show']);
-            Route::get('employees/active',     [EmployeeController::class, 'active']);
 
             Route::get('employment-contracts',                            [EmploymentContractController::class, 'index']);
             Route::get('employment-contracts/{contract}',                 [EmploymentContractController::class, 'show']);
             Route::get('employment-contracts/employee/{employee}/active', [EmploymentContractController::class, 'active']);
 
-            Route::get('stock-movements',            [StockMovementController::class, 'index']);
-            Route::get('stock-movements/{movement}', [StockMovementController::class, 'show']);
+            // ✅ stock-movements: المسارات المحددة قبل المورد
             Route::get('stock-movements/incoming',   [StockMovementController::class, 'incoming']);
             Route::get('stock-movements/outgoing',   [StockMovementController::class, 'outgoing']);
+            Route::get('stock-movements',            [StockMovementController::class, 'index']);
+            Route::get('stock-movements/{movement}', [StockMovementController::class, 'show']);
 
-            Route::get('fiscal-years',         [FiscalYearController::class, 'index']);
-            Route::get('fiscal-years/{year}',  [FiscalYearController::class, 'show']);
+            // ✅ fiscal-years: المسارات المحددة قبل المورد
             Route::get('fiscal-years/current', [FiscalYearController::class, 'current']);
             Route::get('fiscal-years/open',    [FiscalYearController::class, 'open']);
+            Route::get('fiscal-years',         [FiscalYearController::class, 'index']);
+            Route::get('fiscal-years/{year}',  [FiscalYearController::class, 'show']);
 
-            Route::get('roles',                   [RoleController::class, 'index']);
-            Route::get('roles/{role}',            [RoleController::class, 'show']);
-            Route::get('permissions',             [PermissionController::class, 'index']);
-            Route::get('permissions/by-group',    [PermissionController::class, 'byGroup']);
-            Route::get('permissions/{permission}',[PermissionController::class, 'show']);
+            Route::get('roles',                    [RoleController::class, 'index']);
+            Route::get('roles/{role}',             [RoleController::class, 'show']);
+            Route::get('permissions/by-group',     [PermissionController::class, 'byGroup']);
+            Route::get('permissions',              [PermissionController::class, 'index']);
+            Route::get('permissions/{permission}', [PermissionController::class, 'show']);
 
+            // ✅ notifications: المسارات المحددة قبل المورد
+            Route::get('notifications/unread',                       [NotificationController::class, 'unread']);
             Route::get('notifications',                              [NotificationController::class, 'index']);
             Route::get('notifications/{notification}',               [NotificationController::class, 'show']);
-            Route::get('notifications/unread',                       [NotificationController::class, 'unread']);
             Route::post('notifications/{notification}/mark-read',    [NotificationController::class, 'markAsRead']);
             Route::post('notifications/mark-all-read',               [NotificationController::class, 'markAllAsRead']);
 
@@ -332,11 +336,12 @@ Route::prefix('v1')->group(function () {
                 Route::apiResource('parties',           PartyController::class,               ['except' => ['index', 'show']]);
 
                 // مستخدمون (بصلاحيات كاملة)
-                Route::apiResource('users', UserController::class);
+                // ✅ المسارات المحددة قبل apiResource لتجنب conflict
                 Route::get('users/trashed',                [UserController::class, 'trashed']);
-                Route::get('users-by-role',                [UserController::class, 'byRole']);
                 Route::get('users/active',                 [UserController::class, 'active']);
                 Route::get('users/inactive',               [UserController::class, 'inactive']);
+                Route::get('users-by-role',                [UserController::class, 'byRole']);
+                Route::apiResource('users', UserController::class);
                 Route::post('users/{user}/restore',        [UserController::class, 'restore']);
                 Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete']);
                 Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
@@ -378,41 +383,52 @@ Route::prefix('v1')->group(function () {
 
             // ── ⑤-ج: للمالك والمدير والمحاسب ──────────────────
             Route::middleware('can:create_sales_document')->group(function () {
+
+                // ✅ المسارات المحددة (unpaid, overdue) يجب أن تكون
+                //    قبل apiResource — وإلا Laravel يعترضها كـ {document}
+                Route::get('documents/unpaid',  [CommercialDocumentController::class, 'unpaid']);
+                Route::get('documents/overdue', [CommercialDocumentController::class, 'overdue']);
+
+                // ✅ apiResource بعد المسارات المحددة
                 Route::apiResource('documents', CommercialDocumentController::class);
-                Route::get('documents/unpaid',                    [CommercialDocumentController::class, 'unpaid']);
-                Route::get('documents/overdue',                   [CommercialDocumentController::class, 'overdue']);
-                Route::post('documents/{document}/validate',      [CommercialDocumentController::class, 'validateDocument']);
-                Route::post('documents/{document}/lock',          [CommercialDocumentController::class, 'lock']);
-                Route::post('documents/{document}/unlock',        [CommercialDocumentController::class, 'unlock']);
-                Route::post('documents/{document}/cancel',        [CommercialDocumentController::class, 'cancel']);
-                Route::get('documents/{document}/qrcode',         [CommercialDocumentController::class, 'generateQRCode']);
+
+                // مسارات الإجراءات على الوثيقة
+                Route::post('documents/{document}/validate', [CommercialDocumentController::class, 'validateDocument']);
+                Route::post('documents/{document}/lock',     [CommercialDocumentController::class, 'lock']);
+                Route::post('documents/{document}/unlock',   [CommercialDocumentController::class, 'unlock']);
+                Route::post('documents/{document}/cancel',   [CommercialDocumentController::class, 'cancel']);
+                Route::get('documents/{document}/qrcode',   [CommercialDocumentController::class, 'generateQRCode']);
 
                 Route::apiResource('commercial-document-lines', CommercialDocumentLineController::class);
 
-                Route::apiResource('payments', PaymentController::class);
+                // ✅ payments: المسارات المحددة قبل apiResource
                 Route::get('payments/confirmed', [PaymentController::class, 'confirmed']);
                 Route::get('payments/pending',   [PaymentController::class, 'pending']);
+                Route::apiResource('payments', PaymentController::class);
 
-                Route::apiResource('checks', CheckController::class);
+                // ✅ checks: المسارات المحددة قبل apiResource
                 Route::get('checks/pending',               [CheckController::class, 'pending']);
                 Route::get('checks/overdue',               [CheckController::class, 'overdue']);
+                Route::apiResource('checks', CheckController::class);
                 Route::post('checks/{check}/mark-cleared', [CheckController::class, 'markAsCleared']);
                 Route::post('checks/{check}/mark-bounced', [CheckController::class, 'markAsBounced']);
 
+                // ✅ treasury-accounts: المسارات المحددة قبل apiResource
                 Route::get('treasury-accounts/bank-accounts', [TreasuryAccountController::class, 'bankAccounts']);
                 Route::get('treasury-accounts/cash-accounts', [TreasuryAccountController::class, 'cashAccounts']);
                 Route::get('treasury-accounts/default',       [TreasuryAccountController::class, 'default']);
                 Route::apiResource('treasury-accounts', TreasuryAccountController::class);
 
-                Route::apiResource('expenses', ExpenseController::class);
+                // ✅ expenses: المسارات المحددة قبل apiResource
                 Route::get('expenses/paid',   [ExpenseController::class, 'paid']);
                 Route::get('expenses/unpaid', [ExpenseController::class, 'unpaid']);
+                Route::apiResource('expenses', ExpenseController::class);
 
-                Route::post('product-lots',                [ProductLotController::class, 'store']);
-                Route::put('product-lots/{lot}',           [ProductLotController::class, 'update']);
-                Route::delete('product-lots/{lot}',        [ProductLotController::class, 'destroy']);
+                Route::post('product-lots',         [ProductLotController::class, 'store']);
+                Route::put('product-lots/{lot}',    [ProductLotController::class, 'update']);
+                Route::delete('product-lots/{lot}', [ProductLotController::class, 'destroy']);
 
-                Route::post('stock-movements',             [StockMovementController::class, 'store']);
+                Route::post('stock-movements',              [StockMovementController::class, 'store']);
                 Route::delete('stock-movements/{movement}', [StockMovementController::class, 'destroy']);
             });
 
@@ -420,8 +436,9 @@ Route::prefix('v1')->group(function () {
             Route::apiResource('attachments', AttachmentController::class);
             Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download']);
 
+            // ✅ settings: المسارات المحددة قبل apiResource
+            Route::get('settings/group/{group}',   [SettingController::class, 'byGroup']);
+            Route::get('settings/key/{key}/value', [SettingController::class, 'getValue']);
             Route::apiResource('settings', SettingController::class);
-            Route::get('settings/group/{group}',    [SettingController::class, 'byGroup']);
-            Route::get('settings/key/{key}/value',  [SettingController::class, 'getValue']);
         });
 });
