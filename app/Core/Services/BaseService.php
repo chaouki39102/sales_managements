@@ -19,7 +19,6 @@ abstract class BaseService
     protected array $defaultWith = [];
     protected array $showWith    = [];
 
-    /** اسم المورد — يُستخدم في الكاش والأحداث والسجلات */
     abstract protected function getResourceName(): string;
 
     // ═══════════════════════════════════════════════════════════════
@@ -46,12 +45,31 @@ abstract class BaseService
         return $query->get();
     }
 
+    /**
+     * الطبقة 6 — Soft Deletes آمن: يضيف company_id فلتراً يدوياً
+     * لأن onlyTrashed() يتجاوز GlobalScope
+     */
     public function findTrashedById($id): Model
     {
         if (!method_exists($this->model, 'withTrashed')) {
             throw new BusinessRuleException('هذا المورد لا يدعم الحذف المؤقت.', 400);
         }
-        return $this->model::onlyTrashed()->findOrFail($id);
+
+        $query = $this->model::onlyTrashed();
+
+        // ✅ أضف company_id يدوياً — onlyTrashed يتجاوز CompanyScope
+        if ($this->modelHasColumn('company_id')) {
+            try {
+                $companyId = app(\App\Services\CompanyContextService::class)->get();
+                if ($companyId) {
+                    $query->where('company_id', $companyId);
+                }
+            } catch (\RuntimeException $e) {
+                Log::debug('CompanyContext unavailable in findTrashedById', ['model' => $this->model]);
+            }
+        }
+
+        return $query->findOrFail($id);
     }
 
     public function exists($id): bool
@@ -252,15 +270,33 @@ abstract class BaseService
     // 6. Hooks
     // ═══════════════════════════════════════════════════════════════
 
+    /**
+     * الطبقة 4 — Mass Assignment Protection
+     *
+     * يحذف:
+     * - company_id  → يعيّنه HasCompany تلقائياً، المهاجم لا يحدده
+     * - created_by  → يعيّنه النظام، ليس المستخدم
+     * - updated_by  → يعيّنه prepareDataForUpdate
+     * - deleted_by  → يعيّنه نظام الحذف
+     *
+     * ويفلتر الحقول غير الموجودة في الجدول
+     */
     protected function beforeCreate(array $data, ?Request $request): array
     {
         try {
             $columns = Schema::getColumnListing((new $this->model)->getTable());
+            $data    = array_intersect_key($data, array_flip($columns));
         } catch (\Throwable $e) {
-            return $data;
+            // إذا فشل Schema نبقى مع البيانات كما هي
         }
 
-        return array_intersect_key($data, array_flip($columns));
+        // ✅ الطبقة 4: حقول لا يجب أن تأتي من الـ request أبداً
+        unset($data['company_id']);   // HasCompany يتولاه
+        unset($data['created_by']);   // النظام يعيّنه
+        unset($data['updated_by']);   // ليس عند الإنشاء
+        unset($data['deleted_by']);   // ليس عند الإنشاء
+
+        return $data;
     }
 
     protected function afterCreate(Model $item, array $data, ?Request $request): void {}
@@ -277,10 +313,17 @@ abstract class BaseService
         }
     }
 
+    /**
+     * الطبقة 4 — Mass Assignment Protection عند التحديث
+     */
     protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
     {
-        unset($data['company_id']);
+        // ✅ الطبقة 4: حقول محمية لا تُحدَّث من الـ request
+        unset($data['company_id']);  // لا يتغير أبداً
+        unset($data['created_by']); // لا يتغير أبداً
+        unset($data['deleted_by']); // يديره نظام الحذف فقط
 
+        // updated_by يعيّنه النظام تلقائياً
         if ($this->modelHasColumn('updated_by') && auth()->check()) {
             $data['updated_by'] = auth()->id();
         }
@@ -310,10 +353,19 @@ abstract class BaseService
         return $item;
     }
 
+    /**
+     * الطبقة 7 — Cache Keys per-Company
+     *
+     * المشكلة: إذا كان الـ key هو "brands_list" فقط →
+     * شركة A ترى cache شركة B.
+     *
+     * الحل: نضيف company_id في الـ key لعزل كل شركة
+     */
     protected function clearCache(): void
     {
         if (method_exists(Cache::getStore(), 'tags')) {
-            Cache::tags(['api', $this->getResourceName()])->flush();
+            $companyTag = $this->getCompanyCacheTag();
+            Cache::tags(['api', $this->getResourceName(), $companyTag])->flush();
             return;
         }
 
@@ -322,21 +374,42 @@ abstract class BaseService
         }
     }
 
+    /**
+     * الطبقة 7 — Cache Keys تشمل company_id
+     */
     protected function getCacheKeys(): array
     {
         $r = $this->getResourceName();
-        return ["{$r}_list", "{$r}_all", "{$r}_count"];
+        $c = $this->getCurrentCompanyId() ?? 'global';
+
+        return [
+            "{$r}:{$c}:list",
+            "{$r}:{$c}:all",
+            "{$r}:{$c}:count",
+        ];
     }
 
     /**
-     * ✅ دالة واحدة فقط — دُمجت نسختان كانتا متضاربتين
-     *
-     * المشكلة الأصلية:
-     *   كانت هناك نسختان من logOperation في نفس الكلاس:
-     *   - النسخة القديمة: تكتب في Log::info() الافتراضي
-     *   - النسخة الجديدة: تكتب في Log::channel('operations')
-     *   PHP يرفض تعريف نفس الدالة مرتين → Fatal Error → 500 على كل طلب
+     * الطبقة 7 — Cache Tag للشركة الحالية
      */
+    protected function getCompanyCacheTag(): string
+    {
+        $c = $this->getCurrentCompanyId() ?? 'global';
+        return "company:{$c}";
+    }
+
+    /**
+     * جلب company_id الحالي بأمان
+     */
+    protected function getCurrentCompanyId(): ?int
+    {
+        try {
+            return app(\App\Services\CompanyContextService::class)->get();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     protected function logOperation(string $operation, Model $item, array $extra = []): void
     {
         $data = [
@@ -350,7 +423,6 @@ abstract class BaseService
             ...$extra,
         ];
 
-        // يكتب في قناة 'operations' إذا كانت مُعرَّفة، وإلا في الافتراضية
         try {
             Log::channel('operations')->info("Service: {$operation}", $data);
         } catch (\Throwable $e) {
@@ -358,9 +430,6 @@ abstract class BaseService
         }
     }
 
-    /**
-     * تطبيق company_id scoping على query بشكل آمن
-     */
     protected function applyScopeToQuery(Builder $query): Builder
     {
         if (!$this->modelHasColumn('company_id')) {
@@ -379,9 +448,6 @@ abstract class BaseService
         return $query;
     }
 
-    /**
-     * التحقق من وجود عمود في جدول الـ model — مع cache ثابت
-     */
     protected function modelHasColumn(string $column): bool
     {
         static $cache = [];

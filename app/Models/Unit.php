@@ -45,37 +45,5 @@ class Unit extends Model
         return $this->hasMany(Product::class);
     }
 
-    protected static function boot(): void
-{
-    parent::boot();
-
-    static::creating(function (self $model): void {
-        $model->slug = static::uniqueSlug($model->name, $model->company_id);
-    });
-
-    static::updating(function (self $model): void {
-        if ($model->isDirty('name')) {
-            $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
-        }
-    });
-}
-
-public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
-{
-    $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
-    $originalSlug = $slug;
-    $count = 1;
-
-    while (\Illuminate\Support\Facades\DB::table('units_of_measure')
-        ->where('slug', $slug)
-        ->when($ignoreId, function ($query) use ($ignoreId) {
-            return $query->where('id', '!=', $ignoreId);
-        })
-        ->exists()
-    ) {
-        $slug = $originalSlug . '-' . $count++;
-    }
-
-    return $slug;
-}
+    
 }

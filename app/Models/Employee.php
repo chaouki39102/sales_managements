@@ -10,11 +10,13 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 
 #[Cacheable]
 class Employee extends Model
 {
-    use HasStandardizedConfiguration, HasCompany, SoftDeletes, Auditable;
+    use HasStandardizedConfiguration, HasCompany,
+        SoftDeletes, Auditable, HasTenantRouteBinding;
 
     protected $table = 'employees';
 

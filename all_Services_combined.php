@@ -16,7 +16,7 @@ class AttachmentService extends \App\Core\Services\BaseService
     protected string $resourceName = 'attachment';
     protected array $defaultWith = ['uploadedBy'];
     protected function getResourceName(): string { return $this->resourceName; }
-    
+
 
     public function getFilePath(Attachment $attachment): string
     {
@@ -39,7 +39,7 @@ class AuditService extends \App\Core\Services\BaseService
     protected string $resourceName = 'audit';
     protected array $defaultWith = ['user'];
     protected function getResourceName(): string { return $this->resourceName; }
-    
+
 
     public function getByUser(int $userId)
     {
@@ -389,7 +389,7 @@ class BarcodeService extends \App\Core\Services\BaseService
         return $query->exists();
     }
 
-    private function getCurrentCompanyId(): int
+    protected function getCurrentCompanyId(): ?int
     {
         return app(\App\Services\CompanyContextService::class)->getCurrentCompanyId();
     }
@@ -466,7 +466,7 @@ class CheckService extends \App\Core\Services\BaseService
     protected string $resourceName = 'check';
     protected array $defaultWith = ['party', 'payments'];
     protected function getResourceName(): string { return $this->resourceName; }
-    
+
 
     public function getPending()
     {
@@ -3237,7 +3237,7 @@ class PartyService extends \App\Core\Services\BaseService
     /**
      * Get customers only
      */
-    private function getCurrentCompanyId(): int
+    protected function getCurrentCompanyId(): ?int
     {
         return app(\App\Services\CompanyContextService::class)->get();
     }
@@ -3796,7 +3796,7 @@ class QRCodeService
     public function generateForDocument(CommercialDocument $document): string
     {
         $data = $this->buildQRData($document);
-        
+
         $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
             ->size(200)
             ->errorCorrection('M')
@@ -3813,7 +3813,7 @@ class QRCodeService
     private function buildQRData(CommercialDocument $document): string
     {
         $supplier = $document->party;
-        
+
         $qrData = [
             'supplier' => [
                 'name' => config('app.company_name', 'Company Name'),
@@ -3845,7 +3845,7 @@ class QRCodeService
 
     private function generateHash(CommercialDocument $document): string
     {
-        $data = 
+        $data =
             ($document->document_number ?? '') .
             ($document->document_date?->format('Ymd') ?? '') .
             round($document->total_ttc ?? 0, 2) .
@@ -4712,7 +4712,7 @@ class UserService extends \App\Core\Services\BaseService
         $user->update(['avatar' => $path]);
     }
 
-    private function getCurrentCompanyId(): int
+    protected function getCurrentCompanyId(): ?int
     {
         return app(\App\Services\CompanyContextService::class)->get();
     }

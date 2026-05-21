@@ -333,7 +333,7 @@ class UserService extends \App\Core\Services\BaseService
         $user->update(['avatar' => $path]);
     }
 
-    private function getCurrentCompanyId(): int
+    protected function getCurrentCompanyId(): ?int
     {
         return app(\App\Services\CompanyContextService::class)->get();
     }

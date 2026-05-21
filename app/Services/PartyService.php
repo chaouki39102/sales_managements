@@ -196,7 +196,7 @@ class PartyService extends \App\Core\Services\BaseService
     /**
      * Get customers only
      */
-    private function getCurrentCompanyId(): int
+    protected function getCurrentCompanyId(): ?int
     {
         return app(\App\Services\CompanyContextService::class)->get();
     }

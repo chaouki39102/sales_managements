@@ -153,19 +153,21 @@ export default function ProductsPage() {
   const [priceTooltip, setPriceTooltip] = useState<number | null>(null);
 
   // ── Lookups ──
-  const { data: families = [] } = useQuery<Family[]>({
-    queryKey: ['families', slug],
+ const { data: families = [] } = useQuery<Family[]>({
+    queryKey: ['families'],          // ← احذف slug — lookups مشتركة لا تتغير بالصفحة
     queryFn: () => apiClient.get('/families', { params: { per_page: 200 } }).then(r => r.data.data ?? []),
-    staleTime: 5 * 60_000,
+    staleTime: 30 * 60_000,         // ← من 5 إلى 30 دقيقة
+    gcTime: 60 * 60_000,            // ← أضف هذا: يبقى في الـ cache ساعة كاملة
     enabled: !!slug,
-  });
+});
 
-  const { data: brands = [] } = useQuery<Brand[]>({
-    queryKey: ['brands', slug],
+const { data: brands = [] } = useQuery<Brand[]>({
+    queryKey: ['brands'],            // ← احذف slug
     queryFn: () => apiClient.get('/brands', { params: { per_page: 200 } }).then(r => r.data.data ?? []),
-    staleTime: 5 * 60_000,
+    staleTime: 30 * 60_000,         // ← من 5 إلى 30 دقيقة
+    gcTime: 60 * 60_000,            // ← أضف هذا
     enabled: !!slug,
-  });
+});
 
   // ── Products Query — include الصحيح بدون variants ──
   const { data: response, isLoading, isFetching, refetch } = useQuery({

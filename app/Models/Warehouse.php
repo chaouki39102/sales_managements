@@ -6,16 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 
 #[Cacheable]
 class Warehouse extends Model
 {
-    use HasStandardizedConfiguration, HasCompany, SoftDeletes, Auditable;
+    use HasStandardizedConfiguration, HasCompany,
+        SoftDeletes, Auditable, HasTenantRouteBinding;
 
     protected $table = 'warehouses';
 

@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-UI-files.md"
+OUTPUT="merged-UI-code.md"
 
 > "$OUTPUT"
 
@@ -60,8 +60,12 @@ EXCLUDE=(
 
 
 
+# CSS
+merge_section "🎨 STYLES" \
+  \( -iname "*.css" \) "${EXCLUDE[@]}"
+
 # COMPONENTS
-merge_section "🧠 COMPONENTS" \
+merge_section "🧩 COMPONENTS" \
   \( -path "*/components/*" \) "${EXCLUDE[@]}"
 
 

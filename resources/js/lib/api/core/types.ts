@@ -625,3 +625,26 @@ export interface ExchangeRate  extends BaseModel {
   currency_id: number; rate: number; date: string;
   currency?: Currency; company_id: number;
 }
+
+// ─── Company Members ──────────────────────────────────────────────────────────
+
+export type CompanyMemberRole =
+  | 'owner'
+  | 'admin'
+  | 'accountant'
+  | 'cashier'
+  | 'warehouseman'
+  | 'viewer'
+  | 'member';
+
+export interface CompanyMember extends BaseModel {
+  user_id:    number;
+  company_id: number;
+  role:       CompanyMemberRole;
+  active:     boolean;
+  user?: {
+    id:    number;
+    name:  string;
+    email: string;
+  };
+}

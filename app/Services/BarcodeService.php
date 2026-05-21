@@ -253,7 +253,7 @@ class BarcodeService extends \App\Core\Services\BaseService
         return $query->exists();
     }
 
-    private function getCurrentCompanyId(): int
+    protected function getCurrentCompanyId(): ?int
     {
         return app(\App\Services\CompanyContextService::class)->getCurrentCompanyId();
     }

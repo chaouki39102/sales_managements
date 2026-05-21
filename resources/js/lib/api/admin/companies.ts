@@ -1,99 +1,121 @@
 // ════════════════════════════════════════════════════════════════════════════
-// lib/api/admin/companies.ts  ← النسخة المُصلحة الكاملة
+// lib/api/admin/companies.ts
 //
-// المشكلة الأصلية:
-//   suspend/unsuspend/activate/deactivate/verify/unverify/changePlan
-//   كانت تستخدم Tenant routes:
-//     /companies/{slug}/suspend  (مع _skipSlug: true)
-//   لكن api_admin.php يُعرّفها في Admin routes:
-//     /api/v1/admin/companies/{id}/suspend
+// ✅ هذا الملف خاص بـ AdminCompanyController (api_admin.php → /api/v1/admin/*)
+//    المستخدم: super-admin فقط (middleware: super.admin)
 //
-//   النتيجة: 404 أو 403 عند كل محاولة تعديل على شركة
-//
-// الحل:
-//   كل العمليات تستخدم /admin/companies/{id}/... (الـ id الرقمي)
-//   لا يوجد _skipSlug — لا حاجة له
-//   أُضيفت listUsers التي كانت مستخدمة في CompanyDrawer لكن غير معرّفة
+// ✅ كل العمليات بالـ id الرقمي — route model binding في Laravel بالـ id
+//    (AdminCompanyController يستخدم Company $company بدون getRouteKeyName override)
 // ════════════════════════════════════════════════════════════════════════════
-import { apiPost, apiPut, apiPatch, apiDelete, apiGet } from '@/lib/api/core/client';
-import { apiGetPaginated }                              from './client';
-import type {
-  AdminCompany,
-  AdminUser,
-  Paginated,
-  AdminCompaniesFilter,
-} from '@/types/admin';
+
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '@/lib/api/core/client';
+import { apiGetPaginated } from './client';
+import type { AdminCompany, AdminUser, Paginated, AdminCompaniesFilter } from '@/types/admin';
 
 const ADMIN = '/admin/companies';
 
 export const companiesApi = {
+  // ── CRUD ───────────────────────────────────────────────────────────────────
 
-  // ─── List & CRUD ───────────────────────────────────────────────────────────
+  // GET  /api/v1/admin/companies
   list: (f?: AdminCompaniesFilter) =>
     apiGetPaginated<Paginated<AdminCompany>>(ADMIN, f as any),
 
-  show:   (id: number)                           => apiGet<AdminCompany>(`${ADMIN}/${id}`),
-  create: (d: Partial<AdminCompany>)             => apiPost<AdminCompany>(ADMIN, d),
-  update: (id: number, d: Partial<AdminCompany>) => apiPut<AdminCompany>(`${ADMIN}/${id}`, d),
-  remove: (id: number)                           => apiDelete(`${ADMIN}/${id}`),
+  // GET  /api/v1/admin/companies/{id}
+  show: (id: number) =>
+    apiGet<AdminCompany>(`${ADMIN}/${id}`),
 
-  // ─── Notes ─────────────────────────────────────────────────────────────────
+  // POST /api/v1/admin/companies
+  create: (data: Partial<AdminCompany>) =>
+    apiPost<AdminCompany>(ADMIN, data),
+
+  // PUT  /api/v1/admin/companies/{id}
+  update: (id: number, data: Partial<AdminCompany>) =>
+    apiPut<AdminCompany>(`${ADMIN}/${id}`, data),
+
+  // DELETE /api/v1/admin/companies/{id}
+  remove: (id: number) =>
+    apiDelete(`${ADMIN}/${id}`),
+
+  // ── Notes ──────────────────────────────────────────────────────────────────
+
+  // PATCH /api/v1/admin/companies/{id}/notes
   updateNotes: (id: number, notes: string) =>
     apiPatch<void>(`${ADMIN}/${id}/notes`, { notes }),
 
-  // ─── Company Actions — كلها /admin/companies/{id}/... ✅ ──────────────────
-  // الخطأ القديم: كانت تستخدم /companies/{slug}/... مع _skipSlug: true
-  // الصواب: api_admin.php يُعرّف هذه الـ routes تحت prefix('v1/admin')
+  // ── Actions ────────────────────────────────────────────────────────────────
+  // جميع هذه الـ routes تحت prefix('v1/admin') في api_admin.php
 
-  suspend:    (id: number, reason: string) =>
-    apiPost<AdminCompany>(`${ADMIN}/${id}/suspend`,   { reason }),
+  // POST /api/v1/admin/companies/{id}/suspend
+  suspend: (id: number, reason: string) =>
+    apiPost<AdminCompany>(`${ADMIN}/${id}/suspend`, { reason }),
 
-  unsuspend:  (id: number) =>
+  // POST /api/v1/admin/companies/{id}/unsuspend
+  unsuspend: (id: number) =>
     apiPost<AdminCompany>(`${ADMIN}/${id}/unsuspend`),
 
-  activate:   (id: number) =>
+  // POST /api/v1/admin/companies/{id}/activate
+  activate: (id: number) =>
     apiPost<AdminCompany>(`${ADMIN}/${id}/activate`),
 
+  // POST /api/v1/admin/companies/{id}/deactivate
   deactivate: (id: number) =>
     apiPost<AdminCompany>(`${ADMIN}/${id}/deactivate`),
 
-  verify:     (id: number) =>
+  // POST /api/v1/admin/companies/{id}/verify
+  verify: (id: number) =>
     apiPost<AdminCompany>(`${ADMIN}/${id}/verify`),
 
-  unverify:   (id: number) =>
+  // POST /api/v1/admin/companies/{id}/unverify
+  unverify: (id: number) =>
     apiPost<AdminCompany>(`${ADMIN}/${id}/unverify`),
 
-  changePlan: (id: number, d: {
-    plan:             string;
-    max_users?:       number;
-    max_products?:    number;
-    max_warehouses?:  number;
-  }) => apiPost<AdminCompany>(`${ADMIN}/${id}/change-plan`, d),
+  // POST /api/v1/admin/companies/{id}/change-plan
+  changePlan: (
+    id: number,
+    d: {
+      plan:            string;
+      max_users?:      number;
+      max_products?:   number;
+      max_warehouses?: number;
+    },
+  ) => apiPost<AdminCompany>(`${ADMIN}/${id}/change-plan`, d),
 
-  // ─── Members ───────────────────────────────────────────────────────────────
-  // ✅ listUsers كانت مُستخدَمة في CompanyDrawer لكن غير موجودة
+  // ── Members ────────────────────────────────────────────────────────────────
+
+  // GET  /api/v1/admin/companies/{id}/users
   listUsers: (id: number, params?: { page?: number; per_page?: number }) =>
     apiGetPaginated<Paginated<AdminUser>>(`${ADMIN}/${id}/users`, params as any),
 
-  addUser:    (id: number, userId: number, role?: string) =>
+  // POST /api/v1/admin/companies/{id}/users
+  addUser: (id: number, userId: number, role?: string) =>
     apiPost(`${ADMIN}/${id}/users`, { user_id: userId, role }),
 
+  // DELETE /api/v1/admin/companies/{id}/users/{userId}
   removeUser: (id: number, userId: number) =>
     apiDelete(`${ADMIN}/${id}/users/${userId}`),
 
+  // PATCH /api/v1/admin/companies/{id}/users/{userId}/toggle
   toggleUser: (id: number, userId: number) =>
     apiPatch(`${ADMIN}/${id}/users/${userId}/toggle`, {}),
 
-  // ─── Seed ──────────────────────────────────────────────────────────────────
+  // ── Seed ───────────────────────────────────────────────────────────────────
+
+  // POST /api/v1/admin/companies/{id}/seed
   seed: (id: number) =>
     apiPost<{ message: string; applied: string[]; skipped: string[] }>(
-      `${ADMIN}/${id}/seed`
+      `${ADMIN}/${id}/seed`,
     ),
+
+  // POST /api/v1/admin/companies/{id}/seed/{seeder}
+  seedSingle: (id: number, seeder: string) =>
+    apiPost<{ message: string }>(`${ADMIN}/${id}/seed/${seeder}`),
 
 } as const;
 
 // ─── Type helpers للـ hooks ───────────────────────────────────────────────────
-export type CompanyActionId =
+
+export type CompanyActionPayload =
   | { action: 'suspend';    id: number; reason: string }
   | { action: 'unsuspend';  id: number }
   | { action: 'activate';   id: number }

@@ -35,11 +35,11 @@ class ApiListService
      * @return LengthAwarePaginator|JsonResponse|\Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
      */
     public static function getList(string $modelClass, array $config, Request $request)
-    {
-        // ✅ الكاش مُعطَّل: تخزين LengthAwarePaginator يسبب مشكلة unserialize
-        $queryCallback = $config['query_callback'] ?? null;
-        return self::executeQuery($modelClass, $config, $request, $queryCallback);
-    }
+{
+    // ✅ الكاش معطّل — Paginator لا يُحفظ في cache
+    $queryCallback = $config['query_callback'] ?? null;
+    return self::executeQuery($modelClass, $config, $request, $queryCallback);
+}
 
     /**
      * تنفيذ الاستعلام الأساسي، مع معالجة التصدير والـ Pagination.
@@ -67,11 +67,18 @@ class ApiListService
             }
 
             // تطبيق الـ Pagination
+            // في executeQuery — استبدل السطر الأخير:
+
             $perPage = (int) $request->get('per_page', $config['default_per_page'] ?? 15);
             $perPage = min($perPage, $config['per_page_limit'] ?? 100);
 
-            return $qb->paginate($perPage);
+            // ✅ simplePaginate إذا لم يطلب المستخدم total count صراحةً
+            // يتجنب COUNT(*) الثقيل على الجداول الكبيرة
+            if ($config['simple_paginate'] ?? false) {
+                return $qb->simplePaginate($perPage);
+            }
 
+            return $qb->paginate($perPage);
         } catch (InvalidFilterQuery | InvalidSortQuery | InvalidIncludeQuery $e) {
             // ✅ تحسين: معالجة أخطاء المستخدم (مثل فلتر غير صالح) كـ 400 Bad Request
             Log::warning('ApiListService: Invalid query parameter from user.', [
@@ -81,7 +88,6 @@ class ApiListService
             ]);
             // إعادة رمي الاستثناء كنوع مخصص يمكن معالجته في الـ Handler العام
             throw new ApiQueryBuilderException("Invalid query parameter: " . $e->getMessage(), 400, $e);
-
         } catch (\Throwable $e) {
             // معالجة الأخطاء غير المتوقعة كـ 500 Server Error
             Log::error('ApiListService.executeQuery unexpected error', [
@@ -142,9 +148,15 @@ class ApiListService
 
         // ✅ إصلاح: Spatie QueryBuilder يرفض [] في بعض الإصدارات
         // ✅ استخدام spread operator لأن Spatie تقبل AllowedFilter|string وليس array
-        if (!empty($allowedFilters))  { $qb->allowedFilters(...$allowedFilters);   }
-        if (!empty($allowedSorts))    { $qb->allowedSorts(...$allowedSorts);       }
-        if (!empty($allowedIncludes)) { $qb->allowedIncludes(...$allowedIncludes); }
+        if (!empty($allowedFilters)) {
+            $qb->allowedFilters(...$allowedFilters);
+        }
+        if (!empty($allowedSorts)) {
+            $qb->allowedSorts(...$allowedSorts);
+        }
+        if (!empty($allowedIncludes)) {
+            $qb->allowedIncludes(...$allowedIncludes);
+        }
 
         // تطبيق الترتيب الافتراضي فقط إذا لم يحدده المستخدم
         if (!$request->has('sort')) {
@@ -238,8 +250,12 @@ class ApiListService
      */
     protected static function generateCacheKey(string $modelClass, Request $request, array $config): string
     {
-        $uid    = auth()->id() ?? 'guest';
-        $tenant = config('app.tenant_id') ?? 'default';
+        // ✅ company_id في الـ key — عزل كل شركة (Multi-Tenancy)
+        try {
+            $tenant = app(\App\Services\CompanyContextService::class)->get() ?? 'global';
+        } catch (\Throwable $e) {
+            $tenant = 'global';
+        }
 
         $relevantParams = $request->only(['filter', 'sort', 'include', 'page', 'per_page', 'search']);
 
@@ -247,14 +263,13 @@ class ApiListService
             $relevantParams['soft_deleted'] = 1;
         }
 
-        // ✅ هام: ترتيب المعاملات لضمان أن الطلبات المتطابقة لها نفس مفتاح الكاش
         ksort($relevantParams);
         array_walk_recursive($relevantParams, function (&$item) {
             if (is_array($item)) ksort($item);
         });
 
         $hash = md5(json_encode($relevantParams));
-        return "api-list:{$tenant}:" . class_basename($modelClass) . ":{$uid}:{$hash}";
+        return "api:{$tenant}:" . class_basename($modelClass) . ":{$hash}";
     }
 
     /**

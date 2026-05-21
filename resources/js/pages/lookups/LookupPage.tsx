@@ -6,8 +6,9 @@
 import React, {
   useState, useEffect, useCallback, useRef, useMemo,
 } from 'react';
-import { useLookup } from '@/hooks/useLookup';
-import apiClient from '@/lib/api/core/client';
+import { useLookup }       from '@/hooks/useLookup';
+import { useRemoteLabels } from '@/hooks/useRemoteLabels';
+import apiClient           from '@/lib/api/core/client';
 
 // ── Types ──────────────────────────────────────
 export interface FieldDef {
@@ -573,29 +574,8 @@ export default function LookupPage({
   // refs للحقول — للـ Enter navigation
   const fieldRefs = useRef<Array<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>([]);
 
-  // remote labels للجدول
-  const [remoteLabels, setRemoteLabels] = useState<RemoteLabels>({});
-  useEffect(() => {
-    fields
-      .filter(f => f.type === 'remote-select' && f.remoteEndpoint)
-      .forEach(f => {
-        apiClient.get(f.remoteEndpoint!, { params: { per_page: 500 } })
-          .then(res => {
-            const raw = res.data as any;
-            const arr: any[] = Array.isArray(raw?.data) ? raw.data
-              : Array.isArray(raw?.data?.data) ? raw.data.data : [];
-            const labelField = f.remoteLabel ?? 'arabic_name';
-            const valueField = f.remoteValue ?? 'id';
-            const map: Record<string | number, string> = {};
-            arr.forEach(i => {
-              map[i[valueField]] = i[labelField] ?? i.arabic_name ?? i.name ?? String(i[valueField]);
-            });
-            setRemoteLabels(prev => ({ ...prev, [f.key]: map }));
-          })
-          .catch(() => {});
-      });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endpoint]);
+  // remote labels للجدول — مع كاش React Query (useRemoteLabels.ts)
+  const remoteLabels = useRemoteLabels(fields, endpoint);
 
   // Enter navigation: انتقل للحقل التالي
   const focusField = useCallback((idx: number) => {

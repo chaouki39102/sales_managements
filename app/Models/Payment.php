@@ -12,11 +12,13 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 
 #[Cacheable]
 class Payment extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, BelongsToFiscalYear;
+    use HasStandardizedConfiguration, SoftDeletes,
+        HasCompany, Auditable, BelongsToFiscalYear, HasTenantRouteBinding;
 
     protected $table = 'payments';
 

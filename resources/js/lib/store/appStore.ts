@@ -1,7 +1,15 @@
 // ════════════════════════════════════════════════════════════════════════════
 // lib/store/appStore.ts
-// Zustand — للحالة المحلية فقط (لا server state هنا)
-// React Query يتولى كل بيانات الـ API
+//
+// Zustand — حالة التطبيق المحلية (لا server state هنا — تلك مهمة React Query)
+//
+// ✅ هذا الملف هو المصدر الوحيد لـ:
+//    - activeCompany (slug, id, name)  ← يقرأه الـ Interceptor
+//    - selectedYearId                  ← يتغير مع تبديل الشركة
+//    - sidebarCollapsed                ← ❌ لا تُعرِّفه في uiStore أيضاً
+//    - theme
+//
+// ⚠️  sidebarCollapsed مُعرَّف هنا فقط — لا تُضفه لأي store آخر
 // ════════════════════════════════════════════════════════════════════════════
 
 import { create } from 'zustand';
@@ -12,23 +20,19 @@ import type { ActiveCompany } from '../api/core/types';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AppState {
-  // الشركة النشطة
   activeCompany:    ActiveCompany | null;
-  // السنة المالية المختارة (id فقط — البيانات من React Query)
   selectedYearId:   number | null;
-  // السايدبار
-  sidebarCollapsed: boolean;
-  // الثيم
+  sidebarCollapsed: boolean;    // ← المصدر الوحيد لهذه القيمة
   theme:            'light' | 'dark' | 'auto';
 }
 
 interface AppActions {
-  setActiveCompany:   (company: ActiveCompany | null) => void;
-  setSelectedYearId:  (id: number | null) => void;
-  toggleSidebar:      () => void;
-  setSidebarCollapsed:(collapsed: boolean) => void;
-  setTheme:           (theme: AppState['theme']) => void;
-  reset:              () => void;
+  setActiveCompany:    (company: ActiveCompany | null) => void;
+  setSelectedYearId:   (id: number | null) => void;
+  toggleSidebar:       () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  setTheme:            (theme: AppState['theme']) => void;
+  reset:               () => void;
 }
 
 type AppStore = AppState & AppActions;
@@ -51,7 +55,7 @@ export const useAppStore = create<AppStore>()(
 
       setActiveCompany: (company) =>
         set((state) => {
-          // تغيير الشركة → إعادة تعيين السنة المختارة
+          // تغيير الشركة → إعادة تعيين السنة المختارة تلقائياً
           if (state.activeCompany?.slug !== company?.slug) {
             state.selectedYearId = null;
           }
@@ -72,11 +76,10 @@ export const useAppStore = create<AppStore>()(
 
       reset: () => set(initialState),
     })),
-
     {
       name:    'app-store',
       storage: createJSONStorage(() => sessionStorage),
-      // persist فقط الحالة الضرورية بين الصفحات
+      // persist فقط الحالة الضرورية بين الصفحات داخل نفس الجلسة
       partialize: (state) => ({
         activeCompany:    state.activeCompany,
         selectedYearId:   state.selectedYearId,
@@ -93,13 +96,13 @@ export const useActiveCompany    = () => useAppStore((s) => s.activeCompany);
 export const useActiveSlug       = () => useAppStore((s) => s.activeCompany?.slug ?? null);
 export const useSelectedYearId   = () => useAppStore((s) => s.selectedYearId);
 export const useSidebarCollapsed = () => useAppStore((s) => s.sidebarCollapsed);
-export const useTheme            = () => useAppStore((s) => s.theme);
+export const useCurrentTheme     = () => useAppStore((s) => s.theme);
 
-// ─── Actions (خارج React — للاستخدام في Interceptors وما شابه) ──────────────
+// ─── Actions (خارج React — للـ Interceptors والـ event handlers) ─────────────
 
 export const appActions = {
-  getActiveSlug: () => useAppStore.getState().activeCompany?.slug ?? null,
+  getActiveSlug:    () => useAppStore.getState().activeCompany?.slug ?? null,
   setActiveCompany: (company: ActiveCompany | null) =>
     useAppStore.getState().setActiveCompany(company),
-  reset: () => useAppStore.getState().reset(),
+  reset:            () => useAppStore.getState().reset(),
 };

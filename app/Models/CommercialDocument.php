@@ -13,6 +13,7 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 
 #[Cacheable]
 class CommercialDocument extends Model
@@ -21,7 +22,8 @@ class CommercialDocument extends Model
         SoftDeletes,
         HasCompany,
         Auditable,
-        BelongsToFiscalYear;
+        BelongsToFiscalYear
+        ,HasTenantRouteBinding;
 
     protected $table = 'commercial_documents';
 

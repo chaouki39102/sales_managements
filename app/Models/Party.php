@@ -11,13 +11,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 use App\Models\Traits\HasTenantSlug;
 
 
 #[Cacheable]
 class Party extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, HasTenantSlug;
+    use HasStandardizedConfiguration, SoftDeletes,
+        HasCompany, Auditable, HasTenantSlug, HasTenantRouteBinding;
 
     protected $table = 'parties';
 
