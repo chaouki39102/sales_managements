@@ -1,18 +1,17 @@
-// ════════════════════════════════════════════════
 // components/topbar/SuperAdminButton.tsx
-// زر الوصول السريع للوحة تحكم السوبر أدمن
-// أضفه في Topbar.tsx بجانب أزرار الأيقونات
-// ════════════════════════════════════════════════
+// ✅ يستخدم نفس isSuperAdmin المُعرَّف في DashboardLayout (السطر 532)
+//    user?.roles?.some((r: any) => r.name === 'super-admin')
+
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth }     from '@/context/AuthContext';
 
 export default function SuperAdminButton() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { user }  = useAuth() as any;
+  const navigate  = useNavigate();
 
-  const isSuperAdmin =
-    (user as any)?.roles?.some((r: any) => r.name === 'super-admin') ||
-    (user as any)?.role === 'super_admin';
+  // نفس منطق DashboardLayout بالضبط
+  const isSuperAdmin: boolean =
+    user?.roles?.some((r: { name: string }) => r.name === 'super-admin') ?? false;
 
   if (!isSuperAdmin) return null;
 
@@ -21,10 +20,27 @@ export default function SuperAdminButton() {
       onClick={() => navigate('/admin')}
       title="لوحة تحكم النظام"
       style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '5px 10px', borderRadius: 8,
-        border: '1px solid #ef444433', background: '#ef44440d',
-        color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+        display:     'flex',
+        alignItems:  'center',
+        gap:          6,
+        padding:     '5px 10px',
+        borderRadius: 8,
+        border:      '1px solid var(--redbo)',
+        background:  'var(--redb)',
+        color:       'var(--red)',
+        cursor:      'pointer',
+        fontSize:     12,
+        fontWeight:   600,
+        fontFamily:  'Tajawal, sans-serif',
+        transition:  'all .15s',
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLButtonElement).style.background = 'var(--red)';
+        (e.currentTarget as HTMLButtonElement).style.color      = '#fff';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLButtonElement).style.background = 'var(--redb)';
+        (e.currentTarget as HTMLButtonElement).style.color      = 'var(--red)';
       }}
     >
       <i className="ti ti-shield-lock" style={{ fontSize: 15 }} />

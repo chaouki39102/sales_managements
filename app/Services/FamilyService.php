@@ -27,21 +27,7 @@ class FamilyService extends \App\Core\Services\BaseService
 
     protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
     {
-        $data = parent::prepareDataForUpdate($item, $data, $request);
+            return parent::prepareDataForUpdate($item, $data, $request);
 
-        if (isset($data['name'])) {
-            $modelClass = $this->model;
-            $proposedSlug = $modelClass::uniqueSlug($data['name'], $item->company_id, $item->id);
-
-            if ($proposedSlug === $item->slug) {
-                unset($data['slug'], $data['name']);
-            } else {
-                $data['slug'] = $proposedSlug;
-            }
-        } else {
-            unset($data['slug']);
-        }
-
-        return $data;
     }
 }

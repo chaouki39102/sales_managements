@@ -252,18 +252,18 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 use App\Models\Traits\HasTenantSlug;
 
 #[Cacheable]
 class Brand extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany, HasTenantSlug;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable,
+        HasCompany, HasTenantSlug, HasTenantRouteBinding;
 
     protected $table = 'brands';
 
@@ -507,6 +507,7 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 
 #[Cacheable]
 class CommercialDocument extends Model
@@ -515,7 +516,8 @@ class CommercialDocument extends Model
         SoftDeletes,
         HasCompany,
         Auditable,
-        BelongsToFiscalYear;
+        BelongsToFiscalYear
+        ,HasTenantRouteBinding;
 
     protected $table = 'commercial_documents';
 
@@ -642,6 +644,7 @@ class CommercialDocument extends Model
     public function isOverdue(): bool { return $this->due_date && $this->due_date->isPast() && !$this->isFullyPaid(); }
     public function canBeModified(): bool { return !$this->is_locked && !$this->validated_at; }
 }
+
 
 
 
@@ -1293,7 +1296,6 @@ class Currency extends Model
         return number_format($amount, $this->decimal_places) . ' ' . $this->symbol;
     }
 
-   
 }
 
 
@@ -1510,11 +1512,13 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 
 #[Cacheable]
 class Employee extends Model
 {
-    use HasStandardizedConfiguration, HasCompany, SoftDeletes, Auditable;
+    use HasStandardizedConfiguration, HasCompany,
+        SoftDeletes, Auditable, HasTenantRouteBinding;
 
     protected $table = 'employees';
 
@@ -1595,6 +1599,7 @@ class Employee extends Model
         return $query->where('employment_status', 'active');
     }
 }
+
 
 
 
@@ -1744,11 +1749,13 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 
 #[Cacheable]
 class Expense extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, BelongsToFiscalYear;
+    use HasStandardizedConfiguration, SoftDeletes,
+        HasCompany, Auditable, BelongsToFiscalYear, HasTenantRouteBinding;
 
     protected $table = 'expenses';
 
@@ -1854,6 +1861,7 @@ class Expense extends Model
 
 
 
+
 // ===== ملف: ExpenseCategory.php =====
 namespace App\Models;
 
@@ -1943,17 +1951,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 use App\Models\Traits\HasTenantSlug;
 
 #[Cacheable]
 class Family extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany, HasTenantSlug;
+    use HasStandardizedConfiguration, SoftDeletes, Auditable,
+        HasCompany, HasTenantSlug, HasTenantRouteBinding;
 
     protected $table = 'families';
 
@@ -2022,40 +2031,6 @@ class Family extends Model
         return $query->where('active', true);
     }
 
-    // protected static function boot(): void
-    // {
-    //     parent::boot();
-
-    //     static::creating(function (self $model): void {
-    //         $model->slug = static::uniqueSlug($model->name, $model->company_id);
-    //     });
-
-    //     static::updating(function (self $model): void {
-    //         if ($model->isDirty('name')) {
-    //             $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
-    //         }
-    //     });
-    // }
-
-    // public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
-    // {
-    //     $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
-    //     $originalSlug = $slug;
-    //     $count = 1;
-
-    //     // 💡 تم تعديل الجدول هنا ليكون families بشكل صحيح
-    //     while (\Illuminate\Support\Facades\DB::table('families')
-    //         ->where('slug', $slug)
-    //         ->when($ignoreId, function ($query) use ($ignoreId) {
-    //             return $query->where('id', '!=', $ignoreId);
-    //         })
-    //         ->exists()
-    //     ) {
-    //         $slug = $originalSlug . '-' . $count++;
-    //     }
-
-    //     return $slug;
-    // }
 
 }
 
@@ -2836,14 +2811,15 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 use App\Models\Traits\HasTenantSlug;
-use Illuminate\Support\Str;
 
 
 #[Cacheable]
 class Party extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, HasTenantSlug;
+    use HasStandardizedConfiguration, SoftDeletes,
+        HasCompany, Auditable, HasTenantSlug, HasTenantRouteBinding;
 
     protected $table = 'parties';
 
@@ -2972,19 +2948,6 @@ class Party extends Model
         return in_array($this->partyType?->name, ['supplier', 'both']);
     }
 
-//     protected static function booted()
-// {
-//     static::saving(function ($party) {
-//         if (empty($party->slug) && !empty($party->name)) {
-//             $party->slug = Str::slug($party->name);
-//             $original = $party->slug;
-//             $counter = 1;
-//             while (static::where('slug', $party->slug)->where('id', '!=', $party->id)->exists()) {
-//                 $party->slug = $original . '-' . $counter++;
-//             }
-//         }
-//     });
-// }
 }
 
 
@@ -3052,11 +3015,13 @@ use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\BelongsToFiscalYear;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 
 #[Cacheable]
 class Payment extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, HasCompany, Auditable, BelongsToFiscalYear;
+    use HasStandardizedConfiguration, SoftDeletes,
+        HasCompany, Auditable, BelongsToFiscalYear, HasTenantRouteBinding;
 
     protected $table = 'payments';
 
@@ -3149,6 +3114,7 @@ class Payment extends Model
         return $this->getUnappliedAmount() <= 0.01;
     }
 }
+
 
 
 
@@ -3347,17 +3313,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 use App\Models\Traits\HasTenantSlug;
 
 #[Cacheable]
 class Product extends Model
 {
-    use HasCompany, HasStandardizedConfiguration, SoftDeletes, Auditable, HasTenantSlug;
+    use HasCompany, HasStandardizedConfiguration, SoftDeletes,
+        Auditable, HasTenantSlug, HasTenantRouteBinding;
 
     protected $table = 'products';
 
@@ -4554,39 +4521,7 @@ class Unit extends Model
         return $this->hasMany(Product::class);
     }
 
-    protected static function boot(): void
-{
-    parent::boot();
-
-    static::creating(function (self $model): void {
-        $model->slug = static::uniqueSlug($model->name, $model->company_id);
-    });
-
-    static::updating(function (self $model): void {
-        if ($model->isDirty('name')) {
-            $model->slug = static::uniqueSlug($model->name, $model->company_id, $model->id);
-        }
-    });
-}
-
-public static function uniqueSlug(string $name, int $companyId, ?int $ignoreId = null): string
-{
-    $slug = \Illuminate\Support\Str::slug($name) ?: preg_replace('/\s+/u', '-', trim(mb_strtolower($name)));
-    $originalSlug = $slug;
-    $count = 1;
-
-    while (\Illuminate\Support\Facades\DB::table('units_of_measure')
-        ->where('slug', $slug)
-        ->when($ignoreId, function ($query) use ($ignoreId) {
-            return $query->where('id', '!=', $ignoreId);
-        })
-        ->exists()
-    ) {
-        $slug = $originalSlug . '-' . $count++;
-    }
-
-    return $slug;
-}
+    
 }
 
 
@@ -4738,16 +4673,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Models\Traits\HasTenantRouteBinding;
 
 #[Cacheable]
 class Warehouse extends Model
 {
-    use HasStandardizedConfiguration, HasCompany, SoftDeletes, Auditable;
+    use HasStandardizedConfiguration, HasCompany,
+        SoftDeletes, Auditable, HasTenantRouteBinding;
 
     protected $table = 'warehouses';
 
@@ -4802,6 +4738,7 @@ class Warehouse extends Model
         return implode(', ', $parts);
     }
 }
+
 
 
 

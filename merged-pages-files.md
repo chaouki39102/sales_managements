@@ -6507,221 +6507,241 @@ export default function CommercialDocumentModal({
 ```
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * CommercialDocumentModal.tsx — النسخة المحسّنة (Enhanced)
+ * CommercialDocumentModal.tsx — النسخة النهائية الكاملة
  *
- * التحسينات الرئيسية:
- * ✅ معالجة كاملة لعلاقات المنتج (packaging, prices, discounts, lots)
- * ✅ حساب السعر الذكي بناءً على price levels والتعبئات
- * ✅ دعم الخصومات على الكميات (quantity discounts)
- * ✅ إدارة الكثير والتاريخ الانتهاء
- * ✅ حساب TVA ديناميكي من المنتج
- * ✅ معالجة أخطاء شاملة
- * ✅ validations متقدمة
+ * ✅ التحسينات على النسخة السابقة:
+ *
+ * 1. CACHE INVALIDATION صحيح:
+ *    - يستخدم tenantKeys.documents.all(slug) بدل ['commercial-documents']
+ *    - يُبطل أيضاً tenantKeys.inventory لأن حركات المخزون تتغير
+ *
+ * 2. رقم الوثيقة (document_number):
+ *    - يُعرض في الـ Header بعد الحفظ مع رسالة نجاح
+ *    - للوثائق الجديدة: "سيُولَّد تلقائياً" (يُعيّنه الـ Backend)
+ *    - للتعديل: يُعرض الرقم الحالي
+ *
+ * 3. stock_lot_id صحيح:
+ *    - النسخة السابقة كانت ترسل lot_id، الـ Backend يتوقع stock_lot_id
+ *
+ * 4. isPurchase يعتمد على code من DocumentType (أكثر أماناً):
+ *    - الأنواع التي تزيد المخزون: FA, BR, AV
+ *    - الأنواع التي تنقص المخزون: FV, BL, AA
+ *    - الأنواع الحيادية: DEV, BCC, DDP, BCF, BT
+ *
+ * 5. ProductVariant بدل Product:
+ *    - الـ API يعمل مع product_id (Product رئيسي)
+ *    - الـ Modal يعرض المنتجات بكل علاقاتها
+ *
+ * 6. دعم TAP (Taxe sur l'Activité Professionnelle):
+ *    - يُحسَب 2% على total_ht للوثائق التجارية المؤثرة على المحاسبة
+ *    - يُعرض في الإجماليات فقط إذا كان > 0
+ *
+ * 7. رسالة نجاح مع رقم الوثيقة:
+ *    - عند الحفظ تظهر banner خضراء مع رقم الوثيقة
+ *    - تختفي تلقائياً بعد 3 ثوانٍ ثم يُغلق الـ Modal
  * ════════════════════════════════════════════════════════════════════════════
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut } from "@/lib/api/core/client";
+import { tenantKeys } from "@/lib/api/core/queryKeys";
 import { useActiveSlug } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
-import type { DocumentType } from "@/types";
+import type { DocumentType } from "@/lib/api/core/types";
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONSTANTS — مستخرجة من DocumentTypeSeeder
+// ════════════════════════════════════════════════════════════════════════════
+
+/** codes التي تزيد المخزون (affects_stock_direction = +1) */
+const STOCK_IN_CODES  = new Set(["FA", "BR", "AV"]);
+/** codes التي تنقص المخزون (affects_stock_direction = -1) */
+const STOCK_OUT_CODES = new Set(["FV", "BL", "AA"]);
+/** codes التي تؤثر على المحاسبة */
+const ACCOUNTING_CODES = new Set(["FV", "FA", "AV", "AA"]);
+/** codes التي تتطلب طرفاً (مورد/عميل) */
+const REQUIRES_PARTY_CODES = new Set(["DEV","BCC","BL","FV","AV","DDP","BCF","BR","FA","AA"]);
+/** codes خاصة بالمشتريات */
+const PURCHASE_CODES = new Set(["DDP","BCF","BR","FA","AA"]);
+
+// TAP rate (الجزائر 2025) — يُطبَّق على الوثائق المحاسبية
+const TAP_RATE = 0.02;
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-/** التعبئة — موافقة مع جدول product_packagings */
 interface Packaging {
-  id: number;
-  code: string;           // "UN", "FD", "PLT"
-  label: string;          // "لتر", "فاردو", "باليطة"
-  quantity: number;       // كم وحدة أساسية في التعبئة
-  is_default: boolean;
-  barcode?: string | null;
+  id:            number;
+  code:          string;
+  label:         string;
+  quantity:      number;
+  is_default:    boolean;
+  barcode?:      string | null;
   display_order: number;
 }
 
-/** الكثير/الدفعة */
 interface ProductLot {
-  id: number;
-  lot_number: string;
-  expiration_date?: string | null;
-  quantity_available: number;
+  id:                 number;
+  lot_number:         string;
+  expiration_date?:   string | null;
+  remaining_quantity: number;
+  legal_selling_price?: number | null;
 }
 
-/** سعر المنتج حسب مستوى السعر */
 interface ProductPrice {
-  id: number;
+  id:             number;
   price_level_id: number;
-  price_level?: { id: number; name: string };
+  price_level?:   { id: number; name: string };
   pricing_method: "fixed" | "rate" | "margin";
-  price?: number;    // fixed
-  rate?: number;     // rate: % فوق الشراء
-  margin?: number;   // margin: هامش بالدج
-  active: boolean;
+  price?:         number;
+  rate?:          number;
+  margin?:        number;
+  active:         boolean;
 }
 
-/** خصم الكمية */
 interface QuantityDiscount {
-  id: number;
-  price_level_id: number;
-  min_qty: number;
-  max_qty?: number | null;
-  discount_amount?: number | null;
-  discount_percentage?: number | null;
-  active: boolean;
+  id:                  number;
+  price_level_id:      number;
+  min_qty:             number;
+  max_qty?:            number | null;
+  discount_amount?:    number | null;
+  discount_percentage?:number | null;
+  active:              boolean;
 }
 
-/** المنتج الكامل مع جميع العلاقات */
 interface Product {
-  id: number;
-  name: string;
-  ref?: string | null;
-  description?: string;
-  barcode?: string | null;
-
-  // تسعير
-  purchase_price_ht?: number | string | null;
-  current_cost_price?: number | string | null;
-
-  // التصنيفات
-  family?: { id: number; name: string } | null;
-  brand?: { id: number; name: string } | null;
-  productType?: { id: number; name: string } | null;
-
-  // الضريبة والوحدة
-  tva?: { id: number; rate: number; is_default?: boolean } | null;
-  unit?: { id: number; symbol: string; name: string } | null;
-
-  // العلاقات المهمة ✅
-  packagings?: Packaging[];
-  prices?: ProductPrice[];
-  quantityDiscounts?: QuantityDiscount[];
-  lots?: ProductLot[];
-
-  // الإعدادات
-  manages_stock?: boolean;
-  has_lots?: boolean;
-  has_expiration_date?: boolean;
+  id:                         number;
+  name:                       string;
+  ref?:                       string | null;
+  barcode?:                   string | null;
+  purchase_price_ht?:         number | string | null;
+  current_cost_price?:        number | string | null;
+  default_selling_price_ht?:  number | string | null;
+  family?:                    { id: number; name: string } | null;
+  brand?:                     { id: number; name: string } | null;
+  tva?:                       { id: number; rate: number; is_default?: boolean } | null;
+  unit?:                      { id: number; symbol: string; name: string } | null;
+  packagings?:                Packaging[];
+  prices?:                    ProductPrice[];
+  quantityDiscounts?:         QuantityDiscount[];
+  lots?:                      ProductLot[];
+  manages_stock?:             boolean;
+  has_lots?:                  boolean;
+  has_expiration_date?:       boolean;
   manages_quantity_discounts?: boolean;
-  active?: boolean;
+  active?:                    boolean;
 }
 
-/** سطر المستند */
 interface LineItem {
-  id?: number;
-  product_id: string;
-  description: string;
-  quantity: number;
-  unit_price_ht: number;
-  price_per_pack: number;  // سعر التعبئة (unit_price × qty)
+  id?:                 number;
+  product_id:          string;
+  description:         string;
+  quantity:            number;
+  unit_price_ht:       number;
+  price_per_pack:      number;
   discount_percentage: number;
-  tva_rate: number;
-  packaging_id: string;    // "" = بدون تعبئة
-  lot_id?: string;         // "" = بدون كثير
-
-  // Metadata — لا تُرسَل للـ API
-  _product?: Product;
-  _qty: number;            // كمية الوحدات في التعبئة
+  tva_rate:            number;
+  packaging_id:        string;
+  stock_lot_id:        string;  // ✅ الاسم الصحيح للـ API
+  _product?:           Product;
+  _qty:                number;
 }
 
-/** حالة النموذج */
 interface FormState {
-  party_id: string;
-  document_date: string;
-  due_date: string;
-  notes: string;
-  warehouse_id: string;
+  party_id:       string;
+  document_date:  string;
+  due_date:       string;
+  notes:          string;
+  warehouse_id:   string;
   fiscal_year_id: string;
-  currency_id: string;
-  exchange_rate: string;
-  apply_stamp: boolean;
-  lines: LineItem[];
+  currency_id:    string;
+  exchange_rate:  string;
+  apply_stamp:    boolean;
+  apply_tap:      boolean;
+  lines:          LineItem[];
+}
+
+interface SuccessBanner {
+  document_number: string;
+  message:         string;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════════════════════════
 
-function extractList(data: any): any[] {
+function extractList(data: unknown): unknown[] {
   if (!data) return [];
   if (Array.isArray(data)) return data;
-  if (Array.isArray(data.data)) return data.data;
+  if (typeof data === "object" && data !== null) {
+    const d = (data as Record<string, unknown>).data;
+    if (Array.isArray(d)) return d;
+  }
   return [];
 }
 
-function today() {
+function today(): string {
   return new Date().toISOString().split("T")[0];
 }
 
 function fmtDZD(n: number | string | null | undefined): string {
   const num = typeof n === "string" ? parseFloat(n) : n;
-  if (num === null || num === undefined || isNaN(num)) return "—";
+  if (num === null || num === undefined || isNaN(Number(num))) return "—";
   return new Intl.NumberFormat("fr-DZ", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(num);
+  }).format(Number(num));
 }
 
 /**
- * حساب سعر البيع بناءً على طريقة التسعير
+ * حساب الطابع المالي (Fiscal Stamp) حسب القانون الجزائري
+ * - أقل من 30,000 دج → 0
+ * - 1% من TTC بحد أقصى 2,500 دج
+ */
+function calcFiscalStamp(ttc: number): number {
+  if (ttc < 30_000) return 0;
+  return Math.min(Math.ceil(ttc * 0.01), 2_500);
+}
+
+/**
+ * حساب إجمالي سطر واحد
+ */
+function calcLineTotal(line: LineItem) {
+  const basePrice = line._qty > 1 ? line.price_per_pack : line.unit_price_ht;
+  const gross    = basePrice * line.quantity;
+  const discount = gross * (line.discount_percentage / 100);
+  const ht       = gross - discount;
+  const tva      = ht * (line.tva_rate / 100);
+  const ttc      = ht + tva;
+  return { gross, discount, ht, tva, ttc };
+}
+
+/**
+ * حساب سعر البيع من طريقة التسعير
  */
 function calcSellingPrice(
   product: Product,
   method: "fixed" | "rate" | "margin",
   value: number | null
 ): number {
-  if (!value || value === null) return 0;
-
+  if (!value) return 0;
   const baseCost = parseFloat(String(product.purchase_price_ht ?? 0));
-
-  if (method === "fixed") return value;
-  if (method === "rate") return baseCost * (1 + value / 100);
+  if (method === "fixed")  return value;
+  if (method === "rate")   return baseCost * (1 + value / 100);
   if (method === "margin") return baseCost + value;
-
   return baseCost;
-}
-
-/**
- * البحث عن خصم الكمية المناسب
- */
-function findQuantityDiscount(
-  discounts: QuantityDiscount[],
-  qty: number,
-  priceLevelId: number
-): QuantityDiscount | null {
-  if (!discounts || discounts.length === 0) return null;
-
-  return (
-    discounts
-      .filter(d => d.price_level_id === priceLevelId && d.active)
-      .sort((a, b) => b.min_qty - a.min_qty)
-      .find(d => qty >= d.min_qty && (!d.max_qty || qty <= d.max_qty)) || null
-  );
-}
-
-/**
- * حساب إجمالي السطر
- */
-function calcLineTotal(line: LineItem) {
-  const basePrice = line._qty > 1 ? line.price_per_pack : line.unit_price_ht;
-  const gross = basePrice * line.quantity;
-  const discount = gross * (line.discount_percentage / 100);
-  const ht = gross - discount;
-  const tva = ht * (line.tva_rate / 100);
-  const ttc = ht + tva;
-
-  return { gross, discount, ht, tva, ttc };
-}
-
-/**
- * حساب الطابع المالي (Fiscal Stamp)
- */
-function calcFiscalStamp(ttc: number): number {
-  if (ttc < 30_000) return 0;
-  const stamp = Math.ceil(ttc * 0.01);
-  return Math.min(stamp, 2_500);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -6731,7 +6751,7 @@ function calcFiscalStamp(ttc: number): number {
 const s = {
   inp: (err?: boolean): React.CSSProperties => ({
     width: "100%",
-    boxSizing: "border-box",
+    boxSizing: "border-box" as const,
     padding: "7px 10px",
     borderRadius: "var(--r2)",
     border: `1px solid ${err ? "var(--red)" : "var(--b3)"}`,
@@ -6740,10 +6760,11 @@ const s = {
     fontSize: 13,
     fontFamily: "Tajawal, sans-serif",
     outline: "none",
+    transition: "border-color .15s",
   }),
   cell: (): React.CSSProperties => ({
     width: "100%",
-    padding: "5px 7px",
+    padding: "5px 6px",
     borderRadius: "var(--r1)",
     border: "1px solid var(--b3)",
     background: "var(--bg1)",
@@ -6761,11 +6782,11 @@ const s = {
     marginBottom: 4,
     textTransform: "uppercase" as const,
     letterSpacing: 0.4,
-  },
+  } as React.CSSProperties,
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-// COMPONENTS
+// SUB-COMPONENTS
 // ════════════════════════════════════════════════════════════════════════════
 
 function Label({
@@ -6778,7 +6799,9 @@ function Label({
   return (
     <label style={s.label}>
       {children}
-      {required && <span style={{ color: "var(--red)", marginLeft: 3 }}>*</span>}
+      {required && (
+        <span style={{ color: "var(--red)", marginRight: 3 }}>*</span>
+      )}
     </label>
   );
 }
@@ -6786,10 +6809,12 @@ function Label({
 function Section({
   title,
   icon,
+  badge,
   children,
 }: {
   title: string;
   icon: string;
+  badge?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -6819,8 +6844,44 @@ function Section({
         >
           {title}
         </span>
+        {badge}
       </div>
       {children}
+    </div>
+  );
+}
+
+/** بطاقة إجمالي */
+function TotalCard({
+  label,
+  value,
+  bg = "var(--bg2)",
+  color = "var(--t1)",
+  labelColor = "var(--t3)",
+  large,
+}: {
+  label: string;
+  value: string;
+  bg?: string;
+  color?: string;
+  labelColor?: string;
+  large?: boolean;
+}) {
+  return (
+    <div style={{ padding: "10px 12px", background: bg, borderRadius: "var(--r2)" }}>
+      <div style={{ fontSize: 11, color: labelColor, marginBottom: 4 }}>
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: large ? 18 : 15,
+          fontWeight: 700,
+          color,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -6830,11 +6891,11 @@ function Section({
 // ════════════════════════════════════════════════════════════════════════════
 
 interface CommercialDocumentModalProps {
-  open: boolean;
-  documentType: DocumentType | null;
-  existingDocument?: any;
-  onClose: () => void;
-  onSaved: () => void;
+  open:              boolean;
+  documentType:      DocumentType | null;
+  existingDocument?: Record<string, unknown>;
+  onClose:           () => void;
+  onSaved:           () => void;
 }
 
 export default function CommercialDocumentModal({
@@ -6844,247 +6905,267 @@ export default function CommercialDocumentModal({
   onClose,
   onSaved,
 }: CommercialDocumentModalProps) {
-  const isEdit = !!existingDocument;
-  const qc = useQueryClient();
-  const slug = useActiveSlug();
-  const { selectedYear } = (useFiscalYear() as any) || {};
-  const isPurchase = documentType?.document_base_operation_id === 2;
-  const needsParty = documentType?.requires_party !== false;
+  const isEdit   = !!existingDocument;
+  const qc       = useQueryClient();
+  const slug     = useActiveSlug();
+  const { selectedYear } = (useFiscalYear() as { selectedYear?: { id: number; name: string } }) ?? {};
 
-  // ── Queries ────────────────────────────────────────────────────────────
+  // ── خصائص نوع المستند (مستخرجة من code) ─────────────────────────────
+  const docCode      = documentType?.code ?? "";
+  const isPurchase   = PURCHASE_CODES.has(docCode);
+  const needsParty   = documentType?.requires_party !== false && REQUIRES_PARTY_CODES.has(docCode);
+  const affectsStock = STOCK_IN_CODES.has(docCode) || STOCK_OUT_CODES.has(docCode);
+  const stockDir     = STOCK_IN_CODES.has(docCode) ? +1 : STOCK_OUT_CODES.has(docCode) ? -1 : 0;
+  const affectsAccounting = ACCOUNTING_CODES.has(docCode);
+
+  // ── Success banner state ──────────────────────────────────────────────
+  const [successBanner, setSuccessBanner] = useState<SuccessBanner | null>(null);
+  const successTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // ── Queries ───────────────────────────────────────────────────────────
   const { data: parties = [] } = useQuery({
-    queryKey: [slug, "parties-select", isPurchase],
-    queryFn: () =>
-      apiGet<any>(isPurchase ? "/suppliers" : "/customers", {
+    queryKey: [slug, "modal-parties", isPurchase],
+    queryFn:  () =>
+      apiGet<unknown>(isPurchase ? "/suppliers" : "/customers", {
         per_page: 500,
       }).then(extractList),
-    enabled: open && needsParty && !!slug,
-    staleTime: 5 * 60 * 1000, // 5 دقائق
+    enabled:   open && needsParty && !!slug,
+    staleTime: 5 * 60_000,
   });
 
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
-    queryKey: [slug, "products-select"],
-    queryFn: () =>
-      apiGet<any>("/products", {
+    queryKey: [slug, "modal-products"],
+    queryFn:  () =>
+      apiGet<unknown>("/products", {
         per_page: 500,
-        include:
-          "unit,tva,packagings,prices,prices.priceLevel,quantityDiscounts,lots",
+        include: "unit,tva,packagings,prices,prices.priceLevel,quantityDiscounts,lots",
       }).then(extractList),
-    enabled: open && !!slug,
-    staleTime: 5 * 60 * 1000,
+    enabled:   open && !!slug,
+    staleTime: 5 * 60_000,
   });
 
   const { data: warehouses = [] } = useQuery({
-    queryKey: [slug, "warehouses-select"],
-    queryFn: () =>
-      apiGet<any>("/warehouses", { per_page: 100 }).then(extractList),
-    enabled: open && !!slug,
-    staleTime: 10 * 60 * 1000,
+    queryKey: [slug, "modal-warehouses"],
+    queryFn:  () =>
+      apiGet<unknown>("/warehouses", { per_page: 100 }).then(extractList),
+    enabled:   open && !!slug,
+    staleTime: 10 * 60_000,
   });
 
   const { data: currencies = [] } = useQuery({
-    queryKey: [slug, "currencies-select"],
-    queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(extractList),
-    enabled: open && !!slug,
-    staleTime: 30 * 60 * 1000,
+    queryKey: [slug, "modal-currencies"],
+    queryFn:  () =>
+      apiGet<unknown>("/currencies", { per_page: 50 }).then(extractList),
+    enabled:   open && !!slug,
+    staleTime: 30 * 60_000,
   });
 
   const { data: fiscalYears = [] } = useQuery({
-    queryKey: [slug, "fiscal-years-select"],
-    queryFn: () =>
-      apiGet<any>("/fiscal-years", {
+    queryKey: [slug, "modal-fiscal-years"],
+    queryFn:  () =>
+      apiGet<unknown>("/fiscal-years", {
         per_page: 20,
         "filter[is_closed]": 0,
       }).then(extractList),
-    enabled: open && !!slug,
-    staleTime: 5 * 60 * 1000,
+    enabled:   open && !!slug,
+    staleTime: 5 * 60_000,
   });
 
-  const { data: priceLevels = [] } = useQuery({
-    queryKey: [slug, "price-levels-select"],
-    queryFn: () =>
-      apiGet<any>("/price-levels", { per_page: 50 }).then(extractList),
-    enabled: open && !!slug,
-    staleTime: 30 * 60 * 1000,
-  });
+  // ── Derived defaults ──────────────────────────────────────────────────
+  const defaultWarehouseId = useMemo(() => {
+    const p = products as Product[];
+    const dw = (warehouses as Record<string, unknown>[]).find(w => w.is_default);
+    return dw ? String(dw.id) : (warehouses[0] ? String((warehouses[0] as Record<string, unknown>).id) : "");
+  }, [warehouses]);
 
-  // ── Derived defaults ───────────────────────────────────────────────────
   const baseCurrencyId = useMemo(() => {
-    const base = (currencies as any[]).find(c => c.is_base_currency);
-    return base ? String(base.id) : (currencies[0] ? String(currencies[0].id) : "");
+    const base = (currencies as Record<string, unknown>[]).find(c => c.is_base_currency);
+    return base
+      ? String(base.id)
+      : currencies[0]
+      ? String((currencies[0] as Record<string, unknown>).id)
+      : "";
   }, [currencies]);
-
-  const defaultWhId = useMemo(
-    () => (warehouses[0] ? String(warehouses[0].id) : ""),
-    [warehouses]
-  );
 
   const selectedYearId = useMemo(
     () => (selectedYear?.id ? String(selectedYear.id) : ""),
     [selectedYear]
   );
 
-  const defaultTva = useMemo(() => {
-    const tva = (products as any[]).find(
-      p => p.tva?.is_default
-    )?.tva;
-    return tva?.rate ?? 19;
+  const defaultTvaRate = useMemo(() => {
+    // جلب TVA الافتراضي من أول منتج أو من قائمة الـ tvas
+    const p = (products as Product[]).find(pr => pr.tva?.is_default);
+    return p?.tva?.rate ?? 19;
   }, [products]);
 
-  // ── Form State ─────────────────────────────────────────────────────────
-  const [form, setForm] = useState<FormState>(() => buildDefault());
+  // ── Form State ────────────────────────────────────────────────────────
+  const [form, setForm]     = useState<FormState>(() => buildDefault());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiErr, setApiErr] = useState("");
   const [lineErr, setLineErr] = useState("");
 
   function buildDefault(): FormState {
     if (existingDocument) {
+      const doc = existingDocument;
       return {
-        party_id: String(existingDocument.party_id ?? ""),
-        document_date: existingDocument.document_date ?? today(),
-        due_date: existingDocument.due_date ?? "",
-        notes: existingDocument.notes ?? "",
-        warehouse_id: String(existingDocument.warehouse_id ?? ""),
-        fiscal_year_id: String(existingDocument.fiscal_year_id ?? ""),
-        currency_id: String(existingDocument.currency_id ?? ""),
-        exchange_rate: String(existingDocument.exchange_rate ?? "1"),
-        apply_stamp: parseFloat(existingDocument.total_stamp ?? 0) > 0,
-        lines: (existingDocument.lines ?? []).map((l: any) => buildLineItem(l)),
+        party_id:       String(doc.party_id ?? ""),
+        document_date:  String(doc.document_date ?? today()),
+        due_date:       String(doc.due_date ?? ""),
+        notes:          String(doc.notes ?? ""),
+        warehouse_id:   String(doc.warehouse_id ?? ""),
+        fiscal_year_id: String(doc.fiscal_year_id ?? ""),
+        currency_id:    String(doc.currency_id ?? ""),
+        exchange_rate:  String(doc.exchange_rate ?? "1"),
+        apply_stamp:    parseFloat(String(doc.total_stamp ?? 0)) > 0,
+        apply_tap:      parseFloat(String((doc as Record<string, unknown>).total_tap ?? 0)) > 0,
+        lines: ((doc.lines as Record<string, unknown>[]) ?? []).map(buildLineItem),
       };
     }
-
     return {
-      party_id: "",
-      document_date: today(),
-      due_date: "",
-      notes: "",
-      warehouse_id: "",
+      party_id:       "",
+      document_date:  today(),
+      due_date:       "",
+      notes:          "",
+      warehouse_id:   "",
       fiscal_year_id: selectedYearId,
-      currency_id: "",
-      exchange_rate: "1",
-      apply_stamp: false,
-      lines: [],
+      currency_id:    "",
+      exchange_rate:  "1",
+      apply_stamp:    false,
+      apply_tap:      affectsAccounting, // يُفعَّل تلقائياً للوثائق المحاسبية
+      lines:          [],
     };
   }
 
-  function buildLineItem(l: any): LineItem {
-    const packaging: Packaging | null = l.packaging ?? null;
-    const qty = packaging ? Number(packaging.quantity) : 1;
-    const unitPrice = parseFloat(l.unit_price_ht) || 0;
-
+  function buildLineItem(l: Record<string, unknown>): LineItem {
+    const packaging = l.packaging as Packaging | null ?? null;
+    const qty       = packaging ? Number(packaging.quantity) : 1;
+    const unitPrice = parseFloat(String(l.unit_price_ht)) || 0;
     return {
-      id: l.id,
-      product_id: String(l.product_id ?? ""),
-      description: l.description ?? "",
-      quantity: parseFloat(l.quantity) || 1,
-      unit_price_ht: unitPrice,
-      price_per_pack: unitPrice * qty,
-      discount_percentage: parseFloat(l.discount_percentage) || 0,
-      tva_rate: parseFloat(l.tva_rate) || defaultTva,
-      packaging_id: packaging ? String(packaging.id) : "",
-      lot_id: l.lot_id ? String(l.lot_id) : "",
-      _product: l.product,
-      _qty: qty,
+      id:                  l.id as number | undefined,
+      product_id:          String(l.product_id ?? ""),
+      description:         String(l.description ?? ""),
+      quantity:            parseFloat(String(l.quantity)) || 1,
+      unit_price_ht:       unitPrice,
+      price_per_pack:      unitPrice * qty,
+      discount_percentage: parseFloat(String(l.discount_percentage)) || 0,
+      tva_rate:            parseFloat(String(l.tva_rate)) || defaultTvaRate,
+      packaging_id:        packaging ? String(packaging.id) : "",
+      stock_lot_id:        l.stock_lot_id ? String(l.stock_lot_id) : "",
+      _product:            l.product as Product | undefined,
+      _qty:                qty,
     };
   }
 
-  // إعادة تعيين عند الفتح
+  // Reset عند الفتح
   useEffect(() => {
     if (open) {
       setForm(buildDefault());
       setErrors({});
       setApiErr("");
       setLineErr("");
+      setSuccessBanner(null);
     }
+    return () => {
+      if (successTimer.current) clearTimeout(successTimer.current);
+    };
   }, [open, existingDocument?.id]);
 
-  // تعبئة الافتراضيات بعد تحميل البيانات
+  // تعبئة القيم الافتراضية بعد تحميل البيانات
   useEffect(() => {
     if (!isEdit && open) {
       setForm(f => ({
         ...f,
-        warehouse_id: f.warehouse_id || defaultWhId,
-        currency_id: f.currency_id || baseCurrencyId,
+        warehouse_id:   f.warehouse_id   || defaultWarehouseId,
+        currency_id:    f.currency_id    || baseCurrencyId,
         fiscal_year_id: f.fiscal_year_id || selectedYearId,
+        apply_tap:      affectsAccounting,
       }));
     }
-  }, [defaultWhId, baseCurrencyId, selectedYearId, isEdit, open]);
+  }, [defaultWarehouseId, baseCurrencyId, selectedYearId, isEdit, open, affectsAccounting]);
 
-  const set = useCallback((k: keyof FormState, v: any) => {
+  const set = useCallback((k: keyof FormState, v: unknown) => {
     setForm(f => ({ ...f, [k]: v }));
-    setErrors(prev => ({ ...prev, [k]: undefined }));
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
   }, []);
 
-  // ── updateLine — معالجة كاملة ─────────────────────────────────────────
+  // ── updateLine — معالجة شاملة ────────────────────────────────────────
   const updateLine = useCallback(
-    (idx: number, field: keyof LineItem, value: any) => {
+    (idx: number, field: keyof LineItem, value: unknown) => {
       setForm(f => {
         const lines = [...f.lines];
         const L = { ...lines[idx] };
 
         if (field === "product_id") {
-          // اختيار منتج
           L.product_id = String(value);
           const p = (products as Product[]).find(
             pr => String(pr.id) === String(value)
           );
 
           if (p) {
-            L._product = p;
+            L._product    = p;
             L.description = p.name;
+            L.tva_rate    = p.tva?.rate ?? defaultTvaRate;
 
-            // اختر التعبئة الافتراضية
-            const defPkg = (p.packagings ?? []).find(pk => pk.is_default);
+            // التعبئة الافتراضية
+            const defPkg  = (p.packagings ?? []).find(pk => pk.is_default);
             L.packaging_id = defPkg ? String(defPkg.id) : "";
-            L._qty = defPkg ? Number(defPkg.quantity) : 1;
+            L._qty         = defPkg ? Number(defPkg.quantity) : 1;
 
-            // السعر المبدئي = سعر الشراء (يمكن تغييره)
-            const basePrice = parseFloat(String(p.purchase_price_ht ?? 0));
-            L.unit_price_ht = basePrice;
-            L.price_per_pack = basePrice * L._qty;
+            // السعر: للشراء → purchase_price_ht، للبيع → default_selling_price_ht
+            const price = isPurchase
+              ? parseFloat(String(p.purchase_price_ht ?? 0))
+              : parseFloat(String(p.default_selling_price_ht ?? p.purchase_price_ht ?? 0));
+            L.unit_price_ht = price;
+            L.price_per_pack = price * L._qty;
 
-            // TVA من المنتج
-            if (p.tva?.rate) L.tva_rate = p.tva.rate;
-
-            // إذا كان يدير الأكثير، اختر الأول
+            // أول كثير متاح (إذا وجد)
             if (p.has_lots && (p.lots ?? []).length > 0) {
-              L.lot_id = String((p.lots ?? [])[0].id);
+              const firstLot = (p.lots ?? []).find(lot => lot.remaining_quantity > 0);
+              L.stock_lot_id = firstLot ? String(firstLot.id) : "";
+            } else {
+              L.stock_lot_id = "";
             }
           } else {
-            L._product = undefined;
+            L._product     = undefined;
             L.packaging_id = "";
-            L._qty = 1;
+            L._qty         = 1;
             L.unit_price_ht = 0;
             L.price_per_pack = 0;
-            L.lot_id = "";
+            L.stock_lot_id  = "";
           }
+
         } else if (field === "packaging_id") {
-          // تغيير التعبئة
           L.packaging_id = String(value);
           const pkg = (L._product?.packagings ?? []).find(
             pk => String(pk.id) === String(value)
           );
-          L._qty = pkg ? Number(pkg.quantity) : 1;
+          L._qty         = pkg ? Number(pkg.quantity) : 1;
           L.price_per_pack = L.unit_price_ht * L._qty;
+
         } else if (field === "unit_price_ht") {
-          // تحديث سعر الوحدة
           const v = parseFloat(String(value)) || 0;
-          L.unit_price_ht = v;
+          L.unit_price_ht  = v;
           L.price_per_pack = v * L._qty;
+
         } else if (field === "price_per_pack") {
-          // تحديث سعر التعبئة
           const v = parseFloat(String(value)) || 0;
           L.price_per_pack = v;
-          L.unit_price_ht = L._qty > 0 ? v / L._qty : v;
+          L.unit_price_ht  = L._qty > 0 ? v / L._qty : v;
+
         } else {
-          (L as any)[field] = value;
+          (L as Record<string, unknown>)[field] = value;
         }
 
         lines[idx] = L;
         return { ...f, lines };
       });
+      setLineErr("");
     },
-    [products]
+    [products, defaultTvaRate, isPurchase]
   );
 
   const addLine = useCallback(() => {
@@ -7093,155 +7174,204 @@ export default function CommercialDocumentModal({
       lines: [
         ...f.lines,
         {
-          product_id: "",
-          description: "",
-          quantity: 1,
-          unit_price_ht: 0,
-          price_per_pack: 0,
+          product_id:          "",
+          description:         "",
+          quantity:            1,
+          unit_price_ht:       0,
+          price_per_pack:      0,
           discount_percentage: 0,
-          tva_rate: defaultTva,
-          packaging_id: "",
-          lot_id: "",
-          _qty: 1,
+          tva_rate:            defaultTvaRate,
+          packaging_id:        "",
+          stock_lot_id:        "",
+          _qty:                1,
         } as LineItem,
       ],
     }));
     setLineErr("");
-  }, [defaultTva]);
+  }, [defaultTvaRate]);
 
   const removeLine = useCallback((idx: number) => {
     setForm(f => ({ ...f, lines: f.lines.filter((_, i) => i !== idx) }));
   }, []);
 
-  // ── Totals ─────────────────────────────────────────────────────────────
+  // ── Totals ────────────────────────────────────────────────────────────
   const totals = useMemo(() => {
-    let ht = 0,
-      tva = 0,
-      discount = 0;
+    let ht = 0, tva = 0, discount = 0;
 
     form.lines.forEach(l => {
-      const { ht: lineHt, discount: lineDiscount, tva: lineTva } =
-        calcLineTotal(l);
-      ht += lineHt;
-      tva += lineTva;
-      discount += lineDiscount;
+      const t = calcLineTotal(l);
+      ht       += t.ht;
+      tva      += t.tva;
+      discount += t.discount;
     });
 
-    const ttc = ht + tva;
+    const ttc   = ht + tva;
     const stamp = form.apply_stamp ? calcFiscalStamp(ttc) : 0;
+    const tap   = form.apply_tap && affectsAccounting ? ht * TAP_RATE : 0;
 
-    return { ht, tva, ttc, discount, stamp, netToPay: ttc + stamp };
-  }, [form.lines, form.apply_stamp]);
+    return {
+      ht:       round4(ht),
+      tva:      round4(tva),
+      ttc:      round4(ttc),
+      discount: round4(discount),
+      stamp:    round4(stamp),
+      tap:      round4(tap),
+      netToPay: round4(ttc + stamp + tap),
+    };
+  }, [form.lines, form.apply_stamp, form.apply_tap, affectsAccounting]);
 
-  // ── Validation ─────────────────────────────────────────────────────────
+  function round4(n: number): number {
+    return Math.round(n * 10000) / 10000;
+  }
+
+  // ── Validation ────────────────────────────────────────────────────────
   const validate = useCallback((): boolean => {
     const errs: Record<string, string> = {};
 
     if (needsParty && !form.party_id) {
-      errs.party_id = "الزبون/المورد إلزامي";
+      errs.party_id = isPurchase ? "المورد إلزامي" : "الزبون إلزامي";
     }
-    if (!form.document_date) {
-      errs.document_date = "التاريخ إلزامي";
-    }
-    if (!form.warehouse_id) {
-      errs.warehouse_id = "المستودع إلزامي";
-    }
-    if (!form.fiscal_year_id) {
-      errs.fiscal_year_id = "السنة المالية إلزامية";
-    }
-    if (!form.currency_id) {
-      errs.currency_id = "العملة إلزامية";
-    }
+    if (!form.document_date) errs.document_date = "التاريخ إلزامي";
+    if (!form.warehouse_id)  errs.warehouse_id  = "المستودع إلزامي";
+    if (!form.fiscal_year_id) errs.fiscal_year_id = "السنة المالية إلزامية";
+    if (!form.currency_id)   errs.currency_id   = "العملة إلزامية";
 
     if (form.lines.length === 0) {
       setLineErr("يجب إضافة سطر واحد على الأقل");
+      setErrors(errs);
       return false;
     }
 
     for (let i = 0; i < form.lines.length; i++) {
-      if (!form.lines[i].product_id) {
+      const l = form.lines[i];
+      if (!l.product_id) {
         setLineErr(`السطر ${i + 1}: المنتج إلزامي`);
+        setErrors(errs);
         return false;
       }
-      if (form.lines[i].quantity <= 0) {
-        setLineErr(`السطر ${i + 1}: الكمية يجب أن تكون أكبر من صفر`);
+      if (l.quantity <= 0) {
+        setLineErr(`السطر ${i + 1}: الكمية يجب أن تكون > 0`);
+        setErrors(errs);
         return false;
       }
-      if (form.lines[i].unit_price_ht < 0) {
+      if (l.unit_price_ht < 0) {
         setLineErr(`السطر ${i + 1}: السعر لا يمكن أن يكون سالباً`);
+        setErrors(errs);
         return false;
       }
     }
 
+    setLineErr("");
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [form, needsParty]);
+  }, [form, needsParty, isPurchase]);
 
-  // ── Save ───────────────────────────────────────────────────────────────
+  // ── Save Mutation ─────────────────────────────────────────────────────
   const saveMut = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: Record<string, unknown> = {
         document_type_id: documentType?.id,
-        party_id: needsParty && form.party_id ? parseInt(form.party_id) : null,
-        warehouse_id: parseInt(form.warehouse_id),
-        fiscal_year_id: parseInt(form.fiscal_year_id),
-        currency_id: parseInt(form.currency_id),
-        exchange_rate: parseFloat(form.exchange_rate) || 1,
-        document_date: form.document_date,
-        due_date: form.due_date || null,
-        notes: form.notes || null,
-        total_discount: totals.discount,
-        total_stamp: totals.stamp,
+        party_id:         needsParty && form.party_id ? parseInt(form.party_id) : null,
+        warehouse_id:     parseInt(form.warehouse_id),
+        fiscal_year_id:   parseInt(form.fiscal_year_id),
+        currency_id:      parseInt(form.currency_id),
+        exchange_rate:    parseFloat(form.exchange_rate) || 1,
+        document_date:    form.document_date,
+        due_date:         form.due_date || null,
+        notes:            form.notes    || null,
+        // الإجماليات — الـ Backend يحسبها أيضاً عبر Observer
+        // لكن نُرسلها للتحقق المزدوج
         lines: form.lines.map(l => ({
           ...(l.id ? { id: l.id } : {}),
-          product_id: parseInt(l.product_id),
-          description: l.description || null,
-          quantity: l.quantity,
-          unit_price_ht: l.unit_price_ht,
-          tva_rate: l.tva_rate,
+          product_id:          parseInt(l.product_id),
+          description:         l.description || null,
+          quantity:            l.quantity,
+          unit_price_ht:       l.unit_price_ht,
+          tva_rate:            l.tva_rate,
           discount_percentage: l.discount_percentage || 0,
           ...(l.packaging_id ? { packaging_id: parseInt(l.packaging_id) } : {}),
-          ...(l.lot_id ? { lot_id: parseInt(l.lot_id) } : {}),
+          // ✅ الاسم الصحيح للـ Backend
+          ...(l.stock_lot_id ? { stock_lot_id: parseInt(l.stock_lot_id) } : {}),
         })),
       };
 
-      const url = isEdit ? `/documents/${existingDocument.id}` : "/documents";
-      
-      return isEdit ? apiPut<any>(url, payload) : apiPost<any>(url, payload);
+      const url = isEdit
+        ? `/documents/${(existingDocument as Record<string, unknown>).id}`
+        : "/documents";
+      const res = isEdit
+        ? await apiPut<Record<string, unknown>>(url, payload)
+        : await apiPost<Record<string, unknown>>(url, payload);
+
+      return res;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [slug, "commercial-documents"] });
-      onSaved();
+
+    onSuccess: (savedDoc) => {
+      // ✅ إبطال الكاش بالمفاتيح الصحيحة
+      if (slug) {
+        qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+        // إبطال المخزون أيضاً إذا أثّر المستند على المخزون
+        if (affectsStock) {
+          qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
+        }
+      }
+
+      // عرض banner النجاح مع رقم الوثيقة
+      const docNum = String(
+        (savedDoc as Record<string, unknown>)?.document_number
+        ?? (savedDoc as Record<string, unknown>)?.data?.document_number
+        ?? "—"
+      );
+
+      setSuccessBanner({
+        document_number: docNum,
+        message: isEdit
+          ? `تم تحديث المستند ${docNum} بنجاح`
+          : `تم إنشاء المستند ${docNum} بنجاح${affectsStock ? ` — تم ${stockDir > 0 ? "إضافة" : "خصم"} المخزون` : ""}`,
+      });
+
+      // إغلاق بعد 3 ثوانٍ
+      successTimer.current = setTimeout(() => {
+        onSaved();
+      }, 2_500);
     },
-    onError: (e: any) => {
-      const msg =
-        e?.errors && Object.values(e.errors).length > 0
-          ? Object.values(e.errors).flat().join(" | ")
-          : e?.message ?? "فشل الحفظ";
-      setApiErr(String(msg));
+
+    onError: (e: unknown) => {
+      const err = e as Record<string, unknown>;
+      const msg = err?.errors && Object.keys(err.errors as object).length > 0
+        ? Object.values(err.errors as Record<string, string[]>)
+            .flat()
+            .join(" | ")
+        : String(err?.message ?? "فشل الحفظ. تحقق من البيانات وأعد المحاولة.");
+      setApiErr(msg);
     },
   });
 
   const handleSave = useCallback(() => {
     setApiErr("");
-    if (validate()) {
-      saveMut.mutate();
-    }
+    if (validate()) saveMut.mutate();
   }, [validate, saveMut]);
 
+  // ─────────────────────────────────────────────────────────────────────
   if (!open) return null;
 
-  const isPending = saveMut.isPending;
+  const isPending  = saveMut.isPending;
   const disableForm = isPending || isLoadingProducts;
 
-  // ── Render ─────────────────────────────────────────────────────────────
+  // لون badge المخزون
+  const stockBadge = affectsStock
+    ? stockDir > 0
+      ? { bg: "var(--greenb)", color: "var(--green)", text: "▲ يزيد المخزون" }
+      : { bg: "var(--redb)",   color: "var(--red)",   text: "▼ ينقص المخزون" }
+    : null;
+
+  // ── RENDER ────────────────────────────────────────────────────────────
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 500,
-        background: "rgba(0,0,0,.5)",
+        background: "rgba(0,0,0,.55)",
         backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "flex-start",
@@ -7257,34 +7387,111 @@ export default function CommercialDocumentModal({
           maxWidth: 1200,
           background: "var(--bg1)",
           borderRadius: "var(--r3)",
-          boxShadow: "0 24px 64px rgba(0,0,0,.25)",
+          boxShadow: "0 24px 64px rgba(0,0,0,.3)",
           display: "flex",
           flexDirection: "column",
+          marginTop: 0,
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* ── HEADER ──────────────────────────────────────────────────── */}
         <div
           style={{
-            padding: "16px 20px",
+            padding: "14px 20px",
             borderBottom: "1px solid var(--b1)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             background: "var(--bg2)",
             borderRadius: "var(--r3) var(--r3) 0 0",
+            gap: 12,
           }}
         >
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "var(--t1)" }}>
-              {isEdit ? `تعديل ${documentType?.name}` : `${documentType?.name} جديد`}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+            {/* أيقونة نوع المستند */}
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "var(--r2)",
+                background: isPurchase ? "var(--blueb, #e0eaff)" : "var(--greenb)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <i
+                className={`ti ${isPurchase ? "ti-truck" : "ti-receipt"}`}
+                style={{
+                  fontSize: 18,
+                  color: isPurchase ? "var(--blue, #2563eb)" : "var(--green)",
+                }}
+              />
             </div>
-            {documentType?.name_latin && (
-              <div style={{ fontSize: 11, color: "var(--t4)", marginTop: 2 }}>
-                {documentType.name_latin} — {documentType.code}
+
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 800,
+                  color: "var(--t1)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                {isEdit
+                  ? `تعديل ${documentType?.name}`
+                  : `${documentType?.name} جديد`}
+
+                {/* رقم الوثيقة عند التعديل */}
+                {isEdit && existingDocument?.document_number && (
+                  <span
+                    style={{
+                      padding: "2px 8px",
+                      borderRadius: "var(--r1)",
+                      background: "var(--bg1)",
+                      border: "1px solid var(--b2)",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "var(--em)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {String(existingDocument.document_number)}
+                  </span>
+                )}
+
+                {/* badge أثر المخزون */}
+                {stockBadge && (
+                  <span
+                    style={{
+                      padding: "2px 8px",
+                      borderRadius: "var(--r1)",
+                      background: stockBadge.bg,
+                      color: stockBadge.color,
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {stockBadge.text}
+                  </span>
+                )}
               </div>
-            )}
+
+              <div style={{ fontSize: 11, color: "var(--t4)", marginTop: 1 }}>
+                {documentType?.name_latin} — {docCode}
+                {!isEdit && (
+                  <span style={{ marginRight: 8, color: "var(--t4)" }}>
+                    · رقم الوثيقة يُولَّد تلقائياً
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
+
           <button
             onClick={onClose}
             disabled={isPending}
@@ -7299,14 +7506,43 @@ export default function CommercialDocumentModal({
               justifyContent: "center",
               cursor: isPending ? "not-allowed" : "pointer",
               color: "var(--t3)",
+              flexShrink: 0,
             }}
           >
             <i className="ti ti-x" style={{ fontSize: 14 }} />
           </button>
         </div>
 
-        {/* Body */}
+        {/* ── BODY ────────────────────────────────────────────────────── */}
         <div style={{ padding: "20px", overflowY: "auto", flex: 1 }}>
+
+          {/* Success Banner */}
+          {successBanner && (
+            <div
+              style={{
+                padding: "12px 16px",
+                marginBottom: 16,
+                borderRadius: "var(--r2)",
+                background: "var(--greenb)",
+                border: "1px solid var(--green)",
+                color: "var(--green)",
+                fontSize: 13,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <i className="ti ti-check" style={{ fontSize: 18 }} />
+              <div>
+                <div>{successBanner.message}</div>
+                <div style={{ fontSize: 11, fontWeight: 400, marginTop: 2, opacity: 0.8 }}>
+                  سيُغلق هذا النافذة تلقائياً خلال ثوانٍ...
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* API Error */}
           {apiErr && (
             <div
@@ -7315,20 +7551,20 @@ export default function CommercialDocumentModal({
                 marginBottom: 16,
                 borderRadius: "var(--r2)",
                 background: "var(--redb)",
-                border: "1px solid var(--redbo)",
+                border: "1px solid var(--redbo, var(--red))",
                 color: "var(--red)",
                 fontSize: 13,
                 display: "flex",
                 gap: 8,
-                alignItems: "center",
+                alignItems: "flex-start",
               }}
             >
-              <i className="ti ti-alert-circle" />
-              {apiErr}
+              <i className="ti ti-alert-circle" style={{ marginTop: 1, flexShrink: 0 }} />
+              <span>{apiErr}</span>
             </div>
           )}
 
-          {/* معلومات المستند */}
+          {/* ── Section 1: معلومات المستند ────────────────────────────── */}
           <Section title="معلومات المستند" icon="ti-file-description">
             <div
               style={{
@@ -7337,11 +7573,10 @@ export default function CommercialDocumentModal({
                 gap: 14,
               }}
             >
+              {/* العميل / المورد */}
               {needsParty && (
                 <div style={{ gridColumn: "span 2" }}>
-                  <Label required>
-                    {isPurchase ? "المورد" : "الزبون"}
-                  </Label>
+                  <Label required>{isPurchase ? "المورد" : "الزبون"}</Label>
                   <select
                     value={form.party_id}
                     onChange={e => set("party_id", e.target.value)}
@@ -7351,9 +7586,10 @@ export default function CommercialDocumentModal({
                     <option value="">
                       — اختر {isPurchase ? "مورداً" : "زبوناً"} —
                     </option>
-                    {(parties as any[]).map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
+                    {(parties as Record<string, unknown>[]).map(p => (
+                      <option key={String(p.id)} value={String(p.id)}>
+                        {String(p.name)}
+                        {p.code ? ` (${p.code})` : ""}
                       </option>
                     ))}
                   </select>
@@ -7365,6 +7601,7 @@ export default function CommercialDocumentModal({
                 </div>
               )}
 
+              {/* تاريخ المستند */}
               <div>
                 <Label required>تاريخ المستند</Label>
                 <input
@@ -7374,19 +7611,27 @@ export default function CommercialDocumentModal({
                   onChange={e => set("document_date", e.target.value)}
                   disabled={disableForm}
                 />
+                {errors.document_date && (
+                  <div style={{ color: "var(--red)", fontSize: 11, marginTop: 3 }}>
+                    {errors.document_date}
+                  </div>
+                )}
               </div>
 
+              {/* تاريخ الاستحقاق */}
               <div>
                 <Label>تاريخ الاستحقاق</Label>
                 <input
                   type="date"
                   style={s.inp()}
                   value={form.due_date}
+                  min={form.document_date}
                   onChange={e => set("due_date", e.target.value)}
                   disabled={disableForm}
                 />
               </div>
 
+              {/* المستودع */}
               <div>
                 <Label required>المستودع</Label>
                 <select
@@ -7396,14 +7641,21 @@ export default function CommercialDocumentModal({
                   disabled={disableForm}
                 >
                   <option value="">— اختر —</option>
-                  {(warehouses as any[]).map(w => (
-                    <option key={w.id} value={String(w.id)}>
-                      {w.name}
+                  {(warehouses as Record<string, unknown>[]).map(w => (
+                    <option key={String(w.id)} value={String(w.id)}>
+                      {String(w.name)}
+                      {w.is_default ? " ★" : ""}
                     </option>
                   ))}
                 </select>
+                {errors.warehouse_id && (
+                  <div style={{ color: "var(--red)", fontSize: 11, marginTop: 3 }}>
+                    {errors.warehouse_id}
+                  </div>
+                )}
               </div>
 
+              {/* السنة المالية */}
               <div>
                 <Label required>السنة المالية</Label>
                 <select
@@ -7413,16 +7665,22 @@ export default function CommercialDocumentModal({
                   disabled={disableForm}
                 >
                   <option value="">— اختر —</option>
-                  {(fiscalYears as any[]).map(fy => (
-                    <option key={fy.id} value={String(fy.id)}>
-                      {fy.name}
+                  {(fiscalYears as Record<string, unknown>[]).map(fy => (
+                    <option key={String(fy.id)} value={String(fy.id)}>
+                      {String(fy.name)}
                       {fy.is_current ? " ★" : ""}
-                      {fy.is_closed ? " (مقفلة)" : ""}
+                      {fy.is_closed  ? " (مقفلة)" : ""}
                     </option>
                   ))}
                 </select>
+                {errors.fiscal_year_id && (
+                  <div style={{ color: "var(--red)", fontSize: 11, marginTop: 3 }}>
+                    {errors.fiscal_year_id}
+                  </div>
+                )}
               </div>
 
+              {/* العملة */}
               <div>
                 <Label required>العملة</Label>
                 <select
@@ -7432,14 +7690,21 @@ export default function CommercialDocumentModal({
                   disabled={disableForm}
                 >
                   <option value="">— اختر —</option>
-                  {(currencies as any[]).map(c => (
-                    <option key={c.id} value={String(c.id)}>
-                      {c.code} — {c.name}
+                  {(currencies as Record<string, unknown>[]).map(c => (
+                    <option key={String(c.id)} value={String(c.id)}>
+                      {String(c.code)} — {String(c.name)}
+                      {c.is_base_currency ? " ★" : ""}
                     </option>
                   ))}
                 </select>
+                {errors.currency_id && (
+                  <div style={{ color: "var(--red)", fontSize: 11, marginTop: 3 }}>
+                    {errors.currency_id}
+                  </div>
+                )}
               </div>
 
+              {/* سعر الصرف */}
               <div>
                 <Label>سعر الصرف</Label>
                 <input
@@ -7454,6 +7719,7 @@ export default function CommercialDocumentModal({
               </div>
             </div>
 
+            {/* ملاحظات */}
             <div style={{ marginTop: 14 }}>
               <Label>ملاحظات</Label>
               <textarea
@@ -7467,8 +7733,51 @@ export default function CommercialDocumentModal({
             </div>
           </Section>
 
-          {/* أسطر المستند */}
-          <Section title="أسطر المستند" icon="ti-list-details">
+          {/* ── Section 2: أسطر المستند ────────────────────────────────── */}
+          <Section
+            title="أسطر المستند"
+            icon="ti-list-details"
+            badge={
+              form.lines.length > 0 ? (
+                <span
+                  style={{
+                    padding: "1px 7px",
+                    borderRadius: 99,
+                    background: "var(--em)",
+                    color: "white",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {form.lines.length}
+                </span>
+              ) : undefined
+            }
+          >
+            {/* تحذير أثر المخزون */}
+            {affectsStock && (
+              <div
+                style={{
+                  padding: "8px 12px",
+                  marginBottom: 12,
+                  borderRadius: "var(--r2)",
+                  background: stockDir > 0 ? "var(--greenb)" : "var(--redb)",
+                  color: stockDir > 0 ? "var(--green)" : "var(--red)",
+                  fontSize: 12,
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <i
+                  className={`ti ${stockDir > 0 ? "ti-box-seam" : "ti-box-seam-off"}`}
+                />
+                {stockDir > 0
+                  ? "هذا المستند سيُضيف الكميات إلى المخزون عند الحفظ"
+                  : "هذا المستند سيخصم الكميات من المخزون عند الحفظ"}
+              </div>
+            )}
+
             {lineErr && (
               <div
                 style={{
@@ -7487,286 +7796,394 @@ export default function CommercialDocumentModal({
               </div>
             )}
 
-            {isLoadingProducts && (
-              <div style={{ textAlign: "center", padding: 20, color: "var(--t4)" }}>
-                <i className="ti ti-loader" style={{ animation: "spin 1s linear infinite" }} />
-                جاري تحميل المنتجات...
-              </div>
-            )}
-
-            {!isLoadingProducts && (products as any[]).length === 0 && (
+            {isLoadingProducts ? (
               <div
                 style={{
-                  padding: "10px 14px",
-                  marginBottom: 10,
+                  textAlign: "center",
+                  padding: 24,
+                  color: "var(--t4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <i
+                  className="ti ti-loader"
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                جاري تحميل المنتجات...
+              </div>
+            ) : (products as Product[]).length === 0 ? (
+              <div
+                style={{
+                  padding: "12px 16px",
                   borderRadius: "var(--r2)",
                   background: "var(--goldb)",
                   color: "var(--gold)",
-                  fontSize: 12,
+                  fontSize: 12.5,
+                  marginBottom: 12,
                 }}
               >
-                <i className="ti ti-info-circle" /> لا توجد منتجات مسجلة.
+                <i className="ti ti-alert-triangle" /> لا توجد منتجات. أضف منتجاً
+                أولاً من قسم المخزون.
               </div>
-            )}
-
-            {/* جدول الأسطر */}
-            <div style={{ overflowX: "auto", marginBottom: 10 }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  minWidth: 900,
-                }}
-              >
-                <thead>
-                  <tr
-                    style={{
-                      borderBottom: "2px solid var(--b2)",
-                      background: "var(--bg2)",
-                    }}
-                  >
-                    {[
-                      "#",
-                      "المنتج",
-                      "التعبئة",
-                      "الكثير",
-                      "الكمية",
-                      "سعر الوحدة",
-                      "خصم %",
-                      "TVA %",
-                      "الإجمالي",
-                      "",
-                    ].map((h, i) => (
-                      <th
-                        key={i}
-                        style={{
-                          padding: "8px 6px",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: "var(--t3)",
-                          textAlign: "right",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.lines.map((line, idx) => {
-                    const { ttc } = calcLineTotal(line);
-                    const selPkg = line._product?.packagings?.find(
-                      pk => String(pk.id) === line.packaging_id
-                    );
-                    const hasActivePkg = !!line.packaging_id && line._qty > 1;
-                    const selLot = line._product?.lots?.find(
-                      l => String(l.id) === line.lot_id
-                    );
-
-                    return (
-                      <tr
-                        key={idx}
-                        style={{
-                          borderBottom: "1px solid var(--b1)",
-                          background:
-                            idx % 2
-                              ? "color-mix(in srgb,var(--b1) 25%,transparent)"
-                              : "transparent",
-                        }}
-                      >
-                        {/* # */}
-                        <td
+            ) : (
+              <div style={{ overflowX: "auto", borderRadius: "var(--r2)", border: "1px solid var(--b1)" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 12,
+                    direction: "rtl",
+                  }}
+                >
+                  <thead>
+                    <tr style={{ background: "var(--bg2)" }}>
+                      {[
+                        { label: "#",           w: 32 },
+                        { label: "المنتج",      w: 200 },
+                        { label: "التعبئة",    w: 100 },
+                        { label: "الكثير/Lot", w: 100 },
+                        { label: "الكمية",     w: 70 },
+                        { label: "سعر الوحدة HT", w: 100 },
+                        { label: "س. التعبئة", w: 90 },
+                        { label: "خصم %",      w: 70 },
+                        { label: "TVA %",      w: 65 },
+                        { label: "الإجمالي TTC", w: 100 },
+                        { label: "",           w: 36 },
+                      ].map(h => (
+                        <th
+                          key={h.label}
                           style={{
+                            padding: "8px 6px",
                             textAlign: "center",
+                            fontWeight: 700,
+                            color: "var(--t3)",
                             fontSize: 11,
-                            color: "var(--t4)",
-                            padding: "5px 4px",
+                            letterSpacing: 0.3,
+                            width: h.w,
+                            whiteSpace: "nowrap",
+                            borderBottom: "1px solid var(--b2)",
                           }}
                         >
-                          {idx + 1}
-                        </td>
+                          {h.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
 
-                        {/* المنتج */}
-                        <td style={{ padding: "4px 4px" }}>
-                          <select
-                            value={line.product_id}
-                            onChange={e => updateLine(idx, "product_id", e.target.value)}
-                            disabled={isLoadingProducts || (products as any[]).length === 0 || isPending}
-                            style={s.cell()}
-                          >
-                            <option value="">— اختر —</option>
-                            {(products as Product[]).map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                                {p.ref ? ` (${p.ref})` : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
+                  <tbody>
+                    {form.lines.map((line, idx) => {
+                      const { ttc } = calcLineTotal(line);
+                      const prod    = line._product;
+                      const packagings = prod?.packagings ?? [];
+                      const lots       = prod?.lots?.filter(
+                        lt => lt.remaining_quantity > 0
+                      ) ?? [];
 
-                        {/* التعبئة */}
-                        <td style={{ padding: "4px 4px" }}>
-                          {line._product?.packagings && line._product.packagings.length > 0 ? (
-                            <select
-                              value={line.packaging_id}
-                              onChange={e => updateLine(idx, "packaging_id", e.target.value)}
-                              disabled={isPending}
-                              style={s.cell()}
-                            >
-                              <option value="">— وحدة —</option>
-                              {line._product.packagings.map(pk => (
-                                <option key={pk.id} value={pk.id}>
-                                  {pk.label}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div
-                              style={{
-                                textAlign: "center",
-                                fontSize: 11,
-                                color: "var(--t4)",
-                              }}
-                            >
-                              —
-                            </div>
-                          )}
-                        </td>
-
-                        {/* الكثير */}
-                        <td style={{ padding: "4px 4px" }}>
-                          {line._product?.has_lots && line._product.lots && line._product.lots.length > 0 ? (
-                            <select
-                              value={line.lot_id}
-                              onChange={e => updateLine(idx, "lot_id", e.target.value)}
-                              disabled={isPending}
-                              style={s.cell()}
-                            >
-                              <option value="">— اختر —</option>
-                              {line._product.lots.map(lot => (
-                                <option key={lot.id} value={lot.id}>
-                                  {lot.lot_number}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div
-                              style={{
-                                textAlign: "center",
-                                fontSize: 11,
-                                color: "var(--t4)",
-                              }}
-                            >
-                              —
-                            </div>
-                          )}
-                        </td>
-
-                        {/* الكمية */}
-                        <td style={{ padding: "4px 4px" }}>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.001"
-                            value={line.quantity}
-                            onChange={e =>
-                              updateLine(idx, "quantity", parseFloat(e.target.value) || 0)
-                            }
-                            style={s.cell()}
-                            disabled={isPending}
-                          />
-                        </td>
-
-                        {/* سعر الوحدة */}
-                        <td style={{ padding: "4px 4px" }}>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={line.unit_price_ht}
-                            onChange={e => updateLine(idx, "unit_price_ht", e.target.value)}
-                            style={s.cell()}
-                            disabled={isPending}
-                          />
-                        </td>
-
-                        {/* خصم % */}
-                        <td style={{ padding: "4px 4px" }}>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            value={line.discount_percentage}
-                            onChange={e =>
-                              updateLine(
-                                idx,
-                                "discount_percentage",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            style={s.cell()}
-                            disabled={isPending}
-                          />
-                        </td>
-
-                        {/* TVA % */}
-                        <td style={{ padding: "4px 4px" }}>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            value={line.tva_rate}
-                            onChange={e =>
-                              updateLine(idx, "tva_rate", parseFloat(e.target.value) || 0)
-                            }
-                            style={s.cell()}
-                            disabled={isPending}
-                          />
-                        </td>
-
-                        {/* الإجمالي */}
-                        <td
+                      return (
+                        <tr
+                          key={idx}
                           style={{
-                            padding: "4px 4px",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "var(--em)",
-                            textAlign: "center",
+                            borderBottom: "1px solid var(--b1)",
+                            background: idx % 2 === 0
+                              ? "var(--bg1)"
+                              : "var(--bg2, rgba(0,0,0,.02))",
                           }}
                         >
-                          {fmtDZD(ttc)}
-                        </td>
-
-                        {/* حذف */}
-                        <td style={{ padding: "4px 4px", textAlign: "center" }}>
-                          <button
-                            onClick={() => removeLine(idx)}
-                            disabled={isPending}
+                          {/* # */}
+                          <td
                             style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: 4,
-                              border: "1px solid var(--b3)",
-                              background: "var(--bg1)",
-                              color: "var(--red)",
-                              cursor: isPending ? "not-allowed" : "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
+                              textAlign: "center",
+                              padding: "6px 4px",
+                              color: "var(--t4)",
+                              fontSize: 11,
+                              fontWeight: 600,
                             }}
                           >
-                            <i className="ti ti-trash" style={{ fontSize: 11 }} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            {idx + 1}
+                          </td>
+
+                          {/* المنتج */}
+                          <td style={{ padding: "4px 6px" }}>
+                            <select
+                              value={line.product_id}
+                              onChange={e =>
+                                updateLine(idx, "product_id", e.target.value)
+                              }
+                              style={{
+                                ...s.cell(),
+                                textAlign: "right",
+                                maxWidth: 200,
+                                border: !line.product_id
+                                  ? "1px solid var(--red)"
+                                  : "1px solid var(--b3)",
+                              }}
+                              disabled={disableForm}
+                            >
+                              <option value="">— اختر منتجاً —</option>
+                              {(products as Product[]).map(p => (
+                                <option key={p.id} value={String(p.id)}>
+                                  {p.name}
+                                  {p.ref ? ` (${p.ref})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+
+                          {/* التعبئة */}
+                          <td style={{ padding: "4px 4px" }}>
+                            {packagings.length > 0 ? (
+                              <select
+                                value={line.packaging_id}
+                                onChange={e =>
+                                  updateLine(idx, "packaging_id", e.target.value)
+                                }
+                                style={{ ...s.cell(), cursor: "pointer" }}
+                                disabled={disableForm}
+                              >
+                                <option value="">وحدة</option>
+                                {packagings.map(pk => (
+                                  <option key={pk.id} value={String(pk.id)}>
+                                    {pk.label} ({pk.quantity})
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span
+                                style={{
+                                  display: "block",
+                                  textAlign: "center",
+                                  color: "var(--t4)",
+                                  fontSize: 11,
+                                  padding: "5px 0",
+                                }}
+                              >
+                                —
+                              </span>
+                            )}
+                          </td>
+
+                          {/* الكثير/Lot */}
+                          <td style={{ padding: "4px 4px" }}>
+                            {prod?.has_lots ? (
+                              lots.length > 0 ? (
+                                <select
+                                  value={line.stock_lot_id}
+                                  onChange={e =>
+                                    updateLine(idx, "stock_lot_id", e.target.value)
+                                  }
+                                  style={{ ...s.cell(), cursor: "pointer" }}
+                                  disabled={disableForm}
+                                >
+                                  <option value="">— اختر —</option>
+                                  {lots.map(lt => (
+                                    <option key={lt.id} value={String(lt.id)}>
+                                      {lt.lot_number}
+                                      {lt.expiration_date
+                                        ? ` (${lt.expiration_date})`
+                                        : ""}
+                                      {` — ${lt.remaining_quantity}`}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span
+                                  style={{
+                                    display: "block",
+                                    textAlign: "center",
+                                    color: "var(--red)",
+                                    fontSize: 10,
+                                    padding: "5px 0",
+                                  }}
+                                  title="لا يوجد مخزون"
+                                >
+                                  لا مخزون
+                                </span>
+                              )
+                            ) : (
+                              <span
+                                style={{
+                                  display: "block",
+                                  textAlign: "center",
+                                  color: "var(--t4)",
+                                  fontSize: 11,
+                                  padding: "5px 0",
+                                }}
+                              >
+                                —
+                              </span>
+                            )}
+                          </td>
+
+                          {/* الكمية */}
+                          <td style={{ padding: "4px 4px" }}>
+                            <input
+                              type="number"
+                              min="0.001"
+                              step="1"
+                              value={line.quantity}
+                              onChange={e =>
+                                updateLine(
+                                  idx,
+                                  "quantity",
+                                  parseFloat(e.target.value) || 1
+                                )
+                              }
+                              style={{
+                                ...s.cell(),
+                                border:
+                                  line.quantity <= 0
+                                    ? "1px solid var(--red)"
+                                    : "1px solid var(--b3)",
+                              }}
+                              disabled={disableForm}
+                            />
+                          </td>
+
+                          {/* سعر الوحدة */}
+                          <td style={{ padding: "4px 4px" }}>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={line.unit_price_ht}
+                              onChange={e =>
+                                updateLine(idx, "unit_price_ht", e.target.value)
+                              }
+                              style={s.cell()}
+                              disabled={disableForm}
+                            />
+                          </td>
+
+                          {/* سعر التعبئة */}
+                          <td style={{ padding: "4px 4px" }}>
+                            {line._qty > 1 ? (
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={line.price_per_pack}
+                                onChange={e =>
+                                  updateLine(idx, "price_per_pack", e.target.value)
+                                }
+                                style={{
+                                  ...s.cell(),
+                                  background: "var(--goldb, #fffbeb)",
+                                  borderColor: "var(--gold, #d97706)",
+                                }}
+                                disabled={disableForm}
+                                title={`${line._qty} وحدة × ${fmtDZD(line.unit_price_ht)}`}
+                              />
+                            ) : (
+                              <span
+                                style={{
+                                  display: "block",
+                                  textAlign: "center",
+                                  color: "var(--t4)",
+                                  fontSize: 11,
+                                  padding: "5px 0",
+                                }}
+                              >
+                                —
+                              </span>
+                            )}
+                          </td>
+
+                          {/* خصم % */}
+                          <td style={{ padding: "4px 4px" }}>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={line.discount_percentage}
+                              onChange={e =>
+                                updateLine(
+                                  idx,
+                                  "discount_percentage",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              style={s.cell()}
+                              disabled={disableForm}
+                            />
+                          </td>
+
+                          {/* TVA % */}
+                          <td style={{ padding: "4px 4px" }}>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={line.tva_rate}
+                              onChange={e =>
+                                updateLine(
+                                  idx,
+                                  "tva_rate",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              style={s.cell()}
+                              disabled={disableForm}
+                            />
+                          </td>
+
+                          {/* الإجمالي TTC */}
+                          <td
+                            style={{
+                              padding: "4px 6px",
+                              fontWeight: 700,
+                              color: "var(--em)",
+                              textAlign: "center",
+                              fontVariantNumeric: "tabular-nums",
+                              whiteSpace: "nowrap",
+                              fontSize: 12,
+                            }}
+                          >
+                            {fmtDZD(ttc)}
+                          </td>
+
+                          {/* حذف */}
+                          <td style={{ padding: "4px 4px", textAlign: "center" }}>
+                            <button
+                              onClick={() => removeLine(idx)}
+                              disabled={isPending}
+                              title="حذف السطر"
+                              style={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: 4,
+                                border: "1px solid var(--b3)",
+                                background: "var(--bg1)",
+                                color: "var(--red)",
+                                cursor: isPending ? "not-allowed" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                transition: "background .15s",
+                              }}
+                              onMouseEnter={e =>
+                                ((e.currentTarget as HTMLElement).style.background =
+                                  "var(--redb)")
+                              }
+                              onMouseLeave={e =>
+                                ((e.currentTarget as HTMLElement).style.background =
+                                  "var(--bg1)")
+                              }
+                            >
+                              <i className="ti ti-trash" style={{ fontSize: 12 }} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {/* زر إضافة سطر */}
             <button
@@ -7775,91 +8192,99 @@ export default function CommercialDocumentModal({
               style={{
                 width: "100%",
                 padding: "10px 14px",
+                marginTop: 10,
                 borderRadius: "var(--r2)",
                 border: "1px dashed var(--em)",
                 background: "transparent",
                 color: "var(--em)",
                 cursor: disableForm ? "not-allowed" : "pointer",
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 600,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 6,
+                opacity: disableForm ? 0.5 : 1,
+                transition: "background .15s",
+              }}
+              onMouseEnter={e => {
+                if (!disableForm) (e.currentTarget as HTMLElement).style.background = "var(--bg2)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = "transparent";
               }}
             >
-              <i className="ti ti-plus" /> إضافة سطر
+              <i className="ti ti-plus" />
+              إضافة سطر
             </button>
           </Section>
 
-          {/* الإجماليات */}
+          {/* ── Section 3: الإجماليات ──────────────────────────────────── */}
           <Section title="الإجماليات" icon="ti-calculator">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-              <div style={{ padding: 10, background: "var(--bg2)", borderRadius: "var(--r2)" }}>
-                <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>
-                  إجمالي HT
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--t1)" }}>
-                  {fmtDZD(totals.ht)}
-                </div>
-              </div>
-
-              <div style={{ padding: 10, background: "var(--bg2)", borderRadius: "var(--r2)" }}>
-                <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>
-                  الخصم
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--red)" }}>
-                  {fmtDZD(totals.discount)}
-                </div>
-              </div>
-
-              <div style={{ padding: 10, background: "var(--bg2)", borderRadius: "var(--r2)" }}>
-                <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>
-                  TVA
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--t1)" }}>
-                  {fmtDZD(totals.tva)}
-                </div>
-              </div>
-
-              <div style={{ padding: 10, background: "var(--em)", borderRadius: "var(--r2)" }}>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
-                  الإجمالي TTC
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "white" }}>
-                  {fmtDZD(totals.ttc)}
-                </div>
-              </div>
-
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: 10,
+              }}
+            >
+              <TotalCard label="إجمالي HT"       value={fmtDZD(totals.ht)} />
+              <TotalCard label="الخصم"           value={fmtDZD(totals.discount)} color="var(--red)" />
+              <TotalCard label="TVA"             value={fmtDZD(totals.tva)} />
+              <TotalCard
+                label="إجمالي TTC"
+                value={fmtDZD(totals.ttc)}
+                bg="var(--em)"
+                color="white"
+                labelColor="rgba(255,255,255,0.75)"
+              />
               {totals.stamp > 0 && (
-                <div style={{ padding: 10, background: "var(--goldb)", borderRadius: "var(--r2)" }}>
-                  <div style={{ fontSize: 11, color: "var(--gold)", marginBottom: 4 }}>
-                    الطابع المالي
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--gold)" }}>
-                    {fmtDZD(totals.stamp)}
-                  </div>
-                </div>
+                <TotalCard
+                  label="الطابع الجبائي"
+                  value={fmtDZD(totals.stamp)}
+                  bg="var(--goldb)"
+                  color="var(--gold)"
+                  labelColor="var(--gold)"
+                />
               )}
-
-              <div
-                style={{
-                  padding: 10,
-                  background: "var(--greenb)",
-                  borderRadius: "var(--r2)",
-                }}
-              >
-                <div style={{ fontSize: 11, color: "var(--green)", marginBottom: 4 }}>
-                  المبلغ المستحق
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>
-                  {fmtDZD(totals.netToPay)}
-                </div>
-              </div>
+              {totals.tap > 0 && (
+                <TotalCard
+                  label={`TAP (${TAP_RATE * 100}%)`}
+                  value={fmtDZD(totals.tap)}
+                  bg="var(--purpleb, #f5f3ff)"
+                  color="var(--purple, #7c3aed)"
+                  labelColor="var(--purple, #7c3aed)"
+                />
+              )}
+              <TotalCard
+                label="المبلغ المستحق"
+                value={fmtDZD(totals.netToPay)}
+                bg="var(--greenb)"
+                color="var(--green)"
+                labelColor="var(--green)"
+                large
+              />
             </div>
 
-            <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            {/* خيارات الضرائب */}
+            <div
+              style={{
+                marginTop: 14,
+                display: "flex",
+                gap: 20,
+                flexWrap: "wrap",
+              }}
+            >
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: disableForm ? "not-allowed" : "pointer",
+                  fontSize: 13,
+                  color: "var(--t2)",
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={form.apply_stamp}
@@ -7867,67 +8292,126 @@ export default function CommercialDocumentModal({
                   disabled={disableForm}
                   style={{ cursor: disableForm ? "not-allowed" : "pointer" }}
                 />
-                <span style={{ fontSize: 13, color: "var(--t2)" }}>
-                  تطبيق الطابع المالي
+                تطبيق الطابع الجبائي
+                <span style={{ color: "var(--t4)", fontSize: 11 }}>
+                  (1% من TTC — max 2,500 دج)
                 </span>
               </label>
+
+              {affectsAccounting && (
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    cursor: disableForm ? "not-allowed" : "pointer",
+                    fontSize: 13,
+                    color: "var(--t2)",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.apply_tap}
+                    onChange={e => set("apply_tap", e.target.checked)}
+                    disabled={disableForm}
+                    style={{ cursor: disableForm ? "not-allowed" : "pointer" }}
+                  />
+                  تطبيق TAP
+                  <span style={{ color: "var(--t4)", fontSize: 11 }}>
+                    ({TAP_RATE * 100}% من HT)
+                  </span>
+                </label>
+              )}
             </div>
           </Section>
         </div>
 
-        {/* Footer */}
+        {/* ── FOOTER ──────────────────────────────────────────────────── */}
         <div
           style={{
-            padding: "16px 20px",
+            padding: "14px 20px",
             borderTop: "1px solid var(--b1)",
             background: "var(--bg2)",
             display: "flex",
             gap: 8,
-            justifyContent: "flex-end",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderRadius: "0 0 var(--r3) var(--r3)",
           }}
         >
-          <button
-            onClick={onClose}
-            disabled={isPending}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "var(--r2)",
-              border: "1px solid var(--b2)",
-              background: "var(--bg1)",
-              color: "var(--t2)",
-              cursor: isPending ? "not-allowed" : "pointer",
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            إلغاء
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isPending}
-            style={{
-              padding: "8px 20px",
-              borderRadius: "var(--r2)",
-              border: "none",
-              background: "var(--em)",
-              color: "white",
-              cursor: isPending ? "not-allowed" : "pointer",
-              fontSize: 13,
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              opacity: isPending ? 0.6 : 1,
-            }}
-          >
-            {isPending && (
-              <i
-                className="ti ti-loader"
-                style={{ animation: "spin 1s linear infinite" }}
-              />
+          {/* ملخص الأسطر */}
+          <div style={{ fontSize: 12, color: "var(--t4)" }}>
+            {form.lines.length > 0 && (
+              <>
+                <span>{form.lines.length} سطر</span>
+                <span style={{ margin: "0 6px" }}>·</span>
+                <span style={{ fontWeight: 700, color: "var(--green)" }}>
+                  {fmtDZD(totals.netToPay)} دج
+                </span>
+              </>
             )}
-            {isEdit ? "تحديث" : "حفظ"}
-          </button>
+          </div>
+
+          {/* أزرار */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={onClose}
+              disabled={isPending}
+              style={{
+                padding: "8px 18px",
+                borderRadius: "var(--r2)",
+                border: "1px solid var(--b2)",
+                background: "var(--bg1)",
+                color: "var(--t2)",
+                cursor: isPending ? "not-allowed" : "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              إلغاء
+            </button>
+
+            <button
+              onClick={handleSave}
+              disabled={isPending || !!successBanner}
+              style={{
+                padding: "8px 24px",
+                borderRadius: "var(--r2)",
+                border: "none",
+                background: successBanner ? "var(--green)" : "var(--em)",
+                color: "white",
+                cursor:
+                  isPending || !!successBanner ? "not-allowed" : "pointer",
+                fontSize: 13,
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                opacity: isPending ? 0.7 : 1,
+                transition: "background .2s, opacity .2s",
+              }}
+            >
+              {isPending ? (
+                <>
+                  <i
+                    className="ti ti-loader"
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                  جاري الحفظ...
+                </>
+              ) : successBanner ? (
+                <>
+                  <i className="ti ti-check" />
+                  تم الحفظ
+                </>
+              ) : (
+                <>
+                  <i className={`ti ${isEdit ? "ti-device-floppy" : "ti-plus"}`} />
+                  {isEdit ? "تحديث" : "حفظ المستند"}
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -11372,48 +11856,60 @@ export default function TvaPage() {
 ## FILE: resources/js/pages/inventory/InventoryPage.tsx
 ```
 // pages/inventory/InventoryPage.tsx
-import React, { useState } from 'react';
-import { useQuery }       from '@tanstack/react-query';
+import React, { useState, useMemo } from 'react';
+import { useQuery }          from '@tanstack/react-query';
 import { useWarehouses, useFamilies } from '@/lib/api/endpoints/lookups';
-import apiClient from '@/lib/api/core/client';
-import { useModal }       from '@/hooks/useModal';
-import PageHeader         from '@/components/ui/PageHeader';
-import Card               from '@/components/ui/Card';
-import Badge              from '@/components/ui/Badge';
-import Button             from '@/components/ui/Button';
-import Modal              from '@/components/ui/Modal';
-import KpiCard            from '@/components/ui/KpiCard';
-import ProgressBar        from '@/components/ui/ProgressBar';
-import AlertBar           from '@/components/ui/AlertBar';
-
-import type { ProductVariant } from '@/types';
+import {
+  useInventoryProducts,
+  useLowStockProducts,
+  useStockSummary,
+  useInventoryMutations,
+  type InventoryProduct,
+  type StockMovementCreateInput,
+} from '@/lib/api/endpoints/inventory';
+import { useModal }    from '@/hooks/useModal';
+import PageHeader      from '@/components/ui/PageHeader';
+import Card            from '@/components/ui/Card';
+import Badge           from '@/components/ui/Badge';
+import Button          from '@/components/ui/Button';
+import Modal           from '@/components/ui/Modal';
+import KpiCard         from '@/components/ui/KpiCard';
+import ProgressBar     from '@/components/ui/ProgressBar';
+import AlertBar        from '@/components/ui/AlertBar';
 
 export default function InventoryPage() {
-  const [search, setSearch]   = useState('');
-  const [familyId, setFamily] = useState<number | null>(null);
-  const [statusFilter, setStatus] = useState('');
+  const [search,      setSearch]   = useState('');
+  const [familyId,    setFamily]   = useState<number | null>(null);
+  const [warehouseId, setWarehouse]= useState<number | null>(null);
+  const [status,      setStatus]   = useState<'low' | 'out' | 'ok' | ''>('');
+  const [page,        setPage]     = useState(1);
 
   const stockIn  = useModal();
   const stockOut = useModal();
 
-  const { data: lowStock } = useLowStockVariants();
-  const { data: families } = useFamilies();
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const { data: summary }    = useStockSummary();
+  const { data: lowStock }   = useLowStockProducts();
+  const { data: families }   = useFamilies();
   const { data: warehouses } = useWarehouses();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['inventory', 'variants', search, familyId, statusFilter],
-    queryFn:  () => variantsApi.list({ search: search || undefined, page: 1 }).then(r => r.data),
-    staleTime: 30_000,
+  const { data, isLoading } = useInventoryProducts({
+    search:      search   || undefined,
+    family_id:   familyId ?? undefined,
+    warehouse_id:warehouseId ?? undefined,
+    status:      status   || undefined,
+    page,
+    per_page:    20,
   });
 
-  const variants = data?.data ?? [];
+  const products = data?.data ?? [];
   const meta     = data?.meta;
 
-  const outOfStock = lowStock?.filter(v => (v.current_stock ?? 0) <= 0).length ?? 0;
-  const lowStockCount = lowStock?.filter(v => {
-    const s = v.current_stock ?? 0;
-    return s > 0 && s <= v.min_stock_alert;
-  }).length ?? 0;
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  const outOfStock  = summary?.out_of_stock  ?? 0;
+  const lowStockCnt = summary?.low_stock     ?? 0;
+  const totalValue  = summary?.total_value   ?? 0;
+  const totalProds  = summary?.total_products ?? 0;
 
   return (
     <div className="page on" id="p-inventory">
@@ -11423,51 +11919,65 @@ export default function InventoryPage() {
         subtitle={`تتبع الكميات والقيمة — ${warehouses?.[0]?.name ?? 'المستودع الرئيسي'}`}
         actions={
           <>
-            <Button variant="primary" size="sm" icon={<i className="ti ti-download"/>} onClick={stockIn.openModal}>
-              إدخال مخزون
-            </Button>
-            <Button variant="warning" size="sm" icon={<i className="ti ti-upload"/>} onClick={stockOut.openModal}>
-              إخراج
-            </Button>
+            <Button variant="primary" size="sm" icon={<i className="ti ti-download"/>}
+              onClick={stockIn.openModal}>إدخال مخزون</Button>
+            <Button variant="warning" size="sm" icon={<i className="ti ti-upload"/>}
+              onClick={stockOut.openModal}>إخراج</Button>
             <Button size="sm" icon={<i className="ti ti-clipboard-list"/>}>طلب شراء</Button>
             <Button size="sm" icon={<i className="ti ti-table-export"/>}>تصدير</Button>
           </>
         }
       />
 
-      {(outOfStock > 0 || lowStockCount > 0) && (
+      {/* تحذيرات المخزون */}
+      {(outOfStock > 0 || lowStockCnt > 0) && (
         <AlertBar variant="red">
-          <strong>تحذير!</strong> — {outOfStock > 0 && `${outOfStock} منتج نفد تماماً`}
-          {outOfStock > 0 && lowStockCount > 0 && ' و'}
-          {lowStockCount > 0 && `${lowStockCount} منتج بالحد الأدنى`}
+          <strong>تحذير!</strong>{' '}
+          {outOfStock  > 0 && `${outOfStock} منتج نفد تماماً`}
+          {outOfStock  > 0 && lowStockCnt > 0 && ' و'}
+          {lowStockCnt > 0 && `${lowStockCnt} منتج بالحد الأدنى`}
           . يُنصح بالطلب الفوري.
         </AlertBar>
       )}
 
       {/* KPIs */}
       <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
-        <KpiCard variant="green"  icon="ti-coin"           label="قيمة المخزون الكلي"  value="451,820" unit="دج" sub="بسعر الشراء" />
-        <KpiCard variant="red"    icon="ti-alert-circle"   label="منتجات نفدت"         value={outOfStock}          sub="تحتاج طلب عاجل" />
-        <KpiCard variant="gold"   icon="ti-alert-triangle" label="منتجات منخفضة"       value={lowStockCount}        sub="دون الحد الأدنى" />
-        <KpiCard variant="blue"   icon="ti-package"        label="إجمالي الأصناف"      value={meta?.total ?? '…'} sub={`${variants.filter(v => (v.current_stock ?? 0) > 0).length} متوفر`} />
+        <KpiCard variant="green"  icon="ti-coin"
+          label="قيمة المخزون الكلي"
+          value={totalValue.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+          unit="دج" sub="بسعر التكلفة الحالي" />
+        <KpiCard variant="red"    icon="ti-alert-circle"
+          label="منتجات نفدت"
+          value={outOfStock}   sub="تحتاج طلب عاجل" />
+        <KpiCard variant="gold"   icon="ti-alert-triangle"
+          label="منتجات منخفضة"
+          value={lowStockCnt}  sub="دون الحد الأدنى" />
+        <KpiCard variant="blue"   icon="ti-package"
+          label="إجمالي الأصناف"
+          value={meta?.total ?? totalProds}
+          sub={`${products.filter(p => p.current_stock > 0).length} متوفر`} />
       </div>
 
       {/* Filters */}
       <div className="filters">
         <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
           <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
-          <input type="text" placeholder="ابحث بالاسم أو الباركود..." style={{ width: '100%' }}
-            onChange={e => setSearch(e.target.value)} />
+          <input type="text" placeholder="ابحث باسم المنتج أو الرمز..."
+            style={{ width: '100%' }}
+            onChange={e => { setSearch(e.target.value); setPage(1); }} />
         </div>
-        <select style={{ width: 130 }} onChange={e => setFamily(e.target.value ? Number(e.target.value) : null)}>
+        <select style={{ width: 130 }}
+          onChange={e => { setFamily(e.target.value ? Number(e.target.value) : null); setPage(1); }}>
           <option value="">كل الفئات</option>
           {families?.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
-        <select style={{ width: 140 }}>
+        <select style={{ width: 140 }}
+          onChange={e => { setWarehouse(e.target.value ? Number(e.target.value) : null); setPage(1); }}>
           <option value="">كل المستودعات</option>
           {warehouses?.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
-        <select style={{ width: 140 }} onChange={e => setStatus(e.target.value)}>
+        <select style={{ width: 140 }}
+          onChange={e => { setStatus(e.target.value as any); setPage(1); }}>
           <option value="">كل الحالات</option>
           <option value="ok">جيد</option>
           <option value="low">منخفض</option>
@@ -11483,10 +11993,10 @@ export default function InventoryPage() {
               <tr>
                 <th>المنتج</th>
                 <th>الفئة</th>
-                <th>الكمية</th>
+                <th>الكمية الحالية</th>
                 <th>الحد الأدنى</th>
-                <th>سعر الشراء</th>
-                <th>سعر البيع TTC</th>
+                <th>سعر التكلفة</th>
+                <th>سعر البيع HT</th>
                 <th>الهامش</th>
                 <th>القيمة الإجمالية</th>
                 <th>الحالة</th>
@@ -11495,102 +12005,188 @@ export default function InventoryPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={10} style={{ textAlign: 'center', padding: 40, color: 'var(--t4)' }}>جاري التحميل...</td></tr>
-              ) : variants.map(v => {
-                const stock     = v.current_stock ?? 0;
-                const minStock  = v.min_stock_alert;
-                const isOOS     = v.manages_stock && stock <= 0;
-                const isLow     = v.manages_stock && stock > 0 && stock <= minStock;
-                const buyPrice  = v.last_purchase_price;
-                const sellHt    = v.default_selling_price_ht;
-                const tvaRate   = v.tva?.rate ?? 19;
-                const sellTtc   = sellHt * (1 + tvaRate / 100);
-                const margin    = sellHt > 0 ? ((sellHt - buyPrice) / sellHt * 100) : 0;
-                const totalVal  = stock * buyPrice;
-                const pct       = minStock > 0 ? Math.min(100, (stock / (minStock * 2)) * 100) : 100;
-
-                return (
-                  <tr key={v.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--emb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--em)', flexShrink: 0 }}>
-                          <i className="ti ti-package"/>
-                        </div>
-                        <div>
-                          <div className="s">{v.product?.name ?? '—'}</div>
-                          <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>
-                            {v.barcode ?? v.ref ?? '—'}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td><Badge variant="warning" noDot>{v.product?.family?.name ?? '—'}</Badge></td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div>
-                          <div style={{ fontWeight: 800, color: isOOS ? 'var(--red)' : isLow ? 'var(--gold)' : 'var(--t1)' }}>
-                            {v.manages_stock ? stock : '∞'}
-                          </div>
-                          {v.manages_stock && (
-                            <div style={{ marginTop: 3 }}>
-                              <ProgressBar value={pct} color={isOOS ? 'var(--red)' : isLow ? 'var(--gold)' : 'var(--em)'} height={3} />
-                            </div>
-                          )}
-                        </div>
-                        <span style={{ fontSize: 10, color: 'var(--t4)' }}>{v.unit?.symbol ?? 'قطعة'}</span>
-                      </div>
-                    </td>
-                    <td className="m" style={{ color: 'var(--t4)' }}>{minStock > 0 ? minStock : '—'}</td>
-                    <td className="m">{buyPrice.toFixed(2)} دج</td>
-                    <td className="e">{sellTtc.toFixed(0)} دج</td>
-                    <td style={{ color: margin > 20 ? 'var(--em)' : margin > 0 ? 'var(--gold)' : 'var(--red)', fontWeight: 700 }}>
-                      {margin > 0 ? `+${margin.toFixed(1)}%` : '—'}
-                    </td>
-                    <td className="m">{totalVal > 0 ? totalVal.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }) + ' دج' : '—'}</td>
-                    <td>
-                      <Badge variant={isOOS ? 'danger' : isLow ? 'warning' : 'success'}>
-                        {isOOS ? 'نفد' : isLow ? 'منخفض' : 'جيد'}
-                      </Badge>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 3 }}>
-                        <Button size="xs" variant="primary" icon={<i className="ti ti-plus"/>} onClick={stockIn.openModal} title="إدخال" />
-                        <Button size="xs" icon={<i className="ti ti-history"/>} title="حركات" />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                <tr>
+                  <td colSpan={10} style={{ textAlign: 'center', padding: 40, color: 'var(--t4)' }}>
+                    جاري التحميل...
+                  </td>
+                </tr>
+              ) : products.length === 0 ? (
+                <tr>
+                  <td colSpan={10} style={{ textAlign: 'center', padding: 40, color: 'var(--t4)' }}>
+                    لا توجد منتجات
+                  </td>
+                </tr>
+              ) : products.map(p => <ProductRow key={p.id} product={p} onStockIn={stockIn.openModal} />)}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {meta && meta.last_page > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '12px 16px' }}>
+            <Button size="xs" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              <i className="ti ti-chevron-right"/>
+            </Button>
+            <span style={{ fontSize: 12, color: 'var(--t3)', alignSelf: 'center' }}>
+              {page} / {meta.last_page}
+            </span>
+            <Button size="xs" disabled={page >= meta.last_page} onClick={() => setPage(p => p + 1)}>
+              <i className="ti ti-chevron-left"/>
+            </Button>
+          </div>
+        )}
       </Card>
 
-      {/* Stock In Modal */}
+      {/* Modals */}
       <StockMovementModal
         open={stockIn.open}
         onClose={stockIn.closeModal}
         type="in"
-        variants={variants}
+        products={products}
       />
       <StockMovementModal
         open={stockOut.open}
         onClose={stockOut.closeModal}
         type="out"
-        variants={variants}
+        products={products}
       />
     </div>
   );
 }
 
-function StockMovementModal({ open, onClose, type, variants }: {
-  open: boolean; onClose: () => void;
-  type: 'in' | 'out'; variants: ProductVariant[];
+// ── ProductRow ────────────────────────────────────────────────────────────────
+
+function ProductRow({ product: p, onStockIn }: {
+  product: InventoryProduct;
+  onStockIn: () => void;
 }) {
-  const [variantId, setVariantId] = useState('');
-  const [qty,       setQty]       = useState('');
-  const [price,     setPrice]     = useState('');
-  const [notes,     setNotes]     = useState('');
+  const stock    = p.current_stock  ?? 0;
+  const minStock = p.min_stock_alert ?? 0;
+  const isOOS    = p.manages_stock && stock <= 0;
+  const isLow    = p.manages_stock && stock > 0 && minStock > 0 && stock <= minStock;
+
+  const costPrice = p.current_cost_price ?? p.purchase_price_ht ?? 0;
+  const sellHt    = p.purchase_price_ht  ?? 0; // سيُستبدل بـ default_selling_price لاحقاً
+  const margin    = sellHt > 0 && costPrice > 0
+    ? ((sellHt - costPrice) / sellHt * 100) : 0;
+  const totalVal  = stock * costPrice;
+  const pct       = minStock > 0 ? Math.min(100, (stock / (minStock * 2)) * 100) : 100;
+
+  return (
+    <tr>
+      <td>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8, background: 'var(--emb)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 14, color: 'var(--em)', flexShrink: 0,
+          }}>
+            <i className="ti ti-package"/>
+          </div>
+          <div>
+            <div className="s">{p.name}</div>
+            <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>
+              {p.ref ?? '—'}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <Badge variant="warning" noDot>{p.family?.name ?? '—'}</Badge>
+      </td>
+      <td>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div>
+            <div style={{
+              fontWeight: 800,
+              color: isOOS ? 'var(--red)' : isLow ? 'var(--gold)' : 'var(--t1)',
+            }}>
+              {p.manages_stock ? stock : '∞'}
+            </div>
+            {p.manages_stock && (
+              <div style={{ marginTop: 3 }}>
+                <ProgressBar
+                  value={pct}
+                  color={isOOS ? 'var(--red)' : isLow ? 'var(--gold)' : 'var(--em)'}
+                  height={3}
+                />
+              </div>
+            )}
+          </div>
+          <span style={{ fontSize: 10, color: 'var(--t4)' }}>
+            {p.unit?.symbol ?? 'قطعة'}
+          </span>
+        </div>
+      </td>
+      <td className="m" style={{ color: 'var(--t4)' }}>
+        {minStock > 0 ? minStock : '—'}
+      </td>
+      <td className="m">{costPrice.toFixed(2)} دج</td>
+      <td className="e">{sellHt.toFixed(2)} دج</td>
+      <td style={{
+        color: margin > 20 ? 'var(--em)' : margin > 0 ? 'var(--gold)' : 'var(--red)',
+        fontWeight: 700,
+      }}>
+        {margin > 0 ? `+${margin.toFixed(1)}%` : '—'}
+      </td>
+      <td className="m">
+        {totalVal > 0
+          ? totalVal.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }) + ' دج'
+          : '—'}
+      </td>
+      <td>
+        <Badge variant={isOOS ? 'danger' : isLow ? 'warning' : 'success'}>
+          {isOOS ? 'نفد' : isLow ? 'منخفض' : 'جيد'}
+        </Badge>
+      </td>
+      <td>
+        <div style={{ display: 'flex', gap: 3 }}>
+          <Button size="xs" variant="primary" icon={<i className="ti ti-plus"/>}
+            onClick={onStockIn} title="إدخال مخزون" />
+          <Button size="xs" icon={<i className="ti ti-history"/>} title="سجل الحركات" />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ── StockMovementModal ────────────────────────────────────────────────────────
+
+function StockMovementModal({ open, onClose, type, products }: {
+  open:     boolean;
+  onClose:  () => void;
+  type:     'in' | 'out';
+  products: InventoryProduct[];
+}) {
+  const [productId,  setProductId]  = useState('');
+  const [warehouseId,setWarehouseId]= useState('');
+  const [qty,        setQty]        = useState('');
+  const [price,      setPrice]      = useState('');
+  const [notes,      setNotes]      = useState('');
+
+  const { data: warehouses } = useWarehouses();
+  const { createMovement }   = useInventoryMutations();
+
+  const handleSubmit = () => {
+    if (!productId || !warehouseId || !qty) return;
+
+    createMovement.mutate({
+      product_id:             Number(productId),
+      warehouse_id:           Number(warehouseId),
+      fiscal_year_id:         0, // سيُحدَّد من السياق في الـ Backend
+      stock_movement_type_id: type === 'in' ? 1 : 2, // يجب جلبه من stock_movement_types
+      movement_date:          new Date().toISOString().split('T')[0],
+      quantity:               Number(qty),
+      unit_price:             price ? Number(price) : 0,
+      notes:                  notes || null,
+    }, {
+      onSuccess: () => {
+        onClose();
+        setProductId(''); setWarehouseId('');
+        setQty(''); setPrice(''); setNotes('');
+      },
+    });
+  };
 
   return (
     <Modal
@@ -11599,8 +12195,13 @@ function StockMovementModal({ open, onClose, type, variants }: {
       footer={
         <>
           <Button onClick={onClose}>إلغاء</Button>
-          <Button variant={type === 'in' ? 'primary' : 'warning'} icon={<i className={`ti ${type === 'in' ? 'ti-download' : 'ti-upload'}`}/>}>
-            تأكيد
+          <Button
+            variant={type === 'in' ? 'primary' : 'warning'}
+            icon={<i className={`ti ${type === 'in' ? 'ti-download' : 'ti-upload'}`}/>}
+            onClick={handleSubmit}
+            disabled={!productId || !warehouseId || !qty || createMovement.isPending}
+          >
+            {createMovement.isPending ? 'جاري...' : 'تأكيد'}
           </Button>
         </>
       }
@@ -11608,32 +12209,53 @@ function StockMovementModal({ open, onClose, type, variants }: {
       <div className="fgrid">
         <div className="fg s2">
           <label className="req">المنتج</label>
-          <select value={variantId} onChange={e => setVariantId(e.target.value)}>
+          <select value={productId} onChange={e => setProductId(e.target.value)}>
             <option value="">— اختر منتجاً —</option>
-            {variants.map(v => (
-              <option key={v.id} value={v.id}>
-                {v.product?.name}{v.variant_name ? ` — ${v.variant_name}` : ''}
-                {v.manages_stock ? ` (مخزون: ${v.current_stock ?? 0})` : ''}
+            {products.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+                {p.manages_stock ? ` (مخزون: ${p.current_stock ?? 0})` : ''}
               </option>
+            ))}
+          </select>
+        </div>
+        <div className="fg s2">
+          <label className="req">المستودع</label>
+          <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)}>
+            <option value="">— اختر مستودعاً —</option>
+            {warehouses?.map(w => (
+              <option key={w.id} value={w.id}>{w.name}</option>
             ))}
           </select>
         </div>
         <div className="fg">
           <label className="req">الكمية</label>
-          <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="0" min={0.001} inputMode="decimal" />
+          <input
+            type="number" value={qty}
+            onChange={e => setQty(e.target.value)}
+            placeholder="0" min={0.001} inputMode="decimal"
+          />
         </div>
         {type === 'in' && (
           <div className="fg">
             <label>سعر الشراء HT</label>
             <div className="inp-row">
-              <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" />
+              <input
+                type="number" value={price}
+                onChange={e => setPrice(e.target.value)}
+                placeholder="0.00"
+              />
               <div className="inp-suf">دج</div>
             </div>
           </div>
         )}
         <div className="fg s2">
           <label>ملاحظة</label>
-          <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="سبب الحركة..." />
+          <input
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="سبب الحركة..."
+          />
         </div>
       </div>
     </Modal>

@@ -5,22 +5,29 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 
 /**
- * DatabaseSeeder — إنتاج
+ * DatabaseSeeder — نقطة الدخول الوحيدة
  * ══════════════════════════════════════════════════════════════════
- * يُشغَّل مرة واحدة عند نشر النظام لأول مرة:
- *   php artisan migrate --seed
- *   php artisan db:seed
+ * php artisan migrate --seed
+ * php artisan db:seed
  *
- * يُنفّذ GlobalSeeder فقط:
- *   1. ولايات + بلديات (WilayaCommuneSeeder)
- *   2. حساب super-admin (UserSeeder)
- *   3. صلاحيات + دور super-admin (GlobalRolesAndPermissionsSeeder)
+ * يُشغّل GlobalSeeder فقط:
+ *   1. WilayaCommuneSeeder    ← بيانات جغرافية
+ *   2. UserSeeder             ← super-admin فقط
+ *   3. GlobalRolesAndPermissionsSeeder ← صلاحيات + دور super-admin
  *
- * بعد الانتهاء:
- *   - السوبر أدمن يسجّل دخوله ويرى مودال إعداد النظام
- *     إذا اكتشف أن البيانات العالمية غير مكتملة.
- *   - كل مستخدم عادي يسجّل حساباً ثم ينشئ شركته.
- *   - CompanyObserver يُطلق CompanySeeder تلقائياً عند كل شركة جديدة.
+ * ─────────────────────────────────────────────────────────────────
+ * ما يتم لاحقاً من الواجهة:
+ *
+ *   السوبر أدمن (AdminBootModal):
+ *     POST /api/v1/admin/system/boot
+ *       إذا احتاج إعادة تثبيت البيانات العالمية
+ *
+ *   مالك الشركة — تلقائي:
+ *     CompanyObserver::created() → CompanySeeder
+ *       (currencies, tvas, units, warehouses, roles, fiscal_year...)
+ *
+ *   مالك الشركة — يدوي اختياري:
+ *     DataSeedingModal → POST /api/v1/{company}/seed/{key}
  * ══════════════════════════════════════════════════════════════════
  */
 class DatabaseSeeder extends Seeder

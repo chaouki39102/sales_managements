@@ -44,20 +44,18 @@ class ProductService extends \App\Core\Services\BaseService
     // =========================================================
 
     protected function beforeCreate(array $data, $request): array
-    {
-        $companyId = app(\App\Services\CompanyContextService::class)->get();
-        $company = $companyId ? Company::find($companyId) : null;
+{
+    $data = parent::beforeCreate($data, $request); // ← أضف هذا السطر
 
-        if ($company && $company->products()->count() >= $company->max_products) {
-            throw new BusinessRuleException("وصلت الشركة للحد الأقصى من المنتجات ({$company->max_products})", 422);
-        }
+    $companyId = app(\App\Services\CompanyContextService::class)->get();
+    $company = $companyId ? Company::find($companyId) : null;
 
-        if (empty($data['slug']) && isset($data['name'])) {
-            $data['slug'] = $this->generateUniqueSlug($data['name']);
-        }
-
-        return $data;
+    if ($company && $company->products()->count() >= $company->max_products) {
+        throw new BusinessRuleException("وصلت الشركة للحد الأقصى من المنتجات ({$company->max_products})", 422);
     }
+
+    return $data;
+}
 
     protected function afterCreate(Model $item, array $data, $request): void
     {
@@ -87,16 +85,15 @@ class ProductService extends \App\Core\Services\BaseService
             }
         }
 
-        if (isset($data['name']) && $data['name'] !== $item->name && empty($data['slug'])) {
-            $data['slug'] = $this->generateUniqueSlug($data['name'], $item->id);
-        }
+
     }
 
     protected function prepareDataForUpdate(Model $item, array $data, $request): array
-    {
-        unset($data['packagings'], $data['prices'], $data['quantity_discounts']);
-        return $data;
-    }
+{
+    $data = parent::prepareDataForUpdate($item, $data, $request); // ← أضف
+    unset($data['packagings'], $data['prices'], $data['quantity_discounts']);
+    return $data;
+}
 
     protected function afterUpdate(Model $item, array $data, $request): void
     {
@@ -278,17 +275,5 @@ class ProductService extends \App\Core\Services\BaseService
     // Slug Helper
     // =========================================================
 
-    private function generateUniqueSlug(string $name, ?int $excludeId = null): string
-    {
-        $slug     = Str::slug($name);
-        $query    = Product::where('slug', 'like', $slug . '%');
-        if ($excludeId) $query->where('id', '!=', $excludeId);
-        $existing = $query->pluck('slug');
 
-        if (!$existing->contains($slug)) return $slug;
-
-        $i = 1;
-        while ($existing->contains("{$slug}-{$i}")) $i++;
-        return "{$slug}-{$i}";
-    }
 }

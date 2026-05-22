@@ -6,6 +6,7 @@ import { useFiscalYear, FiscalYearSelector } from '@/context/FiscalYearContext';
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 import client from '@/lib/api/core/client';
+import { useTopbarTitle } from '@/hooks/useTopbarTitle';
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
   {
@@ -20,7 +21,7 @@ const NAV_GROUPS = [
     items: [
       { name: 'عروض الأسعار',          href: 'documents/DEV', icon: 'ti-file-check'             },
       { name: 'طلبيات العملاء',        href: 'documents/BCC', icon: 'ti-clipboard-list'         },
-      { name: 'وصل التسليم BL',        href: 'documents/BL',  icon: 'ti-truck'                  },
+      { name: 'وصل التسليم ',        href: 'documents/BL',  icon: 'ti-truck'                  },
       { name: 'فواتير البيع',          href: 'documents/FV',  icon: 'ti-file-invoice', badge: 3 },
       { name: 'مرتجعات البيع',         href: 'documents/AV',  icon: 'ti-corner-up-left'         },
     ],
@@ -551,7 +552,7 @@ export default function DashboardLayout() {
   };
 
   const currentPath = location.pathname.replace(/^\//, '') || 'dashboard';
-  const meta = PAGE_META[currentPath] ?? { title: 'لوحة التحكم', path: 'الرئيسية' };
+const meta = useTopbarTitle();
   const userInitial = user?.name?.[0] ?? 'م';
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);

@@ -1,21 +1,52 @@
 // ════════════════════════════════════════════════════════════════════════════
-// lib/api/endpoints/inventory.ts — مُصلح
+// lib/api/endpoints/inventory.ts
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-// ✅ FIX: أضفنا apiPut
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug } from '../../store/appStore';
 import type {
-  StockMovement, ProductLot,
-  PaginatedResponse, ListParams,
+  StockMovement,
+  ProductLot,
+  Product,
+  PaginatedResponse,
+  ListParams,
 } from '../core/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** منتج مبسّط لعرض المخزون — يعكس Product model في الـ Backend */
+export interface InventoryProduct {
+  id:                  number;
+  name:                string;
+  ref?:                string | null;
+  current_stock:       number;
+  min_stock_alert:     number;
+  max_stock_alert?:    number | null;
+  current_cost_price:  number;
+  purchase_price_ht:   number;
+  manages_stock:       boolean;
+  family_id?:          number | null;
+  brand_id?:           number | null;
+  unit_id?:            number | null;
+  tva_id?:             number | null;
+  active:              boolean;
+  company_id:          number;
+  // Relations
+  family?:   { id: number; name: string } | null;
+  brand?:    { id: number; name: string } | null;
+  unit?:     { id: number; name: string; symbol: string } | null;
+  tva?:      { id: number; rate: number } | null;
+}
+
 export interface StockMovementCreateInput {
-  product_variant_id:     number;
+  product_id:             number;
   warehouse_id:           number;
   fiscal_year_id:         number;
   stock_movement_type_id: number;
@@ -23,32 +54,56 @@ export interface StockMovementCreateInput {
   quantity:               number;
   unit_price:             number;
   notes?:                 string | null;
+  lot_number?:            string | null;
 }
 
 export interface StockMovementListParams extends ListParams {
-  product_variant_id?:     number;
+  product_id?:             number;
   warehouse_id?:           number;
   stock_movement_type_id?: number;
   fiscal_year_id?:         number;
   date_from?:              string;
   date_to?:                string;
+  is_validated?:           boolean;
+}
+
+export interface InventoryProductListParams extends ListParams {
+  family_id?:   number;
+  brand_id?:    number;
+  warehouse_id?: number;
+  /** low = أقل من min_stock_alert, out = نفد, ok = جيد */
+  status?:      'low' | 'out' | 'ok';
+}
+
+export interface StockSummary {
+  total_products: number;
+  out_of_stock:   number;
+  low_stock:      number;
+  total_value:    number;
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 export const inventoryApi = {
+  // ── Products (for inventory view) ─────────────────────────────────────────
+  products: (params?: InventoryProductListParams) =>
+    apiGet<PaginatedResponse<InventoryProduct>>('/products', {
+      ...params,
+      include: 'family,brand,unit,tva',
+    }),
+
+  lowStockProducts: () =>
+    apiGet<InventoryProduct[]>('/inventory/low-stock'),
+
+  stockSummary: () =>
+    apiGet<StockSummary>('/inventory/summary'),
+
   // ── Stock Movements ────────────────────────────────────────────────────────
   movements: (params?: StockMovementListParams) =>
     apiGet<PaginatedResponse<StockMovement>>('/stock-movements', {
       ...params,
-      include: 'productVariant.product,warehouse,movementType',
+      include: 'product,warehouse,stockMovementType',
     }),
-
-  incoming: (params?: StockMovementListParams) =>
-    apiGet<PaginatedResponse<StockMovement>>('/stock-movements/incoming', params),
-
-  outgoing: (params?: StockMovementListParams) =>
-    apiGet<PaginatedResponse<StockMovement>>('/stock-movements/outgoing', params),
 
   createMovement: (data: StockMovementCreateInput) =>
     apiPost<StockMovement>('/stock-movements', data),
@@ -58,18 +113,20 @@ export const inventoryApi = {
 
   // ── Product Lots ───────────────────────────────────────────────────────────
   lots: (params?: ListParams) =>
-    apiGet<PaginatedResponse<ProductLot>>('/product-lots', params),
+    apiGet<PaginatedResponse<ProductLot>>('/product-lots', {
+      ...params,
+      include: 'product,warehouse',
+    }),
 
-  lotAvailable: () =>
+  lotsAvailable: () =>
     apiGet<ProductLot[]>('/product-lots/available'),
 
-  lotExpiring: (days = 30) =>
+  lotsExpiring: (days = 30) =>
     apiGet<ProductLot[]>('/product-lots/expiring', { days }),
 
   createLot: (data: Partial<ProductLot>) =>
     apiPost<ProductLot>('/product-lots', data),
 
-  // ✅ FIX: apiPut بدل apiPost
   updateLot: (id: number, data: Partial<ProductLot>) =>
     apiPut<ProductLot>(`/product-lots/${id}`, data),
 
@@ -79,18 +136,53 @@ export const inventoryApi = {
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
-export function useStockMovements(params?: StockMovementListParams) {
+/** قائمة المنتجات مع بيانات المخزون */
+export function useInventoryProducts(params?: InventoryProductListParams) {
   const slug = useActiveSlug();
   return useQuery({
-    // ✅ FIX: استخدام tenantKeys.inventory.movements الجديد
-    queryKey:        tenantKeys.inventory.movements(slug ?? '', params),
-    queryFn:         () => inventoryApi.movements(params),
+    queryKey:        tenantKeys.inventory.list(slug ?? '', params),
+    queryFn:         () => inventoryApi.products(params),
     enabled:         !!slug,
-    staleTime:       3 * 60_000,
+    staleTime:       2 * 60_000,
     placeholderData: keepPreviousData,
   });
 }
 
+/** منتجات منخفضة أو نافدة المخزون */
+export function useLowStockProducts() {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey: [slug, 'inventory', 'low-stock'],
+    queryFn:  () => inventoryApi.lowStockProducts(),
+    enabled:  !!slug,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** ملخص المخزون للـ KPIs */
+export function useStockSummary() {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey: [slug, 'inventory', 'summary'],
+    queryFn:  () => inventoryApi.stockSummary(),
+    enabled:  !!slug,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** قائمة حركات المخزون */
+export function useStockMovements(params?: StockMovementListParams) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:        tenantKeys.inventory.movements(slug ?? '', params),
+    queryFn:         () => inventoryApi.movements(params),
+    enabled:         !!slug,
+    staleTime:       2 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** دفعات المخزون */
 export function useProductLots(params?: ListParams) {
   const slug = useActiveSlug();
   return useQuery({
@@ -102,11 +194,12 @@ export function useProductLots(params?: ListParams) {
   });
 }
 
+/** دفعات قاربت الانتهاء */
 export function useExpiringLots(days = 30) {
   const slug = useActiveSlug();
   return useQuery({
     queryKey:  [slug, 'product-lots', 'expiring', days],
-    queryFn:   () => inventoryApi.lotExpiring(days),
+    queryFn:   () => inventoryApi.lotsExpiring(days),
     enabled:   !!slug,
     staleTime: 10 * 60_000,
   });
@@ -120,8 +213,9 @@ export function useInventoryMutations() {
 
   const invalidate = () => {
     if (!slug) return;
+    // إبطال المخزون
     qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
-    // إبطال المنتجات أيضاً — الحركات تغير current_stock
+    // إبطال المنتجات — الحركات تغير current_stock
     qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
   };
 

@@ -31,22 +31,36 @@ class PartyService extends \App\Core\Services\BaseService
      * Before creating - data preparation and validation
      */
     protected function beforeCreate(array $data, $request): array
-    {
-        // Generate unique code if not provided
-        if (empty($data['code'])) {
-            $data['code'] = $this->generatePartyCode($data['party_type_id']);
-        }
+{
+    $data = parent::beforeCreate($data, $request); // ← أضف
 
-        // Generate slug from name
-        if (!isset($data['slug']) && isset($data['name'])) {
-            $data['slug'] = $this->generateSlug($data['name']);
-        }
-
-        // Algerian-specific validations
-        $this->validateAlgerianFields($data);
-
-        return $data;
+    if (empty($data['code'])) {
+        $data['code'] = $this->generatePartyCode(
+            $data['party_type_id'],
+            app(\App\Services\CompanyContextService::class)->get()
+        );
     }
+
+    // ← احذف generateSlug — HasTenantSlug يتولاه
+    $this->validateAlgerianFields($data);
+    return $data;
+}
+
+private function generatePartyCode(int $partyTypeId, ?int $companyId): string
+{
+    $prefix = $partyTypeId === 1 ? 'CUS' : 'SUP';
+
+    do {
+        $code = $prefix . str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
+    } while (
+        Party::where('code', $code)
+             ->where('company_id', $companyId) // ← أضف
+             ->exists()
+    );
+
+    return $code;
+}
+
 
     /**
      * After create - within transaction
@@ -109,89 +123,56 @@ class PartyService extends \App\Core\Services\BaseService
         }
     }
 
-    /**
-     * Generate unique party code
-     */
-    private function generatePartyCode(int $partyTypeId): string
-    {
-        $prefix = $partyTypeId === 1 ? 'CUS' : 'SUP'; // Assuming 1=customer, 2=supplier
-
-        do {
-            $code = $prefix . str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
-        } while (Party::where('code', $code)->exists());
-
-        return $code;
-    }
-
-    /**
-     * Generate slug from name
-     */
-    private function generateSlug(string $name): string
-    {
-        $slug = strtolower(str_replace([' ', '.', ','], '-', $name));
-        $slug = preg_replace('/[^a-z0-9\-]/', '', $slug);
-        $originalSlug = $slug;
-        $counter = 1;
-
-        while (Party::where('slug', $slug)->exists()) {
-            $slug = $originalSlug . '-' . $counter;
-            $counter++;
-        }
-
-        return $slug;
-    }
 
     /**
      * Validate Algerian-specific fields
      */
     private function validateAlgerianFields(array $data, ?Party $existingParty = null): void
-    {
-        // NIF validation (Algerian tax number - 15-16 digits usually)
-        if (isset($data['nif']) && !empty($data['nif'])) {
-            if (!preg_match('/^\d{15,16}$/', $data['nif'])) {
-                throw new BusinessRuleException('رقم التعريف الجبائي يجب أن يكون 15-16 رقم', 422);
-            }
+{
+    $companyId = app(\App\Services\CompanyContextService::class)->get();
 
-            // Check uniqueness except for current party
-            $query = Party::where('nif', $data['nif']);
-            if ($existingParty) {
-                $query->where('id', '!=', $existingParty->id);
-            }
-            if ($query->exists()) {
-                throw new BusinessRuleException('رقم التعريف الجبائي موجود بالفعل', 422);
-            }
+    if (isset($data['nif']) && !empty($data['nif'])) {
+        if (!preg_match('/^\d{15,20}$/', $data['nif'])) {
+            throw new BusinessRuleException('رقم التعريف الجبائي يجب أن يكون 15-20 رقم', 422);
         }
 
-        // RC validation (Commercial Register)
-        if (isset($data['rc']) && !empty($data['rc'])) {
-            if (strlen($data['rc']) < 3 || strlen($data['rc']) > 50) {
-                throw new BusinessRuleException('رقم السجل التجاري غير صحيح', 422);
-            }
+        $query = Party::where('nif', $data['nif'])
+                      ->where('company_id', $companyId); // ← أضف
+        if ($existingParty) {
+            $query->where('id', '!=', $existingParty->id);
         }
-
-        // NIS validation (Statistical number)
-        if (isset($data['nis']) && !empty($data['nis'])) {
-            if (!preg_match('/^\d{10,15}$/', $data['nis'])) {
-                throw new BusinessRuleException('رقم التعريف الإحصائي يجب أن يكون 10-15 رقم', 422);
-            }
-        }
-
-        // Email uniqueness
-        if (isset($data['email']) && !empty($data['email'])) {
-            $query = Party::where('email', $data['email']);
-            if ($existingParty) {
-                $query->where('id', '!=', $existingParty->id);
-            }
-            if ($query->exists()) {
-                throw new BusinessRuleException('البريد الإلكتروني موجود بالفعل', 422);
-            }
-        }
-
-        // Credit limit validation
-        if (isset($data['credit_limit']) && $data['credit_limit'] < 0) {
-            throw new BusinessRuleException('الحد الائتماني لا يمكن أن يكون سالباً', 422);
+        if ($query->exists()) {
+            throw new BusinessRuleException('رقم التعريف الجبائي موجود بالفعل', 422);
         }
     }
+
+    if (isset($data['rc']) && !empty($data['rc'])) {
+        if (strlen($data['rc']) < 3 || strlen($data['rc']) > 50) {
+            throw new BusinessRuleException('رقم السجل التجاري غير صحيح', 422);
+        }
+    }
+
+    if (isset($data['nis']) && !empty($data['nis'])) {
+        if (!preg_match('/^\d{15,18}$/', $data['nis'])) {
+            throw new BusinessRuleException('رقم التعريف الإحصائي يجب أن يكون 15-18 رقم', 422);
+        }
+    }
+
+    if (isset($data['email']) && !empty($data['email'])) {
+        $query = Party::where('email', $data['email'])
+                      ->where('company_id', $companyId); // ← أضف
+        if ($existingParty) {
+            $query->where('id', '!=', $existingParty->id);
+        }
+        if ($query->exists()) {
+            throw new BusinessRuleException('البريد الإلكتروني موجود بالفعل', 422);
+        }
+    }
+
+    if (isset($data['credit_limit']) && $data['credit_limit'] < 0) {
+        throw new BusinessRuleException('الحد الائتماني لا يمكن أن يكون سالباً', 422);
+    }
+}
 
     /**
      * Get customers only
