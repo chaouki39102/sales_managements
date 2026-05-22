@@ -1016,7 +1016,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'invoices',   label: 'الفواتير',       href: '/invoices',   icon: 'ti-file-text',     badge: 3 },
       { id: 'orders',     label: 'طلبيات الشراء',  href: '/orders',     icon: 'ti-clipboard-list'           },
       { id: 'returns',    label: 'المرتجعات',       href: '/returns',    icon: 'ti-corner-up-left'           },
-      { id: 'quotations', label: 'عروض الأسعار',    href: '/quotations', icon: 'ti-file-check'               },
+      { id: 'quotations', label: 'فاتورة شكلية',    href: '/quotations', icon: 'ti-file-check'               },
       { id: 'bl',         label: 'وصل التسليم BL',  href: '/bl',         icon: 'ti-truck'                    },
     ],
   },

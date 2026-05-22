@@ -720,7 +720,7 @@ const META: Record<string, PageMeta> = {
   '/invoices':     { title:'الفواتير',             path:'مبيعات ← فواتير'           },
   '/orders':       { title:'طلبيات الشراء',         path:'مبيعات ← طلبيات'          },
   '/returns':      { title:'المرتجعات',             path:'مبيعات ← مرتجعات'         },
-  '/quotations':   { title:'عروض الأسعار',          path:'مبيعات ← عروض أسعار'      },
+  '/quotations':   { title:'فاتورة شكلية',          path:'مبيعات ← عروض أسعار'      },
   '/bl':           { title:'وصل التسليم BL',        path:'مبيعات ← وصل تسليم'       },
   '/products':     { title:'المنتجات',              path:'مخزون ← منتجات'           },
   '/inventory':    { title:'إدارة المخزون',         path:'مخزون ← جرد'              },

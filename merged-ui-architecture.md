@@ -3966,7 +3966,7 @@ const NAV_GROUPS = [
   {
     label: 'المبيعات',
     items: [
-      { name: 'عروض الأسعار',          href: 'documents/DEV', icon: 'ti-file-check'             },
+      { name: 'فاتورة شكلية',          href: 'documents/DEV', icon: 'ti-file-check'             },
       { name: 'طلبيات العملاء',        href: 'documents/BCC', icon: 'ti-clipboard-list'         },
       { name: 'وصل التسليم BL',        href: 'documents/BL',  icon: 'ti-truck'                  },
       { name: 'فواتير البيع',          href: 'documents/FV',  icon: 'ti-file-invoice', badge: 3 },
@@ -3976,7 +3976,7 @@ const NAV_GROUPS = [
   {
     label: 'المشتريات',
     items: [
-      { name: 'طلبات عروض الأسعار',    href: 'documents/DDP', icon: 'ti-file-search'           },
+      { name: 'طلبات فاتورة شكلية',    href: 'documents/DDP', icon: 'ti-file-search'           },
       { name: 'أوامر الشراء للموردين', href: 'documents/BCF', icon: 'ti-clipboard-check'       },
       { name: 'وصل الاستلام',          href: 'documents/BR',  icon: 'ti-package-import'        },
       { name: 'فواتير الشراء',         href: 'documents/FA',  icon: 'ti-file-invoice'          },
@@ -4042,12 +4042,12 @@ const LABEL_COLORS = ['var(--em)','var(--blue)','var(--purple)','var(--gold)','v
 const PAGE_META: Record<string, { title: string; path: string }> = {
   'dashboard':               { title: 'لوحة التحكم',        path: 'الرئيسية ← إحصائيات'   },
   'pos':                     { title: 'نقطة البيع',          path: 'الرئيسية ← POS'         },
-  'documents/DEV':           { title: 'عروض الأسعار',       path: 'مبيعات ← عروض أسعار'   },
+  'documents/DEV':           { title: 'فاتورة شكلية',       path: 'مبيعات ← عروض أسعار'   },
   'documents/BCC':           { title: 'طلبيات العملاء',     path: 'مبيعات ← طلبيات'       },
   'documents/BL':            { title: 'وصل التسليم',        path: 'مبيعات ← وصل تسليم'    },
   'documents/FV':            { title: 'فواتير البيع',       path: 'مبيعات ← فواتير'        },
   'documents/AV':            { title: 'مرتجعات البيع',      path: 'مبيعات ← مرتجعات'      },
-  'documents/DDP':           { title: 'طلبات عروض الأسعار', path: 'مشتريات ← طلبات عروض'  },
+  'documents/DDP':           { title: 'طلبات فاتورة شكلية', path: 'مشتريات ← طلبات عروض'  },
   'documents/BCF':           { title: 'أوامر الشراء',       path: 'مشتريات ← أوامر شراء'  },
   'documents/BR':            { title: 'وصل الاستلام',       path: 'مشتريات ← وصل استلام'  },
   'documents/FA':            { title: 'فواتير الشراء',      path: 'مشتريات ← فواتير شراء' },
@@ -33912,7 +33912,7 @@ const META: Record<string, PageMeta> = {
   '/invoices':     { title:'الفواتير',             path:'مبيعات ← فواتير'           },
   '/orders':       { title:'طلبيات الشراء',         path:'مبيعات ← طلبيات'          },
   '/returns':      { title:'المرتجعات',             path:'مبيعات ← مرتجعات'         },
-  '/quotations':   { title:'عروض الأسعار',          path:'مبيعات ← عروض أسعار'      },
+  '/quotations':   { title:'فاتورة شكلية',          path:'مبيعات ← عروض أسعار'      },
   '/bl':           { title:'وصل التسليم BL',        path:'مبيعات ← وصل تسليم'       },
   '/products':     { title:'المنتجات',              path:'مخزون ← منتجات'           },
   '/inventory':    { title:'إدارة المخزون',         path:'مخزون ← جرد'              },
@@ -36279,7 +36279,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id:'invoices',   label:'الفواتير',        href:'/invoices',    icon:'ti-file-text',     badge: 3  },
       { id:'orders',     label:'طلبيات الشراء',   href:'/orders',      icon:'ti-clipboard-list'           },
       { id:'returns',    label:'المرتجعات',        href:'/returns',     icon:'ti-corner-up-left'           },
-      { id:'quotations', label:'عروض الأسعار',     href:'/quotations',  icon:'ti-file-check'               },
+      { id:'quotations', label:'فاتورة شكلية',     href:'/quotations',  icon:'ti-file-check'               },
       { id:'bl',         label:'وصل التسليم BL',   href:'/bl',          icon:'ti-truck'                    },
     ],
   },

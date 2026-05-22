@@ -11,12 +11,12 @@ export interface PageMeta {
 
 // ── Document types (مطابق لـ api.php document codes) ──────────────────────────
 const DOCUMENT_CODES: Record<string, PageMeta> = {
-  DEV: { title: 'عروض الأسعار',          path: 'مبيعات ← عروض أسعار'   },
+  DEV: { title: 'فاتورة شكلية',          path: 'مبيعات ← عروض أسعار'   },
   BCC: { title: 'طلبيات العملاء',        path: 'مبيعات ← طلبيات'       },
   BL:  { title: 'وصل التسليم',        path: 'مبيعات ← وصل تسليم'    },
   FV:  { title: 'فواتير البيع',          path: 'مبيعات ← فواتير'        },
   AV:  { title: 'مرتجعات البيع',         path: 'مبيعات ← مرتجعات'      },
-  DDP: { title: 'طلبات عروض الأسعار',   path: 'مشتريات ← طلبات عروض'  },
+  DDP: { title: 'طلبات فاتورة شكلية',   path: 'مشتريات ← طلبات عروض'  },
   BCF: { title: 'أوامر الشراء',          path: 'مشتريات ← أوامر شراء'  },
   BR:  { title: 'وصل الاستلام',          path: 'مشتريات ← وصل استلام'  },
   FA:  { title: 'فواتير الشراء',         path: 'مشتريات ← فواتير شراء' },
