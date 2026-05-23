@@ -139,8 +139,11 @@ export default function CommercialDocumentsPage() {
     staleTime:       2 * 60_000,
   });
 
-  const items = (docs as { data?: unknown[] })?.data ?? [];
-  const meta  = (docs as { meta?: Record<string, number> })?.meta ?? {};
+  // ✅ دعم قراءة البيانات سواء كانت مصفوفة مباشرة أو داخل كائن data
+const items = Array.isArray(docs) ? docs : ((docs as { data?: unknown[] })?.data ?? []);
+const meta  = (docs as { meta?: Record<string, number> })?.meta ?? {
+  total: 0, last_page: 1, current_page: 1, from: 0, to: 0 
+};
 
   // ── فتح مودل التعديل (جلب البيانات الكاملة) ─────────────────────────────
   const openEditModal = async (doc: Record<string, unknown>) => {
