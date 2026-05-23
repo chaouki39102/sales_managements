@@ -53,14 +53,20 @@ trait BelongsToFiscalYear
      */
     protected static function loadClosedYears(): void
     {
-        if (empty(static::$closedYearsCache)) {
+        if (! empty(static::$closedYearsCache)) {
+            return;
+        }
+
+        try {
             static::$closedYearsCache = Cache::remember(
                 'closed_fiscal_years',
-                now()->addHours(24), // يتم تحديثه عند إقفال سنة
-                fn() => FiscalYear::where('is_closed', true)
+                now()->addHours(24),
+                fn () => FiscalYear::where('is_closed', true)
                     ->pluck('id')
                     ->toArray()
             );
+        } catch (\Throwable) {
+            static::$closedYearsCache = [];
         }
     }
 
