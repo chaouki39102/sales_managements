@@ -87,22 +87,6 @@ export default function CommercialDocumentsPage() {
     setTimeout(() => setToast(null), 3500);
   }
 
-  // ── نوع المستند ───────────────────────────────────────────────────────────
-  const { data: docType } = useQuery<DocumentType>({
-    // ✅ إضافة slug في الـ key لعزل الشركات
-    queryKey: [slug, 'document-type-by-code', typeCode],
-    queryFn: () =>
-      apiGet<{ data: DocumentType[] }>('/document-types', { per_page: 500 })
-        .then((res) => {
-          const list = Array.isArray(res)
-            ? res
-            : (res as { data?: DocumentType[] }).data ?? [];
-          return (list as DocumentType[]).find((dt) => dt.code === typeCode) ?? null;
-        }) as Promise<DocumentType>,
-    enabled: !!slug && !!typeCode,
-    staleTime: 10 * 60_000,
-  });
-
   // ✅ isPurch يعتمد على code وليس document_base_operation_id
   const PURCHASE_CODES = new Set(['FA', 'BR', 'DDP', 'BCF', 'AA']);
   const isPurch   = PURCHASE_CODES.has(typeCode ?? '');
@@ -119,26 +103,38 @@ export default function CommercialDocumentsPage() {
   }, [qc, slug]);
 
   // ── جلب المستندات ────────────────────────────────────────────────────────
+  const { data: docType, isLoading: loadingDocType } = useQuery<DocumentType>({
+  queryKey: [slug, 'document-type-by-code', typeCode],
+  queryFn: () => apiGet<{ data: DocumentType[] }>('/document-types', { per_page: 500 })
+    .then(res => {
+      const list = Array.isArray(res) ? res : (res as { data?: DocumentType[] }).data ?? [];
+      return list.find(dt => dt.code === typeCode) ?? null;
+    }),
+  enabled: !!slug && !!typeCode,
+  staleTime: 10 * 60_000,
+});
+
   const { data: docs, isLoading, isFetching } = useQuery({
     // ✅ يشمل slug في الـ key لعزل الشركات
     queryKey: tenantKeys.documents.byType(slug ?? '', typeCode ?? '', {
       fiscal_year_id: selectedYear?.id,
+      document_type_id: docType?.id,
       search,
       status: statusFilter,
       page,
     }),
     queryFn: () =>
-      apiGet<{ data: unknown[]; meta: unknown }>('/documents', {
-        'filter[document_type.code]': typeCode,
-        'filter[fiscal_year_id]':     selectedYear?.id,
-        'filter[search]':             search   || undefined,
-        'filter[document_status.name]': statusFilter || undefined,
-        include:  'party,documentStatus,warehouse',
-        sort:     '-document_date',
-        per_page: 15,
-        page,
-      }),
-    enabled:         !!slug && !!typeCode && !!selectedYear?.id,
+  apiGet<{ data: unknown[]; meta: unknown }>('/documents', {
+    'filter[document_type_id]':       docType?.id,      // ✅ صحيح
+    'filter[fiscal_year_id]':         selectedYear?.id,
+    'filter[search]':                 search || undefined,
+    'filter[document_status_id]':     statusFilter || undefined,
+    include:  'party,documentStatus,warehouse',
+    sort:     '-document_date',
+    per_page: 15,
+    page,
+  }),
+    enabled: !!slug && !!typeCode && !!selectedYear?.id && !!docType?.id,
     placeholderData: keepPreviousData,
     staleTime:       2 * 60_000,
   });

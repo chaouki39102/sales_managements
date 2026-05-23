@@ -1,9 +1,9 @@
 # Module Export: Party
-Generated at: 2026-05-22 15:56:39
+Generated at: 2026-05-23 08:36:22
 
 ## Models
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\OpeningBalanceParty.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\OpeningBalanceParty.php
 ```php
 <?php
 
@@ -67,7 +67,7 @@ class OpeningBalanceParty extends Model
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\Party.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\Party.php
 ```php
 <?php
 
@@ -223,7 +223,7 @@ class Party extends Model
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\PartyType.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\PartyType.php
 ```php
 <?php
 
@@ -276,7 +276,7 @@ class PartyType extends Model
 
 ## Controllers
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\OpeningBalancePartyController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\OpeningBalancePartyController.php
 ```php
 <?php
 
@@ -311,7 +311,7 @@ class OpeningBalancePartyController extends BaseApiController
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\PartyController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\PartyController.php
 ```php
 <?php
 
@@ -397,7 +397,7 @@ class PartyController extends BaseApiController
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\PartyTypeController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\PartyTypeController.php
 ```php
 <?php
 
@@ -432,7 +432,7 @@ class PartyTypeController extends BaseApiController
 
 ## Services
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\OpeningBalancePartyService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\OpeningBalancePartyService.php
 ```php
 <?php
 
@@ -451,7 +451,7 @@ class OpeningBalancePartyService extends \App\Core\Services\BaseService
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\PartyService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\PartyService.php
 ```php
 <?php
 
@@ -680,7 +680,7 @@ private function generatePartyCode(int $partyTypeId, ?int $companyId): string
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\PartyTypeService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\PartyTypeService.php
 ```php
 <?php
 
@@ -699,7 +699,7 @@ class PartyTypeService extends \App\Core\Services\BaseService
 
 ## Requests
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\OpeningBalancePartyRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\OpeningBalancePartyRequest.php
 ```php
 <?php
 
@@ -744,7 +744,7 @@ class UpdateOpeningBalancePartyRequest extends FormRequest
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StorePartyRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StorePartyRequest.php
 ```php
 <?php
 
@@ -889,7 +889,7 @@ class StorePartyRequest extends FormRequest
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdatePartyRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdatePartyRequest.php
 ```php
 <?php
 
@@ -1020,7 +1020,7 @@ class UpdatePartyRequest extends FormRequest
 
 ## Policies
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\OpeningBalancePartyPolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\OpeningBalancePartyPolicy.php
 ```php
 <?php
 
@@ -1070,7 +1070,7 @@ class OpeningBalancePartyPolicy
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\PartyPolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\PartyPolicy.php
 ```php
 <?php
 
@@ -1120,7 +1120,7 @@ class PartyPolicy
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\PartyTypePolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\PartyTypePolicy.php
 ```php
 <?php
 
