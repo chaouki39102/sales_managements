@@ -11,7 +11,7 @@ const laravelPlugin = laravel.default || laravel;
 export default defineConfig({
     plugins: [
         laravelPlugin({
-            input: ['resources/js/app.tsx', 'resources/css/app.css'],
+            input: ['resources/js/app.jsx', 'resources/css/app.css'],
             refresh: true,
         }),
         react({
