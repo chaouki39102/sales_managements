@@ -1,349 +1,494 @@
-// ════════════════════════════════════════════════
-// resources/js/pages/reports/ReportsPage.tsx
-// لوحة التقارير والإحصائيات
-// ════════════════════════════════════════════════
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import PageHeader from '@/components/ui/PageHeader';
-import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
-import KpiCard from '@/components/ui/KpiCard';
-import AlertBar from '@/components/ui/AlertBar';
-import ProgressBar from '@/components/ui/ProgressBar';
-import apiClient from '@/lib/api/core/client';
-import { useFiscalYear } from '@/context/FiscalYearContext';
+// ════════════════════════════════════════════════════════════════════════════
+// pages/reports/ReportsPage.tsx
+//
+// الإصلاحات:
+//   1. استبدال apiClient.get المباشر بـ hooks من reports.ts
+//   2. fiscal_year_id → year_id (اسم الحقل الصحيح في ReportBaseParams)
+//   3. تقسيم ReportViewer لـ sub-components مُصنَّفة بـ types
+//   4. جدول TVA يستخدم TaxesReportData الحقيقي
+//   5. جدول البيانات لا يعرض مفاتيح الـ object الخام (Object.keys)
+//   6. export URLs تمر عبر apiClient بدل window.open مباشرة
+//   7. QuickReportCard لا يستدعي navigate + onClick في نفس الوقت
+// ════════════════════════════════════════════════════════════════════════════
 
-// ─────────────────────────────────────────────────────────────
-// أنواع التقارير
-// ─────────────────────────────────────────────────────────────
-interface ReportCard {
-    id: string;
-    title: string;
-    description: string;
-    icon: string;
-    color: string;
-    endpoint: string;
-    params?: Record<string, string>;
-    badge?: string;
-    badgeColor?: string;
+import React, { useState, useCallback } from 'react';
+import PageHeader    from '@/components/ui/PageHeader';
+import Card          from '@/components/ui/Card';
+import Badge         from '@/components/ui/Badge';
+import Button        from '@/components/ui/Button';
+import KpiCard       from '@/components/ui/KpiCard';
+import AlertBar      from '@/components/ui/AlertBar';
+import { useFiscalYear } from '@/context/FiscalYearContext';
+import { useActiveSlug } from '@/lib/store/appStore';
+import {
+  useSalesReport, usePurchasesReport, useCustomersReport,
+  useSuppliersReport, useProductsReport, useInventoryReport,
+  usePaymentsReport, useTvaReport,
+  type SalesReportData, type PurchasesReportData,
+  type PartyReportData, type ProductsReportData,
+  type InventoryReportData, type PaymentsReportData,
+  type TaxesReportData,
+} from '@/lib/api/endpoints/reports';
+import apiClient from '@/lib/api/core/client';
+
+// ─── Report Card meta (UI فقط — بدون endpoint مباشر) ────────────────────────
+
+interface ReportCardMeta {
+  id:           string;
+  title:        string;
+  description:  string;
+  icon:         string;
+  color:        string;
+  badge?:       string;
 }
 
-const REPORT_CARDS: ReportCard[] = [
-    {
-        id: 'sales',
-        title: 'تقرير المبيعات',
-        description: 'تحليل المبيعات حسب الفترة، المنتج، والزبون مع مقارنة سنوية',
-        icon: 'ti-trending-up',
-        color: 'var(--em)',
-        endpoint: '/reports/sales',
-        badge: 'الأكثر استخداماً',
-    },
-    {
-        id: 'purchases',
-        title: 'تقرير المشتريات',
-        description: 'تحليل المشتريات والموردين مع تتبع التكاليف',
-        icon: 'ti-trending-down',
-        color: 'var(--blue)',
-        endpoint: '/reports/purchases',
-    },
-    {
-        id: 'customers',
-        title: 'تقرير العملاء',
-        description: 'كشف حساب العملاء، الديون المستحقة، وأفضل العملاء',
-        icon: 'ti-users',
-        color: 'var(--purple)',
-        endpoint: '/reports/customers',
-    },
-    {
-        id: 'suppliers',
-        title: 'تقرير الموردين',
-        description: 'كشف حساب الموردين، المستحقات، وأفضل الموردين',
-        icon: 'ti-truck',
-        color: 'var(--gold)',
-        endpoint: '/reports/suppliers',
-    },
-    {
-        id: 'products',
-        title: 'تقرير المنتجات',
-        description: 'حركة المنتجات، الأكثر مبيعاً، والأقل مبيعاً',
-        icon: 'ti-package',
-        color: 'var(--teal)',
-        endpoint: '/reports/products',
-    },
-    {
-        id: 'inventory',
-        title: 'تقرير المخزون',
-        description: 'تقييم المخزون، الحركات، والمنتجات المنخفضة',
-        icon: 'ti-building-warehouse',
-        color: 'var(--orange)',
-        endpoint: '/reports/inventory',
-    },
-    {
-        id: 'payments',
-        title: 'تقرير الدفعات',
-        description: 'سجل الدفعات والتحصيلات حسب طريقة الدفع والفترة',
-        icon: 'ti-cash',
-        color: 'var(--em)',
-        endpoint: '/reports/payments',
-    },
-    {
-        id: 'taxes',
-        title: 'تقرير الضرائب',
-        description: 'تقرير TVA، الطابع الجبائي، وإقرار G50',
-        icon: 'ti-calculator',
-        color: 'var(--red)',
-        endpoint: '/reports/taxes',
-        badge: 'G50',
-        badgeColor: 'var(--gold)',
-    },
+const REPORT_CARDS: ReportCardMeta[] = [
+  { id: 'sales',     title: 'تقرير المبيعات',     description: 'تحليل المبيعات حسب الفترة، المنتج، والزبون مع مقارنة سنوية', icon: 'ti-trending-up',        color: 'var(--em)',     badge: 'الأكثر استخداماً' },
+  { id: 'purchases', title: 'تقرير المشتريات',    description: 'تحليل المشتريات والموردين مع تتبع التكاليف',                  icon: 'ti-trending-down',      color: 'var(--blue)'   },
+  { id: 'customers', title: 'تقرير العملاء',      description: 'كشف حساب العملاء، الديون المستحقة، وأفضل العملاء',           icon: 'ti-users',              color: 'var(--purple)' },
+  { id: 'suppliers', title: 'تقرير الموردين',     description: 'كشف حساب الموردين، المستحقات، وأفضل الموردين',              icon: 'ti-truck',              color: 'var(--gold)'   },
+  { id: 'products',  title: 'تقرير المنتجات',     description: 'حركة المنتجات، الأكثر مبيعاً، والأقل مبيعاً',               icon: 'ti-package',            color: 'var(--teal)'   },
+  { id: 'inventory', title: 'تقرير المخزون',      description: 'تقييم المخزون، الحركات، والمنتجات المنخفضة',                icon: 'ti-building-warehouse', color: 'var(--orange)' },
+  { id: 'payments',  title: 'تقرير الدفعات',      description: 'سجل الدفعات والتحصيلات حسب طريقة الدفع والفترة',            icon: 'ti-cash',               color: 'var(--em)'     },
+  { id: 'taxes',     title: 'تقرير الضرائب',      description: 'تقرير TVA، الطابع الجبائي، وإقرار G50',                     icon: 'ti-calculator',         color: 'var(--red)',    badge: 'G50' },
 ];
 
-// ─────────────────────────────────────────────────────────────
-// مكون التقرير السريع
-// ─────────────────────────────────────────────────────────────
-function QuickReportCard({ report }: { report: ReportCard }) {
-    const navigate = useNavigate();
+type ReportId = typeof REPORT_CARDS[number]['id'];
 
-    return (
-        <Card
-            style={{ cursor: 'pointer', transition: 'all .2s' }}
-            onClick={() => navigate(`/reports?id=${report.id}`)}
-        >
-            <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                {/* الأيقونة */}
-                <div style={{
-                    width: 52, height: 52, borderRadius: 12, flexShrink: 0,
-                    background: `color-mix(in srgb, ${report.color} 12%, transparent)`,
-                    border: `1px solid color-mix(in srgb, ${report.color} 25%, transparent)`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: report.color, fontSize: 22,
-                }}>
-                    <span className="ic"><i className={`ti ${report.icon}`}/></span>
-                </div>
+// ─── QuickReportCard ──────────────────────────────────────────────────────────
 
-                {/* المحتوى */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--t1)' }}>
-                            {report.title}
-                        </div>
-                        {report.badge && (
-                            <Badge variant="success" noDot>
-                                {report.badge}
-                            </Badge>
-                        )}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--t4)', marginBottom: 12, lineHeight: 1.6 }}>
-                        {report.description}
-                    </div>
-                    <Button size="xs" variant="primary" icon={<i className="ti ti-arrow-left"/>}>
-                        عرض التقرير
-                    </Button>
-                </div>
-            </div>
-        </Card>
-    );
-}
-
-// ─────────────────────────────────────────────────────────────
-// مكون عرض تقرير محدد
-// ─────────────────────────────────────────────────────────────
-function ReportViewer({ reportId, fiscalYearId }: { reportId: string; fiscalYearId?: number }) {
-    const report = REPORT_CARDS.find(r => r.id === reportId);
-    const isTaxReport = reportId === 'taxes';
-
-    const { data, isLoading, isError, refetch } = useQuery({
-        queryKey: ['report', reportId, fiscalYearId],
-        queryFn: () => apiClient.get(report?.endpoint || '', {
-            params: {
-                fiscal_year_id: fiscalYearId,
-                ...(report?.params || {}),
-            },
-        }).then(r => r.data),
-        enabled: !!reportId && !!report?.endpoint,
-    });
-
-    if (!report) {
-        return (
-            <EmptyState icon="ti-file-search" text="تقرير غير موجود" sub="اختر تقريراً من القائمة"/>
-        );
-    }
-
-    return (
-        <div>
-            <PageHeader
-                title={report.title}
-                subtitle={report.description}
-                actions={
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <Button size="sm" icon={<i className="ti ti-download"/>} onClick={() => window.open(`${report.endpoint}?fiscal_year_id=${fiscalYearId}&export=excel`, '_blank')}>
-                            تصدير Excel
-                        </Button>
-                        <Button size="sm" icon={<i className="ti ti-printer"/>} onClick={() => window.open(`${report.endpoint}?fiscal_year_id=${fiscalYearId}&export=pdf`, '_blank')}>
-                            PDF
-                        </Button>
-                        <Button size="sm" icon={<i className="ti ti-refresh"/>} onClick={() => refetch()}>
-                            تحديث
-                        </Button>
-                    </div>
-                }
-            />
-
-            {isLoading ? (
-                <div className="empty" style={{ padding: 60 }}>
-                    <div className="empty-ic"><i className="ti ti-loader"/></div>
-                    <div className="empty-tx">جاري تحميل التقرير...</div>
-                </div>
-            ) : isError ? (
-                <AlertBar variant="red">
-                    فشل تحميل التقرير.{' '}
-                    <button onClick={() => refetch()} style={{ fontWeight: 700, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>
-                        إعادة المحاولة
-                    </button>
-                </AlertBar>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* KPIs خاصة بالتقرير */}
-                    {isTaxReport && data?.summary && (
-                        <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-                            <KpiCard variant="green" icon="ti-arrow-up-circle" label="TVA محصلة" value={data.summary.tva_collected?.toLocaleString('fr-DZ') || '—'} unit="دج"/>
-                            <KpiCard variant="blue" icon="ti-arrow-down-circle" label="TVA قابلة للخصم" value={data.summary.tva_deductible?.toLocaleString('fr-DZ') || '—'} unit="دج"/>
-                            <KpiCard variant="red" icon="ti-calculator" label="المستحق" value={data.summary.net_tva?.toLocaleString('fr-DZ') || '—'} unit="دج"/>
-                            <KpiCard variant="gold" icon="ti-file-check" label="حالة الإقرار" value={data.summary.submitted ? 'مقدم' : 'قيد الإعداد'}/>
-                        </div>
-                    )}
-
-                    {/* جدول البيانات */}
-                    {data?.data && data.data.length > 0 && (
-                        <Card noHeader style={{ padding: 0 }}>
-                            <div className="tw">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            {Object.keys(data.data[0]).slice(0, 6).map(key => (
-                                                <th key={key}>{key}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {data.data.slice(0, 20).map((row: any, i: number) => (
-                                            <tr key={i}>
-                                                {Object.values(row).slice(0, 6).map((val: any, j: number) => (
-                                                    <td key={j}>{String(val ?? '—')}</td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {data.data.length > 20 && (
-                                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--b1)', fontSize: 12, color: 'var(--t4)', textAlign: 'center' }}>
-                                    عرض 20 من أصل {data.data.length} سجل — حمّل الملف للاطلاع على الكل
-                                </div>
-                            )}
-                        </Card>
-                    )}
-
-                    {(!data?.data || data.data.length === 0) && (
-                        <div className="empty" style={{ padding: 40 }}>
-                            <div className="empty-ic"><i className="ti ti-file-off"/></div>
-                            <div className="empty-tx">لا توجد بيانات متاحة لهذه الفترة</div>
-                            <div className="empty-sub">جرب تغيير السنة المالية أو معايير التقرير</div>
-                        </div>
-                    )}
-                </div>
-            )}
+function QuickReportCard({ report, onSelect }: { report: ReportCardMeta; onSelect: () => void }) {
+  return (
+    <Card style={{ cursor: 'pointer', transition: 'all .2s' }} onClick={onSelect}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+          background: `color-mix(in srgb, ${report.color} 12%, transparent)`,
+          border:     `1px solid color-mix(in srgb, ${report.color} 25%, transparent)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: report.color, fontSize: 22,
+        }}>
+          <span className="ic"><i className={`ti ${report.icon}`}/></span>
         </div>
-    );
-}
-
-// ─────────────────────────────────────────────────────────────
-// حالة فارغة
-// ─────────────────────────────────────────────────────────────
-function EmptyState({ icon, text, sub }: { icon: string; text: string; sub?: string }) {
-    return (
-        <div className="empty" style={{ padding: 60 }}>
-            <div className="empty-ic"><i className={`ti ${icon}`}/></div>
-            <div className="empty-tx">{text}</div>
-            {sub && <div className="empty-sub">{sub}</div>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--t1)' }}>{report.title}</div>
+            {report.badge && <Badge variant="success" noDot>{report.badge}</Badge>}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--t4)', marginBottom: 12, lineHeight: 1.6 }}>
+            {report.description}
+          </div>
+          <Button size="xs" variant="primary" icon={<i className="ti ti-arrow-left"/>}>
+            عرض التقرير
+          </Button>
         </div>
-    );
+      </div>
+    </Card>
+  );
 }
 
-// ════════════════════════════════════════════════
-// الصفحة الرئيسية للتقارير
-// ════════════════════════════════════════════════
-export default function ReportsPage() {
-    const { selectedYear } = useFiscalYear();
-    const [viewingReport, setViewingReport] = useState<string | null>(null);
+// ─── Report Viewers (كل تقرير بـ component مُصنَّف) ──────────────────────────
 
-    // إذا كان هناك تقرير مطلوب عرضه
-    if (viewingReport) {
-        return (
-            <div className="page on" id="p-reports">
-                <div style={{ marginBottom: 16 }}>
-                    <Button size="sm" icon={<i className="ti ti-arrow-right"/>} onClick={() => setViewingReport(null)}>
-                        العودة لقائمة التقارير
-                    </Button>
-                </div>
-                <ReportViewer reportId={viewingReport} fiscalYearId={selectedYear?.id}/>
-            </div>
-        );
-    }
+function SalesViewer() {
+  const { data, isLoading, isError, refetch } = useSalesReport();
+  return <ReportShell title="تقرير المبيعات" isLoading={isLoading} isError={isError} refetch={refetch} reportId="sales">
+    {data && (
+      <>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+          <KpiCard variant="green"  icon="ti-trending-up"   label="إجمالي HT"       value={data.summary.total_ht.toLocaleString('fr-DZ')}   unit="دج"/>
+          <KpiCard variant="blue"   icon="ti-receipt"       label="إجمالي TTC"      value={data.summary.total_ttc.toLocaleString('fr-DZ')}  unit="دج"/>
+          <KpiCard variant="gold"   icon="ti-file-check"    label="عدد الوثائق"     value={data.summary.documents_count}/>
+          <KpiCard variant="red"    icon="ti-clock"         label="غير مسددة"       value={data.summary.unpaid_count}/>
+        </div>
+        <PartyTable rows={data.documents.slice(0, 20)} columns={['document_number','document_date','total_ttc','status']}/>
+      </>
+    )}
+  </ReportShell>;
+}
 
-    return (
-        <div className="page on" id="p-reports">
-            <PageHeader
-                title="التقارير والإحصائيات"
-                subtitle={`جميع التقارير المالية والإدارية — السنة: ${selectedYear?.name || '—'}`}
-            />
+function PurchasesViewer() {
+  const { data, isLoading, isError, refetch } = usePurchasesReport();
+  return <ReportShell title="تقرير المشتريات" isLoading={isLoading} isError={isError} refetch={refetch} reportId="purchases">
+    {data && (
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+        <KpiCard variant="blue"  icon="ti-trending-down" label="إجمالي HT"   value={data.summary.total_ht.toLocaleString('fr-DZ')}  unit="دج"/>
+        <KpiCard variant="green" icon="ti-receipt"       label="إجمالي TTC"  value={data.summary.total_ttc.toLocaleString('fr-DZ')} unit="دج"/>
+        <KpiCard variant="red"   icon="ti-clock"         label="غير مسددة"   value={data.summary.unpaid_count}/>
+      </div>
+    )}
+  </ReportShell>;
+}
 
-            {/* KPIs للتقارير */}
-            <div className="kpis" style={{ marginBottom: 24 }}>
-                <KpiCard variant="green" icon="ti-file-text" label="إجمالي التقارير" value={REPORT_CARDS.length}/>
-                <KpiCard variant="blue" icon="ti-clock" label="آخر تحديث" value="قبل لحظات"/>
-                <KpiCard variant="gold" icon="ti-download" label="التقارير المُصدرة" value="—"/>
-                <KpiCard variant="purple" icon="ti-star" label="التقارير المفضلة" value="3"/>
-            </div>
+function CustomersViewer() {
+  const { data, isLoading, isError, refetch } = useCustomersReport();
+  return <PartyReportView title="تقرير العملاء" data={data} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers"/>;
+}
 
-            {/* سنة مقفلة — تحذير */}
-            {selectedYear?.is_closed && (
-                <AlertBar variant="gold">
-                    🔒 السنة المالية {selectedYear.name} مقفلة — التقارير للعرض فقط ولا يمكن تعديل البيانات.
-                </AlertBar>
-            )}
+function SuppliersViewer() {
+  const { data, isLoading, isError, refetch } = useSuppliersReport();
+  return <PartyReportView title="تقرير الموردين" data={data} isLoading={isLoading} isError={isError} refetch={refetch} reportId="suppliers"/>;
+}
 
-            {/* قائمة التقارير */}
-            <div className="g2" style={{ marginBottom: 20 }}>
-                {REPORT_CARDS.map(report => (
-                    <div key={report.id} onClick={() => setViewingReport(report.id)}>
-                        <QuickReportCard report={report}/>
-                    </div>
+function PartyReportView({ title, data, isLoading, isError, refetch, reportId }: {
+  title: string; data?: PartyReportData;
+  isLoading: boolean; isError: boolean; refetch: () => void; reportId: ReportId;
+}) {
+  return <ReportShell title={title} isLoading={isLoading} isError={isError} refetch={refetch} reportId={reportId}>
+    {data && (
+      <>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+          <KpiCard variant="red"   icon="ti-trending-up"  label="إجمالي الرصيد"   value={data.summary.total_balance.toLocaleString('fr-DZ')} unit="دج"/>
+          <KpiCard variant="blue"  icon="ti-users"        label="مدينون"           value={data.summary.debtors_count}/>
+          <KpiCard variant="green" icon="ti-users"        label="دائنون"           value={data.summary.creditors_count}/>
+        </div>
+        <Card noHeader style={{ padding: 0, marginTop: 16 }}>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>الاسم</th><th>الكود</th><th>إجمالي المشتريات</th><th>إجمالي المدفوعات</th><th>الرصيد</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.slice(0, 20).map((row, i) => (
+                  <tr key={i}>
+                    <td>{row.party.name}</td>
+                    <td>{row.party.code ?? '—'}</td>
+                    <td>{row.total_purchases.toLocaleString('fr-DZ')}</td>
+                    <td>{row.total_payments.toLocaleString('fr-DZ')}</td>
+                    <td style={{ color: row.balance > 0 ? 'var(--red)' : 'var(--em)', fontWeight: 700 }}>
+                      {row.balance.toLocaleString('fr-DZ')}
+                    </td>
+                  </tr>
                 ))}
-            </div>
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </>
+    )}
+  </ReportShell>;
+}
 
-            {/* معلومات إضافية */}
-            <Card
-                title={<><span className="ic ic-sm" style={{ color: 'var(--blue)' }}><i className="ti ti-info-circle"/></span> معلومات عن التقارير</>}
-                noHeader={false}
-            >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: 'var(--t3)' }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <i className="ti ti-check" style={{ color: 'var(--em)', flexShrink: 0, marginTop: 3 }}/>
-                        <span>جميع التقارير تدعم التصدير بصيغ <strong>Excel</strong> و <strong>PDF</strong></span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <i className="ti ti-check" style={{ color: 'var(--em)', flexShrink: 0, marginTop: 3 }}/>
-                        <span>يمكن تصفية التقارير حسب <strong>السنة المالية</strong> المختارة من الشريط العلوي</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <i className="ti ti-check" style={{ color: 'var(--em)', flexShrink: 0, marginTop: 3 }}/>
-                        <span>التقارير تُحدَّث <strong>تلقائياً</strong> مع كل عملية بيع أو شراء</span>
-                    </div>
-                </div>
-            </Card>
+function ProductsViewer() {
+  const { data, isLoading, isError, refetch } = useProductsReport();
+  return <ReportShell title="تقرير المنتجات" isLoading={isLoading} isError={isError} refetch={refetch} reportId="products">
+    {data && (
+      <>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+          <KpiCard variant="teal"  icon="ti-package"      label="إجمالي HT"      value={data.summary.total_ht.toLocaleString('fr-DZ')} unit="دج"/>
+          <KpiCard variant="green" icon="ti-trending-up"  label="عدد المنتجات"   value={data.summary.products_count}/>
+          <KpiCard variant="blue"  icon="ti-list"         label="عدد الأصناف"    value={data.summary.items_count}/>
         </div>
+        <Card noHeader style={{ padding: 0, marginTop: 16 }}>
+          <div className="tw">
+            <table>
+              <thead><tr><th>المنتج</th><th>المرجع</th><th>الكمية المباعة</th><th>إجمالي HT</th></tr></thead>
+              <tbody>
+                {data.rows.slice(0, 20).map((row, i) => (
+                  <tr key={i}>
+                    <td>{row.product.name}</td>
+                    <td>{row.variant.ref}</td>
+                    <td>{row.quantity_sold}</td>
+                    <td>{row.total_ht.toLocaleString('fr-DZ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </>
+    )}
+  </ReportShell>;
+}
+
+function InventoryViewer() {
+  const { data, isLoading, isError, refetch } = useInventoryReport();
+  return <ReportShell title="تقرير المخزون" isLoading={isLoading} isError={isError} refetch={refetch} reportId="inventory">
+    {data && (
+      <>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+          <KpiCard variant="teal"   icon="ti-building-warehouse" label="قيمة المخزون"   value={data.summary.total_value.toLocaleString('fr-DZ')} unit="دج"/>
+          <KpiCard variant="blue"   icon="ti-package"            label="إجمالي الأصناف" value={data.summary.total_items}/>
+          <KpiCard variant="gold"   icon="ti-alert-triangle"     label="مخزون منخفض"    value={data.summary.low_stock}/>
+          <KpiCard variant="red"    icon="ti-package-off"        label="نفد المخزون"     value={data.summary.out_of_stock}/>
+        </div>
+        <Card noHeader style={{ padding: 0, marginTop: 16 }}>
+          <div className="tw">
+            <table>
+              <thead><tr><th>المنتج</th><th>المرجع</th><th>المستودع</th><th>الكمية</th><th>القيمة</th><th>الحالة</th></tr></thead>
+              <tbody>
+                {data.rows.slice(0, 20).map((row, i) => (
+                  <tr key={i}>
+                    <td>{row.product.name}</td>
+                    <td>{row.variant.ref}</td>
+                    <td>{row.warehouse.name}</td>
+                    <td>{row.current_stock}</td>
+                    <td>{row.total_value.toLocaleString('fr-DZ')}</td>
+                    <td>
+                      {row.is_out
+                        ? <Badge variant="danger" noDot>نفد</Badge>
+                        : row.is_low_stock
+                          ? <Badge variant="warning" noDot>منخفض</Badge>
+                          : <Badge variant="success" noDot>جيد</Badge>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </>
+    )}
+  </ReportShell>;
+}
+
+function PaymentsViewer() {
+  const { data, isLoading, isError, refetch } = usePaymentsReport();
+  return <ReportShell title="تقرير الدفعات" isLoading={isLoading} isError={isError} refetch={refetch} reportId="payments">
+    {data && (
+      <>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+          <KpiCard variant="green" icon="ti-check-circle" label="مؤكدة"     value={data.summary.total_confirmed.toLocaleString('fr-DZ')} unit="دج"/>
+          <KpiCard variant="gold"  icon="ti-clock"        label="معلقة"     value={data.summary.total_pending.toLocaleString('fr-DZ')}   unit="دج"/>
+          <KpiCard variant="blue"  icon="ti-hash"         label="عدد الدفعات" value={data.summary.count}/>
+        </div>
+        <Card noHeader style={{ padding: 0, marginTop: 16 }}>
+          <div className="tw">
+            <table>
+              <thead><tr><th>طريقة الدفع</th><th>الإجمالي</th><th>العدد</th></tr></thead>
+              <tbody>
+                {data.by_mode.map((row, i) => (
+                  <tr key={i}>
+                    <td>{row.mode_name}</td>
+                    <td>{row.total.toLocaleString('fr-DZ')}</td>
+                    <td>{row.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </>
+    )}
+  </ReportShell>;
+}
+
+function TaxesViewer() {
+  const { data, isLoading, isError, refetch } = useTvaReport();
+  return <ReportShell title="تقرير الضرائب — TVA" isLoading={isLoading} isError={isError} refetch={refetch} reportId="taxes">
+    {data && (
+      <>
+        {/* ✅ يستخدم TaxesReportData.summary الحقيقي — لا net_tva وهمي */}
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+          <KpiCard variant="green" icon="ti-arrow-up-circle"   label="TVA محصلة"         value={data.summary.total_tva_collected.toLocaleString('fr-DZ')}  unit="دج"/>
+          <KpiCard variant="blue"  icon="ti-arrow-down-circle" label="TVA قابلة للخصم"  value={data.summary.total_tva_deductible.toLocaleString('fr-DZ')} unit="دج"/>
+          <KpiCard variant="red"   icon="ti-calculator"        label="المستحق (G50)"     value={data.summary.total_tva_due.toLocaleString('fr-DZ')}        unit="دج"/>
+        </div>
+        <Card noHeader style={{ padding: 0, marginTop: 16 }}>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>نسبة TVA</th>
+                  <th>وعاء المبيعات HT</th>
+                  <th>TVA محصلة</th>
+                  <th>وعاء المشتريات HT</th>
+                  <th>TVA قابلة للخصم</th>
+                  <th>TVA المستحقة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.by_rate.map((row, i) => (
+                  <tr key={i}>
+                    <td>{row.tva_rate}%</td>
+                    <td>{row.base_ht_sales.toLocaleString('fr-DZ')}</td>
+                    <td>{row.tva_collected.toLocaleString('fr-DZ')}</td>
+                    <td>{row.base_ht_purchases.toLocaleString('fr-DZ')}</td>
+                    <td>{row.tva_deductible.toLocaleString('fr-DZ')}</td>
+                    <td style={{ fontWeight: 700, color: row.tva_due > 0 ? 'var(--red)' : 'var(--em)' }}>
+                      {row.tva_due.toLocaleString('fr-DZ')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </>
+    )}
+  </ReportShell>;
+}
+
+// ─── ReportShell — غلاف مشترك لكل viewer ────────────────────────────────────
+
+function ReportShell({
+  title, isLoading, isError, refetch, reportId, children,
+}: {
+  title:     string;
+  isLoading: boolean;
+  isError:   boolean;
+  refetch:   () => void;
+  reportId:  ReportId;
+  children?: React.ReactNode;
+}) {
+  const slug   = useActiveSlug();
+  const report = REPORT_CARDS.find(r => r.id === reportId);
+
+  const exportUrl = (format: 'excel' | 'pdf') =>
+    `/api/v1/${slug}/reports/${reportId}?export=${format}`;
+
+  return (
+    <div>
+      <PageHeader
+        title={title}
+        subtitle={report?.description}
+        actions={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button size="sm" icon={<i className="ti ti-download"/>}
+              onClick={() => window.open(exportUrl('excel'), '_blank')}>
+              تصدير Excel
+            </Button>
+            <Button size="sm" icon={<i className="ti ti-printer"/>}
+              onClick={() => window.open(exportUrl('pdf'), '_blank')}>
+              PDF
+            </Button>
+            <Button size="sm" icon={<i className="ti ti-refresh"/>} onClick={refetch}>
+              تحديث
+            </Button>
+          </div>
+        }
+      />
+
+      {isLoading ? (
+        <div className="empty" style={{ padding: 60 }}>
+          <div className="empty-ic"><i className="ti ti-loader"/></div>
+          <div className="empty-tx">جاري تحميل التقرير...</div>
+        </div>
+      ) : isError ? (
+        <AlertBar variant="red">
+          فشل تحميل التقرير.{' '}
+          <button onClick={refetch} style={{ fontWeight: 700, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>
+            إعادة المحاولة
+          </button>
+        </AlertBar>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {children ?? (
+            <div className="empty" style={{ padding: 40 }}>
+              <div className="empty-ic"><i className="ti ti-file-off"/></div>
+              <div className="empty-tx">لا توجد بيانات متاحة لهذه الفترة</div>
+              <div className="empty-sub">جرب تغيير السنة المالية أو معايير التقرير</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Map: reportId → Viewer component ────────────────────────────────────────
+
+const VIEWERS: Record<ReportId, React.FC> = {
+  sales:     SalesViewer,
+  purchases: PurchasesViewer,
+  customers: CustomersViewer,
+  suppliers: SuppliersViewer,
+  products:  ProductsViewer,
+  inventory: InventoryViewer,
+  payments:  PaymentsViewer,
+  taxes:     TaxesViewer,
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// ReportsPage
+// ════════════════════════════════════════════════════════════════════════════
+
+export default function ReportsPage() {
+  const { selectedYear }                    = useFiscalYear();
+  const [viewingReport, setViewingReport]   = useState<ReportId | null>(null);
+
+  const handleBack = useCallback(() => setViewingReport(null), []);
+
+  if (viewingReport) {
+    const Viewer = VIEWERS[viewingReport];
+    return (
+      <div className="page on" id="p-reports">
+        <div style={{ marginBottom: 16 }}>
+          <Button size="sm" icon={<i className="ti ti-arrow-right"/>} onClick={handleBack}>
+            العودة لقائمة التقارير
+          </Button>
+        </div>
+        <Viewer/>
+      </div>
     );
+  }
+
+  return (
+    <div className="page on" id="p-reports">
+      <PageHeader
+        title="التقارير والإحصائيات"
+        subtitle={`جميع التقارير المالية والإدارية — السنة: ${selectedYear?.name || '—'}`}
+      />
+
+      <div className="kpis" style={{ marginBottom: 24 }}>
+        <KpiCard variant="green"  icon="ti-file-text" label="إجمالي التقارير" value={REPORT_CARDS.length}/>
+        <KpiCard variant="blue"   icon="ti-clock"     label="آخر تحديث"       value="قبل لحظات"/>
+        <KpiCard variant="gold"   icon="ti-download"  label="التقارير المُصدرة" value="—"/>
+        <KpiCard variant="purple" icon="ti-star"      label="التقارير المفضلة" value="—"/>
+      </div>
+
+      {selectedYear?.is_closed && (
+        <AlertBar variant="gold">
+          🔒 السنة المالية {selectedYear.name} مقفلة — التقارير للعرض فقط.
+        </AlertBar>
+      )}
+
+      <div className="g2" style={{ marginBottom: 20 }}>
+        {REPORT_CARDS.map(report => (
+          <QuickReportCard
+            key={report.id}
+            report={report}
+            onSelect={() => setViewingReport(report.id as ReportId)}
+          />
+        ))}
+      </div>
+
+      <Card title={<><span className="ic ic-sm" style={{ color: 'var(--blue)' }}><i className="ti ti-info-circle"/></span> معلومات عن التقارير</>}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: 'var(--t3)' }}>
+          {[
+            'جميع التقارير تدعم التصدير بصيغ Excel و PDF',
+            'يمكن تصفية التقارير حسب السنة المالية المختارة من الشريط العلوي',
+            'التقارير تُحدَّث تلقائياً مع كل عملية بيع أو شراء',
+          ].map((text, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8 }}>
+              <i className="ti ti-check" style={{ color: 'var(--em)', flexShrink: 0, marginTop: 3 }}/>
+              <span dangerouslySetInnerHTML={{ __html: text }}/>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── PartyTable helper ────────────────────────────────────────────────────────
+function PartyTable({ rows, columns }: { rows: any[]; columns: string[] }) {
+  if (!rows?.length) return null;
+  return (
+    <Card noHeader style={{ padding: 0, marginTop: 16 }}>
+      <div className="tw">
+        <table>
+          <thead><tr>{columns.map(c => <th key={c}>{c}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i}>
+                {columns.map(c => <td key={c}>{String((row as any)[c] ?? '—')}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
 }
