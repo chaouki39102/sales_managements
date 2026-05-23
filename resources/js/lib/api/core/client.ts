@@ -84,13 +84,21 @@ const isPublicPath = (url: string): boolean => {
   return TRULY_PUBLIC.some(p => path === p || path.startsWith(p + '/'));
 };
 
+// ─── CSRF (required for stateful Sanctum API requests from the SPA) ───────────
+const getCsrfToken = (): string | null => {
+  if (typeof document === 'undefined') return null;
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? null;
+};
+
+const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
+
 // ─── Axios instance ───────────────────────────────────────────────────────────
 const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api/v1';
 
 const client: AxiosInstance = axios.create({
   baseURL:         API_BASE,
   timeout:         30_000,
-  withCredentials: false,
+  withCredentials: true,
   headers: {
     'Content-Type':     'application/json',
     'Accept':           'application/json',
@@ -123,6 +131,13 @@ client.interceptors.request.use(
     const token = tokenStorage.get();
     if (token) config.headers.Authorization = `Bearer ${token}`;
     if (slug)  config.headers['X-Company-Slug'] = slug;
+
+    const method = config.method?.toLowerCase() ?? '';
+    if (MUTATING_METHODS.has(method)) {
+      const csrf = getCsrfToken();
+      if (csrf) config.headers['X-CSRF-TOKEN'] = csrf;
+    }
+
     if (config.data instanceof FormData) config.timeout = 60_000;
 
     return config;

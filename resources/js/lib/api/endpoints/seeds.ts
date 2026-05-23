@@ -39,7 +39,11 @@ export const SEED_DEFINITIONS: Array<{
 
 export const seedsApi = {
   run: (slug: string, key: SeedKey) =>
-    apiPost<{ message: string }>(`/${slug}/seeds/${key}`),
+    apiPost<{ message: string }>(
+      `/${slug}/seeds/${key}`,
+      undefined,
+      { _skipSlug: true } as Parameters<typeof apiPost>[2],
+    ),
 } as const;
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
