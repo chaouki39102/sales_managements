@@ -5,8 +5,9 @@
 //   - كل عنصر مكتمل يبقى مرئياً ويتراكم
 //   - auto-scroll للعنصر النشط
 // ════════════════════════════════════════════════════════════════════
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import client from '@/lib/api/core/client';
+import React, { useState, useRef, useEffect } from 'react';
+import { seedsApi } from '@/lib/api/endpoints/seeds';
+import type { SeedKey } from '@/lib/api/core/types';
 import Modal from '@/components/ui/Modal';
 
 interface SeedItem  { key: string; label: string; endpoint: string; }
@@ -129,27 +130,12 @@ const handleApply = async () => {
   setLogs(selectedSeeds.map(s => ({ key: s.key, label: s.label, status: 'idle' })));
 
   let done = 0, errors = false;
-  // الحصول على التوكن من localStorage
-  const token = localStorage.getItem('auth_token');
 
   for (const seed of selectedSeeds) {
     setCurrentKey(seed.key);
     setLogs(prev => prev.map(l => l.key === seed.key ? { ...l, status: 'running' } : l));
     try {
-      // ✅ استخدام fetch مباشرة بدلاً من client.post
-      const response = await fetch(`/api/v1/${companySlug}/seeds/${seed.endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'فشل');
-      }
+      await seedsApi.run(companySlug, seed.endpoint as SeedKey);
 
       done++;
       setTotalDone(done);
