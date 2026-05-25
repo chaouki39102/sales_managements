@@ -1,6 +1,7 @@
-// pages/admin/AdminDashboardPage.tsx
-import { useAdminDashboard } from '@/hooks/useAdmin';
+import { useState } from 'react';
+import { useAdminDashboard, useSystemSettings} from '@/hooks/useAdmin';
 import { useNavigate }       from 'react-router-dom';
+import AdminBootModal from '@/components/modals/AdminBootModal';
 import PageHeader  from '@/components/ui/PageHeader';
 import Card        from '@/components/ui/Card';
 import KpiCard     from '@/components/ui/KpiCard';
@@ -29,6 +30,11 @@ export default function AdminDashboardPage() {
   const { data: stats, isLoading, isError, refetch } = useAdminDashboard();
   const navigate = useNavigate();
 
+  // ── فحص حالة البيانات العالمية ──────────────────────────────
+  const { data: systemStatus, isLoading: statusLoading } = useSystemSettings();
+  const [bootDismissed, setBootDismissed] = useState(false);
+  const showBootModal = !statusLoading && systemStatus?.is_ready === false && !bootDismissed;
+
   if (isLoading) return (
     <div className="empty" style={{ padding: 60 }}>
       <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 24, color: 'var(--em)' }} />
@@ -49,6 +55,37 @@ export default function AdminDashboardPage() {
 
   return (
     <div>
+      {/* ── مودال إعداد النظام — يظهر تلقائياً إذا البيانات العالمية ناقصة ── */}
+      {showBootModal && (
+        <AdminBootModal onComplete={() => setBootDismissed(true)} />
+      )}
+
+      {/* ── شريط تحذير إذا أغلق المودال بدون تثبيت ── */}
+      {!statusLoading && systemStatus?.is_ready === false && bootDismissed && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 16px', marginBottom: 16, borderRadius: 10,
+          background: '#f59e0b1a', border: '1px solid #f59e0b33',
+          fontSize: 13, color: '#f59e0b',
+        }}>
+          <span>
+            <i className="ti ti-alert-triangle" style={{ marginLeft: 8 }} />
+            البيانات العالمية غير مكتملة — بعض وظائف النظام قد لا تعمل
+          </span>
+          <button
+            onClick={() => setBootDismissed(false)}
+            style={{
+              padding: '4px 12px', borderRadius: 7,
+              border: '1px solid #f59e0b55', background: '#f59e0b22',
+              color: '#f59e0b', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+            }}
+          >
+            إعداد النظام
+          </button>
+        </div>
+      )}
+
       <PageHeader title="لوحة تحكم النظام" description="نظرة شاملة على كامل المنصة" />
 
       {/* KPI Cards */}

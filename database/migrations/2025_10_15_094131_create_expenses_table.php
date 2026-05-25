@@ -9,7 +9,7 @@ return new class extends Migration {
         Schema::create('expenses', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
-            $table->string('expense_number', 50)->unique()->nullable();
+            $table->string('expense_number', 50)->nullable();
             $table->date('date');
             $table->decimal('amount', 15, 4);
             $table->foreignId('expense_category_id')->constrained('expense_categories')->restrictOnDelete();
@@ -28,6 +28,8 @@ return new class extends Migration {
             $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
             $table->softDeletes();
+
+            $table->unique(['company_id', 'expense_number']);
 
             $table->index(['company_id', 'date', 'status']);
             $table->index(['company_id', 'expense_category_id', 'date']);
