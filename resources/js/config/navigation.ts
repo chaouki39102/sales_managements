@@ -82,6 +82,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'users',      label: 'المستخدمون',  href: '/users',           icon: 'ti-user'        },
       { id: 'settings',   label: 'الإعدادات',   href: '/settings',        icon: 'ti-settings'   },
       { id: 'numbering',  label: 'ترقيم المستندات', href: '/numbering-series', icon: 'ti-123'  },
+      { id: 'profile',     label: 'الملف الشخصي', href: '/profile',         icon: 'ti-user-circle' },
     ],
   },
 ];

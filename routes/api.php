@@ -440,5 +440,16 @@ Route::prefix('v1')->group(function () {
             Route::get('settings/group/{group}',   [SettingController::class, 'byGroup']);
             Route::get('settings/key/{key}/value', [SettingController::class, 'getValue']);
             Route::apiResource('settings', SettingController::class);
+            // جلب الملف الشخصي للمستخدم المسجل
+            Route::get('/profile',          [UserController::class, 'profile']);
+
+            // تحديث المعلومات الشخصية
+            Route::put('/profile',          [UserController::class, 'updateProfile']);
+
+            // تغيير كلمة المرور
+            Route::put('/profile/password', [UserController::class, 'changeMyPassword']);
+
+            // رفع الصورة الشخصية
+            Route::post('/profile/avatar',  [UserController::class, 'uploadAvatar']);
         });
 });

@@ -107,7 +107,8 @@ class UserController extends BaseApiController
     public function profile(Request $request): JsonResponse
     {
         try {
-            $user = $request->user()->load(['gender', 'commune', 'wilaya', 'roles']);
+            // ✅ نحمّل roles + permissions لتظهر في تبويب الصلاحيات
+            $user = $request->user()->load(['gender', 'commune', 'wilaya', 'roles', 'permissions']);
             return $this->successResponse(new UserResource($user));
         } catch (\Throwable $e) {
             return $this->handleError($e, 'profile');

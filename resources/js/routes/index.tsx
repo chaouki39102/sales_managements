@@ -45,6 +45,7 @@ const ReportsPage     = lazy(() => import('@/pages/reports/ReportsPage'));
 const UsersPage     = lazy(() => import('@/pages/users/UsersPage'));
 const RolesPage     = lazy(() => import('@/pages/users/RolesPage'));
 const EmployeesPage = lazy(() => import('@/pages/users/EmployeesPage'));
+const ProfilePage   = lazy(() => import('@/pages/profile/ProfilePage'));
 
 // ── Settings ───────────────────────────────────────────────────────────────
 const SettingsPage      = lazy(() => import('@/pages/settings/SettingsPage'));
@@ -222,6 +223,9 @@ export function AppRoutes() {
           <Route path="settings"                element={<SettingsPage />} />
           <Route path="settings/document-types" element={<DocumentTypesPage />} />
           <Route path="payment-methods"         element={<PaymentMethodsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
+
+
 
           {/* Tenant Lookups */}
           <Route path="categories"        element={<FamiliesPage />} />

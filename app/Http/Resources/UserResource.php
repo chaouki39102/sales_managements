@@ -34,19 +34,34 @@ class UserResource extends JsonResource
             'updated_at'          => $this->updated_at,
             'deleted_at'          => $this->deleted_at,
 
-            // Relations
-            'gender'              => new GenderResource($this->whenLoaded('gender')),
-            'commune'             => new CommuneResource($this->whenLoaded('commune')),
-            'wilaya'              => new WilayaResource($this->whenLoaded('wilaya')),
+            // ── Relations ────────────────────────────────────────────
+            'gender'  => new GenderResource($this->whenLoaded('gender')),
+            'commune' => new CommuneResource($this->whenLoaded('commune')),
+            'wilaya'  => new WilayaResource($this->whenLoaded('wilaya')),
 
-             // ✅ roles دائماً — حتى لو علاقة غير محملة تُعيد []
+            // ✅ roles — unique() لمنع التكرار + display_name
             'roles' => $this->whenLoaded(
                 'roles',
-                fn () => $this->roles->map(fn ($r) => [
-                    'id'   => $r->id,
-                    'name' => $r->name,
+                fn () => $this->roles->unique('id')->map(fn ($r) => [
+                    'id'           => $r->id,
+                    'name'         => $r->name,
+                    'display_name' => $r->display_name ?? null,
                 ]),
-                []   // ← القيمة الافتراضية إذا لم تُحمَّل العلاقة
+                []
+            ),
+
+            // ✅ permissions — unique() + group آمن بدون pivot
+            // لا يوجد عمود group في جدول model_has_permissions
+            // الـ Frontend يستخرج المجموعة من اسم الصلاحية تلقائياً
+            'permissions' => $this->whenLoaded(
+                'permissions',
+                fn () => $this->permissions->unique('id')->map(fn ($p) => [
+                    'id'           => $p->id,
+                    'name'         => $p->name,
+                    'display_name' => $p->display_name ?? null,
+                    'group'        => $p->group ?? null, // عمود مباشر في جدول permissions (إن وُجد)
+                ]),
+                []
             ),
         ];
     }
