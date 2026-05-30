@@ -64,9 +64,10 @@ export const queryClient = new QueryClient({
 
 /**
  * إبطال كل كاش شركة معينة عند تبديل الشركة النشطة
- */
-export function invalidateCompanyCache(slug: string): Promise<void> {
-  return queryClient.invalidateQueries({ queryKey: [slug] });
+ */export function invalidateCompanyCache(qc: QueryClient, slug?: string): Promise<void> {
+    return slug
+        ? qc.invalidateQueries({ queryKey: [slug] })
+        : qc.invalidateQueries({ queryKey: companyKeys.all });
 }
 
 /**

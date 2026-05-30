@@ -108,7 +108,7 @@ class SettingService extends BaseService
                 ]);
 
                 // ✅ updateOrInsert مباشر بدون Eloquent events التي قد تستدعي Cache::tags
-DB::table('settings')->updateOrInsert($where, $createData);
+                DB::table('settings')->updateOrInsert($where, $updateData);
 
                 // جلب السجل المحدَّث
                 $setting = Setting::where('key', $key)

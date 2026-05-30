@@ -13,6 +13,16 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use App\Core\Exceptions\BusinessRuleException;
 
+/**
+ * ════════════════════════════════════════════════════════════════════
+ * BaseService — محسّن مع دعم UpsertMany للـ Batch Operations
+ *
+ * الإضافات الجديدة:
+ * - upsertMany()     ← تحديث/إنشاء جماعي من dictionary
+ * - updateMany()     ← تحديث جماعي لـ IDs متعددة
+ * - newQuery()       ← builder مباشر للـ advanced queries
+ * ════════════════════════════════════════════════════════════════════
+ */
 abstract class BaseService
 {
     protected string $model;
@@ -45,10 +55,6 @@ abstract class BaseService
         return $query->get();
     }
 
-    /**
-     * الطبقة 6 — Soft Deletes آمن: يضيف company_id فلتراً يدوياً
-     * لأن onlyTrashed() يتجاوز GlobalScope
-     */
     public function findTrashedById($id): Model
     {
         if (!method_exists($this->model, 'withTrashed')) {
@@ -146,6 +152,117 @@ abstract class BaseService
 
         DB::transaction(function () use ($ids, $data, $request, &$count, &$updated) {
             $items = $this->findMany($ids);
+            foreach ($items as $item) {
+                $this->beforeUpdate($item, $data, $request);
+                $prepared = $this->prepareDataForUpdate($item, $data, $request);
+                $item->update($prepared);
+                $this->afterUpdate($item, $data, $request);
+                $updated->push($item->fresh());
+                $count++;
+            }
+        });
+
+        foreach ($updated as $item) {
+            $this->performPostCommitOperations($item, $data, $request, 'update');
+        }
+
+        return $count;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 3.1. ✅ UpsertMany — جديد! لدعم Batch Dictionary Updates
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ Upsert متعدد من dictionary
+     *
+     * استخدام:
+     *   upsertMany(
+     *     ['setting_key_1' => 'value1', 'setting_key_2' => 'value2'],
+     *     ['key'],  // ← البحث بـ 'key' عن السجل الموجود
+     *     $request
+     *   )
+     *
+     * آلية العمل:
+     * 1. تحويل dictionary إلى مصفوفة سجلات
+     * 2. أضف company_id تلقائياً (multi-tenancy)
+     * 3. لكل سجل: find or create + update
+     * 4. تشغيل hooks و cache clear
+     *
+     * مثالي لـ Settings, Configurations, وأي batch data
+     */
+    public function upsertMany(
+        array $recordsAsDict,
+        array $uniqueBy = ['id'],
+        ?Request $request = null
+    ): Collection
+    {
+        // الخطوة 1: تحويل dictionary → records
+        $records = [];
+        foreach ($recordsAsDict as $key => $value) {
+            $record = ['key' => $key, 'value' => $value];
+
+            // ✅ Tenancy: أضف company_id تلقائياً
+            if ($this->modelHasColumn('company_id')) {
+                $companyId = $this->getCurrentCompanyId();
+                if ($companyId) {
+                    $record['company_id'] = $companyId;
+                }
+            }
+
+            $records[] = $record;
+        }
+
+        $upserted = new Collection();
+
+        // الخطوة 2: Upsert كل سجل في transaction
+        DB::transaction(function () use ($records, $uniqueBy, $request, &$upserted) {
+            foreach ($records as $data) {
+                // Prepare
+                $data = $this->beforeCreate($data, $request);
+
+                // Build WHERE clause من $uniqueBy
+                $whereClause = array_intersect_key($data, array_flip($uniqueBy));
+
+                // Upsert
+                $item = $this->model::updateOrCreate($whereClause, $data);
+
+                // Hooks
+                $this->afterCreate($item, $data, $request);
+                $upserted->push($this->loadDefaultRelations($item));
+            }
+        });
+
+        // الخطوة 3: Post-commit operations
+        foreach ($upserted as $item) {
+            $this->performPostCommitOperations($item, [], $request, 'create');
+        }
+
+        return $upserted;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 3.2. ✅ UpdateMany — جديد! تحديث جماعي بـ IDs متعددة
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ تحديث متعدد لـ ID list نفس البيانات
+     *
+     * استخدام:
+     *   updateMany([1, 2, 3], ['status' => 'active'], $request)
+     */
+    public function updateMany(
+        array $ids,
+        array $data,
+        ?Request $request = null
+    ): int
+    {
+        $count   = 0;
+        $updated = new Collection();
+
+        DB::transaction(function () use ($ids, $data, $request, &$count, &$updated) {
+            $items = $this->findMany($ids);
+
             foreach ($items as $item) {
                 $this->beforeUpdate($item, $data, $request);
                 $prepared = $this->prepareDataForUpdate($item, $data, $request);
@@ -270,17 +387,6 @@ abstract class BaseService
     // 6. Hooks
     // ═══════════════════════════════════════════════════════════════
 
-    /**
-     * الطبقة 4 — Mass Assignment Protection
-     *
-     * يحذف:
-     * - company_id  → يعيّنه HasCompany تلقائياً، المهاجم لا يحدده
-     * - created_by  → يعيّنه النظام، ليس المستخدم
-     * - updated_by  → يعيّنه prepareDataForUpdate
-     * - deleted_by  → يعيّنه نظام الحذف
-     *
-     * ويفلتر الحقول غير الموجودة في الجدول
-     */
     protected function beforeCreate(array $data, ?Request $request): array
     {
         try {
@@ -313,9 +419,6 @@ abstract class BaseService
         }
     }
 
-    /**
-     * الطبقة 4 — Mass Assignment Protection عند التحديث
-     */
     protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
     {
         // ✅ الطبقة 4: حقول محمية لا تُحدَّث من الـ request
@@ -353,14 +456,14 @@ abstract class BaseService
         return $item;
     }
 
-    /**
-     * الطبقة 7 — Cache Keys per-Company
-     *
-     * المشكلة: إذا كان الـ key هو "brands_list" فقط →
-     * شركة A ترى cache شركة B.
-     *
-     * الحل: نضيف company_id في الـ key لعزل كل شركة
-     */
+    // ✅ جديد! Query builder مباشر
+    public function newQuery(): Builder
+    {
+        $query = $this->model::query();
+        $this->applyScopeToQuery($query);
+        return $query;
+    }
+
     protected function clearCache(): void
     {
         if (method_exists(Cache::getStore(), 'tags')) {
@@ -374,9 +477,6 @@ abstract class BaseService
         }
     }
 
-    /**
-     * الطبقة 7 — Cache Keys تشمل company_id
-     */
     protected function getCacheKeys(): array
     {
         $r = $this->getResourceName();
@@ -389,18 +489,12 @@ abstract class BaseService
         ];
     }
 
-    /**
-     * الطبقة 7 — Cache Tag للشركة الحالية
-     */
     protected function getCompanyCacheTag(): string
     {
         $c = $this->getCurrentCompanyId() ?? 'global';
         return "company:{$c}";
     }
 
-    /**
-     * جلب company_id الحالي بأمان
-     */
     protected function getCurrentCompanyId(): ?int
     {
         try {

@@ -1,5 +1,5 @@
 # Module Export: setting
-Generated at: 2026-05-26 10:42:44
+Generated at: 2026-05-30 12:36:43
 
 ## Models
 
@@ -12,14 +12,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
-use App\Core\Attributes\Cacheable;
-use App\Core\Traits\HasStandardizedConfiguration;
 use App\Models\Traits\HasCompany;
 
-#[Cacheable]
+/**
+ * ════════════════════════════════════════════════════════════════════
+ * Setting Model — النسخة المُصلحة
+ *
+ * الإصلاحات الجوهرية:
+ * ① حذف Cache::tags() من boot() — يُسبب 500 مع file/database cache driver
+ *    "This cache store does not support tagging"
+ *
+ * ② حذف cast 'value' => 'array' من $casts
+ *    المشكلة: هذا الـ cast يحوّل "My App" إلى ["My App"] عند القراءة
+ *    الحل: نتعامل مع القيمة يدوياً في SettingService::castValue()
+ *
+ * ③ إضافة دالة clearCacheForKey() آمنة تعمل مع كل drivers
+ * ════════════════════════════════════════════════════════════════════
+ */
 class Setting extends Model
 {
-    use HasCompany, HasStandardizedConfiguration;
+    use HasCompany;
 
     protected $table = 'settings';
 
@@ -35,65 +47,166 @@ class Setting extends Model
         'display_order',
     ];
 
+    // ✅ لا 'value' => 'array' هنا — يُسبب bugs مع strings العادية
     protected $casts = [
-        'value' => 'array',
-        'is_public' => 'boolean',
-        'is_editable' => 'boolean',
+        'is_public'     => 'boolean',
+        'is_editable'   => 'boolean',
         'display_order' => 'integer',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'created_at'    => 'datetime',
+        'updated_at'    => 'datetime',
     ];
 
-    public static array $searchableFields = ['key', 'description'];
-    public static array $filterable = ['group', 'is_public', 'is_editable'];
-    public static array $sortable = ['id', 'key', 'group', 'display_order'];
-    public static array $defaultWith = [];
-    public static array $allowedIncludes = [];
-    public static string $defaultSort = 'display_order';
-    public static ?int $cacheTtl = 7200;
-    public static array $cacheTags = ['settings'];
+    // ─── Scopes ──────────────────────────────────────────────────────
 
-    public function scopeByGroup(Builder $query, string $group): Builder { return $query->where('group', $group); }
-    public function scopePublic(Builder $query): Builder { return $query->where('is_public', true); }
-    public function scopeEditable(Builder $query): Builder { return $query->where('is_editable', true); }
-
-    public static function get(string $key, $default = null)
+    public function scopeByGroup(Builder $query, string $group): Builder
     {
-        return Cache::tags(['settings'])->remember("setting:{$key}", now()->addHours(24), function () use ($key, $default) {
-            $setting = static::where('key', $key)->first();
-            return $setting ? $setting->getTypedValue() : $default;
+        return $query->where('group', $group);
+    }
+
+    public function scopePublic(Builder $query): Builder
+    {
+        return $query->where('is_public', true);
+    }
+
+    public function scopeEditable(Builder $query): Builder
+    {
+        return $query->where('is_editable', true);
+    }
+
+    // ─── Static Helpers ───────────────────────────────────────────────
+
+    /**
+     * جلب قيمة إعداد واحد بأمان (بدون Cache::tags)
+     */
+    public static function getSetting(string $key, $default = null, ?int $companyId = null)
+    {
+        $cacheKey = "setting:{$companyId}:{$key}";
+
+        // ✅ Cache::remember بدون tags — يعمل مع كل drivers
+        return Cache::remember($cacheKey, now()->addHours(24), function () use ($key, $default, $companyId) {
+            $query = static::where('key', $key);
+
+            if ($companyId !== null) {
+                $query->where('company_id', $companyId);
+            } else {
+                $query->whereNull('company_id');
+            }
+
+            $setting = $query->first();
+
+            if (!$setting) {
+                return $default;
+            }
+
+            return $setting->getTypedValue();
         });
     }
 
-    public static function set(string $key, $value): bool
+    /**
+     * تعيين قيمة إعداد
+     */
+    public static function setSetting(string $key, $value, ?int $companyId = null): bool
     {
-        $setting = static::where('key', $key)->first();
-        if (!$setting || !$setting->is_editable) return false;
+        $query = static::where('key', $key);
+
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
+        } else {
+            $query->whereNull('company_id');
+        }
+
+        $setting = $query->first();
+
+        if (!$setting || !$setting->is_editable) {
+            return false;
+        }
+
         $setting->value = $value;
         $result = $setting->save();
-        if ($result) Cache::tags(['settings'])->forget("setting:{$key}");
+
+        if ($result) {
+            static::clearCacheForKey($key, $companyId);
+        }
+
         return $result;
     }
 
-    public function getTypedValue()
+    /**
+     * ✅ مسح cache بأمان بدون tags
+     */
+    public static function clearCacheForKey(string $key, ?int $companyId = null): void
     {
-        $value = $this->value;
-        return match ($this->type) {
-            'integer', 'int' => is_array($value) ? (int)($value[0] ?? 0) : (int)$value,
-            'float', 'double' => is_array($value) ? (float)($value[0] ?? 0) : (float)$value,
-            'boolean', 'bool' => is_array($value) ? (bool)($value[0] ?? false) : (bool)$value,
-            'json', 'array' => is_array($value) ? $value : json_decode($value, true),
-            default => is_array($value) ? ($value[0] ?? '') : $value,
+        Cache::forget("setting:{$companyId}:{$key}");
+    }
+
+    /**
+     * ✅ مسح كل cache للشركة بدون tags
+     */
+    public static function clearAllCacheForCompany(?int $companyId): void
+    {
+        // لا يمكن مسح كل keys بدون قائمة — نستخدم cache prefix
+        // الحل الأفضل: استخدام Redis tags أو store قائمة الـ keys
+        // للـ file/database driver نكتفي بـ forget لكل key معروف
+        $knownGroups = ['invoice', 'fiscal', 'inventory', 'alerts', 'general'];
+
+        foreach ($knownGroups as $group) {
+            Cache::forget("settings:{$companyId}:{$group}");
+        }
+
+        Cache::forget("settings:{$companyId}:all");
+    }
+
+    // ─── Value Helpers ────────────────────────────────────────────────
+
+    /**
+     * إرجاع القيمة المحوَّلة حسب النوع
+     * يعمل مع القيمة الخام (text) من الـ DB
+     */
+    public function getTypedValue(): mixed
+    {
+        $raw  = $this->getRawOriginal('value') ?? $this->attributes['value'] ?? null;
+        $type = $this->type ?? 'string';
+
+        if ($raw === null || $raw === '') {
+            return match ($type) {
+                'boolean', 'bool' => false,
+                'integer', 'int'  => 0,
+                'float', 'double' => 0.0,
+                'json', 'array'   => [],
+                default           => '',
+            };
+        }
+
+        // محاولة JSON decode
+        $decoded = json_decode($raw, true);
+
+        return match ($type) {
+            'boolean', 'bool' => filter_var($decoded ?? $raw, FILTER_VALIDATE_BOOLEAN),
+            'integer', 'int'  => (int) ($decoded ?? $raw),
+            'float', 'double' => (float) ($decoded ?? $raw),
+            'json', 'array'   => is_array($decoded) ? $decoded : (json_decode($raw, true) ?? []),
+            default           => is_string($decoded) ? $decoded : (is_scalar($decoded) ? (string) $decoded : $raw),
         };
     }
 
-    protected static function boot()
+    // ─── Boot ─────────────────────────────────────────────────────────
+
+    protected static function boot(): void
     {
         parent::boot();
-        static::saved(fn($s) => Cache::tags(['settings'])->forget("setting:{$s->key}"));
-        static::deleted(fn($s) => Cache::tags(['settings'])->forget("setting:{$s->key}"));
+
+        // ✅ مسح cache بعد الحفظ/الحذف — بدون Cache::tags()
+        static::saved(function (self $setting) {
+            static::clearCacheForKey($setting->key, $setting->company_id);
+            static::clearAllCacheForCompany($setting->company_id);
+        });
+
+        static::deleted(function (self $setting) {
+            static::clearCacheForKey($setting->key, $setting->company_id);
+        });
     }
 }
+
 ```
 
 ## Controllers
@@ -165,87 +278,130 @@ class AdminSystemSettingsController extends Controller
 namespace App\Http\Controllers\Api\V1;
 
 use App\Core\Http\Controllers\BaseApiController;
-use App\Http\Resources\SettingResource;
 use App\Services\SettingService;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+/**
+ * ════════════════════════════════════════════════════════════════════
+ * SettingController — النسخة المُصلحة
+ *
+ * المسارات:
+ * GET    /{company}/settings              → index()    — dictionary
+ * PATCH  /{company}/settings              → update()   — تحديث متعدد
+ * PUT    /{company}/settings              → update()   — تحديث متعدد
+ * GET    /{company}/settings/group/{grp}  → byGroup()  — array
+ * GET    /{company}/settings/{key}        → getValue() — object واحد
+ * ════════════════════════════════════════════════════════════════════
+ */
 class SettingController extends BaseApiController
 {
-    protected string $resourceName = 'setting';
-    protected ?string $resourceClass = SettingResource::class;
+    protected string  $resourceName  = 'setting';
+    protected ?string $resourceClass = null;
 
     public function __construct(private SettingService $settingService)
     {
         parent::__construct();
     }
 
-    /**
-     * تجاوز store() لاستخدام updateOrCreate بدلاً من create
-     * ويتجاوز الـ Policy لأن إعداد المؤسسة مسموح لأي مستخدم مسجّل دخوله
-     */
-    public function store(Request $request): JsonResponse
+    // ─── GET /{company}/settings ──────────────────────────────────────
+
+    public function index(Request $request): JsonResponse
     {
         try {
-            $request->validate([
-                'key'   => 'required|string|max:150',
-                'group' => 'nullable|string|max:100',
-                'value' => 'nullable',
-            ]);
-
-            $setting = Setting::updateOrCreate(
-                ['key' => $request->key],
-                [
-                    'value' => $request->value,
-                    'group' => $request->group ?? 'general',
-                ]
-            );
-
-            return $this->successResponse(
-                new SettingResource($setting),
-                'تم حفظ الإعداد بنجاح',
-                201
-            );
+            $dict = $this->settingService->getAllAsDict();
+            return $this->successResponse($dict, 'تم جلب الإعدادات');
         } catch (\Throwable $e) {
-            return $this->handleError($e, 'store');
+            return $this->handleError($e, 'index');
         }
     }
 
-    /**
-     * جلب الإعدادات حسب المجموعة
-     */
+    // ─── PATCH|PUT /{company}/settings ───────────────────────────────
+
+    public function update(Request $request, $id = null): JsonResponse
+    {
+        try {
+            $allData     = $request->all();
+            $settingData = $this->filterSettingData($allData);
+
+            if (empty($settingData)) {
+                return $this->errorResponse(
+                    'لم يتم تقديم إعدادات صحيحة — تأكد من صحة المفاتيح',
+                    422,
+                    'EMPTY_SETTINGS'
+                );
+            }
+
+            $result = $this->settingService->upsertSettings($settingData);
+
+            $response = $result->map(fn($s) => [
+                'key'   => $s->key,
+                'value' => $this->settingService->castValue($s),
+                'group' => $s->group,
+                'type'  => $s->type,
+            ])->values()->toArray();
+
+            return $this->successResponse($response, 'تم تحديث الإعدادات بنجاح');
+
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'update');
+        }
+    }
+
+    // ─── GET /{company}/settings/group/{group} ────────────────────────
+
     public function byGroup(Request $request, string $group): JsonResponse
     {
         try {
-            $settings = $this->settingService->getByGroup($group);
-            return $this->successResponse(
-                SettingResource::collection($settings),
-                'تم جلب الإعدادات حسب المجموعة بنجاح'
-            );
+            $settings = $this->settingService->getGroupAsArray($group);
+            return $this->successResponse($settings, "إعدادات المجموعة: {$group}");
         } catch (\Throwable $e) {
             return $this->handleError($e, 'byGroup');
         }
     }
 
-    /**
-     * جلب قيمة إعداد بواسطة المفتاح
-     * إذا لم يوجد المفتاح يُرجع null بدلاً من 500
-     */
+    // ─── GET /{company}/settings/{key} ────────────────────────────────
+
     public function getValue(Request $request, string $key): JsonResponse
     {
         try {
-            $setting = Setting::where('key', $key)->first();
+            $setting = $this->settingService->findByKey($key);
 
-            // ← إرجاع مباشر بدون Resource
+            if (!$setting) {
+                return $this->errorResponse("الإعداد '{$key}' غير موجود", 404, 'SETTING_NOT_FOUND');
+            }
+
             return $this->successResponse([
-                'key'   => $key,
-                'value' => $setting?->value,
+                'key'   => $setting->key,
+                'value' => $this->settingService->castValue($setting),
+                'group' => $setting->group,
+                'type'  => $setting->type,
             ]);
+
         } catch (\Throwable $e) {
             return $this->handleError($e, 'getValue');
         }
     }
+
+    // ─── Disabled endpoints ───────────────────────────────────────────
+
+    public function store(Request $request): JsonResponse
+    {
+        return $this->errorResponse('استخدم PATCH /settings', 405, 'METHOD_NOT_ALLOWED');
+    }
+
+    public function show($id): JsonResponse
+    {
+        return $this->errorResponse('استخدم GET /settings/{key}', 405, 'METHOD_NOT_ALLOWED');
+    }
+
+    public function destroy($id): JsonResponse
+    {
+        return $this->errorResponse('لا يمكن حذف الإعدادات', 405, 'METHOD_NOT_ALLOWED');
+    }
+
+    // ─── Required by BaseApiController ───────────────────────────────
 
     protected function getService(): SettingService
     {
@@ -255,6 +411,45 @@ class SettingController extends BaseApiController
     protected function getModelClass(): string
     {
         return Setting::class;
+    }
+
+    // ─── Whitelist ────────────────────────────────────────────────────
+
+    private function filterSettingData(array $data): array
+    {
+        $allowedKeys = [
+            // invoice
+            'invoice_design', 'invoice_header_color', 'invoice_paper_size',
+            'invoice_font_size', 'price_mode', 'invoice_show_logo',
+            'invoice_show_stamp', 'invoice_show_sign', 'invoice_show_watermark',
+            'invoice_footer_text', 'invoice_legal_text', 'invoice_format',
+            'invoice_number_prefix',
+
+            // fiscal
+            'tax_regime', 'entity_type', 'ifu_rate', 'default_tva_rate',
+            'fiscal_stamp_enabled', 'fiscal_stamp_threshold', 'default_currency',
+            'year_regimes', 'tax_rate', 'tax_number', 'currency_code', 'decimal_places',
+
+            // inventory
+            'default_valuation_method', 'allow_negative_stock', 'manage_lots',
+            'manage_expiry', 'low_stock_default_threshold', 'auto_adjust_on_document',
+
+            // alerts
+            'alert_low_stock', 'alert_out_of_stock', 'low_stock_threshold',
+            'alert_debt_due', 'debt_due_days', 'alert_overdue_debts',
+            'alert_fiscal_close', 'fiscal_close_days', 'alert_g50', 'g50_days_before',
+            'alert_g12', 'alert_g12bis', 'alert_draft_docs', 'draft_docs_days',
+            'email_notifications', 'notif_email',
+
+            // general
+            'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',
+            'timezone', 'date_format', 'time_format',
+        ];
+
+        return array_filter(
+            array_intersect_key($data, array_flip($allowedKeys)),
+            fn($v) => $v !== null
+        );
     }
 }
 
@@ -269,22 +464,330 @@ class SettingController extends BaseApiController
 namespace App\Services;
 
 use App\Models\Setting;
+use App\Core\Services\BaseService;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
-class SettingService extends \App\Core\Services\BaseService
+/**
+ * ════════════════════════════════════════════════════════════════════
+ * SettingService — النسخة المُصلحة
+ *
+ * الإصلاحات:
+ * ① clearCache() بدون tags — يعمل مع file/database/redis drivers
+ * ② upsertSettings() — updateOrCreate مباشر، لا يمر بـ BaseService
+ * ③ castValue() — تحويل صحيح للقيم (string/boolean/integer/json)
+ * ④ beforeCreate() يُعيد company_id بعد أن يحذفه BaseService
+ * ════════════════════════════════════════════════════════════════════
+ */
+class SettingService extends BaseService
 {
-    protected string $model = Setting::class;
+    protected string $model        = Setting::class;
     protected string $resourceName = 'setting';
-    protected function getResourceName(): string { return $this->resourceName; }
+    protected array  $defaultWith  = [];
 
-    public function getByGroup(string $group)
+    protected function getResourceName(): string
     {
-        return $this->model::byGroup($group)->get();
+        return 'setting';
     }
 
-    public function getValue(string $key, $default = null)
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ clearCache — بدون Cache::tags()
+    // ═══════════════════════════════════════════════════════════════
+
+    protected function clearCache(): void
     {
-        return $this->model::get($key, $default);
+        $companyId = $this->getCurrentCompanyId();
+
+        // مسح cache groups المعروفة
+        foreach (['invoice', 'fiscal', 'inventory', 'alerts', 'general', 'company'] as $group) {
+            Cache::forget("settings:{$companyId}:{$group}");
+        }
+
+        Cache::forget("settings:{$companyId}:all");
+
+        // ✅ لا Cache::tags() — يُسبب: "This cache store does not support tagging"
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ beforeCreate — يُعيد company_id بعد أن يحذفه BaseService
+    // ═══════════════════════════════════════════════════════════════
+
+    protected function beforeCreate(array $data, ?Request $request): array
+    {
+        $companyId = $data['company_id'] ?? $this->getCurrentCompanyId();
+        $data = parent::beforeCreate($data, $request);
+        if ($companyId) {
+            $data['company_id'] = $companyId;
+        }
+        return $data;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ upsertSettings — الدالة الرئيسية لتحديث الإعدادات
+    //
+    // تستقبل: ['invoice_design' => 'modern', 'price_mode' => 'ht', ...]
+    // تُرجع: Collection<Setting>
+    // ═══════════════════════════════════════════════════════════════
+
+    public function upsertSettings(array $settingsDict): Collection
+    {
+        $companyId = $this->getCurrentCompanyId();
+        $upserted  = new Collection();
+        $now       = now();
+
+        DB::transaction(function () use ($settingsDict, $companyId, $now, &$upserted) {
+            foreach ($settingsDict as $key => $value) {
+                // ✅ حوِّل القيمة للتخزين (كل شيء نصي في الـ DB)
+                $storedValue = $this->prepareValueForStorage($value);
+
+                // ✅ WHERE clause
+                $where = ['key' => $key];
+                if ($companyId) {
+                    $where['company_id'] = $companyId;
+                } else {
+                    $where['company_id'] = null; // whereNull
+                }
+
+                // ✅ القيم للتحديث
+                $updateData = [
+                    'value'      => $storedValue,
+                    'updated_at' => $now,
+                ];
+
+                // ✅ القيم للإنشاء إذا لم يوجد
+                $createData = array_merge($where, $updateData, [
+                    'group'         => $this->guessGroup($key),
+                    'type'          => $this->guessType($value),
+                    'is_editable'   => true,
+                    'is_public'     => false,
+                    'display_order' => 0,
+                    'created_at'    => $now,
+                ]);
+
+                // ✅ updateOrInsert مباشر بدون Eloquent events التي قد تستدعي Cache::tags
+DB::table('settings')->updateOrInsert($where, $createData);
+
+                // جلب السجل المحدَّث
+                $setting = Setting::where('key', $key)
+                    ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+                    ->when(!$companyId, fn($q) => $q->whereNull('company_id'))
+                    ->first();
+
+                if ($setting) {
+                    $upserted->push($setting);
+                }
+            }
+        });
+
+        // ✅ مسح cache بعد التحديث (بدون tags)
+        $this->clearCache();
+
+        return $upserted;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ getAllAsDict — dictionary للـ index endpoint
+    //
+    // الصيغة: { "invoice_design": { value, group, type, is_editable } }
+    // ═══════════════════════════════════════════════════════════════
+
+    public function getAllAsDict(): array
+    {
+        $companyId = $this->getCurrentCompanyId();
+        $cacheKey  = "settings:{$companyId}:all";
+
+        return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($companyId) {
+            $query = Setting::query();
+
+            if ($companyId) {
+                $query->where('company_id', $companyId);
+            } else {
+                $query->whereNull('company_id');
+            }
+
+            $settings = $query->orderBy('display_order')->get();
+            $dict     = [];
+
+            foreach ($settings as $setting) {
+                $dict[$setting->key] = [
+                    'value'       => $this->castValue($setting),
+                    'group'       => $setting->group,
+                    'type'        => $setting->type ?? 'string',
+                    'is_editable' => $setting->is_editable ?? true,
+                ];
+            }
+
+            return $dict;
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ getGroupAsArray — array من objects للـ frontend hook
+    //
+    // الصيغة: [{ key, value, group, type, is_editable, updated_at }]
+    // هذا ما يتوقعه: useSettingsByGroup() → makeGs(rawSettings)
+    // ═══════════════════════════════════════════════════════════════
+
+    public function getGroupAsArray(string $group): array
+    {
+        $companyId = $this->getCurrentCompanyId();
+        $cacheKey  = "settings:{$companyId}:{$group}";
+
+        return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($group, $companyId) {
+            $query = Setting::query()->where('group', $group);
+
+            if ($companyId) {
+                $query->where('company_id', $companyId);
+            } else {
+                $query->whereNull('company_id');
+            }
+
+            return $query
+                ->orderBy('display_order')
+                ->get()
+                ->map(fn(Setting $s) => [
+                    'key'         => $s->key,
+                    'value'       => $this->castValue($s),
+                    'group'       => $s->group,
+                    'type'        => $s->type ?? 'string',
+                    'is_editable' => $s->is_editable ?? true,
+                    'updated_at'  => $s->updated_at?->toIso8601String(),
+                ])
+                ->values()
+                ->toArray();
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // findByKey — جلب إعداد واحد
+    // ═══════════════════════════════════════════════════════════════
+
+    public function findByKey(string $key): ?Setting
+    {
+        $companyId = $this->getCurrentCompanyId();
+
+        $query = Setting::where('key', $key);
+
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        } else {
+            $query->whereNull('company_id');
+        }
+
+        return $query->first();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Helpers الداخلية
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ castValue — تحويل القيمة من DB حسب النوع
+     *
+     * المشكلة: Setting::$casts كان يحوّل 'value' => 'array'
+     * هذا يُسبب: "My App" → ["My App"] (array بدل string)
+     *
+     * الحل: نقرأ القيمة الخام ونحوّلها يدوياً
+     */
+    public function castValue(Setting $setting): mixed
+    {
+        // ✅ getRawOriginal يُرجع القيمة كما هي في DB (بدون cast)
+        $raw  = $setting->getRawOriginal('value');
+        $type = $setting->type ?? 'string';
+
+        if ($raw === null || $raw === '') {
+            return match ($type) {
+                'boolean', 'bool' => false,
+                'integer', 'int'  => 0,
+                'float', 'double' => 0.0,
+                'json', 'array'   => [],
+                default           => '',
+            };
+        }
+
+        // محاولة JSON decode
+        $decoded = json_decode($raw, true);
+        $jsonOk  = json_last_error() === JSON_ERROR_NONE;
+
+        return match ($type) {
+            'boolean', 'bool' => filter_var($jsonOk ? $decoded : $raw, FILTER_VALIDATE_BOOLEAN),
+            'integer', 'int'  => (int) ($jsonOk ? $decoded : $raw),
+            'float', 'double' => (float) ($jsonOk ? $decoded : $raw),
+            'json', 'array'   => $jsonOk && is_array($decoded) ? $decoded : [],
+            default           => // string
+                $jsonOk && is_string($decoded) ? $decoded
+                    : ($jsonOk && is_scalar($decoded) ? (string) $decoded
+                        : $raw),
+        };
+    }
+
+    /**
+     * تحضير القيمة للتخزين في DB (كـ text)
+     */
+    private function prepareValueForStorage(mixed $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_array($value) || is_object($value)) {
+            return json_encode($value, JSON_UNESCAPED_UNICODE);
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * تخمين المجموعة من اسم المفتاح
+     */
+    private function guessGroup(string $key): string
+    {
+        $prefixes = [
+            'invoice_' => 'invoice',
+            'price_mode' => 'invoice',
+            'tax_'     => 'fiscal',
+            'fiscal_'  => 'fiscal',
+            'ifu_'     => 'fiscal',
+            'default_tva' => 'fiscal',
+            'year_reg' => 'fiscal',
+            'entity_'  => 'fiscal',
+            'default_currency' => 'fiscal',
+            'allow_neg'   => 'inventory',
+            'manage_'     => 'inventory',
+            'default_val' => 'inventory',
+            'low_stock_d' => 'inventory',
+            'auto_adj'    => 'inventory',
+            'alert_'   => 'alerts',
+            'notif_'   => 'alerts',
+            'email_not'=> 'alerts',
+            'debt_'    => 'alerts',
+            'g50_'     => 'alerts',
+            'draft_'   => 'alerts',
+        ];
+
+        foreach ($prefixes as $prefix => $group) {
+            if (str_starts_with($key, $prefix)) {
+                return $group;
+            }
+        }
+
+        return 'general';
+    }
+
+    /**
+     * تخمين النوع من القيمة
+     */
+    private function guessType(mixed $value): string
+    {
+        if (is_bool($value)) return 'boolean';
+        if (is_int($value))  return 'integer';
+        if (is_float($value)) return 'float';
+        if (is_array($value)) return 'json';
+        return 'string';
     }
 }
 

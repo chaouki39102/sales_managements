@@ -91,12 +91,19 @@ class CompanySeeder extends Seeder
         // ─── المرحلة 6: السنة المالية الأولى ─────────────────────
         $this->seedFiscalYear($companyId);
 
-        // ─── المرحلة 7: الأدوار الخاصة بالشركة ──────────────────
+        // ─── المرحلة 7: الإعدادات العامة للشركة (جديد) ───────────
+        // 🔥 استدعاء SettingsSeeder لإنشاء الإعدادات الافتراضية
+        $this->command?->info("⚙️  جاري إنشاء إعدادات الشركة...");
+        $settingsSeeder = new SettingsSeeder();
+        $settingsSeeder->seedForCompany($companyId);
+        $this->command?->info("✅ تم إنشاء إعدادات الشركة #{$companyId}");
+
+        // ─── المرحلة 8: الأدوار الخاصة بالشركة ──────────────────
         // (admin, manager, cashier, viewer — company_id = $companyId)
         $this->roleService->seedRoles($companyId);
         $this->command?->info("✅ تم إنشاء أدوار الشركة #{$companyId}");
 
-        // ─── المرحلة 8: تعيين دور admin للمالك ──────────────────
+        // ─── المرحلة 9: تعيين دور admin للمالك ──────────────────
         $this->assignOwnerRole($companyId);
 
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();

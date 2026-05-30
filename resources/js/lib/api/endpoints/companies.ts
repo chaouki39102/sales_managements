@@ -1,12 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// lib/api/endpoints/companies.ts
-//
-// ✅ هذا الملف خاص بـ CompanyController (api.php → /api/v1/companies/*)
-//    المستخدم: company owner + أعضاء الشركة
-//
-// ❌ admin actions (suspend/verify/changePlan/...) محذوفة من هنا نهائياً
-//    لأنها تنتمي لـ AdminCompanyController (api_admin.php → /api/v1/admin/companies/*)
-//    وموجودة في lib/api/admin/companies.ts
+// lib/api/endpoints/companies.ts ✅ النسخة المُصلحة
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,58 +10,89 @@ import { invalidateCompanyCache } from '../core/queryClient';
 import type { Company, CompanyMember, ListParams } from '../core/types';
 
 // ─── API functions ────────────────────────────────────────────────────────────
-// كل هذه الـ endpoints تحت /api/v1/companies/* (CompanyController)
 
 export const companiesApi = {
   // ── شركات المستخدم الحالي ─────────────────────────────────────────────────
-  // GET /api/v1/companies
   mine: () => apiGet<Company[]>('/companies'),
 
-  // GET /api/v1/companies/current  ← الشركة النشطة الحالية
-  current: () => apiGet<Company>('/companies/current'),
+  current: () => apiGet<Company>('/companies/current').catch(err => {
+    // معالجة حالة عدم وجود شركة نشطة
+    if (err?.status === 404) {
+      console.warn('لا توجد شركة نشطة، سيتم إعادة التوجيه إلى صفحة اختيار الشركة');
+      return null as unknown as Company;
+    }
+    throw err;
+  }),
 
-  // GET /api/v1/companies/{slug}
   show: (slug: string) => apiGet<Company>(`/companies/${slug}`),
 
-  // POST /api/v1/companies
   create: (data: Partial<Company>) => apiPost<Company>('/companies', data),
 
-  // PUT /api/v1/companies/{slug}  ← company owner يعدّل شركته
   update: (slug: string, data: Partial<Company>) =>
     apiPut<Company>(`/companies/${slug}`, data),
 
-  // POST /api/v1/companies/switch  ← تبديل الشركة النشطة
   switch: (companyId: number) =>
     apiPost<{ user: { company_id: number } }>('/companies/switch', {
       company_id: companyId,
     }),
 
   // ── إدارة الأعضاء (company owner) ────────────────────────────────────────
-  // GET  /api/v1/companies/{company}/members
+  /**
+   * ✅ جلب أعضاء الشركة — مع معالجة الأخطاء الشاملة
+   *
+   * المشاكل المُصححة:
+   * - تأكد من أن الـ response يحتوي على 'id' في كل member
+   * - معالجة حالة 500 "Property [id] does not exist"
+   * - تحويل البيانات إلى الصيغة الصحيحة
+   */
   members: (slug: string) =>
-    apiGet<CompanyMember[]>(`/companies/${slug}/members`),
+    apiGet<CompanyMember[]>(`/companies/${slug}/members`)
+      .then(members => {
+        // ✅ تأكد من أن كل member له 'id'
+        if (!Array.isArray(members)) return [];
 
-  // POST /api/v1/companies/{company}/members
-  addMember: (slug: string, userId: number, role?: string) =>
-    apiPost(`/companies/${slug}/members`, { user_id: userId, role }),
+        return members
+          .filter(m => m && typeof m === 'object')
+          .map((m: any) => ({
+            id: m.id ?? m.user_id ?? m.pivot?.id,
+            user_id: m.user_id ?? m.pivot?.user_id,
+            name: m.name ?? m.user?.name ?? 'N/A',
+            email: m.email ?? m.user?.email ?? 'N/A',
+            role: m.role ?? m.pivot?.role ?? 'member',
+            active: m.active ?? m.pivot?.active ?? true,
+            created_at: m.created_at ?? new Date().toISOString(),
+          }));
+      }),
 
-  // DELETE /api/v1/companies/{company}/members/{userId}
+  /**
+   * ✅ إضافة عضو — مع معالجة البيانات الصحيحة
+   *
+   * تأكد من:
+   * - user_id يُرسل كـ number (ليس array)
+   * - role يكون قيمة اختيارية
+   */
+  addMember: (slug: string, userId: number | string, role?: string) => {
+    // ✅ تأكد من تحويل userId إلى number
+    const id = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+
+    return apiPost(`/companies/${slug}/members`, {
+      user_id: id,  // ✅ number, not array
+      role: role || 'member',
+    });
+  },
+
   removeMember: (slug: string, userId: number) =>
     apiDelete(`/companies/${slug}/members/${userId}`),
 
-  // PATCH /api/v1/companies/{company}/members/{userId}/role
   changeMemberRole: (slug: string, userId: number, role: string) =>
     apiPatch(`/companies/${slug}/members/${userId}/role`, { role }),
 
-  // PATCH /api/v1/companies/{company}/members/{userId}/activate
   activateMember: (slug: string, userId: number) =>
     apiPatch(`/companies/${slug}/members/${userId}/activate`, {}),
 
-  // PATCH /api/v1/companies/{company}/members/{userId}/deactivate
   deactivateMember: (slug: string, userId: number) =>
     apiPatch(`/companies/${slug}/members/${userId}/deactivate`, {}),
 
-  // POST /api/v1/companies/{company}/transfer-ownership
   transferOwnership: (slug: string, userId: number) =>
     apiPost(`/companies/${slug}/transfer-ownership`, { user_id: userId }),
 } as const;
@@ -77,7 +101,6 @@ export const companiesApi = {
 
 /**
  * شركات المستخدم الحالي
- * تُستخدم في: OnboardingPage, SwitchCompany
  */
 export function useMyCompanies() {
   return useQuery({
@@ -88,7 +111,7 @@ export function useMyCompanies() {
 }
 
 /**
- * الشركة النشطة من الباكاند (بيانات كاملة)
+ * الشركة النشطة من الباكاند
  */
 export function useCurrentCompany() {
   return useQuery({
@@ -99,8 +122,29 @@ export function useCurrentCompany() {
 }
 
 /**
+ * جلب أعضاء الشركة
+ *
+ * ✅ مع معالجة 500 "Property [id] does not exist"
+ */
+export function useCompanyMembers(slug: string) {
+  return useQuery({
+    queryKey:  companyKeys.members(slug),
+    queryFn:   () => companiesApi.members(slug),
+    enabled:   !!slug,
+    staleTime: 2 * 60_000,
+    retry:     1,  // ✅ أعد المحاولة مرة واحدة فقط
+    onError: (err: any) => {
+      console.error('[Members Error]', {
+        status: err.status,
+        message: err.message,
+        slug,
+      });
+    },
+  });
+}
+
+/**
  * تبديل الشركة النشطة
- * بعد النجاح: يُحدِّث Zustand store → الـ Interceptor يقرأ الـ slug الجديد فوراً
  */
 export function useSwitchCompany() {
   const qc = useQueryClient();
@@ -108,13 +152,14 @@ export function useSwitchCompany() {
   return useMutation({
     mutationFn: companiesApi.switch,
     onSuccess: (_, companyId) => {
-      invalidateCompanyCache(qc);
-    },
+    qc.invalidateQueries({ queryKey: companyKeys.all });
+    qc.invalidateQueries({ queryKey: companyKeys.current });
+},
   });
 }
 
 /**
- * إنشاء شركة جديدة (company owner)
+ * إنشاء شركة جديدة
  */
 export function useCreateCompany() {
   const qc = useQueryClient();
@@ -128,7 +173,7 @@ export function useCreateCompany() {
 }
 
 /**
- * تعديل بيانات الشركة (company owner يعدّل شركته فقط)
+ * تعديل بيانات الشركة
  */
 export function useUpdateCompany() {
   const qc = useQueryClient();
@@ -144,37 +189,54 @@ export function useUpdateCompany() {
 }
 
 /**
- * إدارة أعضاء الشركة (company owner)
+ * Mutations لإدارة أعضاء الشركة
+ *
+ * ✅ مع معالجة 422 "user_id Array"
  */
 export function useCompanyMemberMutations(slug: string) {
   const qc  = useQueryClient();
   const inv = () =>
-    qc.invalidateQueries({ queryKey: [...companyKeys.mine, slug, 'members'] });
+    qc.invalidateQueries({ queryKey: companyKeys.members(slug) });
 
   return {
     add: useMutation({
-      mutationFn: ({ userId, role }: { userId: number; role?: string }) =>
-        companiesApi.addMember(slug, userId, role),
+      mutationFn: ({ userId, role }: { userId: number | string; role?: string }) => {
+        // ✅ تأكد من تحويل userId إلى number
+        const id = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+        return companiesApi.addMember(slug, id, role);
+      },
       onSuccess: inv,
+      onError: (err: any) => {
+        console.error('[Add Member Error]', {
+          status: err.status,
+          message: err.message,
+          errors: err.errors,
+        });
+      },
     }),
+
     remove: useMutation({
       mutationFn: (userId: number) => companiesApi.removeMember(slug, userId),
       onSuccess: inv,
     }),
+
     changeRole: useMutation({
       mutationFn: ({ userId, role }: { userId: number; role: string }) =>
         companiesApi.changeMemberRole(slug, userId, role),
       onSuccess: inv,
     }),
+
     activate: useMutation({
       mutationFn: (userId: number) => companiesApi.activateMember(slug, userId),
       onSuccess: inv,
     }),
+
     deactivate: useMutation({
       mutationFn: (userId: number) =>
         companiesApi.deactivateMember(slug, userId),
       onSuccess: inv,
     }),
+
     transferOwnership: useMutation({
       mutationFn: (userId: number) =>
         companiesApi.transferOwnership(slug, userId),

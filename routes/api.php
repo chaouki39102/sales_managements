@@ -437,9 +437,14 @@ Route::prefix('v1')->group(function () {
             Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download']);
 
             // ✅ settings: المسارات المحددة قبل apiResource
-            Route::get('settings/group/{group}',   [SettingController::class, 'byGroup']);
-            Route::get('settings/key/{key}/value', [SettingController::class, 'getValue']);
-            Route::apiResource('settings', SettingController::class);
+ // ① المسارات المحددة أولاً (قبل أي {wildcard})
+Route::get('settings/group/{group}',   [SettingController::class, 'byGroup']);
+Route::get('settings/{key}',           [SettingController::class, 'getValue']);
+
+// ② العمليات الجماعية على /settings (بدون ID)
+Route::get('settings',                 [SettingController::class, 'index']);
+Route::patch('settings',               [SettingController::class, 'update']);
+Route::put('settings',                 [SettingController::class, 'update']);
             // جلب الملف الشخصي للمستخدم المسجل
             Route::get('/profile',          [UserController::class, 'profile']);
 

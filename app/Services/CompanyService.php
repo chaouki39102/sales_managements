@@ -168,4 +168,119 @@ class CompanyService extends \App\Core\Services\BaseService
                 ->toArray(),
         ];
     }
+
+
+    /**
+     * البحث عن شركة باستخدام slug
+     */
+    public function findBySlug(string $slug): Company
+    {
+        return Company::where('slug', $slug)->firstOrFail();
+    }
+
+    /**
+     * تحديث شركة باستخدام slug
+     */
+    public function updateBySlug(string $slug, array $data, ?Request $request = null): Company
+    {
+        $company = $this->findBySlug($slug);
+        return $this->update($company, $data, $request);
+    }
+
+    /**
+     * حذف شركة باستخدام slug
+     */
+    public function deleteBySlug(string $slug, ?Request $request = null): bool
+    {
+        $company = $this->findBySlug($slug);
+        return $this->delete($company, $request);
+    }
+
+    /**
+     * جلب أعضاء الشركة
+     */
+    public function getMembersBySlug(string $slug): array
+    {
+        $company = $this->findBySlug($slug);
+
+        return DB::table('company_user as cu')
+            ->join('users as u', 'cu.user_id', '=', 'u.id')
+            ->where('cu.company_id', $company->id)
+            ->select([
+                'cu.id',
+                'cu.user_id',
+                'cu.role',
+                'cu.active',
+                'cu.joined_at',
+                'u.name',
+                'u.email',
+                'u.avatar',
+            ])
+            ->orderBy('cu.role')
+            ->get()
+            ->map(fn($row) => [
+                'id'        => $row->id,
+                'user_id'   => $row->user_id,
+                'role'      => $row->role,
+                'active'    => (bool) $row->active,
+                'joined_at' => $row->joined_at,
+                'user'      => [
+                    'id'     => $row->user_id,
+                    'name'   => $row->name,
+                    'email'  => $row->email,
+                    'avatar' => $row->avatar,
+                ],
+            ])
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * إضافة عضو إلى الشركة
+     */
+    public function addMemberBySlug(string $slug, int $userId, string $role = 'member'): void
+    {
+        $company = $this->findBySlug($slug);
+
+        $exists = DB::table('company_user')
+            ->where('user_id', $userId)
+            ->where('company_id', $company->id)
+            ->exists();
+
+        if ($exists) {
+            DB::table('company_user')
+                ->where('user_id', $userId)
+                ->where('company_id', $company->id)
+                ->update(['role' => $role, 'active' => true, 'updated_at' => now()]);
+            return;
+        }
+
+        DB::table('company_user')->insert([
+            'user_id'    => $userId,
+            'company_id' => $company->id,
+            'role'       => $role,
+            'active'     => true,
+            'joined_at'  => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /**
+     * إزالة عضو من الشركة (باستثناء المالك)
+     */
+    public function removeMemberBySlug(string $slug, int $userId): void
+    {
+        $company = $this->findBySlug($slug);
+
+        $deleted = DB::table('company_user')
+            ->where('company_id', $company->id)
+            ->where('user_id', $userId)
+            ->where('role', '!=', 'owner')
+            ->delete();
+
+        if (!$deleted) {
+            throw new BusinessRuleException('لا يمكن حذف مالك الشركة أو العضو غير موجود', 422);
+        }
+    }
 }
