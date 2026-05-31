@@ -34,20 +34,22 @@ class PermissionService extends BaseService
     //   - كل شركة تربط أدوارها بنفس مجموعة الصلاحيات العالمية
     // ══════════════════════════════════════════════════════════════
 
-    protected function getListConfig(): array
+    public function getListConfig(): array
     {
         return [
-            'searchable'     => Permission::$searchableFields,
-            'filterable'     => Permission::$filterable,
-            'sortable'       => Permission::$sortable,
-            'defaultSort'    => Permission::$defaultSort,
-            'defaultWith'    => [],
-            'allowedIncludes'=> Permission::$allowedIncludes,
-            'cache_tags'     => ['permissions'],
-            'modifyQuery'    => function ($query) {
-                // ✅ الصلاحيات عالمية دائماً (company_id IS NULL)
-                // نُعيد تعريف الـ scope يدوياً بدل ما يطبقه BaseService خطأً
-                $query->whereNull('company_id');
+            'search_fields'          => Permission::$searchableFields,
+            'filters'                => Permission::$filterable,
+            'sorts'                  => Permission::$sortable,
+            'default_sort'           => Permission::$defaultSort,
+            'default_sort_direction' => 'asc',
+            'default_includes'       => [],
+            'relations'              => Permission::$allowedIncludes,
+            'cache_tags'             => Permission::$cacheTags,
+
+            'modifyQuery' => function ($qb, $request) {
+                $qb->whereNull('company_id');
+
+                return $qb;
             },
         ];
     }
