@@ -298,7 +298,21 @@ abstract class BaseApiController extends Controller
 
     protected function getListConfig(): array
     {
-        return ['cache_tags' => ['api', $this->resourceName]];
+        $config = ['cache_tags' => ['api', $this->resourceName]];
+
+        try {
+            $service = $this->getService();
+            if (is_object($service) && method_exists($service, 'getListConfig')) {
+                $serviceConfig = $service->getListConfig();
+                if (is_array($serviceConfig)) {
+                    $config = array_merge($config, $serviceConfig);
+                }
+            }
+        } catch (\LogicException) {
+            // Controllers like AuthController don't define getService().
+        }
+
+        return $config;
     }
 
     protected function transformItem(mixed $item): mixed

@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import apiClient from "@/lib/api/core/client";
+import { useRoles } from "@/lib/api/endpoints/roles";
 
 // ─── Types ─────────────────────────────────────
 interface Permission {
@@ -1943,19 +1944,7 @@ export default function UsersPage() {
         staleTime: 30_000,
     });
 
-    const { data: roles = [], isLoading: rolesLoading } = useQuery<Role[]>({
-        queryKey: ["roles", slug],
-        queryFn: async () => {
-            if (!slug) return [];
-            const res = await apiClient.get(`/${slug}/roles`, {
-                params: { per_page: 100, include: "permissions" },
-            });
-            const raw = res.data?.data ?? res.data;
-            return Array.isArray(raw) ? raw : (raw?.data ?? []);
-        },
-        enabled: !!slug,
-        staleTime: 300_000,
-    });
+    const { data: roles = [], isLoading: rolesLoading } = useRoles();
 
     const { data: permissions = [], isLoading: permsLoading } = useQuery<
         Permission[]

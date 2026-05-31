@@ -49,29 +49,29 @@ class RoleService extends BaseService
      * في RoleController، نستدعي getListData() → HasApiList
      * → يبحث عن 'modifyQuery'
      */
-    protected function getListConfig(): array
+    public function getListConfig(): array
     {
         $companyId = $this->getCurrentCompanyId();
 
         return [
-            'searchable'      => Role::$searchableFields,
-            'filterable'      => Role::$filterable,
-            'sortable'        => Role::$sortable,
-            'defaultSort'     => Role::$defaultSort,
-            'defaultWith'     => ['permissions'],
-            'allowedIncludes' => Role::$allowedIncludes,
+            'search_fields'          => Role::$searchableFields,
+            'filters'                => Role::$filterable,
+            'sorts'                  => Role::$sortable,
+            'default_sort'           => Role::$defaultSort,
+            'default_sort_direction' => Role::$defaultSortDirection,
+            'default_includes'       => ['permissions'],
+            'relations'              => Role::$allowedIncludes,
+            'cache_tags'             => Role::$cacheTags,
 
-            // ✅ استخدم modifyQuery (الخاص بـ HasApiList)
-            // و return QueryBuilder دائماً!
             'modifyQuery' => function ($qb, $request) use ($companyId) {
                 if ($companyId) {
-                    // أدوار الشركة الحالية فقط
-                    $qb->where('company_id', $companyId);
+                    $qb->where(function ($q) use ($companyId) {
+                        $q->where('company_id', $companyId)
+                            ->orWhereNull('company_id');
+                    });
                 }
-                // إذا كان $companyId = null، سيُرجع كل شيء
-                // (لكن SetCompanyContext يضمن وجود company_id دائماً)
 
-                return $qb;  // ✅ يجب أن تُرجع QueryBuilder!
+                return $qb;
             },
         ];
     }
