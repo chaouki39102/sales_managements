@@ -18,7 +18,7 @@ class SeederController extends BaseApiController
 {
     protected string $resourceName = 'seeder';
 
-    protected function getService() { return null; }
+    protected function getService(): ?object { return null; }
     protected function getModelClass(): string { return \App\Models\Company::class; }
 
     /**

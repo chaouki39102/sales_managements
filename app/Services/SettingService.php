@@ -80,49 +80,74 @@ class SettingService extends BaseService
 
         DB::transaction(function () use ($settingsDict, $companyId, $now, &$upserted) {
             foreach ($settingsDict as $key => $value) {
-                // ✅ حوِّل القيمة للتخزين (كل شيء نصي في الـ DB)
-                $storedValue = $this->prepareValueForStorage($value);
 
-                // ✅ WHERE clause
-                $where = ['key' => $key];
-                if ($companyId) {
-                    $where['company_id'] = $companyId;
-                } else {
-                    $where['company_id'] = null; // whereNull
-                }
-
-                // ✅ القيم للتحديث
-                $updateData = [
-                    'value'      => $storedValue,
-                    'updated_at' => $now,
-                ];
-
-                // ✅ القيم للإنشاء إذا لم يوجد
-                $createData = array_merge($where, $updateData, [
-                    'group'         => $this->guessGroup($key),
-                    'type'          => $this->guessType($value),
-                    'is_editable'   => true,
-                    'is_public'     => false,
-                    'display_order' => 0,
-                    'created_at'    => $now,
-                ]);
-
-                // ✅ updateOrInsert مباشر بدون Eloquent events التي قد تستدعي Cache::tags
-DB::table('settings')->updateOrInsert($where, $createData);
-
-                // جلب السجل المحدَّث
-                $setting = Setting::where('key', $key)
-                    ->when($companyId, fn($q) => $q->where('company_id', $companyId))
-                    ->when(!$companyId, fn($q) => $q->whereNull('company_id'))
+                // ① تحقق من is_editable قبل أي تعديل
+                $existing = Setting::where('key', $key)
+                    ->when(
+                        $companyId,
+                        fn($q) => $q->where('company_id', $companyId),
+                        fn($q) => $q->whereNull('company_id')
+                    )
                     ->first();
 
-                if ($setting) {
-                    $upserted->push($setting);
+                if ($existing && !$existing->is_editable) {
+                    continue; // تخطّى الإعدادات المحمية
+                }
+
+                $storedValue = $this->prepareValueForStorage($value);
+                $updateData  = ['value' => $storedValue, 'updated_at' => $now];
+
+                if ($companyId) {
+                    // ② المسار الطبيعي — tenant
+                    DB::table('settings')->updateOrInsert(
+                        ['key' => $key, 'company_id' => $companyId],
+                        array_merge($updateData, $existing ? [] : [
+                            'key'           => $key,
+                            'company_id'    => $companyId,
+                            'group'         => $this->guessGroup($key),
+                            'type'          => $this->guessType($value),
+                            'is_editable'   => true,
+                            'is_public'     => false,
+                            'display_order' => 0,
+                            'created_at'    => $now,
+                        ])
+                    );
+                } else {
+                    // ③ company_id IS NULL — updateOrInsert لا يفهم null كـ IS NULL
+                    if ($existing) {
+                        DB::table('settings')
+                            ->where('key', $key)
+                            ->whereNull('company_id')
+                            ->update($updateData);
+                    } else {
+                        DB::table('settings')->insert(array_merge($updateData, [
+                            'key'           => $key,
+                            'company_id'    => null,
+                            'group'         => $this->guessGroup($key),
+                            'type'          => $this->guessType($value),
+                            'is_editable'   => true,
+                            'is_public'     => false,
+                            'display_order' => 0,
+                            'created_at'    => $now,
+                        ]));
+                    }
+                }
+
+                // ④ جلب السجل المحدَّث — $existing قد يكون stale بعد الـ update
+                $fresh = Setting::where('key', $key)
+                    ->when(
+                        $companyId,
+                        fn($q) => $q->where('company_id', $companyId),
+                        fn($q) => $q->whereNull('company_id')
+                    )
+                    ->first();
+
+                if ($fresh) {
+                    $upserted->push($fresh);
                 }
             }
         });
 
-        // ✅ مسح cache بعد التحديث (بدون tags)
         $this->clearCache();
 
         return $upserted;
@@ -258,9 +283,9 @@ DB::table('settings')->updateOrInsert($where, $createData);
             'float', 'double' => (float) ($jsonOk ? $decoded : $raw),
             'json', 'array'   => $jsonOk && is_array($decoded) ? $decoded : [],
             default           => // string
-                $jsonOk && is_string($decoded) ? $decoded
-                    : ($jsonOk && is_scalar($decoded) ? (string) $decoded
-                        : $raw),
+            $jsonOk && is_string($decoded) ? $decoded
+                : ($jsonOk && is_scalar($decoded) ? (string) $decoded
+                    : $raw),
         };
     }
 
@@ -302,7 +327,7 @@ DB::table('settings')->updateOrInsert($where, $createData);
             'auto_adj'    => 'inventory',
             'alert_'   => 'alerts',
             'notif_'   => 'alerts',
-            'email_not'=> 'alerts',
+            'email_not' => 'alerts',
             'debt_'    => 'alerts',
             'g50_'     => 'alerts',
             'draft_'   => 'alerts',

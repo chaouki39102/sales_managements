@@ -27,7 +27,7 @@ use RuntimeException;
 class ApiListService
 {
     /**
-     * جلب قائمة من البيانات مع الفلاتر، الكاش، والتصدير.
+     * جلب قائمة من البيانات مع تغيات الـ Callback أو الـ modifyQuery.
      *
      * @param string $modelClass The fully qualified class name of the Eloquent model.
      * @param array $config Configuration array for the query.
@@ -35,11 +35,14 @@ class ApiListService
      * @return LengthAwarePaginator|JsonResponse|\Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
      */
     public static function getList(string $modelClass, array $config, Request $request)
-{
-    // ✅ الكاش معطّل — Paginator لا يُحفظ في cache
-    $queryCallback = $config['query_callback'] ?? null;
-    return self::executeQuery($modelClass, $config, $request, $queryCallback);
-}
+    {
+        // ✅ دعم كلا المفتاحين لتجنب المشكلة مستقبلاً
+        $queryCallback = $config['query_callback']
+            ?? $config['modifyQuery']
+            ?? null;
+
+        return self::executeQuery($modelClass, $config, $request, $queryCallback);
+    }
 
     /**
      * تنفيذ الاستعلام الأساسي، مع معالجة التصدير والـ Pagination.

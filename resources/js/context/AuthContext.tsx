@@ -1,23 +1,3 @@
-// ════════════════════════════════════════════════════════════════════════════
-// context/AuthContext.tsx  ← النسخة المُصلحة
-//
-// المشكلة الأصلية:
-//   Zustand يحتفظ بالـ activeCompany/slug في sessionStorage (persist)
-//   → بعد انتهاء الجلسة، عند فتح صفحة Login:
-//     slug لا يزال موجوداً → FiscalYearProvider يُشغِّل query → 500
-//
-//   ملاحظة: useCurrentUser في auth.ts لديه retry:false وهو صحيح
-//   المشكلة الوحيدة: auth/me يُعيد 500 (خطأ PHP syntax في الباكاند)
-//   وليس 401 → الـ interceptor لا يُشغِّل forcedLogout → المشكلة في الباكاند
-//
-// الحل الصحيح هنا (frontend):
-//   FiscalYearContext الجديد يقرأ isAuthenticated قبل تشغيل أي query
-//   (انظر FiscalYearContext.tsx المُصلَح)
-//
-//   AuthContext: لا حاجة لتغييره — useLogout يستدعي appActions.reset()
-//   الذي يمسح الـ slug. المشكلة كانت أن FiscalYearContext لا ينتظر Auth.
-// ════════════════════════════════════════════════════════════════════════════
-
 import React, { createContext, useContext } from 'react';
 import { useCurrentUser, useLogin, useLogout } from '@/lib/api/endpoints/auth';
 import { useActiveCompany, useAppStore } from '@/lib/store/appStore';

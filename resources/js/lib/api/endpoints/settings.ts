@@ -117,17 +117,32 @@ export function useSettingsDict() {
  *   const gs = makeGs(rawSettings);
  *   const design = gs('invoice_design', 'classic');
  */
+// settings.ts — الإصلاح الفوري والنهائي
 export function useSettingsByGroup(group: string) {
   const slug = useActiveSlug() ?? '';
+
   return useQuery({
     queryKey:  [...tenantKeys.settings.current(slug), group],
-    queryFn:   () => settingsApi.byGroup(group),
-    enabled:   !!slug && !!group,
-    staleTime: 5 * 60_000,
-    // ✅ لا نُعيد الجلب عند العودة للتبويب — البيانات مستقرة
+    queryFn:   async () => {
+      // ✅ نجلب كل الإعدادات من endpoint الذي يعمل
+      // ونفلتر محلياً بدل endpoint byGroup الذي يُرجع []
+      const dict = await settingsApi.list();
+
+      return Object.entries(dict)
+        .filter(([_, meta]) => (meta as any).group === group)
+        .map(([key, meta]) => ({
+          key,
+          value:       (meta as any).value,
+          group:       (meta as any).group,
+          type:        (meta as any).type        ?? 'string',
+          is_editable: (meta as any).is_editable ?? true,
+          updated_at:  undefined, // list() لا يُرجع updated_at
+        } satisfies Setting));
+    },
+    enabled:              !!slug && !!group,
+    staleTime:            5 * 60_000,
     refetchOnWindowFocus: false,
-    // ✅ initialData آمن كـ array فارغ
-    placeholderData: [],
+    placeholderData:      [],
   });
 }
 

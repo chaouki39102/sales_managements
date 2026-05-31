@@ -6,6 +6,7 @@ class CompanyContextService
 {
     private ?int $companyId = null;
 
+
     public function set(int $id): void
     {
         $this->companyId = $id;

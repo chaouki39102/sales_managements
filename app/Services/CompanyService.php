@@ -199,41 +199,41 @@ class CompanyService extends \App\Core\Services\BaseService
     /**
      * جلب أعضاء الشركة
      */
-    public function getMembersBySlug(string $slug): array
-    {
-        $company = $this->findBySlug($slug);
+public function getMembersBySlug(string $slug): array
+{
+    $company = $this->findBySlug($slug);
 
-        return DB::table('company_user as cu')
-            ->join('users as u', 'cu.user_id', '=', 'u.id')
-            ->where('cu.company_id', $company->id)
-            ->select([
-                'cu.id',
-                'cu.user_id',
-                'cu.role',
-                'cu.active',
-                'cu.joined_at',
-                'u.name',
-                'u.email',
-                'u.avatar',
-            ])
-            ->orderBy('cu.role')
-            ->get()
-            ->map(fn($row) => [
-                'id'        => $row->id,
-                'user_id'   => $row->user_id,
-                'role'      => $row->role,
-                'active'    => (bool) $row->active,
-                'joined_at' => $row->joined_at,
-                'user'      => [
-                    'id'     => $row->user_id,
-                    'name'   => $row->name,
-                    'email'  => $row->email,
-                    'avatar' => $row->avatar,
-                ],
-            ])
-            ->values()
-            ->toArray();
-    }
+    return DB::table('company_user as cu')
+        ->join('users as u', 'cu.user_id', '=', 'u.id')
+        ->where('cu.company_id', $company->id)
+        ->select([
+            // ✅ لا cu.id — استخدم user_id كمعرف
+            'cu.user_id',
+            'cu.role',
+            'cu.active',
+            'cu.joined_at',
+            'u.name',
+            'u.email',
+            'u.avatar',
+        ])
+        ->orderBy('cu.role')
+        ->get()
+        ->map(fn($row) => [
+            'id'        => $row->user_id,  // ✅ user_id كـ id
+            'user_id'   => $row->user_id,
+            'role'      => $row->role,
+            'active'    => (bool) $row->active,
+            'joined_at' => $row->joined_at,
+            'user'      => [
+                'id'     => $row->user_id,
+                'name'   => $row->name,
+                'email'  => $row->email,
+                'avatar' => $row->avatar,
+            ],
+        ])
+        ->values()
+        ->toArray();
+}
 
     /**
      * إضافة عضو إلى الشركة

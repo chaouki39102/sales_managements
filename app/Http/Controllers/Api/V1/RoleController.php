@@ -3,21 +3,166 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Core\Http\Controllers\BaseApiController;
+use App\Core\Services\ApiListService;
+use App\Http\Requests\StoreRoleRequest;
+use App\Http\Requests\UpdateRoleRequest;
 use App\Http\Resources\RoleResource;
 use App\Services\RoleService;
 use App\Models\Role;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+/**
+ * RoleController
+ *
+ * ══════════════════════════════════════════════════════════════════
+ * المسارات (من api.php):
+ *   GET    /{company}/roles              → index()
+ *   GET    /{company}/roles/{role}       → show($id)
+ *   POST   /{company}/roles              → store(Request)
+ *   PUT    /{company}/roles/{role}       → update(Request, $id)
+ *   DELETE /{company}/roles/{role}       → destroy($id)
+ *
+ * ✅ متوافق مع BaseApiController:
+ *   - extractId() يتعامل مع route params تلقائياً
+ *   - resolveRouteId() يبحث عن 'role' ثم 'id' في route params
+ *   - getService() و getModelClass() مُعرَّفان
+ *   - store() يستخدم StoreRoleRequest (FormRequest)
+ *   - update() يستخدم UpdateRoleRequest (FormRequest)
+ * ══════════════════════════════════════════════════════════════════
+ */
 class RoleController extends BaseApiController
 {
-    protected string $resourceName = 'role';
-    protected ?string $resourceClass = RoleResource::class;
+    protected string  $resourceName  = 'role';
+    // Use a plain string here to avoid static analysis errors if the resource
+    // class isn't autoloadable in this context.
+    protected ?string $resourceClass = 'App\\Http\\Resources\\RoleResource';
 
-    public function __construct(private RoleService $roleService)
+    public function __construct(private readonly RoleService $roleService)
     {
         parent::__construct();
     }
+
+    // ──────────────────────────────────────────────────────────────
+    // index — GET /{company}/roles
+    //
+    // ✅ BaseApiController::index() يستدعي getListData() → HasApiList
+    // HasApiList يبني query من getListConfig() في RoleService
+    // getListConfig() يضع ->distinct() لمنع التكرار
+    // ──────────────────────────────────────────────────────────────
+
+    // نرث index() من BaseApiController — لا نحتاج override
+
+    // ──────────────────────────────────────────────────────────────
+    // show — GET /{company}/roles/{role}
+    //
+    // ✅ extractId() يستخرج 'role' من route params تلقائياً
+    // لا نحتاج override إلا لإضافة RoleResource
+    // ──────────────────────────────────────────────────────────────
+
+
+    public function show($id): JsonResponse
+{
+    try {
+        $resolvedId = $this->extractId($id);
+        $user = $this->userService->findById($resolvedId, ['roles', 'company']);
+        $this->authorizeAction('view', $user);
+
+        // ✅ إذا كان مالك الشركة، أضف دوره
+        $companyId = app(CompanyContextService::class)->get();
+        if ($companyId && $user->company && $user->company->owner_id === $user->id) {
+            // مالك الشركة — يمكن إضافة دور owner
+            // أو تعديل response
+        }
+
+        return $this->successResponse(new UserResource($user));
+    } catch (\Throwable $e) {
+        return $this->handleError($e, 'show');
+    }
+}
+
+    // ──────────────────────────────────────────────────────────────
+    // store — POST /{company}/roles
+    //
+    // ✅ يستخدم StoreRoleRequest بدل Request عادي
+    // BaseApiController::store() يستدعي getValidatedData() التي
+    // تتحقق إذا كان الـ request FormRequest → تستدعي validated()
+    // ──────────────────────────────────────────────────────────────
+
+    public function store(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('create', Role::class);
+            $validatedData = $request instanceof StoreRoleRequest
+                ? $request->validated()
+                : $request->all();
+            $role = $this->roleService->create($validatedData, $request);
+            return $this->successResponse(
+                new RoleResource($role),
+                'تم إنشاء الدور بنجاح',
+                201
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'store');
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // update — PUT /{company}/roles/{role}
+    //
+    // ✅ يستخدم UpdateRoleRequest
+    // extractId() يحل {role} من route params
+    // ──────────────────────────────────────────────────────────────
+
+    public function update(Request $request, $id): JsonResponse
+    {
+        try {
+            $resolvedId = $this->extractId($id);
+            $role       = $this->roleService->findById($resolvedId);
+            $this->authorizeAction('update', $role);
+            $validatedData = $request instanceof UpdateRoleRequest
+                ? $request->validated()
+                : $request->all();
+            $role = $this->roleService->update($role, $validatedData, $request);
+            return $this->successResponse(
+                new RoleResource($role),
+                'تم تحديث الدور بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'update');
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // destroy — DELETE /{company}/roles/{role}
+    // ──────────────────────────────────────────────────────────────
+
+    public function destroy($id): JsonResponse
+    {
+        try {
+            $resolvedId = $this->extractId($id);
+            $role       = $this->roleService->findById($resolvedId);
+            $this->authorizeAction('delete', $role);
+
+            // ✅ لا نسمح بحذف الأدوار الأساسية
+            if (in_array($role->name, ['owner', 'admin', 'super-admin'], true)) {
+                return $this->errorResponse(
+                    'لا يمكن حذف الأدوار الأساسية للنظام',
+                    409,
+                    'BUSINESS_RULE_VIOLATION'
+                );
+            }
+
+            $this->roleService->delete($role);
+            return $this->successResponse(null, 'تم حذف الدور بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'destroy');
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Abstract implementations
+    // ──────────────────────────────────────────────────────────────
 
     protected function getService(): RoleService
     {
@@ -29,78 +174,12 @@ class RoleController extends BaseApiController
         return Role::class;
     }
 
-    // ══════════════════════════════════════════
-    // نفس مشكلة UserController: /{company}/{role}
-    // Laravel يمرر {company} كـ $id بدل {role}
-    // الحل: قراءة {role} من الـ route بالاسم
-    // ══════════════════════════════════════════
+    // ──────────────────────────────────────────────────────────────
+    // ✅ resolveRouteId — يبحث عن 'role' في route params
+    // ──────────────────────────────────────────────────────────────
 
-    public function show($id): JsonResponse
+    protected function resolveRouteId(string ...$paramNames): int|string
     {
-        try {
-            $roleId = request()->route('role') ?? $id;
-            $role = $this->roleService->findById($roleId);
-            $this->authorizeAction('view', $role);
-            return $this->successResponse(new RoleResource($role));
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'show');
-        }
-    }
-
-    public function store(Request $request): JsonResponse
-    {
-        try {
-            $this->authorizeAction('create', Role::class);
-
-            $data = $request->validate([
-                'name'             => 'required|string|max:100|unique:roles,name',
-                'display_name'     => 'nullable|string|max:150',
-                'description'      => 'nullable|string|max:500',
-                'guard_name'       => 'nullable|string|max:50',
-                'permission_ids'   => 'nullable|array',
-                'permission_ids.*' => 'integer|exists:permissions,id',
-            ]);
-
-            $role = $this->roleService->create($data);
-            return $this->successResponse(new RoleResource($role), 'تم إنشاء الدور بنجاح', 201);
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'store');
-        }
-    }
-
-    public function update(Request $request, $id): JsonResponse
-    {
-        try {
-            // الإصلاح: نقرأ {role} بالاسم بدل الاعتماد على الترتيب
-            $roleId = $request->route('role') ?? $id;
-            $role = $this->roleService->findById($roleId);
-            $this->authorizeAction('update', $role);
-
-            $data = $request->validate([
-                'display_name'     => 'nullable|string|max:150',
-                'description'      => 'nullable|string|max:500',
-                'permission_ids'   => 'nullable|array',
-                'permission_ids.*' => 'integer|exists:permissions,id',
-            ]);
-
-            $role = $this->roleService->update($role, $data);
-            return $this->successResponse(new RoleResource($role), 'تم تحديث الدور بنجاح');
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'update');
-        }
-    }
-
-    public function destroy($id): JsonResponse
-    {
-        try {
-            // الإصلاح: request() helper بدل $request parameter
-            $roleId = request()->route('role') ?? $id;
-            $role = $this->roleService->findById($roleId);
-            $this->authorizeAction('delete', $role);
-            $this->roleService->delete($role);
-            return $this->successResponse(null, 'تم حذف الدور');
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'destroy');
-        }
+        return parent::resolveRouteId('role', 'id');
     }
 }

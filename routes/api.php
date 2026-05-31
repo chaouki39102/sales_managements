@@ -156,6 +156,8 @@ Route::prefix('v1')->group(function () {
             '/{company}/transfer-ownership',
             fn(Request $request, Company $company) => app(CompanyController::class)->transferOwnership($request, $company)
         );
+
+        Route::get('/users/search', [CompanyController::class, 'searchUsers']);
     });
 
     // ═══════════════════════════════════════════
@@ -437,14 +439,14 @@ Route::prefix('v1')->group(function () {
             Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download']);
 
             // ✅ settings: المسارات المحددة قبل apiResource
- // ① المسارات المحددة أولاً (قبل أي {wildcard})
-Route::get('settings/group/{group}',   [SettingController::class, 'byGroup']);
-Route::get('settings/{key}',           [SettingController::class, 'getValue']);
+            // ① المسارات المحددة أولاً (قبل أي {wildcard})
+            Route::get('settings/group/{group}',   [SettingController::class, 'byGroup']);
+            Route::get('settings/{key}',           [SettingController::class, 'getValue']);
 
-// ② العمليات الجماعية على /settings (بدون ID)
-Route::get('settings',                 [SettingController::class, 'index']);
-Route::patch('settings',               [SettingController::class, 'update']);
-Route::put('settings',                 [SettingController::class, 'update']);
+            // ② العمليات الجماعية على /settings (بدون ID)
+            Route::get('settings',                 [SettingController::class, 'index']);
+            Route::patch('settings',               [SettingController::class, 'update']);
+            Route::put('settings',                 [SettingController::class, 'update']);
             // جلب الملف الشخصي للمستخدم المسجل
             Route::get('/profile',          [UserController::class, 'profile']);
 

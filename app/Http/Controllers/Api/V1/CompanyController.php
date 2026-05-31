@@ -94,11 +94,12 @@ class CompanyController extends BaseApiController
             // بحث نصي
             if ($request->filled('search')) {
                 $s = $request->search;
-                $query->where(fn($q) => $q
-                    ->where('name', 'like', "%{$s}%")
-                    ->orWhere('commercial_name', 'like', "%{$s}%")
-                    ->orWhere('email', 'like', "%{$s}%")
-                    ->orWhere('nif', 'like', "%{$s}%")
+                $query->where(
+                    fn($q) => $q
+                        ->where('name', 'like', "%{$s}%")
+                        ->orWhere('commercial_name', 'like', "%{$s}%")
+                        ->orWhere('email', 'like', "%{$s}%")
+                        ->orWhere('nif', 'like', "%{$s}%")
                 );
             }
 
@@ -290,6 +291,7 @@ class CompanyController extends BaseApiController
             $companyId = $this->context->get();
 
             if (!$companyId) {
+                // ✅ 404 واضح — الـ frontend يعالجه
                 return $this->errorResponse('لا توجد شركة نشطة', 404, 'NO_ACTIVE_COMPANY');
             }
 
@@ -412,10 +414,17 @@ class CompanyController extends BaseApiController
     {
         try {
             $this->authorizeAction('manageMember', $company);
-            return $this->successResponse(
-                $this->companyService->getMembers($company),
-                'أعضاء الشركة'
-            );
+
+            // getMembersBySlug يُرجع array جاهز — لا يمر بـ CompanyResource
+            $members = $this->companyService->getMembersBySlug($company->slug);
+
+            // ✅ successResponse مباشر بدون resource transformation
+            return response()->json([
+                'status'    => 'success',
+                'message'   => 'أعضاء الشركة',
+                'data'      => $members,
+                'timestamp' => now()->toISOString(),
+            ]);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'members');
         }
@@ -496,5 +505,18 @@ class CompanyController extends BaseApiController
         } catch (\Throwable $e) {
             return $this->handleError($e, 'transferOwnership');
         }
+    }
+
+    public function searchUsers(Request $request, $id): JsonResponse
+    {
+        $company = $this->resolveCompany($id);
+        $email   = $request->get('email', '');
+
+        $users = \App\Models\User::where('email', 'like', "%{$email}%")
+            ->orWhere('name', 'like', "%{$email}%")
+            ->limit(10)
+            ->get(['id', 'name', 'email', 'avatar']);
+
+        return $this->rawSuccessResponse($users);
     }
 }
