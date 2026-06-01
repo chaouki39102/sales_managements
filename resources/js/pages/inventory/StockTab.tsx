@@ -1,16 +1,17 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/inventory/StockTab.tsx — تاب "المخزون الحالي"
+// pages/inventory/StockTab.tsx — تحديث ✅
+//
+// تم التصحيح:
+// ❌ قبل: p.current_stock يُحسب من accessor في الـ Backend → N+1 queries
+// ✅ بعد: p.current_stock يأتي مباشرة من query scope → single efficient query
 // ════════════════════════════════════════════════════════════════════════════
+
 import React, { useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
-import {
-  type InventoryProduct,
-  fmt,
-  stockStatus,
-} from './inventoryTypes';
+import type { Product } from '@/lib/api/core/types';
 import { Th } from './InventoryShared';
 
 // ─── ثوابت ───────────────────────────────────────────────────────────────────
@@ -30,6 +31,26 @@ const KPI_DEFS = [
   { key: 'ok'  as Filter, label: 'مخزون جيد',      icon: 'ti-circle-check',   color: '#10b981'   },
 ] as const;
 
+// ────────────────────────────────────────────────────────────────────────────
+
+function stockStatus(p: Product): 'out' | 'low' | 'ok' {
+  // ✅ تم التصحيح: current_stock يأتي مباشرة من الـ Backend
+  const stock = p.current_stock ?? 0;
+  const min = p.min_stock_alert ?? 0;
+  if (stock <= 0) return 'out';
+  if (stock <= min) return 'low';
+  return 'ok';
+}
+
+function fmt(n: number | null | undefined, dec = 2): string {
+  const num = Number(n ?? 0);
+  if (isNaN(num)) return '0';
+  return num.toLocaleString('fr-DZ', {
+    minimumFractionDigits: dec,
+    maximumFractionDigits: dec,
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 
 export default function StockTab() {
@@ -37,12 +58,13 @@ export default function StockTab() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
 
-  // queryKey يستخدم tenantKeys.products.list حتى يتحدث عند invalidate بعد الرصيد الافتتاحي
+  // ✅ يستخدم withCurrentStock scope في Backend — لا N+1 queries!
   const { data, isLoading } = useQuery({
-    queryKey:        tenantKeys.products.list(slug ?? '', { search, manages_stock: 1 }),
-    queryFn:         () => apiGet<InventoryProduct[]>('/products', {
+    queryKey:        tenantKeys.products.list(slug ?? '', { search, manages_stock: 1, status: filter !== 'all' ? filter : undefined }),
+    queryFn:         () => apiGet<Product[]>('/products', {
       search,
       manages_stock: 1,
+      status: filter !== 'all' ? filter : undefined,  // ✅ فلتر حسب حالة المخزون من الـ Backend!
       per_page:      500,
       include:       'family,unit',
     }),
@@ -51,7 +73,7 @@ export default function StockTab() {
     placeholderData: keepPreviousData,
   });
 
-  const all: InventoryProduct[] = data ?? [];
+  const all: Product[] = data ?? [];
 
   // KPI counts — حساب مرة واحدة
   const counts = {
@@ -198,6 +220,7 @@ export default function StockTab() {
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{
                         fontWeight: 700,
+                        // ✅ تم التصحيح: current_stock يأتي مباشرة من الـ Backend
                         color: st === 'out' ? '#ef4444' : 'var(--t1)',
                       }}>
                         {fmt(p.current_stock, 3)}
