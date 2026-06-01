@@ -42,6 +42,7 @@ export interface DraftRow {
   product_id:         number | '';
   warehouse_id:       number | '';
   opening_quantity:   string;
+  unit_price:         string;
   opening_value:      string;
   lot_number:         string;
   manufacturing_date: string;
@@ -92,6 +93,7 @@ export const emptyDraft = (): DraftRow => ({
   product_id:         '',
   warehouse_id:       '',
   opening_quantity:   '',
+  unit_price:         '',
   opening_value:      '',
   lot_number:         '',
   manufacturing_date: '',

@@ -37,9 +37,9 @@ export default function StockTab() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
 
-  // extractData في client.ts يستخرج data.data ويرجع المصفوفة مباشرة
+  // queryKey يستخدم tenantKeys.products.list حتى يتحدث عند invalidate بعد الرصيد الافتتاحي
   const { data, isLoading } = useQuery({
-    queryKey:        tenantKeys.inventory.list(slug ?? '', { search }),
+    queryKey:        tenantKeys.products.list(slug ?? '', { search, manages_stock: 1 }),
     queryFn:         () => apiGet<InventoryProduct[]>('/products', {
       search,
       manages_stock: 1,

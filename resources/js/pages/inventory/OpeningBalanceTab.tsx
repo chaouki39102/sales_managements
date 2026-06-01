@@ -86,7 +86,8 @@ export default function OpeningBalanceTab() {
     if (!slug) return;
     qc.invalidateQueries({ queryKey: obKeys.all(slug) });
     qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
-    qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
+    // إبطال كل products queries (يشمل products.list الذي يستخدمه StockTab)
+    qc.invalidateQueries({ queryKey: [slug, 'products'] });
   }, [qc, slug]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
@@ -118,7 +119,17 @@ export default function OpeningBalanceTab() {
     setDrafts(prev => prev.filter((_, i) => i !== idx));
 
   const updateDraft = (idx: number, field: keyof DraftRow, value: string | number) =>
-    setDrafts(prev => prev.map((d, i) => i === idx ? { ...d, [field]: value } : d));
+    setDrafts(prev => prev.map((d, i) => {
+      if (i !== idx) return d;
+      const updated = { ...d, [field]: value };
+      // حساب تلقائي للقيمة الإجمالية عند تغيير الكمية أو سعر الوحدة
+      if (field === 'opening_quantity' || field === 'unit_price') {
+        const qty   = parseFloat(field === 'opening_quantity' ? String(value) : updated.opening_quantity) || 0;
+        const price = parseFloat(field === 'unit_price'       ? String(value) : updated.unit_price)       || 0;
+        updated.opening_value = qty > 0 && price > 0 ? String(+(qty * price).toFixed(4)) : updated.opening_value;
+      }
+      return updated;
+    }));
 
   // ── حفظ draft واحد ───────────────────────────────────────────────────────
 
@@ -158,6 +169,9 @@ export default function OpeningBalanceTab() {
       product_id:         row.product_id,
       warehouse_id:       row.warehouse_id,
       opening_quantity:   String(row.opening_quantity),
+      unit_price:         Number(row.opening_quantity) > 0
+                            ? String(+(Number(row.opening_value) / Number(row.opening_quantity)).toFixed(4))
+                            : '',
       opening_value:      String(row.opening_value),
       lot_number:         row.lot_number         ?? '',
       manufacturing_date: row.manufacturing_date ?? '',
@@ -279,15 +293,16 @@ export default function OpeningBalanceTab() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{
               width: '100%', borderCollapse: 'collapse',
-              fontSize: 13, minWidth: 900,
+              fontSize: 13, minWidth: 1000,
             }}>
               <thead>
                 <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b1)' }}>
                   <Th width="36px">#</Th>
                   <Th>المنتج</Th>
-                  <Th width="140px">المستودع</Th>
-                  <Th width="130px">الكمية الافتتاحية</Th>
-                  <Th width="130px">القيمة الإجمالية</Th>
+                  <Th width="130px">المستودع</Th>
+                  <Th width="110px">سعر الوحدة</Th>
+                  <Th width="120px">الكمية الافتتاحية</Th>
+                  <Th width="120px">القيمة الإجمالية</Th>
                   <Th width="120px">رقم الدفعة</Th>
                   <Th width="115px">تاريخ الصنع</Th>
                   <Th width="115px">تاريخ الانتهاء</Th>
@@ -299,7 +314,7 @@ export default function OpeningBalanceTab() {
                 {/* ── تحميل ── */}
                 {isLoading && (
                   <tr>
-                    <td colSpan={9} style={{ padding: 50, textAlign: 'center', color: 'var(--t4)' }}>
+                    <td colSpan={10} style={{ padding: 50, textAlign: 'center', color: 'var(--t4)' }}>
                       <i className="ti ti-loader-2" style={{
                         fontSize: 24, animation: 'spin .8s linear infinite',
                       }} />
@@ -346,15 +361,56 @@ export default function OpeningBalanceTab() {
                         {row.warehouse?.name ?? `#${row.warehouse_id}`}
                       </td>
 
+                      {/* سعر الوحدة */}
+                      <td style={{ padding: '8px 12px' }}>
+                        {isEditing ? (
+                          <input
+                            type="number" step="0.0001" min="0"
+                            placeholder="0.00"
+                            value={editDraft.unit_price}
+                            onChange={e => {
+                              const price = e.target.value;
+                              const qty   = parseFloat(editDraft.opening_quantity) || 0;
+                              const p     = parseFloat(price) || 0;
+                              setEditDraft(d => ({
+                                ...d,
+                                unit_price:    price,
+                                opening_value: qty > 0 && p > 0
+                                  ? String(+(qty * p).toFixed(4))
+                                  : d.opening_value,
+                              }));
+                            }}
+                            style={inputStyle(false)}
+                          />
+                        ) : (
+                          <span style={{ color: 'var(--t1)', fontSize: 12 }}>
+                            {Number(row.opening_quantity) > 0
+                              ? fmt(Number(row.opening_value) / Number(row.opening_quantity), 4)
+                              : '—'
+                            }{' '}
+                            <span style={{ fontSize: 10, color: 'var(--t4)' }}>دج</span>
+                          </span>
+                        )}
+                      </td>
+
                       {/* الكمية */}
                       <td style={{ padding: '8px 12px' }}>
                         {isEditing ? (
                           <input
                             type="number" step="0.001" min="0"
                             value={editDraft.opening_quantity}
-                            onChange={e => setEditDraft(d => ({
-                              ...d, opening_quantity: e.target.value,
-                            }))}
+                            onChange={e => {
+                              const qty   = e.target.value;
+                              const price = parseFloat(editDraft.unit_price) || 0;
+                              const q     = parseFloat(qty) || 0;
+                              setEditDraft(d => ({
+                                ...d,
+                                opening_quantity: qty,
+                                opening_value: q > 0 && price > 0
+                                  ? String(+(q * price).toFixed(4))
+                                  : d.opening_value,
+                              }));
+                            }}
                             style={inputStyle(!!errors['eq'])}
                           />
                         ) : (
@@ -541,6 +597,16 @@ export default function OpeningBalanceTab() {
                       </select>
                     </td>
 
+                    {/* سعر الوحدة */}
+                    <td style={{ padding: '8px 12px' }}>
+                      <input
+                        type="number" step="0.0001" min="0" placeholder="0.00"
+                        value={d.unit_price}
+                        onChange={e => updateDraft(idx, 'unit_price', e.target.value)}
+                        style={inputStyle(!!errors[`up_${idx}`])}
+                      />
+                    </td>
+
                     {/* الكمية */}
                     <td style={{ padding: '8px 12px' }}>
                       <input
@@ -551,13 +617,16 @@ export default function OpeningBalanceTab() {
                       />
                     </td>
 
-                    {/* القيمة */}
+                    {/* القيمة — محسوبة تلقائياً */}
                     <td style={{ padding: '8px 12px' }}>
                       <input
-                        type="number" step="0.01" min="0" placeholder="0.00"
+                        type="number" step="0.01" min="0" placeholder="تلقائي"
                         value={d.opening_value}
                         onChange={e => updateDraft(idx, 'opening_value', e.target.value)}
-                        style={inputStyle(!!errors[`v_${idx}`])}
+                        style={{
+                          ...inputStyle(!!errors[`v_${idx}`]),
+                          background: d.opening_value ? 'var(--emb)' : 'var(--bg1)',
+                        }}
                       />
                     </td>
 
@@ -634,7 +703,7 @@ export default function OpeningBalanceTab() {
                 {/* ── فارغ ── */}
                 {!isLoading && rows.length === 0 && drafts.length === 0 && (
                   <tr>
-                    <td colSpan={9} style={{ padding: '50px 20px', textAlign: 'center' }}>
+                    <td colSpan={10} style={{ padding: '50px 20px', textAlign: 'center' }}>
                       <i className="ti ti-flag-2" style={{
                         fontSize: 40, display: 'block',
                         marginBottom: 12, color: 'var(--t4)',
