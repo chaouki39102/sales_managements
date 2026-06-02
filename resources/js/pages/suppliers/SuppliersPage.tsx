@@ -48,7 +48,7 @@ const meta = (data as any)?.meta;
             />
 
             {/* KPIs */}
-            <div className="kpis" style={{ marginBottom: 20 }}>
+            <div className="kpis mb-20">
                 <KpiCard variant="green" icon="ti-users" label="إجمالي الموردين" value={meta?.total ?? '—'} />
                 <KpiCard variant="blue" icon="ti-trending-up" label="إجمالي المشتريات" value={totalBusiness.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
                 <KpiCard variant="red" icon="ti-receipt" label="ديون للموردين" value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} مورد`} />
@@ -56,12 +56,12 @@ const meta = (data as any)?.meta;
             </div>
 
             {/* Search */}
-            <div className="filters" style={{ marginBottom: 16 }}>
-                <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
+            <div className="filters mb-16">
+                <div className="srch flex flex-1" style={{ minWidth: 200 }}>
                     <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
-                    <input type="text" placeholder="ابحث بالاسم، الهاتف، NIF..." style={{ width: '100%' }} onChange={e => setSearch(e.target.value)} />
+                    <input type="text" placeholder="ابحث بالاسم، الهاتف، NIF..." className="w-full" onChange={e => setSearch(e.target.value)} />
                 </div>
-                <select style={{ width: 140 }}>
+                <select className="w-35">
                     <option>كل الأنواع</option>
                     <option>نشط</option>
                     <option>موقوف</option>
@@ -81,12 +81,12 @@ const meta = (data as any)?.meta;
                         const creditUsed = c.credit_limit > 0 ? Math.min(100, ((c.balance ?? 0) / c.credit_limit) * 100) : 0;
 
                         return (
-                            <Card key={c.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(c)}>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
+                            <Card key={c.id} className="cursor-pointer" onClick={() => openEdit(c)}>
+                                <div className="flex items-start gap-12 mb-12">
                                     <Avatar initials={c.name[0]} color={avatarColor} size={42} />
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--t1)', marginBottom: 2 }}>{c.name}</div>
-                                        <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                                    <div className="flex-1" style={{ minWidth: 0 }}>
+                                        <div className="font-extrabold text-lg text-t1 mb-2">{c.name}</div>
+                                        <div className="flex gap-6 mt-4 flex-wrap">
                                             <Badge variant={c.active ? 'success' : 'danger'}>{c.active ? 'نشط' : 'موقوف'}</Badge>
                                             {hasDebt && <Badge variant="danger">دين</Badge>}
                                         </div>
@@ -94,15 +94,15 @@ const meta = (data as any)?.meta;
                                 </div>
 
                                 {(c.phone || c.nif) && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--t3)' }}>
-                                        {c.phone && <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><i className="ti ti-phone" style={{ fontSize: 13, color: 'var(--t4)' }}/><span>{c.phone}</span></div>}
-                                        {c.nif && <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><i className="ti ti-file-certificate" style={{ fontSize: 13, color: 'var(--t4)' }}/><span style={{ fontFamily: 'monospace', fontSize: 11 }}>NIF: {c.nif}</span></div>}
+                                    <div className="flex flex-col gap-4 text-sm text-t3">
+                                        {c.phone && <div className="flex items-center gap-6"><i className="ti ti-phone" style={{ fontSize: 13, color: 'var(--t4)' }}/><span>{c.phone}</span></div>}
+                                        {c.nif && <div className="flex items-center gap-6"><i className="ti ti-file-certificate" style={{ fontSize: 13, color: 'var(--t4)' }}/><span style={{ fontFamily: 'monospace', fontSize: 11 }}>NIF: {c.nif}</span></div>}
                                     </div>
                                 )}
 
                                 {c.credit_limit > 0 && (
-                                    <div style={{ marginTop: 10 }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--t4)', marginBottom: 3 }}>
+                                    <div className="mt-10">
+                                        <div className="flex justify-between text-xs text-t4 mb-3">
                                             <span>حد الائتمان</span>
                                             <span>{creditUsed.toFixed(0)}%</span>
                                         </div>
@@ -110,7 +110,7 @@ const meta = (data as any)?.meta;
                                     </div>
                                 )}
 
-                                <div style={{ display: 'flex', gap: 6, marginTop: 10 }} onClick={e => e.stopPropagation()}>
+                                <div className="flex gap-6 mt-10" onClick={e => e.stopPropagation()}>
                                     <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(c)}>تعديل</Button>
                                     <Button size="xs" icon={<i className="ti ti-file-invoice"/>}>فواتيره</Button>
                                     {hasDebt && <Button size="xs" variant="danger" icon={<i className="ti ti-cash"/>}>تسوية</Button>}

@@ -146,13 +146,8 @@ export function FiscalYearSelector() {
 
   if (isLoading) {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '4px 12px', borderRadius: 20,
-        background: 'var(--bg3)', border: '1px solid var(--b2)',
-        fontSize: 12, color: 'var(--t4)',
-      }}>
-        <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite', fontSize: 13 }} />
+      <div className="flex items-center gap-6 px-12 py-4 rounded-full bg-3 border border-b2 text-sm text-t4">
+        <i className="ti ti-loader-2 animate-spin-slow text-base" />
         تحميل...
       </div>
     );
@@ -161,53 +156,43 @@ export function FiscalYearSelector() {
   if (!selectedYear && years.length === 0) return null;
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} className="relative">
       <button
         onClick={() => setIsOpen(v => !v)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '5px 12px', borderRadius: 20,
-          background: 'var(--bg3)', border: '1px solid var(--b2)',
-          cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
-          transition: 'all .15s',
-        }}
+        className="flex items-center gap-6 px-12 py-5 rounded-full bg-3 border border-b2 cursor-pointer transition"
+        style={{ fontFamily: 'Tajawal, sans-serif' }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--em)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--b2)')}
       >
         <i
-          className={`ti ${selectedYear?.is_closed ? 'ti-lock' : 'ti-calendar-check'}`}
-          style={{ color: selectedYear?.is_closed ? 'var(--t4)' : 'var(--em)', fontSize: 13 }}
+          className={`ti ${selectedYear?.is_closed ? 'ti-lock' : 'ti-calendar-check'} text-base`}
+          style={{ color: selectedYear?.is_closed ? 'var(--t4)' : 'var(--em)' }}
         />
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--t1)' }}>
+        <span className="text-sm font-semibold text-t1">
           {selectedYear?.name ?? 'اختر سنة'}
         </span>
         {selectedYear?.is_current && (
           <i className="ti ti-star-filled" style={{ color: 'var(--gold)', fontSize: 9 }} />
         )}
-        <i className={`ti ti-chevron-${isOpen ? 'up' : 'down'}`}
-           style={{ fontSize: 11, color: 'var(--t4)' }} />
+        <i className={`ti ti-chevron-${isOpen ? 'up' : 'down'} text-sm text-t4`} />
       </button>
 
       {isOpen && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0,
-          minWidth: 200, background: 'var(--bg2)',
-          border: '1px solid var(--b2)', borderRadius: 12,
-          boxShadow: '0 8px 24px rgba(0,0,0,.2)',
-          zIndex: 1000, overflow: 'hidden', direction: 'rtl',
-        }}>
+        <div className="absolute top-0 left-0 mt-6 min-w-52 bg-2 border border-b2 rounded-lg shadow-md z-1000 overflow-hidden" style={{ direction: 'rtl' }}>
           {open.length > 0 && (
             <>
-              <div style={{
-                padding: '6px 12px', fontSize: 9.5, fontWeight: 800,
-                color: 'var(--em)', textTransform: 'uppercase', letterSpacing: .5,
-                background: 'var(--bg3)',
-              }}>مفتوحة</div>
+              <div className="px-12 py-6 text-xs font-extrabold text-em uppercase tracking-widest bg-3">
+                مفتوحة
+              </div>
               {open.map(year => (
                 <YearOption
-                  key={year.id} year={year}
+                  key={year.id}
+                  year={year}
                   selected={selectedYear?.id === year.id}
-                  onClick={() => { setSelectedYear(year); setIsOpen(false); }}
+                  onClick={() => {
+                    setSelectedYear(year);
+                    setIsOpen(false);
+                  }}
                 />
               ))}
             </>
@@ -215,41 +200,37 @@ export function FiscalYearSelector() {
 
           {closed.length > 0 && (
             <>
-              <div style={{
-                padding: '6px 12px', fontSize: 9.5, fontWeight: 800,
-                color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: .5,
-                borderTop: open.length ? '1px solid var(--b1)' : 'none',
-                background: 'var(--bg3)',
-              }}>مقفلة</div>
+              <div className={`px-12 py-6 text-xs font-extrabold text-t4 uppercase tracking-widest bg-3 ${
+                open.length ? 'border-t border-b1' : ''
+              }`}>
+                مقفلة
+              </div>
               {closed.slice(0, 3).map(year => (
                 <YearOption
-                  key={year.id} year={year}
+                  key={year.id}
+                  year={year}
                   selected={selectedYear?.id === year.id}
-                  onClick={() => { setSelectedYear(year); setIsOpen(false); }}
+                  onClick={() => {
+                    setSelectedYear(year);
+                    setIsOpen(false);
+                  }}
                 />
               ))}
               {closed.length > 3 && (
-                <div style={{ padding: '6px 12px', fontSize: 11, color: 'var(--t4)', fontStyle: 'italic' }}>
+                <div className="px-12 py-6 text-sm text-t4 italic">
                   + {closed.length - 3} سنوات أخرى...
                 </div>
               )}
             </>
           )}
 
-          <div style={{ borderTop: '1px solid var(--b1)' }}>
+          <div className="border-t border-b1">
             <a
               href="/fiscalyears"
               onClick={() => setIsOpen(false)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '8px 12px', fontSize: 12,
-                color: 'var(--em)', fontWeight: 600,
-                textDecoration: 'none', transition: 'background .1s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg3)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              className="flex items-center gap-6 px-12 py-8 text-sm text-em font-semibold no-underline transition hover:bg-3"
             >
-              <i className="ti ti-settings" style={{ fontSize: 13 }} />
+              <i className="ti ti-settings text-base" />
               إدارة السنوات المالية
             </a>
           </div>
@@ -260,40 +241,40 @@ export function FiscalYearSelector() {
 }
 
 function YearOption({
-  year, selected, onClick,
+  year,
+  selected,
+  onClick,
 }: {
-  year: FiscalYear; selected: boolean; onClick: () => void;
+  year: FiscalYear;
+  selected: boolean;
+  onClick: () => void;
 }) {
   return (
     <div
       onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 14px', cursor: 'pointer',
-        background: selected ? 'var(--emb)' : 'transparent',
-        transition: 'background .1s',
-      }}
-      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'; }}
-      onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+      className={`flex items-center justify-between px-14 py-8 cursor-pointer transition ${
+        selected ? 'bg-emb' : 'hover:bg-3'
+      }`}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="flex items-center gap-8">
         <i
-          className={`ti ${year.is_closed ? 'ti-lock' : year.is_current ? 'ti-star-filled' : 'ti-calendar'}`}
+          className={`ti ${
+            year.is_closed ? 'ti-lock' : year.is_current ? 'ti-star-filled' : 'ti-calendar'
+          } text-base`}
           style={{
-            fontSize: 13,
             color: year.is_closed ? 'var(--t4)' : year.is_current ? 'var(--gold)' : 'var(--em)',
           }}
         />
         <div>
-          <div style={{ fontSize: 13, fontWeight: selected ? 700 : 500, color: selected ? 'var(--em)' : 'var(--t1)' }}>
+          <div className={`text-base ${selected ? 'font-bold text-em' : 'font-medium text-t1'}`}>
             {year.name}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--t4)' }}>
+          <div className="text-xs text-t4">
             {year.start_date?.split('-')[0]} — {year.end_date?.split('-')[0]}
           </div>
         </div>
       </div>
-      {selected && <i className="ti ti-check" style={{ color: 'var(--em)', fontSize: 14 }} />}
+      {selected && <i className="ti ti-check text-em text-lg" />}
     </div>
   );
 }

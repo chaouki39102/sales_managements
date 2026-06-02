@@ -113,7 +113,7 @@ export default function ClientsPage() {
       />
 
       {/* بطاقات الأداء */}
-      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
+      <div className="kpis mb-20">
         <KpiCard variant="green" icon="ti-users" label="إجمالي العملاء" value={meta?.total ?? clients.length} />
         <KpiCard variant="blue" icon="ti-trending-up" label="إجمالي المشتريات" value={totalBusiness.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
         <KpiCard variant="red" icon="ti-receipt" label="ديون العملاء" value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} زبون متأخر`} />
@@ -121,13 +121,13 @@ export default function ClientsPage() {
       </div>
 
       {/* فلاتر البحث والحالة */}
-      <div className="filters" style={{ marginBottom: 16 }}>
-        <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
+      <div className="filters mb-16">
+        <div className="srch flex flex-1" style={{ minWidth: 200 }}>
           <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
           <input
             type="text"
             placeholder="ابحث بالاسم، الهاتف، NIF..."
-            style={{ width: '100%' }}
+            className="w-full"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -135,7 +135,7 @@ export default function ClientsPage() {
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value as any)}
-          style={{ width: 160 }}
+          className="w-40"
         >
           <option value="all">جميع الحالات</option>
           <option value="active">نشط فقط</option>
@@ -152,7 +152,7 @@ export default function ClientsPage() {
           action={<Button variant="primary" onClick={openCreate}>زبون جديد</Button>}
         />
       ) : (
-        <Card noHeader style={{ padding: 0 }}>
+        <Card noHeader className="p-0">
           <div className="tw">
             <table className="table">
               <thead>
@@ -178,23 +178,23 @@ export default function ClientsPage() {
                     <tr key={c.id}>
                       <td>{((currentPage - 1) * (meta?.per_page || 10) + idx + 1)}</td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div className="flex items-center gap-8">
                           <Avatar
                             initials={c.name?.[0] || '?'}
                             color={avatarColor}
                             size={32}
                           />
                           <div>
-                            <div className="s" style={{ fontWeight: 600 }}>{c.name || 'بدون اسم'}</div>
+                            <div className="s font-semibold">{c.name || 'بدون اسم'}</div>
                             {c.commercial_name && (
-                              <div style={{ fontSize: 11, color: 'var(--t4)' }}>{c.commercial_name}</div>
+                              <div className="text-xs text-t4">{c.commercial_name}</div>
                             )}
                           </div>
                         </div>
                        </td>
                       <td className="m">{c.phone || '—'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--t4)' }}>{location}</td>
-                      <td className="m" style={{ fontSize: 11 }}>{c.nif || '—'}</td>
+                      <td className="text-sm text-t4">{location}</td>
+                      <td className="m text-xs">{c.nif || '—'}</td>
                       <td className={hasDebt ? 'text-danger' : ''}>
                         {c.balance?.toLocaleString()} دج
                       </td>
@@ -222,11 +222,11 @@ export default function ClientsPage() {
 
       {/* Pagination */}
       {meta && meta.last_page > 1 && (
-        <div className="pagination" style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
+        <div className="pagination flex justify-center gap-8 mt-20">
           <Button size="sm" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
             السابق
           </Button>
-          <span style={{ padding: '6px 12px', background: 'var(--bg3)', borderRadius: 6 }}>
+          <span className="px-12 py-6 bg-3 rounded-sm">
             صفحة {currentPage} من {meta.last_page}
           </span>
           <Button size="sm" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === meta.last_page}>
