@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\CommercialDocument;
 use App\Models\CommercialDocumentLine;
 use App\Models\StockMovement;
 use App\Observers\CommercialDocumentLineObserver;
+use App\Observers\CommercialDocumentObserver;
 use App\Observers\StockMovementObserver;
 use Illuminate\Support\ServiceProvider;
 
@@ -26,5 +28,6 @@ class EventServiceProvider extends ServiceProvider
         // parent::boot();
         StockMovement::observe(StockMovementObserver::class);
         CommercialDocumentLine::observe(CommercialDocumentLineObserver::class);
+        CommercialDocument::observe(CommercialDocumentObserver::class);
     }
 }

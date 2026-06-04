@@ -51,6 +51,11 @@ class StockMovementObserver
     {
         try {
             DB::transaction(function () use ($movement) {
+                // ✅ نتأكد من تحميل الـ relationship قبل الاستخدام
+                $movement->loadMissing('stockMovementType', 'product');
+
+                if (!$movement->stockMovementType) return;
+
                 // 1. تحديث PMP لحركات الإدخال
                 if ($movement->stockMovementType->direction > 0) {
                     $this->valuationService->updateCostAfterPurchase($movement);

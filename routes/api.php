@@ -33,6 +33,8 @@ use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\BarcodeController;
 use App\Http\Controllers\Api\V1\CompanySeedController;
 use App\Http\Controllers\Api\V1\ProductVariantController;
+use App\Http\Controllers\Api\V1\InventoryController;
+
 
 // Tenant Lookup Controllers
 use App\Http\Controllers\Api\V1\FamilyController;
@@ -273,6 +275,9 @@ Route::prefix('v1')->group(function () {
             Route::get('stock-movements/outgoing',   [StockMovementController::class, 'outgoing']);
             Route::get('stock-movements',            [StockMovementController::class, 'index']);
             Route::get('stock-movements/{movement}', [StockMovementController::class, 'show']);
+
+            // ✅ inventory: المسارات المحددة قبل المورد
+            Route::get('inventory/stock-at', [InventoryController::class, 'stockAt']);
 
             // ✅ fiscal-years: المسارات المحددة قبل المورد
             Route::get('fiscal-years/current', [FiscalYearController::class, 'current']);

@@ -1,54 +1,58 @@
 <?php
+// app/Observers/CommercialDocumentLineObserver.php
 
 namespace App\Observers;
 
 use App\Models\CommercialDocumentLine;
-use Illuminate\Support\Facades\Log;
 
+/**
+ * CommercialDocumentLineObserver
+ *
+ * المسؤولية: حساب إجماليات السطر عند التعديل المباشر
+ *
+ * ✅ يعمل بشكل صحيح عند: PATCH/PUT على سطر منفرد
+ *
+ * ⚠️ لماذا لا يكفي عند الإنشاء؟
+ *    Eloquent::isDirty() يُرجع false عند create() الجديد
+ *    لأنه يقارن بالقيم الأصلية — والنموذج الجديد ليس له قيم أصلية
+ *    لذا CommercialDocumentService::createDocumentLines() تحسب
+ *    الإجماليات مباشرة في data قبل create()
+ *
+ * ✅ لا تعارض: إذا أرسل Service قيماً محسوبة، يُرجع isDirty() false
+ *    لأن القيم الجديدة = القيم المُرسَلة → لا إعادة حساب غير ضرورية
+ */
 class CommercialDocumentLineObserver
 {
-    /**
-     * قبل الحفظ: حساب المجاميع تلقائياً
-     */
     public function saving(CommercialDocumentLine $line): void
     {
-        // لا تحسب إذا لم تتغير القيم الأساسية (لتجنب الحساب غير الضروري)
-        if (!$line->isDirty(['quantity', 'unit_price_ht', 'discount_percentage', 'tva_rate'])) {
+        // عند الإنشاء ($line->exists = false):
+        //   isDirty() يُرجع false دائماً → لكننا نحسب لضمان الصحة
+        //   في حالة استدعاء create() مباشرة بدون Service
+        //
+        // عند التحديث ($line->exists = true):
+        //   نحسب فقط إذا تغيرت القيم الأساسية — تحسين للأداء
+        if ($line->exists && !$line->isDirty(['quantity', 'unit_price_ht', 'discount_percentage', 'tva_rate'])) {
             return;
         }
 
         $this->calculateLineTotals($line);
     }
 
-    /**
-     * حساب جميع حقول المجاميع للسطر
-     */
-    protected function calculateLineTotals(CommercialDocumentLine $line): void
+    private function calculateLineTotals(CommercialDocumentLine $line): void
     {
-        $quantity = $line->quantity ?? 0;
-        $unitPrice = $line->unit_price_ht ?? 0;
-        $discountPercentage = $line->discount_percentage ?? 0;
-        $tvaRate = $line->tva_rate ?? 0;
+        $qty     = (float) ($line->quantity            ?? 0);
+        $price   = (float) ($line->unit_price_ht       ?? 0);
+        $discPct = (float) ($line->discount_percentage ?? 0);
+        $tvaRate = (float) ($line->tva_rate            ?? 0);
 
-        // 1. الإجمالي قبل الخصم
-        $totalHt = $quantity * $unitPrice;
+        $gross          = $qty * $price;
+        $discountAmount = $gross * ($discPct / 100);
+        $ht             = $gross - $discountAmount;
+        $tva            = $ht * ($tvaRate / 100);
 
-        // 2. مبلغ الخصم
-        $discountAmount = $totalHt * ($discountPercentage / 100);
-
-        // 3. بعد الخصم
-        $afterDiscount = $totalHt - $discountAmount;
-
-        // 4. TVA
-        $totalTva = $afterDiscount * ($tvaRate / 100);
-
-        // 5. TTC
-        $totalTtc = $afterDiscount + $totalTva;
-
-        // تعيين القيم
-        $line->total_ht = round($totalHt, 4);
+        $line->total_ht        = round($ht,             4);
         $line->discount_amount = round($discountAmount, 4);
-        $line->total_tva = round($totalTva, 4);
-        $line->total_ttc = round($totalTtc, 4);
+        $line->total_tva       = round($tva,             4);
+        $line->total_ttc       = round($ht + $tva,       4);
     }
 }

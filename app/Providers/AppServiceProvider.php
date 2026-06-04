@@ -74,6 +74,6 @@ class AppServiceProvider extends ServiceProvider
 
         // ✅ CommercialDocumentObserver لم يكن مسجّلاً في أي Provider
         // EventServiceProvider يسجّل LineObserver وStockMovementObserver فقط
-        CommercialDocument::observe(CommercialDocumentObserver::class);
+        // CommercialDocument::observe(CommercialDocumentObserver::class);
     }
 }

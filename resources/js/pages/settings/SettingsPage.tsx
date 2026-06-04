@@ -167,54 +167,19 @@ class SettingsErrorBoundary extends React.Component<
     render() {
         if (this.state.hasError)
             return (
-                <div
-                    style={{
-                        padding: "40px 20px",
-                        textAlign: "center",
-                        color: "var(--t4)",
-                    }}
-                >
-                    <i
-                        className="ti ti-alert-triangle"
-                        style={{
-                            fontSize: 36,
-                            color: "var(--red)",
-                            display: "block",
-                            marginBottom: 12,
-                        }}
-                    />
-                    <div
-                        style={{
-                            fontWeight: 700,
-                            fontSize: 14,
-                            color: "var(--t1)",
-                            marginBottom: 6,
-                        }}
-                    >
+                <div className="p-10 text-center text-t4">
+                    <i className="ti ti-alert-triangle block text-5xl text-red mb-3" />
+                    <div className="font-bold text-lg text-t1 mb-2">
                         خطأ في تحميل إعدادات "{this.props.tabLabel}"
                     </div>
-                    <div
-                        style={{
-                            fontSize: 12,
-                            color: "var(--t4)",
-                            marginBottom: 16,
-                        }}
-                    >
+                    <div className="text-md text-t4 mb-4">
                         {this.state.error}
                     </div>
                     <button
                         onClick={() =>
                             this.setState({ hasError: false, error: "" })
                         }
-                        style={{
-                            padding: "8px 20px",
-                            borderRadius: 8,
-                            border: "1px solid var(--b2)",
-                            background: "var(--bg3)",
-                            cursor: "pointer",
-                            fontFamily: "Tajawal, sans-serif",
-                            fontSize: 13,
-                        }}
+                        className="px-5 py-2 rounded border border-b2 bg-3 cursor-pointer font-sans text-base hover:border-em transition"
                     >
                         إعادة المحاولة
                     </button>
@@ -237,17 +202,8 @@ function SettingsLastModified({ group }: { group: string }) {
 
     if (!last?.updated_at) return null;
     return (
-        <div
-            style={{
-                fontSize: 10.5,
-                color: "var(--t4)",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                marginTop: 2,
-            }}
-        >
-            <i className="ti ti-clock" style={{ fontSize: 11 }} />
+        <div className="flex items-center gap-1 mt-1 text-xs text-t4">
+            <i className="ti ti-clock text-9" />
             آخر تعديل: {new Date(last.updated_at).toLocaleDateString("fr-DZ")}
         </div>
     );
@@ -436,21 +392,7 @@ function SettingsSearch({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
                     setOpen(true);
                     setTimeout(() => inputRef.current?.focus(), 50);
                 }}
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "7px 14px",
-                    borderRadius: 20,
-                    border: "1px solid var(--b2)",
-                    background: "var(--bg3)",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    color: "var(--t4)",
-                    fontFamily: "Tajawal, sans-serif",
-                    transition: ".15s",
-                    minWidth: 200,
-                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-b2 bg-3 cursor-pointer text-md text-t4 font-sans transition min-w-52 hover:border-em"
                 onMouseEnter={(e) =>
                     (e.currentTarget.style.borderColor = "var(--em)")
                 }
@@ -458,34 +400,16 @@ function SettingsSearch({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
                     (e.currentTarget.style.borderColor = "var(--b2)")
                 }
             >
-                <i className="ti ti-search" style={{ fontSize: 13 }} />
+                <i className="ti ti-search text-base" />
                 <span>ابحث في الإعدادات...</span>
-                <span
-                    style={{
-                        marginRight: "auto",
-                        fontSize: 10,
-                        padding: "1px 5px",
-                        borderRadius: 4,
-                        border: "1px solid var(--b2)",
-                        background: "var(--bg2)",
-                    }}
-                >
+                <span className="ml-auto text-8 px-1.5 py-0.5 rounded-sm border border-b2 bg-2">
                     ⌘K
                 </span>
             </button>
 
             {open && (
                 <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        background: "rgba(0,0,0,.5)",
-                        zIndex: 3000,
-                        display: "flex",
-                        alignItems: "flex-start",
-                        justifyContent: "center",
-                        paddingTop: "10vh",
-                    }}
+                    className="fixed inset-0 flex items-start justify-center bg-black/50 z-50 pt-40"
                     onClick={(e) => {
                         if (e.target === e.currentTarget) {
                             setOpen(false);
@@ -493,17 +417,7 @@ function SettingsSearch({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
                         }
                     }}
                 >
-                    <div
-                        style={{
-                            background: "var(--bg2)",
-                            borderRadius: 16,
-                            width: 520,
-                            maxWidth: "90vw",
-                            boxShadow: "0 24px 60px rgba(0,0,0,.4)",
-                            border: "1px solid var(--b2)",
-                            overflow: "hidden",
-                        }}
-                    >
+                    <div className="bg-2 rounded-2xl w-520 max-w-90vw shadow-lg border border-b2 overflow-hidden">
                         <div
                             style={{
                                 display: "flex",

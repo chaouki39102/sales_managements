@@ -184,6 +184,13 @@
 
 .min-h-92vh { min-height: 92vh; }
 
+.min-w-0 { min-width: 0; }
+.max-w-full { max-width: 100%; }
+.max-w-360 { max-width: 360px; }
+.max-w-420 { max-width: 420px; }
+.max-w-580 { max-width: 580px; }
+.max-w-700 { max-width: 700px; }
+
 /* ════════════════════════════════════════
    BORDER RADIUS
 ════════════════════════════════════════ */
@@ -240,6 +247,8 @@
 ════════════════════════════════════════ */
 
 /* Font sizes */
+.text-8 { font-size: 8px; }
+.text-9 { font-size: 9px; }
 .text-xs { font-size: 10px; }
 .text-sm { font-size: 11px; }
 .text-md { font-size: 12px; }
@@ -247,7 +256,9 @@
 .text-lg { font-size: 14px; }
 .text-xl { font-size: 15px; }
 .text-2xl { font-size: 18px; }
+.text-22 { font-size: 22px; }
 .text-3xl { font-size: 23px; }
+.text-25 { font-size: 25px; }
 .text-4xl { font-size: 28px; }
 .text-5xl { font-size: 36px; }
 
@@ -258,6 +269,8 @@
 .font-bold { font-weight: 700; }
 .font-extrabold { font-weight: 800; }
 .font-black { font-weight: 900; }
+.font-mono { font-family: monospace; }
+.font-sans { font-family: "Tajawal", sans-serif; }
 
 /* Font styles */
 .italic { font-style: italic; }
@@ -284,6 +297,11 @@
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 .text-justify { text-align: justify; }
+
+/* Text decoration */
+.line-through { text-decoration: line-through; }
+.no-underline { text-decoration: none; }
+.underline { text-decoration: underline; }
 
 /* White space */
 .whitespace-nowrap { white-space: nowrap; }
@@ -373,6 +391,20 @@
 .cursor-pointer { cursor: pointer; }
 .cursor-not-allowed { cursor: not-allowed; }
 .cursor-text { cursor: text; }
+
+/* ════════════════════════════════════════
+   POINTER EVENTS
+════════════════════════════════════════ */
+
+.pointer-events-none { pointer-events: none; }
+.pointer-events-auto { pointer-events: auto; }
+
+/* ════════════════════════════════════════
+   BACKDROP FILTER
+════════════════════════════════════════ */
+
+.backdrop-blur { backdrop-filter: blur(6px); }
+.backdrop-blur-none { backdrop-filter: none; }
 
 /* ════════════════════════════════════════
    USER SELECT
@@ -528,6 +560,19 @@
 .icon-box-lg { width: 40px; height: 40px; border-radius: 12px; font-size: 18px; }
 .icon-box-xl { width: 48px; height: 48px; border-radius: 14px; font-size: 22px; }
 
+/* ── Icon (inline) ── */
+.ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ic-xs { width: 16px; height: 16px; font-size: 14px; }
+.ic-sm { width: 20px; height: 20px; font-size: 18px; }
+.ic-md { width: 24px; height: 24px; font-size: 22px; }
+.ic-lg { width: 32px; height: 32px; font-size: 28px; }
+
 /* ── Form helpers ── */
 .form-label {
   display: block;
@@ -556,6 +601,12 @@
 /* ════════════════════════════════════════
    CUSTOM ANIMATIONS
 ════════════════════════════════════════ */
+
+/* Object fit */
+.object-contain { object-fit: contain; }
+.object-cover { object-fit: cover; }
+.object-fill { object-fit: fill; }
+.object-scale { object-fit: scale-down; }
 
 @keyframes ovIn {
   from { opacity: 0; backdrop-filter: blur(0px); }

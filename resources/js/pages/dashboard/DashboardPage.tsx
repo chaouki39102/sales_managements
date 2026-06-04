@@ -87,28 +87,23 @@ function BarChart() {
               style={{ height: `${m.v}%` }}
             >
               <span
-                className="bc-v"
-                style={m.hi ? { color: 'var(--gold)' } : {}}
+                className={`bc-v ${m.hi ? 'text-gold' : ''}`}
               >
                 {m.val}
               </span>
             </div>
             <div
-              className="bc-lbl"
-              style={m.hi ? { color: 'var(--gold)', fontWeight: 800 } : {}}
+              className={`bc-lbl ${m.hi ? 'text-gold font-extrabold' : ''}`}
             >
               {m.lbl}
             </div>
           </div>
         ))}
       </div>
-      <div style={{
-        display:'flex', justifyContent:'space-between', marginTop:12,
-        padding:'9px 12px', background:'var(--bg3)', borderRadius:'var(--r2)',
-      }}>
-        <span style={{fontSize:'11.5px',color:'var(--t4)'}}>أدنى <strong style={{color:'var(--t2)'}}>210K</strong></span>
-        <span style={{fontSize:'11.5px',color:'var(--t4)'}}>متوسط <strong style={{color:'var(--t2)'}}>313K</strong></span>
-        <span style={{fontSize:'11.5px',color:'var(--t4)'}}>أعلى <strong style={{color:'var(--gold)'}}>524K دج</strong></span>
+      <div className="flex justify-between mt-3 px-3 py-2 bg-3 rounded-md">
+        <span className="text-sm text-t4">أدنى <strong className="text-t2">210K</strong></span>
+        <span className="text-sm text-t4">متوسط <strong className="text-t2">313K</strong></span>
+        <span className="text-sm text-t4">أعلى <strong className="text-gold">524K دج</strong></span>
       </div>
     </>
   );
@@ -135,16 +130,16 @@ export default function DashboardPage() {
       <AlertBar variant="green">
         <strong>تنبيهات اليوم:</strong>{' '}
         5 منتجات بمخزون منخفض — 3 فواتير معلقة — دين مستحق لفاطمة بن علي منذ 5 أيام.{' '}
-        <a onClick={() => navigate('/dashboard/inventory')} style={{cursor:'pointer',fontWeight:800,textDecoration:'underline',marginRight:4}}>
+        <a onClick={() => navigate('/dashboard/inventory')} className="cursor-pointer font-extrabold underline" style={{marginRight:4}}>
           معالجة المخزون ←
         </a>
-        <a onClick={() => navigate('/dashboard/debts')} style={{cursor:'pointer',fontWeight:800,textDecoration:'underline'}}>
+        <a onClick={() => navigate('/dashboard/debts')} className="cursor-pointer font-extrabold underline">
           تتبع الديون ←
         </a>
       </AlertBar>
 
       {/* ── Mobile quick actions ── */}
-      <div className="dash-quick" style={{gap:8,marginBottom:14,overflowX:'auto',paddingBottom:2}}>
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
         <Button variant="primary" size="sm" icon={<i className="ti ti-file-plus"/>}>فاتورة</Button>
         <Button size="sm" icon={<i className="ti ti-shopping-bag"/>} onClick={() => navigate('/pos')}>بيع</Button>
         <Button size="sm" icon={<i className="ti ti-package"/>} onClick={() => navigate('/dashboard/inventory')}>مخزون</Button>
@@ -181,7 +176,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── KPI Row 2 ── */}
-      <div className="kpis" style={{ marginBottom: 20 }}>
+      <div className="kpis mb-5">
         <KpiCard
           variant="purple" icon="ti-trending-up"
           label="مبيعات الشهر" value="1,248,400" unit="دج"
@@ -189,7 +184,7 @@ export default function DashboardPage() {
           sub={
             <>
               هدف: 1,500,000 دج
-              <div style={{ marginTop: 5 }}>
+              <div className="mt-1">
                 <ProgressBar value={83} />
               </div>
             </>
@@ -217,7 +212,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Charts Row ── */}
-      <div className="g65" style={{ marginBottom: 18 }}>
+      <div className="g65 mb-5">
 
         {/* Bar Chart */}
         <Card
@@ -232,11 +227,11 @@ export default function DashboardPage() {
           actions={
             <>
               <Button size="xs" onClick={() => setChartMode('monthly')}
-                style={chartMode === 'monthly' ? {background:'var(--emb)',borderColor:'var(--embo)',color:'var(--em)'} : {}}>
+                className={chartMode === 'monthly' ? 'bg-emb border-embo text-em' : ''}>
                 شهري
               </Button>
               <Button size="xs" onClick={() => setChartMode('weekly')}
-                style={chartMode === 'weekly' ? {background:'var(--emb)',borderColor:'var(--embo)',color:'var(--em)'} : {}}>
+                className={chartMode === 'weekly' ? 'bg-emb border-embo text-em' : ''}>
                 أسبوعي
               </Button>
             </>
@@ -246,7 +241,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Side column */}
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <div className="flex flex-col gap-4">
 
           {/* Donut */}
           <Card
@@ -266,7 +261,7 @@ export default function DashboardPage() {
                 {DONUT_LEGEND.map(({ color, label, pct }) => (
                   <div className="d-item" key={label}>
                     <div className="d-dot" style={{ background: color }} />
-                    <span style={{ color:'var(--t3)', flex:1 }}>{label}</span>
+                    <span className="text-t3 flex-1">{label}</span>
                     <strong>{pct}</strong>
                   </div>
                 ))}
@@ -293,12 +288,12 @@ export default function DashboardPage() {
             ].map(({ name, val, n, c }) => (
               <div className="sr" key={name}>
                 <div>
-                  <div style={{fontSize:'12.5px',fontWeight:700,color:'var(--t1)',marginBottom:4}}>
+                  <div className="text-sm font-bold text-t1 mb-1">
                     {name}
                   </div>
                   <ProgressBar value={val} color={c} height={4} />
                 </div>
-                <span style={{fontSize:'11.5px',color:'var(--t4)',minWidth:72,textAlign:'left'}}>{n}</span>
+                <span className="text-xs text-t4" style={{minWidth:72,textAlign:'left'}}>{n}</span>
               </div>
             ))}
           </Card>
@@ -342,21 +337,19 @@ export default function DashboardPage() {
                   <tr key={inv.id}>
                     <td className="m">{inv.id}</td>
                     <td>
-                      <div style={{display:'flex',alignItems:'center',gap:7}}>
+                      <div className="flex items-center gap-2">
                         <Avatar initials={inv.clientInitial} color={inv.avatarColor} size={26} />
-                        <span className="s"
-                          style={inv.status === 'cancelled' ? {textDecoration:'line-through',color:'var(--t4)'} : {}}>
+                        <span className={`s ${inv.status === 'cancelled' ? 'line-through text-t4' : ''}`}>
                           {inv.client}
                         </span>
                       </div>
                     </td>
-                    <td className={inv.status === 'cancelled' ? 'r' : 'e'}
-                      style={inv.status === 'cancelled' ? {textDecoration:'line-through'} : {}}>
+                    <td className={inv.status === 'cancelled' ? 'r line-through' : 'e'}>
                       {inv.amount}
                     </td>
-                    <td className="m" style={{color:'var(--t4)'}}>{inv.tva}</td>
+                    <td className="m text-t4">{inv.tva}</td>
                     <td>{statusBadge(inv.status)}</td>
-                    <td style={{fontSize:'11.5px',color:'var(--t4)'}}>{inv.date}</td>
+                    <td className="text-xs text-t4">{inv.date}</td>
                     <td>
                       <button className="btn btn-xs">
                         <span className="ic ic-xs">
@@ -372,7 +365,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Right column */}
-        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div className="flex flex-col gap-4">
 
           {/* Stock alerts */}
           <Card
@@ -389,16 +382,15 @@ export default function DashboardPage() {
           >
             {STOCK_ALERTS.map(({ name, qty, level, status }) => (
               <div className="sr" key={name}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:'12.5px',fontWeight:700,color:'var(--t1)'}}>{name}</div>
-                  <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+                <div className="flex-1">
+                  <div className="text-sm font-bold text-t1">{name}</div>
+                  <div className="flex items-center gap-2 mt-1">
                     <ProgressBar
                       value={level}
                       color={status === 'out' ? 'var(--red)' : 'var(--gold)'}
                       height={4}
                     />
-                    <span style={{
-                      fontSize:'10.5px',
+                    <span className="text-xs flex-shrink-0" style={{
                       color: status === 'out' ? 'var(--red)' : 'var(--gold)',
                       minWidth:44,
                     }}>
@@ -414,7 +406,7 @@ export default function DashboardPage() {
             <Button
               variant="danger" size="sm" fullWidth
               icon={<i className="ti ti-arrow-left"/>}
-              style={{marginTop:10}}
+              className="mt-2"
               onClick={() => navigate('/dashboard/inventory')}
             >
               إدارة المخزون
@@ -453,31 +445,30 @@ export default function DashboardPage() {
             }}
             noHeader
           >
-            <div style={{fontSize:12,fontWeight:700,color:'var(--em)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+            <div className="text-sm font-bold text-em mb-2 flex items-center gap-2">
               <i className="ti ti-landmark"/> TVA مستحقة — أفريل 2024
             </div>
             <div className="sr">
               <div className="sr-l">TVA محصّلة</div>
-              <div className="sr-v" style={{color:'var(--gold)'}}>237,196 دج</div>
+              <div className="sr-v text-gold">237,196 دج</div>
             </div>
             <div className="sr">
               <div className="sr-l">TVA مستردة</div>
-              <div className="sr-v" style={{color:'var(--blue)'}}>− 46,588 دج</div>
+              <div className="sr-v text-blue">− 46,588 دج</div>
             </div>
-            <div className="sr" style={{borderTop:'1px solid var(--embo)',paddingTop:8,marginTop:4}}>
-              <div className="sr-l" style={{fontWeight:800,color:'var(--red)'}}>المستحق للدولة</div>
-              <div className="sr-v" style={{color:'var(--red)',fontSize:16}}>190,608 دج</div>
+            <div className="sr border-t border-embo pt-2 mt-1">
+              <div className="sr-l font-extrabold text-red">المستحق للدولة</div>
+              <div className="sr-v text-red" style={{fontSize:16}}>190,608 دج</div>
             </div>
-            <div style={{
-              fontSize:'10.5px',color:'var(--em)',marginTop:8,
-              padding:'6px 10px',background:'rgba(10,138,92,.08)',borderRadius:6,
+            <div className="text-xs text-em mt-2 px-2 py-1 rounded" style={{
+              background:'rgba(10,138,92,.08)',
             }}>
               ⏰ الاستحقاق: 20 ماي 2024 — G50
             </div>
             <Button
               variant="primary" size="sm" fullWidth
               icon={<i className="ti ti-calculator"/>}
-              style={{marginTop:10}}
+              className="mt-2"
               onClick={() => navigate('/dashboard/tva')}
             >
               إقرار G50

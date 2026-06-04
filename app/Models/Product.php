@@ -18,22 +18,47 @@ use App\Models\Traits\HasTenantSlug;
 #[Cacheable]
 class Product extends Model
 {
-    use HasCompany, HasStandardizedConfiguration, SoftDeletes,
-        Auditable, HasTenantSlug, HasTenantRouteBinding;
+    use HasCompany,
+        HasStandardizedConfiguration,
+        SoftDeletes,
+        Auditable,
+        HasTenantSlug,
+        HasTenantRouteBinding;
 
     protected $table = 'products';
 
     protected $fillable = [
         'company_id',
-        'name', 'slug', 'ref', 'barcode', 'description',
-        'family_id', 'brand_id', 'product_type_id',
-        'tva_id', 'unit_id',
-        'purchase_price_ht', 'current_cost_price',
-        'manages_stock', 'allow_negative_stock', 'has_lots', 'has_expiration_date',
-        'min_stock_alert', 'max_stock_alert', 'manages_quantity_discounts',
+        'name',
+        'slug',
+        'ref',
+        'barcode',
+        'description',
+        'family_id',
+        'brand_id',
+        'product_type_id',
+        'tva_id',
+        'unit_id',
+        'purchase_price_ht',
+        'current_cost_price',
+        'manages_stock',
+        'allow_negative_stock',
+        'has_lots',
+        'has_expiration_date',
+        'min_stock_alert',
+        'max_stock_alert',
+        'manages_quantity_discounts',
         'valuation_method_id',
-        'weight', 'volume', 'length', 'width', 'height',
-        'specifications', 'images', 'meta_title', 'meta_description', 'meta_keywords',
+        'weight',
+        'volume',
+        'length',
+        'width',
+        'height',
+        'specifications',
+        'images',
+        'meta_title',
+        'meta_description',
+        'meta_keywords',
         'active',
     ];
 
@@ -61,19 +86,42 @@ class Product extends Model
         'deleted_at' => 'datetime',
     ];
 
-    protected $appends = ['current_stock', 'is_low_stock'];
+    protected $appends = ['is_low_stock'];
 
     public static array $searchableFields = ['name', 'ref', 'barcode', 'description'];
     public static array $filterable = [
-        'family_id', 'brand_id', 'product_type_id', 'tva_id', 'unit_id', 'valuation_method_id',
-        'manages_stock', 'has_lots', 'has_expiration_date', 'manages_quantity_discounts', 'active'
+        'family_id',
+        'brand_id',
+        'product_type_id',
+        'tva_id',
+        'unit_id',
+        'valuation_method_id',
+        'manages_stock',
+        'has_lots',
+        'has_expiration_date',
+        'manages_quantity_discounts',
+        'active'
     ];
     public static array $sortable = ['id', 'name', 'ref', 'purchase_price_ht', 'created_at', 'updated_at'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = [
-        'family', 'brand', 'productType', 'tva', 'unit', 'valuationMethod',
-        'packagings', 'prices', 'prices.priceLevel', 'quantityDiscounts', 'quantityDiscounts.priceLevel',
-        'stockMovements', 'lots', 'documentLines', 'openingBalances', 'barcodes', 'primaryBarcode'
+        'family',
+        'brand',
+        'productType',
+        'tva',
+        'unit',
+        'valuationMethod',
+        'packagings',
+        'prices',
+        'prices.priceLevel',
+        'quantityDiscounts',
+        'quantityDiscounts.priceLevel',
+        'stockMovements',
+        'lots',
+        'documentLines',
+        'openingBalances',
+        'barcodes',
+        'primaryBarcode'
     ];
     public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
@@ -86,30 +134,89 @@ class Product extends Model
     // Relations
     // app/Models/Product.php — أضف هذه الدالة
 
-    public function family(): BelongsTo { return $this->belongsTo(Family::class); }
-    public function brand(): BelongsTo { return $this->belongsTo(Brand::class); }
-    public function variants() { return $this->hasMany(ProductVariant::class); }
-    public function productType(): BelongsTo { return $this->belongsTo(ProductType::class); }
-    public function tva(): BelongsTo { return $this->belongsTo(Tva::class); }
-    public function unit(): BelongsTo { return $this->belongsTo(Unit::class); }
-    public function valuationMethod(): BelongsTo { return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id'); }
-    public function barcodes(): HasMany { return $this->hasMany(Barcode::class); }
-    public function primaryBarcode(): HasOne { return $this->hasOne(Barcode::class)->where('is_primary', true); }
-    public function packagings(): HasMany { return $this->hasMany(ProductPackaging::class)->orderBy('display_order'); }
-    public function prices(): HasMany { return $this->hasMany(ProductPrice::class); }
-    public function quantityDiscounts(): HasMany { return $this->hasMany(QuantityDiscount::class)->orderBy('price_level_id')->orderBy('tier_order'); }
-    public function stockMovements(): HasMany { return $this->hasMany(StockMovement::class); }
-    public function lots(): HasMany { return $this->hasMany(ProductLot::class); }
-    public function documentLines(): HasMany { return $this->hasMany(CommercialDocumentLine::class); }
-    public function openingBalances(): HasMany { return $this->hasMany(OpeningBalanceStock::class); }
+    public function family(): BelongsTo
+    {
+        return $this->belongsTo(Family::class);
+    }
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class);
+    }
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+    public function productType(): BelongsTo
+    {
+        return $this->belongsTo(ProductType::class);
+    }
+    public function tva(): BelongsTo
+    {
+        return $this->belongsTo(Tva::class);
+    }
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class);
+    }
+    public function valuationMethod(): BelongsTo
+    {
+        return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id');
+    }
+    public function barcodes(): HasMany
+    {
+        return $this->hasMany(Barcode::class);
+    }
+    public function primaryBarcode(): HasOne
+    {
+        return $this->hasOne(Barcode::class)->where('is_primary', true);
+    }
+    public function packagings(): HasMany
+    {
+        return $this->hasMany(ProductPackaging::class)->orderBy('display_order');
+    }
+    public function prices(): HasMany
+    {
+        return $this->hasMany(ProductPrice::class);
+    }
+    public function quantityDiscounts(): HasMany
+    {
+        return $this->hasMany(QuantityDiscount::class)->orderBy('price_level_id')->orderBy('tier_order');
+    }
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
+    }
+    public function lots(): HasMany
+    {
+        return $this->hasMany(ProductLot::class);
+    }
+    public function documentLines(): HasMany
+    {
+        return $this->hasMany(CommercialDocumentLine::class);
+    }
+    public function openingBalances(): HasMany
+    {
+        return $this->hasMany(OpeningBalanceStock::class);
+    }
 
     // Scopes
-    public function scopeByFamily(Builder $q, int $familyId): Builder { return $q->where('family_id', $familyId); }
-    public function scopeByBrand(Builder $q, int $brandId): Builder { return $q->where('brand_id', $brandId); }
-    public function scopeManagesStock(Builder $q): Builder { return $q->where('manages_stock', true); }
+    public function scopeByFamily(Builder $q, int $familyId): Builder
+    {
+        return $q->where('family_id', $familyId);
+    }
+    public function scopeByBrand(Builder $q, int $brandId): Builder
+    {
+        return $q->where('brand_id', $brandId);
+    }
+    public function scopeManagesStock(Builder $q): Builder
+    {
+        return $q->where('manages_stock', true);
+    }
     public function scopeLowStock(Builder $q): Builder
     {
-        return $q->whereColumn('min_stock_alert', '>=',
+        return $q->whereColumn(
+            'min_stock_alert',
+            '>=',
             StockMovement::selectRaw('COALESCE(stock_balance_after, 0)')
                 ->whereColumn('product_id', 'products.id')
                 ->latest('movement_date')->latest('id')->limit(1)
@@ -117,14 +224,12 @@ class Product extends Model
     }
 
     // Accessors
-    public function getCurrentStockAttribute(): float
-    {
-        return (float) ($this->stockMovements()->latest('movement_date')->latest('id')->value('stock_balance_after') ?? 0);
-    }
+
     public function getIsLowStockAttribute(): bool
     {
         if (!$this->manages_stock) return false;
-        return $this->current_stock <= (float) $this->min_stock_alert;
+        return (float) ($this->attributes['current_stock'] ?? 0)
+            <= (float) $this->min_stock_alert;
     }
 
     // Business Logic
@@ -188,7 +293,8 @@ class Product extends Model
             ->where('movement_date', '<=', $date)
             ->orderBy('movement_date')
             ->get();
-        $totalValue = 0; $totalQuantity = 0;
+        $totalValue = 0;
+        $totalQuantity = 0;
         foreach ($movements as $mov) {
             $direction = $mov->stockMovementType->direction;
             $quantity = $direction * $mov->quantity;
@@ -204,6 +310,4 @@ class Product extends Model
         }
         return $totalQuantity > 0 ? round($totalValue / $totalQuantity, 4) : 0;
     }
-
-
 }

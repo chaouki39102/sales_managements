@@ -18,6 +18,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api/core/client';
+import { buildClasses } from '@/hooks/useStyles';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -177,49 +178,42 @@ function buildPayload(form: ProductForm) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const s = {
-  field:   { display: 'flex', flexDirection: 'column' as const, gap: 4 },
-  label:   { fontSize: 11, fontWeight: 600, color: 'var(--t3)', letterSpacing: '0.03em', textTransform: 'uppercase' as const },
-  inp: (err?: boolean): React.CSSProperties => ({
-    padding: '8px 10px', borderRadius: 'var(--r2)',
-    border: `1px solid ${err ? 'var(--red)' : 'var(--b3)'}`,
-    background: 'var(--bg2)', color: 'var(--t1)', fontSize: 13,
-    outline: 'none', fontFamily: 'Tajawal, inherit',
-    transition: 'border-color .15s, box-shadow .15s',
-    boxSizing: 'border-box' as const, width: '100%',
+  field: 'flex flex-col gap-1',
+  label: 'text-sm font-semibold text-t3 uppercase tracking-widest',
+  inp: (err?: boolean) => buildClasses('px-10 py-2 rounded-md border bg-2 text-base text-t1 font-sans outline-none transition-all', {
+    'border-red': err,
+    'border-b3': !err,
   }),
-  sel: (err?: boolean): React.CSSProperties => ({
-    padding: '8px 10px', borderRadius: 'var(--r2)',
-    border: `1px solid ${err ? 'var(--red)' : 'var(--b3)'}`,
-    background: 'var(--bg2)', color: 'var(--t1)', fontSize: 13,
-    outline: 'none', fontFamily: 'Tajawal, inherit',
-    boxSizing: 'border-box' as const, width: '100%', cursor: 'pointer',
+  sel: (err?: boolean) => buildClasses('px-10 py-2 rounded-md border bg-2 text-base text-t1 font-sans outline-none cursor-pointer transition-all', {
+    'border-red': err,
+    'border-b3': !err,
   }),
-  row2:    { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
-  row3:    { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 },
-  section: { display: 'flex', flexDirection: 'column' as const, gap: 14 },
-  divider: { height: 1, background: 'var(--b2)', margin: '4px 0' },
-  hint:    { fontSize: 11, color: 'var(--t4)', marginTop: 2 },
-  errText: { fontSize: 11, color: 'var(--red)', marginTop: 2 },
+  row2: 'grid grid-cols-2 gap-3',
+  row3: 'grid grid-cols-3 gap-3',
+  section: 'flex flex-col gap-14',
+  divider: 'h-px bg-b2 my-1',
+  hint: 'text-xs text-t4 mt-1',
+  errText: 'text-xs text-red mt-1',
 };
 
 function Field({ label, error, children, hint, col }: { label: string; error?: string; children: React.ReactNode; hint?: string; col?: number }) {
   return (
-    <div style={{ ...s.field, gridColumn: col ? `span ${col}` : undefined }}>
-      <label style={s.label}>{label}</label>
+    <div className={buildClasses(s.field, { [`col-span-${col}`]: !!col })}>
+      <label className={s.label}>{label}</label>
       {children}
-      {hint  && <span style={s.hint}>{hint}</span>}
-      {error && <span style={s.errText}>{error}</span>}
+      {hint  && <span className={s.hint}>{hint}</span>}
+      {error && <span className={s.errText}>{error}</span>}
     </div>
   );
 }
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
-      <div onClick={() => onChange(!checked)} style={{ width: 36, height: 20, borderRadius: 10, position: 'relative', background: checked ? 'var(--em)' : 'var(--b3)', transition: 'background .2s', flexShrink: 0, cursor: 'pointer' }}>
-        <div style={{ position: 'absolute', top: 3, left: checked ? 19 : 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <div onClick={() => onChange(!checked)} className="flex-shrink-0 w-36 h-20 rounded-full transition-colors cursor-pointer" style={{ background: checked ? 'var(--em)' : 'var(--b3)' }}>
+        <div className="absolute top-3 w-14 h-14 rounded-full bg-white transition-all" style={{ left: checked ? '19px' : '3px' }} />
       </div>
-      {label && <span style={{ fontSize: 13, color: 'var(--t2)' }}>{label}</span>}
+      {label && <span className="text-base text-t2">{label}</span>}
     </label>
   );
 }
@@ -423,10 +417,10 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
 
   function renderBasic() {
     return (
-      <div style={s.section}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
+      <div className={s.section}>
+        <div className="grid grid-cols-auto gap-3 items-end">
           <Field label="اسم المنتج *" error={errors.name}>
-            <input ref={nameRef} style={s.inp(!!errors.name)} value={form.name}
+            <input ref={nameRef} className={s.inp(!!errors.name)} value={form.name}
               onChange={e => set('name', e.target.value)}
               onBlur={() => validateField('name')}
               placeholder="مثال: حليب نصف دسم 1 لتر" />
@@ -434,37 +428,37 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           <Toggle checked={form.active} onChange={v => set('active', v)} label="نشط" />
         </div>
 
-        <div style={s.row2}>
+        <div className={s.row2}>
           <Field label="المرجع (SKU)" hint="مرجع داخلي فريد">
-            <input style={s.inp()} value={form.ref} onChange={e => set('ref', e.target.value)} placeholder="EX-001" />
+            <input className={s.inp()} value={form.ref} onChange={e => set('ref', e.target.value)} placeholder="EX-001" />
           </Field>
           <Field label="الباركود">
-            <input style={s.inp()} value={form.barcode} onChange={e => set('barcode', e.target.value)} placeholder="6121234567890" />
+            <input className={s.inp()} value={form.barcode} onChange={e => set('barcode', e.target.value)} placeholder="6121234567890" />
           </Field>
         </div>
 
         <Field label="الوصف">
-          <textarea style={{ ...s.inp(), resize: 'vertical', minHeight: 72 }} value={form.description}
+          <textarea className={buildClasses(s.inp(), 'resize-vertical')} style={{ minHeight: '72px' }} value={form.description}
             onChange={e => set('description', e.target.value)} placeholder="وصف مختصر للمنتج..." />
         </Field>
 
-        <div style={s.divider} />
+        <div className={s.divider} />
 
-        <div style={s.row3}>
+        <div className={s.row3}>
           <Field label="التصنيف">
-            <select style={s.sel()} value={form.family_id ?? ''} onChange={e => set('family_id', e.target.value ? Number(e.target.value) : null)}>
+            <select className={s.sel()} value={form.family_id ?? ''} onChange={e => set('family_id', e.target.value ? Number(e.target.value) : null)}>
               <option value="">— لا يوجد —</option>
               {(families as Family[]).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </Field>
           <Field label="العلامة التجارية">
-            <select style={s.sel()} value={form.brand_id ?? ''} onChange={e => set('brand_id', e.target.value ? Number(e.target.value) : null)}>
+            <select className={s.sel()} value={form.brand_id ?? ''} onChange={e => set('brand_id', e.target.value ? Number(e.target.value) : null)}>
               <option value="">— لا يوجد —</option>
               {(brands as Brand[]).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </Field>
           <Field label="نوع المنتج">
-            <select style={s.sel()} value={form.product_type_id ?? ''} onChange={e => {
+            <select className={s.sel()} value={form.product_type_id ?? ''} onChange={e => {
               const id = e.target.value ? Number(e.target.value) : null;
               const pt = (productTypes as ProductType[]).find(t => t.id === id);
               setForm(f => ({ ...f, product_type_id: id, manages_stock: pt?.manages_stock ?? f.manages_stock }));
@@ -476,21 +470,21 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           </Field>
         </div>
 
-        <div style={s.row3}>
+        <div className={s.row3}>
           <Field label="معدل TVA" error={errors.tva_id}>
-            <select style={s.sel()} value={form.tva_id ?? ''} onChange={e => set('tva_id', e.target.value ? Number(e.target.value) : null)}>
+            <select className={s.sel()} value={form.tva_id ?? ''} onChange={e => set('tva_id', e.target.value ? Number(e.target.value) : null)}>
               <option value="">— اختر —</option>
               {(tvaRates as TvaRate[]).map(t => <option key={t.id} value={t.id}>{t.rate}%{t.is_default ? ' (افتراضي)' : ''}</option>)}
             </select>
           </Field>
           <Field label="وحدة القياس">
-            <select style={s.sel()} value={form.unit_id ?? ''} onChange={e => set('unit_id', e.target.value ? Number(e.target.value) : null)}>
+            <select className={s.sel()} value={form.unit_id ?? ''} onChange={e => set('unit_id', e.target.value ? Number(e.target.value) : null)}>
               <option value="">— اختر —</option>
               {(units as Unit[]).map(u => <option key={u.id} value={u.id}>{u.name} ({u.symbol})</option>)}
             </select>
           </Field>
           <Field label="سعر الشراء HT *" error={errors.purchase_price_ht} hint="يُستخدم أساساً لحساب الأسعار">
-            <input type="number" min="0" step="0.01" style={s.inp(!!errors.purchase_price_ht)}
+            <input type="number" min="0" step="0.01" className={s.inp(!!errors.purchase_price_ht)}
               value={form.purchase_price_ht}
               onChange={e => set('purchase_price_ht', e.target.value === '' ? '' : +e.target.value)}
               onBlur={() => validateField('purchase_price_ht')}
@@ -504,29 +498,29 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   function renderPricing() {
     const lvls = priceLevels as PriceLevel[];
     if (!lvls.length) return (
-      <div style={{ textAlign: 'center', padding: 56, color: 'var(--t4)' }}>
-        <i className="ti ti-tag" style={{ fontSize: 36, opacity: 0.3 }} />
-        <div style={{ marginTop: 10, fontSize: 13 }}>لا توجد مستويات أسعار معرفة</div>
-        <div style={{ fontSize: 11, marginTop: 4 }}>أضف مستويات الأسعار من الإعدادات أولاً</div>
+      <div className="text-center py-56 text-t4">
+        <i className="ti ti-tag text-5xl opacity-30" />
+        <div className="mt-10 text-base">لا توجد مستويات أسعار معرفة</div>
+        <div className="text-sm mt-1">أضف مستويات الأسعار من الإعدادات أولاً</div>
       </div>
     );
 
     const purchasePrice = Number(form.purchase_price_ht) || 0;
     return (
-      <div style={s.section}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+      <div className={s.section}>
+        <div className="grid grid-cols-3 gap-2">
           {PRICING_METHODS.map(m => (
-            <div key={m.value} style={{ padding: '10px 12px', borderRadius: 'var(--r2)', border: '1px solid var(--b2)', background: 'var(--bg3)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <i className={`ti ${m.icon}`} style={{ fontSize: 16, color: 'var(--em)', marginTop: 2 }} />
+            <div key={m.value} className="px-3 py-10 rounded-md border border-b2 bg-3 flex items-start gap-2">
+              <i className={`ti ${m.icon} text-base text-em mt-1 flex-shrink-0`} />
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>{m.label}</div>
-                <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 2 }}>{m.hint}</div>
+                <div className="text-md font-bold text-t2">{m.label}</div>
+                <div className="text-xs text-t4 mt-1">{m.hint}</div>
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="flex flex-col gap-1">
           {lvls.map(pl => {
             const pr = form.prices.find(p => p.price_level_id === pl.id) ?? { price_level_id: pl.id, pricing_method: 'fixed' as const, price: '', rate: '', margin: '', active: true };
             const method = pr.pricing_method;
@@ -536,15 +530,15 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
             if (method === 'margin' && pr.margin !== '' && pr.margin !== null) preview = purchasePrice + Number(pr.margin);
 
             return (
-              <div key={pl.id} style={{ display: 'grid', gridTemplateColumns: '140px 1fr 1fr 60px auto', gap: 10, alignItems: 'center', padding: '10px 14px', borderRadius: 'var(--r2)', border: `1px solid ${pr.active ? 'var(--b2)' : 'var(--b1)'}`, background: pr.active ? 'var(--bg2)' : 'var(--bg3)', opacity: pr.active ? 1 : 0.55, transition: 'opacity .15s' }}>
+              <div key={pl.id} className="grid gap-10 items-center px-14 py-10 rounded-md border transition-opacity" style={{ gridTemplateColumns: '140px 1fr 1fr 60px auto', opacity: pr.active ? 1 : 0.55, borderColor: pr.active ? 'var(--b2)' : 'var(--b1)', background: pr.active ? 'var(--bg2)' : 'var(--bg3)' }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{pl.name}</div>
-                  {preview > 0 && <div style={{ fontSize: 11, color: 'var(--em)', marginTop: 2, fontWeight: 600 }}>≈ {fmtDZD(preview)}</div>}
+                  <div className="text-base font-bold text-t1">{pl.name}</div>
+                  {preview > 0 && <div className="text-sm text-em mt-1 font-semibold">≈ {fmtDZD(preview)}</div>}
                 </div>
-                <select style={{ ...s.sel(), fontSize: 12 }} value={method} onChange={e => updatePrice(pl.id, 'pricing_method', e.target.value as any)}>
+                <select className={buildClasses(s.sel(), 'text-sm')} value={method} onChange={e => updatePrice(pl.id, 'pricing_method', e.target.value as any)}>
                   {PRICING_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
-                <input type="number" min="0" step="0.01" style={{ ...s.inp(), fontSize: 12 }}
+                <input type="number" min="0" step="0.01" className={buildClasses(s.inp(), 'text-sm')}
                   value={method === 'fixed' ? (pr.price ?? '') : method === 'rate' ? (pr.rate ?? '') : (pr.margin ?? '')}
                   onChange={e => {
                     const k = method === 'fixed' ? 'price' : method === 'rate' ? 'rate' : 'margin';
@@ -554,7 +548,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
                     if (method === 'margin') { updatePrice(pl.id, 'price', ''); updatePrice(pl.id, 'rate', ''); }
                   }}
                   placeholder={method === 'rate' ? '% فوق الشراء' : method === 'margin' ? 'هامش دج' : 'سعر دج'} />
-                <div style={{ fontSize: 11, color: 'var(--t4)', textAlign: 'center' }}>{method === 'rate' ? '%' : 'دج'}</div>
+                <div className="text-xs text-t4 text-center">{method === 'rate' ? '%' : 'دج'}</div>
                 <Toggle checked={pr.active} onChange={v => updatePrice(pl.id, 'active', v)} label="" />
               </div>
             );
