@@ -16,8 +16,7 @@ class RangeFilter implements Filter
      * @param mixed $value
      * @param string $property
      */
-    public function __invoke(Builder $query, $value, string $property)
-    {
+public function __invoke(Builder $query, mixed $value, string $property): void    {
         // إذا كانت القيمة نصية نفصلها بفاصلة
         if (is_string($value)) {
             $value = explode(',', $value);

@@ -35,8 +35,41 @@ class CommercialDocumentController extends BaseApiController
         parent::__construct();
     }
 
+    /**
+     * عرض قائمة الوثائق التجارية باستخدام الإعدادات والفلاتر المتقدمة.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            // 1. التحقق من صلاحيات العرض المجمع (Multi-Tenancy & RBAC Safe)
+            $this->authorizeAction('viewAny', $this->getModelClass());
 
-   
+            // 2. جلب مصفوفة الفلاتر المخصصة
+            $customConfig = $this->getListConfig();
+
+            // 3. استدعاء خدمة القوائم المركزية عبر الـ Trait لجلب البيانات (تُرجع LengthAwarePaginator)
+            $paginatedData = $this->apiListWithConfig($this->getModelClass(), $customConfig, $request);
+
+            // 4. الـ Trait قد يرجع JsonResponse في حالات خاصة (مثل التصدير للاكسيل)، نتحقق من ذلك:
+            if ($paginatedData instanceof JsonResponse) {
+                return $paginatedData;
+            }
+
+            // 5. تمرير الـ Paginator إلى successResponse لتوحيد الهيكل وتطبيق الـ Resource
+            return $this->successResponse(
+                $paginatedData,
+                'تم جلب قائمة الوثائق التجارية بنجاح'
+            );
+
+        } catch (\Throwable $e) {
+            // معالجة الخطأ عبر الميكانيزم الموحد للكلاس الأب
+            return $this->handleError($e, 'index');
+        }
+    }
+
     /**
      * Get unpaid documents
      */
@@ -163,81 +196,39 @@ class CommercialDocumentController extends BaseApiController
     }
 
     /**
-     * ✅ إعدادات الجلب — فلاتر + فرز كاملة متوافقة مع DataTable v7
+     * ✅ إعدادات الجلب — فلاتر + فرز كاملة متوافقة مع DataTable v7 و RangeFilter القياسي
      */
     protected function getListConfig(): array
     {
         return array_merge(parent::getListConfig(), [
             'allowed_filters' => [
-                // ─ بحث نصي شامل
-                AllowedFilter::partial('search', null)->ignore([null, '']),
+                'document_type_id',
+                'party_id',
+                'warehouse_id',
+                'fiscal_year_id',
+                'currency_id',
+                'document_status_id',
+                'is_locked',
+                'is_proforma',
+                'is_exported_to_accounting',
+                'search',
 
-                // ─ فلاتر أساسية
-                AllowedFilter::exact('document_type_id'),
-                AllowedFilter::exact('fiscal_year_id'),
+                // 1. الفلترة عبر اسم حالة المستند (علاقة DocumentStatus)
+                AllowedFilter::exact('document_status.name', 'documentStatus.name'),
 
-                // ─ الحالة (عبر العلاقة)
-                AllowedFilter::callback('document_status.name', function ($query, $value) {
-                    $query->whereHas('documentStatus', fn ($q) => $q->where('name', $value));
-                }),
-
-                // ─ المستودع (بحث نصي)
-                AllowedFilter::callback('warehouse.name', function ($query, $value) {
-                    $query->whereHas('warehouse', fn ($q) => $q->where('name', 'like', "%{$value}%"));
-                }),
-
-                // ─ تاريخ المستند (range)
-                AllowedFilter::callback('document_date', function ($query, $value) {
-                    if (is_array($value)) {
-                        if (!empty($value['gte'])) $query->whereDate('document_date', '>=', $value['gte']);
-                        if (!empty($value['lte'])) $query->whereDate('document_date', '<=', $value['lte']);
-                    }
-                }),
-
-                // ─ تاريخ الاستحقاق (range)
-                AllowedFilter::callback('due_date', function ($query, $value) {
-                    if (is_array($value)) {
-                        if (!empty($value['gte'])) $query->whereDate('due_date', '>=', $value['gte']);
-                        if (!empty($value['lte'])) $query->whereDate('due_date', '<=', $value['lte']);
-                    }
-                }),
-
-                // ─ الإجماليات (range)
-                AllowedFilter::callback('total_ht', function ($query, $value) {
-                    if (is_array($value)) {
-                        if (!empty($value['gte'])) $query->where('total_ht', '>=', $value['gte']);
-                        if (!empty($value['lte'])) $query->where('total_ht', '<=', $value['lte']);
-                    }
-                }),
-                AllowedFilter::callback('total_tva', function ($query, $value) {
-                    if (is_array($value)) {
-                        if (!empty($value['gte'])) $query->where('total_tva', '>=', $value['gte']);
-                        if (!empty($value['lte'])) $query->where('total_tva', '<=', $value['lte']);
-                    }
-                }),
-                AllowedFilter::callback('total_ttc', function ($query, $value) {
-                    if (is_array($value)) {
-                        if (!empty($value['gte'])) $query->where('total_ttc', '>=', $value['gte']);
-                        if (!empty($value['lte'])) $query->where('total_ttc', '<=', $value['lte']);
-                    }
-                }),
-                AllowedFilter::callback('net_to_pay', function ($query, $value) {
-                    if (is_array($value)) {
-                        if (!empty($value['gte'])) $query->where('net_to_pay', '>=', $value['gte']);
-                        if (!empty($value['lte'])) $query->where('net_to_pay', '<=', $value['lte']);
-                    }
-                }),
+                // 2. إصلاح تمرير الحقل لـ RangeFilter لضمان بناء استعلام SQL سليم ومطابق للـ Core
+                AllowedFilter::custom('total_ht', new RangeFilter('total_ht')),
+                AllowedFilter::custom('total_ttc', new RangeFilter('total_ttc')), // تم إضافته لدعم كود الواجهة بالكامل
+                AllowedFilter::custom('document_date', new RangeFilter('document_date')),
             ],
 
             'allowed_sorts' => [
-                AllowedSort::field('document_number'),
-                AllowedSort::field('document_date'),
-                AllowedSort::field('total_ht'),
-                AllowedSort::field('total_tva'),
-                AllowedSort::field('total_ttc'),
-                AllowedSort::field('net_to_pay'),
-                AllowedSort::field('due_date'),
-                // ─ فرز عبر العلاقات
+                'document_number',
+                'document_date',
+                'total_ht',
+                'total_ttc',
+
+                // الترتيب الديناميكي عبر العلاقات باستخدام Left Joins لضمان كفاءة قواعد البيانات والـ Pagination
                 AllowedSort::callback('party.name', function ($query, bool $descending) {
                     $query->leftJoin('parties', 'commercial_documents.party_id', '=', 'parties.id')
                           ->orderBy('parties.name', $descending ? 'desc' : 'asc');
