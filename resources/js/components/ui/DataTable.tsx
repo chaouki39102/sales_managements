@@ -1,16 +1,11 @@
 // ════════════════════════════════════════════════════════════════════════════
-// components/ui/DataTable.tsx  —  v7.1 (Improved)
+// components/ui/DataTable.tsx  —  v7.2
 //
-// ✅ التحسينات عن v7.0:
-//    - إصلاح مقارنة التواريخ باستخدام Date objects
-//    - تحسين buildPageNumbers للحالات الحدودية
-//    - إصلاح alignToCSS لـ RTL
-//    - تحسين autoFocus في EditInput
-//    - إصلاح إغلاق FilterPopup بدون setTimeout
-//    - إزالة isIndex واستخدام showIndex فقط
-//    - إضافة fallback لـ color-mix للمتصفحات القديمة
-//    - تحسين clearAllFilters
-//    - إصلاحات متنوعة في الأنواع والأداء
+// ✅ التعديلات عن v7.1:
+//    - getRawValue: دعم dot-notation keys ("party.name") بدون accessor
+//      مهم لأعمدة مثل: key:"party.name", key:"warehouse.name",
+//      key:"document_status.name" التي يجب أن تطابق مفاتيح الباكاند
+//    - لا تعديلات أخرى — v7.1 صحيح في كل النواحي الأخرى
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, {
@@ -27,8 +22,9 @@ export type FilterDef =
   | { type: 'text' }
   | { type: 'number' }
   | { type: 'date' }
-  | { type: 'select';      options: readonly { value: string; label: string }[] }
-  | { type: 'multiselect'; options: readonly { value: string; label: string }[] };
+  | { type: 'select';             options: readonly { value: string; label: string }[] }
+  | { type: 'multiselect';        options: readonly { value: string; label: string }[] }
+  | { type: 'dynamic-multiselect'; labelFormatter?: (value: string) => string };
 
 export type RangeFilter    = { min: string; max: string };
 export type AggregateType  = 'sum' | 'avg' | 'min' | 'max' | 'count';
@@ -122,6 +118,12 @@ export interface DataTableProps<T = Record<string, unknown>> {
   exportName?:      string;
   onRowClick?:      (row: T) => void;
   rowClassName?:    (row: T) => string | undefined;
+  /**
+   * allData — البيانات الكاملة لبناء dynamic-multiselect options
+   * في Server-side mode: مرر البيانات الكاملة غير المُصفَّحة هنا
+   * إذا لم تُمرَّر: يستخدم data (الصفحة الحالية)
+   */
+  allData?:         T[];
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -542,8 +544,48 @@ function injectCSS(): void {
 .dt-v7 .dt-card-label { font-size: 10px; color: var(--t4); font-weight: 700; margin-bottom: 2px; }
 .dt-v7 .dt-card-value { font-size: 13px; color: var(--t1); font-weight: 600; }
 
-/* ── Divider between toolbar sections ── */
-.dt-v7 .dt-divider {
+/* ── Dynamic multiselect header controls ── */
+.dt-v7 .dt-ms-controls {
+  display: flex; gap: 4px; margin-bottom: 6px;
+}
+.dt-v7 .dt-ms-ctrl-btn {
+  flex: 1; padding: 3px 0; font-size: 10px; font-weight: 700;
+  border: 1px solid var(--b2); border-radius: var(--r1);
+  background: var(--bg3); color: var(--t4); cursor: pointer;
+  font-family: inherit; transition: all .12s;
+}
+.dt-v7 .dt-ms-ctrl-btn:hover { border-color: var(--em); color: var(--em); background: var(--emb); }
+
+.dt-v7 .dt-ms-count {
+  margin-right: auto; font-size: 10px; color: var(--em);
+  font-weight: 700; padding: 1px 6px; border-radius: 10px;
+  background: var(--emb);
+}
+
+.dt-v7 .dt-ms-item-count {
+  margin-right: auto; font-size: 10px; color: var(--t4);
+  background: var(--bg3); padding: 1px 5px; border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.dt-v7 .dt-ms-empty {
+  text-align: center; padding: 16px 0; color: var(--t4); font-size: 12px;
+}
+
+.dt-v7 .dt-ms-loading {
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 16px 0; color: var(--t4); font-size: 12px;
+}
+
+/* Divider في footer الـ popup */
+.dt-v7 .dt-flt-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 8px; padding-top: 6px;
+  border-top: 1px solid var(--b1);
+}
+.dt-v7 .dt-ms-selected-count {
+  font-size: 11px; color: var(--em); font-weight: 700;
+}
   width: 1px; height: 20px; background: var(--b2); flex-shrink: 0;
 }
 
@@ -565,6 +607,16 @@ function injectCSS(): void {
 
 function getRawValue<T>(row: T, col: Column<T>): unknown {
   if (col.accessor) return col.accessor(row);
+  // ✅ دعم dot-notation (مثل "party.name") إذا لم يكن هناك accessor
+  if (col.key.includes('.')) {
+    const parts = col.key.split('.');
+    let val: unknown = row;
+    for (const part of parts) {
+      if (val == null || typeof val !== 'object') return undefined;
+      val = (val as Record<string, unknown>)[part];
+    }
+    return val;
+  }
   return (row as Record<string, unknown>)[col.key];
 }
 
@@ -1094,9 +1146,6 @@ export function DataTable<T = Record<string, unknown>>({
 
   useEffect(() => { injectCSS(); }, []);
 
-  // ✅ يُعرَّف أولاً لأنه يُستخدم في useCallback أدناه
-  const isServerPaged = !!pagination;
-
   // ── Responsive ─────────────────────────────────────────────────────────
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -1175,6 +1224,8 @@ export function DataTable<T = Record<string, unknown>>({
   const [filters, setFilters] = useState<FilterMap>({});
   const onFilterChangeRef = useRef(onFilterChange);
   useEffect(() => { onFilterChangeRef.current = onFilterChange; }, [onFilterChange]);
+
+  const isServerPaged = !!pagination;
 
   const handleFilterChange = useCallback((key: string, val: string) => {
     setFilters(prev => {

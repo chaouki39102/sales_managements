@@ -199,59 +199,51 @@ class CommercialDocumentController extends BaseApiController
      * ✅ إعدادات الجلب — فلاتر + فرز كاملة متوافقة مع DataTable v7 و RangeFilter القياسي
      */
     protected function getListConfig(): array
-    {
-        return array_merge(parent::getListConfig(), [
-            'allowed_filters' => [
-                'document_type_id',
-                'party_id',
-                'warehouse_id',
-                'fiscal_year_id',
-                'currency_id',
-                'document_status_id',
-                'is_locked',
-                'is_proforma',
-                'is_exported_to_accounting',
-                'search',
+{
+    return array_merge(parent::getListConfig(), [
+        // ✅ المفتاح الصحيح هو 'advanced_filters' وليس 'allowed_filters'
+        // ApiListService يقرأ: $config['filters'] + $config['custom_filters'] + $config['advanced_filters']
+        'advanced_filters' => [
+            AllowedFilter::exact('document_status.name', 'documentStatus.name'),
+            AllowedFilter::custom('document_date', new RangeFilter(), 'document_date'),
+            AllowedFilter::custom('total_ht',      new RangeFilter(), 'total_ht'),
+            AllowedFilter::custom('total_ttc',     new RangeFilter(), 'total_ttc'),
+        ],
 
-                // 1. الفلترة عبر اسم حالة المستند (علاقة DocumentStatus)
-                AllowedFilter::exact('document_status.name', 'documentStatus.name'),
+        // ✅ فلاتر العلاقات كـ partial (بحث نصي)
+        'filters' => array_merge(
+            // فلاتر الموديل الأصلية
+            CommercialDocument::$filterable,
+            [
+                // بحث نصي على علاقات
+                'party.name'     => ['type' => 'partial', 'column' => 'party.name'],
+                'warehouse.name' => ['type' => 'partial', 'column' => 'warehouse.name'],
+            ]
+        ),
 
-                // 2. إصلاح تمرير الحقل لـ RangeFilter لضمان بناء استعلام SQL سليم ومطابق للـ Core
-                AllowedFilter::custom('total_ht', new RangeFilter('total_ht')),
-                AllowedFilter::custom('total_ttc', new RangeFilter('total_ttc')), // تم إضافته لدعم كود الواجهة بالكامل
-                AllowedFilter::custom('document_date', new RangeFilter('document_date')),
-            ],
+        'sorts' => [
+            'document_number', 'document_date', 'total_ht', 'total_ttc',
+            AllowedSort::callback('party.name', fn($q, $d) =>
+                $q->leftJoin('parties', 'commercial_documents.party_id', '=', 'parties.id')
+                  ->orderBy('parties.name', $d ? 'desc' : 'asc')),
+            AllowedSort::callback('warehouse.name', fn($q, $d) =>
+                $q->leftJoin('warehouses', 'commercial_documents.warehouse_id', '=', 'warehouses.id')
+                  ->orderBy('warehouses.name', $d ? 'desc' : 'asc')),
+            AllowedSort::callback('document_status.name', fn($q, $d) =>
+                $q->leftJoin('document_statuses', 'commercial_documents.document_status_id', '=', 'document_statuses.id')
+                  ->orderBy('document_statuses.name', $d ? 'desc' : 'asc')),
+        ],
 
-            'allowed_sorts' => [
-                'document_number',
-                'document_date',
-                'total_ht',
-                'total_ttc',
+        'default_sort'      => 'document_date',
+        'default_sort_direction' => 'desc',
 
-                // الترتيب الديناميكي عبر العلاقات باستخدام Left Joins لضمان كفاءة قواعد البيانات والـ Pagination
-                AllowedSort::callback('party.name', function ($query, bool $descending) {
-                    $query->leftJoin('parties', 'commercial_documents.party_id', '=', 'parties.id')
-                          ->orderBy('parties.name', $descending ? 'desc' : 'asc');
-                }),
-                AllowedSort::callback('warehouse.name', function ($query, bool $descending) {
-                    $query->leftJoin('warehouses', 'commercial_documents.warehouse_id', '=', 'warehouses.id')
-                          ->orderBy('warehouses.name', $descending ? 'desc' : 'asc');
-                }),
-                AllowedSort::callback('document_status.name', function ($query, bool $descending) {
-                    $query->leftJoin('document_statuses', 'commercial_documents.document_status_id', '=', 'document_statuses.id')
-                          ->orderBy('document_statuses.name', $descending ? 'desc' : 'asc');
-                }),
-            ],
-
-            'default_sort' => '-document_date',
-
-            'allowed_includes' => [
-                'party', 'warehouse', 'documentType', 'documentStatus',
-                'currency', 'fiscalYear', 'lines', 'lines.product',
-                'payments', 'payments.paymentMode',
-            ],
-        ]);
-    }
+        'allowed_includes' => [
+            'party', 'warehouse', 'documentType', 'documentStatus',
+            'currency', 'fiscalYear', 'lines', 'lines.product',
+            'payments', 'payments.paymentMode',
+        ],
+    ]);
+}
 
     protected function getModelClass(): string
     {
