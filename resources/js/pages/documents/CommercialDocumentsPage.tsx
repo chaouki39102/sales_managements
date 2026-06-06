@@ -1,904 +1,2527 @@
-// resources/js/pages/documents/CommercialDocumentsPage.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// ✅ التحسينات:
-//   1. زرّ "بيع سريع" → يفتح QuickSaleModal (في صفحة أي مستند مبيعات)
-//   2. زرّ "مستند جديد" → يفتح CommercialDocumentModal (الصفحة الكاملة)
-//   3. invalidateDocs يستخدم tenantKeys.documents.all(slug) الصحيح
-//   4. import من CommercialDocumentModal الجديد (لا .old)
-//   5. isPurch يعتمد على code وليس document_base_operation_id
-//   6. إصلاح queryKey لـ document-type ليشمل slug
+// pages/documents/CommercialDocumentsPage.tsx  —  v3.1 (Fixed API filters)
+//
+// ✅ التعديلات:
+//    - إزالة filter[party.name] و filter[document_number]
+//    - استخدام filter[search] بدلاً منهما
+//    - دمج فلتر المستند والطرف في search واحد
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useCallback } from 'react';
-import { useParams }                     from 'react-router-dom';
+
+import React, {
+    useState,
+    useCallback,
+    useMemo,
+    useEffect,
+    useRef,
+} from "react";
+import { useParams } from "react-router-dom";
 import {
-  useQuery, useMutation, useQueryClient, keepPreviousData,
-} from '@tanstack/react-query';
-import { apiGet, apiPost, apiDelete } from '@/lib/api/core/client';
-import { tenantKeys }                   from '@/lib/api/core/queryKeys';
-import { useActiveSlug }                from '@/lib/store/appStore';
-import { useFiscalYear }                from '@/context/FiscalYearContext';
-import CommercialDocumentModal          from './CommercialDocumentModal';
-import QuickSaleModal                   from './QuickSaleModal';
-import type { DocumentType }            from '@/lib/api/core/types';
+    useQuery,
+    useMutation,
+    useQueryClient,
+    keepPreviousData,
+} from "@tanstack/react-query";
+import { apiGet, apiPost, apiDelete } from "@/lib/api/core/client";
+import { tenantKeys } from "@/lib/api/core/queryKeys";
+import { useActiveSlug } from "@/lib/store/appStore";
+import { useFiscalYear } from "@/context/FiscalYearContext";
+import { DataTable } from "@/components/ui/DataTable";
+import type { Column } from "@/components/ui/DataTable";
+import CommercialDocumentModal from "./CommercialDocumentModal";
+import QuickSaleModal from "./QuickSaleModal";
+import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
 
-// ── codes التي تخص المبيعات (يظهر زر "بيع سريع") ──────────────────────────
-const SALE_CODES = new Set(['FV', 'BL', 'DEV', 'BCC', 'AV']);
+// ════════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ════════════════════════════════════════════════════════════════════════════
 
-// ── Status config ────────────────────────────────────────────────────────────
-const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  draft:          { label: 'مسودة',        color: 'var(--t4)',     bg: 'var(--bg3)' },
-  pending:        { label: 'قيد الانتظار', color: 'var(--orange)', bg: 'color-mix(in srgb, var(--orange) 12%, transparent)' },
-  validated:      { label: 'معتمد',         color: 'var(--blue)',   bg: 'color-mix(in srgb, var(--blue) 12%, transparent)'   },
-  partially_paid: { label: 'مدفوع جزئياً', color: 'var(--purple)', bg: 'color-mix(in srgb, var(--purple) 12%, transparent)' },
-  paid:           { label: 'مدفوع',         color: 'var(--em)',     bg: 'color-mix(in srgb, var(--em) 12%, transparent)'     },
-  overdue:        { label: 'متأخر',         color: 'var(--red)',    bg: 'color-mix(in srgb, var(--red) 12%, transparent)'    },
-  cancelled:      { label: 'ملغي',          color: 'var(--red)',    bg: 'color-mix(in srgb, var(--red) 8%, transparent)'     },
-  returned:       { label: 'مرتجع',         color: 'var(--purple)', bg: 'color-mix(in srgb, var(--purple) 10%, transparent)' },
-};
+const SALE_CODES = new Set(["FV", "BL", "DEV", "BCC", "AV"]);
+const PURCHASE_CODES = new Set(["FA", "BR", "DDP", "BCF", "AA"]);
 
-function fmtDate(d?: string) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('ar-DZ', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  });
+const STATUS_CFG = {
+    draft: { label: "مسودة", color: "#6b7280", bg: "#f3f4f6", dot: "#9ca3af" },
+    pending: {
+        label: "قيد الانتظار",
+        color: "#d97706",
+        bg: "#fffbeb",
+        dot: "#f59e0b",
+    },
+    validated: {
+        label: "معتمد",
+        color: "#2563eb",
+        bg: "#eff6ff",
+        dot: "#3b82f6",
+    },
+    partially_paid: {
+        label: "مدفوع جزئياً",
+        color: "#7c3aed",
+        bg: "#f5f3ff",
+        dot: "#8b5cf6",
+    },
+    paid: { label: "مدفوع", color: "#059669", bg: "#ecfdf5", dot: "#10b981" },
+    overdue: {
+        label: "متأخر",
+        color: "#dc2626",
+        bg: "#fef2f2",
+        dot: "#ef4444",
+    },
+    cancelled: {
+        label: "ملغي",
+        color: "#dc2626",
+        bg: "#fef2f2",
+        dot: "#fca5a5",
+    },
+    returned: {
+        label: "مرتجع",
+        color: "#7c3aed",
+        bg: "#f5f3ff",
+        dot: "#a78bfa",
+    },
+} as const;
+
+type StatusKey = keyof typeof STATUS_CFG;
+
+// ════════════════════════════════════════════════════════════════════════════
+// PURE HELPERS
+// ════════════════════════════════════════════════════════════════════════════
+
+function fmtDate(d?: string | null): string {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("ar-DZ", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    });
 }
-function fmtNum(n?: number | string) {
-  const v = parseFloat(String(n ?? 0));
-  return isNaN(v) ? '—'
-    : v.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' دج';
+
+function fmtMoney(n?: number | string | null): string {
+    const v = parseFloat(String(n ?? 0));
+    if (isNaN(v)) return "—";
+    return v.toLocaleString("fr-DZ", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 }
+
+function getDocStatus(doc: CommercialDocument): string {
+    return (
+        ((doc.document_status as Record<string, unknown> | undefined)
+            ?.name as string) ??
+        ((doc as unknown as Record<string, unknown>).status as string) ??
+        "draft"
+    );
+}
+
+function getPartyName(doc: CommercialDocument): string {
+    return (
+        ((doc.party as Record<string, unknown> | undefined)?.name as string) ??
+        ""
+    );
+}
+
+function getWarehouseName(doc: CommercialDocument): string {
+    return (
+        ((doc.warehouse as Record<string, unknown> | undefined)
+            ?.name as string) ?? ""
+    );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MICRO COMPONENTS
+// ════════════════════════════════════════════════════════════════════════════
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CFG[status] ?? { label: status, color: 'var(--t4)', bg: 'var(--bg3)' };
-  return (
-    <span style={{
-      padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-      color: cfg.color, background: cfg.bg, whiteSpace: 'nowrap',
-    }}>
-      {cfg.label}
-    </span>
-  );
+    const cfg = STATUS_CFG[status as StatusKey] ?? STATUS_CFG.draft;
+    return (
+        <span
+            style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "3px 9px",
+                borderRadius: 20,
+                fontSize: 11,
+                fontWeight: 700,
+                color: cfg.color,
+                background: cfg.bg,
+                border: `1px solid color-mix(in srgb, ${cfg.color} 22%, transparent)`,
+                whiteSpace: "nowrap",
+            }}
+        >
+            <span
+                style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: cfg.dot,
+                    flexShrink: 0,
+                }}
+            />
+            {cfg.label}
+        </span>
+    );
+}
+
+function MoneyCell({
+    value,
+    bold,
+    accent,
+}: {
+    value?: number | string | null;
+    bold?: boolean;
+    accent?: string;
+}) {
+    const v = parseFloat(String(value ?? 0));
+    if (isNaN(v) || v === 0) {
+        return <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
+    }
+    return (
+        <span
+            style={{
+                direction: "ltr",
+                display: "inline-block",
+                fontVariantNumeric: "tabular-nums",
+                fontWeight: bold ? 800 : 400,
+                color: accent ?? "var(--t2)",
+            }}
+        >
+            {fmtMoney(v)}
+            <span style={{ fontSize: 10, marginRight: 3, color: "var(--t4)" }}>
+                دج
+            </span>
+        </span>
+    );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SUMMARY CARDS
+// ════════════════════════════════════════════════════════════════════════════
+
+function SummaryCards({
+    items = [],
+    opColor,
+}: {
+    items: CommercialDocument[];
+    opColor: string;
+}) {
+    const stats = useMemo(
+        () => ({
+            count: items?.length ?? 0,
+            totalHt: (items ?? []).reduce(
+                (s, d) => s + (Number(d.total_ht) || 0),
+                0,
+            ),
+            totalTtc: (items ?? []).reduce(
+                (s, d) => s + (Number(d.total_ttc) || 0),
+                0,
+            ),
+            unpaid: (items ?? []).filter((d) => {
+                const rem = Number(
+                    (d as unknown as Record<string, unknown>)
+                        .remaining_amount ?? 0,
+                );
+                return rem > 0.001;
+            }).length,
+        }),
+        [items],
+    );
+
+    const cards = [
+        {
+            icon: "ti-file-text",
+            label: "عدد المستندات",
+            value: stats.count.toLocaleString("ar-DZ"),
+            accent: opColor,
+        },
+        {
+            icon: "ti-currency-dinar",
+            label: "إجمالي HT",
+            value: fmtMoney(stats.totalHt) + " دج",
+            accent: "var(--blue)",
+            ltr: true,
+        },
+        {
+            icon: "ti-receipt",
+            label: "إجمالي TTC",
+            value: fmtMoney(stats.totalTtc) + " دج",
+            accent: opColor,
+            ltr: true,
+        },
+        {
+            icon: "ti-clock-exclamation",
+            label: "غير مسدد",
+            value: stats.unpaid.toLocaleString("ar-DZ"),
+            accent: stats.unpaid > 0 ? "var(--red)" : "var(--t4)",
+        },
+    ] as const;
+
+    return (
+        <div
+            style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: 10,
+            }}
+        >
+            {cards.map((c) => (
+                <div
+                    key={c.label}
+                    style={{
+                        padding: "12px 16px",
+                        background: "var(--bg1)",
+                        border: "1px solid var(--b1)",
+                        borderRadius: "var(--r2)",
+                        borderTop: `3px solid ${c.accent}`,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                    }}
+                >
+                    <div
+                        style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            flexShrink: 0,
+                            background: `color-mix(in srgb, ${c.accent} 12%, transparent)`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <i
+                            className={`ti ${c.icon}`}
+                            style={{ fontSize: 17, color: c.accent }}
+                            aria-hidden="true"
+                        />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                        <div
+                            style={{
+                                fontSize: 10,
+                                color: "var(--t4)",
+                                fontWeight: 700,
+                                marginBottom: 2,
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {c.label}
+                        </div>
+                        <div
+                            style={{
+                                fontSize: 14,
+                                fontWeight: 800,
+                                color: "var(--t1)",
+                                direction: (c as { ltr?: boolean }).ltr
+                                    ? "ltr"
+                                    : "rtl",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {c.value}
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EXPANDED LINES
+// ════════════════════════════════════════════════════════════════════════════
+
+function ExpandedLines({ doc }: { doc: CommercialDocument }) {
+    const slug = useActiveSlug();
+
+    const { data: full, isLoading } = useQuery({
+        queryKey: [slug, "doc-lines", doc.id],
+        queryFn: () =>
+            apiGet<CommercialDocument>(`/documents/${doc.id}`, {
+                include: "lines.product,lines.productVariant",
+            }).then(
+                (r) =>
+                    ((r as unknown as Record<string, unknown>)
+                        .data as CommercialDocument) ?? r,
+            ),
+        staleTime: 5 * 60_000,
+        enabled: !!doc.id,
+    });
+
+    if (isLoading) {
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: "var(--t4)",
+                    fontSize: 12,
+                    padding: "4px 0",
+                }}
+            >
+                <i
+                    className="ti ti-loader-2"
+                    style={{
+                        animation: "cdp-spin .8s linear infinite",
+                        fontSize: 14,
+                    }}
+                    aria-hidden="true"
+                />
+                جارٍ تحميل الأسطر…
+            </div>
+        );
+    }
+
+    const lines =
+        ((full as unknown as Record<string, unknown>)?.lines as
+            | Record<string, unknown>[]
+            | undefined) ?? [];
+
+    if (lines.length === 0) {
+        return (
+            <div style={{ color: "var(--t4)", fontSize: 12 }}>لا توجد أسطر</div>
+        );
+    }
+
+    return (
+        <div style={{ overflowX: "auto" }}>
+            <table
+                style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 12,
+                }}
+            >
+                <thead>
+                    <tr style={{ background: "var(--bg3)" }}>
+                        {[
+                            "#",
+                            "المنتج",
+                            "الكمية",
+                            "سعر HT",
+                            "خصم",
+                            "TVA%",
+                            "الإجمالي TTC",
+                        ].map((h) => (
+                            <th
+                                key={h}
+                                style={{
+                                    padding: "5px 12px",
+                                    textAlign: "right",
+                                    fontWeight: 700,
+                                    color: "var(--t4)",
+                                    fontSize: 10,
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {h}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {lines.map((line, idx) => {
+                        const name =
+                            ((
+                                line.product as
+                                    | Record<string, unknown>
+                                    | undefined
+                            )?.name as string) ??
+                            (line.description as string) ??
+                            "—";
+                        const disc = parseFloat(
+                            String(line.discount_percentage ?? 0),
+                        );
+                        return (
+                            <tr
+                                key={String(line.id ?? idx)}
+                                style={{ borderBottom: "1px solid var(--b1)" }}
+                            >
+                                <td
+                                    style={{
+                                        padding: "6px 12px",
+                                        color: "var(--t4)",
+                                        fontWeight: 700,
+                                    }}
+                                >
+                                    {idx + 1}
+                                </td>
+                                <td
+                                    style={{
+                                        padding: "6px 12px",
+                                        fontWeight: 600,
+                                        color: "var(--t1)",
+                                    }}
+                                >
+                                    {name}
+                                </td>
+                                <td
+                                    style={{
+                                        padding: "6px 12px",
+                                        direction: "ltr",
+                                        textAlign: "left",
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    {parseFloat(
+                                        String(line.quantity),
+                                    ).toLocaleString("fr-DZ")}
+                                </td>
+                                <td
+                                    style={{
+                                        padding: "6px 12px",
+                                        direction: "ltr",
+                                        textAlign: "left",
+                                    }}
+                                >
+                                    <MoneyCell
+                                        value={line.unit_price_ht as number}
+                                    />
+                                </td>
+                                <td
+                                    style={{
+                                        padding: "6px 12px",
+                                        textAlign: "left",
+                                    }}
+                                >
+                                    {disc > 0 ? (
+                                        <span
+                                            style={{
+                                                color: "var(--red)",
+                                                fontWeight: 700,
+                                            }}
+                                        >
+                                            -{disc}%
+                                        </span>
+                                    ) : (
+                                        <span style={{ color: "var(--t4)" }}>
+                                            —
+                                        </span>
+                                    )}
+                                </td>
+                                <td
+                                    style={{
+                                        padding: "6px 12px",
+                                        color: "var(--t4)",
+                                        textAlign: "left",
+                                    }}
+                                >
+                                    {line.tva_rate}%
+                                </td>
+                                <td
+                                    style={{
+                                        padding: "6px 12px",
+                                        direction: "ltr",
+                                        textAlign: "left",
+                                    }}
+                                >
+                                    <MoneyCell
+                                        value={line.total_ttc as number}
+                                        bold
+                                        accent="var(--em)"
+                                    />
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+                <tfoot>
+                    <tr
+                        style={{
+                            background:
+                                "color-mix(in srgb, var(--em) 5%, var(--bg2))",
+                        }}
+                    >
+                        <td
+                            colSpan={6}
+                            style={{
+                                padding: "6px 12px",
+                                fontWeight: 800,
+                                color: "var(--t2)",
+                                fontSize: 11,
+                                textAlign: "right",
+                            }}
+                        >
+                            إجمالي TTC
+                        </td>
+                        <td
+                            style={{
+                                padding: "6px 12px",
+                                direction: "ltr",
+                                textAlign: "left",
+                            }}
+                        >
+                            <MoneyCell
+                                value={
+                                    (full as unknown as Record<string, unknown>)
+                                        ?.total_ttc as number
+                                }
+                                bold
+                                accent="var(--em)"
+                            />
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════════════════════════════════
+
+interface ToastItem {
+    id: number;
+    msg: string;
+    type: "success" | "error" | "info";
+}
+
+function useToast() {
+    const [toasts, setToasts] = useState<ToastItem[]>([]);
+    const counterRef = useRef(0);
+
+    const show = useCallback(
+        (msg: string, type: "success" | "error" | "info" = "success") => {
+            const id = ++counterRef.current;
+            setToasts((p) => [...p, { id, msg, type }]);
+            setTimeout(
+                () => setToasts((p) => p.filter((t) => t.id !== id)),
+                3500,
+            );
+        },
+        [],
+    );
+
+    const ToastContainer = useCallback(
+        () => (
+            <div
+                style={{
+                    position: "fixed",
+                    bottom: 24,
+                    left: 24,
+                    zIndex: 9999,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    pointerEvents: "none",
+                }}
+            >
+                {toasts.map((t) => (
+                    <div
+                        key={t.id}
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "10px 16px",
+                            borderRadius: 10,
+                            background:
+                                t.type === "error"
+                                    ? "color-mix(in srgb, var(--red) 15%, var(--bg1))"
+                                    : t.type === "info"
+                                      ? "color-mix(in srgb, var(--blue) 12%, var(--bg1))"
+                                      : "color-mix(in srgb, var(--em) 12%, var(--bg1))",
+                            border: `1px solid ${
+                                t.type === "error"
+                                    ? "var(--red)"
+                                    : t.type === "info"
+                                      ? "var(--blue)"
+                                      : "var(--em)"
+                            }`,
+                            boxShadow: "0 8px 24px rgba(0,0,0,.14)",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "var(--t1)",
+                            animation: "cdp-toast-in .2s ease",
+                        }}
+                    >
+                        <i
+                            className={`ti ${
+                                t.type === "error"
+                                    ? "ti-alert-circle"
+                                    : t.type === "info"
+                                      ? "ti-info-circle"
+                                      : "ti-circle-check"
+                            }`}
+                            style={{
+                                color:
+                                    t.type === "error"
+                                        ? "var(--red)"
+                                        : t.type === "info"
+                                          ? "var(--blue)"
+                                          : "var(--em)",
+                            }}
+                            aria-hidden="true"
+                        />
+                        {t.msg}
+                    </div>
+                ))}
+            </div>
+        ),
+        [toasts],
+    );
+
+    return { show, ToastContainer };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ROW ACTIONS BUTTON
+// ════════════════════════════════════════════════════════════════════════════
+
+const ActionBtn = React.memo(function ActionBtn({
+    icon,
+    title,
+    onClick,
+    color,
+    disabled,
+}: {
+    icon: string;
+    title: string;
+    onClick: () => void;
+    color?: string;
+    disabled?: boolean;
+}) {
+    return (
+        <button
+            title={title}
+            aria-label={title}
+            disabled={disabled}
+            onClick={onClick}
+            style={{
+                width: 28,
+                height: 28,
+                borderRadius: 6,
+                border: "1px solid var(--b1)",
+                background: "var(--bg2)",
+                color: color ?? "var(--t3)",
+                fontSize: 13,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all .15s",
+                opacity: disabled ? 0.4 : 1,
+            }}
+        >
+            <i className={`ti ${icon}`} aria-hidden="true" />
+        </button>
+    );
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// DOCUMENT VIEW MODAL
+// ════════════════════════════════════════════════════════════════════════════
+
+function DocumentViewModal({
+    docId,
+    docType,
+    onClose,
+    onEdit,
+    isReadOnly,
+}: {
+    docId: number;
+    docType: DocumentType | null;
+    onClose: () => void;
+    onEdit: () => void;
+    isReadOnly: boolean;
+}) {
+    const slug = useActiveSlug();
+    const isPurch = PURCHASE_CODES.has(docType?.code ?? "");
+
+    const { data, isLoading } = useQuery({
+        queryKey: [slug, "doc-detail-full", docId],
+        queryFn: () =>
+            apiGet<CommercialDocument>(`/documents/${docId}`, {
+                include: [
+                    "party",
+                    "documentStatus",
+                    "warehouse",
+                    "fiscalYear",
+                    "currency",
+                    "documentType",
+                    "lines.product",
+                    "lines.productVariant",
+                    "validatedBy",
+                    "payments.paymentMode",
+                ].join(","),
+            }).then(
+                (r) =>
+                    ((r as unknown as Record<string, unknown>)
+                        .data as CommercialDocument) ?? r,
+            ),
+        staleTime: 2 * 60_000,
+    });
+
+    const d = data as unknown as Record<string, unknown> | undefined;
+    const status = d ? getDocStatus(data as CommercialDocument) : "draft";
+
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        document.addEventListener("keydown", handler);
+        return () => document.removeEventListener("keydown", handler);
+    }, [onClose]);
+
+    return (
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`تفاصيل ${docType?.name ?? "المستند"}`}
+            style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 500,
+                background: "rgba(0,0,0,.45)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16,
+                direction: "rtl",
+            }}
+            onClick={onClose}
+        >
+            <div
+                style={{
+                    width: "100%",
+                    maxWidth: 920,
+                    maxHeight: "94vh",
+                    overflowY: "auto",
+                    overflowX: "hidden",
+                    background: "var(--bg1)",
+                    borderRadius: "var(--r3)",
+                    boxShadow: "0 24px 64px rgba(0,0,0,.22)",
+                    display: "flex",
+                    flexDirection: "column",
+                }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div
+                    style={{
+                        padding: "14px 20px",
+                        borderBottom: "1px solid var(--b1)",
+                        background: "var(--bg2)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 10,
+                        flexShrink: 0,
+                    }}
+                >
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 10,
+                                background: `color-mix(in srgb, ${isPurch ? "var(--purple)" : "var(--em)"} 12%, transparent)`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                            }}
+                        >
+                            <i
+                                className={`ti ${isPurch ? "ti-shopping-cart" : "ti-file-invoice"}`}
+                                style={{
+                                    fontSize: 18,
+                                    color: isPurch
+                                        ? "var(--purple)"
+                                        : "var(--em)",
+                                }}
+                                aria-hidden="true"
+                            />
+                        </div>
+                        <div>
+                            <div
+                                style={{
+                                    fontWeight: 800,
+                                    fontSize: 15,
+                                    color: "var(--t1)",
+                                }}
+                            >
+                                {docType?.name}
+                                {d && (
+                                    <span
+                                        style={{
+                                            marginRight: 8,
+                                            color: isPurch
+                                                ? "var(--purple)"
+                                                : "var(--em)",
+                                            fontFamily: "monospace",
+                                        }}
+                                    >
+                                        {String(
+                                            d.document_number ?? `#${d.id}`,
+                                        )}
+                                    </span>
+                                )}
+                            </div>
+                            {d && (
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: 8,
+                                        alignItems: "center",
+                                        marginTop: 4,
+                                    }}
+                                >
+                                    <StatusBadge status={status} />
+                                    {d.is_locked && (
+                                        <span
+                                            style={{
+                                                fontSize: 11,
+                                                color: "var(--t4)",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 3,
+                                            }}
+                                        >
+                                            <i
+                                                className="ti ti-lock"
+                                                style={{ fontSize: 10 }}
+                                                aria-hidden="true"
+                                            />
+                                            مقفل
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div
+                        style={{
+                            display: "flex",
+                            gap: 6,
+                            alignItems: "center",
+                        }}
+                    >
+                        {!isReadOnly && !d?.is_locked && status === "draft" && (
+                            <button
+                                onClick={onEdit}
+                                style={{
+                                    height: 32,
+                                    padding: "0 14px",
+                                    borderRadius: 8,
+                                    border: "1px solid var(--blue)",
+                                    background:
+                                        "color-mix(in srgb, var(--blue) 8%, transparent)",
+                                    color: "var(--blue)",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                <i
+                                    className="ti ti-pencil"
+                                    style={{ fontSize: 13 }}
+                                    aria-hidden="true"
+                                />
+                                تعديل
+                            </button>
+                        )}
+                        <button
+                            onClick={() => window.print()}
+                            aria-label="طباعة"
+                            style={{
+                                height: 32,
+                                padding: "0 12px",
+                                borderRadius: 8,
+                                border: "1px solid var(--b2)",
+                                background: "var(--bg1)",
+                                color: "var(--t3)",
+                                fontSize: 12,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 5,
+                                fontFamily: "inherit",
+                            }}
+                        >
+                            <i
+                                className="ti ti-printer"
+                                style={{ fontSize: 13 }}
+                                aria-hidden="true"
+                            />
+                            طباعة
+                        </button>
+                        <button
+                            onClick={onClose}
+                            aria-label="إغلاق"
+                            style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 8,
+                                border: "1px solid var(--b2)",
+                                background: "var(--bg1)",
+                                color: "var(--t3)",
+                                cursor: "pointer",
+                                fontSize: 16,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <i className="ti ti-x" aria-hidden="true" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Body */}
+                {isLoading ? (
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            height: 200,
+                            gap: 10,
+                            color: "var(--t4)",
+                        }}
+                    >
+                        <i
+                            className="ti ti-loader-2"
+                            style={{
+                                fontSize: 24,
+                                animation: "cdp-spin .8s linear infinite",
+                            }}
+                            aria-hidden="true"
+                        />
+                    </div>
+                ) : !d ? null : (
+                    <div
+                        style={{
+                            padding: 20,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 20,
+                        }}
+                    >
+                        {/* Basic info */}
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                    "repeat(auto-fill, minmax(175px, 1fr))",
+                                gap: 10,
+                            }}
+                        >
+                            {(
+                                [
+                                    {
+                                        icon: "ti-user",
+                                        label: isPurch ? "المورد" : "الزبون",
+                                        value: (
+                                            d.party as
+                                                | Record<string, unknown>
+                                                | undefined
+                                        )?.name,
+                                    },
+                                    {
+                                        icon: "ti-calendar",
+                                        label: "تاريخ المستند",
+                                        value: fmtDate(
+                                            d.document_date as string,
+                                        ),
+                                    },
+                                    {
+                                        icon: "ti-calendar-event",
+                                        label: "تاريخ الاستحقاق",
+                                        value: fmtDate(d.due_date as string),
+                                    },
+                                    {
+                                        icon: "ti-building",
+                                        label: "المستودع",
+                                        value: (
+                                            d.warehouse as
+                                                | Record<string, unknown>
+                                                | undefined
+                                        )?.name,
+                                    },
+                                    {
+                                        icon: "ti-calendar-stats",
+                                        label: "السنة المالية",
+                                        value: (
+                                            d.fiscal_year as
+                                                | Record<string, unknown>
+                                                | undefined
+                                        )?.name,
+                                    },
+                                    {
+                                        icon: "ti-currency-dollar",
+                                        label: "العملة",
+                                        value: (
+                                            d.currency as
+                                                | Record<string, unknown>
+                                                | undefined
+                                        )?.code,
+                                    },
+                                ] as {
+                                    icon: string;
+                                    label: string;
+                                    value: unknown;
+                                }[]
+                            )
+                                .filter((r) => r.value)
+                                .map(({ icon, label, value }) => (
+                                    <div
+                                        key={label}
+                                        style={{
+                                            padding: "10px 14px",
+                                            borderRadius: "var(--r2)",
+                                            background: "var(--bg2)",
+                                            border: "1px solid var(--b1)",
+                                            display: "flex",
+                                            alignItems: "flex-start",
+                                            gap: 10,
+                                        }}
+                                    >
+                                        <i
+                                            className={`ti ${icon}`}
+                                            style={{
+                                                fontSize: 15,
+                                                color: "var(--t4)",
+                                                marginTop: 2,
+                                                flexShrink: 0,
+                                            }}
+                                            aria-hidden="true"
+                                        />
+                                        <div>
+                                            <div
+                                                style={{
+                                                    fontSize: 10,
+                                                    color: "var(--t4)",
+                                                    fontWeight: 700,
+                                                    marginBottom: 2,
+                                                }}
+                                            >
+                                                {label}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    fontSize: 13,
+                                                    fontWeight: 700,
+                                                    color: "var(--t1)",
+                                                }}
+                                            >
+                                                {String(value)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+
+                        {/* Document lines */}
+                        <div>
+                            <div
+                                style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: "var(--t4)",
+                                    marginBottom: 8,
+                                    letterSpacing: 0.5,
+                                }}
+                            >
+                                أسطر المستند
+                            </div>
+                            <div
+                                style={{
+                                    border: "1px solid var(--b1)",
+                                    borderRadius: "var(--r2)",
+                                    overflow: "auto",
+                                }}
+                            >
+                                <table
+                                    style={{
+                                        width: "100%",
+                                        borderCollapse: "collapse",
+                                        fontSize: 12,
+                                    }}
+                                >
+                                    <thead>
+                                        <tr
+                                            style={{
+                                                background: "var(--bg2)",
+                                                borderBottom:
+                                                    "1px solid var(--b1)",
+                                            }}
+                                        >
+                                            {[
+                                                "#",
+                                                "المنتج",
+                                                "الكمية",
+                                                "سعر HT",
+                                                "خصم",
+                                                "TVA",
+                                                "إجمالي TTC",
+                                            ].map((h) => (
+                                                <th
+                                                    key={h}
+                                                    style={{
+                                                        padding: "7px 12px",
+                                                        textAlign: "right",
+                                                        fontWeight: 700,
+                                                        color: "var(--t4)",
+                                                        fontSize: 10,
+                                                        whiteSpace: "nowrap",
+                                                    }}
+                                                >
+                                                    {h}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(
+                                            (d.lines as Record<
+                                                string,
+                                                unknown
+                                            >[]) ?? []
+                                        ).length === 0 ? (
+                                            <tr>
+                                                <td
+                                                    colSpan={7}
+                                                    style={{
+                                                        textAlign: "center",
+                                                        padding: 24,
+                                                        color: "var(--t4)",
+                                                        fontSize: 12,
+                                                    }}
+                                                >
+                                                    لا توجد أسطر
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            (
+                                                d.lines as Record<
+                                                    string,
+                                                    unknown
+                                                >[]
+                                            ).map((line, idx) => {
+                                                const name =
+                                                    ((
+                                                        line.product as
+                                                            | Record<
+                                                                  string,
+                                                                  unknown
+                                                              >
+                                                            | undefined
+                                                    )?.name as string) ??
+                                                    (line.description as string) ??
+                                                    "—";
+                                                const disc = parseFloat(
+                                                    String(
+                                                        line.discount_percentage ??
+                                                            0,
+                                                    ),
+                                                );
+                                                return (
+                                                    <tr
+                                                        key={String(
+                                                            line.id ?? idx,
+                                                        )}
+                                                        style={{
+                                                            borderBottom:
+                                                                "1px solid var(--b1)",
+                                                        }}
+                                                    >
+                                                        <td
+                                                            style={{
+                                                                padding:
+                                                                    "7px 12px",
+                                                                color: "var(--t4)",
+                                                                fontWeight: 700,
+                                                            }}
+                                                        >
+                                                            {idx + 1}
+                                                        </td>
+                                                        <td
+                                                            style={{
+                                                                padding:
+                                                                    "7px 12px",
+                                                                fontWeight: 600,
+                                                                color: "var(--t1)",
+                                                            }}
+                                                        >
+                                                            {name}
+                                                        </td>
+                                                        <td
+                                                            style={{
+                                                                padding:
+                                                                    "7px 12px",
+                                                                direction:
+                                                                    "ltr",
+                                                                textAlign:
+                                                                    "left",
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            {parseFloat(
+                                                                String(
+                                                                    line.quantity,
+                                                                ),
+                                                            ).toLocaleString(
+                                                                "fr-DZ",
+                                                            )}
+                                                        </td>
+                                                        <td
+                                                            style={{
+                                                                padding:
+                                                                    "7px 12px",
+                                                                direction:
+                                                                    "ltr",
+                                                                textAlign:
+                                                                    "left",
+                                                            }}
+                                                        >
+                                                            <MoneyCell
+                                                                value={
+                                                                    line.unit_price_ht as number
+                                                                }
+                                                            />
+                                                        </td>
+                                                        <td
+                                                            style={{
+                                                                padding:
+                                                                    "7px 12px",
+                                                                textAlign:
+                                                                    "left",
+                                                            }}
+                                                        >
+                                                            {disc > 0 ? (
+                                                                <span
+                                                                    style={{
+                                                                        color: "var(--red)",
+                                                                        fontWeight: 700,
+                                                                    }}
+                                                                >
+                                                                    -{disc}%
+                                                                </span>
+                                                            ) : (
+                                                                <span
+                                                                    style={{
+                                                                        color: "var(--t4)",
+                                                                    }}
+                                                                >
+                                                                    —
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td
+                                                            style={{
+                                                                padding:
+                                                                    "7px 12px",
+                                                                color: "var(--t4)",
+                                                                textAlign:
+                                                                    "left",
+                                                            }}
+                                                        >
+                                                            {line.tva_rate}%
+                                                        </td>
+                                                        <td
+                                                            style={{
+                                                                padding:
+                                                                    "7px 12px",
+                                                                direction:
+                                                                    "ltr",
+                                                                textAlign:
+                                                                    "left",
+                                                            }}
+                                                        >
+                                                            <MoneyCell
+                                                                value={
+                                                                    line.total_ttc as number
+                                                                }
+                                                                bold
+                                                                accent="var(--em)"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Totals */}
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: 310,
+                                    border: "1px solid var(--b1)",
+                                    borderRadius: "var(--r2)",
+                                    overflow: "hidden",
+                                }}
+                            >
+                                {(
+                                    [
+                                        {
+                                            label: "إجمالي HT",
+                                            value: d.total_ht,
+                                            dim: true,
+                                        },
+                                        {
+                                            label: "TVA",
+                                            value: d.total_tva,
+                                            dim: true,
+                                        },
+                                        parseFloat(
+                                            String(d.total_discount ?? 0),
+                                        ) > 0
+                                            ? {
+                                                  label: "الخصم الإجمالي",
+                                                  value: d.total_discount,
+                                                  dim: false,
+                                                  red: true,
+                                              }
+                                            : null,
+                                        parseFloat(String(d.total_stamp ?? 0)) >
+                                        0
+                                            ? {
+                                                  label: "الطابع الجبائي",
+                                                  value: d.total_stamp,
+                                                  dim: true,
+                                              }
+                                            : null,
+                                        parseFloat(
+                                            String(
+                                                (d.total_tap as number) ?? 0,
+                                            ),
+                                        ) > 0
+                                            ? {
+                                                  label: "TAP",
+                                                  value: d.total_tap,
+                                                  dim: true,
+                                              }
+                                            : null,
+                                    ] as ({
+                                        label: string;
+                                        value: unknown;
+                                        dim: boolean;
+                                        red?: boolean;
+                                    } | null)[]
+                                )
+                                    .filter(Boolean)
+                                    .map((row) => {
+                                        const r = row!;
+                                        return (
+                                            <div
+                                                key={r.label}
+                                                style={{
+                                                    display: "flex",
+                                                    justifyContent:
+                                                        "space-between",
+                                                    padding: "8px 14px",
+                                                    borderBottom:
+                                                        "1px solid var(--b1)",
+                                                    fontSize: 12,
+                                                    color: r.dim
+                                                        ? "var(--t4)"
+                                                        : "var(--t2)",
+                                                }}
+                                            >
+                                                <span>{r.label}</span>
+                                                <span
+                                                    style={{
+                                                        fontWeight: 600,
+                                                        direction: "ltr",
+                                                        color: r.red
+                                                            ? "var(--red)"
+                                                            : "inherit",
+                                                    }}
+                                                >
+                                                    {r.red ? "-" : ""}
+                                                    {fmtMoney(
+                                                        r.value as number,
+                                                    )}{" "}
+                                                    دج
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        padding: "12px 14px",
+                                        background:
+                                            "color-mix(in srgb, var(--em) 6%, transparent)",
+                                        fontSize: 15,
+                                        fontWeight: 800,
+                                    }}
+                                >
+                                    <span style={{ color: "var(--t1)" }}>
+                                        المستحق الكلي
+                                    </span>
+                                    <span
+                                        style={{
+                                            color: "var(--em)",
+                                            direction: "ltr",
+                                        }}
+                                    >
+                                        {fmtMoney(
+                                            (d.net_to_pay as number) ??
+                                                (d.total_ttc as number),
+                                        )}{" "}
+                                        دج
+                                    </span>
+                                </div>
+
+                                {parseFloat(String(d.paid_amount ?? 0)) > 0 && (
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            padding: "8px 14px",
+                                            borderTop: "1px solid var(--b1)",
+                                            fontSize: 12,
+                                        }}
+                                    >
+                                        <span style={{ color: "var(--t4)" }}>
+                                            المدفوع
+                                        </span>
+                                        <span
+                                            style={{
+                                                color: "var(--em)",
+                                                fontWeight: 700,
+                                                direction: "ltr",
+                                            }}
+                                        >
+                                            {fmtMoney(d.paid_amount as number)}{" "}
+                                            دج
+                                        </span>
+                                    </div>
+                                )}
+
+                                {parseFloat(String(d.remaining_amount ?? 0)) >
+                                    0.001 && (
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            padding: "8px 14px",
+                                            borderTop: "1px solid var(--b1)",
+                                            fontSize: 12,
+                                        }}
+                                    >
+                                        <span style={{ color: "var(--t4)" }}>
+                                            المتبقي
+                                        </span>
+                                        <span
+                                            style={{
+                                                color: "var(--red)",
+                                                fontWeight: 700,
+                                                direction: "ltr",
+                                            }}
+                                        >
+                                            {fmtMoney(
+                                                d.remaining_amount as number,
+                                            )}{" "}
+                                            دج
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Notes */}
+                        {d.notes && (
+                            <div
+                                style={{
+                                    padding: "10px 14px",
+                                    borderRadius: "var(--r2)",
+                                    background: "var(--bg2)",
+                                    border: "1px solid var(--b1)",
+                                    fontSize: 12.5,
+                                    color: "var(--t3)",
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "flex-start",
+                                }}
+                            >
+                                <i
+                                    className="ti ti-notes"
+                                    style={{
+                                        fontSize: 15,
+                                        marginTop: 1,
+                                        color: "var(--t4)",
+                                        flexShrink: 0,
+                                    }}
+                                    aria-hidden="true"
+                                />
+                                {String(d.notes)}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ════════════════════════════════════════════════════════════════════════════
+
 export default function CommercialDocumentsPage() {
-  const { typeCode }  = useParams<{ typeCode: string }>();
-  const qc            = useQueryClient();
-  const slug          = useActiveSlug();
-  const { selectedYear, isReadOnly } = useFiscalYear() as {
-    selectedYear?: { id: number; name: string };
-    isReadOnly?: boolean;
-  };
+    const { typeCode } = useParams<{ typeCode: string }>();
+    const qc = useQueryClient();
+    const slug = useActiveSlug();
+    const { selectedYear, isReadOnly } = useFiscalYear() as {
+        selectedYear?: { id: number; name: string };
+        isReadOnly?: boolean;
+    };
 
-  const [search,       setSearch]      = useState('');
-  const [statusFilter, setStatus]      = useState('');
-  const [page,         setPage]        = useState(1);
-  // modal: null | 'add' | 'edit' | 'view' | 'quick'
-  const [modal,        setModal]       = useState<'add' | 'edit' | 'view' | 'quick' | null>(null);
-  const [activeDoc,    setActiveDoc]   = useState<Record<string, unknown> | null>(null);
-  const [editDocFull,  setEditDocFull] = useState<Record<string, unknown> | null>(null);
-  const [loadingEdit,  setLoadingEdit] = useState(false);
-  const [toast,        setToast]       = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    const { show: showToast, ToastContainer } = useToast();
 
-  function showToast(msg: string, type: 'success' | 'error' = 'success') {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  }
+    // ── Modal state ───────────────────────────────────────────────────────────
+    type ModalMode = "add" | "edit" | "view" | "quick" | null;
+    const [modal, setModal] = useState<ModalMode>(null);
+    const [viewDocId, setViewDocId] = useState<number | null>(null);
+    const [editDocFull, setEditDocFull] = useState<CommercialDocument | null>(
+        null,
+    );
+    const [loadingEdit, setLoadingEdit] = useState(false);
 
-  // ✅ isPurch يعتمد على code وليس document_base_operation_id
-  const PURCHASE_CODES = new Set(['FA', 'BR', 'DDP', 'BCF', 'AA']);
-  const isPurch   = PURCHASE_CODES.has(typeCode ?? '');
-  const isSalable = SALE_CODES.has(typeCode ?? '');
+    // ── Server-side state ─────────────────────────────────────────────────────
+    const [page, setPage] = useState(1);
+    const [perPage, setPerPage] = useState(15);
+    const [serverFilters, setServerFilters] = useState<Record<string, string>>(
+        {},
+    );
+    const [sortParam, setSortParam] = useState<string>("-document_date");
 
-  const opColor = isPurch ? 'var(--purple)' : 'var(--em)';
-  const opIcon  = isPurch ? 'ti-shopping-cart' : 'ti-file-invoice';
+    const isPurch = PURCHASE_CODES.has(typeCode ?? "");
+    const isSalable = SALE_CODES.has(typeCode ?? "");
+    const opColor = isPurch ? "var(--purple)" : "var(--em)";
 
-  // ── ✅ invalidateDocs موحّدة — تُبطل كل مستندات هذه الشركة ────────────────
-  const invalidateDocs = useCallback(() => {
-    if (slug) {
-      qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
-    }
-  }, [qc, slug]);
+    // دالة لدمج فلتر document_number و party في search واحد
+    const buildSearchTerm = useCallback((filters: Record<string, string>): string => {
+        const parts: string[] = [];
+        if (filters.document_number) parts.push(filters.document_number);
+        if (filters.party) parts.push(filters.party);
+        return parts.join(' ').trim();
+    }, []);
 
-  // ── جلب المستندات ────────────────────────────────────────────────────────
-  const { data: docType, isLoading: loadingDocType } = useQuery<DocumentType>({
-  queryKey: [slug, 'document-type-by-code', typeCode],
-  queryFn: () => apiGet<{ data: DocumentType[] }>('/document-types', { per_page: 500 })
-    .then(res => {
-      const list = Array.isArray(res) ? res : (res as { data?: DocumentType[] }).data ?? [];
-      return list.find(dt => dt.code === typeCode) ?? null;
-    }),
-  enabled: !!slug && !!typeCode,
-  staleTime: 10 * 60_000,
-});
+    // معالج الفلاتر المعدل
+    const handleFilterChange = useCallback((filters: Record<string, string>) => {
+        const newFilters: Record<string, string> = {};
 
-  const { data: docs, isLoading, isFetching } = useQuery({
-    // ✅ يشمل slug في الـ key لعزل الشركات
-    queryKey: tenantKeys.documents.byType(slug ?? '', typeCode ?? '', {
-      fiscal_year_id: selectedYear?.id,
-      document_type_id: docType?.id,
-      search,
-      status: statusFilter,
-      page,
-    }),
-    queryFn: () =>
-  apiGet<{ data: unknown[]; meta: unknown }>('/documents', {
-    'filter[document_type_id]':       docType?.id,      // ✅ صحيح
-    'filter[fiscal_year_id]':         selectedYear?.id,
-    'filter[search]':                 search || undefined,
-    'filter[document_status_id]':     statusFilter || undefined,
-    include:  'party,documentStatus,warehouse',
-    sort:     '-document_date',
-    per_page: 15,
-    page,
-  }),
-    enabled: !!slug && !!typeCode && !!selectedYear?.id && !!docType?.id,
-    placeholderData: keepPreviousData,
-    staleTime:       2 * 60_000,
-  });
+        Object.entries(filters).forEach(([key, val]) => {
+            if (key !== 'document_number' && key !== 'party' && val) {
+                newFilters[key] = val;
+            }
+        });
 
-  // ✅ دعم قراءة البيانات سواء كانت مصفوفة مباشرة أو داخل كائن data
-const items = Array.isArray(docs) ? docs : ((docs as { data?: unknown[] })?.data ?? []);
-const meta  = (docs as { meta?: Record<string, number> })?.meta ?? {
-  total: 0, last_page: 1, current_page: 1, from: 0, to: 0
-};
+        const search = buildSearchTerm(filters);
+        if (search) {
+            newFilters.search = search;
+        } else {
+            delete newFilters.search;
+        }
 
-  // ── فتح مودل التعديل (جلب البيانات الكاملة) ─────────────────────────────
-  const openEditModal = async (doc: Record<string, unknown>) => {
-    setLoadingEdit(true);
-    setActiveDoc(doc);
-    try {
-      const res = await apiGet<{ data?: unknown; id?: unknown }>(
-        `/documents/${doc.id}`,
-        { include: 'party,warehouse,fiscalYear,currency,documentStatus,lines,lines.product,lines.packaging' }
-      );
-      const full = (res as Record<string, unknown>).data ?? res;
-      // تحويل التواريخ إلى YYYY-MM-DD
-      const formatDate = (d: unknown) =>
-        d ? String(d).split('T')[0] : '';
-      setEditDocFull({
-        ...(full as Record<string, unknown>),
-        document_date: formatDate((full as Record<string, unknown>).document_date),
-        due_date:      formatDate((full as Record<string, unknown>).due_date),
-      });
-      setModal('edit');
-    } catch {
-      showToast('فشل تحميل بيانات المستند', 'error');
-    } finally {
-      setLoadingEdit(false);
-    }
-  };
+        setServerFilters(newFilters);
+        setPage(1);
+    }, [buildSearchTerm]);
 
-  // ── Mutations ────────────────────────────────────────────────────────────
-  const validateMutation = useMutation({
-    mutationFn: (id: number) => apiPost(`/documents/${id}/validate`),
-    onSuccess:  () => { invalidateDocs(); showToast('تم اعتماد المستند بنجاح'); },
-    onError:    (e: unknown) => showToast(
-      (e as Record<string, unknown>)?.message as string ?? 'فشل الاعتماد', 'error'
-    ),
-  });
-  const lockMutation = useMutation({
-    mutationFn: (id: number) => apiPost(`/documents/${id}/lock`),
-    onSuccess:  () => { invalidateDocs(); showToast('تم قفل المستند'); },
-    onError:    (e: unknown) => showToast(
-      (e as Record<string, unknown>)?.message as string ?? 'فشل القفل', 'error'
-    ),
-  });
-  const cancelMutation = useMutation({
-    mutationFn: (id: number) => apiPost(`/documents/${id}/cancel`),
-    onSuccess:  () => { invalidateDocs(); showToast('تم إلغاء المستند'); },
-    onError:    (e: unknown) => showToast(
-      (e as Record<string, unknown>)?.message as string ?? 'فشل الإلغاء', 'error'
-    ),
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiDelete(`/documents/${id}`),
-    onSuccess:  () => { invalidateDocs(); showToast('تم حذف المستند'); },
-    onError:    (e: unknown) => showToast(
-      (e as Record<string, unknown>)?.message as string ?? 'فشل الحذف', 'error'
-    ),
-  });
+    const invalidateDocs = useCallback(() => {
+        if (slug)
+            qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+    }, [qc, slug]);
 
-  const closeAllModals = useCallback(() => {
-    setModal(null);
-    setActiveDoc(null);
-    setEditDocFull(null);
-  }, []);
+    // ── Fetch document type ───────────────────────────────────────────────────
+    const { data: docType } = useQuery<DocumentType | null>({
+        queryKey: [slug, "document-type-by-code", typeCode],
+        queryFn: () =>
+            apiGet<{ data?: DocumentType[] }>("/document-types", {
+                per_page: 500,
+            }).then((res) => {
+                const list = Array.isArray(res)
+                    ? (res as DocumentType[])
+                    : (((res as Record<string, unknown>)
+                          .data as DocumentType[]) ?? []);
+                return list.find((dt) => dt.code === typeCode) ?? null;
+            }),
+        enabled: !!slug && !!typeCode,
+        staleTime: 10 * 60_000,
+    });
 
-  // ════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ════════════════════════════════════════════════════════════════════════
-  return (
-    <div className="page on" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    // ── Fetch documents ───────────────────────────────────────────────────────
+    const queryParams = useMemo(
+        () => ({
+            "filter[document_type_id]": docType?.id,
+            "filter[fiscal_year_id]": selectedYear?.id,
+            "filter[search]": serverFilters.search || undefined,
+            "filter[document_status.name]": serverFilters.status || undefined,
+            "filter[document_date]": serverFilters.document_date || undefined,
+            "filter[total_ttc][gte]": serverFilters.total_ttc || undefined,
+            include: "party,documentStatus,warehouse",
+            sort: sortParam,
+            per_page: perPage,
+            page,
+        }),
+        [
+            docType?.id,
+            selectedYear?.id,
+            serverFilters,
+            sortParam,
+            perPage,
+            page,
+        ],
+    );
 
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 9999, padding: '10px 22px', borderRadius: 'var(--r2)',
-          background: toast.type === 'success' ? 'var(--em)' : 'var(--red)',
-          color: '#fff', fontSize: 13, fontWeight: 700,
-          boxShadow: '0 4px 24px rgba(0,0,0,.2)',
-          display: 'flex', alignItems: 'center', gap: 8,
-          pointerEvents: 'none',
-        }}>
-          <i className={`ti ${toast.type === 'success' ? 'ti-check' : 'ti-x'}`} />
-          {toast.msg}
-        </div>
-      )}
+    const {
+        data: docsRaw,
+        isLoading,
+        isFetching,
+    } = useQuery({
+        queryKey: tenantKeys.documents.byType(
+            slug ?? "",
+            typeCode ?? "",
+            queryParams,
+        ),
+        queryFn: () =>
+            apiGet<{
+                data: CommercialDocument[];
+                meta: Record<string, number>;
+            }>("/documents", queryParams),
+        enabled: !!slug && !!typeCode && !!selectedYear?.id && !!docType?.id,
+        placeholderData: keepPreviousData,
+        staleTime: 2 * 60_000,
+    });
 
-      {/* ── Header الصفحة ──────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
-      }}>
-        {/* العنوان */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-            background: `color-mix(in srgb, ${opColor} 12%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${opColor} 25%, transparent)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: opColor, fontSize: 20,
-          }}>
-            <i className={`ti ${opIcon}`} />
-          </div>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--t1)' }}>
-              {docType?.name ?? '...'}
-              {docType?.name_latin && (
-                <span style={{ fontSize: 12, color: 'var(--t4)', marginRight: 8, fontWeight: 400 }}>
-                  {docType.name_latin}
-                </span>
-              )}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-              <span style={{ fontSize: 11, color: 'var(--t4)' }}>
-                {(meta as Record<string, number>).total ?? 0} مستند
-              </span>
-              {selectedYear && (
-                <span style={{
-                  fontSize: 10, padding: '2px 7px', borderRadius: 10, fontWeight: 700,
-                  background: 'color-mix(in srgb, var(--blue) 12%, transparent)',
-                  color: 'var(--blue)',
-                }}>{selectedYear.name}</span>
-              )}
-              {isReadOnly && (
-                <span style={{
-                  fontSize: 10, padding: '2px 7px', borderRadius: 10, fontWeight: 700,
-                  background: 'color-mix(in srgb, var(--red) 12%, transparent)',
-                  color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 3,
-                }}>
-                  <i className="ti ti-lock" style={{ fontSize: 9 }} /> للقراءة فقط
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+    const items: CommercialDocument[] = useMemo(() => {
+        if (!docsRaw) return [];
+        if (Array.isArray(docsRaw)) return docsRaw as CommercialDocument[];
+        return (
+            ((docsRaw as unknown as Record<string, unknown>)
+                .data as CommercialDocument[]) ?? []
+        );
+    }, [docsRaw]);
 
-        {/* ✅ الأزرار الجديدة */}
-        {!isReadOnly && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    const meta = useMemo(() => {
+        if (!docsRaw || Array.isArray(docsRaw))
+            return { total: 0, last_page: 1, current_page: 1 };
+        return (
+            ((docsRaw as unknown as Record<string, unknown>).meta as Record<
+                string,
+                number
+            >) ?? { total: 0, last_page: 1, current_page: 1 }
+        );
+    }, [docsRaw]);
 
-            {/* زر البيع السريع — يظهر فقط لأنواع المبيعات */}
-            {isSalable && (
-              <button
-                className="btn"
-                onClick={() => setModal('quick')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  background: 'linear-gradient(135deg, var(--em), color-mix(in srgb, var(--em) 70%, var(--blue)))',
-                  color: 'white', border: 'none',
-                  padding: '8px 16px', borderRadius: 'var(--r2)',
-                  fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                  boxShadow: '0 2px 8px color-mix(in srgb, var(--em) 40%, transparent)',
-                }}
-              >
-                <i className="ti ti-bolt" style={{ fontSize: 15 }} />
-                بيع سريع
-              </button>
-            )}
-
-            {/* زر مستند جديد — يفتح الـ Modal الكامل */}
-            <button
-              className="btn btn-p"
-              onClick={() => { setActiveDoc(null); setEditDocFull(null); setModal('add'); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <i className="ti ti-plus" />
-              {docType?.name ?? 'مستند'} جديد
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── شريط البحث والفلاتر ────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div className="srch" style={{ flex: '1 1 220px', maxWidth: 320 }}>
-          <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
-          <input
-            type="text"
-            placeholder="بحث برقم المستند، اسم المتعامل..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-          />
-        </div>
-        <select
-          value={statusFilter}
-          onChange={e => { setStatus(e.target.value); setPage(1); }}
-          style={{
-            padding: '7px 12px', borderRadius: 'var(--r2)',
-            border: '1px solid var(--b3)', background: 'var(--bg1)',
-            color: 'var(--t1)', fontSize: 12.5, fontFamily: 'Tajawal, sans-serif',
-            outline: 'none', cursor: 'pointer',
-          }}
-        >
-          <option value="">كل الحالات</option>
-          {Object.entries(STATUS_CFG).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
-        <button
-          className="btn"
-          onClick={() => { setSearch(''); setStatus(''); setPage(1); }}
-          title="إعادة الضبط"
-        >
-          <i className="ti ti-refresh" />
-        </button>
-      </div>
-
-      {/* ── جدول المستندات ─────────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden', flex: 1 }}>
-        {isLoading ? (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            height: 220, gap: 10, color: 'var(--t3)',
-          }}>
-            <i className="ti ti-loader-2" style={{ fontSize: 22, animation: 'spin .8s linear infinite' }} />
-            جارٍ تحميل المستندات...
-          </div>
-        ) : items.length === 0 ? (
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', height: 220, gap: 10, color: 'var(--t4)',
-          }}>
-            <i className="ti ti-file-off" style={{ fontSize: 40 }} />
-            <div style={{ fontSize: 14, fontWeight: 700 }}>لا توجد مستندات</div>
-            <div style={{ fontSize: 12 }}>
-              {search || statusFilter
-                ? 'لا توجد نتائج تطابق البحث'
-                : `لم يتم إنشاء أي ${docType?.name ?? 'مستند'} بعد`}
-            </div>
-            {!isReadOnly && !search && !statusFilter && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                {isSalable && (
-                  <button
-                    className="btn btn-sm"
-                    style={{
-                      background: 'var(--em)', color: 'white', border: 'none',
-                      display: 'flex', alignItems: 'center', gap: 5,
-                    }}
-                    onClick={() => setModal('quick')}
-                  >
-                    <i className="ti ti-bolt" /> بيع سريع
-                  </button>
-                )}
-                <button
-                  className="btn btn-p btn-sm"
-                  onClick={() => { setActiveDoc(null); setModal('add'); }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5 }}
-                >
-                  <i className="ti ti-plus" /> إضافة أول مستند
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="tw" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity .2s' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th>رقم المستند</th>
-                    <th>التاريخ</th>
-                    <th>{isPurch ? 'المورد' : 'الزبون'}</th>
-                    <th>المستودع</th>
-                    <th>إجمالي HT</th>
-                    <th>TVA</th>
-                    <th>إجمالي TTC</th>
-                    <th>الحالة</th>
-                    <th style={{ textAlign: 'center', width: 160 }}>إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(items as Record<string, unknown>[]).map((doc) => {
-                    const status   = (doc.document_status as Record<string, unknown>)?.name as string ?? 'draft';
-                    const canEdit  = !doc.is_locked && status === 'draft';
-                    const canValid = !doc.validated_at && status === 'draft';
-                    const canLock  = !!doc.validated_at && !doc.is_locked;
-                    const canCancel = !['cancelled', 'returned'].includes(status);
-                    const docId    = Number(doc.id);
-
-                    return (
-                      <tr
-                        key={String(doc.id)}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => { setActiveDoc(doc); setModal('view'); }}
-                      >
-                        {/* رقم المستند */}
-                        <td>
-                          <span style={{
-                            fontWeight: 800, color: opColor,
-                            fontFamily: 'monospace', fontSize: 13,
-                          }}>
-                            {String(doc.document_number ?? `#${doc.id}`)}
-                          </span>
-                          {doc.is_locked && (
-                            <i className="ti ti-lock" style={{
-                              fontSize: 11, color: 'var(--t4)', marginRight: 6,
-                            }} />
-                          )}
-                        </td>
-
-                        {/* التاريخ */}
-                        <td style={{ color: 'var(--t3)', fontSize: 12 }}>
-                          {fmtDate(doc.document_date as string)}
-                        </td>
-
-                        {/* المتعامل */}
-                        <td>
-                          {doc.party
-                            ? <span style={{ fontWeight: 600, color: 'var(--t1)' }}>
-                                {String((doc.party as Record<string, unknown>).name)}
-                              </span>
-                            : <span style={{ color: 'var(--t4)' }}>نقدي</span>
-                          }
-                        </td>
-
-                        {/* المستودع */}
-                        <td style={{ color: 'var(--t3)', fontSize: 12 }}>
-                          {String((doc.warehouse as Record<string, unknown>)?.name ?? '—')}
-                        </td>
-
-                        {/* الإجماليات */}
-                        <td style={{ fontWeight: 600, color: 'var(--t2)', textAlign: 'left', direction: 'ltr' }}>
-                          {fmtNum(doc.total_ht as number)}
-                        </td>
-                        <td style={{ color: 'var(--t4)', fontSize: 12, textAlign: 'left', direction: 'ltr' }}>
-                          {fmtNum(doc.total_tva as number)}
-                        </td>
-                        <td style={{ fontWeight: 800, color: opColor, textAlign: 'left', direction: 'ltr' }}>
-                          {fmtNum(doc.total_ttc as number)}
-                        </td>
-
-                        {/* الحالة */}
-                        <td><StatusBadge status={status} /></td>
-
-                        {/* الإجراءات */}
-                        <td onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-
-                            {/* تعديل */}
-                            {!isReadOnly && canEdit && (
-                              <button
-                                className="btn btn-xs"
-                                title="تعديل"
-                                disabled={loadingEdit}
-                                onClick={() => openEditModal(doc)}
-                              >
-                                {loadingEdit && activeDoc?.id === doc.id
-                                  ? <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-                                  : <i className="ti ti-pencil" />}
-                              </button>
-                            )}
-
-                            {/* اعتماد */}
-                            {!isReadOnly && canValid && (
-                              <button
-                                className="btn btn-xs" title="اعتماد"
-                                style={{ color: 'var(--blue)', borderColor: 'color-mix(in srgb, var(--blue) 30%, transparent)' }}
-                                onClick={() => validateMutation.mutate(docId)}
-                                disabled={validateMutation.isPending}
-                              >
-                                <i className="ti ti-check" />
-                              </button>
-                            )}
-
-                            {/* قفل */}
-                            {!isReadOnly && canLock && (
-                              <button
-                                className="btn btn-xs" title="قفل"
-                                style={{ color: 'var(--orange)', borderColor: 'color-mix(in srgb, var(--orange) 30%, transparent)' }}
-                                onClick={() => lockMutation.mutate(docId)}
-                                disabled={lockMutation.isPending}
-                              >
-                                <i className="ti ti-lock" />
-                              </button>
-                            )}
-
-                            {/* طباعة */}
-                            <button
-                              className="btn btn-xs" title="طباعة"
-                              style={{ color: 'var(--t4)' }}
-                              onClick={() => window.print()}
-                            >
-                              <i className="ti ti-printer" />
-                            </button>
-
-                            {/* حذف / إلغاء */}
-                            {!isReadOnly && (
-                              canEdit
-                                ? <button
-                                    className="btn btn-xs btn-r" title="حذف"
-                                    disabled={deleteMutation.isPending}
-                                    onClick={() => {
-                                      if (confirm('هل تريد حذف هذا المستند؟')) {
-                                        deleteMutation.mutate(docId);
-                                      }
-                                    }}
-                                  >
-                                    <i className="ti ti-trash" />
-                                  </button>
-                                : canCancel
-                                  ? <button
-                                      className="btn btn-xs btn-r" title="إلغاء"
-                                      disabled={cancelMutation.isPending}
-                                      onClick={() => {
-                                        if (confirm('إلغاء هذا المستند؟')) {
-                                          cancelMutation.mutate(docId);
-                                        }
-                                      }}
-                                    >
-                                      <i className="ti ti-x" />
-                                    </button>
-                                  : null
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {(meta as Record<string, number>).last_page > 1 && (
-              <div style={{
-                padding: '10px 16px', borderTop: '1px solid var(--b1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <span style={{ fontSize: 12, color: 'var(--t4)' }}>
-                  {(meta as Record<string, number>).from}–{(meta as Record<string, number>).to}
-                  {' من '}
-                  {(meta as Record<string, number>).total}
-                </span>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button className="btn btn-xs"
-                    disabled={page <= 1}
-                    onClick={() => setPage(p => Math.max(1, p - 1))}>
-                    <i className="ti ti-chevron-right" />
-                  </button>
-                  {Array.from(
-                    { length: Math.min((meta as Record<string, number>).last_page, 7) },
-                    (_, i) => i + 1
-                  ).map(p => (
-                    <button key={p} className="btn btn-xs"
-                      style={page === p ? { background: 'var(--em)', color: '#fff', borderColor: 'var(--em)' } : {}}
-                      onClick={() => setPage(p)}>
-                      {p}
-                    </button>
-                  ))}
-                  <button className="btn btn-xs"
-                    disabled={page >= (meta as Record<string, number>).last_page}
-                    onClick={() => setPage(p => Math.min((meta as Record<string, number>).last_page, p + 1))}>
-                    <i className="ti ti-chevron-left" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* ════════════════════════════════════════════════════════════════
-          Modals
-      ════════════════════════════════════════════════════════════════ */}
-
-      {/* ✅ مودل البيع السريع */}
-      <QuickSaleModal
-        open={modal === 'quick'}
-        onClose={closeAllModals}
-        onSaved={(state) => {
-          showToast(`تم إنشاء الفاتورة ${state.document_number} بنجاح`);
-          closeAllModals();
-          invalidateDocs();
-        }}
-      />
-
-      {/* ✅ مودل الإنشاء / التعديل الكامل */}
-      {(modal === 'add' || modal === 'edit') && (
-        <CommercialDocumentModal
-          open={true}
-          documentType={docType ?? null}
-          existingDocument={modal === 'edit' ? editDocFull ?? undefined : undefined}
-          onClose={closeAllModals}
-          onSaved={() => {
-            showToast(modal === 'add' ? 'تم إنشاء المستند بنجاح' : 'تم تحديث المستند بنجاح');
-            closeAllModals();
+    // ── Mutations ─────────────────────────────────────────────────────────────
+    const validateMut = useMutation({
+        mutationFn: (id: number) => apiPost(`/documents/${id}/validate`),
+        onSuccess: () => {
+            showToast("تم الاعتماد بنجاح");
             invalidateDocs();
-          }}
-        />
-      )}
+        },
+        onError: () => showToast("فشل الاعتماد", "error"),
+    });
 
-      {/* ✅ مودل العرض */}
-      {modal === 'view' && activeDoc && (
-        <DocumentViewModal
-          doc={activeDoc}
-          docType={docType ?? null}
-          onClose={closeAllModals}
-          onEdit={() => {
-            openEditModal(activeDoc);
-          }}
-          isReadOnly={isReadOnly ?? false}
-        />
-      )}
-    </div>
-  );
-}
+    const lockMut = useMutation({
+        mutationFn: (id: number) => apiPost(`/documents/${id}/lock`),
+        onSuccess: () => {
+            showToast("تم قفل المستند");
+            invalidateDocs();
+        },
+        onError: () => showToast("فشل القفل", "error"),
+    });
 
-// ════════════════════════════════════════════════════════════════════════════
-// DocumentViewModal — عرض تفاصيل المستند
-// ════════════════════════════════════════════════════════════════════════════
-function DocumentViewModal({
-  doc, docType, onClose, onEdit, isReadOnly,
-}: {
-  doc: Record<string, unknown>;
-  docType: DocumentType | null;
-  onClose: () => void;
-  onEdit: () => void;
-  isReadOnly: boolean;
-}) {
-  const slug   = useActiveSlug();
-  const status = (doc.document_status as Record<string, unknown>)?.name as string ?? 'draft';
-  const PURCHASE_CODES = new Set(['FA', 'BR', 'DDP', 'BCF', 'AA']);
-  const isPurch = PURCHASE_CODES.has(docType?.code ?? '');
+    const cancelMut = useMutation({
+        mutationFn: (id: number) => apiPost(`/documents/${id}/cancel`),
+        onSuccess: () => {
+            showToast("تم إلغاء المستند");
+            invalidateDocs();
+        },
+        onError: () => showToast("فشل الإلغاء", "error"),
+    });
 
-  const { data: fullDoc, isLoading } = useQuery({
-    queryKey: [slug, 'doc-detail', doc.id],
-    queryFn:  () => apiGet<{ data?: unknown }>(`/documents/${doc.id}`, {
-      include: 'party,documentStatus,warehouse,fiscalYear,currency,lines,lines.product,documentType,validatedBy',
-    }).then(r => (r as Record<string, unknown>).data ?? r),
-    staleTime: 2 * 60_000,
-  });
+    const deleteMut = useMutation({
+        mutationFn: (id: number) => apiDelete(`/documents/${id}`),
+        onSuccess: () => {
+            showToast("تم الحذف بنجاح");
+            invalidateDocs();
+        },
+        onError: () => showToast("فشل الحذف", "error"),
+    });
 
-  const d = (fullDoc as Record<string, unknown>) ?? doc;
+    // ── Edit modal ────────────────────────────────────────────────────────────
+    const openEditModal = useCallback(
+        async (doc: CommercialDocument) => {
+            setLoadingEdit(true);
+            try {
+                const res = await apiGet<CommercialDocument>(
+                    `/documents/${doc.id}`,
+                    {
+                        include: [
+                            "party",
+                            "warehouse",
+                            "documentType",
+                            "fiscalYear",
+                            "lines.product",
+                            "lines.productVariant",
+                            "payments.paymentMode",
+                        ].join(","),
+                    },
+                );
+                const full =
+                    ((res as unknown as Record<string, unknown>)
+                        .data as CommercialDocument) ?? res;
+                setEditDocFull(full);
+                setModal("edit");
+            } catch {
+                showToast("فشل تحميل بيانات المستند", "error");
+            } finally {
+                setLoadingEdit(false);
+            }
+        },
+        [showToast],
+    );
 
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 500,
-        background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: '100%', maxWidth: 860, maxHeight: '92vh', overflow: 'auto',
-          background: 'var(--bg1)', borderRadius: 'var(--r3)',
-          boxShadow: '0 24px 64px rgba(0,0,0,.25)',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div style={{
-          padding: '16px 20px', borderBottom: '1px solid var(--b1)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'var(--bg2)',
-        }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)' }}>
-              {docType?.name} — {String(d.document_number ?? `#${d.id}`)}
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
-              <StatusBadge status={status} />
-              {d.is_locked && (
-                <span style={{ fontSize: 11, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <i className="ti ti-lock" style={{ fontSize: 11 }} /> مقفل
-                </span>
-              )}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {!isReadOnly && !d.is_locked && status === 'draft' && (
-              <button className="btn btn-sm" onClick={onEdit}>
-                <i className="ti ti-pencil" /> تعديل
-              </button>
-            )}
-            <button className="btn btn-sm" onClick={() => window.print()}>
-              <i className="ti ti-printer" /> طباعة
-            </button>
-            <button className="btn btn-sm btn-xs" onClick={onClose}>
-              <i className="ti ti-x" />
-            </button>
-          </div>
-        </div>
+    const closeModal = useCallback(() => {
+        setModal(null);
+        setViewDocId(null);
+        setEditDocFull(null);
+    }, []);
 
-        {/* Body */}
-        {isLoading ? (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            height: 200, gap: 10, color: 'var(--t3)',
-          }}>
-            <i className="ti ti-loader-2" style={{ fontSize: 22, animation: 'spin .8s linear infinite' }} />
-          </div>
-        ) : (
-          <div style={{ padding: 20 }}>
-            {/* معلومات */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
-              {[
-                { label: isPurch ? 'المورد' : 'الزبون', value: (d.party as Record<string, unknown>)?.name },
-                { label: 'التاريخ',          value: fmtDate(d.document_date as string) },
-                { label: 'تاريخ الاستحقاق', value: fmtDate(d.due_date as string) },
-                { label: 'المستودع',          value: (d.warehouse as Record<string, unknown>)?.name },
-                { label: 'السنة المالية',     value: (d.fiscal_year as Record<string, unknown>)?.name },
-                { label: 'العملة',            value: (d.currency as Record<string, unknown>)?.code },
-              ].filter(r => r.value).map(({ label, value }) => (
-                <div key={label} style={{
-                  padding: '10px 14px', borderRadius: 'var(--r2)',
-                  background: 'var(--bg2)', border: '1px solid var(--b1)',
-                }}>
-                  <div style={{
-                    fontSize: 10, color: 'var(--t4)', fontWeight: 700,
-                    marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.5,
-                  }}>{label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>
-                    {String(value)}
-                  </div>
-                </div>
-              ))}
-            </div>
+    const handleSortChange = useCallback(
+        (key: string, dir: "asc" | "desc" | null) => {
+            setSortParam(
+                dir ? `${dir === "desc" ? "-" : ""}${key}` : "-document_date",
+            );
+            setPage(1);
+        },
+        [],
+    );
 
-            {/* أسطر */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{
-                fontSize: 12, fontWeight: 700, color: 'var(--t4)',
-                marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5,
-              }}>أسطر المستند</div>
-              <div className="tw">
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th>#</th><th>المنتج</th>
-                      <th style={{ textAlign: 'left' }}>الكمية</th>
-                      <th style={{ textAlign: 'left' }}>سعر HT</th>
-                      <th style={{ textAlign: 'left' }}>خصم</th>
-                      <th style={{ textAlign: 'left' }}>TVA</th>
-                      <th style={{ textAlign: 'left' }}>الإجمالي TTC</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {((d.lines as Record<string, unknown>[]) ?? []).map((line, idx) => {
-                      const productName =
-                        (line.product as Record<string, unknown>)?.name as string
-                        ?? line.description as string
-                        ?? '—';
-                      return (
-                        <tr key={String(line.id ?? idx)}>
-                          <td style={{ color: 'var(--t4)', fontSize: 11 }}>{idx + 1}</td>
-                          <td>
-                            <div style={{ fontWeight: 700, color: 'var(--t1)', fontSize: 13 }}>
-                              {productName}
-                            </div>
-                            {line.description && line.description !== productName && (
-                              <div style={{ fontSize: 11, color: 'var(--t4)' }}>
-                                {String(line.description)}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ direction: 'ltr', textAlign: 'left', fontWeight: 600 }}>
-                            {parseFloat(String(line.quantity)).toLocaleString('fr-DZ')}
-                          </td>
-                          <td style={{ direction: 'ltr', textAlign: 'left' }}>
-                            {fmtNum(line.unit_price_ht as number)}
-                          </td>
-                          <td style={{ color: 'var(--red)', direction: 'ltr', textAlign: 'left' }}>
-                            {parseFloat(String(line.discount_percentage ?? 0)) > 0
-                              ? `-${line.discount_percentage}%` : '—'}
-                          </td>
-                          <td style={{ color: 'var(--t4)', direction: 'ltr', textAlign: 'left' }}>
-                            {line.tva_rate}%
-                          </td>
-                          <td style={{ fontWeight: 800, color: 'var(--em)', direction: 'ltr', textAlign: 'left' }}>
-                            {fmtNum(line.total_ttc as number)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* الإجماليات */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <div style={{ width: 300, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {[
-                  { label: 'إجمالي HT', value: d.total_ht, color: 'var(--t2)' },
-                  { label: 'TVA',       value: d.total_tva, color: 'var(--t3)' },
-                  parseFloat(String(d.total_discount ?? 0)) > 0
-                    ? { label: 'الخصم',          value: `-${fmtNum(d.total_discount as number)}`, color: 'var(--red)' }
-                    : null,
-                  parseFloat(String(d.total_stamp ?? 0)) > 0
-                    ? { label: 'الطابع الجبائي', value: d.total_stamp, color: 'var(--t3)' }
-                    : null,
-                  parseFloat(String((d as Record<string, unknown>).total_tap ?? 0)) > 0
-                    ? { label: `TAP`, value: (d as Record<string, unknown>).total_tap, color: 'var(--purple)' }
-                    : null,
-                ].filter(Boolean).map((row: unknown) => {
-                  const r = row as { label: string; value: unknown; color: string };
-                  return (
-                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: r.color }}>
-                      <span>{r.label}</span>
-                      <span style={{ fontWeight: 600, direction: 'ltr' }}>
-                        {typeof r.value === 'string' && r.value.startsWith('-')
-                          ? r.value : fmtNum(r.value as number)}
-                      </span>
+    // ── Column definitions ────────────────────────────────────────────────────
+    const columns: Column<CommercialDocument>[] = useMemo(
+        () => [
+            {
+                key: "document_number",
+                header: "رقم المستند",
+                sticky: "start",
+                width: 145,
+                sortable: true,
+                filter: { type: "text" },
+                accessor: (r) => String(r.document_number ?? r.id),
+                render: (row) => (
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                        }}
+                    >
+                        {row.is_locked && (
+                            <i
+                                className="ti ti-lock"
+                                style={{ fontSize: 10, color: "var(--t4)" }}
+                                aria-label="مقفل"
+                            />
+                        )}
+                        <span
+                            style={{
+                                fontWeight: 800,
+                                color: opColor,
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                                letterSpacing: "-.3px",
+                            }}
+                        >
+                            {String(row.document_number ?? `#${row.id}`)}
+                        </span>
                     </div>
-                  );
-                })}
+                ),
+            },
+            {
+                key: "document_date",
+                header: "التاريخ",
+                width: 110,
+                sortable: true,
+                filter: { type: "date" },
+                accessor: (r) => r.document_date,
+                render: (row) => (
+                    <span style={{ fontSize: 12, color: "var(--t3)" }}>
+                        {fmtDate(row.document_date)}
+                    </span>
+                ),
+            },
+            {
+                key: "party",
+                header: isPurch ? "المورد" : "الزبون",
+                sortable: true,
+                filter: { type: "text" },
+                accessor: (r) => getPartyName(r),
+                render: (row) => {
+                    const name = getPartyName(row);
+                    return name ? (
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: "50%",
+                                    flexShrink: 0,
+                                    background: `color-mix(in srgb, ${opColor} 14%, transparent)`,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    color: opColor,
+                                }}
+                            >
+                                {name.charAt(0)}
+                            </div>
+                            <span
+                                style={{
+                                    fontWeight: 600,
+                                    color: "var(--t1)",
+                                    fontSize: 13,
+                                }}
+                            >
+                                {name}
+                            </span>
+                        </div>
+                    ) : (
+                        <span
+                            style={{
+                                color: "var(--t4)",
+                                fontStyle: "italic",
+                                fontSize: 12,
+                            }}
+                        >
+                            نقدي
+                        </span>
+                    );
+                },
+            },
+            {
+                key: "warehouse",
+                header: "المستودع",
+                sortable: false,
+                hideOnMobile: true,
+                filter: { type: "text" },
+                accessor: (r) => getWarehouseName(r),
+                render: (row) => (
+                    <span style={{ fontSize: 12, color: "var(--t3)" }}>
+                        {getWarehouseName(row) || "—"}
+                    </span>
+                ),
+            },
+            {
+                key: "status",
+                header: "الحالة",
+                width: 135,
+                sortable: true,
+                filter: {
+                    type: "select",
+                    options: Object.entries(STATUS_CFG).map(([v, c]) => ({
+                        value: v,
+                        label: c.label,
+                    })),
+                },
+                accessor: (r) => getDocStatus(r),
+                render: (row) => <StatusBadge status={getDocStatus(row)} />,
+            },
+            {
+                key: "total_ht",
+                header: "إجمالي HT",
+                width: 130,
+                align: "end",
+                sortable: true,
+                hideOnMobile: true,
+                filter: { type: "number" },
+                accessor: (r) => Number(r.total_ht ?? 0),
+                aggregate: "sum",
+                aggregateFormat: (v) => `${fmtMoney(v)} دج`,
+                render: (row) => <MoneyCell value={row.total_ht} />,
+            },
+            {
+                key: "total_tva",
+                header: "TVA",
+                width: 110,
+                align: "end",
+                sortable: true,
+                defaultHidden: true,
+                filter: { type: "number" },
+                accessor: (r) => Number(r.total_tva ?? 0),
+                aggregate: "sum",
+                aggregateFormat: (v) => `${fmtMoney(v)} دج`,
+                render: (row) => <MoneyCell value={row.total_tva} />,
+            },
+            {
+                key: "total_ttc",
+                header: "الإجمالي TTC",
+                width: 145,
+                align: "end",
+                sortable: true,
+                filter: { type: "number" },
+                accessor: (r) => Number(r.total_ttc ?? 0),
+                aggregate: "sum",
+                aggregateFormat: (v) => `${fmtMoney(v)} دج`,
+                render: (row) => <MoneyCell value={row.total_ttc} bold />,
+            },
+            {
+                key: "net_to_pay",
+                header: "المستحق",
+                width: 145,
+                align: "end",
+                sortable: true,
+                hideOnMobile: true,
+                filter: { type: "number" },
+                accessor: (r) =>
+                    Number(
+                        (r as unknown as Record<string, unknown>).net_to_pay ??
+                            r.total_ttc ??
+                            0,
+                    ),
+                aggregate: "sum",
+                aggregateFormat: (v) => `${fmtMoney(v)} دج`,
+                render: (row) => {
+                    const ntp = Number(
+                        (row as unknown as Record<string, unknown>)
+                            .net_to_pay ??
+                            row.total_ttc ??
+                            0,
+                    );
+                    const rem = Number(
+                        (row as unknown as Record<string, unknown>)
+                            .remaining_amount ?? 0,
+                    );
+                    const paid = ntp > 0 && rem <= 0.001;
+                    return (
+                        <MoneyCell
+                            value={ntp}
+                            bold
+                            accent={
+                                paid
+                                    ? "var(--em)"
+                                    : rem > 0
+                                      ? "var(--red)"
+                                      : "var(--t2)"
+                            }
+                        />
+                    );
+                },
+            },
+            {
+                key: "due_date",
+                header: "الاستحقاق",
+                width: 110,
+                sortable: true,
+                defaultHidden: true,
+                filter: { type: "date" },
+                accessor: (r) => r.due_date ?? "",
+                render: (row) => {
+                    if (!row.due_date)
+                        return <span style={{ color: "var(--t4)" }}>—</span>;
+                    const overdue = new Date(row.due_date) < new Date();
+                    const status = getDocStatus(row);
+                    const isLate =
+                        overdue && status !== "paid" && status !== "cancelled";
+                    return (
+                        <span
+                            style={{
+                                fontSize: 12,
+                                fontWeight: isLate ? 700 : 400,
+                                color: isLate ? "var(--red)" : "var(--t3)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
+                            }}
+                        >
+                            {isLate && (
+                                <i
+                                    className="ti ti-alert-triangle"
+                                    style={{ fontSize: 11 }}
+                                    aria-label="متأخر"
+                                />
+                            )}
+                            {fmtDate(row.due_date)}
+                        </span>
+                    );
+                },
+            },
+        ],
+        [isPurch, opColor],
+    );
 
-                {/* TTC */}
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between',
-                  paddingTop: 10, marginTop: 4, borderTop: '2px solid var(--b2)',
-                  fontSize: 15, fontWeight: 800,
-                }}>
-                  <span style={{ color: 'var(--t1)' }}>المستحق الكلي</span>
-                  <span style={{ color: 'var(--em)', direction: 'ltr' }}>
-                    {fmtNum((d.net_to_pay as number) ?? (d.total_ttc as number))}
-                  </span>
+    // ── Row actions ───────────────────────────────────────────────────────────
+    const rowActions = useCallback(
+        (row: CommercialDocument) => {
+            const status = getDocStatus(row);
+            const canEdit = !isReadOnly && !row.is_locked && status === "draft";
+            const canValid =
+                !isReadOnly && !row.is_locked && status === "draft";
+            const canLock =
+                !isReadOnly &&
+                !row.is_locked &&
+                !!(row as unknown as Record<string, unknown>).validated_at;
+            const canCancel =
+                !isReadOnly && !["cancelled", "returned"].includes(status);
+            const canDelete =
+                !isReadOnly && !row.is_locked && status === "draft";
+
+            return (
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 3,
+                        justifyContent: "center",
+                    }}
+                >
+                    <ActionBtn
+                        icon="ti-eye"
+                        title="عرض"
+                        onClick={() => {
+                            setViewDocId(row.id);
+                            setModal("view");
+                        }}
+                    />
+                    {canEdit && (
+                        <ActionBtn
+                            icon={loadingEdit ? "ti-loader-2" : "ti-pencil"}
+                            title="تعديل"
+                            color="var(--blue)"
+                            disabled={loadingEdit}
+                            onClick={() => openEditModal(row)}
+                        />
+                    )}
+                    {canValid && (
+                        <ActionBtn
+                            icon="ti-check"
+                            title="اعتماد"
+                            color="var(--em)"
+                            disabled={validateMut.isPending}
+                            onClick={() => {
+                                if (
+                                    window.confirm("تأكيد اعتماد هذا المستند؟")
+                                ) {
+                                    validateMut.mutate(row.id);
+                                }
+                            }}
+                        />
+                    )}
+                    {canLock && (
+                        <ActionBtn
+                            icon="ti-lock"
+                            title="قفل"
+                            color="var(--orange)"
+                            disabled={lockMut.isPending}
+                            onClick={() => {
+                                if (window.confirm("تأكيد قفل هذا المستند؟")) {
+                                    lockMut.mutate(row.id);
+                                }
+                            }}
+                        />
+                    )}
+                    {canDelete ? (
+                        <ActionBtn
+                            icon="ti-trash"
+                            title="حذف"
+                            color="var(--red)"
+                            disabled={deleteMut.isPending}
+                            onClick={() => {
+                                if (window.confirm("تأكيد حذف هذا المستند؟")) {
+                                    deleteMut.mutate(row.id);
+                                }
+                            }}
+                        />
+                    ) : canCancel ? (
+                        <ActionBtn
+                            icon="ti-ban"
+                            title="إلغاء"
+                            color="var(--red)"
+                            disabled={cancelMut.isPending}
+                            onClick={() => {
+                                if (
+                                    window.confirm("تأكيد إلغاء هذا المستند؟")
+                                ) {
+                                    cancelMut.mutate(row.id);
+                                }
+                            }}
+                        />
+                    ) : null}
                 </div>
+            );
+        },
+        [
+            isReadOnly,
+            loadingEdit,
+            openEditModal,
+            validateMut,
+            lockMut,
+            deleteMut,
+            cancelMut,
+        ],
+    );
 
-                {/* المدفوع */}
-                {parseFloat(String(d.paid_amount ?? 0)) > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                    <span style={{ color: 'var(--t4)' }}>المدفوع</span>
-                    <span style={{ color: 'var(--green)', fontWeight: 700, direction: 'ltr' }}>
-                      {fmtNum(d.paid_amount as number)}
+    // ── Header actions ────────────────────────────────────────────────────────
+    const headerActions = useMemo(
+        () => (
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {isFetching && !isLoading && (
+                    <i
+                        className="ti ti-loader-2"
+                        aria-hidden="true"
+                        style={{
+                            fontSize: 15,
+                            color: "var(--t4)",
+                            animation: "cdp-spin .8s linear infinite",
+                        }}
+                    />
+                )}
+                {isReadOnly && (
+                    <span
+                        style={{
+                            padding: "3px 10px",
+                            borderRadius: 12,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background:
+                                "color-mix(in srgb, var(--orange) 12%, transparent)",
+                            color: "var(--orange)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                        }}
+                    >
+                        <i
+                            className="ti ti-lock"
+                            style={{ fontSize: 10 }}
+                            aria-hidden="true"
+                        />
+                        للقراءة فقط
                     </span>
-                  </div>
+                )}
+                {isSalable && !isReadOnly && (
+                    <button
+                        onClick={() => setModal("quick")}
+                        style={{
+                            height: 32,
+                            padding: "0 14px",
+                            borderRadius: 8,
+                            border: `1px solid color-mix(in srgb, ${opColor} 35%, transparent)`,
+                            background: `color-mix(in srgb, ${opColor} 8%, transparent)`,
+                            color: opColor,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontFamily: "inherit",
+                        }}
+                    >
+                        <i
+                            className="ti ti-bolt"
+                            style={{ fontSize: 14 }}
+                            aria-hidden="true"
+                        />
+                        بيع سريع
+                    </button>
+                )}
+                {!isReadOnly && (
+                    <button
+                        onClick={() => setModal("add")}
+                        style={{
+                            height: 32,
+                            padding: "0 16px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: opColor,
+                            color: "#fff",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            boxShadow: `0 2px 8px color-mix(in srgb, ${opColor} 30%, transparent)`,
+                            fontFamily: "inherit",
+                        }}
+                    >
+                        <i
+                            className="ti ti-plus"
+                            style={{ fontSize: 15 }}
+                            aria-hidden="true"
+                        />
+                        مستند جديد
+                    </button>
+                )}
+            </div>
+        ),
+        [isFetching, isLoading, isReadOnly, isSalable, opColor],
+    );
+
+    // ── Page title ────────────────────────────────────────────────────────────
+    const tableTitle = useMemo(
+        () => (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                    style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        flexShrink: 0,
+                        background: `color-mix(in srgb, ${opColor} 14%, transparent)`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                    }}
+                >
+                    <i
+                        className={`ti ${isPurch ? "ti-shopping-cart" : "ti-file-invoice"}`}
+                        style={{ fontSize: 16, color: opColor }}
+                        aria-hidden="true"
+                    />
+                </div>
+                <div>
+                    <div
+                        style={{
+                            fontWeight: 800,
+                            fontSize: 14,
+                            color: "var(--t1)",
+                            lineHeight: 1.2,
+                        }}
+                    >
+                        {docType?.name ?? typeCode}
+                    </div>
+                    {selectedYear && (
+                        <div
+                            style={{
+                                fontSize: 10,
+                                color: "var(--t4)",
+                                marginTop: 1,
+                            }}
+                        >
+                            {selectedYear.name}
+                        </div>
+                    )}
+                </div>
+            </div>
+        ),
+        [docType?.name, typeCode, isPurch, opColor, selectedYear],
+    );
+
+    // ── isExpandable — فقط الصفوف المعتمدة أو المدفوعة ───────────────────────
+    const isExpandable = useCallback((row: CommercialDocument) => {
+        const s = getDocStatus(row);
+        return s !== "draft" && s !== "cancelled";
+    }, []);
+
+    // ── Render expanded ───────────────────────────────────────────────────────
+    const renderExpanded = useCallback(
+        (row: CommercialDocument) => <ExpandedLines doc={row} />,
+        [],
+    );
+
+    // ── Row class ─────────────────────────────────────────────────────────────
+    const rowClassName = useCallback(
+        (row: CommercialDocument): string | undefined => {
+            const status = getDocStatus(row);
+            const rem = Number(
+                (row as unknown as Record<string, unknown>).remaining_amount ??
+                    0,
+            );
+            if (status === "cancelled") return "cdp-row-cancelled";
+            if (rem > 0.001 && status === "validated") return "cdp-row-overdue";
+            return undefined;
+        },
+        [],
+    );
+
+    // ════════════════════════════════════════════════════════════════════════
+    // RENDER
+    // ════════════════════════════════════════════════════════════════════════
+    return (
+        <>
+            <style>{`
+        @keyframes cdp-spin  { to { transform: rotate(360deg); } }
+        @keyframes cdp-toast-in {
+          from { transform: translateY(10px); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+        .cdp-row-cancelled td { opacity: .55; }
+        .cdp-row-overdue td:first-child {
+          border-right: 3px solid var(--red) !important;
+        }
+      `}</style>
+
+            <div
+                style={{
+                    padding: "14px 16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                    minHeight: 0,
+                    flex: 1,
+                    direction: "rtl",
+                    fontFamily: "Tajawal, sans-serif",
+                }}
+            >
+                {/* Summary cards */}
+                {items.length > 0 && (
+                    <SummaryCards
+                        items={items ?? []}
+                        opColor={opColor}
+                    />
                 )}
 
-                {/* المتبقي */}
-                {parseFloat(String(d.remaining_amount ?? 0)) > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                    <span style={{ color: 'var(--t4)' }}>المتبقي</span>
-                    <span style={{ color: 'var(--red)', fontWeight: 700, direction: 'ltr' }}>
-                      {fmtNum(d.remaining_amount as number)}
-                    </span>
-                  </div>
-                )}
-              </div>
+                {/* DataTable */}
+                <div
+                    style={{
+                        background: "var(--bg1)",
+                        border: "1px solid var(--b1)",
+                        borderRadius: "var(--r3)",
+                        overflow: "hidden",
+                        boxShadow: "0 1px 4px rgba(0,0,0,.06)",
+                        flex: 1,
+                    }}
+                >
+                    <DataTable<CommercialDocument>
+                        data={items}
+                        columns={columns}
+                        rowKey={(r) => r.id}
+                        loading={isLoading}
+                        // server-side
+                        pagination={{
+                            page: Number(meta.current_page ?? 1),
+                            perPage,
+                            total: Number(meta.total ?? 0),
+                            lastPage: Number(meta.last_page ?? 1),
+                            onPage: setPage,
+                            onPerPage: (n) => {
+                                setPerPage(n);
+                                setPage(1);
+                            },
+                        }}
+                        onFilterChange={handleFilterChange}
+                        onSortChange={handleSortChange}
+                        // ميزات v3
+                        searchable
+                        searchPlaceholder="بحث برقم المستند أو اسم المتعامل…"
+                        showAggregates
+                        aggregateLabel="إجمالي الصفحة"
+                        expandable
+                        renderExpanded={renderExpanded}
+                        isExpandable={isExpandable}
+                        // actions
+                        rowActions={rowActions}
+                        headerActions={headerActions}
+                        title={tableTitle}
+                        // export
+                        exportable
+                        exportName={`${typeCode}_${selectedYear?.name ?? ""}`}
+                        // callbacks
+                        onRowClick={(row) => {
+                            setViewDocId(row.id);
+                            setModal("view");
+                        }}
+                        rowClassName={rowClassName}
+                        emptyText={
+                            !selectedYear
+                                ? "الرجاء اختيار سنة مالية"
+                                : !docType
+                                  ? "جارٍ تحميل نوع المستند…"
+                                  : "لا توجد مستندات"
+                        }
+                    />
+                </div>
             </div>
 
-            {/* ملاحظات */}
-            {d.notes && (
-              <div style={{
-                marginTop: 16, padding: '10px 14px', borderRadius: 'var(--r2)',
-                background: 'var(--bg2)', border: '1px solid var(--b1)',
-                fontSize: 12.5, color: 'var(--t3)',
-              }}>
-                <i className="ti ti-notes" style={{ marginLeft: 6 }} />
-                {String(d.notes)}
-              </div>
+            {/* ── Modals ───────────────────────────────────────────────────────── */}
+            {(modal === "add" || modal === "edit") && (
+                <CommercialDocumentModal
+                    open
+                    documentType={docType ?? null}
+                    existingDocument={
+                        modal === "edit"
+                            ? (editDocFull ?? undefined)
+                            : undefined
+                    }
+                    onClose={closeModal}
+                    onSaved={() => {
+                        closeModal();
+                        invalidateDocs();
+                        showToast(
+                            modal === "add"
+                                ? "تم إنشاء المستند بنجاح"
+                                : "تم تحديث المستند بنجاح",
+                        );
+                    }}
+                />
             )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+
+            {modal === "quick" && (
+                <QuickSaleModal
+                    open
+                    onClose={closeModal}
+                    onSaved={(state: Record<string, unknown>) => {
+                        closeModal();
+                        invalidateDocs();
+                        showToast(
+                            `تم إنشاء ${String(state.document_number ?? "المستند")} بنجاح`,
+                        );
+                    }}
+                />
+            )}
+
+            {modal === "view" && viewDocId != null && (
+                <DocumentViewModal
+                    docId={viewDocId}
+                    docType={docType ?? null}
+                    onClose={closeModal}
+                    onEdit={() => {
+                        const doc = items.find((d) => d.id === viewDocId);
+                        if (doc) {
+                            closeModal();
+                            openEditModal(doc);
+                        }
+                    }}
+                    isReadOnly={!!isReadOnly}
+                />
+            )}
+
+            {/* Toast */}
+            <ToastContainer />
+        </>
+    );
 }
