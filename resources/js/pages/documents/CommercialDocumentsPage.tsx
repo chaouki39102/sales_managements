@@ -1630,22 +1630,70 @@ export default function CommercialDocumentsPage() {
         return parts.join(' ').trim();
     }, []);
 
-    // معالج الفلاتر المعدل
+    // ✅ معالج الفلاتر — يحوّل مفاتيح DataTable إلى params API صحيحة
     const handleFilterChange = useCallback((filters: Record<string, string>) => {
         const newFilters: Record<string, string> = {};
 
         Object.entries(filters).forEach(([key, val]) => {
-            if (key !== 'document_number' && key !== 'party' && val) {
-                newFilters[key] = val;
+            if (!val || val === '|') return;
+
+            switch (key) {
+                // ─ بحث نصي: رقم المستند + اسم المتعامل → search واحد
+                case 'document_number':
+                case 'party':
+                    break; // يُعالَج أدناه في buildSearchTerm
+
+                // ─ الحالة: DataTable يُرسل اسم الحالة مباشرة
+                case 'status':
+                    newFilters['status'] = val;
+                    break;
+
+                // ─ تاريخ المستند (range: "من|إلى")
+                case 'document_date': {
+                    const idx = val.indexOf('|');
+                    const from = idx === -1 ? val : val.slice(0, idx);
+                    const to   = idx === -1 ? ''  : val.slice(idx + 1);
+                    if (from) newFilters['date_from'] = from;
+                    if (to)   newFilters['date_to']   = to;
+                    break;
+                }
+
+                // ─ تاريخ الاستحقاق
+                case 'due_date': {
+                    const idx = val.indexOf('|');
+                    const from = idx === -1 ? val : val.slice(0, idx);
+                    const to   = idx === -1 ? ''  : val.slice(idx + 1);
+                    if (from) newFilters['due_date_from'] = from;
+                    if (to)   newFilters['due_date_to']   = to;
+                    break;
+                }
+
+                // ─ أرقام: range "min|max"
+                case 'total_ht':
+                case 'total_tva':
+                case 'total_ttc':
+                case 'net_to_pay': {
+                    const idx = val.indexOf('|');
+                    const min = idx === -1 ? val : val.slice(0, idx);
+                    const max = idx === -1 ? ''  : val.slice(idx + 1);
+                    if (min) newFilters[`${key}_min`] = min;
+                    if (max) newFilters[`${key}_max`] = max;
+                    break;
+                }
+
+                // ─ المستودع
+                case 'warehouse':
+                    newFilters['warehouse'] = val;
+                    break;
+
+                default:
+                    newFilters[key] = val;
             }
         });
 
+        // بحث نصي موحد
         const search = buildSearchTerm(filters);
-        if (search) {
-            newFilters.search = search;
-        } else {
-            delete newFilters.search;
-        }
+        if (search) newFilters['search'] = search;
 
         setServerFilters(newFilters);
         setPage(1);
@@ -1676,16 +1724,68 @@ export default function CommercialDocumentsPage() {
     // ── Fetch documents ───────────────────────────────────────────────────────
     const queryParams = useMemo(
         () => ({
+            // ── فلاتر أساسية ثابتة
             "filter[document_type_id]": docType?.id,
-            "filter[fiscal_year_id]": selectedYear?.id,
-            "filter[search]": serverFilters.search || undefined,
-            "filter[document_status.name]": serverFilters.status || undefined,
-            "filter[document_date]": serverFilters.document_date || undefined,
-            "filter[total_ttc][gte]": serverFilters.total_ttc || undefined,
+            "filter[fiscal_year_id]":   selectedYear?.id,
             include: "party,documentStatus,warehouse",
-            sort: sortParam,
+            sort:     sortParam,
             per_page: perPage,
             page,
+            // ── فلاتر ديناميكية من DataTable
+            // بحث نصي
+            ...(serverFilters.search
+                ? { "filter[search]": serverFilters.search }
+                : {}),
+            // الحالة
+            ...(serverFilters.status
+                ? { "filter[document_status.name]": serverFilters.status }
+                : {}),
+            // المستودع
+            ...(serverFilters.warehouse
+                ? { "filter[warehouse.name]": serverFilters.warehouse }
+                : {}),
+            // تاريخ المستند
+            ...(serverFilters.date_from
+                ? { "filter[document_date][gte]": serverFilters.date_from }
+                : {}),
+            ...(serverFilters.date_to
+                ? { "filter[document_date][lte]": serverFilters.date_to }
+                : {}),
+            // تاريخ الاستحقاق
+            ...(serverFilters.due_date_from
+                ? { "filter[due_date][gte]": serverFilters.due_date_from }
+                : {}),
+            ...(serverFilters.due_date_to
+                ? { "filter[due_date][lte]": serverFilters.due_date_to }
+                : {}),
+            // إجمالي HT
+            ...(serverFilters.total_ht_min
+                ? { "filter[total_ht][gte]": serverFilters.total_ht_min }
+                : {}),
+            ...(serverFilters.total_ht_max
+                ? { "filter[total_ht][lte]": serverFilters.total_ht_max }
+                : {}),
+            // إجمالي TVA
+            ...(serverFilters.total_tva_min
+                ? { "filter[total_tva][gte]": serverFilters.total_tva_min }
+                : {}),
+            ...(serverFilters.total_tva_max
+                ? { "filter[total_tva][lte]": serverFilters.total_tva_max }
+                : {}),
+            // إجمالي TTC
+            ...(serverFilters.total_ttc_min
+                ? { "filter[total_ttc][gte]": serverFilters.total_ttc_min }
+                : {}),
+            ...(serverFilters.total_ttc_max
+                ? { "filter[total_ttc][lte]": serverFilters.total_ttc_max }
+                : {}),
+            // المستحق
+            ...(serverFilters.net_to_pay_min
+                ? { "filter[net_to_pay][gte]": serverFilters.net_to_pay_min }
+                : {}),
+            ...(serverFilters.net_to_pay_max
+                ? { "filter[net_to_pay][lte]": serverFilters.net_to_pay_max }
+                : {}),
         }),
         [
             docType?.id,
@@ -1813,10 +1913,25 @@ export default function CommercialDocumentsPage() {
         setEditDocFull(null);
     }, []);
 
+    // ✅ ترجمة مفاتيح DataTable إلى sort params صحيحة للـ API
+    const SORT_KEY_MAP: Record<string, string> = {
+        'document_number': 'document_number',
+        'document_date':   'document_date',
+        'party':           'party.name',
+        'warehouse':       'warehouse.name',
+        'status':          'document_status.name',
+        'total_ht':        'total_ht',
+        'total_tva':       'total_tva',
+        'total_ttc':       'total_ttc',
+        'net_to_pay':      'net_to_pay',
+        'due_date':        'due_date',
+    };
+
     const handleSortChange = useCallback(
         (key: string, dir: "asc" | "desc" | null) => {
+            const apiKey = SORT_KEY_MAP[key] ?? key;
             setSortParam(
-                dir ? `${dir === "desc" ? "-" : ""}${key}` : "-document_date",
+                dir ? `${dir === "desc" ? "-" : ""}${apiKey}` : "-document_date",
             );
             setPage(1);
         },
@@ -2435,6 +2550,15 @@ export default function CommercialDocumentsPage() {
                         }}
                         onFilterChange={handleFilterChange}
                         onSortChange={handleSortChange}
+                        onSearchChange={(q) => {
+                            setServerFilters(prev => {
+                                const next = { ...prev };
+                                if (q) next.search = q;
+                                else delete next.search;
+                                return next;
+                            });
+                            setPage(1);
+                        }}
                         // ميزات v3
                         searchable
                         searchPlaceholder="بحث برقم المستند أو اسم المتعامل…"

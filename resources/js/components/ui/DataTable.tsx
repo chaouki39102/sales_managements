@@ -1094,6 +1094,9 @@ export function DataTable<T = Record<string, unknown>>({
 
   useEffect(() => { injectCSS(); }, []);
 
+  // ✅ يُعرَّف أولاً لأنه يُستخدم في useCallback أدناه
+  const isServerPaged = !!pagination;
+
   // ── Responsive ─────────────────────────────────────────────────────────
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -1172,8 +1175,6 @@ export function DataTable<T = Record<string, unknown>>({
   const [filters, setFilters] = useState<FilterMap>({});
   const onFilterChangeRef = useRef(onFilterChange);
   useEffect(() => { onFilterChangeRef.current = onFilterChange; }, [onFilterChange]);
-
-  const isServerPaged = !!pagination;
 
   const handleFilterChange = useCallback((key: string, val: string) => {
     setFilters(prev => {
