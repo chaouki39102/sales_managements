@@ -46,8 +46,14 @@ export function useColumnResize(initialWidths: Record<string, number>) {
     const onMove = (e: MouseEvent) => {
       if (!drag.current) return;
       const { key, startX, startW } = drag.current;
-      // RTL: handle في اليسار — السحب يميناً يكبّر، يساراً يصغّر
-      const delta = e.clientX - startX;
+      // RTL: handle في يسار العمود — السحب يساراً (clientX أقل) = تكبير
+      // LTR: handle في يمين العمود — السحب يميناً (clientX أكبر) = تكبير
+      const isRTL =
+        document.documentElement.dir === 'rtl' ||
+        document.body.dir === 'rtl';
+      const delta = isRTL
+        ? startX - e.clientX   // RTL: يسار = أكبر
+        : e.clientX - startX;  // LTR: يمين = أكبر
       setWidths(p => ({ ...p, [key]: Math.max(MIN_COL_WIDTH, startW + delta) }));
     };
     const onUp = () => { drag.current = null; };
@@ -145,7 +151,8 @@ export function useColumnDragReorder(
       const filtered = prev.filter(k => removed.has(k));
       return [...filtered, ...newKeys];
     });
-  }, [initialOrder.join(',')]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(initialOrder)]);
   const onDragStart = useCallback((key: string, e: React.DragEvent) => {
     draggingKey.current = key;
     e.dataTransfer.effectAllowed = 'move';
@@ -683,11 +690,14 @@ export function useSmartFilter<T>(
     return { success: true, filters: result, sort };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patterns]);
-  const applySmartFilter = useCallback((query: string) => {
+  const applySmartFilter = useCallback((query: string): SmartFilterResult | null => {
     const parsed = parseNaturalQuery(query);
     if (parsed && parsed.success) {
       onFilterChange(parsed.filters, parsed.sort);
+      return parsed;
     }
+    // لا تطابق → نُجرّب fallback: global search
+    return null;
   }, [parseNaturalQuery, onFilterChange]);
   return { applySmartFilter, parseNaturalQuery };
 }

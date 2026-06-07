@@ -471,46 +471,9 @@
 /* ══════════════════════════════════════
    TABLE WRAPPER
 ══════════════════════════════════════ */
-.dt-table-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    /* شريط تمرير خفيف */
-    scrollbar-width: thin;
-    scrollbar-color: var(--b3) transparent;
-    /* ✅ cursor افتراضي يوحي بإمكانية السحب */
-    cursor: grab;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-.dt-table-wrap::-webkit-scrollbar {
-    height: 5px;
-}
-.dt-table-wrap::-webkit-scrollbar-thumb {
-    background: var(--b3);
-    border-radius: 6px;
-}
-
-/* ✅ أثناء السحب الفعلي */
-.dt-table-wrap.dt-dragging {
-    cursor: grabbing;
-    scroll-behavior: auto;
-}
-/* ✅ منع تحديد النص أثناء السحب */
-.dt-table-wrap.dt-dragging * {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    pointer-events: none;
-}
-/* ✅ السماح للأزرار بالعمل عند عدم السحب */
-.dt-table-wrap:not(.dt-dragging) button,
-.dt-table-wrap:not(.dt-dragging) input,
-.dt-table-wrap:not(.dt-dragging) a {
-    pointer-events: auto;
-}
+/* ── dt-table-wrap: alias لـ dt-table-outer (دُمجا لمنع التكرار) ──────────────
+   الأنماط الحقيقية في .dt-table-outer أسفل الملف */
+.dt-table-wrap { overflow-x: auto; }
 
 .dt-v7 table {
     width: 100%;
@@ -2470,4 +2433,292 @@ th:hover .dt-th-pin-btn,
   gap: 8px;
   padding: 12px 16px 14px;
   border-top: 1px solid var(--b1, #e2e8f0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   إصلاحات v10-fixes
+   ١. Conditional Formatting classes جاهزة
+   ٢. SmartFilter dialog
+   ٣. dt-table-wrap alias ← dt-table-outer (اندماج كامل)
+   ٤. Batch bar
+   ٥. Context Menu
+   ٦. Saved Views menu
+   ٧. Resize handle RTL
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Conditional Formatting — classes جاهزة (تُستدعى من conditionalFormatting prop) */
+.dt-cf-red    { background: rgba(239,68,68,.10) !important; color: #991b1b !important; font-weight: 600; }
+.dt-cf-green  { background: rgba(34,197,94,.10) !important; color: #14532d !important; font-weight: 600; }
+.dt-cf-yellow { background: rgba(245,158,11,.10) !important; color: #78350f !important; font-weight: 600; }
+.dt-cf-blue   { background: rgba(59,130,246,.10) !important; color: #1e3a8a !important; font-weight: 600; }
+.dt-cf-bold   { font-weight: 800 !important; }
+.dt-cf-italic { font-style: italic !important; }
+.dt-cf-strike { text-decoration: line-through !important; }
+
+/* ── 2. Smart Filter dialog + Save View dialog */
+.dt-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 99998;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
+}
+.dt-dialog {
+    background: var(--bg2);
+    border: 1px solid var(--b2);
+    border-radius: var(--r3, 12px);
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    min-width: 380px;
+    max-width: 520px;
+    width: 90%;
+    z-index: 99999;
+    display: flex; flex-direction: column;
+    animation: dt-dialog-in .18s ease;
+}
+@keyframes dt-dialog-in {
+    from { opacity: 0; transform: scale(.96) translateY(8px); }
+    to   { opacity: 1; transform: none; }
+}
+.dt-dialog-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--b1);
+}
+.dt-dialog-title {
+    font-size: 14px; font-weight: 700; color: var(--t1);
+    display: flex; align-items: center; gap: 8px;
+}
+.dt-dialog-title i { color: var(--em); }
+.dt-dialog-close {
+    background: none; border: none; cursor: pointer;
+    color: var(--t4); font-size: 16px;
+    padding: 4px; border-radius: 5px;
+    transition: background .12s, color .12s;
+}
+.dt-dialog-close:hover { background: var(--bg4); color: var(--t1); }
+.dt-dialog-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.dt-dialog-hint { font-size: 12px; color: var(--t3); line-height: 1.5; }
+.dt-dialog-input { width: 100%; font-size: 13px; }
+.dt-dialog-footer {
+    display: flex; gap: 8px; justify-content: flex-start;
+    padding: 12px 18px; border-top: 1px solid var(--b1);
+}
+
+/* ── 3. Batch bar */
+.dt-batch-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg2));
+    border-top: 1px solid color-mix(in srgb, var(--em, #0a8a5c) 20%, transparent);
+    gap: 10px; border-radius: 0 0 var(--r2, 8px) var(--r2, 8px);
+    animation: slide-up-bar .2s ease;
+}
+@keyframes slide-up-bar {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: none; }
+}
+.dt-batch-info  { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--em); }
+.dt-batch-actions { display: flex; gap: 6px; }
+.dt-batch-discard { color: var(--t3) !important; }
+.dt-batch-discard:hover { color: var(--red, #dc2626) !important; }
+.dt-batch-save {
+    background: var(--em) !important;
+    color: #fff !important;
+    border-color: var(--em) !important;
+}
+.dt-batch-save:hover { opacity: .88; }
+.dt-batch-save:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── 4. Context Menu */
+.dt-context-menu {
+    min-width: 180px;
+    animation: dt-ctx-in .12s ease;
+}
+@keyframes dt-ctx-in {
+    from { opacity: 0; transform: scale(.96); }
+    to   { opacity: 1; transform: none; }
+}
+.dt-context-item {
+    direction: rtl;
+    transition: background .1s !important;
+}
+.dt-context-item:hover:not(:disabled) {
+    background: var(--bg3) !important;
+}
+.dt-context-item i { flex-shrink: 0; }
+
+/* ── 5. Pending cell */
+.dt-cell-pending {
+    border-bottom: 2px solid #f59e0b !important;
+    background: rgba(245,158,11,.06) !important;
+}
+.dt-pending-value { color: #92400e; font-style: italic; }
+
+/* ── 6. Cell error tooltip */
+.dt-cell-error {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    right: 0;
+    background: var(--red, #dc2626);
+    color: #fff;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+    z-index: 50;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(220,38,38,.25);
+    font-weight: 500;
+}
+.dt-cell-error::after {
+    content: '';
+    position: absolute;
+    top: 100%; right: 10px;
+    border: 4px solid transparent;
+    border-top-color: var(--red, #dc2626);
+}
+
+/* ── 7. Group rows */
+.dt-group-row {
+    cursor: pointer;
+    background: var(--bg3) !important;
+    user-select: none;
+}
+.dt-group-row:hover td { background: var(--bg4) !important; }
+.dt-group-row td { border-bottom: 1px solid var(--b2); padding: 0; }
+.dt-group-cell {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    direction: rtl;
+}
+.dt-group-chevron { color: var(--t3); transition: transform .18s; font-size: 13px; }
+.dt-group-label   { font-size: 12px; font-weight: 700; color: var(--t1); flex: 1; }
+.dt-group-count   {
+    background: var(--em); color: #fff;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 7px; border-radius: 20px; min-width: 22px; text-align: center;
+}
+.dt-group-subtotal td {
+    background: color-mix(in srgb, var(--em, #0a8a5c) 5%, var(--bg2));
+    font-size: 11px;
+}
+
+/* ── 8. Resize handle RTL — يسار العمود */
+.dt-rh {
+    position: absolute;
+    /* RTL: handle يجلس على يسار العمود */
+    left: 0; right: auto;
+    top: 0; bottom: 0;
+    width: 5px;
+    cursor: col-resize;
+    z-index: 5;
+    border-left: 2px solid transparent;
+    transition: border-color .15s;
+}
+.dt-rh:hover,
+.dt-th:has(.dt-rh:active) .dt-rh {
+    border-left-color: var(--em);
+}
+
+/* ── 9. Pinned columns — RTL-aware borders */
+.dt-sticky-start {
+    position: sticky !important;
+    right: 0;
+    z-index: 2;
+    border-left: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
+}
+.dt-sticky-end {
+    position: sticky !important;
+    left: 0;
+    z-index: 2;
+    border-right: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
+}
+.dt-pinned { background: color-mix(in srgb, var(--em, #0a8a5c) 4%, var(--bg2)) !important; }
+th.dt-pinned { background: color-mix(in srgb, var(--em, #0a8a5c) 6%, var(--bg3)) !important; }
+
+/* ── 10. Active cell (keyboard nav) */
+.dt-cell-active {
+    outline: 2px solid var(--em) !important;
+    outline-offset: -2px;
+    background: rgba(10,138,92,.06) !important;
+    position: relative; z-index: 1;
+}
+
+/* ── 11. Pin menu dropdown */
+.dt-pin-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: var(--bg2);
+    border: 1px solid var(--b2);
+    border-radius: var(--r2, 8px);
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    min-width: 170px;
+    z-index: 9999;
+    padding: 4px 0;
+    animation: dt-ctx-in .12s ease;
+}
+.dt-pin-menu button {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 7px 12px;
+    background: none; border: none;
+    font-size: 12px; color: var(--t1);
+    cursor: pointer; font-family: inherit; text-align: right;
+    transition: background .1s;
+}
+.dt-pin-menu button:hover { background: var(--bg3); }
+.dt-pin-menu button.active { color: var(--em); font-weight: 600; }
+.dt-pin-menu button i { color: var(--em); font-size: 13px; }
+
+/* ── 12. Toolbar group buttons */
+.dt-toolbar-group-btns { display: flex; align-items: center; gap: 4px; }
+
+/* ── 13. Pin button في رأس العمود */
+.dt-th-pin-btn {
+    background: none; border: none; cursor: pointer;
+    padding: 2px 3px; opacity: 0;
+    transition: opacity .15s, color .15s;
+    color: var(--t4); border-radius: 4px;
+    line-height: 1; font-size: 11px; flex-shrink: 0;
+}
+th:hover .dt-th-pin-btn, .dt-th-pin-btn.active { opacity: 1; }
+.dt-th-pin-btn.active  { color: var(--em); }
+.dt-th-pin-btn:hover   { background: var(--bg4); color: var(--em); }
+
+/* ── 14. Column pin actions in col menu */
+.dt-col-pin-actions { display: flex; gap: 2px; margin-right: auto; }
+.dt-pin-btn {
+    background: none; border: 1px solid var(--b2);
+    border-radius: 4px; padding: 2px 5px;
+    font-size: 11px; cursor: pointer; color: var(--t4);
+    transition: all .12s; line-height: 1;
+}
+.dt-pin-btn:hover, .dt-pin-btn.active { border-color: var(--em); color: var(--em); background: var(--emb); }
+
+/* ── 15. dt-col-item layout fix للـ pin buttons */
+.dt-col-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+.dt-col-item > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 16. Bulk clear */
+.dt-bulk-clear {
+    background: none; border: none; cursor: pointer;
+    color: var(--t4); font-size: 14px;
+    display: flex; align-items: center;
+    padding: 4px; border-radius: 4px;
+    margin-right: auto;
+    transition: color .12s;
+}
+.dt-bulk-clear:hover { color: var(--red, #dc2626); }
+
+/* ── 17. virtual badge */
+.dt-virtual-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600;
+    color: var(--em); background: var(--emb);
+    border: 1px solid var(--embo, rgba(10,138,92,.2));
+    padding: 3px 10px; border-radius: 20px;
 }

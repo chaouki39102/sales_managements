@@ -262,6 +262,10 @@ export function DataTable<T = Record<string, unknown>>({
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
   }, []);
 
+  // ── Pagination state — مُعرَّف هنا لأن handleFilterChange تحتاجه ──────────
+  const [localPage, setLocalPage] = useState(() => url.readInitialPage());
+  const [localPerPage, setLocalPerPage] = useState(15);
+
   // ── Column filters ────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<FilterMap>(() => url.readInitialFilters());
   const onFilterChangeRef = useRef(onFilterChange);
@@ -280,6 +284,7 @@ export function DataTable<T = Record<string, unknown>>({
         Promise.resolve().then(() => onFilterChangeRef.current?.(next));
         return next;
       });
+      // setLocalPage مُعرَّف لاحقاً لكن useState يعمل بـ hoisting — آمن
       if (!isServerPaged) setLocalPage(1);
     },
     [isServerPaged, url],
@@ -303,12 +308,14 @@ export function DataTable<T = Record<string, unknown>>({
   const [openFilterKey, setOpenFilterKey] = useState<string | null>(null);
   const filterBtnRefs = useRef<Record<string, React.RefObject<HTMLButtonElement>>>({});
 
-  const getFilterBtnRef = (key: string): React.RefObject<HTMLButtonElement> => {
+  // ✅ إصلاح: useCallback لمنع إنشاء ref جديد في كل render
+  // الاستدعاء المزدوج (ref + anchorRef) لا يُنشئ كائنَين مختلفَين
+  const getFilterBtnRef = useCallback((key: string): React.RefObject<HTMLButtonElement> => {
     if (!filterBtnRefs.current[key]) {
       filterBtnRefs.current[key] = React.createRef<HTMLButtonElement>();
     }
     return filterBtnRefs.current[key];
-  };
+  }, []);
 
   // ── Multi-sort (v9) ───────────────────────────────────────────────────────
   const {
@@ -372,9 +379,7 @@ export function DataTable<T = Record<string, unknown>>({
     collapseAll: collapseAllGroups,
   } = useRowGrouping(processedData, groupBy, orderedColumns as Column<Record<string, unknown>>[]);
 
-  // ── Pagination ────────────────────────────────────────────────────────────
-  const [localPage, setLocalPage] = useState(() => url.readInitialPage());
-  const [localPerPage, setLocalPerPage] = useState(15);
+  // ── Pagination (state مُعرَّف أعلاه قبل filters) ────────────────────────
 
   const paginationRef = useRef(pagination);
   useEffect(() => {
@@ -681,10 +686,11 @@ export function DataTable<T = Record<string, unknown>>({
 
   const submitSmartFilter = useCallback(() => {
     const q = smartFilterInput.trim();
-    if (q) {
-      applySmartFilter(q);
-      onSmartFilterApply?.(q, { success: true, filters: {}, sort: [] });
-    }
+    if (!q) return;
+    // applySmartFilter يستدعي parseNaturalQuery داخلياً ويُطبق الفلاتر
+    // applyClientFilter في utils.ts يدعم الآن صيغة operator:value
+    applySmartFilter(q);
+    onSmartFilterApply?.(q, { success: true, filters: {}, sort: [] });
     setSmartFilterOpen(false);
     setSmartFilterInput('');
   }, [smartFilterInput, applySmartFilter, onSmartFilterApply]);
@@ -756,35 +762,44 @@ export function DataTable<T = Record<string, unknown>>({
 
   const handleApplyView = useCallback(
     (view: SavedView) => {
+      // ✅ إصلاح: تطبيق كامل الحالة المحفوظة (كانت تُطبق نصف الحالة فقط)
       setFilters(view.filters);
       setSorts(view.sorts);
       setGlobalQuery(view.searchQuery);
-      setLocalPerPage(view.pageSize);
-      setHiddenKeys(new Set(view.hiddenColumns));
-      if (view.columnOrder) setColumnOrder(view.columnOrder);
+
+      // pageSize
+      if (view.pageSize) setLocalPerPage(view.pageSize);
+
+      // hiddenColumns — كامل
+      setHiddenKeys(new Set(view.hiddenColumns ?? []));
+
+      // columnOrder — كامل
+      if (view.columnOrder?.length) setColumnOrder(view.columnOrder);
+
+      // pinnedColumns — إعادة بناء كاملة (امسح القديم أولاً)
       if (view.pinnedColumns) {
-        Object.entries(view.pinnedColumns).forEach(([side, keys]) => {
-          keys.forEach(key => pinColumn(key, side as 'start' | 'end'));
-        });
+        // امسح كل التثبيتات الحالية ثم طبّق المحفوظة
+        clearAllPins();
+        (view.pinnedColumns.start ?? []).forEach(key => pinColumn(key, 'start'));
+        (view.pinnedColumns.end   ?? []).forEach(key => pinColumn(key, 'end'));
+      } else {
+        clearAllPins();
       }
+
       setLocalPage(1);
       if (urlState?.enabled) {
         url.writeFilters(view.filters);
         url.writeSort(view.sorts);
         url.writeSearch(view.searchQuery);
+        url.writePage(1);
       }
+      setViewsMenuOpen(false);
     },
     [
-      setFilters,
-      setSorts,
-      setGlobalQuery,
-      setLocalPerPage,
-      setHiddenKeys,
-      setColumnOrder,
-      pinColumn,
-      setLocalPage,
-      url,
-      urlState,
+      setFilters, setSorts, setGlobalQuery,
+      setLocalPerPage, setHiddenKeys,
+      setColumnOrder, pinColumn, clearAllPins,
+      setLocalPage, url, urlState,
     ],
   );
 

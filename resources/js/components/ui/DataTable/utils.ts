@@ -46,26 +46,74 @@ function compareDates(d1Str: string, d2Str: string, op: 'lt' | 'gt'): boolean {
   return op === 'lt' ? d1 < d2 : d1 > d2;
 }
 
+// ─── تحليل قيمة فلتر SmartFilter (operator:value) ──────────────────────────
+//
+// SmartFilter يُنتج قيماً بصيغة "gt:30" أو "contains:أحمد" أو "30|60" (range)
+// هذه الدالة تُحوّلها لمقارنة رقمية/نصية صحيحة.
+// إذا لم تكن بصيغة operator:value → تُعامَل كفلتر نصي عادي.
+//
+function applySmartOperator(rv: string, rawVal: string): boolean {
+  const colonIdx = rawVal.indexOf(':');
+  if (colonIdx === -1) return rv.includes(rawVal.toLowerCase());
+
+  const op  = rawVal.slice(0, colonIdx);
+  const val = rawVal.slice(colonIdx + 1);
+
+  switch (op) {
+    case 'eq':       return rv === val.toLowerCase();
+    case 'neq':      return rv !== val.toLowerCase();
+    case 'contains': return rv.includes(val.toLowerCase());
+    case 'starts':   return rv.startsWith(val.toLowerCase());
+    case 'ends':     return rv.endsWith(val.toLowerCase());
+    case 'gt':  { const n = parseFloat(rv); const v = parseFloat(val); return !isNaN(n) && !isNaN(v) && n > v; }
+    case 'gte': { const n = parseFloat(rv); const v = parseFloat(val); return !isNaN(n) && !isNaN(v) && n >= v; }
+    case 'lt':  { const n = parseFloat(rv); const v = parseFloat(val); return !isNaN(n) && !isNaN(v) && n < v; }
+    case 'lte': { const n = parseFloat(rv); const v = parseFloat(val); return !isNaN(n) && !isNaN(v) && n <= v; }
+    default:         return rv.includes(rawVal.toLowerCase());
+  }
+}
+
 export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Column<T>[]): T[] {
   const active = Object.entries(filters).filter(([, v]) => v !== '');
   if (!active.length) return data;
+
   return data.filter(row =>
     active.every(([key, rawVal]) => {
+      // ── فلاتر SmartFilter بدون عمود مطابق (مثل 'overdue_days', 'party.name')
+      // نبحث عن العمود أولاً وإذا لم نجده نطبق البحث على الحقل المباشر
       const col = columns.find(c => c.key === key);
-      if (!col?.filter) return true;
-      const { type } = col.filter;
+
+      // إذا لا يوجد عمود → محاولة dot-notation على الكائن مباشرة
+      if (!col) {
+        const parts = key.split('.');
+        let val: unknown = row;
+        for (const part of parts) {
+          if (val == null || typeof val !== 'object') { val = undefined; break; }
+          val = (val as Record<string, unknown>)[part];
+        }
+        const rv = val == null ? '' : String(val).toLowerCase();
+        return applySmartOperator(rv, rawVal);
+      }
+
+      const { type } = col.filter ?? { type: 'text' };
       const rv = getStringValue(row, col);
+
       if (type === 'select') return rv === rawVal.toLowerCase();
       if (type === 'multiselect' || type === 'dynamic-multiselect') {
         const selected = rawVal.split(',').filter(Boolean);
         return !selected.length || selected.includes(rv);
       }
       if (type === 'number') {
-        const { min, max } = decodeRange(rawVal);
-        const numRv = parseFloat(rv);
-        if (min && !isNaN(parseFloat(min)) && numRv < parseFloat(min)) return false;
-        if (max && !isNaN(parseFloat(max)) && numRv > parseFloat(max)) return false;
-        return true;
+        // range عادي (min|max)
+        if (rawVal.includes('|') && !rawVal.includes(':')) {
+          const { min, max } = decodeRange(rawVal);
+          const numRv = parseFloat(rv);
+          if (min && !isNaN(parseFloat(min)) && numRv < parseFloat(min)) return false;
+          if (max && !isNaN(parseFloat(max)) && numRv > parseFloat(max)) return false;
+          return true;
+        }
+        // SmartFilter operator
+        return applySmartOperator(rv, rawVal);
       }
       if (type === 'date') {
         const { min, max } = decodeRange(rawVal);
@@ -73,7 +121,8 @@ export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Col
         if (max && !compareDates(rv, max, 'gt')) return false;
         return true;
       }
-      return rv.includes(rawVal.toLowerCase());
+      // text / fallback — يدعم SmartFilter operators أيضاً
+      return applySmartOperator(rv, rawVal);
     }),
   );
 }
