@@ -1,14 +1,21 @@
 // ════════════════════════════════════════════════════════════════════════════
-// DataTable/FilterPopup.tsx  —  v8.2
-// ✅ إصلاح: useCallback لتحديث الموضع + إزالة التبعيات غير المستقرة
+// DataTable/FilterPopup.tsx  — v8.1
+//
+// ✅ createPortal → يُعرَض في document.body خارج الـ <table> تماماً
+//    يمنع اقتطاع الـ popup بسبب overflow:hidden على الـ <th>
+// ✅ Smart positioning: يفتح لأعلى إذا لا مساحة أدناه
+//    يُحدَّث عند scroll/resize
+// ✅ getRawValue يدعم dot-notation (party.name, warehouse.name...)
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { createPortal } from 'react-dom';
-import type { Column } from './types';
-import { decodeRange, encodeRange, getRawValue } from './utils';
-import { useClickOutside, useEscapeKey } from './hooks';
-import { StaticMultiSelect, DynamicMultiSelect } from './MultiSelect';
+import React, { useState, useEffect, useRef, memo } from 'react';
+import { createPortal }                              from 'react-dom';
+import type { Column }                               from './types';
+import { decodeRange, encodeRange, getRawValue }     from './utils';
+import { useClickOutside, useEscapeKey }             from './hooks';
+import { StaticMultiSelect, DynamicMultiSelect }     from './MultiSelect';
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface FilterPopupProps {
   col:       Column<Record<string, unknown>>;
@@ -20,48 +27,59 @@ interface FilterPopupProps {
   data?:     Record<string, unknown>[];
 }
 
+// ─── FilterPopup ─────────────────────────────────────────────────────────────
+
 const FilterPopup = memo(function FilterPopup({
   col, value, onChange, anchorRef, onClose, allData, data,
 }: FilterPopupProps) {
+
   const popupRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
-  // دالة مستقرة لحساب الموضع
-  const updatePosition = useCallback(() => {
-    if (!anchorRef.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    const popupW = 240;
-    const popupH = 370;
-    let left = rect.right - popupW;
-    if (left < 8) left = 8;
-    if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
-    const spaceBelow = window.innerHeight - rect.bottom - 8;
-    const top = spaceBelow >= popupH
-      ? rect.bottom + 4
-      : Math.max(8, rect.top - popupH - 4);
-    setPos({ top, left });
-  }, [anchorRef]);
-
+  // حساب الموضع ويُحدَّث عند scroll/resize
   useEffect(() => {
-    updatePosition();
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
-    return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
+    if (!anchorRef.current) return;
+
+    const update = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+      const rect   = anchor.getBoundingClientRect();
+      const popupW = 240;
+      const popupH = 370;
+      let   left   = rect.right - popupW;
+      if (left < 8) left = 8;
+      if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const top = spaceBelow >= popupH
+        ? rect.bottom + 4
+        : Math.max(8, rect.top - popupH - 4);
+      setPos({ top, left });
     };
-  }, [updatePosition]);
+
+    update();
+    // يُحدَّث عند scroll أي عنصر (true = capture phase)
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [anchorRef]);
 
   useClickOutside(popupRef, anchorRef, onClose);
   useEscapeKey(onClose);
 
+  // لا نُعرِض حتى يُحسب الموضع
   if (!col.filter || !pos) return null;
 
   const { type } = col.filter;
-  const hasVal = value !== '' && value !== '|';
-  const header = typeof col.header === 'string' ? col.header : '';
+  const hasVal   = value !== '' && value !== '|';
+  const header   = typeof col.header === 'string' ? col.header : '';
+
+  // ── المحتوى حسب نوع الفلتر ───────────────────────────────────────────────
 
   const renderContent = () => {
+    // Text
     if (type === 'text') return (
       <input
         className={`dt-fi${hasVal ? ' act' : ''}`}
@@ -70,9 +88,11 @@ const FilterPopup = memo(function FilterPopup({
         autoFocus
         onChange={e => onChange(e.target.value)}
         placeholder="ابحث..."
+        aria-label={`فلتر ${header}`}
       />
     );
 
+    // Select
     if (type === 'select') return (
       <select
         className={`dt-fi${hasVal ? ' act' : ''}`}
@@ -87,6 +107,7 @@ const FilterPopup = memo(function FilterPopup({
       </select>
     );
 
+    // Number range
     if (type === 'number') {
       const { min, max } = decodeRange(value);
       return (
@@ -97,6 +118,7 @@ const FilterPopup = memo(function FilterPopup({
             value={min}
             placeholder="من"
             onChange={e => onChange(encodeRange(e.target.value, max))}
+            aria-label="الحد الأدنى"
           />
           <span className="dt-range-sep">—</span>
           <input
@@ -105,11 +127,13 @@ const FilterPopup = memo(function FilterPopup({
             value={max}
             placeholder="إلى"
             onChange={e => onChange(encodeRange(min, e.target.value))}
+            aria-label="الحد الأعلى"
           />
         </div>
       );
     }
 
+    // Date range
     if (type === 'date') {
       const { min, max } = decodeRange(value);
       return (
@@ -121,6 +145,7 @@ const FilterPopup = memo(function FilterPopup({
               type="date"
               value={min}
               onChange={e => onChange(encodeRange(e.target.value, max))}
+              aria-label="تاريخ البداية"
             />
           </div>
           <div>
@@ -130,25 +155,27 @@ const FilterPopup = memo(function FilterPopup({
               type="date"
               value={max}
               onChange={e => onChange(encodeRange(min, e.target.value))}
+              aria-label="تاريخ النهاية"
             />
           </div>
         </div>
       );
     }
 
-    if (type === 'multiselect') {
-      return (
-        <StaticMultiSelect
-          options={col.filter.options as { value: string; label: string }[]}
-          value={value}
-          onChange={onChange}
-          onClose={onClose}
-        />
-      );
-    }
+    // Static multiselect
+    if (type === 'multiselect') return (
+      <StaticMultiSelect
+        options={col.filter.options as { value: string; label: string }[]}
+        value={value}
+        onChange={onChange}
+        onClose={onClose}
+      />
+    );
 
+    // Dynamic multiselect — يبني خياراته من البيانات الحالية
     if (type === 'dynamic-multiselect') {
       const sourceData = allData ?? data ?? [];
+      // ✅ getRawValue يدعم dot-notation الآن
       const rawValues = [...new Set(
         sourceData
           .map(row => {
@@ -173,6 +200,7 @@ const FilterPopup = memo(function FilterPopup({
 
   const showFooter = hasVal && type !== 'multiselect' && type !== 'dynamic-multiselect';
 
+  // ✅ Portal → يُعرَض في document.body بدلاً من داخل <th>
   return createPortal(
     <div
       ref={popupRef}
@@ -182,7 +210,9 @@ const FilterPopup = memo(function FilterPopup({
       aria-label={`فلتر ${header}`}
     >
       {header && <div className="dt-flt-popup-title">{header}</div>}
+
       {renderContent()}
+
       {showFooter && (
         <div className="dt-flt-footer">
           <button

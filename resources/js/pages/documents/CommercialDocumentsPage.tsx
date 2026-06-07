@@ -1635,9 +1635,13 @@ export default function CommercialDocumentsPage() {
     const isSalable = SALE_CODES.has(typeCode ?? "");
     const opColor = isPurch ? "var(--purple)" : "var(--em)";
 
-    // ✅ v4 — handleFilterChange الصحيح
-    // DataTable يُرسل range كـ "min|max" ← RangeFilter.php يتوقع "min,max"
-    // مفاتيح الأعمدة يجب أن تطابق AllowedFilter في الباكاند مباشرة
+    // ✅ v4.1 — handleFilterChange
+    //
+    // DataTable يُرسل:
+    //   range:             "min|max"     → RangeFilter.php يتوقع "min,max"
+    //   dynamic-multiselect: "a,b,c"     → filter[party.name]=a,b,c (IN)
+    //   text/number/date:  string عادي
+    //
     const handleFilterChange = useCallback((filters: Record<string, string>) => {
         const converted: Record<string, string> = {};
 
@@ -1654,6 +1658,8 @@ export default function CommercialDocumentsPage() {
                 // "2026-01-01|2026-12-31" → "2026-01-01,2026-12-31"
                 converted[key] = val.replace('|', ',');
             } else {
+                // dynamic-multiselect و text و select — يُرسَل كما هو
+                // "الشركة الوطنية,مؤسسة النور" → filter[party.name]=الشركة الوطنية,مؤسسة النور
                 converted[key] = val;
             }
         }
@@ -1706,10 +1712,10 @@ export default function CommercialDocumentsPage() {
         if (serverFilters.search)
             params["filter[search]"] = serverFilters.search;
 
-        // ── Text filters (partial match) ───────────────────────────────────
-        if (serverFilters["document_number"])
-            params["filter[document_number]"] = serverFilters["document_number"];
-
+        // ── Dynamic multiselect / Text filters ────────────────────────────
+        // party.name و warehouse.name: يمكن أن يكونا text عادي أو comma-separated
+        // الباكاند (AllowedFilter::callback) يُعالجهما بـ whereHas + LIKE
+        // عند تمرير "a,b,c" → يمكن تعديل الباكاند لـ whereIn أو نُرسل أول قيمة فقط
         if (serverFilters["party.name"])
             params["filter[party.name]"] = serverFilters["party.name"];
 

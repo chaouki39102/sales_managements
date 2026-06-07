@@ -1,7 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
-// DataTable/utils.ts  —  v8.2
-// إصلاح منطق مقارنة التواريخ (كان مقلوباً)
-// إزالة استيراد React من ملف الدوال الخالصة
+// DataTable/utils.ts
+// دوال مساعدة خالصة (pure functions) — بدون React، بدون side effects
 // ════════════════════════════════════════════════════════════════════════════
 
 import type { Column, SortState, FilterMap, AggregateType, RangeFilter } from './types';
@@ -10,6 +9,8 @@ import type { Column, SortState, FilterMap, AggregateType, RangeFilter } from '.
 
 export function getRawValue<T>(row: T, col: Column<T>): unknown {
   if (col.accessor) return col.accessor(row);
+  // ✅ دعم dot-notation: "party.name" → row.party.name
+  // مطلوب لأعمدة مثل key:"party.name", key:"warehouse.name", key:"document_status.name"
   if (col.key.includes('.')) {
     const parts = col.key.split('.');
     let val: unknown = row;
@@ -39,7 +40,17 @@ export function decodeRange(val: string): RangeFilter {
   return { min: val.slice(0, idx), max: val.slice(idx + 1) };
 }
 
-// ─── Client-side filter (بمنطق تواريخ مباشر وصحيح) ───────────────────────────
+// ─── Date comparison ─────────────────────────────────────────────────────────
+
+function compareDates(d1Str: string, d2Str: string, op: 'lt' | 'gt'): boolean {
+  if (!d1Str || !d2Str) return true;
+  const d1 = new Date(d1Str);
+  const d2 = new Date(d2Str);
+  if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return false;
+  return op === 'lt' ? d1 < d2 : d1 > d2;
+}
+
+// ─── Client-side filter ───────────────────────────────────────────────────────
 
 export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Column<T>[]): T[] {
   const active = Object.entries(filters).filter(([, v]) => v !== '');
@@ -69,10 +80,8 @@ export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Col
 
       if (type === 'date') {
         const { min, max } = decodeRange(rawVal);
-        const dateRv = new Date(rv);
-        // ✅ المنطق الصحيح: استبعد إذا كان التاريخ خارج النطاق
-        if (min && dateRv < new Date(min)) return false;
-        if (max && dateRv > new Date(max)) return false;
+        if (min && !compareDates(rv, min, 'lt')) return false;
+        if (max && !compareDates(rv, max, 'gt')) return false;
         return true;
       }
 
@@ -82,7 +91,7 @@ export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Col
   );
 }
 
-// ─── Global search, sort, aggregate (بدون تغيير) ─────────────────────────────
+// ─── Global search ────────────────────────────────────────────────────────────
 
 export function applyGlobalSearch<T>(data: T[], query: string, columns: Column<T>[]): T[] {
   const q = query.trim().toLowerCase();
@@ -92,6 +101,8 @@ export function applyGlobalSearch<T>(data: T[], query: string, columns: Column<T
     cols.some(col => String(getRawValue(row, col) ?? '').toLowerCase().includes(q)),
   );
 }
+
+// ─── Client-side sort ─────────────────────────────────────────────────────────
 
 export function applyClientSort<T>(data: T[], sort: SortState, columns: Column<T>[]): T[] {
   if (!sort.key || !sort.dir) return data;
@@ -107,6 +118,8 @@ export function applyClientSort<T>(data: T[], sort: SortState, columns: Column<T
   });
 }
 
+// ─── Aggregate ────────────────────────────────────────────────────────────────
+
 export function computeAggregate<T>(rows: T[], col: Column<T>, type: AggregateType): number | null {
   const nums = rows
     .map(r => { const v = getRawValue(r, col); return typeof v === 'number' ? v : parseFloat(String(v ?? '')); })
@@ -121,6 +134,8 @@ export function computeAggregate<T>(rows: T[], col: Column<T>, type: AggregateTy
   }
 }
 
+// ─── CSV export ───────────────────────────────────────────────────────────────
+
 export function exportToCSV<T>(data: T[], columns: Column<T>[], name: string): void {
   const cols = columns.filter(c => typeof (c.exportHeader ?? c.header) === 'string');
   const hdr  = cols.map(c => `"${(c.exportHeader ?? c.header as string)}"`).join(',');
@@ -133,6 +148,8 @@ export function exportToCSV<T>(data: T[], columns: Column<T>[], name: string): v
   a.href = url; a.download = `${name}.csv`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
+
+// ─── Pagination ───────────────────────────────────────────────────────────────
 
 export function buildPageNumbers(cur: number, last: number): (number | '…')[] {
   if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
@@ -148,10 +165,13 @@ export function buildPageNumbers(cur: number, last: number): (number | '…')[] 
   return pages;
 }
 
-// ─── CSS alignment (RTL-aware) — الآن بدون React ─────────────────────────────
+// ─── CSS alignment (RTL-aware) ────────────────────────────────────────────────
 
-export function getTextAlign(align?: Column['align']): 'left' | 'right' | 'center' {
+export function getTextAlign(align?: Column['align']): React.CSSProperties['textAlign'] {
   if (align === 'center') return 'center';
   if (align === 'end') return 'left';   // RTL: end = يسار
   return 'right';                        // RTL: start = يمين
 }
+
+// ── prevent TS error on React import in utils ─────────────────────────────────
+import type React from 'react';
