@@ -62,10 +62,14 @@ export {
   useKeyboardNav,              // v10
   useBatchEdit,                // v10
   useCellValidation,           // v10
-   useClipboardPaste,
+  useClipboardPaste,
   useSmartFilter,
   useSavedViews,
   useContextMenu,
+  // v10.1 exports
+  DEFAULT_SMART_FILTER_PATTERNS,
 } from './hooks';
+
+export type { SmartFilterPattern } from './hooks';
 export { exportToExcel, parseTSV } from './utils';
 export { default as ContextMenu } from './ContextMenu';

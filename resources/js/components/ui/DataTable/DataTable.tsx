@@ -326,12 +326,22 @@ export function DataTable<T = Record<string, unknown>>({
   const handleSortToggle = useCallback(
     (key: string, e: React.MouseEvent) => {
       const shiftKey = multiSort && e.shiftKey;
+      // toggleMultiSort يحدّث sorts ويستدعي onMultiSortChange داخلياً
+      // نستمع على التغيير عبر useEffect لكتابة URL بعد التحديث
       toggleMultiSort(key, shiftKey);
-      url.writeSort(sorts);
       if (!isServerPaged) setLocalPage(1);
     },
-    [multiSort, toggleMultiSort, url, sorts, isServerPaged],
+    [multiSort, toggleMultiSort, isServerPaged],
   );
+
+  // كتابة URL بعد تحديث sorts (ليس أثناء render)
+  const sortsRef = useRef(sorts);
+  useEffect(() => { sortsRef.current = sorts; }, [sorts]);
+  useEffect(() => {
+    if (!url.enabled) return;
+    url.writeSort(sorts);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sorts]);
 
   // ── Client-side data processing ───────────────────────────────────────────
   const isClientFiltered = !onFilterChange;
@@ -647,6 +657,12 @@ export function DataTable<T = Record<string, unknown>>({
     { allowMultiCell: true },
   );
 
+  // ── Smart Filter + Saved Views — Dialog states (يجب قبل الـ callbacks) ────
+  const [smartFilterOpen, setSmartFilterOpen] = useState(false);
+  const [smartFilterInput, setSmartFilterInput] = useState('');
+  const smartFilterRef = useRef<HTMLDivElement>(null);
+  const smartInputRef = useRef<HTMLInputElement>(null);
+
   // ── Smart Filter (اللغة العربية) 🆕 ───────────────────────────────────────
   const { applySmartFilter } = useSmartFilter(columns, (newFilters, newSorts) => {
     setFilters(newFilters);
@@ -659,14 +675,36 @@ export function DataTable<T = Record<string, unknown>>({
   });
 
   const handleSmartFilter = useCallback(() => {
-    const userQuery = prompt(
-      '🔍 فلتر ذكي: اكتب وصفاً مثل "فواتير متأخرة أكثر من 30 يوم" أو "الفرز حسب التاريخ تنازلي"',
-    );
-    if (userQuery) {
-      applySmartFilter(userQuery);
-      onSmartFilterApply?.(userQuery, { success: true, filters: {}, sort: [] });
+    setSmartFilterOpen(true);
+    setTimeout(() => smartInputRef.current?.focus(), 50);
+  }, []);
+
+  const submitSmartFilter = useCallback(() => {
+    const q = smartFilterInput.trim();
+    if (q) {
+      applySmartFilter(q);
+      onSmartFilterApply?.(q, { success: true, filters: {}, sort: [] });
     }
-  }, [applySmartFilter, onSmartFilterApply]);
+    setSmartFilterOpen(false);
+    setSmartFilterInput('');
+  }, [smartFilterInput, applySmartFilter, onSmartFilterApply]);
+
+  const closeSmartFilter = useCallback(() => {
+    setSmartFilterOpen(false);
+    setSmartFilterInput('');
+  }, []);
+
+  // Close on click outside
+  useEffect(() => {
+    if (!smartFilterOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (smartFilterRef.current && !smartFilterRef.current.contains(e.target as Node)) {
+        closeSmartFilter();
+      }
+    };
+    document.addEventListener('mousedown', handler, true);
+    return () => document.removeEventListener('mousedown', handler, true);
+  }, [smartFilterOpen, closeSmartFilter]);
 
   // ── Saved Views 🆕 ────────────────────────────────────────────────────────
   const { loadViews, saveView, deleteView } = useSavedViews(
@@ -674,13 +712,22 @@ export function DataTable<T = Record<string, unknown>>({
   );
   const [savedViewsList, setSavedViewsList] = useState<SavedView[]>([]);
   const [viewsMenuOpen, setViewsMenuOpen] = useState(false);
+  const [saveViewDialogOpen, setSaveViewDialogOpen] = useState(false);
+  const [saveViewName, setSaveViewName] = useState('');
+  const saveViewInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (enableSavedViews) setSavedViewsList(loadViews());
   }, [enableSavedViews, loadViews]);
 
   const handleSaveCurrentView = useCallback(() => {
-    const name = prompt('💾 أدخل اسم العرض الجديد');
+    setSaveViewDialogOpen(true);
+    setSaveViewName('');
+    setTimeout(() => saveViewInputRef.current?.focus(), 50);
+  }, []);
+
+  const commitSaveView = useCallback(() => {
+    const name = saveViewName.trim();
     if (!name) return;
     saveView(name, {
       filters,
@@ -692,7 +739,10 @@ export function DataTable<T = Record<string, unknown>>({
       pinnedColumns: pinConfig,
     });
     setSavedViewsList(loadViews());
+    setSaveViewDialogOpen(false);
+    setSaveViewName('');
   }, [
+    saveViewName,
     filters,
     sorts,
     globalQuery,
@@ -867,8 +917,8 @@ export function DataTable<T = Record<string, unknown>>({
   const getSortIndex = (key: string) => sorts.findIndex(s => s.key === key);
   const getSortDir = (key: string) => sorts.find(s => s.key === key)?.dir ?? null;
 
-  // ─── Render Helper: صف بيانات ──────────────────────────────────────────────
-  const renderDataRow = (row: T, absoluteIdx: number) => {
+  // ─── Render Helper: صف بيانات (useCallback لتجنب إعادة إنشاء الدالة) ──────
+  const renderDataRow = useCallback((row: T, absoluteIdx: number) => {
     const rKey = rowKey(row, absoluteIdx);
     const isSelected = selectedKeys.has(rKey);
     const isExpanded = expandedKeys.has(rKey);
@@ -1027,7 +1077,15 @@ export function DataTable<T = Record<string, unknown>>({
         )}
       </React.Fragment>
     );
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    rowKey, selectable, expandable, showIndex, rowActions, keyboardNav,
+    visibleCols, editingCell, batchEdit, batch, conditionalFormatting,
+    getEffectiveSticky, activeCell, getError, startEdit, activateCell,
+    commitEdit, cancelEdit, onRowClick, rowClassName,
+    curPage, perPage, isVirtual, rowHeight, totalColSpan,
+    renderExpanded, expandedKeys, toggleExpanded, selectedKeys, toggleRow,
+  ]);
 
   // ════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -1192,7 +1250,11 @@ export function DataTable<T = Record<string, unknown>>({
                 <div className="dt-col-menu" style={{ minWidth: '200px' }}>
                   <div className="dt-col-menu-header">
                     <span>العروض المحفوظة</span>
-                    <button onClick={handleSaveCurrentView}>
+                    <button
+                      onClick={() => { setViewsMenuOpen(false); handleSaveCurrentView(); }}
+                      type="button"
+                      title="حفظ العرض الحالي"
+                    >
                       <i className="ti ti-plus" /> حفظ
                     </button>
                   </div>
@@ -1409,7 +1471,7 @@ export function DataTable<T = Record<string, unknown>>({
                   tableLayout: 'fixed',
                   width: '100%',
                 }
-              : { tableLayout: 'fixed', width: '100%' }
+              : { tableLayout: 'auto', width: 'max-content', minWidth: '100%' }
           }
         >
           <colgroup>
@@ -1966,6 +2028,123 @@ export function DataTable<T = Record<string, unknown>>({
           items={(contextMenuItems || defaultContextMenuItems)(menuState.context)}
           onClose={closeMenu}
         />
+      )}
+
+      {/* 🆕 SMART FILTER DIALOG */}
+      {enableSmartFilter && smartFilterOpen && (
+        <div className="dt-overlay" role="presentation" aria-hidden="true">
+          <div
+            ref={smartFilterRef}
+            className="dt-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="فلتر ذكي"
+          >
+            <div className="dt-dialog-header">
+              <span className="dt-dialog-title">
+                <i className="ti ti-robot" />
+                فلتر ذكي بالعربية
+              </span>
+              <button className="dt-dialog-close" onClick={closeSmartFilter} type="button" aria-label="إغلاق">
+                <i className="ti ti-x" />
+              </button>
+            </div>
+            <div className="dt-dialog-body">
+              <p className="dt-dialog-hint">
+                اكتب وصفاً مثل: &quot;فواتير متأخرة أكثر من 30 يوم&quot; أو &quot;الفرز حسب التاريخ تنازلي&quot;
+              </p>
+              <input
+                ref={smartInputRef}
+                className="dt-fi dt-dialog-input"
+                type="text"
+                value={smartFilterInput}
+                onChange={e => setSmartFilterInput(e.target.value)}
+                placeholder="اكتب استعلامك هنا..."
+                onKeyDown={e => {
+                  if (e.key === 'Enter') submitSmartFilter();
+                  if (e.key === 'Escape') closeSmartFilter();
+                }}
+                aria-label="نص الفلتر الذكي"
+              />
+            </div>
+            <div className="dt-dialog-footer">
+              <button className="dt-tbtn" onClick={closeSmartFilter} type="button">
+                إلغاء
+              </button>
+              <button
+                className="dt-tbtn dt-batch-save"
+                onClick={submitSmartFilter}
+                disabled={!smartFilterInput.trim()}
+                type="button"
+              >
+                <i className="ti ti-filter" />
+                تطبيق الفلتر
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 SAVE VIEW DIALOG */}
+      {enableSavedViews && saveViewDialogOpen && (
+        <div className="dt-overlay" role="presentation" aria-hidden="true">
+          <div
+            className="dt-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="حفظ العرض"
+          >
+            <div className="dt-dialog-header">
+              <span className="dt-dialog-title">
+                <i className="ti ti-bookmark" />
+                حفظ العرض الحالي
+              </span>
+              <button
+                className="dt-dialog-close"
+                onClick={() => setSaveViewDialogOpen(false)}
+                type="button"
+                aria-label="إغلاق"
+              >
+                <i className="ti ti-x" />
+              </button>
+            </div>
+            <div className="dt-dialog-body">
+              <p className="dt-dialog-hint">أدخل اسماً للعرض ليتم حفظ الفلاتر والترتيب وإعدادات الأعمدة.</p>
+              <input
+                ref={saveViewInputRef}
+                className="dt-fi dt-dialog-input"
+                type="text"
+                value={saveViewName}
+                onChange={e => setSaveViewName(e.target.value)}
+                placeholder="اسم العرض..."
+                onKeyDown={e => {
+                  if (e.key === 'Enter') commitSaveView();
+                  if (e.key === 'Escape') setSaveViewDialogOpen(false);
+                }}
+                aria-label="اسم العرض"
+                maxLength={50}
+              />
+            </div>
+            <div className="dt-dialog-footer">
+              <button
+                className="dt-tbtn"
+                onClick={() => setSaveViewDialogOpen(false)}
+                type="button"
+              >
+                إلغاء
+              </button>
+              <button
+                className="dt-tbtn dt-batch-save"
+                onClick={commitSaveView}
+                disabled={!saveViewName.trim()}
+                type="button"
+              >
+                <i className="ti ti-device-floppy" />
+                حفظ
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

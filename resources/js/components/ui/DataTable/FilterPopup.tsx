@@ -8,7 +8,7 @@
 // ✅ getRawValue يدعم dot-notation (party.name, warehouse.name...)
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useEffect, useRef, memo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, memo } from 'react';
 import { createPortal }                              from 'react-dom';
 import type { Column }                               from './types';
 import { decodeRange, encodeRange, getRawValue }     from './utils';
@@ -37,30 +37,70 @@ const FilterPopup = memo(function FilterPopup({
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   // حساب الموضع ويُحدَّث عند scroll/resize
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!anchorRef.current) return;
 
     const update = () => {
       const anchor = anchorRef.current;
       if (!anchor) return;
-      const rect   = anchor.getBoundingClientRect();
-      const popupW = 240;
+
+      const rect = anchor.getBoundingClientRect();
+
+      // إذا كان الـ rect فارغاً (العنصر لم يُرسم بعد في الـ DOM) → تجاهل
+      if (rect.width === 0 && rect.height === 0) return;
+
+      const popupW = 250;
       const popupH = 370;
-      let   left   = rect.right - popupW;
-      if (left < 8) left = 8;
-      if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
-      const spaceBelow = window.innerHeight - rect.bottom - 8;
-      const top = spaceBelow >= popupH
-        ? rect.bottom + 4
-        : Math.max(8, rect.top - popupH - 4);
+
+      // getBoundingClientRect تعطي إحداثيات relative للـ viewport
+      // position:fixed تعمل relative للـ viewport مباشرة
+      // لذا لا نحتاج window.scrollY — نستخدم rect.bottom/top مباشرة
+
+      // الموضع الأفقي: RTL-aware
+      // في RTL: الـ popup يظهر على يسار الزر (بجانب اليسار)
+      // نحسب من rect.left في RTL و rect.right في LTR
+      const isRTL = document.documentElement.dir === 'rtl' ||
+                    document.body.dir === 'rtl';
+      let left: number;
+      if (isRTL) {
+        // نضع الـ popup على يسار الزر (rect.left) بدءاً من يمين الـ popup
+        left = rect.left;
+        if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
+        if (left < 8) left = 8;
+      } else {
+        left = rect.right - popupW;
+        if (left < 8) left = 8;
+        if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
+      }
+
+      // الموضع العمودي: أسفل الزر افتراضياً، وأعلاه إذا لا مساحة
+      // نضمن أن top لا يكون سالباً أو خارج الشاشة
+      const anchorBottom = rect.bottom;
+      const anchorTop    = rect.top;
+      const spaceBelow   = window.innerHeight - anchorBottom - 8;
+      let   top: number;
+      if (spaceBelow >= Math.min(popupH, 200)) {
+        top = anchorBottom + 4;
+      } else {
+        top = Math.max(8, anchorTop - popupH - 4);
+      }
+      // صيانة: إذا لا يزال top خاطئاً نضعه مكان الزر
+      if (top < 0 || top > window.innerHeight - 50) {
+        top = Math.min(Math.max(8, anchorBottom), window.innerHeight - 100);
+      }
+
       setPos({ top, left });
     };
 
+    // نستدعي update مرة مباشرة (layout effect يعمل بعد الـ paint مباشرة)
+    // ثم setTimeout كـ fallback للحالات التي يكون فيها الـ button خارج الـ viewport
     update();
-    // يُحدَّث عند scroll أي عنصر (true = capture phase)
+    const timer = setTimeout(update, 16);
+
     window.addEventListener('scroll', update, true);
     window.addEventListener('resize', update);
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('scroll', update, true);
       window.removeEventListener('resize', update);
     };
@@ -205,7 +245,7 @@ const FilterPopup = memo(function FilterPopup({
     <div
       ref={popupRef}
       className="dt-flt-popup"
-      style={{ top: pos.top, left: pos.left }}
+      style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 99999 }}
       role="dialog"
       aria-label={`فلتر ${header}`}
     >

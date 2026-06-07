@@ -46,7 +46,8 @@ export function useColumnResize(initialWidths: Record<string, number>) {
     const onMove = (e: MouseEvent) => {
       if (!drag.current) return;
       const { key, startX, startW } = drag.current;
-      const delta = startX - e.clientX;
+      // RTL: handle في اليسار — السحب يميناً يكبّر، يساراً يصغّر
+      const delta = e.clientX - startX;
       setWidths(p => ({ ...p, [key]: Math.max(MIN_COL_WIDTH, startW + delta) }));
     };
     const onUp = () => { drag.current = null; };
@@ -448,12 +449,16 @@ export function useBatchEdit({
   onBatchSave?: (edits: PendingEdit[]) => void;
 }) {
   const [state, setState] = useState<BatchEditState>({ pending: {}, history: [], future: [] });
+  // refs لضمان أن keydown handler يستدعي أحدث نسخة دون stale closure
+  const undoRef = useRef<() => void>(() => {});
+  const redoRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     if (!enabled) return;
     const handler = (e: KeyboardEvent) => {
       const isCtrl = e.ctrlKey || e.metaKey;
-      if (isCtrl && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-      if (isCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+      if (isCtrl && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undoRef.current(); }
+      if (isCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redoRef.current(); }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
@@ -501,6 +506,10 @@ export function useBatchEdit({
       return { pending, history: [...prev.history, next], future };
     });
   }, []);
+  // تحديث refs بعد كل render
+  undoRef.current = undo;
+  redoRef.current = redo;
+
   const save = useCallback(() => {
     if (!onBatchSave) return;
     const edits: PendingEdit[] = [];
@@ -605,32 +614,56 @@ export function useClipboardPaste<T>(
       }
     }
   }, [tableRef, data, columns, rowKey, onCellEdit, batchEdit, batchRecord, transform]);
+  // ref للـ handler لتجنب re-register عند كل render
+  const handlePasteRef = useRef(handlePaste);
+  useEffect(() => { handlePasteRef.current = handlePaste; }, [handlePaste]);
+
   useEffect(() => {
     const el = tableRef.current;
     if (!el) return;
-    el.addEventListener('paste', handlePaste);
-    return () => el.removeEventListener('paste', handlePaste);
-  }, [tableRef, handlePaste]);
+    const stableHandler = (e: Event) => handlePasteRef.current(e as ClipboardEvent);
+    el.addEventListener('paste', stableHandler);
+    return () => el.removeEventListener('paste', stableHandler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableRef]);
 }
 
 // ─── useSmartFilter (تحليل اللغة العربية) ───────────────────────────────────
 
+// نوع النمط القابل للتمرير من الخارج
+export interface SmartFilterPattern {
+  regex: RegExp;
+  field: string;
+  operator: 'gt' | 'lt' | 'gte' | 'lte' | 'eq' | 'contains' | 'between' | 'sort';
+  valueType: 'string' | 'number';
+}
+
+// الأنماط الافتراضية للغة العربية — قابلة للتوسعة
+export const DEFAULT_SMART_FILTER_PATTERNS: SmartFilterPattern[] = [
+  { regex: /فاتورة(?:ات)?\s+أكثر\s+من\s+(\d+)\s+يوم/,     field: 'overdue_days',         operator: 'gt',       valueType: 'number' },
+  { regex: /أقل\s+من\s+(\d+)\s+([^\s]+)/,                  field: '$2',                   operator: 'lt',       valueType: 'number' },
+  { regex: /بين\s+(\d+)\s+و\s+(\d+)/,                      field: 'range',                operator: 'between',  valueType: 'number' },
+  { regex: /العميل\s+([^\s]+)/,                                field: 'party.name',           operator: 'contains', valueType: 'string' },
+  { regex: /الحالة\s+([^\s]+)/,                                field: 'document_status.name', operator: 'eq',       valueType: 'string' },
+  { regex: /الفرز\s+حسب\s+([^\s]+)\s+(تصاعدي|تنازلي)/,      field: '$1',                   operator: 'sort',     valueType: 'string' },
+];
+
 export function useSmartFilter<T>(
   columns: Column<T>[],
-  onFilterChange: (filters: Record<string, string>, sorts?: MultiSortState) => void
+  onFilterChange: (filters: Record<string, string>, sorts?: MultiSortState) => void,
+  /** أنماط مخصصة — إذا مُررت تحل محل الافتراضية بالكامل */
+  customPatterns?: SmartFilterPattern[]
 ) {
+  const patterns = useMemo(
+    () => customPatterns ?? DEFAULT_SMART_FILTER_PATTERNS,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [customPatterns],
+  );
   const parseNaturalQuery = useCallback((query: string): SmartFilterResult | null => {
     const q = query.trim();
     const result: Record<string, string> = {};
     let sort: MultiSortState | undefined;
-    const patterns: { regex: RegExp; field: string; operator: string; valueType: 'string' | 'number' }[] = [
-      { regex: /فاتورة(?:ات)?\s+أكثر\s+من\s+(\d+)\s+يوم/, field: 'overdue_days', operator: 'gt', valueType: 'number' },
-      { regex: /أقل\s+من\s+(\d+)\s+([^\s]+)/, field: '$2', operator: 'lt', valueType: 'number' },
-      { regex: /بين\s+(\d+)\s+و\s+(\d+)/, field: 'range', operator: 'between', valueType: 'number' },
-      { regex: /العميل\s+([^\s]+)/, field: 'party.name', operator: 'contains', valueType: 'string' },
-      { regex: /الحالة\s+([^\s]+)/, field: 'document_status.name', operator: 'eq', valueType: 'string' },
-      { regex: /الفرز\s+حسب\s+([^\s]+)\s+(تصاعدي|تنازلي)/, field: '$1', operator: 'sort', valueType: 'string' },
-    ];
+
     for (const p of patterns) {
       const match = q.match(p.regex);
       if (match) {
@@ -648,7 +681,8 @@ export function useSmartFilter<T>(
     }
     if (Object.keys(result).length === 0 && !sort) return null;
     return { success: true, filters: result, sort };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patterns]);
   const applySmartFilter = useCallback((query: string) => {
     const parsed = parseNaturalQuery(query);
     if (parsed && parsed.success) {
@@ -693,46 +727,62 @@ export function useContextMenu(
   containerRef: React.RefObject<HTMLElement>
 ) {
   const [state, setState] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, context: null });
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+
+  // نستخدم DOM MouseEvent مباشرةً لأن الـ listener مسجَّل عبر addEventListener
+  const handleContextMenu = useCallback((e: MouseEvent) => {
     e.preventDefault();
-    let target = e.target as HTMLElement;
+    const target = e.target as HTMLElement;
     let context: ContextMenuContext | null = null;
-    if (target.closest('.dt-td')) {
-      const cell = target.closest('.dt-td') as HTMLElement;
-      const rowIndexAttr = cell.getAttribute('data-row-index');
-      const colKey = cell.getAttribute('data-col-key');
-      if (rowIndexAttr !== null && colKey) {
-        context = { type: 'cell', rowIndex: parseInt(rowIndexAttr, 10), colKey, originalEvent: e };
+
+    const cellEl = target.closest('.dt-td') as HTMLElement | null;
+    const rowEl  = target.closest('.dt-row') as HTMLElement | null;
+    const thEl   = target.closest('th')     as HTMLElement | null;
+
+    // نحوّل DOM MouseEvent إلى React.MouseEvent للتوافق مع النوع
+    const reactEvent = e as unknown as React.MouseEvent;
+
+    if (cellEl) {
+      const rowIndex = cellEl.getAttribute('data-row-index');
+      const colKey   = cellEl.getAttribute('data-col-key');
+      if (rowIndex !== null && colKey) {
+        context = { type: 'cell', rowIndex: parseInt(rowIndex, 10), colKey, originalEvent: reactEvent };
       }
-    } else if (target.closest('.dt-row')) {
-      const row = target.closest('.dt-row') as HTMLElement;
-      const rowIndexAttr = row.getAttribute('data-row-index');
-      if (rowIndexAttr !== null) {
-        context = { type: 'row', rowIndex: parseInt(rowIndexAttr, 10), originalEvent: e };
+    } else if (rowEl) {
+      const rowIndex = rowEl.getAttribute('data-row-index');
+      if (rowIndex !== null) {
+        context = { type: 'row', rowIndex: parseInt(rowIndex, 10), originalEvent: reactEvent };
       }
-    } else if (target.closest('th')) {
-      const th = target.closest('th') as HTMLElement;
-      const colKey = th.getAttribute('data-col-key');
+    } else if (thEl) {
+      const colKey = thEl.getAttribute('data-col-key');
       if (colKey) {
-        context = { type: 'header', colKey, originalEvent: e };
+        context = { type: 'header', colKey, originalEvent: reactEvent };
       }
     }
+
     if (!context) return;
     setState({ visible: true, x: e.clientX, y: e.clientY, context });
   }, []);
+
   const closeMenu = useCallback(() => {
     setState(prev => ({ ...prev, visible: false }));
   }, []);
+
+  // ref لضمان قراءة أحدث قيمة لـ closeMenu بدون إعادة تسجيل
+  const closeMenuRef = useRef(closeMenu);
+  useEffect(() => { closeMenuRef.current = closeMenu; }, [closeMenu]);
+
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => { if (state.visible) closeMenu(); };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [state.visible, closeMenu]);
+    const handler = () => closeMenuRef.current();
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    container.addEventListener('contextmenu', handleContextMenu as any);
-    return () => container.removeEventListener('contextmenu', handleContextMenu as any);
+    container.addEventListener('contextmenu', handleContextMenu);
+    return () => container.removeEventListener('contextmenu', handleContextMenu);
   }, [containerRef, handleContextMenu]);
+
   return { menuState: state, closeMenu, setContext: setState };
 }

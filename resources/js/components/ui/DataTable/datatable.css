@@ -99,7 +99,8 @@
     background: var(--bg2);
     border: 1px solid var(--b2);
     border-radius: var(--r3);
-    overflow: hidden;
+    /* لا نضع overflow:hidden هنا — يمنع السكرول الأفقي للجدول */
+    overflow: visible;
     box-shadow: var(--shadow2);
     /* خط علوي ملون يعبّر عن هوية المشروع */
     border-top: 2px solid var(--em);
@@ -628,13 +629,14 @@
     box-shadow: 0 0 0 2px var(--bg3);
 }
 
-/* ── Resize handle ── */
+/* ── Resize handle — RTL: الشريط في اليسار لأن الجدول عربي ── */
 .dt-rh {
     position: absolute;
-    right: 0;
+    left: 0;
+    right: auto;
     top: 0;
     bottom: 0;
-    width: 5px;
+    width: 6px;
     cursor: col-resize;
     z-index: 4;
     transition: background 0.15s;
@@ -644,15 +646,17 @@
     position: absolute;
     top: 20%;
     bottom: 20%;
-    right: 2px;
-    width: 1px;
-    background: var(--b3);
-    border-radius: 1px;
-    transition: background 0.15s;
+    left: 2px;
+    right: auto;
+    width: 2px;
+    background: var(--b2);
+    border-radius: 2px;
+    transition: background 0.15s, width 0.15s;
 }
 .dt-rh:hover::after,
 .dt-rh:active::after {
     background: var(--em);
+    width: 3px;
 }
 
 /* ══════════════════════════════════════
@@ -1578,6 +1582,7 @@ body.dark .dt-skel {
 /* الحاوية الخارجية عند تفعيل virtual */
 .dt-table-outer {
     overflow-x: auto;
+    overflow-y: visible;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: var(--b3) transparent;
@@ -1586,6 +1591,15 @@ body.dark .dt-skel {
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
+    width: 100%;
+    /* ✅ لا نضع will-change أو transform هنا — يكسران position:fixed للـ FilterPopup */
+}
+
+/* ✅ الجدول نفسه: max-content يسمح بالتمرير الأفقي عند كثرة الأعمدة */
+.dt-table-outer table {
+    width: max-content !important;
+    min-width: 100%;
+    table-layout: auto !important;
 }
 .dt-table-outer::-webkit-scrollbar {
     height: 5px;
@@ -2348,4 +2362,112 @@ th:hover .dt-th-pin-btn,
 .dt-context-item:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: -2px;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Smart Filter & Save View Dialogs
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.dt-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(2px);
+  animation: dt-fade-in 0.15s ease;
+}
+
+@keyframes dt-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.dt-dialog {
+  background: var(--bg2, #fff);
+  border: 1px solid var(--b2, #cbd5e1);
+  border-radius: var(--r3, 14px);
+  box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.25);
+  min-width: 360px;
+  max-width: 480px;
+  width: 90vw;
+  animation: dt-slide-up 0.18s ease;
+  direction: rtl;
+}
+
+@keyframes dt-slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.dt-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--b1, #e2e8f0);
+}
+
+.dt-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--t1, #0f172a);
+}
+
+.dt-dialog-title .ti {
+  color: var(--em, #0a8a5c);
+  font-size: 16px;
+}
+
+.dt-dialog-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  border-radius: var(--r1, 6px);
+  cursor: pointer;
+  color: var(--t3, #475569);
+  transition: background 0.15s, color 0.15s;
+}
+
+.dt-dialog-close:hover {
+  background: var(--bg3, #f1f5f9);
+  color: var(--t1, #0f172a);
+}
+
+.dt-dialog-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dt-dialog-hint {
+  font-size: 12px;
+  color: var(--t3, #475569);
+  line-height: 1.5;
+}
+
+.dt-dialog-input {
+  width: 100% !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+}
+
+.dt-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--b1, #e2e8f0);
 }
