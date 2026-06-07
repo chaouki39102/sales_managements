@@ -1,16 +1,19 @@
 // ════════════════════════════════════════════════════════════════════════════
-// DataTable/utils.ts
-// دوال مساعدة خالصة (pure functions) — بدون React، بدون side effects
+// DataTable/utils.ts  —  v10.0
+//
+// ✅ كل دوال v9 بدون تغيير
+// 🆕 applyConditionalFormat  — تطبيق التنسيق الشرطي على خلية
 // ════════════════════════════════════════════════════════════════════════════
 
-import type { Column, SortState, FilterMap, AggregateType, RangeFilter } from './types';
+import type {
+  Column, SortState, MultiSortState, FilterMap, AggregateType, RangeFilter,
+  ConditionalFormat,
+} from './types';
 
 // ─── Raw value extraction ─────────────────────────────────────────────────────
 
 export function getRawValue<T>(row: T, col: Column<T>): unknown {
   if (col.accessor) return col.accessor(row);
-  // ✅ دعم dot-notation: "party.name" → row.party.name
-  // مطلوب لأعمدة مثل key:"party.name", key:"warehouse.name", key:"document_status.name"
   if (col.key.includes('.')) {
     const parts = col.key.split('.');
     let val: unknown = row;
@@ -30,9 +33,7 @@ export function getStringValue<T>(row: T, col: Column<T>): string {
 
 // ─── Range encode/decode ─────────────────────────────────────────────────────
 
-export function encodeRange(min: string, max: string): string {
-  return `${min}|${max}`;
-}
+export function encodeRange(min: string, max: string): string { return `${min}|${max}`; }
 
 export function decodeRange(val: string): RangeFilter {
   const idx = val.indexOf('|');
@@ -55,21 +56,17 @@ function compareDates(d1Str: string, d2Str: string, op: 'lt' | 'gt'): boolean {
 export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Column<T>[]): T[] {
   const active = Object.entries(filters).filter(([, v]) => v !== '');
   if (!active.length) return data;
-
   return data.filter(row =>
     active.every(([key, rawVal]) => {
       const col = columns.find(c => c.key === key);
       if (!col?.filter) return true;
       const { type } = col.filter;
       const rv = getStringValue(row, col);
-
       if (type === 'select') return rv === rawVal.toLowerCase();
-
       if (type === 'multiselect' || type === 'dynamic-multiselect') {
         const selected = rawVal.split(',').filter(Boolean);
         return !selected.length || selected.includes(rv);
       }
-
       if (type === 'number') {
         const { min, max } = decodeRange(rawVal);
         const numRv = parseFloat(rv);
@@ -77,15 +74,12 @@ export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Col
         if (max && !isNaN(parseFloat(max)) && numRv > parseFloat(max)) return false;
         return true;
       }
-
       if (type === 'date') {
         const { min, max } = decodeRange(rawVal);
         if (min && !compareDates(rv, min, 'lt')) return false;
         if (max && !compareDates(rv, max, 'gt')) return false;
         return true;
       }
-
-      // text (default)
       return rv.includes(rawVal.toLowerCase());
     }),
   );
@@ -97,12 +91,10 @@ export function applyGlobalSearch<T>(data: T[], query: string, columns: Column<T
   const q = query.trim().toLowerCase();
   if (!q) return data;
   const cols = columns.filter(c => c.searchable !== false);
-  return data.filter(row =>
-    cols.some(col => String(getRawValue(row, col) ?? '').toLowerCase().includes(q)),
-  );
+  return data.filter(row => cols.some(col => String(getRawValue(row, col) ?? '').toLowerCase().includes(q)));
 }
 
-// ─── Client-side sort ─────────────────────────────────────────────────────────
+// ─── Client-side sort (v8 — عمود واحد) ───────────────────────────────────────
 
 export function applyClientSort<T>(data: T[], sort: SortState, columns: Column<T>[]): T[] {
   if (!sort.key || !sort.dir) return data;
@@ -116,6 +108,54 @@ export function applyClientSort<T>(data: T[], sort: SortState, columns: Column<T
       : String(va ?? '').localeCompare(String(vb ?? ''), 'ar-DZ');
     return sort.dir === 'desc' ? -cmp : cmp;
   });
+}
+
+// ─── applyMultiSort (v9) ──────────────────────────────────────────────────────
+
+export function applyMultiSort<T>(
+  data:    T[],
+  sorts:   MultiSortState,
+  columns: Column<T>[],
+): T[] {
+  if (!sorts.length) return data;
+  const colMap = new Map(columns.map(c => [c.key, c]));
+  return [...data].sort((a, b) => {
+    for (const { key, dir } of sorts) {
+      const col = colMap.get(key);
+      if (!col) continue;
+      const va = getRawValue(a, col);
+      const vb = getRawValue(b, col);
+      let cmp: number;
+      if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+      else cmp = String(va ?? '').localeCompare(String(vb ?? ''), 'ar-DZ');
+      if (cmp !== 0) return dir === 'desc' ? -cmp : cmp;
+    }
+    return 0;
+  });
+}
+
+// ─── 🆕 applyConditionalFormat (v10) ─────────────────────────────────────────
+//
+// يُطبّق التنسيق الشرطي على خلية ويُعيد { style, className } المناسبَين
+
+export function applyConditionalFormat<T>(
+  value:    unknown,
+  row:      T,
+  colKey:   string,
+  formats:  ConditionalFormat<T>[],
+): { style: React.CSSProperties; className: string } {
+  let style: React.CSSProperties = {};
+  const classes: string[] = [];
+
+  for (const fmt of formats) {
+    if (fmt.colKey !== '*' && fmt.colKey !== colKey) continue;
+    if (fmt.condition(value, row)) {
+      style = { ...style, ...fmt.style };
+      if (fmt.className) classes.push(fmt.className);
+    }
+  }
+
+  return { style, className: classes.join(' ') };
 }
 
 // ─── Aggregate ────────────────────────────────────────────────────────────────
@@ -169,9 +209,8 @@ export function buildPageNumbers(cur: number, last: number): (number | '…')[] 
 
 export function getTextAlign(align?: Column['align']): React.CSSProperties['textAlign'] {
   if (align === 'center') return 'center';
-  if (align === 'end') return 'left';   // RTL: end = يسار
-  return 'right';                        // RTL: start = يمين
+  if (align === 'end') return 'left';
+  return 'right';
 }
 
-// ── prevent TS error on React import in utils ─────────────────────────────────
 import type React from 'react';

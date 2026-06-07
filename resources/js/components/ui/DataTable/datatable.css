@@ -16,1203 +16,2242 @@
    ANIMATIONS
 ══════════════════════════════════════ */
 @keyframes dt-pulse {
-  0%, 100% { opacity: .4 }
-  50%       { opacity: 1  }
+    0%,
+    100% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 1;
+    }
 }
 @keyframes dt-spin {
-  to { transform: rotate(360deg) }
+    to {
+        transform: rotate(360deg);
+    }
 }
 @keyframes dt-fade {
-  from { opacity: 0; transform: translateY(-6px) }
-  to   { opacity: 1; transform: none }
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 @keyframes dt-fade-up {
-  from { opacity: 0; transform: translateY(6px) }
-  to   { opacity: 1; transform: none }
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 @keyframes dt-expand {
-  from { opacity: 0; transform: translateY(-4px) }
-  to   { opacity: 1; transform: none }
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 @keyframes dt-skel-shimmer {
-  0%   { background-position:  600px 0 }
-  100% { background-position: -600px 0 }
+    0% {
+        background-position: 600px 0;
+    }
+    100% {
+        background-position: -600px 0;
+    }
 }
 @keyframes dt-row-in {
-  from { opacity: 0; transform: translateX(6px) }
-  to   { opacity: 1; transform: none }
+    from {
+        opacity: 0;
+        transform: translateX(6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 @keyframes dt-bulk-in {
-  from { opacity: 0; transform: translateY(-4px) }
-  to   { opacity: 1; transform: none }
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 
 /* ══════════════════════════════════════
    ROOT WRAPPER
 ══════════════════════════════════════ */
 .dt-v7 {
-  font-family: 'Tajawal', sans-serif;
-  direction: rtl;
-  font-size: 13px;
-  color: var(--t1);
-  background: var(--bg2);
-  border: 1px solid var(--b2);
-  border-radius: var(--r3);
-  overflow: hidden;
-  box-shadow: var(--shadow2);
-  /* خط علوي ملون يعبّر عن هوية المشروع */
-  border-top: 2px solid var(--em);
+    font-family: "Tajawal", sans-serif;
+    direction: rtl;
+    font-size: 13px;
+    color: var(--t1);
+    background: var(--bg2);
+    border: 1px solid var(--b2);
+    border-radius: var(--r3);
+    overflow: hidden;
+    box-shadow: var(--shadow2);
+    /* خط علوي ملون يعبّر عن هوية المشروع */
+    border-top: 2px solid var(--em);
 }
-.dt-v7 * { box-sizing: border-box; }
+.dt-v7 * {
+    box-sizing: border-box;
+}
 
 /* ── Variant: بدون border علوي ملون ── */
-.dt-v7.no-accent { border-top-color: var(--b2); }
+.dt-v7.no-accent {
+    border-top-color: var(--b2);
+}
 
 /* ══════════════════════════════════════
    TOOLBAR
 ══════════════════════════════════════ */
 .dt-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--b2);
-  background: var(--bg2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--b2);
+    background: var(--bg2);
 }
-.dt-toolbar-left  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0; }
-.dt-toolbar-right { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; flex-shrink: 0; }
+.dt-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+}
+.dt-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
 
 /* ── Title ── */
 .dt-toolbar-title {
-  font-weight: 800;
-  font-size: 14px;
-  color: var(--t1);
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 7px;
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--t1);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 7px;
 }
 .dt-toolbar-title::before {
-  content: '';
-  display: inline-block;
-  width: 3px;
-  height: 16px;
-  background: var(--grad-em);
-  border-radius: 2px;
-  flex-shrink: 0;
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 16px;
+    background: var(--grad-em);
+    border-radius: 2px;
+    flex-shrink: 0;
 }
 
 /* ── Divider ── */
 .dt-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--b2);
-  flex-shrink: 0;
+    width: 1px;
+    height: 18px;
+    background: var(--b2);
+    flex-shrink: 0;
 }
 
 /* ── Toolbar buttons ── */
 .dt-tbtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 10px;
-  height: 30px;
-  border: 1px solid var(--b2);
-  border-radius: var(--r2);
-  background: var(--bg3);
-  color: var(--t3);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .14s;
-  white-space: nowrap;
-  user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 10px;
+    height: 30px;
+    border: 1px solid var(--b2);
+    border-radius: var(--r2);
+    background: var(--bg3);
+    color: var(--t3);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.14s;
+    white-space: nowrap;
+    user-select: none;
 }
 .dt-tbtn:hover {
-  border-color: var(--em);
-  color: var(--em);
-  background: var(--emb);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    border-color: var(--em);
+    color: var(--em);
+    background: var(--emb);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
-.dt-tbtn:active { transform: translateY(0); }
-.dt-tbtn.on     { background: var(--em); color: #fff; border-color: var(--em); box-shadow: var(--emglow); }
-.dt-tbtn i      { font-size: 13px; }
-.dt-tbtn:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.dt-tbtn:active {
+    transform: translateY(0);
+}
+.dt-tbtn.on {
+    background: var(--em);
+    color: #fff;
+    border-color: var(--em);
+    box-shadow: var(--emglow);
+}
+.dt-tbtn i {
+    font-size: 13px;
+}
+.dt-tbtn:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+}
 
 /* ── Per-page chips ── */
-.dt-pp-wrap { display: flex; gap: 2px; }
+.dt-pp-wrap {
+    display: flex;
+    gap: 2px;
+}
 
 .dt-pp-chip {
-  height: 26px;
-  min-width: 32px;
-  padding: 0 7px;
-  border-radius: var(--r1);
-  border: 1px solid var(--b2);
-  background: var(--bg3);
-  color: var(--t4);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .13s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  user-select: none;
+    height: 26px;
+    min-width: 32px;
+    padding: 0 7px;
+    border-radius: var(--r1);
+    border: 1px solid var(--b2);
+    background: var(--bg3);
+    color: var(--t4);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.13s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
 }
-.dt-pp-chip:hover { border-color: var(--em); color: var(--em); background: var(--emb); }
-.dt-pp-chip.on    { background: var(--em); color: #fff; border-color: var(--em); font-weight: 700; box-shadow: var(--emglow); }
+.dt-pp-chip:hover {
+    border-color: var(--em);
+    color: var(--em);
+    background: var(--emb);
+}
+.dt-pp-chip.on {
+    background: var(--em);
+    color: #fff;
+    border-color: var(--em);
+    font-weight: 700;
+    box-shadow: var(--emglow);
+}
 
 /* ── Search ── */
-.dt-search.srch { border-radius: var(--r2); }
-.dt-search.srch input { width: 190px; }
+.dt-search.srch {
+    border-radius: var(--r2);
+}
+.dt-search.srch input {
+    width: 190px;
+}
 
 .dt-search-clear {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--t4);
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  padding: 0;
-  line-height: 1;
-  transition: color .12s;
-  border-radius: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--t4);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.12s;
+    border-radius: 4px;
 }
-.dt-search-clear:hover        { color: var(--red); }
-.dt-search-clear:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.dt-search-clear:hover {
+    color: var(--red);
+}
+.dt-search-clear:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+}
 
 /* ── Filter badge ── */
 .dt-filter-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-  background: var(--emb);
-  color: var(--em);
-  border: 1px solid var(--embo);
-  animation: dt-fade .15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--emb);
+    color: var(--em);
+    border: 1px solid var(--embo);
+    animation: dt-fade 0.15s ease;
 }
-.dt-filter-badge i { font-size: 10px; }
+.dt-filter-badge i {
+    font-size: 10px;
+}
 .dt-filter-badge button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--em);
-  font-size: 14px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  line-height: 1;
-  opacity: .7;
-  transition: opacity .12s;
-  border-radius: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--em);
+    font-size: 14px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.12s;
+    border-radius: 4px;
 }
-.dt-filter-badge button:hover        { opacity: 1; }
-.dt-filter-badge button:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.dt-filter-badge button:hover {
+    opacity: 1;
+}
+.dt-filter-badge button:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+}
 
 /* ══════════════════════════════════════
    COLUMN VISIBILITY MENU
 ══════════════════════════════════════ */
-.dt-col-menu-wrap { position: relative; }
+.dt-col-menu-wrap {
+    position: relative;
+}
 
 .dt-col-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 300;
-  background: var(--bg2);
-  border: 1px solid var(--b2);
-  border-radius: var(--r3);
-  padding: 5px 4px;
-  box-shadow: var(--shadow2);
-  min-width: 210px;
-  animation: dt-fade .14s ease;
-  max-height: 340px;
-  overflow-y: auto;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 300;
+    background: var(--bg2);
+    border: 1px solid var(--b2);
+    border-radius: var(--r3);
+    padding: 5px 4px;
+    box-shadow: var(--shadow2);
+    min-width: 210px;
+    animation: dt-fade 0.14s ease;
+    max-height: 340px;
+    overflow-y: auto;
 }
 
 .dt-col-menu-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 8px 8px;
-  border-bottom: 1px solid var(--b1);
-  margin-bottom: 4px;
-  font-size: 10px;
-  color: var(--t4);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px 8px;
+    border-bottom: 1px solid var(--b1);
+    margin-bottom: 4px;
+    font-size: 10px;
+    color: var(--t4);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
 }
 .dt-col-menu-header button {
-  font-size: 11px;
-  color: var(--em);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  font-weight: 700;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  transition: opacity .12s;
+    font-size: 11px;
+    color: var(--em);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 700;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    transition: opacity 0.12s;
 }
-.dt-col-menu-header button:hover { opacity: .75; }
-.dt-col-menu-header button i     { font-size: 11px; }
+.dt-col-menu-header button:hover {
+    opacity: 0.75;
+}
+.dt-col-menu-header button i {
+    font-size: 11px;
+}
 
 .dt-col-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  cursor: pointer;
-  border-radius: var(--r1);
-  font-size: 12px;
-  color: var(--t2);
-  transition: background .1s;
-  user-select: none;
-  /* ✅ إصلاح: منع خروج النص خارج القائمة */
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: var(--r1);
+    font-size: 12px;
+    color: var(--t2);
+    transition: background 0.1s;
+    user-select: none;
+    /* ✅ إصلاح: منع خروج النص خارج القائمة */
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.dt-col-item:hover { background: var(--bg3); }
+.dt-col-item:hover {
+    background: var(--bg3);
+}
 /* ✅ الـ checkbox يأخذ حجمه الطبيعي ولا يُضغط */
 .dt-col-item input[type="checkbox"] {
-  accent-color: var(--em);
-  cursor: pointer;
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
+    accent-color: var(--em);
+    cursor: pointer;
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
 }
 /* ✅ النص داخل الـ label يأخذ المساحة المتبقية فقط */
 .dt-col-item > *:not(input) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
 }
 
 /* ══════════════════════════════════════
    BULK BAR
 ══════════════════════════════════════ */
 .dt-bulk {
-  padding: 8px 14px;
-  background: var(--emb);
-  border-bottom: 1px solid var(--embo);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  animation: dt-bulk-in .18s ease;
+    padding: 8px 14px;
+    background: var(--emb);
+    border-bottom: 1px solid var(--embo);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: dt-bulk-in 0.18s ease;
 }
 .dt-bulk-count {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--em);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--bg2);
-  padding: 3px 10px;
-  border-radius: 20px;
-  border: 1px solid var(--embo);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--em);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg2);
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--embo);
 }
-.dt-bulk-count i { font-size: 12px; }
+.dt-bulk-count i {
+    font-size: 12px;
+}
 
 /* ══════════════════════════════════════
    ERROR BAR
 ══════════════════════════════════════ */
 .dt-error {
-  padding: 10px 16px;
-  font-size: 13px;
-  background: var(--redb);
-  border-bottom: 1px solid var(--redbo);
-  color: var(--red);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: dt-fade .15s ease;
+    padding: 10px 16px;
+    font-size: 13px;
+    background: var(--redb);
+    border-bottom: 1px solid var(--redbo);
+    color: var(--red);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: dt-fade 0.15s ease;
 }
-.dt-error i { font-size: 16px; }
+.dt-error i {
+    font-size: 16px;
+}
 
 /* ══════════════════════════════════════
    TABLE WRAPPER
 ══════════════════════════════════════ */
 .dt-table-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  /* شريط تمرير خفيف */
-  scrollbar-width: thin;
-  scrollbar-color: var(--b3) transparent;
-  /* ✅ cursor افتراضي يوحي بإمكانية السحب */
-  cursor: grab;
-  user-select: none;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* شريط تمرير خفيف */
+    scrollbar-width: thin;
+    scrollbar-color: var(--b3) transparent;
+    /* ✅ cursor افتراضي يوحي بإمكانية السحب */
+    cursor: grab;
+    user-select: none;
 }
-.dt-table-wrap::-webkit-scrollbar       { height: 5px; }
-.dt-table-wrap::-webkit-scrollbar-thumb { background: var(--b3); border-radius: 6px; }
+.dt-table-wrap::-webkit-scrollbar {
+    height: 5px;
+}
+.dt-table-wrap::-webkit-scrollbar-thumb {
+    background: var(--b3);
+    border-radius: 6px;
+}
 
 /* ✅ أثناء السحب الفعلي */
 .dt-table-wrap.dt-dragging {
-  cursor: grabbing;
-  scroll-behavior: auto;
+    cursor: grabbing;
+    scroll-behavior: auto;
 }
 /* ✅ منع تحديد النص أثناء السحب */
 .dt-table-wrap.dt-dragging * {
-  user-select: none;
-  pointer-events: none;
+    user-select: none;
+    pointer-events: none;
 }
 /* ✅ السماح للأزرار بالعمل عند عدم السحب */
 .dt-table-wrap:not(.dt-dragging) button,
 .dt-table-wrap:not(.dt-dragging) input,
 .dt-table-wrap:not(.dt-dragging) a {
-  pointer-events: auto;
+    pointer-events: auto;
 }
 
 .dt-v7 table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
 }
 
 /* ══════════════════════════════════════
    TH — رأس الجدول
 ══════════════════════════════════════ */
 .dt-v7 thead th {
-  padding: 9px 10px;
-  text-align: right;
-  font-size: 10.5px;
-  font-weight: 800;
-  color: var(--t4);
-  letter-spacing: .6px;
-  text-transform: uppercase;
-  background: var(--bg3);
-  white-space: nowrap;
-  user-select: none;
-  position: relative;
-  border-bottom: 2px solid var(--b2);
-  /* خط فاصل بين الأعمدة */
-  border-left: 1px solid var(--b1);
+    padding: 9px 10px;
+    text-align: right;
+    font-size: 10.5px;
+    font-weight: 800;
+    color: var(--t4);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    background: var(--bg3);
+    white-space: nowrap;
+    user-select: none;
+    position: relative;
+    border-bottom: 2px solid var(--b2);
+    /* خط فاصل بين الأعمدة */
+    border-left: 1px solid var(--b1);
 }
-.dt-v7 thead th:last-child { border-left: none; }
-.dt-v7 thead th:first-child { border-right: none; }
+.dt-v7 thead th:last-child {
+    border-left: none;
+}
+.dt-v7 thead th:first-child {
+    border-right: none;
+}
 
 /* ── TH inner ── */
 .dt-th-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    width: 100%;
 }
 .dt-th-label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
 }
 
 /* ── Sort button ── */
 .dt-sort-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  text-align: right;
-  transition: color .12s;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    text-align: right;
+    transition: color 0.12s;
 }
-.dt-sort-btn:hover         { color: var(--em); }
-.dt-sort-btn:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; border-radius: 3px; }
+.dt-sort-btn:hover {
+    color: var(--em);
+}
+.dt-sort-btn:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
 
 /* ── Filter icon in TH ── */
 .dt-flt-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  border: none;
-  background: none;
-  cursor: pointer;
-  border-radius: var(--r1);
-  color: var(--t4);
-  transition: all .13s;
-  padding: 0;
-  position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: var(--r1);
+    color: var(--t4);
+    transition: all 0.13s;
+    padding: 0;
+    position: relative;
 }
-.dt-flt-btn:hover           { background: var(--bg4); color: var(--em); }
-.dt-flt-btn.has-val         { color: var(--em); background: var(--emb); }
-.dt-flt-btn:focus-visible   { outline: 2px solid var(--em); outline-offset: 2px; }
-.dt-flt-btn.has-val::after  {
-  content: '';
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--em);
-  box-shadow: 0 0 0 2px var(--bg3);
+.dt-flt-btn:hover {
+    background: var(--bg4);
+    color: var(--em);
+}
+.dt-flt-btn.has-val {
+    color: var(--em);
+    background: var(--emb);
+}
+.dt-flt-btn:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+}
+.dt-flt-btn.has-val::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--em);
+    box-shadow: 0 0 0 2px var(--bg3);
 }
 
 /* ── Resize handle ── */
 .dt-rh {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  cursor: col-resize;
-  z-index: 4;
-  transition: background .15s;
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    cursor: col-resize;
+    z-index: 4;
+    transition: background 0.15s;
 }
 .dt-rh::after {
-  content: '';
-  position: absolute;
-  top: 20%;
-  bottom: 20%;
-  right: 2px;
-  width: 1px;
-  background: var(--b3);
-  border-radius: 1px;
-  transition: background .15s;
+    content: "";
+    position: absolute;
+    top: 20%;
+    bottom: 20%;
+    right: 2px;
+    width: 1px;
+    background: var(--b3);
+    border-radius: 1px;
+    transition: background 0.15s;
 }
 .dt-rh:hover::after,
-.dt-rh:active::after { background: var(--em); }
+.dt-rh:active::after {
+    background: var(--em);
+}
 
 /* ══════════════════════════════════════
    TR — صفوف الجدول
 ══════════════════════════════════════ */
 .dt-v7 tbody tr {
-  border-bottom: 1px solid var(--b1);
-  transition: background .12s;
+    border-bottom: 1px solid var(--b1);
+    transition: background 0.12s;
 }
-.dt-v7 tbody tr:hover > td { background: var(--bg3) !important; }
-.dt-v7 tbody tr:last-child  { border-bottom: none; }
-.dt-row-click { cursor: pointer; }
+.dt-v7 tbody tr:hover > td {
+    background: var(--bg3) !important;
+}
+.dt-v7 tbody tr:last-child {
+    border-bottom: none;
+}
+.dt-row-click {
+    cursor: pointer;
+}
 
 /* ── Zebra ── أضف class dt-zebra على .dt-v7 لتفعيله */
-.dt-v7.dt-zebra tbody tr:nth-child(even) > td { background: var(--bg3); }
-.dt-v7.dt-zebra tbody tr:nth-child(even):hover > td { background: var(--bg4) !important; }
+.dt-v7.dt-zebra tbody tr:nth-child(even) > td {
+    background: var(--bg3);
+}
+.dt-v7.dt-zebra tbody tr:nth-child(even):hover > td {
+    background: var(--bg4) !important;
+}
 
 /* ── Row highlight states ── */
-.dt-row-success > td { background: rgba(10,138,92,.04) !important; }
-.dt-row-warn    > td { background: rgba(184,125,10,.04) !important; }
-.dt-row-danger  > td { background: rgba(212,43,43,.04) !important; }
+.dt-row-success > td {
+    background: rgba(10, 138, 92, 0.04) !important;
+}
+.dt-row-warn > td {
+    background: rgba(184, 125, 10, 0.04) !important;
+}
+.dt-row-danger > td {
+    background: rgba(212, 43, 43, 0.04) !important;
+}
 
 /* ══════════════════════════════════════
    TD — خلايا الجدول
 ══════════════════════════════════════ */
 .dt-v7 td {
-  padding: 10px 10px;
-  font-size: 13px;
-  color: var(--t2);
-  vertical-align: middle;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    padding: 10px 10px;
+    font-size: 13px;
+    color: var(--t2);
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ── Compact mode ── */
-.dt-v7.compact td { padding: 5px 10px; font-size: 12px; }
-.dt-v7.compact thead th { padding: 6px 10px; }
+.dt-v7.compact td {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+.dt-v7.compact thead th {
+    padding: 6px 10px;
+}
 
 /* ── Index column ── */
 .dt-idx {
-  color: var(--t4);
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-  font-family: 'IBM Plex Mono', monospace;
+    color: var(--t4);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    font-family: "IBM Plex Mono", monospace;
 }
 
 /* ── Sticky columns ── */
 .dt-ss {
-  position: sticky;
-  right: 0;
-  z-index: 2;
-  background: var(--bg2);
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: var(--bg2);
 }
 .dt-ss::after {
-  content: '';
-  position: absolute;
-  top: 0; bottom: 0; left: 0;
-  width: 6px;
-  background: linear-gradient(to right, rgba(0,0,0,.06), transparent);
-  pointer-events: none;
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 6px;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.06), transparent);
+    pointer-events: none;
 }
 .dt-se {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  background: var(--bg2);
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--bg2);
 }
 .dt-se::before {
-  content: '';
-  position: absolute;
-  top: 0; bottom: 0; right: 0;
-  width: 6px;
-  background: linear-gradient(to left, rgba(0,0,0,.06), transparent);
-  pointer-events: none;
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 6px;
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.06), transparent);
+    pointer-events: none;
 }
 
 /* ── Expand button ── */
 .dt-exp-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: var(--r1);
-  border: 1px solid var(--b2);
-  background: var(--bg2);
-  color: var(--t4);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  transition: all .15s;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--r1);
+    border: 1px solid var(--b2);
+    background: var(--bg2);
+    color: var(--t4);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    transition: all 0.15s;
 }
 .dt-exp-btn:hover,
 .dt-exp-btn.open {
-  border-color: var(--em);
-  color: var(--em);
-  background: var(--emb);
-  box-shadow: 0 0 0 3px var(--emb);
+    border-color: var(--em);
+    color: var(--em);
+    background: var(--emb);
+    box-shadow: 0 0 0 3px var(--emb);
 }
-.dt-exp-btn:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.dt-exp-btn:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+}
 
 /* ── Expanded row ── */
 .dt-exp-td {
-  padding: 0 !important;
-  background: var(--bg3) !important;
-  border-bottom: 1px solid var(--b1);
+    padding: 0 !important;
+    background: var(--bg3) !important;
+    border-bottom: 1px solid var(--b1);
 }
 .dt-exp-inner {
-  padding: 14px 18px;
-  animation: dt-expand .18s ease;
-  border-right: 3px solid var(--em);
+    padding: 14px 18px;
+    animation: dt-expand 0.18s ease;
+    border-right: 3px solid var(--em);
 }
 
 /* ── Inline editing ── */
 .dt-editable {
-  cursor: text;
-  position: relative;
-  border-radius: var(--r1);
-  transition: background .12s;
+    cursor: text;
+    position: relative;
+    border-radius: var(--r1);
+    transition: background 0.12s;
 }
 .dt-editable::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border: 1px dashed transparent;
-  border-radius: 4px;
-  transition: border-color .15s;
-  pointer-events: none;
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border: 1px dashed transparent;
+    border-radius: 4px;
+    transition: border-color 0.15s;
+    pointer-events: none;
 }
-.dt-editable:hover { background: var(--emb); }
-.dt-editable:hover::after { border-color: var(--embo); }
+.dt-editable:hover {
+    background: var(--emb);
+}
+.dt-editable:hover::after {
+    border-color: var(--embo);
+}
 
 .dt-edit-input {
-  width: 100%;
-  padding: 4px 8px;
-  font-size: inherit;
-  border: 2px solid var(--em);
-  border-radius: var(--r1);
-  background: var(--bg2);
-  color: var(--t1);
-  outline: none;
-  font-family: inherit;
-  box-shadow: 0 0 0 3px var(--emb);
+    width: 100%;
+    padding: 4px 8px;
+    font-size: inherit;
+    border: 2px solid var(--em);
+    border-radius: var(--r1);
+    background: var(--bg2);
+    color: var(--t1);
+    outline: none;
+    font-family: inherit;
+    box-shadow: 0 0 0 3px var(--emb);
 }
 
 /* ══════════════════════════════════════
    SKELETON
 ══════════════════════════════════════ */
 .dt-skel {
-  display: block;
-  border-radius: var(--r1);
-  background: linear-gradient(
-    90deg,
-    var(--bg3) 25%,
-    var(--bg4) 50%,
-    var(--bg3) 75%
-  );
-  background-size: 600px 100%;
-  animation: dt-skel-shimmer 1.6s infinite linear;
+    display: block;
+    border-radius: var(--r1);
+    background: linear-gradient(
+        90deg,
+        var(--bg3) 25%,
+        var(--bg4) 50%,
+        var(--bg3) 75%
+    );
+    background-size: 600px 100%;
+    animation: dt-skel-shimmer 1.6s infinite linear;
 }
-.dt-skel-td { padding: 10px 10px; }
+.dt-skel-td {
+    padding: 10px 10px;
+}
 
 /* ── Active filter dot ── */
 .dt-flt-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--em);
-  flex-shrink: 0;
-  box-shadow: 0 0 0 2px var(--emb);
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--em);
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px var(--emb);
 }
 
 /* ══════════════════════════════════════
    EMPTY STATE
 ══════════════════════════════════════ */
 .dt-empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--t4);
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--t4);
 }
 .dt-empty i {
-  font-size: 42px;
-  display: block;
-  margin-bottom: 12px;
-  opacity: .25;
+    font-size: 42px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.25;
 }
-.dt-empty-text   { font-size: 14px; color: var(--t4); line-height: 1.5; }
-.dt-empty-action { margin-top: 16px; }
+.dt-empty-text {
+    font-size: 14px;
+    color: var(--t4);
+    line-height: 1.5;
+}
+.dt-empty-action {
+    margin-top: 16px;
+}
 
 /* ══════════════════════════════════════
    AGGREGATE ROW
 ══════════════════════════════════════ */
 .dt-agg-row td {
-  background: var(--emb) !important;
-  border-top: 2px solid var(--embo);
-  padding: 7px 10px;
-  font-weight: 700;
-  font-size: 12px;
+    background: var(--emb) !important;
+    border-top: 2px solid var(--embo);
+    padding: 7px 10px;
+    font-weight: 700;
+    font-size: 12px;
 }
 .dt-agg-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--em);
-  font-weight: 800;
-  font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--em);
+    font-weight: 800;
+    font-size: 11px;
 }
-.dt-agg-label i { font-size: 12px; }
+.dt-agg-label i {
+    font-size: 12px;
+}
 
 .dt-agg-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  border-radius: var(--r1);
-  padding: 2px 6px;
-  transition: background .15s;
-  user-select: none;
-  color: var(--em);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    border-radius: var(--r1);
+    padding: 2px 6px;
+    transition: background 0.15s;
+    user-select: none;
+    color: var(--em);
 }
-.dt-agg-cell:hover { background: var(--em2b); }
+.dt-agg-cell:hover {
+    background: var(--em2b);
+}
 
 .dt-agg-type {
-  font-size: 9px;
-  padding: 1px 4px;
-  border-radius: 8px;
-  background: var(--embo);
-  color: var(--em);
-  font-weight: 800;
-  font-family: 'IBM Plex Mono', monospace;
-  letter-spacing: .3px;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 8px;
+    background: var(--embo);
+    color: var(--em);
+    font-weight: 800;
+    font-family: "IBM Plex Mono", monospace;
+    letter-spacing: 0.3px;
 }
 .dt-agg-value {
-  color: var(--em);
-  font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
+    color: var(--em);
+    font-weight: 700;
+    font-family: "IBM Plex Mono", monospace;
 }
 
 /* ══════════════════════════════════════
    FILTER POPUP
 ══════════════════════════════════════ */
 .dt-flt-popup {
-  position: fixed;
-  z-index: 9999;
-  background: var(--bg2);
-  border: 1px solid var(--b2);
-  border-radius: var(--r3);
-  box-shadow: var(--shadow2), 0 0 0 1px rgba(0,0,0,.04);
-  padding: 12px;
-  width: 250px;
-  animation: dt-fade .14s ease;
-  /* خط علوي ملون */
-  border-top: 2px solid var(--em);
+    position: fixed;
+    z-index: 9999;
+    background: var(--bg2);
+    border: 1px solid var(--b2);
+    border-radius: var(--r3);
+    box-shadow:
+        var(--shadow2),
+        0 0 0 1px rgba(0, 0, 0, 0.04);
+    padding: 12px;
+    width: 250px;
+    animation: dt-fade 0.14s ease;
+    /* خط علوي ملون */
+    border-top: 2px solid var(--em);
 }
 
 .dt-flt-popup-title {
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--t4);
-  text-transform: uppercase;
-  letter-spacing: .7px;
-  margin-bottom: 10px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--b1);
-  display: flex;
-  align-items: center;
-  gap: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--t4);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    margin-bottom: 10px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--b1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 .dt-flt-popup-title::before {
-  content: '';
-  display: inline-block;
-  width: 3px;
-  height: 12px;
-  background: var(--grad-em);
-  border-radius: 2px;
-  flex-shrink: 0;
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 12px;
+    background: var(--grad-em);
+    border-radius: 2px;
+    flex-shrink: 0;
 }
 
 /* ── Filter inputs ── */
 .dt-fi {
-  width: 100%;
-  padding: 7px 10px;
-  font-size: 12.5px;
-  border: 1px solid var(--b2);
-  border-radius: var(--r2);
-  background: var(--bg3);
-  color: var(--t1);
-  outline: none;
-  font-family: inherit;
-  transition: border-color .15s, box-shadow .15s, background .15s;
-  height: 34px;
+    width: 100%;
+    padding: 7px 10px;
+    font-size: 12.5px;
+    border: 1px solid var(--b2);
+    border-radius: var(--r2);
+    background: var(--bg3);
+    color: var(--t1);
+    outline: none;
+    font-family: inherit;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s,
+        background 0.15s;
+    height: 34px;
 }
-.dt-fi:focus         {
-  border-color: var(--em);
-  box-shadow: 0 0 0 3px var(--emb);
-  background: var(--bg2);
+.dt-fi:focus {
+    border-color: var(--em);
+    box-shadow: 0 0 0 3px var(--emb);
+    background: var(--bg2);
 }
-.dt-fi.act           { background: var(--emb); border-color: var(--embo); }
-.dt-fi[type="date"]  { padding: 4px 8px; }
-.dt-fi[type="number"]{ padding: 4px 8px; direction: ltr; text-align: left; }
+.dt-fi.act {
+    background: var(--emb);
+    border-color: var(--embo);
+}
+.dt-fi[type="date"] {
+    padding: 4px 8px;
+}
+.dt-fi[type="number"] {
+    padding: 4px 8px;
+    direction: ltr;
+    text-align: left;
+}
 
 /* ── Number/date range ── */
 .dt-range-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
-.dt-range-row .dt-fi { flex: 1; }
+.dt-range-row .dt-fi {
+    flex: 1;
+}
 .dt-range-sep {
-  color: var(--t4);
-  font-size: 12px;
-  flex-shrink: 0;
+    color: var(--t4);
+    font-size: 12px;
+    flex-shrink: 0;
 }
 
-.dt-date-group { display: flex; flex-direction: column; gap: 7px; }
+.dt-date-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
 .dt-date-label {
-  font-size: 10px;
-  color: var(--t4);
-  margin-bottom: 2px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .4px;
+    font-size: 10px;
+    color: var(--t4);
+    margin-bottom: 2px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
 }
 
 /* ── Popup footer ── */
 .dt-flt-footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--b1);
-  gap: 6px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--b1);
+    gap: 6px;
 }
-.dt-flt-footer-between { justify-content: space-between; }
+.dt-flt-footer-between {
+    justify-content: space-between;
+}
 
 .dt-flt-clear {
-  font-size: 11px;
-  cursor: pointer;
-  color: var(--t4);
-  background: none;
-  border: none;
-  font-family: inherit;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: var(--r1);
-  transition: all .13s;
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--t4);
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: var(--r1);
+    transition: all 0.13s;
 }
-.dt-flt-clear:hover { color: var(--red); background: var(--redb); }
+.dt-flt-clear:hover {
+    color: var(--red);
+    background: var(--redb);
+}
 
 /* ══════════════════════════════════════
    MULTISELECT
 ══════════════════════════════════════ */
 
 /* Controls */
-.dt-ms-controls { display: flex; gap: 4px; margin-bottom: 8px; }
+.dt-ms-controls {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
 
 .dt-ms-ctrl-btn {
-  flex: 1;
-  padding: 4px 0;
-  font-size: 10.5px;
-  font-weight: 700;
-  border: 1px solid var(--b2);
-  border-radius: var(--r1);
-  background: var(--bg3);
-  color: var(--t4);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .13s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  user-select: none;
+    flex: 1;
+    padding: 4px 0;
+    font-size: 10.5px;
+    font-weight: 700;
+    border: 1px solid var(--b2);
+    border-radius: var(--r1);
+    background: var(--bg3);
+    color: var(--t4);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.13s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    user-select: none;
 }
-.dt-ms-ctrl-btn:hover:not(:disabled) { border-color: var(--em); color: var(--em); background: var(--emb); }
-.dt-ms-ctrl-btn:disabled              { opacity: .4; cursor: not-allowed; }
-.dt-ms-ctrl-btn i                     { font-size: 11px; }
+.dt-ms-ctrl-btn:hover:not(:disabled) {
+    border-color: var(--em);
+    color: var(--em);
+    background: var(--emb);
+}
+.dt-ms-ctrl-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.dt-ms-ctrl-btn i {
+    font-size: 11px;
+}
 
 /* Search */
 .dt-ms-search-wrap {
-  position: relative;
-  margin-bottom: 7px;
+    position: relative;
+    margin-bottom: 7px;
 }
-.dt-ms-search-wrap .dt-fi { padding-left: 30px; }
+.dt-ms-search-wrap .dt-fi {
+    padding-left: 30px;
+}
 .dt-ms-search-icon {
-  position: absolute;
-  left: 9px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 12px;
-  color: var(--t4);
-  pointer-events: none;
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--t4);
+    pointer-events: none;
 }
 
 /* List */
 .dt-ms-list {
-  max-height: 210px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-bottom: 6px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--b3) transparent;
+    max-height: 210px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-bottom: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--b3) transparent;
 }
-.dt-ms-list::-webkit-scrollbar       { width: 4px; }
-.dt-ms-list::-webkit-scrollbar-thumb { background: var(--b3); border-radius: 4px; }
+.dt-ms-list::-webkit-scrollbar {
+    width: 4px;
+}
+.dt-ms-list::-webkit-scrollbar-thumb {
+    background: var(--b3);
+    border-radius: 4px;
+}
 
 /* Item */
 .dt-ms-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 8px;
-  border-radius: var(--r1);
-  cursor: pointer;
-  transition: background .1s;
-  user-select: none;
-  border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: var(--r1);
+    cursor: pointer;
+    transition: background 0.1s;
+    user-select: none;
+    border: 1px solid transparent;
 }
-.dt-ms-item:hover { background: var(--bg3); }
-.dt-ms-item.on    { background: var(--emb); border-color: var(--embo); }
-.dt-ms-item:focus-visible { outline: 2px solid var(--em); outline-offset: 1px; }
+.dt-ms-item:hover {
+    background: var(--bg3);
+}
+.dt-ms-item.on {
+    background: var(--emb);
+    border-color: var(--embo);
+}
+.dt-ms-item:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 1px;
+}
 
 /* ✅ إصلاح الـ checkbox — استخدام checkbox حقيقي بدل أيقونة Tabler */
 .dt-ms-check {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
 }
 
 /* ✅ checkbox مخفي بصرياً خلف custom design */
 .dt-ms-check input[type="checkbox"] {
-  position: absolute;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  cursor: pointer;
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
 }
 
 /* ✅ الصندوق المرسوم بـ CSS */
 .dt-ms-check-box {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  border: 1.5px solid var(--b3);
-  background: var(--bg3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all .13s;
-  pointer-events: none;
-  flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid var(--b3);
+    background: var(--bg3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.13s;
+    pointer-events: none;
+    flex-shrink: 0;
 }
 .dt-ms-item.on .dt-ms-check-box {
-  background: var(--em);
-  border-color: var(--em);
+    background: var(--em);
+    border-color: var(--em);
 }
 /* ✅ علامة الصح بـ SVG مدمج */
 .dt-ms-check-box::after {
-  content: '';
-  display: none;
-  width: 9px;
-  height: 5px;
-  border-left: 2px solid #fff;
-  border-bottom: 2px solid #fff;
-  transform: rotate(-45deg) translateY(-1px);
+    content: "";
+    display: none;
+    width: 9px;
+    height: 5px;
+    border-left: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    transform: rotate(-45deg) translateY(-1px);
 }
-.dt-ms-item.on .dt-ms-check-box::after { display: block; }
+.dt-ms-item.on .dt-ms-check-box::after {
+    display: block;
+}
 
 .dt-ms-label {
-  flex: 1;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--t2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.4;
+    flex: 1;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--t2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
 }
-.dt-ms-item.on .dt-ms-label { color: var(--em); font-weight: 700; }
+.dt-ms-item.on .dt-ms-label {
+    color: var(--em);
+    font-weight: 700;
+}
 
 /* Empty */
 .dt-ms-empty {
-  text-align: center;
-  padding: 18px 0;
-  color: var(--t4);
-  font-size: 12px;
+    text-align: center;
+    padding: 18px 0;
+    color: var(--t4);
+    font-size: 12px;
 }
 
 /* Count & actions */
 .dt-ms-selected-count {
-  font-size: 11px;
-  color: var(--em);
-  font-weight: 700;
-  background: var(--emb);
-  padding: 2px 9px;
-  border-radius: 12px;
-  border: 1px solid var(--embo);
+    font-size: 11px;
+    color: var(--em);
+    font-weight: 700;
+    background: var(--emb);
+    padding: 2px 9px;
+    border-radius: 12px;
+    border: 1px solid var(--embo);
 }
-.dt-ms-footer-actions { display: flex; gap: 6px; align-items: center; }
+.dt-ms-footer-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
 
 /* Apply */
 .dt-ms-apply {
-  background: var(--em);
-  border: none;
-  border-radius: var(--r1);
-  padding: 4px 14px;
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background .13s, box-shadow .13s;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(10,138,92,.25);
+    background: var(--em);
+    border: none;
+    border-radius: var(--r1);
+    padding: 4px 14px;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition:
+        background 0.13s,
+        box-shadow 0.13s;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(10, 138, 92, 0.25);
 }
-.dt-ms-apply:hover           { background: var(--em2); box-shadow: var(--emglow); }
-.dt-ms-apply:disabled        { opacity: .4; cursor: not-allowed; box-shadow: none; }
-.dt-ms-apply:focus-visible   { outline: 2px solid var(--em); outline-offset: 2px; }
+.dt-ms-apply:hover {
+    background: var(--em2);
+    box-shadow: var(--emglow);
+}
+.dt-ms-apply:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+.dt-ms-apply:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+}
 
 /* Checkbox accent */
-.dt-ms-checkbox { accent-color: var(--em); cursor: pointer; flex-shrink: 0; }
+.dt-ms-checkbox {
+    accent-color: var(--em);
+    cursor: pointer;
+    flex-shrink: 0;
+}
 
 /* ══════════════════════════════════════
    FOOTER
 ══════════════════════════════════════ */
 .dt-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 9px 14px;
-  border-top: 1px solid var(--b2);
-  background: var(--bg3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 9px 14px;
+    border-top: 1px solid var(--b2);
+    background: var(--bg3);
 }
 .dt-footer-info {
-  font-size: 12px;
-  color: var(--t4);
-  display: flex;
-  gap: 10px;
-  align-items: center;
+    font-size: 12px;
+    color: var(--t4);
+    display: flex;
+    gap: 10px;
+    align-items: center;
 }
-.dt-footer-info strong { color: var(--t1); }
+.dt-footer-info strong {
+    color: var(--t1);
+}
 
 .dt-footer-spinner {
-  animation: dt-spin .75s linear infinite;
-  font-size: 14px;
-  color: var(--em);
+    animation: dt-spin 0.75s linear infinite;
+    font-size: 14px;
+    color: var(--em);
 }
 
 /* ── Pagination ── */
-.dt-pagination { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
-.dt-pg-ellipsis { padding: 0 4px; color: var(--t4); font-size: 13px; user-select: none; }
+.dt-pagination {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.dt-pg-ellipsis {
+    padding: 0 4px;
+    color: var(--t4);
+    font-size: 13px;
+    user-select: none;
+}
 
 .dt-pg {
-  min-width: 28px;
-  height: 28px;
-  padding: 0 7px;
-  border: 1px solid var(--b2);
-  border-radius: var(--r1);
-  background: var(--bg2);
-  color: var(--t3);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all .13s;
-  user-select: none;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 7px;
+    border: 1px solid var(--b2);
+    border-radius: var(--r1);
+    background: var(--bg2);
+    color: var(--t3);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.13s;
+    user-select: none;
 }
 .dt-pg:hover:not(:disabled):not(.on) {
-  border-color: var(--em);
-  color: var(--em);
-  background: var(--emb);
+    border-color: var(--em);
+    color: var(--em);
+    background: var(--emb);
 }
 .dt-pg.on {
-  background: var(--em);
-  color: #fff;
-  border-color: var(--em);
-  font-weight: 800;
-  box-shadow: var(--emglow);
+    background: var(--em);
+    color: #fff;
+    border-color: var(--em);
+    font-weight: 800;
+    box-shadow: var(--emglow);
 }
-.dt-pg:disabled        { opacity: .3; cursor: not-allowed; }
-.dt-pg:focus-visible   { outline: 2px solid var(--em); outline-offset: 2px; }
+.dt-pg:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+.dt-pg:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+}
 
 /* ══════════════════════════════════════
    MOBILE CARDS
 ══════════════════════════════════════ */
-.dt-mobile-wrap { padding: 10px; }
+.dt-mobile-wrap {
+    padding: 10px;
+}
 
 .dt-card-item {
-  border: 1px solid var(--b2);
-  border-radius: var(--r3);
-  padding: 12px 14px;
-  background: var(--bg2);
-  margin-bottom: 8px;
-  transition: box-shadow .15s, border-color .15s;
-  animation: dt-fade-up .18s ease;
-  /* خط أيمن ملون خفيف */
-  border-right: 3px solid var(--b2);
+    border: 1px solid var(--b2);
+    border-radius: var(--r3);
+    padding: 12px 14px;
+    background: var(--bg2);
+    margin-bottom: 8px;
+    transition:
+        box-shadow 0.15s,
+        border-color 0.15s;
+    animation: dt-fade-up 0.18s ease;
+    /* خط أيمن ملون خفيف */
+    border-right: 3px solid var(--b2);
 }
 .dt-card-item:hover {
-  box-shadow: var(--shadow2);
-  border-right-color: var(--em);
+    box-shadow: var(--shadow2);
+    border-right-color: var(--em);
 }
-.dt-card-item.clickable { cursor: pointer; }
+.dt-card-item.clickable {
+    cursor: pointer;
+}
 
 /* ── Card header (الحقول البارزة) ── */
 .dt-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  gap: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 8px;
 }
 
 /* ── Card grid ── */
-.dt-card-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
-.dt-card-label {
-  font-size: 9.5px;
-  color: var(--t4);
-  font-weight: 800;
-  margin-bottom: 2px;
-  text-transform: uppercase;
-  letter-spacing: .5px;
+.dt-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
 }
-.dt-card-value { font-size: 12.5px; color: var(--t1); font-weight: 600; }
+.dt-card-label {
+    font-size: 9.5px;
+    color: var(--t4);
+    font-weight: 800;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.dt-card-value {
+    font-size: 12.5px;
+    color: var(--t1);
+    font-weight: 600;
+}
 
 .dt-card-actions {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--b1);
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--b1);
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
 }
 
 /* ── Skeleton cards ── */
-.dt-card-skeletons { display: flex; flex-direction: column; gap: 8px; }
+.dt-card-skeletons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
 .dt-card-skel-item {
-  height: 96px;
-  border-radius: var(--r3);
-  overflow: hidden;
-  border: 1px solid var(--b1);
+    height: 96px;
+    border-radius: var(--r3);
+    overflow: hidden;
+    border: 1px solid var(--b1);
 }
 
 /* ══════════════════════════════════════
    RESPONSIVE
 ══════════════════════════════════════ */
 @media (max-width: 639px) {
-  .dt-desktop { display: none !important; }
-  .dt-mobile  { display: block !important; }
+    .dt-desktop {
+        display: none !important;
+    }
+    .dt-mobile {
+        display: block !important;
+    }
 
-  .dt-toolbar         { padding: 8px 12px; }
-  .dt-toolbar-title   { font-size: 13px; }
-  .dt-search.srch input { width: 140px; }
+    .dt-toolbar {
+        padding: 8px 12px;
+    }
+    .dt-toolbar-title {
+        font-size: 13px;
+    }
+    .dt-search.srch input {
+        width: 140px;
+    }
 }
 @media (min-width: 640px) {
-  .dt-mobile { display: none !important; }
+    .dt-mobile {
+        display: none !important;
+    }
 }
 
 /* ══════════════════════════════════════
    DARK MODE REFINEMENTS
 ══════════════════════════════════════ */
 body.dark .dt-v7 {
-  box-shadow: var(--shadow2), 0 0 0 1px rgba(255,255,255,.03);
+    box-shadow:
+        var(--shadow2),
+        0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 body.dark .dt-flt-popup {
-  box-shadow: var(--shadow2), 0 0 0 1px rgba(255,255,255,.05);
+    box-shadow:
+        var(--shadow2),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
 }
-body.dark .dt-ss { background: var(--bg2); }
-body.dark .dt-se { background: var(--bg2); }
+body.dark .dt-ss {
+    background: var(--bg2);
+}
+body.dark .dt-se {
+    background: var(--bg2);
+}
 body.dark .dt-card-item {
-  box-shadow: var(--shadow);
+    box-shadow: var(--shadow);
 }
 body.dark .dt-skel {
-  background: linear-gradient(
-    90deg,
-    var(--bg3) 25%,
-    var(--bg5) 50%,
-    var(--bg3) 75%
-  );
-  background-size: 600px 100%;
+    background: linear-gradient(
+        90deg,
+        var(--bg3) 25%,
+        var(--bg5) 50%,
+        var(--bg3) 75%
+    );
+    background-size: 600px 100%;
 }
 
 /* ══════════════════════════════════════
    PRINT
 ══════════════════════════════════════ */
 @media print {
-  .dt-toolbar,
-  .dt-footer,
-  .dt-flt-btn,
-  .dt-rh,
-  .dt-exp-btn,
-  .dt-card-actions { display: none !important; }
+    .dt-toolbar,
+    .dt-footer,
+    .dt-flt-btn,
+    .dt-rh,
+    .dt-exp-btn,
+    .dt-card-actions {
+        display: none !important;
+    }
 
-  .dt-v7 {
-    border: 1px solid #ddd;
-    box-shadow: none;
-    border-top: 2px solid #0a8a5c;
-  }
-  .dt-v7 thead th { background: #f5f5f5 !important; }
-  .dt-v7 tbody tr:nth-child(even) > td { background: #fafafa !important; }
+    .dt-v7 {
+        border: 1px solid #ddd;
+        box-shadow: none;
+        border-top: 2px solid #0a8a5c;
+    }
+    .dt-v7 thead th {
+        background: #f5f5f5 !important;
+    }
+    .dt-v7 tbody tr:nth-child(even) > td {
+        background: #fafafa !important;
+    }
 }
+
+/* ══════════════════════════════════════
+   🆕 VIRTUAL SCROLLING
+══════════════════════════════════════ */
+
+/* الحاوية الخارجية عند تفعيل virtual */
+.dt-table-outer {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--b3) transparent;
+    cursor: grab;
+    user-select: none;
+}
+.dt-table-outer::-webkit-scrollbar {
+    height: 5px;
+    width: 5px;
+}
+.dt-table-outer::-webkit-scrollbar-thumb {
+    background: var(--b3);
+    border-radius: 6px;
+}
+.dt-table-outer.dt-dragging {
+    cursor: grabbing;
+    scroll-behavior: auto;
+}
+.dt-table-outer.dt-dragging * {
+    user-select: none;
+    pointer-events: none;
+}
+.dt-table-outer:not(.dt-dragging) button,
+.dt-table-outer:not(.dt-dragging) input,
+.dt-table-outer:not(.dt-dragging) a {
+    pointer-events: auto;
+}
+
+/* إبقاء الـ thead مرئياً دائماً في virtual scroll */
+.dt-table-outer thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg3);
+}
+
+/* badge "Virtual" في الـ toolbar */
+.dt-virtual-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 10px;
+    height: 26px;
+    background: var(--bg3);
+    border: 1px solid var(--b2);
+    border-radius: var(--r2);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--t4);
+    cursor: default;
+    user-select: none;
+}
+.dt-virtual-badge i {
+    font-size: 12px;
+    color: var(--em);
+}
+
+/* ══════════════════════════════════════
+   🆕 COLUMN DRAG REORDER
+══════════════════════════════════════ */
+
+/* رأس العمود القابل للسحب */
+.dt-v7 thead th.dt-th-draggable {
+    cursor: grab;
+}
+.dt-v7 thead th.dt-th-draggable:active {
+    cursor: grabbing;
+}
+
+/* أيقونة السحب تظهر عند hover */
+.dt-th-draggable .dt-th-inner::before {
+    content: "";
+    display: block;
+    width: 10px;
+    height: 14px;
+    flex-shrink: 0;
+    background-image: radial-gradient(
+        circle,
+        var(--b3) 1.5px,
+        transparent 1.5px
+    );
+    background-size: 4px 4px;
+    background-repeat: repeat;
+    opacity: 0;
+    transition: opacity 0.15s;
+    cursor: grab;
+    margin-left: auto;
+}
+.dt-th-draggable:hover .dt-th-inner::before {
+    opacity: 1;
+}
+
+/* العمود الهدف عند السحب فوقه */
+.dt-v7 thead th.dt-th-drag-over {
+    background: var(--emb) !important;
+    border-left: 2px solid var(--em) !important;
+}
+/* RTL: الـ indicator يظهر على اليمين */
+[dir="rtl"] .dt-v7 thead th.dt-th-drag-over {
+    border-left: none !important;
+    border-right: 2px solid var(--em) !important;
+}
+
+/* ══════════════════════════════════════
+   🆕 MULTI-COLUMN SORT
+══════════════════════════════════════ */
+
+/* رقم أولوية الفرز على رأس العمود */
+.dt-sort-priority {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    background: var(--em);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 9px;
+    font-weight: 800;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* السهم بجانب الرقم */
+.dt-sort-ic {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--em);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+.dt-sort-ic i {
+    font-size: 11px;
+}
+
+/* العمود المُرتَّب: خلفية خفيفة */
+.dt-v7 thead th.dt-th-sorted {
+    background: var(--emb) !important;
+    color: var(--em);
+}
+.dt-v7 thead th.dt-th-sorted .dt-sort-btn {
+    color: var(--em);
+}
+
+/* hint للمستخدم: Shift+Click */
+.dt-sort-btn[title] {
+    position: relative;
+}
+
+/* ══════════════════════════════════════
+   🆕 URL STATE — Visual indicator
+══════════════════════════════════════ */
+
+/* نقطة صغيرة تظهر على زر الفلتر إذا جاءت قيمته من URL */
+.dt-flt-btn.on {
+    color: var(--em);
+    background: var(--emb);
+}
+.dt-flt-btn.on i {
+    color: var(--em);
+}
+
+/* ══════════════════════════════════════
+   🆕 STICKY COLUMN (محدَّث للـ v9)
+   الأسماء تغيّرت: dt-ss → dt-sticky-start، dt-se → dt-sticky-end
+══════════════════════════════════════ */
+
+.dt-sticky-start {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: var(--bg2);
+}
+.dt-sticky-start::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 8px;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.07), transparent);
+    pointer-events: none;
+}
+
+.dt-sticky-end {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--bg2);
+}
+.dt-sticky-end::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 8px;
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.07), transparent);
+    pointer-events: none;
+}
+
+/* thead sticky columns تحتاج z-index أعلى */
+.dt-v7 thead .dt-sticky-start,
+.dt-v7 thead .dt-sticky-end {
+    z-index: 12;
+}
+
+/* ══════════════════════════════════════
+   🆕 VIRTUAL FOOTER INFO
+══════════════════════════════════════ */
+
+/* نص "يعرض X صف من Y (virtual scroll)" */
+.dt-footer-info strong {
+    color: var(--em);
+    font-weight: 700;
+}
+
+/* ══════════════════════════════════════
+   🆕 DARK MODE — ميزات v9
+══════════════════════════════════════ */
+
+body.dark .dt-sort-priority {
+    box-shadow: 0 0 0 2px var(--bg2);
+}
+body.dark .dt-v7 thead th.dt-th-drag-over {
+    background: rgba(10, 138, 92, 0.15) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   datatable-v10-additions.css
+   أضف هذا في نهاية datatable.css الخاص بك
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════
+   ROW GROUPING
+══════════════════════════════════════ */
+
+.dt-group-row {
+    background: var(--bg3, #f0f0f0);
+    cursor: pointer;
+    user-select: none;
+}
+.dt-group-row:hover {
+    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg3, #f0f0f0));
+}
+.dt-group-row td {
+    padding: 0;
+    border-bottom: 1px solid var(--b2, #e0e0e0);
+}
+.dt-group-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 12px;
+}
+.dt-group-chevron {
+    font-size: 13px;
+    color: var(--t2, #666);
+    flex-shrink: 0;
+    transition: transform 0.18s ease;
+}
+.dt-group-label {
+    color: var(--t1, #111);
+    flex: 1;
+}
+.dt-group-count {
+    background: var(--em, #0a8a5c);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 20px;
+    min-width: 22px;
+    text-align: center;
+}
+.dt-group-subtotal td {
+    background: color-mix(in srgb, var(--em, #0a8a5c) 4%, var(--bg2, #fff));
+    border-top: 1px dashed var(--b2, #e0e0e0);
+    font-size: 11px;
+    padding: 4px 10px;
+}
+
+/* ══════════════════════════════════════
+   COLUMN PINNING
+══════════════════════════════════════ */
+
+.dt-pinned {
+    background: var(--bg2, #fff);
+}
+.dt-table thead .dt-pinned {
+    background: var(--bg3, #f5f5f5);
+}
+
+/* الخط الفاصل بين الأعمدة المثبتة */
+.dt-sticky-start {
+    border-left: 2px solid
+        color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
+}
+.dt-sticky-end {
+    border-right: 2px solid
+        color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
+}
+
+/* أيقونة التثبيت في الرأس */
+.dt-th-pin-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 3px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    color: var(--t3, #999);
+    border-radius: 4px;
+    line-height: 1;
+}
+th:hover .dt-th-pin-btn,
+.dt-th-pin-btn.active {
+    opacity: 1;
+}
+.dt-th-pin-btn.active {
+    color: var(--em, #0a8a5c);
+}
+.dt-th-pin-btn:hover {
+    background: var(--bg4, #eee);
+}
+
+/* قائمة التثبيت dropdown */
+.dt-pin-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--bg2, #fff);
+    border: 1px solid var(--b2, #e0e0e0);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    z-index: 100;
+    min-width: 150px;
+    overflow: hidden;
+    animation: dt-fade 0.12s ease;
+}
+.dt-pin-menu button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--t1, #111);
+    cursor: pointer;
+    text-align: right;
+    direction: rtl;
+}
+.dt-pin-menu button:hover {
+    background: var(--bg3, #f5f5f5);
+}
+.dt-pin-menu button.active {
+    color: var(--em, #0a8a5c);
+    font-weight: 600;
+}
+
+/* Badge pin في قائمة الأعمدة */
+.dt-col-pin-badge {
+    font-size: 10px;
+    margin-right: auto;
+    color: var(--em, #0a8a5c);
+}
+.dt-col-pin-actions {
+    display: flex;
+    gap: 3px;
+    margin-right: 6px;
+}
+.dt-pin-btn {
+    font-size: 9px;
+    padding: 1px 5px;
+    border: 1px solid var(--b2, #e0e0e0);
+    background: var(--bg3, #f5f5f5);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--t2, #666);
+}
+.dt-pin-btn.active {
+    background: var(--em, #0a8a5c);
+    color: #fff;
+    border-color: var(--em, #0a8a5c);
+}
+.dt-pin-btn:hover {
+    background: var(--bg4, #eee);
+}
+
+/* ══════════════════════════════════════
+   KEYBOARD NAVIGATION
+══════════════════════════════════════ */
+
+.dt-v7:focus {
+    outline: 2px solid var(--em, #0a8a5c);
+    outline-offset: -2px;
+}
+.dt-v7:focus-visible {
+    outline: 2px solid var(--em, #0a8a5c);
+}
+
+.dt-cell-active {
+    outline: 2px solid var(--em, #0a8a5c) !important;
+    outline-offset: -2px;
+    background: color-mix(
+        in srgb,
+        var(--em, #0a8a5c) 6%,
+        var(--bg2, #fff)
+    ) !important;
+    position: relative;
+    z-index: 1;
+}
+
+/* ══════════════════════════════════════
+   CELL VALIDATION
+══════════════════════════════════════ */
+
+.dt-cell-error {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    right: 0;
+    background: var(--red, #dc2626);
+    color: #fff;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+    z-index: 50;
+    pointer-events: none;
+    animation: dt-fade 0.15s ease;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+}
+.dt-cell-error::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    right: 10px;
+    border: 4px solid transparent;
+    border-top-color: var(--red, #dc2626);
+}
+td:has(.dt-cell-error) {
+    outline: 2px solid var(--red, #dc2626);
+    outline-offset: -2px;
+}
+
+/* ══════════════════════════════════════
+   BATCH EDIT
+══════════════════════════════════════ */
+
+/* شريط الـ Batch Edit */
+.dt-batch-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg2, #fff));
+    border-top: 1px solid
+        color-mix(in srgb, var(--em, #0a8a5c) 20%, transparent);
+    gap: 8px;
+    animation: dt-fade-up 0.15s ease;
+}
+.dt-batch-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--em, #0a8a5c);
+}
+.dt-batch-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.dt-batch-save {
+    background: var(--em, #0a8a5c) !important;
+    color: #fff !important;
+    border-color: var(--em, #0a8a5c) !important;
+}
+.dt-batch-save:hover {
+    opacity: 0.9;
+}
+.dt-batch-discard {
+    color: var(--red, #dc2626) !important;
+    border-color: var(--red, #dc2626) !important;
+}
+.dt-batch-discard:hover {
+    background: color-mix(
+        in srgb,
+        var(--red, #dc2626) 8%,
+        var(--bg2, #fff)
+    ) !important;
+}
+
+/* الخلية ذات التعديل المعلّق */
+.dt-cell-pending {
+    background: color-mix(in srgb, #f59e0b 8%, var(--bg2, #fff)) !important;
+}
+.dt-pending-value {
+    color: #b45309;
+    font-style: italic;
+}
+
+/* ══════════════════════════════════════
+   CONDITIONAL FORMATTING helpers
+   (يمكن استخدامها مباشرة في conditionalFormatting)
+══════════════════════════════════════ */
+
+.dt-cf-red {
+    background: color-mix(in srgb, #ef4444 12%, transparent) !important;
+    color: #991b1b !important;
+}
+.dt-cf-green {
+    background: color-mix(in srgb, #22c55e 12%, transparent) !important;
+    color: #14532d !important;
+}
+.dt-cf-yellow {
+    background: color-mix(in srgb, #f59e0b 12%, transparent) !important;
+    color: #78350f !important;
+}
+.dt-cf-blue {
+    background: color-mix(in srgb, #3b82f6 12%, transparent) !important;
+    color: #1e3a8a !important;
+}
+.dt-cf-bold {
+    font-weight: 700 !important;
+}
+
+/* ══════════════════════════════════════
+   DARK MODE
+══════════════════════════════════════ */
+
+@media (prefers-color-scheme: dark) {
+    .dt-group-row {
+        background: color-mix(
+            in srgb,
+            var(--bg1, #111) 60%,
+            var(--bg2, #1e1e1e)
+        );
+    }
+    .dt-cell-active {
+        background: color-mix(
+            in srgb,
+            var(--em, #0a8a5c) 15%,
+            var(--bg2, #1e1e1e)
+        ) !important;
+    }
+    .dt-cell-pending {
+        background: color-mix(
+            in srgb,
+            #f59e0b 12%,
+            var(--bg2, #1e1e1e)
+        ) !important;
+    }
+    .dt-pinned {
+        background: var(--bg2, #1e1e1e);
+    }
+    .dt-table thead .dt-pinned {
+        background: var(--bg3, #252525);
+    }
+    .dt-pin-menu {
+        background: var(--bg2, #1e1e1e);
+        border-color: var(--b1, #333);
+    }
+    .dt-pin-menu button:hover {
+        background: var(--bg3, #252525);
+    }
+    .dt-cf-red {
+        background: color-mix(in srgb, #ef4444 18%, transparent) !important;
+        color: #fca5a5 !important;
+    }
+    .dt-cf-green {
+        background: color-mix(in srgb, #22c55e 18%, transparent) !important;
+        color: #86efac !important;
+    }
+    .dt-cf-yellow {
+        background: color-mix(in srgb, #f59e0b 18%, transparent) !important;
+        color: #fcd34d !important;
+    }
+    .dt-cf-blue {
+        background: color-mix(in srgb, #3b82f6 18%, transparent) !important;
+        color: #93c5fd !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   datatable-v10-final.css
+   إصلاحات وإضافات مكملة لـ v10
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toolbar group buttons ── */
+.dt-toolbar-group-btns {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ── Batch bar: موضع صحيح في أسفل الجدول ── */
+.dt-batch-bar {
+    border-top: 1px solid color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent);
+    border-bottom: none;
+}
+
+/* ── Pin button في رأس العمود: مخفي افتراضياً ── */
+.dt-th-pin-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 3px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+    color: var(--t4);
+    border-radius: 4px;
+    line-height: 1;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+th:hover .dt-th-pin-btn,
+.dt-th-pin-btn.active {
+    opacity: 1;
+}
+.dt-th-pin-btn.active {
+    color: var(--em);
+}
+.dt-th-pin-btn:hover {
+    background: var(--bg4);
+    color: var(--em);
+}
+
+/* ── dt-col-item flex fix لدعم pin actions ── */
+.dt-col-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+}
+.dt-col-item > span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Sticky col: border اتجاه صحيح RTL ── */
+.dt-sticky-start {
+    border-left: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent) !important;
+    border-right: none !important;
+}
+.dt-sticky-end {
+    border-right: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent) !important;
+    border-left: none !important;
+}
+
+/* ── Group row RTL chevron ── */
+.dt-group-cell {
+    direction: rtl;
+}
+
+/* ── Keyboard nav indicator ── */
+.dt-cell-active:focus {
+    outline: 2px solid var(--em);
+}
+
+/* ── dt-td-idx ── */
+.dt-td-idx {
+    color: var(--t4);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    font-family: "IBM Plex Mono", monospace;
+}
+
+/* ── dt-th-acts align ── */
+.dt-th-acts {
+    text-align: center !important;
+}
+
+/* ── Filter btn مع قيمة: أيقونة ملوّنة ── */
+.dt-flt-btn.on {
+    color: var(--em);
+    background: var(--emb);
+}
+
+/* ── Pending cell: border جانبي ── */
+.dt-cell-pending {
+    border-bottom: 2px solid #f59e0b !important;
+}
+
+/* ── dt-bulk-clear ── */
+.dt-bulk-clear {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--t4);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    border-radius: 4px;
+    margin-right: auto;
+    transition: color 0.12s;
+}
+.dt-bulk-clear:hover { color: var(--red); }

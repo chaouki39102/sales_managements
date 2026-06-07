@@ -95,7 +95,7 @@ class CommercialDocumentObserver
         $document->total_tva      = round($totalTva,      4);
         $document->total_discount = round($totalDiscount, 4);
         $document->total_stamp    = round($totalStamp,    4);
-        $document->total_tap      = round($totalTap,      4);
+        //$document->total_tap      = round($totalTap,      4);
         $document->total_ttc      = round($totalTtc,      4);
         $document->net_to_pay     = round($netToPay,      4);
 
