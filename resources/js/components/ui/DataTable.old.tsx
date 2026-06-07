@@ -1,11 +1,8 @@
 // ════════════════════════════════════════════════════════════════════════════
-// components/ui/DataTable.tsx  —  v7.2
+// components/ui/DataTable.tsx  —  v7.3 (Dynamic Multiselect Fix)
 //
-// ✅ التعديلات عن v7.1:
-//    - getRawValue: دعم dot-notation keys ("party.name") بدون accessor
-//      مهم لأعمدة مثل: key:"party.name", key:"warehouse.name",
-//      key:"document_status.name" التي يجب أن تطابق مفاتيح الباكاند
-//    - لا تعديلات أخرى — v7.1 صحيح في كل النواحي الأخرى
+// ✅ الإصلاح: تم تمرير allData, data, getRawValueFn إلى FilterPopup
+// ✅ دعم dynamic-multiselect مع استخراج القيم الفريدة من البيانات المعروضة
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, {
@@ -118,11 +115,6 @@ export interface DataTableProps<T = Record<string, unknown>> {
   exportName?:      string;
   onRowClick?:      (row: T) => void;
   rowClassName?:    (row: T) => string | undefined;
-  /**
-   * allData — البيانات الكاملة لبناء dynamic-multiselect options
-   * في Server-side mode: مرر البيانات الكاملة غير المُصفَّحة هنا
-   * إذا لم تُمرَّر: يستخدم data (الصفحة الحالية)
-   */
   allData?:         T[];
 }
 
@@ -144,7 +136,7 @@ const MIN_COL_WIDTH    = 60;
 const SEARCH_DEBOUNCE  = 180;
 
 // ════════════════════════════════════════════════════════════════════════════
-// CSS — موحَّد مع النظام (مع fallback لـ color-mix)
+// CSS
 // ════════════════════════════════════════════════════════════════════════════
 
 let _cssInjected = false;
@@ -209,7 +201,55 @@ function injectCSS(): void {
   color: var(--em); font-size: 14px; padding: 0;
   display: flex; align-items: center; line-height: 1;
 }
-
+/* Dynamic multiselect improvements */
+.dt-ms-check {
+  width: 20px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.dt-ms-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t2);
+}
+.dt-ms-item.on .dt-ms-label {
+  color: var(--em);
+  font-weight: 700;
+}
+.dt-ms-apply {
+  background: var(--em);
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: filter 0.12s;
+}
+.dt-ms-apply:hover {
+  filter: brightness(0.92);
+}
+.dt-flt-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--b1);
+}
+.dt-ms-selected-count {
+  font-size: 11px;
+  color: var(--em);
+  font-weight: 700;
+  background: var(--emb);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
 /* ── Bulk bar ── */
 .dt-v7 .dt-bulk {
   padding: 7px 14px;
@@ -544,7 +584,7 @@ function injectCSS(): void {
 .dt-v7 .dt-card-label { font-size: 10px; color: var(--t4); font-weight: 700; margin-bottom: 2px; }
 .dt-v7 .dt-card-value { font-size: 13px; color: var(--t1); font-weight: 600; }
 
-/* ── Dynamic multiselect header controls ── */
+/* ── Dynamic multiselect controls ── */
 .dt-v7 .dt-ms-controls {
   display: flex; gap: 4px; margin-bottom: 6px;
 }
@@ -555,38 +595,12 @@ function injectCSS(): void {
   font-family: inherit; transition: all .12s;
 }
 .dt-v7 .dt-ms-ctrl-btn:hover { border-color: var(--em); color: var(--em); background: var(--emb); }
-
-.dt-v7 .dt-ms-count {
-  margin-right: auto; font-size: 10px; color: var(--em);
-  font-weight: 700; padding: 1px 6px; border-radius: 10px;
-  background: var(--emb);
-}
-
 .dt-v7 .dt-ms-item-count {
   margin-right: auto; font-size: 10px; color: var(--t4);
   background: var(--bg3); padding: 1px 5px; border-radius: 8px;
-  flex-shrink: 0;
 }
-
 .dt-v7 .dt-ms-empty {
   text-align: center; padding: 16px 0; color: var(--t4); font-size: 12px;
-}
-
-.dt-v7 .dt-ms-loading {
-  display: flex; align-items: center; justify-content: center;
-  gap: 6px; padding: 16px 0; color: var(--t4); font-size: 12px;
-}
-
-/* Divider في footer الـ popup */
-.dt-v7 .dt-flt-footer {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-top: 8px; padding-top: 6px;
-  border-top: 1px solid var(--b1);
-}
-.dt-v7 .dt-ms-selected-count {
-  font-size: 11px; color: var(--em); font-weight: 700;
-}
-  width: 1px; height: 20px; background: var(--b2); flex-shrink: 0;
 }
 
 /* ── Responsive ── */
@@ -607,7 +621,6 @@ function injectCSS(): void {
 
 function getRawValue<T>(row: T, col: Column<T>): unknown {
   if (col.accessor) return col.accessor(row);
-  // ✅ دعم dot-notation (مثل "party.name") إذا لم يكن هناك accessor
   if (col.key.includes('.')) {
     const parts = col.key.split('.');
     let val: unknown = row;
@@ -632,7 +645,6 @@ function decodeRange(val: string): RangeFilter {
   return { min: val.slice(0, idx), max: val.slice(idx + 1) };
 }
 
-// دالة مساعدة لمقارنة التواريخ بصيغة ISO
 function compareDateStrings(dateStr1: string, dateStr2: string, operator: 'lt' | 'gt'): boolean {
   if (!dateStr1 || !dateStr2) return true;
   const d1 = new Date(dateStr1);
@@ -653,15 +665,13 @@ function applyClientFilter<T>(
       const col = columns.find(c => c.key === key);
       if (!col?.filter) return true;
       const { type } = col.filter;
-      const rv       = getStringValue(row, col);
+      const rv = getStringValue(row, col);
 
       if (type === 'select') return rv === rawVal.toLowerCase();
-
       if (type === 'multiselect') {
         const selected = rawVal.split(',').filter(Boolean);
         return !selected.length || selected.includes(rv);
       }
-
       if (type === 'number') {
         const { min, max } = decodeRange(rawVal);
         const numRv = parseFloat(getStringValue(row, col));
@@ -669,7 +679,6 @@ function applyClientFilter<T>(
         if (max && !isNaN(parseFloat(max)) && numRv > parseFloat(max)) return false;
         return true;
       }
-
       if (type === 'date') {
         const { min, max } = decodeRange(rawVal);
         const dateRv = getStringValue(row, col);
@@ -677,8 +686,6 @@ function applyClientFilter<T>(
         if (max && !compareDateStrings(dateRv, max, 'gt')) return false;
         return true;
       }
-
-      // text
       return rv.includes(rawVal.toLowerCase());
     }),
   );
@@ -738,22 +745,13 @@ function exportToCSV<T>(data: T[], columns: Column<T>[], name: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
-// تحسين buildPageNumbers للحالات الحدودية
 function buildPageNumbers(cur: number, last: number): (number | '…')[] {
   if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
   const pages: (number | '…')[] = [1];
   let s = Math.max(2, cur - 1);
   let e = Math.min(last - 1, cur + 1);
-  // إذا كان cur قريبًا من البداية
-  if (cur <= 3) {
-    s = 2;
-    e = 4;
-  }
-  // إذا كان cur قريبًا من النهاية
-  if (cur >= last - 2) {
-    s = last - 3;
-    e = last - 1;
-  }
+  if (cur <= 3) { s = 2; e = 4; }
+  if (cur >= last - 2) { s = last - 3; e = last - 1; }
   if (s > 2) pages.push('…');
   for (let p = s; p <= e; p++) pages.push(p);
   if (e < last - 1) pages.push('…');
@@ -761,11 +759,10 @@ function buildPageNumbers(cur: number, last: number): (number | '…')[] {
   return pages;
 }
 
-// إصلاح alignToCSS لـ RTL
 function getTextAlign(align?: Column['align']): CSSProperties['textAlign'] {
   if (align === 'center') return 'center';
-  if (align === 'end') return 'left';    // في RTL، النهاية تكون يسار
-  return 'right';                         // البداية تكون يمين
+  if (align === 'end') return 'left';
+  return 'right';
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -805,7 +802,7 @@ function useColumnResize(initialWidths: Record<string, number>) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// useClickOutside (local hook لاستخدامه في FilterPopup)
+// useClickOutside
 // ════════════════════════════════════════════════════════════════════════════
 
 function useClickOutside(
@@ -828,22 +825,25 @@ function useClickOutside(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// FilterPopup — popup منسدلة لكل عمود
+// FilterPopup — popup منسدلة لكل عمود (مع دعم dynamic-multiselect)
 // ════════════════════════════════════════════════════════════════════════════
 
 const FilterPopup = memo(function FilterPopup({
   col, value, onChange, anchorRef, onClose,
+  allData, data, getRawValueFn,
 }: {
-  col:       Column<Record<string, unknown>>;
-  value:     string;
-  onChange:  (v: string) => void;
+  col: Column<Record<string, unknown>>;
+  value: string;
+  onChange: (v: string) => void;
   anchorRef: React.RefObject<HTMLButtonElement>;
-  onClose:   () => void;
+  onClose: () => void;
+  allData?: Record<string, unknown>[];
+  data?: Record<string, unknown>[];
+  getRawValueFn: (row: Record<string, unknown>, col: Column<Record<string, unknown>>) => unknown;
 }) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
-  // حساب موضع الـ popup
   useEffect(() => {
     if (!anchorRef.current) return;
     const rect = anchorRef.current.getBoundingClientRect();
@@ -853,10 +853,8 @@ const FilterPopup = memo(function FilterPopup({
     setPos({ top: rect.bottom + 4, left });
   }, [anchorRef]);
 
-  // إغلاق عند الضغط خارجاً باستخدام useClickOutside المحسن
   useClickOutside(popupRef, anchorRef, onClose);
 
-  // إغلاق بـ Escape
   useEffect(() => {
     const h = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', h);
@@ -947,6 +945,101 @@ const FilterPopup = memo(function FilterPopup({
       );
     }
 
+    if (type === 'dynamic-multiselect') {
+  const sourceData = allData ?? data ?? [];
+  const uniqueValues = [...new Set(
+    sourceData.map(row => String(getRawValueFn(row, col) ?? '')).filter(v => v)
+  )];
+  const options = uniqueValues.map(v => ({ value: v, label: v }));
+
+  // State مؤقت للتحديدات داخل الـ popup
+  const [tempSelected, setTempSelected] = useState<string[]>(value ? value.split(',') : []);
+  const [search, setSearch] = useState('');
+
+  // تحديث القائمة المؤقتة عند تغير value من الخارج (نادراً)
+  useEffect(() => {
+    setTempSelected(value ? value.split(',') : []);
+  }, [value]);
+
+  const filtered = options.filter(opt => !search || opt.label.includes(search));
+
+  const toggleOption = (val: string) => {
+    setTempSelected(prev =>
+      prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]
+    );
+  };
+
+  const applySelection = () => {
+    onChange(tempSelected.join(','));
+    onClose();
+  };
+
+  const selectAll = () => {
+    setTempSelected(options.map(o => o.value));
+  };
+
+  const clearAll = () => {
+    setTempSelected([]);
+  };
+
+  return (
+    <>
+      <div className="dt-ms-controls">
+        <button className="dt-ms-ctrl-btn" onClick={selectAll}>
+          <i className="ti ti-check" style={{ fontSize: 11, marginLeft: 3 }} /> كل الكل
+        </button>
+        <button className="dt-ms-ctrl-btn" onClick={clearAll}>
+          <i className="ti ti-x" style={{ fontSize: 11, marginLeft: 3 }} /> إلغاء الكل
+        </button>
+      </div>
+      <div style={{ position: 'relative' }}>
+        <input
+          className="dt-fi"
+          type="text"
+          placeholder="بحث..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          autoFocus
+        />
+        <i className="ti ti-search" style={{
+          position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+          fontSize: 12, color: 'var(--t4)', pointerEvents: 'none'
+        }} />
+      </div>
+      <div className="dt-ms-list">
+        {filtered.map(opt => {
+          const selected = tempSelected.includes(opt.value);
+          return (
+            <div
+              key={opt.value}
+              className={`dt-ms-item ${selected ? 'on' : ''}`}
+              onClick={() => toggleOption(opt.value)}
+            >
+              <span className="dt-ms-check">
+                <i className={`ti ${selected ? 'ti-checkbox-checked' : 'ti-checkbox'}`}
+                   style={{ fontSize: 14 }} />
+              </span>
+              <span className="dt-ms-label">{opt.label}</span>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && <div className="dt-ms-empty">لا توجد خيارات</div>}
+      </div>
+      <div className="dt-flt-footer" style={{ justifyContent: 'space-between' }}>
+        <span className="dt-ms-selected-count">{tempSelected.length} محدد</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="dt-flt-clear" onClick={() => { onChange(''); onClose(); }}>مسح الكل</button>
+          <button className="dt-ms-apply" onClick={applySelection} style={{
+            background: 'var(--em)', border: 'none', borderRadius: 6, padding: '4px 12px',
+            color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer'
+          }}>تطبيق</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+    // standard multiselect (static options)
     if (type === 'multiselect') {
       const selected = value ? value.split(',').filter(Boolean) : [];
       const [search, setSearch] = useState('');
@@ -996,15 +1089,11 @@ const FilterPopup = memo(function FilterPopup({
       className="dt-flt-popup"
       style={{ top: pos.top, left: pos.left, width: 230 }}
     >
-      {header && (
-        <div className="dt-flt-popup-title">{header}</div>
-      )}
+      {header && <div className="dt-flt-popup-title">{header}</div>}
       {renderInput()}
       {hasVal && (
         <div className="dt-flt-footer">
-          <button className="dt-flt-clear" onClick={() => { onChange(''); onClose(); }}>
-            مسح الفلتر ✕
-          </button>
+          <button className="dt-flt-clear" onClick={() => { onChange(''); onClose(); }}>مسح الفلتر ✕</button>
         </div>
       )}
     </div>
@@ -1042,7 +1131,7 @@ function SkeletonRows({ rows, cols }: { rows: number; cols: number }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// EditInput — مع تحسين التركيز التلقائي
+// EditInput
 // ════════════════════════════════════════════════════════════════════════════
 
 const EditInput = memo(function EditInput({
@@ -1057,7 +1146,6 @@ const EditInput = memo(function EditInput({
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
 
   useEffect(() => {
-    // التركيز التلقائي بعد التصيير
     if (inputRef.current) {
       inputRef.current.focus();
       if (inputRef.current instanceof HTMLInputElement && inputRef.current.type !== 'date') {
@@ -1142,6 +1230,7 @@ export function DataTable<T = Record<string, unknown>>({
   exportName     = 'export',
   onRowClick,
   rowClassName,
+  allData,
 }: DataTableProps<T>) {
 
   useEffect(() => { injectCSS(); }, []);
@@ -1658,7 +1747,6 @@ export function DataTable<T = Record<string, unknown>>({
 
                 return (
                   <th
-
                     key={col.key}
                     scope="col"
                     aria-sort={canSort
@@ -1673,25 +1761,24 @@ export function DataTable<T = Record<string, unknown>>({
                       width:    colW ?? undefined,
                       minWidth: col.minWidth ?? 80,
                     }}
-
                   >
                     <div className="dt-th-inner">
                       <div className="dt-th-label">
                         {hasFilter && (
-                        <button
-                          ref={btnRef as React.RefObject<HTMLButtonElement>}
-                          className={`dt-flt-btn ${hasVal ? 'has-val' : ''}`}
-                          onClick={e => {
-                            e.stopPropagation();
-                            setOpenFilterKey(isFilterOpen ? null : col.key);
-                          }}
-                          aria-label={`فلتر ${col.header}`}
-                          title="فلتر"
-                          type="button"
-                        >
-                          <i className="ti ti-filter" style={{ fontSize: 11 }} aria-hidden="true" />
-                        </button>
-                      )}
+                          <button
+                            ref={btnRef as React.RefObject<HTMLButtonElement>}
+                            className={`dt-flt-btn ${hasVal ? 'has-val' : ''}`}
+                            onClick={e => {
+                              e.stopPropagation();
+                              setOpenFilterKey(isFilterOpen ? null : col.key);
+                            }}
+                            aria-label={`فلتر ${col.header}`}
+                            title="فلتر"
+                            type="button"
+                          >
+                            <i className="ti ti-filter" style={{ fontSize: 11 }} aria-hidden="true" />
+                          </button>
+                        )}
                         {canSort ? (
                           <button
                             className="dt-sort-btn"
@@ -1710,8 +1797,6 @@ export function DataTable<T = Record<string, unknown>>({
                           <span style={{ color: 'var(--t4)' }}>{col.header}</span>
                         )}
                       </div>
-
-
                     </div>
 
                     <div
@@ -1729,6 +1814,9 @@ export function DataTable<T = Record<string, unknown>>({
                         onChange={v => handleFilterChange(col.key, v)}
                         anchorRef={btnRef}
                         onClose={() => setOpenFilterKey(null)}
+                        allData={allData}
+                        data={data}
+                        getRawValueFn={getRawValue}
                       />
                     )}
                   </th>

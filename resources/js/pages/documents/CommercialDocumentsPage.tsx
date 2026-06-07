@@ -1932,10 +1932,12 @@ export default function CommercialDocumentsPage() {
             },
             {
                 // ✅ key: "party.name" يطابق AllowedFilter::callback('party.name') في الباكاند
+                // ✅ dynamic-multiselect: يبني القائمة من الأطراف الموجودة في الصفحة الحالية
+                //    مع allData: يبني من كل البيانات إذا مُرِّرت
                 key: "party.name",
                 header: isPurch ? "المورد" : "الزبون",
                 sortable: true,
-                filter: { type: "text" },
+                filter: { type: "dynamic-multiselect" },
                 accessor: (r) => getPartyName(r),
                 render: (row) => {
                     const name = getPartyName(row);
@@ -1989,11 +1991,12 @@ export default function CommercialDocumentsPage() {
             },
             {
                 // ✅ key: "warehouse.name" يطابق AllowedFilter::callback('warehouse.name')
+                // ✅ dynamic-multiselect: يبني قائمة المستودعات من البيانات الحالية
                 key: "warehouse.name",
                 header: "المستودع",
                 sortable: false,
                 hideOnMobile: true,
-                filter: { type: "text" },
+                filter: { type: "dynamic-multiselect" },
                 accessor: (r) => getWarehouseName(r),
                 render: (row) => (
                     <span style={{ fontSize: 12, color: "var(--t3)" }}>
@@ -2478,6 +2481,10 @@ export default function CommercialDocumentsPage() {
                         columns={columns}
                         rowKey={(r) => r.id}
                         loading={isLoading}
+                        // ✅ allData: تُمرَّر للـ dynamic-multiselect ليبني القائمة
+                        // في Server-side mode يستخدم items الصفحة الحالية فقط
+                        // لو أردت كل الأطراف: مرر بيانات غير مُصفَّحة هنا
+                        allData={items as unknown as Record<string, unknown>[]}
                         // ── Server-side ────────────────────────────────────
                         pagination={{
                             page: Number(meta.current_page ?? 1),
