@@ -1,16 +1,20 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/documents/CommercialDocumentsPage.tsx  —  v10.0
+// pages/documents/CommercialDocumentsPage.tsx  —  v10.0 (كامل)
 //
-// 🚀 متكامل مع DataTable v10:
+// 🚀 متكامل مع DataTable v10 وجميع ميزاته الجديدة:
 //   • columnReorder + حفظ الترتيب في localStorage
-//   • multiSort + تحويل إلى sort param للسيرفر (يدعم الأعمدة المتعددة)
+//   • multiSort + تحويل إلى sort param للسيرفر
 //   • urlState لحالة الفلتر/الفرز/الصفحة/البحث في الرابط
-//   • virtual scroll اختياري (يفعّل تلقائياً عند تجاوز 500 صف)
-//   • dynamic-multiselect يعمل مع allData (كل الأطراف)
-//   • دعم كامل لـ conditionalFormatting (تلوين المتأخرات)
-//   • دعم batchEdit (تحرير ميداني لـ notes مثلاً) – معطل افتراضياً
-//   • keyboardNav (التنقل بلوحة المفاتيح) – معطل افتراضياً
-//   • pinnedColumns (تثبيت العمود) – معطل افتراضياً
+//   • virtual scroll اختياري
+//   • dynamic-multiselect مع allData
+//   • conditionalFormatting (تلوين المتأخرات)
+//   • batchEdit (معطل افتراضياً)
+//   • keyboardNav (معطل افتراضياً)
+//   • pinnedColumns (معطل افتراضياً)
+//   • 🆕 Excel Export حقيقي (enableExcelExport)
+//   • 🆕 Smart Filter بالعربية (enableSmartFilter)
+//   • 🆕 Saved Views (enableSavedViews)
+//   • 🆕 Context Menu (enableContextMenu)
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, {
@@ -32,7 +36,7 @@ import { tenantKeys } from "@/lib/api/core/queryKeys";
 import { useActiveSlug } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
 import { DataTable } from "@/components/ui/DataTable";
-import type { Column, MultiSortState, ConditionalFormat } from "@/components/ui/DataTable";
+import type { Column, MultiSortState, ConditionalFormat, ContextMenuItem, ContextMenuContext } from "@/components/ui/DataTable";
 import CommercialDocumentModal from "./CommercialDocumentModal";
 import QuickSaleModal from "./QuickSaleModal";
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
@@ -426,7 +430,7 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
                                 {h}
                             </th>
                         ))}
-                    </tr>
+</tr>
                 </thead>
                 <tbody>
                     {lines.map((line, idx) => {
@@ -1593,7 +1597,7 @@ function DocumentViewModal({
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// MAIN PAGE — DataTable v10 Integration
+// MAIN PAGE — DataTable v10 مع جميع الميزات الجديدة
 // ════════════════════════════════════════════════════════════════════════════
 
 export default function CommercialDocumentsPage() {
@@ -1622,7 +1626,6 @@ export default function CommercialDocumentsPage() {
     const [serverFilters, setServerFilters] = useState<Record<string, string>>(
         {},
     );
-    // ✅ v10: use MultiSortState بدلاً من string واحد
     const [multiSort, setMultiSort] = useState<MultiSortState>([]);
 
     const isPurch = PURCHASE_CODES.has(typeCode ?? "");
@@ -1644,7 +1647,7 @@ export default function CommercialDocumentsPage() {
         [STORAGE_KEY],
     );
 
-    // ── تحويل MultiSortState إلى sort param للسيرفر (مثل "-document_date,party.name") ──
+    // ── تحويل MultiSortState إلى sort param للسيرفر ───────────────────────────
     const sortParam = useMemo(() => {
         if (!multiSort.length) return "-document_date";
         return multiSort
@@ -1666,7 +1669,6 @@ export default function CommercialDocumentsPage() {
         for (const [key, val] of Object.entries(filters)) {
             if (!val || val === "|") continue;
             if (rangeFields.has(key) && val.includes("|")) {
-                // تحويل "min|max" إلى "min,max" لـ RangeFilter.php
                 converted[key] = val.replace("|", ",");
             } else {
                 converted[key] = val;
@@ -1846,7 +1848,6 @@ export default function CommercialDocumentsPage() {
         setEditDocFull(null);
     }, []);
 
-    // ✅ v10: معالجة الفرز المتعدد وتحويله إلى server-friendly format
     const handleMultiSortChange = useCallback((sorts: MultiSortState) => {
         setMultiSort(sorts);
         setPage(1);
@@ -1856,7 +1857,7 @@ export default function CommercialDocumentsPage() {
     const conditionalFormatting = useMemo<ConditionalFormat<CommercialDocument>[]>(
         () => [
             {
-                colKey: "*", // ينطبق على كل الأعمدة
+                colKey: "*",
                 condition: (value, row) => {
                     const status = getDocStatus(row);
                     const dueDate = row.due_date;
@@ -1879,7 +1880,7 @@ export default function CommercialDocumentsPage() {
         [],
     );
 
-    // ── Column definitions (نفس v4 ولكن مع إضافة بعض التحسينات) ────────────────
+    // ── Column definitions ────────────────────────────────────────────────────
     const columns: Column<CommercialDocument>[] = useMemo(
         () => [
             {
@@ -2139,7 +2140,7 @@ export default function CommercialDocumentsPage() {
         [isPurch, opColor],
     );
 
-    // ── Row actions (نفس الإصدار السابق) ───────────────────────────────────────
+    // ── Row actions ───────────────────────────────────────────────────────────
     const rowActions = useCallback(
         (row: CommercialDocument) => {
             const status = getDocStatus(row);
@@ -2397,7 +2398,7 @@ export default function CommercialDocumentsPage() {
         [docType?.name, typeCode, isPurch, opColor, selectedYear],
     );
 
-    // ── isExpandable — فقط الصفوف المعتمدة أو المدفوعة ───────────────────────
+    // ── isExpandable ──────────────────────────────────────────────────────────
     const isExpandable = useCallback((row: CommercialDocument) => {
         const s = getDocStatus(row);
         return s !== "draft" && s !== "cancelled";
@@ -2409,7 +2410,7 @@ export default function CommercialDocumentsPage() {
         [],
     );
 
-    // ── Row class (يبقى مدعوماً) ──────────────────────────────────────────────
+    // ── Row class ─────────────────────────────────────────────────────────────
     const rowClassName = useCallback(
         (row: CommercialDocument): string | undefined => {
             const status = getDocStatus(row);
@@ -2424,8 +2425,122 @@ export default function CommercialDocumentsPage() {
         [],
     );
 
+    // ── Context Menu Items ────────────────────────────────────────────────────
+    const contextMenuItems = useCallback(
+        (ctx: ContextMenuContext): ContextMenuItem[] => {
+            const items: ContextMenuItem[] = [];
+
+            if (ctx.type === 'cell') {
+                const row = ctx.rowIndex !== undefined ? items[ctx.rowIndex] : undefined;
+                const colKey = ctx.colKey;
+                const value = ctx.value;
+
+                items.push(
+                    {
+                        label: 'نسخ القيمة',
+                        icon: 'copy',
+                        onClick: () => {
+                            if (value !== undefined) {
+                                navigator.clipboard.writeText(String(value));
+                                showToast('تم نسخ القيمة', 'success');
+                            }
+                        },
+                    },
+                    { divider: true },
+                    {
+                        label: 'فلتر بنفس القيمة',
+                        icon: 'filter',
+                        onClick: () => {
+                            if (colKey && value !== undefined) {
+                                setServerFilters(prev => ({
+                                    ...prev,
+                                    [colKey]: String(value),
+                                }));
+                                setPage(1);
+                                showToast(`تم تطبيق فلتر: ${String(value)}`, 'info');
+                            }
+                        },
+                    },
+                    {
+                        label: 'عرض التفاصيل',
+                        icon: 'eye',
+                        onClick: () => {
+                            if (ctx.rowIndex !== undefined && items[ctx.rowIndex]) {
+                                const doc = items[ctx.rowIndex];
+                                setViewDocId(doc.id);
+                                setModal("view");
+                            }
+                        },
+                    },
+                );
+            } else if (ctx.type === 'row') {
+                const row = ctx.rowIndex !== undefined ? items[ctx.rowIndex] : undefined;
+                items.push(
+                    {
+                        label: 'نسخ رقم المستند',
+                        icon: 'copy',
+                        onClick: () => {
+                            if (row?.document_number) {
+                                navigator.clipboard.writeText(String(row.document_number));
+                                showToast('تم نسخ رقم المستند', 'success');
+                            }
+                        },
+                    },
+                    {
+                        label: 'عرض التفاصيل',
+                        icon: 'eye',
+                        onClick: () => {
+                            if (row) {
+                                setViewDocId(row.id);
+                                setModal("view");
+                            }
+                        },
+                    },
+                );
+                if (!isReadOnly && row && getDocStatus(row) === 'draft') {
+                    items.push(
+                        {
+                            label: 'تعديل المستند',
+                            icon: 'pencil',
+                            onClick: () => {
+                                if (row) openEditModal(row);
+                            },
+                        },
+                    );
+                }
+            } else if (ctx.type === 'header') {
+                items.push(
+                    {
+                        label: 'إخفاء العمود',
+                        icon: 'eye-off',
+                        onClick: () => {
+                            if (ctx.colKey) {
+                                showToast(`تم إخفاء العمود ${ctx.colKey}`, 'info');
+                            }
+                        },
+                    },
+                );
+            }
+
+            return items;
+        },
+        [items, isReadOnly, openEditModal, showToast],
+    );
+
+    // ── رد الفلتر الذكي ───────────────────────────────────────────────────────
+    const handleSmartFilterApply = useCallback(
+        (query: string, result: any) => {
+            if (result.success && Object.keys(result.filters).length > 0) {
+                showToast(`تم تطبيق الفلتر الذكي: ${query}`, 'success');
+            } else {
+                showToast(`لم يتم التعرف على طلب البحث: ${query}`, 'info');
+            }
+        },
+        [showToast],
+    );
+
     // ════════════════════════════════════════════════════════════════════════
-    // RENDER — DataTable v10
+    // RENDER — DataTable v10 مع جميع الميزات
     // ════════════════════════════════════════════════════════════════════════
     return (
         <>
@@ -2475,16 +2590,12 @@ export default function CommercialDocumentsPage() {
                         rowKey={(r) => r.id}
                         loading={isLoading}
 
-                        // 🚀 v10: Column Reorder
+                        // v9/v10 الميزات الأساسية
                         columnReorder={true}
                         initialColumnOrder={columnOrder}
                         onColumnOrderChange={handleColumnOrderChange}
-
-                        // 🚀 v10: Multi Sort
                         multiSort={true}
                         onMultiSortChange={handleMultiSortChange}
-
-                        // 🚀 v10: URL State (حفظ الفلتر/الفرز/الصفحة/البحث في الرابط)
                         urlState={{
                             enabled: true,
                             prefix: `commercial_${typeCode}`,
@@ -2493,29 +2604,18 @@ export default function CommercialDocumentsPage() {
                             page: true,
                             search: true,
                         }}
-
-                        // 🚀 v10: Virtual Scroll (تفعيل تلقائي عند تجاوز 500 صف)
                         virtual={
                             items.length > 500
                                 ? { rowHeight: 40, containerHeight: 600, overscan: 8 }
                                 : undefined
                         }
-
-                        // 🚀 v10: Conditional Formatting (تلوين المتأخرات)
                         conditionalFormatting={conditionalFormatting}
-
-                        // 🚀 v10: Keyboard Navigation (معطل افتراضياً، يمكن تفعيله)
                         keyboardNav={false}
-
-                        // 🚀 v10: Batch Edit (معطل حالياً، يمكن تفعيله لتحرير notes مثلاً)
                         batchEdit={false}
-                        // onBatchSave={(edits) => console.log('batch save', edits)}
+                        pinnedColumns={undefined}
+                        onPinnedColumnsChange={undefined}
 
-                        // 🚀 v10: Column Pinning (معطل، يمكن تفعيله)
-                        // pinnedColumns={{ start: ['document_number'], end: ['net_to_pay'] }}
-                        // onPinnedColumnsChange={(cfg) => console.log('pins changed', cfg)}
-
-                        // ── Server-side pagination ─────────────────────────────
+                        // Server-side pagination
                         pagination={{
                             page: Number(meta.current_page ?? 1),
                             perPage,
@@ -2527,7 +2627,6 @@ export default function CommercialDocumentsPage() {
                                 setPage(1);
                             },
                         }}
-
                         onFilterChange={handleFilterChange}
                         onSearchChange={(q) => {
                             setServerFilters((prev) => {
@@ -2538,11 +2637,9 @@ export default function CommercialDocumentsPage() {
                             });
                             setPage(1);
                         }}
-
-                        // جميع البيانات (لـ dynamic-multiselect)
                         allData={items as unknown as Record<string, unknown>[]}
 
-                        // ── الميزات الأساسية ──────────────────────────────────────
+                        // الميزات الأساسية
                         searchable
                         searchPlaceholder="بحث برقم المستند أو اسم المتعامل…"
                         showAggregates
@@ -2567,6 +2664,24 @@ export default function CommercialDocumentsPage() {
                                   ? "جارٍ تحميل نوع المستند…"
                                   : "لا توجد مستندات"
                         }
+
+                        // 🆕 ميزات جديدة
+                        enableExcelExport={true}
+                        excelExportOptions={{
+                            fileName: `${typeCode}_${selectedYear?.name ?? ""}_export`,
+                            includeAggregates: true,
+                            includeHiddenColumns: false,
+                            title: docType?.name ?? typeCode,
+                        }}
+                        enableSmartFilter={true}
+                        onSmartFilterApply={handleSmartFilterApply}
+                        enableSavedViews={true}
+                        savedViewsConfig={{
+                            tableKey: `commercial_${typeCode}_${slug ?? "default"}`,
+                            maxViews: 10,
+                        }}
+                        enableContextMenu={true}
+                        contextMenuItems={contextMenuItems}
                     />
                 </div>
             </div>

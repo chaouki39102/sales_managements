@@ -187,6 +187,9 @@
     font-family: inherit;
     transition: all 0.14s;
     white-space: nowrap;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 .dt-tbtn:hover {
@@ -235,6 +238,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 .dt-pp-chip:hover {
@@ -385,6 +391,9 @@
     font-size: 12px;
     color: var(--t2);
     transition: background 0.1s;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
     /* ✅ إصلاح: منع خروج النص خارج القائمة */
     min-width: 0;
@@ -469,6 +478,9 @@
     scrollbar-color: var(--b3) transparent;
     /* ✅ cursor افتراضي يوحي بإمكانية السحب */
     cursor: grab;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 .dt-table-wrap::-webkit-scrollbar {
@@ -486,6 +498,9 @@
 }
 /* ✅ منع تحديد النص أثناء السحب */
 .dt-table-wrap.dt-dragging * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
     pointer-events: none;
 }
@@ -515,6 +530,9 @@
     text-transform: uppercase;
     background: var(--bg3);
     white-space: nowrap;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
     position: relative;
     border-bottom: 2px solid var(--b2);
@@ -896,6 +914,9 @@
     border-radius: var(--r1);
     padding: 2px 6px;
     transition: background 0.15s;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
     color: var(--em);
 }
@@ -1083,6 +1104,9 @@
     align-items: center;
     justify-content: center;
     gap: 3px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 .dt-ms-ctrl-btn:hover:not(:disabled) {
@@ -1144,6 +1168,9 @@
     border-radius: var(--r1);
     cursor: pointer;
     transition: background 0.1s;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
     border: 1px solid transparent;
 }
@@ -1332,6 +1359,9 @@
     padding: 0 4px;
     color: var(--t4);
     font-size: 13px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 
@@ -1351,6 +1381,9 @@
     align-items: center;
     justify-content: center;
     transition: all 0.13s;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 .dt-pg:hover:not(:disabled):not(.on) {
@@ -1549,6 +1582,9 @@ body.dark .dt-skel {
     scrollbar-width: thin;
     scrollbar-color: var(--b3) transparent;
     cursor: grab;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 .dt-table-outer::-webkit-scrollbar {
@@ -1564,6 +1600,9 @@ body.dark .dt-skel {
     scroll-behavior: auto;
 }
 .dt-table-outer.dt-dragging * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
     pointer-events: none;
 }
@@ -1595,6 +1634,21 @@ body.dark .dt-skel {
     font-weight: 700;
     color: var(--t4);
     cursor: default;
+    -webkit--webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -moz--webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -ms--webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 .dt-virtual-badge i {
@@ -1786,6 +1840,21 @@ body.dark .dt-v7 thead th.dt-th-drag-over {
 .dt-group-row {
     background: var(--bg3, #f0f0f0);
     cursor: pointer;
+    -webkit--webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -moz--webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -ms--webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 .dt-group-row:hover {
@@ -2150,7 +2219,8 @@ td:has(.dt-cell-error) {
 
 /* ── Batch bar: موضع صحيح في أسفل الجدول ── */
 .dt-batch-bar {
-    border-top: 1px solid color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent);
+    border-top: 1px solid
+        color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent);
     border-bottom: none;
 }
 
@@ -2161,7 +2231,9 @@ td:has(.dt-cell-error) {
     cursor: pointer;
     padding: 2px 3px;
     opacity: 0;
-    transition: opacity 0.15s, color 0.15s;
+    transition:
+        opacity 0.15s,
+        color 0.15s;
     color: var(--t4);
     border-radius: 4px;
     line-height: 1;
@@ -2197,11 +2269,13 @@ th:hover .dt-th-pin-btn,
 
 /* ── Sticky col: border اتجاه صحيح RTL ── */
 .dt-sticky-start {
-    border-left: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent) !important;
+    border-left: 2px solid
+        color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent) !important;
     border-right: none !important;
 }
 .dt-sticky-end {
-    border-right: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent) !important;
+    border-right: 2px solid
+        color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent) !important;
     border-left: none !important;
 }
 
@@ -2254,4 +2328,24 @@ th:hover .dt-th-pin-btn,
     margin-right: auto;
     transition: color 0.12s;
 }
-.dt-bulk-clear:hover { color: var(--red); }
+.dt-bulk-clear:hover {
+    color: var(--red);
+}
+
+/* ── Context Menu ── */
+.dt-context-menu {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -moz--webkit-user-select: none;
+    backdrop-filter: blur(2px);
+    transition: opacity 0.1s;
+}
+.dt-context-item {
+    transition: background 0.1s;
+}
+.dt-context-item:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: -2px;
+}

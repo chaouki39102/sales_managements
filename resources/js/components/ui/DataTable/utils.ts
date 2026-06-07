@@ -1,16 +1,13 @@
-// ════════════════════════════════════════════════════════════════════════════
-// DataTable/utils.ts  —  v10.0
-//
-// ✅ كل دوال v9 بدون تغيير
-// 🆕 applyConditionalFormat  — تطبيق التنسيق الشرطي على خلية
-// ════════════════════════════════════════════════════════════════════════════
+// DataTable/utils.ts  —  v10.0 (كامل مع جميع الدوال)
 
 import type {
   Column, SortState, MultiSortState, FilterMap, AggregateType, RangeFilter,
-  ConditionalFormat,
+  ConditionalFormat, ExcelExportOptions,
 } from './types';
 
-// ─── Raw value extraction ─────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// دوال أساسية (موجودة سابقاً)
+// ════════════════════════════════════════════════════════════════════════════
 
 export function getRawValue<T>(row: T, col: Column<T>): unknown {
   if (col.accessor) return col.accessor(row);
@@ -31,17 +28,15 @@ export function getStringValue<T>(row: T, col: Column<T>): string {
   return v == null ? '' : String(v).toLowerCase();
 }
 
-// ─── Range encode/decode ─────────────────────────────────────────────────────
-
-export function encodeRange(min: string, max: string): string { return `${min}|${max}`; }
+export function encodeRange(min: string, max: string): string {
+  return `${min}|${max}`;
+}
 
 export function decodeRange(val: string): RangeFilter {
   const idx = val.indexOf('|');
   if (idx === -1) return { min: val, max: '' };
   return { min: val.slice(0, idx), max: val.slice(idx + 1) };
 }
-
-// ─── Date comparison ─────────────────────────────────────────────────────────
 
 function compareDates(d1Str: string, d2Str: string, op: 'lt' | 'gt'): boolean {
   if (!d1Str || !d2Str) return true;
@@ -50,8 +45,6 @@ function compareDates(d1Str: string, d2Str: string, op: 'lt' | 'gt'): boolean {
   if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return false;
   return op === 'lt' ? d1 < d2 : d1 > d2;
 }
-
-// ─── Client-side filter ───────────────────────────────────────────────────────
 
 export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Column<T>[]): T[] {
   const active = Object.entries(filters).filter(([, v]) => v !== '');
@@ -85,16 +78,12 @@ export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Col
   );
 }
 
-// ─── Global search ────────────────────────────────────────────────────────────
-
 export function applyGlobalSearch<T>(data: T[], query: string, columns: Column<T>[]): T[] {
   const q = query.trim().toLowerCase();
   if (!q) return data;
   const cols = columns.filter(c => c.searchable !== false);
   return data.filter(row => cols.some(col => String(getRawValue(row, col) ?? '').toLowerCase().includes(q)));
 }
-
-// ─── Client-side sort (v8 — عمود واحد) ───────────────────────────────────────
 
 export function applyClientSort<T>(data: T[], sort: SortState, columns: Column<T>[]): T[] {
   if (!sort.key || !sort.dir) return data;
@@ -110,13 +99,7 @@ export function applyClientSort<T>(data: T[], sort: SortState, columns: Column<T
   });
 }
 
-// ─── applyMultiSort (v9) ──────────────────────────────────────────────────────
-
-export function applyMultiSort<T>(
-  data:    T[],
-  sorts:   MultiSortState,
-  columns: Column<T>[],
-): T[] {
+export function applyMultiSort<T>(data: T[], sorts: MultiSortState, columns: Column<T>[]): T[] {
   if (!sorts.length) return data;
   const colMap = new Map(columns.map(c => [c.key, c]));
   return [...data].sort((a, b) => {
@@ -134,19 +117,14 @@ export function applyMultiSort<T>(
   });
 }
 
-// ─── 🆕 applyConditionalFormat (v10) ─────────────────────────────────────────
-//
-// يُطبّق التنسيق الشرطي على خلية ويُعيد { style, className } المناسبَين
-
 export function applyConditionalFormat<T>(
-  value:    unknown,
-  row:      T,
-  colKey:   string,
-  formats:  ConditionalFormat<T>[],
+  value: unknown,
+  row: T,
+  colKey: string,
+  formats: ConditionalFormat<T>[],
 ): { style: React.CSSProperties; className: string } {
   let style: React.CSSProperties = {};
   const classes: string[] = [];
-
   for (const fmt of formats) {
     if (fmt.colKey !== '*' && fmt.colKey !== colKey) continue;
     if (fmt.condition(value, row)) {
@@ -154,11 +132,8 @@ export function applyConditionalFormat<T>(
       if (fmt.className) classes.push(fmt.className);
     }
   }
-
   return { style, className: classes.join(' ') };
 }
-
-// ─── Aggregate ────────────────────────────────────────────────────────────────
 
 export function computeAggregate<T>(rows: T[], col: Column<T>, type: AggregateType): number | null {
   const nums = rows
@@ -166,30 +141,26 @@ export function computeAggregate<T>(rows: T[], col: Column<T>, type: AggregateTy
     .filter(n => !isNaN(n));
   if (!nums.length) return null;
   switch (type) {
-    case 'sum':   return nums.reduce((a, b) => a + b, 0);
-    case 'avg':   return nums.reduce((a, b) => a + b, 0) / nums.length;
-    case 'min':   return Math.min(...nums);
-    case 'max':   return Math.max(...nums);
+    case 'sum': return nums.reduce((a, b) => a + b, 0);
+    case 'avg': return nums.reduce((a, b) => a + b, 0) / nums.length;
+    case 'min': return Math.min(...nums);
+    case 'max': return Math.max(...nums);
     case 'count': return nums.length;
   }
 }
 
-// ─── CSV export ───────────────────────────────────────────────────────────────
-
 export function exportToCSV<T>(data: T[], columns: Column<T>[], name: string): void {
   const cols = columns.filter(c => typeof (c.exportHeader ?? c.header) === 'string');
-  const hdr  = cols.map(c => `"${(c.exportHeader ?? c.header as string)}"`).join(',');
+  const hdr = cols.map(c => `"${(c.exportHeader ?? c.header as string)}"`).join(',');
   const rows = data.map(r =>
     cols.map(c => `"${String(getRawValue(r, c) ?? '').replace(/"/g, '""')}"`).join(','),
   );
   const blob = new Blob(['\ufeff' + [hdr, ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
   a.href = url; a.download = `${name}.csv`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
-
-// ─── Pagination ───────────────────────────────────────────────────────────────
 
 export function buildPageNumbers(cur: number, last: number): (number | '…')[] {
   if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
@@ -205,12 +176,76 @@ export function buildPageNumbers(cur: number, last: number): (number | '…')[] 
   return pages;
 }
 
-// ─── CSS alignment (RTL-aware) ────────────────────────────────────────────────
-
 export function getTextAlign(align?: Column['align']): React.CSSProperties['textAlign'] {
   if (align === 'center') return 'center';
   if (align === 'end') return 'left';
   return 'right';
 }
 
-import type React from 'react';
+// ════════════════════════════════════════════════════════════════════════════
+// 🆕 دوال جديدة للميزات
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── Excel Export حقيقي (يتطلب xlsx) ─────────────────────────────────────────
+
+export async function exportToExcel<T>(
+  data: T[],
+  columns: Column<T>[],
+  options: ExcelExportOptions = {}
+): Promise<void> {
+  try {
+    const XLSX = await import('xlsx');
+    const { fileName = 'export', includeHiddenColumns = false, title } = options;
+
+    const visibleCols = columns.filter(c => !c.defaultHidden || includeHiddenColumns);
+    const headers = visibleCols.map(c => c.exportHeader ?? (typeof c.header === 'string' ? c.header : c.key));
+
+    const rows = data.map(row =>
+      visibleCols.map(col => {
+        let value = getRawValue(row, col);
+        if (col.render && typeof value !== 'string') {
+          const rendered = col.render(row, 0);
+          if (typeof rendered === 'string') value = rendered;
+          else if (rendered && typeof rendered === 'object' && 'props' in rendered) {
+            value = (rendered as any)?.props?.children ?? value;
+          }
+        }
+        return value ?? '';
+      })
+    );
+
+    const sheetData = [headers, ...rows];
+    if (title) sheetData.unshift([title], []);
+
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    ws['!cols'] = headers.map(() => ({ wch: 15 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+    XLSX.writeFile(wb, `${fileName}.xlsx`);
+  } catch (error) {
+    console.error('Excel export failed:', error);
+    throw new Error('Failed to export Excel. Make sure "xlsx" library is installed.');
+  }
+}
+
+// ─── Paste from Excel (TSV/CSV parsing) ──────────────────────────────────────
+
+export function parseTSV(plainText: string): string[][] {
+  const lines = plainText.split(/\r?\n/);
+  const result: string[][] = [];
+  for (const line of lines) {
+    if (line.trim() === '') continue;
+    let cells: string[] = [];
+    if (line.includes('\t')) {
+      cells = line.split('\t');
+    } else {
+      const regex = /(?:,|^)(?:"([^"]*(?:""[^"]*)*)"|([^",]*))/g;
+      let match;
+      while ((match = regex.exec(line)) !== null) {
+        cells.push(match[1] ? match[1].replace(/""/g, '"') : (match[2] || ''));
+      }
+    }
+    result.push(cells);
+  }
+  return result;
+}

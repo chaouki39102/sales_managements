@@ -26,6 +26,15 @@ export type {
   PendingEdit,
   BatchEditState,
   ConditionalFormat,
+    PasteOptions,
+  ExcelExportOptions,
+  SmartFilterRule,
+  SmartFilterResult,
+  SavedView,
+  SavedViewsConfig,
+  ContextMenuItem,
+  ContextMenuContext,
+  ContextMenuState,
 } from './types';
 
 export { StaticMultiSelect, DynamicMultiSelect } from './MultiSelect';
@@ -53,4 +62,10 @@ export {
   useKeyboardNav,              // v10
   useBatchEdit,                // v10
   useCellValidation,           // v10
+   useClipboardPaste,
+  useSmartFilter,
+  useSavedViews,
+  useContextMenu,
 } from './hooks';
+export { exportToExcel, parseTSV } from './utils';
+export { default as ContextMenu } from './ContextMenu';

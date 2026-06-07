@@ -1,17 +1,28 @@
 // ════════════════════════════════════════════════════════════════════════════
-// DataTable/DataTable.tsx  —  v10.0
+// DataTable/DataTable.tsx  —  v10.0 (كامل)
 //
-// ✅ كل ميزات v9 محفوظة بالكامل (Virtual Scroll، Column Reorder، Multi-Sort، URL State)
-// ✅ Column Resize محفوظ (كان مفقوداً في نسخة v10 السابقة)
-// ✅ Filter Popup يعمل صحيحاً (portal داخل th وليس فوق الصفحة)
-// ✅ Toolbar منظّم ومتسق مع v9
+// ✅ كل ميزات v9 محفوظة بالكامل:
+//    • Virtual Scrolling
+//    • Column Reorder (سحب وإفلات)
+//    • Multi‑Column Sort (فرز بأعمدة متعددة)
+//    • URL State (حفظ الحالة في الرابط)
+//    • Column Resize (تغيير عرض الأعمدة)
+//    • Filter Popup (بوابة إلى document.body)
 //
-// 🆕 Row Grouping         — groupBy={{ key:'status', defaultCollapsed:false }}
-// 🆕 Column Pinning       — pinnedColumns / زر تثبيت في رأس العمود
-// 🆕 Keyboard Navigation  — keyboardNav={true} → Arrows/Tab/F2/Escape
-// 🆕 Batch Edit + Undo    — batchEdit={true} → Ctrl+Z/Y، حفظ دفعي
-// 🆕 Cell Validation      — column.validation → رسائل خطأ مضمّنة
-// 🆕 Conditional Format   — conditionalFormatting={[...]}
+// ✅ ميزات v10:
+//    • Row Grouping (تجميع الصفوف + collapse/expand + إجماليات جزئية)
+//    • Column Pinning الديناميكي (تثبيت أعمدة من الرأس أو قائمة الأعمدة)
+//    • Keyboard Navigation (أسهم / Tab / F2 / Enter / Escape)
+//    • Batch Edit + Undo/Redo (تعديل دفعي + Ctrl+Z/Y)
+//    • Cell Validation (تحقق من الخلايا مع رسائل خطأ)
+//    • Conditional Formatting (تلوين شرطي)
+//
+// ✅ ميزات جديدة إضافية (AG Grid مستوى احترافي):
+//    • Copy/Paste من Excel (لصق خلايا من جدول بيانات)
+//    • Excel Export حقيقي (.xlsx مع تنسيق)
+//    • Smart Filter باللغة العربية (تحليل جمل طبيعية)
+//    • Saved Views (حفظ واسترجاع العروض في localStorage)
+//    • Context Menu (قائمة النقر الأيمن)
 // ════════════════════════════════════════════════════════════════════════════
 
 import './datatable.css';
@@ -25,7 +36,8 @@ import React, {
 import type {
   DataTableProps, Column, MultiSortState, EditingCell,
   FilterMap, AggregateType, PaginationConfig,
-  ActiveCell, PendingEdit,
+  ActiveCell, PendingEdit, SavedView, ContextMenuContext,
+  ContextMenuItem, ExcelExportOptions,
 } from './types';
 
 import {
@@ -39,74 +51,104 @@ import {
   applyClientFilter, applyGlobalSearch, applyClientSort, applyMultiSort,
   applyConditionalFormat,
   computeAggregate, exportToCSV, buildPageNumbers,
+  exportToExcel, parseTSV,
 } from './utils';
 
 import {
   useColumnResize, useIsMobile,
   useVirtualScroll, useColumnDragReorder, useURLState, useMultiSort,
   useRowGrouping, useColumnPinning, useKeyboardNav, useBatchEdit, useCellValidation,
+  useClipboardPaste, useSmartFilter, useSavedViews, useContextMenu,
 } from './hooks';
 
-import FilterPopup                                  from './FilterPopup';
-import { SkeletonRows, SkeletonCards, EditInput }   from './Primitives';
+import FilterPopup from './FilterPopup';
+import { SkeletonRows, SkeletonCards, EditInput } from './Primitives';
+import ContextMenu from './ContextMenu';
 
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
 export function DataTable<T = Record<string, unknown>>({
+  // بيانات أساسية
   data,
   columns,
   rowKey,
-  loading            = false,
-  error              = null,
+  loading = false,
+  error = null,
+
+  // Pagination (Server/Client)
   pagination,
   onFilterChange,
   onSortChange,
   onMultiSortChange,
   onSearchChange,
-  selectable         = false,
+
+  // تحديد الصفوف
+  selectable = false,
   onSelect,
   bulkActions,
+
+  // تحرير الخلايا
   onCellEdit,
-  // v10: batch edit
-  batchEdit          = false,
+  batchEdit = false,
   onBatchSave,
-  expandable         = false,
+
+  // توسيع الصفوف
+  expandable = false,
   renderExpanded,
   isExpandable,
-  showAggregates     = false,
+
+  // إجماليات
+  showAggregates = false,
   aggregateLabel,
-  searchable         = false,
-  searchPlaceholder  = 'بحث...',
-  showIndex          = false,
-  indexHeader        = '#',
+
+  // بحث عام
+  searchable = false,
+  searchPlaceholder = 'بحث...',
+
+  // ترقيم الصفوف
+  showIndex = false,
+  indexHeader = '#',
+
+  // أزرار وإجراءات
   rowActions,
   headerActions,
   title,
-  emptyText          = 'لا توجد بيانات',
+  emptyText = 'لا توجد بيانات',
   emptyAction,
-  compact            = false,
-  exportable         = false,
-  exportName         = 'export',
+  compact = false,
+  exportable = false,
+  exportName = 'export',
   onRowClick,
   rowClassName,
   allData,
-  // v9 props
+
+  // v9
   virtual,
-  columnReorder      = false,
+  columnReorder = false,
   initialColumnOrder,
   onColumnOrderChange,
-  multiSort          = false,
+  multiSort = false,
   urlState,
-  // v10 props
+
+  // v10
   groupBy,
   pinnedColumns,
   onPinnedColumnsChange,
-  keyboardNav        = false,
+  keyboardNav = false,
   conditionalFormatting,
-}: DataTableProps<T>) {
 
+  // 🆕 ميزات جديدة
+  enableExcelExport = false,
+  excelExportOptions,
+  enableSmartFilter = false,
+  enableSavedViews = false,
+  savedViewsConfig,
+  enableContextMenu = false,
+  contextMenuItems,
+  onSmartFilterApply,
+}: DataTableProps<T>) {
   // ── Responsive ────────────────────────────────────────────────────────────
   const isMobile = useIsMobile(639);
 
@@ -139,7 +181,7 @@ export function DataTable<T = Record<string, unknown>>({
   }, []);
 
   const nonIndexCols = useMemo(() => columns, [columns]);
-  const allHidden    = nonIndexCols.length > 0 && nonIndexCols.every(c => hiddenKeys.has(c.key));
+  const allHidden = nonIndexCols.length > 0 && nonIndexCols.every(c => hiddenKeys.has(c.key));
 
   const toggleCollapseAll = useCallback(() => {
     if (allHidden) {
@@ -151,7 +193,7 @@ export function DataTable<T = Record<string, unknown>>({
     setColMenuOpen(false);
   }, [allHidden, nonIndexCols]);
 
-  // ── Column resize ✅ (محفوظ من v9) ────────────────────────────────────────
+  // ── Column resize ─────────────────────────────────────────────────────────
   const initialWidthsRef = useRef<Record<string, number>>(
     Object.fromEntries(columns.filter(c => c.width).map(c => [c.key, c.width!])),
   );
@@ -164,51 +206,57 @@ export function DataTable<T = Record<string, unknown>>({
     [],
   );
 
-  const { columnOrder, dragOverKey, dragHandlers } = useColumnDragReorder(
+  const { columnOrder, setColumnOrder, dragOverKey, dragHandlers } = useColumnDragReorder(
     defaultOrder,
     onColumnOrderChange,
   );
 
   const orderedColumns = useMemo(() => {
     if (!columnReorder) return columns;
-    const map     = new Map(columns.map(c => [c.key, c]));
+    const map = new Map(columns.map(c => [c.key, c]));
     const ordered = columnOrder.map(k => map.get(k)).filter(Boolean) as Column<T>[];
     const inOrder = new Set(columnOrder);
-    columns.forEach(c => { if (!inOrder.has(c.key)) ordered.push(c); });
+    columns.forEach(c => {
+      if (!inOrder.has(c.key)) ordered.push(c);
+    });
     return ordered;
   }, [columns, columnOrder, columnReorder]);
 
-  // ── 🆕 Column Pinning ─────────────────────────────────────────────────────
+  // ── Column Pinning (v10) ──────────────────────────────────────────────────
   const { pinConfig, pinColumn, isPinned, clearAllPins } = useColumnPinning(
     pinnedColumns,
     onPinnedColumnsChange,
   );
   const [pinMenuKey, setPinMenuKey] = useState<string | null>(null);
 
-  // دمج sticky من Column definition مع dynamic pinning
   const getEffectiveSticky = useCallback((col: Column<T>): 'start' | 'end' | null => {
     const dynamic = isPinned(col.key);
     if (dynamic) return dynamic;
     if (col.sticky === 'start') return 'start';
-    if (col.sticky === 'end')   return 'end';
+    if (col.sticky === 'end') return 'end';
     return null;
   }, [isPinned]);
 
   // ── Global search ─────────────────────────────────────────────────────────
   const [globalQuery, setGlobalQuery] = useState(() => url.readInitialSearch());
-  const searchTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSearchChangeRef = useRef(onSearchChange);
-  useEffect(() => { onSearchChangeRef.current = onSearchChange; }, [onSearchChange]);
+  useEffect(() => {
+    onSearchChangeRef.current = onSearchChange;
+  }, [onSearchChange]);
 
-  const handleSearchChange = useCallback((v: string) => {
-    setGlobalQuery(v);
-    if (!pagination) setLocalPage(1);
-    url.writeSearch(v);
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    searchTimerRef.current = setTimeout(() => {
-      onSearchChangeRef.current?.(v);
-    }, SEARCH_DEBOUNCE);
-  }, [pagination, url]);
+  const handleSearchChange = useCallback(
+    (v: string) => {
+      setGlobalQuery(v);
+      if (!pagination) setLocalPage(1);
+      url.writeSearch(v);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = setTimeout(() => {
+        onSearchChangeRef.current?.(v);
+      }, SEARCH_DEBOUNCE);
+    },
+    [pagination, url],
+  );
 
   useEffect(() => () => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -216,21 +264,26 @@ export function DataTable<T = Record<string, unknown>>({
 
   // ── Column filters ────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<FilterMap>(() => url.readInitialFilters());
-  const onFilterChangeRef     = useRef(onFilterChange);
-  useEffect(() => { onFilterChangeRef.current = onFilterChange; }, [onFilterChange]);
+  const onFilterChangeRef = useRef(onFilterChange);
+  useEffect(() => {
+    onFilterChangeRef.current = onFilterChange;
+  }, [onFilterChange]);
 
   const isServerPaged = !!pagination;
 
-  const handleFilterChange = useCallback((key: string, val: string) => {
-    setFilters(prev => {
-      const next = { ...prev };
-      val ? (next[key] = val) : delete next[key];
-      url.writeFilters(next);
-      Promise.resolve().then(() => onFilterChangeRef.current?.(next));
-      return next;
-    });
-    if (!isServerPaged) setLocalPage(1);
-  }, [isServerPaged, url]);
+  const handleFilterChange = useCallback(
+    (key: string, val: string) => {
+      setFilters(prev => {
+        const next = { ...prev };
+        val ? (next[key] = val) : delete next[key];
+        url.writeFilters(next);
+        Promise.resolve().then(() => onFilterChangeRef.current?.(next));
+        return next;
+      });
+      if (!isServerPaged) setLocalPage(1);
+    },
+    [isServerPaged, url],
+  );
 
   const clearAllFilters = useCallback(() => {
     setFilters({});
@@ -260,6 +313,7 @@ export function DataTable<T = Record<string, unknown>>({
   // ── Multi-sort (v9) ───────────────────────────────────────────────────────
   const {
     sorts,
+    setSorts,
     toggleSort: toggleMultiSort,
     clearSort,
     legacySortState,
@@ -269,16 +323,19 @@ export function DataTable<T = Record<string, unknown>>({
     onSortChange,
   );
 
-  const handleSortToggle = useCallback((key: string, e: React.MouseEvent) => {
-    const shiftKey = multiSort && e.shiftKey;
-    toggleMultiSort(key, shiftKey);
-    url.writeSort(sorts);
-    if (!isServerPaged) setLocalPage(1);
-  }, [multiSort, toggleMultiSort, url, sorts, isServerPaged]);
+  const handleSortToggle = useCallback(
+    (key: string, e: React.MouseEvent) => {
+      const shiftKey = multiSort && e.shiftKey;
+      toggleMultiSort(key, shiftKey);
+      url.writeSort(sorts);
+      if (!isServerPaged) setLocalPage(1);
+    },
+    [multiSort, toggleMultiSort, url, sorts, isServerPaged],
+  );
 
   // ── Client-side data processing ───────────────────────────────────────────
   const isClientFiltered = !onFilterChange;
-  const isClientSorted   = !onSortChange && !onMultiSortChange;
+  const isClientSorted = !onSortChange && !onMultiSortChange;
 
   const processedData = useMemo(() => {
     let r = data;
@@ -297,43 +354,57 @@ export function DataTable<T = Record<string, unknown>>({
     orderedColumns, isClientFiltered, isClientSorted, searchable, multiSort,
   ]);
 
-  // ── 🆕 Row Grouping ───────────────────────────────────────────────────────
-  const { groups, toggleGroup, expandAll: expandAllGroups, collapseAll: collapseAllGroups } =
-    useRowGrouping(processedData, groupBy, orderedColumns as Column<Record<string, unknown>>[]);
+  // ── Row Grouping (v10) ────────────────────────────────────────────────────
+  const {
+    groups,
+    toggleGroup,
+    expandAll: expandAllGroups,
+    collapseAll: collapseAllGroups,
+  } = useRowGrouping(processedData, groupBy, orderedColumns as Column<Record<string, unknown>>[]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
-  const [localPage,    setLocalPage]    = useState(() => url.readInitialPage());
+  const [localPage, setLocalPage] = useState(() => url.readInitialPage());
   const [localPerPage, setLocalPerPage] = useState(15);
 
   const paginationRef = useRef(pagination);
-  useEffect(() => { paginationRef.current = pagination; }, [pagination]);
+  useEffect(() => {
+    paginationRef.current = pagination;
+  }, [pagination]);
   const lastPageRef = useRef(1);
 
-  const curPage  = isServerPaged ? pagination!.page    : localPage;
-  const perPage  = isServerPaged ? pagination!.perPage : localPerPage;
-  const total    = isServerPaged ? pagination!.total   : processedData.length;
+  const curPage = isServerPaged ? pagination!.page : localPage;
+  const perPage = isServerPaged ? pagination!.perPage : localPerPage;
+  const total = isServerPaged ? pagination!.total : processedData.length;
   const lastPage = isServerPaged
     ? pagination!.lastPage
     : Math.max(1, Math.ceil(processedData.length / localPerPage));
 
-  useEffect(() => { lastPageRef.current = lastPage; }, [lastPage]);
+  useEffect(() => {
+    lastPageRef.current = lastPage;
+  }, [lastPage]);
 
-  const goToPage = useCallback((p: number) => {
-    const c = Math.max(1, Math.min(p, lastPageRef.current));
-    if (isServerPaged) paginationRef.current!.onPage(c);
-    else setLocalPage(c);
-    url.writePage(c);
-  }, [isServerPaged, url]);
+  const goToPage = useCallback(
+    (p: number) => {
+      const c = Math.max(1, Math.min(p, lastPageRef.current));
+      if (isServerPaged) paginationRef.current!.onPage(c);
+      else setLocalPage(c);
+      url.writePage(c);
+    },
+    [isServerPaged, url],
+  );
 
-  const changePerPage = useCallback((n: number) => {
-    if (isServerPaged) {
-      paginationRef.current!.onPerPage(n);
-      paginationRef.current!.onPage(1);
-    } else {
-      setLocalPerPage(n);
-      setLocalPage(1);
-    }
-  }, [isServerPaged]);
+  const changePerPage = useCallback(
+    (n: number) => {
+      if (isServerPaged) {
+        paginationRef.current!.onPerPage(n);
+        paginationRef.current!.onPage(1);
+      } else {
+        setLocalPerPage(n);
+        setLocalPage(1);
+      }
+    },
+    [isServerPaged],
+  );
 
   // ── Virtual Scrolling (v9) ────────────────────────────────────────────────
   const isVirtual = !!virtual;
@@ -345,10 +416,10 @@ export function DataTable<T = Record<string, unknown>>({
     containerHeight: virtualHeight,
     rowHeight,
   } = useVirtualScroll({
-    rowCount:        isVirtual ? processedData.length : 0,
-    rowHeight:       virtual?.rowHeight       ?? DEFAULT_ROW_HEIGHT,
+    rowCount: isVirtual ? processedData.length : 0,
+    rowHeight: virtual?.rowHeight ?? DEFAULT_ROW_HEIGHT,
     containerHeight: virtual?.containerHeight ?? DEFAULT_CONTAINER_HEIGHT,
-    overscan:        virtual?.overscan,
+    overscan: virtual?.overscan,
   });
 
   const displayData = useMemo(() => {
@@ -372,11 +443,11 @@ export function DataTable<T = Record<string, unknown>>({
   );
 
   const totalColSpan =
-    visibleCols.length
-    + (selectable ? 1 : 0)
-    + (expandable ? 1 : 0)
-    + (showIndex  ? 1 : 0)
-    + (rowActions ? 1 : 0);
+    visibleCols.length +
+    (selectable ? 1 : 0) +
+    (expandable ? 1 : 0) +
+    (showIndex ? 1 : 0) +
+    (rowActions ? 1 : 0);
 
   // ── Aggregates ────────────────────────────────────────────────────────────
   const [aggTypes, setAggTypes] = useState<Record<string, AggregateType>>(() =>
@@ -403,25 +474,30 @@ export function DataTable<T = Record<string, unknown>>({
     return r;
   }, [showAggregates, processedData, columns, aggTypes]);
 
-  const cycleAgg = useCallback((key: string) => {
-    setAggTypes(prev => {
-      const cur = prev[key] ?? 'sum';
-      const idx = AGG_CYCLE.indexOf(cur);
-      return { ...prev, [key]: AGG_CYCLE[(idx + 1) % AGG_CYCLE.length] };
-    });
-  }, []);
+  const cycleAgg = useCallback(
+    (key: string) => {
+      setAggTypes(prev => {
+        const cur = prev[key] ?? 'sum';
+        const idx = AGG_CYCLE.indexOf(cur);
+        return { ...prev, [key]: AGG_CYCLE[(idx + 1) % AGG_CYCLE.length] };
+      });
+    },
+    [],
+  );
 
   // ── Selection ─────────────────────────────────────────────────────────────
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string | number>>(new Set());
-  const indRef      = useRef<HTMLInputElement>(null);
+  const indRef = useRef<HTMLInputElement>(null);
   const onSelectRef = useRef(onSelect);
-  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
 
   const displayKeys = useMemo(
     () => displayData.map((r, i) => rowKey(r, i)),
     [displayData, rowKey],
   );
-  const allChecked  = displayKeys.length > 0 && displayKeys.every(k => selectedKeys.has(k));
+  const allChecked = displayKeys.length > 0 && displayKeys.every(k => selectedKeys.has(k));
   const someChecked = !allChecked && displayKeys.some(k => selectedKeys.has(k));
 
   useEffect(() => {
@@ -470,47 +546,63 @@ export function DataTable<T = Record<string, unknown>>({
   // ── Inline editing ────────────────────────────────────────────────────────
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const onCellEditRef = useRef(onCellEdit);
-  useEffect(() => { onCellEditRef.current = onCellEdit; }, [onCellEdit]);
+  useEffect(() => {
+    onCellEditRef.current = onCellEdit;
+  }, [onCellEdit]);
 
-  // ── 🆕 Batch Edit ─────────────────────────────────────────────────────────
+  // ── Batch Edit (v10) ──────────────────────────────────────────────────────
   const batch = useBatchEdit({ enabled: batchEdit, onBatchSave });
 
-  // ── 🆕 Cell Validation ────────────────────────────────────────────────────
+  // ── Cell Validation (v10) ─────────────────────────────────────────────────
   const { validate: validateCell, getError, clearError } = useCellValidation();
 
-  const startEdit = useCallback((rKey: string | number, colKey: string, rawVal: unknown, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingCell({ rowKey: rKey, colKey, value: rawVal == null ? '' : String(rawVal) });
-  }, []);
+  const startEdit = useCallback(
+    (rKey: string | number, colKey: string, rawVal: unknown, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setEditingCell({ rowKey: rKey, colKey, value: rawVal == null ? '' : String(rawVal) });
+    },
+    [],
+  );
 
   const commitEdit = useCallback(() => {
-    if (!editingCell) { setEditingCell(null); return; }
+    if (!editingCell) {
+      setEditingCell(null);
+      return;
+    }
     const { rowKey: rKey, colKey, value } = editingCell;
     const rowIdx = data.findIndex((r, i) => rowKey(r, i) === rKey);
-    if (rowIdx < 0) { setEditingCell(null); return; }
+    if (rowIdx < 0) {
+      setEditingCell(null);
+      return;
+    }
 
     const col = columns.find(c => c.key === colKey);
     const oldValue = col ? getRawValue(data[rowIdx], col) : undefined;
-    const cellId   = `${rKey}__${colKey}`;
+    const cellId = `${rKey}__${colKey}`;
 
-    // Validation
     if (col?.validation) {
       const row = data[rowIdx] as Record<string, unknown>;
-      const ok  = validateCell(value, col.validation, row, cellId);
-      if (!ok) return; // لا تُغلق الخلية إذا فيها خطأ
+      const ok = validateCell(value, col.validation, row, cellId);
+      if (!ok) return;
     } else {
       clearError(cellId);
     }
 
     if (batchEdit) {
       batch.recordEdit({
-        rowKey:   rKey,
+        rowKey: rKey,
         colKey,
         oldValue: String(oldValue ?? ''),
         newValue: value,
       });
     } else if (onCellEditRef.current) {
-      onCellEditRef.current({ row: data[rowIdx], rowIndex: rowIdx, colKey, oldValue, newValue: value });
+      onCellEditRef.current({
+        row: data[rowIdx],
+        rowIndex: rowIdx,
+        colKey,
+        oldValue,
+        newValue: value,
+      });
     }
 
     setEditingCell(null);
@@ -521,23 +613,206 @@ export function DataTable<T = Record<string, unknown>>({
     setEditingCell(null);
   }, [editingCell, clearError]);
 
-  // ── 🆕 Keyboard Navigation ────────────────────────────────────────────────
+  // ── Keyboard Navigation (v10) ─────────────────────────────────────────────
   const {
-    activeCell, isEditing: kbIsEditing, handleKeyDown: kbHandleKeyDown, activateCell,
+    activeCell,
+    isEditing: kbIsEditing,
+    handleKeyDown: kbHandleKeyDown,
+    activateCell,
   } = useKeyboardNav({
-    enabled:  keyboardNav,
+    enabled: keyboardNav,
     rowCount: (isVirtual ? virtualDisplayData : displayData).length,
     colCount: visibleCols.length,
-    onStartEdit: (cell) => {
-      const rowData   = (isVirtual ? virtualDisplayData : displayData)[cell.rowIndex];
+    onStartEdit: cell => {
+      const rowData = (isVirtual ? virtualDisplayData : displayData)[cell.rowIndex];
       if (!rowData) return;
-      const col    = visibleCols[cell.colIndex];
+      const col = visibleCols[cell.colIndex];
       if (!col?.editable) return;
-      const rKey   = rowKey(rowData, cell.rowIndex);
+      const rKey = rowKey(rowData, cell.rowIndex);
       const rawVal = getRawValue(rowData, col as Column<T>);
       setEditingCell({ rowKey: rKey, colKey: col.key, value: rawVal == null ? '' : String(rawVal) });
     },
   });
+
+  // ── Copy/Paste from Excel 🆕 ──────────────────────────────────────────────
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  useClipboardPaste(
+    tableWrapRef,
+    data,
+    columns,
+    rowKey,
+    onCellEditRef.current,
+    batchEdit,
+    batch.recordEdit,
+    { allowMultiCell: true },
+  );
+
+  // ── Smart Filter (اللغة العربية) 🆕 ───────────────────────────────────────
+  const { applySmartFilter } = useSmartFilter(columns, (newFilters, newSorts) => {
+    setFilters(newFilters);
+    if (newSorts) setSorts(newSorts);
+    setLocalPage(1);
+    if (urlState?.enabled) {
+      url.writeFilters(newFilters);
+      if (newSorts) url.writeSort(newSorts);
+    }
+  });
+
+  const handleSmartFilter = useCallback(() => {
+    const userQuery = prompt(
+      '🔍 فلتر ذكي: اكتب وصفاً مثل "فواتير متأخرة أكثر من 30 يوم" أو "الفرز حسب التاريخ تنازلي"',
+    );
+    if (userQuery) {
+      applySmartFilter(userQuery);
+      onSmartFilterApply?.(userQuery, { success: true, filters: {}, sort: [] });
+    }
+  }, [applySmartFilter, onSmartFilterApply]);
+
+  // ── Saved Views 🆕 ────────────────────────────────────────────────────────
+  const { loadViews, saveView, deleteView } = useSavedViews(
+    enableSavedViews && savedViewsConfig ? savedViewsConfig : { tableKey: 'default' },
+  );
+  const [savedViewsList, setSavedViewsList] = useState<SavedView[]>([]);
+  const [viewsMenuOpen, setViewsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (enableSavedViews) setSavedViewsList(loadViews());
+  }, [enableSavedViews, loadViews]);
+
+  const handleSaveCurrentView = useCallback(() => {
+    const name = prompt('💾 أدخل اسم العرض الجديد');
+    if (!name) return;
+    saveView(name, {
+      filters,
+      sorts,
+      searchQuery: globalQuery,
+      pageSize: perPage,
+      hiddenColumns: Array.from(hiddenKeys),
+      columnOrder: orderedColumns.map(c => c.key),
+      pinnedColumns: pinConfig,
+    });
+    setSavedViewsList(loadViews());
+  }, [
+    filters,
+    sorts,
+    globalQuery,
+    perPage,
+    hiddenKeys,
+    orderedColumns,
+    pinConfig,
+    saveView,
+    loadViews,
+  ]);
+
+  const handleApplyView = useCallback(
+    (view: SavedView) => {
+      setFilters(view.filters);
+      setSorts(view.sorts);
+      setGlobalQuery(view.searchQuery);
+      setLocalPerPage(view.pageSize);
+      setHiddenKeys(new Set(view.hiddenColumns));
+      if (view.columnOrder) setColumnOrder(view.columnOrder);
+      if (view.pinnedColumns) {
+        Object.entries(view.pinnedColumns).forEach(([side, keys]) => {
+          keys.forEach(key => pinColumn(key, side as 'start' | 'end'));
+        });
+      }
+      setLocalPage(1);
+      if (urlState?.enabled) {
+        url.writeFilters(view.filters);
+        url.writeSort(view.sorts);
+        url.writeSearch(view.searchQuery);
+      }
+    },
+    [
+      setFilters,
+      setSorts,
+      setGlobalQuery,
+      setLocalPerPage,
+      setHiddenKeys,
+      setColumnOrder,
+      pinColumn,
+      setLocalPage,
+      url,
+      urlState,
+    ],
+  );
+
+  // ── Context Menu 🆕 ───────────────────────────────────────────────────────
+  const defaultContextMenuItems = useCallback(
+    (ctx: ContextMenuContext): ContextMenuItem[] => {
+      const items: ContextMenuItem[] = [];
+      if (ctx.type === 'cell') {
+        items.push(
+          {
+            label: 'نسخ القيمة',
+            icon: 'copy',
+            onClick: c => {
+              if (c.value) navigator.clipboard.writeText(String(c.value));
+            },
+          },
+          { divider: true },
+          {
+            label: 'فلتر بنفس القيمة',
+            icon: 'filter',
+            onClick: c => {
+              if (c.colKey && c.value)
+                setFilters(prev => ({ ...prev, [c.colKey!]: String(c.value) }));
+            },
+          },
+          {
+            label: 'تعديل الخلية',
+            icon: 'edit',
+            onClick: () => {},
+            disabled: !columns.find(col => col.key === ctx.colKey)?.editable,
+          },
+        );
+      } else if (ctx.type === 'row') {
+        items.push(
+          {
+            label: 'نسخ معرف الصف',
+            icon: 'copy',
+            onClick: c => {
+              if (c.row) navigator.clipboard.writeText(String(c.row.id));
+            },
+          },
+          {
+            label: 'توسيع/طي',
+            icon: 'arrows-expand',
+            onClick: c => {
+              if (c.rowIndex !== undefined) {
+                toggleExpanded(rowKey(data[c.rowIndex], c.rowIndex), new MouseEvent('click'));
+              }
+            },
+          },
+        );
+      } else if (ctx.type === 'header') {
+        items.push(
+          {
+            label: 'إخفاء العمود',
+            icon: 'eye-off',
+            onClick: c => {
+              if (c.colKey) toggleColVisibility(c.colKey);
+            },
+          },
+          {
+            label: 'تثبيت العمود',
+            icon: 'pin',
+            onClick: c => {
+              if (c.colKey) pinColumn(c.colKey, 'start');
+            },
+          },
+        );
+      }
+      return items;
+    },
+    [columns, data, rowKey, toggleExpanded, toggleColVisibility, pinColumn, setFilters],
+  );
+
+  const { menuState, closeMenu } = useContextMenu(
+    enableContextMenu ? contextMenuItems || defaultContextMenuItems : () => [],
+    tableWrapRef,
+  );
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const selectedRows = useMemo(
@@ -547,27 +822,40 @@ export function DataTable<T = Record<string, unknown>>({
   const hiddenCount = hiddenKeys.size;
 
   // ── Drag scroll (desktop) ─────────────────────────────────────────────────
-  const tableWrapRef = useRef<HTMLDivElement>(null);
-  const dragState    = useRef<{ startX: number; scrollLeft: number } | null>(null);
+  const dragState = useRef<{ startX: number; scrollLeft: number } | null>(null);
 
-  const handleDragMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('button, input, select, a, label, [role="button"], [draggable]')) return;
-    const el = tableWrapRef.current;
-    if (!el) return;
-    dragState.current = { startX: e.pageX - el.getBoundingClientRect().left, scrollLeft: el.scrollLeft };
-    el.classList.add('dt-dragging');
-  }, []);
+  const handleDragMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.closest(
+          'button, input, select, a, label, [role="button"], [draggable]',
+        )
+      )
+        return;
+      const el = tableWrapRef.current;
+      if (!el) return;
+      dragState.current = {
+        startX: e.pageX - el.getBoundingClientRect().left,
+        scrollLeft: el.scrollLeft,
+      };
+      el.classList.add('dt-dragging');
+    },
+    [],
+  );
 
-  const handleDragMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!dragState.current) return;
-    e.preventDefault();
-    const el = tableWrapRef.current;
-    if (!el) return;
-    const x    = e.pageX - el.getBoundingClientRect().left;
-    const walk = (x - dragState.current.startX) * 1.3;
-    el.scrollLeft = dragState.current.scrollLeft - walk;
-  }, []);
+  const handleDragMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!dragState.current) return;
+      e.preventDefault();
+      const el = tableWrapRef.current;
+      if (!el) return;
+      const x = e.pageX - el.getBoundingClientRect().left;
+      const walk = (x - dragState.current.startX) * 1.3;
+      el.scrollLeft = dragState.current.scrollLeft - walk;
+    },
+    [],
+  );
 
   const handleDragEnd = useCallback(() => {
     if (!dragState.current) return;
@@ -577,14 +865,14 @@ export function DataTable<T = Record<string, unknown>>({
 
   // helper: رتبة العمود في الفرز المتعدد
   const getSortIndex = (key: string) => sorts.findIndex(s => s.key === key);
-  const getSortDir   = (key: string) => sorts.find(s => s.key === key)?.dir ?? null;
+  const getSortDir = (key: string) => sorts.find(s => s.key === key)?.dir ?? null;
 
   // ─── Render Helper: صف بيانات ──────────────────────────────────────────────
   const renderDataRow = (row: T, absoluteIdx: number) => {
-    const rKey       = rowKey(row, absoluteIdx);
+    const rKey = rowKey(row, absoluteIdx);
     const isSelected = selectedKeys.has(rKey);
     const isExpanded = expandedKeys.has(rKey);
-    const canExpand  = expandable && (!isExpandable || isExpandable(row));
+    const canExpand = expandable && (!isExpandable || isExpandable(row));
     const extraClass = rowClassName?.(row) ?? '';
 
     return (
@@ -595,10 +883,13 @@ export function DataTable<T = Record<string, unknown>>({
             isSelected ? 'dt-row-sel' : '',
             onRowClick ? 'dt-row-click' : '',
             extraClass,
-          ].filter(Boolean).join(' ')}
+          ]
+            .filter(Boolean)
+            .join(' ')}
           style={isVirtual ? { height: rowHeight } : undefined}
           onClick={onRowClick ? () => onRowClick(row) : undefined}
           aria-selected={selectable ? isSelected : undefined}
+          data-row-index={absoluteIdx}
         >
           {expandable && (
             <td className="dt-td-exp">
@@ -610,7 +901,10 @@ export function DataTable<T = Record<string, unknown>>({
                   aria-expanded={isExpanded}
                   aria-label={isExpanded ? 'طي' : 'توسيع'}
                 >
-                  <i className={`ti ti-chevron-${isExpanded ? 'down' : 'left'}`} aria-hidden="true" />
+                  <i
+                    className={`ti ti-chevron-${isExpanded ? 'down' : 'left'}`}
+                    aria-hidden="true"
+                  />
                 </button>
               )}
             </td>
@@ -635,24 +929,29 @@ export function DataTable<T = Record<string, unknown>>({
           )}
 
           {visibleCols.map((col, colIdx) => {
-            const rawVal   = getRawValue(row, col as Column<T>);
-            const cellId   = `${rKey}__${col.key}`;
-            const isEditing  = editingCell?.rowKey === rKey && editingCell?.colKey === col.key;
-            const canEdit    = !!col.editable && (!!onCellEdit || batchEdit);
-            const isActiveCb = keyboardNav && activeCell?.rowIndex === absoluteIdx && activeCell?.colIndex === colIdx;
-            const cellError  = getError(cellId);
+            const rawVal = getRawValue(row, col as Column<T>);
+            const cellId = `${rKey}__${col.key}`;
+            const isEditing = editingCell?.rowKey === rKey && editingCell?.colKey === col.key;
+            const canEdit = !!col.editable && (!!onCellEdit || batchEdit);
+            const isActiveCb =
+              keyboardNav &&
+              activeCell?.rowIndex === absoluteIdx &&
+              activeCell?.colIndex === colIdx;
+            const cellError = getError(cellId);
 
-            // Batch Edit: القيمة المعلّقة
             const pendingVal = batchEdit ? batch.getPendingValue(rKey, col.key) : undefined;
             const hasPending = pendingVal !== undefined;
             const displayVal = pendingVal ?? rawVal;
 
-            // Conditional Formatting
             const cfResult = conditionalFormatting?.length
-              ? applyConditionalFormat(rawVal, row as Record<string, unknown>, col.key, conditionalFormatting as any)
+              ? applyConditionalFormat(
+                  rawVal,
+                  row as Record<string, unknown>,
+                  col.key,
+                  conditionalFormatting as any,
+                )
               : { style: {}, className: '' };
 
-            // Sticky
             const sticky = getEffectiveSticky(col as Column<T>);
 
             return (
@@ -661,19 +960,23 @@ export function DataTable<T = Record<string, unknown>>({
                 className={[
                   'dt-td',
                   sticky === 'start' ? 'dt-sticky-start dt-pinned' : '',
-                  sticky === 'end'   ? 'dt-sticky-end dt-pinned'   : '',
-                  canEdit && !isEditing   ? 'dt-td-editable'  : '',
-                  isActiveCb             ? 'dt-cell-active'   : '',
-                  hasPending             ? 'dt-cell-pending'  : '',
+                  sticky === 'end' ? 'dt-sticky-end dt-pinned' : '',
+                  canEdit && !isEditing ? 'dt-td-editable' : '',
+                  isActiveCb ? 'dt-cell-active' : '',
+                  hasPending ? 'dt-cell-pending' : '',
                   cfResult.className,
-                ].filter(Boolean).join(' ')}
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 style={{
-                  textAlign:  getTextAlign(col.align),
+                  textAlign: getTextAlign(col.align),
                   background: isEditing ? 'var(--emb)' : undefined,
                   whiteSpace: isEditing ? 'normal' : undefined,
-                  position:   cellError ? 'relative' : undefined,
+                  position: cellError ? 'relative' : undefined,
                   ...cfResult.style,
                 }}
+                data-row-index={absoluteIdx}
+                data-col-key={col.key}
                 onClick={e => {
                   if (keyboardNav) activateCell({ rowIndex: absoluteIdx, colIndex: colIdx });
                   if (canEdit && !isEditing) startEdit(rKey, col.key, rawVal, e);
@@ -686,7 +989,7 @@ export function DataTable<T = Record<string, unknown>>({
                     <EditInput
                       def={col.editable}
                       value={editingCell!.value}
-                      onChange={v => setEditingCell(p => p ? { ...p, value: v } : null)}
+                      onChange={v => setEditingCell(p => (p ? { ...p, value: v } : null))}
                       onCommit={commitEdit}
                       onCancel={cancelEdit}
                     />
@@ -718,9 +1021,7 @@ export function DataTable<T = Record<string, unknown>>({
         {isExpanded && renderExpanded && (
           <tr>
             <td colSpan={totalColSpan} className="dt-exp-td">
-              <div className="dt-exp-inner">
-                {renderExpanded(row, absoluteIdx)}
-              </div>
+              <div className="dt-exp-inner">{renderExpanded(row, absoluteIdx)}</div>
             </td>
           </tr>
         )}
@@ -738,11 +1039,9 @@ export function DataTable<T = Record<string, unknown>>({
       tabIndex={keyboardNav ? 0 : undefined}
       onKeyDown={keyboardNav ? kbHandleKeyDown : undefined}
     >
-
       {/* ══ TOOLBAR ═════════════════════════════════════════════════════════ */}
       <div className="dt-toolbar">
         <div className="dt-toolbar-left">
-
           {title && <span className="dt-toolbar-title">{title}</span>}
 
           {searchable && (
@@ -774,18 +1073,29 @@ export function DataTable<T = Record<string, unknown>>({
             <span className="dt-filter-badge">
               <i className="ti ti-filter" aria-hidden="true" />
               {activeFilterCount}
-              <button onClick={clearAllFilters} aria-label="مسح كل الفلاتر" type="button">×</button>
+              <button onClick={clearAllFilters} aria-label="مسح كل الفلاتر" type="button">
+                ×
+              </button>
             </span>
           )}
 
-          {/* 🆕 Group controls */}
           {groupBy && groups && (
             <div className="dt-toolbar-group-btns">
-              <button className="dt-tbtn" onClick={expandAllGroups} type="button" title="توسيع كل المجموعات">
+              <button
+                className="dt-tbtn"
+                onClick={expandAllGroups}
+                type="button"
+                title="توسيع كل المجموعات"
+              >
                 <i className="ti ti-layout-list" />
                 توسيع الكل
               </button>
-              <button className="dt-tbtn" onClick={collapseAllGroups} type="button" title="طي كل المجموعات">
+              <button
+                className="dt-tbtn"
+                onClick={collapseAllGroups}
+                type="button"
+                title="طي كل المجموعات"
+              >
                 <i className="ti ti-layout-rows" />
                 طي الكل
               </button>
@@ -822,15 +1132,19 @@ export function DataTable<T = Record<string, unknown>>({
             </span>
           )}
 
-          {/* 🆕 Keyboard nav indicator */}
+          {/* Keyboard nav indicator */}
           {keyboardNav && (
-            <span className="dt-tbtn" style={{ cursor: 'default', opacity: .7 }} title="التنقل بلوحة المفاتيح مفعّل — Arrows/Tab/F2/Escape">
+            <span
+              className="dt-tbtn"
+              style={{ cursor: 'default', opacity: 0.7 }}
+              title="التنقل بلوحة المفاتيح مفعّل — Arrows/Tab/F2/Escape"
+            >
               <i className="ti ti-keyboard" />
               KB
             </span>
           )}
 
-          {/* 🆕 Multi-sort clear */}
+          {/* Multi-sort clear */}
           {multiSort && sorts.length > 0 && (
             <button className="dt-tbtn" onClick={clearSort} type="button">
               <i className="ti ti-arrows-sort" />
@@ -838,10 +1152,89 @@ export function DataTable<T = Record<string, unknown>>({
             </button>
           )}
 
-          {/* 🆕 Unpin all */}
+          {/* Unpin all */}
           {(pinConfig.start?.length || pinConfig.end?.length) && (
-            <button className="dt-tbtn" onClick={clearAllPins} type="button" title="إزالة كل التثبيتات">
+            <button
+              className="dt-tbtn"
+              onClick={clearAllPins}
+              type="button"
+              title="إزالة كل التثبيتات"
+            >
               <i className="ti ti-pinned-off" />
+            </button>
+          )}
+
+          {/* 🆕 Smart Filter */}
+          {enableSmartFilter && (
+            <button
+              className="dt-tbtn"
+              onClick={handleSmartFilter}
+              type="button"
+              title="فلتر ذكي بالعربية"
+            >
+              <i className="ti ti-robot" />
+              فلتر ذكي
+            </button>
+          )}
+
+          {/* 🆕 Saved Views */}
+          {enableSavedViews && (
+            <div className="dt-col-menu-wrap">
+              <button
+                className="dt-tbtn"
+                onClick={() => setViewsMenuOpen(v => !v)}
+                type="button"
+              >
+                <i className="ti ti-bookmark" />
+                العروض
+              </button>
+              {viewsMenuOpen && (
+                <div className="dt-col-menu" style={{ minWidth: '200px' }}>
+                  <div className="dt-col-menu-header">
+                    <span>العروض المحفوظة</span>
+                    <button onClick={handleSaveCurrentView}>
+                      <i className="ti ti-plus" /> حفظ
+                    </button>
+                  </div>
+                  {savedViewsList.length === 0 && (
+                    <div style={{ padding: '8px', color: 'var(--t4)' }}>لا توجد عروض</div>
+                  )}
+                  {savedViewsList.map(view => (
+                    <div
+                      key={view.id}
+                      className="dt-col-item"
+                      style={{ justifyContent: 'space-between' }}
+                    >
+                      <span onClick={() => handleApplyView(view)}>{view.name}</span>
+                      <button
+                        onClick={() => {
+                          deleteView(view.id);
+                          setSavedViewsList(loadViews());
+                        }}
+                      >
+                        <i className="ti ti-trash" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 🆕 Export Excel */}
+          {enableExcelExport && (
+            <button
+              className="dt-tbtn"
+              onClick={() =>
+                exportToExcel(processedData, columns, {
+                  fileName: exportName,
+                  ...excelExportOptions,
+                })
+              }
+              type="button"
+            >
+              <i className="ti ti-file-spreadsheet" />
+              Excel
             </button>
           )}
 
@@ -866,14 +1259,24 @@ export function DataTable<T = Record<string, unknown>>({
                 <div className="dt-col-menu-header">
                   <span>الأعمدة</span>
                   <button onClick={toggleCollapseAll} type="button">
-                    {allHidden
-                      ? <><i className="ti ti-eye" /> إظهار الكل</>
-                      : <><i className="ti ti-eye-off" /> إخفاء الكل</>}
+                    {allHidden ? (
+                      <>
+                        <i className="ti ti-eye" /> إظهار الكل
+                      </>
+                    ) : (
+                      <>
+                        <i className="ti ti-eye-off" /> إخفاء الكل
+                      </>
+                    )}
                   </button>
                 </div>
                 {nonIndexCols.map(col => (
-                  <label key={col.key} className="dt-col-item" role="menuitemcheckbox"
-                         aria-checked={!hiddenKeys.has(col.key)}>
+                  <label
+                    key={col.key}
+                    className="dt-col-item"
+                    role="menuitemcheckbox"
+                    aria-checked={!hiddenKeys.has(col.key)}
+                  >
                     <input
                       className="dt-ms-checkbox"
                       type="checkbox"
@@ -881,12 +1284,17 @@ export function DataTable<T = Record<string, unknown>>({
                       onChange={() => toggleColVisibility(col.key)}
                     />
                     <span>{col.header}</span>
-                    {/* 🆕 Pin actions in column menu */}
                     {!col.disablePin && (
                       <div className="dt-col-pin-actions">
                         <button
                           className={`dt-pin-btn${isPinned(col.key) === 'start' ? ' active' : ''}`}
-                          onClick={e => { e.preventDefault(); pinColumn(col.key, isPinned(col.key) === 'start' ? null : 'start'); }}
+                          onClick={e => {
+                            e.preventDefault();
+                            pinColumn(
+                              col.key,
+                              isPinned(col.key) === 'start' ? null : 'start',
+                            );
+                          }}
                           title="تثبيت يميناً"
                           type="button"
                         >
@@ -894,7 +1302,13 @@ export function DataTable<T = Record<string, unknown>>({
                         </button>
                         <button
                           className={`dt-pin-btn${isPinned(col.key) === 'end' ? ' active' : ''}`}
-                          onClick={e => { e.preventDefault(); pinColumn(col.key, isPinned(col.key) === 'end' ? null : 'end'); }}
+                          onClick={e => {
+                            e.preventDefault();
+                            pinColumn(
+                              col.key,
+                              isPinned(col.key) === 'end' ? null : 'end',
+                            );
+                          }}
                           title="تثبيت يساراً"
                           type="button"
                         >
@@ -908,7 +1322,7 @@ export function DataTable<T = Record<string, unknown>>({
             )}
           </div>
 
-          {/* تصدير */}
+          {/* تصدير CSV */}
           {exportable && (
             <button
               className="dt-tbtn"
@@ -954,38 +1368,54 @@ export function DataTable<T = Record<string, unknown>>({
       {/* ══ TABLE — Desktop ═════════════════════════════════════════════════ */}
       <div
         className="dt-desktop dt-table-outer"
-        ref={isVirtual ? scrollContainerRef : tableWrapRef}
-        style={isVirtual ? {
-          height:    virtualHeight,
-          overflowY: 'auto',
-          overflowX: 'auto',
-          position:  'relative',
-        } : undefined}
+        ref={tableWrapRef}
+        style={
+          isVirtual
+            ? {
+                height: virtualHeight,
+                overflowY: 'auto',
+                overflowX: 'auto',
+                position: 'relative',
+              }
+            : undefined
+        }
         onMouseDown={isVirtual ? undefined : handleDragMouseDown}
         onMouseMove={isVirtual ? undefined : handleDragMouseMove}
         onMouseUp={isVirtual ? undefined : handleDragEnd}
         onMouseLeave={isVirtual ? undefined : handleDragEnd}
       >
-        {/* Virtual Scrolling: spacer */}
         {isVirtual && (
-          <div style={{ height: totalHeight, position: 'absolute', top: 0, left: 0, right: 0, pointerEvents: 'none' }} />
+          <div
+            style={{
+              height: totalHeight,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              pointerEvents: 'none',
+            }}
+          />
         )}
 
         <table
           className="dt-table"
           role="grid"
           aria-rowcount={total}
-          style={isVirtual ? {
-            position:    'sticky',
-            top:          0,
-            tableLayout: 'fixed',
-            width:       '100%',
-          } : { tableLayout: 'fixed', width: '100%' }}
+          style={
+            isVirtual
+              ? {
+                  position: 'sticky',
+                  top: 0,
+                  tableLayout: 'fixed',
+                  width: '100%',
+                }
+              : { tableLayout: 'fixed', width: '100%' }
+          }
         >
           <colgroup>
             {expandable && <col style={{ width: 36 }} />}
             {selectable && <col style={{ width: 36 }} />}
-            {showIndex  && <col style={{ width: 44 }} />}
+            {showIndex && <col style={{ width: 44 }} />}
             {visibleCols.map(col => (
               <col
                 key={col.key}
@@ -1014,41 +1444,50 @@ export function DataTable<T = Record<string, unknown>>({
               {showIndex && <th className="dt-th dt-th-idx">{indexHeader}</th>}
 
               {visibleCols.map(col => {
-                const canSort     = col.sortable !== false;
-                const sortIdx     = getSortIndex(col.key);
-                const sortDir     = getSortDir(col.key);
-                const isSorted    = sortDir !== null;
+                const canSort = col.sortable !== false;
+                const sortIdx = getSortIndex(col.key);
+                const sortDir = getSortDir(col.key);
+                const isSorted = sortDir !== null;
                 const singleSorted = !multiSort && legacySortState.key === col.key;
-                const singleDir    = !multiSort ? legacySortState.dir : null;
+                const singleDir = !multiSort ? legacySortState.dir : null;
 
-                const canDrag   = columnReorder && !col.sticky && !col.disableDrag;
+                const canDrag = columnReorder && !col.sticky && !col.disableDrag;
                 const isDragOver = dragOverKey === col.key;
-                const sticky    = getEffectiveSticky(col as Column<T>);
-                const pinned    = isPinned(col.key);
+                const sticky = getEffectiveSticky(col as Column<T>);
+                const pinned = isPinned(col.key);
 
                 return (
                   <th
                     key={col.key}
                     className={[
                       'dt-th',
-                      canSort                       ? 'dt-th-sort'     : '',
-                      isSorted || singleSorted      ? 'dt-th-sorted'   : '',
-                      sticky === 'start'            ? 'dt-sticky-start dt-pinned' : '',
-                      sticky === 'end'              ? 'dt-sticky-end dt-pinned'   : '',
-                      isDragOver                    ? 'dt-th-drag-over' : '',
-                      canDrag                       ? 'dt-th-draggable' : '',
-                    ].filter(Boolean).join(' ')}
+                      canSort ? 'dt-th-sort' : '',
+                      isSorted || singleSorted ? 'dt-th-sorted' : '',
+                      sticky === 'start' ? 'dt-sticky-start dt-pinned' : '',
+                      sticky === 'end' ? 'dt-sticky-end dt-pinned' : '',
+                      isDragOver ? 'dt-th-drag-over' : '',
+                      canDrag ? 'dt-th-draggable' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                     style={{ textAlign: getTextAlign(col.align), position: 'relative' }}
                     aria-sort={
                       isSorted || singleSorted
-                        ? (sortDir ?? singleDir) === 'asc' ? 'ascending' : 'descending'
+                        ? (sortDir ?? singleDir) === 'asc'
+                          ? 'ascending'
+                          : 'descending'
                         : undefined
                     }
                     draggable={canDrag}
-                    onDragStart={canDrag ? e => dragHandlers.onDragStart(col.key, e) : undefined}
-                    onDragOver={canDrag  ? e => dragHandlers.onDragOver(col.key, e)  : undefined}
-                    onDrop={canDrag      ? e => dragHandlers.onDrop(col.key, e)       : undefined}
-                    onDragEnd={canDrag   ? dragHandlers.onDragEnd                    : undefined}
+                    onDragStart={
+                      canDrag ? e => dragHandlers.onDragStart(col.key, e) : undefined
+                    }
+                    onDragOver={
+                      canDrag ? e => dragHandlers.onDragOver(col.key, e) : undefined
+                    }
+                    onDrop={canDrag ? e => dragHandlers.onDrop(col.key, e) : undefined}
+                    onDragEnd={canDrag ? dragHandlers.onDragEnd : undefined}
+                    data-col-key={col.key}
                   >
                     <div className="dt-th-inner">
                       {canSort ? (
@@ -1067,10 +1506,14 @@ export function DataTable<T = Record<string, unknown>>({
                             {multiSort && isSorted ? (
                               <>
                                 <span className="dt-sort-priority">{sortIdx + 1}</span>
-                                <i className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`} />
+                                <i
+                                  className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`}
+                                />
                               </>
                             ) : singleSorted ? (
-                              <i className={`ti ti-arrow-${singleDir === 'asc' ? 'up' : 'down'}`} />
+                              <i
+                                className={`ti ti-arrow-${singleDir === 'asc' ? 'up' : 'down'}`}
+                              />
                             ) : (
                               <i className="ti ti-arrows-sort" />
                             )}
@@ -1080,30 +1523,31 @@ export function DataTable<T = Record<string, unknown>>({
                         <span>{col.header}</span>
                       )}
 
-                      {/* زر الفلتر */}
                       {col.filter && (
                         <button
                           ref={getFilterBtnRef(col.key)}
                           className={`dt-flt-btn${filters[col.key] ? ' on' : ''}`}
                           onClick={e => {
                             e.stopPropagation();
-                            setOpenFilterKey(p => p === col.key ? null : col.key);
+                            setOpenFilterKey(p => (p === col.key ? null : col.key));
                           }}
                           type="button"
                           aria-label={`فلتر ${typeof col.header === 'string' ? col.header : ''}`}
                           aria-expanded={openFilterKey === col.key}
                         >
-                          <i className={`ti ${filters[col.key] ? 'ti-filter-filled' : 'ti-filter'}`} aria-hidden="true" />
+                          <i
+                            className={`ti ${filters[col.key] ? 'ti-filter-filled' : 'ti-filter'}`}
+                            aria-hidden="true"
+                          />
                         </button>
                       )}
 
-                      {/* 🆕 زر التثبيت في رأس العمود */}
                       {!col.disablePin && (
                         <button
                           className={`dt-th-pin-btn${pinned ? ' active' : ''}`}
                           onClick={e => {
                             e.stopPropagation();
-                            setPinMenuKey(p => p === col.key ? null : col.key);
+                            setPinMenuKey(p => (p === col.key ? null : col.key));
                           }}
                           title="تثبيت العمود"
                           type="button"
@@ -1113,27 +1557,33 @@ export function DataTable<T = Record<string, unknown>>({
                         </button>
                       )}
 
-                      {/* ✅ resize handle — محفوظ من v9 */}
                       <span
                         className="dt-rh"
-                        onMouseDown={e => startResize(col.key, colWidths[col.key] ?? col.width ?? 120, e)}
+                        onMouseDown={e =>
+                          startResize(
+                            col.key,
+                            colWidths[col.key] ?? col.width ?? 120,
+                            e,
+                          )
+                        }
                         onDoubleClick={() => resetWidth(col.key)}
                         aria-hidden="true"
                         title="اسحب لتغيير العرض • دوبل-كليك لإعادة الضبط"
                       />
                     </div>
 
-                    {/* 🆕 Pin menu */}
                     {pinMenuKey === col.key && (
                       <PinMenu
                         colKey={col.key}
                         current={pinned}
-                        onPin={side => { pinColumn(col.key, side); setPinMenuKey(null); }}
+                        onPin={side => {
+                          pinColumn(col.key, side);
+                          setPinMenuKey(null);
+                        }}
                         onClose={() => setPinMenuKey(null)}
                       />
                     )}
 
-                    {/* FilterPopup — portal يعمل صحيحاً */}
                     {openFilterKey === col.key && col.filter && (
                       <FilterPopup
                         col={col as Column<Record<string, unknown>>}
@@ -1154,13 +1604,10 @@ export function DataTable<T = Record<string, unknown>>({
           </thead>
 
           {/* ── tbody ──────────────────────────────────────────────────────── */}
-          <tbody
-            style={isVirtual ? { transform: `translateY(${offsetY}px)` } : undefined}
-          >
+          <tbody style={isVirtual ? { transform: `translateY(${offsetY}px)` } : undefined}>
             {loading ? (
               <SkeletonRows rows={8} cols={totalColSpan} />
             ) : groups ? (
-              /* ── Grouped mode ───────────────────────────────────────────── */
               groups.length === 0 ? (
                 <tr>
                   <td colSpan={totalColSpan} className="dt-empty-td">
@@ -1174,7 +1621,6 @@ export function DataTable<T = Record<string, unknown>>({
               ) : (
                 groups.map(group => (
                   <React.Fragment key={String(group.value)}>
-                    {/* رأس المجموعة */}
                     <tr
                       className="dt-group-row"
                       onClick={() => toggleGroup(String(group.value))}
@@ -1186,7 +1632,6 @@ export function DataTable<T = Record<string, unknown>>({
                             className={`ti ti-chevron-${group.collapsed ? 'left' : 'down'} dt-group-chevron`}
                             aria-hidden="true"
                           />
-                          {/* groupRenderer مخصص أو label افتراضي */}
                           {(() => {
                             const groupCol = visibleCols.find(c => c.key === groupBy!.key);
                             return groupCol?.groupRenderer
@@ -1198,38 +1643,45 @@ export function DataTable<T = Record<string, unknown>>({
                       </td>
                     </tr>
 
-                    {/* صفوف المجموعة */}
-                    {!group.collapsed && (group.rows as T[]).map((row, idx) =>
-                      renderDataRow(row, idx),
-                    )}
+                    {!group.collapsed &&
+                      (group.rows as T[]).map((row, idx) => renderDataRow(row, idx))}
 
-                    {/* Sub-totals */}
-                    {!group.collapsed && groupBy?.showSubTotals && showAggregates && aggregates && (
-                      <tr className="dt-group-subtotal">
-                        {expandable && <td />}
-                        {selectable && <td />}
-                        {showIndex  && <td />}
-                        {visibleCols.map((col, ci) => {
-                          const agg = aggregates[col.key];
-                          if (ci === 0) return <td key={col.key}><span className="dt-agg-label">Σ</span></td>;
-                          if (!agg || agg.value == null) return <td key={col.key} />;
-                          const fmt = col.aggregateFormat
-                            ? col.aggregateFormat(agg.value, agg.type)
-                            : agg.value.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                          return (
-                            <td key={col.key} style={{ textAlign: getTextAlign(col.align) }}>
-                              <span className="dt-agg-value">{fmt}</span>
-                            </td>
-                          );
-                        })}
-                        {rowActions && <td />}
-                      </tr>
-                    )}
+                    {!group.collapsed &&
+                      groupBy?.showSubTotals &&
+                      showAggregates &&
+                      aggregates && (
+                        <tr className="dt-group-subtotal">
+                          {expandable && <td />}
+                          {selectable && <td />}
+                          {showIndex && <td />}
+                          {visibleCols.map((col, ci) => {
+                            const agg = aggregates[col.key];
+                            if (ci === 0)
+                              return (
+                                <td key={col.key}>
+                                  <span className="dt-agg-label">Σ</span>
+                                </td>
+                              );
+                            if (!agg || agg.value == null) return <td key={col.key} />;
+                            const fmt = col.aggregateFormat
+                              ? col.aggregateFormat(agg.value, agg.type)
+                              : agg.value.toLocaleString('fr-DZ', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                });
+                            return (
+                              <td key={col.key} style={{ textAlign: getTextAlign(col.align) }}>
+                                <span className="dt-agg-value">{fmt}</span>
+                              </td>
+                            );
+                          })}
+                          {rowActions && <td />}
+                        </tr>
+                      )}
                   </React.Fragment>
                 ))
               )
             ) : (isVirtual ? virtualDisplayData : displayData).length === 0 ? (
-              /* ── Empty state ─────────────────────────────────────────────── */
               <tr>
                 <td colSpan={totalColSpan} className="dt-empty-td">
                   <div className="dt-empty" role="status">
@@ -1240,7 +1692,6 @@ export function DataTable<T = Record<string, unknown>>({
                 </td>
               </tr>
             ) : (
-              /* ── Normal rows ─────────────────────────────────────────────── */
               (isVirtual ? virtualDisplayData : displayData).map((row, idx) => {
                 const absoluteIdx = isVirtual ? visibleRange.start + idx : idx;
                 return renderDataRow(row, absoluteIdx);
@@ -1254,7 +1705,7 @@ export function DataTable<T = Record<string, unknown>>({
               <tr className="dt-agg-row" aria-label="صف الإجماليات">
                 {expandable && <td />}
                 {selectable && <td />}
-                {showIndex  && <td />}
+                {showIndex && <td />}
 
                 {visibleCols.map((col, ci) => {
                   const agg = aggregates[col.key];
@@ -1272,10 +1723,13 @@ export function DataTable<T = Record<string, unknown>>({
 
                   if (!agg || agg.value == null) return <td key={col.key} />;
 
-                  const canCycle  = typeof col.aggregate === 'string';
+                  const canCycle = typeof col.aggregate === 'string';
                   const formatted = col.aggregateFormat
                     ? col.aggregateFormat(agg.value, agg.type)
-                    : agg.value.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    : agg.value.toLocaleString('fr-DZ', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      });
 
                   return (
                     <td
@@ -1319,14 +1773,10 @@ export function DataTable<T = Record<string, unknown>>({
           </div>
         ) : (
           displayData.map((row, idx) => {
-            const rKey     = rowKey(row, idx);
+            const rKey = rowKey(row, idx);
             const cardCols = visibleCols.slice(0, 4);
             return (
-              <div
-                key={rKey}
-                className="dt-card-item"
-                onClick={() => onRowClick?.(row)}
-              >
+              <div key={rKey} className="dt-card-item" onClick={() => onRowClick?.(row)}>
                 <div className="dt-card-grid">
                   {cardCols.map(col => (
                     <div key={col.key}>
@@ -1373,14 +1823,30 @@ export function DataTable<T = Record<string, unknown>>({
 
           {lastPage > 1 && (
             <nav aria-label="التنقل بين الصفحات" className="dt-pagination">
-              <button className="dt-pg" disabled={curPage <= 1}
-                      onClick={() => goToPage(1)} aria-label="الصفحة الأولى" type="button">«</button>
-              <button className="dt-pg" disabled={curPage <= 1}
-                      onClick={() => goToPage(curPage - 1)} aria-label="الصفحة السابقة" type="button">‹</button>
+              <button
+                className="dt-pg"
+                disabled={curPage <= 1}
+                onClick={() => goToPage(1)}
+                aria-label="الصفحة الأولى"
+                type="button"
+              >
+                «
+              </button>
+              <button
+                className="dt-pg"
+                disabled={curPage <= 1}
+                onClick={() => goToPage(curPage - 1)}
+                aria-label="الصفحة السابقة"
+                type="button"
+              >
+                ‹
+              </button>
 
               {pageNumbers.map((p, i) =>
                 p === '…' ? (
-                  <span key={`e${i}`} className="dt-pg-ellipsis" aria-hidden="true">…</span>
+                  <span key={`e${i}`} className="dt-pg-ellipsis" aria-hidden="true">
+                    …
+                  </span>
                 ) : (
                   <button
                     key={p}
@@ -1395,10 +1861,24 @@ export function DataTable<T = Record<string, unknown>>({
                 ),
               )}
 
-              <button className="dt-pg" disabled={curPage >= lastPage}
-                      onClick={() => goToPage(curPage + 1)} aria-label="الصفحة التالية" type="button">›</button>
-              <button className="dt-pg" disabled={curPage >= lastPage}
-                      onClick={() => goToPage(lastPage)} aria-label="الصفحة الأخيرة" type="button">»</button>
+              <button
+                className="dt-pg"
+                disabled={curPage >= lastPage}
+                onClick={() => goToPage(curPage + 1)}
+                aria-label="الصفحة التالية"
+                type="button"
+              >
+                ›
+              </button>
+              <button
+                className="dt-pg"
+                disabled={curPage >= lastPage}
+                onClick={() => goToPage(lastPage)}
+                aria-label="الصفحة الأخيرة"
+                type="button"
+              >
+                »
+              </button>
             </nav>
           )}
         </div>
@@ -1432,7 +1912,7 @@ export function DataTable<T = Record<string, unknown>>({
         </div>
       )}
 
-      {/* ══ 🆕 BATCH EDIT BAR ════════════════════════════════════════════════ */}
+      {/* ══ BATCH EDIT BAR ════════════════════════════════════════════════════ */}
       {batchEdit && batch.hasPending && (
         <div className="dt-batch-bar">
           <div className="dt-batch-info">
@@ -1478,6 +1958,15 @@ export function DataTable<T = Record<string, unknown>>({
         </div>
       )}
 
+      {/* 🆕 CONTEXT MENU */}
+      {enableContextMenu && menuState.visible && menuState.context && (
+        <ContextMenu
+          x={menuState.x}
+          y={menuState.y}
+          items={(contextMenuItems || defaultContextMenuItems)(menuState.context)}
+          onClose={closeMenu}
+        />
+      )}
     </div>
   );
 }
@@ -1487,11 +1976,14 @@ export function DataTable<T = Record<string, unknown>>({
 // ════════════════════════════════════════════════════════════════════════════
 
 const PinMenu = memo(function PinMenu({
-  colKey, current, onPin, onClose,
+  colKey,
+  current,
+  onPin,
+  onClose,
 }: {
-  colKey:  string;
+  colKey: string;
   current: 'start' | 'end' | null;
-  onPin:   (side: 'start' | 'end' | null) => void;
+  onPin: (side: 'start' | 'end' | null) => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
