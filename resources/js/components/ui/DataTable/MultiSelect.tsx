@@ -155,7 +155,9 @@ const MultiSelectShell = memo(function MultiSelectShell({
               onKeyDown={e => e.key === 'Enter' && onToggle(opt.value)}
               tabIndex={0}
             >
-              <span className="dt-ms-check"><i className={`ti ${isOn ? 'ti-checkbox-checked' : 'ti-checkbox'}`} /></span>
+              <span className="dt-ms-check" aria-hidden="true">
+                <span className="dt-ms-check-box" />
+              </span>
               <span className="dt-ms-label" title={opt.label}>{opt.label}</span>
             </div>
           );

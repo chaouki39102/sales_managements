@@ -385,6 +385,36 @@ export function DataTable<T = Record<string, unknown>>({
   );
   const hiddenCount = hiddenKeys.size;
 
+  // ── Drag scroll ────────────────────────────────────────────────────────────
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const dragState    = useRef<{ startX: number; scrollLeft: number } | null>(null);
+
+  const handleDragMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    // تجاهل الضغط على عناصر تفاعلية
+    if (target.closest('button, input, select, a, label, [role="button"]')) return;
+    const el = tableWrapRef.current;
+    if (!el) return;
+    dragState.current = { startX: e.pageX - el.getBoundingClientRect().left, scrollLeft: el.scrollLeft };
+    el.classList.add('dt-dragging');
+  }, []);
+
+  const handleDragMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!dragState.current) return;
+    e.preventDefault();
+    const el = tableWrapRef.current;
+    if (!el) return;
+    const x    = e.pageX - el.getBoundingClientRect().left;
+    const walk = (x - dragState.current.startX) * 1.3;
+    el.scrollLeft = dragState.current.scrollLeft - walk;
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    if (!dragState.current) return;
+    dragState.current = null;
+    tableWrapRef.current?.classList.remove('dt-dragging');
+  }, []);
+
   // ════════════════════════════════════════════════════════════════════════
   // RENDER
   // ════════════════════════════════════════════════════════════════════════
@@ -529,7 +559,14 @@ export function DataTable<T = Record<string, unknown>>({
       )}
 
       {/* ══ TABLE — Desktop ═════════════════════════════════════════════════ */}
-      <div className="dt-table-wrap dt-desktop">
+      <div
+        ref={tableWrapRef}
+        className="dt-table-wrap dt-desktop"
+        onMouseDown={handleDragMouseDown}
+        onMouseMove={handleDragMouseMove}
+        onMouseUp={handleDragEnd}
+        onMouseLeave={handleDragEnd}
+      >
         <table role="grid" aria-rowcount={total} style={{ tableLayout: 'fixed' }}>
           <colgroup>
             {expandable && <col style={{ width: 38 }} />}

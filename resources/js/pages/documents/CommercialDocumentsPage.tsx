@@ -475,7 +475,7 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
                                     style={{
                                         padding: "6px 12px",
                                         direction: "ltr",
-                                        textAlign: "left",
+                                        textAlign: "right",
                                         fontWeight: 600,
                                     }}
                                 >
@@ -487,7 +487,7 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
                                     style={{
                                         padding: "6px 12px",
                                         direction: "ltr",
-                                        textAlign: "left",
+                                        textAlign: "right",
                                     }}
                                 >
                                     <MoneyCell
@@ -497,7 +497,7 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
                                 <td
                                     style={{
                                         padding: "6px 12px",
-                                        textAlign: "left",
+                                        textAlign: "right",
                                     }}
                                 >
                                     {disc > 0 ? (
@@ -519,7 +519,7 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
                                     style={{
                                         padding: "6px 12px",
                                         color: "var(--t4)",
-                                        textAlign: "left",
+                                        textAlign: "right",
                                     }}
                                 >
                                     {line.tva_rate}%
@@ -528,7 +528,7 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
                                     style={{
                                         padding: "6px 12px",
                                         direction: "ltr",
-                                        textAlign: "left",
+                                        textAlign: "right",
                                     }}
                                 >
                                     <MoneyCell
