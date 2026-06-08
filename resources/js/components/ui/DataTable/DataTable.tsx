@@ -760,10 +760,11 @@ export function DataTable<T = Record<string, unknown>>({
   const submitSmartFilter = useCallback(() => {
     const q = smartFilterInput.trim();
     if (!q) return;
-    // applySmartFilter يستدعي parseNaturalQuery داخلياً ويُطبق الفلاتر
-    // applyClientFilter في utils.ts يدعم الآن صيغة operator:value
-    applySmartFilter(q);
-    onSmartFilterApply?.(q, { success: true, filters: {}, sort: [] });
+    const result = applySmartFilter(q);
+    onSmartFilterApply?.(q, result
+      ? { success: true,  filters: result.filters ?? {}, sort: result.sort ?? [] }
+      : { success: false, filters: {},                   sort: [] }
+    );
     setSmartFilterOpen(false);
     setSmartFilterInput('');
   }, [smartFilterInput, applySmartFilter, onSmartFilterApply]);
@@ -1256,21 +1257,26 @@ export function DataTable<T = Record<string, unknown>>({
           {headerActions}
           {headerActions && <div className="dt-divider" />}
 
-          {/* per page */}
+          {/* per page — select أنيق بدلاً من chips */}
           {!isVirtual && (
             <div className="dt-pp-wrap">
-              {PER_PAGE_OPTIONS.map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  className={`dt-pp-chip${perPage === n ? ' on' : ''}`}
-                  onClick={() => changePerPage(n)}
-                  aria-label={`${n} صف لكل صفحة`}
-                  aria-pressed={perPage === n}
+              <label className="dt-pp-label" htmlFor="dt-pp-select">
+                <i className="ti ti-layout-rows" aria-hidden="true" />
+              </label>
+              <div className="dt-pp-select-wrap">
+                <select
+                  id="dt-pp-select"
+                  className="dt-pp-select"
+                  value={perPage}
+                  onChange={e => changePerPage(Number(e.target.value))}
+                  aria-label="عدد الصفوف لكل صفحة"
                 >
-                  {n}
-                </button>
-              ))}
+                  {PER_PAGE_OPTIONS.map(n => (
+                    <option key={n} value={n}>{n} صف</option>
+                  ))}
+                </select>
+                <i className="ti ti-chevron-down dt-pp-chevron" aria-hidden="true" />
+              </div>
             </div>
           )}
 
@@ -2099,62 +2105,46 @@ export function DataTable<T = Record<string, unknown>>({
           </div>
 
           {lastPage > 1 && (
-            <nav aria-label="التنقل بين الصفحات" className="dt-pagination">
+            <nav aria-label="التنقل بين الصفحات" className="dt-pagination-compact">
+              {/* زر السابق */}
               <button
-                className="dt-pg"
-                disabled={curPage <= 1}
-                onClick={() => goToPage(1)}
-                aria-label="الصفحة الأولى"
-                type="button"
-              >
-                «
-              </button>
-              <button
-                className="dt-pg"
+                className="dt-pg-arrow"
                 disabled={curPage <= 1}
                 onClick={() => goToPage(curPage - 1)}
                 aria-label="الصفحة السابقة"
                 type="button"
+                title="السابق"
               >
-                ‹
+                <i className="ti ti-chevron-right" />
               </button>
 
-              {pageNumbers.map((p, i) =>
-                p === '…' ? (
-                  <span key={`e${i}`} className="dt-pg-ellipsis" aria-hidden="true">
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={p}
-                    type="button"
-                    className={`dt-pg${p === curPage ? ' on' : ''}`}
-                    onClick={() => goToPage(p as number)}
-                    aria-label={`الصفحة ${p}`}
-                    aria-current={p === curPage ? 'page' : undefined}
-                  >
-                    {(p as number).toLocaleString('ar-DZ')}
-                  </button>
-                ),
-              )}
+              {/* قائمة منسدلة للصفحات */}
+              <div className="dt-pg-select-wrap">
+                <select
+                  className="dt-pg-select"
+                  value={curPage}
+                  onChange={e => goToPage(Number(e.target.value))}
+                  aria-label="اختر الصفحة"
+                >
+                  {Array.from({ length: lastPage }, (_, i) => i + 1).map(p => (
+                    <option key={p} value={p}>
+                      {p.toLocaleString('ar-DZ')} / {lastPage.toLocaleString('ar-DZ')}
+                    </option>
+                  ))}
+                </select>
+                <i className="ti ti-chevron-down dt-pg-select-icon" aria-hidden="true" />
+              </div>
 
+              {/* زر التالي */}
               <button
-                className="dt-pg"
+                className="dt-pg-arrow"
                 disabled={curPage >= lastPage}
                 onClick={() => goToPage(curPage + 1)}
                 aria-label="الصفحة التالية"
                 type="button"
+                title="التالي"
               >
-                ›
-              </button>
-              <button
-                className="dt-pg"
-                disabled={curPage >= lastPage}
-                onClick={() => goToPage(lastPage)}
-                aria-label="الصفحة الأخيرة"
-                type="button"
-              >
-                »
+                <i className="ti ti-chevron-left" />
               </button>
             </nav>
           )}

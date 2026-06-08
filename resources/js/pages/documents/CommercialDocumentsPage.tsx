@@ -39,7 +39,6 @@ import type {
     ContextMenuContext,
 } from "@/components/ui/DataTable";
 import { useColumnVisibility, useColumnStatePersistence } from "@/components/ui/DataTable";
-import type { ColumnStateSnapshot } from "@/components/ui/DataTable";
 import CommercialDocumentModal from "./CommercialDocumentModal";
 import QuickSaleModal from "./QuickSaleModal";
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
@@ -152,9 +151,9 @@ function SummaryCards({ items = [], opColor }: { items: CommercialDocument[]; op
 
     const cards = [
         { icon: "ti-file-text",         label: "عدد المستندات", value: stats.count.toLocaleString("ar-DZ"),       accent: opColor },
-        { icon: "ti-currency-dinar",     label: "إجمالي HT",    value: fmtMoney(stats.totalHt) + " دج",           accent: "var(--blue)", ltr: true },
-        { icon: "ti-receipt",            label: "إجمالي TTC",   value: fmtMoney(stats.totalTtc) + " دج",          accent: opColor, ltr: true },
-        { icon: "ti-clock-exclamation",  label: "غير مسدد",     value: stats.unpaid.toLocaleString("ar-DZ"),       accent: stats.unpaid > 0 ? "var(--red)" : "var(--t4)" },
+        { icon: "ti-currency-dinar",     label: "HT (الصفحة)",   value: fmtMoney(stats.totalHt) + " دج",           accent: "var(--blue)", ltr: true },
+        { icon: "ti-receipt",            label: "TTC (الصفحة)",  value: fmtMoney(stats.totalTtc) + " دج",          accent: opColor, ltr: true },
+        { icon: "ti-clock-exclamation",  label: "غير مسدد",      value: stats.unpaid.toLocaleString("ar-DZ"),       accent: stats.unpaid > 0 ? "var(--red)" : "var(--t4)" },
     ] as const;
 
     return (
@@ -779,25 +778,33 @@ export default function CommercialDocumentsPage() {
         },
     ], [isPurch, opColor]);
 
-    // ✅ useColumnVisibility: يقرأ الأعمدة المخفية من الـ snapshot الموحّد
-    //    عند toggle → يحفظ في نفس المفتاح COL_STATE_KEY
+    // ✅ useColumnVisibility:
+    //    — يدمج defaultHidden (من تعريف الأعمدة) مع hiddenColumns المحفوظة في snapshot
+    //    — إذا لا يوجد snapshot → يُطبق defaultHidden فقط
+    //    — إذا يوجد snapshot → يستخدمه كاملاً (يشمل ما حفظه المستخدم بما في ذلك
+    //      الأعمدة ذات defaultHidden التي أظهرها أو أخفاها يدوياً)
+    const defaultHiddenKeys = useMemo(
+        () => allColumns.filter(c => c.defaultHidden).map(c => c.key),
+        [allColumns],
+    );
+    const initialHiddenKeys = initialSnapshot?.hiddenColumns ?? defaultHiddenKeys;
+
     const {
         visibleColumns: columns,
         hiddenColumns,
         toggleColumn: toggleColumnBase,
     } = useColumnVisibility(
         allColumns,
-        initialSnapshot?.hiddenColumns ?? [],   // ← من snapshot بدلاً من مفتاح منفصل
-        null,                                   // ← لا مفتاح localStorage مستقل بعد الآن
+        initialHiddenKeys,
+        null,   // لا مفتاح localStorage مستقل — الحفظ عبر useColumnStatePersistence
     );
 
     // نُغلّف toggleColumn لنحفظ التغيير في snapshot الموحد
     const toggleColumn = useCallback((key: string) => {
         toggleColumnBase(key);
-        // نحسب الحالة الجديدة بعد Toggle
         setTimeout(() => {
             const newHidden = allColumns
-                .filter(c => hiddenColumns.has(c.key) ? c.key === key ? false : true : c.key === key)
+                .filter(c => hiddenColumns.has(c.key) ? c.key !== key : c.key === key)
                 .map(c => c.key);
             saveColState({ hiddenColumns: newHidden });
         }, 0);
@@ -978,12 +985,15 @@ export default function CommercialDocumentsPage() {
 
     const handleSmartFilterApply = useCallback((query: string, result: { success: boolean; filters: Record<string, string> }) => {
         if (result.success && Object.keys(result.filters).length > 0) {
-            // طبّق الفلاتر الناتجة عن SmartFilter على السيرفر مباشرةً
             setServerFilters(prev => ({ ...prev, ...result.filters }));
             setPage(1);
-            showToast(`✓ فُلتر: ${query}`, "success");
+            const count = Object.keys(result.filters).length;
+            showToast(`✓ ${count} فلتر من: "${query}"`, "success");
+        } else if (result.success) {
+            // تطابق نمط بدون فلاتر (مثل sort فقط)
+            showToast(`✓ فُرِّز حسب: "${query}"`, "info");
         } else {
-            showToast(`لم يُتعرف على: ${query}`, "info");
+            showToast(`لم يُتعرف على: "${query}"`, "info");
         }
     }, [showToast]);
 
@@ -1083,11 +1093,10 @@ export default function CommercialDocumentsPage() {
     // ── Callbacks ─────────────────────────────────────────────────────────────
     const isExpandable  = useCallback((row: CommercialDocument) => { const s = getDocStatus(row); return s !== "draft" && s !== "cancelled"; }, []);
     const renderExpanded = useCallback((row: CommercialDocument) => <ExpandedLines doc={row} />, []);
-    const rowClassName   = useCallback((row: CommercialDocument): string | undefined => {
+    const rowClassName = useCallback((row: CommercialDocument): string | undefined => {
         const status = getDocStatus(row);
-        const rem    = Number((row as unknown as Record<string,unknown>).remaining_amount ?? 0);
+        // cdp-row-overdue يُطبَّق عبر conditionalFormatting فقط (لا ازدواج)
         if (status === "cancelled") return "cdp-row-cancelled";
-        if (rem > 0.001 && status === "validated") return "cdp-row-overdue";
         return undefined;
     }, []);
 
@@ -1133,8 +1142,8 @@ export default function CommercialDocumentsPage() {
                             filters: true, sort: true, page: true, search: true,
                         }}
 
-                        // ── Virtual scroll للقوائم الكبيرة ────────────
-                        virtual={items.length > 500 ? { rowHeight: 40, containerHeight: 600, overscan: 8 } : undefined}
+                        // ── Virtual scroll: فقط عند تعطيل pagination وتحميل كمية كبيرة ──
+                        virtual={items.length > 100 ? { rowHeight: 40, containerHeight: 600, overscan: 8 } : undefined}
 
                         // ── تنسيق شرطي ─────────────────────────────────
                         conditionalFormatting={conditionalFormatting}

@@ -8,8 +8,8 @@ import type { ReactNode } from 'react';
 
 export type FilterDef =
   | { type: 'text' }
-  | { type: 'number' }
-  | { type: 'date' }
+  | { type: 'number'; presets?: { label: string; min: string; max: string }[] }
+  | { type: 'date';   presets?: string[] }   // قائمة preset keys من DATE_SHORTCUT_GROUPS
   | { type: 'select'; options: readonly { value: string; label: string }[] }
   | { type: 'multiselect'; options: readonly { value: string; label: string }[] }
   | { type: 'dynamic-multiselect'; labelFormatter?: (v: string) => string };

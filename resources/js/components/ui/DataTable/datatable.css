@@ -220,49 +220,65 @@
 /* ── Per-page chips ── */
 .dt-pp-wrap {
     display: flex;
-    gap: 2px;
+    align-items: center;
+    gap: 5px;
 }
-
-.dt-pp-chip {
-    height: 26px;
-    min-width: 32px;
-    padding: 0 7px;
-    border-radius: var(--r1);
+.dt-pp-label {
+    color: var(--t4);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    cursor: default;
+    flex-shrink: 0;
+}
+.dt-pp-select-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.dt-pp-select {
+    height: 28px;
+    padding: 0 24px 0 8px;
+    border-radius: var(--r2);
     border: 1px solid var(--b2);
     background: var(--bg3);
-    color: var(--t4);
+    color: var(--t2);
     font-size: 11px;
     font-weight: 600;
-    cursor: pointer;
     font-family: inherit;
-    transition: all 0.13s;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    transition: border-color .13s, background .13s;
+    min-width: 72px;
 }
-.dt-pp-chip:hover {
+.dt-pp-select:hover {
     border-color: var(--em);
     color: var(--em);
     background: var(--emb);
 }
-.dt-pp-chip.on {
-    background: var(--em);
-    color: #fff;
-    border-color: var(--em);
-    font-weight: 700;
-    box-shadow: var(--emglow);
+.dt-pp-select:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+}
+.dt-pp-chevron {
+    position: absolute;
+    left: 6px;
+    right: auto;
+    font-size: 10px;
+    color: var(--t4);
+    pointer-events: none;
 }
 
 /* ── Search ── */
 .dt-search.srch {
     border-radius: var(--r2);
+    flex-shrink: 0;
 }
 .dt-search.srch input {
     width: 190px;
+    min-width: 140px;
 }
 
 .dt-search-clear {
@@ -1013,7 +1029,79 @@
     letter-spacing: 0.4px;
 }
 
-/* ── Popup footer ── */
+/* ── Date Shortcuts (v8.2) ── */
+.dt-date-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.dt-date-sc-group {
+    margin-bottom: 8px;
+}
+
+.dt-date-sc-label {
+    font-size: 9.5px;
+    font-weight: 800;
+    color: var(--t4);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.dt-date-sc-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.dt-date-sc {
+    padding: 3px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--b2);
+    background: var(--bg3);
+    color: var(--t2);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color .12s, background .12s, color .12s;
+    white-space: nowrap;
+    line-height: 1.6;
+}
+
+.dt-date-sc:hover {
+    border-color: var(--em);
+    color: var(--em);
+    background: var(--emb);
+}
+
+.dt-date-sc.act {
+    border-color: var(--em);
+    background: var(--em);
+    color: #fff;
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--em) 30%, transparent);
+}
+
+.dt-date-divider {
+    height: 1px;
+    background: var(--b1);
+    margin: 4px 0 10px;
+}
+
+/* ── Number Range Presets ── */
+.dt-num-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.dt-num-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+
 .dt-flt-footer {
     display: flex;
     justify-content: flex-end;
@@ -1469,9 +1557,6 @@
     }
     .dt-toolbar-title {
         font-size: 13px;
-    }
-    .dt-search.srch input {
-        width: 140px;
     }
 }
 @media (min-width: 640px) {
@@ -2764,3 +2849,345 @@ th:hover .dt-th-pin-btn, .dt-th-pin-btn.active { opacity: 1; }
 .dt-tree-toggle:hover {
   color: var(--t1);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   v9.0 — FilterPopup المُعاد تصميمه
+══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Text Filter ────────────────────────────────────────────────────────── */
+.dt-flt-popup--text .dt-flt-text-wrap {
+  position: relative;
+  padding: 10px 10px 6px;
+}
+.dt-flt-text-icon {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-10%);
+  color: var(--t4);
+  font-size: 14px;
+  pointer-events: none;
+}
+.dt-flt-text-input {
+  padding-right: 32px !important;
+  padding-left: 28px !important;
+  width: 100%;
+}
+.dt-flt-text-clear {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-10%);
+  background: none;
+  border: none;
+  color: var(--t4);
+  cursor: pointer;
+  padding: 2px;
+  line-height: 1;
+  font-size: 13px;
+  border-radius: 3px;
+}
+.dt-flt-text-clear:hover { color: var(--t1); background: var(--bg3); }
+
+/* ─── Select (Radio List) ────────────────────────────────────────────────── */
+.dt-flt-radio-list {
+  padding: 6px 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.dt-flt-radio-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--r1);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--t2);
+  transition: background 0.1s;
+  user-select: none;
+}
+.dt-flt-radio-item:hover { background: var(--bg3); }
+.dt-flt-radio-item.on {
+  background: var(--emb);
+  color: var(--em);
+  font-weight: 500;
+}
+.dt-flt-radio-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--b2);
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+.dt-flt-radio-item.on .dt-flt-radio-dot {
+  background: var(--em);
+  border-color: var(--em);
+  box-shadow: 0 0 0 3px var(--emb);
+}
+.dt-flt-radio-check {
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--em);
+}
+
+/* ─── Number Filter ──────────────────────────────────────────────────────── */
+.dt-flt-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 10px 10px 4px;
+}
+.dt-flt-pill {
+  padding: 3px 10px;
+  border: 1px solid var(--b2);
+  border-radius: 20px;
+  background: var(--bg2);
+  color: var(--t3);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.dt-flt-pill:hover { border-color: var(--em); color: var(--em); }
+.dt-flt-pill.act {
+  background: var(--em);
+  color: #fff;
+  border-color: var(--em);
+}
+.dt-flt-range-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+}
+.dt-flt-range-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dt-flt-range-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--t4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dt-flt-range-sep {
+  color: var(--t4);
+  font-size: 14px;
+  padding-top: 18px;
+}
+.dt-flt-range-field .dt-fi { width: 100%; }
+
+/* ─── Date Filter — Tabs ─────────────────────────────────────────────────── */
+.dt-flt-popup--date { min-width: 280px; }
+
+.dt-flt-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--b1);
+  margin-bottom: 4px;
+}
+.dt-flt-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--t3);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: var(--r1) var(--r1) 0 0;
+  position: relative;
+  margin-bottom: -1px;
+  transition: all 0.12s;
+}
+.dt-flt-tab:hover { color: var(--t1); background: var(--bg3); }
+.dt-flt-tab.on {
+  color: var(--em);
+  border-bottom-color: var(--em);
+  background: var(--emb);
+}
+.dt-flt-tab-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--em);
+  position: absolute;
+  top: 4px;
+  left: 4px;
+}
+
+/* ─── Date Shortcuts ─────────────────────────────────────────────────────── */
+.dt-flt-sc-wrap {
+  padding: 6px 8px;
+  overflow-y: auto;
+  max-height: 300px;
+}
+/* Custom scrollbar */
+.dt-flt-sc-wrap::-webkit-scrollbar { width: 4px; }
+.dt-flt-sc-wrap::-webkit-scrollbar-track { background: transparent; }
+.dt-flt-sc-wrap::-webkit-scrollbar-thumb { background: var(--b2); border-radius: 4px; }
+
+.dt-flt-sc-group { margin-bottom: 10px; }
+.dt-flt-sc-group:last-child { margin-bottom: 0; }
+
+.dt-flt-sc-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t4);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0 2px 4px;
+}
+.dt-flt-sc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+.dt-flt-sc-btn {
+  padding: 6px 8px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r1);
+  background: var(--bg2);
+  color: var(--t2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: right;
+  transition: all 0.11s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dt-flt-sc-btn:hover {
+  border-color: var(--em);
+  color: var(--em);
+  background: var(--emb);
+}
+.dt-flt-sc-btn.act {
+  background: var(--em);
+  color: #fff;
+  border-color: var(--em);
+  font-weight: 600;
+}
+
+/* ─── Date Manual ────────────────────────────────────────────────────────── */
+.dt-flt-manual-wrap {
+  padding: 10px 10px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dt-flt-manual-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dt-flt-manual-field .dt-fi { width: 100%; }
+.dt-flt-manual-preview {
+  font-size: 11px;
+  color: var(--t3);
+  background: var(--bg3);
+  border-radius: var(--r1);
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  direction: ltr;
+}
+
+/* ─── Title badge ────────────────────────────────────────────────────────── */
+.dt-flt-title-badge {
+  margin-right: auto;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: var(--emb);
+  color: var(--em);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   v9.0 — Pagination Compact
+══════════════════════════════════════════════════════════════════════════ */
+.dt-pagination-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dt-pg-arrow {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--b2);
+  border-radius: var(--r1);
+  background: var(--bg2);
+  color: var(--t3);
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+.dt-pg-arrow:hover:not(:disabled) {
+  border-color: var(--em);
+  color: var(--em);
+  background: var(--emb);
+}
+.dt-pg-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+.dt-pg-arrow:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+
+.dt-pg-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.dt-pg-select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 30px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r1);
+  background: var(--bg2);
+  color: var(--t1);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  min-width: 100px;
+  text-align: center;
+  transition: border-color 0.12s;
+  direction: rtl;
+}
+.dt-pg-select:hover { border-color: var(--em); }
+.dt-pg-select:focus {
+  outline: 2px solid var(--em);
+  outline-offset: 1px;
+  border-color: var(--em);
+}
+.dt-pg-select-icon {
+  position: absolute;
+  left: 8px;
+  font-size: 12px;
+  color: var(--t4);
+  pointer-events: none;
+}
+
+/* Dark mode overrides */
+body.dark .dt-flt-sc-btn { background: var(--bg3); }
+body.dark .dt-flt-pill   { background: var(--bg3); }
+body.dark .dt-pg-select  { background: var(--bg3); }
