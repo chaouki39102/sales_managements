@@ -143,16 +143,23 @@ export function useColumnDragReorder(
   const [columnOrder, setColumnOrder] = useState<string[]>(initialOrder);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const draggingKey = useRef<string | null>(null);
+  // ✅ إصلاح: useRef للمقارنة العميقة بدلاً من JSON.stringify في dependency array
+  const initialOrderRef = useRef<string[]>(initialOrder);
   useEffect(() => {
-    setColumnOrder(prev => {
-      const existing = new Set(prev);
+    const prev = initialOrderRef.current;
+    const hasChanged =
+      prev.length !== initialOrder.length ||
+      prev.some((k, i) => k !== initialOrder[i]);
+    if (!hasChanged) return;
+    initialOrderRef.current = initialOrder;
+    setColumnOrder(current => {
+      const existing = new Set(current);
       const newKeys = initialOrder.filter(k => !existing.has(k));
       const removed = new Set(initialOrder);
-      const filtered = prev.filter(k => removed.has(k));
+      const filtered = current.filter(k => removed.has(k));
       return [...filtered, ...newKeys];
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(initialOrder)]);
+  }, [initialOrder]);
   const onDragStart = useCallback((key: string, e: React.DragEvent) => {
     draggingKey.current = key;
     e.dataTransfer.effectAllowed = 'move';
@@ -319,6 +326,7 @@ export function useRowGrouping<T>(
   expandAll: () => void;
   collapseAll: () => void;
   collapsedGroups: Set<string>;
+  groupSubTotals: Record<string, Record<string, unknown>>;
 } {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -345,13 +353,68 @@ export function useRowGrouping<T>(
     let entries = [...groupMap.entries()];
     if (config.sortGroups === 'asc') entries.sort(([a], [b]) => a.localeCompare(b, 'ar-DZ'));
     if (config.sortGroups === 'desc') entries.sort(([a], [b]) => b.localeCompare(a, 'ar-DZ'));
-    return entries.map(([value, rows]) => ({
-      value,
-      label: value || '(فارغ)',
-      rows,
-      collapsed: collapsedGroups.has(value),
-    }));
+    // ✅ إصلاح: الصفوف المطوية تُحذف من الـ render فعلياً (تُخرج من DOM)
+    // rowCount يحفظ العدد الحقيقي للعرض في group header
+    return entries.map(([value, allRows]) => {
+      const collapsed = collapsedGroups.has(value);
+      return {
+        value,
+        label: value || '(فارغ)',
+        rows: collapsed ? [] : allRows,   // ← DOM cleanup للمجموعات المطوية
+        rowCount: allRows.length,          // ← العدد الحقيقي دائماً
+        collapsed,
+      };
+    });
   }, [data, config, columns, collapsedGroups]);
+
+  // ✅ حساب Sub-totals للمجموعات (يعمل فقط عند showSubTotals: true)
+  const { computeAggregate: _computeAgg } = (() => {
+    // استيراد lazy لتجنب circular dependency
+    const computeAggregate = (rows: T[], col: Column<T>, type: import('./types').AggregateType): number | null => {
+      const nums = rows
+        .map(r => { const v = getRawValue(r, col); return typeof v === 'number' ? v : parseFloat(String(v ?? '')); })
+        .filter(n => !isNaN(n));
+      if (!nums.length) return null;
+      switch (type) {
+        case 'sum':   return nums.reduce((a, b) => a + b, 0);
+        case 'avg':   return nums.reduce((a, b) => a + b, 0) / nums.length;
+        case 'min':   return Math.min(...nums);
+        case 'max':   return Math.max(...nums);
+        case 'count': return nums.length;
+      }
+    };
+    return { computeAggregate };
+  })();
+
+  const groupSubTotals = useMemo(() => {
+    if (!config?.showSubTotals || !groups) return {} as Record<string, Record<string, unknown>>;
+    const aggCols = columns.filter(c => c.aggregate);
+    if (!aggCols.length) return {} as Record<string, Record<string, unknown>>;
+    // نحتاج البيانات الكاملة (قبل الطي) — نُعيد تجميعها
+    const col = columns.find(c => c.key === config.key);
+    if (!col) return {} as Record<string, Record<string, unknown>>;
+    const fullGroupMap = new Map<string, T[]>();
+    data.forEach(row => {
+      const val = String(getRawValue(row, col) ?? '');
+      if (!fullGroupMap.has(val)) fullGroupMap.set(val, []);
+      fullGroupMap.get(val)!.push(row);
+    });
+    return Object.fromEntries(
+      [...fullGroupMap.entries()].map(([value, rows]) => [
+        value,
+        Object.fromEntries(
+          aggCols.map(c => {
+            const type = typeof c.aggregate === 'string' ? c.aggregate : 'sum';
+            const val = typeof c.aggregate === 'function'
+              ? c.aggregate(rows)
+              : _computeAgg(rows, c, type as import('./types').AggregateType);
+            return [c.key, { value: val, type }];
+          })
+        ),
+      ])
+    );
+  }, [groups, columns, config?.showSubTotals, data, config?.key, _computeAgg]);
+
   const toggleGroup = useCallback((value: string) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
@@ -364,7 +427,7 @@ export function useRowGrouping<T>(
     if (!groups) return;
     setCollapsedGroups(new Set(groups.map(g => String(g.value))));
   }, [groups]);
-  return { groups, toggleGroup, expandAll, collapseAll, collapsedGroups };
+  return { groups, toggleGroup, expandAll, collapseAll, collapsedGroups, groupSubTotals };
 }
 
 export function useColumnPinning(
@@ -393,7 +456,27 @@ export function useColumnPinning(
     setPinConfig({});
     onChange?.({});
   }, [onChange]);
-  return { pinConfig, pinColumn, isPinned, clearAllPins };
+
+  // ✅ إصلاح: حساب offset تراكمي للأعمدة المثبتة
+  // بدون هذا، كل عمودين مثبتَين على نفس الجانب يحصلان على left:0 ويتداخلان
+  const getPinnedOffset = useCallback((
+    key: string,
+    side: 'start' | 'end',
+    colWidths: Record<string, number>,
+    defaultWidth = 120,
+  ): number => {
+    const pinned = (side === 'start' ? pinConfig.start : pinConfig.end) ?? [];
+    const idx = pinned.indexOf(key);
+    if (idx <= 0) return 0;
+    // لـ 'end': الترتيب معكوس (العمود الأخير في القائمة هو الأقرب للحافة)
+    const orderedKeys = side === 'end' ? [...pinned].reverse() : pinned;
+    const keyIdx = orderedKeys.indexOf(key);
+    return orderedKeys
+      .slice(0, keyIdx)
+      .reduce((sum, k) => sum + (colWidths[k] ?? defaultWidth), 0);
+  }, [pinConfig]);
+
+  return { pinConfig, pinColumn, isPinned, clearAllPins, getPinnedOffset };
 }
 
 export function useKeyboardNav({
@@ -430,13 +513,44 @@ export function useKeyboardNav({
       return;
     }
     switch (e.key) {
-      case 'ArrowUp': e.preventDefault(); move(-1, 0); break;
-      case 'ArrowDown': e.preventDefault(); move(+1, 0); break;
+      case 'ArrowUp':    e.preventDefault(); move(-1, 0); break;
+      case 'ArrowDown':  e.preventDefault(); move(+1, 0); break;
+      // RTL: السهم الأيمن → عمود بـ index أقل (نحو بداية المستند في RTL)
       case 'ArrowRight': e.preventDefault(); move(0, -1); break;
-      case 'ArrowLeft': e.preventDefault(); move(0, +1); break;
-      case 'Tab': e.preventDefault(); if (e.shiftKey) move(0, -1); else move(0, +1); break;
-      case 'Enter': e.preventDefault(); if (activeCell) { if (isEditing) move(+1, 0); else { setIsEditing(true); onStartEdit?.(activeCell); } } break;
-      case 'F2': if (activeCell) { e.preventDefault(); setIsEditing(true); onStartEdit?.(activeCell); } break;
+      case 'ArrowLeft':  e.preventDefault(); move(0, +1); break;
+      // ✅ إصلاح: Tab يجب أن يتبع اتجاه القراءة الطبيعي للـ visual order
+      // في RTL: Tab بدون Shift → العمود الأقل index (يمين الشاشة في RTL)
+      // move(0, -1) = ينتقل نحو عمود بـ index أقل = يمين الشاشة في RTL = صحيح
+      case 'Tab': {
+        const isRTL = document.documentElement.dir === 'rtl' || document.body.dir === 'rtl';
+        e.preventDefault();
+        // في RTL: Tab → يمين (index أقل). في LTR: Tab → يسار (index أكبر)
+        if (e.shiftKey) move(0, isRTL ? +1 : -1);
+        else            move(0, isRTL ? -1 : +1);
+        break;
+      }
+      case 'Enter': e.preventDefault();
+        if (activeCell) {
+          if (isEditing) move(+1, 0);
+          else { setIsEditing(true); onStartEdit?.(activeCell); }
+        }
+        break;
+      case 'F2':
+        if (activeCell) { e.preventDefault(); setIsEditing(true); onStartEdit?.(activeCell); }
+        break;
+      // ✅ جديد: Ctrl+C لنسخ قيمة الخلية النشطة
+      case 'c':
+      case 'C':
+        if ((e.ctrlKey || e.metaKey) && activeCell && !isEditing) {
+          e.preventDefault();
+          const cellEl = document.querySelector(
+            `[data-row-index="${activeCell.rowIndex}"][data-col-key]`
+          );
+          if (cellEl?.textContent) {
+            navigator.clipboard.writeText(cellEl.textContent.trim()).catch(() => {});
+          }
+        }
+        break;
       case 'Escape': setActiveCell(null); setIsEditing(false); break;
     }
   }, [enabled, isEditing, activeCell, move, onStartEdit]);
@@ -645,15 +759,10 @@ export interface SmartFilterPattern {
   valueType: 'string' | 'number';
 }
 
-// الأنماط الافتراضية للغة العربية — قابلة للتوسعة
-export const DEFAULT_SMART_FILTER_PATTERNS: SmartFilterPattern[] = [
-  { regex: /فاتورة(?:ات)?\s+أكثر\s+من\s+(\d+)\s+يوم/,     field: 'overdue_days',         operator: 'gt',       valueType: 'number' },
-  { regex: /أقل\s+من\s+(\d+)\s+([^\s]+)/,                  field: '$2',                   operator: 'lt',       valueType: 'number' },
-  { regex: /بين\s+(\d+)\s+و\s+(\d+)/,                      field: 'range',                operator: 'between',  valueType: 'number' },
-  { regex: /العميل\s+([^\s]+)/,                                field: 'party.name',           operator: 'contains', valueType: 'string' },
-  { regex: /الحالة\s+([^\s]+)/,                                field: 'document_status.name', operator: 'eq',       valueType: 'string' },
-  { regex: /الفرز\s+حسب\s+([^\s]+)\s+(تصاعدي|تنازلي)/,      field: '$1',                   operator: 'sort',     valueType: 'string' },
-];
+// الأنماط الافتراضية — فارغة عمداً
+// كل مشروع يُمرر customPatterns الخاصة به عبر useSmartFilter
+// راجع: my-erp/datatable-patterns.ts لأنماط ERP الجزائري
+export const DEFAULT_SMART_FILTER_PATTERNS: SmartFilterPattern[] = [];
 
 export function useSmartFilter<T>(
   columns: Column<T>[],
@@ -732,9 +841,11 @@ export function useSavedViews(config: SavedViewsConfig) {
 
 // ─── useContextMenu (قائمة السياق) ──────────────────────────────────────────
 
-export function useContextMenu(
+export function useContextMenu<T = Record<string, unknown>>(
   menuItems: (context: ContextMenuContext) => ContextMenuItem[],
-  containerRef: React.RefObject<HTMLElement>
+  containerRef: React.RefObject<HTMLElement>,
+  // ✅ إصلاح: data مطلوبة لملء context.row الذي كان فارغاً دائماً
+  data: T[] = []
 ) {
   const [state, setState] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, context: null });
 
@@ -752,15 +863,20 @@ export function useContextMenu(
     const reactEvent = e as unknown as React.MouseEvent;
 
     if (cellEl) {
-      const rowIndex = cellEl.getAttribute('data-row-index');
-      const colKey   = cellEl.getAttribute('data-col-key');
-      if (rowIndex !== null && colKey) {
-        context = { type: 'cell', rowIndex: parseInt(rowIndex, 10), colKey, originalEvent: reactEvent };
+      const rowIndexStr = cellEl.getAttribute('data-row-index');
+      const colKey      = cellEl.getAttribute('data-col-key');
+      if (rowIndexStr !== null && colKey) {
+        const rowIndex = parseInt(rowIndexStr, 10);
+        // ✅ نملأ row data فعلياً من مصفوفة data
+        const row = (data[rowIndex] ?? null) as Record<string, unknown> | undefined;
+        context = { type: 'cell', rowIndex, colKey, row, originalEvent: reactEvent };
       }
     } else if (rowEl) {
-      const rowIndex = rowEl.getAttribute('data-row-index');
-      if (rowIndex !== null) {
-        context = { type: 'row', rowIndex: parseInt(rowIndex, 10), originalEvent: reactEvent };
+      const rowIndexStr = rowEl.getAttribute('data-row-index');
+      if (rowIndexStr !== null) {
+        const rowIndex = parseInt(rowIndexStr, 10);
+        const row = (data[rowIndex] ?? null) as Record<string, unknown> | undefined;
+        context = { type: 'row', rowIndex, row, originalEvent: reactEvent };
       }
     } else if (thEl) {
       const colKey = thEl.getAttribute('data-col-key');
@@ -771,7 +887,7 @@ export function useContextMenu(
 
     if (!context) return;
     setState({ visible: true, x: e.clientX, y: e.clientY, context });
-  }, []);
+  }, [data]);
 
   const closeMenu = useCallback(() => {
     setState(prev => ({ ...prev, visible: false }));
@@ -795,4 +911,106 @@ export function useContextMenu(
   }, [containerRef, handleContextMenu]);
 
   return { menuState: state, closeMenu, setContext: setState };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// useColumnVisibility — يدير إظهار/إخفاء الأعمدة مع localStorage
+//
+// الاستخدام:
+//   const { visibleColumns, hiddenColumns, toggleColumn } =
+//     useColumnVisibility(allColumns, [], `cdp-cols-${typeCode}`);
+// ════════════════════════════════════════════════════════════════════════════
+
+export function useColumnVisibility<T = Record<string, unknown>>(
+  columns: Column<T>[],
+  /** مفاتيح الأعمدة المخفية افتراضياً (تُدمج مع defaultHidden على العمود) */
+  initialHidden: string[] = [],
+  /** مفتاح localStorage للحفظ — إذا تُرك فارغاً لا يُحفظ */
+  storageKey?: string,
+): {
+  visibleColumns: Column<T>[];
+  hiddenColumns: Set<string>;
+  toggleColumn: (key: string) => void;
+  showColumn: (key: string) => void;
+  hideColumn: (key: string) => void;
+  resetVisibility: () => void;
+} {
+  // بناء القيمة الابتدائية من defaultHidden + initialHidden + localStorage
+  const getInitial = useCallback((): Set<string> => {
+    const fromProps = new Set<string>([
+      ...initialHidden,
+      ...columns.filter(c => c.defaultHidden).map(c => c.key),
+    ]);
+
+    if (!storageKey) return fromProps;
+
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed: string[] = JSON.parse(saved);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
+    } catch {
+      // localStorage غير متاح أو البيانات تالفة — نتجاهل
+    }
+
+    return fromProps;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // نحسبها مرة واحدة عند التهيئة
+
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(getInitial);
+
+  // حفظ في localStorage عند كل تغيير
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify([...hiddenColumns]));
+    } catch {
+      // تجاهل خطأ الكتابة (وضع private / حجم ممتلئ)
+    }
+  }, [hiddenColumns, storageKey]);
+
+  const toggleColumn = useCallback((key: string) => {
+    setHiddenColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const showColumn = useCallback((key: string) => {
+    setHiddenColumns(prev => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const hideColumn = useCallback((key: string) => {
+    setHiddenColumns(prev => {
+      if (prev.has(key)) return prev;
+      return new Set([...prev, key]);
+    });
+  }, []);
+
+  const resetVisibility = useCallback(() => {
+    const defaults = new Set<string>([
+      ...initialHidden,
+      ...columns.filter(c => c.defaultHidden).map(c => c.key),
+    ]);
+    setHiddenColumns(defaults);
+    if (storageKey) {
+      try { localStorage.removeItem(storageKey); } catch { /* تجاهل */ }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  const visibleColumns = useMemo(
+    () => columns.filter(c => !hiddenColumns.has(c.key)),
+    [columns, hiddenColumns],
+  );
+
+  return { visibleColumns, hiddenColumns, toggleColumn, showColumn, hideColumn, resetVisibility };
 }

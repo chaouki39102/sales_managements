@@ -68,6 +68,8 @@ export {
   useContextMenu,
   // v10.1 exports
   DEFAULT_SMART_FILTER_PATTERNS,
+  // v10.2 exports
+  useColumnVisibility,
 } from './hooks';
 
 export type { SmartFilterPattern } from './hooks';

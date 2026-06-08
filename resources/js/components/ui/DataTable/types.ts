@@ -123,6 +123,7 @@ export interface RowGroup<T> {
   value: unknown;
   label: string;
   rows: T[];
+  rowCount: number;   // العدد الحقيقي دائماً — حتى عند collapsed (rows قد تكون [])
   collapsed: boolean;
 }
 
