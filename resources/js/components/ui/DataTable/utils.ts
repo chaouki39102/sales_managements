@@ -242,9 +242,10 @@ export async function exportToExcel<T>(
   columns: Column<T>[],
   options: ExcelExportOptions = {}
 ): Promise<void> {
+  const { fileName = 'export', includeHiddenColumns = false, title } = options;
+
   try {
     const XLSX = await import('xlsx');
-    const { fileName = 'export', includeHiddenColumns = false, title } = options;
 
     const visibleCols = columns.filter(c => !c.defaultHidden || includeHiddenColumns);
     const headers = visibleCols.map(c => c.exportHeader ?? (typeof c.header === 'string' ? c.header : c.key));
@@ -272,8 +273,27 @@ export async function exportToExcel<T>(
     XLSX.utils.book_append_sheet(wb, ws, 'Data');
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   } catch (error) {
-    console.error('Excel export failed:', error);
-    throw new Error('Failed to export Excel. Make sure "xlsx" library is installed.');
+    // ── Fallback تلقائي لـ CSV مع رسالة واضحة ──────────────────────────────
+    console.warn(
+      'DataTable: مكتبة xlsx غير متوفرة — جارٍ التصدير بصيغة CSV بدلاً من ذلك.\n' +
+      'لتفعيل تصدير Excel الحقيقي: npm install xlsx'
+    );
+
+    // إشعار المستخدم بأسلوب غير متطفل
+    const msg = document.createElement('div');
+    msg.setAttribute('role', 'alert');
+    msg.style.cssText = [
+      'position:fixed', 'bottom:20px', 'left:50%', 'transform:translateX(-50%)',
+      'background:#1a1a2e', 'color:#fff', 'padding:10px 20px',
+      'border-radius:8px', 'font-size:13px', 'z-index:99999',
+      'box-shadow:0 4px 12px rgba(0,0,0,.3)', 'direction:rtl',
+    ].join(';');
+    msg.textContent = '⚠️ مكتبة xlsx غير مثبتة — تم التصدير بصيغة CSV';
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 4000);
+
+    // التصدير كـ CSV
+    exportToCSV(data, columns, fileName);
   }
 }
 

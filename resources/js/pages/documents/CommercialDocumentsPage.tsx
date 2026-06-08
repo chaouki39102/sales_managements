@@ -1,16 +1,15 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/documents/CommercialDocumentsPage.tsx  —  v10.1
+// pages/documents/CommercialDocumentsPage.tsx  —  v10.3
 //
-// ✅ إصلاحات جوهرية عن v10.0:
-//   • contextMenuItems: كانت تقرأ items[ctx.rowIndex] بدلاً من ctx.row
-//     (الـ hook v10.1 يملأ ctx.row الآن — نستخدمه مباشرةً)
-//   • useColumnVisibility: مُدمج لإدارة defaultHidden + toggle من Context Menu
-//   • getPinnedOffset: مُفعَّل مع pinnedColumns لأعمدة الرقم والمبلغ
-//   • keyboardNav: مُفعَّل بشكل صحيح مع Ctrl+C (v10.1 fix)
-//   • ERP_FILTER_PATTERNS: مُمررة لـ SmartFilter بدلاً من DEFAULT الفارغ
-//   • groupSubTotals: ظاهر في صف المجموعة عند تفعيل groupBy
-//   • rowCount: مستخدم في header المجموعة بعد إصلاح RowGroup type
-//   • useContextMenu: يأخذ data كـ parameter (v10.1)
+// ✅ جديد في v10.3:
+//   • useColumnStatePersistence — مفتاح localStorage واحد لكل typeCode يحفظ:
+//     columnOrder + hiddenColumns + activeFilters (pinnedColumns جاهز للإضافة)
+//   • زر إعادة ضبط Layout يظهر عند وجود snapshot محفوظ
+//   • إزالة المفاتيح المتفرقة: cdp-column-order-* و cdp-cols-*
+//
+// ✅ محفوظ من v10.2:
+//   • smartFilterPatterns={ERP_FILTER_PATTERNS} مُفعَّل
+//   • DataTableErrorBoundary يلف الجدول
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, {
@@ -31,7 +30,7 @@ import { apiGet, apiPost, apiDelete } from "@/lib/api/core/client";
 import { tenantKeys } from "@/lib/api/core/queryKeys";
 import { useActiveSlug } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
-import { DataTable } from "@/components/ui/DataTable";
+import { DataTable, DataTableErrorBoundary } from "@/components/ui/DataTable";
 import type {
     Column,
     MultiSortState,
@@ -39,7 +38,8 @@ import type {
     ContextMenuItem,
     ContextMenuContext,
 } from "@/components/ui/DataTable";
-import { useColumnVisibility } from "@/components/ui/DataTable";
+import { useColumnVisibility, useColumnStatePersistence } from "@/components/ui/DataTable";
+import type { ColumnStateSnapshot } from "@/components/ui/DataTable";
 import CommercialDocumentModal from "./CommercialDocumentModal";
 import QuickSaleModal from "./QuickSaleModal";
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
@@ -474,17 +474,19 @@ export default function CommercialDocumentsPage() {
     const isSalable = SALE_CODES.has(typeCode ?? "");
     const opColor   = isPurch ? "var(--purple)" : "var(--em)";
 
-    // ── Column reorder: localStorage ──────────────────────────────────────────
-    const STORAGE_KEY = `cdp-column-order-${typeCode}`;
-    const [columnOrder, setColumnOrder] = useState<string[] | undefined>(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        return saved ? JSON.parse(saved) : undefined;
-    });
+    // ── Column State Persistence — مفتاح واحد يحفظ: ترتيب + عرض + مخفي + مثبت + فلاتر ──
+    const COL_STATE_KEY = `cdp-cols-state-${typeCode}-${slug ?? "default"}`;
+    const { save: saveColState, reset: resetColState, initialSnapshot } = useColumnStatePersistence(COL_STATE_KEY);
+
+    // columnOrder: يُقرأ من الـ snapshot المحفوظة
+    const [columnOrder, setColumnOrder] = useState<string[] | undefined>(
+        () => initialSnapshot?.columnOrder,
+    );
 
     const handleColumnOrderChange = useCallback((order: string[]) => {
         setColumnOrder(order);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
-    }, [STORAGE_KEY]);
+        saveColState({ columnOrder: order });
+    }, [saveColState]);
 
     // ── Sort → server param ───────────────────────────────────────────────────
     const sortParam = useMemo(() => {
@@ -502,7 +504,9 @@ export default function CommercialDocumentsPage() {
         }
         setServerFilters(converted);
         setPage(1);
-    }, []);
+        // حفظ الفلاتر في snapshot الموحد
+        saveColState({ activeFilters: converted });
+    }, [saveColState]);
 
     const invalidateDocs = useCallback(() => {
         if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
@@ -775,16 +779,29 @@ export default function CommercialDocumentsPage() {
         },
     ], [isPurch, opColor]);
 
-    // ✅ useColumnVisibility: يدير الأعمدة المخفية (defaultHidden + toggle من Context Menu)
+    // ✅ useColumnVisibility: يقرأ الأعمدة المخفية من الـ snapshot الموحّد
+    //    عند toggle → يحفظ في نفس المفتاح COL_STATE_KEY
     const {
         visibleColumns: columns,
         hiddenColumns,
-        toggleColumn,
+        toggleColumn: toggleColumnBase,
     } = useColumnVisibility(
         allColumns,
-        [],
-        `cdp-cols-${typeCode}`,
+        initialSnapshot?.hiddenColumns ?? [],   // ← من snapshot بدلاً من مفتاح منفصل
+        null,                                   // ← لا مفتاح localStorage مستقل بعد الآن
     );
+
+    // نُغلّف toggleColumn لنحفظ التغيير في snapshot الموحد
+    const toggleColumn = useCallback((key: string) => {
+        toggleColumnBase(key);
+        // نحسب الحالة الجديدة بعد Toggle
+        setTimeout(() => {
+            const newHidden = allColumns
+                .filter(c => hiddenColumns.has(c.key) ? c.key === key ? false : true : c.key === key)
+                .map(c => c.key);
+            saveColState({ hiddenColumns: newHidden });
+        }, 0);
+    }, [toggleColumnBase, hiddenColumns, allColumns, saveColState]);
 
     // ════════════════════════════════════════════════════════════════════════
     // CONDITIONAL FORMATTING
@@ -1019,6 +1036,22 @@ export default function CommercialDocumentsPage() {
                     {hiddenColumns.size} مخفي
                 </span>
             )}
+            {/* زر إعادة ضبط layout — يظهر فقط عند وجود snapshot محفوظ */}
+            {initialSnapshot && (
+                <button
+                    title="إعادة ضبط تخطيط الأعمدة (الترتيب، العرض، المخفي، الفلاتر)"
+                    onClick={() => {
+                        if (window.confirm("إعادة ضبط تخطيط الجدول للإعدادات الافتراضية؟")) {
+                            resetColState();
+                            window.location.reload();
+                        }
+                    }}
+                    style={{ height: 28, width: 28, borderRadius: 7, border: "1px solid var(--b2)", background: "var(--bg2)", color: "var(--t4)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s" }}
+                    aria-label="إعادة ضبط تخطيط الجدول"
+                >
+                    <i className="ti ti-layout-columns" aria-hidden="true" />
+                </button>
+            )}
             {isSalable && !isReadOnly && (
                 <button onClick={() => setModal("quick")} style={{ height: 32, padding: "0 14px", borderRadius: 8, border: `1px solid color-mix(in srgb, ${opColor} 35%, transparent)`, background: `color-mix(in srgb, ${opColor} 8%, transparent)`, color: opColor, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
                     <i className="ti ti-bolt" style={{ fontSize: 14 }} aria-hidden="true" />
@@ -1032,7 +1065,7 @@ export default function CommercialDocumentsPage() {
                 </button>
             )}
         </div>
-    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumns.size]);
+    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumns.size, initialSnapshot, resetColState]);
 
     // ── Page title ────────────────────────────────────────────────────────────
     const tableTitle = useMemo(() => (
@@ -1079,8 +1112,9 @@ export default function CommercialDocumentsPage() {
                 {/* Summary cards */}
                 {items.length > 0 && <SummaryCards items={items} opColor={opColor} />}
 
-                {/* DataTable v10.1 */}
+                {/* DataTable v10.2 — محاطة بـ ErrorBoundary لمنع أي خطأ من إسقاط الصفحة */}
                 <div style={{ background: "var(--bg1)", border: "1px solid var(--b1)", borderRadius: "var(--r3)", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,.06)", flex: 1 }}>
+                    <DataTableErrorBoundary>
                     <DataTable<CommercialDocument>
                         data={items}
                         columns={columns}                           // ← visibleColumns من useColumnVisibility
@@ -1160,12 +1194,10 @@ export default function CommercialDocumentsPage() {
                             title: docType?.name ?? typeCode,
                         }}
 
-                        // ── 🆕 Smart Filter عربي — مع أنماط ERP الجزائري
+                        // ── 🆕 Smart Filter عربي — مع أنماط ERP الجزائري ──
                         enableSmartFilter={true}
+                        smartFilterPatterns={ERP_FILTER_PATTERNS}
                         onSmartFilterApply={handleSmartFilterApply}
-                        // customPatterns تُمرر عبر hook داخل DataTable —
-                        // ولو دعم DataTable prop لها نُضيف:
-                        // smartFilterPatterns={ERP_FILTER_PATTERNS}
 
                         // ── 🆕 Saved Views ──────────────────────────────
                         enableSavedViews={true}
@@ -1178,6 +1210,7 @@ export default function CommercialDocumentsPage() {
                         enableContextMenu={true}
                         contextMenuItems={contextMenuItems}
                     />
+                    </DataTableErrorBoundary>
                 </div>
             </div>
 

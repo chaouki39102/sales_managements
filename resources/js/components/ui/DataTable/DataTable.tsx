@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// DataTable/DataTable.tsx  —  v10.0 (كامل)
+// DataTable/DataTable.tsx  —  v10.3
 //
 // ✅ كل ميزات v9 محفوظة بالكامل:
 //    • Virtual Scrolling
@@ -23,6 +23,11 @@
 //    • Smart Filter باللغة العربية (تحليل جمل طبيعية)
 //    • Saved Views (حفظ واسترجاع العروض في localStorage)
 //    • Context Menu (قائمة النقر الأيمن)
+//
+// ✅ v10.2: Tree Data، Column Groups، Range Selection، ErrorBoundary
+//
+// ✅ v10.3:
+//    • VirtualRow كـ memo مستقل بمقارنة عميقة — scroll لا يُعيد render الصفوف
 // ════════════════════════════════════════════════════════════════════════════
 
 import './datatable.css';
@@ -59,11 +64,53 @@ import {
   useVirtualScroll, useColumnDragReorder, useURLState, useMultiSort,
   useRowGrouping, useColumnPinning, useKeyboardNav, useBatchEdit, useCellValidation,
   useClipboardPaste, useSmartFilter, useSavedViews, useContextMenu,
+  useRowModel, useTreeData, useColumnGroups, useRangeSelection,
 } from './hooks';
 
 import FilterPopup from './FilterPopup';
 import { SkeletonRows, SkeletonCards, EditInput } from './Primitives';
 import ContextMenu from './ContextMenu';
+
+// ════════════════════════════════════════════════════════════════════════════
+// VirtualRow — صف بيانات معزول كـ memo مستقل
+//
+// الهدف: عند تحرك virtual scroll يتغير visibleRange فقط،
+//        وهذا يُعيد render الـ parent. بدون memo كل الصفوف
+//        المرئية تُعاد كاملاً حتى لو بياناتها لم تتغير.
+//
+// المقارنة: areEqual يدوية تتحقق فقط من:
+//   • تغيير بيانات الصف نفسه (rowData)
+//   • تغيير حالة التحديد / التوسيع / التعديل
+//   • تغيير Range Selection
+//   • تغيير التنسيق الشرطي
+//   الـ visibleRange/offsetY لا تُسبب re-render للصف إذا بياناته ثابتة
+// ════════════════════════════════════════════════════════════════════════════
+
+interface VirtualRowProps {
+  rowNode:    React.ReactNode;
+  rowDataKey: string | number;  // رقم الصف كـ row key للمقارنة
+  isSelected: boolean;
+  isExpanded: boolean;
+  isEditing:  boolean;          // أي خلية في هذا الصف تُعدَّل
+  isActive:   boolean;          // keyboard nav
+  inRange:    boolean;          // range selection يشمل هذا الصف
+}
+
+// areEqual: مقارنة يدوية — يُعاد render الصف فقط عند تغيير حقيقي
+function virtualRowAreEqual(prev: VirtualRowProps, next: VirtualRowProps): boolean {
+  return (
+    prev.rowDataKey === next.rowDataKey &&
+    prev.isSelected === next.isSelected &&
+    prev.isExpanded === next.isExpanded &&
+    prev.isEditing  === next.isEditing  &&
+    prev.isActive   === next.isActive   &&
+    prev.inRange    === next.inRange
+  );
+}
+
+const VirtualRow = memo(function VirtualRow({ rowNode }: VirtualRowProps) {
+  return <>{rowNode}</>;
+}, virtualRowAreEqual);
 
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -143,11 +190,16 @@ export function DataTable<T = Record<string, unknown>>({
   enableExcelExport = false,
   excelExportOptions,
   enableSmartFilter = false,
+  smartFilterPatterns,
   enableSavedViews = false,
   savedViewsConfig,
   enableContextMenu = false,
   contextMenuItems,
   onSmartFilterApply,
+  // 🆕 v10.2
+  treeData: treeConfig,
+  columnGroups,
+  enableRangeSelection = false,
 }: DataTableProps<T>) {
   // ── Responsive ────────────────────────────────────────────────────────────
   const isMobile = useIsMobile(639);
@@ -350,26 +402,24 @@ export function DataTable<T = Record<string, unknown>>({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sorts]);
 
-  // ── Client-side data processing ───────────────────────────────────────────
+  // ── Client-side data processing (useRowModel — خارج دورة React) ─────────
   const isClientFiltered = !onFilterChange;
   const isClientSorted = !onSortChange && !onMultiSortChange;
 
-  const processedData = useMemo(() => {
-    let r = data;
-    if (isClientFiltered) r = applyClientFilter(r, filters, orderedColumns);
-    if (searchable && globalQuery) r = applyGlobalSearch(r, globalQuery, orderedColumns);
-    if (isClientSorted) {
-      if (multiSort && sorts.length > 0) {
-        r = applyMultiSort(r, sorts, orderedColumns);
-      } else if (legacySortState.key) {
-        r = applyClientSort(r, legacySortState, orderedColumns);
-      }
-    }
-    return r;
-  }, [
-    data, filters, globalQuery, sorts, legacySortState,
-    orderedColumns, isClientFiltered, isClientSorted, searchable, multiSort,
-  ]);
+  const processedData = useRowModel(
+    data,
+    filters,
+    globalQuery,
+    sorts,
+    legacySortState,
+    orderedColumns,
+    {
+      clientFiltered: isClientFiltered,
+      clientSorted: isClientSorted,
+      searchable,
+      multiSort,
+    },
+  );
 
   // ── Row Grouping (v10) ────────────────────────────────────────────────────
   const {
@@ -668,6 +718,29 @@ export function DataTable<T = Record<string, unknown>>({
   const smartFilterRef = useRef<HTMLDivElement>(null);
   const smartInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Tree Data (v10.2) ─────────────────────────────────────────────────────
+  const {
+    treeRows,
+    toggleTreeNode,
+    expandAll: expandTree,
+    collapseAll: collapseTree,
+    isTreeMode,
+  } = useTreeData(data, treeConfig);
+
+  // ── Column Groups (v10.2) ─────────────────────────────────────────────────
+  const visibleColKeysForGroups = useMemo(() => visibleCols.map(c => c.key), [visibleCols]);
+  const { resolvedGroups, toggleGroupCollapse, isGrouped } = useColumnGroups(
+    columnGroups,
+    visibleColKeysForGroups,
+  );
+
+  // ── Range Selection (v10.2) ───────────────────────────────────────────────
+  const { range, selectCell, clearRange, isInRange, getRangeText } = useRangeSelection(
+    enableRangeSelection,
+    displayData.length,
+    visibleCols.length,
+  );
+
   // ── Smart Filter (اللغة العربية) 🆕 ───────────────────────────────────────
   const { applySmartFilter } = useSmartFilter(columns, (newFilters, newSorts) => {
     setFilters(newFilters);
@@ -677,7 +750,7 @@ export function DataTable<T = Record<string, unknown>>({
       url.writeFilters(newFilters);
       if (newSorts) url.writeSort(newSorts);
     }
-  });
+  }, smartFilterPatterns);
 
   const handleSmartFilter = useCallback(() => {
     setSmartFilterOpen(true);
@@ -1029,6 +1102,7 @@ export function DataTable<T = Record<string, unknown>>({
                   canEdit && !isEditing ? 'dt-td-editable' : '',
                   isActiveCb ? 'dt-cell-active' : '',
                   hasPending ? 'dt-cell-pending' : '',
+                  enableRangeSelection && isInRange(absoluteIdx, colIdx) ? 'dt-cell-selected' : '',
                   cfResult.className,
                 ]
                   .filter(Boolean)
@@ -1044,6 +1118,7 @@ export function DataTable<T = Record<string, unknown>>({
                 data-col-key={col.key}
                 onClick={e => {
                   if (keyboardNav) activateCell({ rowIndex: absoluteIdx, colIndex: colIdx });
+                  if (enableRangeSelection) selectCell(absoluteIdx, colIdx, e.shiftKey);
                   if (canEdit && !isEditing) startEdit(rKey, col.key, rawVal, e);
                 }}
                 title={canEdit && !isEditing ? 'انقر للتعديل' : undefined}
@@ -1100,6 +1175,7 @@ export function DataTable<T = Record<string, unknown>>({
     commitEdit, cancelEdit, onRowClick, rowClassName,
     curPage, perPage, isVirtual, rowHeight, totalColSpan,
     renderExpanded, expandedKeys, toggleExpanded, selectedKeys, toggleRow,
+    enableRangeSelection, isInRange, selectCell,
   ]);
 
   // ════════════════════════════════════════════════════════════════════════
@@ -1504,6 +1580,38 @@ export function DataTable<T = Record<string, unknown>>({
 
           {/* ── thead ──────────────────────────────────────────────────────── */}
           <thead>
+            {/* ── صف Column Groups (إذا مفعّل) ──────────────────────────── */}
+            {isGrouped && resolvedGroups.length > 0 && (
+              <tr className="dt-group-header-row">
+                {expandable && <th />}
+                {selectable && <th />}
+                {showIndex && <th />}
+                {resolvedGroups.map(({ group, collapsed, colspan }) => (
+                  <th
+                    key={group.key}
+                    colSpan={colspan}
+                    className="dt-th dt-th-group"
+                    style={{ textAlign: 'center', background: 'var(--bg3)' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                      <span>{group.header}</span>
+                      {group.collapsible && (
+                        <button
+                          className="dt-tbtn"
+                          style={{ padding: '0 4px', fontSize: 11 }}
+                          onClick={() => toggleGroupCollapse(group.key)}
+                          type="button"
+                          title={collapsed ? 'توسيع المجموعة' : 'طي المجموعة'}
+                        >
+                          <i className={`ti ti-chevron-${collapsed ? 'left' : 'down'}`} />
+                        </button>
+                      )}
+                    </div>
+                  </th>
+                ))}
+                {rowActions && <th />}
+              </tr>
+            )}
             <tr>
               {expandable && <th className="dt-th dt-th-exp" />}
               {selectable && (
@@ -1684,6 +1792,73 @@ export function DataTable<T = Record<string, unknown>>({
           <tbody style={isVirtual ? { transform: `translateY(${offsetY}px)` } : undefined}>
             {loading ? (
               <SkeletonRows rows={8} cols={totalColSpan} />
+            ) : isTreeMode ? (
+              // ── Tree Data rendering ──────────────────────────────────────
+              treeRows.length === 0 ? (
+                <tr>
+                  <td colSpan={totalColSpan} className="dt-empty-td">
+                    <div className="dt-empty" role="status">
+                      <i className="ti ti-inbox" aria-hidden="true" />
+                      <span className="dt-empty-text">{emptyText}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                treeRows.map(({ row, level, hasChildren, collapsed: nodeCollapsed, id }) => {
+                  const rKey = id;
+                  return (
+                    <tr
+                      key={String(rKey)}
+                      className="dt-row"
+                      onClick={onRowClick ? () => onRowClick(row) : undefined}
+                      data-row-index={0}
+                    >
+                      {expandable && <td className="dt-td-exp" />}
+                      {selectable && <td className="dt-td-sel" />}
+                      {showIndex && <td className="dt-td dt-td-idx">{level + 1}</td>}
+                      {visibleCols.map((col, colIdx) => {
+                        const rawVal = getRawValue(row, col as Column<T>);
+                        const isFirst = colIdx === 0;
+                        return (
+                          <td
+                            key={col.key}
+                            className="dt-td"
+                            style={{ textAlign: getTextAlign(col.align) }}
+                          >
+                            {isFirst ? (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  paddingRight: `${level * (treeConfig?.indentPx ?? 20)}px`,
+                                }}
+                              >
+                                {hasChildren ? (
+                                  <button
+                                    className="dt-exp-btn"
+                                    onClick={e => { e.stopPropagation(); toggleTreeNode(id); }}
+                                    type="button"
+                                    aria-expanded={!nodeCollapsed}
+                                  >
+                                    <i className={`ti ti-chevron-${nodeCollapsed ? 'left' : 'down'}`} />
+                                  </button>
+                                ) : (
+                                  <span style={{ width: 20, display: 'inline-block' }} />
+                                )}
+                                {col.render ? col.render(row, 0) : String(rawVal ?? '—')}
+                              </span>
+                            ) : (
+                              col.render ? col.render(row, 0) : String(rawVal ?? '—')
+                            )}
+                          </td>
+                        );
+                      })}
+                      {rowActions && <td style={{ textAlign: 'center' }}>{rowActions(row)}</td>}
+                    </tr>
+                  );
+                })
+              )
             ) : groups ? (
               groups.length === 0 ? (
                 <tr>
@@ -1771,6 +1946,31 @@ export function DataTable<T = Record<string, unknown>>({
             ) : (
               (isVirtual ? virtualDisplayData : displayData).map((row, idx) => {
                 const absoluteIdx = isVirtual ? visibleRange.start + idx : idx;
+                const rKey = rowKey(row, absoluteIdx);
+
+                // في وضع virtual: نُغلّف كل صف بـ VirtualRow memo
+                // حتى تحرك الـ scroll لا يُعيد render الصف ما لم تتغير بياناته
+                if (isVirtual) {
+                  const isRowEditing = editingCell?.rowKey === rKey;
+                  const isRowActive = !!(activeCell && activeCell.rowIndex === absoluteIdx);
+                  const rowInRange = enableRangeSelection
+                    ? isInRange(absoluteIdx, 0) // تحقق أن الصف داخل النطاق
+                    : false;
+
+                  return (
+                    <VirtualRow
+                      key={rKey}
+                      rowDataKey={rKey}
+                      isSelected={selectedKeys.has(rKey)}
+                      isExpanded={expandedKeys.has(rKey)}
+                      isEditing={!!isRowEditing}
+                      isActive={isRowActive}
+                      inRange={rowInRange}
+                      rowNode={renderDataRow(row, absoluteIdx)}
+                    />
+                  );
+                }
+
                 return renderDataRow(row, absoluteIdx);
               })
             )}
@@ -2219,5 +2419,79 @@ const PinMenu = memo(function PinMenu({
     </div>
   );
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// DataTableErrorBoundary — يمنع خطأ في عمود واحد من إسقاط الصفحة كاملاً
+// ════════════════════════════════════════════════════════════════════════════
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+export class DataTableErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  ErrorBoundaryState
+> {
+  constructor(props: { children: React.ReactNode; fallback?: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[DataTable] خطأ في التصيير:', error, info.componentStack);
+  }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback;
+      return (
+        <div
+          role="alert"
+          style={{
+            padding: '24px',
+            background: 'var(--bg2, #fff8f8)',
+            border: '1px solid var(--red2, #fca5a5)',
+            borderRadius: '8px',
+            textAlign: 'center',
+            direction: 'rtl',
+            fontFamily: 'inherit',
+          }}
+        >
+          <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+          <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--t1, #111)' }}>
+            حدث خطأ في عرض الجدول
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--t3, #666)', marginBottom: 16 }}>
+            {this.state.error?.message ?? 'خطأ غير متوقع'}
+          </div>
+          <button
+            onClick={this.handleRetry}
+            style={{
+              padding: '6px 18px',
+              background: 'var(--primary, #2563eb)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontSize: 13,
+            }}
+          >
+            إعادة المحاولة
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default DataTable;

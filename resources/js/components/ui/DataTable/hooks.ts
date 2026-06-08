@@ -1,4 +1,4 @@
-// DataTable/hooks.ts  —  v10.0 (كامل مع جميع hooks)
+// DataTable/hooks.ts  —  v10.3 (كامل مع جميع hooks)
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type {
@@ -12,7 +12,11 @@ import {
   MIN_COL_WIDTH, DEFAULT_ROW_HEIGHT,
   DEFAULT_CONTAINER_HEIGHT, DEFAULT_OVERSCAN,
 } from './types';
-import { getRawValue, parseTSV } from './utils';
+import {
+  getRawValue, parseTSV,
+  applyClientFilter, applyGlobalSearch, applyClientSort, applyMultiSort,
+} from './utils';
+import type { SortState } from './types';
 
 // ==================== hooks الموجودة سابقاً (محفوظة بالكامل) ====================
 
@@ -762,7 +766,23 @@ export interface SmartFilterPattern {
 // الأنماط الافتراضية — فارغة عمداً
 // كل مشروع يُمرر customPatterns الخاصة به عبر useSmartFilter
 // راجع: my-erp/datatable-patterns.ts لأنماط ERP الجزائري
-export const DEFAULT_SMART_FILTER_PATTERNS: SmartFilterPattern[] = [];
+export const DEFAULT_SMART_FILTER_PATTERNS: SmartFilterPattern[] = [
+  // فواتير متأخرة
+  { regex: /فاتورة(?:ات)?\s+(?:متأخرة\s+)?أكثر\s+من\s+(\d+)\s+يوم/, field: 'overdue_days', operator: 'gt', valueType: 'number' },
+  { regex: /(?:تأخر|مضى)\s+أكثر\s+من\s+(\d+)\s+يوم/, field: 'overdue_days', operator: 'gt', valueType: 'number' },
+  // مقارنات رقمية عامة
+  { regex: /أقل\s+من\s+(\d[\d\s]*)(?:\s+دج)?/, field: '$1', operator: 'lt', valueType: 'number' },
+  { regex: /أكثر\s+من\s+(\d[\d\s]*)(?:\s+دج)?/, field: '$1', operator: 'gt', valueType: 'number' },
+  { regex: /بين\s+(\d[\d\s]*)\s+و(?:الى|إلى)?\s+(\d[\d\s]*)/, field: 'range', operator: 'between', valueType: 'number' },
+  // طرف / عميل / مورد
+  { regex: /(?:العميل|الزبون|الطرف|المورد)\s+(?:اسمه\s+)?["']?([^"'\s]+)["']?/, field: 'party.name', operator: 'contains', valueType: 'string' },
+  // الحالة
+  { regex: /(?:الحالة|الوضع)\s+["']?([^"'\s]+)["']?/, field: 'document_status.name', operator: 'eq', valueType: 'string' },
+  // المخزن
+  { regex: /(?:المخزن|المستودع)\s+["']?([^"'\s]+)["']?/, field: 'warehouse.name', operator: 'contains', valueType: 'string' },
+  // الفرز
+  { regex: /(?:رتب|فرز|صنّف)\s+(?:حسب\s+)?([^\s]+)\s+(تصاعدي|تنازلي|الأحدث|الأقدم)/, field: '$1', operator: 'sort', valueType: 'string' },
+];
 
 export function useSmartFilter<T>(
   columns: Column<T>[],
@@ -1013,4 +1033,388 @@ export function useColumnVisibility<T = Record<string, unknown>>(
   );
 
   return { visibleColumns, hiddenColumns, toggleColumn, showColumn, hideColumn, resetVisibility };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ─── useColumnStatePersistence — حفظ حالة الأعمدة الكاملة ──────────────────
+//
+// يحفظ تحت مفتاح واحد في localStorage لكل typeCode:
+//   • columnOrder      — ترتيب الأعمدة (drag & drop)
+//   • columnWidths     — عرض كل عمود (resize)
+//   • hiddenColumns    — الأعمدة المخفية
+//   • pinnedColumns    — الأعمدة المثبتة (start/end)
+//   • activeFilters    — الفلاتر النشطة
+//
+// واجهة بسيطة: save(patch) / load() / reset()
+// لا يُلوّث useColumnVisibility/useColumnResize بمنطق localStorage خارجي
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface ColumnStateSnapshot {
+  columnOrder?:   string[];
+  columnWidths?:  Record<string, number>;
+  hiddenColumns?: string[];
+  pinnedColumns?: { start?: string[]; end?: string[] };
+  activeFilters?: Record<string, string>;
+  savedAt:        number;
+}
+
+export function useColumnStatePersistence(storageKey: string | null | undefined) {
+  // القراءة: تُنفَّذ مرة واحدة عند التهيئة (lazy initializer)
+  const load = useCallback((): ColumnStateSnapshot | null => {
+    if (!storageKey) return null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as ColumnStateSnapshot;
+      // تحقق بسيط من صحة البنية
+      if (typeof parsed !== 'object' || !parsed.savedAt) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, [storageKey]);
+
+  // الحفظ: patch جزئي — يدمج مع الحالة المحفوظة بدلاً من الكتابة الكاملة
+  const save = useCallback((patch: Partial<Omit<ColumnStateSnapshot, 'savedAt'>>) => {
+    if (!storageKey) return;
+    try {
+      const current = (() => {
+        try { return JSON.parse(localStorage.getItem(storageKey) ?? '{}') as ColumnStateSnapshot; }
+        catch { return {} as ColumnStateSnapshot; }
+      })();
+      const updated: ColumnStateSnapshot = { ...current, ...patch, savedAt: Date.now() };
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+    } catch {
+      // localStorage ممتلئ أو وضع private — نتجاهل بصمت
+    }
+  }, [storageKey]);
+
+  // حذف: إعادة ضبط كاملة
+  const reset = useCallback(() => {
+    if (!storageKey) return;
+    try { localStorage.removeItem(storageKey); } catch { /* تجاهل */ }
+  }, [storageKey]);
+
+  // استخراج القيمة الابتدائية بكسل واحدة في التهيئة
+  const initialSnapshot = useMemo(() => load(), [load]);
+
+  return { load, save, reset, initialSnapshot };
+}
+//
+// يُشغّل الفلتر والفرز والبحث بـ useRef للنتائج دون إعادة render
+// حتى اكتمال المعالجة — يُمهّد لنقل المعالجة لـ Web Worker لاحقاً
+// ════════════════════════════════════════════════════════════════════════════
+
+export function useRowModel<T>(
+  data: T[],
+  filters: import('./types').FilterMap,
+  globalQuery: string,
+  sorts: import('./types').MultiSortState,
+  legacySortState: import('./types').SortState,
+  columns: import('./types').Column<T>[],
+  options: {
+    clientFiltered: boolean;
+    clientSorted: boolean;
+    searchable: boolean;
+    multiSort: boolean;
+  }
+): T[] {
+  // نحتفظ بالنتيجة الأخيرة في ref حتى لا نُعيد الحساب ما لم تتغير المدخلات
+  const prevResultRef = useRef<T[]>(data);
+
+  const result = useMemo(() => {
+    let r = data;
+    if (options.clientFiltered) r = applyClientFilter(r, filters, columns);
+    if (options.searchable && globalQuery) r = applyGlobalSearch(r, globalQuery, columns);
+    if (options.clientSorted) {
+      if (options.multiSort && sorts.length > 0) r = applyMultiSort(r, sorts, columns);
+      else if (legacySortState.key) r = applyClientSort(r, legacySortState, columns);
+    }
+    prevResultRef.current = r;
+    return r;
+  }, [
+    data, filters, globalQuery, sorts, legacySortState,
+    columns, options.clientFiltered, options.clientSorted,
+    options.searchable, options.multiSort,
+  ]);
+
+  return result;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ─── useTreeData — بيانات هرمية (مخطط الحسابات، فئات المنتجات...) ─────────
+//
+// يبني الشجرة من flat array بـ idKey/parentKey
+// يُخرج الصفوف المطوية من DOM فعلياً
+// يدعم indentPx لكل مستوى
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface TreeConfig {
+  idKey: string;
+  parentKey: string;
+  defaultCollapsed?: boolean;
+  indentPx?: number;
+}
+
+export interface TreeRow<T> {
+  row: T;
+  level: number;
+  hasChildren: boolean;
+  collapsed: boolean;
+  id: string | number;
+  parentId: string | number | null;
+}
+
+export function useTreeData<T>(
+  data: T[],
+  config: TreeConfig | undefined
+): {
+  treeRows: TreeRow<T>[];
+  toggleTreeNode: (id: string | number) => void;
+  expandAll: () => void;
+  collapseAll: () => void;
+  isTreeMode: boolean;
+} {
+  const [collapsed, setCollapsed] = useState<Set<string | number>>(new Set());
+
+  // بناء الشجرة الأولية
+  const tree = useMemo(() => {
+    if (!config) return null;
+
+    const { idKey, parentKey, defaultCollapsed = false } = config;
+
+    // فهرسة البيانات
+    const byId = new Map<string | number, T>();
+    const childrenOf = new Map<string | number | null, (string | number)[]>();
+
+    for (const row of data) {
+      const id = (row as Record<string, unknown>)[idKey] as string | number;
+      const pid = (row as Record<string, unknown>)[parentKey] as string | number | null;
+      byId.set(id, row);
+      const list = childrenOf.get(pid) ?? [];
+      list.push(id);
+      childrenOf.set(pid, list);
+    }
+
+    // جمع IDs التي لها أبناء
+    const parentIds = new Set<string | number>();
+    for (const [pid, children] of childrenOf.entries()) {
+      if (pid !== null && pid !== undefined && children.length > 0) {
+        parentIds.add(pid);
+      }
+    }
+
+    // تعبئة الـ collapsed الافتراضية
+    if (defaultCollapsed) {
+      setCollapsed(new Set(parentIds));
+    }
+
+    return { byId, childrenOf, parentIds };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, config?.idKey, config?.parentKey, config?.defaultCollapsed]);
+
+  // Flatten الشجرة مع مراعاة الـ collapsed
+  const treeRows = useMemo<TreeRow<T>[]>(() => {
+    if (!config || !tree) return [];
+
+    const { idKey, parentKey } = config;
+    const { byId, childrenOf, parentIds } = tree;
+
+    const result: TreeRow<T>[] = [];
+
+    const walk = (parentId: string | number | null, level: number) => {
+      const children = childrenOf.get(parentId) ?? [];
+      for (const id of children) {
+        const row = byId.get(id);
+        if (!row) continue;
+        const hasChildren = parentIds.has(id);
+        const isCollapsed = collapsed.has(id);
+        result.push({ row, level, hasChildren, collapsed: isCollapsed, id, parentId });
+        if (hasChildren && !isCollapsed) {
+          walk(id, level + 1);
+        }
+      }
+    };
+
+    walk(null, 0);
+    return result;
+  }, [tree, collapsed, config]);
+
+  const toggleTreeNode = useCallback((id: string | number) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  const expandAll = useCallback(() => setCollapsed(new Set()), []);
+
+  const collapseAll = useCallback(() => {
+    if (!tree) return;
+    setCollapsed(new Set(tree.parentIds));
+  }, [tree]);
+
+  return {
+    treeRows,
+    toggleTreeNode,
+    expandAll,
+    collapseAll,
+    isTreeMode: !!config,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ─── useColumnGroups — رؤوس أعمدة متعددة المستويات (Column Groups) ─────────
+//
+// يدعم تجميع الأعمدة تحت header مشترك مع collapse/expand للمجموعة
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface ColumnGroupDef {
+  key: string;
+  header: import('react').ReactNode;
+  children: string[];   // مفاتيح الأعمدة المضمَّنة
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
+}
+
+export interface ResolvedColumnGroup {
+  group: ColumnGroupDef;
+  collapsed: boolean;
+  visibleChildren: string[];
+  colspan: number;
+}
+
+export function useColumnGroups(
+  groups: ColumnGroupDef[] | undefined,
+  visibleColKeys: string[]
+): {
+  resolvedGroups: ResolvedColumnGroup[];
+  toggleGroupCollapse: (key: string) => void;
+  isGrouped: boolean;
+} {
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    if (!groups) return new Set();
+    return new Set(
+      groups.filter(g => g.defaultCollapsed && g.collapsible).map(g => g.key)
+    );
+  });
+
+  const resolvedGroups = useMemo<ResolvedColumnGroup[]>(() => {
+    if (!groups) return [];
+    return groups.map(group => {
+      const collapsed = group.collapsible ? collapsedGroups.has(group.key) : false;
+      // إذا مطوية: فقط أول عمود يظهر كـ placeholder
+      const visibleChildren = collapsed
+        ? [group.children[0]].filter(Boolean)
+        : group.children.filter(k => visibleColKeys.includes(k));
+      return {
+        group,
+        collapsed,
+        visibleChildren,
+        colspan: visibleChildren.length,
+      };
+    });
+  }, [groups, collapsedGroups, visibleColKeys]);
+
+  const toggleGroupCollapse = useCallback((key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }, []);
+
+  return {
+    resolvedGroups,
+    toggleGroupCollapse,
+    isGrouped: !!groups?.length,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ─── useRangeSelection — تحديد نطاق خلايا (Shift+Click / سحب) ──────────────
+//
+// يُكمّل useClipboardPaste: النطاق المحدد = ما يُنسخ لـ Excel
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface CellRange {
+  startRow: number;
+  startCol: number;
+  endRow: number;
+  endCol: number;
+}
+
+export function useRangeSelection(
+  enabled: boolean,
+  rowCount: number,
+  colCount: number
+): {
+  range: CellRange | null;
+  anchorCell: { row: number; col: number } | null;
+  selectCell: (row: number, col: number, shift: boolean) => void;
+  clearRange: () => void;
+  isInRange: (row: number, col: number) => boolean;
+  getRangeText: (getData: (row: number, col: number) => string) => string;
+} {
+  const [range, setRange] = useState<CellRange | null>(null);
+  const [anchor, setAnchor] = useState<{ row: number; col: number } | null>(null);
+
+  const selectCell = useCallback((row: number, col: number, shift: boolean) => {
+    if (!enabled) return;
+    if (shift && anchor) {
+      setRange({
+        startRow: Math.min(anchor.row, row),
+        startCol: Math.min(anchor.col, col),
+        endRow: Math.max(anchor.row, row),
+        endCol: Math.max(anchor.col, col),
+      });
+    } else {
+      setAnchor({ row, col });
+      setRange({ startRow: row, startCol: col, endRow: row, endCol: col });
+    }
+  }, [enabled, anchor]);
+
+  const clearRange = useCallback(() => {
+    setRange(null);
+    setAnchor(null);
+  }, []);
+
+  const isInRange = useCallback((row: number, col: number): boolean => {
+    if (!range) return false;
+    return (
+      row >= range.startRow && row <= range.endRow &&
+      col >= range.startCol && col <= range.endCol
+    );
+  }, [range]);
+
+  // تحويل النطاق المحدد إلى TSV (للنسخ لـ Excel)
+  const getRangeText = useCallback((getData: (row: number, col: number) => string): string => {
+    if (!range) return '';
+    const rows: string[] = [];
+    for (let r = range.startRow; r <= range.endRow; r++) {
+      const cols: string[] = [];
+      for (let c = range.startCol; c <= range.endCol; c++) {
+        cols.push(getData(r, c));
+      }
+      rows.push(cols.join('\t'));
+    }
+    return rows.join('\n');
+  }, [range]);
+
+  // Clear on Escape
+  useEffect(() => {
+    if (!enabled) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clearRange();
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && range) {
+        // Ctrl+C → نسخ النطاق المحدد (يحتاج getData من الخارج)
+        // يُفعَّل من المكوّن الأب بـ getRangeText
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [enabled, clearRange, range]);
+
+  return { range, anchorCell: anchor, selectCell, clearRange, isInRange, getRangeText };
 }

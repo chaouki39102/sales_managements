@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-pages-files.md"
+OUTPUT="merged-components-files.md"
 
 > "$OUTPUT"
 
@@ -62,9 +62,9 @@ EXCLUDE=(
 
 
 
-  # pages
-merge_section "📘 pages" \
-  \( -path "*/pages/*" \) "${EXCLUDE[@]}"
+  # components
+merge_section "📘 Components" \
+  \( -path "*/components/ui*" \) "${EXCLUDE[@]}"
 
 
 

@@ -312,11 +312,16 @@ export interface DataTableProps<T = Record<string, unknown>> {
   enableExcelExport?: boolean;
   excelExportOptions?: ExcelExportOptions;
   enableSmartFilter?: boolean;
+  smartFilterPatterns?: import('./hooks').SmartFilterPattern[];
   enableSavedViews?: boolean;
   savedViewsConfig?: SavedViewsConfig;
   enableContextMenu?: boolean;
   contextMenuItems?: (context: ContextMenuContext) => ContextMenuItem[];
   onSmartFilterApply?: (query: string, result: SmartFilterResult) => void;
+  // 🆕 v10.2
+  treeData?: import('./hooks').TreeConfig;
+  columnGroups?: import('./hooks').ColumnGroupDef[];
+  enableRangeSelection?: boolean;
 }
 
 export interface EditingCell {

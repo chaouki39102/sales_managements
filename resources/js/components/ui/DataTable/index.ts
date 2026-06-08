@@ -1,5 +1,5 @@
-// DataTable/index.ts  —  v10.0
-export { DataTable, DataTable as default } from './DataTable';
+// DataTable/index.ts  —  v10.3
+export { DataTable, DataTable as default, DataTableErrorBoundary } from './DataTable';
 
 export type {
   DataTableProps,
@@ -26,7 +26,7 @@ export type {
   PendingEdit,
   BatchEditState,
   ConditionalFormat,
-    PasteOptions,
+  PasteOptions,
   ExcelExportOptions,
   SmartFilterRule,
   SmartFilterResult,
@@ -49,6 +49,7 @@ export {
   applyConditionalFormat,      // v10
   computeAggregate, exportToCSV, buildPageNumbers,
   getTextAlign,
+  exportToExcel, parseTSV,
 } from './utils';
 
 export {
@@ -62,16 +63,30 @@ export {
   useKeyboardNav,              // v10
   useBatchEdit,                // v10
   useCellValidation,           // v10
+  useColumnVisibility,         // v10 (كان مفقوداً من index.ts)
   useClipboardPaste,
   useSmartFilter,
   useSavedViews,
   useContextMenu,
-  // v10.1 exports
+  // v10.1
   DEFAULT_SMART_FILTER_PATTERNS,
-  // v10.2 exports
-  useColumnVisibility,
+  // v10.2 — الجديد
+  useRowModel,
+  useTreeData,
+  useColumnGroups,
+  useRangeSelection,
+  // v10.3 — الجديد
+  useColumnStatePersistence,
 } from './hooks';
 
-export type { SmartFilterPattern } from './hooks';
-export { exportToExcel, parseTSV } from './utils';
+export type {
+  SmartFilterPattern,       // v10.1
+  TreeConfig,               // v10.2
+  TreeRow,                  // v10.2
+  ColumnGroupDef,           // v10.2
+  ResolvedColumnGroup,      // v10.2
+  CellRange,                // v10.2
+  ColumnStateSnapshot,      // v10.3
+} from './hooks';
+
 export { default as ContextMenu } from './ContextMenu';
