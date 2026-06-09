@@ -525,12 +525,19 @@ export default function CommercialDocumentsPage() {
 
     // ── Fetch documents ───────────────────────────────────────────────────────
     const queryParams = useMemo(() => {
+        // نبني الـ params بدون أي مفتاح قيمته undefined أو null
+        // لأن بعض HTTP clients تُرسلها كـ "undefined" string → Backend يُرجع []
         const params: Record<string, unknown> = {
-            "filter[document_type_id]": docType?.id,
-            "filter[fiscal_year_id]":   selectedYear?.id,
             include: "party,documentStatus,warehouse",
-            sort: sortParam, per_page: perPage, page,
+            sort: sortParam,
+            per_page: perPage,
+            page,
         };
+
+        // نُضيف filter[document_type_id] فقط إذا كانت القيمة موجودة
+        if (docType?.id != null)       params["filter[document_type_id]"] = docType.id;
+        if (selectedYear?.id != null)  params["filter[fiscal_year_id]"]   = selectedYear.id;
+
         const filterMap: Record<string, string> = {
             search:                   "filter[search]",
             "party.name":             "filter[party.name]",
@@ -551,7 +558,13 @@ export default function CommercialDocumentsPage() {
 
     const { data: docsRaw, isLoading, isFetching } = useQuery({
         queryKey: tenantKeys.documents.byType(slug ?? "", typeCode ?? "", queryParams),
-        queryFn: () => apiGet<{ data: CommercialDocument[]; meta: Record<string, number> }>("/documents", queryParams),
+        queryFn: () => {
+            // TODO: احذف هذا الـ log بعد حل المشكلة
+            if (process.env.NODE_ENV === "development") {
+                console.debug("[CommercialDocumentsPage] sending params:", queryParams);
+            }
+            return apiGet<{ data: CommercialDocument[]; meta: Record<string, number> }>("/documents", queryParams);
+        },
         enabled: !!slug && !!typeCode && !!selectedYear?.id && !!docType?.id,
         placeholderData: keepPreviousData,
         staleTime: 2 * 60_000,
@@ -560,13 +573,48 @@ export default function CommercialDocumentsPage() {
     const items = useMemo((): CommercialDocument[] => {
         if (!docsRaw) return [];
         if (Array.isArray(docsRaw)) return docsRaw as CommercialDocument[];
-        return (((docsRaw as unknown as Record<string,unknown>).data as CommercialDocument[]) ?? []);
+        const raw = docsRaw as unknown as Record<string, unknown>;
+        // بنية مباشرة: { data: [...], meta: {...} }
+        if (Array.isArray(raw.data)) return raw.data as CommercialDocument[];
+        // بنية مُغلَّفة: { data: { data: [...], meta: {...} } }
+        const nested = raw.data as Record<string, unknown> | undefined;
+        if (nested && Array.isArray(nested.data)) return nested.data as CommercialDocument[];
+        return [];
     }, [docsRaw]);
 
+    // ── استخراج meta مع دعم كل بنى Laravel ──────────────────────────────────
+    // Laravel يُرجع pagination في:
+    //   • { data: [...], meta: { current_page, last_page, total, per_page } }  ← JsonResource::collection
+    //   • { data: { data: [...], meta: {...} } }                                ← لو apiGet يُغلّف
+    //   • { data: [...], current_page, last_page, total }                       ← paginator مباشر
     const meta = useMemo(() => {
-        if (!docsRaw || Array.isArray(docsRaw)) return { total: 0, last_page: 1, current_page: 1 };
-        return (((docsRaw as unknown as Record<string,unknown>).meta as Record<string,number>) ?? { total: 0, last_page: 1, current_page: 1 });
-    }, [docsRaw]);
+        if (!docsRaw || Array.isArray(docsRaw)) return { total: 0, last_page: 1, current_page: 1, per_page: perPage };
+
+        const raw    = docsRaw as unknown as Record<string, unknown>;
+        // الأكثر شيوعاً: meta object على المستوى الأول
+        const m      = (raw.meta ?? (raw.data as Record<string, unknown> | undefined)?.meta) as Record<string, number> | undefined;
+
+        if (m && (m.total != null || m.last_page != null)) {
+            return {
+                total:        Number(m.total        ?? 0),
+                last_page:    Number(m.last_page    ?? 1),
+                current_page: Number(m.current_page ?? 1),
+                per_page:     Number(m.per_page     ?? perPage),
+            };
+        }
+
+        // fallback: pagination مباشرة على الـ root object (بعض الإعدادات)
+        if (raw.total != null || raw.last_page != null) {
+            return {
+                total:        Number(raw.total        ?? 0),
+                last_page:    Number(raw.last_page    ?? 1),
+                current_page: Number(raw.current_page ?? 1),
+                per_page:     Number(raw.per_page     ?? perPage),
+            };
+        }
+
+        return { total: 0, last_page: 1, current_page: 1, per_page: perPage };
+    }, [docsRaw, perPage]);
 
     // ── Mutations ─────────────────────────────────────────────────────────────
     const validateMut = useMutation({
