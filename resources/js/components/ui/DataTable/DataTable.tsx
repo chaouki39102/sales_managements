@@ -42,7 +42,7 @@ import type {
   DataTableProps, Column, MultiSortState, EditingCell,
   FilterMap, AggregateType, PaginationConfig,
   ActiveCell, PendingEdit, SavedView, ContextMenuContext,
-  ContextMenuItem, ExcelExportOptions,
+  ContextMenuItem, ExcelExportOptions, ExportConfig, ExportFormat,
 } from './types';
 
 import {
@@ -56,7 +56,7 @@ import {
   applyClientFilter, applyGlobalSearch, applyClientSort, applyMultiSort,
   applyConditionalFormat,
   computeAggregate, exportToCSV, buildPageNumbers,
-  exportToExcel, parseTSV,
+  exportToExcel, exportToJSON, exportToPrint, parseTSV,
 } from './utils';
 
 import {
@@ -193,6 +193,7 @@ export function DataTable<T = Record<string, unknown>>({
   smartFilterPatterns,
   enableSavedViews = false,
   savedViewsConfig,
+  exportConfig,
   enableContextMenu = false,
   contextMenuItems,
   onSmartFilterApply,
@@ -213,6 +214,8 @@ export function DataTable<T = Record<string, unknown>>({
   );
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const colMenuRef = useRef<HTMLDivElement>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!colMenuOpen) return;
@@ -223,6 +226,16 @@ export function DataTable<T = Record<string, unknown>>({
     document.addEventListener('mousedown', h, true);
     return () => document.removeEventListener('mousedown', h, true);
   }, [colMenuOpen]);
+
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node))
+        setExportMenuOpen(false);
+    };
+    document.addEventListener('mousedown', h, true);
+    return () => document.removeEventListener('mousedown', h, true);
+  }, [exportMenuOpen]);
 
   const toggleColVisibility = useCallback((key: string) => {
     setHiddenKeys(prev => {
@@ -1002,6 +1015,24 @@ export function DataTable<T = Record<string, unknown>>({
     tableWrapRef.current?.classList.remove('dt-dragging');
   }, []);
 
+  // helper: تنفيذ الـ export حسب الصيغة
+  const handleExport = useCallback((format: ExportFormat) => {
+    // بناء الـ config من exportConfig أو القيم القديمة للـ backward compatibility
+    const cfg = exportConfig ?? {};
+    const fileName = cfg.fileName ?? exportName;
+    const title    = cfg.title;
+    const includeHiddenColumns = cfg.includeHiddenColumns ?? false;
+    const opts = { fileName, title, includeHiddenColumns, ...cfg.excelOptions };
+
+    setExportMenuOpen(false);
+    switch (format) {
+      case 'csv':   exportToCSV(processedData, visibleCols, fileName); break;
+      case 'excel': exportToExcel(processedData, visibleCols, opts); break;
+      case 'json':  exportToJSON(processedData, visibleCols, opts); break;
+      case 'print': exportToPrint(processedData, visibleCols, opts); break;
+    }
+  }, [exportConfig, exportName, processedData, visibleCols]);
+
   // helper: رتبة العمود في الفرز المتعدد
   const getSortIndex = (key: string) => sorts.findIndex(s => s.key === key);
   const getSortDir = (key: string) => sorts.find(s => s.key === key)?.dir ?? null;
@@ -1380,22 +1411,61 @@ export function DataTable<T = Record<string, unknown>>({
             </div>
           )}
 
-          {/* 🆕 Export Excel */}
-          {enableExcelExport && (
-            <button
-              className="dt-tbtn"
-              onClick={() =>
-                exportToExcel(processedData, columns, {
-                  fileName: exportName,
-                  ...excelExportOptions,
-                })
-              }
-              type="button"
-            >
-              <i className="ti ti-file-spreadsheet" />
-              Excel
-            </button>
-          )}
+          {/* 🆕 Export Menu — يجمع CSV + Excel + JSON + Print */}
+          {(exportable || enableExcelExport || exportConfig) && (() => {
+            const formats = exportConfig?.formats ?? (
+              enableExcelExport
+                ? ['csv', 'excel', 'json', 'print'] as ExportFormat[]
+                : ['csv', 'json', 'print'] as ExportFormat[]
+            );
+            const ITEMS: { fmt: ExportFormat; icon: string; label: string; ext: string }[] = [
+              { fmt: 'csv',   icon: 'ti-file-text',        label: 'CSV',         ext: '.csv' },
+              { fmt: 'excel', icon: 'ti-file-spreadsheet', label: 'Excel',       ext: '.xlsx' },
+              { fmt: 'json',  icon: 'ti-file-code',        label: 'JSON',        ext: '.json' },
+              { fmt: 'print', icon: 'ti-printer',          label: 'طباعة / PDF', ext: '' },
+            ].filter(i => formats.includes(i.fmt));
+
+            return (
+              <div ref={exportMenuRef} className="dt-export-wrap">
+                <button
+                  className={`dt-tbtn${exportMenuOpen ? ' on' : ''}`}
+                  onClick={() => setExportMenuOpen(p => !p)}
+                  aria-expanded={exportMenuOpen}
+                  aria-haspopup="menu"
+                  title="تصدير البيانات"
+                  type="button"
+                >
+                  <i className="ti ti-download" aria-hidden="true" />
+                  تصدير
+                  <i className="ti ti-chevron-down dt-export-chevron" aria-hidden="true" />
+                </button>
+
+                {exportMenuOpen && (
+                  <div className="dt-export-menu" role="menu">
+                    <div className="dt-export-menu-title">تصدير البيانات</div>
+                    <div className="dt-export-menu-count">
+                      {processedData.length.toLocaleString('ar-DZ')} سجل
+                    </div>
+                    {ITEMS.map(item => (
+                      <button
+                        key={item.fmt}
+                        className="dt-export-item"
+                        role="menuitem"
+                        type="button"
+                        onClick={() => handleExport(item.fmt)}
+                      >
+                        <i className={`ti ${item.icon} dt-export-item-icon`} aria-hidden="true" />
+                        <span className="dt-export-item-label">{item.label}</span>
+                        {item.ext && (
+                          <span className="dt-export-item-ext">{item.ext}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="dt-divider" />
 
@@ -1481,19 +1551,6 @@ export function DataTable<T = Record<string, unknown>>({
             )}
           </div>
 
-          {/* تصدير CSV */}
-          {exportable && (
-            <button
-              className="dt-tbtn"
-              onClick={() => exportToCSV(processedData, columns, exportName)}
-              aria-label="تصدير CSV"
-              title="تصدير CSV"
-              type="button"
-            >
-              <i className="ti ti-download" aria-hidden="true" />
-              تصدير
-            </button>
-          )}
         </div>
       </div>
 

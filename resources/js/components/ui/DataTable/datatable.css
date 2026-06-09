@@ -344,6 +344,103 @@
 /* ══════════════════════════════════════
    COLUMN VISIBILITY MENU
 ══════════════════════════════════════ */
+/* ── Export Menu ── */
+.dt-export-wrap {
+    position: relative;
+}
+
+.dt-export-chevron {
+    font-size: 10px;
+    opacity: .6;
+    margin-inline-start: 2px;
+}
+
+.dt-export-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 9999;
+    min-width: 180px;
+    background: var(--bg2);
+    border: 1px solid var(--b2);
+    border-radius: var(--r3);
+    box-shadow: var(--shadow2);
+    padding: 6px 0 4px;
+    animation: dt-fade .13s ease;
+    border-top: 2px solid var(--em);
+}
+
+.dt-export-menu-title {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--t4);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 0 12px 4px;
+}
+
+.dt-export-menu-count {
+    font-size: 11px;
+    color: var(--em);
+    font-weight: 700;
+    padding: 0 12px 6px;
+    border-bottom: 1px solid var(--b1);
+    margin-bottom: 4px;
+}
+
+.dt-export-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 12px;
+    background: none;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--t2);
+    cursor: pointer;
+    font-family: inherit;
+    text-align: right;
+    transition: background .1s, color .1s;
+}
+
+.dt-export-item:hover {
+    background: var(--bg3);
+    color: var(--em);
+}
+
+.dt-export-item-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    color: var(--t4);
+}
+
+.dt-export-item:hover .dt-export-item-icon {
+    color: var(--em);
+}
+
+.dt-export-item-label {
+    flex: 1;
+}
+
+.dt-export-item-ext {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--t4);
+    background: var(--bg3);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: monospace;
+    letter-spacing: .3px;
+}
+
+.dt-export-item:hover .dt-export-item-ext {
+    background: color-mix(in srgb, var(--em) 12%, transparent);
+    color: var(--em);
+}
+
+/* ── Col Menu ── */
 .dt-col-menu-wrap {
     position: relative;
 }

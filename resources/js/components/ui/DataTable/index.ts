@@ -28,6 +28,8 @@ export type {
   ConditionalFormat,
   PasteOptions,
   ExcelExportOptions,
+  ExportConfig,
+  ExportFormat,
   SmartFilterRule,
   SmartFilterResult,
   SavedView,
@@ -49,7 +51,7 @@ export {
   applyConditionalFormat,      // v10
   computeAggregate, exportToCSV, buildPageNumbers,
   getTextAlign,
-  exportToExcel, parseTSV,
+  exportToExcel, exportToJSON, exportToPrint, parseTSV,
 } from './utils';
 
 export {

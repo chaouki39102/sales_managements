@@ -297,6 +297,95 @@ export async function exportToExcel<T>(
   }
 }
 
+// ─── JSON Export ──────────────────────────────────────────────────────────────
+
+export function exportToJSON<T>(
+  data: T[],
+  columns: Column<T>[],
+  options: ExcelExportOptions = {},
+): void {
+  const { fileName = 'export', includeHiddenColumns = false } = options;
+  const visibleCols = columns.filter(c => !c.defaultHidden || includeHiddenColumns);
+
+  const rows = data.map(row => {
+    const obj: Record<string, unknown> = {};
+    for (const col of visibleCols) {
+      const key = col.exportHeader ?? (typeof col.header === 'string' ? col.header : col.key);
+      obj[key] = getRawValue(row, col) ?? '';
+    }
+    return obj;
+  });
+
+  const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${fileName}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+// ─── Print Export (نافذة طباعة مُنسَّقة) ────────────────────────────────────
+
+export function exportToPrint<T>(
+  data: T[],
+  columns: Column<T>[],
+  options: ExcelExportOptions = {},
+): void {
+  const { fileName = 'تقرير', title, includeHiddenColumns = false } = options;
+  const visibleCols = columns.filter(c => !c.defaultHidden || includeHiddenColumns);
+  const headers = visibleCols.map(c => c.exportHeader ?? (typeof c.header === 'string' ? c.header : c.key));
+
+  const rows = data.map(row =>
+    visibleCols.map(col => {
+      const v = getRawValue(row, col);
+      return v == null ? '' : String(v);
+    }),
+  );
+
+  const tableRows = rows.map(r =>
+    `<tr>${r.map(cell => `<td>${cell}</td>`).join('')}</tr>`,
+  ).join('');
+
+  const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <title>${title ?? fileName}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11px; color: #111; direction: rtl; padding: 16px; }
+    h2 { font-size: 14px; margin-bottom: 12px; color: #222; border-bottom: 2px solid #333; padding-bottom: 6px; }
+    .meta { font-size: 10px; color: #666; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #1a1a2e; color: #fff; padding: 6px 8px; text-align: right; font-size: 10px; font-weight: 700; }
+    td { padding: 5px 8px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
+    tr:nth-child(even) td { background: #f9f9f9; }
+    @media print {
+      body { padding: 0; }
+      @page { margin: 15mm; size: A4 landscape; }
+    }
+  </style>
+</head>
+<body>
+  ${title ? `<h2>${title}</h2>` : ''}
+  <div class="meta">
+    عدد السجلات: ${data.length} &nbsp;|&nbsp; 
+    تاريخ الطباعة: ${new Date().toLocaleDateString('ar-DZ')}
+  </div>
+  <table>
+    <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 300);
+}
+
 // ─── Paste from Excel (TSV/CSV parsing) ──────────────────────────────────────
 
 export function parseTSV(plainText: string): string[][] {

@@ -179,6 +179,18 @@ export interface ExcelExportOptions {
   includeHiddenColumns?: boolean;
   numberFormat?: string;
   title?: string;
+  sheetName?: string;              // اسم الـ sheet في Excel
+  headerStyle?: boolean;           // تنسيق الـ header بلون مختلف
+}
+
+export type ExportFormat = 'csv' | 'excel' | 'json' | 'print';
+
+export interface ExportConfig {
+  formats?: ExportFormat[];        // الصيغ المتاحة — default: ['csv','excel','json','print']
+  fileName?: string;
+  title?: string;
+  includeHiddenColumns?: boolean;
+  excelOptions?: ExcelExportOptions;
 }
 
 // ─── Smart Filter (تحليل اللغة العربية) ─────────────────────────────────────
@@ -318,6 +330,8 @@ export interface DataTableProps<T = Record<string, unknown>> {
   enableContextMenu?: boolean;
   contextMenuItems?: (context: ContextMenuContext) => ContextMenuItem[];
   onSmartFilterApply?: (query: string, result: SmartFilterResult) => void;
+  // 🆕 Export Menu الموحد (يستبدل exportable + enableExcelExport)
+  exportConfig?: ExportConfig;
   // 🆕 v10.2
   treeData?: import('./hooks').TreeConfig;
   columnGroups?: import('./hooks').ColumnGroupDef[];
