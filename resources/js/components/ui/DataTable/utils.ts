@@ -2,7 +2,7 @@
 
 import type {
   Column, SortState, MultiSortState, FilterMap, AggregateType, RangeFilter,
-  ConditionalFormat, ExcelExportOptions,
+  ConditionalFormat, ExcelExportOptions, ExcelExportAdvancedOptions,
 } from './types';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -231,55 +231,75 @@ export function getTextAlign(align?: Column['align']): React.CSSProperties['text
   return 'right';
 }
 
+// ─── formatDateShort ─────────────────────────────────────────────────────────
+//
+// تحويل أي صيغة تاريخ إلى YYYY-MM-DD للعرض والتصدير
+//
+// "2026-06-07T23:00:00.000000Z"  →  "2026-06-07"
+// "2026-06-07 14:30:00"          →  "2026-06-07"
+// null / undefined               →  ""
+//
+export function formatDateShort(val: string | Date | null | undefined): string {
+  if (!val) return '';
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0'),
+    ].join('-');
+  } catch {
+    return String(val);
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // 🆕 دوال جديدة للميزات
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── Excel Export حقيقي (يتطلب xlsx) ─────────────────────────────────────────
 
+// ─── Excel Export — يستخدم excelExportAdvanced (exceljs) مع fallback لـ CSV ───
+//
+// المسار المفضل: exportToExcelAdvanced من excelExportAdvanced.ts
+// هذه الدالة تبقى للـ backward compatibility مع DataTable الداخلي
+// (زر Excel في export menu)
+//
 export async function exportToExcel<T>(
-  data: T[],
+  data:    T[],
   columns: Column<T>[],
-  options: ExcelExportOptions = {}
+  options: ExcelExportOptions & { documentInfo?: import('./types').DocumentInfo } = {},
 ): Promise<void> {
-  const { fileName = 'export', includeHiddenColumns = false, title } = options;
+  const { fileName = 'export', title, documentInfo } = options;
 
   try {
-    const XLSX = await import('xlsx');
+    // استيراد dynamic لتجنب تحميل exceljs عند عدم الحاجة
+    const { exportToExcelAdvanced, computeAggregatesForExport } =
+      await import('./excelExportAdvanced');
 
-    const visibleCols = columns.filter(c => !c.defaultHidden || includeHiddenColumns);
-    const headers = visibleCols.map(c => c.exportHeader ?? (typeof c.header === 'string' ? c.header : c.key));
+    const aggregates = options.includeAggregates
+      ? computeAggregatesForExport(data as Record<string, unknown>[], columns as Column[])
+      : {};
 
-    const rows = data.map(row =>
-      visibleCols.map(col => {
-        let value = getRawValue(row, col);
-        if (col.render && typeof value !== 'string') {
-          const rendered = col.render(row, 0);
-          if (typeof rendered === 'string') value = rendered;
-          else if (rendered && typeof rendered === 'object' && 'props' in rendered) {
-            value = (rendered as any)?.props?.children ?? value;
-          }
-        }
-        return value ?? '';
-      })
+    await exportToExcelAdvanced(
+      data as Record<string, unknown>[],
+      columns as Column[],
+      {
+        fileName,
+        title:          title ?? fileName,
+        documentInfo:   documentInfo ?? {},
+        showAggregates: options.includeAggregates ?? false,
+        aggregates,
+      },
     );
-
-    const sheetData = [headers, ...rows];
-    if (title) sheetData.unshift([title], []);
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = headers.map(() => ({ wch: 15 }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Data');
-    XLSX.writeFile(wb, `${fileName}.xlsx`);
   } catch (error) {
-    // ── Fallback تلقائي لـ CSV مع رسالة واضحة ──────────────────────────────
+    // Fallback: CSV مع إشعار المستخدم
     console.warn(
-      'DataTable: مكتبة xlsx غير متوفرة — جارٍ التصدير بصيغة CSV بدلاً من ذلك.\n' +
-      'لتفعيل تصدير Excel الحقيقي: npm install xlsx'
+      'DataTable: مكتبة exceljs غير متوفرة — جارٍ التصدير بصيغة CSV.\n' +
+      'لتفعيل تصدير Excel الاحترافي: npm install exceljs',
     );
 
-    // إشعار المستخدم بأسلوب غير متطفل
     const msg = document.createElement('div');
     msg.setAttribute('role', 'alert');
     msg.style.cssText = [
@@ -288,11 +308,10 @@ export async function exportToExcel<T>(
       'border-radius:8px', 'font-size:13px', 'z-index:99999',
       'box-shadow:0 4px 12px rgba(0,0,0,.3)', 'direction:rtl',
     ].join(';');
-    msg.textContent = '⚠️ مكتبة xlsx غير مثبتة — تم التصدير بصيغة CSV';
+    msg.textContent = '⚠️ مكتبة exceljs غير مثبتة — تم التصدير بصيغة CSV';
     document.body.appendChild(msg);
     setTimeout(() => msg.remove(), 4000);
 
-    // التصدير كـ CSV
     exportToCSV(data, columns, fileName);
   }
 }

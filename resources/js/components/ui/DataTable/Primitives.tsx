@@ -86,6 +86,7 @@ export const EditInput = memo(function EditInput({
 
   if (def.type === 'select') return (
     <select
+      autoFocus={true}
       ref={inputRef as React.RefObject<HTMLSelectElement>}
       className="dt-edit-input"
       value={value}

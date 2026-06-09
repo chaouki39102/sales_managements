@@ -37,6 +37,9 @@ export type {
   ContextMenuItem,
   ContextMenuContext,
   ContextMenuState,
+  // v10.3 — Excel Advanced
+  DocumentInfo,
+  ExcelExportAdvancedOptions,
 } from './types';
 
 export { StaticMultiSelect, DynamicMultiSelect } from './MultiSelect';
@@ -51,6 +54,7 @@ export {
   applyConditionalFormat,      // v10
   computeAggregate, exportToCSV, buildPageNumbers,
   getTextAlign,
+  formatDateShort,             // v10.3 — تنسيق التاريخ للعرض
   exportToExcel, exportToJSON, exportToPrint, parseTSV,
 } from './utils';
 
@@ -65,19 +69,19 @@ export {
   useKeyboardNav,              // v10
   useBatchEdit,                // v10
   useCellValidation,           // v10
-  useColumnVisibility,         // v10 (كان مفقوداً من index.ts)
+  useColumnVisibility,         // v10
   useClipboardPaste,
   useSmartFilter,
   useSavedViews,
   useContextMenu,
   // v10.1
   DEFAULT_SMART_FILTER_PATTERNS,
-  // v10.2 — الجديد
+  // v10.2
   useRowModel,
   useTreeData,
   useColumnGroups,
   useRangeSelection,
-  // v10.3 — الجديد
+  // v10.3
   useColumnStatePersistence,
 } from './hooks';
 
@@ -92,3 +96,15 @@ export type {
 } from './hooks';
 
 export { default as ContextMenu } from './ContextMenu';
+
+// ── Excel Export الاحترافي (exceljs) ─────────────────────────────────────────
+// استخدام مستقل: import { useERPExport } from '@/components/ui/DataTable'
+export {
+  exportToExcelAdvanced,
+  exportDocumentToExcel,
+  computeAggregatesForExport,
+  calcFiscalStamp,
+  useERPExport,
+} from './excelExportAdvanced';
+
+export type { UseERPExportOptions } from './excelExportAdvanced';

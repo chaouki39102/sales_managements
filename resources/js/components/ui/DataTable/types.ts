@@ -173,14 +173,64 @@ export interface PasteOptions {
 
 // ─── Excel Export (حقيقي) ───────────────────────────────────────────────────
 
+// ─── Excel Export ────────────────────────────────────────────────────────────
+//
+// ExcelExportOptions: خيارات التصدير البسيط (CSV fallback / print / json)
+// DocumentInfo:       معلومات المستند والشركة للتصدير الاحترافي (excelExportAdvanced)
+// ExcelExportAdvancedOptions: خيارات التصدير الاحترافي الكامل
+//
+
 export interface ExcelExportOptions {
-  fileName?: string;
-  includeAggregates?: boolean;
+  fileName?:             string;
+  includeAggregates?:    boolean;
   includeHiddenColumns?: boolean;
-  numberFormat?: string;
-  title?: string;
-  sheetName?: string;              // اسم الـ sheet في Excel
-  headerStyle?: boolean;           // تنسيق الـ header بلون مختلف
+  numberFormat?:         string;
+  title?:                string;
+  sheetName?:            string;
+  headerStyle?:          boolean;
+}
+
+/** معلومات الشركة والمستند — تُمرَّر لـ exportToExcelAdvanced */
+export interface DocumentInfo {
+  // معلومات الشركة
+  company?:        string;
+  companyAddress?: string;
+  companyPhone?:   string;
+  /** رقم التعريف الجبائي / RC */
+  companyTaxId?:   string;
+  companyNIF?:     string;
+  companyNIS?:     string;
+  // معلومات المستند
+  documentNumber?: string;
+  /** مثال: 'فاتورة بيع' | 'أمر شراء' | 'وصل استلام' */
+  documentType?:   string;
+  dateFrom?:       string;
+  dateTo?:         string;
+  department?:     string;
+  preparedBy?:     string;
+  approvedBy?:     string;
+  notes?:          string;
+  /** 'DZD' | 'EUR' | 'USD' */
+  currency?:       string;
+  // ميزات ERP الجزائرية
+  vatAmount?:      number;
+  /** 0.19 = 19% */
+  vatRate?:        number;
+  /** الطابع المالي: 1% من TTC، حد أقصى 2500 دج */
+  fiscalStamp?:    number;
+}
+
+export interface ExcelExportAdvancedOptions {
+  fileName?:       string;
+  title?:          string;
+  documentInfo?:   DocumentInfo;
+  showAggregates?: boolean;
+  aggregates?:     Record<string, { type: AggregateType; value: number | string }>;
+  currency?:       string;
+  orientation?:    'landscape' | 'portrait';
+  sheetName?:      string;
+  /** callback لحفظ الـ buffer بطريقة مختلفة (مثلاً رفع للسيرفر) */
+  onSave?:         (buffer: ArrayBuffer) => void;
 }
 
 export type ExportFormat = 'csv' | 'excel' | 'json' | 'print';
@@ -323,6 +373,9 @@ export interface DataTableProps<T = Record<string, unknown>> {
   // 🆕 ميزات جديدة
   enableExcelExport?: boolean;
   excelExportOptions?: ExcelExportOptions;
+  /** معلومات الشركة والمستند — تُمرَّر لـ exportToExcelAdvanced تلقائياً */
+  documentInfo?: DocumentInfo;
+  excelExportAdvancedOptions?: Omit<ExcelExportAdvancedOptions, 'documentInfo'>;
   enableSmartFilter?: boolean;
   smartFilterPatterns?: import('./hooks').SmartFilterPattern[];
   enableSavedViews?: boolean;
