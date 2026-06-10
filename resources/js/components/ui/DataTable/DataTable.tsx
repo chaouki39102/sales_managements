@@ -120,6 +120,9 @@ export function DataTable<T = Record<string, unknown>>({
   // بيانات أساسية
   data,
   columns,
+  columnDefs,
+  hiddenColumnKeys,
+  onHiddenColumnsChange,
   rowKey,
   loading = false,
   error = null,
@@ -189,6 +192,8 @@ export function DataTable<T = Record<string, unknown>>({
   // 🆕 ميزات جديدة
   enableExcelExport = false,
   excelExportOptions,
+  documentInfo,
+  excelExportAdvancedOptions,
   enableSmartFilter = false,
   smartFilterPatterns,
   enableSavedViews = false,
@@ -209,9 +214,18 @@ export function DataTable<T = Record<string, unknown>>({
   const url = useURLState(urlState);
 
   // ── Column visibility ─────────────────────────────────────────────────────
-  const [hiddenKeys, setHiddenKeys] = useState<ReadonlySet<string>>(
-    () => new Set(columns.filter(c => c.defaultHidden).map(c => c.key)),
-  );
+  //
+  // إذا مُرِّر hiddenColumnKeys من الخارج → نستخدمه كقيمة أولية مباشرة
+  // (الصفحة مسؤولة عن حسابه من defaultHidden + الـ snapshot المحفوظ)
+  //
+  // إذا مُرِّر columnDefs فقط بدون hiddenColumnKeys → نحسبه من defaultHidden
+  //
+  // الحالة الافتراضية (لا columnDefs ولا hiddenColumnKeys) → السلوك القديم
+  const [hiddenKeys, setHiddenKeys] = useState<ReadonlySet<string>>(() => {
+    if (hiddenColumnKeys) return new Set(hiddenColumnKeys);
+    const src = columnDefs ?? columns;
+    return new Set(src.filter(c => c.defaultHidden).map(c => c.key));
+  });
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const colMenuRef = useRef<HTMLDivElement>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -240,12 +254,20 @@ export function DataTable<T = Record<string, unknown>>({
   const toggleColVisibility = useCallback((key: string) => {
     setHiddenKeys(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      const willBeHidden = !next.has(key);
+      willBeHidden ? next.add(key) : next.delete(key);
+      // إعلام الصفحة الأب بالتغيير (لحفظه في snapshot أو state خارجي)
+      onHiddenColumnsChange?.(key, willBeHidden);
       return next;
     });
-  }, []);
+  }, [onHiddenColumnsChange]);
 
-  const nonIndexCols = useMemo(() => columns, [columns]);
+  // إذا مُرِّر columnDefs → قائمة إدارة الأعمدة تعرض كل الأعمدة بما فيها المخفية
+  // (columns = الأعمدة المُصفَّاة للعرض، columnDefs = كل الأعمدة)
+  const nonIndexCols = useMemo(
+    () => columnDefs ?? columns,
+    [columnDefs, columns],
+  );
   const allHidden = nonIndexCols.length > 0 && nonIndexCols.every(c => hiddenKeys.has(c.key));
 
   const toggleCollapseAll = useCallback(() => {
@@ -259,14 +281,17 @@ export function DataTable<T = Record<string, unknown>>({
   }, [allHidden, nonIndexCols]);
 
   // ── Column resize ─────────────────────────────────────────────────────────
+  // nonIndexCols = columnDefs ?? columns يشمل كل الأعمدة لا نفقد عرض مخفي عند إظهاره
   const initialWidthsRef = useRef<Record<string, number>>(
-    Object.fromEntries(columns.filter(c => c.width).map(c => [c.key, c.width!])),
+    Object.fromEntries(nonIndexCols.filter(c => c.width).map(c => [c.key, c.width!])),
   );
   const { widths: colWidths, startResize, resetWidth } = useColumnResize(initialWidthsRef.current);
 
   // ── Column Reorder (v9) ───────────────────────────────────────────────────
+  // nonIndexCols = columnDefs ?? columns — يشمل كل الأعمدة بما فيها المخفية
+  // لكي يعمل الترتيب والرؤية بشكل صحيح عند إظهار عمود كان مخفياً
   const defaultOrder = useMemo(
-    () => initialColumnOrder ?? columns.map(c => c.key),
+    () => initialColumnOrder ?? nonIndexCols.map(c => c.key),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -277,15 +302,17 @@ export function DataTable<T = Record<string, unknown>>({
   );
 
   const orderedColumns = useMemo(() => {
-    if (!columnReorder) return columns;
-    const map = new Map(columns.map(c => [c.key, c]));
+    // دائماً نبني من nonIndexCols (كل الأعمدة) — visibleCols ستُصفي المخفية لاحقاً
+    const src = nonIndexCols;
+    if (!columnReorder) return src;
+    const map = new Map(src.map(c => [c.key, c]));
     const ordered = columnOrder.map(k => map.get(k)).filter(Boolean) as Column<T>[];
     const inOrder = new Set(columnOrder);
-    columns.forEach(c => {
+    src.forEach(c => {
       if (!inOrder.has(c.key)) ordered.push(c);
     });
     return ordered;
-  }, [columns, columnOrder, columnReorder]);
+  }, [nonIndexCols, columnOrder, columnReorder]);
 
   // ── Column Pinning (v10) ──────────────────────────────────────────────────
   const { pinConfig, pinColumn, isPinned, clearAllPins } = useColumnPinning(
@@ -530,7 +557,7 @@ export function DataTable<T = Record<string, unknown>>({
   // ── Aggregates ────────────────────────────────────────────────────────────
   const [aggTypes, setAggTypes] = useState<Record<string, AggregateType>>(() =>
     Object.fromEntries(
-      columns
+      nonIndexCols
         .filter(c => c.aggregate && typeof c.aggregate === 'string')
         .map(c => [c.key, c.aggregate as AggregateType]),
     ),
@@ -539,7 +566,7 @@ export function DataTable<T = Record<string, unknown>>({
   const aggregates = useMemo(() => {
     if (!showAggregates) return null;
     const r: Record<string, { value: number | null; type: AggregateType }> = {};
-    for (const col of columns) {
+    for (const col of nonIndexCols) {
       if (!col.aggregate) continue;
       if (typeof col.aggregate === 'function') {
         const v = col.aggregate(processedData);
@@ -550,7 +577,7 @@ export function DataTable<T = Record<string, unknown>>({
       }
     }
     return r;
-  }, [showAggregates, processedData, columns, aggTypes]);
+  }, [showAggregates, processedData, nonIndexCols, aggTypes]);
 
   const cycleAgg = useCallback(
     (key: string) => {
@@ -654,7 +681,7 @@ export function DataTable<T = Record<string, unknown>>({
       return;
     }
 
-    const col = columns.find(c => c.key === colKey);
+    const col = nonIndexCols.find(c => c.key === colKey);
     const oldValue = col ? getRawValue(data[rowIdx], col) : undefined;
     const cellId = `${rKey}__${colKey}`;
 
@@ -684,7 +711,7 @@ export function DataTable<T = Record<string, unknown>>({
     }
 
     setEditingCell(null);
-  }, [editingCell, data, rowKey, columns, batchEdit, batch, validateCell, clearError]);
+  }, [editingCell, data, rowKey, nonIndexCols, batchEdit, batch, validateCell, clearError]);
 
   const cancelEdit = useCallback(() => {
     if (editingCell) clearError(`${editingCell.rowKey}__${editingCell.colKey}`);
@@ -717,7 +744,7 @@ export function DataTable<T = Record<string, unknown>>({
   useClipboardPaste(
     tableWrapRef,
     data,
-    columns,
+    nonIndexCols,
     rowKey,
     onCellEditRef.current,
     batchEdit,
@@ -755,7 +782,7 @@ export function DataTable<T = Record<string, unknown>>({
   );
 
   // ── Smart Filter (اللغة العربية) 🆕 ───────────────────────────────────────
-  const { applySmartFilter } = useSmartFilter(columns, (newFilters, newSorts) => {
+  const { applySmartFilter } = useSmartFilter(nonIndexCols, (newFilters, newSorts) => {
     setFilters(newFilters);
     if (newSorts) setSorts(newSorts);
     setLocalPage(1);
@@ -916,7 +943,7 @@ export function DataTable<T = Record<string, unknown>>({
             label: 'تعديل الخلية',
             icon: 'edit',
             onClick: () => {},
-            disabled: !columns.find(col => col.key === ctx.colKey)?.editable,
+            disabled: !nonIndexCols.find(col => col.key === ctx.colKey)?.editable,
           },
         );
       } else if (ctx.type === 'row') {
@@ -958,12 +985,13 @@ export function DataTable<T = Record<string, unknown>>({
       }
       return items;
     },
-    [columns, data, rowKey, toggleExpanded, toggleColVisibility, pinColumn, setFilters],
+    [nonIndexCols, data, rowKey, toggleExpanded, toggleColVisibility, pinColumn, setFilters],
   );
 
   const { menuState, closeMenu } = useContextMenu(
     enableContextMenu ? contextMenuItems || defaultContextMenuItems : () => [],
     tableWrapRef,
+    data,   // ✅ context.row يحتاج بيانات الصف الفعلية
   );
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -1017,12 +1045,35 @@ export function DataTable<T = Record<string, unknown>>({
 
   // helper: تنفيذ الـ export حسب الصيغة
   const handleExport = useCallback((format: ExportFormat) => {
-    // بناء الـ config من exportConfig أو القيم القديمة للـ backward compatibility
-    const cfg = exportConfig ?? {};
+    const cfg      = exportConfig ?? {};
     const fileName = cfg.fileName ?? exportName;
     const title    = cfg.title;
     const includeHiddenColumns = cfg.includeHiddenColumns ?? false;
-    const opts = { fileName, title, includeHiddenColumns, ...cfg.excelOptions };
+
+    // ✅ تحويل aggregates من format الـ state إلى format التصدير
+    const aggregatesForExport = showAggregates && aggregates
+      ? Object.fromEntries(
+          Object.entries(aggregates).map(([k, v]) => [
+            k,
+            { type: v.type, value: v.value ?? 0 },
+          ]),
+        )
+      : {};
+
+    const opts = {
+      fileName,
+      title,
+      includeHiddenColumns,
+      // ✅ documentInfo يصل الآن للملف
+      documentInfo: documentInfo ?? {},
+      // ✅ aggregates الجاهزة من الـ state
+      includeAggregates: showAggregates && !!aggregates,
+      aggregates: aggregatesForExport,
+      // خيارات excel الأساسية
+      ...cfg.excelOptions,
+      // ✅ خيارات advanced (orientation، sheetName، onSave)
+      ...excelExportAdvancedOptions,
+    };
 
     setExportMenuOpen(false);
     switch (format) {
@@ -1031,7 +1082,11 @@ export function DataTable<T = Record<string, unknown>>({
       case 'json':  exportToJSON(processedData, visibleCols, opts); break;
       case 'print': exportToPrint(processedData, visibleCols, opts); break;
     }
-  }, [exportConfig, exportName, processedData, visibleCols]);
+  }, [
+    exportConfig, exportName, processedData, visibleCols,
+    documentInfo, excelExportAdvancedOptions,
+    showAggregates, aggregates,
+  ]);
 
   // helper: رتبة العمود في الفرز المتعدد
   const getSortIndex = (key: string) => sorts.findIndex(s => s.key === key);
@@ -1512,7 +1567,7 @@ export function DataTable<T = Record<string, unknown>>({
                       checked={!hiddenKeys.has(col.key)}
                       onChange={() => toggleColVisibility(col.key)}
                     />
-                    <span>{col.header}</span>
+                    <span title={typeof col.header === 'string' ? col.header : (col.exportHeader ?? '')}>{col.exportHeader ?? col.header}</span>
                     {!col.disablePin && (
                       <div className="dt-col-pin-actions">
                         <button
@@ -1768,7 +1823,7 @@ export function DataTable<T = Record<string, unknown>>({
                           </span>
                         </button>
                       ) : (
-                        <span>{col.header}</span>
+                        <span title={typeof col.header === 'string' ? col.header : (col.exportHeader ?? '')}>{col.exportHeader ?? col.header}</span>
                       )}
 
                       {col.filter && (

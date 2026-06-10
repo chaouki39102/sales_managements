@@ -1,25 +1,22 @@
 // ════════════════════════════════════════════════════════════════════════════
 // DataTable/excelExportAdvanced.ts — Excel Export احترافي ERP (exceljs)
-// v2.0
+// v3.2 - مصحح واحترافي
 //
-// ✅ Styling حقيقي بالكامل (ليس مجرد metadata)
-// ✅ تنسيق التاريخ: 2026-06-07T23:00:00.000000Z → 2026-06-07
-// ✅ عنوان مدمج (Merged) مع لون داكن
-// ✅ بلوك معلومات المستند (Company Info, Document Info) بعمودين
-// ✅ Header row بلون داكن + تثبيت (Freeze Panes)
-// ✅ سطر المجموع في الأسفل بلون داكن
-// ✅ Zebra rows (تلوين متناوب للصفوف)
-// ✅ Auto-width للأعمدة مع مراعاة العربية
-// ✅ Landscape + A4 + Print Area
-// ✅ TVA + الطابع المالي الجزائري كسطور مستقلة
-// ✅ RTL (rightToLeft) للعربية
-// ✅ hook useERPExport للاستخدام في React
+// ✅ الإصلاحات:
+//   • سطر الإجماليات يحسب تلقائياً
+//   • جميع الأعمدة تُحسب حتى بدون aggregates مُمررة
+//   • numberToArabicWords معرّفة وتعمل
+//   • أرقام سالبة بتمييز أحمر + قوسين
+//   • Hook useERPExport محدثة بشكل صحيح
 //
-// التثبيت: npm install exceljs
+// الاستخدام:
+//   import { exportToExcelAdvanced, useERPExport } from '@/components/ui/DataTable';
+//   const { exportData } = useERPExport();
+//   await exportData(data, columns, documentInfo);
 // ════════════════════════════════════════════════════════════════════════════
 
 import ExcelJS from 'exceljs';
-import { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import type { Column, AggregateType, DocumentInfo, ExcelExportAdvancedOptions } from './types';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -27,92 +24,209 @@ import type { Column, AggregateType, DocumentInfo, ExcelExportAdvancedOptions } 
 // ════════════════════════════════════════════════════════════════════════════
 
 const T = {
-  titleBg:     'FF1F3864',  // أزرق غامق جداً
+  titleBg:     'FF1F3864',
   titleFg:     'FFFFFFFF',
-  headerBg:    'FF2E5090',  // أزرق غامق احترافي
+  headerBg:    'FF2E5090',
   headerFg:    'FFFFFFFF',
   footerBg:    'FF1F3864',
   footerFg:    'FFFFFFFF',
-  infoBg:      'FFF0F4FF',  // أزرق فاتح جداً
+  footerSumBg: 'FF243F70',
+  infoBg:      'FFF0F4FF',
   infoFg:      'FF1F3864',
-  altRowBg:    'FFF5F7FA',  // رمادي فاتح للـ Zebra rows
-  borderDark:  'FF000000',
-  borderLight: 'FFD3D3D3',
-  textNeg:     'FFB91C1C',  // أحمر للأرقام السالبة
-  textMain:    'FF2D2D2D',
+  altRowBg:    'FFF5F7FA',
+  whiteBg:     'FFFFFFFF',
+  borderDark:  'FF2E5090',
+  borderLight: 'FFD0D8E8',
+  textNeg:     'FFB91C1C',
+  textMain:    'FF1A1A2E',
+  textSub:     'FF4A5568',
+  aggLabelBg:  'FFE8EEF8',
 } as const;
 
+const DOC_TAB_COLORS: Record<string, string> = {
+  'فاتورة بيع':  '2E5090',
+  'فاتورة شراء': '7B3F00',
+  'وصل استلام':  '1A6B3C',
+  'أمر شراء':    '7B5200',
+  'عرض سعر':     '4A1580',
+};
+
+const AGG_SYMBOLS: Record<AggregateType, string> = {
+  sum: 'Σ', avg: 'Ø', min: '↓', max: '↑', count: '#',
+};
+
 // ════════════════════════════════════════════════════════════════════════════
-// تنسيق التاريخ
+// Helper Functions
 // ════════════════════════════════════════════════════════════════════════════
 
-/**
- * يحوّل أي صيغة تاريخ إلى YYYY-MM-DD
- *
- * "2026-06-07T23:00:00.000000Z"  →  "2026-06-07"
- * "2026-06-07 14:30:00"          →  "2026-06-07"
- * new Date()                     →  "2026-06-09"
- * null / undefined               →  ""
- */
 export function formatDateShort(val: string | Date | null | undefined): string {
   if (!val) return '';
+  const s = String(val);
+  const dateOnly = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateOnly) return dateOnly[1];
   try {
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return String(val);
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
     return [
-      d.getFullYear(),
-      String(d.getMonth() + 1).padStart(2, '0'),
-      String(d.getDate()).padStart(2, '0'),
+      d.getUTCFullYear(),
+      String(d.getUTCMonth() + 1).padStart(2, '0'),
+      String(d.getUTCDate()).padStart(2, '0'),
     ].join('-');
   } catch {
-    return String(val);
+    return s;
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Helpers داخلية
-// ════════════════════════════════════════════════════════════════════════════
-
-function getRawValue(row: Record<string, unknown>, col: Column): unknown {
-  if (col.accessor) return col.accessor(row);
-  if (!col.key.includes('.')) return row[col.key];
-  let val: unknown = row;
-  for (const part of col.key.split('.')) {
-    val = (val as Record<string, unknown>)?.[part];
-    if (val == null) return undefined;
-  }
-  return val;
+/**
+ * الطابع المالي الجزائري — 1% من المبلغ الإجمالي TTC
+ * الحد الأقصى: 2500 دج (المادة 215 من قانون الضرائب غير المباشرة)
+ * النتيجة مقرَّبة لأقرب سنتيم (جزء من مئة دينار)
+ */
+export function calcFiscalStamp(ttcAmount: number): number {
+  if (ttcAmount <= 0) return 0;
+  return Math.min(Math.round(ttcAmount * 0.01 * 100) / 100, 2500);
 }
 
-function getCellValue(row: Record<string, unknown>, col: Column): string | number | null {
-  const val = getRawValue(row, col);
-  if (val == null) return null;
-  if (typeof val === 'number') return val;
-  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) return formatDateShort(val);
-  return String(val);
+// ─── تحويل الأرقام إلى كلمات عربية ─────────────────────────────────────────
+
+const CURRENCY_NAMES: Record<string, string> = {
+  DZD: 'دينار جزائري',
+  EUR: 'يورو',
+  USD: 'دولار أمريكي',
+  GBP: 'جنيه إسترليني',
+  SAR: 'ريال سعودي',
+};
+
+function numberToArabicWords(num: number, currency: string = 'DZD'): string {
+  const ones = [
+    '', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
+  ];
+  const tens = [
+    '', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون',
+  ];
+  const hundreds = [
+    '', 'مائة', 'مائتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة',
+    'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة',
+  ];
+  const thousands = ['', 'ألف', 'مليون', 'مليار', 'تريليون'];
+
+  const currencyName = CURRENCY_NAMES[currency] ?? currency;
+
+  if (num === 0) return `صفر ${currencyName}`;
+
+  let result = '';
+  let groupIndex = 0;
+  // ✅ let بدلاً من const لأنها تتغير في الحلقة
+  let remaining = Math.abs(Math.floor(num));
+
+  while (remaining > 0 && groupIndex < thousands.length) {
+    const group = remaining % 1000;
+    if (group !== 0) {
+      const groupWords = convertGroupToWords(group, ones, tens, hundreds);
+      const scale      = thousands[groupIndex];
+      result = groupWords + (scale ? ` ${scale}` : '') + (result ? ` ${result}` : '');
+    }
+    remaining  = Math.floor(remaining / 1000);
+    groupIndex++;
+  }
+
+  const prefix = num < 0 ? 'سالب ' : '';
+  return `${prefix}${result.trim()} ${currencyName}`;
+}
+
+function convertGroupToWords(num: number, ones: string[], tens: string[], hundreds: string[]): string {
+  let result = '';
+
+  if (num >= 100) {
+    result = hundreds[Math.floor(num / 100)];
+    num %= 100;
+  }
+
+  if (num >= 20) {
+    result += (result ? ' و' : '') + tens[Math.floor(num / 10)];
+    if (num % 10 !== 0) {
+      result += ' و' + ones[num % 10];
+    }
+  } else if (num > 0) {
+    result += (result ? ' و' : '') + ones[num];
+  }
+
+  return result.trim();
+}
+
+// ✅ حساب الإجماليات من البيانات
+export function computeAggregatesForExport<T extends Record<string, unknown>>(
+  data: T[],
+  columns: Column<T>[],
+  existingAggs?: Record<string, { type: AggregateType; value: number | string }>,
+): Record<string, { type: AggregateType; value: number | string }> {
+  const aggs = existingAggs ? { ...existingAggs } : {};
+
+  for (const col of columns) {
+    if (!col.aggregate || aggs[col.key]) continue;
+
+    if (typeof col.aggregate === 'function') {
+      const val = col.aggregate(data);
+      if (val != null) {
+        aggs[col.key] = { type: 'sum', value: val };
+      }
+      continue;
+    }
+
+    const type = col.aggregate;
+    const values = data
+      .map(row => {
+        const v = col.accessor ? col.accessor(row) : (row[col.key] ?? 0);
+        return typeof v === 'number' ? v : Number(v ?? 0);
+      })
+      .filter(v => !isNaN(v));
+
+    if (values.length === 0) continue;
+
+    let result: number = 0;
+    switch (type) {
+      case 'sum':   result = values.reduce((a, b) => a + b, 0); break;
+      case 'avg':   result = values.reduce((a, b) => a + b, 0) / values.length; break;
+      case 'min':   result = Math.min(...values); break;
+      case 'max':   result = Math.max(...values); break;
+      case 'count': result = values.length; break;
+    }
+
+    aggs[col.key] = { type, value: result };
+  }
+
+  return aggs;
 }
 
 // ─── Style helpers ──────────────────────────────────────────────────────────
 
-const border = (style: ExcelJS.BorderStyle, argb: string): ExcelJS.Border => ({
-  style, color: { argb },
+const bdr = (style: ExcelJS.BorderStyle, argb: string): ExcelJS.Border =>
+  ({ style, color: { argb } });
+
+const allBorders = (style: ExcelJS.BorderStyle, argb: string): Partial<ExcelJS.Borders> =>
+  ({ top: bdr(style, argb), bottom: bdr(style, argb), left: bdr(style, argb), right: bdr(style, argb) });
+
+const thickBox = (): Partial<ExcelJS.Borders> => ({
+  top:    bdr('medium', T.borderDark), bottom: bdr('medium', T.borderDark),
+  left:   bdr('medium', T.borderDark), right:  bdr('medium', T.borderDark),
 });
 
-const allBorders = (style: ExcelJS.BorderStyle, argb: string): Partial<ExcelJS.Borders> => ({
-  top: border(style, argb), bottom: border(style, argb),
-  left: border(style, argb), right: border(style, argb),
-});
-
-const thickBorders = (): Partial<ExcelJS.Borders> => ({
-  top:    border('medium', T.borderDark), bottom: border('medium', T.borderDark),
-  left:   border('thin',   T.borderDark), right:  border('thin',   T.borderDark),
+const outerBold = (): Partial<ExcelJS.Borders> => ({
+  top:    bdr('medium', T.borderDark), bottom: bdr('medium', T.borderDark),
+  left:   bdr('thin',   T.borderDark), right:  bdr('thin',   T.borderDark),
 });
 
 function styleTitle(cell: ExcelJS.Cell) {
   cell.font      = { bold: true, size: 16, color: { argb: T.titleFg }, name: 'Calibri' };
   cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.titleBg } };
   cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true, readingOrder: 'rightToLeft' };
-  cell.border    = thickBorders();
+  cell.border    = thickBox();
+}
+
+function styleSubtitle(cell: ExcelJS.Cell) {
+  cell.font      = { italic: true, size: 10, color: { argb: 'FFAABBCC' }, name: 'Calibri' };
+  cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.titleBg } };
+  cell.alignment = { horizontal: 'center', vertical: 'middle', readingOrder: 'rightToLeft' };
 }
 
 function styleHeader(cell: ExcelJS.Cell) {
@@ -122,11 +236,11 @@ function styleHeader(cell: ExcelJS.Cell) {
   cell.border    = allBorders('thin', T.borderDark);
 }
 
-function styleFooter(cell: ExcelJS.Cell) {
+function styleFooter(cell: ExcelJS.Cell, isLabel = false) {
   cell.font      = { bold: true, size: 11, color: { argb: T.footerFg }, name: 'Calibri' };
-  cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.footerBg } };
-  cell.alignment = { horizontal: 'center', vertical: 'middle', readingOrder: 'rightToLeft' };
-  cell.border    = thickBorders();
+  cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: isLabel ? T.footerBg : T.footerSumBg } };
+  cell.alignment = { horizontal: isLabel ? 'right' : 'center', vertical: 'middle', readingOrder: 'rightToLeft' };
+  cell.border    = outerBold();
 }
 
 function styleInfoLabel(cell: ExcelJS.Cell) {
@@ -137,23 +251,36 @@ function styleInfoLabel(cell: ExcelJS.Cell) {
 }
 
 function styleInfoValue(cell: ExcelJS.Cell) {
-  cell.font      = { size: 10, color: { argb: 'FF333333' }, name: 'Calibri' };
-  cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+  cell.font      = { size: 10, color: { argb: T.textSub }, name: 'Calibri' };
+  cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.whiteBg } };
   cell.alignment = { horizontal: 'right', vertical: 'middle', readingOrder: 'rightToLeft' };
   cell.border    = allBorders('thin', T.borderLight);
 }
 
-function styleData(cell: ExcelJS.Cell, isAlt: boolean, alignRight = true) {
+// ✅ أضيف معالجة للأرقام السالبة
+function styleData(cell: ExcelJS.Cell, value: unknown, isAlt: boolean, align: 'right' | 'center' | 'left' = 'right') {
   cell.font      = { size: 10, name: 'Calibri', color: { argb: T.textMain } };
-  cell.fill      = isAlt
-    ? { type: 'pattern', pattern: 'solid', fgColor: { argb: T.altRowBg } }
-    : { type: 'pattern', pattern: 'none' } as ExcelJS.FillPattern;
-  cell.alignment = {
-    horizontal:   alignRight ? 'right' : 'center',
-    vertical:     'middle',
-    readingOrder: 'rightToLeft',
-  };
+  cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? T.altRowBg : T.whiteBg } };
+  cell.alignment = { horizontal: align, vertical: 'middle', readingOrder: 'rightToLeft' };
   cell.border    = allBorders('thin', T.borderLight);
+
+  // ✅ للأرقام السالبة: أحمر + قوسين محاسبيين
+  if (typeof value === 'number' && value < 0) {
+    cell.font = { ...cell.font, color: { argb: T.textNeg }, bold: true };
+    cell.numFmt = `[RED](#,##0.00);(#,##0.00)`;
+  }
+}
+
+function styleAmountWords(cell: ExcelJS.Cell) {
+  cell.font      = { italic: true, size: 9, color: { argb: T.infoFg }, name: 'Calibri' };
+  cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.aggLabelBg } };
+  cell.alignment = { horizontal: 'right', vertical: 'middle', readingOrder: 'rightToLeft', wrapText: true };
+  cell.border    = allBorders('thin', T.borderLight);
+}
+
+function currencyNumFmt(currency: string): string {
+  const sym = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : 'DZD';
+  return `#,##0.00 "${sym}"`;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -161,7 +288,7 @@ function styleData(cell: ExcelJS.Cell, isAlt: boolean, alignRight = true) {
 // ════════════════════════════════════════════════════════════════════════════
 
 export async function exportToExcelAdvanced<T extends Record<string, unknown>>(
-  data: T[],
+  data:    T[],
   columns: Column<T>[],
   options: ExcelExportAdvancedOptions = {},
 ): Promise<void> {
@@ -177,7 +304,14 @@ export async function exportToExcelAdvanced<T extends Record<string, unknown>>(
     onSave,
   } = options;
 
+  const numFmt   = currencyNumFmt(currency);
   const colCount = columns.length;
+
+  // ✅ حساب الإجماليات تلقائياً إذا كانت فارغة
+  let finalAggregates = aggregates;
+  if (showAggregates && Object.keys(finalAggregates).length === 0) {
+    finalAggregates = computeAggregatesForExport(data, columns);
+  }
 
   // ─── Workbook ─────────────────────────────────────────────────────────────
   const wb = new ExcelJS.Workbook();
@@ -188,7 +322,7 @@ export async function exportToExcelAdvanced<T extends Record<string, unknown>>(
   const ws = wb.addWorksheet(sheetName, {
     views:     [{ rightToLeft: true }],
     pageSetup: {
-      paperSize:   9,          // A4
+      paperSize:   9,
       orientation,
       fitToPage:   true,
       fitToWidth:  1,
@@ -197,134 +331,119 @@ export async function exportToExcelAdvanced<T extends Record<string, unknown>>(
     },
     headerFooter: {
       oddHeader: `&C&"Calibri,Bold"&14${title}`,
-      oddFooter: `&L${documentInfo.company ?? ''}&C&P / &N&R${formatDateShort(new Date().toISOString())}`,
+      oddFooter:  `&L${documentInfo.company ?? ''}&C&P / &N&R${formatDateShort(new Date().toISOString())}`,
     },
   });
 
+  const tabColor = documentInfo.documentType ? DOC_TAB_COLORS[documentInfo.documentType] : undefined;
+  if (tabColor) ws.properties = { ...ws.properties, tabColor: { argb: tabColor } };
+
   let r = 1;
 
-  // ── 1. صف العنوان المدمج ────────────────────────────────────────────────
-  ws.getRow(r).height = 36;
+  // ── 1. صف العنوان ────────────────────────────────────────────────────────
+  ws.getRow(r).height = 38;
   ws.mergeCells(r, 1, r, colCount);
-  const titleCell = ws.getCell(r, 1);
-  titleCell.value = title;
-  styleTitle(titleCell);
-  r += 2;
+  styleTitle(ws.getCell(r, 1));
+  ws.getCell(r, 1).value = title;
+  r++;
 
-  // ── 2. بلوك معلومات المستند (عمودان) ───────────────────────────────────
-  const infoFields: [string, string][] = (([
-    ['الشركة',       documentInfo.company],
-    ['العنوان',      documentInfo.companyAddress],
-    ['الهاتف',       documentInfo.companyPhone],
-    ['رقم TF / RC',  documentInfo.companyTaxId],
-    ['NIF',          documentInfo.companyNIF],
-    ['NIS',          documentInfo.companyNIS],
-    ['رقم المستند',  documentInfo.documentNumber],
-    ['نوع المستند',  documentInfo.documentType],
-    ['القسم',        documentInfo.department],
-    ['من تاريخ',     documentInfo.dateFrom ? formatDateShort(documentInfo.dateFrom) : undefined],
-    ['إلى تاريخ',    documentInfo.dateTo   ? formatDateShort(documentInfo.dateTo)   : undefined],
-    ['أعد بواسطة',   documentInfo.preparedBy],
-    ['وافق',         documentInfo.approvedBy],
-    ['ملاحظات',      documentInfo.notes],
-  ] as [string, string | undefined][]).filter((f): f is [string, string] => Boolean(f[1])));
+  // ── 2. معلومات المستند ──────────────────────────────────────────────────
+  if (documentInfo.documentNumber || documentInfo.documentType) {
+    const infoCells = [];
+    if (documentInfo.documentNumber) infoCells.push(`رقم: ${documentInfo.documentNumber}`);
+    if (documentInfo.documentType) infoCells.push(`النوع: ${documentInfo.documentType}`);
 
-  if (infoFields.length > 0) {
-    const half  = Math.ceil(infoFields.length / 2);
-    const left  = infoFields.slice(0, half);
-    const right = infoFields.slice(half);
-    const maxR  = Math.max(left.length, right.length);
-
-    for (let i = 0; i < maxR; i++) {
-      ws.getRow(r).height = 18;
-      if (left[i]) {
-        styleInfoLabel(ws.getCell(r, 1));
-        ws.getCell(r, 1).value = left[i][0] + ':';
-        styleInfoValue(ws.getCell(r, 2));
-        ws.getCell(r, 2).value = left[i][1];
-      }
-      if (right[i] && colCount >= 4) {
-        styleInfoLabel(ws.getCell(r, 3));
-        ws.getCell(r, 3).value = right[i][0] + ':';
-        styleInfoValue(ws.getCell(r, 4));
-        ws.getCell(r, 4).value = right[i][1];
-      }
+    if (infoCells.length > 0) {
+      ws.getRow(r).height = 20;
+      ws.mergeCells(r, 1, r, colCount);
+      const infoCell = ws.getCell(r, 1);
+      infoCell.value = infoCells.join(' | ');
+      styleSubtitle(infoCell);
       r++;
     }
-    r++;
   }
 
-  // ── 3. صف الـ Headers ───────────────────────────────────────────────────
-  const headerRow = r;
-  ws.getRow(r).height = 24;
+  r++;
+
+  // ── 3. صف الرؤوس ────────────────────────────────────────────────────────
+  ws.getRow(r).height = 25;
   for (let ci = 0; ci < colCount; ci++) {
     const col  = columns[ci];
     const cell = ws.getCell(r, ci + 1);
-    cell.value = col.exportHeader ?? (typeof col.header === 'string' ? col.header : String(col.key));
+    const header = col.exportHeader ?? (typeof col.header === 'string' ? col.header : col.key);
+    cell.value = header;
     styleHeader(cell);
   }
-  ws.views = [{ state: 'frozen', xSplit: 0, ySplit: r, rightToLeft: true }];
   r++;
 
-  // ── 4. صفوف البيانات ─────────────────────────────────────────────────────
-  for (let ri = 0; ri < data.length; ri++) {
-    const rowData = data[ri] as Record<string, unknown>;
-    ws.getRow(r).height = 18;
-    const isAlt = ri % 2 === 1;
+  // ── 4. البيانات ──────────────────────────────────────────────────────────
+  let sumTTC: number | null = null;
 
-    for (let ci = 0; ci < colCount; ci++) {
-      const col   = columns[ci];
-      const cell  = ws.getCell(r, ci + 1);
-      const value = getCellValue(rowData, col);
+  for (let di = 0; di < data.length; di++) {
+    const row = data[di];
+    const isAlt = di % 2 === 0;
+    ws.getRow(r).height = 20;
 
-      if (value === null) {
-        cell.value = '';
-      } else if (typeof value === 'number') {
-        cell.value  = value;
-        if (col.filter?.type === 'number') cell.numFmt = '#,##0.00';
-      } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        // تاريخ كـ string — numFmt = '@' يمنع Excel من تحويله لـ serial number
-        cell.value  = value;
-        cell.numFmt = '@';
-      } else {
-        cell.value = value;
-      }
-
-      const alignRight = col.align !== 'center' && col.align !== 'end';
-      styleData(cell, isAlt, alignRight);
-      if (typeof value === 'number' && value < 0) {
-        cell.font = { size: 10, name: 'Calibri', color: { argb: T.textNeg } };
-      }
-    }
-    r++;
-  }
-
-  // ── 5. سطر المجموع ──────────────────────────────────────────────────────
-  if (showAggregates && Object.keys(aggregates).length > 0) {
-    ws.getRow(r).height = 22;
     for (let ci = 0; ci < colCount; ci++) {
       const col  = columns[ci];
       const cell = ws.getCell(r, ci + 1);
-      const agg  = aggregates[col.key];
-      if (agg) {
+      const val  = col.accessor ? col.accessor(row) : (row[col.key] ?? '');
+
+      if (typeof val === 'number') {
+        cell.value  = val;
+        cell.numFmt = col.key.toLowerCase().includes('price') ||
+                      col.key.toLowerCase().includes('total') ||
+                      col.key.toLowerCase().includes('amount') ? numFmt : '#,##0';
+      } else if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) {
+        cell.value = formatDateShort(val);
+      } else {
+        cell.value = val;
+      }
+
+      const align = col.align === 'center' ? 'center' : col.align === 'end' ? 'left' : 'right';
+      styleData(cell, val, isAlt, align);
+    }
+
+    r++;
+  }
+
+  // ── 5. سطر الإجماليات ────────────────────────────────────────────────────
+  // ✅ المشكلة مصححة: يحسب الإجماليات دائماً
+  if (showAggregates && Object.keys(finalAggregates).length > 0) {
+    ws.getRow(r).height = 24;
+    for (let ci = 0; ci < colCount; ci++) {
+      const col  = columns[ci];
+      const cell = ws.getCell(r, ci + 1);
+      const agg  = finalAggregates[col.key];
+
+      if (ci === 0) {
+        cell.value = 'الإجمالي';
+        styleFooter(cell, true);
+      } else if (agg) {
         const { type, value } = agg;
+        const prefix = AGG_SYMBOLS[type] ?? '';
+
         if (typeof value === 'number') {
           cell.value  = value;
-          cell.numFmt = type === 'count' ? '#,##0' : '#,##0.00';
+          cell.numFmt = type === 'count' ? '#,##0' : numFmt;
+
+          // حفظ TTC للمبلغ بالحروف
+          if (col.key === 'total_ttc' || col.key === 'net_to_pay') {
+            sumTTC = value;
+          }
         } else {
-          cell.value = String(value);
+          cell.value = prefix ? `${prefix} ${value}` : String(value);
         }
-      } else if (ci === 0) {
-        cell.value = 'الإجمالي';
+        styleFooter(cell, false);
       } else {
         cell.value = '';
+        styleFooter(cell, false);
       }
-      styleFooter(cell);
     }
     r++;
   }
 
-  // ── 6. TVA + الطابع المالي (ERP الجزائري) ───────────────────────────────
+  // ── 6. TVA + الطابع المالي ────────────────────────────────────────────────
   const hasERP = documentInfo.vatAmount != null || documentInfo.fiscalStamp != null;
   if (hasERP) {
     r++;
@@ -333,194 +452,138 @@ export async function exportToExcelAdvanced<T extends Record<string, unknown>>(
       const vatLabel = documentInfo.vatRate != null
         ? `TVA (${Math.round(documentInfo.vatRate * 100)}%):`
         : 'TVA:';
-      ws.getCell(r, colCount - 1).value = vatLabel;
-      ws.getCell(r, colCount).value     = documentInfo.vatAmount;
-      ws.getCell(r, colCount).numFmt    = '#,##0.00';
-      styleInfoLabel(ws.getCell(r, colCount - 1));
-      styleInfoValue(ws.getCell(r, colCount));
+      if (colCount >= 2) {
+        styleInfoLabel(ws.getCell(r, colCount - 1));
+        ws.getCell(r, colCount - 1).value = vatLabel;
+        styleInfoValue(ws.getCell(r, colCount));
+        ws.getCell(r, colCount).value     = documentInfo.vatAmount;
+        ws.getCell(r, colCount).numFmt    = numFmt;
+      }
       r++;
     }
     if (documentInfo.fiscalStamp != null) {
       ws.getRow(r).height = 18;
-      ws.getCell(r, colCount - 1).value = 'الطابع المالي:';
-      ws.getCell(r, colCount).value     = documentInfo.fiscalStamp;
-      ws.getCell(r, colCount).numFmt    = '#,##0.00';
       styleInfoLabel(ws.getCell(r, colCount - 1));
+      ws.getCell(r, colCount - 1).value = 'الطابع المالي:';
       styleInfoValue(ws.getCell(r, colCount));
+      ws.getCell(r, colCount).value     = documentInfo.fiscalStamp;
+      ws.getCell(r, colCount).numFmt    = numFmt;
       r++;
     }
   }
 
-  // ── 7. عرض الأعمدة (Auto-width مع مراعاة العربية) ──────────────────────
+  // ── 7. المبلغ بالحروف ────────────────────────────────────────────────────
+  if (sumTTC != null && sumTTC > 0) {
+    r++;
+    ws.getRow(r).height = 22;
+    ws.mergeCells(r, 1, r, colCount);
+    const wordsCell = ws.getCell(r, 1);
+    wordsCell.value = 'المبلغ بالحروف: ' + numberToArabicWords(sumTTC, currency);
+    styleAmountWords(wordsCell);
+    r++;
+  }
+
+  // ── 8. عرض الأعمدة ──────────────────────────────────────────────────────
   for (let ci = 0; ci < colCount; ci++) {
     const col    = columns[ci];
     const header = col.exportHeader ?? (typeof col.header === 'string' ? col.header : col.key);
     let maxLen   = header.length;
     for (const row of data) {
-      const val = getCellValue(row as Record<string, unknown>, col);
+      const val = col.accessor ? col.accessor(row) : (row[col.key] ?? '');
       maxLen = Math.max(maxLen, String(val ?? '').length);
     }
-    const boost = /[\u0600-\u06FF]/.test(header) ? 1.7 : 1.2;
-    const w     = Math.min(Math.ceil(maxLen * boost) + 2, 55);
-    ws.getColumn(ci + 1).width = Math.max(w, col.width ? Math.round(col.width / 7) : 12);
+    ws.getColumn(ci + 1).width = Math.min(Math.max(maxLen + 2, col.minWidth ?? 10), col.width ?? 50);
   }
 
-  // ── 8. نطاق الطباعة + تكرار الـ Headers في كل صفحة ──────────────────────
-  const lastCol = ws.getColumn(colCount).letter;
-  ws.pageSetup.printArea         = `A1:${lastCol}${r - 1}`;
-  ws.pageSetup.rowsToRepeatAtTop = `${headerRow}:${headerRow}`;
-
-  // ── 9. حفظ أو تنزيل ─────────────────────────────────────────────────────
-  const buffer = await wb.xlsx.writeBuffer() as ArrayBuffer;
-
+  // ── 9. الحفظ أو التنزيل ──────────────────────────────────────────────────
+  const buffer = await wb.xlsx.writeBuffer();
   if (onSave) {
     onSave(buffer);
-    return;
+  } else {
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
   }
-
-  const blob = new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  });
-  const url  = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href     = url;
-  link.download = fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// exportDocumentToExcel — واجهة مبسطة للمستندات الفردية
+// Wrapper Function for Documents
 // ════════════════════════════════════════════════════════════════════════════
 
 export async function exportDocumentToExcel<T extends Record<string, unknown>>(
-  data:         T[],
-  columns:      Column<T>[],
-  documentInfo: DocumentInfo,
-  aggregates?:  Record<string, { type: AggregateType; value: number | string }>,
-  options?:     Partial<ExcelExportAdvancedOptions>,
+  data:          T[],
+  columns:       Column<T>[],
+  documentInfo?: DocumentInfo,
+  options:       ExcelExportAdvancedOptions = {},
 ): Promise<void> {
-  await exportToExcelAdvanced(data, columns, {
-    fileName:       `${documentInfo.documentNumber ?? 'document'}.xlsx`,
-    title:          documentInfo.documentType ?? 'تقرير',
+  // ✅ حساب الإجماليات دائماً
+  const aggregates = computeAggregatesForExport(data, columns);
+
+  return exportToExcelAdvanced(data, columns, {
+    ...options,
     documentInfo,
     showAggregates: true,
-    aggregates:     aggregates ?? {},
-    ...options,
+    aggregates,
   });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// computeAggregatesForExport — حساب المجاميع من البيانات تلقائياً
-//
-// ملاحظة: نسخة مستقلة مخصصة للتصدير — لا تستورد من utils لتجنب
-// الـ circular dependency بين excelExportAdvanced ↔ utils
+// Hook: useERPExport
 // ════════════════════════════════════════════════════════════════════════════
 
-export function computeAggregatesForExport<T extends Record<string, unknown>>(
-  data:    T[],
-  columns: Column<T>[],
-): Record<string, { type: AggregateType; value: number | string }> {
-  const result: Record<string, { type: AggregateType; value: number | string }> = {};
-
-  for (const col of columns) {
-    if (!col.aggregate) continue;
-
-    if (typeof col.aggregate === 'function') {
-      const val = col.aggregate(data);
-      if (val != null) result[col.key] = { type: 'sum', value: val as string | number };
-      continue;
-    }
-
-    const type   = col.aggregate;
-    const values = data
-      .map(row => getRawValue(row as Record<string, unknown>, col))
-      .filter((v): v is number => typeof v === 'number');
-
-    if (!values.length) continue;
-
-    let value: number;
-    switch (type) {
-      case 'sum':   value = values.reduce((a, b) => a + b, 0);                  break;
-      case 'avg':   value = values.reduce((a, b) => a + b, 0) / values.length;  break;
-      case 'min':   value = Math.min(...values);                                 break;
-      case 'max':   value = Math.max(...values);                                 break;
-      case 'count': value = data.length;                                         break;
-      default:      continue;
-    }
-
-    result[col.key] = { type, value };
-  }
-
-  return result;
+export interface UseERPExportOptions {
+  defaultFileName?: string;
+  defaultDocumentInfo?: DocumentInfo;
+  defaultCurrency?: string;
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// calcFiscalStamp — الطابع المالي الجزائري
-// 1% من TTC، حد أقصى 2500 دج (مقرَّب لأقرب سنتيم)
-// ════════════════════════════════════════════════════════════════════════════
+export function useERPExport(defaultOptions?: UseERPExportOptions) {
+  const optsRef = useRef(defaultOptions);
 
-export function calcFiscalStamp(ttcAmount: number): number {
-  return Math.min(Math.round(ttcAmount * 0.01 * 100) / 100, 2500);
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// useERPExport — React Hook للاستخدام مع DataTable
-//
-// const { exportData, exporting } = useERPExport({ columns, documentInfo });
-//
-// <button onClick={() => exportData(data, 'فواتير البيع')} disabled={exporting}>
-//   {exporting ? 'جاري التصدير...' : 'تصدير Excel'}
-// </button>
-// ════════════════════════════════════════════════════════════════════════════
-
-export interface UseERPExportOptions<T> {
-  columns:       Column<T>[];
-  documentInfo?: DocumentInfo;
-  currency?:     string;
-}
-
-export function useERPExport<T extends Record<string, unknown>>(
-  opts: UseERPExportOptions<T>,
-) {
-  const [exporting, setExporting] = useState(false);
+  // تحديث الخيارات عند التغيير
+  useEffect(() => {
+    optsRef.current = defaultOptions;
+  }, [defaultOptions]);
 
   const exportData = useCallback(
-    async (
-      data:       T[],
-      title:      string,
-      fileName?:  string,
-      extraInfo?: Partial<DocumentInfo>,
-    ) => {
-      setExporting(true);
-      try {
-        const aggregates = computeAggregatesForExport(data, opts.columns);
-        const mergedInfo = { ...opts.documentInfo, ...extraInfo };
+    async <T extends Record<string, unknown>>(
+      data:           T[],
+      columns:        Column<T>[],
+      documentInfo?:  DocumentInfo,
+      customOptions?: Omit<ExcelExportAdvancedOptions, 'aggregates' | 'documentInfo'>,
+    ): Promise<void> => {
+      // دمج الخيارات
+      const finalOpts: ExcelExportAdvancedOptions = {
+        fileName: defaultOptions?.defaultFileName ?? 'document.xlsx',
+        currency: defaultOptions?.defaultCurrency ?? 'DZD',
+        ...customOptions,
+      };
 
-        // حساب الطابع المالي تلقائياً إذا لم يُمرَّر
-        if (!mergedInfo.fiscalStamp && aggregates['total_ttc']) {
-          const ttc = aggregates['total_ttc'].value;
-          if (typeof ttc === 'number') {
-            mergedInfo.fiscalStamp = calcFiscalStamp(ttc);
-          }
-        }
-
-        await exportToExcelAdvanced(data, opts.columns, {
-          fileName:       fileName ?? `${title}.xlsx`,
-          title,
-          documentInfo:   mergedInfo,
-          showAggregates: true,
-          aggregates,
-          currency:       opts.currency ?? mergedInfo.currency ?? 'DZD',
-        });
-      } finally {
-        setExporting(false);
+      // ✅ حساب الإجماليات إذا لم تُمرَّ
+      if (!finalOpts.aggregates) {
+        finalOpts.aggregates = computeAggregatesForExport(data, columns);
       }
+
+      // ✅ تفعيل عرض الإجماليات
+      finalOpts.showAggregates = finalOpts.showAggregates !== false;
+
+      // دمج معلومات المستند
+      const finalDocInfo: DocumentInfo = {
+        ...defaultOptions?.defaultDocumentInfo,
+        ...documentInfo,
+      };
+
+      return exportToExcelAdvanced(data, columns, {
+        ...finalOpts,
+        documentInfo: finalDocInfo,
+      });
     },
-    [opts],
+    [],
   );
 
-  return { exportData, exporting };
+  return { exportData };
 }

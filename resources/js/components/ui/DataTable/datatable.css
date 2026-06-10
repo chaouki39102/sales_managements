@@ -455,9 +455,9 @@
     border-radius: var(--r3);
     padding: 5px 4px;
     box-shadow: var(--shadow2);
-    min-width: 210px;
+    min-width: 250px;
     animation: dt-fade 0.14s ease;
-    max-height: 340px;
+    max-height: 380px;
     overflow-y: auto;
 }
 
@@ -509,11 +509,8 @@
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-    /* ✅ إصلاح: منع خروج النص خارج القائمة */
     min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* overflow على الـ span الداخلي فقط */
 }
 .dt-col-item:hover {
     background: var(--bg3);
@@ -526,13 +523,19 @@
     width: 14px;
     height: 14px;
 }
-/* ✅ النص داخل الـ label يأخذ المساحة المتبقية فقط */
-.dt-col-item > *:not(input) {
+/* النص يأخذ المساحة المتبقية — pin-actions تظل بحجمها الطبيعي */
+.dt-col-item > span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
     flex: 1;
+}
+.dt-col-pin-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+    margin-right: auto;
 }
 
 /* ══════════════════════════════════════
@@ -2877,13 +2880,24 @@ th:hover .dt-th-pin-btn, .dt-th-pin-btn.active { opacity: 1; }
 }
 .dt-pin-btn:hover, .dt-pin-btn.active { border-color: var(--em); color: var(--em); background: var(--emb); }
 
-/* ── 15. dt-col-item layout fix للـ pin buttons */
+/* ── 15. dt-col-item layout — pin buttons fix (يُكمل التعريف الأساسي) */
 .dt-col-item {
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
 }
-.dt-col-item > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-col-item > span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dt-col-item .dt-col-pin-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
 
 /* ── 16. Bulk clear */
 .dt-bulk-clear {

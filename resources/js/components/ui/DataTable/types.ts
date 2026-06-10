@@ -312,6 +312,21 @@ export interface ContextMenuState {
 export interface DataTableProps<T = Record<string, unknown>> {
   data: T[];
   columns: Column<T>[];
+  /**
+   * قائمة كل الأعمدة (بما فيها المخفية) — تُستخدم في قائمة إدارة الأعمدة.
+   * إذا لم تُمرَّر يُستخدم `columns` بدلاً منها.
+   */
+  columnDefs?: Column<T>[];
+  /**
+   * مفاتيح الأعمدة المخفية حالياً — يُمرَّر من الخارج عند إدارة الرؤية خارجياً.
+   * (مثال: useColumnVisibility في الصفحة الأب)
+   */
+  hiddenColumnKeys?: string[];
+  /**
+   * callback عند تغيير رؤية عمود من قائمة الأعمدة الداخلية.
+   * key: مفتاح العمود، willBeHidden: القيمة الجديدة
+   */
+  onHiddenColumnsChange?: (key: string, willBeHidden: boolean) => void;
   rowKey: (row: T, index: number) => string | number;
   loading?: boolean;
   error?: string | null;

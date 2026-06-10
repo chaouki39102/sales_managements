@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,8 +23,8 @@ class CommercialDocument extends Model
         SoftDeletes,
         HasCompany,
         Auditable,
-        BelongsToFiscalYear
-        ,HasTenantRouteBinding;
+        BelongsToFiscalYear,
+        HasTenantRouteBinding;
 
     protected $table = 'commercial_documents';
 
@@ -96,17 +97,100 @@ class CommercialDocument extends Model
         'deleted_at' => 'datetime',
     ];
 
-    public static array $searchableFields = ['document_number', 'notes', 'internal_notes'];
-    public static array $filterable = [
-        'document_type_id', 'party_id', 'warehouse_id', 'fiscal_year_id',
-        'currency_id', 'document_status_id', 'is_locked', 'is_proforma', 'is_exported_to_accounting'
+    public static array $searchableFields = [
+        'document_number',
+        'notes',
+        'internal_notes',
+        'reference',
     ];
-    public static array $sortable = ['id', 'document_number', 'document_date', 'total_ttc', 'created_at'];
+
+    public static array $filterable = [
+        // FK مباشر
+        'document_type_id',
+        'party_id',
+        'warehouse_id',
+        'fiscal_year_id',
+        'currency_id',
+        'document_status_id',
+        'is_locked',
+        'is_proforma',
+        'is_exported_to_accounting',
+        // حقول تاريخية (يدعم Spatie النطاق: filter[document_date]=2024-01-01,2024-12-31)
+        'document_date',
+        'due_date',
+        'delivery_date',
+        'validated_at',
+        'created_at',
+        'updated_at',
+        // حقول مالية
+        'total_ht',
+        'total_tva',
+        'total_ttc',
+        'total_discount',
+        'total_stamp',
+        'net_to_pay',
+        'paid_amount',
+        'remaining_amount',
+        // نصية قابلة للفلتر
+        'reference',
+        // علاقات (Spatie يدعم filter[party.name])
+        'party.name',
+        'warehouse.name',
+        'document_status.name',
+        // بحث نصي موحد
+        'search',
+    ];
+
+    public static array $sortable = [
+        'id',
+        'document_number',
+        'document_date',
+        'due_date',
+        'total_ht',
+        'total_tva',
+        'total_ttc',
+        'net_to_pay',
+        'total_discount',
+        'total_stamp',
+        'remaining_amount',
+        'validated_at',
+        'created_at',
+        'updated_at',
+        'document_status_id',
+        // sort عبر العلاقة (Spatie يدعم party.name إذا ضُبط allowedSorts)
+        'party.name',
+        'warehouse.name',
+    ];
     public static array $defaultWith = [];
     public static array $allowedIncludes = [
-        'documentType', 'numberingSeries', 'user', 'party', 'warehouse', 'fiscalYear',
-        'currency', 'documentStatus', 'validatedBy', 'sourceDocument', 'cancellationOfDocument',
-        'lines', 'payments', 'stockMovements', 'createdBy', 'updatedBy', 'deletedBy'
+        // علاقات مباشرة
+        'documentType',
+        'numberingSeries',
+        'party',
+        'warehouse',
+        'fiscalYear',
+        'currency',
+        'documentStatus',
+        // المستخدمون — user = المنشئ (user_id)، validatedBy = المعتمِد (validated_by)
+        'user',
+        'validatedBy',
+        // المستندات المرتبطة
+        'sourceDocument',
+        'cancellationOfDocument',
+        // الأسطر — nested includes
+        'lines',
+        'lines.product',
+        'lines.productVariant',
+        'lines.tva',
+        // المدفوعات — nested includes
+        'payments',
+        'payments.paymentMode',
+        // حركات المخزن
+        'stockMovements',
+        // audit
+        'createdBy',
+        'updatedBy',
+        'deletedBy',
     ];
     public static string $defaultSort = 'document_date';
     public static string $defaultSortDirection = 'desc';
@@ -117,18 +201,54 @@ class CommercialDocument extends Model
     public static array $cacheInvalidateRelations = ['lines', 'payments', 'stockMovements'];
     public static array $scopes = [];
 
-    public function documentType(): BelongsTo { return $this->belongsTo(DocumentType::class); }
-    public function numberingSeries(): BelongsTo { return $this->belongsTo(NumberingSeries::class); }
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
-    public function party(): BelongsTo { return $this->belongsTo(Party::class); }
-    public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
-    public function fiscalYear(): BelongsTo { return $this->belongsTo(FiscalYear::class); }
-    public function currency(): BelongsTo { return $this->belongsTo(Currency::class); }
-    public function documentStatus(): BelongsTo { return $this->belongsTo(DocumentStatus::class); }
-    public function validatedBy(): BelongsTo { return $this->belongsTo(User::class, 'validated_by'); }
-    public function sourceDocument(): BelongsTo { return $this->belongsTo(CommercialDocument::class, 'source_document_id'); }
-    public function cancellationOfDocument(): BelongsTo { return $this->belongsTo(CommercialDocument::class, 'cancellation_of_document_id'); }
-    public function lines(): HasMany { return $this->hasMany(CommercialDocumentLine::class); }
+    public function documentType(): BelongsTo
+    {
+        return $this->belongsTo(DocumentType::class);
+    }
+    public function numberingSeries(): BelongsTo
+    {
+        return $this->belongsTo(NumberingSeries::class);
+    }
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+    public function party(): BelongsTo
+    {
+        return $this->belongsTo(Party::class);
+    }
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
+    }
+    public function fiscalYear(): BelongsTo
+    {
+        return $this->belongsTo(FiscalYear::class);
+    }
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(Currency::class);
+    }
+    public function documentStatus(): BelongsTo
+    {
+        return $this->belongsTo(DocumentStatus::class);
+    }
+    public function validatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validated_by');
+    }
+    public function sourceDocument(): BelongsTo
+    {
+        return $this->belongsTo(CommercialDocument::class, 'source_document_id');
+    }
+    public function cancellationOfDocument(): BelongsTo
+    {
+        return $this->belongsTo(CommercialDocument::class, 'cancellation_of_document_id');
+    }
+    public function lines(): HasMany
+    {
+        return $this->hasMany(CommercialDocumentLine::class);
+    }
     public function payments(): BelongsToMany
     {
         return $this->belongsToMany(Payment::class, 'document_payment')
@@ -140,13 +260,37 @@ class CommercialDocument extends Model
         return $this->hasManyThrough(StockMovement::class, CommercialDocumentLine::class, 'commercial_document_id', 'commercial_document_line_id');
     }
 
-    public function scopeLocked(Builder $query): Builder { return $query->where('is_locked', true); }
-    public function scopeUnlocked(Builder $query): Builder { return $query->where('is_locked', false); }
-    public function scopeValidated(Builder $query): Builder { return $query->whereNotNull('validated_at'); }
-    public function scopeUnpaid(Builder $query): Builder { return $query->where('remaining_amount', '>', 0); }
-    public function scopeOverdue(Builder $query): Builder { return $query->where('due_date', '<', now())->where('remaining_amount', '>', 0); }
+    public function scopeLocked(Builder $query): Builder
+    {
+        return $query->where('is_locked', true);
+    }
+    public function scopeUnlocked(Builder $query): Builder
+    {
+        return $query->where('is_locked', false);
+    }
+    public function scopeValidated(Builder $query): Builder
+    {
+        return $query->whereNotNull('validated_at');
+    }
+    public function scopeUnpaid(Builder $query): Builder
+    {
+        return $query->where('remaining_amount', '>', 0);
+    }
+    public function scopeOverdue(Builder $query): Builder
+    {
+        return $query->where('due_date', '<', now())->where('remaining_amount', '>', 0);
+    }
 
-    public function isFullyPaid(): bool { return $this->remaining_amount <= 0; }
-    public function isOverdue(): bool { return $this->due_date && $this->due_date->isPast() && !$this->isFullyPaid(); }
-    public function canBeModified(): bool { return !$this->is_locked && !$this->validated_at; }
+    public function isFullyPaid(): bool
+    {
+        return $this->remaining_amount <= 0;
+    }
+    public function isOverdue(): bool
+    {
+        return $this->due_date && $this->due_date->isPast() && !$this->isFullyPaid();
+    }
+    public function canBeModified(): bool
+    {
+        return !$this->is_locked && !$this->validated_at;
+    }
 }

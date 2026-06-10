@@ -269,18 +269,34 @@ export function formatDateShort(val: string | Date | null | undefined): string {
 export async function exportToExcel<T>(
   data:    T[],
   columns: Column<T>[],
-  options: ExcelExportOptions & { documentInfo?: import('./types').DocumentInfo } = {},
+  options: ExcelExportOptions & {
+    documentInfo?:     import('./types').DocumentInfo;
+    includeAggregates?: boolean;
+    aggregates?:        Record<string, { type: AggregateType; value: number | string }>;
+    // خيارات advanced إضافية
+    orientation?:      'landscape' | 'portrait';
+    sheetName?:        string;
+    onSave?:           (buffer: ArrayBuffer) => void;
+  } = {},
 ): Promise<void> {
-  const { fileName = 'export', title, documentInfo } = options;
+  const {
+    fileName = 'export', title, documentInfo,
+    includeAggregates, aggregates: passedAggregates,
+    orientation, sheetName, onSave,
+  } = options;
 
   try {
     // استيراد dynamic لتجنب تحميل exceljs عند عدم الحاجة
     const { exportToExcelAdvanced, computeAggregatesForExport } =
       await import('./excelExportAdvanced');
 
-    const aggregates = options.includeAggregates
-      ? computeAggregatesForExport(data as Record<string, unknown>[], columns as Column[])
-      : {};
+    // ✅ إذا مُرِّرت aggregates جاهزة من DataTable نستخدمها مباشرة
+    // وإلا نحسبها من columns.aggregate (fallback)
+    const aggregates = passedAggregates && Object.keys(passedAggregates).length > 0
+      ? passedAggregates
+      : includeAggregates
+        ? computeAggregatesForExport(data as Record<string, unknown>[], columns as Column[])
+        : {};
 
     await exportToExcelAdvanced(
       data as Record<string, unknown>[],
@@ -289,8 +305,12 @@ export async function exportToExcel<T>(
         fileName,
         title:          title ?? fileName,
         documentInfo:   documentInfo ?? {},
-        showAggregates: options.includeAggregates ?? false,
+        // ✅ showAggregates يتبع includeAggregates أو وجود aggregates جاهزة
+        showAggregates: includeAggregates ?? Object.keys(aggregates).length > 0,
         aggregates,
+        orientation,
+        sheetName,
+        onSave,
       },
     );
   } catch (error) {
@@ -387,7 +407,7 @@ export function exportToPrint<T>(
 <body>
   ${title ? `<h2>${title}</h2>` : ''}
   <div class="meta">
-    عدد السجلات: ${data.length} &nbsp;|&nbsp; 
+    عدد السجلات: ${data.length} &nbsp;|&nbsp;
     تاريخ الطباعة: ${new Date().toLocaleDateString('ar-DZ')}
   </div>
   <table>

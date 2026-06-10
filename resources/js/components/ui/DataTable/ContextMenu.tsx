@@ -1,16 +1,18 @@
 // DataTable/ContextMenu.tsx
 
 import React, { useEffect, useRef } from 'react';
-import type { ContextMenuItem } from './types';
+import type { ContextMenuItem, ContextMenuContext } from './types';
 
 interface ContextMenuProps {
   x: number;
   y: number;
   items: ContextMenuItem[];
+  /** السياق الذي فُتحت منه القائمة — يُمرَّر لكل onClick */
+  context: ContextMenuContext;
   onClose: () => void;
 }
 
-export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
+export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, context, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,7 +52,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }
             <button
               className="dt-context-item"
               onClick={() => {
-                item.onClick(item as any);
+                // ✅ تمرير ContextMenuContext الصحيح — وليس ContextMenuItem
+                item.onClick(context);
                 onClose();
               }}
               disabled={item.disabled}
