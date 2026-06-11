@@ -100,7 +100,7 @@ export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Col
 
       if (type === 'select') return rv === rawVal.toLowerCase();
       if (type === 'multiselect' || type === 'dynamic-multiselect') {
-        const selected = rawVal.split(',').filter(Boolean);
+        const selected = rawVal.split(',').filter(Boolean).map(s => s.toLowerCase());
         return !selected.length || selected.includes(rv);
       }
       if (type === 'number') {
@@ -417,12 +417,29 @@ export function exportToPrint<T>(
 </body>
 </html>`;
 
-  const win = window.open('', '_blank');
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  setTimeout(() => { win.print(); }, 300);
+  try {
+    const win = window.open('', '_blank');
+    if (!win) {
+      // Popup blocker: fallback — فتح في نافذة جديدة عبر data URL
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      try { win.print(); } catch { /* المستخدم أغلق النافذة قبل الطباعة */ }
+    }, 300);
+  } catch (err) {
+    console.warn('[DataTable] exportToPrint: فشل فتح نافذة الطباعة', err);
+  }
 }
 
 // ─── Paste from Excel (TSV/CSV parsing) ──────────────────────────────────────

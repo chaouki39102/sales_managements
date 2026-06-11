@@ -69,13 +69,12 @@ export {
   useKeyboardNav,              // v10
   useBatchEdit,                // v10
   useCellValidation,           // v10
-  useColumnVisibility,         // v10
+  useColumnVisibility,         // standalone — للاستخدام خارج DataTable فقط
   useClipboardPaste,
   useSmartFilter,
   useSavedViews,
   useContextMenu,
-  // v10.1
-  DEFAULT_SMART_FILTER_PATTERNS,
+  DEFAULT_SMART_FILTER_PATTERNS, // [] فارغة — كل مشروع يُمرر patterns الخاصة به
   // v10.2
   useRowModel,
   useTreeData,

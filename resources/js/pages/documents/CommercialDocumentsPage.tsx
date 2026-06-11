@@ -38,7 +38,7 @@ import type {
     ContextMenuItem,
     ContextMenuContext,
 } from "@/components/ui/DataTable";
-import { useColumnVisibility, useColumnStatePersistence } from "@/components/ui/DataTable";
+import { useColumnStatePersistence } from "@/components/ui/DataTable";
 import CommercialDocumentModal from "./CommercialDocumentModal";
 import QuickSaleModal from "./QuickSaleModal";
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
@@ -75,6 +75,16 @@ function fmtDate(d?: string | null): string {
     return new Date(d).toLocaleDateString("ar-DZ", {
         year: "numeric", month: "2-digit", day: "2-digit",
     });
+}
+
+/** تاريخ + وقت كامل (ساعة:دقيقة:ثانية) — لأعمدة created_at / updated_at / validated_at */
+function fmtDateTime(d?: string | null): string {
+    if (!d) return "—";
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return "—";
+    const date = dt.toLocaleDateString("ar-DZ", { year: "numeric", month: "2-digit", day: "2-digit" });
+    const time = dt.toLocaleTimeString("ar-DZ", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+    return `${date} ${time}`;
 }
 
 function fmtMoney(n?: number | string | null): string {
@@ -131,6 +141,24 @@ function MoneyCell({ value, bold, accent }: { value?: number | string | null; bo
             {fmtMoney(v)}
             <span style={{ fontSize: 10, marginRight: 3, color: "var(--t4)" }}>دج</span>
         </span>
+    );
+}
+
+/** Avatar بسيط + اسم — لعرض المستخدم في أعمدة created_by / validated_by */
+function UserChip({ name, color = "var(--primary)" }: { name: string; color?: string }) {
+    if (!name) return <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
+    return (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{
+                width: 22, height: 22, borderRadius: "50%",
+                background: `color-mix(in srgb, ${color} 15%, transparent)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, fontWeight: 800, color, flexShrink: 0,
+            }}>
+                {name.charAt(0).toUpperCase()}
+            </div>
+            <span style={{ fontSize: 12, color: "var(--t2)" }}>{name}</span>
+        </div>
     );
 }
 
@@ -477,11 +505,6 @@ export default function CommercialDocumentsPage() {
     const COL_STATE_KEY = `cdp-cols-state-${typeCode}-${slug ?? "default"}`;
     const { save: saveColState, reset: resetColState, initialSnapshot } = useColumnStatePersistence(COL_STATE_KEY);
 
-    // مفتاح لإعادة تهيئة الجدول كاملاً عند reset المظهر
-    const [tableResetKey, setTableResetKey] = useState(0);
-    // عند reset: hiddenKeys التي يجب تطبيقها عند إعادة mount
-    const [forcedHiddenKeys, setForcedHiddenKeys] = useState<string[] | null>(null);
-
     // columnOrder: يُقرأ من الـ snapshot المحفوظة
     const [columnOrder, setColumnOrder] = useState<string[] | undefined>(
         () => initialSnapshot?.columnOrder,
@@ -501,26 +524,44 @@ export default function CommercialDocumentsPage() {
     // ── Filter change ─────────────────────────────────────────────────────────
     const handleFilterChange = useCallback((filters: Record<string, string>) => {
         const converted: Record<string, string> = {};
-        const rangeFields = new Set(["document_date","due_date","total_ht","total_tva","total_ttc","net_to_pay","total_discount","total_stamp","remaining_amount","validated_at","created_at","updated_at"]);
+
+        // حقول النطاق (تاريخ / رقم) — DataTable يُرسل "min|max" → Backend يتوقع "min,max"
+        const rangeFields = new Set([
+            "document_date","due_date","total_ht","total_tva","total_ttc",
+            "net_to_pay","total_discount","total_stamp","remaining_amount",
+            "validated_at","created_at","updated_at",
+        ]);
+
+        // حقول العلاقات (dynamic-multiselect CSV) — Backend يُقسّمها بنفسه
+        const csvRelationFields = new Set(["party.name","warehouse.name"]);
+
         for (const [key, val] of Object.entries(filters)) {
+            // تخطى القيم الفارغة
             if (!val || val === "|") continue;
-            converted[key] = rangeFields.has(key) && val.includes("|") ? val.replace("|", ",") : val;
+
+            if (rangeFields.has(key) && val.includes("|")) {
+                // "min|max" → "min,max"
+                const rangeVal = val.replaceAll("|", ",");
+                if (rangeVal !== "," && rangeVal !== "") {
+                    converted[key] = rangeVal;
+                }
+            } else if (csvRelationFields.has(key) && val.includes(",")) {
+                // CSV من multiselect — نُرسله كما هو
+                converted[key] = val;
+            } else {
+                converted[key] = val;
+            }
         }
         setServerFilters(converted);
         setPage(1);
-        // حفظ الفلاتر في snapshot الموحد
-        saveColState({ activeFilters: converted });
+        const toSave = Object.fromEntries(
+            Object.entries(converted).filter(([, v]) => v != null && v !== "")
+        );
+        saveColState({ activeFilters: toSave });
     }, [saveColState]);
 
     const invalidateDocs = useCallback(() => {
-        if (!slug) return;
-        // نستخدم predicate لضمان مطابقة أي query key يحتوي على slug و documents
-        qc.invalidateQueries({
-            predicate: (query) => {
-                const key = query.queryKey;
-                return Array.isArray(key) && key.includes(slug) && key.some(k => typeof k === 'string' && k.includes('document'));
-            },
-        });
+        if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
     }, [qc, slug]);
 
     // ── Fetch document type ───────────────────────────────────────────────────
@@ -566,9 +607,13 @@ export default function CommercialDocumentsPage() {
             remaining_amount:         "filter[remaining_amount]",
             reference:                "filter[reference]",
             notes:                    "filter[notes]",
+            payment_terms:            "filter[payment_terms]",
             validated_at:             "filter[validated_at]",
             created_at:               "filter[created_at]",
             updated_at:               "filter[updated_at]",
+            // ✅ إضافة: فلتر باسم المستخدم الذي اعتمد / أنشأ المستند
+            validated_by:             "filter[validated_by]",
+            created_by:               "filter[created_by]",
         };
         for (const [fk, pk] of Object.entries(filterMap)) {
             if (serverFilters[fk]) params[pk] = serverFilters[fk];
@@ -845,96 +890,97 @@ export default function CommercialDocumentsPage() {
             },
         },
 
-        // ── أعمدة مالية إضافية (مخفية افتراضياً — يُظهرها المستخدم حسب الحاجة) ──────────
+        // ════════════════════════════════════════════════════════════════════
+        // أعمدة إضافية — مخفية افتراضياً (defaultHidden: true)
+        // يُظهرها المستخدم حسب الحاجة عبر قائمة الأعمدة
+        // ════════════════════════════════════════════════════════════════════
+
+        // ── مالية ────────────────────────────────────────────────────────────
 
         {
             key: "total_discount",
-            header: "الخصم الإجمالي",
+            header: "الخصم",
             exportHeader: "الخصم الإجمالي (دج)",
-            width: 130,
-            align: "end",
+            width: 120,
+            align: "end" as const,
             sortable: true,
             defaultHidden: true,
-            filter: { type: "number" },
-            accessor: r => Number((r as unknown as Record<string,unknown>).total_discount ?? 0),
-            aggregate: "sum",
-            aggregateFormat: v => `${fmtMoney(v)} دج`,
-            render: row => {
+            filter: { type: "number" as const },
+            accessor: (r: CommercialDocument) => Number((r as unknown as Record<string,unknown>).total_discount ?? 0),
+            aggregate: "sum" as const,
+            aggregateFormat: (v: number) => `${fmtMoney(v)} دج`,
+            render: (row: CommercialDocument) => {
                 const v = Number((row as unknown as Record<string,unknown>).total_discount ?? 0);
                 if (!v) return <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
-                return <span style={{ direction: "ltr", display: "inline-block", fontVariantNumeric: "tabular-nums", color: "var(--red)", fontWeight: 600 }}>{fmtMoney(v)}<span style={{ fontSize: 10, marginRight: 3, color: "var(--t4)" }}>دج</span></span>;
+                return <MoneyCell value={v} accent="var(--red)" />;
             },
         },
         {
             key: "total_stamp",
-            header: "الطابع الجبائي",
+            header: "الطابع",
             exportHeader: "الطابع الجبائي (دج)",
-            width: 130,
-            align: "end",
+            width: 110,
+            align: "end" as const,
             sortable: true,
             defaultHidden: true,
-            filter: { type: "number" },
-            accessor: r => Number((r as unknown as Record<string,unknown>).total_stamp ?? 0),
-            aggregate: "sum",
-            aggregateFormat: v => `${fmtMoney(v)} دج`,
-            render: row => <MoneyCell value={(row as unknown as Record<string,unknown>).total_stamp as number} />,
+            filter: { type: "number" as const },
+            accessor: (r: CommercialDocument) => Number((r as unknown as Record<string,unknown>).total_stamp ?? 0),
+            aggregate: "sum" as const,
+            aggregateFormat: (v: number) => `${fmtMoney(v)} دج`,
+            render: (row: CommercialDocument) => <MoneyCell value={(row as unknown as Record<string,unknown>).total_stamp as number} />,
         },
         {
             key: "remaining_amount",
-            header: "المبلغ المتبقي",
+            header: "المتبقي",
             exportHeader: "المبلغ المتبقي (دج)",
-            width: 140,
-            align: "end",
+            width: 130,
+            align: "end" as const,
             sortable: true,
             defaultHidden: true,
-            filter: { type: "number" },
-            accessor: r => Number((r as unknown as Record<string,unknown>).remaining_amount ?? 0),
-            aggregate: "sum",
-            aggregateFormat: v => `${fmtMoney(v)} دج`,
-            render: row => {
+            filter: { type: "number" as const },
+            accessor: (r: CommercialDocument) => Number((r as unknown as Record<string,unknown>).remaining_amount ?? 0),
+            aggregate: "sum" as const,
+            aggregateFormat: (v: number) => `${fmtMoney(v)} دج`,
+            render: (row: CommercialDocument) => {
                 const rem = Number((row as unknown as Record<string,unknown>).remaining_amount ?? 0);
                 if (rem <= 0.001) return <span style={{ color: "var(--em)", fontSize: 12, fontWeight: 700 }}>مسدد ✓</span>;
-                return <MoneyCell value={rem} bold accent="var(--red)" />;
+                return <MoneyCell value={rem} accent="var(--red)" bold />;
             },
         },
 
-        // ── أعمدة الرقابة والتتبع (مخفية افتراضياً) ────────────────────────────────────
+        // ── مرجعية ───────────────────────────────────────────────────────────
 
         {
             key: "reference",
             header: "المرجع",
-            exportHeader: "رقم المرجع",
+            exportHeader: "رقم المرجع (BL/BC)",
             width: 130,
             sortable: false,
             defaultHidden: true,
-            filter: { type: "text" },
+            filter: { type: "text" as const },
             searchable: true,
-            accessor: r => String((r as unknown as Record<string,unknown>).reference ?? ""),
-            render: row => {
+            accessor: (r: CommercialDocument) => String((r as unknown as Record<string,unknown>).reference ?? ""),
+            render: (row: CommercialDocument) => {
                 const ref = String((row as unknown as Record<string,unknown>).reference ?? "");
                 return ref
-                    ? <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--t3)", background: "var(--bg3)", padding: "1px 6px", borderRadius: 4 }}>{ref}</span>
+                    ? <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--t3)", background: "var(--bg3)", padding: "2px 6px", borderRadius: 4 }}>{ref}</span>
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
         {
             key: "notes",
             header: "ملاحظات",
-            exportHeader: "ملاحظات",
+            exportHeader: "الملاحظات",
             width: 200,
             sortable: false,
             defaultHidden: true,
-            filter: { type: "text" },
+            filter: { type: "text" as const },
             searchable: true,
-            accessor: r => String((r as unknown as Record<string,unknown>).notes ?? ""),
-            render: row => {
+            accessor: (r: CommercialDocument) => String((r as unknown as Record<string,unknown>).notes ?? ""),
+            render: (row: CommercialDocument) => {
                 const notes = String((row as unknown as Record<string,unknown>).notes ?? "");
                 return notes
-                    ? (
-                        <span style={{ fontSize: 12, color: "var(--t2)", overflow: "hidden", display: "block", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }} title={notes}>
-                            {notes}
-                        </span>
-                      )
+                    ? <span style={{ fontSize: 12, color: "var(--t2)", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }} title={notes}>{notes}</span>
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
@@ -945,28 +991,31 @@ export default function CommercialDocumentsPage() {
             width: 130,
             sortable: false,
             defaultHidden: true,
-            filter: { type: "text" },
-            accessor: r => String((r as unknown as Record<string,unknown>).payment_terms ?? ""),
-            render: row => {
+            filter: { type: "text" as const },
+            accessor: (r: CommercialDocument) => String((r as unknown as Record<string,unknown>).payment_terms ?? ""),
+            render: (row: CommercialDocument) => {
                 const pt = String((row as unknown as Record<string,unknown>).payment_terms ?? "");
                 return pt
                     ? <span style={{ fontSize: 12, color: "var(--t3)" }}>{pt}</span>
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
+
+        // ── رقابة وتتبع ───────────────────────────────────────────────────────
+
         {
             key: "validated_at",
             header: "تاريخ الاعتماد",
             exportHeader: "تاريخ الاعتماد",
-            width: 120,
+            width: 130,
             sortable: true,
             defaultHidden: true,
-            filter: { type: "date" },
-            accessor: r => String((r as unknown as Record<string,unknown>).validated_at ?? ""),
-            render: row => {
+            filter: { type: "date" as const },
+            accessor: (r: CommercialDocument) => String((r as unknown as Record<string,unknown>).validated_at ?? ""),
+            render: (row: CommercialDocument) => {
                 const d = (row as unknown as Record<string,unknown>).validated_at as string | null | undefined;
                 return d
-                    ? <span style={{ fontSize: 12, color: "var(--em)" }}>{fmtDate(d)}</span>
+                    ? <span style={{ fontSize: 11, color: "var(--em)", fontVariantNumeric: "tabular-nums" }}>{fmtDateTime(d)}</span>
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
@@ -977,68 +1026,50 @@ export default function CommercialDocumentsPage() {
             width: 150,
             sortable: false,
             defaultHidden: true,
-            filter: { type: "text" },
-            accessor: r => {
-                // validated_by في DB هو integer FK — الـ Resource يُرسل العلاقة بـ camelCase: validatedBy
+            filter: { type: "text" as const },
+            // validated_by في DB = integer FK — الـ Resource يُرسل العلاقة بـ camelCase
+            accessor: (r: CommercialDocument) => {
                 const vb = (r as unknown as Record<string,unknown>).validatedBy as Record<string,unknown> | null | undefined;
                 return String(vb?.name ?? vb?.username ?? "");
             },
-            render: row => {
+            render: (row: CommercialDocument) => {
                 const vb = (row as unknown as Record<string,unknown>).validatedBy as Record<string,unknown> | null | undefined;
                 const name = String(vb?.name ?? vb?.username ?? "");
-                return name
-                    ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "color-mix(in srgb, var(--em) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "var(--em)", flexShrink: 0 }}>
-                                {name.charAt(0)}
-                            </div>
-                            <span style={{ fontSize: 12, color: "var(--t2)" }}>{name}</span>
-                        </div>
-                      )
-                    : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
+                return name ? <UserChip name={name} color="var(--em)" /> : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
         {
-            // user_id هو حقل المنشئ في CommercialDocument — العلاقة هي user()
             key: "created_by",
             header: "أنشأه",
             exportHeader: "أنشأه",
             width: 150,
             sortable: false,
             defaultHidden: true,
-            filter: { type: "text" },
-            accessor: r => {
+            filter: { type: "text" as const },
+            // المنشئ = user_id في DB → العلاقة هي user() وليس created_by
+            accessor: (r: CommercialDocument) => {
                 const u = (r as unknown as Record<string,unknown>).user as Record<string,unknown> | null | undefined;
                 return String(u?.name ?? u?.username ?? "");
             },
-            render: row => {
+            render: (row: CommercialDocument) => {
                 const u = (row as unknown as Record<string,unknown>).user as Record<string,unknown> | null | undefined;
                 const name = String(u?.name ?? u?.username ?? "");
-                return name
-                    ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "color-mix(in srgb, var(--blue) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "var(--blue)", flexShrink: 0 }}>
-                                {name.charAt(0)}
-                            </div>
-                            <span style={{ fontSize: 12, color: "var(--t2)" }}>{name}</span>
-                        </div>
-                      )
-                    : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
+                return name ? <UserChip name={name} color="var(--blue)" /> : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
         {
             key: "created_at",
             header: "تاريخ الإنشاء",
             exportHeader: "تاريخ الإنشاء",
-            width: 120,
+            width: 160,
             sortable: true,
             defaultHidden: true,
-            filter: { type: "date" },
-            accessor: r => String((r as unknown as Record<string,unknown>).created_at ?? ""),
-            render: row => {
+            filter: { type: "date" as const },
+            accessor: (r: CommercialDocument) => String((r as unknown as Record<string,unknown>).created_at ?? ""),
+            render: (row: CommercialDocument) => {
                 const d = (row as unknown as Record<string,unknown>).created_at as string | null | undefined;
                 return d
-                    ? <span style={{ fontSize: 12, color: "var(--t4)" }}>{fmtDate(d)}</span>
+                    ? <span style={{ fontSize: 11, color: "var(--t4)", fontVariantNumeric: "tabular-nums" }}>{fmtDateTime(d)}</span>
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
@@ -1046,52 +1077,44 @@ export default function CommercialDocumentsPage() {
             key: "updated_at",
             header: "آخر تعديل",
             exportHeader: "آخر تعديل",
-            width: 120,
+            width: 160,
             sortable: true,
             defaultHidden: true,
-            filter: { type: "date" },
-            accessor: r => String((r as unknown as Record<string,unknown>).updated_at ?? ""),
-            render: row => {
+            filter: { type: "date" as const },
+            accessor: (r: CommercialDocument) => String((r as unknown as Record<string,unknown>).updated_at ?? ""),
+            render: (row: CommercialDocument) => {
                 const d = (row as unknown as Record<string,unknown>).updated_at as string | null | undefined;
                 return d
-                    ? <span style={{ fontSize: 12, color: "var(--t4)" }}>{fmtDate(d)}</span>
+                    ? <span style={{ fontSize: 11, color: "var(--t4)", fontVariantNumeric: "tabular-nums" }}>{fmtDateTime(d)}</span>
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
     ], [isPurch, opColor]);
 
-    // ✅ useColumnVisibility:
-    //    — يدمج defaultHidden (من تعريف الأعمدة) مع hiddenColumns المحفوظة في snapshot
-    //    — إذا لا يوجد snapshot → يُطبق defaultHidden فقط
-    //    — إذا يوجد snapshot → يستخدمه كاملاً (يشمل ما حفظه المستخدم بما في ذلك
-    //      الأعمدة ذات defaultHidden التي أظهرها أو أخفاها يدوياً)
-    const defaultHiddenKeys = useMemo(
-        () => allColumns.filter(c => c.defaultHidden).map(c => c.key),
-        [allColumns],
-    );
-    // بعد reset: forcedHiddenKeys = defaultHiddenKeys (يُزيل تخصيصات المستخدم)
-    const initialHiddenKeys = forcedHiddenKeys ?? (initialSnapshot?.hiddenColumns ?? defaultHiddenKeys);
+    // ── إدارة الأعمدة المخفية — مُفوَّضة بالكامل لـ DataTable الداخلي ──────────
+    // DataTable يتولى: قائمة الأعمدة + toggle + عرض القائمة
+    // هنا نحتفظ فقط بـ state للاستخدام في headerActions و contextMenu
 
-    const {
-        visibleColumns: columns,
-        hiddenColumns,
-        toggleColumn: toggleColumnBase,
-    } = useColumnVisibility(
-        allColumns,
-        initialHiddenKeys,
-        null,   // لا مفتاح localStorage مستقل — الحفظ عبر useColumnStatePersistence
+    const initialHiddenKeys = useMemo(
+        () => initialSnapshot?.hiddenColumns ?? allColumns.filter(c => c.defaultHidden).map(c => c.key),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [], // يُحسب مرة واحدة عند الـ mount فقط
     );
 
-    // نُغلّف toggleColumn لنحفظ التغيير في snapshot الموحد
-    const toggleColumn = useCallback((key: string) => {
-        toggleColumnBase(key);
-        setTimeout(() => {
-            const newHidden = allColumns
-                .filter(c => hiddenColumns.has(c.key) ? c.key !== key : c.key === key)
-                .map(c => c.key);
-            saveColState({ hiddenColumns: newHidden });
-        }, 0);
-    }, [toggleColumnBase, hiddenColumns, allColumns, saveColState]);
+    const [hiddenColumnKeys, setHiddenColumnKeys] = useState<string[]>(initialHiddenKeys);
+
+    // onHiddenColumnsChange الجديدة: تستقبل القائمة الكاملة دائماً (allHidden)
+    // سواء كان toggle فردي أو batch (إخفاء الكل / تطبيق view)
+    const handleHiddenColumnsChange = useCallback(
+        (_key: string, _willBeHidden: boolean, allHidden: string[]) => {
+            setHiddenColumnKeys(allHidden);
+            saveColState({ hiddenColumns: allHidden });
+        },
+        [saveColState],
+    );
+
+    // Set سريع للبحث في contextMenu
+    const hiddenColumnsSet = useMemo(() => new Set(hiddenColumnKeys), [hiddenColumnKeys]);
 
     // ════════════════════════════════════════════════════════════════════════
     // CONDITIONAL FORMATTING
@@ -1243,7 +1266,7 @@ export default function CommercialDocumentsPage() {
 
         if (ctx.type === "header") {
             const colKey = ctx.colKey;
-            const isHidden = colKey ? hiddenColumns.has(colKey) : false;
+            const isHidden = colKey ? hiddenColumnsSet.has(colKey) : false;
             menuItems.push(
                 {
                     label: isHidden ? "إظهار العمود" : "إخفاء العمود",
@@ -1251,7 +1274,7 @@ export default function CommercialDocumentsPage() {
                     disabled: !colKey,
                     onClick: () => {
                         if (colKey) {
-                            toggleColumn(colKey);
+                            handleHiddenColumnsChange(colKey, !hiddenColumnsSet.has(colKey));
                             showToast(isHidden ? `تم إظهار العمود` : `تم إخفاء العمود`, "info");
                         }
                     },
@@ -1260,7 +1283,7 @@ export default function CommercialDocumentsPage() {
         }
 
         return menuItems;
-    }, [hiddenColumns, toggleColumn, isReadOnly, openEditModal, validateMut, deleteMut, cancelMut, showToast]);
+    }, [hiddenColumnsSet, handleHiddenColumnsChange, isReadOnly, openEditModal, validateMut, deleteMut, cancelMut, showToast]);
 
     // ════════════════════════════════════════════════════════════════════════
     // SMART FILTER CALLBACK
@@ -1323,25 +1346,20 @@ export default function CommercialDocumentsPage() {
                 </span>
             )}
             {/* مؤشر الأعمدة المخفية */}
-            {hiddenColumns.size > 0 && (
+            {hiddenColumnKeys.length > 0 && (
                 <span style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 700, background: "color-mix(in srgb, var(--blue) 10%, transparent)", color: "var(--blue)", display: "flex", alignItems: "center", gap: 4 }}>
                     <i className="ti ti-eye-off" style={{ fontSize: 10 }} aria-hidden="true" />
-                    {hiddenColumns.size} مخفي
+                    {hiddenColumnKeys.length} مخفي
                 </span>
             )}
             {/* زر إعادة ضبط layout — يظهر فقط عند وجود snapshot محفوظ */}
             {initialSnapshot && (
                 <button
-                    title="إعادة ضبط تخطيط الجدول (الترتيب، العرض، المخفي، الفلاتر)"
+                    title="إعادة ضبط تخطيط الأعمدة (الترتيب، العرض، المخفي، الفلاتر)"
                     onClick={() => {
                         if (window.confirm("إعادة ضبط تخطيط الجدول للإعدادات الافتراضية؟")) {
                             resetColState();
-                            setColumnOrder(undefined);
-                            setServerFilters({});
-                            setPage(1);
-                            // نُجبر useColumnVisibility على استخدام defaultHidden عند إعادة mount
-                            setForcedHiddenKeys(allColumns.filter(c => c.defaultHidden).map(c => c.key));
-                            setTableResetKey(k => k + 1);   // force remount للجدول
+                            window.location.reload();
                         }
                     }}
                     style={{ height: 28, width: 28, borderRadius: 7, border: "1px solid var(--b2)", background: "var(--bg2)", color: "var(--t4)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s" }}
@@ -1363,7 +1381,7 @@ export default function CommercialDocumentsPage() {
                 </button>
             )}
         </div>
-    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumns.size, initialSnapshot, resetColState, setColumnOrder, setServerFilters, setPage, allColumns, setForcedHiddenKeys]);
+    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumnKeys.length, initialSnapshot, resetColState]);
 
     // ── Page title ────────────────────────────────────────────────────────────
     const tableTitle = useMemo(() => (
@@ -1413,12 +1431,11 @@ export default function CommercialDocumentsPage() {
                 <div style={{ background: "var(--bg1)", border: "1px solid var(--b1)", borderRadius: "var(--r3)", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,.06)", flex: 1 }}>
                     <DataTableErrorBoundary>
                     <DataTable<CommercialDocument>
-                        key={tableResetKey}
                         data={items}
-                        columns={columns}                           // ← visibleColumns من useColumnVisibility
-                        columnDefs={allColumns}                     // ← كل الأعمدة لقائمة إدارة الأعمدة (بما فيها المخفية)
-                        hiddenColumnKeys={Array.from(hiddenColumns)}  // ← الأعمدة المخفية حالياً
-                        onHiddenColumnsChange={(key, _willBeHidden) => toggleColumn(key)}
+                        columns={allColumns}
+                        columnDefs={allColumns}
+                        hiddenColumnKeys={hiddenColumnKeys}         // الأعمدة المخفية الأولية
+                        onHiddenColumnsChange={handleHiddenColumnsChange}  // callback لحفظ التغييرات
                         rowKey={r => r.id}
                         loading={isLoading}
 

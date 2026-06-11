@@ -64,7 +64,7 @@ import {
   useVirtualScroll, useColumnDragReorder, useURLState, useMultiSort,
   useRowGrouping, useColumnPinning, useKeyboardNav, useBatchEdit, useCellValidation,
   useClipboardPaste, useSmartFilter, useSavedViews, useContextMenu,
-  useRowModel, useTreeData, useColumnGroups, useRangeSelection,
+  useRowModel, useTreeData, useColumnGroups, useRangeSelection, useEscapeKey,
 } from './hooks';
 
 import FilterPopup from './FilterPopup';
@@ -88,7 +88,9 @@ import ContextMenu from './ContextMenu';
 
 interface VirtualRowProps {
   rowNode:    React.ReactNode;
-  rowDataKey: string | number;  // رقم الصف كـ row key للمقارنة
+  /** renderFn: يُستدعى بدلاً من rowNode إذا مُرِّر — يمنع حساب rowNode في الأب */
+  renderFn?:  () => React.ReactNode;
+  rowDataKey: string | number;  // row key للمقارنة في areEqual
   isSelected: boolean;
   isExpanded: boolean;
   isEditing:  boolean;          // أي خلية في هذا الصف تُعدَّل
@@ -108,8 +110,9 @@ function virtualRowAreEqual(prev: VirtualRowProps, next: VirtualRowProps): boole
   );
 }
 
-const VirtualRow = memo(function VirtualRow({ rowNode }: VirtualRowProps) {
-  return <>{rowNode}</>;
+const VirtualRow = memo(function VirtualRow({ rowNode, renderFn }: VirtualRowProps) {
+  // renderFn: يُستدعى فقط عند تغيير حقيقي في البيانات (بعد areEqual يمر)
+  return <>{renderFn ? renderFn() : rowNode}</>;
 }, virtualRowAreEqual);
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -214,18 +217,25 @@ export function DataTable<T = Record<string, unknown>>({
   const url = useURLState(urlState);
 
   // ── Column visibility ─────────────────────────────────────────────────────
+  // ── Column visibility — نمط controlled/uncontrolled ─────────────────────
   //
-  // إذا مُرِّر hiddenColumnKeys من الخارج → نستخدمه كقيمة أولية مباشرة
-  // (الصفحة مسؤولة عن حسابه من defaultHidden + الـ snapshot المحفوظ)
-  //
-  // إذا مُرِّر columnDefs فقط بدون hiddenColumnKeys → نحسبه من defaultHidden
-  //
-  // الحالة الافتراضية (لا columnDefs ولا hiddenColumnKeys) → السلوك القديم
+  // القيمة الأولية: hiddenColumnKeys (من الأب) → أو defaultHidden من columnDefs/columns
   const [hiddenKeys, setHiddenKeys] = useState<ReadonlySet<string>>(() => {
     if (hiddenColumnKeys) return new Set(hiddenColumnKeys);
     const src = columnDefs ?? columns;
     return new Set(src.filter(c => c.defaultHidden).map(c => c.key));
   });
+
+  // updateHidden: دالة مركزية تُعدِّل hiddenKeys وتُعلم الأب دائماً
+  // تستخدمها: toggleColVisibility + toggleCollapseAll + handleApplyView
+  const onHiddenColumnsChangeRef = useRef(onHiddenColumnsChange);
+  useEffect(() => { onHiddenColumnsChangeRef.current = onHiddenColumnsChange; }, [onHiddenColumnsChange]);
+
+  const updateHidden = useCallback((next: ReadonlySet<string>) => {
+    setHiddenKeys(next);
+    // batch update: نُرسل key='' كإشارة أن التغيير شامل (ليس toggle فردي)
+    onHiddenColumnsChangeRef.current?.('', false, [...next]);
+  }, []);
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const colMenuRef = useRef<HTMLDivElement>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -256,11 +266,11 @@ export function DataTable<T = Record<string, unknown>>({
       const next = new Set(prev);
       const willBeHidden = !next.has(key);
       willBeHidden ? next.add(key) : next.delete(key);
-      // إعلام الصفحة الأب بالتغيير (لحفظه في snapshot أو state خارجي)
-      onHiddenColumnsChange?.(key, willBeHidden);
+      // إعلام الأب: toggle فردي
+      onHiddenColumnsChangeRef.current?.(key, willBeHidden, [...next]);
       return next;
     });
-  }, [onHiddenColumnsChange]);
+  }, []);
 
   // إذا مُرِّر columnDefs → قائمة إدارة الأعمدة تعرض كل الأعمدة بما فيها المخفية
   // (columns = الأعمدة المُصفَّاة للعرض، columnDefs = كل الأعمدة)
@@ -271,27 +281,22 @@ export function DataTable<T = Record<string, unknown>>({
   const allHidden = nonIndexCols.length > 0 && nonIndexCols.every(c => hiddenKeys.has(c.key));
 
   const toggleCollapseAll = useCallback(() => {
-    if (allHidden) {
-      setHiddenKeys(new Set());
-    } else {
-      const firstKey = nonIndexCols[0]?.key;
-      setHiddenKeys(new Set(nonIndexCols.filter(c => c.key !== firstKey).map(c => c.key)));
-    }
+    const next = allHidden
+      ? new Set<string>()
+      : new Set(nonIndexCols.filter((c, i) => i > 0).map(c => c.key));
+    updateHidden(next);
     setColMenuOpen(false);
-  }, [allHidden, nonIndexCols]);
+  }, [allHidden, nonIndexCols, updateHidden]);
 
   // ── Column resize ─────────────────────────────────────────────────────────
-  // nonIndexCols = columnDefs ?? columns يشمل كل الأعمدة لا نفقد عرض مخفي عند إظهاره
   const initialWidthsRef = useRef<Record<string, number>>(
-    Object.fromEntries(nonIndexCols.filter(c => c.width).map(c => [c.key, c.width!])),
+    Object.fromEntries((columnDefs ?? columns).filter(c => c.width).map(c => [c.key, c.width!])),
   );
   const { widths: colWidths, startResize, resetWidth } = useColumnResize(initialWidthsRef.current);
 
   // ── Column Reorder (v9) ───────────────────────────────────────────────────
-  // nonIndexCols = columnDefs ?? columns — يشمل كل الأعمدة بما فيها المخفية
-  // لكي يعمل الترتيب والرؤية بشكل صحيح عند إظهار عمود كان مخفياً
   const defaultOrder = useMemo(
-    () => initialColumnOrder ?? nonIndexCols.map(c => c.key),
+    () => initialColumnOrder ?? (columnDefs ?? columns).map(c => c.key),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -302,8 +307,8 @@ export function DataTable<T = Record<string, unknown>>({
   );
 
   const orderedColumns = useMemo(() => {
-    // دائماً نبني من nonIndexCols (كل الأعمدة) — visibleCols ستُصفي المخفية لاحقاً
-    const src = nonIndexCols;
+    // نعمل على allColumnDefs حتى يشمل الأعمدة المخفية في الـ reorder
+    const src = columnDefs ?? columns;
     if (!columnReorder) return src;
     const map = new Map(src.map(c => [c.key, c]));
     const ordered = columnOrder.map(k => map.get(k)).filter(Boolean) as Column<T>[];
@@ -312,10 +317,10 @@ export function DataTable<T = Record<string, unknown>>({
       if (!inOrder.has(c.key)) ordered.push(c);
     });
     return ordered;
-  }, [nonIndexCols, columnOrder, columnReorder]);
+  }, [columns, columnDefs, columnOrder, columnReorder]);
 
   // ── Column Pinning (v10) ──────────────────────────────────────────────────
-  const { pinConfig, pinColumn, isPinned, clearAllPins } = useColumnPinning(
+  const { pinConfig, pinColumn, isPinned, clearAllPins, setPinConfigBatch } = useColumnPinning(
     pinnedColumns,
     onPinnedColumnsChange,
   );
@@ -446,13 +451,21 @@ export function DataTable<T = Record<string, unknown>>({
   const isClientFiltered = !onFilterChange;
   const isClientSorted = !onSortChange && !onMultiSortChange;
 
+  // searchCols: فقط الأعمدة المرئية وغير المخفية للبحث العام
+  // فلترة الأعمدة المخفية من البحث تمنع ظهور نتائج مربِكة للمستخدم
+  const searchCols = useMemo(
+    () => orderedColumns.filter(c => !hiddenKeys.has(c.key)),
+    [orderedColumns, hiddenKeys],
+  );
+
   const processedData = useRowModel(
     data,
     filters,
     globalQuery,
     sorts,
     legacySortState,
-    orderedColumns,
+    orderedColumns,   // كل الأعمدة للفلترة (المخفية تُفلتر أيضاً)
+    searchCols,       // فقط المرئية للبحث العام
     {
       clientFiltered: isClientFiltered,
       clientSorted: isClientSorted,
@@ -557,16 +570,19 @@ export function DataTable<T = Record<string, unknown>>({
   // ── Aggregates ────────────────────────────────────────────────────────────
   const [aggTypes, setAggTypes] = useState<Record<string, AggregateType>>(() =>
     Object.fromEntries(
-      nonIndexCols
+      (columnDefs ?? columns)
         .filter(c => c.aggregate && typeof c.aggregate === 'string')
         .map(c => [c.key, c.aggregate as AggregateType]),
     ),
   );
 
+  // allColDefs: مرجع موحد لكل الأعمدة (بما فيها المخفية) — يُستخدم في aggregates/edit/smartFilter
+  const allColDefs = useMemo(() => columnDefs ?? columns, [columnDefs, columns]);
+
   const aggregates = useMemo(() => {
     if (!showAggregates) return null;
     const r: Record<string, { value: number | null; type: AggregateType }> = {};
-    for (const col of nonIndexCols) {
+    for (const col of allColDefs) {
       if (!col.aggregate) continue;
       if (typeof col.aggregate === 'function') {
         const v = col.aggregate(processedData);
@@ -577,7 +593,7 @@ export function DataTable<T = Record<string, unknown>>({
       }
     }
     return r;
-  }, [showAggregates, processedData, nonIndexCols, aggTypes]);
+  }, [showAggregates, processedData, allColDefs, aggTypes]);
 
   const cycleAgg = useCallback(
     (key: string) => {
@@ -681,7 +697,7 @@ export function DataTable<T = Record<string, unknown>>({
       return;
     }
 
-    const col = nonIndexCols.find(c => c.key === colKey);
+    const col = allColDefs.find(c => c.key === colKey);
     const oldValue = col ? getRawValue(data[rowIdx], col) : undefined;
     const cellId = `${rKey}__${colKey}`;
 
@@ -711,7 +727,7 @@ export function DataTable<T = Record<string, unknown>>({
     }
 
     setEditingCell(null);
-  }, [editingCell, data, rowKey, nonIndexCols, batchEdit, batch, validateCell, clearError]);
+  }, [editingCell, data, rowKey, allColDefs, batchEdit, batch, validateCell, clearError]);
 
   const cancelEdit = useCallback(() => {
     if (editingCell) clearError(`${editingCell.rowKey}__${editingCell.colKey}`);
@@ -741,12 +757,18 @@ export function DataTable<T = Record<string, unknown>>({
 
   // ── Copy/Paste from Excel 🆕 ──────────────────────────────────────────────
   const tableWrapRef = useRef<HTMLDivElement>(null);
+  // نمرر onCellEditRef.current عبر wrapper مستقر لتجنب stale closure
+  const stableOnCellEdit = useCallback(
+    (...args: Parameters<NonNullable<typeof onCellEdit>>) => onCellEditRef.current?.(...args),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
   useClipboardPaste(
     tableWrapRef,
     data,
-    nonIndexCols,
+    allColDefs,
     rowKey,
-    onCellEditRef.current,
+    stableOnCellEdit,
     batchEdit,
     batch.recordEdit,
     { allowMultiCell: true },
@@ -782,7 +804,7 @@ export function DataTable<T = Record<string, unknown>>({
   );
 
   // ── Smart Filter (اللغة العربية) 🆕 ───────────────────────────────────────
-  const { applySmartFilter } = useSmartFilter(nonIndexCols, (newFilters, newSorts) => {
+  const { applySmartFilter } = useSmartFilter(allColDefs, (newFilters, newSorts) => {
     setFilters(newFilters);
     if (newSorts) setSorts(newSorts);
     setLocalPage(1);
@@ -884,21 +906,14 @@ export function DataTable<T = Record<string, unknown>>({
       // pageSize
       if (view.pageSize) setLocalPerPage(view.pageSize);
 
-      // hiddenColumns — كامل
-      setHiddenKeys(new Set(view.hiddenColumns ?? []));
+      // hiddenColumns — كامل + إعلام الأب
+      updateHidden(new Set(view.hiddenColumns ?? []));
 
       // columnOrder — كامل
       if (view.columnOrder?.length) setColumnOrder(view.columnOrder);
 
-      // pinnedColumns — إعادة بناء كاملة (امسح القديم أولاً)
-      if (view.pinnedColumns) {
-        // امسح كل التثبيتات الحالية ثم طبّق المحفوظة
-        clearAllPins();
-        (view.pinnedColumns.start ?? []).forEach(key => pinColumn(key, 'start'));
-        (view.pinnedColumns.end   ?? []).forEach(key => pinColumn(key, 'end'));
-      } else {
-        clearAllPins();
-      }
+      // pinnedColumns — batch update بـ setState واحد (تجنب renders متعددة)
+      setPinConfigBatch(view.pinnedColumns ?? {});
 
       setLocalPage(1);
       if (urlState?.enabled) {
@@ -911,8 +926,8 @@ export function DataTable<T = Record<string, unknown>>({
     },
     [
       setFilters, setSorts, setGlobalQuery,
-      setLocalPerPage, setHiddenKeys,
-      setColumnOrder, pinColumn, clearAllPins,
+      setLocalPerPage, updateHidden,
+      setColumnOrder, setPinConfigBatch,
       setLocalPage, url, urlState,
     ],
   );
@@ -943,7 +958,7 @@ export function DataTable<T = Record<string, unknown>>({
             label: 'تعديل الخلية',
             icon: 'edit',
             onClick: () => {},
-            disabled: !nonIndexCols.find(col => col.key === ctx.colKey)?.editable,
+            disabled: !allColDefs.find(col => col.key === ctx.colKey)?.editable,
           },
         );
       } else if (ctx.type === 'row') {
@@ -985,7 +1000,7 @@ export function DataTable<T = Record<string, unknown>>({
       }
       return items;
     },
-    [nonIndexCols, data, rowKey, toggleExpanded, toggleColVisibility, pinColumn, setFilters],
+    [allColDefs, data, rowKey, toggleExpanded, toggleColVisibility, pinColumn, setFilters],
   );
 
   const { menuState, closeMenu } = useContextMenu(
@@ -993,6 +1008,9 @@ export function DataTable<T = Record<string, unknown>>({
     tableWrapRef,
     data,   // ✅ context.row يحتاج بيانات الصف الفعلية
   );
+
+  // ✅ إصلاح: إغلاق قائمة السياق بـ Escape (كانت تبقى مفتوحة بدون هذا)
+  useEscapeKey(closeMenu);
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const selectedRows = useMemo(
@@ -1567,7 +1585,7 @@ export function DataTable<T = Record<string, unknown>>({
                       checked={!hiddenKeys.has(col.key)}
                       onChange={() => toggleColVisibility(col.key)}
                     />
-                    <span title={typeof col.header === 'string' ? col.header : (col.exportHeader ?? '')}>{col.exportHeader ?? col.header}</span>
+                    <span title={col.exportHeader ?? (typeof col.header === 'string' ? col.header : '')}>{col.exportHeader ?? col.header}</span>
                     {!col.disablePin && (
                       <div className="dt-col-pin-actions">
                         <button
@@ -1823,7 +1841,7 @@ export function DataTable<T = Record<string, unknown>>({
                           </span>
                         </button>
                       ) : (
-                        <span title={typeof col.header === 'string' ? col.header : (col.exportHeader ?? '')}>{col.exportHeader ?? col.header}</span>
+                        <span title={col.exportHeader ?? (typeof col.header === 'string' ? col.header : '')}>{col.exportHeader ?? col.header}</span>
                       )}
 
                       {col.filter && (
@@ -2075,16 +2093,20 @@ export function DataTable<T = Record<string, unknown>>({
                     ? isInRange(absoluteIdx, 0) // تحقق أن الصف داخل النطاق
                     : false;
 
+                  // dataHash: نفضل updated_at لأنه خفيف — fallback إلى JSON.stringify
+                  const dataHash = String((row as Record<string, unknown>).updated_at ?? JSON.stringify(row));
                   return (
                     <VirtualRow
                       key={rKey}
                       rowDataKey={rKey}
+                      dataHash={dataHash}
                       isSelected={selectedKeys.has(rKey)}
                       isExpanded={expandedKeys.has(rKey)}
                       isEditing={!!isRowEditing}
                       isActive={isRowActive}
                       inRange={rowInRange}
-                      rowNode={renderDataRow(row, absoluteIdx)}
+                      rowNode={null}
+                      renderFn={() => renderDataRow(row, absoluteIdx)}
                     />
                   );
                 }
@@ -2217,7 +2239,7 @@ export function DataTable<T = Record<string, unknown>>({
           </div>
 
           {lastPage > 1 && (
-            <nav aria-label="التنقل بين الصفحات" className="dt-pagination-compact">
+            <nav aria-label="التنقل بين الصفحات" className="dt-pagination">
               {/* زر السابق */}
               <button
                 className="dt-pg-arrow"
@@ -2230,22 +2252,40 @@ export function DataTable<T = Record<string, unknown>>({
                 <i className="ti ti-chevron-right" />
               </button>
 
-              {/* قائمة منسدلة للصفحات */}
-              <div className="dt-pg-select-wrap">
-                <select
-                  className="dt-pg-select"
-                  value={curPage}
-                  onChange={e => goToPage(Number(e.target.value))}
-                  aria-label="اختر الصفحة"
-                >
-                  {Array.from({ length: lastPage }, (_, i) => i + 1).map(p => (
-                    <option key={p} value={p}>
-                      {p.toLocaleString('ar-DZ')} / {lastPage.toLocaleString('ar-DZ')}
-                    </option>
-                  ))}
-                </select>
-                <i className="ti ti-chevron-down dt-pg-select-icon" aria-hidden="true" />
-              </div>
+              {/* ✅ أرقام الصفحات الظاهرة — تستخدم pageNumbers المحسوبة أعلاه */}
+              {pageNumbers.map((p, i) =>
+                p === '…' ? (
+                  <span key={`ell-${i}`} className="dt-pg-ellipsis" aria-hidden="true">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    className={`dt-pg-btn${p === curPage ? ' active' : ''}`}
+                    onClick={() => goToPage(p as number)}
+                    type="button"
+                    aria-label={`الصفحة ${p}`}
+                    aria-current={p === curPage ? 'page' : undefined}
+                  >
+                    {(p as number).toLocaleString('ar-DZ')}
+                  </button>
+                )
+              )}
+
+              {/* للجداول ذات صفحات كثيرة: إدخال رقم مباشر */}
+              {lastPage > 7 && (
+                <div className="dt-pg-select-wrap" title="انتقل إلى صفحة">
+                  <select
+                    className="dt-pg-select"
+                    value={curPage}
+                    onChange={e => goToPage(Number(e.target.value))}
+                    aria-label="اختر الصفحة"
+                  >
+                    {Array.from({ length: lastPage }, (_, i) => i + 1).map(p => (
+                      <option key={p} value={p}>{p.toLocaleString('ar-DZ')}</option>
+                    ))}
+                  </select>
+                  <i className="ti ti-chevron-down dt-pg-select-icon" aria-hidden="true" />
+                </div>
+              )}
 
               {/* زر التالي */}
               <button
@@ -2343,6 +2383,7 @@ export function DataTable<T = Record<string, unknown>>({
           x={menuState.x}
           y={menuState.y}
           items={(contextMenuItems || defaultContextMenuItems)(menuState.context)}
+          context={menuState.context}
           onClose={closeMenu}
         />
       )}

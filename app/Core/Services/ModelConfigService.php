@@ -55,8 +55,16 @@ class ModelConfigService
             }
 
             // 3. Cache miss - build config from reflection data
-            $reflectionData = self::getReflectionData($modelClass);
-            $config = self::buildConfiguration($modelClass, $reflectionData);
+
+
+
+            $reflection = new \ReflectionClass($modelClass);
+            if ($reflection->hasProperty('searchableFields')) {
+                $searchable = $reflection->getStaticPropertyValue('searchableFields');
+                if (!empty($searchable) && empty($config['search_fields'])) {
+                    $config['search_fields'] = $searchable;
+                }
+            }
 
             // 4. Cache the final config
             if (self::supportsTags()) {
@@ -72,7 +80,6 @@ class ModelConfigService
             self::recordMetric('cache_miss', $modelClass, microtime(true) - $startTime);
 
             return $config;
-
         } catch (\Throwable $e) {
             Log::error('ModelConfigService: Failed to get config', [
                 'model' => $modelClass,
@@ -128,11 +135,13 @@ class ModelConfigService
 
         // Extract all static properties
         $propertiesToExtract = [
-            'searchableFields', 'searchable',
+            'searchableFields',
+            'searchable',
             'filterable',
             'sortable',
             'defaultWith',
-            'allowedIncludes', 'relations',
+            'allowedIncludes',
+            'relations',
             'customFilters',
             'advancedFilters',
             'scopes',

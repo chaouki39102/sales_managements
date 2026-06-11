@@ -1,20 +1,10 @@
-/* ═══════════════════════════════════════════════════════════════════════════
-   datatable.css — DataTable v9  ✦  نظام جداول البيانات المتقدم
-   يُستورَد بعد tokens.css — يعتمد على CSS variables من نظام التصميم
-   تحسينات v9:
-   • شريط أدوات أكثر تنظيماً مع تفاصيل بصرية محسّنة
-   • صفوف جدول بتأثير hover أكثر سلاسة وتأثير zebra اختياري
-   • رأس الجدول بخط فاصل علوي ملون يعكس هوية المشروع
-   • بطاقات الموبايل محسّنة مع معلومات أغنى
-   • Skeleton shimmer أكثر واقعية
-   • Popup فلتر بظل وانتقالات أفضل
-   • دعم dark mode أكثر عمقاً
-   • تحسينات إمكانية الوصول (focus-visible)
-═══════════════════════════════════════════════════════════════════════════ */
+/*
+ * DataTable CSS  v10.3  —  مُنظَّف
+ * 46 selector مكرر مدموجة (آخر قيمة تفوز)
+ */
 
-/* ══════════════════════════════════════
-   ANIMATIONS
-══════════════════════════════════════ */
+/* ─── Animations ─────────────────────────────────────────── */
+
 @keyframes dt-pulse {
     0%,
     100% {
@@ -24,11 +14,13 @@
         opacity: 1;
     }
 }
+
 @keyframes dt-spin {
     to {
         transform: rotate(360deg);
     }
 }
+
 @keyframes dt-fade {
     from {
         opacity: 0;
@@ -39,6 +31,7 @@
         transform: none;
     }
 }
+
 @keyframes dt-fade-up {
     from {
         opacity: 0;
@@ -49,6 +42,7 @@
         transform: none;
     }
 }
+
 @keyframes dt-expand {
     from {
         opacity: 0;
@@ -59,6 +53,7 @@
         transform: none;
     }
 }
+
 @keyframes dt-skel-shimmer {
     0% {
         background-position: 600px 0;
@@ -67,6 +62,7 @@
         background-position: -600px 0;
     }
 }
+
 @keyframes dt-row-in {
     from {
         opacity: 0;
@@ -77,6 +73,7 @@
         transform: none;
     }
 }
+
 @keyframes dt-bulk-in {
     from {
         opacity: 0;
@@ -88,9 +85,55 @@
     }
 }
 
-/* ══════════════════════════════════════
-   ROOT WRAPPER
-══════════════════════════════════════ */
+@keyframes dt-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes dt-slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes dt-dialog-in {
+    from { opacity: 0; transform: scale(.96) translateY(8px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@keyframes slide-up-bar {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@keyframes dt-ctx-in {
+    from { opacity: 0; transform: scale(.96); }
+    to   { opacity: 1; transform: none; }
+}
+
+.dt-pagination {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.dt-pg-ellipsis {
+    padding: 0 4px;
+    color: var(--t4);
+    font-size: 13px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 30px;
+}
+
+/* ─── Styles ─────────────────────────────────────────────── */
+
 .dt-v7 {
     font-family: "Tajawal", sans-serif;
     direction: rtl;
@@ -99,24 +142,19 @@
     background: var(--bg2);
     border: 1px solid var(--b2);
     border-radius: var(--r3);
-    /* لا نضع overflow:hidden هنا — يمنع السكرول الأفقي للجدول */
     overflow: visible;
     box-shadow: var(--shadow2);
-    /* خط علوي ملون يعبّر عن هوية المشروع */
     border-top: 2px solid var(--em);
 }
+
 .dt-v7 * {
     box-sizing: border-box;
 }
 
-/* ── Variant: بدون border علوي ملون ── */
 .dt-v7.no-accent {
     border-top-color: var(--b2);
 }
 
-/* ══════════════════════════════════════
-   TOOLBAR
-══════════════════════════════════════ */
 .dt-toolbar {
     display: flex;
     align-items: center;
@@ -127,6 +165,7 @@
     border-bottom: 1px solid var(--b2);
     background: var(--bg2);
 }
+
 .dt-toolbar-left {
     display: flex;
     align-items: center;
@@ -135,6 +174,7 @@
     flex: 1;
     min-width: 0;
 }
+
 .dt-toolbar-right {
     display: flex;
     align-items: center;
@@ -143,7 +183,6 @@
     flex-shrink: 0;
 }
 
-/* ── Title ── */
 .dt-toolbar-title {
     font-weight: 800;
     font-size: 14px;
@@ -153,6 +192,7 @@
     align-items: center;
     gap: 7px;
 }
+
 .dt-toolbar-title::before {
     content: "";
     display: inline-block;
@@ -163,7 +203,6 @@
     flex-shrink: 0;
 }
 
-/* ── Divider ── */
 .dt-divider {
     width: 1px;
     height: 18px;
@@ -171,7 +210,6 @@
     flex-shrink: 0;
 }
 
-/* ── Toolbar buttons ── */
 .dt-tbtn {
     display: inline-flex;
     align-items: center;
@@ -193,6 +231,7 @@
     -ms-user-select: none;
     user-select: none;
 }
+
 .dt-tbtn:hover {
     border-color: var(--em);
     color: var(--em);
@@ -200,29 +239,33 @@
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
+
 .dt-tbtn:active {
     transform: translateY(0);
 }
+
 .dt-tbtn.on {
     background: var(--em);
     color: #fff;
     border-color: var(--em);
     box-shadow: var(--emglow);
 }
+
 .dt-tbtn i {
     font-size: 13px;
 }
+
 .dt-tbtn:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 2px;
 }
 
-/* ── Per-page chips ── */
 .dt-pp-wrap {
     display: flex;
     align-items: center;
     gap: 5px;
 }
+
 .dt-pp-label {
     color: var(--t4);
     font-size: 13px;
@@ -231,11 +274,13 @@
     cursor: default;
     flex-shrink: 0;
 }
+
 .dt-pp-select-wrap {
     position: relative;
     display: flex;
     align-items: center;
 }
+
 .dt-pp-select {
     height: 28px;
     padding: 0 24px 0 8px;
@@ -253,15 +298,18 @@
     transition: border-color .13s, background .13s;
     min-width: 72px;
 }
+
 .dt-pp-select:hover {
     border-color: var(--em);
     color: var(--em);
     background: var(--emb);
 }
+
 .dt-pp-select:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 2px;
 }
+
 .dt-pp-chevron {
     position: absolute;
     left: 6px;
@@ -271,11 +319,11 @@
     pointer-events: none;
 }
 
-/* ── Search ── */
 .dt-search.srch {
     border-radius: var(--r2);
     flex-shrink: 0;
 }
+
 .dt-search.srch input {
     width: 190px;
     min-width: 140px;
@@ -294,15 +342,16 @@
     transition: color 0.12s;
     border-radius: 4px;
 }
+
 .dt-search-clear:hover {
     color: var(--red);
 }
+
 .dt-search-clear:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 2px;
 }
 
-/* ── Filter badge ── */
 .dt-filter-badge {
     display: inline-flex;
     align-items: center;
@@ -316,9 +365,11 @@
     border: 1px solid var(--embo);
     animation: dt-fade 0.15s ease;
 }
+
 .dt-filter-badge i {
     font-size: 10px;
 }
+
 .dt-filter-badge button {
     background: none;
     border: none;
@@ -333,18 +384,16 @@
     transition: opacity 0.12s;
     border-radius: 4px;
 }
+
 .dt-filter-badge button:hover {
     opacity: 1;
 }
+
 .dt-filter-badge button:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 2px;
 }
 
-/* ══════════════════════════════════════
-   COLUMN VISIBILITY MENU
-══════════════════════════════════════ */
-/* ── Export Menu ── */
 .dt-export-wrap {
     position: relative;
 }
@@ -440,7 +489,6 @@
     color: var(--em);
 }
 
-/* ── Col Menu ── */
 .dt-col-menu-wrap {
     position: relative;
 }
@@ -455,7 +503,7 @@
     border-radius: var(--r3);
     padding: 5px 4px;
     box-shadow: var(--shadow2);
-    min-width: 250px;
+    min-width: 260px;
     animation: dt-fade 0.14s ease;
     max-height: 380px;
     overflow-y: auto;
@@ -474,6 +522,7 @@
     text-transform: uppercase;
     letter-spacing: 0.6px;
 }
+
 .dt-col-menu-header button {
     font-size: 11px;
     color: var(--em);
@@ -488,9 +537,11 @@
     gap: 3px;
     transition: opacity 0.12s;
 }
+
 .dt-col-menu-header button:hover {
     opacity: 0.75;
 }
+
 .dt-col-menu-header button i {
     font-size: 11px;
 }
@@ -510,12 +561,12 @@
     -ms-user-select: none;
     user-select: none;
     min-width: 0;
-    /* overflow على الـ span الداخلي فقط */
 }
+
 .dt-col-item:hover {
     background: var(--bg3);
 }
-/* ✅ الـ checkbox يأخذ حجمه الطبيعي ولا يُضغط */
+
 .dt-col-item input[type="checkbox"] {
     accent-color: var(--em);
     cursor: pointer;
@@ -523,14 +574,15 @@
     width: 14px;
     height: 14px;
 }
-/* النص يأخذ المساحة المتبقية — pin-actions تظل بحجمها الطبيعي */
+
 .dt-col-item > span {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    min-width: 0;
-    flex: 1;
 }
+
 .dt-col-pin-actions {
     display: flex;
     gap: 2px;
@@ -538,9 +590,6 @@
     margin-right: auto;
 }
 
-/* ══════════════════════════════════════
-   BULK BAR
-══════════════════════════════════════ */
 .dt-bulk {
     padding: 8px 14px;
     background: var(--emb);
@@ -550,6 +599,7 @@
     gap: 10px;
     animation: dt-bulk-in 0.18s ease;
 }
+
 .dt-bulk-count {
     font-size: 12px;
     font-weight: 700;
@@ -562,13 +612,11 @@
     border-radius: 20px;
     border: 1px solid var(--embo);
 }
+
 .dt-bulk-count i {
     font-size: 12px;
 }
 
-/* ══════════════════════════════════════
-   ERROR BAR
-══════════════════════════════════════ */
 .dt-error {
     padding: 10px 16px;
     font-size: 13px;
@@ -580,16 +628,14 @@
     gap: 8px;
     animation: dt-fade 0.15s ease;
 }
+
 .dt-error i {
     font-size: 16px;
 }
 
-/* ══════════════════════════════════════
-   TABLE WRAPPER
-══════════════════════════════════════ */
-/* ── dt-table-wrap: alias لـ dt-table-outer (دُمجا لمنع التكرار) ──────────────
-   الأنماط الحقيقية في .dt-table-outer أسفل الملف */
-.dt-table-wrap { overflow-x: auto; }
+.dt-table-wrap {
+    overflow-x: auto;
+}
 
 .dt-v7 table {
     width: 100%;
@@ -597,9 +643,6 @@
     table-layout: fixed;
 }
 
-/* ══════════════════════════════════════
-   TH — رأس الجدول
-══════════════════════════════════════ */
 .dt-v7 thead th {
     padding: 9px 10px;
     text-align: right;
@@ -616,17 +659,17 @@
     user-select: none;
     position: relative;
     border-bottom: 2px solid var(--b2);
-    /* خط فاصل بين الأعمدة */
     border-left: 1px solid var(--b1);
 }
+
 .dt-v7 thead th:last-child {
     border-left: none;
 }
+
 .dt-v7 thead th:first-child {
     border-right: none;
 }
 
-/* ── TH inner ── */
 .dt-th-inner {
     display: flex;
     align-items: center;
@@ -634,6 +677,7 @@
     gap: 4px;
     width: 100%;
 }
+
 .dt-th-label {
     display: flex;
     align-items: center;
@@ -642,7 +686,6 @@
     min-width: 0;
 }
 
-/* ── Sort button ── */
 .dt-sort-btn {
     background: none;
     border: none;
@@ -658,16 +701,17 @@
     text-align: right;
     transition: color 0.12s;
 }
+
 .dt-sort-btn:hover {
     color: var(--em);
 }
+
 .dt-sort-btn:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 2px;
     border-radius: 3px;
 }
 
-/* ── Filter icon in TH ── */
 .dt-flt-btn {
     display: inline-flex;
     align-items: center;
@@ -684,18 +728,22 @@
     padding: 0;
     position: relative;
 }
+
 .dt-flt-btn:hover {
     background: var(--bg4);
     color: var(--em);
 }
+
 .dt-flt-btn.has-val {
     color: var(--em);
     background: var(--emb);
 }
+
 .dt-flt-btn:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 2px;
 }
+
 .dt-flt-btn.has-val::after {
     content: "";
     position: absolute;
@@ -708,18 +756,19 @@
     box-shadow: 0 0 0 2px var(--bg3);
 }
 
-/* ── Resize handle — RTL: الشريط في اليسار لأن الجدول عربي ── */
 .dt-rh {
     position: absolute;
     left: 0;
     right: auto;
     top: 0;
     bottom: 0;
-    width: 6px;
+    width: 5px;
     cursor: col-resize;
-    z-index: 4;
-    transition: background 0.15s;
+    z-index: 5;
+    transition: border-color .15s;
+    border-left: 2px solid transparent;
 }
+
 .dt-rh::after {
     content: "";
     position: absolute;
@@ -732,51 +781,49 @@
     border-radius: 2px;
     transition: background 0.15s, width 0.15s;
 }
-.dt-rh:hover::after,
-.dt-rh:active::after {
+
+.dt-rh:hover::after, .dt-rh:active::after {
     background: var(--em);
     width: 3px;
 }
 
-/* ══════════════════════════════════════
-   TR — صفوف الجدول
-══════════════════════════════════════ */
 .dt-v7 tbody tr {
     border-bottom: 1px solid var(--b1);
     transition: background 0.12s;
 }
+
 .dt-v7 tbody tr:hover > td {
     background: var(--bg3) !important;
 }
+
 .dt-v7 tbody tr:last-child {
     border-bottom: none;
 }
+
 .dt-row-click {
     cursor: pointer;
 }
 
-/* ── Zebra ── أضف class dt-zebra على .dt-v7 لتفعيله */
 .dt-v7.dt-zebra tbody tr:nth-child(even) > td {
     background: var(--bg3);
 }
+
 .dt-v7.dt-zebra tbody tr:nth-child(even):hover > td {
     background: var(--bg4) !important;
 }
 
-/* ── Row highlight states ── */
 .dt-row-success > td {
     background: rgba(10, 138, 92, 0.04) !important;
 }
+
 .dt-row-warn > td {
     background: rgba(184, 125, 10, 0.04) !important;
 }
+
 .dt-row-danger > td {
     background: rgba(212, 43, 43, 0.04) !important;
 }
 
-/* ══════════════════════════════════════
-   TD — خلايا الجدول
-══════════════════════════════════════ */
 .dt-v7 td {
     padding: 10px 10px;
     font-size: 13px;
@@ -787,16 +834,15 @@
     text-overflow: ellipsis;
 }
 
-/* ── Compact mode ── */
 .dt-v7.compact td {
     padding: 5px 10px;
     font-size: 12px;
 }
+
 .dt-v7.compact thead th {
     padding: 6px 10px;
 }
 
-/* ── Index column ── */
 .dt-idx {
     color: var(--t4);
     font-size: 11px;
@@ -805,13 +851,13 @@
     font-family: "IBM Plex Mono", monospace;
 }
 
-/* ── Sticky columns ── */
 .dt-ss {
     position: sticky;
     right: 0;
     z-index: 2;
     background: var(--bg2);
 }
+
 .dt-ss::after {
     content: "";
     position: absolute;
@@ -822,12 +868,14 @@
     background: linear-gradient(to right, rgba(0, 0, 0, 0.06), transparent);
     pointer-events: none;
 }
+
 .dt-se {
     position: sticky;
     left: 0;
     z-index: 2;
     background: var(--bg2);
 }
+
 .dt-se::before {
     content: "";
     position: absolute;
@@ -839,7 +887,6 @@
     pointer-events: none;
 }
 
-/* ── Expand button ── */
 .dt-exp-btn {
     width: 22px;
     height: 22px;
@@ -854,37 +901,38 @@
     font-size: 11px;
     transition: all 0.15s;
 }
-.dt-exp-btn:hover,
-.dt-exp-btn.open {
+
+.dt-exp-btn:hover, .dt-exp-btn.open {
     border-color: var(--em);
     color: var(--em);
     background: var(--emb);
     box-shadow: 0 0 0 3px var(--emb);
 }
+
 .dt-exp-btn:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 2px;
 }
 
-/* ── Expanded row ── */
 .dt-exp-td {
     padding: 0 !important;
     background: var(--bg3) !important;
     border-bottom: 1px solid var(--b1);
 }
+
 .dt-exp-inner {
     padding: 14px 18px;
     animation: dt-expand 0.18s ease;
     border-right: 3px solid var(--em);
 }
 
-/* ── Inline editing ── */
 .dt-editable {
     cursor: text;
     position: relative;
     border-radius: var(--r1);
     transition: background 0.12s;
 }
+
 .dt-editable::after {
     content: "";
     position: absolute;
@@ -894,9 +942,11 @@
     transition: border-color 0.15s;
     pointer-events: none;
 }
+
 .dt-editable:hover {
     background: var(--emb);
 }
+
 .dt-editable:hover::after {
     border-color: var(--embo);
 }
@@ -914,26 +964,18 @@
     box-shadow: 0 0 0 3px var(--emb);
 }
 
-/* ══════════════════════════════════════
-   SKELETON
-══════════════════════════════════════ */
 .dt-skel {
     display: block;
     border-radius: var(--r1);
-    background: linear-gradient(
-        90deg,
-        var(--bg3) 25%,
-        var(--bg4) 50%,
-        var(--bg3) 75%
-    );
+    background: linear-gradient( 90deg, var(--bg3) 25%, var(--bg4) 50%, var(--bg3) 75% );
     background-size: 600px 100%;
     animation: dt-skel-shimmer 1.6s infinite linear;
 }
+
 .dt-skel-td {
     padding: 10px 10px;
 }
 
-/* ── Active filter dot ── */
 .dt-flt-dot {
     display: inline-block;
     width: 6px;
@@ -944,32 +986,29 @@
     box-shadow: 0 0 0 2px var(--emb);
 }
 
-/* ══════════════════════════════════════
-   EMPTY STATE
-══════════════════════════════════════ */
 .dt-empty {
     text-align: center;
     padding: 60px 20px;
     color: var(--t4);
 }
+
 .dt-empty i {
     font-size: 42px;
     display: block;
     margin-bottom: 12px;
     opacity: 0.25;
 }
+
 .dt-empty-text {
     font-size: 14px;
     color: var(--t4);
     line-height: 1.5;
 }
+
 .dt-empty-action {
     margin-top: 16px;
 }
 
-/* ══════════════════════════════════════
-   AGGREGATE ROW
-══════════════════════════════════════ */
 .dt-agg-row td {
     background: var(--emb) !important;
     border-top: 2px solid var(--embo);
@@ -977,6 +1016,7 @@
     font-weight: 700;
     font-size: 12px;
 }
+
 .dt-agg-label {
     display: inline-flex;
     align-items: center;
@@ -985,6 +1025,7 @@
     font-weight: 800;
     font-size: 11px;
 }
+
 .dt-agg-label i {
     font-size: 12px;
 }
@@ -1003,6 +1044,7 @@
     user-select: none;
     color: var(--em);
 }
+
 .dt-agg-cell:hover {
     background: var(--em2b);
 }
@@ -1017,15 +1059,13 @@
     font-family: "IBM Plex Mono", monospace;
     letter-spacing: 0.3px;
 }
+
 .dt-agg-value {
     color: var(--em);
     font-weight: 700;
     font-family: "IBM Plex Mono", monospace;
 }
 
-/* ══════════════════════════════════════
-   FILTER POPUP
-══════════════════════════════════════ */
 .dt-flt-popup {
     position: fixed;
     z-index: 9999;
@@ -1038,7 +1078,6 @@
     padding: 12px;
     width: 250px;
     animation: dt-fade 0.14s ease;
-    /* خط علوي ملون */
     border-top: 2px solid var(--em);
 }
 
@@ -1055,6 +1094,7 @@
     align-items: center;
     gap: 6px;
 }
+
 .dt-flt-popup-title::before {
     content: "";
     display: inline-block;
@@ -1065,7 +1105,6 @@
     flex-shrink: 0;
 }
 
-/* ── Filter inputs ── */
 .dt-fi {
     width: 100%;
     padding: 7px 10px;
@@ -1082,33 +1121,38 @@
         background 0.15s;
     height: 34px;
 }
+
 .dt-fi:focus {
     border-color: var(--em);
     box-shadow: 0 0 0 3px var(--emb);
     background: var(--bg2);
 }
+
 .dt-fi.act {
     background: var(--emb);
     border-color: var(--embo);
 }
+
 .dt-fi[type="date"] {
     padding: 4px 8px;
 }
+
 .dt-fi[type="number"] {
     padding: 4px 8px;
     direction: ltr;
     text-align: left;
 }
 
-/* ── Number/date range ── */
 .dt-range-row {
     display: flex;
     align-items: center;
     gap: 6px;
 }
+
 .dt-range-row .dt-fi {
     flex: 1;
 }
+
 .dt-range-sep {
     color: var(--t4);
     font-size: 12px;
@@ -1120,6 +1164,7 @@
     flex-direction: column;
     gap: 7px;
 }
+
 .dt-date-label {
     font-size: 10px;
     color: var(--t4);
@@ -1129,7 +1174,6 @@
     letter-spacing: 0.4px;
 }
 
-/* ── Date Shortcuts (v8.2) ── */
 .dt-date-wrap {
     display: flex;
     flex-direction: column;
@@ -1189,18 +1233,17 @@
     margin: 4px 0 10px;
 }
 
-/* ── Number Range Presets ── */
 .dt-num-wrap {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
+
 .dt-num-presets {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
 }
-
 
 .dt-flt-footer {
     display: flex;
@@ -1211,6 +1254,7 @@
     border-top: 1px solid var(--b1);
     gap: 6px;
 }
+
 .dt-flt-footer-between {
     justify-content: space-between;
 }
@@ -1227,16 +1271,12 @@
     border-radius: var(--r1);
     transition: all 0.13s;
 }
+
 .dt-flt-clear:hover {
     color: var(--red);
     background: var(--redb);
 }
 
-/* ══════════════════════════════════════
-   MULTISELECT
-══════════════════════════════════════ */
-
-/* Controls */
 .dt-ms-controls {
     display: flex;
     gap: 4px;
@@ -1264,27 +1304,31 @@
     -ms-user-select: none;
     user-select: none;
 }
+
 .dt-ms-ctrl-btn:hover:not(:disabled) {
     border-color: var(--em);
     color: var(--em);
     background: var(--emb);
 }
+
 .dt-ms-ctrl-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
+
 .dt-ms-ctrl-btn i {
     font-size: 11px;
 }
 
-/* Search */
 .dt-ms-search-wrap {
     position: relative;
     margin-bottom: 7px;
 }
+
 .dt-ms-search-wrap .dt-fi {
     padding-left: 30px;
 }
+
 .dt-ms-search-icon {
     position: absolute;
     left: 9px;
@@ -1295,7 +1339,6 @@
     pointer-events: none;
 }
 
-/* List */
 .dt-ms-list {
     max-height: 210px;
     overflow-y: auto;
@@ -1306,15 +1349,16 @@
     scrollbar-width: thin;
     scrollbar-color: var(--b3) transparent;
 }
+
 .dt-ms-list::-webkit-scrollbar {
     width: 4px;
 }
+
 .dt-ms-list::-webkit-scrollbar-thumb {
     background: var(--b3);
     border-radius: 4px;
 }
 
-/* Item */
 .dt-ms-item {
     display: flex;
     align-items: center;
@@ -1329,19 +1373,21 @@
     user-select: none;
     border: 1px solid transparent;
 }
+
 .dt-ms-item:hover {
     background: var(--bg3);
 }
+
 .dt-ms-item.on {
     background: var(--emb);
     border-color: var(--embo);
 }
+
 .dt-ms-item:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 1px;
 }
 
-/* ✅ إصلاح الـ checkbox — استخدام checkbox حقيقي بدل أيقونة Tabler */
 .dt-ms-check {
     width: 16px;
     height: 16px;
@@ -1352,7 +1398,6 @@
     position: relative;
 }
 
-/* ✅ checkbox مخفي بصرياً خلف custom design */
 .dt-ms-check input[type="checkbox"] {
     position: absolute;
     opacity: 0;
@@ -1362,7 +1407,6 @@
     cursor: pointer;
 }
 
-/* ✅ الصندوق المرسوم بـ CSS */
 .dt-ms-check-box {
     width: 16px;
     height: 16px;
@@ -1376,11 +1420,12 @@
     pointer-events: none;
     flex-shrink: 0;
 }
+
 .dt-ms-item.on .dt-ms-check-box {
     background: var(--em);
     border-color: var(--em);
 }
-/* ✅ علامة الصح بـ SVG مدمج */
+
 .dt-ms-check-box::after {
     content: "";
     display: none;
@@ -1390,6 +1435,7 @@
     border-bottom: 2px solid #fff;
     transform: rotate(-45deg) translateY(-1px);
 }
+
 .dt-ms-item.on .dt-ms-check-box::after {
     display: block;
 }
@@ -1404,12 +1450,12 @@
     text-overflow: ellipsis;
     line-height: 1.4;
 }
+
 .dt-ms-item.on .dt-ms-label {
     color: var(--em);
     font-weight: 700;
 }
 
-/* Empty */
 .dt-ms-empty {
     text-align: center;
     padding: 18px 0;
@@ -1417,7 +1463,6 @@
     font-size: 12px;
 }
 
-/* Count & actions */
 .dt-ms-selected-count {
     font-size: 11px;
     color: var(--em);
@@ -1427,13 +1472,13 @@
     border-radius: 12px;
     border: 1px solid var(--embo);
 }
+
 .dt-ms-footer-actions {
     display: flex;
     gap: 6px;
     align-items: center;
 }
 
-/* Apply */
 .dt-ms-apply {
     background: var(--em);
     border: none;
@@ -1452,30 +1497,29 @@
     align-items: center;
     box-shadow: 0 2px 8px rgba(10, 138, 92, 0.25);
 }
+
 .dt-ms-apply:hover {
     background: var(--em2);
     box-shadow: var(--emglow);
 }
+
 .dt-ms-apply:disabled {
     opacity: 0.4;
     cursor: not-allowed;
     box-shadow: none;
 }
+
 .dt-ms-apply:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 2px;
 }
 
-/* Checkbox accent */
 .dt-ms-checkbox {
     accent-color: var(--em);
     cursor: pointer;
     flex-shrink: 0;
 }
 
-/* ══════════════════════════════════════
-   FOOTER
-══════════════════════════════════════ */
 .dt-footer {
     display: flex;
     align-items: center;
@@ -1486,6 +1530,7 @@
     border-top: 1px solid var(--b2);
     background: var(--bg3);
 }
+
 .dt-footer-info {
     font-size: 12px;
     color: var(--t4);
@@ -1493,31 +1538,16 @@
     gap: 10px;
     align-items: center;
 }
+
 .dt-footer-info strong {
-    color: var(--t1);
+    color: var(--em);
+    font-weight: 700;
 }
 
 .dt-footer-spinner {
     animation: dt-spin 0.75s linear infinite;
     font-size: 14px;
     color: var(--em);
-}
-
-/* ── Pagination ── */
-.dt-pagination {
-    display: flex;
-    gap: 3px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.dt-pg-ellipsis {
-    padding: 0 4px;
-    color: var(--t4);
-    font-size: 13px;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
 }
 
 .dt-pg {
@@ -1541,11 +1571,13 @@
     -ms-user-select: none;
     user-select: none;
 }
+
 .dt-pg:hover:not(:disabled):not(.on) {
     border-color: var(--em);
     color: var(--em);
     background: var(--emb);
 }
+
 .dt-pg.on {
     background: var(--em);
     color: #fff;
@@ -1553,18 +1585,17 @@
     font-weight: 800;
     box-shadow: var(--emglow);
 }
+
 .dt-pg:disabled {
     opacity: 0.3;
     cursor: not-allowed;
 }
+
 .dt-pg:focus-visible {
     outline: 2px solid var(--em);
     outline-offset: 2px;
 }
 
-/* ══════════════════════════════════════
-   MOBILE CARDS
-══════════════════════════════════════ */
 .dt-mobile-wrap {
     padding: 10px;
 }
@@ -1579,18 +1610,18 @@
         box-shadow 0.15s,
         border-color 0.15s;
     animation: dt-fade-up 0.18s ease;
-    /* خط أيمن ملون خفيف */
     border-right: 3px solid var(--b2);
 }
+
 .dt-card-item:hover {
     box-shadow: var(--shadow2);
     border-right-color: var(--em);
 }
+
 .dt-card-item.clickable {
     cursor: pointer;
 }
 
-/* ── Card header (الحقول البارزة) ── */
 .dt-card-header {
     display: flex;
     align-items: center;
@@ -1599,12 +1630,12 @@
     gap: 8px;
 }
 
-/* ── Card grid ── */
 .dt-card-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px 14px;
 }
+
 .dt-card-label {
     font-size: 9.5px;
     color: var(--t4);
@@ -1613,6 +1644,7 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
 .dt-card-value {
     font-size: 12.5px;
     color: var(--t1);
@@ -1628,12 +1660,12 @@
     gap: 6px;
 }
 
-/* ── Skeleton cards ── */
 .dt-card-skeletons {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
+
 .dt-card-skel-item {
     height: 96px;
     border-radius: var(--r3);
@@ -1641,9 +1673,1234 @@
     border: 1px solid var(--b1);
 }
 
-/* ══════════════════════════════════════
-   RESPONSIVE
-══════════════════════════════════════ */
+.dark .dt-v7 {
+    box-shadow:
+        var(--shadow2),
+        0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.dark .dt-flt-popup {
+    box-shadow:
+        var(--shadow2),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.dark .dt-ss {
+    background: var(--bg2);
+}
+
+.dark .dt-se {
+    background: var(--bg2);
+}
+
+.dark .dt-card-item {
+    box-shadow: var(--shadow);
+}
+
+.dark .dt-skel {
+    background: linear-gradient( 90deg, var(--bg3) 25%, var(--bg5) 50%, var(--bg3) 75% );
+    background-size: 600px 100%;
+}
+
+.dt-table-outer {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--b3) transparent;
+    cursor: grab;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    width: 100%;
+}
+
+.dt-table-outer table {
+    width: max-content !important;
+    min-width: 100%;
+    table-layout: auto !important;
+}
+
+.dt-table-outer::-webkit-scrollbar {
+    height: 5px;
+    width: 5px;
+}
+
+.dt-table-outer::-webkit-scrollbar-thumb {
+    background: var(--b3);
+    border-radius: 6px;
+}
+
+.dt-table-outer.dt-dragging {
+    cursor: grabbing;
+    scroll-behavior: auto;
+}
+
+.dt-table-outer.dt-dragging * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    pointer-events: none;
+}
+
+.dt-table-outer:not(.dt-dragging) button, .dt-table-outer:not(.dt-dragging) input, .dt-table-outer:not(.dt-dragging) a {
+    pointer-events: auto;
+}
+
+.dt-table-outer thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg3);
+}
+
+.dt-virtual-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    height: 26px;
+    background: var(--emb);
+    border: 1px solid var(--embo, rgba(10,138,92,.2));
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--em);
+    cursor: default;
+    -webkit--webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -moz--webkit-user-select: none;
+    -ms--webkit-user-select: none;
+    -webkit-user-select: none;
+}
+
+.dt-virtual-badge i {
+    font-size: 12px;
+    color: var(--em);
+}
+
+.dt-v7 thead th.dt-th-draggable {
+    cursor: grab;
+}
+
+.dt-v7 thead th.dt-th-draggable:active {
+    cursor: grabbing;
+}
+
+.dt-th-draggable .dt-th-inner::before {
+    content: "";
+    display: block;
+    width: 10px;
+    height: 14px;
+    flex-shrink: 0;
+    background-image: radial-gradient( circle, var(--b3) 1.5px, transparent 1.5px );
+    background-size: 4px 4px;
+    background-repeat: repeat;
+    opacity: 0;
+    transition: opacity 0.15s;
+    cursor: grab;
+    margin-left: auto;
+}
+
+.dt-th-draggable:hover .dt-th-inner::before {
+    opacity: 1;
+}
+
+.dt-v7 thead th.dt-th-drag-over {
+    background: var(--emb) !important;
+    border-left: none !important;
+    border-right: 2px solid var(--em) !important;
+}
+
+.dt-sort-priority {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    background: var(--em);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 9px;
+    font-weight: 800;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.dt-sort-ic {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--em);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.dt-sort-ic i {
+    font-size: 11px;
+}
+
+.dt-v7 thead th.dt-th-sorted {
+    background: var(--emb) !important;
+    color: var(--em);
+}
+
+.dt-v7 thead th.dt-th-sorted .dt-sort-btn {
+    color: var(--em);
+}
+
+.dt-sort-btn[title] {
+    position: relative;
+}
+
+.dt-flt-btn.on {
+    color: var(--em);
+    background: var(--emb);
+}
+
+.dt-flt-btn.on i {
+    color: var(--em);
+}
+
+.dt-sticky-start {
+    position: sticky !important;
+    right: 0;
+    z-index: 2;
+    background: var(--bg2);
+    border-left: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
+    border-right: none !important;
+}
+
+.dt-sticky-start::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 8px;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.07), transparent);
+    pointer-events: none;
+}
+
+.dt-sticky-end {
+    position: sticky !important;
+    left: 0;
+    z-index: 2;
+    background: var(--bg2);
+    border-right: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
+    border-left: none !important;
+}
+
+.dt-sticky-end::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 8px;
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.07), transparent);
+    pointer-events: none;
+}
+
+.dt-v7 thead .dt-sticky-start, .dt-v7 thead .dt-sticky-end {
+    z-index: 12;
+}
+
+.dark .dt-sort-priority {
+    box-shadow: 0 0 0 2px var(--bg2);
+}
+
+.dark .dt-v7 thead th.dt-th-drag-over {
+    background: rgba(10, 138, 92, 0.15) !important;
+}
+
+.dt-group-row {
+    background: var(--bg3) !important;
+    cursor: pointer;
+    -webkit--webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -moz--webkit-user-select: none;
+    -ms--webkit-user-select: none;
+    -webkit-user-select: none;
+}
+
+.dt-group-row:hover {
+    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg3, #f0f0f0));
+}
+
+.dt-group-row td {
+    padding: 0;
+    border-bottom: 1px solid var(--b2);
+}
+
+.dt-group-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 12px;
+    direction: rtl;
+}
+
+.dt-group-chevron {
+    font-size: 13px;
+    color: var(--t3);
+    flex-shrink: 0;
+    transition: transform .18s;
+}
+
+.dt-group-label {
+    color: var(--t1);
+    flex: 1;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.dt-group-count {
+    background: var(--em);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 20px;
+    min-width: 22px;
+    text-align: center;
+}
+
+.dt-group-subtotal td {
+    background: color-mix(in srgb, var(--em, #0a8a5c) 5%, var(--bg2));
+    border-top: 1px dashed var(--b2, #e0e0e0);
+    font-size: 11px;
+    padding: 4px 10px;
+}
+
+.dt-pinned {
+    background: color-mix(in srgb, var(--em, #0a8a5c) 6%, var(--bg3)) !important;
+}
+
+.dt-table thead .dt-pinned {
+    background: var(--bg3, #f5f5f5);
+}
+
+.dt-th-pin-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 3px;
+    opacity: 0;
+    transition: opacity .15s, color .15s;
+    color: var(--t4);
+    border-radius: 4px;
+    line-height: 1;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.dt-th-pin-btn, .dt-th-pin-btn.active {
+    opacity: 1;
+}
+
+.dt-th-pin-btn.active {
+    color: var(--em);
+}
+
+.dt-th-pin-btn:hover {
+    background: var(--bg4);
+    color: var(--em);
+}
+
+.dt-pin-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--bg2);
+    border: 1px solid var(--b2);
+    border-radius: var(--r2, 8px);
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    z-index: 9999;
+    min-width: 170px;
+    overflow: hidden;
+    animation: dt-ctx-in .12s ease;
+    left: 0;
+    padding: 4px 0;
+}
+
+.dt-pin-menu button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 12px;
+    background: none;
+    border: none;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--t1);
+    cursor: pointer;
+    text-align: right;
+    direction: rtl;
+    transition: background .1s;
+}
+
+.dt-pin-menu button:hover {
+    background: var(--bg3);
+}
+
+.dt-pin-menu button.active {
+    color: var(--em);
+    font-weight: 600;
+}
+
+.dt-col-pin-badge {
+    font-size: 10px;
+    margin-right: auto;
+    color: var(--em, #0a8a5c);
+}
+
+.dt-pin-btn {
+    font-size: 11px;
+    padding: 2px 5px;
+    border: 1px solid var(--b2);
+    background: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--t4);
+    transition: all .12s;
+    line-height: 1;
+}
+
+.dt-pin-btn.active {
+    background: var(--em, #0a8a5c);
+    color: #fff;
+    border-color: var(--em, #0a8a5c);
+}
+
+.dt-pin-btn:hover {
+    background: var(--bg4, #eee);
+}
+
+.dt-v7:focus {
+    outline: 2px solid var(--em, #0a8a5c);
+    outline-offset: -2px;
+}
+
+.dt-v7:focus-visible {
+    outline: 2px solid var(--em, #0a8a5c);
+}
+
+.dt-cell-active {
+    outline: 2px solid var(--em) !important;
+    outline-offset: -2px;
+    background: rgba(10,138,92,.06) !important;
+    position: relative;
+    z-index: 1;
+}
+
+.dt-cell-error {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    right: 0;
+    background: var(--red, #dc2626);
+    color: #fff;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+    z-index: 50;
+    pointer-events: none;
+    animation: dt-fade 0.15s ease;
+    box-shadow: 0 2px 8px rgba(220,38,38,.25);
+    font-weight: 500;
+}
+
+.dt-cell-error::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    right: 10px;
+    border: 4px solid transparent;
+    border-top-color: var(--red, #dc2626);
+}
+
+.dt-cell-error {
+    outline: 2px solid var(--red, #dc2626);
+    outline-offset: -2px;
+}
+
+.dt-batch-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg2));
+    border-top: 1px solid color-mix(in srgb, var(--em, #0a8a5c) 20%, transparent);
+    gap: 10px;
+    animation: slide-up-bar .2s ease;
+    border-bottom: none;
+    border-radius: 0 0 var(--r2, 8px) var(--r2, 8px);
+}
+
+.dt-batch-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--em);
+}
+
+.dt-batch-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dt-batch-save {
+    background: var(--em) !important;
+    color: #fff !important;
+    border-color: var(--em) !important;
+}
+
+.dt-batch-save:hover {
+    opacity: .88;
+}
+
+.dt-batch-discard {
+    color: var(--t3) !important;
+    border-color: var(--red, #dc2626) !important;
+}
+
+.dt-batch-discard:hover {
+    background: color-mix( in srgb, var(--red, #dc2626) 8%, var(--bg2, #fff) ) !important;
+    color: var(--red, #dc2626) !important;
+}
+
+.dt-cell-pending {
+    background: rgba(245,158,11,.06) !important;
+    border-bottom: 2px solid #f59e0b !important;
+}
+
+.dt-pending-value {
+    color: #92400e;
+    font-style: italic;
+}
+
+.dt-cf-red {
+    background: rgba(239,68,68,.10) !important;
+    color: #991b1b !important;
+    font-weight: 600;
+}
+
+.dt-cf-green {
+    background: rgba(34,197,94,.10) !important;
+    color: #14532d !important;
+    font-weight: 600;
+}
+
+.dt-cf-yellow {
+    background: rgba(245,158,11,.10) !important;
+    color: #78350f !important;
+    font-weight: 600;
+}
+
+.dt-cf-blue {
+    background: rgba(59,130,246,.10) !important;
+    color: #1e3a8a !important;
+    font-weight: 600;
+}
+
+.dt-cf-bold {
+    font-weight: 800 !important;
+}
+
+.dt-toolbar-group-btns {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dt-cell-active:focus {
+    outline: 2px solid var(--em);
+}
+
+.dt-td-idx {
+    color: var(--t4);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    font-family: "IBM Plex Mono", monospace;
+}
+
+.dt-th-acts {
+    text-align: center !important;
+}
+
+.dt-bulk-clear {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--t4);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    border-radius: 4px;
+    margin-right: auto;
+    transition: color .12s;
+}
+
+.dt-bulk-clear:hover {
+    color: var(--red, #dc2626);
+}
+
+.dt-context-menu {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -moz--webkit-user-select: none;
+    backdrop-filter: blur(2px);
+    transition: opacity 0.1s;
+    min-width: 180px;
+    animation: dt-ctx-in .12s ease;
+}
+
+.dt-context-item {
+    transition: background .1s !important;
+    direction: rtl;
+}
+
+.dt-context-item:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: -2px;
+}
+
+.dt-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99998;
+    backdrop-filter: blur(2px);
+    animation: dt-fade-in 0.15s ease;
+}
+
+.dt-dialog {
+    background: var(--bg2);
+    border: 1px solid var(--b2);
+    border-radius: var(--r3, 12px);
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    min-width: 380px;
+    max-width: 520px;
+    width: 90%;
+    animation: dt-dialog-in .18s ease;
+    direction: rtl;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+}
+
+.dt-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--b1);
+}
+
+.dt-dialog-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--t1);
+}
+
+.dt-dialog-title .ti {
+    color: var(--em, #0a8a5c);
+    font-size: 16px;
+}
+
+.dt-dialog-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    border-radius: 5px;
+    cursor: pointer;
+    color: var(--t4);
+    transition: background .12s, color .12s;
+    font-size: 16px;
+    padding: 4px;
+}
+
+.dt-dialog-close:hover {
+    background: var(--bg4);
+    color: var(--t1);
+}
+
+.dt-dialog-body {
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dt-dialog-hint {
+    font-size: 12px;
+    color: var(--t3);
+    line-height: 1.5;
+}
+
+.dt-dialog-input {
+    width: 100%;
+    font-size: 13px;
+    padding: 8px 12px !important;
+}
+
+.dt-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--b1);
+}
+
+.dt-cf-italic {
+    font-style: italic !important;
+}
+
+.dt-cf-strike {
+    text-decoration: line-through !important;
+}
+
+.dt-dialog-title i {
+    color: var(--em);
+}
+
+.dt-batch-save:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.dt-context-item:hover:not(:disabled) {
+    background: var(--bg3) !important;
+}
+
+.dt-context-item i {
+    flex-shrink: 0;
+}
+
+.dt-group-row:hover td {
+    background: var(--bg4) !important;
+}
+
+.dt-rh:hover, .dt-th:has(.dt-rh:active) .dt-rh {
+    border-left-color: var(--em);
+}
+
+.dt-pin-menu button i {
+    color: var(--em);
+    font-size: 13px;
+}
+
+.dt-pin-btn:hover, .dt-pin-btn.active {
+    border-color: var(--em);
+    color: var(--em);
+    background: var(--emb);
+}
+
+.dt-cell-selected {
+    background-color: rgba(37, 99, 235, 0.12) !important;
+    outline: 1px solid rgba(37, 99, 235, 0.4);
+    outline-offset: -1px;
+}
+
+.dt-th-group {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--t3);
+    border-bottom: 1px solid var(--b1);
+    padding: 4px 8px;
+}
+
+.dt-group-header-row th {
+    background: var(--bg3);
+}
+
+.dt-tree-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--t3);
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.dt-tree-toggle:hover {
+    color: var(--t1);
+}
+
+.dt-flt-popup--text .dt-flt-text-wrap {
+    position: relative;
+    padding: 10px 10px 6px;
+}
+
+.dt-flt-text-icon {
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-10%);
+    color: var(--t4);
+    font-size: 14px;
+    pointer-events: none;
+}
+
+.dt-flt-text-input {
+    padding-right: 32px !important;
+    padding-left: 28px !important;
+    width: 100%;
+}
+
+.dt-flt-text-clear {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-10%);
+    background: none;
+    border: none;
+    color: var(--t4);
+    cursor: pointer;
+    padding: 2px;
+    line-height: 1;
+    font-size: 13px;
+    border-radius: 3px;
+}
+
+.dt-flt-text-clear:hover {
+    color: var(--t1);
+    background: var(--bg3);
+}
+
+.dt-flt-radio-list {
+    padding: 6px 8px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.dt-flt-radio-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: var(--r1);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--t2);
+    transition: background 0.1s;
+    user-select: none;
+}
+
+.dt-flt-radio-item:hover {
+    background: var(--bg3);
+}
+
+.dt-flt-radio-item.on {
+    background: var(--emb);
+    color: var(--em);
+    font-weight: 500;
+}
+
+.dt-flt-radio-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--b2);
+    flex-shrink: 0;
+    transition: all 0.12s;
+}
+
+.dt-flt-radio-item.on .dt-flt-radio-dot {
+    background: var(--em);
+    border-color: var(--em);
+    box-shadow: 0 0 0 3px var(--emb);
+}
+
+.dt-flt-radio-check {
+    margin-right: auto;
+    font-size: 13px;
+    color: var(--em);
+}
+
+.dt-flt-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 10px 10px 4px;
+}
+
+.dt-flt-pill {
+    padding: 3px 10px;
+    border: 1px solid var(--b2);
+    border-radius: 20px;
+    background: var(--bg2);
+    color: var(--t3);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.12s;
+}
+
+.dt-flt-pill:hover {
+    border-color: var(--em);
+    color: var(--em);
+}
+
+.dt-flt-pill.act {
+    background: var(--em);
+    color: #fff;
+    border-color: var(--em);
+}
+
+.dt-flt-range-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+}
+
+.dt-flt-range-field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.dt-flt-range-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--t4);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dt-flt-range-sep {
+    color: var(--t4);
+    font-size: 14px;
+    padding-top: 18px;
+}
+
+.dt-flt-range-field .dt-fi {
+    width: 100%;
+}
+
+.dt-flt-popup--date {
+    min-width: 280px;
+}
+
+.dt-flt-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px 8px 0;
+    border-bottom: 1px solid var(--b1);
+    margin-bottom: 4px;
+}
+
+.dt-flt-tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--t3);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    border-radius: var(--r1) var(--r1) 0 0;
+    position: relative;
+    margin-bottom: -1px;
+    transition: all 0.12s;
+}
+
+.dt-flt-tab:hover {
+    color: var(--t1);
+    background: var(--bg3);
+}
+
+.dt-flt-tab.on {
+    color: var(--em);
+    border-bottom-color: var(--em);
+    background: var(--emb);
+}
+
+.dt-flt-tab-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--em);
+    position: absolute;
+    top: 4px;
+    left: 4px;
+}
+
+.dt-flt-sc-wrap {
+    padding: 6px 8px;
+    overflow-y: auto;
+    max-height: 300px;
+}
+
+.dt-flt-sc-wrap::-webkit-scrollbar {
+    width: 4px;
+}
+
+.dt-flt-sc-wrap::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.dt-flt-sc-wrap::-webkit-scrollbar-thumb {
+    background: var(--b2);
+    border-radius: 4px;
+}
+
+.dt-flt-sc-group {
+    margin-bottom: 10px;
+}
+
+.dt-flt-sc-group:last-child {
+    margin-bottom: 0;
+}
+
+.dt-flt-sc-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--t4);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    padding: 0 2px 4px;
+}
+
+.dt-flt-sc-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+}
+
+.dt-flt-sc-btn {
+    padding: 6px 8px;
+    border: 1px solid var(--b2);
+    border-radius: var(--r1);
+    background: var(--bg2);
+    color: var(--t2);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: right;
+    transition: all 0.11s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dt-flt-sc-btn:hover {
+    border-color: var(--em);
+    color: var(--em);
+    background: var(--emb);
+}
+
+.dt-flt-sc-btn.act {
+    background: var(--em);
+    color: #fff;
+    border-color: var(--em);
+    font-weight: 600;
+}
+
+.dt-flt-manual-wrap {
+    padding: 10px 10px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dt-flt-manual-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dt-flt-manual-field .dt-fi {
+    width: 100%;
+}
+
+.dt-flt-manual-preview {
+    font-size: 11px;
+    color: var(--t3);
+    background: var(--bg3);
+    border-radius: var(--r1);
+    padding: 5px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    direction: ltr;
+}
+
+.dt-flt-title-badge {
+    margin-right: auto;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: var(--emb);
+    color: var(--em);
+}
+
+.dt-pagination-compact {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dt-pg-arrow {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--b2);
+    border-radius: var(--r1);
+    background: var(--bg2);
+    color: var(--t3);
+    cursor: pointer;
+    font-size: 15px;
+    transition: all 0.12s;
+    flex-shrink: 0;
+}
+/* ── Pagination — أرقام الصفحات الظاهرة (v10.3) ─────────────── */
+
+.dt-pg-btn {
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--b2);
+    border-radius: var(--r1);
+    background: var(--bg2);
+    color: var(--t2);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+}
+.dt-pg-btn:hover {
+    background: var(--bg3);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.dt-pg-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    font-weight: 800;
+}
+
+.dt-pg-arrow:hover:not(:disabled) {
+    border-color: var(--em);
+    color: var(--em);
+    background: var(--emb);
+}
+
+.dt-pg-arrow:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.dt-pg-arrow:focus-visible {
+    outline: 2px solid var(--em);
+    outline-offset: 2px;
+}
+
+.dt-pg-select-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.dt-pg-select {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 30px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--b2);
+    border-radius: var(--r1);
+    background: var(--bg2);
+    color: var(--t1);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    min-width: 100px;
+    text-align: center;
+    transition: border-color 0.12s;
+    direction: rtl;
+}
+
+.dt-pg-select:hover {
+    border-color: var(--em);
+}
+
+.dt-pg-select:focus {
+    outline: 2px solid var(--em);
+    outline-offset: 1px;
+    border-color: var(--em);
+}
+
+.dt-pg-select-icon {
+    position: absolute;
+    left: 8px;
+    font-size: 12px;
+    color: var(--t4);
+    pointer-events: none;
+}
+
+.dark .dt-flt-sc-btn {
+    background: var(--bg3);
+}
+
+.dark .dt-flt-pill {
+    background: var(--bg3);
+}
+
+.dark .dt-pg-select {
+    background: var(--bg3);
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+
 @media (max-width: 639px) {
     .dt-desktop {
         display: none !important;
@@ -1659,47 +2916,15 @@
         font-size: 13px;
     }
 }
+
 @media (min-width: 640px) {
     .dt-mobile {
         display: none !important;
     }
 }
 
-/* ══════════════════════════════════════
-   DARK MODE REFINEMENTS
-══════════════════════════════════════ */
-body.dark .dt-v7 {
-    box-shadow:
-        var(--shadow2),
-        0 0 0 1px rgba(255, 255, 255, 0.03);
-}
-body.dark .dt-flt-popup {
-    box-shadow:
-        var(--shadow2),
-        0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-body.dark .dt-ss {
-    background: var(--bg2);
-}
-body.dark .dt-se {
-    background: var(--bg2);
-}
-body.dark .dt-card-item {
-    box-shadow: var(--shadow);
-}
-body.dark .dt-skel {
-    background: linear-gradient(
-        90deg,
-        var(--bg3) 25%,
-        var(--bg5) 50%,
-        var(--bg3) 75%
-    );
-    background-size: 600px 100%;
-}
+/* ─── Print ───────────────────────────────────────────────── */
 
-/* ══════════════════════════════════════
-   PRINT
-══════════════════════════════════════ */
 @media print {
     .dt-toolbar,
     .dt-footer,
@@ -1723,618 +2948,17 @@ body.dark .dt-skel {
     }
 }
 
-/* ══════════════════════════════════════
-   🆕 VIRTUAL SCROLLING
-══════════════════════════════════════ */
-
-/* الحاوية الخارجية عند تفعيل virtual */
-.dt-table-outer {
-    overflow-x: auto;
-    overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: var(--b3) transparent;
-    cursor: grab;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    width: 100%;
-    /* ✅ لا نضع will-change أو transform هنا — يكسران position:fixed للـ FilterPopup */
-}
-
-/* ✅ الجدول نفسه: max-content يسمح بالتمرير الأفقي عند كثرة الأعمدة */
-.dt-table-outer table {
-    width: max-content !important;
-    min-width: 100%;
-    table-layout: auto !important;
-}
-.dt-table-outer::-webkit-scrollbar {
-    height: 5px;
-    width: 5px;
-}
-.dt-table-outer::-webkit-scrollbar-thumb {
-    background: var(--b3);
-    border-radius: 6px;
-}
-.dt-table-outer.dt-dragging {
-    cursor: grabbing;
-    scroll-behavior: auto;
-}
-.dt-table-outer.dt-dragging * {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    pointer-events: none;
-}
-.dt-table-outer:not(.dt-dragging) button,
-.dt-table-outer:not(.dt-dragging) input,
-.dt-table-outer:not(.dt-dragging) a {
-    pointer-events: auto;
-}
-
-/* إبقاء الـ thead مرئياً دائماً في virtual scroll */
-.dt-table-outer thead {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--bg3);
-}
-
-/* badge "Virtual" في الـ toolbar */
-.dt-virtual-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 0 10px;
-    height: 26px;
-    background: var(--bg3);
-    border: 1px solid var(--b2);
-    border-radius: var(--r2);
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--t4);
-    cursor: default;
-    -webkit--webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -moz--webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -ms--webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-.dt-virtual-badge i {
-    font-size: 12px;
-    color: var(--em);
-}
-
-/* ══════════════════════════════════════
-   🆕 COLUMN DRAG REORDER
-══════════════════════════════════════ */
-
-/* رأس العمود القابل للسحب */
-.dt-v7 thead th.dt-th-draggable {
-    cursor: grab;
-}
-.dt-v7 thead th.dt-th-draggable:active {
-    cursor: grabbing;
-}
-
-/* أيقونة السحب تظهر عند hover */
-.dt-th-draggable .dt-th-inner::before {
-    content: "";
-    display: block;
-    width: 10px;
-    height: 14px;
-    flex-shrink: 0;
-    background-image: radial-gradient(
-        circle,
-        var(--b3) 1.5px,
-        transparent 1.5px
-    );
-    background-size: 4px 4px;
-    background-repeat: repeat;
-    opacity: 0;
-    transition: opacity 0.15s;
-    cursor: grab;
-    margin-left: auto;
-}
-.dt-th-draggable:hover .dt-th-inner::before {
-    opacity: 1;
-}
-
-/* العمود الهدف عند السحب فوقه */
-.dt-v7 thead th.dt-th-drag-over {
-    background: var(--emb) !important;
-    border-left: 2px solid var(--em) !important;
-}
-/* RTL: الـ indicator يظهر على اليمين */
-[dir="rtl"] .dt-v7 thead th.dt-th-drag-over {
-    border-left: none !important;
-    border-right: 2px solid var(--em) !important;
-}
-
-/* ══════════════════════════════════════
-   🆕 MULTI-COLUMN SORT
-══════════════════════════════════════ */
-
-/* رقم أولوية الفرز على رأس العمود */
-.dt-sort-priority {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 14px;
-    height: 14px;
-    background: var(--em);
-    color: #fff;
-    border-radius: 50%;
-    font-size: 9px;
-    font-weight: 800;
-    flex-shrink: 0;
-    line-height: 1;
-}
-
-/* السهم بجانب الرقم */
-.dt-sort-ic {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    color: var(--em);
-    font-size: 11px;
-    flex-shrink: 0;
-}
-.dt-sort-ic i {
-    font-size: 11px;
-}
-
-/* العمود المُرتَّب: خلفية خفيفة */
-.dt-v7 thead th.dt-th-sorted {
-    background: var(--emb) !important;
-    color: var(--em);
-}
-.dt-v7 thead th.dt-th-sorted .dt-sort-btn {
-    color: var(--em);
-}
-
-/* hint للمستخدم: Shift+Click */
-.dt-sort-btn[title] {
-    position: relative;
-}
-
-/* ══════════════════════════════════════
-   🆕 URL STATE — Visual indicator
-══════════════════════════════════════ */
-
-/* نقطة صغيرة تظهر على زر الفلتر إذا جاءت قيمته من URL */
-.dt-flt-btn.on {
-    color: var(--em);
-    background: var(--emb);
-}
-.dt-flt-btn.on i {
-    color: var(--em);
-}
-
-/* ══════════════════════════════════════
-   🆕 STICKY COLUMN (محدَّث للـ v9)
-   الأسماء تغيّرت: dt-ss → dt-sticky-start، dt-se → dt-sticky-end
-══════════════════════════════════════ */
-
-.dt-sticky-start {
-    position: sticky;
-    right: 0;
-    z-index: 2;
-    background: var(--bg2);
-}
-.dt-sticky-start::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 8px;
-    background: linear-gradient(to right, rgba(0, 0, 0, 0.07), transparent);
-    pointer-events: none;
-}
-
-.dt-sticky-end {
-    position: sticky;
-    left: 0;
-    z-index: 2;
-    background: var(--bg2);
-}
-.dt-sticky-end::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    width: 8px;
-    background: linear-gradient(to left, rgba(0, 0, 0, 0.07), transparent);
-    pointer-events: none;
-}
-
-/* thead sticky columns تحتاج z-index أعلى */
-.dt-v7 thead .dt-sticky-start,
-.dt-v7 thead .dt-sticky-end {
-    z-index: 12;
-}
-
-/* ══════════════════════════════════════
-   🆕 VIRTUAL FOOTER INFO
-══════════════════════════════════════ */
-
-/* نص "يعرض X صف من Y (virtual scroll)" */
-.dt-footer-info strong {
-    color: var(--em);
-    font-weight: 700;
-}
-
-/* ══════════════════════════════════════
-   🆕 DARK MODE — ميزات v9
-══════════════════════════════════════ */
-
-body.dark .dt-sort-priority {
-    box-shadow: 0 0 0 2px var(--bg2);
-}
-body.dark .dt-v7 thead th.dt-th-drag-over {
-    background: rgba(10, 138, 92, 0.15) !important;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   datatable-v10-additions.css
-   أضف هذا في نهاية datatable.css الخاص بك
-═══════════════════════════════════════════════════════════════════════════ */
-
-/* ══════════════════════════════════════
-   ROW GROUPING
-══════════════════════════════════════ */
-
-.dt-group-row {
-    background: var(--bg3, #f0f0f0);
-    cursor: pointer;
-    -webkit--webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -moz--webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -ms--webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-.dt-group-row:hover {
-    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg3, #f0f0f0));
-}
-.dt-group-row td {
-    padding: 0;
-    border-bottom: 1px solid var(--b2, #e0e0e0);
-}
-.dt-group-cell {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    font-weight: 600;
-    font-size: 12px;
-}
-.dt-group-chevron {
-    font-size: 13px;
-    color: var(--t2, #666);
-    flex-shrink: 0;
-    transition: transform 0.18s ease;
-}
-.dt-group-label {
-    color: var(--t1, #111);
-    flex: 1;
-}
-.dt-group-count {
-    background: var(--em, #0a8a5c);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 1px 7px;
-    border-radius: 20px;
-    min-width: 22px;
-    text-align: center;
-}
-.dt-group-subtotal td {
-    background: color-mix(in srgb, var(--em, #0a8a5c) 4%, var(--bg2, #fff));
-    border-top: 1px dashed var(--b2, #e0e0e0);
-    font-size: 11px;
-    padding: 4px 10px;
-}
-
-/* ══════════════════════════════════════
-   COLUMN PINNING
-══════════════════════════════════════ */
-
-.dt-pinned {
-    background: var(--bg2, #fff);
-}
-.dt-table thead .dt-pinned {
-    background: var(--bg3, #f5f5f5);
-}
-
-/* الخط الفاصل بين الأعمدة المثبتة */
-.dt-sticky-start {
-    border-left: 2px solid
-        color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
-}
-.dt-sticky-end {
-    border-right: 2px solid
-        color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
-}
-
-/* أيقونة التثبيت في الرأس */
-.dt-th-pin-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 2px 3px;
-    opacity: 0;
-    transition: opacity 0.15s;
-    color: var(--t3, #999);
-    border-radius: 4px;
-    line-height: 1;
-}
-th:hover .dt-th-pin-btn,
-.dt-th-pin-btn.active {
-    opacity: 1;
-}
-.dt-th-pin-btn.active {
-    color: var(--em, #0a8a5c);
-}
-.dt-th-pin-btn:hover {
-    background: var(--bg4, #eee);
-}
-
-/* قائمة التثبيت dropdown */
-.dt-pin-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    background: var(--bg2, #fff);
-    border: 1px solid var(--b2, #e0e0e0);
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-    z-index: 100;
-    min-width: 150px;
-    overflow: hidden;
-    animation: dt-fade 0.12s ease;
-}
-.dt-pin-menu button {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    width: 100%;
-    padding: 8px 12px;
-    background: none;
-    border: none;
-    font-size: 12px;
-    font-family: inherit;
-    color: var(--t1, #111);
-    cursor: pointer;
-    text-align: right;
-    direction: rtl;
-}
-.dt-pin-menu button:hover {
-    background: var(--bg3, #f5f5f5);
-}
-.dt-pin-menu button.active {
-    color: var(--em, #0a8a5c);
-    font-weight: 600;
-}
-
-/* Badge pin في قائمة الأعمدة */
-.dt-col-pin-badge {
-    font-size: 10px;
-    margin-right: auto;
-    color: var(--em, #0a8a5c);
-}
-.dt-col-pin-actions {
-    display: flex;
-    gap: 3px;
-    margin-right: 6px;
-}
-.dt-pin-btn {
-    font-size: 9px;
-    padding: 1px 5px;
-    border: 1px solid var(--b2, #e0e0e0);
-    background: var(--bg3, #f5f5f5);
-    border-radius: 4px;
-    cursor: pointer;
-    color: var(--t2, #666);
-}
-.dt-pin-btn.active {
-    background: var(--em, #0a8a5c);
-    color: #fff;
-    border-color: var(--em, #0a8a5c);
-}
-.dt-pin-btn:hover {
-    background: var(--bg4, #eee);
-}
-
-/* ══════════════════════════════════════
-   KEYBOARD NAVIGATION
-══════════════════════════════════════ */
-
-.dt-v7:focus {
-    outline: 2px solid var(--em, #0a8a5c);
-    outline-offset: -2px;
-}
-.dt-v7:focus-visible {
-    outline: 2px solid var(--em, #0a8a5c);
-}
-
-.dt-cell-active {
-    outline: 2px solid var(--em, #0a8a5c) !important;
-    outline-offset: -2px;
-    background: color-mix(
-        in srgb,
-        var(--em, #0a8a5c) 6%,
-        var(--bg2, #fff)
-    ) !important;
-    position: relative;
-    z-index: 1;
-}
-
-/* ══════════════════════════════════════
-   CELL VALIDATION
-══════════════════════════════════════ */
-
-.dt-cell-error {
-    position: absolute;
-    bottom: calc(100% + 4px);
-    right: 0;
-    background: var(--red, #dc2626);
-    color: #fff;
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 5px;
-    white-space: nowrap;
-    z-index: 50;
-    pointer-events: none;
-    animation: dt-fade 0.15s ease;
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
-}
-.dt-cell-error::after {
-    content: "";
-    position: absolute;
-    top: 100%;
-    right: 10px;
-    border: 4px solid transparent;
-    border-top-color: var(--red, #dc2626);
-}
-td:has(.dt-cell-error) {
-    outline: 2px solid var(--red, #dc2626);
-    outline-offset: -2px;
-}
-
-/* ══════════════════════════════════════
-   BATCH EDIT
-══════════════════════════════════════ */
-
-/* شريط الـ Batch Edit */
-.dt-batch-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 14px;
-    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg2, #fff));
-    border-top: 1px solid
-        color-mix(in srgb, var(--em, #0a8a5c) 20%, transparent);
-    gap: 8px;
-    animation: dt-fade-up 0.15s ease;
-}
-.dt-batch-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--em, #0a8a5c);
-}
-.dt-batch-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.dt-batch-save {
-    background: var(--em, #0a8a5c) !important;
-    color: #fff !important;
-    border-color: var(--em, #0a8a5c) !important;
-}
-.dt-batch-save:hover {
-    opacity: 0.9;
-}
-.dt-batch-discard {
-    color: var(--red, #dc2626) !important;
-    border-color: var(--red, #dc2626) !important;
-}
-.dt-batch-discard:hover {
-    background: color-mix(
-        in srgb,
-        var(--red, #dc2626) 8%,
-        var(--bg2, #fff)
-    ) !important;
-}
-
-/* الخلية ذات التعديل المعلّق */
-.dt-cell-pending {
-    background: color-mix(in srgb, #f59e0b 8%, var(--bg2, #fff)) !important;
-}
-.dt-pending-value {
-    color: #b45309;
-    font-style: italic;
-}
-
-/* ══════════════════════════════════════
-   CONDITIONAL FORMATTING helpers
-   (يمكن استخدامها مباشرة في conditionalFormatting)
-══════════════════════════════════════ */
-
-.dt-cf-red {
-    background: color-mix(in srgb, #ef4444 12%, transparent) !important;
-    color: #991b1b !important;
-}
-.dt-cf-green {
-    background: color-mix(in srgb, #22c55e 12%, transparent) !important;
-    color: #14532d !important;
-}
-.dt-cf-yellow {
-    background: color-mix(in srgb, #f59e0b 12%, transparent) !important;
-    color: #78350f !important;
-}
-.dt-cf-blue {
-    background: color-mix(in srgb, #3b82f6 12%, transparent) !important;
-    color: #1e3a8a !important;
-}
-.dt-cf-bold {
-    font-weight: 700 !important;
-}
-
-/* ══════════════════════════════════════
-   DARK MODE
-══════════════════════════════════════ */
+/* ─── Dark Mode ───────────────────────────────────────────── */
 
 @media (prefers-color-scheme: dark) {
     .dt-group-row {
-        background: color-mix(
-            in srgb,
-            var(--bg1, #111) 60%,
-            var(--bg2, #1e1e1e)
-        );
+        background: color-mix( in srgb, var(--bg1, #111) 60%, var(--bg2, #1e1e1e) );
     }
     .dt-cell-active {
-        background: color-mix(
-            in srgb,
-            var(--em, #0a8a5c) 15%,
-            var(--bg2, #1e1e1e)
-        ) !important;
+        background: color-mix( in srgb, var(--em, #0a8a5c) 15%, var(--bg2, #1e1e1e) ) !important;
     }
     .dt-cell-pending {
-        background: color-mix(
-            in srgb,
-            #f59e0b 12%,
-            var(--bg2, #1e1e1e)
-        ) !important;
+        background: color-mix( in srgb, #f59e0b 12%, var(--bg2, #1e1e1e) ) !important;
     }
     .dt-pinned {
         background: var(--bg2, #1e1e1e);
@@ -2366,939 +2990,3 @@ td:has(.dt-cell-error) {
         color: #93c5fd !important;
     }
 }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   datatable-v10-final.css
-   إصلاحات وإضافات مكملة لـ v10
-═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── Toolbar group buttons ── */
-.dt-toolbar-group-btns {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* ── Batch bar: موضع صحيح في أسفل الجدول ── */
-.dt-batch-bar {
-    border-top: 1px solid
-        color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent);
-    border-bottom: none;
-}
-
-/* ── Pin button في رأس العمود: مخفي افتراضياً ── */
-.dt-th-pin-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 2px 3px;
-    opacity: 0;
-    transition:
-        opacity 0.15s,
-        color 0.15s;
-    color: var(--t4);
-    border-radius: 4px;
-    line-height: 1;
-    font-size: 11px;
-    flex-shrink: 0;
-}
-th:hover .dt-th-pin-btn,
-.dt-th-pin-btn.active {
-    opacity: 1;
-}
-.dt-th-pin-btn.active {
-    color: var(--em);
-}
-.dt-th-pin-btn:hover {
-    background: var(--bg4);
-    color: var(--em);
-}
-
-/* ── dt-col-item flex fix لدعم pin actions ── */
-.dt-col-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-}
-.dt-col-item > span {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* ── Sticky col: border اتجاه صحيح RTL ── */
-.dt-sticky-start {
-    border-left: 2px solid
-        color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent) !important;
-    border-right: none !important;
-}
-.dt-sticky-end {
-    border-right: 2px solid
-        color-mix(in srgb, var(--em, #0a8a5c) 25%, transparent) !important;
-    border-left: none !important;
-}
-
-/* ── Group row RTL chevron ── */
-.dt-group-cell {
-    direction: rtl;
-}
-
-/* ── Keyboard nav indicator ── */
-.dt-cell-active:focus {
-    outline: 2px solid var(--em);
-}
-
-/* ── dt-td-idx ── */
-.dt-td-idx {
-    color: var(--t4);
-    font-size: 11px;
-    font-weight: 600;
-    text-align: center;
-    font-family: "IBM Plex Mono", monospace;
-}
-
-/* ── dt-th-acts align ── */
-.dt-th-acts {
-    text-align: center !important;
-}
-
-/* ── Filter btn مع قيمة: أيقونة ملوّنة ── */
-.dt-flt-btn.on {
-    color: var(--em);
-    background: var(--emb);
-}
-
-/* ── Pending cell: border جانبي ── */
-.dt-cell-pending {
-    border-bottom: 2px solid #f59e0b !important;
-}
-
-/* ── dt-bulk-clear ── */
-.dt-bulk-clear {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--t4);
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    padding: 4px;
-    border-radius: 4px;
-    margin-right: auto;
-    transition: color 0.12s;
-}
-.dt-bulk-clear:hover {
-    color: var(--red);
-}
-
-/* ── Context Menu ── */
-.dt-context-menu {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -moz--webkit-user-select: none;
-    backdrop-filter: blur(2px);
-    transition: opacity 0.1s;
-}
-.dt-context-item {
-    transition: background 0.1s;
-}
-.dt-context-item:focus-visible {
-    outline: 2px solid var(--em);
-    outline-offset: -2px;
-}
-
-
-/* ════════════════════════════════════════════════════════════════════════════
-   Smart Filter & Save View Dialogs
-   ════════════════════════════════════════════════════════════════════════════ */
-
-.dt-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  backdrop-filter: blur(2px);
-  animation: dt-fade-in 0.15s ease;
-}
-
-@keyframes dt-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.dt-dialog {
-  background: var(--bg2, #fff);
-  border: 1px solid var(--b2, #cbd5e1);
-  border-radius: var(--r3, 14px);
-  box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.25);
-  min-width: 360px;
-  max-width: 480px;
-  width: 90vw;
-  animation: dt-slide-up 0.18s ease;
-  direction: rtl;
-}
-
-@keyframes dt-slide-up {
-  from { transform: translateY(16px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
-}
-
-.dt-dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--b1, #e2e8f0);
-}
-
-.dt-dialog-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--t1, #0f172a);
-}
-
-.dt-dialog-title .ti {
-  color: var(--em, #0a8a5c);
-  font-size: 16px;
-}
-
-.dt-dialog-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: none;
-  border-radius: var(--r1, 6px);
-  cursor: pointer;
-  color: var(--t3, #475569);
-  transition: background 0.15s, color 0.15s;
-}
-
-.dt-dialog-close:hover {
-  background: var(--bg3, #f1f5f9);
-  color: var(--t1, #0f172a);
-}
-
-.dt-dialog-body {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.dt-dialog-hint {
-  font-size: 12px;
-  color: var(--t3, #475569);
-  line-height: 1.5;
-}
-
-.dt-dialog-input {
-  width: 100% !important;
-  font-size: 13px !important;
-  padding: 8px 12px !important;
-}
-
-.dt-dialog-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  padding: 12px 16px 14px;
-  border-top: 1px solid var(--b1, #e2e8f0);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   إصلاحات v10-fixes
-   ١. Conditional Formatting classes جاهزة
-   ٢. SmartFilter dialog
-   ٣. dt-table-wrap alias ← dt-table-outer (اندماج كامل)
-   ٤. Batch bar
-   ٥. Context Menu
-   ٦. Saved Views menu
-   ٧. Resize handle RTL
-═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── 1. Conditional Formatting — classes جاهزة (تُستدعى من conditionalFormatting prop) */
-.dt-cf-red    { background: rgba(239,68,68,.10) !important; color: #991b1b !important; font-weight: 600; }
-.dt-cf-green  { background: rgba(34,197,94,.10) !important; color: #14532d !important; font-weight: 600; }
-.dt-cf-yellow { background: rgba(245,158,11,.10) !important; color: #78350f !important; font-weight: 600; }
-.dt-cf-blue   { background: rgba(59,130,246,.10) !important; color: #1e3a8a !important; font-weight: 600; }
-.dt-cf-bold   { font-weight: 800 !important; }
-.dt-cf-italic { font-style: italic !important; }
-.dt-cf-strike { text-decoration: line-through !important; }
-
-/* ── 2. Smart Filter dialog + Save View dialog */
-.dt-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,.35);
-    z-index: 99998;
-    display: flex; align-items: center; justify-content: center;
-    backdrop-filter: blur(2px);
-}
-.dt-dialog {
-    background: var(--bg2);
-    border: 1px solid var(--b2);
-    border-radius: var(--r3, 12px);
-    box-shadow: 0 20px 60px rgba(0,0,0,.2);
-    min-width: 380px;
-    max-width: 520px;
-    width: 90%;
-    z-index: 99999;
-    display: flex; flex-direction: column;
-    animation: dt-dialog-in .18s ease;
-}
-@keyframes dt-dialog-in {
-    from { opacity: 0; transform: scale(.96) translateY(8px); }
-    to   { opacity: 1; transform: none; }
-}
-.dt-dialog-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--b1);
-}
-.dt-dialog-title {
-    font-size: 14px; font-weight: 700; color: var(--t1);
-    display: flex; align-items: center; gap: 8px;
-}
-.dt-dialog-title i { color: var(--em); }
-.dt-dialog-close {
-    background: none; border: none; cursor: pointer;
-    color: var(--t4); font-size: 16px;
-    padding: 4px; border-radius: 5px;
-    transition: background .12s, color .12s;
-}
-.dt-dialog-close:hover { background: var(--bg4); color: var(--t1); }
-.dt-dialog-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
-.dt-dialog-hint { font-size: 12px; color: var(--t3); line-height: 1.5; }
-.dt-dialog-input { width: 100%; font-size: 13px; }
-.dt-dialog-footer {
-    display: flex; gap: 8px; justify-content: flex-start;
-    padding: 12px 18px; border-top: 1px solid var(--b1);
-}
-
-/* ── 3. Batch bar */
-.dt-batch-bar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px;
-    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg2));
-    border-top: 1px solid color-mix(in srgb, var(--em, #0a8a5c) 20%, transparent);
-    gap: 10px; border-radius: 0 0 var(--r2, 8px) var(--r2, 8px);
-    animation: slide-up-bar .2s ease;
-}
-@keyframes slide-up-bar {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: none; }
-}
-.dt-batch-info  { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--em); }
-.dt-batch-actions { display: flex; gap: 6px; }
-.dt-batch-discard { color: var(--t3) !important; }
-.dt-batch-discard:hover { color: var(--red, #dc2626) !important; }
-.dt-batch-save {
-    background: var(--em) !important;
-    color: #fff !important;
-    border-color: var(--em) !important;
-}
-.dt-batch-save:hover { opacity: .88; }
-.dt-batch-save:disabled { opacity: .4; cursor: not-allowed; }
-
-/* ── 4. Context Menu */
-.dt-context-menu {
-    min-width: 180px;
-    animation: dt-ctx-in .12s ease;
-}
-@keyframes dt-ctx-in {
-    from { opacity: 0; transform: scale(.96); }
-    to   { opacity: 1; transform: none; }
-}
-.dt-context-item {
-    direction: rtl;
-    transition: background .1s !important;
-}
-.dt-context-item:hover:not(:disabled) {
-    background: var(--bg3) !important;
-}
-.dt-context-item i { flex-shrink: 0; }
-
-/* ── 5. Pending cell */
-.dt-cell-pending {
-    border-bottom: 2px solid #f59e0b !important;
-    background: rgba(245,158,11,.06) !important;
-}
-.dt-pending-value { color: #92400e; font-style: italic; }
-
-/* ── 6. Cell error tooltip */
-.dt-cell-error {
-    position: absolute;
-    bottom: calc(100% + 4px);
-    right: 0;
-    background: var(--red, #dc2626);
-    color: #fff;
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 5px;
-    white-space: nowrap;
-    z-index: 50;
-    pointer-events: none;
-    box-shadow: 0 2px 8px rgba(220,38,38,.25);
-    font-weight: 500;
-}
-.dt-cell-error::after {
-    content: '';
-    position: absolute;
-    top: 100%; right: 10px;
-    border: 4px solid transparent;
-    border-top-color: var(--red, #dc2626);
-}
-
-/* ── 7. Group rows */
-.dt-group-row {
-    cursor: pointer;
-    background: var(--bg3) !important;
-    user-select: none;
-}
-.dt-group-row:hover td { background: var(--bg4) !important; }
-.dt-group-row td { border-bottom: 1px solid var(--b2); padding: 0; }
-.dt-group-cell {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 14px;
-    direction: rtl;
-}
-.dt-group-chevron { color: var(--t3); transition: transform .18s; font-size: 13px; }
-.dt-group-label   { font-size: 12px; font-weight: 700; color: var(--t1); flex: 1; }
-.dt-group-count   {
-    background: var(--em); color: #fff;
-    font-size: 10px; font-weight: 700;
-    padding: 1px 7px; border-radius: 20px; min-width: 22px; text-align: center;
-}
-.dt-group-subtotal td {
-    background: color-mix(in srgb, var(--em, #0a8a5c) 5%, var(--bg2));
-    font-size: 11px;
-}
-
-/* ── 8. Resize handle RTL — يسار العمود */
-.dt-rh {
-    position: absolute;
-    /* RTL: handle يجلس على يسار العمود */
-    left: 0; right: auto;
-    top: 0; bottom: 0;
-    width: 5px;
-    cursor: col-resize;
-    z-index: 5;
-    border-left: 2px solid transparent;
-    transition: border-color .15s;
-}
-.dt-rh:hover,
-.dt-th:has(.dt-rh:active) .dt-rh {
-    border-left-color: var(--em);
-}
-
-/* ── 9. Pinned columns — RTL-aware borders */
-.dt-sticky-start {
-    position: sticky !important;
-    right: 0;
-    z-index: 2;
-    border-left: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
-}
-.dt-sticky-end {
-    position: sticky !important;
-    left: 0;
-    z-index: 2;
-    border-right: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
-}
-.dt-pinned { background: color-mix(in srgb, var(--em, #0a8a5c) 4%, var(--bg2)) !important; }
-th.dt-pinned { background: color-mix(in srgb, var(--em, #0a8a5c) 6%, var(--bg3)) !important; }
-
-/* ── 10. Active cell (keyboard nav) */
-.dt-cell-active {
-    outline: 2px solid var(--em) !important;
-    outline-offset: -2px;
-    background: rgba(10,138,92,.06) !important;
-    position: relative; z-index: 1;
-}
-
-/* ── 11. Pin menu dropdown */
-.dt-pin-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    background: var(--bg2);
-    border: 1px solid var(--b2);
-    border-radius: var(--r2, 8px);
-    box-shadow: 0 4px 16px rgba(0,0,0,.12);
-    min-width: 170px;
-    z-index: 9999;
-    padding: 4px 0;
-    animation: dt-ctx-in .12s ease;
-}
-.dt-pin-menu button {
-    display: flex; align-items: center; gap: 8px;
-    width: 100%; padding: 7px 12px;
-    background: none; border: none;
-    font-size: 12px; color: var(--t1);
-    cursor: pointer; font-family: inherit; text-align: right;
-    transition: background .1s;
-}
-.dt-pin-menu button:hover { background: var(--bg3); }
-.dt-pin-menu button.active { color: var(--em); font-weight: 600; }
-.dt-pin-menu button i { color: var(--em); font-size: 13px; }
-
-/* ── 12. Toolbar group buttons */
-.dt-toolbar-group-btns { display: flex; align-items: center; gap: 4px; }
-
-/* ── 13. Pin button في رأس العمود */
-.dt-th-pin-btn {
-    background: none; border: none; cursor: pointer;
-    padding: 2px 3px; opacity: 0;
-    transition: opacity .15s, color .15s;
-    color: var(--t4); border-radius: 4px;
-    line-height: 1; font-size: 11px; flex-shrink: 0;
-}
-th:hover .dt-th-pin-btn, .dt-th-pin-btn.active { opacity: 1; }
-.dt-th-pin-btn.active  { color: var(--em); }
-.dt-th-pin-btn:hover   { background: var(--bg4); color: var(--em); }
-
-/* ── 14. Column pin actions in col menu */
-.dt-col-pin-actions { display: flex; gap: 2px; margin-right: auto; }
-.dt-pin-btn {
-    background: none; border: 1px solid var(--b2);
-    border-radius: 4px; padding: 2px 5px;
-    font-size: 11px; cursor: pointer; color: var(--t4);
-    transition: all .12s; line-height: 1;
-}
-.dt-pin-btn:hover, .dt-pin-btn.active { border-color: var(--em); color: var(--em); background: var(--emb); }
-
-/* ── 15. dt-col-item layout — pin buttons fix (يُكمل التعريف الأساسي) */
-.dt-col-item {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-}
-.dt-col-item > span {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.dt-col-item .dt-col-pin-actions {
-    display: flex;
-    gap: 2px;
-    flex-shrink: 0;
-}
-
-/* ── 16. Bulk clear */
-.dt-bulk-clear {
-    background: none; border: none; cursor: pointer;
-    color: var(--t4); font-size: 14px;
-    display: flex; align-items: center;
-    padding: 4px; border-radius: 4px;
-    margin-right: auto;
-    transition: color .12s;
-}
-.dt-bulk-clear:hover { color: var(--red, #dc2626); }
-
-/* ── 17. virtual badge */
-.dt-virtual-badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11px; font-weight: 600;
-    color: var(--em); background: var(--emb);
-    border: 1px solid var(--embo, rgba(10,138,92,.2));
-    padding: 3px 10px; border-radius: 20px;
-}
-
-/* ══════════════════════════════════════════════════════
-   v10.2 — Range Selection
-══════════════════════════════════════════════════════ */
-.dt-cell-selected {
-  background-color: rgba(37, 99, 235, 0.12) !important;
-  outline: 1px solid rgba(37, 99, 235, 0.4);
-  outline-offset: -1px;
-}
-
-/* ══════════════════════════════════════════════════════
-   v10.2 — Column Groups Header
-══════════════════════════════════════════════════════ */
-.dt-th-group {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--t3);
-  border-bottom: 1px solid var(--b1);
-  padding: 4px 8px;
-}
-
-.dt-group-header-row th {
-  background: var(--bg3);
-}
-
-/* ══════════════════════════════════════════════════════
-   v10.2 — Tree Data indentation
-══════════════════════════════════════════════════════ */
-.dt-tree-toggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--t3);
-  padding: 0 2px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.dt-tree-toggle:hover {
-  color: var(--t1);
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   v9.0 — FilterPopup المُعاد تصميمه
-══════════════════════════════════════════════════════════════════════════ */
-
-/* ─── Text Filter ────────────────────────────────────────────────────────── */
-.dt-flt-popup--text .dt-flt-text-wrap {
-  position: relative;
-  padding: 10px 10px 6px;
-}
-.dt-flt-text-icon {
-  position: absolute;
-  right: 18px;
-  top: 50%;
-  transform: translateY(-10%);
-  color: var(--t4);
-  font-size: 14px;
-  pointer-events: none;
-}
-.dt-flt-text-input {
-  padding-right: 32px !important;
-  padding-left: 28px !important;
-  width: 100%;
-}
-.dt-flt-text-clear {
-  position: absolute;
-  left: 18px;
-  top: 50%;
-  transform: translateY(-10%);
-  background: none;
-  border: none;
-  color: var(--t4);
-  cursor: pointer;
-  padding: 2px;
-  line-height: 1;
-  font-size: 13px;
-  border-radius: 3px;
-}
-.dt-flt-text-clear:hover { color: var(--t1); background: var(--bg3); }
-
-/* ─── Select (Radio List) ────────────────────────────────────────────────── */
-.dt-flt-radio-list {
-  padding: 6px 8px;
-  max-height: 280px;
-  overflow-y: auto;
-}
-.dt-flt-radio-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 8px;
-  border-radius: var(--r1);
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--t2);
-  transition: background 0.1s;
-  user-select: none;
-}
-.dt-flt-radio-item:hover { background: var(--bg3); }
-.dt-flt-radio-item.on {
-  background: var(--emb);
-  color: var(--em);
-  font-weight: 500;
-}
-.dt-flt-radio-dot {
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--b2);
-  flex-shrink: 0;
-  transition: all 0.12s;
-}
-.dt-flt-radio-item.on .dt-flt-radio-dot {
-  background: var(--em);
-  border-color: var(--em);
-  box-shadow: 0 0 0 3px var(--emb);
-}
-.dt-flt-radio-check {
-  margin-right: auto;
-  font-size: 13px;
-  color: var(--em);
-}
-
-/* ─── Number Filter ──────────────────────────────────────────────────────── */
-.dt-flt-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 10px 10px 4px;
-}
-.dt-flt-pill {
-  padding: 3px 10px;
-  border: 1px solid var(--b2);
-  border-radius: 20px;
-  background: var(--bg2);
-  color: var(--t3);
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.12s;
-}
-.dt-flt-pill:hover { border-color: var(--em); color: var(--em); }
-.dt-flt-pill.act {
-  background: var(--em);
-  color: #fff;
-  border-color: var(--em);
-}
-.dt-flt-range-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-}
-.dt-flt-range-field {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.dt-flt-range-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--t4);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.dt-flt-range-sep {
-  color: var(--t4);
-  font-size: 14px;
-  padding-top: 18px;
-}
-.dt-flt-range-field .dt-fi { width: 100%; }
-
-/* ─── Date Filter — Tabs ─────────────────────────────────────────────────── */
-.dt-flt-popup--date { min-width: 280px; }
-
-.dt-flt-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 6px 8px 0;
-  border-bottom: 1px solid var(--b1);
-  margin-bottom: 4px;
-}
-.dt-flt-tab {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: none;
-  color: var(--t3);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  border-radius: var(--r1) var(--r1) 0 0;
-  position: relative;
-  margin-bottom: -1px;
-  transition: all 0.12s;
-}
-.dt-flt-tab:hover { color: var(--t1); background: var(--bg3); }
-.dt-flt-tab.on {
-  color: var(--em);
-  border-bottom-color: var(--em);
-  background: var(--emb);
-}
-.dt-flt-tab-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--em);
-  position: absolute;
-  top: 4px;
-  left: 4px;
-}
-
-/* ─── Date Shortcuts ─────────────────────────────────────────────────────── */
-.dt-flt-sc-wrap {
-  padding: 6px 8px;
-  overflow-y: auto;
-  max-height: 300px;
-}
-/* Custom scrollbar */
-.dt-flt-sc-wrap::-webkit-scrollbar { width: 4px; }
-.dt-flt-sc-wrap::-webkit-scrollbar-track { background: transparent; }
-.dt-flt-sc-wrap::-webkit-scrollbar-thumb { background: var(--b2); border-radius: 4px; }
-
-.dt-flt-sc-group { margin-bottom: 10px; }
-.dt-flt-sc-group:last-child { margin-bottom: 0; }
-
-.dt-flt-sc-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--t4);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  padding: 0 2px 4px;
-}
-.dt-flt-sc-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px;
-}
-.dt-flt-sc-btn {
-  padding: 6px 8px;
-  border: 1px solid var(--b2);
-  border-radius: var(--r1);
-  background: var(--bg2);
-  color: var(--t2);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  text-align: right;
-  transition: all 0.11s;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dt-flt-sc-btn:hover {
-  border-color: var(--em);
-  color: var(--em);
-  background: var(--emb);
-}
-.dt-flt-sc-btn.act {
-  background: var(--em);
-  color: #fff;
-  border-color: var(--em);
-  font-weight: 600;
-}
-
-/* ─── Date Manual ────────────────────────────────────────────────────────── */
-.dt-flt-manual-wrap {
-  padding: 10px 10px 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.dt-flt-manual-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.dt-flt-manual-field .dt-fi { width: 100%; }
-.dt-flt-manual-preview {
-  font-size: 11px;
-  color: var(--t3);
-  background: var(--bg3);
-  border-radius: var(--r1);
-  padding: 5px 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  direction: ltr;
-}
-
-/* ─── Title badge ────────────────────────────────────────────────────────── */
-.dt-flt-title-badge {
-  margin-right: auto;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 20px;
-  background: var(--emb);
-  color: var(--em);
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   v9.0 — Pagination Compact
-══════════════════════════════════════════════════════════════════════════ */
-.dt-pagination-compact {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.dt-pg-arrow {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--b2);
-  border-radius: var(--r1);
-  background: var(--bg2);
-  color: var(--t3);
-  cursor: pointer;
-  font-size: 15px;
-  transition: all 0.12s;
-  flex-shrink: 0;
-}
-.dt-pg-arrow:hover:not(:disabled) {
-  border-color: var(--em);
-  color: var(--em);
-  background: var(--emb);
-}
-.dt-pg-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
-.dt-pg-arrow:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
-
-.dt-pg-select-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.dt-pg-select {
-  appearance: none;
-  -webkit-appearance: none;
-  height: 30px;
-  padding: 0 28px 0 10px;
-  border: 1px solid var(--b2);
-  border-radius: var(--r1);
-  background: var(--bg2);
-  color: var(--t1);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  min-width: 100px;
-  text-align: center;
-  transition: border-color 0.12s;
-  direction: rtl;
-}
-.dt-pg-select:hover { border-color: var(--em); }
-.dt-pg-select:focus {
-  outline: 2px solid var(--em);
-  outline-offset: 1px;
-  border-color: var(--em);
-}
-.dt-pg-select-icon {
-  position: absolute;
-  left: 8px;
-  font-size: 12px;
-  color: var(--t4);
-  pointer-events: none;
-}
-
-/* Dark mode overrides */
-body.dark .dt-flt-sc-btn { background: var(--bg3); }
-body.dark .dt-flt-pill   { background: var(--bg3); }
-body.dark .dt-pg-select  { background: var(--bg3); }

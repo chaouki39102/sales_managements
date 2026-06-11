@@ -5,7 +5,7 @@ import type {
   MultiSortState, URLStateConfig, FilterMap,
   RowGroupConfig, RowGroup, ColumnPinConfig, ActiveCell,
   Column, CellValidationRule, PendingEdit, BatchEditState,
-  EditingCell, PasteOptions, SmartFilterResult, SavedView,
+  CellEditPayload, EditingCell, PasteOptions, SmartFilterResult, SavedView,
   SavedViewsConfig, ContextMenuItem, ContextMenuContext, ContextMenuState,
 } from './types';
 import {
@@ -461,6 +461,16 @@ export function useColumnPinning(
     onChange?.({});
   }, [onChange]);
 
+  // batch update: يُستخدم من handleApplyView — setState واحد بدلاً من N
+  const setPinConfigBatch = useCallback((config: ColumnPinConfig) => {
+    const next: ColumnPinConfig = {
+      start: config.start ?? [],
+      end:   config.end   ?? [],
+    };
+    setPinConfig(next);
+    onChange?.(next);
+  }, [onChange]);
+
   // ✅ إصلاح: حساب offset تراكمي للأعمدة المثبتة
   // بدون هذا، كل عمودين مثبتَين على نفس الجانب يحصلان على left:0 ويتداخلان
   const getPinnedOffset = useCallback((
@@ -764,25 +774,11 @@ export interface SmartFilterPattern {
 }
 
 // الأنماط الافتراضية — فارغة عمداً
-// كل مشروع يُمرر customPatterns الخاصة به عبر useSmartFilter
-// راجع: my-erp/datatable-patterns.ts لأنماط ERP الجزائري
-export const DEFAULT_SMART_FILTER_PATTERNS: SmartFilterPattern[] = [
-  // فواتير متأخرة
-  { regex: /فاتورة(?:ات)?\s+(?:متأخرة\s+)?أكثر\s+من\s+(\d+)\s+يوم/, field: 'overdue_days', operator: 'gt', valueType: 'number' },
-  { regex: /(?:تأخر|مضى)\s+أكثر\s+من\s+(\d+)\s+يوم/, field: 'overdue_days', operator: 'gt', valueType: 'number' },
-  // مقارنات رقمية عامة
-  { regex: /أقل\s+من\s+(\d[\d\s]*)(?:\s+دج)?/, field: '$1', operator: 'lt', valueType: 'number' },
-  { regex: /أكثر\s+من\s+(\d[\d\s]*)(?:\s+دج)?/, field: '$1', operator: 'gt', valueType: 'number' },
-  { regex: /بين\s+(\d[\d\s]*)\s+و(?:الى|إلى)?\s+(\d[\d\s]*)/, field: 'range', operator: 'between', valueType: 'number' },
-  // طرف / عميل / مورد
-  { regex: /(?:العميل|الزبون|الطرف|المورد)\s+(?:اسمه\s+)?["']?([^"'\s]+)["']?/, field: 'party.name', operator: 'contains', valueType: 'string' },
-  // الحالة
-  { regex: /(?:الحالة|الوضع)\s+["']?([^"'\s]+)["']?/, field: 'document_status.name', operator: 'eq', valueType: 'string' },
-  // المخزن
-  { regex: /(?:المخزن|المستودع)\s+["']?([^"'\s]+)["']?/, field: 'warehouse.name', operator: 'contains', valueType: 'string' },
-  // الفرز
-  { regex: /(?:رتب|فرز|صنّف)\s+(?:حسب\s+)?([^\s]+)\s+(تصاعدي|تنازلي|الأحدث|الأقدم)/, field: '$1', operator: 'sort', valueType: 'string' },
-];
+// المكتبة لا تعرف شيئاً عن بنية بيانات المشروع
+// كل مشروع يُمرر customPatterns الخاصة به:
+//   useSmartFilter(columns, onFilter, MY_PATTERNS)
+// مثال: datatable-patterns.ts في مشروع ERP الجزائري
+export const DEFAULT_SMART_FILTER_PATTERNS: SmartFilterPattern[] = [];
 
 export function useSmartFilter<T>(
   columns: Column<T>[],
@@ -934,11 +930,15 @@ export function useContextMenu<T = Record<string, unknown>>(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// useColumnVisibility — يدير إظهار/إخفاء الأعمدة مع localStorage
+// useColumnVisibility — standalone hook لإدارة رؤية الأعمدة
 //
-// الاستخدام:
+// ⚠️  استخدمه فقط خارج DataTable (في مكونات مخصصة)
+//     داخل DataTable استخدم: columnDefs + hiddenColumnKeys + onHiddenColumnsChange
+//     التي تُدار بـ updateHidden المركزية وتُعلم الأب دائماً
+//
+// الاستخدام المستقل:
 //   const { visibleColumns, hiddenColumns, toggleColumn } =
-//     useColumnVisibility(allColumns, [], `cdp-cols-${typeCode}`);
+//     useColumnVisibility(allColumns, initialHidden);
 // ════════════════════════════════════════════════════════════════════════════
 
 export function useColumnVisibility<T = Record<string, unknown>>(
@@ -1095,8 +1095,13 @@ export function useColumnStatePersistence(storageKey: string | null | undefined)
     try { localStorage.removeItem(storageKey); } catch { /* تجاهل */ }
   }, [storageKey]);
 
-  // استخراج القيمة الابتدائية بكسل واحدة في التهيئة
-  const initialSnapshot = useMemo(() => load(), [load]);
+  // استخراج القيمة الابتدائية مرة واحدة فقط عند الـ mount
+  // useRef أفضل من useMemo هنا لأن useMemo لا يضمن الاستقرار
+  const initialSnapshotRef = useRef<ColumnStateSnapshot | null | undefined>(undefined);
+  if (initialSnapshotRef.current === undefined) {
+    initialSnapshotRef.current = load();
+  }
+  const initialSnapshot = initialSnapshotRef.current;
 
   return { load, save, reset, initialSnapshot };
 }
@@ -1111,7 +1116,10 @@ export function useRowModel<T>(
   globalQuery: string,
   sorts: import('./types').MultiSortState,
   legacySortState: import('./types').SortState,
+  /** كل الأعمدة (بما فيها المخفية) — للفلترة والفرز */
   columns: import('./types').Column<T>[],
+  /** الأعمدة المرئية فقط — للبحث العام (لا نبحث في المخفية) */
+  searchCols: import('./types').Column<T>[],
   options: {
     clientFiltered: boolean;
     clientSorted: boolean;
@@ -1119,22 +1127,21 @@ export function useRowModel<T>(
     multiSort: boolean;
   }
 ): T[] {
-  // نحتفظ بالنتيجة الأخيرة في ref حتى لا نُعيد الحساب ما لم تتغير المدخلات
-  const prevResultRef = useRef<T[]>(data);
-
   const result = useMemo(() => {
     let r = data;
+    // الفلترة: تشمل كل الأعمدة (المخفية يمكن فلترتها من الـ API)
     if (options.clientFiltered) r = applyClientFilter(r, filters, columns);
-    if (options.searchable && globalQuery) r = applyGlobalSearch(r, globalQuery, columns);
+    // البحث العام: فقط الأعمدة المرئية — لا نُرجع نتائج من أعمدة المستخدم لا يراها
+    if (options.searchable && globalQuery) r = applyGlobalSearch(r, globalQuery, searchCols);
     if (options.clientSorted) {
       if (options.multiSort && sorts.length > 0) r = applyMultiSort(r, sorts, columns);
       else if (legacySortState.key) r = applyClientSort(r, legacySortState, columns);
     }
-    prevResultRef.current = r;
     return r;
   }, [
     data, filters, globalQuery, sorts, legacySortState,
-    columns, options.clientFiltered, options.clientSorted,
+    columns, searchCols,
+    options.clientFiltered, options.clientSorted,
     options.searchable, options.multiSort,
   ]);
 
@@ -1204,14 +1211,19 @@ export function useTreeData<T>(
       }
     }
 
-    // تعبئة الـ collapsed الافتراضية
-    if (defaultCollapsed) {
-      setCollapsed(new Set(parentIds));
-    }
-
     return { byId, childrenOf, parentIds };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, config?.idKey, config?.parentKey, config?.defaultCollapsed]);
+
+  // ✅ إصلاح خطأ حرج: نقل setCollapsed من useMemo إلى useEffect
+  // useMemo يجب أن يكون pure — أي side effect فيه ينتهك قواعد React
+  // ويمكن أن يسبب تحديثات غير متوقعة أو حلقات لا نهائية في Strict Mode
+  const treeParentIds = tree?.parentIds;
+  const defaultCollapsedFlag = config?.defaultCollapsed ?? false;
+  useEffect(() => {
+    if (!treeParentIds || !defaultCollapsedFlag) return;
+    setCollapsed(new Set(treeParentIds));
+  }, [treeParentIds, defaultCollapsedFlag]);
 
   // Flatten الشجرة مع مراعاة الـ collapsed
   const treeRows = useMemo<TreeRow<T>[]>(() => {
