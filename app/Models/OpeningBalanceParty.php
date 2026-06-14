@@ -25,18 +25,18 @@ class OpeningBalanceParty extends Model
 
     protected $casts = [
         'opening_balance' => 'decimal:4',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'created_at'      => 'datetime',
+        'updated_at'      => 'datetime',
     ];
 
     public static array $searchableFields = [];
-    public static array $filterable = ['fiscal_year_id', 'party_id', 'balance_type'];
-    public static array $sortable = ['id', 'opening_balance', 'created_at'];
-    public static array $defaultWith = [];
+    public static array $filterable      = ['fiscal_year_id', 'party_id', 'balance_type'];
+    public static array $sortable        = ['id', 'opening_balance', 'created_at'];
+    public static array $defaultWith     = [];
     public static array $allowedIncludes = ['fiscalYear', 'party'];
-    public static string $defaultSort = 'party_id';
-    public static ?int $cacheTtl = 3600;
-    public static array $cacheTags = ['opening_balances_parties'];
+    public static string $defaultSort    = 'party_id';
+    public static ?int $cacheTtl         = 3600;
+    public static array $cacheTags       = ['opening_balances_parties'];
 
     public function fiscalYear(): BelongsTo
     {
@@ -56,5 +56,17 @@ class OpeningBalanceParty extends Model
     public function isCredit(): bool
     {
         return $this->balance_type === 'credit';
+    }
+
+    /**
+     * Signed amount: positive for debit, negative for credit.
+     * Mirrors OpeningBalanceStock::getAverageCostPrice() pattern —
+     * encapsulates the sign logic so callers never repeat it.
+     */
+    public function signedAmount(): float
+    {
+        return $this->isDebit()
+            ? (float) $this->opening_balance
+            : -(float) $this->opening_balance;
     }
 }

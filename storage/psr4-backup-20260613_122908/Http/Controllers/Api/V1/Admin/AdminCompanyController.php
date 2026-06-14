@@ -1,0 +1,270 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Http\Resources\CompanyResource;
+use App\Http\Resources\UserResource;
+use App\Models\Company;
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class AdminCompanyController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $query = Company::query()
+            ->withCount('users')
+            ->with('owner:id,name,email');
+
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('slug', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($status = $request->get('status')) {
+            match ($status) {
+                'active'     => $query->where('active', true)->whereNull('suspended_at'),
+                'suspended'  => $query->whereNotNull('suspended_at'),
+                'inactive'   => $query->where('active', false),
+                'verified'   => $query->whereNotNull('verified_at'),
+                'unverified' => $query->whereNull('verified_at'),
+                default      => null,
+            };
+        }
+
+        if ($plan = $request->get('plan')) {
+            $query->where('plan', $plan);
+        }
+
+        $sortBy = in_array($request->get('sort_by'), ['name', 'created_at', 'users_count'])
+                    ? $request->get('sort_by')
+                    : 'created_at';
+        $sortDir = $request->get('sort_dir', 'desc') === 'asc' ? 'asc' : 'desc';
+        $query->orderBy($sortBy, $sortDir);
+
+        $companies = $query->paginate($request->get('per_page', 20));
+        $items = CompanyResource::collection($companies);
+
+        return response()->json([
+            'data'  => $items->collection,
+            'meta'  => [
+                'current_page' => $companies->currentPage(),
+                'last_page'    => $companies->lastPage(),
+                'per_page'     => $companies->perPage(),
+                'total'        => $companies->total(),
+                'from'         => $companies->firstItem(),
+                'to'           => $companies->lastItem(),
+            ],
+            'links' => [
+                'first' => $companies->url(1),
+                'last'  => $companies->url($companies->lastPage()),
+                'prev'  => $companies->previousPageUrl(),
+                'next'  => $companies->nextPageUrl(),
+            ],
+        ]);
+    }
+
+    public function show(Company $company): JsonResponse
+    {
+        $company->loadCount('users')->load('owner:id,name,email');
+        return response()->json([
+            'data' => new CompanyResource($company)
+        ]);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:100',
+            'plan' => 'required|in:free,starter,professional,enterprise',
+            'max_users'      => 'nullable|integer|min:1',
+            'max_products'   => 'nullable|integer|min:1',
+            'max_warehouses' => 'nullable|integer|min:1',
+        ]);
+
+        $company = Company::create($data + ['owner_id' => auth()->id()]);
+        return response()->json([
+            'data' => new CompanyResource($company)
+        ], 201);
+    }
+
+    public function update(Request $request, Company $company): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'email' => 'nullable|email|max:100',
+            'active' => 'sometimes|boolean',
+        ]);
+
+        $company->update($data);
+        return response()->json([
+            'data' => new CompanyResource($company->fresh())
+        ]);
+    }
+
+    public function destroy(Company $company): JsonResponse
+    {
+        $company->delete();
+        return response()->json(null, 204);
+    }
+
+    public function suspend(Request $request, Company $company): JsonResponse
+    {
+        $data = $request->validate(['reason' => 'required|string|max:500']);
+        $company->suspend($data['reason'], auth()->id());
+        return response()->json([
+            'data' => new CompanyResource($company->fresh())
+        ]);
+    }
+
+    public function unsuspend(Company $company): JsonResponse
+    {
+        $company->unsuspend();
+        return response()->json([
+            'data' => new CompanyResource($company->fresh())
+        ]);
+    }
+
+    public function activate(Company $company): JsonResponse
+    {
+        $company->activate();
+        return response()->json([
+            'data' => new CompanyResource($company->fresh())
+        ]);
+    }
+
+    public function deactivate(Company $company): JsonResponse
+    {
+        $company->deactivate(auth()->id());
+        return response()->json([
+            'data' => new CompanyResource($company->fresh())
+        ]);
+    }
+
+    public function verify(Company $company): JsonResponse
+    {
+        $company->verify(auth()->id());
+        return response()->json([
+            'data' => new CompanyResource($company->fresh())
+        ]);
+    }
+
+    public function unverify(Company $company): JsonResponse
+    {
+        $company->unverify();
+        return response()->json(['message' => 'تم إلغاء التوثيق']);
+    }
+
+    public function changePlan(Request $request, Company $company): JsonResponse
+    {
+        $data = $request->validate([
+            'plan'           => ['required', 'string', 'in:free,starter,professional,enterprise'],
+            'max_users'      => 'nullable|integer|min:1',
+            'max_warehouses' => 'nullable|integer|min:1',
+            'max_products'   => 'nullable|integer|min:1',
+        ]);
+
+        $customLimits = array_filter([
+            'max_users'      => $data['max_users']      ?? null,
+            'max_warehouses' => $data['max_warehouses'] ?? null,
+            'max_products'   => $data['max_products']   ?? null,
+        ]);
+
+        $company->upgradePlan($data['plan'], $customLimits ?: null);
+        return response()->json([
+            'data' => new CompanyResource($company->fresh())
+        ]);
+    }
+
+    public function updateNotes(Request $request, Company $company): JsonResponse
+    {
+        $data = $request->validate(['notes' => 'nullable|string|max:5000']);
+        $company->update(['notes' => $data['notes']]);
+        return response()->json(['message' => 'تم تحديث الملاحظات']);
+    }
+
+    public function users(Request $request, Company $company): JsonResponse
+    {
+        $users = $company->users()
+            ->withPivot(['role', 'active', 'created_at'])
+            ->orderByPivot('created_at', 'desc')
+            ->paginate($request->get('per_page', 20));
+
+        $items = UserResource::collection($users);
+
+        return response()->json([
+            'data'  => $items->collection,
+            'meta'  => [
+                'current_page' => $users->currentPage(),
+                'last_page'    => $users->lastPage(),
+                'per_page'     => $users->perPage(),
+                'total'        => $users->total(),
+                'from'         => $users->firstItem(),
+                'to'           => $users->lastItem(),
+            ],
+            'links' => [
+                'first' => $users->url(1),
+                'last'  => $users->url($users->lastPage()),
+                'prev'  => $users->previousPageUrl(),
+                'next'  => $users->nextPageUrl(),
+            ],
+        ]);
+    }
+
+    public function addUser(Request $request, Company $company): JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'role'    => 'nullable|string|max:50',
+        ]);
+
+        if (DB::table('company_user')->where('company_id', $company->id)->where('user_id', $data['user_id'])->exists()) {
+            return response()->json(['message' => 'المستخدم موجود بالفعل'], 422);
+        }
+
+        $company->users()->attach($data['user_id'], [
+            'role'       => $data['role'] ?? 'member',
+            'active'     => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'تمت إضافة المستخدم للشركة'], 201);
+    }
+
+    public function removeUser(Company $company, User $user): JsonResponse
+    {
+        $company->users()->detach($user->id);
+        return response()->json(['message' => 'تم إزالة المستخدم من الشركة']);
+    }
+
+    public function toggleUserStatus(Company $company, User $user): JsonResponse
+    {
+        $membership = DB::table('company_user')
+            ->where('company_id', $company->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$membership) {
+            return response()->json(['message' => 'المستخدم ليس عضواً في هذه الشركة'], 404);
+        }
+
+        $newStatus = !$membership->active;
+        DB::table('company_user')
+            ->where('company_id', $company->id)
+            ->where('user_id', $user->id)
+            ->update(['active' => $newStatus, 'updated_at' => now()]);
+
+        return response()->json([
+            'data'    => ['active' => $newStatus],
+            'message' => $newStatus ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم',
+        ]);
+    }
+}

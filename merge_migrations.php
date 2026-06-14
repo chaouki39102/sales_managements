@@ -1,6 +1,6 @@
 <?php
 
-$dir = __DIR__ . '/database/migrations';
+$dir = __DIR__ . '/database/migrations/';
 $outputFile = __DIR__ . '/all_migrations_combined.php';
 
 $files = glob($dir . '/*.php');
@@ -10,7 +10,7 @@ if (!$files) {
     exit;
 }
 
-$content = "<?php\n\n// دمج تلقائي لكل ملفات الـ migrations\n\n";
+$content = "<?php\n\n// دمج تلقائي لكل ملفات الـ requests\n\n";
 
 foreach ($files as $file) {
     $filename = basename($file);

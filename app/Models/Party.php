@@ -13,7 +13,7 @@ use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
 use App\Models\Traits\HasTenantRouteBinding;
 use App\Models\Traits\HasTenantSlug;
-
+use App\Services\PartyBalanceService;
 
 #[Cacheable]
 class Party extends Model
@@ -48,7 +48,6 @@ class Party extends Model
         'avatar',
         'bank_name',
         'rib',
-        'initial_balance',
         'credit_limit',
         'default_price_level_id',
         'credit_days',
@@ -65,52 +64,58 @@ class Party extends Model
     ];
 
     protected $casts = [
-        'capital_amount' => 'decimal:4',
-        'rc_date' => 'date',
-        'initial_balance' => 'decimal:4',
-        'credit_limit' => 'decimal:4',
-        'credit_days' => 'integer',
-        'is_tva_exempt' => 'boolean',
-        'is_taxable' => 'boolean',
-        'is_final_consumer' => 'boolean',
-        'is_vat_registered' => 'boolean',
-        'vat_registration_date' => 'date',
-        'additional_data' => 'array',
-        'active' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'deleted_at' => 'datetime',
+        'capital_amount'       => 'decimal:4',
+        'rc_date'              => 'date',
+        'credit_limit'         => 'decimal:4',
+        'credit_days'          => 'integer',
+        'is_tva_exempt'        => 'boolean',
+        'is_taxable'           => 'boolean',
+        'is_final_consumer'    => 'boolean',
+        'is_vat_registered'    => 'boolean',
+        'vat_registration_date'=> 'date',
+        'additional_data'      => 'array',
+        'active'               => 'boolean',
+        'created_at'           => 'datetime',
+        'updated_at'           => 'datetime',
+        'deleted_at'           => 'datetime',
     ];
 
-    public static array $searchableFields = ['name', 'commercial_name', 'code', 'nif', 'rc', 'email', 'phone', 'mobile', 'address'];
-    public static array $filterable = [
-        'party_type_id', 'legal_form_id', 'commune_id', 'wilaya_id', 'default_price_level_id',
-        'is_tva_exempt', 'is_taxable', 'is_final_consumer', 'is_vat_registered', 'active'
+    public static array $searchableFields = [
+        'name', 'commercial_name', 'code', 'nif', 'rc', 'email', 'phone', 'mobile', 'address'
     ];
-    public static array $sortable = ['id', 'code', 'name', 'commercial_name', 'created_at', 'updated_at'];
-    public static array $defaultWith = [];
+    public static array $filterable = [
+        'party_type_id', 'legal_form_id', 'commune_id', 'wilaya_id',
+        'default_price_level_id', 'is_tva_exempt', 'is_taxable',
+        'is_final_consumer', 'is_vat_registered', 'active',
+    ];
+    public static array $sortable        = ['id', 'code', 'name', 'commercial_name', 'created_at', 'updated_at'];
+    public static array $defaultWith     = [];
     public static array $allowedIncludes = [
         'partyType', 'legalForm', 'commune', 'wilaya', 'defaultPriceLevel',
-        'commercialDocuments', 'payments', 'openingBalances', 'createdBy', 'updatedBy', 'deletedBy'
+        'commercialDocuments', 'payments', 'openingBalances',
+        'createdBy', 'updatedBy', 'deletedBy',
     ];
-    public static string $defaultSort = 'name';
+    public static string $defaultSort          = 'name';
     public static string $defaultSortDirection = 'asc';
-    public static int $defaultPerPage = 15;
-    public static int $perPageLimit = 100;
-    public static ?int $cacheTtl = 300;
-    public static array $cacheTags = ['parties'];
+    public static int $defaultPerPage          = 15;
+    public static int $perPageLimit            = 100;
+    public static ?int $cacheTtl               = 300;
+    public static array $cacheTags             = ['parties'];
     public static array $cacheInvalidateRelations = ['commercialDocuments', 'payments'];
-    public static array $scopes = [];
+    public static array $scopes                = [];
 
-    public function partyType(): BelongsTo { return $this->belongsTo(PartyType::class); }
-    public function legalForm(): BelongsTo { return $this->belongsTo(LegalForm::class); }
-    public function commune(): BelongsTo { return $this->belongsTo(Commune::class); }
-    public function wilaya(): BelongsTo { return $this->belongsTo(Wilaya::class); }
-    public function defaultPriceLevel(): BelongsTo { return $this->belongsTo(PriceLevel::class, 'default_price_level_id'); }
+    public function partyType(): BelongsTo      { return $this->belongsTo(PartyType::class); }
+    public function legalForm(): BelongsTo      { return $this->belongsTo(LegalForm::class); }
+    public function commune(): BelongsTo        { return $this->belongsTo(Commune::class); }
+    public function wilaya(): BelongsTo         { return $this->belongsTo(Wilaya::class); }
+    public function defaultPriceLevel(): BelongsTo
+    {
+        return $this->belongsTo(PriceLevel::class, 'default_price_level_id');
+    }
     public function commercialDocuments(): HasMany { return $this->hasMany(CommercialDocument::class); }
-    public function payments(): HasMany { return $this->hasMany(Payment::class); }
-    public function openingBalances(): HasMany { return $this->hasMany(OpeningBalanceParty::class); }
-    public function checks(): HasMany { return $this->hasMany(Check::class); }
+    public function payments(): HasMany            { return $this->hasMany(Payment::class); }
+    public function openingBalances(): HasMany     { return $this->hasMany(OpeningBalanceParty::class); }
+    public function checks(): HasMany              { return $this->hasMany(Check::class); }
 
     public function scopeCustomers(Builder $query): Builder
     {
@@ -133,9 +138,17 @@ class Party extends Model
         return implode(', ', $parts);
     }
 
+    /**
+     * Current balance as of today for the active fiscal year.
+     *
+     * WARNING: triggers 3 DB queries via PartyBalanceService.
+     * Do NOT use inside list/collection resources — use
+     * PartyBalanceService::getAllBalancesAt() for list screens instead.
+     */
     public function getCurrentBalanceAttribute(): float
     {
-        return 0.00; // سيتم تنفيذه لاحقاً
+        return app(PartyBalanceService::class)
+            ->getBalanceAt($this->id, now()->toDateString())['current_balance'];
     }
 
     public function isCustomer(): bool
@@ -147,5 +160,4 @@ class Party extends Model
     {
         return in_array($this->partyType?->name, ['supplier', 'both']);
     }
-
 }
