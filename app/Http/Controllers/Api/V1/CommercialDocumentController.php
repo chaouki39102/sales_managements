@@ -9,6 +9,7 @@ use App\Http\Resources\CommercialDocumentResource;
 use App\Services\QRCodeService;
 use App\Services\CommercialDocumentService;
 use App\Models\CommercialDocument;
+use App\Models\Company;          // ✅ أضفنا هذا
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -60,34 +61,18 @@ class CommercialDocumentController extends BaseApiController
                 'validatedBy', 'user', 'documentType', 'currency', 'fiscalYear',
             ]);
 
-            // ══════════════════════════════════════════════════════════════════
-            // ✅ IMPORTANT: كل الفلاتر تُقرأ من $f مباشرة كـ array
-            //
-            // السبب: HTTP يُرسل filter[party.name] → PHP يُحلّلها كـ:
-            //   filter = ['party.name' => 'value']  ← مفتاح يحتوي نقطة حرفية
-            //
-            // $request->has('filter.party.name') و $request->input('filter.party.name')
-            // تفشل لأن Laravel يُفسّر النقطة كـ nested path (filter→party→name)
-            // بينما الحقيقي هو literal key "party.name" داخل مصفوفة "filter"
-            //
-            // الحل الوحيد: $f = $request->input('filter', []); isset($f['party.name'])
-            // ══════════════════════════════════════════════════════════════════
             $f = $request->input('filter', []);
 
-            // ── 1. فلاتر المفاتيح الأجنبية المباشرة ─────────────────────────
             foreach (['document_type_id','fiscal_year_id','document_status_id','party_id','warehouse_id'] as $field) {
                 if (isset($f[$field]) && $f[$field] !== '') {
                     $query->where($field, $f[$field]);
                 }
             }
 
-            // ── 2. البحث في رقم المستند ───────────────────────────────────────
-            // document_number له filter type:"text" → يصل كـ $f['document_number']
             if (isset($f['document_number']) && $f['document_number'] !== '') {
                 $query->where('document_number', 'like', '%' . $f['document_number'] . '%');
             }
 
-            // ── 3. البحث العام (search) ───────────────────────────────────────
             if (isset($f['search']) && $f['search'] !== '') {
                 $search = $f['search'];
                 $query->where(function ($q) use ($search) {
@@ -98,8 +83,6 @@ class CommercialDocumentController extends BaseApiController
                 });
             }
 
-            // ── 4. فلاتر العلاقات النصية (مفاتيح بنقطة — literal keys) ───────
-            // ✅ party.name: يدعم CSV من dynamic-multiselect ("Cevital,CANDIA")
             if (isset($f['party.name']) && $f['party.name'] !== '') {
                 $names = array_filter(array_map('trim', explode(',', $f['party.name'])));
                 $query->whereHas('party', function ($q) use ($names) {
@@ -111,7 +94,6 @@ class CommercialDocumentController extends BaseApiController
                 });
             }
 
-            // ✅ warehouse.name: يدعم CSV
             if (isset($f['warehouse.name']) && $f['warehouse.name'] !== '') {
                 $names = array_filter(array_map('trim', explode(',', $f['warehouse.name'])));
                 $query->whereHas('warehouse', function ($q) use ($names) {
@@ -123,7 +105,6 @@ class CommercialDocumentController extends BaseApiController
                 });
             }
 
-            // ✅ document_status.name: يدعم CSV + case-insensitive
             if (isset($f['document_status.name']) && $f['document_status.name'] !== '') {
                 $names = array_filter(array_map('trim', explode(',', $f['document_status.name'])));
                 $query->whereHas('documentStatus', function ($q) use ($names) {
@@ -135,11 +116,6 @@ class CommercialDocumentController extends BaseApiController
                 });
             }
 
-            // ── 5. فلاتر التاريخ ──────────────────────────────────────────────
-            // ✅ إصلاح رئيسي: document_date في DB هو datetime (UTC)
-            //    فلتر "today" يُرسل min=max="2026-06-11"
-            //    whereBetween('document_date', ['2026-06-11','2026-06-11']) = فشل على datetime!
-            //    الحل: استخدام whereDate() دائماً لحقول التاريخ
             $dateFields = ['document_date', 'due_date', 'validated_at', 'created_at', 'updated_at'];
             foreach ($dateFields as $field) {
                 if (!isset($f[$field]) || $f[$field] === '') continue;
@@ -150,10 +126,8 @@ class CommercialDocumentController extends BaseApiController
 
                 if ($minDate !== '' && $maxDate !== '') {
                     if ($minDate === $maxDate) {
-                        // ✅ نفس التاريخ → whereDate() بدلاً من whereBetween
                         $query->whereDate($field, $minDate);
                     } else {
-                        // ✅ نطاق تاريخ → whereDate بين يوم البداية ويوم النهاية
                         $query->whereDate($field, '>=', $minDate)
                               ->whereDate($field, '<=', $maxDate);
                     }
@@ -164,7 +138,6 @@ class CommercialDocumentController extends BaseApiController
                 }
             }
 
-            // ── 6. فلاتر الأرقام (نطاق) ──────────────────────────────────────
             $numericFields = ['total_ht','total_tva','total_ttc','total_discount','total_stamp','net_to_pay','remaining_amount'];
             foreach ($numericFields as $field) {
                 if (!isset($f[$field]) || $f[$field] === '') continue;
@@ -182,14 +155,12 @@ class CommercialDocumentController extends BaseApiController
                 }
             }
 
-            // ── 7. فلاتر نصية مباشرة ─────────────────────────────────────────
             foreach (['reference', 'notes', 'payment_terms'] as $field) {
                 if (isset($f[$field]) && $f[$field] !== '') {
                     $query->where($field, 'like', '%' . $f[$field] . '%');
                 }
             }
 
-            // ── 8. الفرز ─────────────────────────────────────────────────────
             $sortParam    = $request->input('sort', '-document_date');
             $sorts        = explode(',', $sortParam);
             $allowedSorts = [
@@ -224,7 +195,6 @@ class CommercialDocumentController extends BaseApiController
                 };
             }
 
-            // ── 9. Pagination ─────────────────────────────────────────────────
             $perPage = min((int) $request->input('per_page', 15), 100);
 
             return $this->successResponse(
@@ -238,7 +208,7 @@ class CommercialDocumentController extends BaseApiController
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // باقي الـ actions بدون تغيير
+    // دوال Route Model Binding المُصلحة (أضفنا Company $company كأول معامل)
     // ══════════════════════════════════════════════════════════════════════════
 
     public function unpaid(Request $request): JsonResponse
@@ -263,59 +233,101 @@ class CommercialDocumentController extends BaseApiController
         } catch (\Throwable $e) { return $this->handleError($e, 'overdue'); }
     }
 
-    public function validateDocument(Request $request, $id): JsonResponse
+    /**
+     * ✅ مصحح: (Request, Company, CommercialDocument)
+     */
+    public function validateDocument(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('update', $document);
-            $this->commercialDocumentService->validateDocument($document, $request);
-            return $this->successResponse(new CommercialDocumentResource($document->fresh()), 'تم التحقق من الوثيقة بنجاح');
-        } catch (\Throwable $e) { return $this->handleError($e, 'validate'); }
+            $this->authorizeAction('update', $commercialDocument);
+            $this->commercialDocumentService->validateDocument($commercialDocument, $request);
+            return $this->successResponse(
+                new CommercialDocumentResource($commercialDocument->fresh()),
+                'تم التحقق من الوثيقة بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'validate');
+        }
     }
 
-    public function lock(Request $request, $id): JsonResponse
+    /**
+     * ✅ مصحح: (Request, Company, CommercialDocument)
+     */
+    public function lock(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('update', $document);
-            $this->commercialDocumentService->lockDocument($document);
-            return $this->successResponse(new CommercialDocumentResource($document->fresh()), 'تم قفل الوثيقة بنجاح');
-        } catch (\Throwable $e) { return $this->handleError($e, 'lock'); }
+            $this->authorizeAction('update', $commercialDocument);
+            $this->commercialDocumentService->lockDocument($commercialDocument);
+            return $this->successResponse(
+                new CommercialDocumentResource($commercialDocument->fresh()),
+                'تم قفل الوثيقة بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'lock');
+        }
     }
 
-    public function unlock(Request $request, $id): JsonResponse
+    /**
+     * ✅ مصحح: (Request, Company, CommercialDocument)
+     */
+    public function unlock(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('update', $document);
-            $this->commercialDocumentService->unlockDocument($document);
-            return $this->successResponse(new CommercialDocumentResource($document->fresh()), 'تم فتح قفل الوثيقة بنجاح');
-        } catch (\Throwable $e) { return $this->handleError($e, 'unlock'); }
+            $this->authorizeAction('update', $commercialDocument);
+            $this->commercialDocumentService->unlockDocument($commercialDocument);
+            return $this->successResponse(
+                new CommercialDocumentResource($commercialDocument->fresh()),
+                'تم فتح قفل الوثيقة بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'unlock');
+        }
     }
 
-    public function cancel(Request $request, $id): JsonResponse
+    /**
+     * ✅ مصحح: (Request, Company, CommercialDocument)
+     */
+    public function cancel(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('delete', $document);
-            $request->validate(['cancellation_reason' => 'required|string|max:500']);
-            $this->commercialDocumentService->cancelDocument($document, $request->cancellation_reason);
-            return $this->successResponse(new CommercialDocumentResource($document->fresh()), 'تم إلغاء الوثيقة بنجاح');
-        } catch (\Throwable $e) { return $this->handleError($e, 'cancel'); }
+            $this->authorizeAction('delete', $commercialDocument);
+
+            $validated = $request->validate([
+                'cancellation_reason' => 'required|string|max:500'
+            ]);
+
+            $this->commercialDocumentService->cancelDocument(
+                $commercialDocument,
+                $validated['cancellation_reason']
+            );
+
+            return $this->successResponse(
+                new CommercialDocumentResource($commercialDocument->fresh()),
+                'تم إلغاء الوثيقة بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'cancel');
+        }
     }
 
-    public function generateQRCode($id): JsonResponse
+    /**
+     * ✅ مصحح: (Company, CommercialDocument) — لا يوجد $request
+     */
+    public function generateQRCode(Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('view', $document);
-            $qrCode       = $this->qrCodeService->generateForDocument($document);
-            $qrDataString = $this->qrCodeService->getQRDataString($document);
+            $this->authorizeAction('view', $commercialDocument);
+
+            $qrCode       = $this->qrCodeService->generateForDocument($commercialDocument);
+            $qrDataString = $this->qrCodeService->getQRDataString($commercialDocument);
+
             return $this->successResponse(
                 ['qr_code_base64' => $qrCode, 'qr_data_string' => $qrDataString],
                 'تم توليد QR Code بنجاح'
             );
-        } catch (\Throwable $e) { return $this->handleError($e, 'generateQRCode'); }
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'generateQRCode');
+        }
     }
 
     protected function getService(): CommercialDocumentService { return $this->commercialDocumentService; }

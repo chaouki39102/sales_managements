@@ -162,4 +162,16 @@ export const tenantKeys = {
     current: (slug: string) => [slug, 'settings']                                                  as const,
   },
 
+
+  // ── Balances (الأرصدة) ─────────────────────────────────────────────────────
+   partyBalances: {
+        all:  (slug: string) => [slug, 'party-balances'] as const,
+        list: (slug: string, params?: Record<string, unknown>) => [slug, 'party-balances', 'list', params] as const,
+        detail: (slug: string, partyId: number, date?: string) => [slug, 'party-balances', partyId, date] as const,
+    },
+    openingBalances: {
+        parties:  (slug: string, yearId: number) => [slug, 'opening-balances', 'parties', yearId] as const,
+        treasury: (slug: string, yearId: number) => [slug, 'opening-balances', 'treasury', yearId] as const,
+    },
 } as const;
+

@@ -1,13 +1,18 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/documents/CommercialDocumentsPage.tsx  —  v10.3
+// pages/documents/CommercialDocumentsPage.tsx  —  v10.4
 //
-// ✅ جديد في v10.3:
-//   • useColumnStatePersistence — مفتاح localStorage واحد لكل typeCode يحفظ:
-//     columnOrder + hiddenColumns + activeFilters (pinnedColumns جاهز للإضافة)
-//   • زر إعادة ضبط Layout يظهر عند وجود snapshot محفوظ
-//   • إزالة المفاتيح المتفرقة: cdp-column-order-* و cdp-cols-*
+// ✅ جديد في v10.4:
+//   • إزالة validateMut و deleteMut (المستند معتمد فور الإنشاء)
+//   • إضافة unlockMut — فتح القفل متاح للمستندات غير المُصدَّرة
+//   • cancelMut يرسل cancellation_reason
+//   • getRowPermissions() — helper خارجي لحساب الصلاحيات
+//   • عمود is_locked مرئي افتراضياً + نقر مزدوج للتبديل
+//   • contextMenuItems: كتلة "table" للقفل/فتح الجماعي
+//   • STATUS_CFG مُبسَّط: validated + cancelled فقط
+//   • isExpandable: كل المستندات قابلة للتوسع
 //
-// ✅ محفوظ من v10.2:
+// ✅ محفوظ من v10.3:
+//   • useColumnStatePersistence — مفتاح localStorage واحد
 //   • smartFilterPatterns={ERP_FILTER_PATTERNS} مُفعَّل
 //   • DataTableErrorBoundary يلف الجدول
 // ════════════════════════════════════════════════════════════════════════════
@@ -26,7 +31,7 @@ import {
     useQueryClient,
     keepPreviousData,
 } from "@tanstack/react-query";
-import { apiGet, apiPost, apiDelete } from "@/lib/api/core/client";
+import { apiGet, apiPost } from "@/lib/api/core/client";
 import { tenantKeys } from "@/lib/api/core/queryKeys";
 import { useActiveSlug } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
@@ -54,14 +59,8 @@ const SALE_CODES     = new Set(["FV", "BL", "DEV", "BCC", "AV"]);
 const PURCHASE_CODES = new Set(["FA", "BR", "DDP", "BCF", "AA"]);
 
 const STATUS_CFG = {
-    draft:          { label: "مسودة",          color: "#6b7280", bg: "#f3f4f6", dot: "#9ca3af" },
-    pending:        { label: "قيد الانتظار",   color: "#d97706", bg: "#fffbeb", dot: "#f59e0b" },
-    validated:      { label: "معتمد",          color: "#2563eb", bg: "#eff6ff", dot: "#3b82f6" },
-    partially_paid: { label: "مدفوع جزئياً",   color: "#7c3aed", bg: "#f5f3ff", dot: "#8b5cf6" },
-    paid:           { label: "مدفوع",          color: "#059669", bg: "#ecfdf5", dot: "#10b981" },
-    overdue:        { label: "متأخر",          color: "#dc2626", bg: "#fef2f2", dot: "#ef4444" },
-    cancelled:      { label: "ملغي",           color: "#dc2626", bg: "#fef2f2", dot: "#fca5a5" },
-    returned:       { label: "مرتجع",          color: "#7c3aed", bg: "#f5f3ff", dot: "#a78bfa" },
+    validated:  { label: "معتمد", color: "#2563eb", bg: "#eff6ff", dot: "#3b82f6" },
+    cancelled:  { label: "ملغي",  color: "#dc2626", bg: "#fef2f2", dot: "#fca5a5" },
 } as const;
 
 type StatusKey = keyof typeof STATUS_CFG;
@@ -343,6 +342,26 @@ const ActionBtn = React.memo(function ActionBtn({
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// ROW PERMISSIONS HELPER
+// ════════════════════════════════════════════════════════════════════════════
+
+function getRowPermissions(row: CommercialDocument, isReadOnly: boolean) {
+    const isLocked    = !!row.is_locked;
+    const isExported  = !!(row as unknown as Record<string, unknown>).is_exported_to_accounting;
+    const status      = getDocStatus(row);
+    const isCancelled = status === "cancelled";
+
+    return {
+        canEdit:   !isReadOnly && !isLocked && !isExported,
+        canLock:   !isReadOnly && !isLocked && !isCancelled,
+        canUnlock: !isReadOnly &&  isLocked && !isExported,
+        canCancel: !isReadOnly && !isLocked && !isExported && !isCancelled,
+        isLocked,
+        isCancelled,
+    };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // DOCUMENT VIEW MODAL (مختصر — يبقى كما هو تقريباً)
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -396,7 +415,7 @@ function DocumentViewModal({
                         </div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                        {!isReadOnly && d && status === "draft" && (
+                        {!isReadOnly && d && !(d as Record<string, unknown>).is_locked && (
                             <button onClick={onEdit} style={{ height: 32, padding: "0 14px", borderRadius: 8, border: `1px solid color-mix(in srgb, var(--blue) 30%, transparent)`, background: "color-mix(in srgb, var(--blue) 8%, transparent)", color: "var(--blue)", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
                                 <i className="ti ti-pencil" style={{ fontSize: 13 }} aria-hidden="true" />
                                 تعديل
@@ -682,25 +701,21 @@ export default function CommercialDocumentsPage() {
     }, [docsRaw, perPage]);
 
     // ── Mutations ─────────────────────────────────────────────────────────────
-    const validateMut = useMutation({
-        mutationFn: (id: number) => apiPost(`/documents/${id}/validate`),
-        onSuccess: () => { showToast("تم الاعتماد بنجاح"); invalidateDocs(); },
-        onError:   () => showToast("فشل الاعتماد", "error"),
-    });
     const lockMut = useMutation({
         mutationFn: (id: number) => apiPost(`/documents/${id}/lock`),
         onSuccess: () => { showToast("تم قفل المستند"); invalidateDocs(); },
         onError:   () => showToast("فشل القفل", "error"),
     });
+    const unlockMut = useMutation({
+        mutationFn: (id: number) => apiPost(`/documents/${id}/unlock`),
+        onSuccess: () => { showToast("تم فتح قفل المستند"); invalidateDocs(); },
+        onError:   () => showToast("فشل فتح القفل", "error"),
+    });
     const cancelMut = useMutation({
-        mutationFn: (id: number) => apiPost(`/documents/${id}/cancel`),
+        mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+            apiPost(`/documents/${id}/cancel`, { cancellation_reason: reason }),
         onSuccess: () => { showToast("تم إلغاء المستند"); invalidateDocs(); },
         onError:   () => showToast("فشل الإلغاء", "error"),
-    });
-    const deleteMut = useMutation({
-        mutationFn: (id: number) => apiDelete(`/documents/${id}`),
-        onSuccess: () => { showToast("تم الحذف بنجاح"); invalidateDocs(); },
-        onError:   () => showToast("فشل الحذف", "error"),
     });
 
     // ── Edit modal ────────────────────────────────────────────────────────────
@@ -751,6 +766,60 @@ export default function CommercialDocumentsPage() {
                     </span>
                 </div>
             ),
+        },
+        {
+            key: "is_locked",
+            header: "مقفل",
+            exportHeader: "مقفل",
+            width: 80,
+            sortable: true,
+            defaultHidden: false,
+            filter: {
+                type: "select" as const,
+                options: [
+                    { value: "1", label: "مقفل" },
+                    { value: "0", label: "غير مقفل" },
+                ],
+            },
+            accessor: (r: CommercialDocument) => r.is_locked ? "مقفل" : "—",
+            render: (row: CommercialDocument) => {
+                const locked     = !!row.is_locked;
+                const isExported = !!(row as unknown as Record<string, unknown>).is_exported_to_accounting;
+                return (
+                    <span
+                        title={
+                            locked
+                                ? isExported
+                                    ? "مقفل ومُصدَّر — لا يمكن فتحه"
+                                    : "مقفل — انقر مرتين لفتح القفل"
+                                : "غير مقفل — انقر مرتين للقفل"
+                        }
+                        onDoubleClick={() => {
+                            if (isReadOnly) return;
+                            if (locked) {
+                                if (isExported) { showToast("لا يمكن فتح قفل مستند مُصدَّر للمحاسبة", "error"); return; }
+                                if (window.confirm("تأكيد فتح قفل هذا المستند؟")) unlockMut.mutate(row.id);
+                            } else {
+                                const status = getDocStatus(row);
+                                if (status === "cancelled") { showToast("لا يمكن قفل مستند ملغى", "error"); return; }
+                                if (window.confirm("تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل.")) lockMut.mutate(row.id);
+                            }
+                        }}
+                        style={{
+                            display: "inline-flex", alignItems: "center", gap: 4,
+                            cursor: isReadOnly ? "default" : "pointer",
+                            padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 700,
+                            color:      locked ? "var(--orange)" : "var(--t4)",
+                            background: locked ? "color-mix(in srgb, var(--orange) 10%, transparent)" : "transparent",
+                            border:     locked ? "1px solid color-mix(in srgb, var(--orange) 25%, transparent)" : "none",
+                            userSelect: "none",
+                        }}
+                    >
+                        <i className={`ti ${locked ? "ti-lock" : "ti-lock-open"}`} style={{ fontSize: 12 }} aria-hidden="true" />
+                        {locked ? "مقفل" : "—"}
+                    </span>
+                );
+            },
         },
         {
             key: "document_date",
@@ -1148,14 +1217,14 @@ export default function CommercialDocumentsPage() {
     ], []);
 
     // ════════════════════════════════════════════════════════════════════════
-    // CONTEXT MENU ITEMS — يستخدم ctx.row المُصلح في v10.1
+    // CONTEXT MENU ITEMS
     // ════════════════════════════════════════════════════════════════════════
 
     const contextMenuItems = useCallback((ctx: ContextMenuContext): ContextMenuItem[] => {
         const menuItems: ContextMenuItem[] = [];
 
+        // ─── خلية ───────────────────────────────────────────────────────────
         if (ctx.type === "cell") {
-            // ✅ ctx.row مُملوء الآن بـ useContextMenu v10.1
             const row    = ctx.row as CommercialDocument | undefined;
             const colKey = ctx.colKey;
             const value  = row && colKey ? (row as unknown as Record<string, unknown>)[colKey] : undefined;
@@ -1187,17 +1256,17 @@ export default function CommercialDocumentsPage() {
                     label: "عرض التفاصيل",
                     icon: "eye",
                     disabled: !row,
-                    onClick: () => {
-                        if (row) { setViewDocId(row.id); setModal("view"); }
-                    },
+                    onClick: () => { if (row) { setViewDocId(row.id); setModal("view"); } },
                 },
             );
         }
 
+        // ─── صف ─────────────────────────────────────────────────────────────
         if (ctx.type === "row") {
-            // ✅ ctx.row مُملوء
             const row = ctx.row as CommercialDocument | undefined;
-            const status = row ? getDocStatus(row) : "";
+            const { canEdit, canLock, canUnlock, canCancel } = row
+                ? getRowPermissions(row, !!isReadOnly)
+                : { canEdit: false, canLock: false, canUnlock: false, canCancel: false };
 
             menuItems.push(
                 {
@@ -1219,71 +1288,104 @@ export default function CommercialDocumentsPage() {
                 },
             );
 
-            if (!isReadOnly && row && status === "draft") {
-                menuItems.push(
-                    { label: "", divider: true, onClick: () => {} },
-                    {
-                        label: "تعديل المستند",
-                        icon: "pencil",
-                        onClick: () => { if (row) openEditModal(row); },
+            const editActions: ContextMenuItem[] = [];
+
+            if (canEdit) {
+                editActions.push({
+                    label: "تعديل المستند",
+                    icon: "pencil",
+                    onClick: () => { if (row) openEditModal(row); },
+                });
+            }
+            if (canLock) {
+                editActions.push({
+                    label: "قفل المستند",
+                    icon: "lock",
+                    onClick: () => {
+                        if (row && window.confirm("تأكيد قفل هذا المستند؟")) lockMut.mutate(row.id);
                     },
-                    {
-                        label: "اعتماد المستند",
-                        icon: "check",
-                        onClick: () => {
-                            if (row && window.confirm("تأكيد اعتماد هذا المستند؟")) {
-                                validateMut.mutate(row.id);
-                            }
-                        },
+                });
+            }
+            if (canUnlock) {
+                editActions.push({
+                    label: "فتح قفل المستند",
+                    icon: "lock-open",
+                    onClick: () => {
+                        if (row && window.confirm("تأكيد فتح قفل هذا المستند؟")) unlockMut.mutate(row.id);
                     },
-                    {
-                        label: "حذف المستند",
-                        icon: "trash",
-                        onClick: () => {
-                            if (row && !row.is_locked && window.confirm("تأكيد حذف هذا المستند؟")) {
-                                deleteMut.mutate(row.id);
-                            }
-                        },
+                });
+            }
+            if (canCancel) {
+                editActions.push({
+                    label: "إلغاء المستند",
+                    icon: "ban",
+                    onClick: () => {
+                        if (!row) return;
+                        const reason = window.prompt("سبب الإلغاء (إلزامي):");
+                        if (!reason?.trim()) return;
+                        if (window.confirm("تأكيد إلغاء المستند؟")) cancelMut.mutate({ id: row.id, reason: reason.trim() });
                     },
-                );
+                });
             }
 
-            if (!isReadOnly && row && !["cancelled","returned","draft"].includes(status)) {
-                menuItems.push(
-                    { label: "", divider: true, onClick: () => {} },
-                    {
-                        label: "إلغاء المستند",
-                        icon: "ban",
-                        onClick: () => {
-                            if (row && window.confirm("تأكيد إلغاء هذا المستند؟")) {
-                                cancelMut.mutate(row.id);
-                            }
-                        },
-                    },
-                );
+            if (editActions.length > 0) {
+                menuItems.push({ label: "", divider: true, onClick: () => {} }, ...editActions);
             }
         }
 
+        // ─── رأس العمود ─────────────────────────────────────────────────────
         if (ctx.type === "header") {
-            const colKey = ctx.colKey;
+            const colKey   = ctx.colKey;
             const isHidden = colKey ? hiddenColumnsSet.has(colKey) : false;
-            menuItems.push(
-                {
-                    label: isHidden ? "إظهار العمود" : "إخفاء العمود",
-                    icon: isHidden ? "eye" : "eye-off",
-                    disabled: !colKey,
-                    onClick: () => {
-                        if (colKey) {
-                            handleHiddenColumnsChange(colKey, !hiddenColumnsSet.has(colKey));
-                            showToast(isHidden ? `تم إظهار العمود` : `تم إخفاء العمود`, "info");
-                        }
-                    },
+            menuItems.push({
+                label:    isHidden ? "إظهار العمود" : "إخفاء العمود",
+                icon:     isHidden ? "eye" : "eye-off",
+                disabled: !colKey,
+                onClick: () => {
+                    if (colKey) {
+                        handleHiddenColumnsChange(colKey, !hiddenColumnsSet.has(colKey), hiddenColumnKeys);
+                        showToast(isHidden ? "تم إظهار العمود" : "تم إخفاء العمود", "info");
+                    }
                 },
-            );
+            });
+        }
+
+        // ─── جدول — قفل/فتح جماعي للصفحة الحالية ──────────────────────────
+        if (ctx.type === "table" && !isReadOnly) {
+            const lockable   = items.filter(r => getRowPermissions(r, false).canLock);
+            const unlockable = items.filter(r => getRowPermissions(r, false).canUnlock);
+
+            if (lockable.length > 0) {
+                menuItems.push({
+                    label: `قفل الكل (${lockable.length} مستند)`,
+                    icon: "lock",
+                    onClick: () => {
+                        if (!window.confirm(`تأكيد قفل ${lockable.length} مستند في هذه الصفحة؟`)) return;
+                        lockable.reduce(
+                            (chain, doc) => chain.then(() => lockMut.mutateAsync(doc.id).catch(() => null)),
+                            Promise.resolve(null as unknown),
+                        ).then(() => showToast(`تم قفل ${lockable.length} مستند`, "success"));
+                    },
+                });
+            }
+
+            if (unlockable.length > 0) {
+                menuItems.push({
+                    label: `فتح قفل الكل (${unlockable.length} مستند)`,
+                    icon: "lock-open",
+                    onClick: () => {
+                        if (!window.confirm(`تأكيد فتح قفل ${unlockable.length} مستند في هذه الصفحة؟`)) return;
+                        unlockable.reduce(
+                            (chain, doc) => chain.then(() => unlockMut.mutateAsync(doc.id).catch(() => null)),
+                            Promise.resolve(null as unknown),
+                        ).then(() => showToast(`تم فتح قفل ${unlockable.length} مستند`, "success"));
+                    },
+                });
+            }
         }
 
         return menuItems;
-    }, [hiddenColumnsSet, handleHiddenColumnsChange, isReadOnly, openEditModal, validateMut, deleteMut, cancelMut, showToast]);
+    }, [hiddenColumnsSet, hiddenColumnKeys, handleHiddenColumnsChange, isReadOnly, openEditModal, lockMut, unlockMut, cancelMut, items, showToast]);
 
     // ════════════════════════════════════════════════════════════════════════
     // SMART FILTER CALLBACK
@@ -1308,27 +1410,65 @@ export default function CommercialDocumentsPage() {
     // ════════════════════════════════════════════════════════════════════════
 
     const rowActions = useCallback((row: CommercialDocument) => {
-        const status   = getDocStatus(row);
-        const canEdit  = !isReadOnly && !row.is_locked && status === "draft";
-        const canValid = !isReadOnly && !row.is_locked && status === "draft";
-        const canLock  = !isReadOnly && !row.is_locked && !!( row as unknown as Record<string,unknown>).validated_at;
-        const canCancel = !isReadOnly && !["cancelled","returned"].includes(status);
-        const canDelete = !isReadOnly && !row.is_locked && status === "draft";
+        const { canEdit, canLock, canUnlock, canCancel } = getRowPermissions(row, !!isReadOnly);
+
+        const handleCancel = () => {
+            const reason = window.prompt("سبب الإلغاء (إلزامي):");
+            if (!reason?.trim()) return;
+            if (window.confirm("تأكيد إلغاء المستند؟")) {
+                cancelMut.mutate({ id: row.id, reason: reason.trim() });
+            }
+        };
 
         return (
             <div style={{ display: "flex", gap: 3, justifyContent: "center" }}>
-                <ActionBtn icon="ti-eye"   title="عرض"    onClick={() => { setViewDocId(row.id); setModal("view"); }} />
-                {canEdit  && <ActionBtn icon={loadingEdit ? "ti-loader-2" : "ti-pencil"} title="تعديل"  color="var(--blue)"   disabled={loadingEdit}         onClick={() => openEditModal(row)} />}
-                {canValid && <ActionBtn icon="ti-check"  title="اعتماد" color="var(--em)"    disabled={validateMut.isPending} onClick={() => { if (window.confirm("تأكيد اعتماد هذا المستند؟")) validateMut.mutate(row.id); }} />}
-                {canLock  && <ActionBtn icon="ti-lock"   title="قفل"    color="var(--orange)" disabled={lockMut.isPending}    onClick={() => { if (window.confirm("تأكيد قفل هذا المستند؟")) lockMut.mutate(row.id); }} />}
-                {canDelete ? (
-                    <ActionBtn icon="ti-trash" title="حذف"   color="var(--red)"   disabled={deleteMut.isPending}  onClick={() => { if (window.confirm("تأكيد حذف هذا المستند؟")) deleteMut.mutate(row.id); }} />
-                ) : canCancel ? (
-                    <ActionBtn icon="ti-ban"   title="إلغاء" color="var(--red)"   disabled={cancelMut.isPending}  onClick={() => { if (window.confirm("تأكيد إلغاء هذا المستند؟")) cancelMut.mutate(row.id); }} />
-                ) : null}
+                {/* عرض — دائماً متاح */}
+                <ActionBtn icon="ti-eye" title="عرض" onClick={() => { setViewDocId(row.id); setModal("view"); }} />
+
+                {/* تعديل — !is_locked && !is_exported */}
+                {canEdit && (
+                    <ActionBtn
+                        icon={loadingEdit ? "ti-loader-2" : "ti-pencil"}
+                        title="تعديل" color="var(--blue)" disabled={loadingEdit}
+                        onClick={() => openEditModal(row)}
+                    />
+                )}
+
+                {/* قفل — غير مقفل + غير ملغى */}
+                {canLock && (
+                    <ActionBtn
+                        icon="ti-lock" title="قفل المستند" color="var(--orange)"
+                        disabled={lockMut.isPending}
+                        onClick={() => {
+                            if (window.confirm("تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل."))
+                                lockMut.mutate(row.id);
+                        }}
+                    />
+                )}
+
+                {/* فتح القفل — مقفل + غير مُصدَّر */}
+                {canUnlock && (
+                    <ActionBtn
+                        icon="ti-lock-open" title="فتح القفل" color="var(--blue)"
+                        disabled={unlockMut.isPending}
+                        onClick={() => {
+                            if (window.confirm("تأكيد فتح قفل هذا المستند؟"))
+                                unlockMut.mutate(row.id);
+                        }}
+                    />
+                )}
+
+                {/* إلغاء */}
+                {canCancel && (
+                    <ActionBtn
+                        icon="ti-ban" title="إلغاء" color="var(--red)"
+                        disabled={cancelMut.isPending}
+                        onClick={handleCancel}
+                    />
+                )}
             </div>
         );
-    }, [isReadOnly, loadingEdit, openEditModal, validateMut, lockMut, deleteMut, cancelMut]);
+    }, [isReadOnly, loadingEdit, openEditModal, lockMut, unlockMut, cancelMut]);
 
     // ════════════════════════════════════════════════════════════════════════
     // HEADER ACTIONS
@@ -1397,7 +1537,7 @@ export default function CommercialDocumentsPage() {
     ), [docType?.name, typeCode, isPurch, opColor, selectedYear]);
 
     // ── Callbacks ─────────────────────────────────────────────────────────────
-    const isExpandable  = useCallback((row: CommercialDocument) => { const s = getDocStatus(row); return s !== "draft" && s !== "cancelled"; }, []);
+    const isExpandable  = useCallback((_row: CommercialDocument) => true, []);
     const renderExpanded = useCallback((row: CommercialDocument) => <ExpandedLines doc={row} />, []);
     const rowClassName = useCallback((row: CommercialDocument): string | undefined => {
         const status = getDocStatus(row);

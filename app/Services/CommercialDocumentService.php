@@ -17,6 +17,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * CommercialDocumentService — منطق مُبسَّط
+ *
+ * قواعد النظام:
+ *   ✅ الإنشاء → الحالة مباشرة "validated" + حركات المخزون فوراً
+ *   ✅ التعديل → مسموح دائماً ما لم يكن is_locked = true
+ *   ✅ القفل   → is_locked عمود مستقل، لا علاقة له بالحالة
+ *   ✅ الإلغاء → الحالة تصبح "cancelled" (في حالات نادرة جداً)
+ *   ❌ لا مسودة، لا اعتماد لاحق، لا حذف، لا مرتجع
+ *   ❌ حالات المالية (paid/overdue/partially_paid) لا تُدار هنا
+ * ════════════════════════════════════════════════════════════════════════════
+ */
 class CommercialDocumentService extends \App\Core\Services\BaseService
 {
     use ValidatesTenantRelations;
@@ -36,6 +49,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     // ═══════════════════════════════════════════════════════════════════════
     // HOOK: beforeCreate
+    // يُعدّ البيانات ويُولّد رقم المستند والسلسلة الترقيمية
     // ═══════════════════════════════════════════════════════════════════════
 
     protected function beforeCreate(array $data, $request): array
@@ -55,6 +69,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
         $data = $this->prepareDocumentData($data);
 
+        // تحقق من نوع الوثيقة
         $documentType = DocumentType::where('company_id', $companyId)
             ->where('id', $data['document_type_id'] ?? 0)
             ->first();
@@ -67,6 +82,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             throw new BusinessRuleException('يجب تحديد العميل/المورد لهذا النوع من الوثائق.', 422);
         }
 
+        // السلسلة الترقيمية ورقم المستند
         if (empty($data['numbering_series_id'])) {
             $data['numbering_series_id'] = $this
                 ->resolveNumberingSeries($documentType->id, $companyId)->id;
@@ -76,12 +92,16 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $data['document_number'] = $this->generateDocumentNumber($documentType, $companyId);
         }
 
+        // السنة المالية
         if (empty($data['fiscal_year_id'])) {
             $data['fiscal_year_id'] = $this->getCurrentFiscalYearId($companyId)
                 ?? throw new BusinessRuleException('لا توجد سنة مالية مفتوحة.', 422);
         }
 
-        $data['document_status_id'] = $this->getStatusId($companyId, 'draft');
+        // ✅ الحالة مباشرةً "validated" — لا مسودة
+        $data['validated_at'] = now();
+        $data['validated_by'] = auth()->id();
+        $data['document_status_id'] = $this->getStatusId($companyId, 'validated');
 
         $this->validateTenantRelations($data, $companyId, [
             'party_id'       => 'parties',
@@ -95,61 +115,36 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     // ═══════════════════════════════════════════════════════════════════════
     // HOOK: afterCreate
-    //
-    // الاكتشاف الجوهري: afterCreateCommitted لا تُستدعى من BaseService
-    // — هي دالة معرّفة لكن BaseService لا يعرفها ولا يستدعيها.
-    //
-    // لذا كل المنطق يجب أن يكون هنا في afterCreate داخل نفس الـ transaction:
-    //   1. إنشاء الأسطر (مع حساب إجمالياتها)
-    //   2. حساب إجماليات الوثيقة
-    //   3. التحقق من الوثيقة + إنشاء حركات المخزون
-    //
-    // ✅ الحركات داخل الـ transaction = إذا فشلت، تُلغى الوثيقة كاملاً
-    //    هذا السلوك الصحيح — وثيقة بدون حركات مخزون = بيانات غير متسقة
+    // إنشاء الأسطر + حساب الإجماليات + حركات المخزون — كل شيء في transaction واحد
     // ═══════════════════════════════════════════════════════════════════════
 
-   protected function afterCreate(Model $item, array $data, $request): void
-{
-    // ✅ نأخذ lines من $request مباشرة — ضمان وصولها حتى لو صفّى BaseService $data
-    $lines = $request?->input('lines') ?? $data['lines'] ?? [];
-
-    if (!empty($lines)) {
-        $this->createDocumentLines($item, $lines);
-    }
-
-    $this->recalculateTotals($item);
-
-    $item->load('documentType', 'lines.product');
-    $this->validateDocument($item, $request);
-}
-
-protected function afterUpdate(Model $item, array $data, $request): void
-{
-    $lines = $request?->input('lines') ?? $data['lines'] ?? [];
-
-    if (!empty($lines)) {
-        // حذف الأسطر القديمة وإعادة إنشاؤها (تعديل كامل)
-        $item->lines()->delete();
-        $this->createDocumentLines($item, $lines);
-    }
-
-    // ✅ دائماً إعادة الحساب عند أي تعديل
-    $this->recalculateTotals($item);
-}
-    // ═══════════════════════════════════════════════════════════════════════
-    // HOOK: afterCreateCommitted — محتفَظ به للتوافق مع BaseService المستقبلي
-    // إذا أضاف BaseService يوماً دعماً لهذه الدالة
-    // ═══════════════════════════════════════════════════════════════════════
-
-    protected function afterCreateCommitted(Model $item, array $data, $request): void
+    protected function afterCreate(Model $item, array $data, $request): void
     {
-        // لا شيء هنا — كل المنطق في afterCreate
-        // إذا أضاف BaseService دعماً لهذه الدالة مستقبلاً:
-        //   يجب نقل validateDocument() إلى هنا وإزالتها من afterCreate
+        $lines = $request?->input('lines') ?? $data['lines'] ?? [];
+
+        if (!empty($lines)) {
+            $this->createDocumentLines($item, $lines);
+        }
+
+        $this->recalculateTotals($item);
+
+        // ✅ حركات المخزون فوراً بعد الإنشاء (لأن الوثيقة معتمدة مباشرةً)
+        $item->load('documentType', 'lines.product');
+
+        if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
+            $this->createStockMovements($item);
+        }
+
+        // ✅ ربط الدفعات إذا أُرسلت مع المستند
+        $payments = $request?->input('payments') ?? $data['payments'] ?? [];
+        if (!empty($payments)) {
+            $this->attachPayments($item, $payments);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // HOOK: beforeUpdate
+    // القاعدة الوحيدة: مقفول = ممنوع التعديل
     // ═══════════════════════════════════════════════════════════════════════
 
     protected function beforeUpdate(Model $item, array $data, $request): void
@@ -160,32 +155,40 @@ protected function afterUpdate(Model $item, array $data, $request): void
             throw new BusinessRuleException('لا يمكن تعديل وثيقة مقفلة.', 409);
         }
 
-        if ($item->validated_at && $request?->user()?->cannot('force_edit_document')) {
-            throw new BusinessRuleException('لا يمكن تعديل وثيقة معتمدة.', 409);
-        }
-
         if ($item->is_exported_to_accounting) {
             throw new BusinessRuleException('لا يمكن تعديل وثيقة تم تصديرها للمحاسبة.', 409);
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // HOOK: beforeDelete
+    // HOOK: afterUpdate
+    // إعادة حساب الأسطر والإجماليات إذا تغيرت الأسطر
+    // ─── ملاحظة: حركات المخزون لا تُعاد تلقائياً عند التعديل ───
+    // TODO: إذا احتجت لذلك لاحقاً: احذف الحركات القديمة وأنشئ جديدة
+    // ═══════════════════════════════════════════════════════════════════════
+
+    protected function afterUpdate(Model $item, array $data, $request): void
+    {
+        $lines = $request?->input('lines') ?? $data['lines'] ?? [];
+
+        if (!empty($lines)) {
+            $item->lines()->delete();
+            $this->createDocumentLines($item, $lines);
+        }
+
+        $this->recalculateTotals($item);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HOOK: beforeDelete — حذف ممنوع تماماً
     // ═══════════════════════════════════════════════════════════════════════
 
     protected function beforeDelete(Model $item): void
     {
-        if ($item->is_locked) {
-            throw new BusinessRuleException('لا يمكن حذف وثيقة مقفلة.', 409);
-        }
-
-        if ($item->is_exported_to_accounting) {
-            throw new BusinessRuleException('لا يمكن حذف وثيقة تم تصديرها للمحاسبة.', 409);
-        }
-
-        if ($item->payments()->exists()) {
-            throw new BusinessRuleException('لا يمكن حذف وثيقة مرتبطة بمدفوعات.', 409);
-        }
+        throw new BusinessRuleException(
+            'لا يمكن حذف المستندات التجارية. استخدم الإلغاء بدلاً من الحذف.',
+            409
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -193,55 +196,40 @@ protected function afterUpdate(Model $item, array $data, $request): void
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * اعتماد الوثيقة — idempotent
-     *
-     * تُستدعى من:
-     *   - afterCreate() عند إنشاء وثيقة جديدة
-     *   - CommercialDocumentController::validateDocument() عند التحقق اليدوي
-     *
-     * idempotent: إذا validated_at موجودة → لا نفعل شيئاً
+     * قفل المستند — يمنع أي تعديل لاحق
      */
-    public function validateDocument(CommercialDocument $document, $request): void
-    {
-        if ($document->validated_at) {
-            return;
-        }
-
-        $document->updateQuietly([
-            'validated_at' => now(),
-            'validated_by' => $request?->user()?->id ?? auth()->id(),
-        ]);
-
-        $validatedStatusId = $this->getStatusId($document->company_id, 'validated');
-        if ($validatedStatusId) {
-            $document->updateQuietly(['document_status_id' => $validatedStatusId]);
-        }
-
-        $document->loadMissing('documentType', 'lines.product');
-
-        if (($document->documentType?->affects_stock_direction ?? 0) !== 0) {
-            $this->createStockMovements($document);
-        }
-    }
-
     public function lockDocument(CommercialDocument $document): void
     {
         $document->updateQuietly(['is_locked' => true]);
     }
 
+    /**
+     * فتح قفل المستند
+     */
     public function unlockDocument(CommercialDocument $document): void
     {
+        if ($document->is_exported_to_accounting) {
+            throw new BusinessRuleException('لا يمكن فتح قفل وثيقة مُصدَّرة للمحاسبة.', 409);
+        }
+
         $document->updateQuietly(['is_locked' => false]);
     }
 
+    /**
+     * إلغاء المستند — في حالات نادرة جداً
+     * يضع الحالة "cancelled" ولا يؤثر على المخزون بأثر رجعي
+     *
+     * ⚠️ تنبيه: المخزون الذي تأثر عند الإنشاء لا يُعكس تلقائياً.
+     *    إذا احتجت لعكس المخزون: أنشئ مستند مقابل (مرتجع) بدلاً من الإلغاء.
+     */
     public function cancelDocument(CommercialDocument $document, string $reason): void
     {
         if ($document->is_locked) {
-            throw new BusinessRuleException('لا يمكن إلغاء وثيقة مقفلة.', 409);
+            throw new BusinessRuleException('لا يمكن إلغاء وثيقة مقفلة. افتح القفل أولاً.', 409);
         }
 
-        if ($document->payments()->exists()) {
-            throw new BusinessRuleException('لا يمكن إلغاء وثيقة مرتبطة بمدفوعات.', 409);
+        if ($document->is_exported_to_accounting) {
+            throw new BusinessRuleException('لا يمكن إلغاء وثيقة تم تصديرها للمحاسبة.', 409);
         }
 
         $document->updateQuietly([
@@ -250,6 +238,9 @@ protected function afterUpdate(Model $item, array $data, $request): void
         ]);
     }
 
+    /**
+     * جلب المستندات غير المسددة (remaining_amount > 0)
+     */
     public function getUnpaid()
     {
         return CommercialDocument::unpaid()
@@ -257,6 +248,9 @@ protected function afterUpdate(Model $item, array $data, $request): void
             ->get();
     }
 
+    /**
+     * جلب المستندات المتأخرة (due_date < today + remaining > 0)
+     */
     public function getOverdue()
     {
         return CommercialDocument::overdue()
@@ -266,10 +260,6 @@ protected function afterUpdate(Model $item, array $data, $request): void
 
     // ═══════════════════════════════════════════════════════════════════════
     // PRIVATE: إنشاء أسطر الوثيقة
-    //
-    // ✅ الإجماليات محسوبة في Service مباشرة لأن:
-    //    CommercialDocumentLineObserver::saving() يعتمد على isDirty()
-    //    الذي يُرجع false عند create() الجديد — لا قيم قديمة للمقارنة
     // ═══════════════════════════════════════════════════════════════════════
 
     private function createDocumentLines(CommercialDocument $document, array $lines): void
@@ -328,6 +318,51 @@ protected function afterUpdate(Model $item, array $data, $request): void
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // PRIVATE: ربط الدفعات بالمستند
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private function attachPayments(CommercialDocument $document, array $payments): void
+    {
+        foreach ($payments as $paymentData) {
+            if (empty($paymentData['payment_mode_id']) || empty($paymentData['amount'])) {
+                continue;
+            }
+
+            $amount = (float) $paymentData['amount'];
+            if ($amount <= 0) continue;
+
+            $payment = \App\Models\Payment::create([
+                'company_id'      => $document->company_id,
+                'payment_mode_id' => (int) $paymentData['payment_mode_id'],
+                'amount'          => $amount,
+                'payment_date'    => $paymentData['payment_date'] ?? $document->document_date,
+                'reference'       => $paymentData['reference'] ?? null,
+                'notes'           => $paymentData['notes'] ?? null,
+                'user_id'         => auth()->id(),
+            ]);
+
+            $document->payments()->attach($payment->id, [
+                'amount_applied' => $amount,
+                'notes'          => $paymentData['notes'] ?? null,
+            ]);
+        }
+
+        // ✅ إعادة حساب paid_amount و remaining_amount بعد ربط الدفعات
+        $this->recalculatePaymentAmounts($document);
+    }
+
+    private function recalculatePaymentAmounts(CommercialDocument $document): void
+    {
+        $document->load('payments');
+        $paidAmount = (float) $document->payments->sum('pivot.amount_applied');
+
+        $document->updateQuietly([
+            'paid_amount'      => round($paidAmount, 4),
+            'remaining_amount' => round(max(0, (float) $document->net_to_pay - $paidAmount), 4),
+        ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // PRIVATE: حساب إجماليات الوثيقة
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -356,7 +391,7 @@ protected function afterUpdate(Model $item, array $data, $request): void
             'total_stamp'      => round($totalStamp,     4),
             'total_ttc'        => round($totalTtc,       4),
             'net_to_pay'       => round($netToPay,       4),
-            'remaining_amount' => round($netToPay,       4),
+            'remaining_amount' => round($netToPay,       4), // يُحدَّث لاحقاً بعد الدفعات
         ]);
     }
 
@@ -408,8 +443,7 @@ protected function afterUpdate(Model $item, array $data, $request): void
                 'price_source'                => $direction < 0 ? 'sale' : 'purchase',
                 'is_validated'                => true,
                 'user_id'                     => auth()->id(),
-                // ✅ قيمة مبدئية — يُحدّثها StockMovementObserver::created() لاحقاً
-                'stock_balance_after'         => 0,
+                'stock_balance_after'         => 0, // يُحدَّث بـ StockMovementObserver
             ]);
         }
     }
@@ -459,27 +493,26 @@ protected function afterUpdate(Model $item, array $data, $request): void
     }
 
     private function generateDocumentNumber(DocumentType $documentType, int $companyId): string
-{
-    return DB::transaction(function () use ($documentType, $companyId) {
-        $prefix = $documentType->code;
-        $year   = date('Y');
+    {
+        return DB::transaction(function () use ($documentType, $companyId) {
+            $prefix = $documentType->code;
+            $year   = date('Y');
 
-        $last = CommercialDocument::where('company_id', $companyId)
-            ->where('document_number', 'like', "{$prefix}-{$year}-%")
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->first();
+            $last = CommercialDocument::where('company_id', $companyId)
+                ->where('document_number', 'like', "{$prefix}-{$year}-%")
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
 
-        // ✅ المتغير المؤقت ضروري — end() تحتاج reference
-        $seq = 1;
-        if ($last) {
-            $parts = explode('-', $last->document_number);
-            $seq   = (int) end($parts) + 1;
-        }
+            $seq = 1;
+            if ($last) {
+                $parts = explode('-', $last->document_number);
+                $seq   = (int) end($parts) + 1;
+            }
 
-        return sprintf('%s-%s-%06d', $prefix, $year, $seq);
-    });
-}
+            return sprintf('%s-%s-%06d', $prefix, $year, $seq);
+        });
+    }
 
     private function getCurrentFiscalYearId(int $companyId): ?int
     {

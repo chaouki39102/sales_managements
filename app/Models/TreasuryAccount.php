@@ -1,6 +1,5 @@
 <?php
 
-// app/Models/TreasuryAccount.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +11,7 @@ use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
 use App\Core\Traits\Auditable;
 use App\Models\Traits\HasCompany;
+use App\Services\TreasuryBalanceService;
 
 #[Cacheable]
 class TreasuryAccount extends Model
@@ -31,8 +31,7 @@ class TreasuryAccount extends Model
         'iban',
         'swift_bic',
         'currency_id',
-        'initial_balance',
-        'current_balance',
+        'current_balance', // cache فقط — يُحدَّث عبر PaymentService
         'is_default',
         'active',
         'notes',
@@ -42,23 +41,26 @@ class TreasuryAccount extends Model
     ];
 
     protected $casts = [
-        'initial_balance' => 'decimal:4',
         'current_balance' => 'decimal:4',
-        'is_default' => 'boolean',
-        'active' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'deleted_at' => 'datetime',
+        'is_default'      => 'boolean',
+        'active'          => 'boolean',
+        'created_at'      => 'datetime',
+        'updated_at'      => 'datetime',
+        'deleted_at'      => 'datetime',
     ];
 
     public static array $searchableFields = ['name', 'code', 'bank_name', 'account_number', 'rib', 'iban'];
-    public static array $filterable = ['treasury_account_type_id', 'is_default', 'active', 'currency_id'];
-    public static array $sortable = ['id', 'name', 'code', 'current_balance'];
-    public static array $defaultWith = [];
-    public static array $allowedIncludes = ['treasuryAccountType', 'currency', 'payments', 'paymentModes', 'expenses', 'createdBy', 'updatedBy', 'deletedBy'];
-    public static string $defaultSort = 'name';
-    public static ?int $cacheTtl = 300;
-    public static array $cacheTags = ['treasury_accounts'];
+    public static array $filterable       = ['treasury_account_type_id', 'is_default', 'active', 'currency_id'];
+    public static array $sortable         = ['id', 'name', 'code', 'current_balance'];
+    public static array $defaultWith      = [];
+    public static array $allowedIncludes  = [
+        'treasuryAccountType', 'currency', 'payments',
+        'paymentModes', 'expenses', 'openingBalances',
+        'createdBy', 'updatedBy', 'deletedBy',
+    ];
+    public static string $defaultSort     = 'name';
+    public static ?int $cacheTtl          = 300;
+    public static array $cacheTags        = ['treasury_accounts'];
 
     public function treasuryAccountType(): BelongsTo
     {
@@ -83,6 +85,11 @@ class TreasuryAccount extends Model
     public function expenses(): HasMany
     {
         return $this->hasMany(Expense::class);
+    }
+
+    public function openingBalances(): HasMany
+    {
+        return $this->hasMany(OpeningBalanceTreasury::class);
     }
 
     public function scopeDefault(Builder $query): Builder
@@ -110,8 +117,14 @@ class TreasuryAccount extends Model
         return $this->treasuryAccountType?->name === 'cash';
     }
 
-    public function updateBalance(float $amount): bool
+    /**
+     * رصيد حقيقي محسوب من TreasuryBalanceService.
+     * WARNING: 2 DB queries — لا تستخدمه داخل قوائم/collections.
+     * استخدم getAllTreasuryBalancesAt() لشاشات القوائم.
+     */
+    public function getComputedBalanceAttribute(): float
     {
-        return $this->increment('current_balance', $amount);
+        return app(TreasuryBalanceService::class)
+            ->getTreasuryBalanceAt($this->id, now()->toDateString())['current_balance'];
     }
 }

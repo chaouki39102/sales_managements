@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateRoleRequest;
 use App\Http\Resources\RoleResource;
 use App\Services\RoleService;
 use App\Models\Role;
+use App\Services\CompanyContextService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -65,17 +66,17 @@ class RoleController extends BaseApiController
 {
     try {
         $resolvedId = $this->extractId($id);
-        $user = $this->userService->findById($resolvedId, ['roles', 'company']);
-        $this->authorizeAction('view', $user);
+        $role = $this->roleService->findById($resolvedId, ['company']);
+        $this->authorizeAction('view', $role);
 
         // ✅ إذا كان مالك الشركة، أضف دوره
         $companyId = app(CompanyContextService::class)->get();
-        if ($companyId && $user->company && $user->company->owner_id === $user->id) {
+        if ($companyId && $role->company && $role->company->owner_id === $role->id) {
             // مالك الشركة — يمكن إضافة دور owner
             // أو تعديل response
         }
 
-        return $this->successResponse(new UserResource($user));
+        return $this->successResponse(new RoleResource($user));
     } catch (\Throwable $e) {
         return $this->handleError($e, 'show');
     }

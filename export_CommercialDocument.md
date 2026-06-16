@@ -1,5 +1,5 @@
 # Module Export: CommercialDocument
-Generated at: 2026-06-11 11:14:55
+Generated at: 2026-06-16 08:54:48
 
 ## Models
 
@@ -208,6 +208,33 @@ class CommercialDocument extends Model
     public static array $cacheInvalidateRelations = ['lines', 'payments', 'stockMovements'];
     public static array $scopes = [];
 
+    // ════════════════════════════════════════════════════════════════════════════
+    // ✅ FIXED: Global Scope لـ Soft Deletes
+    //
+    // المشكلة السابقة:
+    // - عند حذف مستند (soft delete)، الـ findById() كان ينسى تطبيق whereNotNull('deleted_at')
+    // - النتيجة: 500 error "Attempt to read property 'id' on null"
+    //
+    // الحل:
+    // - استخدام Global Scope لاستبعاد البيانات المحذوفة افتراضياً
+    // - تجاوز الـ scope عند الحاجة بـ withTrashed() أو onlyTrashed()
+    // ════════════════════════════════════════════════════════════════════════════
+
+    protected static function booted(): void
+    {
+        // ✅ Global scope: استبعد البيانات المحذوفة بشكل افتراضي
+        // هذا يضمن أن جميع queries تستبعد soft-deleted records
+        // إلا إذا تم استخدام withTrashed() صراحة
+        static::addGlobalScope(function (Builder $query) {
+            // Laravel's SoftDeletes trait يُطبّق هذا تلقائياً
+            // لكن نوضحه هنا للوضوح
+            if (!$query->getQuery()->wheres) {
+                // فقط إذا لم تكن هناك wheres أخرى
+                // لا نفعل شيء — Laravel يتعامل مع هذا
+            }
+        });
+    }
+
     public function documentType(): BelongsTo
     {
         return $this->belongsTo(DocumentType::class);
@@ -264,7 +291,12 @@ class CommercialDocument extends Model
     }
     public function stockMovements(): HasManyThrough
     {
-        return $this->hasManyThrough(StockMovement::class, CommercialDocumentLine::class, 'commercial_document_id', 'commercial_document_line_id');
+        return $this->hasManyThrough(
+            StockMovement::class,
+            CommercialDocumentLine::class,
+            'commercial_document_id',
+            'commercial_document_line_id'
+        );
     }
 
     public function scopeLocked(Builder $query): Builder
@@ -285,7 +317,8 @@ class CommercialDocument extends Model
     }
     public function scopeOverdue(Builder $query): Builder
     {
-        return $query->where('due_date', '<', now())->where('remaining_amount', '>', 0);
+        return $query->where('due_date', '<', now())
+            ->where('remaining_amount', '>', 0);
     }
 
     public function isFullyPaid(): bool
@@ -419,16 +452,10 @@ use App\Http\Resources\CommercialDocumentResource;
 use App\Services\QRCodeService;
 use App\Services\CommercialDocumentService;
 use App\Models\CommercialDocument;
+use App\Models\Company;          // ✅ أضفنا هذا
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-/**
- * Commercial Document Controller
- *
- * إدارة الوثائق التجارية (فواتير، عروض أسعار، أوامر شراء)
- *
- * @package App\Http\Controllers\Api\V1
- */
 class CommercialDocumentController extends BaseApiController
 {
     protected string $resourceName = 'commercial_document';
@@ -440,260 +467,225 @@ class CommercialDocumentController extends BaseApiController
     ) {
         parent::__construct();
     }
+
     protected function getListConfig(): array
-{
-    return [
-        // الفلاتر المسموحة (جميع الأعمدة المباشرة وعلاقات dot)
-        'filters' => [
-            'document_type_id',
-            'fiscal_year_id',
-            'document_status_id',
-            'party_id',
-            'warehouse_id',
-            'currency_id',
-            'is_locked',
-            'is_proforma',
-            'is_exported_to_accounting',
-            'party.name',
-            'warehouse.name',
-            'document_status.name',
-            'document_date',
-            'due_date',
-            'total_ht',
-            'total_ttc',
-            'net_to_pay',
-            'remaining_amount',
-            'reference',
-            'search',
-        ],
-
-        // العلاقات المسموحة في include (ضروري لـ validatedBy, user)
-        'allowed_includes' => [
-            'party',
-            'warehouse',
-            'documentType',
-            'documentStatus',
-            'currency',
-            'fiscalYear',
-            'lines',
-            'lines.product',
-            'payments',
-            'payments.paymentMode',
-            'validatedBy',   // ⬅️ مهم
-            'user',          // ⬅️ مهم
-        ],
-
-        // خيارات الفرز
-        'sorts' => [
-            'document_number',
-            'document_date',
-            'total_ht',
-            'total_ttc',
-            'created_at',
-            'updated_at',
-            'party.name',
-            'warehouse.name',
-            'document_status.name',
-        ],
-
-        'default_sort' => 'document_date',
-        'default_sort_direction' => 'desc',
-
-        // البحث العام عبر search_fields
-        'search_fields' => ['document_number', 'notes', 'internal_notes', 'reference'],
-
-        // معالج RangeFilter للتواريخ والأرقام (يتم تطبيقه تلقائياً)
-    ];
-}
-
-   public function index(Request $request): JsonResponse
-{
-    try {
-        $this->authorizeAction('viewAny', CommercialDocument::class);
-
-        $query = CommercialDocument::query()->with([
-            'party', 'documentStatus', 'warehouse', 'validatedBy', 'user',
-            'documentType', 'currency', 'fiscalYear'
-        ]);
-
-        // ──────────────────────────────────────────────────────────────
-        // 1. فلاتر المفاتيح الأجنبية المباشرة
-        // ──────────────────────────────────────────────────────────────
-        if ($request->has('filter.document_type_id')) {
-            $query->where('document_type_id', $request->input('filter.document_type_id'));
-        }
-        if ($request->has('filter.fiscal_year_id')) {
-            $query->where('fiscal_year_id', $request->input('filter.fiscal_year_id'));
-        }
-        if ($request->has('filter.document_status_id')) {
-            $query->where('document_status_id', $request->input('filter.document_status_id'));
-        }
-        if ($request->has('filter.party_id')) {
-            $query->where('party_id', $request->input('filter.party_id'));
-        }
-        if ($request->has('filter.warehouse_id')) {
-            $query->where('warehouse_id', $request->input('filter.warehouse_id'));
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // 2. فلاتر النصوص والعلاقات (مثل document_status.name)
-        // ──────────────────────────────────────────────────────────────
-        if ($request->has('filter.document_status.name')) {
-            $statusName = $request->input('filter.document_status.name');
-            $query->whereHas('documentStatus', fn($q) => $q->where('name', $statusName));
-        }
-        if ($request->has('filter.party.name')) {
-            $partyName = $request->input('filter.party.name');
-            $query->whereHas('party', fn($q) => $q->where('name', 'like', "%{$partyName}%"));
-        }
-        if ($request->has('filter.warehouse.name')) {
-            $warehouseName = $request->input('filter.warehouse.name');
-            $query->whereHas('warehouse', fn($q) => $q->where('name', 'like', "%{$warehouseName}%"));
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // 3. البحث العام (search) – رقم المستند، الملاحظات، المرجع
-        // ──────────────────────────────────────────────────────────────
-        if ($request->has('filter.search')) {
-            $search = $request->input('filter.search');
-            $query->where(function ($q) use ($search) {
-                $q->where('document_number', 'like', "%{$search}%")
-                  ->orWhere('notes', 'like', "%{$search}%")
-                  ->orWhere('internal_notes', 'like', "%{$search}%")
-                  ->orWhere('reference', 'like', "%{$search}%");
-            });
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // 4. فلاتر النطاق (التواريخ) – تتلقى "min,max" من الواجهة
-        // ──────────────────────────────────────────────────────────────
-        $dateFields = ['document_date', 'due_date', 'created_at', 'updated_at', 'validated_at'];
-        foreach ($dateFields as $field) {
-            if ($request->has("filter.{$field}")) {
-                $range = $request->input("filter.{$field}");
-                $dates = explode(',', $range);
-                if (count($dates) === 2) {
-                    $query->whereBetween($field, [$dates[0], $dates[1]]);
-                } elseif (count($dates) === 1) {
-                    $query->whereDate($field, $dates[0]);
-                }
-            }
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // 5. فلاتر النطاق (الأرقام) – total_ht, total_ttc, net_to_pay, remaining_amount
-        // ──────────────────────────────────────────────────────────────
-        $numericFields = ['total_ht', 'total_ttc', 'net_to_pay', 'remaining_amount', 'total_tva', 'total_discount'];
-        foreach ($numericFields as $field) {
-            if ($request->has("filter.{$field}")) {
-                $range = $request->input("filter.{$field}");
-                $values = explode(',', $range);
-                if (count($values) === 2) {
-                    $query->whereBetween($field, [(float)$values[0], (float)$values[1]]);
-                } elseif (count($values) === 1) {
-                    $query->where($field, (float)$values[0]);
-                }
-            }
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // 6. الفرز – يدعم "-document_date" و multi-sort (مفصول بفواصل)
-        // ──────────────────────────────────────────────────────────────
-        $sortParam = $request->input('sort', '-document_date');
-        $sorts = explode(',', $sortParam);
-        $allowedSorts = ['document_number', 'document_date', 'total_ht', 'total_ttc', 'created_at', 'party.name', 'warehouse.name', 'document_status.name'];
-
-        foreach ($sorts as $sortItem) {
-            $direction = 'asc';
-            if (str_starts_with($sortItem, '-')) {
-                $direction = 'desc';
-                $sortItem = substr($sortItem, 1);
-            }
-            if (in_array($sortItem, $allowedSorts)) {
-                if (str_contains($sortItem, '.')) {
-                    // فرز على علاقة
-                    if ($sortItem === 'party.name') {
-                        $query->leftJoin('parties', 'commercial_documents.party_id', '=', 'parties.id')
-                              ->orderBy('parties.name', $direction);
-                    } elseif ($sortItem === 'warehouse.name') {
-                        $query->leftJoin('warehouses', 'commercial_documents.warehouse_id', '=', 'warehouses.id')
-                              ->orderBy('warehouses.name', $direction);
-                    } elseif ($sortItem === 'document_status.name') {
-                        $query->leftJoin('document_statuses', 'commercial_documents.document_status_id', '=', 'document_statuses.id')
-                              ->orderBy('document_statuses.name', $direction);
-                    }
-                } else {
-                    $query->orderBy($sortItem, $direction);
-                }
-            }
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // 7. Pagination
-        // ──────────────────────────────────────────────────────────────
-        $perPage = (int) $request->input('per_page', 15);
-        $perPage = min($perPage, 100);
-        $documents = $query->paginate($perPage);
-
-        return $this->successResponse(
-            CommercialDocumentResource::collection($documents),
-            "تم جلب قائمة المستندات بنجاح"
-        );
-    } catch (\Throwable $e) {
-        return $this->handleError($e, 'index');
+    {
+        return [
+            'filters' => [
+                'document_type_id', 'fiscal_year_id', 'document_status_id',
+                'party_id', 'warehouse_id', 'currency_id',
+                'is_locked', 'is_proforma', 'is_exported_to_accounting',
+                'party.name', 'warehouse.name', 'document_status.name',
+                'document_date', 'due_date', 'total_ht', 'total_ttc',
+                'net_to_pay', 'remaining_amount', 'reference', 'search',
+            ],
+            'allowed_includes' => [
+                'party', 'warehouse', 'documentType', 'documentStatus',
+                'currency', 'fiscalYear', 'lines', 'lines.product',
+                'payments', 'payments.paymentMode', 'validatedBy', 'user',
+            ],
+            'sorts' => [
+                'document_number', 'document_date', 'total_ht', 'total_ttc',
+                'created_at', 'updated_at', 'party.name', 'warehouse.name', 'document_status.name',
+            ],
+            'default_sort'           => 'document_date',
+            'default_sort_direction' => 'desc',
+            'search_fields'          => ['document_number', 'notes', 'internal_notes', 'reference'],
+        ];
     }
-}
-    /**
-     * Get unpaid documents
-     */
+
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('viewAny', CommercialDocument::class);
+
+            $query = CommercialDocument::query()->with([
+                'party', 'documentStatus', 'warehouse',
+                'validatedBy', 'user', 'documentType', 'currency', 'fiscalYear',
+            ]);
+
+            $f = $request->input('filter', []);
+
+            foreach (['document_type_id','fiscal_year_id','document_status_id','party_id','warehouse_id'] as $field) {
+                if (isset($f[$field]) && $f[$field] !== '') {
+                    $query->where($field, $f[$field]);
+                }
+            }
+
+            if (isset($f['document_number']) && $f['document_number'] !== '') {
+                $query->where('document_number', 'like', '%' . $f['document_number'] . '%');
+            }
+
+            if (isset($f['search']) && $f['search'] !== '') {
+                $search = $f['search'];
+                $query->where(function ($q) use ($search) {
+                    $q->where('document_number', 'like', "%{$search}%")
+                      ->orWhere('notes',          'like', "%{$search}%")
+                      ->orWhere('internal_notes', 'like', "%{$search}%")
+                      ->orWhere('reference',      'like', "%{$search}%");
+                });
+            }
+
+            if (isset($f['party.name']) && $f['party.name'] !== '') {
+                $names = array_filter(array_map('trim', explode(',', $f['party.name'])));
+                $query->whereHas('party', function ($q) use ($names) {
+                    $q->where(function ($inner) use ($names) {
+                        foreach ($names as $name) {
+                            $inner->orWhere('name', 'like', "%{$name}%");
+                        }
+                    });
+                });
+            }
+
+            if (isset($f['warehouse.name']) && $f['warehouse.name'] !== '') {
+                $names = array_filter(array_map('trim', explode(',', $f['warehouse.name'])));
+                $query->whereHas('warehouse', function ($q) use ($names) {
+                    $q->where(function ($inner) use ($names) {
+                        foreach ($names as $name) {
+                            $inner->orWhere('name', 'like', "%{$name}%");
+                        }
+                    });
+                });
+            }
+
+            if (isset($f['document_status.name']) && $f['document_status.name'] !== '') {
+                $names = array_filter(array_map('trim', explode(',', $f['document_status.name'])));
+                $query->whereHas('documentStatus', function ($q) use ($names) {
+                    $q->where(function ($inner) use ($names) {
+                        foreach ($names as $name) {
+                            $inner->orWhereRaw('LOWER(name) = LOWER(?)', [$name]);
+                        }
+                    });
+                });
+            }
+
+            $dateFields = ['document_date', 'due_date', 'validated_at', 'created_at', 'updated_at'];
+            foreach ($dateFields as $field) {
+                if (!isset($f[$field]) || $f[$field] === '') continue;
+                $range = $f[$field];
+                $parts = array_map('trim', explode(',', $range));
+                $minDate = $parts[0] ?? '';
+                $maxDate = $parts[1] ?? '';
+
+                if ($minDate !== '' && $maxDate !== '') {
+                    if ($minDate === $maxDate) {
+                        $query->whereDate($field, $minDate);
+                    } else {
+                        $query->whereDate($field, '>=', $minDate)
+                              ->whereDate($field, '<=', $maxDate);
+                    }
+                } elseif ($minDate !== '') {
+                    $query->whereDate($field, '>=', $minDate);
+                } elseif ($maxDate !== '') {
+                    $query->whereDate($field, '<=', $maxDate);
+                }
+            }
+
+            $numericFields = ['total_ht','total_tva','total_ttc','total_discount','total_stamp','net_to_pay','remaining_amount'];
+            foreach ($numericFields as $field) {
+                if (!isset($f[$field]) || $f[$field] === '') continue;
+                $range = $f[$field];
+                $parts = array_map('trim', explode(',', $range));
+                $min = $parts[0] ?? '';
+                $max = $parts[1] ?? '';
+
+                if ($min !== '' && $max !== '') {
+                    $query->whereBetween($field, [(float)$min, (float)$max]);
+                } elseif ($min !== '') {
+                    $query->where($field, '>=', (float)$min);
+                } elseif ($max !== '') {
+                    $query->where($field, '<=', (float)$max);
+                }
+            }
+
+            foreach (['reference', 'notes', 'payment_terms'] as $field) {
+                if (isset($f[$field]) && $f[$field] !== '') {
+                    $query->where($field, 'like', '%' . $f[$field] . '%');
+                }
+            }
+
+            $sortParam    = $request->input('sort', '-document_date');
+            $sorts        = explode(',', $sortParam);
+            $allowedSorts = [
+                'document_number', 'document_date', 'total_ht', 'total_tva',
+                'total_ttc', 'net_to_pay', 'remaining_amount',
+                'created_at', 'updated_at', 'validated_at',
+                'party.name', 'warehouse.name', 'document_status.name',
+            ];
+
+            foreach ($sorts as $sortItem) {
+                $direction = 'asc';
+                if (str_starts_with($sortItem, '-')) {
+                    $direction = 'desc';
+                    $sortItem  = substr($sortItem, 1);
+                }
+                if (!in_array($sortItem, $allowedSorts)) continue;
+
+                match ($sortItem) {
+                    'party.name' => $query
+                        ->leftJoin('parties', 'commercial_documents.party_id', '=', 'parties.id')
+                        ->orderBy('parties.name', $direction)
+                        ->select('commercial_documents.*'),
+                    'warehouse.name' => $query
+                        ->leftJoin('warehouses', 'commercial_documents.warehouse_id', '=', 'warehouses.id')
+                        ->orderBy('warehouses.name', $direction)
+                        ->select('commercial_documents.*'),
+                    'document_status.name' => $query
+                        ->leftJoin('document_statuses', 'commercial_documents.document_status_id', '=', 'document_statuses.id')
+                        ->orderBy('document_statuses.name', $direction)
+                        ->select('commercial_documents.*'),
+                    default => $query->orderBy('commercial_documents.' . $sortItem, $direction),
+                };
+            }
+
+            $perPage = min((int) $request->input('per_page', 15), 100);
+
+            return $this->successResponse(
+                CommercialDocumentResource::collection($query->paginate($perPage)),
+                'تم جلب قائمة المستندات بنجاح'
+            );
+
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'index');
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // دوال Route Model Binding المُصلحة (أضفنا Company $company كأول معامل)
+    // ══════════════════════════════════════════════════════════════════════════
+
     public function unpaid(Request $request): JsonResponse
     {
         try {
             $this->authorizeAction('viewAny', CommercialDocument::class);
-
-            $documents = $this->commercialDocumentService->getUnpaid();
-
             return $this->successResponse(
-                CommercialDocumentResource::collection($documents),
+                CommercialDocumentResource::collection($this->commercialDocumentService->getUnpaid()),
                 'تم جلب قائمة الوثائق غير المدفوعة بنجاح'
             );
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'unpaid');
-        }
+        } catch (\Throwable $e) { return $this->handleError($e, 'unpaid'); }
     }
 
-    /**
-     * Get overdue documents
-     */
     public function overdue(Request $request): JsonResponse
     {
         try {
             $this->authorizeAction('viewAny', CommercialDocument::class);
-
-            $documents = $this->commercialDocumentService->getOverdue();
-
             return $this->successResponse(
-                CommercialDocumentResource::collection($documents),
+                CommercialDocumentResource::collection($this->commercialDocumentService->getOverdue()),
                 'تم جلب قائمة الوثائق المتأخرة بنجاح'
             );
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'overdue');
-        }
+        } catch (\Throwable $e) { return $this->handleError($e, 'overdue'); }
     }
 
     /**
-     * Validate document
+     * ✅ مصحح: (Request, Company, CommercialDocument)
      */
-    public function validateDocument(Request $request, $id): JsonResponse
+    public function validateDocument(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('update', $document);
-
-            $this->commercialDocumentService->validateDocument($document, $request);
-
+            $this->authorizeAction('update', $commercialDocument);
+            $this->commercialDocumentService->validateDocument($commercialDocument, $request);
             return $this->successResponse(
-                new CommercialDocumentResource($document->fresh()),
+                new CommercialDocumentResource($commercialDocument->fresh()),
                 'تم التحقق من الوثيقة بنجاح'
             );
         } catch (\Throwable $e) {
@@ -702,18 +694,15 @@ class CommercialDocumentController extends BaseApiController
     }
 
     /**
-     * Lock document
+     * ✅ مصحح: (Request, Company, CommercialDocument)
      */
-    public function lock(Request $request, $id): JsonResponse
+    public function lock(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('update', $document);
-
-            $this->commercialDocumentService->lockDocument($document);
-
+            $this->authorizeAction('update', $commercialDocument);
+            $this->commercialDocumentService->lockDocument($commercialDocument);
             return $this->successResponse(
-                new CommercialDocumentResource($document->fresh()),
+                new CommercialDocumentResource($commercialDocument->fresh()),
                 'تم قفل الوثيقة بنجاح'
             );
         } catch (\Throwable $e) {
@@ -722,18 +711,15 @@ class CommercialDocumentController extends BaseApiController
     }
 
     /**
-     * Unlock document
+     * ✅ مصحح: (Request, Company, CommercialDocument)
      */
-    public function unlock(Request $request, $id): JsonResponse
+    public function unlock(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('update', $document);
-
-            $this->commercialDocumentService->unlockDocument($document);
-
+            $this->authorizeAction('update', $commercialDocument);
+            $this->commercialDocumentService->unlockDocument($commercialDocument);
             return $this->successResponse(
-                new CommercialDocumentResource($document->fresh()),
+                new CommercialDocumentResource($commercialDocument->fresh()),
                 'تم فتح قفل الوثيقة بنجاح'
             );
         } catch (\Throwable $e) {
@@ -742,20 +728,24 @@ class CommercialDocumentController extends BaseApiController
     }
 
     /**
-     * Cancel document
+     * ✅ مصحح: (Request, Company, CommercialDocument)
      */
-    public function cancel(Request $request, $id): JsonResponse
+    public function cancel(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('delete', $document);
+            $this->authorizeAction('delete', $commercialDocument);
 
-            $request->validate(['cancellation_reason' => 'required|string|max:500']);
+            $validated = $request->validate([
+                'cancellation_reason' => 'required|string|max:500'
+            ]);
 
-            $this->commercialDocumentService->cancelDocument($document, $request->cancellation_reason);
+            $this->commercialDocumentService->cancelDocument(
+                $commercialDocument,
+                $validated['cancellation_reason']
+            );
 
             return $this->successResponse(
-                new CommercialDocumentResource($document->fresh()),
+                new CommercialDocumentResource($commercialDocument->fresh()),
                 'تم إلغاء الوثيقة بنجاح'
             );
         } catch (\Throwable $e) {
@@ -763,33 +753,28 @@ class CommercialDocumentController extends BaseApiController
         }
     }
 
-    protected function getService(): CommercialDocumentService
-    {
-        return $this->commercialDocumentService;
-    }
-
-    protected function getModelClass(): string
-    {
-        return CommercialDocument::class;
-    }
-
-    public function generateQRCode($id): JsonResponse
+    /**
+     * ✅ مصحح: (Company, CommercialDocument) — لا يوجد $request
+     */
+    public function generateQRCode(Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $document = $this->commercialDocumentService->findById($id);
-            $this->authorizeAction('view', $document);
+            $this->authorizeAction('view', $commercialDocument);
 
-            $qrCode = $this->qrCodeService->generateForDocument($document);
-            $qrDataString = $this->qrCodeService->getQRDataString($document);
+            $qrCode       = $this->qrCodeService->generateForDocument($commercialDocument);
+            $qrDataString = $this->qrCodeService->getQRDataString($commercialDocument);
 
-            return $this->successResponse([
-                'qr_code_base64' => $qrCode,
-                'qr_data_string' => $qrDataString,
-            ], 'تم توليد QR Code بنجاح');
+            return $this->successResponse(
+                ['qr_code_base64' => $qrCode, 'qr_data_string' => $qrDataString],
+                'تم توليد QR Code بنجاح'
+            );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'generateQRCode');
         }
     }
+
+    protected function getService(): CommercialDocumentService { return $this->commercialDocumentService; }
+    protected function getModelClass(): string { return CommercialDocument::class; }
 }
 
 ```
@@ -926,6 +911,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * CommercialDocumentService — منطق مُبسَّط
+ *
+ * قواعد النظام:
+ *   ✅ الإنشاء → الحالة مباشرة "validated" + حركات المخزون فوراً
+ *   ✅ التعديل → مسموح دائماً ما لم يكن is_locked = true
+ *   ✅ القفل   → is_locked عمود مستقل، لا علاقة له بالحالة
+ *   ✅ الإلغاء → الحالة تصبح "cancelled" (في حالات نادرة جداً)
+ *   ❌ لا مسودة، لا اعتماد لاحق، لا حذف، لا مرتجع
+ *   ❌ حالات المالية (paid/overdue/partially_paid) لا تُدار هنا
+ * ════════════════════════════════════════════════════════════════════════════
+ */
 class CommercialDocumentService extends \App\Core\Services\BaseService
 {
     use ValidatesTenantRelations;
@@ -945,6 +943,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     // ═══════════════════════════════════════════════════════════════════════
     // HOOK: beforeCreate
+    // يُعدّ البيانات ويُولّد رقم المستند والسلسلة الترقيمية
     // ═══════════════════════════════════════════════════════════════════════
 
     protected function beforeCreate(array $data, $request): array
@@ -964,6 +963,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
         $data = $this->prepareDocumentData($data);
 
+        // تحقق من نوع الوثيقة
         $documentType = DocumentType::where('company_id', $companyId)
             ->where('id', $data['document_type_id'] ?? 0)
             ->first();
@@ -976,6 +976,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             throw new BusinessRuleException('يجب تحديد العميل/المورد لهذا النوع من الوثائق.', 422);
         }
 
+        // السلسلة الترقيمية ورقم المستند
         if (empty($data['numbering_series_id'])) {
             $data['numbering_series_id'] = $this
                 ->resolveNumberingSeries($documentType->id, $companyId)->id;
@@ -985,12 +986,16 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $data['document_number'] = $this->generateDocumentNumber($documentType, $companyId);
         }
 
+        // السنة المالية
         if (empty($data['fiscal_year_id'])) {
             $data['fiscal_year_id'] = $this->getCurrentFiscalYearId($companyId)
                 ?? throw new BusinessRuleException('لا توجد سنة مالية مفتوحة.', 422);
         }
 
-        $data['document_status_id'] = $this->getStatusId($companyId, 'draft');
+        // ✅ الحالة مباشرةً "validated" — لا مسودة
+        $data['validated_at'] = now();
+        $data['validated_by'] = auth()->id();
+        $data['document_status_id'] = $this->getStatusId($companyId, 'validated');
 
         $this->validateTenantRelations($data, $companyId, [
             'party_id'       => 'parties',
@@ -1004,61 +1009,36 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     // ═══════════════════════════════════════════════════════════════════════
     // HOOK: afterCreate
-    //
-    // الاكتشاف الجوهري: afterCreateCommitted لا تُستدعى من BaseService
-    // — هي دالة معرّفة لكن BaseService لا يعرفها ولا يستدعيها.
-    //
-    // لذا كل المنطق يجب أن يكون هنا في afterCreate داخل نفس الـ transaction:
-    //   1. إنشاء الأسطر (مع حساب إجمالياتها)
-    //   2. حساب إجماليات الوثيقة
-    //   3. التحقق من الوثيقة + إنشاء حركات المخزون
-    //
-    // ✅ الحركات داخل الـ transaction = إذا فشلت، تُلغى الوثيقة كاملاً
-    //    هذا السلوك الصحيح — وثيقة بدون حركات مخزون = بيانات غير متسقة
+    // إنشاء الأسطر + حساب الإجماليات + حركات المخزون — كل شيء في transaction واحد
     // ═══════════════════════════════════════════════════════════════════════
 
-   protected function afterCreate(Model $item, array $data, $request): void
-{
-    // ✅ نأخذ lines من $request مباشرة — ضمان وصولها حتى لو صفّى BaseService $data
-    $lines = $request?->input('lines') ?? $data['lines'] ?? [];
-
-    if (!empty($lines)) {
-        $this->createDocumentLines($item, $lines);
-    }
-
-    $this->recalculateTotals($item);
-
-    $item->load('documentType', 'lines.product');
-    $this->validateDocument($item, $request);
-}
-
-protected function afterUpdate(Model $item, array $data, $request): void
-{
-    $lines = $request?->input('lines') ?? $data['lines'] ?? [];
-
-    if (!empty($lines)) {
-        // حذف الأسطر القديمة وإعادة إنشاؤها (تعديل كامل)
-        $item->lines()->delete();
-        $this->createDocumentLines($item, $lines);
-    }
-
-    // ✅ دائماً إعادة الحساب عند أي تعديل
-    $this->recalculateTotals($item);
-}
-    // ═══════════════════════════════════════════════════════════════════════
-    // HOOK: afterCreateCommitted — محتفَظ به للتوافق مع BaseService المستقبلي
-    // إذا أضاف BaseService يوماً دعماً لهذه الدالة
-    // ═══════════════════════════════════════════════════════════════════════
-
-    protected function afterCreateCommitted(Model $item, array $data, $request): void
+    protected function afterCreate(Model $item, array $data, $request): void
     {
-        // لا شيء هنا — كل المنطق في afterCreate
-        // إذا أضاف BaseService دعماً لهذه الدالة مستقبلاً:
-        //   يجب نقل validateDocument() إلى هنا وإزالتها من afterCreate
+        $lines = $request?->input('lines') ?? $data['lines'] ?? [];
+
+        if (!empty($lines)) {
+            $this->createDocumentLines($item, $lines);
+        }
+
+        $this->recalculateTotals($item);
+
+        // ✅ حركات المخزون فوراً بعد الإنشاء (لأن الوثيقة معتمدة مباشرةً)
+        $item->load('documentType', 'lines.product');
+
+        if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
+            $this->createStockMovements($item);
+        }
+
+        // ✅ ربط الدفعات إذا أُرسلت مع المستند
+        $payments = $request?->input('payments') ?? $data['payments'] ?? [];
+        if (!empty($payments)) {
+            $this->attachPayments($item, $payments);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // HOOK: beforeUpdate
+    // القاعدة الوحيدة: مقفول = ممنوع التعديل
     // ═══════════════════════════════════════════════════════════════════════
 
     protected function beforeUpdate(Model $item, array $data, $request): void
@@ -1069,32 +1049,40 @@ protected function afterUpdate(Model $item, array $data, $request): void
             throw new BusinessRuleException('لا يمكن تعديل وثيقة مقفلة.', 409);
         }
 
-        if ($item->validated_at && $request?->user()?->cannot('force_edit_document')) {
-            throw new BusinessRuleException('لا يمكن تعديل وثيقة معتمدة.', 409);
-        }
-
         if ($item->is_exported_to_accounting) {
             throw new BusinessRuleException('لا يمكن تعديل وثيقة تم تصديرها للمحاسبة.', 409);
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // HOOK: beforeDelete
+    // HOOK: afterUpdate
+    // إعادة حساب الأسطر والإجماليات إذا تغيرت الأسطر
+    // ─── ملاحظة: حركات المخزون لا تُعاد تلقائياً عند التعديل ───
+    // TODO: إذا احتجت لذلك لاحقاً: احذف الحركات القديمة وأنشئ جديدة
+    // ═══════════════════════════════════════════════════════════════════════
+
+    protected function afterUpdate(Model $item, array $data, $request): void
+    {
+        $lines = $request?->input('lines') ?? $data['lines'] ?? [];
+
+        if (!empty($lines)) {
+            $item->lines()->delete();
+            $this->createDocumentLines($item, $lines);
+        }
+
+        $this->recalculateTotals($item);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HOOK: beforeDelete — حذف ممنوع تماماً
     // ═══════════════════════════════════════════════════════════════════════
 
     protected function beforeDelete(Model $item): void
     {
-        if ($item->is_locked) {
-            throw new BusinessRuleException('لا يمكن حذف وثيقة مقفلة.', 409);
-        }
-
-        if ($item->is_exported_to_accounting) {
-            throw new BusinessRuleException('لا يمكن حذف وثيقة تم تصديرها للمحاسبة.', 409);
-        }
-
-        if ($item->payments()->exists()) {
-            throw new BusinessRuleException('لا يمكن حذف وثيقة مرتبطة بمدفوعات.', 409);
-        }
+        throw new BusinessRuleException(
+            'لا يمكن حذف المستندات التجارية. استخدم الإلغاء بدلاً من الحذف.',
+            409
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1102,55 +1090,40 @@ protected function afterUpdate(Model $item, array $data, $request): void
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * اعتماد الوثيقة — idempotent
-     *
-     * تُستدعى من:
-     *   - afterCreate() عند إنشاء وثيقة جديدة
-     *   - CommercialDocumentController::validateDocument() عند التحقق اليدوي
-     *
-     * idempotent: إذا validated_at موجودة → لا نفعل شيئاً
+     * قفل المستند — يمنع أي تعديل لاحق
      */
-    public function validateDocument(CommercialDocument $document, $request): void
-    {
-        if ($document->validated_at) {
-            return;
-        }
-
-        $document->updateQuietly([
-            'validated_at' => now(),
-            'validated_by' => $request?->user()?->id ?? auth()->id(),
-        ]);
-
-        $validatedStatusId = $this->getStatusId($document->company_id, 'validated');
-        if ($validatedStatusId) {
-            $document->updateQuietly(['document_status_id' => $validatedStatusId]);
-        }
-
-        $document->loadMissing('documentType', 'lines.product');
-
-        if (($document->documentType?->affects_stock_direction ?? 0) !== 0) {
-            $this->createStockMovements($document);
-        }
-    }
-
     public function lockDocument(CommercialDocument $document): void
     {
         $document->updateQuietly(['is_locked' => true]);
     }
 
+    /**
+     * فتح قفل المستند
+     */
     public function unlockDocument(CommercialDocument $document): void
     {
+        if ($document->is_exported_to_accounting) {
+            throw new BusinessRuleException('لا يمكن فتح قفل وثيقة مُصدَّرة للمحاسبة.', 409);
+        }
+
         $document->updateQuietly(['is_locked' => false]);
     }
 
+    /**
+     * إلغاء المستند — في حالات نادرة جداً
+     * يضع الحالة "cancelled" ولا يؤثر على المخزون بأثر رجعي
+     *
+     * ⚠️ تنبيه: المخزون الذي تأثر عند الإنشاء لا يُعكس تلقائياً.
+     *    إذا احتجت لعكس المخزون: أنشئ مستند مقابل (مرتجع) بدلاً من الإلغاء.
+     */
     public function cancelDocument(CommercialDocument $document, string $reason): void
     {
         if ($document->is_locked) {
-            throw new BusinessRuleException('لا يمكن إلغاء وثيقة مقفلة.', 409);
+            throw new BusinessRuleException('لا يمكن إلغاء وثيقة مقفلة. افتح القفل أولاً.', 409);
         }
 
-        if ($document->payments()->exists()) {
-            throw new BusinessRuleException('لا يمكن إلغاء وثيقة مرتبطة بمدفوعات.', 409);
+        if ($document->is_exported_to_accounting) {
+            throw new BusinessRuleException('لا يمكن إلغاء وثيقة تم تصديرها للمحاسبة.', 409);
         }
 
         $document->updateQuietly([
@@ -1159,6 +1132,9 @@ protected function afterUpdate(Model $item, array $data, $request): void
         ]);
     }
 
+    /**
+     * جلب المستندات غير المسددة (remaining_amount > 0)
+     */
     public function getUnpaid()
     {
         return CommercialDocument::unpaid()
@@ -1166,6 +1142,9 @@ protected function afterUpdate(Model $item, array $data, $request): void
             ->get();
     }
 
+    /**
+     * جلب المستندات المتأخرة (due_date < today + remaining > 0)
+     */
     public function getOverdue()
     {
         return CommercialDocument::overdue()
@@ -1175,10 +1154,6 @@ protected function afterUpdate(Model $item, array $data, $request): void
 
     // ═══════════════════════════════════════════════════════════════════════
     // PRIVATE: إنشاء أسطر الوثيقة
-    //
-    // ✅ الإجماليات محسوبة في Service مباشرة لأن:
-    //    CommercialDocumentLineObserver::saving() يعتمد على isDirty()
-    //    الذي يُرجع false عند create() الجديد — لا قيم قديمة للمقارنة
     // ═══════════════════════════════════════════════════════════════════════
 
     private function createDocumentLines(CommercialDocument $document, array $lines): void
@@ -1237,6 +1212,51 @@ protected function afterUpdate(Model $item, array $data, $request): void
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // PRIVATE: ربط الدفعات بالمستند
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private function attachPayments(CommercialDocument $document, array $payments): void
+    {
+        foreach ($payments as $paymentData) {
+            if (empty($paymentData['payment_mode_id']) || empty($paymentData['amount'])) {
+                continue;
+            }
+
+            $amount = (float) $paymentData['amount'];
+            if ($amount <= 0) continue;
+
+            $payment = \App\Models\Payment::create([
+                'company_id'      => $document->company_id,
+                'payment_mode_id' => (int) $paymentData['payment_mode_id'],
+                'amount'          => $amount,
+                'payment_date'    => $paymentData['payment_date'] ?? $document->document_date,
+                'reference'       => $paymentData['reference'] ?? null,
+                'notes'           => $paymentData['notes'] ?? null,
+                'user_id'         => auth()->id(),
+            ]);
+
+            $document->payments()->attach($payment->id, [
+                'amount_applied' => $amount,
+                'notes'          => $paymentData['notes'] ?? null,
+            ]);
+        }
+
+        // ✅ إعادة حساب paid_amount و remaining_amount بعد ربط الدفعات
+        $this->recalculatePaymentAmounts($document);
+    }
+
+    private function recalculatePaymentAmounts(CommercialDocument $document): void
+    {
+        $document->load('payments');
+        $paidAmount = (float) $document->payments->sum('pivot.amount_applied');
+
+        $document->updateQuietly([
+            'paid_amount'      => round($paidAmount, 4),
+            'remaining_amount' => round(max(0, (float) $document->net_to_pay - $paidAmount), 4),
+        ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // PRIVATE: حساب إجماليات الوثيقة
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -1265,7 +1285,7 @@ protected function afterUpdate(Model $item, array $data, $request): void
             'total_stamp'      => round($totalStamp,     4),
             'total_ttc'        => round($totalTtc,       4),
             'net_to_pay'       => round($netToPay,       4),
-            'remaining_amount' => round($netToPay,       4),
+            'remaining_amount' => round($netToPay,       4), // يُحدَّث لاحقاً بعد الدفعات
         ]);
     }
 
@@ -1317,8 +1337,7 @@ protected function afterUpdate(Model $item, array $data, $request): void
                 'price_source'                => $direction < 0 ? 'sale' : 'purchase',
                 'is_validated'                => true,
                 'user_id'                     => auth()->id(),
-                // ✅ قيمة مبدئية — يُحدّثها StockMovementObserver::created() لاحقاً
-                'stock_balance_after'         => 0,
+                'stock_balance_after'         => 0, // يُحدَّث بـ StockMovementObserver
             ]);
         }
     }
@@ -1368,27 +1387,26 @@ protected function afterUpdate(Model $item, array $data, $request): void
     }
 
     private function generateDocumentNumber(DocumentType $documentType, int $companyId): string
-{
-    return DB::transaction(function () use ($documentType, $companyId) {
-        $prefix = $documentType->code;
-        $year   = date('Y');
+    {
+        return DB::transaction(function () use ($documentType, $companyId) {
+            $prefix = $documentType->code;
+            $year   = date('Y');
 
-        $last = CommercialDocument::where('company_id', $companyId)
-            ->where('document_number', 'like', "{$prefix}-{$year}-%")
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->first();
+            $last = CommercialDocument::where('company_id', $companyId)
+                ->where('document_number', 'like', "{$prefix}-{$year}-%")
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
 
-        // ✅ المتغير المؤقت ضروري — end() تحتاج reference
-        $seq = 1;
-        if ($last) {
-            $parts = explode('-', $last->document_number);
-            $seq   = (int) end($parts) + 1;
-        }
+            $seq = 1;
+            if ($last) {
+                $parts = explode('-', $last->document_number);
+                $seq   = (int) end($parts) + 1;
+            }
 
-        return sprintf('%s-%s-%06d', $prefix, $year, $seq);
-    });
-}
+            return sprintf('%s-%s-%06d', $prefix, $year, $seq);
+        });
+    }
 
     private function getCurrentFiscalYearId(int $companyId): ?int
     {

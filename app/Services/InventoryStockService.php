@@ -1,80 +1,88 @@
 <?php
-// app/Services/InventoryStockService.php
 
 namespace App\Services;
 
+use App\Core\Traits\ResolvesFiscalYear;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * InventoryStockService — النسخة المدمجة النهائية
+ * ══════════════════════════════════════════════════════════════════
+ * إصلاحات عن النسخة الأصلية:
+ *
+ * 1. resolveFiscalYearId() بدل when(!$fiscalYear, whereRaw('1=0'))
+ *    قبل: تاريخ خارج السنوات المالية → صفر صامت
+ *    بعد: BusinessRuleException صريح — متسق مع PartyBalanceService
+ *
+ * 2. whereNull('sm.deleted_at') على stock_movements
+ *    DB::table() لا يطبق SoftDeletes تلقائياً
+ *
+ * 3. يستخدم ResolvesFiscalYear trait — مصدر وحيد لمنطق السنة المالية
+ *    مشترك مع PartyBalanceService و TreasuryBalanceService
+ * ══════════════════════════════════════════════════════════════════
+ */
 class InventoryStockService
 {
+    use ResolvesFiscalYear;
+
     public function __construct(
         private CompanyContextService $companyContext
     ) {}
 
     /**
-     * المخزون الفعلي لكل المنتجات في تاريخ محدد
+     * المخزون الفعلي لكل المنتجات في تاريخ محدد.
      *
      * المعادلة:
-     *   current_stock = opening_quantity (للسنة المالية التي يقع فيها التاريخ)
-     *                 + SUM(direction=+1 × quantity)  حتى التاريخ
-     *                 - SUM(direction=-1 × quantity)  حتى التاريخ
+     *   current_stock = opening_quantity (للسنة المالية المطابقة للتاريخ)
+     *                 + SUM(direction=+1 × quantity) حتى التاريخ
+     *                 - SUM(direction=-1 × quantity) حتى التاريخ
      *
-     * سعر التكلفة:
-     *   - إذا current_cost_price > 0  → استخدمه (محدَّث من InventoryValuationService)
-     *   - وإلا                        → opening_value / opening_quantity (من الرصيد الافتتاحي)
+     * سعر التكلفة (بالأولوية):
+     *   1. product.current_cost_price (إذا > 0)
+     *   2. آخر سعر شراء من الحركات
+     *   3. opening_value / opening_quantity
+     *   4. صفر
+     *
+     * @throws \App\Core\Exceptions\BusinessRuleException
      */
     public function getStockAt(
         string  $date,
         ?int    $warehouseId = null,
         ?string $search      = null
     ): array {
-        $companyId = $this->companyContext->get();
+        $companyId    = $this->companyContext->get();
+        $fiscalYearId = $this->resolveFiscalYearId($companyId, $date);
 
-        // ─── 1. تحديد السنة المالية من التاريخ المطلوب ───────────────────────
-        $fiscalYear = DB::table('fiscal_years')
-            ->where('company_id', $companyId)
-            ->whereDate('start_date', '<=', $date)
-            ->whereDate('end_date',   '>=', $date)
-            ->select('id', 'start_date', 'end_date')
-            ->first();
-
-        // ─── 2. الرصيد الافتتاحي لكل product في هذه السنة ───────────────────
-        //    نجلب opening_qty + opening_val لحساب سعر التكلفة الافتتاحي
+        // ─── 1. الرصيد الافتتاحي ─────────────────────────────────────────────
         $openingQuery = DB::table('opening_balances_stock')
             ->select(
                 'product_id',
                 DB::raw('SUM(opening_quantity) as opening_qty'),
                 DB::raw('SUM(opening_value)    as opening_val')
             )
-            ->where('company_id', $companyId)
-            ->when($fiscalYear,  fn($q) => $q->where('fiscal_year_id', $fiscalYear->id))
-            ->when(!$fiscalYear, fn($q) => $q->whereRaw('1 = 0'))
+            ->where('company_id',     $companyId)
+            ->where('fiscal_year_id', $fiscalYearId)
             ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
             ->groupBy('product_id');
 
-        // ─── 3. حركات المخزون (مدخلات ومخرجات) حتى التاريخ المطلوب ──────────
+        // ─── 2. حركات المخزون حتى التاريخ ───────────────────────────────────
         $movementsQuery = DB::table('stock_movements as sm')
-            ->join('stock_movement_types as smt',
-                   'sm.stock_movement_type_id', '=', 'smt.id')
+            ->join('stock_movement_types as smt', 'sm.stock_movement_type_id', '=', 'smt.id')
             ->select(
                 'sm.product_id',
                 DB::raw('SUM(CASE WHEN smt.direction > 0 THEN sm.quantity ELSE 0 END) as total_in'),
                 DB::raw('SUM(CASE WHEN smt.direction < 0 THEN sm.quantity ELSE 0 END) as total_out'),
-                // سعر التكلفة من آخر حركة إدخال مؤكدة
                 DB::raw('MAX(CASE WHEN smt.direction > 0 THEN sm.unit_price ELSE NULL END) as last_purchase_price'),
             )
-            ->where('sm.company_id',   $companyId)
-            ->where('sm.is_validated', true)
+            ->where('sm.company_id',     $companyId)
+            ->where('sm.fiscal_year_id', $fiscalYearId)
+            ->where('sm.is_validated',   true)
+            ->whereNull('sm.deleted_at')
             ->whereDate('sm.movement_date', '<=', $date)
-            ->when(
-                $fiscalYear,
-                fn($q) => $q->where('sm.fiscal_year_id', $fiscalYear->id),
-                fn($q) => $q->whereRaw('1 = 0')
-            )
             ->when($warehouseId, fn($q) => $q->where('sm.warehouse_id', $warehouseId))
             ->groupBy('sm.product_id');
 
-        // ─── 4. Query الرئيسية ────────────────────────────────────────────────
+        // ─── 3. Query الرئيسية ────────────────────────────────────────────────
         $rows = DB::table('products as p')
             ->select(
                 'p.id',
@@ -83,36 +91,27 @@ class InventoryStockService
                 'p.min_stock_alert',
                 'p.manages_stock',
                 'p.active',
-                // افتتاحي
                 DB::raw('COALESCE(ob.opening_qty, 0) as opening_quantity'),
-                // مدخلات
-                DB::raw('COALESCE(mv.total_in, 0) as total_in'),
-                // مخرجات
-                DB::raw('COALESCE(mv.total_out, 0) as total_out'),
-                // المخزون الحالي
+                DB::raw('COALESCE(mv.total_in,  0)  as total_in'),
+                DB::raw('COALESCE(mv.total_out, 0)  as total_out'),
                 DB::raw('
                     COALESCE(ob.opening_qty, 0)
                     + COALESCE(mv.total_in,  0)
                     - COALESCE(mv.total_out, 0)
                     as current_stock
                 '),
-                // ✅ سعر التكلفة الفعلي — أولوية:
-                //   1. current_cost_price من المنتج (إذا > 0)
-                //   2. آخر سعر شراء من الحركات
-                //   3. opening_value / opening_quantity
-                //   4. صفر
                 DB::raw('
                     CASE
                         WHEN p.current_cost_price > 0
                             THEN p.current_cost_price
                         WHEN COALESCE(mv.last_purchase_price, 0) > 0
                             THEN mv.last_purchase_price
-                        WHEN COALESCE(ob.opening_qty, 0) > 0 AND COALESCE(ob.opening_val, 0) > 0
+                        WHEN COALESCE(ob.opening_qty, 0) > 0
+                         AND COALESCE(ob.opening_val, 0) > 0
                             THEN ob.opening_val / ob.opening_qty
                         ELSE 0
                     END as effective_cost_price
                 '),
-                // ✅ القيمة الإجمالية = المخزون × سعر التكلفة الفعلي
                 DB::raw('
                     (
                         COALESCE(ob.opening_qty, 0)
@@ -125,12 +124,12 @@ class InventoryStockService
                             THEN p.current_cost_price
                         WHEN COALESCE(mv.last_purchase_price, 0) > 0
                             THEN mv.last_purchase_price
-                        WHEN COALESCE(ob.opening_qty, 0) > 0 AND COALESCE(ob.opening_val, 0) > 0
+                        WHEN COALESCE(ob.opening_qty, 0) > 0
+                         AND COALESCE(ob.opening_val, 0) > 0
                             THEN ob.opening_val / ob.opening_qty
                         ELSE 0
                     END as total_value
                 '),
-                // علاقات
                 'f.name   as family_name',
                 'u.name   as unit_name',
                 'u.symbol as unit_symbol',
@@ -152,7 +151,6 @@ class InventoryStockService
             ->orderBy('p.name')
             ->get();
 
-        // ─── 5. تحويل للـ format المطلوب ──────────────────────────────────────
         return $rows->map(fn($row) => [
             'id'                 => $row->id,
             'name'               => $row->name,
@@ -165,7 +163,9 @@ class InventoryStockService
             'current_cost_price' => (float) $row->effective_cost_price,
             'total_value'        => (float) $row->total_value,
             'manages_stock'      => (bool)  $row->manages_stock,
-            'family'             => $row->family_name ? ['name' => $row->family_name] : null,
+            'family'             => $row->family_name
+                                     ? ['name' => $row->family_name]
+                                     : null,
             'unit'               => $row->unit_name
                                      ? ['name' => $row->unit_name, 'symbol' => $row->unit_symbol]
                                      : null,

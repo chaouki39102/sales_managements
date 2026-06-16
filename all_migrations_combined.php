@@ -2536,6 +2536,422 @@ return new class extends Migration
 
 
 
+// ===== ملف: 2026_06_14_000001_drop_initial_balance_add_payment_index.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * 1. حذف parties.initial_balance
+ *    السبب: opening_balances_parties أصبح المصدر الوحيد للرصيد الافتتاحي
+ *    مع دعم تعدد السنوات المالية — وجود الحقلين معاً يعني مصدرين للحقيقة.
+ *
+ * 2. إضافة فهرس مركّب على payments لتسريع استعلام PartyBalanceService
+ *    الاستعلام: WHERE company_id + party_id + fiscal_year_id + status + payment_date
+ *    الفهارس الموجودة لا تغطي fiscal_year_id + status معاً في نفس الفهرس.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // 1. حذف initial_balance من parties
+        Schema::table('parties', function (Blueprint $table) {
+            $table->dropColumn('initial_balance');
+        });
+
+        // 2. فهرس مركّب لاستعلام رصيد المتعامل (PartyBalanceService::getBalanceAt)
+        Schema::table('payments', function (Blueprint $table) {
+            $table->index(
+                ['company_id', 'party_id', 'fiscal_year_id', 'status', 'payment_date'],
+                'idx_payments_party_balance_lookup'
+            );
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('parties', function (Blueprint $table) {
+            $table->decimal('initial_balance', 15, 4)->default(0.00);
+        });
+
+        Schema::table('payments', function (Blueprint $table) {
+            $table->dropIndex('idx_payments_party_balance_lookup');
+        });
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_14_000002_add_commercial_documents_balance_index.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * فهرس مركّب على commercial_documents لتسريع استعلام PartyBalanceService
+ *
+ * الاستعلام في getBalanceAt():
+ *   WHERE company_id + party_id + fiscal_year_id + is_locked=true
+ *   JOIN document_types (affects_accounting=true)
+ *   WHERE document_date <= $date
+ *
+ * الفهارس الموجودة:
+ *   idx_docs_by_party_type_date_status  → (company_id, party_id, document_type_id, document_date, document_status_id)
+ *   idx_status_date_party               → (company_id, document_status_id, document_date, party_id)
+ *
+ * المشكلة: لا يوجد فهرس يجمع (party_id + fiscal_year_id + is_locked) معاً.
+ * الفهرس الجديد يغطي الاستعلام المحوري لرصيد المتعامل.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('commercial_documents', function (Blueprint $table) {
+            $table->index(
+                ['company_id', 'party_id', 'fiscal_year_id', 'is_locked', 'document_date'],
+                'idx_docs_party_fiscal_year_balance'
+            );
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('commercial_documents', function (Blueprint $table) {
+            $table->dropIndex('idx_docs_party_fiscal_year_balance');
+        });
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_14_000003_add_opening_balances_lookup_indexes.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * فهرس إضافي على opening_balances_parties
+ *
+ * الجدول يحتوي UNIQUE على (company_id, fiscal_year_id, party_id)
+ * لكن هذا القيد لا يُضاف دائماً كفهرس قابل للبحث في MySQL بكفاءة
+ * عند الاستعلام بـ (company_id + party_id + fiscal_year_id) بترتيب مختلف.
+ *
+ * الاستعلام في PartyBalanceService:
+ *   WHERE company_id = X AND party_id = Y AND fiscal_year_id = Z
+ *
+ * الفهرس المُضاف يُسرّع هذا الاستعلام المباشر بدون الاعتماد على ترتيب
+ * أعمدة الـ UNIQUE constraint.
+ *
+ * كذلك فهرس على opening_balances_stock لنفس السبب.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('opening_balances_parties', function (Blueprint $table) {
+            $table->index(
+                ['company_id', 'party_id', 'fiscal_year_id'],
+                'idx_obp_company_party_year'
+            );
+        });
+
+        Schema::table('opening_balances_stock', function (Blueprint $table) {
+            $table->index(
+                ['company_id', 'product_id', 'warehouse_id', 'fiscal_year_id'],
+                'idx_obs_company_product_wh_year'
+            );
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('opening_balances_parties', function (Blueprint $table) {
+            $table->dropIndex('idx_obp_company_party_year');
+        });
+
+        Schema::table('opening_balances_stock', function (Blueprint $table) {
+            $table->dropIndex('idx_obs_company_product_wh_year');
+        });
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_14_000004_fix_current_stock_cached_triggers.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * إصلاح Migration_CurrentStockCached — مشكلتان حرجتان:
+ *
+ * المشكلة 1: seedCurrentStock() تجمع opening_quantity من كل السنوات المالية
+ *   SELECT SUM(obs.opening_quantity) FROM opening_balances_stock
+ *   بدون فلتر fiscal_year_id → تُضاعف المخزون لكل سنة إضافية.
+ *   الصحيح: أخذ opening_quantity من السنة المالية الحالية فقط (is_current=true).
+ *
+ * المشكلة 2: triggers 4,5,6 (opening_balance insert/update/delete)
+ *   تُحدّث current_stock_cached بكل تغيير في opening_balances_stock
+ *   بما فيها سنوات مالية مغلقة (ترحيل FiscalYearClosure) → يُضاعف المخزون
+ *   عند كل إقفال سنة مالية لأن transferStockBalances() تُدرج صفوفاً جديدة.
+ *   الصحيح: triggers تتحقق من fiscal_year_id = السنة المالية الحالية للشركة.
+ *
+ * هذه الميغريشن تحذف الـ triggers القديمة وتُعيد بناءها بشكل صحيح.
+ * تُشغَّل فقط إذا كانت Migration_CurrentStockCached مُفعَّلة.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (!Schema::hasColumn('products', 'current_stock_cached')) {
+            // Migration_CurrentStockCached لم تُشغَّل — لا شيء للإصلاح
+            return;
+        }
+
+        // 1. حذف الـ triggers القديمة
+        DB::statement('DROP TRIGGER IF EXISTS `after_opening_balance_insert`');
+        DB::statement('DROP TRIGGER IF EXISTS `after_opening_balance_update`');
+        DB::statement('DROP TRIGGER IF EXISTS `after_opening_balance_delete`');
+
+        // 2. إعادة حساب current_stock_cached بشكل صحيح (السنة الحالية فقط)
+        DB::statement(<<<'SQL'
+            UPDATE products p
+            SET p.current_stock_cached = COALESCE((
+                SELECT SUM(obs.opening_quantity)
+                FROM opening_balances_stock obs
+                INNER JOIN fiscal_years fy ON obs.fiscal_year_id = fy.id
+                WHERE obs.product_id = p.id
+                  AND obs.company_id = p.company_id
+                  AND fy.is_current   = 1
+                  AND fy.company_id   = p.company_id
+            ), 0) + COALESCE((
+                SELECT SUM(sm.quantity * COALESCE(smt.direction, 0))
+                FROM stock_movements sm
+                LEFT JOIN stock_movement_types smt ON sm.stock_movement_type_id = smt.id
+                INNER JOIN fiscal_years fy ON sm.fiscal_year_id = fy.id
+                WHERE sm.product_id   = p.id
+                  AND sm.company_id   = p.company_id
+                  AND sm.is_validated = 1
+                  AND fy.is_current   = 1
+                  AND fy.company_id   = p.company_id
+                  AND sm.deleted_at   IS NULL
+            ), 0)
+            WHERE p.manages_stock = 1;
+        SQL);
+
+        // 3. إعادة بناء الـ triggers بشكل صحيح
+        // Trigger 4: بعد إدراج رصيد افتتاحي — فقط إذا كانت السنة هي الحالية
+        DB::statement(<<<'SQL'
+            CREATE TRIGGER `after_opening_balance_insert`
+            AFTER INSERT ON `opening_balances_stock`
+            FOR EACH ROW
+            BEGIN
+                IF (SELECT is_current FROM fiscal_years WHERE id = NEW.fiscal_year_id) = 1 THEN
+                    UPDATE products
+                    SET current_stock_cached = current_stock_cached + NEW.opening_quantity
+                    WHERE id = NEW.product_id;
+                END IF;
+            END
+        SQL);
+
+        // Trigger 5: بعد تحديث رصيد افتتاحي — فقط إذا كانت السنة هي الحالية
+        DB::statement(<<<'SQL'
+            CREATE TRIGGER `after_opening_balance_update`
+            AFTER UPDATE ON `opening_balances_stock`
+            FOR EACH ROW
+            BEGIN
+                IF (SELECT is_current FROM fiscal_years WHERE id = NEW.fiscal_year_id) = 1 THEN
+                    UPDATE products
+                    SET current_stock_cached = current_stock_cached
+                        + (NEW.opening_quantity - OLD.opening_quantity)
+                    WHERE id = NEW.product_id;
+                END IF;
+            END
+        SQL);
+
+        // Trigger 6: بعد حذف رصيد افتتاحي — فقط إذا كانت السنة هي الحالية
+        DB::statement(<<<'SQL'
+            CREATE TRIGGER `after_opening_balance_delete`
+            AFTER DELETE ON `opening_balances_stock`
+            FOR EACH ROW
+            BEGIN
+                IF (SELECT is_current FROM fiscal_years WHERE id = OLD.fiscal_year_id) = 1 THEN
+                    UPDATE products
+                    SET current_stock_cached = current_stock_cached - OLD.opening_quantity
+                    WHERE id = OLD.product_id;
+                END IF;
+            END
+        SQL);
+    }
+
+    public function down(): void
+    {
+        if (!Schema::hasColumn('products', 'current_stock_cached')) {
+            return;
+        }
+
+        // إعادة الـ triggers القديمة (بدون فلتر السنة)
+        DB::statement('DROP TRIGGER IF EXISTS `after_opening_balance_insert`');
+        DB::statement('DROP TRIGGER IF EXISTS `after_opening_balance_update`');
+        DB::statement('DROP TRIGGER IF EXISTS `after_opening_balance_delete`');
+
+        DB::statement(<<<'SQL'
+            CREATE TRIGGER `after_opening_balance_insert`
+            AFTER INSERT ON `opening_balances_stock`
+            FOR EACH ROW
+            BEGIN
+                UPDATE products
+                SET current_stock_cached = current_stock_cached + NEW.opening_quantity
+                WHERE id = NEW.product_id;
+            END
+        SQL);
+
+        DB::statement(<<<'SQL'
+            CREATE TRIGGER `after_opening_balance_update`
+            AFTER UPDATE ON `opening_balances_stock`
+            FOR EACH ROW
+            BEGIN
+                UPDATE products
+                SET current_stock_cached = current_stock_cached
+                    + (NEW.opening_quantity - OLD.opening_quantity)
+                WHERE id = NEW.product_id;
+            END
+        SQL);
+
+        DB::statement(<<<'SQL'
+            CREATE TRIGGER `after_opening_balance_delete`
+            AFTER DELETE ON `opening_balances_stock`
+            FOR EACH ROW
+            BEGIN
+                UPDATE products
+                SET current_stock_cached = current_stock_cached - OLD.opening_quantity
+                WHERE id = OLD.product_id;
+            END
+        SQL);
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_14_000006_create_opening_balances_treasury.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * توحيد الخزينة مع نمط التناظر الكامل:
+ *
+ *   قبل:
+ *     treasury_accounts.initial_balance  → رصيد افتتاحي ثابت بلا سنة مالية
+ *     treasury_accounts.current_balance  → لا يُحدَّث أبداً (PaymentService فارغ)
+ *
+ *   بعد:
+ *     opening_balances_treasury          → مرآة opening_balances_stock/parties
+ *     TreasuryBalanceService::getBalanceAt() → يحسب لحظياً
+ *     PaymentService::afterCreate/Delete → يُحدِّث current_balance كـ cache فقط
+ *
+ * الجداول:
+ *   1. إنشاء opening_balances_treasury
+ *   2. إضافة payments.direction  (in/out) لتحديد اتجاه الدفعة على الخزينة
+ *   3. حذف initial_balance و current_balance من treasury_accounts
+ *      (current_balance يُعاد كـ computed cache في migration منفصلة إن أردت)
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // 1. جدول الأرصدة الافتتاحية للخزينة
+        Schema::create('opening_balances_treasury', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')
+                  ->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('fiscal_year_id')
+                  ->constrained('fiscal_years')->restrictOnDelete()->cascadeOnUpdate();
+            $table->foreignId('treasury_account_id')
+                  ->constrained('treasury_accounts')->restrictOnDelete()->cascadeOnUpdate();
+            $table->decimal('opening_balance', 15, 4)->default(0);
+            $table->timestamps();
+
+            $table->unique(
+                ['company_id', 'fiscal_year_id', 'treasury_account_id'],
+                'obt_year_account_unique'
+            );
+            $table->index(
+                ['company_id', 'treasury_account_id', 'fiscal_year_id'],
+                'idx_obt_account_year'
+            );
+        });
+
+        // 2. إضافة direction على payments لتحديد اتجاه التدفق على الخزينة
+        //    'in'  = دفعة واردة  (العميل يدفع لنا   → يزيد رصيد الخزينة)
+        //    'out' = دفعة صادرة (نحن ندفع للمورد   → ينقص رصيد الخزينة)
+        Schema::table('payments', function (Blueprint $table) {
+            $table->enum('direction', ['in', 'out'])
+                  ->default('in')
+                  ->after('status')
+                  ->comment('in = وارد (زيادة الخزينة), out = صادر (نقص الخزينة)');
+
+            $table->index(
+                ['company_id', 'treasury_account_id', 'fiscal_year_id', 'status', 'direction', 'payment_date'],
+                'idx_payments_treasury_balance'
+            );
+        });
+
+        // 3. ترحيل initial_balance الموجود إلى opening_balances_treasury
+        //    مرتبط بأول سنة مالية للشركة
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement(<<<'SQL'
+                INSERT INTO opening_balances_treasury
+                    (company_id, fiscal_year_id, treasury_account_id, opening_balance, created_at, updated_at)
+                SELECT
+                    ta.company_id,
+                    fy.id as fiscal_year_id,
+                    ta.id as treasury_account_id,
+                    ta.initial_balance,
+                    NOW(),
+                    NOW()
+                FROM treasury_accounts ta
+                INNER JOIN (
+                    SELECT company_id, MIN(id) as id
+                    FROM fiscal_years
+                    GROUP BY company_id
+                ) fy ON fy.company_id = ta.company_id
+                WHERE ta.initial_balance != 0
+                  AND ta.deleted_at IS NULL
+            SQL);
+        }
+
+        // 4. حذف الحقلين القديمين
+        Schema::table('treasury_accounts', function (Blueprint $table) {
+            $table->dropColumn(['initial_balance', 'current_balance']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('treasury_accounts', function (Blueprint $table) {
+            $table->decimal('initial_balance', 15, 4)->default(0.00);
+            $table->decimal('current_balance', 15, 4)->default(0.00);
+        });
+
+        Schema::table('payments', function (Blueprint $table) {
+            $table->dropIndex('idx_payments_treasury_balance');
+            $table->dropColumn('direction');
+        });
+
+        Schema::dropIfExists('opening_balances_treasury');
+    }
+};
+
+
+
+
 // ===== ملف: Migration_CurrentStockCached.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;

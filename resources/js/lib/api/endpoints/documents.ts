@@ -1,6 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
-// lib/api/endpoints/documents.ts
-// ✅ مصحح: lines endpoints + fiscal_year_id + typeCode صحيح
+// lib/api/endpoints/documents.ts — محدَّث
+//
+// ✅ إضافة: check-number endpoint للتحقق من تكرار رقم المستند
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -21,7 +22,7 @@ export interface DocumentCreateInput {
   document_type_id:  number;
   party_id?:         number | null;
   warehouse_id:      number;
-  fiscal_year_id:    number;           // ✅ مطلوب — يُمرَّر دائماً
+  fiscal_year_id:    number;
   document_date:     string;
   due_date?:         string | null;
   notes?:            string | null;
@@ -30,7 +31,7 @@ export interface DocumentCreateInput {
 }
 
 export interface DocumentLineInput {
-  id?:                    number;       // للتعديل
+  id?:                    number;
   product_variant_id?:    number | null;
   description?:           string | null;
   quantity:               number;
@@ -41,7 +42,7 @@ export interface DocumentLineInput {
 
 export interface DocumentListParams extends ListParams {
   document_type_id?:  number;
-  type_code?:         string;   // ✅ الاسم الصحيح
+  type_code?:         string;
   party_id?:          number;
   status?:            string;
   fiscal_year_id?:    number;
@@ -56,16 +57,15 @@ export const documentsApi = {
   list: (params?: DocumentListParams) =>
     apiGet<PaginatedResponse<CommercialDocument>>('/documents', params),
 
-  // ✅ إصلاح: الفلتر بـ document_type_id أو type_code حسب الباكاند
   byType: (typeCode: string, params?: DocumentListParams) =>
     apiGet<PaginatedResponse<CommercialDocument>>('/documents', {
       ...params,
-      'filter[document_type.code]': typeCode,  // ✅ Spatie filter الصحيح
+      'filter[document_type.code]': typeCode,
     }),
 
   show: (id: number) =>
     apiGet<CommercialDocument>(`/documents/${id}`, {
-      include: 'party,warehouse,documentType,lines.productVariant,payments.paymentMode',
+      include: 'party,warehouse,documentType,documentStatus,lines.productVariant,lines.packaging,lines.lot,payments.paymentMode,fiscalStamp,validatedBy,createdBy,updatedBy,deletedBy',
     }),
 
   create: (data: DocumentCreateInput) =>
@@ -76,6 +76,14 @@ export const documentsApi = {
 
   delete: (id: number) =>
     apiDelete(`/documents/${id}`),
+
+  // ✅ جديد: التحقق من تكرار رقم المستند
+  checkNumber: (params: {
+    document_number: string;
+    document_type_id: number;
+    exclude_id?: number;
+  }) =>
+    apiGet<{ exists: boolean }>('/documents/check-number', params),
 
   // ── Document Actions ───────────────────────────────────────────────────────
   validate: (id: number) =>
@@ -94,7 +102,6 @@ export const documentsApi = {
     apiGet<{ url: string }>(`/documents/${id}/qrcode`),
 
   // ── Lines ──────────────────────────────────────────────────────────────────
-  // ✅ مفقودة في النسخة الأصلية — ضرورية لإضافة/تعديل سطور
   lines: {
     list: (documentId: number) =>
       apiGet<CommercialDocumentLine[]>(`/commercial-document-lines`, {
@@ -164,7 +171,6 @@ export function useDocumentMutations() {
     }
   };
 
-  // ✅ يُضيف fiscal_year_id تلقائياً من السياق
   const create = useMutation({
     mutationFn: (data: Omit<DocumentCreateInput, 'fiscal_year_id'> & { fiscal_year_id?: number }) =>
       documentsApi.create({

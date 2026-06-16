@@ -648,3 +648,19 @@ export interface CompanyMember extends BaseModel {
     email: string;
   };
 }
+
+export interface PartyBalance {
+  party_id:          number;
+  date:              string;
+  fiscal_year_id:    number;
+  opening_balance:   number;
+  documents_balance: number;
+  payments_total:    number;
+  current_balance:   number;
+  balance_type:      'debit' | 'credit';
+  party?: {
+    id:   number;
+    name: string;
+    party_type?: { name: string };
+  };
+}

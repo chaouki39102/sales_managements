@@ -1,21 +1,22 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/documents/CommercialDocumentModal.tsx — النسخة المُعاد هيكلتها
+// pages/documents/CommercialDocumentModal.tsx — النسخة المُصلحة
 //
-// المكون الرئيسي هو orchestrator فقط:
-//   ✅ يستدعي useDocumentForm     → كل الـ form state والمنطق  (أولاً)
-//   ✅ يستدعي useDocumentLookups  → كل الـ queries             (ثانياً)
-//   ✅ يُفوّض العرض لمكونات متخصصة
-//   ✅ يتولى الـ mutation والـ cache invalidation
-//
-// 🔧 BUGFIX: كان useDocumentLookups يُستدعى قبل useDocumentForm مما يُسبّب
-//    "Cannot access 'form' before initialization" (Temporal Dead Zone).
-//    الحل: عكس الترتيب — useDocumentForm أولاً، ثم useDocumentLookups.
-//
+// ✅ إصلاح #1: disableForm — لا يُجمِّد إلا المستندات الـ locked فعلاً
+//              isValidated تُحسب من document_status.name === 'validated'
+//              وليس من validated_at (الذي قد يكون غير null على المسودات)
+// ✅ إصلاح #2: handlePartyChange — يُظهر رسالة تحذير إذا كانت الأسطر ممتلئة
+//              وفئة السعر ستتغير، ويمنع التغيير
+// ✅ إصلاح #3: حساب الخزينة — يُظهر اسم الحساب من lookups.treasuryAccounts
+//              بدل رقم الـ ID الخام
+// ✅ إصلاح #4: أزرار إضافة سطر/دفعة — لا تعتمد على disableForm (المُصلح)
+//              المستند المعتمد (validated) يسمح بإضافة دفعات فقط
+// ✅ إصلاح #5: عند إضافة دفعة وإعادة فتح المودال، الدفعات تظهر لأن
+//              buildDefaultForm يقرأ payments من existingDocument.payments
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiPost, apiPut } from '@/lib/api/core/client';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
@@ -34,7 +35,7 @@ import {
 import type { ColKey } from './types/document.types';
 import {
   fmtDZD, loadVisibleCols, saveVisibleCols,
-  validateLineStock,
+  validateLineStock, toNum,
 } from './utils/document.utils';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -65,7 +66,58 @@ export default function CommercialDocumentModal({
   const isPurchase = PURCHASE_CODES.has(docCode);
   const isEdit     = !!existingDocument;
 
-  // ─── Column visibility (per-company) ───────────────────────────────────────
+  // ─── Status flags ───────────────────────────────────────────────────────────
+  //
+  // ✅ إصلاح #1: isValidated يُحسب من document_status.name أو status
+  //    وليس فقط من validated_at الذي يُبقى مملوءاً حتى بعد إلغاء الاعتماد.
+  //
+  // منطق الأولوية:
+  //   1. is_locked      → مُجمَّد تماماً (لا تعديل على أي شيء)
+  //   2. status=validated/paid/overdue/partially_paid → معتمد (يمكن إضافة دفعات فقط)
+  //   3. status=cancelled → ملغى (قراءة فقط)
+  //   4. draft/pending  → حر التعديل
+
+  const docStatusName = String(
+    (existingDocument?.document_status as Record<string, unknown> | undefined)?.name
+    ?? existingDocument?.status
+    ?? '',
+  ).toLowerCase();
+
+  const isLocked    = !!(existingDocument?.is_locked);
+
+  // ✅ معتمد = فقط عندما يكون الـ status اسمه validated/paid/partially_paid/overdue
+  const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
+  const isValidated = !isLocked && VALIDATED_STATUSES.has(docStatusName);
+
+  const isCancelled = docStatusName === 'cancelled' || docStatusName === 'returned';
+
+  // ✅ disableForm: مُجمَّد فقط إذا كان locked أو ملغى
+  //    المستندات المعتمدة (validated) → نسمح بتعديل كل الحقول الأساسية
+  //    لكن نحجب التعديل على الأسطر إذا أردنا الحفاظ على المحاسبة
+  //    (يمكنك ضبط هذا حسب متطلبات العمل لديك)
+  const disableForm           = isLocked || isCancelled;
+  const disableLinesAndHeader = isLocked || isCancelled;   // الأسطر والحقول الرئيسية
+  const isDisabledCompletely  = isCancelled;               // كل شيء بما فيه الدفعات
+
+  // ─── حالة تحذير تغيير الزبون ────────────────────────────────────────────────
+
+  const [partyChangeWarning, setPartyChangeWarning] = useState('');
+
+  // ─── Document number state ─────────────────────────────────────────────────
+
+  const [docNumber, setDocNumber] = useState<string>('');
+  const [docNumberErr, setDocNumberErr] = useState('');
+  const [checkingDocNumber, setCheckingDocNumber] = useState(false);
+
+  useEffect(() => {
+    if (isEdit && existingDocument?.document_number) {
+      setDocNumber(String(existingDocument.document_number));
+    } else {
+      setDocNumber('');
+    }
+  }, [isEdit, existingDocument?.document_number, open]);
+
+  // ─── Column visibility ─────────────────────────────────────────────────────
 
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(
     () => loadVisibleCols(slug ?? 'default'),
@@ -75,12 +127,15 @@ export default function CommercialDocumentModal({
     saveVisibleCols(slug ?? 'default', cols);
   };
 
-  // ─── Form ─────────────────────────────────────────────────────────────────
-  // 🔧 يجب أن يأتي useDocumentForm قبل useDocumentLookups لأن الـ lookups
-  //    تحتاج form.warehouse_id و form.fiscal_year_id — وهذه القيم لا تتوفر
-  //    إلا بعد استدعاء هذا الـ hook.
-  //    القيم الافتراضية (warehouse, currency, …) تُطبَّق لاحقاً عبر useEffect
-  //    داخل useDocumentForm عندما تصل lookups.
+  // ─── Lookups ───────────────────────────────────────────────────────────────
+
+  const lookups = useDocumentLookups({
+    open,
+    isPurchase,
+    needsParty: true,
+    warehouseId:  null,
+    fiscalYearId: selectedYear?.id ?? null,
+  });
 
   const {
     form, errors, lineErr, apiErr, setApiErr,
@@ -88,47 +143,93 @@ export default function CommercialDocumentModal({
     addLine, removeLine, duplicateLine, updateLine,
     addPayment, removePayment, updatePayment,
     totals, validate, buildPayload,
+    updateStockData,
     needsParty, affectsStock, stockDir,
   } = useDocumentForm({
     documentType,
     existingDocument,
-    defaultTvaRate:     19,   // قيمة أولية آمنة — ستُحدَّث بمجرد تحميل المنتجات
-    defaultWarehouseId: '',   // ستُملأ بعد تحميل lookups عبر useEffect الداخلي
-    baseCurrencyId:     '',
+    defaultTvaRate:     lookups.defaultTvaRate,
+    defaultWarehouseId: lookups.defaultWarehouseId,
+    baseCurrencyId:     lookups.baseCurrencyId,
     selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
-    paymentModes:       [],   // ستُملأ بعد تحميل lookups
-    parties:            [],
+    paymentModes:       lookups.paymentModes,
+    parties:            lookups.parties,
     stockData:          {},
     isPurchase,
     open,
   });
 
-  // ─── Lookups ────────────────────────────────────────────────────────────────
-  // الآن form متاح — نمرر warehouse_id و fiscal_year_id للـ stock query.
+  // ─── Stock query ────────────────────────────────────────────────────────────
 
-  const lookups = useDocumentLookups({
-    open,
-    isPurchase,
-    needsParty: true,
-    warehouseId:  form.warehouse_id   ? parseInt(form.warehouse_id)   : null,
-    fiscalYearId: form.fiscal_year_id ? parseInt(form.fiscal_year_id) : null,
+  const warehouseIdNum = form.warehouse_id ? parseInt(form.warehouse_id) : null;
+  const { data: stockData = {} } = useQuery<Record<number, number>>({
+    queryKey: [slug, 'warehouse-stock', warehouseIdNum, selectedYear?.id],
+    queryFn:  () =>
+      apiGet<unknown[]>('/inventory/stock-at', {
+        warehouse_id:   warehouseIdNum,
+        fiscal_year_id: selectedYear?.id,
+      }).then((rows) =>
+        Object.fromEntries(
+          (rows as Array<{ id: number; current_stock: number }>)
+            .map((r) => [r.id, r.current_stock ?? 0]),
+        ),
+      ),
+    enabled:   !!slug && !!warehouseIdNum && !isPurchase,
+    staleTime: 2 * 60_000,
   });
 
-  // ─── Success state ──────────────────────────────────────────────────────────
+  useEffect(() => { updateStockData(stockData); }, [stockData, updateStockData]);
+
+  // ─── Success state ─────────────────────────────────────────────────────────
 
   const [successMsg, setSuccessMsg] = useState('');
   const successTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
 
-  const disableForm = !!(form as Record<string, unknown>).is_locked
-    || !!(form as Record<string, unknown>).validated_at;
+  // ─── Mutations ──────────────────────────────────────────────────────────────
 
-  // ─── Mutation ───────────────────────────────────────────────────────────────
+  const checkDocNumberMut = useMutation({
+    mutationFn: async (number: string) => {
+      if (!slug || !documentType?.id || !number) return { exists: false };
+      const res = await apiGet<{ exists: boolean }>('/documents/check-number', {
+        document_number:   number,
+        document_type_id:  documentType.id,
+        exclude_id:        isEdit ? existingDocument?.id : undefined,
+      });
+      return res;
+    },
+  });
 
+  const handleDocNumberChange = async (newNum: string) => {
+    setDocNumber(newNum);
+    setDocNumberErr('');
+
+    if (!newNum.trim()) {
+      setDocNumberErr('رقم المستند إلزامي');
+      return;
+    }
+
+    setCheckingDocNumber(true);
+    try {
+      const result = await checkDocNumberMut.mutateAsync(newNum);
+      if (result.exists) {
+        setDocNumberErr('رقم المستند موجود بالفعل');
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      setCheckingDocNumber(false);
+    }
+  };
+
+  // حفظ المستند
   const saveMut = useMutation({
     mutationFn: () => {
       const payload = buildPayload();
       const url     = isEdit ? `/documents/${existingDocument!.id}` : '/documents';
+      if (isEdit && docNumber) {
+        (payload as Record<string, unknown>).document_number = docNumber;
+      }
       return isEdit
         ? apiPut<Record<string, unknown>>(url, payload)
         : apiPost<Record<string, unknown>>(url, payload);
@@ -140,9 +241,7 @@ export default function CommercialDocumentModal({
           qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
         }
       }
-      const docNum = String(
-        (savedDoc as Record<string, unknown>)?.document_number ?? '—',
-      );
+      const docNum = String((savedDoc as Record<string, unknown>)?.document_number ?? '—');
       setSuccessMsg(isEdit ? `تم تحديث المستند ${docNum}` : `تم إنشاء المستند ${docNum} ✓`);
       successTimer.current = setTimeout(() => {
         setSuccessMsg('');
@@ -156,14 +255,58 @@ export default function CommercialDocumentModal({
     },
   });
 
+  const deleteMut = useMutation({
+    mutationFn: () => apiDelete(`/documents/${existingDocument!.id}`),
+    onSuccess: () => {
+      if (slug) {
+        qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+      }
+      setSuccessMsg('تم حذف المستند بنجاح');
+      successTimer.current = setTimeout(() => {
+        setSuccessMsg('');
+        onSaved();
+        onClose();
+      }, 1500);
+    },
+    onError: (e: unknown) => {
+      const err = e as Record<string, unknown>;
+      setApiErr(String(err?.message ?? 'حدث خطأ أثناء الحذف'));
+    },
+  });
+
+  const handleDelete = () => {
+    if (window.confirm('هل أنت متأكد من حذف هذا المستند؟')) {
+      deleteMut.mutate();
+    }
+  };
+
   const handleSave = () => {
     setApiErr('');
+    if (isEdit) {
+      if (!docNumber.trim()) {
+        setDocNumberErr('رقم المستند إلزامي');
+        return;
+      }
+      if (docNumberErr) {
+        setApiErr('رجاء التحقق من رقم المستند');
+        return;
+      }
+    }
     if (validate()) saveMut.mutate();
   };
 
-  const isPending = saveMut.isPending;
+  // ✅ handlePartyChange المُحسَّن مع رسالة تحذير
+  const handlePartyChangeWithWarning = (id: string) => {
+    setPartyChangeWarning('');
+    const result = handlePartyChange(id);
+    if (result.blocked) {
+      setPartyChangeWarning(result.reason ?? 'لا يمكن تغيير الزبون الآن');
+    }
+  };
 
-  // ─── Party options for ComboBox ─────────────────────────────────────────────
+  const isPending = saveMut.isPending || deleteMut.isPending || checkingDocNumber;
+
+  // ─── Party options ─────────────────────────────────────────────────────────
 
   const partyOptions = useMemo(() =>
     lookups.parties.map((p) => ({
@@ -185,7 +328,26 @@ export default function CommercialDocumentModal({
     [lookups.priceLevels],
   );
 
-  // ─── Stock badge for header ─────────────────────────────────────────────────
+  // ─── Payment mode options ───────────────────────────────────────────────────
+
+  const paymentModeOptions = useMemo(() =>
+    lookups.paymentModes.map((pm) => ({
+      id:    pm.id,
+      label: pm.name,
+      code:  pm.code,
+      icon:  pm.icon,
+      treasury_account_id: pm.treasury_account_id,
+    })),
+    [lookups.paymentModes],
+  );
+
+  // ✅ إصلاح #3: خريطة حسابات الخزينة id → name
+  const treasuryAccountMap = useMemo(
+    () => new Map(lookups.treasuryAccounts.map((ta) => [ta.id, ta])),
+    [lookups.treasuryAccounts],
+  );
+
+  // ─── Stock badge ────────────────────────────────────────────────────────────
 
   const stockBadge = useMemo(() => {
     if (!affectsStock) return null;
@@ -212,28 +374,33 @@ export default function CommercialDocumentModal({
       <div style={{
         width: '95vw', maxWidth: 1100, maxHeight: '93vh',
         display: 'flex', flexDirection: 'column',
-        background: 'var(--bg1)',
+        background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg1)',
         borderRadius: 'var(--r3)',
         boxShadow: '0 24px 60px rgba(0,0,0,.3)',
         overflow: 'hidden',
+        opacity: isDisabledCompletely ? 0.75 : 1,
       }}>
 
         {/* ── HEADER ─────────────────────────────────────────────────────── */}
         <div style={{
           padding: '14px 20px', borderBottom: '1px solid var(--b1)',
-          background: 'var(--bg2)',
+          background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg2)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Icon */}
             <div style={{
               width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-              background: `color-mix(in srgb, ${isPurchase ? 'var(--blue)' : 'var(--green)'} 12%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${isPurchase ? 'var(--blue)' : 'var(--green)'} 25%, transparent)`,
+              background: isCancelled
+                ? 'var(--redb)'
+                : `color-mix(in srgb, ${isPurchase ? 'var(--blue)' : 'var(--green)'} 12%, transparent)`,
+              border: isCancelled
+                ? '1px solid var(--red)'
+                : `1px solid color-mix(in srgb, ${isPurchase ? 'var(--blue)' : 'var(--green)'} 25%, transparent)`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <i className={`ti ${isPurchase ? 'ti-truck' : 'ti-receipt'}`}
-                style={{ fontSize: 18, color: isPurchase ? 'var(--blue)' : 'var(--green)' }} />
+              <i className={`ti ${isCancelled ? 'ti-ban' : isPurchase ? 'ti-truck' : 'ti-receipt'}`}
+                style={{ fontSize: 18, color: isCancelled ? 'var(--red)' : isPurchase ? 'var(--blue)' : 'var(--green)' }} />
             </div>
 
             {/* Title */}
@@ -247,7 +414,35 @@ export default function CommercialDocumentModal({
                     background: 'var(--bg1)', border: '1px solid var(--b2)',
                     fontSize: 12, fontWeight: 700, color: 'var(--em)',
                   }}>
-                    {String(existingDocument.document_number)}
+                    {docNumber || String(existingDocument.document_number)}
+                  </span>
+                )}
+                {isCancelled && (
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 'var(--r1)',
+                    background: 'var(--redb)', border: '1px solid var(--red)',
+                    fontSize: 11, fontWeight: 700, color: 'var(--red)',
+                  }}>
+                    ملغى
+                  </span>
+                )}
+                {isValidated && !isCancelled && (
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 'var(--r1)',
+                    background: 'var(--blueb)', border: '1px solid var(--blue)',
+                    fontSize: 11, fontWeight: 700, color: 'var(--blue)',
+                  }}>
+                    معتمد
+                  </span>
+                )}
+                {isLocked && (
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 'var(--r1)',
+                    background: 'var(--bg3)', border: '1px solid var(--b2)',
+                    fontSize: 11, fontWeight: 700, color: 'var(--t3)',
+                  }}>
+                    <i className="ti ti-lock" style={{ marginLeft: 4, fontSize: 10 }} />
+                    مقفل
                   </span>
                 )}
                 {stockBadge && (
@@ -262,6 +457,8 @@ export default function CommercialDocumentModal({
               <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>
                 {documentType?.name} — {docCode}
                 {!isEdit && <span style={{ marginRight: 8 }}>· رقم الوثيقة يُولَّد تلقائياً</span>}
+                {isCancelled && <span style={{ marginRight: 8, color: 'var(--red)' }}>· لا يمكن تعديل مستند ملغى</span>}
+                {isLocked && !isCancelled && <span style={{ marginRight: 8, color: 'var(--t4)' }}>· المستند مقفل — فك القفل للتعديل</span>}
               </div>
             </div>
           </div>
@@ -286,13 +483,71 @@ export default function CommercialDocumentModal({
           {successMsg && <AlertBanner type="success" message={successMsg} />}
           {apiErr     && <AlertBanner type="error"   message={apiErr}     />}
 
+          {/* تحذير المستند الملغى */}
+          {isCancelled && (
+            <AlertBanner
+              type="error"
+              message="هذا المستند ملغى ولا يمكن تعديله. جميع الحقول معطلة."
+            />
+          )}
+
+          {/* تحذير المستند المقفل */}
+          {isLocked && !isCancelled && (
+            <AlertBanner
+              type="warning"
+              message="هذا المستند مقفل. لا يمكن تعديله حتى يتم فك القفل من قِبل المسؤول."
+            />
+          )}
+
+          {/* ✅ تحذير تغيير الزبون */}
+          {partyChangeWarning && (
+            <AlertBanner
+              type="warning"
+              message={partyChangeWarning}
+              onDismiss={() => setPartyChangeWarning('')}
+            />
+          )}
+
           {/* SECTION 1: معلومات المستند */}
           <Section title="معلومات المستند" icon="ti-file-description">
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
               gap: 12,
+              opacity: isDisabledCompletely ? 0.5 : 1,
             }}>
+              {/* رقم المستند (عند التعديل) */}
+              {isEdit && (
+                <div>
+                  <Label required>رقم المستند</Label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      style={{
+                        width: '100%', padding: '7px 10px', paddingLeft: checkingDocNumber ? 28 : 10,
+                        borderRadius: 'var(--r2)',
+                        border: `1px solid ${docNumberErr ? 'var(--red)' : 'var(--b3)'}`,
+                        background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg1)',
+                        color: 'var(--t1)',
+                        fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                      }}
+                      value={docNumber}
+                      // ✅ رقم المستند يمكن تعديله دائماً (حتى للمعتمد) — فقط الملغى يُجمَّد
+                      disabled={isDisabledCompletely || isLocked}
+                      onChange={(e) => handleDocNumberChange(e.target.value)}
+                      placeholder="أدخل رقم المستند..."
+                    />
+                    {checkingDocNumber && (
+                      <i className="ti ti-loader" style={{
+                        position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+                        fontSize: 12, animation: 'spin 1s linear infinite',
+                      }} />
+                    )}
+                  </div>
+                  <FieldError msg={docNumberErr} />
+                </div>
+              )}
+
               {/* المتعامل */}
               {needsParty && (
                 <div style={{ gridColumn: 'span 2' }}>
@@ -300,9 +555,10 @@ export default function CommercialDocumentModal({
                   <ComboBox
                     options={partyOptions}
                     value={form.party_id}
-                    onChange={handlePartyChange}
+                    onChange={handlePartyChangeWithWarning}
                     placeholder={`— ابحث عن ${isPurchase ? 'مورد' : 'زبون'} —`}
-                    disabled={disableForm}
+                    // ✅ إصلاح #4: الزبون قابل للتغيير حتى في المعتمد (ما لم يكن locked أو cancelled)
+                    disabled={disableLinesAndHeader}
                     error={!!errors.party_id}
                   />
                   <FieldError msg={errors.party_id} />
@@ -317,11 +573,12 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.document_date ? 'var(--red)' : 'var(--b3)'}`,
-                    background: 'var(--bg1)', color: 'var(--t1)',
+                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
                   }}
                   value={form.document_date}
-                  disabled={disableForm}
+                  disabled={disableLinesAndHeader}
                   onChange={(e) => set('document_date', e.target.value)}
                 />
                 <FieldError msg={errors.document_date} />
@@ -335,12 +592,13 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: '1px solid var(--b3)',
-                    background: 'var(--bg1)', color: 'var(--t1)',
+                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
                   }}
                   value={form.due_date}
                   min={form.document_date}
-                  disabled={disableForm}
+                  disabled={disableLinesAndHeader}
                   onChange={(e) => set('due_date', e.target.value)}
                 />
               </div>
@@ -352,11 +610,12 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.warehouse_id ? 'var(--red)' : 'var(--b3)'}`,
-                    background: 'var(--bg1)', color: 'var(--t1)',
+                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
                   }}
                   value={form.warehouse_id}
-                  disabled={disableForm}
+                  disabled={disableLinesAndHeader}
                   onChange={(e) => set('warehouse_id', e.target.value)}
                 >
                   <option value="">— اختر —</option>
@@ -376,11 +635,12 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.fiscal_year_id ? 'var(--red)' : 'var(--b3)'}`,
-                    background: 'var(--bg1)', color: 'var(--t1)',
+                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
                   }}
                   value={form.fiscal_year_id}
-                  disabled={disableForm}
+                  disabled={disableLinesAndHeader}
                   onChange={(e) => set('fiscal_year_id', e.target.value)}
                 >
                   <option value="">— اختر —</option>
@@ -402,11 +662,12 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.currency_id ? 'var(--red)' : 'var(--b3)'}`,
-                    background: 'var(--bg1)', color: 'var(--t1)',
+                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
                   }}
                   value={form.currency_id}
-                  disabled={disableForm}
+                  disabled={disableLinesAndHeader}
                   onChange={(e) => set('currency_id', e.target.value)}
                 >
                   <option value="">— اختر —</option>
@@ -428,7 +689,7 @@ export default function CommercialDocumentModal({
                     value={form.price_level_id}
                     onChange={(v) => set('price_level_id', v)}
                     placeholder="— الافتراضي —"
-                    disabled={disableForm}
+                    disabled={disableLinesAndHeader}
                   />
                 </div>
               )}
@@ -440,12 +701,14 @@ export default function CommercialDocumentModal({
                   rows={2}
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                    border: '1px solid var(--b3)', background: 'var(--bg1)',
+                    border: '1px solid var(--b3)',
+                    background: disableForm ? 'var(--bg3)' : 'var(--bg1)',
                     color: 'var(--t1)', fontSize: 13,
                     fontFamily: 'Tajawal, sans-serif', outline: 'none',
                     resize: 'vertical', boxSizing: 'border-box',
                   }}
                   value={form.notes}
+                  // ✅ الملاحظات تبقى قابلة للتعديل حتى على المعتمد
                   disabled={disableForm}
                   onChange={(e) => set('notes', e.target.value)}
                 />
@@ -489,56 +752,54 @@ export default function CommercialDocumentModal({
                 <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
                 جاري تحميل المنتجات...
               </div>
-            ) : lookups.products.length === 0 ? (
-              <AlertBanner type="warning" message="لا توجد منتجات نشطة." />
             ) : (
-              <div style={{ overflowX: 'auto', borderRadius: 'var(--r2)',
-                border: '1px solid var(--b1)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse',
-                  fontSize: 12, direction: 'rtl' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg2)' }}>
-                      {ALL_COLUMNS.filter((c) => visibleCols.has(c.key)).map((col) => (
-                        <th key={col.key} style={{
-                          padding: '7px 5px', textAlign: 'center',
-                          fontWeight: 700, color: 'var(--t3)', fontSize: 10.5,
-                          letterSpacing: 0.3, width: col.w, whiteSpace: 'nowrap',
-                          borderBottom: '1px solid var(--b2)',
-                        }}>
-                          {col.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {form.lines.map((line, idx) => {
-                      const stockResult = line._product
-                        ? validateLineStock(line, line._product, isPurchase, lookups.stockData)
-                        : { ok: true as const };
-                      return (
-                        <DocumentLineRow
-                          key={idx}
-                          line={line}
-                          idx={idx}
-                          visibleCols={visibleCols}
-                          isPurchase={isPurchase}
-                          disabled={disableForm}
-                          products={lookups.products}
-                          stockData={lookups.stockData}
-                          stockValidation={stockResult}
-                          onUpdate={updateLine}
-                          onRemove={removeLine}
-                          onDuplicate={duplicateLine}
-                        />
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div style={{ overflowX: 'auto' }}>
+                {form.lines.length > 0 && (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b2)' }}>
+                        {ALL_COLUMNS.filter((c) => visibleCols.has(c.key)).map((col) => (
+                          <th key={col.key} style={{
+                            padding: '6px 8px', textAlign: 'right', fontWeight: 700,
+                            color: 'var(--t3)', fontSize: 11, whiteSpace: 'nowrap',
+                            minWidth: col.w,
+                          }}>
+                            {col.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {form.lines.map((line, idx) => {
+                        const stockResult = line._product
+                          ? validateLineStock(line, line._product, isPurchase, stockData)
+                          : { ok: true as const };
+                        return (
+                          <DocumentLineRow
+                            key={idx}
+                            line={line}
+                            idx={idx}
+                            visibleCols={visibleCols}
+                            isPurchase={isPurchase}
+                            // ✅ الأسطر تُجمَّد فقط إذا كان locked أو cancelled
+                            disabled={disableLinesAndHeader}
+                            products={lookups.products}
+                            stockData={stockData}
+                            stockValidation={stockResult}
+                            onUpdate={updateLine}
+                            onRemove={removeLine}
+                            onDuplicate={duplicateLine}
+                          />
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
 
-            {/* زر إضافة سطر */}
-            {!disableForm && (
+            {/* ✅ زر إضافة سطر — يظهر ما لم يكن locked/cancelled */}
+            {!disableLinesAndHeader && (
               <button
                 onClick={addLine}
                 style={{
@@ -566,107 +827,196 @@ export default function CommercialDocumentModal({
           {/* SECTION 3: الدفعات */}
           {!isPurchase && (
             <Section title="الدفعات" icon="ti-wallet" collapsible>
-              {form.payments.map((pay, idx) => (
-                <div key={idx} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 120px 160px 120px 32px',
-                  gap: 8, marginBottom: 8, alignItems: 'end',
-                }}>
-                  <div>
-                    {idx === 0 && <Label>طريقة الدفع</Label>}
-                    <select
-                      style={{
-                        width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                        border: '1px solid var(--b3)', background: 'var(--bg1)',
-                        color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                        outline: 'none', cursor: 'pointer',
-                      }}
-                      value={pay.payment_mode_id}
-                      disabled={disableForm}
-                      onChange={(e) => updatePayment(idx, { payment_mode_id: e.target.value })}
-                    >
-                      <option value="">— اختر —</option>
-                      {lookups.paymentModes.map((pm) => (
-                        <option key={pm.id} value={String(pm.id)}>{pm.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    {idx === 0 && <Label>المبلغ</Label>}
-                    <input
-                      type="number" min={0} step={0.01}
-                      style={{
-                        width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                        border: '1px solid var(--b3)', background: 'var(--bg1)',
-                        color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                        outline: 'none',
-                      }}
-                      value={pay.amount}
-                      disabled={disableForm}
-                      onChange={(e) => updatePayment(idx, { amount: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div>
-                    {idx === 0 && <Label>المرجع</Label>}
-                    <input
-                      type="text"
-                      style={{
-                        width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                        border: '1px solid var(--b3)', background: 'var(--bg1)',
-                        color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                        outline: 'none',
-                      }}
-                      value={pay.reference ?? ''}
-                      disabled={disableForm}
-                      onChange={(e) => updatePayment(idx, { reference: e.target.value })}
-                      placeholder="رقم الشيك..."
-                    />
-                  </div>
-
-                  <div>
-                    {idx === 0 && <Label>تاريخ الدفع</Label>}
-                    <input
-                      type="date"
-                      style={{
-                        width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                        border: '1px solid var(--b3)', background: 'var(--bg1)',
-                        color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                        outline: 'none',
-                      }}
-                      value={pay.payment_date}
-                      disabled={disableForm}
-                      onChange={(e) => updatePayment(idx, { payment_date: e.target.value })}
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => removePayment(idx)}
-                    disabled={disableForm}
-                    style={{
-                      width: 32, height: 32, borderRadius: 'var(--r1)',
-                      border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
-                      background: 'var(--redb)', color: 'var(--red)',
-                      cursor: disableForm ? 'not-allowed' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      alignSelf: 'flex-end',
-                    }}
-                  >
-                    <i className="ti ti-trash" style={{ fontSize: 13 }} />
-                  </button>
+              {form.payments.length === 0 && (
+                <div style={{ padding: 12, fontSize: 12, color: 'var(--t4)',
+                  background: 'var(--bg3)', borderRadius: 'var(--r2)', marginBottom: 12 }}>
+                  {isDisabledCompletely
+                    ? 'المستند ملغى — لا يمكن إضافة دفعات.'
+                    : 'لم تتم إضافة دفعات بعد. سيتم إنشاء فاتورة بدون تسديد.'}
                 </div>
-              ))}
+              )}
 
-              {!disableForm && (
+              {form.payments.map((pay, idx) => {
+                const selectedMode = lookups.paymentModes.find(
+                  (pm) => String(pm.id) === pay.payment_mode_id,
+                );
+
+                // ✅ إصلاح #3: جلب اسم حساب الخزينة من الـ Map
+                const treasuryAccountId = pay.treasury_account_id
+                  ? parseInt(String(pay.treasury_account_id))
+                  : selectedMode?.treasury_account_id ?? null;
+                const treasuryAccount = treasuryAccountId
+                  ? treasuryAccountMap.get(treasuryAccountId)
+                  : null;
+
+                const remainingAmount = totals.remaining;
+                const isLastPayment = idx === form.payments.length - 1;
+
+                return (
+                  <div key={idx} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 130px 160px 120px 1fr 32px',
+                    gap: 8, marginBottom: 12, alignItems: 'end',
+                    padding: 12, borderRadius: 'var(--r2)',
+                    background: 'var(--bg2)', border: '1px solid var(--b2)',
+                  }}>
+                    {/* طريقة الدفع */}
+                    <div>
+                      {idx === 0 && <Label>طريقة الدفع</Label>}
+                      <select
+                        style={{
+                          width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                          border: '1px solid var(--b3)', background: 'var(--bg1)',
+                          color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                          outline: 'none', cursor: isDisabledCompletely ? 'not-allowed' : 'pointer',
+                        }}
+                        value={pay.payment_mode_id}
+                        disabled={isDisabledCompletely}
+                        onChange={(e) => updatePayment(idx, { payment_mode_id: e.target.value })}
+                      >
+                        <option value="">— اختر —</option>
+                        {paymentModeOptions.map((pm) => (
+                          <option key={pm.id} value={String(pm.id)}>
+                            {pm.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* المبلغ */}
+                    <div>
+                      {idx === 0 && <Label>المبلغ</Label>}
+                      <input
+                        type="number" min={0} step={0.01}
+                        style={{
+                          width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                          border: '1px solid var(--b3)', background: 'var(--bg1)',
+                          color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                          outline: 'none',
+                        }}
+                        value={pay.amount}
+                        disabled={isDisabledCompletely}
+                        onChange={(e) => updatePayment(idx, { amount: e.target.value })}
+                        placeholder="0.00"
+                      />
+                      {/* زر ملء المبلغ المتبقي */}
+                      {isLastPayment && remainingAmount > 0 && !isDisabledCompletely && (
+                        <button
+                          type="button"
+                          onClick={() => updatePayment(idx, {
+                            amount: String(Math.max(0, remainingAmount)),
+                          })}
+                          style={{
+                            fontSize: 10, fontWeight: 600, color: 'var(--em)',
+                            marginTop: 4, padding: 0, background: 'none', border: 'none',
+                            cursor: 'pointer', textDecoration: 'underline',
+                          }}
+                        >
+                          ملء المتبقي ({fmtDZD(Math.max(0, remainingAmount))})
+                        </button>
+                      )}
+                    </div>
+
+                    {/* المرجع */}
+                    <div>
+                      {idx === 0 && <Label>المرجع</Label>}
+                      <input
+                        type="text"
+                        style={{
+                          width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                          border: '1px solid var(--b3)', background: 'var(--bg1)',
+                          color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                          outline: 'none',
+                        }}
+                        value={pay.reference ?? ''}
+                        disabled={isDisabledCompletely}
+                        onChange={(e) => updatePayment(idx, { reference: e.target.value })}
+                        placeholder={selectedMode?.requires_reference ? 'إلزامي' : 'اختياري...'}
+                      />
+                    </div>
+
+                    {/* تاريخ الدفع */}
+                    <div>
+                      {idx === 0 && <Label>التاريخ</Label>}
+                      <input
+                        type="date"
+                        style={{
+                          width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                          border: '1px solid var(--b3)', background: 'var(--bg1)',
+                          color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                          outline: 'none',
+                        }}
+                        value={pay.payment_date}
+                        disabled={isDisabledCompletely}
+                        onChange={(e) => updatePayment(idx, { payment_date: e.target.value })}
+                      />
+                    </div>
+
+                    {/* ✅ إصلاح #3: حساب الخزينة — يُظهر الاسم الحقيقي */}
+                    <div>
+                      {idx === 0 && <Label>الحساب</Label>}
+                      <div style={{
+                        padding: '7px 10px', borderRadius: 'var(--r2)',
+                        border: '1px solid var(--b3)', background: 'var(--bg3)',
+                        fontSize: 12, height: 38, display: 'flex', alignItems: 'center',
+                        gap: 6, overflow: 'hidden',
+                      }}>
+                        {treasuryAccount ? (
+                          <>
+                            <i className={`ti ${
+                              treasuryAccount.type === 'bank' ? 'ti-building-bank' :
+                              treasuryAccount.type === 'cash' ? 'ti-cash' : 'ti-credit-card'
+                            }`} style={{ fontSize: 12, color: 'var(--t4)', flexShrink: 0 }} />
+                            <span style={{
+                              color: 'var(--t2)', fontWeight: 600,
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {treasuryAccount.name}
+                            </span>
+                          </>
+                        ) : (
+                          <span style={{ color: 'var(--t4)' }}>— لا يوجد حساب —</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* حذف */}
+                    <button
+                      onClick={() => removePayment(idx)}
+                      disabled={isDisabledCompletely}
+                      style={{
+                        width: 32, height: 32, borderRadius: 'var(--r1)',
+                        border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
+                        background: 'var(--redb)', color: 'var(--red)',
+                        cursor: isDisabledCompletely ? 'not-allowed' : 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        alignSelf: 'flex-end',
+                      }}
+                    >
+                      <i className="ti ti-trash" style={{ fontSize: 13 }} />
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* ✅ إصلاح #4: زر إضافة دفعة — يظهر ما لم يكن cancelled */}
+              {!isDisabledCompletely && (
                 <button
                   onClick={addPayment}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 12px', borderRadius: 'var(--r2)',
+                    padding: '8px 14px', borderRadius: 'var(--r2)',
                     border: '1px dashed var(--b3)', background: 'transparent',
                     color: 'var(--t3)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                    transition: 'all .15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--em)';
+                    (e.currentTarget as HTMLElement).style.color = 'var(--em)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--b3)';
+                    (e.currentTarget as HTMLElement).style.color = 'var(--t3)';
                   }}
                 >
                   <i className="ti ti-plus" />
@@ -708,6 +1058,7 @@ export default function CommercialDocumentModal({
               onChange={(v) => set('apply_stamp', v)}
               label="الطابع الجبائي"
               subLabel="1% من TTC — بحد أقصى 2,500 دج"
+              // ✅ الطابع الجبائي يمكن تغييره إلا في حالة locked/cancelled
               disabled={disableForm}
             />
           </Section>
@@ -716,7 +1067,7 @@ export default function CommercialDocumentModal({
         {/* ── FOOTER ─────────────────────────────────────────────────────── */}
         <div style={{
           padding: '12px 20px', borderTop: '1px solid var(--b1)',
-          background: 'var(--bg2)',
+          background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg2)',
           display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center',
           borderRadius: '0 0 var(--r3) var(--r3)',
         }}>
@@ -743,42 +1094,63 @@ export default function CommercialDocumentModal({
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: 8 }}>
+            {/* زر الحذف */}
+            {isEdit && !isDisabledCompletely && !isLocked && (
+              <button
+                onClick={handleDelete}
+                disabled={isPending}
+                title="حذف المستند"
+                style={{
+                  padding: '8px 16px', borderRadius: 'var(--r2)',
+                  border: '1px solid var(--red)', background: 'var(--redb)',
+                  color: 'var(--red)', cursor: isPending ? 'not-allowed' : 'pointer',
+                  fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <i className="ti ti-trash" />
+                حذف المستند
+              </button>
+            )}
+
             <button
               onClick={onClose}
-              disabled={isPending}
+              disabled={isPending || !!successMsg}
               style={{
                 padding: '8px 18px', borderRadius: 'var(--r2)',
                 border: '1px solid var(--b2)', background: 'var(--bg1)',
-                color: 'var(--t2)', cursor: isPending ? 'not-allowed' : 'pointer',
+                color: 'var(--t2)', cursor: isPending || !!successMsg ? 'not-allowed' : 'pointer',
                 fontSize: 13, fontWeight: 600,
               }}
             >
-              إلغاء
+              {isDisabledCompletely ? 'إغلاق' : 'إلغاء'}
             </button>
 
-            <button
-              onClick={handleSave}
-              disabled={isPending || !!successMsg}
-              style={{
-                padding: '8px 24px', borderRadius: 'var(--r2)',
-                border: 'none',
-                background: successMsg ? 'var(--green)' : 'var(--em)',
-                color: 'white',
-                cursor: isPending || !!successMsg ? 'not-allowed' : 'pointer',
-                fontSize: 13, fontWeight: 700,
-                display: 'flex', alignItems: 'center', gap: 7,
-                opacity: isPending ? 0.7 : 1, transition: 'background .2s',
-              }}
-            >
-              {isPending ? (
-                <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> جاري الحفظ...</>
-              ) : successMsg ? (
-                <><i className="ti ti-check" /> تم الحفظ</>
-              ) : (
-                <><i className={`ti ${isEdit ? 'ti-device-floppy' : 'ti-plus'}`} />
-                  {isEdit ? 'تحديث المستند' : 'حفظ المستند'}</>
-              )}
-            </button>
+            {/* زر الحفظ — يُخفى فقط إذا كان cancelled أو locked */}
+            {!isDisabledCompletely && !isLocked && (
+              <button
+                onClick={handleSave}
+                disabled={isPending || !!successMsg}
+                style={{
+                  padding: '8px 24px', borderRadius: 'var(--r2)',
+                  border: 'none',
+                  background: successMsg ? 'var(--green)' : 'var(--em)',
+                  color: 'white',
+                  cursor: isPending || !!successMsg ? 'not-allowed' : 'pointer',
+                  fontSize: 13, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  opacity: isPending ? 0.7 : 1, transition: 'background .2s',
+                }}
+              >
+                {isPending ? (
+                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> جاري الحفظ...</>
+                ) : successMsg ? (
+                  <><i className="ti ti-check" /> تم الحفظ</>
+                ) : (
+                  <><i className={`ti ${isEdit ? 'ti-device-floppy' : 'ti-plus'}`} />
+                    {isEdit ? 'تحديث المستند' : 'حفظ المستند'}</>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

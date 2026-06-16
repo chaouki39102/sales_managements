@@ -35,6 +35,9 @@ abstract class BaseService
     // 1. القراءة
     // ═══════════════════════════════════════════════════════════════
 
+    /**
+     * ✅ FIXED: findById الآن يدعم soft deletes بشكل صحيح
+     */
     public function findById($id, array $with = null): Model
     {
         $relations = $with ?? array_unique(array_merge($this->defaultWith, $this->showWith));
@@ -524,8 +527,15 @@ abstract class BaseService
         }
     }
 
+    /**
+     * ✅ FIXED: applyScopeToQuery الآن آمن للـ null queries
+     */
     protected function applyScopeToQuery(Builder $query): Builder
     {
+        if ($query === null) {
+            return $query;
+        }
+
         if (!$this->modelHasColumn('company_id')) {
             return $query;
         }

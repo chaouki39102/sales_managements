@@ -56,6 +56,7 @@ use App\Http\Controllers\Api\V1\FiscalStampController;
 use App\Http\Controllers\Api\V1\GenderController;
 use App\Http\Controllers\Api\V1\InventoryValuationMethodController;
 use App\Http\Controllers\Api\V1\LegalFormController;
+use App\Http\Controllers\Api\V1\PartyBalanceController;
 use App\Http\Controllers\Api\V1\PartyTypeController;
 use App\Http\Controllers\Api\V1\PermissionController;
 use App\Http\Controllers\Api\V1\ProductTypeController;
@@ -392,7 +393,7 @@ Route::prefix('v1')->group(function () {
             Route::middleware('can:create_sales_document')->group(function () {
 
                 // ✅ المسارات المحددة (unpaid, overdue) يجب أن تكون
-                //    قبل apiResource — وإلا Laravel يعترضها كـ {document}
+                //    قبل apiResource — وإلا Laravel يعترضها كـ {commercialDocument}
                 Route::get('documents/unpaid',  [CommercialDocumentController::class, 'unpaid']);
                 Route::get('documents/overdue', [CommercialDocumentController::class, 'overdue']);
 
@@ -400,11 +401,11 @@ Route::prefix('v1')->group(function () {
                 Route::apiResource('documents', CommercialDocumentController::class);
 
                 // مسارات الإجراءات على الوثيقة
-                Route::post('documents/{document}/validate', [CommercialDocumentController::class, 'validateDocument']);
-                Route::post('documents/{document}/lock',     [CommercialDocumentController::class, 'lock']);
-                Route::post('documents/{document}/unlock',   [CommercialDocumentController::class, 'unlock']);
-                Route::post('documents/{document}/cancel',   [CommercialDocumentController::class, 'cancel']);
-                Route::get('documents/{document}/qrcode',   [CommercialDocumentController::class, 'generateQRCode']);
+                Route::post('documents/{commercialDocument}/validate', [CommercialDocumentController::class, 'validateDocument']);
+                Route::post('documents/{commercialDocument}/lock',     [CommercialDocumentController::class, 'lock']);
+                Route::post('documents/{commercialDocument}/unlock',   [CommercialDocumentController::class, 'unlock']);
+                Route::post('documents/{commercialDocument}/cancel',   [CommercialDocumentController::class, 'cancel']);
+                Route::get('documents/{commercialDocument}/qrcode',    [CommercialDocumentController::class, 'generateQRCode']);
 
                 Route::apiResource('commercial-document-lines', CommercialDocumentLineController::class);
 
@@ -426,6 +427,9 @@ Route::prefix('v1')->group(function () {
                 Route::get('treasury-accounts/default',       [TreasuryAccountController::class, 'default']);
                 Route::apiResource('treasury-accounts', TreasuryAccountController::class);
 
+                Route::get('party-balances', [PartyBalanceController::class, 'index']);
+                Route::get('party-balances/{partyId}', [PartyBalanceController::class, 'show']);
+                
                 // ✅ expenses: المسارات المحددة قبل apiResource
                 Route::get('expenses/paid',   [ExpenseController::class, 'paid']);
                 Route::get('expenses/unpaid', [ExpenseController::class, 'unpaid']);

@@ -92,17 +92,34 @@ export interface Party {
 // ─── Payment ──────────────────────────────────────────────────────────────────
 
 export interface PaymentMode {
-  id:     number;
-  name:   string;
-  code?:  string | null;
-  icon?:  string | null;
+  id:                    number;
+  name:                  string;
+  code?:                 string | null;
+  icon?:                 string | null;
+  treasury_account_id?:  number | null;
+  requires_reference?:   boolean;
+  is_cash?:              boolean;
 }
 
 export interface PaymentEntry {
-  payment_mode_id: string;
-  amount:          string;
-  reference?:      string;
-  payment_date:    string;
+  payment_mode_id:      string;
+  amount:               string;
+  reference?:           string;
+  payment_date:         string;
+  treasury_account_id?: string | number;  // ✅ حساب الخزينة — يُستقى تلقائياً من paymentMode
+}
+
+// ─── Treasury Account ─────────────────────────────────────────────────────────
+
+export interface TreasuryAccount {
+  id:              number;
+  code:            string;
+  name:            string;
+  type:            'bank' | 'cash' | 'check';
+  balance:         number;
+  is_active:       boolean;
+  bank_name?:      string | null;
+  account_number?: string | null;
 }
 
 // ─── Line ─────────────────────────────────────────────────────────────────────
@@ -160,6 +177,16 @@ export interface DocumentTotals {
   netToPay:    number;
   totalPaid:   number;
   remaining:   number;
+}
+
+// ─── Document Status ──────────────────────────────────────────────────────────
+
+export interface DocumentStatus {
+  id:     number;
+  name:   string;
+  label:  string;
+  color:  string;
+  active: boolean;
 }
 
 // ─── Column config ────────────────────────────────────────────────────────────

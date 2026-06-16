@@ -1,335 +1,198 @@
 // resources/js/pages/debts/DebtsPage.tsx
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo } from 'react';
 import { useModal } from '@/hooks/useModal';
-import PageHeader from '@/components/ui/PageHeader';
-import Card from '@/components/ui/Card';
+import { useFiscalYear } from '@/context/FiscalYearContext';
+import { usePartyBalances } from '@/lib/api/endpoints/partyBalances';
+import { DataTable } from '@/components/ui/DataTable/DataTable';
+import KpiCard from '@/components/ui/KpiCard';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import KpiCard from '@/components/ui/KpiCard';
-import EmptyState from '@/components/ui/EmptyState';
-import ProgressBar from '@/components/ui/ProgressBar';
+import PageHeader from '@/components/ui/PageHeader';
 import Avatar from '@/components/ui/Avatar';
-import apiClient from '@/lib/api/core/client';
-import type { CommercialDocument } from '@/types';
+import EmptyState from '@/components/ui/EmptyState';
+import { fmtNumber, fmtDate } from '@/lib/utils';
+import type { PartyBalance } from '@/lib/api/core/types';
 
 export default function DebtsPage() {
-    const [activeTab, setActiveTab] = useState<'unpaid' | 'overdue'>('unpaid');
+    const { selectedYear } = useFiscalYear();
+    const [date, setDate] = useState(selectedYear?.start_date || new Date().toISOString().split('T')[0]);
+    const [filterType, setFilterType] = useState<number | null>(null);
     const [search, setSearch] = useState('');
-    const [selectedDoc, setSelectedDoc] = useState<CommercialDocument | null>(null);
+    const [selectedBalance, setSelectedBalance] = useState<PartyBalance | null>(null);
     const detailModal = useModal();
-    const qc = useQueryClient();
 
-    // جلب الفواتير غير المدفوعة
-    const { data: unpaidDocs, isLoading: loadingUnpaid } = useQuery({
-        queryKey: ['debts', 'unpaid', search],
-        queryFn: () => apiClient.get('/commercial-documents/unpaid', {
-            params: { search: search || undefined }
-        }).then(r => r.data.data || []),
+    const { data: balances = [], isLoading } = usePartyBalances({
+        date,
+        party_type_id: filterType || undefined,
+        search: search || undefined,
     });
 
-    // جلب الفواتير المتأخرة
-    const { data: overdueDocs, isLoading: loadingOverdue } = useQuery({
-        queryKey: ['debts', 'overdue', search],
-        queryFn: () => apiClient.get('/commercial-documents/overdue', {
-            params: { search: search || undefined }
-        }).then(r => r.data.data || []),
-    });
+    const totalDebit = balances
+        .filter(b => b.balance_type === 'debit')
+        .reduce((s, b) => s + b.current_balance, 0);
 
-    const docs = activeTab === 'unpaid' ? (unpaidDocs || []) : (overdueDocs || []);
-    const totalAmount = docs.reduce((sum: number, doc: CommercialDocument) => sum + doc.amount_remaining, 0);
-    const totalTTC = docs.reduce((sum: number, doc: CommercialDocument) => sum + doc.total_ttc, 0);
-    const clientsCount = new Set(docs.filter((d: CommercialDocument) => d.party_id).map((d: CommercialDocument) => d.party_id)).size;
+    const totalCredit = balances
+        .filter(b => b.balance_type === 'credit')
+        .reduce((s, b) => s + b.current_balance, 0);
 
-    const viewDetail = (doc: CommercialDocument) => {
-        setSelectedDoc(doc);
-        detailModal.openModal();
-    };
+    const clients = balances.filter(b => b.party?.party_type?.name === 'client').length;
+    const suppliers = balances.filter(b => b.party?.party_type?.name === 'supplier').length;
+
+    const columns = useMemo(() => [
+        {
+            key: 'party',
+            header: 'المتعامل',   // ✅ تغيير label إلى header
+            render: (b: PartyBalance) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <Avatar initials={b.party?.name?.[0] || '?'} size={24} />
+                    <span>{b.party?.name || `#${b.party_id}`}</span>
+                </div>
+            )
+        },
+        {
+            key: 'party_type',
+            header: 'النوع',
+            render: (b: PartyBalance) => (
+                <Badge variant="gray">
+                    {b.party?.party_type?.name === 'client' ? 'عميل' : 'مورد'}
+                </Badge>
+            )
+        },
+        {
+            key: 'opening_balance',
+            header: 'افتتاحي',
+            render: (b: PartyBalance) => fmtNumber(b.opening_balance) + ' دج'
+        },
+        {
+            key: 'documents_balance',
+            header: 'حركة المستندات',
+            render: (b: PartyBalance) => (
+                <span style={{ color: b.documents_balance >= 0 ? 'var(--em)' : 'var(--red)' }}>
+                    {b.documents_balance >= 0 ? '+' : ''}{fmtNumber(b.documents_balance)} دج
+                </span>
+            )
+        },
+        {
+            key: 'payments_total',
+            header: 'الدفعات',
+            render: (b: PartyBalance) => '-' + fmtNumber(b.payments_total) + ' دج'
+        },
+        {
+            key: 'current_balance',
+            header: 'الرصيد الحالي',
+            render: (b: PartyBalance) => (
+                <span style={{
+                    fontWeight: 700,
+                    color: b.balance_type === 'debit' ? 'var(--gold)' : 'var(--blue)'
+                }}>
+                    {fmtNumber(b.current_balance)} دج
+                </span>
+            )
+        },
+        {
+            key: 'status',
+            header: 'الحالة',
+            render: (b: PartyBalance) => (
+                <Badge variant={b.balance_type === 'debit' ? 'warning' : 'info'}>
+                    {b.balance_type === 'debit' ? 'مدين (علينا)' : 'دائن (لنا)'}
+                </Badge>
+            )
+        },
+        {
+            key: 'actions',
+            header: '',
+            render: (b: PartyBalance) => (
+                <Button
+                    size="xs"
+                    icon={<i className="ti ti-eye"/>}
+                    onClick={(e) => { e.stopPropagation(); setSelectedBalance(b); detailModal.openModal(); }}
+                />
+            )
+        }
+    ], []);
 
     return (
         <div className="page on" id="p-debts">
             <PageHeader
-                title="الديون والمستحقات"
-                subtitle="متابعة الفواتير غير المدفوعة والمتأخرة"
+                title="أرصدة المتعاملين"
+                subtitle="الرصيد اللحظي لكل عميل ومورد"
                 actions={
                     <>
-                        <Button size="sm" icon={<i className="ti ti-download"/>}>تصدير</Button>
-                        <Button size="sm" icon={<i className="ti ti-printer"/>}>طباعة</Button>
+                        <input
+                            type="date"
+                            value={date}
+                            onChange={e => setDate(e.target.value)}
+                            style={{ width: 150 }}
+                        />
+                        <Button size="sm" variant="gray" icon={<i className="ti ti-refresh"/>} onClick={() => {}} />
                     </>
                 }
             />
 
-            {/* KPIs */}
             <div className="kpis" style={{ marginBottom: 20 }}>
-                <KpiCard
-                    variant="red" icon="ti-cash" label="إجمالي الديون"
-                    value={totalAmount.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج"
-                    sub={`${docs.length} مستند`}
-                />
-                <KpiCard
-                    variant={activeTab === 'overdue' ? 'red' : 'gold'} icon="ti-clock"
-                    label={activeTab === 'overdue' ? 'متأخرة' : 'معلقة'}
-                    value={docs.length}
-                    sub={`${clientsCount} زبون`}
-                />
-                <KpiCard
-                    variant="blue" icon="ti-file-invoice" label="إجمالي TTC"
-                    value={totalTTC.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج"
-                />
-                <KpiCard
-                    variant="purple" icon="ti-percentage" label="نسبة التحصيل"
-                    value={`${totalTTC > 0 ? Math.round((1 - totalAmount / totalTTC) * 100) : 0}%`}
-                    sub="من إجمالي المستحقات"
-                />
+                <KpiCard variant="gold" icon="ti-arrow-down-circle" label="إجمالي المدين (علينا)" value={fmtNumber(totalDebit)} unit="دج" />
+                <KpiCard variant="blue" icon="ti-arrow-up-circle" label="إجمالي الدائن (لنا)" value={fmtNumber(totalCredit)} unit="دج" />
+                <KpiCard variant="green" icon="ti-users" label="العملاء" value={clients} />
+                <KpiCard variant="purple" icon="ti-truck" label="الموردون" value={suppliers} />
             </div>
 
-            {/* Tabs */}
             <div className="tabs" style={{ marginBottom: 16 }}>
-                <div className={`tab ${activeTab === 'unpaid' ? 'on' : ''}`} onClick={() => setActiveTab('unpaid')}>
-                    <span className="ic ic-xs"><i className="ti ti-file-text"/></span>
-                    غير مدفوعة {unpaidDocs ? `(${unpaidDocs.length})` : ''}
+                <div className={`tab ${filterType === null ? 'on' : ''}`} onClick={() => setFilterType(null)}>
+                    الكل ({balances.length})
                 </div>
-                <div className={`tab ${activeTab === 'overdue' ? 'on' : ''}`} onClick={() => setActiveTab('overdue')}>
-                    <span className="ic ic-xs"><i className="ti ti-alert-triangle"/></span>
-                    متأخرة {overdueDocs ? `(${overdueDocs.length})` : ''}
+                <div className={`tab ${filterType === 1 ? 'on' : ''}`} onClick={() => setFilterType(1)}>
+                    عملاء ({balances.filter(b => b.party?.party_type?.name === 'client').length})
+                </div>
+                <div className={`tab ${filterType === 2 ? 'on' : ''}`} onClick={() => setFilterType(2)}>
+                    موردون ({balances.filter(b => b.party?.party_type?.name === 'supplier').length})
                 </div>
             </div>
 
-            {/* Search */}
             <div className="filters" style={{ marginBottom: 16 }}>
-                <div className="srch" style={{ display: 'flex', flex: 1, minWidth: 200 }}>
-                    <span className="srch-ic ic ic-xs"><i className="ti ti-search"/></span>
-                    <input
-                        type="text"
-                        placeholder="ابحث برقم الفاتورة أو اسم الزبون..."
-                        style={{ width: '100%' }}
-                        onChange={e => setSearch(e.target.value)}
-                    />
+                <div className="srch" style={{ flex: 1 }}>
+                    <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
+                    <input placeholder="ابحث باسم أو كود..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
             </div>
 
-            {/* Table */}
-            {(activeTab === 'unpaid' ? loadingUnpaid : loadingOverdue) ? (
-                <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
-            ) : docs.length === 0 ? (
-                <EmptyState
-                    icon="ti-receipt"
-                    text={activeTab === 'unpaid' ? 'لا توجد فواتير غير مدفوعة' : 'لا توجد فواتير متأخرة'}
-                    sub="جميع المدفوعات مكتملة"
-                />
-            ) : (
-                <Card noHeader style={{ padding: 0 }}>
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>رقم الفاتورة</th>
-                                    <th>الزبون</th>
-                                    <th>TTC</th>
-                                    <th>المدفوع</th>
-                                    <th>المتبقي</th>
-                                    <th>نسبة التحصيل</th>
-                                    <th>تاريخ الاستحقاق</th>
-                                    <th>الحالة</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {docs.map((doc: CommercialDocument, i: number) => {
-                                    const isOverdue = doc.due_date && new Date(doc.due_date) < new Date();
-                                    const percentPaid = doc.total_ttc > 0
-                                        ? Math.round((doc.amount_paid / doc.total_ttc) * 100)
-                                        : 0;
-                                    return (
-                                        <tr key={doc.id} onClick={() => viewDetail(doc)} style={{ cursor: 'pointer' }}>
-                                            <td className="m">{doc.document_number}</td>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                                                    <Avatar
-                                                        initials={doc.party?.name?.[0] || '?'}
-                                                        color={((i % 7) + 1) as 1|2|3|4|5|6|7}
-                                                        size={26}
-                                                    />
-                                                    <span className="s">{doc.party?.name || 'عابر'}</span>
-                                                </div>
-                                            </td>
-                                            <td className="e">{doc.total_ttc.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
-                                            <td style={{ color: 'var(--em)', fontFamily: 'monospace' }}>
-                                                {doc.amount_paid.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج
-                                            </td>
-                                            <td className="r">{doc.amount_remaining.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</td>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    <ProgressBar
-                                                        value={percentPaid}
-                                                        color={percentPaid > 50 ? 'var(--em)' : 'var(--red)'}
-                                                        height={5}
-                                                    />
-                                                    <span style={{ fontSize: 10, color: 'var(--t4)', minWidth: 32 }}>
-                                                        {percentPaid}%
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td style={{
-                                                fontSize: 12,
-                                                color: isOverdue ? 'var(--red)' : 'var(--t4)',
-                                                fontWeight: isOverdue ? 700 : 400
-                                            }}>
-                                                {doc.due_date
-                                                    ? new Date(doc.due_date).toLocaleDateString('fr-DZ')
-                                                    : '—'}
-                                            </td>
-                                            <td>
-                                                <Badge variant={isOverdue ? 'danger' : doc.status === 'partial' ? 'warning' : 'info'}>
-                                                    {isOverdue ? 'متأخرة' : doc.status === 'partial' ? 'جزئية' : 'معلقة'}
-                                                </Badge>
-                                            </td>
-                                            <td onClick={e => e.stopPropagation()}>
-                                                <div style={{ display: 'flex', gap: 3 }}>
-                                                    <Button size="xs" variant="primary" icon={<i className="ti ti-cash"/>}>
-                                                        تحصيل
-                                                    </Button>
-                                                    <Button size="xs" icon={<i className="ti ti-eye"/>} onClick={() => viewDetail(doc)}/>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </Card>
-            )}
+            <DataTable
+                columns={columns}
+                data={balances}
+                isLoading={isLoading}
+                emptyText="لا توجد أرصدة"
+                rowKey={(item: PartyBalance) => item.party_id}
+                rowClick={(b) => { setSelectedBalance(b); detailModal.openModal(); }}
+            />
 
-            {/* Detail Modal */}
-            <DebtDetailModal
+            <BalanceDetailModal
                 open={detailModal.open}
-                doc={selectedDoc}
+                balance={selectedBalance}
                 onClose={detailModal.closeModal}
             />
         </div>
     );
 }
 
-// ===============================================
-// Debt Detail Modal
-// ===============================================
-function DebtDetailModal({ open, doc, onClose }: {
+// ... BalanceDetailModal كما هو ...
+
+// ─── BalanceDetailModal ──────────────────────────────────────────────────────
+function BalanceDetailModal({ open, balance, onClose }: {
     open: boolean;
-    doc: CommercialDocument | null;
+    balance: PartyBalance | null;
     onClose: () => void;
 }) {
-    if (!doc) return null;
-
-    const isOverdue = doc.due_date && new Date(doc.due_date) < new Date();
-    const percentPaid = doc.total_ttc > 0 ? Math.round((doc.amount_paid / doc.total_ttc) * 100) : 0;
-    const daysLate = doc.due_date
-        ? Math.floor((new Date().getTime() - new Date(doc.due_date).getTime()) / (1000 * 60 * 60 * 24))
-        : 0;
+    if (!balance) return null;
 
     return (
-        <Modal
-            open={open} onClose={onClose} size="md"
-            title={`تفاصيل — ${doc.document_number}`}
-            subtitle={doc.party?.name || 'زبون عابر'}
-            footer={
-                <>
-                    <Button onClick={onClose}>إغلاق</Button>
-                    <Button variant="primary" icon={<i className="ti ti-cash"/>}>تسجيل دفعة</Button>
-                </>
-            }
-        >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* Status */}
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 16px',
-                    background: isOverdue ? 'var(--redb)' : 'var(--goldb)',
-                    border: `1px solid ${isOverdue ? 'var(--redbo)' : 'var(--goldbo)'}`,
-                    borderRadius: 'var(--r2)'
-                }}>
-                    <span className="ic ic-sm" style={{ color: isOverdue ? 'var(--red)' : 'var(--gold)' }}>
-                        <i className={`ti ${isOverdue ? 'ti-alert-triangle' : 'ti-clock'}`}/>
-                    </span>
-                    <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--t1)' }}>
-                            {isOverdue ? `متأخرة بـ ${daysLate} يوم` : 'معلقة'}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 2 }}>
-                            تاريخ الاستحقاق: {doc.due_date ? new Date(doc.due_date).toLocaleDateString('ar-DZ') : 'غير محدد'}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Summary */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {[
-                        { label: 'الإجمالي TTC', value: doc.total_ttc.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }), color: 'var(--em)' },
-                        { label: 'المدفوع', value: doc.amount_paid.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }), color: 'var(--em)' },
-                        { label: 'المتبقي', value: doc.amount_remaining.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }), color: 'var(--red)' },
-                        { label: 'TVA', value: doc.total_tva.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }), color: 'var(--t3)' },
-                    ].map(item => (
-                        <div key={item.label} style={{
-                            padding: 10, background: 'var(--bg3)', borderRadius: 'var(--r2)',
-                            border: '1px solid var(--b1)'
-                        }}>
-                            <div style={{ fontSize: 10, color: 'var(--t4)', marginBottom: 4 }}>{item.label}</div>
-                            <div style={{ fontWeight: 700, color: item.color }}>{item.value} دج</div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Progress */}
-                <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
-                        <span style={{ color: 'var(--t3)' }}>نسبة التحصيل</span>
-                        <span style={{ fontWeight: 700, color: percentPaid > 50 ? 'var(--em)' : 'var(--red)' }}>{percentPaid}%</span>
-                    </div>
-                    <ProgressBar value={percentPaid} color={percentPaid > 50 ? 'var(--em)' : 'var(--red)'} height={8} />
-                </div>
-
-                {/* Dates */}
-                <div>
-                    {[
-                        { label: 'تاريخ الفاتورة', value: new Date(doc.document_date).toLocaleDateString('ar-DZ') },
-                        { label: 'تاريخ الاستحقاق', value: doc.due_date ? new Date(doc.due_date).toLocaleDateString('ar-DZ') : '—' },
-                        { label: 'تاريخ الإنشاء', value: new Date(doc.created_at).toLocaleDateString('ar-DZ') },
-                    ].map(row => (
-                        <div key={row.label} className="sr">
-                            <span className="sr-l">{row.label}</span>
-                            <span className="sr-v">{row.value}</span>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Client Info */}
-                {doc.party && (
-                    <div style={{
-                        padding: 12, background: 'var(--bg3)', borderRadius: 'var(--r2)',
-                        border: '1px solid var(--b1)'
-                    }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t4)', marginBottom: 8 }}>
-                            معلومات الزبون
-                        </div>
-                        <div className="sr">
-                            <span className="sr-l">الاسم</span>
-                            <span className="sr-v">{doc.party.name}</span>
-                        </div>
-                        {doc.party.phone && (
-                            <div className="sr">
-                                <span className="sr-l">الهاتف</span>
-                                <span className="sr-v">{doc.party.phone}</span>
-                            </div>
-                        )}
-                        {doc.party.nif && (
-                            <div className="sr">
-                                <span className="sr-l">NIF</span>
-                                <span className="sr-v" style={{ fontFamily: 'monospace', fontSize: 12 }}>{doc.party.nif}</span>
-                            </div>
-                        )}
-                    </div>
-                )}
+        <Modal open={open} onClose={onClose} size="md" title={`تفاصيل الرصيد – ${balance.party?.name || `#${balance.party_id}`}`} footer={<Button onClick={onClose}>إغلاق</Button>}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="sr"><span className="sr-l">التاريخ</span><span className="sr-v">{fmtDate(balance.date)}</span></div>
+                <div className="sr"><span className="sr-l">النوع</span><Badge variant={balance.balance_type === 'debit' ? 'warning' : 'info'}>{balance.balance_type === 'debit' ? 'مدين' : 'دائن'}</Badge></div>
+                <div className="sr"><span className="sr-l">الرصيد الافتتاحي</span><span className="sr-v">{fmtNumber(balance.opening_balance)} دج</span></div>
+                <div className="sr"><span className="sr-l">حركة المستندات</span><span className="sr-v">{fmtNumber(balance.documents_balance)} دج</span></div>
+                <div className="sr"><span className="sr-l">الدفعات</span><span className="sr-v">{fmtNumber(balance.payments_total)} دج</span></div>
+                <div className="sr"><span className="sr-l"><strong>الرصيد الحالي</strong></span><span className="sr-v" style={{ fontWeight: 700, fontSize: 18, color: balance.balance_type === 'debit' ? 'var(--gold)' : 'var(--blue)' }}>{fmtNumber(balance.current_balance)} دج</span></div>
             </div>
         </Modal>
     );
