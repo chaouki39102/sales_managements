@@ -5,22 +5,34 @@ namespace App\Services;
 use App\Models\Payment;
 use App\Models\TreasuryAccount;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 
 /**
- * PaymentService
+ * PaymentService — النسخة المُصلحة
  * ══════════════════════════════════════════════════════════════════
- * afterCreate / afterUpdate / afterDelete:
- *   يُحدِّث current_balance على TreasuryAccount كـ denormalized cache
- *   للعرض السريع في الواجهة (بدل استدعاء getTreasuryBalanceAt() في كل مرة).
+ *
+ * جذر مشكلة 500:
+ *   النسخة القديمة: beforeUpdate(): array  ← تعارض مع BaseService: void
+ *   PHP يرفض تحميل الكلاس نهائياً → 500 حتى على GET /payments
+ *
+ * الإصلاح الصحيح (متوافق مع بنية BaseService):
+ *   BaseService::update() يفصل المسؤوليات:
+ *     beforeUpdate()        → void  (تحقق + رفع exception)
+ *     prepareDataForUpdate()→ array (تعديل البيانات قبل الحفظ) ← هنا نضع direction
+ *
+ *   ✅ نحذف beforeUpdate() من PaymentService
+ *   ✅ نُضيف prepareDataForUpdate() بدلاً منه
+ *   ✅ beforeCreate() لا يوجد تعارض (يُعيد array في BaseService أيضاً)
  *
  * direction (in/out):
- *   يُحدَّد تلقائياً من party_id + document_base_operation:
- *   - دفعة من عميل (sale)   → in  (يزيد الخزينة)
- *   - دفعة لمورد (purchase) → out (ينقص الخزينة)
- *   - إذا لم يكن هناك party (مصروف مثلاً) → out افتراضياً
+ *   يُحدَّد تلقائياً إن لم يُرسَل من الواجهة:
+ *   - بدون party                → out (مصروف)
+ *   - party + sale/unknown      → in  (عميل يدفع)
+ *   - party + purchase          → out (نحن ندفع للمورد)
  *
- * ملاحظة: current_balance هو cache فقط — المصدر الحقيقي هو
- * TreasuryBalanceService::getTreasuryBalanceAt().
+ * current_balance على TreasuryAccount:
+ *   cache مُحدَّث فورياً بعد كل عملية مؤكدة.
+ *   المصدر الحقيقي: TreasuryBalanceService::getTreasuryBalanceAt()
  * ══════════════════════════════════════════════════════════════════
  */
 class PaymentService extends \App\Core\Services\BaseService
@@ -33,10 +45,14 @@ class PaymentService extends \App\Core\Services\BaseService
         return $this->resourceName;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // HOOK: beforeCreate — يُعيد array (متوافق مع BaseService)
+    // ═══════════════════════════════════════════════════════════════
+
     /**
-     * تحديد direction تلقائياً قبل الإنشاء إن لم يُرسَل من الواجهة.
+     * تحديد direction تلقائياً قبل الإنشاء إن لم يُرسَل.
      */
-    protected function beforeCreate(array $data, $request): array
+    protected function beforeCreate(array $data, ?Request $request): array
     {
         $data = parent::beforeCreate($data, $request);
 
@@ -47,9 +63,41 @@ class PaymentService extends \App\Core\Services\BaseService
         return $data;
     }
 
-    protected function beforeUpdate(Model $item, array $data, $request): array
+    // ═══════════════════════════════════════════════════════════════
+    // HOOK: beforeUpdate — void (متوافق مع BaseService)
+    // للتحقق فقط، لا تعديل بيانات
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ void — متطابق مع BaseService::beforeUpdate(): void
+     * التحقق من القيود فقط (لا تعديل بيانات هنا).
+     */
+    protected function beforeUpdate(Model $item, array $data, ?Request $request): void
     {
-        $data = parent::beforeUpdate($item, $data, $request);
+        parent::beforeUpdate($item, $data, $request);
+
+        // مثال: منع تعديل دفعة ملغاة
+        // if ($item->status === 'cancelled') {
+        //     throw new BusinessRuleException('لا يمكن تعديل دفعة ملغاة.', 409);
+        // }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // HOOK: prepareDataForUpdate — array (هنا يتم تعديل البيانات)
+    // BaseService::update() يستدعيه بعد beforeUpdate
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ هنا نُحدِّد direction عند التعديل — بدل beforeUpdate القديم.
+     * BaseService::update() flow:
+     *   1. beforeUpdate($item, $data) → void  (تحقق)
+     *   2. prepareDataForUpdate($item, $data) → array  (تعديل)
+     *   3. $item->update($prepared)
+     *   4. afterUpdate($item, $data)
+     */
+    protected function prepareDataForUpdate(Model $item, array $data, ?Request $request): array
+    {
+        $data = parent::prepareDataForUpdate($item, $data, $request);
 
         if (empty($data['direction'])) {
             $data['direction'] = $this->resolveDirection(
@@ -60,49 +108,76 @@ class PaymentService extends \App\Core\Services\BaseService
         return $data;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // HOOK: afterCreate
+    // ═══════════════════════════════════════════════════════════════
+
     /**
      * بعد إنشاء دفعة مؤكدة: زيادة/نقصان رصيد الخزينة.
      */
-    protected function afterCreate(Model $item, array $data, $request): void
+    protected function afterCreate(Model $item, array $data, ?Request $request): void
     {
         if ($item->status !== 'confirmed') return;
 
-        $this->adjustTreasuryBalance($item->treasury_account_id, $item->amount, $item->direction);
+        $this->adjustTreasuryBalance(
+            (int)   $item->treasury_account_id,
+            (float) $item->amount,
+            (string)$item->direction
+        );
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // HOOK: afterUpdate
+    // ═══════════════════════════════════════════════════════════════
+
     /**
-     * بعد تحديث دفعة: تصحيح رصيد الخزينة بالفرق.
+     * بعد تعديل دفعة: تصحيح رصيد الخزينة بالفرق.
+     *
+     * المنطق:
+     * - إذا تغيَّر الحساب: اعكس التأثير على القديم، طبِّق على الجديد.
+     * - نفس الحساب: اعكس المبلغ القديم ثم طبِّق الجديد.
      */
-    protected function afterUpdate(Model $item, array $data, $request): void
+    protected function afterUpdate(Model $item, array $data, ?Request $request): void
     {
         $oldStatus    = $item->getOriginal('status');
-        $oldAmount    = (float) $item->getOriginal('amount');
-        $oldDirection = $item->getOriginal('direction');
-        $oldAccountId = $item->getOriginal('treasury_account_id');
+        $oldAmount    = (float)  $item->getOriginal('amount');
+        $oldDirection = (string)($item->getOriginal('direction') ?? 'in');
+        $oldAccountId = (int)    $item->getOriginal('treasury_account_id');
+        $newAccountId = (int)    $item->treasury_account_id;
 
-        // إذا تغيّر الحساب البنكي: نعكس التأثير على القديم ونطبّق على الجديد
-        if ($oldAccountId !== $item->treasury_account_id) {
+        // الحساب تغيَّر: عكس القديم + تطبيق الجديد
+        if ($oldAccountId !== $newAccountId) {
             if ($oldStatus === 'confirmed') {
-                $this->adjustTreasuryBalance($oldAccountId, $oldAmount, $this->oppositeDirection($oldDirection));
+                $this->adjustTreasuryBalance(
+                    $oldAccountId, $oldAmount,
+                    $this->oppositeDirection($oldDirection)
+                );
             }
             if ($item->status === 'confirmed') {
-                $this->adjustTreasuryBalance($item->treasury_account_id, $item->amount, $item->direction);
+                $this->adjustTreasuryBalance(
+                    $newAccountId, (float)$item->amount, $item->direction
+                );
             }
             return;
         }
 
-        // نفس الحساب: احسب الفرق فقط
-        $wasConfirmed = $oldStatus === 'confirmed';
-        $isConfirmed  = $item->status === 'confirmed';
-
-        if ($wasConfirmed) {
-            $this->adjustTreasuryBalance($item->treasury_account_id, $oldAmount, $this->oppositeDirection($oldDirection));
+        // نفس الحساب: اعكس القديم ثم طبِّق الجديد
+        if ($oldStatus === 'confirmed') {
+            $this->adjustTreasuryBalance(
+                $newAccountId, $oldAmount,
+                $this->oppositeDirection($oldDirection)
+            );
         }
-
-        if ($isConfirmed) {
-            $this->adjustTreasuryBalance($item->treasury_account_id, $item->amount, $item->direction);
+        if ($item->status === 'confirmed') {
+            $this->adjustTreasuryBalance(
+                $newAccountId, (float)$item->amount, $item->direction
+            );
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // HOOK: afterDelete
+    // ═══════════════════════════════════════════════════════════════
 
     /**
      * بعد حذف دفعة مؤكدة: عكس التأثير على الخزينة.
@@ -112,19 +187,38 @@ class PaymentService extends \App\Core\Services\BaseService
         if ($item->status !== 'confirmed') return;
 
         $this->adjustTreasuryBalance(
-            $item->treasury_account_id,
-            $item->amount,
+            (int)   $item->treasury_account_id,
+            (float) $item->amount,
             $this->oppositeDirection($item->direction)
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════
+    // Public API — للـ Controller
+    // ═══════════════════════════════════════════════════════════════
+
+    public function getConfirmed()
+    {
+        return Payment::confirmed()->get();
+    }
+
+    public function getPending()
+    {
+        return Payment::pending()->get();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Private helpers
+    // ═══════════════════════════════════════════════════════════════
 
     /**
-     * تحديث current_balance كـ cache.
+     * تحديث current_balance كـ denormalized cache على TreasuryAccount.
+     * المصدر الحقيقي: TreasuryBalanceService::getTreasuryBalanceAt()
      */
     private function adjustTreasuryBalance(int $accountId, float $amount, string $direction): void
     {
+        if ($accountId <= 0 || $amount <= 0) return;
+
         $delta = $direction === 'in' ? $amount : -$amount;
 
         TreasuryAccount::withoutGlobalScopes()
@@ -133,10 +227,10 @@ class PaymentService extends \App\Core\Services\BaseService
     }
 
     /**
-     * تحديد direction من نوع العملية:
-     *   - دفعة من عميل (sale)   → in
-     *   - دفعة لمورد (purchase) → out
-     *   - بدون party            → out (مصروف)
+     * تحديد direction من بيانات الدفعة:
+     *   بدون party               → out (مصروف)
+     *   party + purchase          → out (ندفع للمورد)
+     *   party + sale أو unknown  → in  (نقبض من العميل)
      */
     private function resolveDirection(array $data): string
     {
@@ -144,18 +238,11 @@ class PaymentService extends \App\Core\Services\BaseService
             return 'out';
         }
 
-        // نتحقق من نوع المتعامل عبر partyType
-        $partyTypeName = \Illuminate\Support\Facades\DB::table('parties as p')
-            ->join('party_types as pt', 'p.party_type_id', '=', 'pt.id')
-            ->where('p.id', $data['party_id'])
-            ->value('pt.name');
+        if (($data['document_base_operation'] ?? null) === 'purchase') {
+            return 'out';
+        }
 
-        return match ($partyTypeName) {
-            'client' => 'in',
-            'supplier' => 'out',
-            'both'   => $data['direction'] ?? 'in', // يتركه للواجهة تختار
-            default  => 'out',
-        };
+        return 'in';
     }
 
     private function oppositeDirection(string $direction): string

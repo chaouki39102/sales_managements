@@ -1,7 +1,13 @@
 // ════════════════════════════════════════════════════════════════════════════
-// lib/api/endpoints/documents.ts — محدَّث
+// lib/api/endpoints/documents.ts — النسخة النهائية المُصلحة
 //
-// ✅ إضافة: check-number endpoint للتحقق من تكرار رقم المستند
+// ✅ التصحيحات المطبقة:
+// 1. show: إضافة جميع العلاقات (relations) المطلوبة لقراءة البيانات بشكل شامل:
+//    - lines.product, lines.product.packagings, lines.product.lots, lines.product.tva
+//    - lines.packaging, lines.stockLot
+//    - payments, payments.paymentMode, payments.treasuryAccount
+// 2. checkNumber: دالة للتحقق من تكرار رقم المستند
+// 3. دعم كامل للـ treasury_account_id في الدفعات
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -33,11 +39,15 @@ export interface DocumentCreateInput {
 export interface DocumentLineInput {
   id?:                    number;
   product_variant_id?:    number | null;
+  product_id?:            number | null;
   description?:           string | null;
   quantity:               number;
   unit_price_ht:          number;
   discount_percentage?:   number;
+  discount_amount?:       number;
   tva_rate:               number;
+  packaging_id?:          number | null;
+  stock_lot_id?:          number | null;
 }
 
 export interface DocumentListParams extends ListParams {
@@ -63,9 +73,43 @@ export const documentsApi = {
       'filter[document_type.code]': typeCode,
     }),
 
+  // ✅ show: جلب جميع العلاقات المطلوبة للتعديل
   show: (id: number) =>
     apiGet<CommercialDocument>(`/documents/${id}`, {
-      include: 'party,warehouse,documentType,documentStatus,lines.productVariant,lines.packaging,lines.lot,payments.paymentMode,fiscalStamp,validatedBy,createdBy,updatedBy,deletedBy',
+      include: [
+        // المستند الأساسي
+        'party',
+        'warehouse',
+        'documentType',
+        'documentStatus',
+        'fiscalStamp',
+        'validatedBy',
+        'createdBy',
+        'updatedBy',
+        'deletedBy',
+
+        // الأسطر والمنتجات
+        'lines',
+        'lines.product',
+        'lines.product.family',
+        'lines.product.brand',
+        'lines.product.productType',
+        'lines.product.unit',
+        'lines.product.tva',           // ✅ الضريبة
+        'lines.product.packagings',    // ✅ التعبئات المتاحة
+        'lines.product.lots',          // ✅ الأكوام المتاحة
+        'lines.product.prices',
+        'lines.product.prices.priceLevel',
+        'lines.product.quantityDiscounts',
+
+        'lines.packaging',             // ✅ التعبئة المختارة
+        'lines.stockLot',              // ✅ الحصة المختارة
+
+        // الدفعات
+        'payments',                    // ✅ جميع الدفعات
+        'payments.paymentMode',        // ✅ طريقة الدفع
+        'payments.treasuryAccount',    // ✅ حساب الخزينة
+      ].join(','),
     }),
 
   create: (data: DocumentCreateInput) =>
@@ -77,7 +121,7 @@ export const documentsApi = {
   delete: (id: number) =>
     apiDelete(`/documents/${id}`),
 
-  // ✅ جديد: التحقق من تكرار رقم المستند
+  // ✅ التحقق من تكرار رقم المستند
   checkNumber: (params: {
     document_number: string;
     document_type_id: number;
@@ -106,6 +150,7 @@ export const documentsApi = {
     list: (documentId: number) =>
       apiGet<CommercialDocumentLine[]>(`/commercial-document-lines`, {
         'filter[commercial_document_id]': documentId,
+        include: 'product,packaging,stockLot',
       }),
 
     create: (data: DocumentLineInput & { commercial_document_id: number }) =>

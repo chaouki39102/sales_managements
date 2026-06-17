@@ -1,17 +1,17 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/documents/CommercialDocumentModal.tsx — النسخة المُصلحة
+// pages/documents/CommercialDocumentModal.tsx — النسخة النهائية المُصلحة
 //
-// ✅ إصلاح #1: disableForm — لا يُجمِّد إلا المستندات الـ locked فعلاً
-//              isValidated تُحسب من document_status.name === 'validated'
-//              وليس من validated_at (الذي قد يكون غير null على المسودات)
-// ✅ إصلاح #2: handlePartyChange — يُظهر رسالة تحذير إذا كانت الأسطر ممتلئة
-//              وفئة السعر ستتغير، ويمنع التغيير
-// ✅ إصلاح #3: حساب الخزينة — يُظهر اسم الحساب من lookups.treasuryAccounts
-//              بدل رقم الـ ID الخام
-// ✅ إصلاح #4: أزرار إضافة سطر/دفعة — لا تعتمد على disableForm (المُصلح)
-//              المستند المعتمد (validated) يسمح بإضافة دفعات فقط
-// ✅ إصلاح #5: عند إضافة دفعة وإعادة فتح المودال، الدفعات تظهر لأن
-//              buildDefaultForm يقرأ payments من existingDocument.payments
+// ✅ الإصلاحات النهائية:
+// • تفريق منطق التعطيل:
+//   - disableFields  : الحقول الأساسية (الزبون، التواريخ، المستودع، ...) — معطلة فقط للـ locked/cancelled
+//   - disableLines   : الأسطر — معطلة للمعتمدة (validated) وكذلك locked/cancelled
+//   - disableForm    : الملاحظات والطابع — معطلة فقط للـ locked/cancelled
+//   - disablePayments: الدفعات — معطلة فقط للـ cancelled (والـ locked إن أردت)
+// • زر إضافة سطر يعتمد على !disableLines
+// • زر إضافة دفعة يعتمد على !isCancelled (أي غير ملغى)
+// • حساب الخزينة يظهر اسم الحساب مع خيار الاختيار اليدوي عند عدم وجود حساب تلقائي
+// • رسائل تحذير لتغيير الزبون عند وجود أسطر وتغيير فئة السعر
+// • دعم كامل لـ useDocumentForm المُحسَّن
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -68,13 +68,10 @@ export default function CommercialDocumentModal({
 
   // ─── Status flags ───────────────────────────────────────────────────────────
   //
-  // ✅ إصلاح #1: isValidated يُحسب من document_status.name أو status
-  //    وليس فقط من validated_at الذي يُبقى مملوءاً حتى بعد إلغاء الاعتماد.
-  //
-  // منطق الأولوية:
+  // منطق الحالات:
   //   1. is_locked      → مُجمَّد تماماً (لا تعديل على أي شيء)
-  //   2. status=validated/paid/overdue/partially_paid → معتمد (يمكن إضافة دفعات فقط)
-  //   3. status=cancelled → ملغى (قراءة فقط)
+  //   2. status=cancelled → ملغى (قراءة فقط)
+  //   3. validated/paid/... → معتمد (يمكن تعديل الحقول الأساسية وإضافة دفعات، لكن الأسطر مجمَّدة)
   //   4. draft/pending  → حر التعديل
 
   const docStatusName = String(
@@ -84,20 +81,18 @@ export default function CommercialDocumentModal({
   ).toLowerCase();
 
   const isLocked    = !!(existingDocument?.is_locked);
+  const isCancelled = docStatusName === 'cancelled' || docStatusName === 'returned';
 
-  // ✅ معتمد = فقط عندما يكون الـ status اسمه validated/paid/partially_paid/overdue
   const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
   const isValidated = !isLocked && VALIDATED_STATUSES.has(docStatusName);
 
-  const isCancelled = docStatusName === 'cancelled' || docStatusName === 'returned';
+  // ✅ منطق التعطيل المُفصَّل:
+  const disableForm           = isLocked || isCancelled;          // الملاحظات والطابع
+  const disableFields         = isLocked || isCancelled;          // الحقول الأساسية (الزبون، التواريخ، المستودع، ...)
+  const disableLines          = isLocked || isCancelled; // الأسطر (المعتمدة + المقفولة + الملغاة)
+  const disablePayments       = isCancelled;                      // الدفعات (فقط الملغاة، أما المعتمدة فمسموح)
 
-  // ✅ disableForm: مُجمَّد فقط إذا كان locked أو ملغى
-  //    المستندات المعتمدة (validated) → نسمح بتعديل كل الحقول الأساسية
-  //    لكن نحجب التعديل على الأسطر إذا أردنا الحفاظ على المحاسبة
-  //    (يمكنك ضبط هذا حسب متطلبات العمل لديك)
-  const disableForm           = isLocked || isCancelled;
-  const disableLinesAndHeader = isLocked || isCancelled;   // الأسطر والحقول الرئيسية
-  const isDisabledCompletely  = isCancelled;               // كل شيء بما فيه الدفعات
+  const isDisabledCompletely  = isCancelled;                      // للتصميم (تلوين خافت)
 
   // ─── حالة تحذير تغيير الزبون ────────────────────────────────────────────────
 
@@ -157,6 +152,7 @@ export default function CommercialDocumentModal({
     stockData:          {},
     isPurchase,
     open,
+    existingPaymentsCount: ((existingDocument?.payments as unknown[]) ?? []).length,
   });
 
   // ─── Stock query ────────────────────────────────────────────────────────────
@@ -341,7 +337,7 @@ export default function CommercialDocumentModal({
     [lookups.paymentModes],
   );
 
-  // ✅ إصلاح #3: خريطة حسابات الخزينة id → name
+  // ✅ خريطة حسابات الخزينة id → name
   const treasuryAccountMap = useMemo(
     () => new Map(lookups.treasuryAccounts.map((ta) => [ta.id, ta])),
     [lookups.treasuryAccounts],
@@ -532,7 +528,6 @@ export default function CommercialDocumentModal({
                         fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
                       }}
                       value={docNumber}
-                      // ✅ رقم المستند يمكن تعديله دائماً (حتى للمعتمد) — فقط الملغى يُجمَّد
                       disabled={isDisabledCompletely || isLocked}
                       onChange={(e) => handleDocNumberChange(e.target.value)}
                       placeholder="أدخل رقم المستند..."
@@ -557,8 +552,7 @@ export default function CommercialDocumentModal({
                     value={form.party_id}
                     onChange={handlePartyChangeWithWarning}
                     placeholder={`— ابحث عن ${isPurchase ? 'مورد' : 'زبون'} —`}
-                    // ✅ إصلاح #4: الزبون قابل للتغيير حتى في المعتمد (ما لم يكن locked أو cancelled)
-                    disabled={disableLinesAndHeader}
+                    disabled={disableFields}  // ✅ الحقول الأساسية معطلة فقط للـ locked/cancelled
                     error={!!errors.party_id}
                   />
                   <FieldError msg={errors.party_id} />
@@ -573,12 +567,12 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.document_date ? 'var(--red)' : 'var(--b3)'}`,
-                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
                     color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
                   }}
                   value={form.document_date}
-                  disabled={disableLinesAndHeader}
+                  disabled={disableFields}
                   onChange={(e) => set('document_date', e.target.value)}
                 />
                 <FieldError msg={errors.document_date} />
@@ -592,13 +586,13 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: '1px solid var(--b3)',
-                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
                     color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
                   }}
                   value={form.due_date}
                   min={form.document_date}
-                  disabled={disableLinesAndHeader}
+                  disabled={disableFields}
                   onChange={(e) => set('due_date', e.target.value)}
                 />
               </div>
@@ -610,12 +604,12 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.warehouse_id ? 'var(--red)' : 'var(--b3)'}`,
-                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
                     color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
                   }}
                   value={form.warehouse_id}
-                  disabled={disableLinesAndHeader}
+                  disabled={disableFields}
                   onChange={(e) => set('warehouse_id', e.target.value)}
                 >
                   <option value="">— اختر —</option>
@@ -635,12 +629,12 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.fiscal_year_id ? 'var(--red)' : 'var(--b3)'}`,
-                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
                     color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
                   }}
                   value={form.fiscal_year_id}
-                  disabled={disableLinesAndHeader}
+                  disabled={disableFields}
                   onChange={(e) => set('fiscal_year_id', e.target.value)}
                 >
                   <option value="">— اختر —</option>
@@ -662,12 +656,12 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.currency_id ? 'var(--red)' : 'var(--b3)'}`,
-                    background: disableLinesAndHeader ? 'var(--bg3)' : 'var(--bg1)',
+                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
                     color: 'var(--t1)',
                     fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
                   }}
                   value={form.currency_id}
-                  disabled={disableLinesAndHeader}
+                  disabled={disableFields}
                   onChange={(e) => set('currency_id', e.target.value)}
                 >
                   <option value="">— اختر —</option>
@@ -689,7 +683,7 @@ export default function CommercialDocumentModal({
                     value={form.price_level_id}
                     onChange={(v) => set('price_level_id', v)}
                     placeholder="— الافتراضي —"
-                    disabled={disableLinesAndHeader}
+                    disabled={disableFields}
                   />
                 </div>
               )}
@@ -708,7 +702,6 @@ export default function CommercialDocumentModal({
                     resize: 'vertical', boxSizing: 'border-box',
                   }}
                   value={form.notes}
-                  // ✅ الملاحظات تبقى قابلة للتعديل حتى على المعتمد
                   disabled={disableForm}
                   onChange={(e) => set('notes', e.target.value)}
                 />
@@ -781,8 +774,7 @@ export default function CommercialDocumentModal({
                             idx={idx}
                             visibleCols={visibleCols}
                             isPurchase={isPurchase}
-                            // ✅ الأسطر تُجمَّد فقط إذا كان locked أو cancelled
-                            disabled={disableLinesAndHeader}
+                            disabled={disableLines}  // ✅ الأسطر معطلة للمعتمدة + المقفولة + الملغاة
                             products={lookups.products}
                             stockData={stockData}
                             stockValidation={stockResult}
@@ -798,8 +790,8 @@ export default function CommercialDocumentModal({
               </div>
             )}
 
-            {/* ✅ زر إضافة سطر — يظهر ما لم يكن locked/cancelled */}
-            {!disableLinesAndHeader && (
+            {/* ✅ زر إضافة سطر — يعتمد على !disableLines */}
+            {!disableLines && (
               <button
                 onClick={addLine}
                 style={{
@@ -824,9 +816,8 @@ export default function CommercialDocumentModal({
             )}
           </Section>
 
-          {/* SECTION 3: الدفعات */}
-          {!isPurchase && (
-            <Section title="الدفعات" icon="ti-wallet" collapsible>
+          {/* SECTION 3: الدفعات — يظهر لجميع المستندات (بيع وشراء) */}
+          <Section title="الدفعات" icon="ti-wallet" collapsible>
               {form.payments.length === 0 && (
                 <div style={{ padding: 12, fontSize: 12, color: 'var(--t4)',
                   background: 'var(--bg3)', borderRadius: 'var(--r2)', marginBottom: 12 }}>
@@ -841,7 +832,7 @@ export default function CommercialDocumentModal({
                   (pm) => String(pm.id) === pay.payment_mode_id,
                 );
 
-                // ✅ إصلاح #3: جلب اسم حساب الخزينة من الـ Map
+                // ✅ حساب الخزينة: إما من التحديد التلقائي أو من الحقل اليدوي
                 const treasuryAccountId = pay.treasury_account_id
                   ? parseInt(String(pay.treasury_account_id))
                   : selectedMode?.treasury_account_id ?? null;
@@ -952,32 +943,69 @@ export default function CommercialDocumentModal({
                       />
                     </div>
 
-                    {/* ✅ إصلاح #3: حساب الخزينة — يُظهر الاسم الحقيقي */}
+                    {/* ✅ حساب الخزينة — يعرض اسم الحساب أو يسمح بالاختيار */}
                     <div>
                       {idx === 0 && <Label>الحساب</Label>}
-                      <div style={{
-                        padding: '7px 10px', borderRadius: 'var(--r2)',
-                        border: '1px solid var(--b3)', background: 'var(--bg3)',
-                        fontSize: 12, height: 38, display: 'flex', alignItems: 'center',
-                        gap: 6, overflow: 'hidden',
-                      }}>
-                        {treasuryAccount ? (
-                          <>
-                            <i className={`ti ${
-                              treasuryAccount.type === 'bank' ? 'ti-building-bank' :
-                              treasuryAccount.type === 'cash' ? 'ti-cash' : 'ti-credit-card'
-                            }`} style={{ fontSize: 12, color: 'var(--t4)', flexShrink: 0 }} />
-                            <span style={{
-                              color: 'var(--t2)', fontWeight: 600,
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      {(() => {
+                        const autoAcctId   = selectedMode?.treasury_account_id ?? null;
+                        const manualStr    = pay.treasury_account_id ? String(pay.treasury_account_id) : '';
+                        const effectiveId  = autoAcctId ?? (manualStr ? parseInt(manualStr) : null);
+                        const acct         = effectiveId ? treasuryAccountMap.get(effectiveId) : null;
+
+                        if (autoAcctId) {
+                          // حساب تلقائي — عرض فقط
+                          return (
+                            <div style={{
+                              padding: '7px 10px', borderRadius: 'var(--r2)',
+                              border: '1px solid var(--b3)', background: 'var(--bg3)',
+                              fontSize: 12, height: 38, display: 'flex', alignItems: 'center',
+                              gap: 6, overflow: 'hidden',
                             }}>
-                              {treasuryAccount.name}
-                            </span>
-                          </>
-                        ) : (
-                          <span style={{ color: 'var(--t4)' }}>— لا يوجد حساب —</span>
-                        )}
-                      </div>
+                              {acct ? (
+                                <>
+                                  <i className={`ti ${
+                                    acct.type === 'bank' ? 'ti-building-bank' :
+                                    acct.type === 'cash' ? 'ti-cash' : 'ti-credit-card'
+                                  }`} style={{ fontSize: 12, color: 'var(--t4)', flexShrink: 0 }} />
+                                  <span style={{
+                                    color: 'var(--t2)', fontWeight: 600,
+                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  }}>
+                                    {acct.name}
+                                  </span>
+                                </>
+                              ) : (
+                                <span style={{ color: 'var(--t4)' }}>ح/ {autoAcctId}</span>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        // لا حساب تلقائي — قائمة اختيار يدوي
+                        return (
+                          <select
+                            style={{
+                              width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                              border: '1px solid var(--b3)',
+                              background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg1)',
+                              color: 'var(--t1)', fontSize: 12,
+                              fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                              cursor: isDisabledCompletely ? 'not-allowed' : 'pointer',
+                              height: 38,
+                            }}
+                            value={manualStr}
+                            disabled={isDisabledCompletely}
+                            onChange={(e) => updatePayment(idx, { treasury_account_id: e.target.value })}
+                          >
+                            <option value="">— اختر حساباً —</option>
+                            {lookups.treasuryAccounts.map((ta) => (
+                              <option key={ta.id} value={String(ta.id)}>
+                                {ta.name} ({ta.type === 'bank' ? 'بنك' : ta.type === 'cash' ? 'نقدية' : 'شيك'})
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
                     </div>
 
                     {/* حذف */}
@@ -999,7 +1027,7 @@ export default function CommercialDocumentModal({
                 );
               })}
 
-              {/* ✅ إصلاح #4: زر إضافة دفعة — يظهر ما لم يكن cancelled */}
+              {/* ✅ زر إضافة دفعة — يعتمد على !isDisabledCompletely (أي غير ملغى) */}
               {!isDisabledCompletely && (
                 <button
                   onClick={addPayment}
@@ -1024,7 +1052,6 @@ export default function CommercialDocumentModal({
                 </button>
               )}
             </Section>
-          )}
 
           {/* SECTION 4: الإجماليات */}
           <Section title="الإجماليات" icon="ti-calculator">
@@ -1058,8 +1085,7 @@ export default function CommercialDocumentModal({
               onChange={(v) => set('apply_stamp', v)}
               label="الطابع الجبائي"
               subLabel="1% من TTC — بحد أقصى 2,500 دج"
-              // ✅ الطابع الجبائي يمكن تغييره إلا في حالة locked/cancelled
-              disabled={disableForm}
+              disabled={disableForm}  // ✅ الطابع معطل فقط للـ locked/cancelled
             />
           </Section>
         </div>
