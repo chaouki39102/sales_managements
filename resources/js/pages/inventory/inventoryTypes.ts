@@ -72,7 +72,7 @@ export const obApi = {
   // المسار الصحيح من api.php: opening-balance-stocks
   list: (yearId: number) =>
     apiGet<OpeningBalanceStock[]>('/opening-balance-stocks', {
-      fiscal_year_id: yearId,
+      'filter[fiscal_year_id]': yearId,
       per_page:       500,
       include:        'product,warehouse',
     }),

@@ -50,7 +50,7 @@ class TreasuryAccount extends Model
     ];
 
     public static array $searchableFields = ['name', 'code', 'bank_name', 'account_number', 'rib', 'iban'];
-    public static array $filterable       = ['treasury_account_type_id', 'is_default', 'active', 'currency_id'];
+    public static array $filterable       = ['treasury_account_type_id', 'is_default', 'active' => ['type' => 'exact'], 'currency_id'];
     public static array $sortable         = ['id', 'name', 'code', 'current_balance'];
     public static array $defaultWith      = [];
     public static array $allowedIncludes  = [

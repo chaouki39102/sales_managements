@@ -1,33 +1,42 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/documents/hooks/useDocumentForm.ts
+// pages/documents/hooks/useDocumentForm.ts — إصلاح كامل للحسابات
 //
-// ✅ الإصلاحات المطبقة:
+// ══ نموذج الكميات والتعبئة ════════════════════════════════════════════════
 //
-// 1. disableForm — القفل الوحيد هو is_locked فقط
-//    لا يُجمَّد المستند بسبب validated_at أو أي حقل آخر
+// الفرونتند يعمل بـ "عدد العبوات" (displayQty) — هذا ما يُدخله المستخدم.
+// الباكاند يخزن "وحدات أساسية" (baseQty = displayQty × _packQty).
 //
-// 2. handlePartyChange — الشرطان:
-//    a. وجود دفعات مرتبطة → حجب التغيير نهائياً
-//    b. الأسطر ممتلئة وفئة السعر ستتغير → حجب مع رسالة واضحة
-//    c. تحديث price_level_id تلقائياً من party.price_level_id
+// مثال: المستخدم يدخل 2 كرتون × 12 قارورة = 24 قارورة تُرسَل للباكاند.
 //
-// 3. updateLine — إصلاح resolvePrice:
-//    يمرر curPriceLevelId الصحيح (من form.price_level_id)
-//    لا يعتمد على defaultTvaRate فقط — يقرأ tva من product.tva.rate
+// ══ نموذج الخصم ══════════════════════════════════════════════════════════
 //
-// 4. التعبئة (packaging): عند تغيير packaging_id يُعيد حساب
-//    price_per_pack = unit_price_ht × packQty بشكل صحيح
+// الباكاند يخزن:
+//   discount_percentage = نسبة الخصم (تُستخدم في الحساب)
+//   discount_amount     = مبلغ خصم الوحدة الواحدة = unit_price_ht × discPct/100
+//                         (للمرجع فقط — الحساب يعتمد على discPct)
 //
-// 5. الحصة (lot): عند اختيار منتج جديد يُحدِّد أول lot متاح تلقائياً
+// الفرونتند (percent mode):
+//   يُرسل: discount_percentage = L.discount_percentage
+//           discount_amount = unit_price_ht × discPct/100  (خصم وحدة واحدة)
 //
-// 6. الخصم بالقيمة الثابتة: discount_amount_fixed مُرسَل للـ buildPayload
-//    بشكل صريح بجانب discount_percentage
+// الفرونتند (fixed mode):
+//   المستخدم يدخل: discount_amount_fixed = خصم العبوة الواحدة
+//   يُحوَّل: discPct = (discount_amount_fixed / price_per_pack) × 100
+//   يُرسل: discount_percentage = discPct
+//           discount_amount = unit_price_ht × discPct/100
 //
-// 7. buildPayload: يُرسل discount_amount كقيمة مطلقة للسطر
-//    (الباكاند يقبل إما discount_percentage أو discount_amount)
+// ══ الاستقبال من الباكاند (بناء السطر من API) ════════════════════════════
+//
+//   displayQty = db.quantity / _packQty
+//   discount_amount_fixed = db.discount_amount × _packQty
+//     (تحويل خصم الوحدة إلى خصم العبوة للعرض)
+//
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiGet } from '@/lib/api/core/client';
+import { useActiveSlug } from '@/lib/store/appStore';
 import type { DocumentType } from '@/lib/api/core/types';
 import {
   today,
@@ -37,6 +46,7 @@ import {
   calcLineTotal,
   validateLineStock,
   toNum,
+  LineStockValidation,
 } from '../utils/document.utils';
 import {
   PURCHASE_CODES,
@@ -50,13 +60,32 @@ import type {
   DocumentTotals,
   PaymentEntry,
   Product,
-  Packaging,
-  LineStockValidation,
+
 } from '../types/document.types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type FormErrors = Record<keyof DocumentFormState | string, string>;
+export type FormErrors = Record<string, string>;
+
+export interface PartyBalanceInfo {
+  party_id:          number;
+  current_balance:   number;
+  signed_balance:    number;
+  balance_type:      'debit' | 'credit';
+  opening_balance:   number;
+  documents_balance: number;
+  payments_total:    number;
+  fiscal_year_id:    number;
+  date:              string;
+}
+
+export type PaymentMode = 'free' | 'additive' | 'locked';
+
+export interface PartyChangeResult {
+  blocked:    boolean;
+  reason?:    string;
+  blockType?: 'has_payments' | 'price_level_change' | 'existing_payments';
+}
 
 interface UseDocumentFormOptions {
   documentType:       DocumentType | null;
@@ -65,54 +94,67 @@ interface UseDocumentFormOptions {
   defaultWarehouseId: string;
   baseCurrencyId:     string;
   selectedYearId:     string;
-  paymentModes:       Array<{
-    id: number;
-    name: string;
-    code?: string;
-    icon?: string;
+  paymentModes: Array<{
+    id:                   number;
+    name:                 string;
+    code?:                string | null;
+    icon?:                string | null;
     treasury_account_id?: number | null;
-    requires_reference?: boolean;
-    is_cash?: boolean;
+    requires_reference?:  boolean;
+    is_cash?:             boolean;
   }>;
   parties: Array<{
-    id: number;
-    price_level_id?: number | null;
-    price_level?: { id: number; name: string } | null;
+    id:                       number;
+    name:                     string;
+    default_price_level_id?:  number | null;
+    default_price_level?:     { id: number; name: string } | null;
   }>;
-  stockData:    Record<number, number>;
-  isPurchase:   boolean;
-  open:         boolean;
-  // ✅ الدفعات المرتبطة بالمستند (من API) — لمنع تغيير الزبون
-  existingPaymentsCount?: number;
+  products:   Product[];
+  stockData:  Record<number, number>;
+  isPurchase: boolean;
+  open:       boolean;
 }
 
-interface UseDocumentFormReturn {
-  form:               DocumentFormState;
-  errors:             FormErrors;
-  lineErr:            string;
-  apiErr:             string;
-  setApiErr:          (msg: string) => void;
-  set:                (k: keyof DocumentFormState, v: unknown) => void;
-  handlePartyChange:  (id: string) => { blocked: boolean; reason?: string };
-  priceLevelId:       number | null;
-  addLine:            () => void;
-  removeLine:         (idx: number) => void;
-  duplicateLine:      (idx: number) => void;
-  updateLine:         (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
-  addPayment:         () => void;
-  removePayment:      (idx: number) => void;
-  updatePayment:      (idx: number, patch: Partial<PaymentEntry>) => void;
-  totals:             DocumentTotals;
-  validate:           () => boolean;
-  buildPayload:       () => Record<string, unknown>;
-  validateLineStock:  (line: LineItem, product: Product) => LineStockValidation;
-  updateStockData:    (data: Record<number, number>) => void;
-  docCode:            string;
-  isEdit:             boolean;
-  needsParty:         boolean;
-  affectsStock:       boolean;
-  stockDir:           1 | -1 | 0;
+export interface UseDocumentFormReturn {
+  form:                   DocumentFormState;
+  errors:                 FormErrors;
+  lineErr:                string;
+  apiErr:                 string;
+  setApiErr:              (msg: string) => void;
+  set:                    (k: keyof DocumentFormState, v: unknown) => void;
+  handlePartyChange:      (id: string) => PartyChangeResult;
+  handlePriceLevelChange: (priceLevelIdStr: string) => void;
+  priceLevelId:           number | null;
+  addLine:                () => void;
+  removeLine:             (idx: number) => void;
+  duplicateLine:          (idx: number) => void;
+  updateLine:             (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
+  paymentMode:            PaymentMode;
+  existingPayments:       PaymentEntry[];
+  newPayments:            PaymentEntry[];
+  addPayment:             () => void;
+  removePayment:          (idx: number) => void;
+  updatePayment:          (idx: number, patch: Partial<PaymentEntry>) => void;
+  partyBalance:           PartyBalanceInfo | null;
+  isLoadingBalance:       boolean;
+  totals:                 DocumentTotals;
+  validate:               () => boolean;
+  buildPayload:           () => Record<string, unknown>;
+  validateLineStock:      (line: LineItem, product: Product) => LineStockValidation;
+  updateStockData:        (data: Record<number, number>) => void;
+  docCode:                string;
+  isEdit:                 boolean;
+  needsParty:             boolean;
+  affectsStock:           boolean;
+  stockDir:               1 | -1 | 0;
+  isReadOnly:             boolean;
+  isLinesReadOnly:        boolean;
 }
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
+const LOCKED_STATUSES    = new Set(['cancelled', 'returned']);
 
 // ─── makeLine ─────────────────────────────────────────────────────────────────
 
@@ -135,63 +177,140 @@ function makeLine(defaultTvaRate: number): LineItem {
   };
 }
 
+// ─── resolvePackQty ───────────────────────────────────────────────────────────
+
+/**
+ * يحدد كمية الوحدات في العبوة من مصادر متعددة:
+ * 1. packaging relation مُحمَّلة مباشرة
+ * 2. product.packagings من productRel
+ * 3. products list (عند التعديل)
+ */
+function resolvePackQty(
+  packagingId:  string,
+  packagingRel: Record<string, unknown> | null,
+  productRel:   Record<string, unknown> | null,
+  products?:    Product[],
+  productId?:   string,
+): number {
+  if (!packagingId) return 1;
+
+  // 1. من العلاقة المباشرة
+  if (packagingRel) {
+    const q = Number(packagingRel.quantity);
+    if (q > 0) return q;
+  }
+
+  // 2. من packagings المنتج في API response
+  if (productRel) {
+    const pkgs = (productRel as Record<string, unknown>).packagings;
+    if (Array.isArray(pkgs)) {
+      const found = pkgs.find((p: Record<string, unknown>) => String(p.id) === packagingId);
+      if (found) {
+        const q = Number((found as Record<string, unknown>).quantity);
+        if (q > 0) return q;
+      }
+    }
+  }
+
+  // 3. من قائمة products الكاملة
+  if (products && productId) {
+    const prod = products.find((p) => String(p.id) === productId);
+    const pkg  = prod?.packagings?.find((p) => String(p.id) === packagingId);
+    if (pkg) {
+      const q = Number(pkg.quantity);
+      if (q > 0) return q;
+    }
+  }
+
+  return 1;
+}
+
 // ─── buildLineFromApi ─────────────────────────────────────────────────────────
 
+/**
+ * بناء LineItem من بيانات الباكاند.
+ *
+ * الباكاند يخزن:
+ *   quantity      = وحدات أساسية
+ *   discount_amount = خصم الوحدة الواحدة = unit_price × discPct/100
+ *
+ * الفرونتند يعرض:
+ *   quantity      = عدد العبوات = db.quantity / packQty
+ *   discount_amount_fixed = خصم العبوة الواحدة = db.discount_amount × packQty
+ */
 function buildLineFromApi(
-  l: Record<string, unknown>,
+  l:              Record<string, unknown>,
   defaultTvaRate: number,
+  products?:      Product[],
 ): LineItem {
-  // ✅ المنتج: يأتي إما من l.product أو l.productVariant
-  const productRel = (l.product   as Record<string, unknown> | null)
-                  ?? (l.productVariant as Record<string, unknown> | null)
-                  ?? null;
+  const productRel =
+    (l.product        as Record<string, unknown> | null) ??
+    (l.productVariant as Record<string, unknown> | null) ??
+    null;
 
-  // ✅ التعبئة: العلاقة الكاملة أو الـ ID الخام
   const packagingRel = (l.packaging as Record<string, unknown> | null) ?? null;
   const packagingId  = packagingRel
     ? String(packagingRel.id)
-    : (l.packaging_id ? String(l.packaging_id) : '');
-  // ✅ packQty من العلاقة مباشرةً
-  const packQty = packagingRel ? Number(packagingRel.quantity ?? 1) : 1;
+    : l.packaging_id ? String(l.packaging_id) : '';
 
-  // ✅ الحصة (stock lot)
-  const stockLotRel = (l.stockLot  as Record<string, unknown> | null)
-                   ?? (l.stock_lot as Record<string, unknown> | null)
-                   ?? null;
+  const packQty = resolvePackQty(
+    packagingId,
+    packagingRel,
+    productRel,
+    products,
+    String(l.product_id ?? ''),
+  );
+
+  const stockLotRel =
+    (l.stockLot  as Record<string, unknown> | null) ??
+    (l.stock_lot as Record<string, unknown> | null) ??
+    null;
   const stockLotId = stockLotRel
     ? String(stockLotRel.id)
-    : (l.stock_lot_id ? String(l.stock_lot_id) : '');
+    : l.stock_lot_id ? String(l.stock_lot_id) : '';
 
-  const unitPrice = toNum(l.unit_price_ht ?? 0);
-
-  // ✅ الخصم: نسبة أو ثابتة
+  const unitPrice          = toNum(l.unit_price_ht ?? 0);
   const discountPercentage = toNum(l.discount_percentage ?? 0);
-  const discountAmount     = toNum(l.discount_amount ?? l.discount_amount_fixed ?? 0);
-  const discountMode: 'percent' | 'fixed' =
-    discountAmount > 0 && discountPercentage === 0 ? 'fixed' : 'percent';
 
-  // ✅ TVA: من السطر أولاً، ثم من المنتج، ثم الافتراضي
-  let tvaRate = toNum(l.tva_rate ?? 0);
-  if (tvaRate === 0 && productRel) {
-    tvaRate = toNum((productRel.tva as Record<string, unknown> | null)?.rate ?? 0);
+  // discount_amount في DB = خصم الوحدة الواحدة
+  // discount_amount_fixed في الفرونتند = خصم العبوة الواحدة
+  const dbDiscountAmount   = toNum(l.discount_amount ?? 0);
+  const discountAmountFixed = packQty > 1
+    ? Math.round(dbDiscountAmount * packQty * 10_000) / 10_000
+    : dbDiscountAmount;
+
+  const discountMode: 'percent' | 'fixed' =
+    dbDiscountAmount > 0 && discountPercentage === 0 ? 'fixed' : 'percent';
+
+  // TVA: 0 = معفى (قيمة صحيحة — لا تُستبدَل)
+  let tvaRate = l.tva_rate != null ? toNum(l.tva_rate) : NaN;
+  if (isNaN(tvaRate) && productRel) {
+    tvaRate = toNum((productRel.tva as Record<string, unknown> | null)?.rate ?? NaN);
   }
-  if (tvaRate === 0) tvaRate = defaultTvaRate;
+  if (isNaN(tvaRate)) tvaRate = defaultTvaRate;
+
+  // تحويل الكمية من وحدات أساسية إلى عدد عبوات
+  const dbQty    = toNum(l.quantity ?? 1) || 1;
+  const displayQty = packQty > 1
+    ? Math.round((dbQty / packQty) * 1_000_000) / 1_000_000
+    : dbQty;
 
   return {
     id:                    l.id as number | undefined,
     product_id:            String(l.product_id ?? ''),
     description:           String(l.description ?? ''),
-    quantity:              toNum(l.quantity ?? 1) || 1,
+    quantity:              displayQty,
     unit_price_ht:         unitPrice,
-    // ✅ price_per_pack: من الـ API أو محسوب
-    price_per_pack:        toNum(l.price_per_pack ?? 0) || (unitPrice * packQty),
+    price_per_pack:        Math.round(unitPrice * packQty * 10_000) / 10_000,
     discount_mode:         discountMode,
     discount_percentage:   discountPercentage,
-    discount_amount_fixed: discountAmount,
+    discount_amount_fixed: discountAmountFixed,
     tva_rate:              tvaRate,
     packaging_id:          packagingId,
     stock_lot_id:          stockLotId,
-    lot_number_new:        String(l.lot_number ?? l.lot_number_new ?? ''),
+    lot_number_new:        String(
+      stockLotRel?.lot_number ?? l.lot_number ?? l.lot_number_new ?? '',
+    ),
     line_note:             String(l.notes ?? l.line_note ?? ''),
     _product:              productRel as Product | undefined,
     _packQty:              packQty,
@@ -200,19 +319,17 @@ function buildLineFromApi(
 
 // ─── buildPaymentFromApi ──────────────────────────────────────────────────────
 
-function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
-  // ✅ treasury_account_id: من الحقل المباشر أو من العلاقة
-  let treasuryId: string = '';
-  if (p.treasury_account_id) {
-    treasuryId = String(p.treasury_account_id);
-  } else if (p.treasuryAccount) {
-    const ta = p.treasuryAccount as Record<string, unknown>;
-    if (ta?.id) treasuryId = String(ta.id);
-  }
+export function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
+  const treasuryId = p.treasury_account_id
+    ? String(p.treasury_account_id)
+    : (p.treasuryAccount as Record<string, unknown> | null)?.id
+      ? String((p.treasuryAccount as Record<string, unknown>).id)
+      : '';
 
-  // ✅ payment_mode_id: من الحقل أو من العلاقة
   const paymentModeId = String(
-    p.payment_mode_id ?? (p.paymentMode as Record<string, unknown> | null)?.id ?? ''
+    p.payment_mode_id ??
+    (p.paymentMode as Record<string, unknown> | null)?.id ??
+    '',
   );
 
   return {
@@ -228,18 +345,14 @@ function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
 
 function buildDefaultForm(
   existingDocument: Record<string, unknown> | undefined,
-  defaults:         { warehouseId: string; currencyId: string; yearId: string },
-  defaultTvaRate:   number,
+  defaults: { warehouseId: string; currencyId: string; yearId: string },
+  defaultTvaRate: number,
+  products?: Product[],
 ): DocumentFormState {
   if (existingDocument) {
-    const doc = existingDocument;
-
-    const existingLines = ((doc.lines as Record<string, unknown>[]) ?? [])
-      .map((l) => buildLineFromApi(l, defaultTvaRate));
-
-    // ✅ الدفعات: تُقرأ من المستند عند كل فتح للمودال
-    const existingPayments = ((doc.payments as Record<string, unknown>[]) ?? [])
-      .map((p) => buildPaymentFromApi(p));
+    const doc   = existingDocument;
+    const lines = ((doc.lines as Record<string, unknown>[]) ?? [])
+      .map((l) => buildLineFromApi(l, defaultTvaRate, products));
 
     return {
       party_id:       String(doc.party_id       ?? ''),
@@ -252,25 +365,38 @@ function buildDefaultForm(
       exchange_rate:  String(doc.exchange_rate  ?? '1'),
       apply_stamp:    toNum(doc.total_stamp ?? doc.fiscal_stamp ?? 0) > 0,
       price_level_id: String(doc.price_level_id ?? ''),
-      lines:          existingLines,
-      payments:       existingPayments,
+      lines,
+      payments: [],
     };
   }
 
   return {
-    party_id:       '',
-    document_date:  today(),
-    due_date:       '',
-    notes:          '',
+    party_id: '', document_date: today(), due_date: '', notes: '',
     warehouse_id:   defaults.warehouseId,
     fiscal_year_id: defaults.yearId,
     currency_id:    defaults.currencyId,
     exchange_rate:  '1',
     apply_stamp:    false,
     price_level_id: '',
-    lines:          [],
-    payments:       [],
+    lines: [], payments: [],
   };
+}
+
+// ─── resolvePaymentMode ───────────────────────────────────────────────────────
+
+function resolvePaymentMode(
+  existingDocument: Record<string, unknown> | undefined,
+  isLocked:    boolean,
+  isCancelled: boolean,
+): PaymentMode {
+  if (!existingDocument) return 'free';
+  if (isLocked || isCancelled) return 'locked';
+  const statusName = String(
+    (existingDocument.document_status as Record<string, unknown> | undefined)?.name
+    ?? existingDocument.status ?? '',
+  ).toLowerCase();
+  if (VALIDATED_STATUSES.has(statusName)) return 'additive';
+  return 'free';
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -284,61 +410,97 @@ export function useDocumentForm({
   selectedYearId,
   paymentModes,
   parties,
+  products,
   stockData,
   isPurchase,
   open,
-  existingPaymentsCount = 0,
 }: UseDocumentFormOptions): UseDocumentFormReturn {
 
-  const docCode      = documentType?.code ?? '';
-  const isEdit       = !!existingDocument;
+  const slug    = useActiveSlug();
+  const docCode = documentType?.code ?? '';
+  const isEdit  = !!existingDocument;
+
   const needsParty   = REQUIRES_PARTY.has(docCode);
   const affectsStock = STOCK_IN_CODES.has(docCode) || STOCK_OUT_CODES.has(docCode);
   const stockDir: 1 | -1 | 0 = STOCK_IN_CODES.has(docCode) ? 1
                               : STOCK_OUT_CODES.has(docCode) ? -1 : 0;
 
-  // ─── Refs ────────────────────────────────────────────────────────────────────
+  // ── حالة المستند ──────────────────────────────────────────────────────────
 
-  const stockDataRef    = useRef(stockData);
-  const paymentModesRef = useRef(paymentModes);
-  const partiesRef      = useRef(parties);
-  const formRef         = useRef<DocumentFormState | null>(null);
+  const docStatusName = String(
+    (existingDocument?.document_status as Record<string, unknown> | undefined)?.name
+    ?? existingDocument?.status ?? '',
+  ).toLowerCase();
 
-  useEffect(() => { stockDataRef.current    = stockData;    }, [stockData]);
-  useEffect(() => { paymentModesRef.current = paymentModes; }, [paymentModes]);
-  useEffect(() => { partiesRef.current      = parties;      }, [parties]);
+  const isLocked    = !!(existingDocument?.is_locked);
+  const isCancelled = LOCKED_STATUSES.has(docStatusName);
+  const isReadOnly  = isLocked || isCancelled;
+  const isLinesReadOnly = isReadOnly;
 
-  // ─── State ───────────────────────────────────────────────────────────────────
+  const pmMode = resolvePaymentMode(existingDocument, isLocked, isCancelled);
 
-  const [form, setForm] = useState<DocumentFormState>(() =>
+  // ── Refs ──────────────────────────────────────────────────────────────────
+
+  const stockDataRef   = useRef(stockData);
+  const paymentModsRef = useRef(paymentModes);
+  const partiesRef     = useRef(parties);
+  const productsRef    = useRef(products);
+  const formRef        = useRef<DocumentFormState | null>(null);
+
+  useEffect(() => { stockDataRef.current   = stockData;    }, [stockData]);
+  useEffect(() => { paymentModsRef.current = paymentModes; }, [paymentModes]);
+  useEffect(() => { partiesRef.current     = parties;      }, [parties]);
+  useEffect(() => { productsRef.current    = products;     }, [products]);
+
+  // ── State ─────────────────────────────────────────────────────────────────
+
+  const [form, setForm]   = useState<DocumentFormState>(() =>
     buildDefaultForm(existingDocument, {
       warehouseId: defaultWarehouseId,
       currencyId:  baseCurrencyId,
       yearId:      selectedYearId,
-    }, defaultTvaRate),
+    }, defaultTvaRate, products),
   );
   const [errors,  setErrors]  = useState<FormErrors>({});
   const [lineErr, setLineErr] = useState('');
   const [apiErr,  setApiErr]  = useState('');
 
+  const [existingPayments, setExistingPayments] = useState<PaymentEntry[]>([]);
+  const [newPayments,      setNewPayments]      = useState<PaymentEntry[]>([]);
+
   useEffect(() => { formRef.current = form; }, [form]);
 
-  // Reset عند فتح المودال
+  // ── Reset عند فتح ─────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!open) return;
-    const newForm = buildDefaultForm(
+
+    setForm(buildDefaultForm(
       existingDocument,
       { warehouseId: defaultWarehouseId, currencyId: baseCurrencyId, yearId: selectedYearId },
       defaultTvaRate,
-    );
-    setForm(newForm);
+      productsRef.current,
+    ));
     setErrors({});
     setLineErr('');
     setApiErr('');
+
+    const rawPayments = ((existingDocument?.payments as Record<string, unknown>[]) ?? [])
+      .map(buildPaymentFromApi);
+
+    if (pmMode === 'additive') {
+      setExistingPayments(rawPayments);
+      setNewPayments([]);
+    } else if (pmMode === 'free') {
+      setExistingPayments([]);
+      setNewPayments(rawPayments);
+    } else {
+      setExistingPayments(rawPayments);
+      setNewPayments([]);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, existingDocument?.id]);
 
-  // ضبط الافتراضيات عند الإنشاء (ليس التعديل)
   useEffect(() => {
     if (isEdit || !open) return;
     setForm((f) => ({
@@ -349,11 +511,11 @@ export function useDocumentForm({
     }));
   }, [defaultWarehouseId, baseCurrencyId, selectedYearId, isEdit, open]);
 
-  // ─── Form field setter ───────────────────────────────────────────────────────
+  // ── set ───────────────────────────────────────────────────────────────────
 
   const set = useCallback((k: keyof DocumentFormState, v: unknown) => {
     setForm((f) => ({ ...f, [k]: v }));
-    setErrors((prev) => { const n = { ...prev }; delete n[k]; return n; });
+    setErrors((prev) => { const n = { ...prev }; delete n[k as string]; return n; });
   }, []);
 
   const priceLevelId = useMemo(
@@ -361,58 +523,90 @@ export function useDocumentForm({
     [form.price_level_id],
   );
 
-  // ─── handlePartyChange ───────────────────────────────────────────────────────
-  //
-  // قواعد:
-  // 1. إذا كانت هناك دفعات مرتبطة بالمستند (existingPaymentsCount > 0) → حجب
-  // 2. إذا كانت الأسطر ممتلئة وفئة السعر ستتغير → حجب
-  // 3. في كل الأحوال: تحديث price_level_id تلقائياً من الزبون الجديد
+  // ── رصيد المتعامل ─────────────────────────────────────────────────────────
 
-  const handlePartyChange = useCallback((id: string): { blocked: boolean; reason?: string } => {
+  const partyIdNum = form.party_id ? parseInt(form.party_id) : null;
+
+  const { data: partyBalance = null, isLoading: isLoadingBalance } =
+    useQuery<PartyBalanceInfo | null>({
+      queryKey: [slug, 'party-balance', partyIdNum, form.fiscal_year_id, form.document_date],
+      queryFn: async () => {
+        if (!partyIdNum) return null;
+        return apiGet<PartyBalanceInfo>(
+          `/party-balances/${partyIdNum}`,
+          { date: form.document_date || today() },
+        );
+      },
+      enabled:   !!slug && !!partyIdNum && needsParty,
+      staleTime: 60_000,
+    });
+
+  // ── handlePartyChange ─────────────────────────────────────────────────────
+
+  const handlePartyChange = useCallback((id: string): PartyChangeResult => {
+    if (isPurchase) {
+      setForm((f) => ({ ...f, party_id: id }));
+      setErrors((prev) => { const n = { ...prev }; delete n.party_id; return n; });
+      return { blocked: false };
+    }
+
     const curForm       = formRef.current!;
     const party         = partiesRef.current.find((p) => String(p.id) === id);
-    const newPriceLevel = party?.price_level_id ?? null;
+    const newPriceLevel = party?.default_price_level_id ?? null;
     const curPriceLvl   = curForm.price_level_id ? parseInt(curForm.price_level_id) : null;
 
-    // ✅ حجب إذا كانت هناك دفعات مرتبطة بالمستند
-    const paymentsInForm = curForm.payments.filter(
-      (p) => p.payment_mode_id && parseFloat(p.amount) > 0,
-    ).length;
-    const totalPayments = existingPaymentsCount + paymentsInForm;
-
-    if (!isPurchase && totalPayments > 0) {
+    if (existingPayments.length > 0) {
       return {
-        blocked: true,
-        reason: 'لا يمكن تغيير الزبون: هناك دفعات مرتبطة بهذا المستند. احذف الدفعات أولاً.',
+        blocked: true, blockType: 'existing_payments',
+        reason: 'لا يمكن تغيير الزبون: هناك دفعات مُسجَّلة. احذف الدفعات أولاً.',
       };
     }
 
-    // ✅ حجب إذا كانت الأسطر ممتلئة وفئة السعر ستتغير
+    const validNew = newPayments.filter((p) => p.payment_mode_id && parseFloat(p.amount) > 0);
+    if (validNew.length > 0) {
+      return {
+        blocked: true, blockType: 'has_payments',
+        reason: `لا يمكن تغيير الزبون: هناك ${validNew.length} دفعة في النموذج. احذفها أولاً.`,
+      };
+    }
+
     const hasFilledLines  = curForm.lines.some((l) => l.product_id !== '');
     const priceWillChange = newPriceLevel !== curPriceLvl;
 
-    if (!isPurchase && hasFilledLines && priceWillChange) {
-      const curName = curPriceLvl   ? `فئة #${curPriceLvl}`   : 'الافتراضية';
-      const newName = newPriceLevel ? `فئة #${newPriceLevel}` : 'الافتراضية';
+    if (hasFilledLines && priceWillChange) {
       return {
-        blocked: true,
-        reason:  `لا يمكن تغيير الزبون: فئة السعر ستتغير من "${curName}" إلى "${newName}". احذف جميع أسطر المستند أولاً.`,
+        blocked: true, blockType: 'price_level_change',
+        reason: `فئة السعر ستتغير. احذف الأسطر أولاً ثم غيِّر الزبون.`,
       };
     }
 
-    // ✅ تطبيق التغيير + تحديث price_level_id
     const newPriceLevelStr = newPriceLevel ? String(newPriceLevel) : '';
+    setForm((f) => ({ ...f, party_id: id, price_level_id: newPriceLevelStr }));
+    setErrors((prev) => { const n = { ...prev }; delete n.party_id; return n; });
+    return { blocked: false };
+  }, [isPurchase, existingPayments.length, newPayments]);
+
+  // ── handlePriceLevelChange ────────────────────────────────────────────────
+
+  const handlePriceLevelChange = useCallback((priceLevelIdStr: string) => {
+    const newPriceLevelId = priceLevelIdStr ? parseInt(priceLevelIdStr) : null;
+
     setForm((f) => ({
       ...f,
-      party_id:       id,
-      price_level_id: newPriceLevelStr,
+      price_level_id: priceLevelIdStr,
+      lines: f.lines.map((line) => {
+        if (!line.product_id || !line._product) return line;
+        const newPrice = resolvePrice(line._product, newPriceLevelId, isPurchase);
+        return {
+          ...line,
+          unit_price_ht:  newPrice,
+          price_per_pack: Math.round(newPrice * line._packQty * 10_000) / 10_000,
+        };
+      }),
     }));
-    setErrors((prev) => { const n = { ...prev }; delete n.party_id; return n; });
+  }, [isPurchase]);
 
-    return { blocked: false };
-  }, [isPurchase, existingPaymentsCount]);
-
-  // ─── updateLine ──────────────────────────────────────────────────────────────
+  // ── updateLine ────────────────────────────────────────────────────────────
 
   const updateLine = useCallback((
     idx:      number,
@@ -420,46 +614,49 @@ export function useDocumentForm({
     product?: Product | null,
   ) => {
     setForm((f) => {
-      const lines          = [...f.lines];
-      let L                = { ...lines[idx], ...patch };
+      const lines           = [...f.lines];
+      let   L               = { ...lines[idx], ...patch };
       const curPriceLevelId = f.price_level_id ? parseInt(f.price_level_id) : null;
 
-      // ── اختيار منتج جديد ────────────────────────────────────────────────────
+      // ─ L1: اختيار منتج جديد ──────────────────────────────────────────────
       if (product !== undefined) {
         if (product) {
           L.description = product.name;
 
-          // ✅ TVA: من المنتج مباشرةً
-          L.tva_rate = toNum(product.tva?.rate ?? 0) || defaultTvaRate;
+          // TVA — 0 معفى لا تُستبدَل
+          L.tva_rate = product.tva?.rate != null
+            ? toNum(product.tva.rate)
+            : defaultTvaRate;
 
-          // ✅ التعبئة الافتراضية
+          // التعبئة الافتراضية
           const defPkg   = (product.packagings ?? []).find((pk) => pk.is_default);
           L.packaging_id = defPkg ? String(defPkg.id) : '';
-          L._packQty     = defPkg ? Number(defPkg.quantity) || 1 : 1;
+          L._packQty     = defPkg ? (Number(defPkg.quantity) || 1) : 1;
 
-          // ✅ resolvePrice: يمرر curPriceLevelId الصحيح من form.price_level_id
-          const price      = resolvePrice(product, curPriceLevelId, isPurchase);
-          L.unit_price_ht  = price;
-          L.price_per_pack = price * L._packQty;
+          // السعر بوحدة أساسية
+          const unitPrice  = resolvePrice(product, curPriceLevelId, isPurchase);
+          L.unit_price_ht  = unitPrice;
+          L.price_per_pack = Math.round(unitPrice * L._packQty * 10_000) / 10_000;
 
-          // ✅ خصم الكميات
-          const qd = resolveQuantityDiscount(product, L.quantity, curPriceLevelId);
+          // خصم الكميات — يحتاج baseQty
+          const baseQty = Math.round(L.quantity * L._packQty * 1_000_000) / 1_000_000;
+          const qd = resolveQuantityDiscount(product, baseQty, curPriceLevelId);
           if (qd.percentage > 0) {
             L.discount_mode         = 'percent';
             L.discount_percentage   = qd.percentage;
             L.discount_amount_fixed = 0;
           } else if (qd.fixed > 0) {
+            // qd.fixed = خصم الوحدة الأساسية → نحوّل لعبوة
             L.discount_mode         = 'fixed';
-            L.discount_amount_fixed = qd.fixed;
+            L.discount_amount_fixed = Math.round(qd.fixed * L._packQty * 10_000) / 10_000;
             L.discount_percentage   = 0;
           } else {
-            // إبقاء القيم الحالية إذا لم يوجد خصم كميات
             L.discount_mode         = 'percent';
             L.discount_percentage   = 0;
             L.discount_amount_fixed = 0;
           }
 
-          // ✅ الحصة: أول lot متاح تلقائياً للبيع
+          // الحصة (lot) — أول متاحة للبيع
           if (!isPurchase && product.has_lots) {
             const firstLot = (product.lots ?? []).find((lt) => lt.remaining_quantity > 0);
             L.stock_lot_id = firstLot ? String(firstLot.id) : '';
@@ -469,51 +666,76 @@ export function useDocumentForm({
           }
 
           L._product = product;
+
         } else {
           // تفريغ المنتج
-          L._product            = undefined;
-          L.packaging_id        = '';
-          L._packQty            = 1;
-          L.unit_price_ht       = 0;
-          L.price_per_pack      = 0;
-          L.stock_lot_id        = '';
-          L.discount_percentage = 0;
-          L.discount_amount_fixed = 0;
+          L._product = undefined;
+          L.packaging_id = ''; L._packQty = 1;
+          L.unit_price_ht = 0; L.price_per_pack = 0;
+          L.stock_lot_id = '';
+          L.discount_percentage = 0; L.discount_amount_fixed = 0;
         }
       }
 
-      // ── تغيير التعبئة ────────────────────────────────────────────────────────
+      // ─ L3: تغيير التعبئة ──────────────────────────────────────────────────
       if (patch.packaging_id !== undefined && product === undefined) {
-        const pkg  = (L._product?.packagings ?? []).find(
-          (pk) => String(pk.id) === patch.packaging_id,
-        );
-        // ✅ إذا اختار "" (بدون تعبئة) → packQty = 1
+        const packId = patch.packaging_id;
+
+        // ابحث في _product أولاً ثم في productsRef
+        let pkg = (L._product?.packagings ?? []).find((pk) => String(pk.id) === packId);
+        if (!pkg) {
+          const prod = productsRef.current.find((p) => String(p.id) === L.product_id);
+          pkg = prod?.packagings?.find((pk) => String(pk.id) === packId);
+        }
+
+        const oldPackQty = L._packQty;
         L._packQty       = pkg ? (Number(pkg.quantity) || 1) : 1;
-        L.price_per_pack = L.unit_price_ht * L._packQty;
+
+        // تحويل: unit_price_ht لا يتغير — فقط price_per_pack
+        L.price_per_pack = Math.round(L.unit_price_ht * L._packQty * 10_000) / 10_000;
+
+        // تحديث discount_amount_fixed (كان خصم العبوة القديمة → نحوّل للجديدة)
+        if (L.discount_mode === 'fixed' && oldPackQty > 0) {
+          const unitDisc = L.discount_amount_fixed / oldPackQty;
+          L.discount_amount_fixed = Math.round(unitDisc * L._packQty * 10_000) / 10_000;
+        }
+
+        // تحديث خصم الكميات
+        if (L._product) {
+          const baseQty = Math.round(L.quantity * L._packQty * 1_000_000) / 1_000_000;
+          const qd = resolveQuantityDiscount(L._product, baseQty, curPriceLevelId);
+          if (qd.percentage > 0) {
+            L.discount_mode         = 'percent';
+            L.discount_percentage   = qd.percentage;
+            L.discount_amount_fixed = 0;
+          }
+        }
       }
 
-      // ── تغيير سعر الوحدة يدوياً ─────────────────────────────────────────────
+      // ─ L4: تغيير سعر الوحدة يدوياً ───────────────────────────────────────
       if (patch.unit_price_ht !== undefined && product === undefined) {
-        L.price_per_pack = patch.unit_price_ht * L._packQty;
+        L.price_per_pack = Math.round(patch.unit_price_ht * L._packQty * 10_000) / 10_000;
       }
 
-      // ── تغيير سعر التعبئة يدوياً ────────────────────────────────────────────
+      // ─ L5: تغيير سعر التعبئة يدوياً ──────────────────────────────────────
       if (patch.price_per_pack !== undefined && product === undefined) {
         L.unit_price_ht = L._packQty > 1
-          ? patch.price_per_pack / L._packQty
+          ? Math.round((patch.price_per_pack / L._packQty) * 10_000) / 10_000
           : patch.price_per_pack;
+        // price_per_pack مُحدَّث بالفعل من patch
       }
 
-      // ── تغيير الكمية → إعادة حساب خصم الكميات ──────────────────────────────
+      // ─ L6: تغيير الكمية ───────────────────────────────────────────────────
       if (patch.quantity !== undefined && L._product && !isPurchase) {
-        const qd = resolveQuantityDiscount(L._product, patch.quantity, curPriceLevelId);
+        const baseQty = Math.round(patch.quantity * L._packQty * 1_000_000) / 1_000_000;
+        const qd = resolveQuantityDiscount(L._product, baseQty, curPriceLevelId);
         if (qd.percentage > 0) {
           L.discount_mode         = 'percent';
           L.discount_percentage   = qd.percentage;
           L.discount_amount_fixed = 0;
         } else if (qd.fixed > 0) {
           L.discount_mode         = 'fixed';
-          L.discount_amount_fixed = qd.fixed;
+          L.discount_amount_fixed = Math.round(qd.fixed * L._packQty * 10_000) / 10_000;
           L.discount_percentage   = 0;
         }
       }
@@ -524,7 +746,7 @@ export function useDocumentForm({
     setLineErr('');
   }, [defaultTvaRate, isPurchase]);
 
-  // ─── addLine / removeLine / duplicateLine ────────────────────────────────────
+  // ── addLine / removeLine / duplicateLine ──────────────────────────────────
 
   const addLine = useCallback(() => {
     setForm((f) => ({ ...f, lines: [...f.lines, makeLine(defaultTvaRate)] }));
@@ -543,59 +765,56 @@ export function useDocumentForm({
     });
   }, []);
 
-  // ─── Payment management ──────────────────────────────────────────────────────
+  // ── إدارة الدفعات ─────────────────────────────────────────────────────────
 
   const addPayment = useCallback(() => {
-    const firstMode = paymentModesRef.current[0];
-    setForm((f) => ({
-      ...f,
-      payments: [
-        ...f.payments,
-        {
-          payment_mode_id:     firstMode ? String(firstMode.id) : '',
-          amount:              '',
-          reference:           '',
-          payment_date:        today(),
-          treasury_account_id: firstMode?.treasury_account_id
-            ? String(firstMode.treasury_account_id)
-            : '',
-        },
-      ],
-    }));
-  }, []);
+    if (pmMode === 'locked') return;
+    const firstMode = paymentModsRef.current[0];
+    setNewPayments((prev) => [...prev, {
+      payment_mode_id:     firstMode ? String(firstMode.id) : '',
+      amount:              '',
+      reference:           '',
+      payment_date:        today(),
+      treasury_account_id: firstMode?.treasury_account_id
+        ? String(firstMode.treasury_account_id) : '',
+    }]);
+  }, [pmMode]);
 
   const removePayment = useCallback((idx: number) => {
-    setForm((f) => ({ ...f, payments: f.payments.filter((_, i) => i !== idx) }));
-  }, []);
+    if (pmMode === 'locked') return;
+    setNewPayments((prev) => prev.filter((_, i) => i !== idx));
+  }, [pmMode]);
 
   const updatePayment = useCallback((idx: number, patch: Partial<PaymentEntry>) => {
-    setForm((f) => {
-      const payments = [...f.payments];
-      let P = { ...payments[idx], ...patch };
-
-      // ✅ عند تغيير طريقة الدفع → تحديث treasury_account_id تلقائياً
+    if (pmMode === 'locked') return;
+    setNewPayments((prev) => {
+      const payments = [...prev];
+      let   P        = { ...payments[idx], ...patch };
       if (patch.payment_mode_id !== undefined) {
-        const selectedMode = paymentModesRef.current.find(
+        const selectedMode = paymentModsRef.current.find(
           (pm) => String(pm.id) === patch.payment_mode_id,
         );
         P.treasury_account_id = selectedMode?.treasury_account_id
-          ? String(selectedMode.treasury_account_id)
-          : '';
+          ? String(selectedMode.treasury_account_id) : '';
       }
-
       payments[idx] = P;
-      return { ...f, payments };
+      return payments;
     });
-  }, []);
+  }, [pmMode]);
 
-  // ─── Totals ──────────────────────────────────────────────────────────────────
+  // ── Totals ────────────────────────────────────────────────────────────────
 
-  const totals = useMemo(
-    () => calcTotals(form.lines, form.apply_stamp, form.payments),
-    [form.lines, form.apply_stamp, form.payments],
+  const allPaymentsForTotals = useMemo(
+    () => [...existingPayments, ...newPayments],
+    [existingPayments, newPayments],
   );
 
-  // ─── validate ────────────────────────────────────────────────────────────────
+  const totals = useMemo(
+    () => calcTotals(form.lines, form.apply_stamp, allPaymentsForTotals),
+    [form.lines, form.apply_stamp, allPaymentsForTotals],
+  );
+
+  // ── validate ──────────────────────────────────────────────────────────────
 
   const validate = useCallback((): boolean => {
     const errs: FormErrors = {};
@@ -607,120 +826,135 @@ export function useDocumentForm({
     if (!form.fiscal_year_id) errs.fiscal_year_id = 'السنة المالية إلزامية';
     if (!form.currency_id)    errs.currency_id    = 'العملة إلزامية';
 
-    if (form.lines.length === 0) {
-      setLineErr('يجب إضافة سطر واحد على الأقل');
-      setErrors(errs);
-      return false;
-    }
+    if (!isLinesReadOnly) {
+      if (form.lines.length === 0) {
+        setLineErr('يجب إضافة سطر واحد على الأقل');
+        setErrors(errs); return false;
+      }
 
-    for (let i = 0; i < form.lines.length; i++) {
-      const line = form.lines[i];
-      if (!line.product_id) {
-        setLineErr(`السطر ${i + 1}: المنتج إلزامي`);
-        setErrors(errs);
-        return false;
-      }
-      if (line.quantity <= 0) {
-        setLineErr(`السطر ${i + 1}: الكمية يجب أن تكون > 0`);
-        setErrors(errs);
-        return false;
-      }
-      if (!isPurchase && line.unit_price_ht === 0 && line.price_per_pack === 0) {
-        setLineErr(`السطر ${i + 1}: السعر إلزامي`);
-        setErrors(errs);
-        return false;
-      }
-      if (line._product) {
-        const sv = validateLineStock(line, line._product, isPurchase, stockDataRef.current);
-        if (!sv.ok && sv.blocking) {
-          setLineErr(`السطر ${i + 1}: ${sv.message}`);
-          setErrors(errs);
-          return false;
+      for (let i = 0; i < form.lines.length; i++) {
+        const line = form.lines[i];
+        if (!line.product_id) {
+          setLineErr(`السطر ${i + 1}: المنتج إلزامي`);
+          setErrors(errs); return false;
+        }
+        if (line.quantity <= 0) {
+          setLineErr(`السطر ${i + 1}: الكمية يجب أن تكون > 0`);
+          setErrors(errs); return false;
+        }
+        if (!isPurchase && line.unit_price_ht === 0) {
+          setLineErr(`السطر ${i + 1}: السعر إلزامي`);
+          setErrors(errs); return false;
+        }
+        if (line._product) {
+          const sv = validateLineStock(line, line._product, isPurchase, stockDataRef.current);
+          if (!sv.ok && sv.blocking) {
+            setLineErr(`السطر ${i + 1}: ${sv.message}`);
+            setErrors(errs); return false;
+          }
         }
       }
     }
 
-    // التحقق من حسابات الخزينة في الدفعات
-    for (let i = 0; i < form.payments.length; i++) {
-      const pay    = form.payments[i];
+    for (let i = 0; i < newPayments.length; i++) {
+      const pay    = newPayments[i];
       const amount = parseFloat(pay.amount);
-      if (amount > 0 && !pay.treasury_account_id) {
+      if (amount <= 0) continue;
+      if (!pay.payment_mode_id) {
+        setLineErr(`الدفعة ${i + 1}: يجب اختيار طريقة الدفع`);
+        setErrors(errs); return false;
+      }
+      const mode = paymentModsRef.current.find((pm) => String(pm.id) === pay.payment_mode_id);
+      if (mode?.requires_reference && !pay.reference?.trim()) {
+        setLineErr(`الدفعة ${i + 1}: المرجع إلزامي لـ "${mode.name}"`);
+        setErrors(errs); return false;
+      }
+      const autoTreasury = mode?.treasury_account_id ?? null;
+      if (!autoTreasury && !pay.treasury_account_id) {
         setLineErr(`الدفعة ${i + 1}: يجب اختيار حساب خزينة`);
-        setErrors(errs);
-        return false;
+        setErrors(errs); return false;
       }
     }
 
     setLineErr('');
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [form, needsParty, isPurchase]);
+  }, [form, needsParty, isPurchase, isLinesReadOnly, newPayments]);
 
-  // ─── buildPayload ────────────────────────────────────────────────────────────
+  // ── buildPayload ──────────────────────────────────────────────────────────
 
   const buildPayload = useCallback((): Record<string, unknown> => {
     const f = formRef.current!;
-    return {
-      document_type_id:   documentType?.id,
-      party_id:           needsParty && f.party_id ? parseInt(f.party_id) : null,
-      warehouse_id:       parseInt(f.warehouse_id),
-      fiscal_year_id:     parseInt(f.fiscal_year_id),
-      currency_id:        parseInt(f.currency_id),
-      exchange_rate:      parseFloat(f.exchange_rate) || 1,
-      document_date:      f.document_date,
-      due_date:           f.due_date   || null,
-      notes:              f.notes      || null,
-      price_level_id:     f.price_level_id ? parseInt(f.price_level_id) : null,
-      apply_fiscal_stamp: f.apply_stamp,
-      lines: f.lines.map((line) => {
-        // ✅ إرسال الخصم بالطريقة الصحيحة حسب الوضع
-        const discountPayload: Record<string, unknown> = {};
-        if (line.discount_mode === 'percent') {
-          discountPayload.discount_percentage = line.discount_percentage;
-          discountPayload.discount_amount     = 0;
-        } else {
-          // ✅ الخصم بالقيمة الثابتة: discount_amount_fixed × quantity = إجمالي الخصم
-          const totalDiscount = line.discount_amount_fixed * line.quantity;
-          const { gross }     = calcLineTotal(line);
-          // نُرسل نسبة مكافئة للباكاند (إذا كان يتوقع فقط percentage)
-          discountPayload.discount_percentage  = gross > 0
-            ? Math.round((totalDiscount / gross) * 100 * 10000) / 10000
-            : 0;
-          // ✅ نُرسل أيضاً discount_amount للباكاندات التي تقبله مباشرةً
-          discountPayload.discount_amount      = line.discount_amount_fixed;
-        }
 
-        return {
-          ...(line.id ? { id: line.id } : {}),
-          product_id:    parseInt(line.product_id),
-          description:   line.description || null,
-          quantity:      line.quantity,
-          unit_price_ht: line.unit_price_ht,
-          tva_rate:      line.tva_rate,
-          ...discountPayload,
-          ...(line.packaging_id ? { packaging_id: parseInt(line.packaging_id) } : {}),
-          ...(line.stock_lot_id ? { stock_lot_id: parseInt(line.stock_lot_id) } : {}),
-          ...(isPurchase && line.lot_number_new ? { lot_number: line.lot_number_new } : {}),
-          notes: line.line_note || null,
-        };
-      }),
-      ...(f.payments.length > 0 ? {
-        payments: f.payments
-          .filter((p) => p.payment_mode_id && parseFloat(p.amount) > 0)
-          .map((p) => ({
-            payment_mode_id:     parseInt(p.payment_mode_id),
-            amount:              parseFloat(p.amount),
-            reference:           p.reference || null,
-            payment_date:        p.payment_date,
-            treasury_account_id: p.treasury_account_id
-              ? parseInt(String(p.treasury_account_id))
-              : null,
-          })),
-      } : {}),
+    const validNewPayments = newPayments.filter(
+      (p) => p.payment_mode_id && parseFloat(p.amount) > 0,
+    );
+
+    const paymentsPayload = validNewPayments.map((p) => {
+      const mode = paymentModsRef.current.find((pm) => String(pm.id) === p.payment_mode_id);
+      const treasuryId = mode?.treasury_account_id
+        ? mode.treasury_account_id
+        : (p.treasury_account_id ? parseInt(String(p.treasury_account_id)) : null);
+      return {
+        payment_mode_id:     parseInt(p.payment_mode_id),
+        amount:              parseFloat(p.amount),
+        reference:           p.reference?.trim() || null,
+        payment_date:        p.payment_date,
+        treasury_account_id: treasuryId,
+      };
+    });
+
+    const linesPayload = f.lines.map((line) => {
+      const calc = calcLineTotal(line);
+
+      // تحويل الكمية للوحدات الأساسية
+      const effectiveQty = calc.baseQty;
+
+      // discount_percentage: نسبة الخصم الفعلية
+      const discountPercentage = Math.round(calc.discPct * 10_000) / 10_000;
+
+      // discount_amount للباكاند = خصم الوحدة الأساسية الواحدة
+      const discountAmount = calc.unitDiscount;
+
+      return {
+        ...(line.id ? { id: line.id } : {}),
+        product_id:          parseInt(line.product_id),
+        description:         line.description || null,
+        quantity:            effectiveQty,           // وحدات أساسية
+        unit_price_ht:       line.unit_price_ht,     // سعر الوحدة الأساسية
+        tva_rate:            line.tva_rate,
+        discount_percentage: discountPercentage,
+        discount_amount:     discountAmount,          // خصم الوحدة الواحدة
+        ...(line.packaging_id ? { packaging_id: parseInt(line.packaging_id) } : {}),
+        ...(line.stock_lot_id ? { stock_lot_id: parseInt(line.stock_lot_id) } : {}),
+        ...(isPurchase && line.lot_number_new ? { lot_number: line.lot_number_new } : {}),
+        notes: line.line_note || null,
+      };
+    });
+
+    const base: Record<string, unknown> = {
+      document_type_id: documentType?.id,
+      party_id:         needsParty && f.party_id ? parseInt(f.party_id) : null,
+      warehouse_id:     parseInt(f.warehouse_id),
+      fiscal_year_id:   parseInt(f.fiscal_year_id),
+      currency_id:      parseInt(f.currency_id),
+      exchange_rate:    parseFloat(f.exchange_rate) || 1,
+      document_date:    f.document_date,
+      due_date:         f.due_date || null,
+      notes:            f.notes   || null,
     };
-  }, [documentType?.id, needsParty, isPurchase]);
 
-  // ─── validateLineStockFn ─────────────────────────────────────────────────────
+    if (pmMode === 'additive') {
+      if (paymentsPayload.length > 0) base.new_payments = paymentsPayload;
+    } else {
+      base.lines = linesPayload;
+      if (paymentsPayload.length > 0) base.payments = paymentsPayload;
+    }
+
+    return base;
+  }, [documentType?.id, needsParty, isPurchase, pmMode, newPayments]);
+
+  // ── validateLineStockFn ───────────────────────────────────────────────────
 
   const validateLineStockFn = useCallback(
     (line: LineItem, product: Product) =>
@@ -730,15 +964,18 @@ export function useDocumentForm({
 
   return {
     form, errors, lineErr, apiErr, setApiErr,
-    set, handlePartyChange, priceLevelId,
+    set, handlePartyChange, handlePriceLevelChange, priceLevelId,
     addLine, removeLine, duplicateLine, updateLine,
+    paymentMode: pmMode,
+    existingPayments, newPayments,
     addPayment, removePayment, updatePayment,
+    partyBalance, isLoadingBalance,
     totals, validate, buildPayload,
     validateLineStock: validateLineStockFn,
     updateStockData: useCallback(
-      (data: Record<number, number>) => { stockDataRef.current = data; },
-      [],
+      (data: Record<number, number>) => { stockDataRef.current = data; }, [],
     ),
     docCode, isEdit, needsParty, affectsStock, stockDir,
+    isReadOnly, isLinesReadOnly,
   };
 }

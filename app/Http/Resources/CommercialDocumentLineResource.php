@@ -29,6 +29,7 @@ class CommercialDocumentLineResource extends JsonResource
             'additional_costs'         => $this->additional_costs,
             'total_additional_cost'    => $this->total_additional_cost,
             'total_discount_amount'    => $this->total_discount_amount,
+            'packaging_id'             => $this->packaging_id,
             'stock_lot_id'             => $this->stock_lot_id,
             'is_auto_split'            => $this->is_auto_split,
             'parent_line_id'           => $this->parent_line_id,
@@ -39,6 +40,7 @@ class CommercialDocumentLineResource extends JsonResource
             // Relations
             'product'                  => new ProductResource($this->whenLoaded('product')),
             'stock_lot'                => new ProductLotResource($this->whenLoaded('stockLot')),
+            'packaging'                => new ProductPackagingResource($this->whenLoaded('packaging')),
         ];
     }
 }

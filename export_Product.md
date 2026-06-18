@@ -1,5 +1,5 @@
 # Module Export: Product
-Generated at: 2026-06-01 13:20:51
+Generated at: 2026-06-18 12:06:35
 
 ## Models
 
@@ -25,22 +25,47 @@ use App\Models\Traits\HasTenantSlug;
 #[Cacheable]
 class Product extends Model
 {
-    use HasCompany, HasStandardizedConfiguration, SoftDeletes,
-        Auditable, HasTenantSlug, HasTenantRouteBinding;
+    use HasCompany,
+        HasStandardizedConfiguration,
+        SoftDeletes,
+        Auditable,
+        HasTenantSlug,
+        HasTenantRouteBinding;
 
     protected $table = 'products';
 
     protected $fillable = [
         'company_id',
-        'name', 'slug', 'ref', 'barcode', 'description',
-        'family_id', 'brand_id', 'product_type_id',
-        'tva_id', 'unit_id',
-        'purchase_price_ht', 'current_cost_price',
-        'manages_stock', 'allow_negative_stock', 'has_lots', 'has_expiration_date',
-        'min_stock_alert', 'max_stock_alert', 'manages_quantity_discounts',
+        'name',
+        'slug',
+        'ref',
+        'barcode',
+        'description',
+        'family_id',
+        'brand_id',
+        'product_type_id',
+        'tva_id',
+        'unit_id',
+        'purchase_price_ht',
+        'current_cost_price',
+        'manages_stock',
+        'allow_negative_stock',
+        'has_lots',
+        'has_expiration_date',
+        'min_stock_alert',
+        'max_stock_alert',
+        'manages_quantity_discounts',
         'valuation_method_id',
-        'weight', 'volume', 'length', 'width', 'height',
-        'specifications', 'images', 'meta_title', 'meta_description', 'meta_keywords',
+        'weight',
+        'volume',
+        'length',
+        'width',
+        'height',
+        'specifications',
+        'images',
+        'meta_title',
+        'meta_description',
+        'meta_keywords',
         'active',
     ];
 
@@ -68,19 +93,42 @@ class Product extends Model
         'deleted_at' => 'datetime',
     ];
 
-    protected $appends = ['current_stock', 'is_low_stock'];
+    protected $appends = ['is_low_stock'];
 
     public static array $searchableFields = ['name', 'ref', 'barcode', 'description'];
     public static array $filterable = [
-        'family_id', 'brand_id', 'product_type_id', 'tva_id', 'unit_id', 'valuation_method_id',
-        'manages_stock', 'has_lots', 'has_expiration_date', 'manages_quantity_discounts', 'active'
+        'family_id',
+        'brand_id',
+        'product_type_id',
+        'tva_id',
+        'unit_id',
+        'valuation_method_id',
+        'manages_stock',
+        'has_lots',
+        'has_expiration_date',
+        'manages_quantity_discounts',
+        'active'
     ];
     public static array $sortable = ['id', 'name', 'ref', 'purchase_price_ht', 'created_at', 'updated_at'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = [
-        'family', 'brand', 'productType', 'tva', 'unit', 'valuationMethod',
-        'packagings', 'prices', 'prices.priceLevel', 'quantityDiscounts', 'quantityDiscounts.priceLevel',
-        'stockMovements', 'lots', 'documentLines', 'openingBalances', 'barcodes', 'primaryBarcode'
+        'family',
+        'brand',
+        'productType',
+        'tva',
+        'unit',
+        'valuationMethod',
+        'packagings',
+        'prices',
+        'prices.priceLevel',
+        'quantityDiscounts',
+        'quantityDiscounts.priceLevel',
+        'stockMovements',
+        'lots',
+        'documentLines',
+        'openingBalances',
+        'barcodes',
+        'primaryBarcode'
     ];
     public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
@@ -93,30 +141,89 @@ class Product extends Model
     // Relations
     // app/Models/Product.php — أضف هذه الدالة
 
-    public function family(): BelongsTo { return $this->belongsTo(Family::class); }
-    public function brand(): BelongsTo { return $this->belongsTo(Brand::class); }
-    public function variants() { return $this->hasMany(ProductVariant::class); }
-    public function productType(): BelongsTo { return $this->belongsTo(ProductType::class); }
-    public function tva(): BelongsTo { return $this->belongsTo(Tva::class); }
-    public function unit(): BelongsTo { return $this->belongsTo(Unit::class); }
-    public function valuationMethod(): BelongsTo { return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id'); }
-    public function barcodes(): HasMany { return $this->hasMany(Barcode::class); }
-    public function primaryBarcode(): HasOne { return $this->hasOne(Barcode::class)->where('is_primary', true); }
-    public function packagings(): HasMany { return $this->hasMany(ProductPackaging::class)->orderBy('display_order'); }
-    public function prices(): HasMany { return $this->hasMany(ProductPrice::class); }
-    public function quantityDiscounts(): HasMany { return $this->hasMany(QuantityDiscount::class)->orderBy('price_level_id')->orderBy('tier_order'); }
-    public function stockMovements(): HasMany { return $this->hasMany(StockMovement::class); }
-    public function lots(): HasMany { return $this->hasMany(ProductLot::class); }
-    public function documentLines(): HasMany { return $this->hasMany(CommercialDocumentLine::class); }
-    public function openingBalances(): HasMany { return $this->hasMany(OpeningBalanceStock::class); }
+    public function family(): BelongsTo
+    {
+        return $this->belongsTo(Family::class);
+    }
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class);
+    }
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+    public function productType(): BelongsTo
+    {
+        return $this->belongsTo(ProductType::class);
+    }
+    public function tva(): BelongsTo
+    {
+        return $this->belongsTo(Tva::class);
+    }
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class);
+    }
+    public function valuationMethod(): BelongsTo
+    {
+        return $this->belongsTo(InventoryValuationMethod::class, 'valuation_method_id');
+    }
+    public function barcodes(): HasMany
+    {
+        return $this->hasMany(Barcode::class);
+    }
+    public function primaryBarcode(): HasOne
+    {
+        return $this->hasOne(Barcode::class)->where('is_primary', true);
+    }
+    public function packagings(): HasMany
+    {
+        return $this->hasMany(ProductPackaging::class)->orderBy('display_order');
+    }
+    public function prices(): HasMany
+    {
+        return $this->hasMany(ProductPrice::class);
+    }
+    public function quantityDiscounts(): HasMany
+    {
+        return $this->hasMany(QuantityDiscount::class)->orderBy('price_level_id')->orderBy('tier_order');
+    }
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
+    }
+    public function lots(): HasMany
+    {
+        return $this->hasMany(ProductLot::class);
+    }
+    public function documentLines(): HasMany
+    {
+        return $this->hasMany(CommercialDocumentLine::class);
+    }
+    public function openingBalances(): HasMany
+    {
+        return $this->hasMany(OpeningBalanceStock::class);
+    }
 
     // Scopes
-    public function scopeByFamily(Builder $q, int $familyId): Builder { return $q->where('family_id', $familyId); }
-    public function scopeByBrand(Builder $q, int $brandId): Builder { return $q->where('brand_id', $brandId); }
-    public function scopeManagesStock(Builder $q): Builder { return $q->where('manages_stock', true); }
+    public function scopeByFamily(Builder $q, int $familyId): Builder
+    {
+        return $q->where('family_id', $familyId);
+    }
+    public function scopeByBrand(Builder $q, int $brandId): Builder
+    {
+        return $q->where('brand_id', $brandId);
+    }
+    public function scopeManagesStock(Builder $q): Builder
+    {
+        return $q->where('manages_stock', true);
+    }
     public function scopeLowStock(Builder $q): Builder
     {
-        return $q->whereColumn('min_stock_alert', '>=',
+        return $q->whereColumn(
+            'min_stock_alert',
+            '>=',
             StockMovement::selectRaw('COALESCE(stock_balance_after, 0)')
                 ->whereColumn('product_id', 'products.id')
                 ->latest('movement_date')->latest('id')->limit(1)
@@ -124,14 +231,12 @@ class Product extends Model
     }
 
     // Accessors
-    public function getCurrentStockAttribute(): float
-    {
-        return (float) ($this->stockMovements()->latest('movement_date')->latest('id')->value('stock_balance_after') ?? 0);
-    }
+
     public function getIsLowStockAttribute(): bool
     {
         if (!$this->manages_stock) return false;
-        return $this->current_stock <= (float) $this->min_stock_alert;
+        return (float) ($this->attributes['current_stock'] ?? 0)
+            <= (float) $this->min_stock_alert;
     }
 
     // Business Logic
@@ -195,7 +300,8 @@ class Product extends Model
             ->where('movement_date', '<=', $date)
             ->orderBy('movement_date')
             ->get();
-        $totalValue = 0; $totalQuantity = 0;
+        $totalValue = 0;
+        $totalQuantity = 0;
         foreach ($movements as $mov) {
             $direction = $mov->stockMovementType->direction;
             $quantity = $direction * $mov->quantity;
@@ -211,8 +317,6 @@ class Product extends Model
         }
         return $totalQuantity > 0 ? round($totalValue / $totalQuantity, 4) : 0;
     }
-
-
 }
 
 ```
@@ -1362,6 +1466,67 @@ class UpdateProductLotRequest extends FormRequest
 
 ```
 
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreProductLotRequest.php
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+
+class StoreProductLotRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'lot_number'          => ['required', 'string', 'max:50',
+                                       Rule::unique('product_lots', 'lot_number')
+                                           ->where('product_id',   $this->input('product_id'))
+                                           ->where('company_id',   $companyId)],
+            'product_id'          => 'required|integer|exists:products,id',
+            'warehouse_id'        => 'required|integer|exists:warehouses,id',
+
+            'manufacturing_date'  => 'nullable|date',
+            'expiration_date'     => 'nullable|date|after_or_equal:manufacturing_date',
+            'purchase_date'       => 'required|date',
+
+            'purchase_price'      => 'required|numeric|min:0',
+            'legal_selling_price' => 'required|numeric|min:0',
+            'margin_percentage'   => 'nullable|numeric|min:0|max:100',
+
+            'original_quantity'   => 'required|numeric|min:0.0001',
+            // remaining_quantity = original_quantity عند الإنشاء — يحسبها الـ Service
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'lot_number.required'          => 'رقم الدفعة مطلوب',
+            'lot_number.unique'            => 'رقم الدفعة مستخدم بالفعل لهذا المنتج في شركتك',
+            'product_id.required'          => 'المنتج مطلوب',
+            'warehouse_id.required'        => 'المستودع مطلوب',
+            'purchase_date.required'       => 'تاريخ الشراء مطلوب',
+            'purchase_price.required'      => 'سعر الشراء مطلوب',
+            'legal_selling_price.required' => 'سعر البيع القانوني مطلوب',
+            'original_quantity.required'   => 'الكمية الأصلية مطلوبة',
+            'original_quantity.min'        => 'الكمية يجب أن تكون أكبر من الصفر',
+            'expiration_date.after_or_equal' => 'تاريخ الانتهاء يجب أن يكون بعد أو مساوياً لتاريخ الإنتاج',
+        ];
+    }
+}
+
+
+
+```
+
 ### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreProductRequest.php
 ```php
 <?php
@@ -1533,6 +1698,55 @@ class StoreProductVariantRequest extends FormRequest
             'weight' => 'nullable|numeric',
             'volume' => 'nullable|numeric',
             'active' => 'nullable|boolean',
+        ];
+    }
+}
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateProductLotRequest.php
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+
+class UpdateProductLotRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        $id        = $this->route('product_lot');
+        $companyId = $this->user()?->company_id
+            ?? app(\App\Services\CompanyContextService::class)->get();
+
+        return [
+            'lot_number'          => ['sometimes', 'string', 'max:50',
+                                       Rule::unique('product_lots', 'lot_number')
+                                           ->ignore($id)
+                                           ->where('product_id', $this->input('product_id'))
+                                           ->where('company_id', $companyId)],
+            // product_id و warehouse_id لا تتغير بعد الإنشاء
+            'manufacturing_date'  => 'nullable|date',
+            'expiration_date'     => 'nullable|date',
+            'purchase_date'       => 'sometimes|date',
+            'purchase_price'      => 'sometimes|numeric|min:0',
+            'legal_selling_price' => 'sometimes|numeric|min:0',
+            'margin_percentage'   => 'nullable|numeric|min:0|max:100',
+            // remaining_quantity تتغير فقط عبر حركات المخزون — لا تُعدَّل مباشرة
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'lot_number.unique'       => 'رقم الدفعة مستخدم بالفعل لهذا المنتج',
+            'purchase_price.min'      => 'سعر الشراء يجب أن يكون صفراً أو أكثر',
+            'legal_selling_price.min' => 'سعر البيع القانوني يجب أن يكون صفراً أو أكثر',
         ];
     }
 }
@@ -1895,6 +2109,282 @@ class ProductVariantPolicy
         return $user->hasAccessToCompany($variant->company_id);
     }
 }
+
+```
+
+## Migrations
+
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2025_10_15_093205_create_product_types_table.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('product_types', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->string('name', 50);
+            $table->string('label', 100);
+            $table->text('description')->nullable();
+            $table->boolean('manages_stock')->default(true);
+            $table->boolean('active')->default(true)->index();
+            $table->unsignedSmallInteger('display_order')->default(0);
+            $table->timestamps();
+            $table->unique(['company_id', 'name']);
+        });
+    }
+    public function down(): void {
+        Schema::dropIfExists('product_types');
+    }
+};
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2025_10_15_093308_create_products_table.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('products', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->string('name', 150);
+            $table->string('slug', 150)->nullable()->index();
+            $table->string('ref', 50)->nullable()->index()->comment('SKU / مرجع المنتج');
+            $table->string('barcode', 50)->nullable()->index()->comment('الباركود');
+            $table->text('description')->nullable();
+            $table->foreignId('family_id')->nullable()->constrained('families')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreignId('product_type_id')->nullable()->constrained('product_types')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreignId('tva_id')->nullable()->constrained('tvas')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete()->cascadeOnUpdate();
+            $table->decimal('purchase_price_ht', 15, 4)->default(0)->comment('سعر الشراء الأساسي');
+            $table->decimal('current_cost_price', 15, 4)->default(0)->comment('آخر تكلفة محسوبة (PMP/FIFO/LIFO)');
+            $table->boolean('manages_stock')->default(true);
+            $table->boolean('allow_negative_stock')->default(false);
+            $table->boolean('has_lots')->default(false);
+            $table->boolean('has_expiration_date')->default(false);
+            $table->decimal('min_stock_alert', 15, 4)->default(0);
+            $table->decimal('max_stock_alert', 15, 4)->default(0);
+            $table->boolean('manages_quantity_discounts')->default(false);
+            $table->decimal('weight', 8, 2)->nullable();
+            $table->decimal('volume', 8, 2)->nullable();
+            $table->decimal('length', 8, 2)->nullable();
+            $table->decimal('width', 8, 2)->nullable();
+            $table->decimal('height', 8, 2)->nullable();
+            $table->foreignId('valuation_method_id')->nullable()->constrained('inventory_valuation_methods')->nullOnDelete()->cascadeOnUpdate();
+            $table->json('specifications')->nullable()->comment('خصائص تقنية مرنة');
+            $table->json('images')->nullable();
+            $table->string('meta_title', 200)->nullable();
+            $table->text('meta_description')->nullable();
+            $table->json('meta_keywords')->nullable();
+            $table->boolean('active')->default(true)->index();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->index(['company_id', 'active']);
+            $table->index(['company_id', 'name', 'active']);
+            $table->index(['company_id', 'ref', 'barcode'], 'idx_products_lookup');
+            $table->index(['company_id', 'family_id', 'brand_id', 'active'], 'idx_products_filter');
+
+            if (app()->environment() !== 'testing' && DB::getDriverName() !== 'sqlite') {
+                $table->fullText(['name', 'description']);
+            }
+        });
+    }
+    public function down(): void {
+        Schema::dropIfExists('products');
+    }
+};
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_04_28_184027_create_product_packagings_table.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('product_packagings', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->string('code', 20)->comment('UN / FD / PLT');
+            $table->string('label', 100)->comment('قارورة / فاردو / باليطة');
+            $table->decimal('quantity', 15, 4)->default(1)->comment('عدد الوحدات الأساسية في هذه التعبئة');
+            $table->string('barcode', 50)->nullable()->index()->comment('باركود خاص بهذه التعبئة');
+            $table->boolean('is_default')->default(false)->comment('الوحدة الأساسية (quantity=1)');
+            $table->boolean('active')->default(true);
+            $table->unsignedSmallInteger('display_order')->default(0);
+            $table->timestamps();
+
+            $table->unique(['company_id', 'product_id', 'code'], 'product_packaging_code_unique');
+            $table->unique(['company_id', 'barcode'], 'packagings_company_barcode_unique');
+            $table->index(['company_id', 'product_id', 'active']);
+            $table->index(['company_id', 'product_id', 'is_default']);
+        });
+    }
+    public function down(): void {
+        Schema::dropIfExists('product_packagings');
+    }
+};
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_04_28_184054_create_product_prices_table.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('product_prices', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('price_level_id')->constrained('price_levels')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->enum('pricing_method', ['fixed', 'rate', 'margin'])->default('fixed')->comment('fixed=سعر مباشر | rate=نسبة% فوق الشراء | margin=هامش ثابت دج');
+            $table->decimal('price', 15, 4)->nullable()->comment('Prix de Vente HT — للطريقة fixed فقط');
+            $table->decimal('rate', 8, 4)->nullable()->comment('Taux % — للطريقة rate فقط');
+            $table->decimal('margin', 15, 4)->nullable()->comment('Marge دج — للطريقة margin فقط');
+            $table->boolean('active')->default(true)->index();
+            $table->timestamps();
+
+            $table->unique(['company_id', 'product_id', 'price_level_id'], 'product_price_level_unique');
+            $table->index(['company_id', 'product_id', 'active']);
+        });
+
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE product_prices ADD CONSTRAINT chk_pricing_method CHECK ((pricing_method = 'fixed' AND price IS NOT NULL AND price >= 0) OR (pricing_method = 'rate' AND rate IS NOT NULL AND rate >= 0) OR (pricing_method = 'margin' AND margin IS NOT NULL))");
+        }
+    }
+    public function down(): void {
+        Schema::dropIfExists('product_prices');
+    }
+};
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_04_28_184501_create_product_lots_table.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('product_lots', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->string('lot_number', 50)->index();
+            $table->foreignId('product_id')->constrained('products')->restrictOnDelete()->cascadeOnUpdate();
+            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete()->cascadeOnUpdate();
+            $table->date('manufacturing_date')->nullable()->index();
+            $table->date('expiration_date')->nullable()->index();
+            $table->date('purchase_date')->index();
+            $table->decimal('purchase_price', 15, 4);
+            $table->decimal('legal_selling_price', 15, 4);
+            $table->decimal('margin_percentage', 8, 4)->default(5.00);
+            $table->decimal('original_quantity', 15, 4);
+            $table->decimal('remaining_quantity', 15, 4)->index();
+
+            if (DB::getDriverName() !== 'sqlite') {
+                $table->boolean('is_depleted')->storedAs('CASE WHEN remaining_quantity <= 0 THEN 1 ELSE 0 END')->index();
+                $table->decimal('total_cost', 15, 4)->storedAs('original_quantity * purchase_price');
+                $table->decimal('remaining_value', 15, 4)->storedAs('remaining_quantity * purchase_price');
+            } else {
+                $table->boolean('is_depleted')->default(false)->index();
+                $table->decimal('total_cost', 15, 4)->nullable();
+                $table->decimal('remaining_value', 15, 4)->nullable();
+            }
+
+            $table->unsignedBigInteger('stock_movement_id')->nullable()->comment('FK يُضاف لاحقاً');
+            $table->string('supplier_lot_number', 100)->nullable();
+            $table->boolean('active')->default(true)->index();
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->unique(['company_id', 'lot_number'], 'product_lots_company_lot_unique');
+            $table->index(['company_id', 'product_id', 'warehouse_id', 'is_depleted', 'purchase_date'], 'idx_fifo_lookup');
+            $table->index(['company_id', 'active', 'remaining_quantity'], 'idx_active_stock');
+        });
+
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE product_lots ADD CONSTRAINT chk_quantities CHECK (remaining_quantity >= 0 AND remaining_quantity <= original_quantity)");
+        }
+    }
+    public function down(): void {
+        Schema::dropIfExists('product_lots');
+    }
+};
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_05_02_084253_create_product_variants_table.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('product_variants', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
+            $table->string('sku', 100)->nullable();
+            $table->string('barcode', 50)->nullable();
+            $table->enum('price_type', ['fixed', 'percentage'])->nullable();
+            $table->decimal('price_value', 15, 4)->nullable();
+            $table->decimal('stock', 15, 4)->nullable();
+            $table->boolean('track_stock')->nullable();
+            $table->json('attributes')->nullable();
+            $table->string('image')->nullable();
+            $table->decimal('weight', 10, 2)->nullable();
+            $table->decimal('volume', 10, 2)->nullable();
+            $table->boolean('active')->nullable();
+            $table->foreignId('created_by')->nullable()->constrained('users');
+            $table->foreignId('updated_by')->nullable()->constrained('users');
+            $table->foreignId('deleted_by')->nullable()->constrained('users');
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->unique(['company_id', 'sku'], 'pv_company_sku_unique');
+            $table->unique(['company_id', 'barcode'], 'pv_company_barcode_unique');
+            $table->index(['company_id', 'product_id', 'active']);
+            $table->index(['company_id', 'active']);
+        });
+    }
+    public function down(): void {
+        Schema::dropIfExists('product_variants');
+    }
+};
 
 ```
 

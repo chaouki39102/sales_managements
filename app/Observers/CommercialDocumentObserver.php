@@ -5,59 +5,63 @@ namespace App\Observers;
 use App\Models\CommercialDocument;
 use App\Models\DocumentStatus;
 use App\Services\Tax\FiscalStampCalculator;
-use App\Services\Tax\TAPCalculator;
 use Illuminate\Support\Facades\Log;
 
 /**
  * CommercialDocumentObserver
- * ══════════════════════════════════════════════════════════════════
+ * ══════════════════════════════════════════════════════════════════════════════
  *
- * ⚠️ متى يُشغَّل هذا الـ Observer؟
- * - saving()  → قبل كل save() أو update() (بما فيها المباشرة)
- * - saved()   → بعد كل save() أو update() ناجح
+ * المسؤولية: طبقة احتياطية لحساب الإجماليات وتحديث الحالة تلقائياً.
  *
- * ⚠️ ما لا يُشغّله:
- * - saveQuietly()   → لا يشغّل Observers (مقصود — نتجنب الحلقات)
- * - updateQuietly() → لا يشغّل Observers
+ * ══ متى يُشغَّل ════════════════════════════════════════════════════════════
+ *  saving()  → قبل كل save() أو update() عادي
+ *  saved()   → بعد كل save() أو update() ناجح
  *
- * ✅ CommercialDocumentService::calculateTotals() تستخدم updateQuietly()
- *    لذا لن يُشغَّل saving() عند حساب الإجماليات من الخدمة.
+ * ══ ما لا يُشغّله ══════════════════════════════════════════════════════════
+ *  saveQuietly()   → مقصود — نتجنب الحلقات
+ *  updateQuietly() → مقصود — CommercialDocumentService يستخدمه
  *
- * ✅ هذا الـ Observer يعمل كطبقة احتياطية فقط:
- *    إذا حُدّثت الوثيقة مباشرة (مثل $document->save() في اختبار)،
- *    يُحسب الإجماليات إذا كانت الأسطر محملة.
+ * ══ سيناريوهات saving() ════════════════════════════════════════════════════
+ *  S1. الأسطر محملة وغير فارغة → إعادة حساب الإجماليات
+ *  S2. الأسطر غير محملة → تجاوز (لا استعلام DB)
+ *  S3. الأسطر فارغة → تجاوز
  *
- * التسجيل: AppServiceProvider::boot()
- *   CommercialDocument::observe(CommercialDocumentObserver::class);
- * ══════════════════════════════════════════════════════════════════
+ * ══ سيناريوهات saved() ═════════════════════════════════════════════════════
+ *  S4. remaining_amount <= 0.001 و net_to_pay > 0 → تحديث الحالة إلى paid
+ *      لكن فقط إذا كانت الحالة الحالية في: [validated, partially_paid, overdue, pending]
+ *      لا تُحوِّل: draft, cancelled, returned, paid (بالفعل)
+ *  S5. باقي الحالات → لا شيء
+ *
+ * ══ سيناريوهات الدفعات الجزئية ══════════════════════════════════════════════
+ *  S6. 0 < remaining_amount < net_to_pay → يجب أن تتحول إلى partially_paid
+ *      (هذا يُعالَج هنا أيضاً)
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
  */
 class CommercialDocumentObserver
 {
     /**
-     * قبل الحفظ: حساب المجاميع من الأسطر إذا كانت محملة.
-     *
-     * ✅ نتحقق من relationLoaded أولاً — إذا لم تكن الأسطر محملة
-     *    فالـ Observer يتجاوز الحساب (لا يستدعي DB).
-     * ✅ إذا كانت الأسطر فارغة نتجاوز أيضاً.
+     * قبل الحفظ: حساب الإجماليات إذا كانت الأسطر محملة.
      */
     public function saving(CommercialDocument $document): void
     {
+        // S2: الأسطر غير محملة → لا استعلام DB
         if (!$document->relationLoaded('lines')) {
             return;
         }
 
+        // S3: الأسطر فارغة → تجاوز
         if ($document->lines->isEmpty()) {
             return;
         }
 
+        // S1: الأسطر محملة → إعادة حساب
         $this->calculateDocumentTotals($document);
     }
 
     /**
      * حساب إجماليات الوثيقة من الأسطر المحملة.
-     *
-     * ✅ الأسطر تكون قد حُسبت مسبقاً بواسطة CommercialDocumentLineObserver
-     * ✅ نستخدم القيم الموجودة في الـ collection (لا استعلام إضافي)
+     * تُستدعى فقط من saving() — لا تستدعي save() داخلياً.
      */
     protected function calculateDocumentTotals(CommercialDocument $document): void
     {
@@ -71,85 +75,153 @@ class CommercialDocumentObserver
         try {
             $totalStamp = (float) app(FiscalStampCalculator::class)->calculate($document);
         } catch (\Throwable $e) {
-            Log::warning("CommercialDocumentObserver: فشل حساب الطابع الجبائي للوثيقة #{$document->id}", [
+            Log::warning("CommercialDocumentObserver [saving]: فشل حساب الطابع للوثيقة #{$document->id}", [
                 'error' => $e->getMessage(),
             ]);
         }
 
-        // TAP
-        $totalTap = 0.0;
-        try {
-            if (class_exists(TAPCalculator::class)) {
-                $totalTap = (float) app(TAPCalculator::class)->calculate($document);
-            }
-        } catch (\Throwable $e) {
-            Log::warning("CommercialDocumentObserver: فشل حساب TAP للوثيقة #{$document->id}", [
-                'error' => $e->getMessage(),
-            ]);
-        }
+        $netToPay   = $totalTtc + $totalStamp;
+        $paidAmount = (float) ($document->paid_amount ?? 0);
 
-        $netToPay = $totalTtc + $totalStamp + $totalTap;
-
-        // تعيين القيم مباشرة على الـ model (لا save هنا — نحن داخل saving())
-        $document->total_ht       = round($totalHt,       4);
-        $document->total_tva      = round($totalTva,      4);
-        $document->total_discount = round($totalDiscount, 4);
-        $document->total_stamp    = round($totalStamp,    4);
-        $document->total_ttc      = round($totalTtc,      4);
-        $document->net_to_pay     = round($netToPay,      4);
-
-        // remaining_amount = net_to_pay - paid_amount (لا نصفّر paid_amount)
-        $paidAmount               = (float) ($document->paid_amount ?? 0);
+        // تعيين القيم مباشرة على النموذج — لا save() هنا
+        $document->total_ht         = round($totalHt,       4);
+        $document->total_tva        = round($totalTva,      4);
+        $document->total_discount   = round($totalDiscount, 4);
+        $document->total_stamp      = round($totalStamp,    4);
+        $document->total_ttc        = round($totalTtc,      4);
+        $document->net_to_pay       = round($netToPay,      4);
         $document->remaining_amount = round(max(0, $netToPay - $paidAmount), 4);
     }
 
     /**
-     * بعد الحفظ: تحديث حالة الوثيقة إلى "مدفوع" إذا اكتمل الدفع.
+     * بعد الحفظ: تحديث الحالة حسب remaining_amount.
      *
-     * ✅ نستخدم saveQuietly() لتجنب حلقة لا نهائية
-     * ✅ نتحقق من remaining_amount بدقة (float comparison مع epsilon)
-     * ✅ نتحقق من أن الحالة الحالية ليست "paid" مسبقاً
-     * ✅ try/catch لمنع فشل الحالة من إفشال العملية الأصلية
+     * ══ الحالات المُعالَجة ══════════════════════════════════════════════════
+     *
+     * S4. remaining_amount <= 0.001 و net_to_pay > 0
+     *     و الحالة في [validated, partially_paid, overdue, pending]
+     *     → تحديث إلى "paid"
+     *
+     * S6. 0 < remaining_amount < net_to_pay (دفع جزئي)
+     *     و الحالة في [validated, overdue, pending]
+     *     → تحديث إلى "partially_paid"
+     *
+     * S5. باقي الحالات → لا تعديل
+     *
+     * ════════════════════════════════════════════════════════════════════════
      */
     public function saved(CommercialDocument $document): void
     {
-        $remaining = (float) $document->remaining_amount;
+        $netToPay   = (float) $document->net_to_pay;
+        $remaining  = (float) $document->remaining_amount;
+        $paidAmount = (float) $document->paid_amount;
 
-        // ✅ مقارنة float آمنة (epsilon = 0.001 لتجنب مشاكل التقريب)
-        if ($remaining > 0.001) {
-            return;
-        }
+        // لا منطق إذا لم يكن هناك مبلغ مستحق
+        if ($netToPay <= 0) return;
 
-        // تحقق من وجود net_to_pay > 0 (لا نغيّر حالة الوثائق الصفرية تلقائياً)
-        $netToPay = (float) $document->net_to_pay;
-        if ($netToPay <= 0) {
+        // قراءة اسم الحالة الحالية (نستخدم العلاقة إذا كانت محملة وإلا نستعلم)
+        $currentStatusName = $this->resolveCurrentStatusName($document);
+
+        // الحالات المحمية — لا تُعدَّل بأي حال
+        if (in_array($currentStatusName, ['cancelled', 'returned', 'draft'], true)) {
             return;
         }
 
         try {
-            $paidStatus = DocumentStatus::where('company_id', $document->company_id)
-                ->where('name', 'paid')
-                ->first();
-
-            if (!$paidStatus) {
-                Log::warning("CommercialDocumentObserver: لم يُعثر على حالة 'paid' للشركة #{$document->company_id}");
+            // ── S4: دفع كامل → paid ─────────────────────────────────────────
+            if ($remaining <= 0.001) {
+                $this->transitionToPaid($document, $currentStatusName);
                 return;
             }
 
-            // تجنب التحديث إذا كانت الحالة بالفعل 'paid'
-            if ($document->document_status_id === $paidStatus->id) {
-                return;
+            // ── S6: دفع جزئي → partially_paid ───────────────────────────────
+            if ($paidAmount > 0.001 && $remaining > 0.001) {
+                $this->transitionToPartiallyPaid($document, $currentStatusName);
             }
-
-            // ✅ saveQuietly() لا يشغّل Observers مرة أخرى
-            $document->document_status_id = $paidStatus->id;
-            $document->saveQuietly();
 
         } catch (\Throwable $e) {
-            // لا نوقف العملية الأصلية بسبب فشل تحديث الحالة
-            Log::warning("CommercialDocumentObserver: فشل تحديث الحالة للوثيقة #{$document->id}", [
-                'error' => $e->getMessage(),
+            Log::warning("CommercialDocumentObserver [saved]: فشل تحديث الحالة للوثيقة #{$document->id}", [
+                'error'          => $e->getMessage(),
+                'current_status' => $currentStatusName,
+                'remaining'      => $remaining,
+                'net_to_pay'     => $netToPay,
             ]);
         }
+    }
+
+    // ─── Private helpers ──────────────────────────────────────────────────────
+
+    /**
+     * يقرأ اسم الحالة الحالية من العلاقة المحملة أو من الاستعلام.
+     */
+    private function resolveCurrentStatusName(CommercialDocument $document): string
+    {
+        if ($document->relationLoaded('documentStatus') && $document->documentStatus) {
+            return $document->documentStatus->name ?? '';
+        }
+
+        return (string) DocumentStatus::where('id', $document->document_status_id)
+            ->value('name') ?? '';
+    }
+
+    /**
+     * S4: الانتقال إلى "paid".
+     * مسموح فقط من: [validated, partially_paid, overdue, pending]
+     */
+    private function transitionToPaid(CommercialDocument $document, string $currentStatusName): void
+    {
+        $allowedFrom = ['validated', 'partially_paid', 'overdue', 'pending'];
+
+        if (!in_array($currentStatusName, $allowedFrom, true)) {
+            return;
+        }
+
+        $paidStatusId = DocumentStatus::where('company_id', $document->company_id)
+            ->where('name', 'paid')
+            ->value('id');
+
+        if (!$paidStatusId) {
+            Log::warning("CommercialDocumentObserver: لم يُعثر على حالة 'paid' للشركة #{$document->company_id}");
+            return;
+        }
+
+        // لا تُعدِّل إذا كانت الحالة بالفعل paid
+        if ($document->document_status_id === $paidStatusId) {
+            return;
+        }
+
+        // ✅ saveQuietly() لا يُشغِّل الـ Observer مرة أخرى
+        $document->document_status_id = $paidStatusId;
+        $document->saveQuietly();
+    }
+
+    /**
+     * S6: الانتقال إلى "partially_paid".
+     * مسموح فقط من: [validated, overdue, pending]
+     * لا ينتقل من paid (قد يكون تصحيح متأخر)
+     */
+    private function transitionToPartiallyPaid(CommercialDocument $document, string $currentStatusName): void
+    {
+        $allowedFrom = ['validated', 'overdue', 'pending'];
+
+        if (!in_array($currentStatusName, $allowedFrom, true)) {
+            return;
+        }
+
+        $partialStatusId = DocumentStatus::where('company_id', $document->company_id)
+            ->where('name', 'partially_paid')
+            ->value('id');
+
+        if (!$partialStatusId) {
+            Log::warning("CommercialDocumentObserver: لم يُعثر على حالة 'partially_paid' للشركة #{$document->company_id}");
+            return;
+        }
+
+        if ($document->document_status_id === $partialStatusId) {
+            return;
+        }
+
+        $document->document_status_id = $partialStatusId;
+        $document->saveQuietly();
     }
 }

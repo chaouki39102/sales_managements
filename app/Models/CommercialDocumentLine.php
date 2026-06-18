@@ -41,7 +41,6 @@ class CommercialDocumentLine extends Model
         'parent_line_id',
         'line_attributes',
         'packaging_id',
-
     ];
 
     protected $casts = [
@@ -69,7 +68,7 @@ class CommercialDocumentLine extends Model
     public static array $filterable = ['commercial_document_id', 'product_id', 'stock_lot_id', 'is_auto_split'];
     public static array $sortable = ['id', 'line_order', 'quantity', 'total_ttc', 'created_at'];
     public static array $defaultWith = [];
-    public static array $allowedIncludes = ['commercialDocument', 'product', 'stockLot', 'parentLine', 'childLines', 'stockMovements'];
+    public static array $allowedIncludes = ['commercialDocument', 'product', 'stockLot', 'parentLine', 'childLines', 'stockMovements', 'packaging'];
     public static string $defaultSort = 'line_order';
     public static string $defaultSortDirection = 'asc';
     public static int $defaultPerPage = 50;
@@ -85,6 +84,7 @@ class CommercialDocumentLine extends Model
     public function parentLine(): BelongsTo { return $this->belongsTo(CommercialDocumentLine::class, 'parent_line_id'); }
     public function childLines(): HasMany { return $this->hasMany(CommercialDocumentLine::class, 'parent_line_id'); }
     public function stockMovements(): HasMany { return $this->hasMany(StockMovement::class, 'commercial_document_line_id'); }
+    public function packaging(): BelongsTo { return $this->belongsTo(ProductPackaging::class, 'packaging_id'); }
 
     public function scopeParentLines(Builder $query): Builder { return $query->whereNull('parent_line_id'); }
     public function scopeChildLines(Builder $query): Builder { return $query->whereNotNull('parent_line_id'); }

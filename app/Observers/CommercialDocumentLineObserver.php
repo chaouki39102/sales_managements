@@ -7,31 +7,47 @@ use App\Models\CommercialDocumentLine;
 
 /**
  * CommercialDocumentLineObserver
+ * ══════════════════════════════════════════════════════════════════════════════
  *
- * المسؤولية: حساب إجماليات السطر عند التعديل المباشر
+ * المسؤولية: حساب إجماليات السطر عند الحفظ المباشر.
  *
- * ✅ يعمل بشكل صحيح عند: PATCH/PUT على سطر منفرد
+ * ══ نموذج الحساب (مطابق لـ CommercialDocumentService::computeLineTotals) ══
  *
- * ⚠️ لماذا لا يكفي عند الإنشاء؟
- *    Eloquent::isDirty() يُرجع false عند create() الجديد
- *    لأنه يقارن بالقيم الأصلية — والنموذج الجديد ليس له قيم أصلية
- *    لذا CommercialDocumentService::createDocumentLines() تحسب
- *    الإجماليات مباشرة في data قبل create()
+ *   quantity         = وحدات أساسية (الفرونتند يُرسل displayQty × packQty)
+ *   unit_price_ht    = سعر الوحدة الأساسية
+ *   discount_percentage = نسبة الخصم %
+ *   discount_amount  = مبلغ خصم الوحدة الواحدة = unit_price_ht × discPct/100
+ *                      (يُحسَب هنا ويُخزَّن — للمرجع)
  *
- * ✅ لا تعارض: إذا أرسل Service قيماً محسوبة، يُرجع isDirty() false
- *    لأن القيم الجديدة = القيم المُرسَلة → لا إعادة حساب غير ضرورية
+ *   gross    = quantity × unit_price_ht
+ *   discount = gross × discount_percentage / 100
+ *   total_ht = gross - discount
+ *   total_tva = total_ht × tva_rate / 100
+ *   total_ttc = total_ht + total_tva
+ *
+ * ══ الأولوية ═════════════════════════════════════════════════════════════════
+ *
+ *  1. discount_percentage (الأساسي — يُحسَب الباقي منه)
+ *  2. discount_amount (للمرجع — يُحسَب من discPct)
+ *
+ *  ⚠️ إذا أرسل الفرونتند discount_amount بدون discount_percentage
+ *     (وضع fixed)، نحسب discPct = (discount_amount / unit_price_ht) × 100
+ *     ثم نعيد حساب discount_amount بالمنطق الموحَّد.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
  */
 class CommercialDocumentLineObserver
 {
     public function saving(CommercialDocumentLine $line): void
     {
-        // عند الإنشاء ($line->exists = false):
-        //   isDirty() يُرجع false دائماً → لكننا نحسب لضمان الصحة
-        //   في حالة استدعاء create() مباشرة بدون Service
-        //
-        // عند التحديث ($line->exists = true):
-        //   نحسب فقط إذا تغيرت القيم الأساسية — تحسين للأداء
-        if ($line->exists && !$line->isDirty(['quantity', 'unit_price_ht', 'discount_percentage', 'tva_rate'])) {
+        // عند التحديث: لا نعيد الحساب إلا إذا تغيرت القيم الأساسية
+        if ($line->exists && !$line->isDirty([
+            'quantity',
+            'unit_price_ht',
+            'discount_percentage',
+            'discount_amount',
+            'tva_rate',
+        ])) {
             return;
         }
 
@@ -40,19 +56,34 @@ class CommercialDocumentLineObserver
 
     private function calculateLineTotals(CommercialDocumentLine $line): void
     {
-        $qty     = (float) ($line->quantity            ?? 0);
-        $price   = (float) ($line->unit_price_ht       ?? 0);
-        $discPct = (float) ($line->discount_percentage ?? 0);
-        $tvaRate = (float) ($line->tva_rate            ?? 0);
+        $qty      = (float) ($line->quantity        ?? 0);
+        $price    = (float) ($line->unit_price_ht   ?? 0);
+        $tvaRate  = (float) ($line->tva_rate        ?? 0);
+
+        $discPct    = (float) ($line->discount_percentage ?? 0);
+        $discAmount = (float) ($line->discount_amount     ?? 0);
+
+        // إذا كان discPct = 0 لكن discount_amount > 0
+        // → وضع fixed: نحسب discPct من discount_amount
+        if ($discPct <= 0 && $discAmount > 0 && $price > 0) {
+            $discPct = ($discAmount / $price) * 100;
+        }
 
         $gross          = $qty * $price;
-        $discountAmount = $gross * ($discPct / 100);
-        $ht             = $gross - $discountAmount;
+        $discountTotal  = $gross * ($discPct / 100);
+        $ht             = $gross - $discountTotal;
         $tva            = $ht * ($tvaRate / 100);
 
-        $line->total_ht        = round($ht,             4);
-        $line->discount_amount = round($discountAmount, 4);
-        $line->total_tva       = round($tva,             4);
-        $line->total_ttc       = round($ht + $tva,       4);
+        // discount_amount = خصم الوحدة الواحدة (للمرجع)
+        $unitDiscountAmount = $price * ($discPct / 100);
+
+        $line->discount_percentage  = round($discPct,             4);
+        $line->discount_amount      = round($unitDiscountAmount,   4);
+        $line->total_ht             = round($ht,                  4);
+        $line->total_tva            = round($tva,                  4);
+        $line->total_ttc            = round($ht + $tva,            4);
+
+        // total_discount_amount = إجمالي الخصم على الوحدات كلها (للعرض)
+        $line->total_discount_amount = round($discountTotal, 4);
     }
 }

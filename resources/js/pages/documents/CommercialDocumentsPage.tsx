@@ -59,8 +59,14 @@ const SALE_CODES     = new Set(["FV", "BL", "DEV", "BCC", "AV"]);
 const PURCHASE_CODES = new Set(["FA", "BR", "DDP", "BCF", "AA"]);
 
 const STATUS_CFG = {
-    validated:  { label: "معتمد", color: "#2563eb", bg: "#eff6ff", dot: "#3b82f6" },
-    cancelled:  { label: "ملغي",  color: "#dc2626", bg: "#fef2f2", dot: "#fca5a5" },
+    draft:          { label: "مسودة",    color: "#6b7280", bg: "#f3f4f6", dot: "#9ca3af" },
+    pending:        { label: "قيد الانتظار", color: "#f59e0b", bg: "#fffbeb", dot: "#fbbf24" },
+    validated:      { label: "معتمد",    color: "#2563eb", bg: "#eff6ff", dot: "#3b82f6" },
+    partially_paid: { label: "مدفوع جزئياً", color: "#8b5cf6", bg: "#f5f3ff", dot: "#a78bfa" },
+    paid:           { label: "مدفوع",    color: "#16a34a", bg: "#f0fdf4", dot: "#22c55e" },
+    overdue:        { label: "متأخر",    color: "#dc2626", bg: "#fef2f2", dot: "#fca5a5" },
+    cancelled:      { label: "ملغي",     color: "#dc2626", bg: "#fef2f2", dot: "#fca5a5" },
+    returned:       { label: "مرتجع",    color: "#8b5cf6", bg: "#f5f3ff", dot: "#a78bfa" },
 } as const;
 
 type StatusKey = keyof typeof STATUS_CFG;
@@ -536,7 +542,7 @@ export default function CommercialDocumentsPage() {
 
     // ── Sort → server param ───────────────────────────────────────────────────
     const sortParam = useMemo(() => {
-        if (!multiSort.length) return "-document_date";
+        if (!multiSort.length) return "id";
         return multiSort.map(s => `${s.dir === "desc" ? "-" : ""}${s.key}`).join(",");
     }, [multiSort]);
 
@@ -934,6 +940,24 @@ export default function CommercialDocumentsPage() {
                 const rem = Number((row as unknown as Record<string,unknown>).remaining_amount ?? 0);
                 const paid = ntp > 0 && rem <= 0.001;
                 return <MoneyCell value={ntp} bold accent={paid ? "var(--em)" : rem > 0 ? "var(--red)" : "var(--t2)"} />;
+            },
+        },
+        {
+            key: "paid_amount",
+            header: "المدفوع",
+            exportHeader: "المبلغ المدفوع (دج)",
+            width: 130,
+            align: "end",
+            sortable: true,
+            filter: { type: "number" },
+            accessor: r => Number((r as unknown as Record<string,unknown>).paid_amount ?? 0),
+            aggregate: "sum",
+            aggregateFormat: v => `${fmtMoney(v)} دج`,
+            render: row => {
+                const paid = Number((row as unknown as Record<string,unknown>).paid_amount ?? 0);
+                return paid > 0
+                    ? <MoneyCell value={paid} accent="var(--em)" />
+                    : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
         {

@@ -32,9 +32,7 @@ import { ActionBtn, ExpiryCell, Th } from './InventoryShared';
 export default function OpeningBalanceTab() {
   const slug = useActiveSlug();
   const qc   = useQueryClient();
-  const { selectedYear, years } = useFiscalYear();
-
-  const [fiscalYearId, setFiscalYearId] = useState<number | ''>(selectedYear?.id ?? '');
+  const { selectedYear } = useFiscalYear();
   const [drafts,       setDrafts]       = useState<DraftRow[]>([]);
   const [editingId,    setEditingId]    = useState<number | null>(null);
   const [editDraft,    setEditDraft]    = useState<DraftRow>(emptyDraft());
@@ -66,14 +64,13 @@ export default function OpeningBalanceTab() {
   // ── جلب سطور الرصيد الافتتاحي ─────────────────────────────────────────
 
   const { data: obData, isLoading } = useQuery({
-    queryKey:        obKeys.list(slug ?? '', fiscalYearId || undefined),
+    queryKey:        obKeys.list(slug ?? '', selectedYear?.id),
     queryFn:         async () => {
-      if (!fiscalYearId) return [] as OpeningBalanceStock[];
-      const result = await obApi.list(fiscalYearId as number);
-      // extractData قد يرجع undefined في حالات edge — نضمن مصفوفة دائماً
+      if (!selectedYear?.id) return [] as OpeningBalanceStock[];
+      const result = await obApi.list(selectedYear.id);
       return (Array.isArray(result) ? result : []) as OpeningBalanceStock[];
     },
-    enabled:         !!slug && !!fiscalYearId,
+    enabled:         !!slug && !!selectedYear?.id,
     staleTime:       2 * 60_000,
     placeholderData: keepPreviousData,
   });
@@ -139,7 +136,7 @@ export default function OpeningBalanceTab() {
 
     if (!d.product_id)                                      errs[`p_${idx}`] = 'مطلوب';
     if (!d.warehouse_id)                                    errs[`w_${idx}`] = 'مطلوب';
-    if (!fiscalYearId)                                      errs['year']      = 'اختر سنة';
+    if (!selectedYear?.id)                                 errs['year']      = 'اختر سنة';
     if (!d.opening_quantity || isNaN(+d.opening_quantity))  errs[`q_${idx}`] = 'مطلوب';
     if (!d.opening_value    || isNaN(+d.opening_value))     errs[`v_${idx}`] = 'مطلوب';
 
@@ -147,7 +144,7 @@ export default function OpeningBalanceTab() {
     setErrors({});
 
     await createMut.mutateAsync({
-      fiscal_year_id:     fiscalYearId as number,
+      fiscal_year_id:     selectedYear!.id,
       product_id:         d.product_id as number,
       warehouse_id:       d.warehouse_id as number,
       opening_quantity:   +d.opening_quantity,
@@ -215,31 +212,25 @@ export default function OpeningBalanceTab() {
         display: 'flex', alignItems: 'center', gap: 12,
         marginBottom: 16, flexWrap: 'wrap',
       }}>
-        <i className="ti ti-calendar" style={{ color: 'var(--t4)', fontSize: 15 }} />
-        <label style={{ fontSize: 12, color: 'var(--t3)', fontWeight: 600 }}>
-          السنة المالية:
-        </label>
-        <select
-          value={fiscalYearId}
-          onChange={e => setFiscalYearId(e.target.value ? +e.target.value : '')}
-          style={{
-            padding: '6px 10px', background: 'var(--bg2)',
-            border: `1px solid ${errors['year'] ? '#ef4444' : 'var(--b2)'}`,
-            borderRadius: 8, color: 'var(--t1)', fontSize: 13,
-            fontFamily: 'Tajawal, sans-serif', outline: 'none',
-          }}
-        >
-          <option value="">— اختر سنة —</option>
-          {years.map(y => (
-            <option key={y.id} value={y.id}>
-              {y.name}{y.is_current ? ' (الحالية)' : ''}{y.is_closed ? ' 🔒' : ''}
-            </option>
-          ))}
-        </select>
+        {selectedYear && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 13, color: 'var(--t3)',
+          }}>
+            <i className="ti ti-calendar" style={{ color: 'var(--t4)', fontSize: 15 }} />
+            <span style={{ fontWeight: 600 }}>السنة المالية:</span>
+            <span style={{
+              padding: '4px 10px', background: 'var(--emb)',
+              borderRadius: 6, color: 'var(--em)', fontWeight: 700, fontSize: 13,
+            }}>
+              {selectedYear.name}{selectedYear.is_closed ? ' 🔒' : ''}
+            </span>
+          </div>
+        )}
 
         <div style={{ flex: 1 }} />
 
-        {fiscalYearId && (
+        {selectedYear?.id && (
           <button
             onClick={addDraftRow}
             style={{
@@ -270,17 +261,17 @@ export default function OpeningBalanceTab() {
       )}
 
       {/* ── لا سنة مختارة ── */}
-      {!fiscalYearId ? (
+      {!selectedYear ? (
         <div style={{
           textAlign: 'center', padding: '60px 20px',
           background: 'var(--bg2)', border: '1px solid var(--b1)',
           borderRadius: 12, color: 'var(--t4)',
         }}>
-          <i className="ti ti-calendar-off" style={{
+          <i className="ti ti-loader-2" style={{
             fontSize: 40, display: 'block', marginBottom: 12,
           }} />
           <div style={{ fontSize: 14, fontWeight: 600 }}>
-            اختر سنة مالية لعرض الرصيد الافتتاحي
+            جاري التحميل...
           </div>
         </div>
       ) : (
@@ -779,7 +770,7 @@ export default function OpeningBalanceTab() {
       )}
 
       {/* ── ملاحظة ── */}
-      {fiscalYearId && rows.length > 0 && (
+      {selectedYear && rows.length > 0 && (
         <div style={{
           marginTop: 12, padding: '10px 14px',
           background: 'rgba(16,185,129,.08)',

@@ -99,8 +99,20 @@ class StockMovementObserver
         // حساب السعر القانوني (سعر البيع الأدنى = سعر الشراء + 5%)
         $legalSellingPrice = round($purchasePrice * (1 + self::MAX_LEGAL_MARGIN / 100), 4);
 
-        // توليد رقم دفعة فريد
-        $lotNumber = $this->generateLotNumber($product, $movement);
+        // استخدم رقم الدفعة المدخل من المستخدم، أو توليد رقم فريد
+        $lotNumber = !empty($movement->lot_number)
+            ? $movement->lot_number
+            : $this->generateLotNumber($product, $movement);
+
+        // تأكد من تفرد رقم الدفعة (أضف لاحقة إذا كان موجوداً مسبقاً)
+        $baseLot = $lotNumber;
+        $suffix  = 0;
+        while (ProductLot::where('company_id', $movement->company_id)
+            ->where('lot_number', $lotNumber)->exists()
+        ) {
+            $suffix++;
+            $lotNumber = $baseLot . '-' . $suffix;
+        }
 
         $lot = ProductLot::create([
             'lot_number' => $lotNumber,
@@ -120,6 +132,13 @@ class StockMovementObserver
         // ربط الحركة بالدفعة
         $movement->updateQuietly(['stock_lot_id' => $lot->id]);
 
+        // ربط سطر الوثيقة بالدفعة (حتى يمكن عرض رقم الدفعة عبر relationship)
+        if ($movement->commercial_document_line_id) {
+            \App\Models\CommercialDocumentLine::withoutEvents(fn () =>
+                \App\Models\CommercialDocumentLine::where('id', $movement->commercial_document_line_id)
+                    ->update(['stock_lot_id' => $lot->id])
+            );
+        }
 
         Log::info("✅ تم إنشاء دفعة: {$lot->lot_number} للمنتج {$product->name}");
     }

@@ -39,7 +39,7 @@ class CommercialDocumentController extends BaseApiController
             'allowed_includes' => [
                 'party', 'warehouse', 'documentType', 'documentStatus',
                 'currency', 'fiscalYear', 'lines', 'lines.product',
-                'payments', 'payments.paymentMode', 'validatedBy', 'user',
+                'payments', 'payments.paymentMode', 'payments.treasuryAccount', 'validatedBy', 'user',
             ],
             'sorts' => [
                 'document_number', 'document_date', 'total_ht', 'total_ttc',
@@ -247,6 +247,39 @@ class CommercialDocumentController extends BaseApiController
             );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'validate');
+        }
+    }
+
+    public function addPayments(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
+    {
+        try {
+            $this->authorizeAction('update', $commercialDocument);
+
+            if ($commercialDocument->is_locked) {
+                return $this->errorResponse('لا يمكن إضافة دفعات لوثيقة مقفلة.', 409);
+            }
+
+            $validated = $request->validate([
+                'payments'                         => 'required|array|min:1',
+                'payments.*.payment_mode_id'       => 'required|integer',
+                'payments.*.amount'                => 'required|numeric|min:0.01',
+                'payments.*.payment_date'          => 'required|date',
+                'payments.*.reference'             => 'nullable|string|max:255',
+                'payments.*.treasury_account_id'   => 'nullable|integer',
+            ]);
+
+            $this->commercialDocumentService->attachNewPaymentsPublic(
+                $commercialDocument,
+                $validated['payments']
+            );
+
+            return $this->successResponse(
+                new CommercialDocumentResource($commercialDocument->fresh(['payments.paymentMode', 'payments.treasuryAccount', 'documentStatus'])),
+                'تمت إضافة الدفعات بنجاح'
+            );
+
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'addPayments');
         }
     }
 

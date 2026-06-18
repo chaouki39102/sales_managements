@@ -405,6 +405,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('documents/{commercialDocument}/lock',     [CommercialDocumentController::class, 'lock']);
                 Route::post('documents/{commercialDocument}/unlock',   [CommercialDocumentController::class, 'unlock']);
                 Route::post('documents/{commercialDocument}/cancel',   [CommercialDocumentController::class, 'cancel']);
+                Route::post('documents/{commercialDocument}/payments', [CommercialDocumentController::class, 'addPayments']);
                 Route::get('documents/{commercialDocument}/qrcode',    [CommercialDocumentController::class, 'generateQRCode']);
 
                 Route::apiResource('commercial-document-lines', CommercialDocumentLineController::class);

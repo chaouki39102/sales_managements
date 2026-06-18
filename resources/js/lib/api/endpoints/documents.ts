@@ -1,13 +1,23 @@
 // ════════════════════════════════════════════════════════════════════════════
-// lib/api/endpoints/documents.ts — النسخة النهائية المُصلحة
+// lib/api/endpoints/documents.ts — النسخة المُعاد هيكلتها
 //
-// ✅ التصحيحات المطبقة:
-// 1. show: إضافة جميع العلاقات (relations) المطلوبة لقراءة البيانات بشكل شامل:
-//    - lines.product, lines.product.packagings, lines.product.lots, lines.product.tva
-//    - lines.packaging, lines.stockLot
-//    - payments, payments.paymentMode, payments.treasuryAccount
-// 2. checkNumber: دالة للتحقق من تكرار رقم المستند
-// 3. دعم كامل للـ treasury_account_id في الدفعات
+// ══ التغييرات الجوهرية ═══════════════════════════════════════════════════════
+//
+// 1. DocumentCreateInput: إزالة price_level_id و apply_fiscal_stamp
+//    (الباكاند لا يستخدمهما — الطابع يُحسَب تلقائياً)
+//
+// 2. DocumentUpdateInput: انقسام إلى وضعَين:
+//    - free mode:     lines + payments كاملة (مستندات draft/pending)
+//    - additive mode: new_payments فقط (مستندات validated/paid/...)
+//
+// 3. documentsApi.addPayments(): endpoint جديد
+//    POST /{company}/documents/{id}/payments
+//    للوضع additive فقط
+//
+// 4. useDocumentMutations: إضافة addPayments mutation
+//
+// 5. show: إضافة العلاقات الكاملة المطلوبة
+//
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -24,22 +34,17 @@ import type {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface DocumentCreateInput {
-  document_type_id:  number;
-  party_id?:         number | null;
-  warehouse_id:      number;
-  fiscal_year_id:    number;
-  document_date:     string;
-  due_date?:         string | null;
-  notes?:            string | null;
-  fiscal_stamp?:     number;
-  lines?:            DocumentLineInput[];
+export interface DocumentPaymentInput {
+  payment_mode_id:      number;
+  amount:               number;
+  reference?:           string | null;
+  payment_date:         string;
+  treasury_account_id?: number | null;
 }
 
 export interface DocumentLineInput {
   id?:                    number;
-  product_variant_id?:    number | null;
-  product_id?:            number | null;
+  product_id:             number;
   description?:           string | null;
   quantity:               number;
   unit_price_ht:          number;
@@ -48,7 +53,52 @@ export interface DocumentLineInput {
   tva_rate:               number;
   packaging_id?:          number | null;
   stock_lot_id?:          number | null;
+  lot_number?:            string | null;
+  notes?:                 string | null;
 }
+
+export interface DocumentCreateInput {
+  document_type_id:  number;
+  party_id?:         number | null;
+  warehouse_id:      number;
+  fiscal_year_id:    number;
+  currency_id?:      number;
+  exchange_rate?:    number;
+  document_date:     string;
+  due_date?:         string | null;
+  notes?:            string | null;
+  lines:             DocumentLineInput[];
+  payments?:         DocumentPaymentInput[];
+  // ✅ price_level_id و apply_fiscal_stamp مُزالَان — الباكاند لا يستخدمهما
+}
+
+/** تحديث في وضع free (draft/pending) — كامل الحقول */
+export interface DocumentUpdateFreeInput {
+  party_id?:         number | null;
+  warehouse_id?:     number;
+  fiscal_year_id?:   number;
+  currency_id?:      number;
+  exchange_rate?:    number;
+  document_date?:    string;
+  due_date?:         string | null;
+  notes?:            string | null;
+  document_number?:  string;
+  lines?:            DocumentLineInput[];
+  payments?:         DocumentPaymentInput[];
+}
+
+/** تحديث في وضع additive (validated/paid/...) — دفعات جديدة فقط */
+export interface DocumentUpdateAdditiveInput {
+  party_id?:         number | null;
+  document_date?:    string;
+  due_date?:         string | null;
+  notes?:            string | null;
+  document_number?:  string;
+  /** ✅ دفعات جديدة تُضاف فوق الموجودة — لا تمس القديمة */
+  new_payments?:     DocumentPaymentInput[];
+}
+
+export type DocumentUpdateInput = DocumentUpdateFreeInput | DocumentUpdateAdditiveInput;
 
 export interface DocumentListParams extends ListParams {
   document_type_id?:  number;
@@ -63,7 +113,9 @@ export interface DocumentListParams extends ListParams {
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 export const documentsApi = {
-  // ── Documents CRUD ─────────────────────────────────────────────────────────
+
+  // ── CRUD ───────────────────────────────────────────────────────────────────
+
   list: (params?: DocumentListParams) =>
     apiGet<PaginatedResponse<CommercialDocument>>('/documents', params),
 
@@ -73,63 +125,52 @@ export const documentsApi = {
       'filter[document_type.code]': typeCode,
     }),
 
-  // ✅ show: جلب جميع العلاقات المطلوبة للتعديل
   show: (id: number) =>
     apiGet<CommercialDocument>(`/documents/${id}`, {
       include: [
-        // المستند الأساسي
         'party',
         'warehouse',
         'documentType',
         'documentStatus',
-        'fiscalStamp',
+        'fiscalYear',
+        'currency',
         'validatedBy',
         'createdBy',
-        'updatedBy',
-        'deletedBy',
-
-        // الأسطر والمنتجات
         'lines',
         'lines.product',
-        'lines.product.family',
-        'lines.product.brand',
-        'lines.product.productType',
         'lines.product.unit',
-        'lines.product.tva',           // ✅ الضريبة
-        'lines.product.packagings',    // ✅ التعبئات المتاحة
-        'lines.product.lots',          // ✅ الأكوام المتاحة
+        'lines.product.tva',
+        'lines.product.packagings',
+        'lines.product.lots',
         'lines.product.prices',
         'lines.product.prices.priceLevel',
         'lines.product.quantityDiscounts',
-
-        'lines.packaging',             // ✅ التعبئة المختارة
-        'lines.stockLot',              // ✅ الحصة المختارة
-
-        // الدفعات
-        'payments',                    // ✅ جميع الدفعات
-        'payments.paymentMode',        // ✅ طريقة الدفع
-        'payments.treasuryAccount',    // ✅ حساب الخزينة
+        'lines.packaging',
+        'lines.stockLot',
+        'payments',
+        'payments.paymentMode',
+        'payments.treasuryAccount',
       ].join(','),
     }),
 
   create: (data: DocumentCreateInput) =>
     apiPost<CommercialDocument>('/documents', data),
 
-  update: (id: number, data: Partial<DocumentCreateInput>) =>
+  update: (id: number, data: DocumentUpdateInput) =>
     apiPut<CommercialDocument>(`/documents/${id}`, data),
 
   delete: (id: number) =>
     apiDelete(`/documents/${id}`),
 
-  // ✅ التحقق من تكرار رقم المستند
   checkNumber: (params: {
-    document_number: string;
-    document_type_id: number;
-    exclude_id?: number;
+    document_number:   string;
+    document_type_id:  number;
+    exclude_id?:       number;
   }) =>
     apiGet<{ exists: boolean }>('/documents/check-number', params),
 
-  // ── Document Actions ───────────────────────────────────────────────────────
+  // ── Actions ────────────────────────────────────────────────────────────────
+
   validate: (id: number) =>
     apiPost<CommercialDocument>(`/documents/${id}/validate`),
 
@@ -139,16 +180,26 @@ export const documentsApi = {
   unlock: (id: number) =>
     apiPost<CommercialDocument>(`/documents/${id}/unlock`),
 
-  cancel: (id: number) =>
-    apiPost<CommercialDocument>(`/documents/${id}/cancel`),
+  cancel: (id: number, reason: string) =>
+    apiPost<CommercialDocument>(`/documents/${id}/cancel`, { cancellation_reason: reason }),
 
   qrcode: (id: number) =>
     apiGet<{ url: string }>(`/documents/${id}/qrcode`),
 
+  /**
+   * ✅ إضافة دفعات جديدة لمستند موجود (وضع additive).
+   * يُستخدم عندما يكون المستند معتمداً — الفرونتند يرسل new_payments.
+   *
+   * Route: POST /{company}/documents/{id}/payments
+   */
+  addPayments: (id: number, payments: DocumentPaymentInput[]) =>
+    apiPost<CommercialDocument>(`/documents/${id}/payments`, { payments }),
+
   // ── Lines ──────────────────────────────────────────────────────────────────
+
   lines: {
     list: (documentId: number) =>
-      apiGet<CommercialDocumentLine[]>(`/commercial-document-lines`, {
+      apiGet<CommercialDocumentLine[]>('/commercial-document-lines', {
         'filter[commercial_document_id]': documentId,
         include: 'product,packaging,stockLot',
       }),
@@ -201,9 +252,9 @@ export function useDocument(id: number | null | undefined) {
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export function useDocumentMutations() {
-  const slug       = useActiveSlug();
-  const qc         = useQueryClient();
-  const { selectedYear } = useFiscalYear();
+  const slug                 = useActiveSlug();
+  const qc                   = useQueryClient();
+  const { selectedYear }     = useFiscalYear();
 
   const invalidateAll = () => {
     if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
@@ -216,25 +267,56 @@ export function useDocumentMutations() {
     }
   };
 
+  const invalidatePartyBalance = (partyId?: number | null) => {
+    if (slug && partyId) {
+      qc.invalidateQueries({ queryKey: [slug, 'party-balance', partyId] });
+    }
+  };
+
+  // ── create ────────────────────────────────────────────────────────────────
+
   const create = useMutation({
     mutationFn: (data: Omit<DocumentCreateInput, 'fiscal_year_id'> & { fiscal_year_id?: number }) =>
       documentsApi.create({
         ...data,
         fiscal_year_id: data.fiscal_year_id ?? selectedYear?.id ?? 0,
       }),
-    onSuccess: invalidateAll,
+    onSuccess: (doc) => {
+      invalidateAll();
+      invalidatePartyBalance(doc.party_id);
+    },
   });
 
+  // ── update ────────────────────────────────────────────────────────────────
+
   const update = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<DocumentCreateInput> }) =>
+    mutationFn: ({ id, data }: { id: number; data: DocumentUpdateInput }) =>
       documentsApi.update(id, data),
-    onSuccess: invalidateOne,
+    onSuccess: (doc) => {
+      invalidateOne(doc);
+      invalidatePartyBalance(doc.party_id);
+    },
   });
+
+  // ── addPayments (additive mode) ───────────────────────────────────────────
+
+  const addPayments = useMutation({
+    mutationFn: ({ id, payments }: { id: number; payments: DocumentPaymentInput[] }) =>
+      documentsApi.addPayments(id, payments),
+    onSuccess: (doc) => {
+      invalidateOne(doc);
+      invalidatePartyBalance(doc.party_id);
+    },
+  });
+
+  // ── delete ────────────────────────────────────────────────────────────────
 
   const remove = useMutation({
     mutationFn: documentsApi.delete,
     onSuccess:  invalidateAll,
   });
+
+  // ── actions ───────────────────────────────────────────────────────────────
 
   const validate = useMutation({
     mutationFn: documentsApi.validate,
@@ -252,11 +334,16 @@ export function useDocumentMutations() {
   });
 
   const cancel = useMutation({
-    mutationFn: documentsApi.cancel,
-    onSuccess:  invalidateOne,
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      documentsApi.cancel(id, reason),
+    onSuccess: invalidateOne,
   });
 
-  return { create, update, remove, validate, lock, unlock, cancel, selectedYear };
+  return {
+    create, update, addPayments, remove,
+    validate, lock, unlock, cancel,
+    selectedYear,
+  };
 }
 
 // ─── Line Mutations ───────────────────────────────────────────────────────────

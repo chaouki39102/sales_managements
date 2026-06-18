@@ -5,6 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiGet }        from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
+import { useFiscalYear } from '@/context/FiscalYearContext';
 import { useWarehouses } from '@/lib/api/endpoints/lookups';
 import { fmt }           from './inventoryTypes';
 import { Th }            from './InventoryShared';
@@ -29,8 +30,6 @@ const KPI_DEFS: { key: Filter; label: string; icon: string; color: string }[] = 
   { key: 'ok',  label: 'مخزون جيد',      icon: 'ti-circle-check',   color: '#10b981'   },
 ];
 
-const today = (): string => new Date().toISOString().split('T')[0];
-
 function stockStatus(row: StockAtRow): StatusKey {
   if (row.current_stock <= 0)                   return 'out';
   if (row.current_stock <= row.min_stock_alert) return 'low';
@@ -41,9 +40,9 @@ function stockStatus(row: StockAtRow): StatusKey {
 
 export default function StockTab() {
   const slug = useActiveSlug();
+  const { selectedYear } = useFiscalYear();
 
   // ── فلاتر ──
-  const [asOfDate,    setAsOfDate]    = useState<string>(today());
   const [warehouseId, setWarehouseId] = useState<number | ''>('');
   const [search,      setSearch]      = useState('');
   const [filter,      setFilter]      = useState<Filter>('all');
@@ -55,10 +54,10 @@ export default function StockTab() {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: [
       slug, 'inventory', 'stock-at',
-      { date: asOfDate, warehouse_id: warehouseId || null, search },
+      { fiscal_year_id: selectedYear?.id, warehouse_id: warehouseId || null, search },
     ],
     queryFn: () => apiGet<StockAtRow[]>('/inventory/stock-at', {
-      date:         asOfDate,
+      ...(selectedYear?.id ? { fiscal_year_id: selectedYear.id } : {}),
       ...(warehouseId ? { warehouse_id: warehouseId } : {}),
       ...(search      ? { search }                    : {}),
     }),
@@ -88,8 +87,6 @@ export default function StockTab() {
     stock:   rows.reduce((s, r) => s + r.current_stock,    0),
     value:   rows.reduce((s, r) => s + r.total_value,      0),
   }), [rows]);
-
-  const isToday = asOfDate === today();
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -156,38 +153,21 @@ export default function StockTab() {
           />
         </div>
 
-        {/* التاريخ */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-calendar-event" style={{ color: 'var(--t3)', fontSize: 15 }} />
-          <span style={{ fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>
-            المخزون في:
-          </span>
-          <input
-            type="date"
-            value={asOfDate}
-            max={today()}
-            onChange={e => e.target.value && setAsOfDate(e.target.value)}
-            style={{
-              padding: '6px 10px',
-              background: 'var(--bg2)', border: '1px solid var(--b2)',
-              borderRadius: 8, color: 'var(--t1)', fontSize: 13,
-              fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
-            }}
-          />
-          {!isToday && (
-            <button
-              onClick={() => setAsOfDate(today())}
-              style={{
-                padding: '5px 10px', borderRadius: 8,
-                border: '1px solid var(--em)', background: 'var(--emb)',
-                color: 'var(--em)', fontSize: 11,
-                cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
-              }}
-            >
-              اليوم
-            </button>
-          )}
-        </div>
+        {/* السنة المالية */}
+        {selectedYear && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-calendar" style={{ color: 'var(--t3)', fontSize: 15 }} />
+            <span style={{ fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>
+              السنة المالية:
+            </span>
+            <span style={{
+              padding: '4px 10px', background: 'var(--emb)',
+              borderRadius: 6, color: 'var(--em)', fontWeight: 700, fontSize: 13,
+            }}>
+              {selectedYear.name}{selectedYear.is_closed ? ' 🔒' : ''}
+            </span>
+          </div>
+        )}
 
         {/* المستودع */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -279,9 +259,9 @@ export default function StockTab() {
                     fontSize: 36, display: 'block', marginBottom: 8,
                   }} />
                   لا توجد منتجات
-                  {!isToday && (
+                  {selectedYear && (
                     <div style={{ fontSize: 11, marginTop: 4 }}>
-                      لا توجد حركات أو رصيد افتتاحي حتى {asOfDate}
+                      لا توجد حركات أو رصيد افتتاحي للسنة المالية {selectedYear.name}
                     </div>
                   )}
                 </td>

@@ -13,17 +13,10 @@ import Avatar from '@/components/ui/Avatar';
 import { fmtNumber, fmtDate } from '@/lib/utils';
 import type { PartyBalance } from '@/lib/api/core/types';
 
-// ✅ تحويل أي تاريخ (ISO 8601 أو yyyy-MM-dd) إلى yyyy-MM-dd فقط
-function toDateOnly(val: string | undefined | null): string {
-    if (!val) return new Date().toISOString().split('T')[0];
-    return val.substring(0, 10);
-}
-
 export default function DebtsPage() {
     const { selectedYear } = useFiscalYear();
 
-    // ✅ إصلاح: استخدام end_date وتنظيفه من ISO timestamp
-    const [date, setDate] = useState(toDateOnly(selectedYear?.end_date));
+    const date = selectedYear?.end_date?.substring(0, 10);
     const [filterType, setFilterType] = useState<number | null>(null);
     const [search, setSearch]         = useState('');
     const [selectedBalance, setSelectedBalance] = useState<PartyBalance | null>(null);
@@ -153,13 +146,17 @@ export default function DebtsPage() {
                 subtitle="الرصيد اللحظي لكل عميل ومورد"
                 actions={
                     <>
-                        {/* ✅ إصلاح: value دائماً yyyy-MM-dd */}
-                        <input
-                            type="date"
-                            value={date}
-                            onChange={e => setDate(e.target.value)}
-                            style={{ width: 150 }}
-                        />
+                        {selectedYear && (
+                            <span style={{
+                                display: 'flex', alignItems: 'center', gap: 6,
+                                padding: '4px 12px', background: 'var(--emb)',
+                                borderRadius: 6, color: 'var(--em)', fontWeight: 700,
+                                fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                            }}>
+                                <i className="ti ti-calendar" style={{ fontSize: 14 }} />
+                                {selectedYear.name}{selectedYear.is_closed ? ' 🔒' : ''}
+                            </span>
+                        )}
                         <Button
                             size="sm"
                             variant="gray"

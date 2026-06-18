@@ -185,6 +185,7 @@ class CommercialDocument extends Model
         // المدفوعات — nested includes
         'payments',
         'payments.paymentMode',
+        'payments.treasuryAccount',
         // حركات المخزن
         'stockMovements',
         // audit

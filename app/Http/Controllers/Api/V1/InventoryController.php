@@ -34,16 +34,18 @@ class InventoryController extends BaseApiController
             $this->authorizeAction('viewAny', Product::class);
 
             $request->validate([
-                'date'         => 'nullable|date_format:Y-m-d',
-                'warehouse_id' => 'nullable|integer|exists:warehouses,id',
-                'search'       => 'nullable|string|max:100',
+                'date'           => 'nullable|date_format:Y-m-d',
+                'warehouse_id'   => 'nullable|integer|exists:warehouses,id',
+                'search'         => 'nullable|string|max:100',
+                'fiscal_year_id' => 'nullable|integer|exists:fiscal_years,id',
             ]);
 
-            $date        = $request->input('date', now()->toDateString());
-            $warehouseId = $request->input('warehouse_id');
-            $search      = $request->input('search');
+            $date         = $request->input('date', now()->toDateString());
+            $warehouseId  = $request->input('warehouse_id');
+            $search       = $request->input('search');
+            $fiscalYearId = $request->input('fiscal_year_id');
 
-            $data = $this->inventoryStockService->getStockAt($date, $warehouseId, $search);
+            $data = $this->inventoryStockService->getStockAt($date, $warehouseId, $search, $fiscalYearId);
 
             return $this->successResponse($data, 'تم جلب المخزون بنجاح');
         } catch (\Throwable $e) {

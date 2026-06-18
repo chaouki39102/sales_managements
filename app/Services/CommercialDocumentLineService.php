@@ -18,6 +18,43 @@ class CommercialDocumentLineService extends \App\Core\Services\BaseService
         return $this->resourceName;
     }
 
+    protected function beforeUpdate(Model $item, array $data, $request): void
+    {
+        parent::beforeUpdate($item, $data, $request);
+
+        $parentDoc = \App\Models\CommercialDocument::find($item->commercial_document_id);
+
+        if (!$parentDoc) {
+            throw new \App\Core\Exceptions\BusinessRuleException('الوثيقة الأم غير موجودة.', 404);
+        }
+
+        if ($parentDoc->is_locked) {
+            throw new \App\Core\Exceptions\BusinessRuleException(
+                'لا يمكن تعديل سطر في وثيقة مقفلة.',
+                409
+            );
+        }
+
+        if ($parentDoc->is_exported_to_accounting) {
+            throw new \App\Core\Exceptions\BusinessRuleException(
+                'لا يمكن تعديل سطر في وثيقة تم تصديرها للمحاسبة.',
+                409
+            );
+        }
+    }
+
+    protected function beforeDelete(Model $item): void
+    {
+        $parentDoc = \App\Models\CommercialDocument::find($item->commercial_document_id);
+
+        if ($parentDoc?->is_locked) {
+            throw new \App\Core\Exceptions\BusinessRuleException(
+                'لا يمكن حذف سطر من وثيقة مقفلة.',
+                409
+            );
+        }
+    }
+
     // ✅ بعد إنشاء سطر منفرد: إعادة حساب الوثيقة الأم
     protected function afterCreate(Model $item, array $data, $request): void
     {

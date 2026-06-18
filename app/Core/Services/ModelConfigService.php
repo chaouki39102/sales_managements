@@ -55,16 +55,8 @@ class ModelConfigService
             }
 
             // 3. Cache miss - build config from reflection data
-
-
-
-            $reflection = new \ReflectionClass($modelClass);
-            if ($reflection->hasProperty('searchableFields')) {
-                $searchable = $reflection->getStaticPropertyValue('searchableFields');
-                if (!empty($searchable) && empty($config['search_fields'])) {
-                    $config['search_fields'] = $searchable;
-                }
-            }
+            $reflectionData = self::getReflectionData($modelClass);
+            $config = self::buildConfiguration($modelClass, $reflectionData);
 
             // 4. Cache the final config
             if (self::supportsTags()) {

@@ -85,8 +85,8 @@ export interface Party {
   phone?:          string | null;
   email?:          string | null;
   balance?:        number | null;
-  price_level_id?: number | null;
-  price_level?:    { id: number; name: string } | null;
+  default_price_level_id?: number | null;
+  default_price_level?:    { id: number; name: string } | null;
 }
 
 // ─── Payment ──────────────────────────────────────────────────────────────────

@@ -26,6 +26,8 @@ class TreasuryAccountResource extends JsonResource
             'current_balance'         => $this->current_balance,
             'is_default'              => $this->is_default,
             'active'                  => $this->active,
+            'is_active'               => $this->active,
+            'type'                    => $this->treasuryAccountType?->name,
             'notes'                   => $this->notes,
             'created_by'              => $this->created_by,
             'updated_by'              => $this->updated_by,

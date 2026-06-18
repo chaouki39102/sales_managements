@@ -40,6 +40,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     protected array $defaultWith = [
         'documentType', 'party', 'warehouse',
         'currency', 'documentStatus', 'lines.product',
+        'lines.packaging',
     ];
 
     protected function getResourceName(): string
@@ -151,12 +152,42 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     {
         parent::beforeUpdate($item, $data, $request);
 
+        // R1
         if ($item->is_locked) {
             throw new BusinessRuleException('لا يمكن تعديل وثيقة مقفلة.', 409);
         }
 
+        // R2
         if ($item->is_exported_to_accounting) {
             throw new BusinessRuleException('لا يمكن تعديل وثيقة تم تصديرها للمحاسبة.', 409);
+        }
+
+        // R3: لا تسمح بتغيير رقم المستند إذا كان مُعتمداً
+        if (!empty($data['document_number']) && $data['document_number'] !== $item->document_number) {
+            $currentStatusName = $item->documentStatus?->name
+                ?? DocumentStatus::where('id', $item->document_status_id)->value('name');
+            $validatedStatuses = ['validated', 'paid', 'partially_paid', 'overdue'];
+            if (in_array($currentStatusName, $validatedStatuses, true)) {
+                throw new BusinessRuleException(
+                    'لا يمكن تغيير رقم مستند معتمد. رقم المستند محمي بعد الاعتماد.',
+                    409
+                );
+            }
+        }
+
+        // R4: إذا كانت الوثيقة معتمدة وجاءت lines في الطلب → رفض
+        // new_payments مسموح
+        $hasLines = !empty($data['lines']) || !empty($request?->input('lines'));
+        if ($hasLines) {
+            $currentStatusName = $item->documentStatus?->name
+                ?? DocumentStatus::where('id', $item->document_status_id)->value('name');
+            $protectedStatuses = ['validated', 'paid', 'partially_paid', 'overdue'];
+            if (in_array($currentStatusName, $protectedStatuses, true)) {
+                throw new BusinessRuleException(
+                    'لا يمكن تعديل أسطر مستند معتمد. الأسطر محمية بعد الاعتماد. استخدم مستند تصحيح أو مرتجع.',
+                    409
+                );
+            }
         }
     }
 
@@ -169,14 +200,43 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     protected function afterUpdate(Model $item, array $data, $request): void
     {
-        $lines = $request?->input('lines') ?? $data['lines'] ?? [];
+        $lines       = $request?->input('lines')        ?? $data['lines']        ?? [];
+        $newPayments = $request?->input('new_payments')  ?? $data['new_payments'] ?? [];
+        $payments    = $request?->input('payments')      ?? $data['payments']     ?? [];
 
+        // AU1: تحديث الأسطر
         if (!empty($lines)) {
+            // ✅ حذف حركات المخزون المرتبطة أولاً (قبل حذف الأسطر)
+            $this->deleteStockMovementsForDocument($item);
+
+            // ✅ حذف الأسطر القديمة
             $item->lines()->delete();
+
+            // ✅ إنشاء الأسطر الجديدة
             $this->createDocumentLines($item, $lines);
         }
 
+        // إعادة حساب الإجماليات دائماً
         $this->recalculateTotals($item);
+
+        // ✅ إعادة إنشاء حركات المخزون إذا تغيرت الأسطر
+        if (!empty($lines)) {
+            $item->load('documentType', 'lines.product');
+            if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
+                $this->createStockMovements($item);
+            }
+        }
+
+        // AU2: دفعات جديدة (additive mode)
+        if (!empty($newPayments)) {
+            $this->attachNewPayments($item, $newPayments);
+        }
+
+        // دفعات كاملة (free mode — تُستبدَل الكاملة)
+        if (!empty($payments) && empty($newPayments)) {
+            $item->payments()->detach();
+            $this->attachPayments($item, $payments);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -236,6 +296,14 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             'cancellation_reason' => $reason,
             'document_status_id'  => $this->getStatusId($document->company_id, 'cancelled'),
         ]);
+    }
+
+    /**
+     * إضافة دفعات جديدة لمستند (وضع additive — لا تمس القديمة)
+     */
+    public function attachNewPaymentsPublic(CommercialDocument $document, array $payments): void
+    {
+        $this->attachNewPayments($document, $payments);
     }
 
     /**
@@ -331,17 +399,32 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $amount = (float) $paymentData['amount'];
             if ($amount <= 0) continue;
 
+            // ✅ FIX1-3: إضافة الحقول المفقودة من المستند
             $payment = \App\Models\Payment::create([
-                'company_id'      => $document->company_id,
-                'payment_mode_id' => (int) $paymentData['payment_mode_id'],
-                'amount'          => $amount,
-                'payment_date'    => $paymentData['payment_date'] ?? $document->document_date,
-                'reference'       => $paymentData['reference'] ?? null,
-                'notes'           => $paymentData['notes'] ?? null,
-                'user_id'         => auth()->id(),
+                'company_id'         => $document->company_id,
+                'payment_mode_id'    => (int) $paymentData['payment_mode_id'],
+                'treasury_account_id'=> isset($paymentData['treasury_account_id'])
+                                            ? (int) $paymentData['treasury_account_id']
+                                            : null,
+                'amount'             => $amount,
+                'payment_date'       => $paymentData['payment_date'] ?? $document->document_date,
+                'reference'          => $paymentData['reference'] ?? null,
+                'notes'              => $paymentData['notes'] ?? null,
+                'user_id'            => auth()->id(),
+                // ✅ FIX1: fiscal_year_id من المستند
+                'fiscal_year_id'     => $document->fiscal_year_id,
+                // ✅ FIX2: party_id من المستند
+                'party_id'           => $document->party_id,
+                // ✅ FIX3: currency_id من المستند
+                'currency_id'        => $document->currency_id,
+                // ✅ FIX4: payment_number تلقائي
+                'payment_number'     => $this->generatePaymentNumber($document->company_id),
+                // ✅ FIX5: status = confirmed
+                'status'             => 'confirmed',
             ]);
 
             $document->payments()->attach($payment->id, [
+                'company_id'     => $document->company_id,
                 'amount_applied' => $amount,
                 'notes'          => $paymentData['notes'] ?? null,
             ]);
@@ -349,6 +432,51 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
         // ✅ إعادة حساب paid_amount و remaining_amount بعد ربط الدفعات
         $this->recalculatePaymentAmounts($document);
+    }
+
+    private function attachNewPayments(CommercialDocument $document, array $payments): void
+    {
+        // نفس منطق attachPayments تماماً — لكن لا تحذف القديمة
+        $this->attachPayments($document, $payments);
+    }
+
+    private function deleteStockMovementsForDocument(CommercialDocument $document): void
+    {
+        try {
+            // جلب IDs الأسطر
+            $lineIds = $document->lines()->pluck('id');
+            if ($lineIds->isEmpty()) return;
+
+            // حذف حركات المخزون المرتبطة
+            \App\Models\StockMovement::whereIn('commercial_document_line_id', $lineIds)
+                ->delete();
+
+        } catch (\Throwable $e) {
+            Log::warning("deleteStockMovementsForDocument: فشل حذف حركات المخزون للوثيقة #{$document->id}", [
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    private function generatePaymentNumber(int $companyId): string
+    {
+        return DB::transaction(function () use ($companyId) {
+            $year = date('Y');
+            $last = \App\Models\Payment::where('company_id', $companyId)
+                ->where('payment_number', 'like', "PAY-{$year}-%")
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+
+            $seq = 1;
+            if ($last && $last->payment_number) {
+                $parts = explode('-', $last->payment_number);
+                $seq   = ((int) end($parts)) + 1;
+            }
+
+            return sprintf('PAY-%s-%06d', $year, $seq);
+        });
     }
 
     private function recalculatePaymentAmounts(CommercialDocument $document): void
@@ -441,6 +569,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'total_price'                 => round((float) $line->quantity * $costPrice, 4),
                 'movement_date'               => $document->document_date,
                 'price_source'                => $direction < 0 ? 'sale' : 'purchase',
+                'lot_number'                  => $line->lot_number ?? null,
                 'is_validated'                => true,
                 'user_id'                     => auth()->id(),
                 'stock_balance_after'         => 0, // يُحدَّث بـ StockMovementObserver

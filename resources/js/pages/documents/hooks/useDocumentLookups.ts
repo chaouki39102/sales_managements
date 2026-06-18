@@ -54,7 +54,7 @@ export function useDocumentLookups({
     queryKey:  [slug, 'modal-parties', isPurchase],
     queryFn:   () => apiGet<unknown>(
       isPurchase ? '/suppliers' : '/customers',
-      { per_page: 1000, include: 'priceLevel' },
+      { per_page: 1000, include: 'defaultPriceLevel' },
     ).then(extractList),
     enabled:   open && needsParty && !!slug,
     staleTime: 5 * 60_000,
@@ -131,10 +131,9 @@ export function useDocumentLookups({
   // ── Treasury Accounts ────────────────────────────────────────────────────────
 
   const { data: treasuryAccountsRaw = [] } = useQuery({
-    queryKey:  [slug, 'modal-treasury-accounts'],
+    queryKey:  [slug, 'modal-treasury-accounts-v2'],
     queryFn:   () => apiGet<unknown>('/treasury-accounts', {
       per_page: 100,
-      'filter[is_active]': 1,
     }).then(extractList),
     enabled:   open && !!slug,
     staleTime: 10 * 60_000,

@@ -1,21 +1,39 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/documents/CommercialDocumentModal.tsx — النسخة النهائية المُصلحة
+// pages/documents/CommercialDocumentModal.tsx — إعادة هيكلة كاملة
 //
-// ✅ الإصلاحات النهائية:
-// • تفريق منطق التعطيل:
-//   - disableFields  : الحقول الأساسية (الزبون، التواريخ، المستودع، ...) — معطلة فقط للـ locked/cancelled
-//   - disableLines   : الأسطر — معطلة للمعتمدة (validated) وكذلك locked/cancelled
-//   - disableForm    : الملاحظات والطابع — معطلة فقط للـ locked/cancelled
-//   - disablePayments: الدفعات — معطلة فقط للـ cancelled (والـ locked إن أردت)
-// • زر إضافة سطر يعتمد على !disableLines
-// • زر إضافة دفعة يعتمد على !isCancelled (أي غير ملغى)
-// • حساب الخزينة يظهر اسم الحساب مع خيار الاختيار اليدوي عند عدم وجود حساب تلقائي
-// • رسائل تحذير لتغيير الزبون عند وجود أسطر وتغيير فئة السعر
-// • دعم كامل لـ useDocumentForm المُحسَّن
+// ══ سيناريوهات مُغطَّاة في هذا الملف ════════════════════════════════════════
+//
+// [حالة المستند]
+//  draft/pending   → كامل الحرية (حقول + أسطر + دفعات)
+//  validated/paid  → الأسطر للقراءة، الدفعات إضافية فقط، الحقول حرة
+//  locked          → قراءة فقط كاملة (شارة مقفل)
+//  cancelled       → قراءة فقط كاملة (شارة ملغى)
+//
+// [الدفعات — additive mode]
+//  الدفعات القديمة → جدول للقراءة (لا حذف، لا تعديل)
+//  الدفعات الجديدة → نموذج قابل للتعديل مع تحقق كامل
+//  زر "إضافة دفعة" → ظاهر فقط في free/additive
+//
+// [تغيير المتعامل]
+//  يُستدعى handlePartyChange → إذا blocked تُعرض AlertBanner واضحة
+//  أنواع الحجب: existing_payments / has_payments / price_level_change
+//
+// [فئة السعر]
+//  تغيير فئة السعر → handlePriceLevelChange → إعادة حساب أسعار كل الأسطر
+//
+// [رصيد المتعامل]
+//  يُعرَض في Section "معلومات المستند" بعد اختيار الزبون
+//  debit (مدين لنا): أخضر  |  credit (نحن مدينون): أحمر
+//  تحذير إذا كان الرصيد > netToPay × 2
+//
+// [payload]
+//  free mode   → lines + payments كاملة
+//  additive    → لا lines، فقط new_payments
+//  locked      → حفظ محجوب
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
@@ -24,21 +42,20 @@ import type { DocumentType } from '@/lib/api/core/types';
 
 import { useDocumentLookups }  from './hooks/useDocumentLookups';
 import { useDocumentForm }     from './hooks/useDocumentForm';
+import type { PartyChangeResult } from './hooks/useDocumentForm';
 import { DocumentLineRow }     from './components/DocumentLineRow';
 import {
   Section, Label, FieldError, Toggle, TotalCard,
   ComboBox, ColumnManager, AlertBanner,
 } from './components/DocumentUIPrimitives';
+import { ALL_COLUMNS, PURCHASE_CODES } from './types/document.types';
+import type { ColKey, PaymentEntry } from './types/document.types';
 import {
-  ALL_COLUMNS, PURCHASE_CODES,
-} from './types/document.types';
-import type { ColKey } from './types/document.types';
-import {
-  fmtDZD, loadVisibleCols, saveVisibleCols,
+  fmtDZD, fmtDate, loadVisibleCols, saveVisibleCols,
   validateLineStock, toNum,
 } from './utils/document.utils';
 
-// ─── Props ────────────────────────────────────────────────────────────────────
+// ─── Props ─────────────────────────────────────────────────────────────────────
 
 interface CommercialDocumentModalProps {
   open:               boolean;
@@ -46,6 +63,153 @@ interface CommercialDocumentModalProps {
   existingDocument?:  Record<string, unknown>;
   onClose:            () => void;
   onSaved:            () => void;
+}
+
+// ─── PartyBalanceBadge ────────────────────────────────────────────────────────
+
+function PartyBalanceBadge({
+  balance,
+  isLoading,
+  partyLabel,
+}: {
+  balance:    import('./hooks/useDocumentForm').PartyBalanceInfo | null;
+  isLoading:  boolean;
+  partyLabel: string;
+}) {
+  if (isLoading) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '6px 10px', borderRadius: 'var(--r2)',
+        background: 'var(--bg3)', border: '1px solid var(--b2)',
+        fontSize: 11, color: 'var(--t4)', marginTop: 6,
+      }}>
+        <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 12 }} />
+        جاري تحميل رصيد {partyLabel}...
+      </div>
+    );
+  }
+
+  if (!balance) return null;
+
+  const isDebit    = balance.balance_type === 'debit';
+  const color      = isDebit ? 'var(--green)' : 'var(--red)';
+  const bg         = isDebit ? 'var(--greenb)' : 'var(--redb)';
+  const icon       = isDebit ? 'ti-trending-up' : 'ti-trending-down';
+  const typeLabel  = isDebit ? 'مدين لنا' : 'نحن مدينون';
+
+  return (
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6, alignItems: 'center',
+    }}>
+      {/* الرصيد الحالي */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '5px 10px', borderRadius: 'var(--r2)',
+        background: bg, border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
+        fontSize: 12,
+      }}>
+        <i className={`ti ${icon}`} style={{ color, fontSize: 13 }} />
+        <span style={{ color: 'var(--t3)' }}>رصيد {partyLabel}:</span>
+        <span style={{ fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>
+          {fmtDZD(balance.current_balance)} دج
+        </span>
+        <span style={{
+          padding: '1px 6px', borderRadius: 99, fontSize: 10, fontWeight: 700,
+          background: color, color: 'white',
+        }}>
+          {typeLabel}
+        </span>
+      </div>
+
+      {/* تفاصيل */}
+      <div style={{
+        display: 'flex', gap: 8, fontSize: 10.5, color: 'var(--t4)', flexWrap: 'wrap',
+      }}>
+        <span>رصيد افتتاحي: <b>{fmtDZD(balance.opening_balance)}</b></span>
+        <span>·</span>
+        <span>مستندات: <b>{fmtDZD(balance.documents_balance)}</b></span>
+        <span>·</span>
+        <span>دفعات: <b>{fmtDZD(balance.payments_total)}</b></span>
+      </div>
+    </div>
+  );
+}
+
+// ─── ExistingPaymentsTable ────────────────────────────────────────────────────
+// عرض الدفعات القديمة للقراءة فقط في additive mode
+
+function ExistingPaymentsTable({
+  payments,
+  paymentModes,
+  treasuryAccountMap,
+}: {
+  payments:           PaymentEntry[];
+  paymentModes:       Array<{ id: number; name: string }>;
+  treasuryAccountMap: Map<number, { id: number; name: string; type: string }>;
+}) {
+  if (payments.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{
+        padding: '6px 10px', fontSize: 10.5, fontWeight: 800,
+        color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: 0.4,
+        borderBottom: '1px solid var(--b1)', marginBottom: 6,
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        <i className="ti ti-lock" style={{ fontSize: 11 }} />
+        دفعات مُسجَّلة (للقراءة)
+        <span style={{
+          padding: '1px 6px', borderRadius: 99, fontSize: 10,
+          background: 'var(--bg3)', color: 'var(--t4)',
+        }}>
+          {payments.length}
+        </span>
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <thead>
+          <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--b2)' }}>
+            {['طريقة الدفع', 'المبلغ', 'المرجع', 'التاريخ', 'الحساب'].map((h) => (
+              <th key={h} style={{
+                padding: '5px 8px', textAlign: 'right', fontSize: 10.5,
+                fontWeight: 700, color: 'var(--t4)',
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {payments.map((pay, idx) => {
+            const mode = paymentModes.find((pm) => String(pm.id) === pay.payment_mode_id);
+            const taId = pay.treasury_account_id ? parseInt(String(pay.treasury_account_id)) : null;
+            const ta   = taId ? treasuryAccountMap.get(taId) : null;
+            return (
+              <tr key={idx} style={{ borderBottom: '1px solid var(--b1)' }}>
+                <td style={{ padding: '6px 8px', color: 'var(--t2)' }}>
+                  {mode?.name ?? `#${pay.payment_mode_id}`}
+                </td>
+                <td style={{
+                  padding: '6px 8px', fontWeight: 700, color: 'var(--green)',
+                  direction: 'ltr', textAlign: 'right',
+                }}>
+                  {fmtDZD(pay.amount)} دج
+                </td>
+                <td style={{ padding: '6px 8px', color: 'var(--t4)', fontSize: 11 }}>
+                  {pay.reference || '—'}
+                </td>
+                <td style={{ padding: '6px 8px', color: 'var(--t3)', fontSize: 11 }}>
+                  {fmtDate(pay.payment_date)}
+                </td>
+                <td style={{ padding: '6px 8px', color: 'var(--t4)', fontSize: 11 }}>
+                  {ta ? `${ta.name}` : pay.treasury_account_id ? `#${pay.treasury_account_id}` : '—'}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -66,53 +230,7 @@ export default function CommercialDocumentModal({
   const isPurchase = PURCHASE_CODES.has(docCode);
   const isEdit     = !!existingDocument;
 
-  // ─── Status flags ───────────────────────────────────────────────────────────
-  //
-  // منطق الحالات:
-  //   1. is_locked      → مُجمَّد تماماً (لا تعديل على أي شيء)
-  //   2. status=cancelled → ملغى (قراءة فقط)
-  //   3. validated/paid/... → معتمد (يمكن تعديل الحقول الأساسية وإضافة دفعات، لكن الأسطر مجمَّدة)
-  //   4. draft/pending  → حر التعديل
-
-  const docStatusName = String(
-    (existingDocument?.document_status as Record<string, unknown> | undefined)?.name
-    ?? existingDocument?.status
-    ?? '',
-  ).toLowerCase();
-
-  const isLocked    = !!(existingDocument?.is_locked);
-  const isCancelled = docStatusName === 'cancelled' || docStatusName === 'returned';
-
-  const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
-  const isValidated = !isLocked && VALIDATED_STATUSES.has(docStatusName);
-
-  // ✅ منطق التعطيل المُفصَّل:
-  const disableForm           = isLocked || isCancelled;          // الملاحظات والطابع
-  const disableFields         = isLocked || isCancelled;          // الحقول الأساسية (الزبون، التواريخ، المستودع، ...)
-  const disableLines          = isLocked || isCancelled; // الأسطر (المعتمدة + المقفولة + الملغاة)
-  const disablePayments       = isCancelled;                      // الدفعات (فقط الملغاة، أما المعتمدة فمسموح)
-
-  const isDisabledCompletely  = isCancelled;                      // للتصميم (تلوين خافت)
-
-  // ─── حالة تحذير تغيير الزبون ────────────────────────────────────────────────
-
-  const [partyChangeWarning, setPartyChangeWarning] = useState('');
-
-  // ─── Document number state ─────────────────────────────────────────────────
-
-  const [docNumber, setDocNumber] = useState<string>('');
-  const [docNumberErr, setDocNumberErr] = useState('');
-  const [checkingDocNumber, setCheckingDocNumber] = useState(false);
-
-  useEffect(() => {
-    if (isEdit && existingDocument?.document_number) {
-      setDocNumber(String(existingDocument.document_number));
-    } else {
-      setDocNumber('');
-    }
-  }, [isEdit, existingDocument?.document_number, open]);
-
-  // ─── Column visibility ─────────────────────────────────────────────────────
+  // ─── Column visibility ────────────────────────────────────────────────────
 
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(
     () => loadVisibleCols(slug ?? 'default'),
@@ -122,24 +240,31 @@ export default function CommercialDocumentModal({
     saveVisibleCols(slug ?? 'default', cols);
   };
 
-  // ─── Lookups ───────────────────────────────────────────────────────────────
+  // ─── Lookups ──────────────────────────────────────────────────────────────
 
   const lookups = useDocumentLookups({
     open,
     isPurchase,
-    needsParty: true,
+    needsParty:  true,
     warehouseId:  null,
     fiscalYearId: selectedYear?.id ?? null,
   });
 
+  // ─── Form ─────────────────────────────────────────────────────────────────
+
   const {
     form, errors, lineErr, apiErr, setApiErr,
-    set, handlePartyChange, priceLevelId,
+    set, handlePartyChange, handlePriceLevelChange, priceLevelId,
     addLine, removeLine, duplicateLine, updateLine,
+    paymentMode: pmMode,
+    existingPayments,
+    newPayments,
     addPayment, removePayment, updatePayment,
+    partyBalance, isLoadingBalance,
     totals, validate, buildPayload,
     updateStockData,
     needsParty, affectsStock, stockDir,
+    isReadOnly, isLinesReadOnly,
   } = useDocumentForm({
     documentType,
     existingDocument,
@@ -149,80 +274,137 @@ export default function CommercialDocumentModal({
     selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
     paymentModes:       lookups.paymentModes,
     parties:            lookups.parties,
+    products:           lookups.products,
     stockData:          {},
     isPurchase,
     open,
-    existingPaymentsCount: ((existingDocument?.payments as unknown[]) ?? []).length,
   });
 
-  // ─── Stock query ────────────────────────────────────────────────────────────
+  // ─── حالة المستند ─────────────────────────────────────────────────────────
+
+  const docStatusName = String(
+    (existingDocument?.document_status as Record<string, unknown> | undefined)?.name
+    ?? existingDocument?.status
+    ?? '',
+  ).toLowerCase();
+
+  const isLocked    = !!(existingDocument?.is_locked);
+  const isCancelled = docStatusName === 'cancelled' || docStatusName === 'returned';
+  const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
+  const isValidated = !isLocked && !isCancelled && VALIDATED_STATUSES.has(docStatusName);
+
+  // ─── Stock query ──────────────────────────────────────────────────────────
 
   const warehouseIdNum = form.warehouse_id ? parseInt(form.warehouse_id) : null;
+  const docDate        = form.document_date || undefined;
   const { data: stockData = {} } = useQuery<Record<number, number>>({
-    queryKey: [slug, 'warehouse-stock', warehouseIdNum, selectedYear?.id],
+    queryKey: [slug, 'warehouse-stock', warehouseIdNum, selectedYear?.id, docDate],
     queryFn:  () =>
       apiGet<unknown[]>('/inventory/stock-at', {
         warehouse_id:   warehouseIdNum,
         fiscal_year_id: selectedYear?.id,
+        date:           docDate,
       }).then((rows) =>
         Object.fromEntries(
           (rows as Array<{ id: number; current_stock: number }>)
             .map((r) => [r.id, r.current_stock ?? 0]),
         ),
       ),
-    enabled:   !!slug && !!warehouseIdNum && !isPurchase,
-    staleTime: 2 * 60_000,
+    enabled:          !!slug && !!warehouseIdNum && !isPurchase,
+    staleTime:        2 * 60_000,
+    placeholderData:  keepPreviousData,
   });
 
   useEffect(() => { updateStockData(stockData); }, [stockData, updateStockData]);
 
-  // ─── Success state ─────────────────────────────────────────────────────────
+  // ─── Document number ──────────────────────────────────────────────────────
 
-  const [successMsg, setSuccessMsg] = useState('');
-  const successTimer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
+  const [docNumber,         setDocNumber]         = useState('');
+  const [docNumberErr,      setDocNumberErr]       = useState('');
+  const [checkingDocNumber, setCheckingDocNumber]  = useState(false);
 
-  // ─── Mutations ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    setDocNumber(isEdit && existingDocument?.document_number
+      ? String(existingDocument.document_number)
+      : '');
+  }, [isEdit, existingDocument?.document_number, open]);
 
   const checkDocNumberMut = useMutation({
     mutationFn: async (number: string) => {
       if (!slug || !documentType?.id || !number) return { exists: false };
-      const res = await apiGet<{ exists: boolean }>('/documents/check-number', {
-        document_number:   number,
-        document_type_id:  documentType.id,
-        exclude_id:        isEdit ? existingDocument?.id : undefined,
+      return apiGet<{ exists: boolean }>('/documents/check-number', {
+        document_number:  number,
+        document_type_id: documentType.id,
+        exclude_id:       isEdit ? existingDocument?.id : undefined,
       });
-      return res;
     },
   });
 
   const handleDocNumberChange = async (newNum: string) => {
     setDocNumber(newNum);
     setDocNumberErr('');
-
-    if (!newNum.trim()) {
-      setDocNumberErr('رقم المستند إلزامي');
-      return;
-    }
-
+    if (!newNum.trim()) { setDocNumberErr('رقم المستند إلزامي'); return; }
     setCheckingDocNumber(true);
     try {
       const result = await checkDocNumberMut.mutateAsync(newNum);
-      if (result.exists) {
-        setDocNumberErr('رقم المستند موجود بالفعل');
-      }
-    } catch (e) {
-      // ignore
-    } finally {
-      setCheckingDocNumber(false);
+      if (result.exists) setDocNumberErr('رقم المستند موجود بالفعل');
+    } catch { /* ignore */ }
+    finally { setCheckingDocNumber(false); }
+  };
+
+  // ─── تحذير تغيير المتعامل ─────────────────────────────────────────────────
+
+  const [partyChangeWarning, setPartyChangeWarning] = useState<{
+    message:   string;
+    blockType: PartyChangeResult['blockType'];
+  } | null>(null);
+
+  const handlePartyChangeWithWarning = (id: string) => {
+    setPartyChangeWarning(null);
+    const result = handlePartyChange(id);
+    if (result.blocked) {
+      setPartyChangeWarning({
+        message:   result.reason ?? 'لا يمكن تغيير المتعامل الآن',
+        blockType: result.blockType,
+      });
     }
   };
 
-  // حفظ المستند
+  // ─── Success state ────────────────────────────────────────────────────────
+
+  const [successMsg, setSuccessMsg] = useState('');
+  const successTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
+
+  // ─── Mutations ────────────────────────────────────────────────────────────
+
   const saveMut = useMutation({
     mutationFn: () => {
       const payload = buildPayload();
-      const url     = isEdit ? `/documents/${existingDocument!.id}` : '/documents';
+
+      // ✅ وضع additive: حفظ الحقول الأساسية + الدفعات الجديدة (إن وجدت)
+      if (pmMode === 'additive' && isEdit) {
+        const basePayload = { ...payload };
+        delete basePayload.new_payments;
+        delete basePayload.lines;
+        const newPaymentsPayload = (payload.new_payments ?? []) as Array<Record<string, unknown>>;
+        if (newPaymentsPayload.length === 0) {
+          // لا دفعات جديدة — حفظ الحقول الأخرى فقط (ملاحظات، تاريخ، ...)
+          return apiPut<Record<string, unknown>>(`/documents/${existingDocument!.id}`, basePayload);
+        }
+        // هناك دفعات جديدة + حقول أساسية — إرسال كلٍّ على حدة
+        return (async () => {
+          await apiPut<Record<string, unknown>>(`/documents/${existingDocument!.id}`, basePayload);
+          const result = await apiPost<Record<string, unknown>>(
+            `/documents/${existingDocument!.id}/payments`,
+            { payments: newPaymentsPayload },
+          );
+          return result;
+        })();
+      }
+
+      // ✅ وضع free: إرسال كامل
+      const url = isEdit ? `/documents/${existingDocument!.id}` : '/documents';
       if (isEdit && docNumber) {
         (payload as Record<string, unknown>).document_number = docNumber;
       }
@@ -236,6 +418,10 @@ export default function CommercialDocumentModal({
         if (affectsStock) {
           qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
         }
+        // تحديث رصيد المتعامل
+        if (form.party_id) {
+          qc.invalidateQueries({ queryKey: [slug, 'party-balance', parseInt(form.party_id)] });
+        }
       }
       const docNum = String((savedDoc as Record<string, unknown>)?.document_number ?? '—');
       setSuccessMsg(isEdit ? `تم تحديث المستند ${docNum}` : `تم إنشاء المستند ${docNum} ✓`);
@@ -247,74 +433,63 @@ export default function CommercialDocumentModal({
     },
     onError: (e: unknown) => {
       const err = e as Record<string, unknown>;
-      setApiErr(String(err?.message ?? 'حدث خطأ أثناء الحفظ'));
+      const errMsg = err?.message ?? 'حدث خطأ أثناء الحفظ';
+      // استخراج رسائل validation من Laravel
+      const validationErrors = (err as Record<string, unknown>)?.errors as Record<string, string[]> | undefined;
+      if (validationErrors) {
+        const firstMsg = Object.values(validationErrors).flat()[0];
+        setApiErr(firstMsg ?? String(errMsg));
+      } else {
+        setApiErr(String(errMsg));
+      }
     },
   });
 
   const deleteMut = useMutation({
     mutationFn: () => apiDelete(`/documents/${existingDocument!.id}`),
     onSuccess: () => {
-      if (slug) {
-        qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
-      }
+      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
       setSuccessMsg('تم حذف المستند بنجاح');
       successTimer.current = setTimeout(() => {
-        setSuccessMsg('');
-        onSaved();
-        onClose();
+        setSuccessMsg(''); onSaved(); onClose();
       }, 1500);
     },
     onError: (e: unknown) => {
       const err = e as Record<string, unknown>;
-      setApiErr(String(err?.message ?? 'حدث خطأ أثناء الحذف'));
+      setApiErr(String(err?.message ?? 'لا يمكن حذف هذا المستند — استخدم الإلغاء بدلاً من الحذف'));
     },
   });
 
-  const handleDelete = () => {
-    if (window.confirm('هل أنت متأكد من حذف هذا المستند؟')) {
-      deleteMut.mutate();
-    }
-  };
-
   const handleSave = () => {
     setApiErr('');
-    if (isEdit) {
-      if (!docNumber.trim()) {
-        setDocNumberErr('رقم المستند إلزامي');
-        return;
-      }
-      if (docNumberErr) {
-        setApiErr('رجاء التحقق من رقم المستند');
-        return;
-      }
+    if (isReadOnly) return;
+    if (isEdit && !docNumber.trim()) {
+      setDocNumberErr('رقم المستند إلزامي'); return;
     }
+    if (docNumberErr) { setApiErr('رجاء التحقق من رقم المستند'); return; }
     if (validate()) saveMut.mutate();
   };
 
-  // ✅ handlePartyChange المُحسَّن مع رسالة تحذير
-  const handlePartyChangeWithWarning = (id: string) => {
-    setPartyChangeWarning('');
-    const result = handlePartyChange(id);
-    if (result.blocked) {
-      setPartyChangeWarning(result.reason ?? 'لا يمكن تغيير الزبون الآن');
-    }
+  const handleDelete = () => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا المستند؟\n\nملاحظة: الحذف غير مدعوم — استخدم الإلغاء.')) return;
+    deleteMut.mutate();
   };
 
   const isPending = saveMut.isPending || deleteMut.isPending || checkingDocNumber;
 
-  // ─── Party options ─────────────────────────────────────────────────────────
+  // ─── Memos ────────────────────────────────────────────────────────────────
 
   const partyOptions = useMemo(() =>
     lookups.parties.map((p) => ({
       id:    p.id,
       label: p.name,
-      sub:   [p.code, p.phone].filter(Boolean).join(' · '),
-      badge: p.price_level?.name,
+      sub:   [(p as Record<string, unknown>).code, (p as Record<string, unknown>).phone].filter(Boolean).join(' · '),
+      badge: (p as Record<string, unknown>).default_price_level
+        ? ((p as Record<string, unknown>).default_price_level as Record<string, unknown>).name as string
+        : undefined,
     })),
     [lookups.parties],
   );
-
-  // ─── Price level options ────────────────────────────────────────────────────
 
   const priceLevelOptions = useMemo(() =>
     lookups.priceLevels.map((pl) => ({
@@ -324,35 +499,55 @@ export default function CommercialDocumentModal({
     [lookups.priceLevels],
   );
 
-  // ─── Payment mode options ───────────────────────────────────────────────────
-
   const paymentModeOptions = useMemo(() =>
     lookups.paymentModes.map((pm) => ({
-      id:    pm.id,
-      label: pm.name,
-      code:  pm.code,
-      icon:  pm.icon,
+      id:                  pm.id,
+      label:               pm.name,
       treasury_account_id: pm.treasury_account_id,
+      requires_reference:  pm.requires_reference,
     })),
     [lookups.paymentModes],
   );
 
-  // ✅ خريطة حسابات الخزينة id → name
   const treasuryAccountMap = useMemo(
     () => new Map(lookups.treasuryAccounts.map((ta) => [ta.id, ta])),
     [lookups.treasuryAccounts],
   );
 
-  // ─── Stock badge ────────────────────────────────────────────────────────────
+  const selectedParty = useMemo(
+    () => lookups.parties.find((p) => String(p.id) === form.party_id),
+    [lookups.parties, form.party_id],
+  );
 
   const stockBadge = useMemo(() => {
     if (!affectsStock) return null;
     return stockDir > 0
-      ? { text: 'يضيف مخزون',   bg: 'var(--greenb)', color: 'var(--green)' }
-      : { text: 'يخصم مخزون',   bg: 'var(--redb)',   color: 'var(--red)'   };
+      ? { text: 'يضيف مخزون', bg: 'var(--greenb)', color: 'var(--green)' }
+      : { text: 'يخصم مخزون', bg: 'var(--redb)',   color: 'var(--red)'   };
   }, [affectsStock, stockDir]);
 
-  // ─── Modal guard ────────────────────────────────────────────────────────────
+  // P8: تحذير مجموع الدفعات > netToPay
+  const paymentsExceedWarning = useMemo(() => {
+    const allPaid = [...existingPayments, ...newPayments]
+      .reduce((acc, p) => acc + toNum(p.amount), 0);
+    if (allPaid > totals.netToPay + 0.01 && totals.netToPay > 0) {
+      return `مجموع الدفعات (${fmtDZD(allPaid)} دج) يتجاوز المبلغ المستحق (${fmtDZD(totals.netToPay)} دج)`;
+    }
+    return null;
+  }, [existingPayments, newPayments, totals.netToPay]);
+
+  // تحذير رصيد المتعامل الكبير
+  const balanceWarning = useMemo(() => {
+    if (!partyBalance || partyBalance.current_balance <= 0) return null;
+    if (partyBalance.balance_type !== 'debit') return null; // نحن ندين → لا تحذير
+    if (totals.netToPay <= 0) return null;
+    if (partyBalance.current_balance > totals.netToPay * 2) {
+      return `رصيد ${selectedParty?.name ?? 'المتعامل'} المتراكم (${fmtDZD(partyBalance.current_balance)} دج) كبير — تأكد من تسوية الحسابات`;
+    }
+    return null;
+  }, [partyBalance, totals.netToPay, selectedParty]);
+
+  // ─── Guard ────────────────────────────────────────────────────────────────
 
   if (!open) return null;
 
@@ -370,21 +565,22 @@ export default function CommercialDocumentModal({
       <div style={{
         width: '95vw', maxWidth: 1100, maxHeight: '93vh',
         display: 'flex', flexDirection: 'column',
-        background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg1)',
+        background: isCancelled ? 'var(--bg3)' : 'var(--bg1)',
         borderRadius: 'var(--r3)',
         boxShadow: '0 24px 60px rgba(0,0,0,.3)',
         overflow: 'hidden',
-        opacity: isDisabledCompletely ? 0.75 : 1,
+        opacity: isCancelled ? 0.8 : 1,
       }}>
 
-        {/* ── HEADER ─────────────────────────────────────────────────────── */}
+        {/* ════════════════════════════════════════════════════════════════
+            HEADER
+        ════════════════════════════════════════════════════════════════ */}
         <div style={{
           padding: '14px 20px', borderBottom: '1px solid var(--b1)',
-          background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg2)',
+          background: isCancelled ? 'var(--bg3)' : 'var(--bg2)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Icon */}
             <div style={{
               width: 40, height: 40, borderRadius: 12, flexShrink: 0,
               background: isCancelled
@@ -395,15 +591,23 @@ export default function CommercialDocumentModal({
                 : `1px solid color-mix(in srgb, ${isPurchase ? 'var(--blue)' : 'var(--green)'} 25%, transparent)`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <i className={`ti ${isCancelled ? 'ti-ban' : isPurchase ? 'ti-truck' : 'ti-receipt'}`}
-                style={{ fontSize: 18, color: isCancelled ? 'var(--red)' : isPurchase ? 'var(--blue)' : 'var(--green)' }} />
+              <i
+                className={`ti ${isCancelled ? 'ti-ban' : isPurchase ? 'ti-truck' : 'ti-receipt'}`}
+                style={{
+                  fontSize: 18,
+                  color: isCancelled ? 'var(--red)' : isPurchase ? 'var(--blue)' : 'var(--green)',
+                }}
+              />
             </div>
 
-            {/* Title */}
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--t1)',
-                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{
+                fontSize: 14, fontWeight: 800, color: 'var(--t1)',
+                display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+              }}>
                 {isEdit ? `تعديل ${documentType?.name}` : `${documentType?.name} جديد`}
+
+                {/* رقم المستند */}
                 {isEdit && existingDocument?.document_number && (
                   <span style={{
                     padding: '2px 8px', borderRadius: 'var(--r1)',
@@ -413,23 +617,14 @@ export default function CommercialDocumentModal({
                     {docNumber || String(existingDocument.document_number)}
                   </span>
                 )}
+
+                {/* شارات الحالة */}
                 {isCancelled && (
                   <span style={{
                     padding: '2px 8px', borderRadius: 'var(--r1)',
                     background: 'var(--redb)', border: '1px solid var(--red)',
                     fontSize: 11, fontWeight: 700, color: 'var(--red)',
-                  }}>
-                    ملغى
-                  </span>
-                )}
-                {isValidated && !isCancelled && (
-                  <span style={{
-                    padding: '2px 8px', borderRadius: 'var(--r1)',
-                    background: 'var(--blueb)', border: '1px solid var(--blue)',
-                    fontSize: 11, fontWeight: 700, color: 'var(--blue)',
-                  }}>
-                    معتمد
-                  </span>
+                  }}>ملغى</span>
                 )}
                 {isLocked && (
                   <span style={{
@@ -441,20 +636,61 @@ export default function CommercialDocumentModal({
                     مقفل
                   </span>
                 )}
+                {isValidated && !isCancelled && (
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 'var(--r1)',
+                    background: 'var(--blueb)', border: '1px solid var(--blue)',
+                    fontSize: 11, fontWeight: 700, color: 'var(--blue)',
+                  }}>معتمد</span>
+                )}
+                {pmMode === 'additive' && (
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 'var(--r1)',
+                    background: 'color-mix(in srgb, var(--orange) 12%, transparent)',
+                    border: '1px solid var(--orange)',
+                    fontSize: 10, fontWeight: 700, color: 'var(--orange)',
+                  }}>
+                    <i className="ti ti-plus" style={{ marginLeft: 3, fontSize: 9 }} />
+                    دفعات إضافية فقط
+                  </span>
+                )}
                 {stockBadge && (
                   <span style={{
-                    padding: '2px 8px', borderRadius: 'var(--r1)', fontSize: 11, fontWeight: 700,
+                    padding: '2px 8px', borderRadius: 'var(--r1)',
+                    fontSize: 11, fontWeight: 700,
                     background: stockBadge.bg, color: stockBadge.color,
                   }}>
                     {stockBadge.text}
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>
+
+              {/* معلومات الاعتماد (للمستندات المعتمدة) */}
+              {isEdit && existingDocument && (() => {
+                const vb = existingDocument.validatedBy as Record<string, unknown> | undefined;
+                const va = existingDocument.validated_at as string | undefined;
+                if (!vb && !va) return;
+                return (
+                  <div style={{ fontSize: 10.5, color: 'var(--t4)', marginTop: 6, display: 'flex', gap: 12 }}>
+                    {vb && (
+                      <span>اعتمد بواسطة: <strong style={{ color: 'var(--t2)' }}>{String(vb.name ?? vb.username ?? '—')}</strong></span>
+                    )}
+                    {va && (
+                      <span>{fmtDate(va)}</span>
+                    )}
+                  </div>
+                );
+              })()}
+              <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 2 }}>
                 {documentType?.name} — {docCode}
                 {!isEdit && <span style={{ marginRight: 8 }}>· رقم الوثيقة يُولَّد تلقائياً</span>}
                 {isCancelled && <span style={{ marginRight: 8, color: 'var(--red)' }}>· لا يمكن تعديل مستند ملغى</span>}
-                {isLocked && !isCancelled && <span style={{ marginRight: 8, color: 'var(--t4)' }}>· المستند مقفل — فك القفل للتعديل</span>}
+                {isLocked && !isCancelled && <span style={{ marginRight: 8, color: 'var(--t4)' }}>· مقفل — فك القفل للتعديل</span>}
+                {pmMode === 'additive' && !isLocked && (
+                  <span style={{ marginRight: 8, color: 'var(--orange)' }}>
+                    · الأسطر للقراءة — يمكن إضافة دفعات جديدة فقط
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -473,46 +709,68 @@ export default function CommercialDocumentModal({
           </button>
         </div>
 
-        {/* ── BODY ───────────────────────────────────────────────────────── */}
+        {/* ════════════════════════════════════════════════════════════════
+            BODY
+        ════════════════════════════════════════════════════════════════ */}
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
 
-          {successMsg && <AlertBanner type="success" message={successMsg} />}
-          {apiErr     && <AlertBanner type="error"   message={apiErr}     />}
-
-          {/* تحذير المستند الملغى */}
-          {isCancelled && (
-            <AlertBanner
-              type="error"
-              message="هذا المستند ملغى ولا يمكن تعديله. جميع الحقول معطلة."
-            />
-          )}
-
-          {/* تحذير المستند المقفل */}
+          {/* Alerts عامة */}
+          {successMsg         && <AlertBanner type="success" message={successMsg} />}
+          {apiErr             && <AlertBanner type="error"   message={apiErr} />}
+          {isCancelled        && <AlertBanner type="error"   message="هذا المستند ملغى — جميع الحقول معطلة." />}
           {isLocked && !isCancelled && (
+            <AlertBanner type="warning" message="هذا المستند مقفل. لا يمكن تعديله حتى يتم فك القفل من قِبل المسؤول." />
+          )}
+          {pmMode === 'additive' && !isLocked && (
             <AlertBanner
-              type="warning"
-              message="هذا المستند مقفل. لا يمكن تعديله حتى يتم فك القفل من قِبل المسؤول."
+              type="info"
+              message="المستند معتمد — الأسطر محمية من التعديل. يمكنك فقط إضافة دفعات جديدة."
             />
           )}
 
-          {/* ✅ تحذير تغيير الزبون */}
+          {/* تحذير تغيير المتعامل */}
           {partyChangeWarning && (
-            <AlertBanner
-              type="warning"
-              message={partyChangeWarning}
-              onDismiss={() => setPartyChangeWarning('')}
-            />
+            <div style={{
+              padding: '10px 14px', marginBottom: 14,
+              borderRadius: 'var(--r2)',
+              background: 'color-mix(in srgb, var(--orange) 10%, transparent)',
+              border: '1px solid var(--orange)',
+              fontSize: 12.5, color: 'var(--orange)',
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+            }}>
+              <i className="ti ti-alert-triangle" style={{ marginTop: 1, flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, marginBottom: 3 }}>
+                  {partyChangeWarning.blockType === 'existing_payments' && 'دفعات مُسجَّلة في المستند'}
+                  {partyChangeWarning.blockType === 'has_payments'      && 'دفعات في النموذج'}
+                  {partyChangeWarning.blockType === 'price_level_change' && 'تعارض فئة السعر'}
+                  {!partyChangeWarning.blockType                         && 'لا يمكن تغيير المتعامل'}
+                </div>
+                <div>{partyChangeWarning.message}</div>
+              </div>
+              <button
+                onClick={() => setPartyChangeWarning(null)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--orange)', padding: 0, fontSize: 13, flexShrink: 0,
+                }}
+              >
+                <i className="ti ti-x" />
+              </button>
+            </div>
           )}
 
-          {/* SECTION 1: معلومات المستند */}
+          {/* ══════════════════════════════════════════════════════════════
+              SECTION 1: معلومات المستند
+          ══════════════════════════════════════════════════════════════ */}
           <Section title="معلومات المستند" icon="ti-file-description">
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
               gap: 12,
-              opacity: isDisabledCompletely ? 0.5 : 1,
             }}>
-              {/* رقم المستند (عند التعديل) */}
+
+              {/* رقم المستند */}
               {isEdit && (
                 <div>
                   <Label required>رقم المستند</Label>
@@ -520,22 +778,26 @@ export default function CommercialDocumentModal({
                     <input
                       type="text"
                       style={{
-                        width: '100%', padding: '7px 10px', paddingLeft: checkingDocNumber ? 28 : 10,
+                        width: '100%', padding: '7px 10px',
+                        paddingLeft: checkingDocNumber ? 28 : 10,
                         borderRadius: 'var(--r2)',
                         border: `1px solid ${docNumberErr ? 'var(--red)' : 'var(--b3)'}`,
-                        background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg1)',
-                        color: 'var(--t1)',
-                        fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                        background: isReadOnly ? 'var(--bg3)' : 'var(--bg1)',
+                        color: 'var(--t1)', fontSize: 13,
+                        fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                        boxSizing: 'border-box',
                       }}
                       value={docNumber}
-                      disabled={isDisabledCompletely || isLocked}
+                      disabled={isReadOnly}
                       onChange={(e) => handleDocNumberChange(e.target.value)}
                       placeholder="أدخل رقم المستند..."
                     />
                     {checkingDocNumber && (
                       <i className="ti ti-loader" style={{
-                        position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+                        position: 'absolute', left: 10, top: '50%',
+                        transform: 'translateY(-50%)',
                         fontSize: 12, animation: 'spin 1s linear infinite',
+                        color: 'var(--t4)', pointerEvents: 'none',
                       }} />
                     )}
                   </div>
@@ -552,14 +814,24 @@ export default function CommercialDocumentModal({
                     value={form.party_id}
                     onChange={handlePartyChangeWithWarning}
                     placeholder={`— ابحث عن ${isPurchase ? 'مورد' : 'زبون'} —`}
-                    disabled={disableFields}  // ✅ الحقول الأساسية معطلة فقط للـ locked/cancelled
+                    disabled={isReadOnly}
                     error={!!errors.party_id}
                   />
                   <FieldError msg={errors.party_id} />
+
+                  {/* رصيد المتعامل */}
+                  <PartyBalanceBadge
+                    balance={partyBalance}
+                    isLoading={isLoadingBalance}
+                    partyLabel={isPurchase ? 'المورد' : 'الزبون'}
+                  />
+                  {balanceWarning && (
+                    <AlertBanner type="warning" message={balanceWarning} />
+                  )}
                 </div>
               )}
 
-              {/* التاريخ */}
+              {/* تاريخ المستند */}
               <div>
                 <Label required>تاريخ المستند</Label>
                 <input
@@ -567,12 +839,13 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.document_date ? 'var(--red)' : 'var(--b3)'}`,
-                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
-                    color: 'var(--t1)',
-                    fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                    background: isReadOnly ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)', fontSize: 13,
+                    fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                    boxSizing: 'border-box',
                   }}
                   value={form.document_date}
-                  disabled={disableFields}
+                  disabled={isReadOnly}
                   onChange={(e) => set('document_date', e.target.value)}
                 />
                 <FieldError msg={errors.document_date} />
@@ -586,13 +859,14 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: '1px solid var(--b3)',
-                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
-                    color: 'var(--t1)',
-                    fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                    background: isReadOnly ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)', fontSize: 13,
+                    fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                    boxSizing: 'border-box',
                   }}
                   value={form.due_date}
                   min={form.document_date}
-                  disabled={disableFields}
+                  disabled={isReadOnly}
                   onChange={(e) => set('due_date', e.target.value)}
                 />
               </div>
@@ -604,12 +878,14 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.warehouse_id ? 'var(--red)' : 'var(--b3)'}`,
-                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
-                    color: 'var(--t1)',
-                    fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
+                    background: isReadOnly ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)', fontSize: 13,
+                    fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                    cursor: isReadOnly ? 'not-allowed' : 'pointer',
+                    boxSizing: 'border-box',
                   }}
                   value={form.warehouse_id}
-                  disabled={disableFields}
+                  disabled={isReadOnly}
                   onChange={(e) => set('warehouse_id', e.target.value)}
                 >
                   <option value="">— اختر —</option>
@@ -629,12 +905,14 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.fiscal_year_id ? 'var(--red)' : 'var(--b3)'}`,
-                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
-                    color: 'var(--t1)',
-                    fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
+                    background: isReadOnly ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)', fontSize: 13,
+                    fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                    cursor: isReadOnly ? 'not-allowed' : 'pointer',
+                    boxSizing: 'border-box',
                   }}
                   value={form.fiscal_year_id}
-                  disabled={disableFields}
+                  disabled={isReadOnly}
                   onChange={(e) => set('fiscal_year_id', e.target.value)}
                 >
                   <option value="">— اختر —</option>
@@ -656,12 +934,14 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${errors.currency_id ? 'var(--red)' : 'var(--b3)'}`,
-                    background: disableFields ? 'var(--bg3)' : 'var(--bg1)',
-                    color: 'var(--t1)',
-                    fontSize: 13, fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
+                    background: isReadOnly ? 'var(--bg3)' : 'var(--bg1)',
+                    color: 'var(--t1)', fontSize: 13,
+                    fontFamily: 'Tajawal, sans-serif', outline: 'none',
+                    cursor: isReadOnly ? 'not-allowed' : 'pointer',
+                    boxSizing: 'border-box',
                   }}
                   value={form.currency_id}
-                  disabled={disableFields}
+                  disabled={isReadOnly}
                   onChange={(e) => set('currency_id', e.target.value)}
                 >
                   <option value="">— اختر —</option>
@@ -674,17 +954,22 @@ export default function CommercialDocumentModal({
                 <FieldError msg={errors.currency_id} />
               </div>
 
-              {/* الفئة السعرية (بيع فقط) */}
+              {/* فئة السعر (بيع فقط) */}
               {!isPurchase && lookups.priceLevels.length > 0 && (
                 <div>
                   <Label>فئة السعر</Label>
                   <ComboBox
                     options={priceLevelOptions}
                     value={form.price_level_id}
-                    onChange={(v) => set('price_level_id', v)}
+                    onChange={(v) => handlePriceLevelChange(v)}
                     placeholder="— الافتراضي —"
-                    disabled={disableFields}
+                    disabled={isReadOnly || isLinesReadOnly}
                   />
+                  {isLinesReadOnly && (
+                    <div style={{ fontSize: 10.5, color: 'var(--t4)', marginTop: 3 }}>
+                      فئة السعر محمية — الأسطر معتمدة
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -696,20 +981,22 @@ export default function CommercialDocumentModal({
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: '1px solid var(--b3)',
-                    background: disableForm ? 'var(--bg3)' : 'var(--bg1)',
+                    background: isReadOnly ? 'var(--bg3)' : 'var(--bg1)',
                     color: 'var(--t1)', fontSize: 13,
                     fontFamily: 'Tajawal, sans-serif', outline: 'none',
                     resize: 'vertical', boxSizing: 'border-box',
                   }}
                   value={form.notes}
-                  disabled={disableForm}
+                  disabled={isReadOnly}
                   onChange={(e) => set('notes', e.target.value)}
                 />
               </div>
             </div>
           </Section>
 
-          {/* SECTION 2: الأسطر */}
+          {/* ══════════════════════════════════════════════════════════════
+              SECTION 2: الأسطر
+          ══════════════════════════════════════════════════════════════ */}
           <Section
             title="أسطر المستند"
             icon="ti-list-details"
@@ -723,16 +1010,27 @@ export default function CommercialDocumentModal({
                     {form.lines.length} سطر
                   </span>
                 )}
-                <ColumnManager visible={visibleCols} onChange={handleColsChange} />
+                {isLinesReadOnly && (
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 700,
+                    background: 'var(--bg3)', color: 'var(--t4)',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    <i className="ti ti-lock" style={{ fontSize: 10 }} />
+                    محمية
+                  </span>
+                )}
+                {!isLinesReadOnly && (
+                  <ColumnManager visible={visibleCols} onChange={handleColsChange} />
+                )}
               </div>
             }
           >
-            {/* تنبيه المخزون */}
             {affectsStock && (
               <AlertBanner
                 type={stockDir > 0 ? 'info' : 'warning'}
                 message={stockDir > 0
-                  ? 'هذا المستند سيُضيف الكميات إلى المخزون عند الحفظ'
+                  ? 'هذا المستند سيضيف الكميات إلى المخزون عند الحفظ'
                   : 'هذا المستند سيخصم الكميات من المخزون عند الحفظ'}
               />
             )}
@@ -740,388 +1038,534 @@ export default function CommercialDocumentModal({
             {lineErr && <AlertBanner type="error" message={lineErr} />}
 
             {lookups.isLoadingProducts ? (
-              <div style={{ textAlign: 'center', padding: 24, color: 'var(--t4)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <div style={{
+                textAlign: 'center', padding: 24, color: 'var(--t4)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}>
                 <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
                 جاري تحميل المنتجات...
               </div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                {form.lines.length > 0 && (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b2)' }}>
-                        {ALL_COLUMNS.filter((c) => visibleCols.has(c.key)).map((col) => (
-                          <th key={col.key} style={{
-                            padding: '6px 8px', textAlign: 'right', fontWeight: 700,
-                            color: 'var(--t3)', fontSize: 11, whiteSpace: 'nowrap',
-                            minWidth: col.w,
-                          }}>
-                            {col.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.lines.map((line, idx) => {
-                        const stockResult = line._product
-                          ? validateLineStock(line, line._product, isPurchase, stockData)
-                          : { ok: true as const };
-                        return (
-                          <DocumentLineRow
-                            key={idx}
-                            line={line}
-                            idx={idx}
-                            visibleCols={visibleCols}
-                            isPurchase={isPurchase}
-                            disabled={disableLines}  // ✅ الأسطر معطلة للمعتمدة + المقفولة + الملغاة
-                            products={lookups.products}
-                            stockData={stockData}
-                            stockValidation={stockResult}
-                            onUpdate={updateLine}
-                            onRemove={removeLine}
-                            onDuplicate={duplicateLine}
-                          />
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              <>
+                {form.lines.length === 0 ? (
+                  <div style={{
+                    padding: 16, textAlign: 'center', color: 'var(--t4)',
+                    fontSize: 12, background: 'var(--bg3)', borderRadius: 'var(--r2)',
+                  }}>
+                    {isLinesReadOnly ? 'لا أسطر — المستند فارغ' : 'لا أسطر بعد — اضغط "إضافة سطر" أدناه'}
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b2)' }}>
+                          {ALL_COLUMNS.filter((c) => visibleCols.has(c.key)).map((col) => (
+                            <th key={col.key} style={{
+                              padding: '6px 8px', textAlign: 'right', fontWeight: 700,
+                              color: 'var(--t3)', fontSize: 11, whiteSpace: 'nowrap',
+                              minWidth: col.w,
+                            }}>
+                              {col.label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {form.lines.map((line, idx) => {
+                          const stockResult = line._product
+                            ? validateLineStock(line, line._product, isPurchase, stockData)
+                            : { ok: true as const };
+                          return (
+                            <DocumentLineRow
+                              key={idx}
+                              line={line}
+                              idx={idx}
+                              visibleCols={visibleCols}
+                              isPurchase={isPurchase}
+                              disabled={isLinesReadOnly}
+                              products={lookups.products}
+                              stockData={stockData}
+                              stockValidation={stockResult}
+                              onUpdate={updateLine}
+                              onRemove={removeLine}
+                              onDuplicate={duplicateLine}
+                            />
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
+
+                {!isLinesReadOnly && (
+                  <button
+                    onClick={addLine}
+                    style={{
+                      marginTop: 10, display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '7px 14px', borderRadius: 'var(--r2)',
+                      border: '1px dashed var(--b3)', background: 'transparent',
+                      color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget).style.borderColor = 'var(--em)';
+                      (e.currentTarget).style.color = 'var(--em)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget).style.borderColor = 'var(--b3)';
+                      (e.currentTarget).style.color = 'var(--t3)';
+                    }}
+                  >
+                    <i className="ti ti-plus" />
+                    إضافة سطر
+                  </button>
+                )}
+              </>
+            )}
+          </Section>
+
+          {/* ══════════════════════════════════════════════════════════════
+              SECTION 3: الدفعات
+          ══════════════════════════════════════════════════════════════ */}
+          <Section title="الدفعات" icon="ti-wallet" collapsible>
+
+            {/* الدفعات القديمة (للقراءة في additive mode) */}
+            <ExistingPaymentsTable
+              payments={existingPayments}
+              paymentModes={lookups.paymentModes}
+              treasuryAccountMap={treasuryAccountMap}
+            />
+
+            {/* تحذير تجاوز المبلغ */}
+            {paymentsExceedWarning && (
+              <AlertBanner type="warning" message={paymentsExceedWarning} />
+            )}
+
+            {/* رسالة "لا دفعات" */}
+            {existingPayments.length === 0 && newPayments.length === 0 && (
+              <div style={{
+                padding: 12, fontSize: 12, color: 'var(--t4)',
+                background: 'var(--bg3)', borderRadius: 'var(--r2)', marginBottom: 12,
+              }}>
+                {pmMode === 'locked'
+                  ? 'المستند محمي — لا يمكن إضافة دفعات.'
+                  : 'لم تُضَف دفعات — سيتم إنشاء المستند دون تسديد.'}
               </div>
             )}
 
-            {/* ✅ زر إضافة سطر — يعتمد على !disableLines */}
-            {!disableLines && (
+            {/* عنوان قسم الدفعات الجديدة (في additive mode) */}
+            {pmMode === 'additive' && newPayments.length > 0 && (
+              <div style={{
+                padding: '6px 10px', fontSize: 10.5, fontWeight: 800,
+                color: 'var(--em)', textTransform: 'uppercase', letterSpacing: 0.4,
+                borderBottom: '1px solid var(--b1)', marginBottom: 8,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <i className="ti ti-plus" style={{ fontSize: 11 }} />
+                دفعات جديدة تُضاف
+              </div>
+            )}
+
+            {/* الدفعات الجديدة القابلة للتعديل */}
+            {newPayments.map((pay, idx) => {
+              const selectedMode = lookups.paymentModes.find(
+                (pm) => String(pm.id) === pay.payment_mode_id,
+              );
+              const autoTreasuryId  = selectedMode?.treasury_account_id ?? null;
+              const manualTreasuryStr = pay.treasury_account_id ? String(pay.treasury_account_id) : '';
+              const effectiveTreasury = autoTreasuryId
+                ? treasuryAccountMap.get(autoTreasuryId)
+                : (manualTreasuryStr ? treasuryAccountMap.get(parseInt(manualTreasuryStr)) : null);
+
+              const remainingForFill = totals.remaining;
+              const isLast = idx === newPayments.length - 1;
+
+              return (
+                <div key={idx} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 130px 160px 120px 1fr 32px',
+                  gap: 8, marginBottom: 10, alignItems: 'end',
+                  padding: 12, borderRadius: 'var(--r2)',
+                  background: 'var(--bg2)', border: '1px solid var(--b2)',
+                }}>
+
+                  {/* طريقة الدفع */}
+                  <div>
+                    {idx === 0 && <Label>طريقة الدفع</Label>}
+                    <select
+                      style={{
+                        width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                        border: `1px solid ${!pay.payment_mode_id ? 'var(--red)' : 'var(--b3)'}`,
+                        background: 'var(--bg1)', color: 'var(--t1)',
+                        fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                        outline: 'none', cursor: 'pointer', boxSizing: 'border-box',
+                      }}
+                      value={pay.payment_mode_id}
+                      onChange={(e) => updatePayment(idx, { payment_mode_id: e.target.value })}
+                    >
+                      <option value="">— اختر —</option>
+                      {paymentModeOptions.map((pm) => (
+                        <option key={pm.id} value={String(pm.id)}>{pm.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* المبلغ */}
+                  <div>
+                    {idx === 0 && <Label>المبلغ</Label>}
+                    <input
+                      type="number" min={0} step={0.01}
+                      style={{
+                        width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                        border: '1px solid var(--b3)',
+                        background: 'var(--bg1)', color: 'var(--t1)',
+                        fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                        outline: 'none', boxSizing: 'border-box',
+                      }}
+                      value={pay.amount}
+                      onChange={(e) => updatePayment(idx, { amount: e.target.value })}
+                      placeholder="0.00"
+                    />
+                    {/* زر ملء المتبقي */}
+                    {isLast && remainingForFill > 0.01 && (
+                      <button
+                        type="button"
+                        onClick={() => updatePayment(idx, {
+                          amount: String(Math.max(0, remainingForFill)),
+                        })}
+                        style={{
+                          fontSize: 10, fontWeight: 600, color: 'var(--em)',
+                          marginTop: 3, padding: 0, background: 'none',
+                          border: 'none', cursor: 'pointer', textDecoration: 'underline',
+                        }}
+                      >
+                        ملء المتبقي ({fmtDZD(remainingForFill)})
+                      </button>
+                    )}
+                    {/* زر تسديد الرصيد بالكامل */}
+                    {isLast && partyBalance && !isPurchase && (() => {
+                      const prevBal = isEdit && existingDocument
+                        ? partyBalance.signed_balance
+                          - (Number(existingDocument.net_to_pay) || 0)
+                          + (Number(existingDocument.paid_amount) || 0)
+                        : partyBalance.signed_balance;
+                      // prevBal = رصيد المتعامل قبل إصدار هذه الوثيقة
+                      // (للمبيعات = الرصيد الحالي - قيمة الوثيقة + المدفوع)
+                      const totalDue = prevBal + totals.netToPay - totals.totalPaid;
+                      if (totalDue > remainingForFill + 0.01) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => updatePayment(idx, {
+                              amount: String(Math.max(0, totalDue)),
+                            })}
+                            style={{
+                              fontSize: 10, fontWeight: 600, color: 'var(--orange)',
+                              marginTop: 3, padding: 0, background: 'none',
+                              border: 'none', cursor: 'pointer', textDecoration: 'underline',
+                            }}
+                          >
+                            تسديد الرصيد ({fmtDZD(totalDue)})
+                          </button>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+
+                  {/* المرجع */}
+                  <div>
+                    {idx === 0 && <Label>المرجع</Label>}
+                    <input
+                      type="text"
+                      style={{
+                        width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                        border: `1px solid ${
+                          selectedMode?.requires_reference && !pay.reference?.trim()
+                            ? 'var(--red)' : 'var(--b3)'
+                        }`,
+                        background: 'var(--bg1)', color: 'var(--t1)',
+                        fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                        outline: 'none', boxSizing: 'border-box',
+                      }}
+                      value={pay.reference ?? ''}
+                      onChange={(e) => updatePayment(idx, { reference: e.target.value })}
+                      placeholder={selectedMode?.requires_reference ? 'إلزامي ★' : 'اختياري...'}
+                    />
+                  </div>
+
+                  {/* التاريخ */}
+                  <div>
+                    {idx === 0 && <Label>التاريخ</Label>}
+                    <input
+                      type="date"
+                      style={{
+                        width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                        border: '1px solid var(--b3)',
+                        background: 'var(--bg1)', color: 'var(--t1)',
+                        fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                        outline: 'none', boxSizing: 'border-box',
+                      }}
+                      value={pay.payment_date}
+                      onChange={(e) => updatePayment(idx, { payment_date: e.target.value })}
+                    />
+                  </div>
+
+                  {/* حساب الخزينة */}
+                  <div>
+                    {idx === 0 && <Label>الحساب</Label>}
+                    {autoTreasuryId ? (
+                      // حساب تلقائي → عرض فقط
+                      <div style={{
+                        padding: '7px 10px', borderRadius: 'var(--r2)',
+                        border: '1px solid var(--b3)', background: 'var(--bg3)',
+                        fontSize: 12, height: 38, display: 'flex', alignItems: 'center', gap: 6,
+                        overflow: 'hidden', boxSizing: 'border-box',
+                      }}>
+                        {effectiveTreasury ? (
+                          <>
+                            <i className={`ti ${
+                              effectiveTreasury.type === 'bank' ? 'ti-building-bank' :
+                              effectiveTreasury.type === 'cash' ? 'ti-cash' : 'ti-credit-card'
+                            }`} style={{ fontSize: 12, color: 'var(--t4)', flexShrink: 0 }} />
+                            <span style={{
+                              color: 'var(--t2)', fontWeight: 600,
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {effectiveTreasury.name}
+                            </span>
+                          </>
+                        ) : (
+                          <span style={{ color: 'var(--t4)' }}>ح/ {autoTreasuryId}</span>
+                        )}
+                      </div>
+                    ) : (
+                      // لا حساب تلقائي → اختيار يدوي
+                      <select
+                        style={{
+                          width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                          border: `1px solid ${!manualTreasuryStr ? 'var(--red)' : 'var(--b3)'}`,
+                          background: 'var(--bg1)', color: 'var(--t1)',
+                          fontSize: 12, fontFamily: 'Tajawal, sans-serif',
+                          outline: 'none', cursor: 'pointer',
+                          height: 38, boxSizing: 'border-box',
+                        }}
+                        value={manualTreasuryStr}
+                        onChange={(e) => updatePayment(idx, { treasury_account_id: e.target.value })}
+                      >
+                        <option value="">— اختر حساباً ★ —</option>
+                        {lookups.treasuryAccounts.map((ta) => (
+                          <option key={ta.id} value={String(ta.id)}>
+                            {ta.name} ({ta.type === 'bank' ? 'بنك' : ta.type === 'cash' ? 'نقدية' : 'شيك'})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* حذف */}
+                  <button
+                    onClick={() => removePayment(idx)}
+                    style={{
+                      width: 32, height: 32, borderRadius: 'var(--r1)',
+                      border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
+                      background: 'var(--redb)', color: 'var(--red)',
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      alignSelf: 'flex-end',
+                    }}
+                  >
+                    <i className="ti ti-trash" style={{ fontSize: 13 }} />
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* زر إضافة دفعة */}
+            {pmMode !== 'locked' && (
               <button
-                onClick={addLine}
+                onClick={addPayment}
                 style={{
-                  marginTop: 10, display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '7px 14px', borderRadius: 'var(--r2)',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 14px', borderRadius: 'var(--r2)',
                   border: '1px dashed var(--b3)', background: 'transparent',
-                  color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
-                  transition: 'all .15s',
+                  color: 'var(--t3)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--em)';
-                  (e.currentTarget as HTMLElement).style.color = 'var(--em)';
+                  (e.currentTarget).style.borderColor = 'var(--em)';
+                  (e.currentTarget).style.color = 'var(--em)';
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--b3)';
-                  (e.currentTarget as HTMLElement).style.color = 'var(--t3)';
+                  (e.currentTarget).style.borderColor = 'var(--b3)';
+                  (e.currentTarget).style.color = 'var(--t3)';
                 }}
               >
                 <i className="ti ti-plus" />
-                إضافة سطر
+                {pmMode === 'additive' ? 'إضافة دفعة جديدة' : 'إضافة دفعة'}
               </button>
             )}
           </Section>
 
-          {/* SECTION 3: الدفعات — يظهر لجميع المستندات (بيع وشراء) */}
-          <Section title="الدفعات" icon="ti-wallet" collapsible>
-              {form.payments.length === 0 && (
-                <div style={{ padding: 12, fontSize: 12, color: 'var(--t4)',
-                  background: 'var(--bg3)', borderRadius: 'var(--r2)', marginBottom: 12 }}>
-                  {isDisabledCompletely
-                    ? 'المستند ملغى — لا يمكن إضافة دفعات.'
-                    : 'لم تتم إضافة دفعات بعد. سيتم إنشاء فاتورة بدون تسديد.'}
-                </div>
-              )}
-
-              {form.payments.map((pay, idx) => {
-                const selectedMode = lookups.paymentModes.find(
-                  (pm) => String(pm.id) === pay.payment_mode_id,
-                );
-
-                // ✅ حساب الخزينة: إما من التحديد التلقائي أو من الحقل اليدوي
-                const treasuryAccountId = pay.treasury_account_id
-                  ? parseInt(String(pay.treasury_account_id))
-                  : selectedMode?.treasury_account_id ?? null;
-                const treasuryAccount = treasuryAccountId
-                  ? treasuryAccountMap.get(treasuryAccountId)
-                  : null;
-
-                const remainingAmount = totals.remaining;
-                const isLastPayment = idx === form.payments.length - 1;
-
-                return (
-                  <div key={idx} style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 130px 160px 120px 1fr 32px',
-                    gap: 8, marginBottom: 12, alignItems: 'end',
-                    padding: 12, borderRadius: 'var(--r2)',
-                    background: 'var(--bg2)', border: '1px solid var(--b2)',
-                  }}>
-                    {/* طريقة الدفع */}
-                    <div>
-                      {idx === 0 && <Label>طريقة الدفع</Label>}
-                      <select
-                        style={{
-                          width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                          border: '1px solid var(--b3)', background: 'var(--bg1)',
-                          color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                          outline: 'none', cursor: isDisabledCompletely ? 'not-allowed' : 'pointer',
-                        }}
-                        value={pay.payment_mode_id}
-                        disabled={isDisabledCompletely}
-                        onChange={(e) => updatePayment(idx, { payment_mode_id: e.target.value })}
-                      >
-                        <option value="">— اختر —</option>
-                        {paymentModeOptions.map((pm) => (
-                          <option key={pm.id} value={String(pm.id)}>
-                            {pm.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* المبلغ */}
-                    <div>
-                      {idx === 0 && <Label>المبلغ</Label>}
-                      <input
-                        type="number" min={0} step={0.01}
-                        style={{
-                          width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                          border: '1px solid var(--b3)', background: 'var(--bg1)',
-                          color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                          outline: 'none',
-                        }}
-                        value={pay.amount}
-                        disabled={isDisabledCompletely}
-                        onChange={(e) => updatePayment(idx, { amount: e.target.value })}
-                        placeholder="0.00"
-                      />
-                      {/* زر ملء المبلغ المتبقي */}
-                      {isLastPayment && remainingAmount > 0 && !isDisabledCompletely && (
-                        <button
-                          type="button"
-                          onClick={() => updatePayment(idx, {
-                            amount: String(Math.max(0, remainingAmount)),
-                          })}
-                          style={{
-                            fontSize: 10, fontWeight: 600, color: 'var(--em)',
-                            marginTop: 4, padding: 0, background: 'none', border: 'none',
-                            cursor: 'pointer', textDecoration: 'underline',
-                          }}
-                        >
-                          ملء المتبقي ({fmtDZD(Math.max(0, remainingAmount))})
-                        </button>
-                      )}
-                    </div>
-
-                    {/* المرجع */}
-                    <div>
-                      {idx === 0 && <Label>المرجع</Label>}
-                      <input
-                        type="text"
-                        style={{
-                          width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                          border: '1px solid var(--b3)', background: 'var(--bg1)',
-                          color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                          outline: 'none',
-                        }}
-                        value={pay.reference ?? ''}
-                        disabled={isDisabledCompletely}
-                        onChange={(e) => updatePayment(idx, { reference: e.target.value })}
-                        placeholder={selectedMode?.requires_reference ? 'إلزامي' : 'اختياري...'}
-                      />
-                    </div>
-
-                    {/* تاريخ الدفع */}
-                    <div>
-                      {idx === 0 && <Label>التاريخ</Label>}
-                      <input
-                        type="date"
-                        style={{
-                          width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                          border: '1px solid var(--b3)', background: 'var(--bg1)',
-                          color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                          outline: 'none',
-                        }}
-                        value={pay.payment_date}
-                        disabled={isDisabledCompletely}
-                        onChange={(e) => updatePayment(idx, { payment_date: e.target.value })}
-                      />
-                    </div>
-
-                    {/* ✅ حساب الخزينة — يعرض اسم الحساب أو يسمح بالاختيار */}
-                    <div>
-                      {idx === 0 && <Label>الحساب</Label>}
-                      {(() => {
-                        const autoAcctId   = selectedMode?.treasury_account_id ?? null;
-                        const manualStr    = pay.treasury_account_id ? String(pay.treasury_account_id) : '';
-                        const effectiveId  = autoAcctId ?? (manualStr ? parseInt(manualStr) : null);
-                        const acct         = effectiveId ? treasuryAccountMap.get(effectiveId) : null;
-
-                        if (autoAcctId) {
-                          // حساب تلقائي — عرض فقط
-                          return (
-                            <div style={{
-                              padding: '7px 10px', borderRadius: 'var(--r2)',
-                              border: '1px solid var(--b3)', background: 'var(--bg3)',
-                              fontSize: 12, height: 38, display: 'flex', alignItems: 'center',
-                              gap: 6, overflow: 'hidden',
-                            }}>
-                              {acct ? (
-                                <>
-                                  <i className={`ti ${
-                                    acct.type === 'bank' ? 'ti-building-bank' :
-                                    acct.type === 'cash' ? 'ti-cash' : 'ti-credit-card'
-                                  }`} style={{ fontSize: 12, color: 'var(--t4)', flexShrink: 0 }} />
-                                  <span style={{
-                                    color: 'var(--t2)', fontWeight: 600,
-                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                  }}>
-                                    {acct.name}
-                                  </span>
-                                </>
-                              ) : (
-                                <span style={{ color: 'var(--t4)' }}>ح/ {autoAcctId}</span>
-                              )}
-                            </div>
-                          );
-                        }
-
-                        // لا حساب تلقائي — قائمة اختيار يدوي
-                        return (
-                          <select
-                            style={{
-                              width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
-                              border: '1px solid var(--b3)',
-                              background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg1)',
-                              color: 'var(--t1)', fontSize: 12,
-                              fontFamily: 'Tajawal, sans-serif', outline: 'none',
-                              cursor: isDisabledCompletely ? 'not-allowed' : 'pointer',
-                              height: 38,
-                            }}
-                            value={manualStr}
-                            disabled={isDisabledCompletely}
-                            onChange={(e) => updatePayment(idx, { treasury_account_id: e.target.value })}
-                          >
-                            <option value="">— اختر حساباً —</option>
-                            {lookups.treasuryAccounts.map((ta) => (
-                              <option key={ta.id} value={String(ta.id)}>
-                                {ta.name} ({ta.type === 'bank' ? 'بنك' : ta.type === 'cash' ? 'نقدية' : 'شيك'})
-                              </option>
-                            ))}
-                          </select>
-                        );
-                      })()}
-                    </div>
-
-                    {/* حذف */}
-                    <button
-                      onClick={() => removePayment(idx)}
-                      disabled={isDisabledCompletely}
-                      style={{
-                        width: 32, height: 32, borderRadius: 'var(--r1)',
-                        border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
-                        background: 'var(--redb)', color: 'var(--red)',
-                        cursor: isDisabledCompletely ? 'not-allowed' : 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        alignSelf: 'flex-end',
-                      }}
-                    >
-                      <i className="ti ti-trash" style={{ fontSize: 13 }} />
-                    </button>
-                  </div>
-                );
-              })}
-
-              {/* ✅ زر إضافة دفعة — يعتمد على !isDisabledCompletely (أي غير ملغى) */}
-              {!isDisabledCompletely && (
-                <button
-                  onClick={addPayment}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '8px 14px', borderRadius: 'var(--r2)',
-                    border: '1px dashed var(--b3)', background: 'transparent',
-                    color: 'var(--t3)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                    transition: 'all .15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--em)';
-                    (e.currentTarget as HTMLElement).style.color = 'var(--em)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--b3)';
-                    (e.currentTarget as HTMLElement).style.color = 'var(--t3)';
-                  }}
-                >
-                  <i className="ti ti-plus" />
-                  إضافة دفعة
-                </button>
-              )}
-            </Section>
-
-          {/* SECTION 4: الإجماليات */}
+          {/* ══════════════════════════════════════════════════════════════
+              SECTION 4: الإجماليات
+          ══════════════════════════════════════════════════════════════ */}
           <Section title="الإجماليات" icon="ti-calculator">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-              <TotalCard label="إجمالي HT"     value={`${fmtDZD(totals.ht)} دج`} />
-              <TotalCard label="الخصم الإجمالي" value={`${fmtDZD(totals.discount)} دج`}
-                color="var(--red)" muted={totals.discount === 0} />
-              <TotalCard label="TVA"            value={`${fmtDZD(totals.tva)} دج`} />
-              <TotalCard label="إجمالي TTC"     value={`${fmtDZD(totals.ttc)} دج`}
-                bg="var(--bg3)" color="var(--t1)" />
+              <TotalCard label="إجمالي HT"      value={`${fmtDZD(totals.ht)} دج`} />
+              <TotalCard
+                label="الخصم الإجمالي"
+                value={`${fmtDZD(totals.discount)} دج`}
+                color="var(--red)" muted={totals.discount === 0}
+              />
+              <TotalCard label="TVA"             value={`${fmtDZD(totals.tva)} دج`} />
+              <TotalCard label="إجمالي TTC"      value={`${fmtDZD(totals.ttc)} دج`} bg="var(--bg3)" />
               {totals.stamp > 0 && (
-                <TotalCard label="الطابع الجبائي" value={`${fmtDZD(totals.stamp)} دج`}
-                  bg="var(--goldb)" color="var(--gold)" labelColor="var(--gold)" />
+                <TotalCard
+                  label="الطابع الجبائي" value={`${fmtDZD(totals.stamp)} دج`}
+                  bg="var(--goldb)" color="var(--gold)" labelColor="var(--gold)"
+                />
               )}
-              <TotalCard label="المبلغ المستحق" value={`${fmtDZD(totals.netToPay)} دج`}
-                bg="var(--em)" color="white" labelColor="rgba(255,255,255,.75)" large />
-              {form.payments.length > 0 && (
+              <TotalCard
+                label="المبلغ المستحق" value={`${fmtDZD(totals.netToPay)} دج`}
+                bg="var(--em)" color="white" labelColor="rgba(255,255,255,.75)" large
+              />
+              {(existingPayments.length > 0 || newPayments.length > 0) && (
                 <>
-                  <TotalCard label="المدفوع"  value={`${fmtDZD(totals.totalPaid)} دج`}
-                    color="var(--green)"  bg="var(--greenb)" labelColor="var(--green)" />
-                  <TotalCard label="المتبقي"  value={`${fmtDZD(totals.remaining)} دج`}
-                    color={totals.remaining > 0 ? 'var(--red)' : 'var(--green)'}
-                    bg={totals.remaining    > 0 ? 'var(--redb)' : 'var(--greenb)'}
-                    labelColor={totals.remaining > 0 ? 'var(--red)' : 'var(--green)'} />
+                  <TotalCard
+                    label="المدفوع" value={`${fmtDZD(totals.totalPaid)} دج`}
+                    color="var(--green)" bg="var(--greenb)" labelColor="var(--green)"
+                  />
+                  <TotalCard
+                    label="المتبقي" value={`${fmtDZD(totals.remaining)} دج`}
+                    color={totals.remaining > 0.01 ? 'var(--red)' : 'var(--green)'}
+                    bg={totals.remaining    > 0.01 ? 'var(--redb)' : 'var(--greenb)'}
+                    labelColor={totals.remaining > 0.01 ? 'var(--red)' : 'var(--green)'}
+                  />
                 </>
               )}
             </div>
+
+            {/* الرصيد التفصيلي — الرصيد السابق + الوثيقة الحالية + الدفعات */}
+            {partyBalance && form.party_id && totals.netToPay > 0 && (
+              (() => {
+                // الرصيد السابق (قبل هذه الوثيقة)
+                const prevBal = isEdit && existingDocument
+                  ? (isPurchase
+                      ? partyBalance.signed_balance
+                        + (Number(existingDocument.net_to_pay) || 0)
+                        - (Number(existingDocument.paid_amount) || 0)
+                      : partyBalance.signed_balance
+                        - (Number(existingDocument.net_to_pay) || 0)
+                        + (Number(existingDocument.paid_amount) || 0))
+                  : partyBalance.signed_balance;
+
+                const curTotal   = totals.netToPay;
+                const subtotal   = isPurchase ? prevBal - curTotal : prevBal + curTotal;
+                const paid       = totals.totalPaid;
+                const finalBal   = isPurchase
+                  ? prevBal - curTotal + paid
+                  : prevBal + curTotal - paid;
+
+                const BalRow = ({ label, value, strong, emph, color }: {
+                  label: string; value: string; strong?: boolean; emph?: boolean; color?: string;
+                }) => (
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '3px 0',
+                    borderTop: '1px solid var(--b1)',
+                    fontSize: emph ? 13 : 11.5,
+                    fontWeight: strong || emph ? 700 : 400,
+                    color: color ?? (emph ? 'var(--em)' : 'var(--t2)'),
+                  }}>
+                    <span>{label}</span>
+                    <span>{value}</span>
+                  </div>
+                );
+
+                return (
+                  <div style={{
+                    padding: '8px 12px', borderRadius: 'var(--r2)',
+                    background: 'var(--bg3)', border: '1px solid var(--b2)',
+                    marginBottom: 10,
+                  }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      fontSize: 10.5, fontWeight: 700, color: 'var(--t4)',
+                      marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3,
+                    }}>
+                      <i className="ti ti-calculator" style={{ fontSize: 11 }} />
+                      تتبع رصيد {selectedParty?.name ?? 'المتعامل'}
+                    </div>
+                    <BalRow label="الرصيد السابق" value={`${fmtDZD(Math.abs(prevBal))} دج`}
+                      color={prevBal >= 0 ? 'var(--green)' : 'var(--red)'} />
+                    <BalRow label={`قيمة الوثيقة (${isPurchase ? 'مشتريات' : 'مبيعات'})`}
+                      value={`${fmtDZD(curTotal)} دج`} />
+                    <BalRow label="المبلغ الإجمالي المستحق" value={`${fmtDZD(Math.abs(subtotal))} دج`}
+                      strong color={Math.abs(subtotal) > 0.01 ? 'var(--em)' : 'var(--t3)'} />
+                    {paid > 0.01 && (
+                      <BalRow label="المدفوع" value={`${fmtDZD(paid)} دج`}
+                        color="var(--green)" />
+                    )}
+                    <BalRow label="الرصيد النهائي المتوقع" value={`${fmtDZD(Math.abs(finalBal))} دج`}
+                      emph
+                      color={finalBal >= 0 ? 'var(--green)' : 'var(--red)'} />
+                  </div>
+                );
+              })()
+            )}
 
             <Toggle
               checked={form.apply_stamp}
               onChange={(v) => set('apply_stamp', v)}
               label="الطابع الجبائي"
-              subLabel="1% من TTC — بحد أقصى 2,500 دج"
-              disabled={disableForm}  // ✅ الطابع معطل فقط للـ locked/cancelled
+              subLabel="1% من TTC — بحد أقصى 2,500 دج — للفواتير ≥ 30,000 دج"
+              disabled={isReadOnly}
             />
           </Section>
         </div>
 
-        {/* ── FOOTER ─────────────────────────────────────────────────────── */}
+        {/* ════════════════════════════════════════════════════════════════
+            FOOTER
+        ════════════════════════════════════════════════════════════════ */}
         <div style={{
           padding: '12px 20px', borderTop: '1px solid var(--b1)',
-          background: isDisabledCompletely ? 'var(--bg3)' : 'var(--bg2)',
+          background: isCancelled ? 'var(--bg3)' : 'var(--bg2)',
           display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center',
           borderRadius: '0 0 var(--r3) var(--r3)',
         }}>
+
           {/* Summary */}
-          <div style={{ fontSize: 12, color: 'var(--t4)' }}>
+          <div style={{ fontSize: 12, color: 'var(--t4)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {form.lines.length > 0 && (
               <>
                 <span>{form.lines.length} سطر</span>
-                <span style={{ margin: '0 6px' }}>·</span>
+                <span>·</span>
                 <span style={{ fontWeight: 700, color: 'var(--green)' }}>
                   {fmtDZD(totals.netToPay)} دج
                 </span>
-                {form.payments.length > 0 && totals.remaining > 0 && (
-                  <>
-                    <span style={{ margin: '0 6px' }}>·</span>
-                    <span style={{ color: 'var(--red)' }}>
-                      متبقي {fmtDZD(totals.remaining)} دج
-                    </span>
-                  </>
-                )}
+              </>
+            )}
+            {totals.remaining > 0.01 && (existingPayments.length > 0 || newPayments.length > 0) && (
+              <>
+                <span>·</span>
+                <span style={{ color: 'var(--red)', fontWeight: 600 }}>
+                  متبقي {fmtDZD(totals.remaining)} دج
+                </span>
+              </>
+            )}
+            {pmMode === 'additive' && newPayments.length > 0 && (
+              <>
+                <span>·</span>
+                <span style={{ color: 'var(--orange)', fontWeight: 600 }}>
+                  {newPayments.length} دفعة جديدة
+                </span>
               </>
             )}
           </div>
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: 8 }}>
-            {/* زر الحذف */}
-            {isEdit && !isDisabledCompletely && !isLocked && (
+            {/* حذف — فقط للتعديل + غير مقفل + غير ملغى */}
+            {isEdit && !isReadOnly && (
               <button
                 onClick={handleDelete}
                 disabled={isPending}
@@ -1129,12 +1573,14 @@ export default function CommercialDocumentModal({
                 style={{
                   padding: '8px 16px', borderRadius: 'var(--r2)',
                   border: '1px solid var(--red)', background: 'var(--redb)',
-                  color: 'var(--red)', cursor: isPending ? 'not-allowed' : 'pointer',
-                  fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+                  color: 'var(--red)',
+                  cursor: isPending ? 'not-allowed' : 'pointer',
+                  fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 6,
                 }}
               >
                 <i className="ti ti-trash" />
-                حذف المستند
+                حذف
               </button>
             )}
 
@@ -1144,15 +1590,16 @@ export default function CommercialDocumentModal({
               style={{
                 padding: '8px 18px', borderRadius: 'var(--r2)',
                 border: '1px solid var(--b2)', background: 'var(--bg1)',
-                color: 'var(--t2)', cursor: isPending || !!successMsg ? 'not-allowed' : 'pointer',
+                color: 'var(--t2)',
+                cursor: isPending || !!successMsg ? 'not-allowed' : 'pointer',
                 fontSize: 13, fontWeight: 600,
               }}
             >
-              {isDisabledCompletely ? 'إغلاق' : 'إلغاء'}
+              {isReadOnly ? 'إغلاق' : 'إلغاء'}
             </button>
 
-            {/* زر الحفظ — يُخفى فقط إذا كان cancelled أو locked */}
-            {!isDisabledCompletely && !isLocked && (
+            {/* حفظ — مخفي للـ locked/cancelled */}
+            {!isReadOnly && (
               <button
                 onClick={handleSave}
                 disabled={isPending || !!successMsg}
@@ -1168,12 +1615,22 @@ export default function CommercialDocumentModal({
                 }}
               >
                 {isPending ? (
-                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> جاري الحفظ...</>
+                  <>
+                    <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+                    جاري الحفظ...
+                  </>
                 ) : successMsg ? (
-                  <><i className="ti ti-check" /> تم الحفظ</>
+                  <>
+                    <i className="ti ti-check" />
+                    تم الحفظ
+                  </>
                 ) : (
-                  <><i className={`ti ${isEdit ? 'ti-device-floppy' : 'ti-plus'}`} />
-                    {isEdit ? 'تحديث المستند' : 'حفظ المستند'}</>
+                  <>
+                    <i className={`ti ${isEdit ? 'ti-device-floppy' : 'ti-plus'}`} />
+                    {pmMode === 'additive'
+                      ? 'حفظ الدفعات الجديدة'
+                      : isEdit ? 'تحديث المستند' : 'حفظ المستند'}
+                  </>
                 )}
               </button>
             )}

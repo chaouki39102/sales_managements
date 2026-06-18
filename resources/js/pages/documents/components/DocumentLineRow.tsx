@@ -9,7 +9,8 @@ import React, { memo } from 'react';
 import { calcLineTotal, fmtDZD, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
 import { cellStyle } from './DocumentUIPrimitives';
-import type { LineItem, Product, ColKey, LineStockValidation } from '../types/document.types';
+import type { LineItem, Product, ColKey } from '../types/document.types';
+import type { LineStockValidation } from '../utils/document.utils';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -61,11 +62,13 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   stockValidation, onUpdate, onRemove, onDuplicate,
 }: DocumentLineRowProps) {
 
-  const { gross, discountAmt, discPct, ht, tva: lineTva, ttc } = calcLineTotal(line);
+  const { baseQty, gross, discountAmt, discPct, ht, tva: lineTva, ttc } = calcLineTotal(line);
 
-  const prod      = line._product;
-  const packagings = prod?.packagings ?? [];
-  const lots      = prod?.has_lots
+  // نبحث عن المنتج في قائمة products (التي تحوي packagings و lots)
+  const prodFromList = products.find((p) => String(p.id) === line.product_id);
+  const prod         = prodFromList ?? line._product;
+  const packagings   = prod?.packagings ?? [];
+  const lots         = prod?.has_lots
     ? (prod?.lots ?? []).filter((lt) => lt.remaining_quantity > 0)
     : [];
 
@@ -133,15 +136,15 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         {/* الكثير */}
         {col('lot') && (
           <td style={{ padding: '3px 4px' }}>
-            {prod?.has_lots ? (
-              isPurchase ? (
-                <CellInput
-                  type="text"
-                  value={line.lot_number_new ?? ''}
-                  onChange={(v) => onUpdate(idx, { lot_number_new: v })}
-                  disabled={disabled}
-                />
-              ) : (
+            {isPurchase ? (
+              <CellInput
+                type="text"
+                value={line.lot_number_new ?? ''}
+                onChange={(v) => onUpdate(idx, { lot_number_new: v })}
+                disabled={disabled}
+              />
+            ) : (
+              prod?.has_lots ? (
                 <select
                   style={{ ...cellStyle(), cursor: 'pointer' }}
                   value={line.stock_lot_id}
@@ -156,9 +159,9 @@ export const DocumentLineRow = memo(function DocumentLineRow({
                     </option>
                   ))}
                 </select>
+              ) : (
+                <span style={{ fontSize: 11, color: 'var(--t4)', padding: '0 6px' }}>—</span>
               )
-            ) : (
-              <span style={{ fontSize: 11, color: 'var(--t4)', padding: '0 6px' }}>—</span>
             )}
           </td>
         )}

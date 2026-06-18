@@ -47,11 +47,12 @@ class InventoryStockService
      */
     public function getStockAt(
         string  $date,
-        ?int    $warehouseId = null,
-        ?string $search      = null
+        ?int    $warehouseId  = null,
+        ?string $search      = null,
+        ?int    $fiscalYearId = null
     ): array {
-        $companyId    = $this->companyContext->get();
-        $fiscalYearId = $this->resolveFiscalYearId($companyId, $date);
+        $companyId = $this->companyContext->get();
+        $fiscalYearId ??= $this->resolveFiscalYearId($companyId, $date);
 
         // ─── 1. الرصيد الافتتاحي ─────────────────────────────────────────────
         $openingQuery = DB::table('opening_balances_stock')
