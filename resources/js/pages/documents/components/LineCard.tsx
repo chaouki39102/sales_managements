@@ -61,17 +61,24 @@ export function LineCard({
       unitMargin = line.unit_price_ht - costPrice;
       marginPct = (unitMargin / line.unit_price_ht) * 100;
       totalMargin = unitMargin * baseQty;
-      marginColor = marginPct < 0 ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
+      marginColor = marginPct < lowMarginThreshold ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
     }
   }
-  const borderColor = hasWarning
-    ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'var(--red)' : 'var(--orange)')
-    : 'var(--b2)';
-  const bgTint = hasWarning
-    ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking
-        ? `color-mix(in srgb, var(--red) 5%, var(--bg2))`
-        : `color-mix(in srgb, var(--orange) 4%, var(--bg2))`)
-    : 'var(--bg2)';
+  const lowMarginThreshold = prod?.min_margin_percentage ?? 5;
+  const hasLowMarginWarning = (line._warnings ?? []).some(w => w.type === 'low_margin');
+  const hasLowMargin = hasLowMarginWarning || (!isPurchase && marginPct !== null && marginPct < lowMarginThreshold);
+  const borderColor = hasLowMargin
+    ? 'var(--red)'
+    : hasWarning
+      ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'var(--red)' : 'var(--orange)')
+      : 'var(--b2)';
+  const bgTint = hasLowMargin
+    ? `color-mix(in srgb, var(--red) 18%, var(--bg2))`
+    : hasWarning
+      ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking
+          ? `color-mix(in srgb, var(--red) 5%, var(--bg2))`
+          : `color-mix(in srgb, var(--orange) 4%, var(--bg2))`)
+      : 'var(--bg2)';
 
   return (
     <div
@@ -339,7 +346,7 @@ export function LineCard({
         )}
       </div>
 
-      {/* ── Warnings ── */}
+      {/* ── Stock & Other Warnings ── */}
       {hasStockWarning && (
         <div style={{
           marginTop: 6, padding: '4px 8px', borderRadius: 'var(--r1)',

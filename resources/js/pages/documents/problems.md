@@ -497,5 +497,3 @@ CommercialDocumentService::createStockMovements يستخدم $document->warehous
 خطأ في CommercialDocumentService::resolveNumberingSeries: قد ينشئ سلسلة جديدة لكل طلب إذا لم يجد، مما يؤدي إلى تكرار السلاسل.
 
 
-
-

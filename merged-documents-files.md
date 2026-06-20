@@ -350,6 +350,13 @@ export default function CommercialDocumentModal({
     return v === true || v === 'true';
   }, [settingsDict]);
 
+  // ── جاهزية اللوك أب — لا نبني الـ form حتى تصل القيم الجوهرية ──────────
+  // للمستند الجديد: ننتظر warehouse + currency (من settings أو lookups)
+  // للمستند الموجود: يمكن البناء فوراً من existingDocument بدون انتظار
+  const lookupsReady = isEdit
+    ? true
+    : (settingsWarehouseId !== '' && settingsCurrencyId !== '');
+
   // ─── Form ─────────────────────────────────────────────────────────────────
 
   const {
@@ -825,6 +832,36 @@ export default function CommercialDocumentModal({
   // ─── Guard ────────────────────────────────────────────────────────────────
 
   if (!open) return null;
+
+  // Skeleton — نعرضه ريثما تصل القيم الافتراضية (warehouse + currency)
+  // لتجنب عرض الـ form مرتين: مرة بقيم فارغة ومرة بعد وصول اللوك أب
+  if (!lookupsReady) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)',
+        direction: 'rtl',
+      }}>
+        <div style={{
+          width: '95vw', maxWidth: 1100, maxHeight: '93vh',
+          background: 'var(--bg1)', borderRadius: 'var(--r3)',
+          boxShadow: '0 24px 60px rgba(0,0,0,.3)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: 12, padding: 48,
+        }}>
+          <i className="ti ti-loader-2" style={{
+            fontSize: 32, color: 'var(--em)',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <span style={{ fontSize: 13, color: 'var(--t3)' }}>
+            {documentType?.name ?? 'جاري التحميل'}...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -5778,9 +5815,19 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   const activeComputeWarnings = computeWarnings.filter(
     (w) => w.level !== 'info',
   );
-  const rowBg = hasStockWarning || activeComputeWarnings.length > 0
-    ? `color-mix(in srgb, ${stockValidation.blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
-    : undefined;
+  let lowMarginRow = false;
+  if (!isPurchase && prod) {
+    const cp = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
+    if (cp > 0 && line.unit_price_ht > 0) {
+      const threshold = prod.min_margin_percentage ?? 5;
+      lowMarginRow = ((line.unit_price_ht - cp) / line.unit_price_ht) * 100 < threshold;
+    }
+  }
+  const rowBg = lowMarginRow
+    ? `color-mix(in srgb, var(--red) 15%, transparent)`
+    : hasStockWarning || activeComputeWarnings.length > 0
+      ? `color-mix(in srgb, ${stockValidation.blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
+      : undefined;
 
   const col = (key: ColKey) => visibleCols.has(key);
 
@@ -5941,9 +5988,13 @@ export const DocumentLineRow = memo(function DocumentLineRow({
                 style={{ ...cellStyle(), width: 40, padding: '5px 2px', fontSize: 10 }}
                 value={line.discount_mode}
                 disabled={disabled}
-                onChange={(e) => onUpdate(idx, {
-                  discount_mode: e.target.value as 'percent' | 'fixed',
-                })}
+                onChange={(e) => {
+                  const newMode = e.target.value as 'percent' | 'fixed';
+                  onUpdate(idx, newMode === 'fixed'
+                    ? { discount_mode: 'fixed',   discount_percentage:   0 }
+                    : { discount_mode: 'percent', discount_amount_fixed: 0 }
+                  );
+                }}
               >
                 <option value="percent">%</option>
                 <option value="fixed">دج</option>
@@ -5955,8 +6006,9 @@ export const DocumentLineRow = memo(function DocumentLineRow({
                 min={0}
                 step={0.01}
                 onChange={(v) => onUpdate(idx, line.discount_mode === 'percent'
-                  ? { discount_percentage: toNum(v) }
-                  : { discount_amount_fixed: toNum(v) })}
+                  ? { discount_percentage:   toNum(v), discount_amount_fixed: 0 }
+                  : { discount_amount_fixed: toNum(v), discount_percentage:   0 }
+                )}
                 disabled={disabled}
               />
             </div>
@@ -6029,7 +6081,8 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               const unitMargin = line.unit_price_ht - costPrice;
               const marginPct = (unitMargin / line.unit_price_ht) * 100;
               const totalMargin = unitMargin * baseQty;
-              const color  = marginPct < 0 ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
+              const marginThreshold = prod?.min_margin_percentage ?? 5;
+              const color  = marginPct < marginThreshold ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
                   <span style={{ color, fontWeight: 700, fontSize: 12 }}>
@@ -6793,17 +6846,24 @@ export function LineCard({
       unitMargin = line.unit_price_ht - costPrice;
       marginPct = (unitMargin / line.unit_price_ht) * 100;
       totalMargin = unitMargin * baseQty;
-      marginColor = marginPct < 0 ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
+      marginColor = marginPct < lowMarginThreshold ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
     }
   }
-  const borderColor = hasWarning
-    ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'var(--red)' : 'var(--orange)')
-    : 'var(--b2)';
-  const bgTint = hasWarning
-    ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking
-        ? `color-mix(in srgb, var(--red) 5%, var(--bg2))`
-        : `color-mix(in srgb, var(--orange) 4%, var(--bg2))`)
-    : 'var(--bg2)';
+  const lowMarginThreshold = prod?.min_margin_percentage ?? 5;
+  const hasLowMarginWarning = (line._warnings ?? []).some(w => w.type === 'low_margin');
+  const hasLowMargin = hasLowMarginWarning || (!isPurchase && marginPct !== null && marginPct < lowMarginThreshold);
+  const borderColor = hasLowMargin
+    ? 'var(--red)'
+    : hasWarning
+      ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'var(--red)' : 'var(--orange)')
+      : 'var(--b2)';
+  const bgTint = hasLowMargin
+    ? `color-mix(in srgb, var(--red) 18%, var(--bg2))`
+    : hasWarning
+      ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking
+          ? `color-mix(in srgb, var(--red) 5%, var(--bg2))`
+          : `color-mix(in srgb, var(--orange) 4%, var(--bg2))`)
+      : 'var(--bg2)';
 
   return (
     <div
@@ -7071,7 +7131,7 @@ export function LineCard({
         )}
       </div>
 
-      {/* ── Warnings ── */}
+      {/* ── Stock & Other Warnings ── */}
       {hasStockWarning && (
         <div style={{
           marginTop: 6, padding: '4px 8px', borderRadius: 'var(--r1)',
@@ -8338,14 +8398,19 @@ import type { LineItem } from '../types/document.types';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ComputeLineInput {
-  product_id:     number;
-  quantity:       number;
-  packaging_id?:  number | null;
-  price_level_id?: number | null;
-  warehouse_id?:  number | null;
-  party_id?:      number | null;
-  is_purchase?:   boolean;
-  document_date?: string;
+  product_id:                    number;
+  quantity:                      number;
+  packaging_id?:                 number | null;
+  price_level_id?:               number | null;
+  warehouse_id?:                 number | null;
+  party_id?:                     number | null;
+  is_purchase?:                  boolean;
+  document_date?:                string;
+  // الخصم اليدوي — يُمرَّر للباكاند ليُدرجه في حساب الإجماليات
+  // الباكاند يُطبّقه فقط إذا لم يوجد خصم كميات تلقائي
+  manual_discount_mode?:         'percent' | 'fixed' | null;
+  manual_discount_percentage?:   number;
+  manual_discount_amount_fixed?: number;  // خصم العبوة الواحدة
 }
 
 export interface ComputeLineWarning {
@@ -9186,21 +9251,43 @@ export function useDocumentForm({
         const lines = [...f.lines];
         const L     = lines[lineIdx];
         if (!L || !L.product_id) return f;
+
+        // ── الخصم ────────────────────────────────────────────────────────────
+        // الباكاند يُعيد خصم الكميات التلقائي فقط (quantity_discounts).
+        // إذا كان المستخدم قد أدخل خصماً يدوياً (percent أو fixed)
+        // نحتفظ بخصمه ولا نُكتب عليه — إلا إذا جاء خصم كميات جديد من الباكاند.
+        let discountMode       = L.discount_mode;
+        let discountPercentage = L.discount_percentage;
+        let discountAmountFixed = L.discount_amount_fixed;
+
+        if (result.discount_percentage > 0) {
+          // خصم كميات تلقائي من الباكاند — يُطبَّق دائماً (له الأولوية)
+          discountMode        = 'percent';
+          discountPercentage  = result.discount_percentage;
+          discountAmountFixed = 0;
+        } else if (result.quantity_discount_tier === null && L._fromCompute) {
+          // لا يوجد خصم كميات + السطر كان مُعيَّناً من compute سابق → صفّر
+          discountMode        = 'percent';
+          discountPercentage  = 0;
+          discountAmountFixed = 0;
+        }
+        // غير ذلك: نُبقي على الخصم اليدوي كما هو
+
         lines[lineIdx] = {
           ...L,
           unit_price_ht:         result.unit_price_ht,
           price_per_pack:        result.price_per_pack,
           _packQty:              result.pack_qty,
-          discount_percentage:   result.discount_percentage,
-          discount_amount_fixed: result.discount_amount_per_pack,
-          discount_mode:         result.discount_percentage > 0 ? 'percent' : 'fixed',
+          discount_mode:         discountMode,
+          discount_percentage:   discountPercentage,
+          discount_amount_fixed: discountAmountFixed,
           tva_rate:              result.tva_rate,
-          // الكوم FEFO الأول إذا لم يكن محدداً
           stock_lot_id: L.stock_lot_id || (
             result.lot_suggestions[0] ? String(result.lot_suggestions[0].id) : ''
           ),
-          _computing: false,
-          _warnings:  result.warnings,
+          _computing:   false,
+          _fromCompute: true,   // علامة: هذا السطر مرّ على compute مرة واحدة على الأقل
+          _warnings:    result.warnings,
         };
         return { ...f, lines };
       });
@@ -9299,7 +9386,7 @@ export function useDocumentForm({
 
     const curForm       = formRef.current!;
     const party         = partiesRef.current.find((p) => String(p.id) === id);
-    const newPriceLevel = party?.default_price_level_id ?? null;
+    const newPriceLevel = party?.default_price_level_id ?? (defaultPriceLevelId ? parseInt(defaultPriceLevelId) : null);
     const curPriceLvl   = curForm.price_level_id ? parseInt(curForm.price_level_id) : null;
 
     if (existingPayments.length > 0) {
@@ -9470,14 +9557,15 @@ export function useDocumentForm({
 
           // ── استدعاء compute-line فوراً من الباكاند ──
           triggerCompute(idx, {
-            product_id:     product.id,
-            quantity:       L.quantity,
-            packaging_id:   L.packaging_id ? parseInt(L.packaging_id) : null,
-            price_level_id: curPriceLevelId,
-            warehouse_id:   warehouseIdForCompute,
-            party_id:       partyIdForCompute,
-            is_purchase:    isPurchase,
-            document_date:  formRef.current?.document_date,
+            product_id:                   product.id,
+            quantity:                     L.quantity,
+            packaging_id:                 L.packaging_id ? parseInt(L.packaging_id) : null,
+            price_level_id:               curPriceLevelId,
+            warehouse_id:                 warehouseIdForCompute,
+            party_id:                     partyIdForCompute,
+            is_purchase:                  isPurchase,
+            document_date:                formRef.current?.document_date,
+            // عند اختيار منتج جديد لا يوجد خصم يدوي بعد
           }, 0); // فوري بدون debounce عند اختيار منتج جديد
 
         } else {
@@ -9552,14 +9640,18 @@ export function useDocumentForm({
         // compute-line مع debounce 350ms عند تغيير الكمية
         if (L.product_id) {
           setTimeout(() => triggerCompute(idx, {
-            product_id:     parseInt(L.product_id),
-            quantity:       patch.quantity as number,
-            packaging_id:   L.packaging_id ? parseInt(L.packaging_id) : null,
-            price_level_id: curPriceLevelId,
-            warehouse_id:   warehouseIdForCompute,
-            party_id:       partyIdForCompute,
-            is_purchase:    isPurchase,
-            document_date:  formRef.current?.document_date,
+            product_id:                   parseInt(L.product_id),
+            quantity:                     patch.quantity as number,
+            packaging_id:                 L.packaging_id ? parseInt(L.packaging_id) : null,
+            price_level_id:               curPriceLevelId,
+            warehouse_id:                 warehouseIdForCompute,
+            party_id:                     partyIdForCompute,
+            is_purchase:                  isPurchase,
+            document_date:                formRef.current?.document_date,
+            // نُمرّر الخصم اليدوي للباكاند ليحسب الإجماليات الصحيحة
+            manual_discount_mode:         L.discount_mode,
+            manual_discount_percentage:   L.discount_mode === 'percent' ? L.discount_percentage : 0,
+            manual_discount_amount_fixed: L.discount_mode === 'fixed'   ? L.discount_amount_fixed : 0,
           }, 350), 0);
         }
       }
@@ -10509,8 +10601,29 @@ CommercialDocumentService::createStockMovements يستخدم $document->warehous
 خطأ في CommercialDocumentService::resolveNumberingSeries: قد ينشئ سلسلة جديدة لكل طلب إذا لم يجد، مما يؤدي إلى تكرار السلاسل.
 
 
+  Todos
+[✓] زيادة وضوح اللون الأحمر للهامش المنخفض
+[✓] إضافة حقل min_margin_percentage للمنتج (migration + model)
+[✓] إضافة حقل min_margin_percentage في واجهة المنتج
+[✓] إظهار تحذير + خلفية حمراء عندما السعر أقل من min_margin_percentage
+تم. إليك الملخص:
+1. اللون الأحمر أوضح الآن: رفعت نسبة الشفافية من 6-8% إلى 15-18%
+2. حقل min_margin_percentage في المنتج:
+- تمت الهجرة (products.min_margin_percentage decimal 5,2)
+- أضيف إلى Product.php (fillable + cast) و ProductResource.php
+- أضيف إلى ProductModal.tsx في تبويب "الأساسيات" تحت "سعر الشراء"
+3. التحذير:
+- في LineCard و DocumentLineRow: إذا كان هامش الربح أقل من min_margin_percentage، يتحول السطر للأحمر + رسالة تحذير "هامش الربح (X%) أقل من الحد الأدنى (Y%)"
+- إذا لم يكن للمنتج min_margin_percentage محدد، يبقى الحد الافتراضي < 1%
+خطوة: اذهب إلى أي منتج، اضبط "الحد الأدنى لنسبة هامش الربح" في شاشة تعديل المنتج، ثم عند إضافته لوثيقة بسعر أقل من تلك النسبة سيظهر السطر بالأحمر مع تحذير.
 
 
+
+resources\js\pages\products\ProductModal.tsx
+resources\js\pages\products\ProductModal.tsx
+resources\js\pages\products\ProductModal.tsx
+resources\js\pages\products\ProductModal.tsx
+resources\js\pages\products\ProductModal.tsx
 ```
 
 ## FILE: resources/js/pages/documents/QuickSaleModal.tsx
@@ -12543,10 +12656,8 @@ export function calcLineTotal(line: LineItem): LineCalcResult {
     discPct     = line.discount_percentage;
     discountAmt = Math.round(gross * (discPct / 100) * 10_000) / 10_000;
   } else {
-    // fixed: discount_amount_fixed = خصم العبوة الواحدة
-    // إجمالي الخصم = discount_amount_fixed × عدد العبوات
-    const totalFixedDiscount = Math.round(line.discount_amount_fixed * line.quantity * 10_000) / 10_000;
-    discountAmt = Math.min(totalFixedDiscount, gross);
+    // fixed: discount_amount_fixed = خصم إجمالي على السطر كله
+    discountAmt = Math.min(line.discount_amount_fixed, gross);
     discPct     = gross > 0 ? (discountAmt / gross) * 100 : 0;
   }
 

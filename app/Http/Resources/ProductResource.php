@@ -24,6 +24,7 @@ class ProductResource extends JsonResource
             'unit_id'                   => $this->unit_id,
             'purchase_price_ht'         => $this->purchase_price_ht,
             'current_cost_price'        => $this->current_cost_price,
+            'min_margin_percentage'     => $this->min_margin_percentage,
             'manages_stock'             => $this->manages_stock,
             'allow_negative_stock'      => $this->allow_negative_stock,
             'has_lots'                  => $this->has_lots,

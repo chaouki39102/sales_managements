@@ -139,6 +139,8 @@ export interface UseDocumentFormReturn {
   handlePriceLevelChange: (priceLevelIdStr: string) => void;
   priceLevelId:           number | null;
   addLine:                () => void;
+  addLineWithProduct:     (productId: string, unitPrice?: number, tvaRate?: number) => void;
+  bulkAddLines:           (importedLines: Array<{description?: string; unit_price_ht?: number; quantity?: number; line_note?: string}>) => void;
   removeLine:             (idx: number) => void;
   duplicateLine:          (idx: number) => void;
   updateLine:             (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
@@ -146,6 +148,7 @@ export interface UseDocumentFormReturn {
   existingPayments:       PaymentEntry[];
   newPayments:            PaymentEntry[];
   addPayment:             () => void;
+  addPaymentWithValues:   (values: Partial<PaymentEntry>) => void;
   removePayment:          (idx: number) => void;
   updatePayment:          (idx: number, patch: Partial<PaymentEntry>) => void;
   partyBalance:           PartyBalanceInfo | null;
@@ -658,7 +661,7 @@ export function useDocumentForm({
 
     const curForm       = formRef.current!;
     const party         = partiesRef.current.find((p) => String(p.id) === id);
-    const newPriceLevel = party?.default_price_level_id ?? null;
+    const newPriceLevel = party?.default_price_level_id ?? (defaultPriceLevelId ? parseInt(defaultPriceLevelId) : null);
     const curPriceLvl   = curForm.price_level_id ? parseInt(curForm.price_level_id) : null;
 
     if (existingPayments.length > 0) {
@@ -941,6 +944,39 @@ export function useDocumentForm({
     setLineErr('');
   }, [defaultTvaRate]);
 
+  const addLineWithProduct = useCallback((productId: string, unitPrice?: number, tvaRate?: number) => {
+    setForm((f) => ({
+      ...f,
+      lines: [
+        ...f.lines,
+        {
+          ...makeLine(defaultTvaRate),
+          product_id: productId,
+          unit_price_ht: unitPrice ?? 0,
+          tva_rate: tvaRate ?? defaultTvaRate,
+        },
+      ],
+    }));
+  }, [defaultTvaRate]);
+
+  const bulkAddLines = useCallback((importedLines: Array<{
+    description?: string; unit_price_ht?: number; quantity?: number; line_note?: string;
+  }>) => {
+    setForm((f) => ({
+      ...f,
+      lines: [
+        ...f.lines,
+        ...importedLines.map((line) => ({
+          ...makeLine(defaultTvaRate),
+          description: line.description ?? '',
+          unit_price_ht: line.unit_price_ht ?? 0,
+          quantity: line.quantity ?? 1,
+          line_note: line.line_note ?? '',
+        })),
+      ],
+    }));
+  }, [defaultTvaRate]);
+
   const removeLine = useCallback((idx: number) => {
     setForm((f) => ({ ...f, lines: f.lines.filter((_, i) => i !== idx) }));
   }, []);
@@ -965,6 +1001,20 @@ export function useDocumentForm({
       payment_date:        today(),
       treasury_account_id: firstMode?.treasury_account_id
         ? String(firstMode.treasury_account_id) : '',
+    }]);
+  }, [pmMode]);
+
+  const addPaymentWithValues = useCallback((values: Partial<PaymentEntry>) => {
+    if (pmMode === 'locked') return;
+    const firstMode = paymentModsRef.current[0];
+    setNewPayments((prev) => [...prev, {
+      payment_mode_id:     firstMode ? String(firstMode.id) : '',
+      amount:              '',
+      reference:           '',
+      payment_date:        today(),
+      treasury_account_id: firstMode?.treasury_account_id
+        ? String(firstMode.treasury_account_id) : '',
+      ...values,
     }]);
   }, [pmMode]);
 
@@ -1089,6 +1139,9 @@ export function useDocumentForm({
         reference:           p.reference?.trim() || null,
         payment_date:        p.payment_date,
         treasury_account_id: treasuryId,
+        ...(p.check_number   ? { check_number: p.check_number } : {}),
+        ...(p.check_bank     ? { check_bank: p.check_bank } : {}),
+        ...(p.check_due_date ? { check_due_date: p.check_due_date } : {}),
       };
     });
 
@@ -1159,10 +1212,10 @@ export function useDocumentForm({
   return {
     form, errors, lineErr, apiErr, setApiErr,
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
-    addLine, removeLine, duplicateLine, updateLine,
+    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
     paymentMode: pmMode,
     existingPayments, newPayments,
-    addPayment, removePayment, updatePayment,
+    addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
     totals, validate, buildPayload,
     validateLineStock: validateLineStockFn,

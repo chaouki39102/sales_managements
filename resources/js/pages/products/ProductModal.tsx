@@ -58,7 +58,7 @@ interface QuantityDiscount {
 interface ProductForm {
   name: string; slug: string; ref: string; barcode: string; description: string;
   family_id: number | null; brand_id: number | null; product_type_id: number | null;
-  tva_id: number | null; unit_id: number | null; purchase_price_ht: number | '';
+  tva_id: number | null; unit_id: number | null; purchase_price_ht: number | ''; min_margin_percentage: number | null | '';
   manages_stock: boolean; allow_negative_stock: boolean;
   has_lots: boolean; has_expiration_date: boolean;
   min_stock_alert: number | ''; max_stock_alert: number | '';
@@ -110,7 +110,7 @@ function emptyForm(priceLevels: PriceLevel[] = [], defaultTvaId: number | null =
   return {
     name: '', slug: '', ref: '', barcode: '', description: '',
     family_id: null, brand_id: null, product_type_id: null,
-    tva_id: defaultTvaId, unit_id: null, purchase_price_ht: '',
+    tva_id: defaultTvaId, unit_id: null, purchase_price_ht: '', min_margin_percentage: null,
     manages_stock: true, allow_negative_stock: false,
     has_lots: false, has_expiration_date: false,
     min_stock_alert: '', max_stock_alert: '',
@@ -128,7 +128,7 @@ function productToForm(p: any, priceLevels: PriceLevel[]): ProductForm {
     barcode: p.barcode ?? '', description: p.description ?? '',
     family_id: p.family_id ?? null, brand_id: p.brand_id ?? null,
     product_type_id: p.product_type_id ?? null, tva_id: p.tva_id ?? null, unit_id: p.unit_id ?? null,
-    purchase_price_ht: p.purchase_price_ht ?? '',
+    purchase_price_ht: p.purchase_price_ht ?? '', min_margin_percentage: p.min_margin_percentage ?? null,
     manages_stock: p.manages_stock ?? true, allow_negative_stock: p.allow_negative_stock ?? false,
     has_lots: p.has_lots ?? false, has_expiration_date: p.has_expiration_date ?? false,
     min_stock_alert: p.min_stock_alert ?? '', max_stock_alert: p.max_stock_alert ?? '',
@@ -150,6 +150,7 @@ function buildPayload(form: ProductForm) {
     description: form.description || null, family_id: form.family_id, brand_id: form.brand_id,
     product_type_id: form.product_type_id, tva_id: form.tva_id, unit_id: form.unit_id,
     purchase_price_ht: form.purchase_price_ht !== '' ? Number(form.purchase_price_ht) : 0,
+    min_margin_percentage: form.min_margin_percentage !== '' && form.min_margin_percentage !== null ? Number(form.min_margin_percentage) : null,
     manages_stock: form.manages_stock, allow_negative_stock: form.allow_negative_stock,
     has_lots: form.has_lots, has_expiration_date: form.has_expiration_date,
     min_stock_alert: form.min_stock_alert !== '' ? Number(form.min_stock_alert) : 0,
@@ -489,6 +490,12 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
               onChange={e => set('purchase_price_ht', e.target.value === '' ? '' : +e.target.value)}
               onBlur={() => validateField('purchase_price_ht')}
               placeholder="0.00" />
+          </Field>
+          <Field label="الحد الأدنى لنسبة هامش الربح %" hint="تحذير عندما يكون هامش البيع أقل من هذه النسبة">
+            <input type="number" min="0" max="100" step="0.01" className={s.inp()}
+              value={form.min_margin_percentage === null ? '' : form.min_margin_percentage}
+              onChange={e => set('min_margin_percentage', e.target.value === '' ? null : +e.target.value)}
+              placeholder="5.00" />
           </Field>
         </div>
       </div>

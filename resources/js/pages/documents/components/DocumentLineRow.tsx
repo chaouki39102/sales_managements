@@ -72,9 +72,19 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   const activeComputeWarnings = computeWarnings.filter(
     (w) => w.level !== 'info',
   );
-  const rowBg = hasStockWarning || activeComputeWarnings.length > 0
-    ? `color-mix(in srgb, ${stockValidation.blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
-    : undefined;
+  let lowMarginRow = false;
+  if (!isPurchase && prod) {
+    const cp = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
+    if (cp > 0 && line.unit_price_ht > 0) {
+      const threshold = prod.min_margin_percentage ?? 5;
+      lowMarginRow = ((line.unit_price_ht - cp) / line.unit_price_ht) * 100 < threshold;
+    }
+  }
+  const rowBg = lowMarginRow
+    ? `color-mix(in srgb, var(--red) 15%, transparent)`
+    : hasStockWarning || activeComputeWarnings.length > 0
+      ? `color-mix(in srgb, ${stockValidation.blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
+      : undefined;
 
   const col = (key: ColKey) => visibleCols.has(key);
 
@@ -328,7 +338,8 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               const unitMargin = line.unit_price_ht - costPrice;
               const marginPct = (unitMargin / line.unit_price_ht) * 100;
               const totalMargin = unitMargin * baseQty;
-              const color  = marginPct < 0 ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
+              const marginThreshold = prod?.min_margin_percentage ?? 5;
+              const color  = marginPct < marginThreshold ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
                   <span style={{ color, fontWeight: 700, fontSize: 12 }}>

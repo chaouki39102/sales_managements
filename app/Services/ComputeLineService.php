@@ -272,6 +272,17 @@ class ComputeLineService
             ];
         }
 
+        if (!$isPurchase && $marginPct > 0) {
+            $minMargin = $product->min_margin_percentage ?? 5;
+            if ($marginPct < $minMargin) {
+                $warnings[] = [
+                    'type'    => 'low_margin',
+                    'level'   => 'warning',
+                    'message' => "هامش الربح ({$marginPct}%) أقل من الحد الأدنى ({$minMargin}%)",
+                ];
+            }
+        }
+
         $partyCreditInfo = null;
         if ($party && !$isPurchase && $party->credit_limit > 0) {
             try {

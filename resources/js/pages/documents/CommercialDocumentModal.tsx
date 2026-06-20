@@ -354,11 +354,11 @@ export default function CommercialDocumentModal({
   const {
     form, errors, lineErr, apiErr, setApiErr,
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
-    addLine, removeLine, duplicateLine, updateLine,
+    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
     paymentMode: pmMode,
     existingPayments,
     newPayments,
-    addPayment, removePayment, updatePayment,
+    addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
     totals, validate, buildPayload,
     updateStockData,
@@ -1640,12 +1640,7 @@ export default function CommercialDocumentModal({
                     suggestions={productSuggestions}
                     isLoading={isLoadingSuggestions}
                     onAddProduct={(productId, suggestedPrice, suggestedTva) => {
-                      addLine();
-                      const lastIdx = form.lines.length;
-                      const patch: Record<string, unknown> = { product_id: String(productId) };
-                      if (suggestedPrice != null) patch.unit_price_ht = suggestedPrice;
-                      if (suggestedTva != null)   patch.tva_rate     = suggestedTva;
-                      updateLine(lastIdx, patch as Parameters<typeof updateLine>[1]);
+                      addLineWithProduct(String(productId), suggestedPrice ?? undefined, suggestedTva ?? undefined);
                     }}
                     disabled={isReadOnly}
                   />
@@ -2284,16 +2279,19 @@ export default function CommercialDocumentModal({
         open={showBulkImport}
         onClose={() => setShowBulkImport(false)}
         onImport={(importedLines) => {
-          importedLines.forEach((line) => {
-            addLine();
-            const lastIdx = form.lines.length;
-            const patch: Record<string, unknown> = {};
-            if (line.description) patch.description = line.description;
-            if (line.unit_price_ht) patch.unit_price_ht = line.unit_price_ht;
-            if (line.quantity) patch.quantity = line.quantity;
-            if (line.line_note) patch.line_note = line.line_note;
-            updateLine(lastIdx, patch as Parameters<typeof updateLine>[1]);
-          });
+          setForm((f) => ({
+            ...f,
+            lines: [
+              ...f.lines,
+              ...importedLines.map((line) => ({
+                ...makeLine(defaultTvaRate),
+                description: line.description ?? '',
+                unit_price_ht: line.unit_price_ht ?? 0,
+                quantity: line.quantity ?? 1,
+                line_note: line.line_note ?? '',
+              })),
+            ],
+          }));
         }}
       />
 
