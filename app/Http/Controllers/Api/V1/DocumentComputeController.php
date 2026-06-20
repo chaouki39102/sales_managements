@@ -70,21 +70,28 @@ class DocumentComputeController extends BaseApiController
         }
     }
 
-    public function convert(Request $request, CommercialDocument $document): JsonResponse
+    public function convert(Request $request): JsonResponse
     {
         try {
+            $documentId = (int) $request->route('document');
+            $document   = CommercialDocument::findOrFail($documentId);
+
             $this->authorizeAction('update', $document);
 
             $validated = $request->validate([
-                'target_type_code' => 'required|string|max:10',
-                'include_line_ids' => 'nullable|array',
+                'target_type_code'  => 'required|string|max:10',
+                'document_date'     => 'nullable|date',
+                'include_line_ids'  => 'nullable|array',
                 'include_line_ids.*' => 'integer',
             ]);
+
+            \Log::debug('[convert] received document_date:', ['raw' => $request->input('document_date'), 'validated' => $validated['document_date'] ?? null]);
 
             $newDocument = $this->conversionService->convert(
                 $document,
                 $validated['target_type_code'],
                 $validated['include_line_ids'] ?? null,
+                $validated['document_date'] ?? null,
             );
 
             return $this->successResponse(
@@ -97,9 +104,12 @@ class DocumentComputeController extends BaseApiController
         }
     }
 
-    public function chain(CommercialDocument $document): JsonResponse
+    public function chain(Request $request): JsonResponse
     {
         try {
+            $documentId = (int) $request->route('document');
+            $document   = CommercialDocument::findOrFail($documentId);
+
             $this->authorizeAction('view', $document);
 
             $chain = $this->conversionService->buildChain($document);
@@ -139,13 +149,14 @@ class DocumentComputeController extends BaseApiController
         }
     }
 
-    public function creditCheck(Request $request, int $partyId): JsonResponse
+    public function creditCheck(Request $request): JsonResponse
     {
         try {
             $this->authorizeAction('viewAny', \App\Models\Party::class);
 
-            $amount = (float) $request->input('amount', 0);
-            $date   = $request->input('date', now()->toDateString());
+            $partyId = (int) $request->route('party');
+            $amount  = (float) $request->input('amount', 0);
+            $date    = $request->input('date', now()->toDateString());
 
             $result = $this->creditCheckService->check($partyId, $amount, $date);
 

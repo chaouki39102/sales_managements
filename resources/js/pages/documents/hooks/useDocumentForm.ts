@@ -61,6 +61,8 @@ import type {
   DocumentTotals,
   PaymentEntry,
   Product,
+  ShippingInfo,
+  PaymentTerm,
 } from '../types/document.types';
 import type { LineStockValidation } from '../utils/document.utils';
 
@@ -351,15 +353,22 @@ function buildDefaultForm(
   defaultTvaRate: number,
   products?: Product[],
 ): DocumentFormState {
+  const defaultShipping: ShippingInfo = {};
+  const defaultPaymentTerms: PaymentTerm[] = [];
+
   if (existingDocument) {
     const doc   = existingDocument;
     const lines = ((doc.lines as Record<string, unknown>[]) ?? [])
       .map((l) => buildLineFromApi(l, defaultTvaRate, products));
 
+    const rawShipping = (doc as Record<string, unknown>).shipping_info;
+    const rawTerms    = (doc as Record<string, unknown>).payment_terms;
+
     return {
       party_id:       String(doc.party_id       ?? ''),
       document_date:  String(doc.document_date  ?? today()).split('T')[0],
       due_date:       doc.due_date ? String(doc.due_date).split('T')[0] : '',
+      delivery_date:  doc.delivery_date ? String(doc.delivery_date).split('T')[0] : '',
       notes:          String(doc.notes          ?? ''),
       internal_notes: String(doc.internal_notes ?? ''),
       warehouse_id:   String(doc.warehouse_id   ?? ''),
@@ -368,21 +377,29 @@ function buildDefaultForm(
       exchange_rate:  String(doc.exchange_rate  ?? '1'),
       apply_stamp:    toNum(doc.total_stamp ?? doc.fiscal_stamp ?? 0) > 0,
       price_level_id: String(doc.price_level_id ?? ''),
+      is_proforma:    !!(doc as Record<string, unknown>).is_proforma,
       lines,
       payments: [],
+      shipping_info:  (typeof rawShipping === 'object' && rawShipping !== null)
+        ? (rawShipping as ShippingInfo) : { ...defaultShipping },
+      payment_terms:  Array.isArray(rawTerms)
+        ? (rawTerms as PaymentTerm[]) : [...defaultPaymentTerms],
     };
   }
 
   return {
-    party_id: '', document_date: today(), due_date: '', notes: '',
-    internal_notes: '',
+    party_id: '', document_date: today(), due_date: '', delivery_date: '',
+    notes: '', internal_notes: '',
     warehouse_id:   defaults.warehouseId,
     fiscal_year_id: defaults.yearId,
     currency_id:    defaults.currencyId,
     exchange_rate:  '1',
     apply_stamp:    false,
     price_level_id: '',
+    is_proforma:    false,
     lines: [], payments: [],
+    shipping_info:  { ...defaultShipping },
+    payment_terms:  [...defaultPaymentTerms],
   };
 }
 
@@ -766,7 +783,7 @@ export function useDocumentForm({
 
         // ابحث في _product أولاً ثم في productsRef
         let pkg = (L._product?.packagings ?? []).find((pk) => String(pk.id) === packId);
-        if (!pkg) {
+        if (!pkg && productsRef.current) {
           const prod = productsRef.current.find((p) => String(p.id) === L.product_id);
           pkg = prod?.packagings?.find((pk) => String(pk.id) === packId);
         }
@@ -1035,8 +1052,12 @@ export function useDocumentForm({
       exchange_rate:    parseFloat(f.exchange_rate) || 1,
       document_date:    f.document_date,
       due_date:         f.due_date         || null,
+      delivery_date:    f.delivery_date    || null,
       notes:            f.notes            || null,
       internal_notes:   f.internal_notes   || null,
+      is_proforma:      f.is_proforma,
+      shipping_info:    Object.keys(f.shipping_info).length > 0 ? f.shipping_info : null,
+      payment_terms:    f.payment_terms.length > 0 ? f.payment_terms : null,
     };
 
     if (pmMode === 'additive') {

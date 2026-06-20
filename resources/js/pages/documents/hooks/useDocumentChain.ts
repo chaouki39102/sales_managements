@@ -41,6 +41,7 @@ export function useDocumentChain(documentId: number | null | undefined) {
 export interface ConversionPayload {
   documentId:      number;
   targetTypeCode:  string;
+  documentDate?:   string;
   includeLineIds?: number[];
 }
 
@@ -49,9 +50,10 @@ export function useConvertDocument() {
   const qc   = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ documentId, targetTypeCode, includeLineIds }: ConversionPayload) =>
+    mutationFn: ({ documentId, targetTypeCode, documentDate, includeLineIds }: ConversionPayload) =>
       apiPost(`/documents/${documentId}/convert`, {
         target_type_code: targetTypeCode,
+        document_date:    documentDate ?? null,
         include_line_ids: includeLineIds,
       }),
     onSuccess: () => {

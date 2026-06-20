@@ -17,6 +17,7 @@ interface DocumentLineRowProps {
   onUpdate:       (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
   onRemove:       (idx: number) => void;
   onDuplicate:    (idx: number) => void;
+  isTvaExempt?:   boolean;
 }
 
 function CellInput({
@@ -46,7 +47,7 @@ function CellInput({
 
 export const DocumentLineRow = memo(function DocumentLineRow({
   line, idx, visibleCols, isPurchase, disabled, products, stockData,
-  stockValidation, onUpdate, onRemove, onDuplicate,
+  stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt,
 }: DocumentLineRowProps) {
 
   const { baseQty, gross, discountAmt, discPct, ht, tva: lineTva, ttc } = calcLineTotal(line);
@@ -237,14 +238,26 @@ export const DocumentLineRow = memo(function DocumentLineRow({
 
         {col('tva') && (
           <td style={{ padding: '3px 4px' }}>
-            <CellInput
-              value={line.tva_rate}
-              min={0}
-              step={1}
-              onChange={(v) => onUpdate(idx, { tva_rate: toNum(v) })}
-              disabled={disabled}
-              width={60}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <CellInput
+                value={line.tva_rate}
+                min={0}
+                step={1}
+                onChange={(v) => onUpdate(idx, { tva_rate: toNum(v) })}
+                disabled={disabled || isTvaExempt}
+                width={isTvaExempt ? 40 : 60}
+              />
+              {isTvaExempt && (
+                <span style={{
+                  padding: '1px 5px', borderRadius: 99, fontSize: 9, fontWeight: 700,
+                  background: 'color-mix(in srgb, var(--green) 12%, transparent)',
+                  color: 'var(--green)', whiteSpace: 'nowrap',
+                }}>
+                  <i className="ti ti-circle-check" style={{ marginLeft: 2, fontSize: 8 }} />
+                  معفى
+                </span>
+              )}
+            </div>
           </td>
         )}
 

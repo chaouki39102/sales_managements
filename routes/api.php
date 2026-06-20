@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\V1\FiscalYearController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\StockMovementController;
 use App\Http\Controllers\Api\V1\DocumentComputeController;
+use App\Http\Controllers\Api\V1\CustomerInsightController;
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
@@ -422,6 +423,11 @@ Route::prefix('v1')->group(function () {
 
                 // ── فحص الائتمان ─────────────────────────────────
                 Route::get('parties/{party}/credit-check', [DocumentComputeController::class, 'creditCheck']);
+
+                // ── تحليلات المتعامل ───────────────────────────────
+                Route::get('parties/{party}/insights',            [CustomerInsightController::class, 'insights']);
+                Route::get('parties/{party}/product-suggestions', [CustomerInsightController::class, 'productSuggestions']);
+                Route::get('parties/{party}/advances',          [CustomerInsightController::class, 'advances']);
 
                 Route::apiResource('commercial-document-lines', CommercialDocumentLineController::class);
 

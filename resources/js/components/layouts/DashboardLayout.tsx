@@ -53,6 +53,7 @@ const NAV_GROUPS = [
     items: [
       { name: 'العملاء',          href: 'clients',     icon: 'ti-users'           },
       { name: 'الخزينة',          href: 'finance',     icon: 'ti-building-bank'   },
+      { name: 'الشيكات',          href: 'checks',      icon: 'ti-file-invoice'    },
       { name: 'المصروفات',        href: 'expenses',    icon: 'ti-credit-card'     },
       { name: 'الديون',           href: 'debts',       icon: 'ti-receipt'         },
       { name: 'إقرار TVA — G50', href: 'tva',         icon: 'ti-calculator'      },
@@ -114,6 +115,7 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   'warehouses':              { title: 'المستودعات',          path: 'مخزون ← مستودعات'       },
   'clients':                 { title: 'العملاء',             path: 'محاسبة ← عملاء'         },
   'finance':                 { title: 'الخزينة',             path: 'محاسبة ← خزينة'         },
+  'checks':                  { title: 'الشيكات',             path: 'محاسبة ← شيكات'         },
   'expenses':                { title: 'المصروفات',           path: 'محاسبة ← مصروفات'       },
   'debts':                   { title: 'الديون',              path: 'محاسبة ← ديون'          },
   'tva':                     { title: 'إقرار TVA — G50',     path: 'محاسبة ← TVA'           },

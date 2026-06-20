@@ -1,11 +1,11 @@
 # المتبقي من STUDY_extended.md
 
-> نسبة الإنجاز الكلية: ~15-20%
-> ما طُبِّق: todo/ بالكامل (100% من ملفات التنفيذ) + فصول 1-4
+> نسبة الإنجاز الكلية: ~38%
+> ما طُبِّق: todo/ بالكامل (100% من ملفات التنفيذ) + فصول 1–9
 
 ---
 
-## ✅  تم إنجازه
+## ✅ تم إنجازه
 
 | البند | الملفات |
 |---|---|
@@ -24,79 +24,24 @@
 | DocumentConversionService | `app/Services/DocumentConversionService.php` |
 | DocumentReturnService | `app/Services/DocumentReturnService.php` |
 | CreditCheckService | `app/Services/CreditCheckService.php` |
-| DocumentComputeController | `app/Http/Controllers/Api/V1/DocumentComputeController.php`|
+| DocumentComputeController | `app/Http/Controllers/Api/V1/DocumentComputeController.php` |
 | طلب التوثيق | `app/Http/Requests/StoreCommercialDocumentRequest.php` |
 | validateDocument | `app/Services/CommercialDocumentService.php` |
 | Routes | `routes/api.php` |
 | اسم الطرف في الدفعات | `FinancePage.tsx` |
+| **الفصل 5: نظام التسليم** | `DeliveryProgressBar.tsx`, تحويل BCC→BL delivery logic |
+| **الفصل 6: معالجة الشيكات** | `CheckFormFields.tsx`, `ChecksPage.tsx`, route + nav |
+| **الفصل 7: الفاتورة المبدئية** | `is_proforma` toggle/badge/logic + تحويل مبدئي→حقيقي |
+| **الفصل 8: الشحن والتسليم** | `ShippingInfoSection.tsx` + `delivery_date`, `shipping_info` في النموذج |
+| **الفصل 9: شروط الدفع** | `PaymentTermsTable.tsx` + `payment_terms` في النموذج |
+| **تحسينات PaymentTermsTable** | حقل مبلغ قابل للكتابة + حساب عكسي (نسبة↔مبلغ) + زر المبلغ المتبقي + عملة `دج` |
+| **Tabs للمساحة** | `Tabs` component في `DocumentUIPrimitives.tsx` + دمج الشحن/شروط الدفع في tabs |
+| **مودال التحويل** | `ConvertDocumentModal.tsx` — تاريخ, اختيار نوع, لوحة مفاتيح |
+| **تحسينات سلسلة المستندات** | عرض الكود + الاسم الكامل في chain panel و قائمة التحويل |
 
 ---
 
-## ❌ المتبقي — فصول 5-24
-
-### الفصل 5: نظام التسليم والتتبع
-**الملفات المطلوبة:**
-- تحديث `DocumentConversionService.php` (موجود جزئياً)
-- `components/DeliveryProgress.tsx` — شريط تقدم التسليم في أسطر BCC
-- `components/DeliveryTrackingBadge.tsx` — Badge "مُسلَّم كلياً / جزئياً"
-- تحديث `DocumentLineRow.tsx` لإظهار progress bar للأسطر القابلة للتسليم
-
-**المنطق:**
-- تحويل BCC→BL يُحدِّث `delivered_quantity`
-- `getRemainingQuantity()` محسوبة = `quantity - delivered_quantity - returned_quantity`
-- الفرونتند يُظهر 300/500 (60%)
-
----
-
-### الفصل 6: نظام معالجة الشيكات
-**الملفات المطلوبة:**
-- `components/CheckFormFields.tsx` — حقول الشيك (رقم، بنك، تاريخ استحقاق)
-- `pages/checks/ChecksPage.tsx` — صفحة إدارة الشيكات
-- تحديث `PaymentForm` في `CommercialDocumentModal.tsx` — إظهار حقول الشيك عند اختيار طريقة دفع "شيك"
-
-**المنطق:**
-- `Payment.check_id` → `Check` model
-- دورة حياة الشيك: received → deposited → cleared / returned
-- تنبيه قبل أسبوع من تاريخ الاستحقاق
-- الحقول مخزَّنة في `payments.*.check_number`, `check_bank`, `check_due_date` (موجودة في Request)
-
----
-
-### الفصل 7: الفاتورة المبدئية (Pro Forma)
-**الملفات المطلوبة:**
-- تحديث `CommercialDocumentModal.tsx` — إضافة toggle `is_proforma`
-- تحديث `CommercialDocumentService.php` — تخطي حركات المخزون والدفعات إذا `is_proforma`
-
-**المنطق:**
-- `CommercialDocument.is_proforma` موجود في DB
-- Badge "مبدئية" بجانب العنوان
-- زر "تأكيد وتحويل لفاتورة حقيقية"
-
----
-
-### الفصل 8: بيانات الشحن والتسليم
-**الملفات المطلوبة:**
-- `components/ShippingInfoSection.tsx` — قسم الشحن القابل للطي
-
-**المنطق:**
-- `shipping_info` JSON: address, transport_mode, driver_name, vehicle_plate, driver_notes
-- `delivery_date` — تاريخ التسليم
-- يُظهر فقط لـ BL و BCC
-- `shipping_info.*` موجودة في Request
-
----
-
-### الفصل 9: شروط الدفع المفصلة
-**الملفات المطلوبة:**
-- `components/PaymentTermsTable.tsx` — جدول شروط الدفع
-
-**المنطق:**
-- `payment_terms` JSON array: `[{due_date, percentage, amount, notes}]`
-- يُحسَب تلقائياً من `credit_days` الزبون أو يُدخَل يدوياً
-- المجموع يساوي `net_to_pay`
-- يُخزَّن في `CommercialDocument.payment_terms` (موجود في DB)
-
----
+## ❌ المتبقي — فصول 10–24
 
 ### الفصل 10: الإعفاء الضريبي
 **الملفات المطلوبة:**
@@ -246,7 +191,7 @@
 
 ---
 
-## 🐛  مشاكل صغيرة متبقية
+## 🐛 مشاكل صغيرة متبقية
 
 | المشكلة | الموقع | الحل |
 |---|---|---|
@@ -255,4 +200,7 @@
 
 ---
 
-**ملخص:** 24 فصلاً، أُنجز 4 فصول كاملة (~17%)، بقي 20 فصلاً (~83%) + مشكلتين صغيرتين في `lineWarnings` و `_warnings`.
+**ملخص:** 24 فصلاً، أُنجز 9 فصول كاملة (~38%)، بقي 15 فصلاً (~62%) + تحسينات PaymentTermsTable + Tabs + مشكلتين صغيرتين في `lineWarnings` و `_warnings`.
+
+
+

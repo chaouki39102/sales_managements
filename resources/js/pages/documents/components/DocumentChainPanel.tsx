@@ -3,11 +3,16 @@ import { fmtDZD, fmtDate } from '../utils/document.utils';
 import { STATUS_CONFIG } from '../types/document.types';
 import type { DocumentChain, ChainNode } from '../hooks/useDocumentChain';
 
+interface TargetType {
+  code: string;
+  name: string;
+}
+
 interface DocumentChainPanelProps {
   chain:           DocumentChain | null | undefined;
   isLoading:       boolean;
   currentId:       number;
-  allowedTargets:  string[];
+  allowedTargets:  TargetType[];
   onConvert:       (targetCode: string) => void;
   onNavigate:      (documentId: number) => void;
   isReadOnly:      boolean;
@@ -53,7 +58,7 @@ function ChainNodeCard({
           )}
         </div>
         <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 1 }}>
-          {node.type_name} · {fmtDate(node.document_date)} · {fmtDZD(node.net_to_pay)} دج
+          {node.document_type} · {node.type_name} · {fmtDate(node.document_date)} · {fmtDZD(node.net_to_pay)} دج
         </div>
       </div>
       {!isCurrent && (
@@ -146,10 +151,10 @@ export function DocumentChainPanel({
                 borderRadius: 'var(--r2)', boxShadow: '0 4px 16px rgba(0,0,0,.2)',
                 zIndex: 100, minWidth: 160, overflow: 'hidden',
               }}>
-                {allowedTargets.map(code => (
+                {allowedTargets.map(t => (
                   <button
-                    key={code}
-                    onClick={() => { setShowConvert(false); onConvert(code); }}
+                    key={t.code}
+                    onClick={() => { setShowConvert(false); onConvert(t.code); }}
                     style={{
                       width: '100%', padding: '8px 12px', textAlign: 'right',
                       background: 'none', border: 'none', cursor: 'pointer',
@@ -159,7 +164,7 @@ export function DocumentChainPanel({
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg3)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                   >
-                    {code}
+                    {t.code} · {t.name}
                   </button>
                 ))}
               </div>

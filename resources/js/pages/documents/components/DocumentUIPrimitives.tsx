@@ -5,7 +5,7 @@
 // قابلة للتصدير واستخدامها في أي مكان آخر.
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ALL_COLUMNS, STATUS_CONFIG } from '../types/document.types';
 import type { ColKey } from '../types/document.types';
 
@@ -528,6 +528,67 @@ export function AlertBanner({
     }}>
       <i className={`ti ${c.icon}`} style={{ marginTop: 1 }} />
       <span>{message}</span>
+    </div>
+  );
+}
+
+// ─── Tabs ──────────────────────────────────────────────────────────────────────
+
+export interface Tab {
+  key:   string;
+  label: string;
+  icon:  string;
+  badge?: number;
+}
+
+export function Tabs({
+  tabs, activeKey, onChange, children, style,
+}: {
+  tabs:     Tab[];
+  activeKey: string;
+  onChange:  (key: string) => void;
+  children?: React.ReactNode;
+  style?:    React.CSSProperties;
+}) {
+  return (
+    <div style={style}>
+      <div style={{
+        display: 'flex', gap: 2, borderBottom: '1px solid var(--b2)',
+        marginBottom: 14, overflowX: 'auto',
+      }}>
+        {tabs.map((tab) => {
+          const isActive = tab.key === activeKey;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => onChange(tab.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', border: 'none', cursor: 'pointer',
+                fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+                borderRadius: 'var(--r1) var(--r1) 0 0',
+                background: isActive ? 'var(--bg1)' : 'transparent',
+                color: isActive ? 'var(--em)' : 'var(--t4)',
+                borderBottom: isActive ? '2px solid var(--em)' : '2px solid transparent',
+                transition: 'all .15s',
+              }}
+            >
+              <i className={`ti ${tab.icon}`} style={{ fontSize: 13 }} />
+              {tab.label}
+              {tab.badge != null && (
+                <span style={{
+                  padding: '0 6px', borderRadius: 99, fontSize: 10, fontWeight: 700,
+                  background: isActive ? 'var(--emb)' : 'var(--bg3)',
+                  color: isActive ? 'var(--em)' : 'var(--t4)',
+                }}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {children}
     </div>
   );
 }

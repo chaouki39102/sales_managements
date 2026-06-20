@@ -11,6 +11,7 @@ export const STOCK_IN_CODES  = new Set(['FA', 'BR', 'AV']);
 export const STOCK_OUT_CODES = new Set(['FV', 'BL', 'AA']);
 export const REQUIRES_PARTY  = new Set(['DEV', 'BCC', 'BL', 'FV', 'AV', 'DDP', 'BCF', 'BR', 'FA', 'AA']);
 export const SALE_CODES      = new Set(['FV', 'BL', 'DEV', 'BCC', 'AV']);
+export const SHIPPING_CODES  = new Set(['BL', 'BCC']);
 
 /** خريطة التحويلات المسموح بها (من → إلى[]) */
 export const CONVERSION_MAP: Record<string, string[]> = {
@@ -112,6 +113,25 @@ export interface Party {
   is_vat_registered?:      boolean;
 }
 
+// ─── Shipping Info ──────────────────────────────────────────────────────────────
+
+export interface ShippingInfo {
+  address?:       string;
+  transport_mode?: string;
+  driver_name?:   string;
+  vehicle_plate?: string;
+  driver_notes?:  string;
+}
+
+// ─── Payment Term ──────────────────────────────────────────────────────────────
+
+export interface PaymentTerm {
+  due_date:    string;
+  percentage:  number;
+  amount:      number;
+  notes?:      string;
+}
+
 // ─── Payment ──────────────────────────────────────────────────────────────────
 
 export interface PaymentMode {
@@ -180,15 +200,20 @@ export interface DocumentFormState {
   party_id:       string;
   document_date:  string;
   due_date:       string;
+  delivery_date:  string;
   notes:          string;
+  internal_notes: string;
   warehouse_id:   string;
   fiscal_year_id: string;
   currency_id:    string;
   exchange_rate:  string;
   apply_stamp:    boolean;
   price_level_id: string;
+  is_proforma:    boolean;
   lines:          LineItem[];
   payments:       PaymentEntry[];
+  shipping_info:  ShippingInfo;
+  payment_terms:  PaymentTerm[];
 }
 
 // ─── Totals ───────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 # Module Export: CommercialDocument
-Generated at: 2026-06-18 12:06:43
+Generated at: 2026-06-20 12:40:55
 
 ## Models
 
@@ -1383,10 +1383,12 @@ use App\Models\DocumentStatus;
 use App\Models\DocumentType;
 use App\Models\FiscalYear;
 use App\Models\NumberingSeries;
+use App\Models\Product;
 use App\Models\StockMovement;
 use App\Services\CompanyContextService;
 use App\Services\InventoryValuationService;
 use App\Services\Tax\FiscalStampCalculator;
+use App\Services\Tax\TaxRuleService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -1407,6 +1409,9 @@ use Illuminate\Support\Facades\Log;
 class CommercialDocumentService extends \App\Core\Services\BaseService
 {
     use ValidatesTenantRelations;
+
+    /** @var bool علامة للتحويل من مبدئي → حقيقي (تُستخدم في afterUpdate) */
+    private bool $convertingFromProforma = false;
 
     protected string $model        = CommercialDocument::class;
     protected string $resourceName = 'commercial_document';
@@ -1506,13 +1511,13 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         // ✅ حركات المخزون فوراً بعد الإنشاء (لأن الوثيقة معتمدة مباشرةً)
         $item->load('documentType', 'lines.product');
 
-        if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
+        if (($item->documentType?->affects_stock_direction ?? 0) !== 0 && !$item->is_proforma) {
             $this->createStockMovements($item);
         }
 
-        // ✅ ربط الدفعات إذا أُرسلت مع المستند
+        // ✅ ربط الدفعات إذا أُرسلت مع المستند (للمستندات غير المبدئية فقط)
         $payments = $request?->input('payments') ?? $data['payments'] ?? [];
-        if (!empty($payments)) {
+        if (!empty($payments) && !$item->is_proforma) {
             $this->attachPayments($item, $payments);
         }
     }
@@ -1525,6 +1530,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     protected function beforeUpdate(Model $item, array $data, $request): void
     {
         parent::beforeUpdate($item, $data, $request);
+
+        // علامة للتحويل من مبدئي → حقيقي (تُستخدم في afterUpdate)
+        if (isset($data['is_proforma']) && $data['is_proforma'] === false && $item->is_proforma === true) {
+            $this->convertingFromProforma = true;
+        }
 
         // R1
         if ($item->is_locked) {
@@ -1601,7 +1611,22 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             }
         }
 
-        // AU2: دفعات جديدة (additive mode)
+        // AU2: تحويل مبدئي → حقيقي — إنشاء حركات المخزون المفقودة
+        if ($this->convertingFromProforma) {
+            $item->load('documentType', 'lines.product');
+            // إنشاء حركات المخزون إذا كانت مفقودة
+            if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
+                $hasMovements = \App\Models\StockMovement::whereHas(
+                    'commercialDocumentLine',
+                    fn($q) => $q->where('commercial_document_id', $item->id)
+                )->exists();
+                if (!$hasMovements) {
+                    $this->createStockMovements($item);
+                }
+            }
+        }
+
+        // AU3: دفعات جديدة (additive mode)
         if (!empty($newPayments)) {
             $this->attachNewPayments($item, $newPayments);
         }
@@ -1673,6 +1698,74 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     }
 
     /**
+     * validateDocument — تحقق يدوي من مستند (draft → validated)
+     *
+     * يُستدعى عند الضغط على زر "اعتماد" من صفحة القائمة.
+     */
+    public function validateDocument(CommercialDocument $document, $request = null): void
+    {
+        $companyId = $document->company_id;
+
+        if ($document->is_locked) {
+            throw new BusinessRuleException(
+                'لا يمكن اعتماد وثيقة مقفلة.',
+                409
+            );
+        }
+
+        $currentStatus = $document->documentStatus?->name
+            ?? \App\Models\DocumentStatus::where('id', $document->document_status_id)->value('name');
+
+        if (in_array($currentStatus, ['validated', 'paid', 'partially_paid', 'overdue'], true)) {
+            throw new BusinessRuleException(
+                'المستند معتمد بالفعل.',
+                409
+            );
+        }
+
+        if (in_array($currentStatus, ['cancelled', 'returned'], true)) {
+            throw new BusinessRuleException(
+                'لا يمكن اعتماد مستند ملغى أو مرتجع.',
+                409
+            );
+        }
+
+        if ($document->lines()->count() === 0) {
+            throw new BusinessRuleException(
+                'لا يمكن اعتماد مستند بدون أسطر.',
+                422
+            );
+        }
+
+        $validatedStatusId = $this->getStatusId($companyId, 'validated');
+
+        if (!$validatedStatusId) {
+            throw new BusinessRuleException(
+                "لم يُعثر على حالة 'validated' للشركة #{$companyId}",
+                500
+            );
+        }
+
+        $document->updateQuietly([
+            'document_status_id' => $validatedStatusId,
+            'validated_at'       => now(),
+            'validated_by'       => auth()->id(),
+        ]);
+
+        $document->load('documentType', 'lines.product');
+
+        if (($document->documentType?->affects_stock_direction ?? 0) !== 0) {
+            $existingMovements = StockMovement::whereHas('commercialDocumentLine', function ($q) use ($document) {
+                $q->where('commercial_document_id', $document->id);
+            })->exists();
+
+            if (!$existingMovements) {
+                $this->createStockMovements($document);
+            }
+        }
+    }
+
+    /**
      * إضافة دفعات جديدة لمستند (وضع additive — لا تمس القديمة)
      */
     public function attachNewPaymentsPublic(CommercialDocument $document, array $payments): void
@@ -1715,7 +1808,22 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             );
         }
 
+        // Load party for TVA exemption enforcement
+        $party  = $document->party;
+        $taxSvc = app(TaxRuleService::class);
+
         foreach ($lines as $order => $lineData) {
+            // Override TVA rate if party is exempt
+            $product = isset($lineData['product_id'])
+                ? Product::find((int) $lineData['product_id'])
+                : null;
+            if ($party && $product) {
+                $rule = $taxSvc->getEffectiveTvaRate($party, $product);
+                if ($rule['forced']) {
+                    $lineData['tva_rate'] = $rule['rate'];
+                }
+            }
+
             $totals = $this->computeLineTotals($lineData);
 
             $document->lines()->create([
@@ -1765,6 +1873,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function attachPayments(CommercialDocument $document, array $payments): void
     {
+        if ($document->is_proforma) return;
+
         foreach ($payments as $paymentData) {
             if (empty($paymentData['payment_mode_id']) || empty($paymentData['amount'])) {
                 continue;
@@ -1898,14 +2008,31 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // PUBLIC: إضافة أسطر لمستند موجود + إعادة حساب الإجماليات
+    // يُستخدم من DocumentConversionService لأن BaseService::beforeCreate
+    // يزيل المفاتيح غير المرتبطة بعمود (مثل 'lines') من $data
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function addLinesToDocument(CommercialDocument $document, array $linesData): void
+    {
+        $this->createDocumentLines($document, $linesData);
+        $this->recalculateTotals($document);
+        $document->load('documentType', 'lines.product');
+        if (($document->documentType?->affects_stock_direction ?? 0) !== 0 && !$document->is_proforma) {
+            $this->createStockMovements($document);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // PRIVATE: إنشاء حركات المخزون
     // ═══════════════════════════════════════════════════════════════════════
 
     private function createStockMovements(CommercialDocument $document): void
     {
+        if ($document->is_proforma) return;
+
         $documentType = $document->documentType;
         $direction    = (int) ($documentType?->affects_stock_direction ?? 0);
-
         if ($direction === 0) return;
 
         if (!$document->warehouse_id || !$document->fiscal_year_id) {
@@ -2106,7 +2233,10 @@ class StoreCommercialDocumentRequest extends FormRequest
             'shipping_info'  => 'nullable|array',
             'legal_mentions' => 'nullable|array',
             'is_proforma'    => 'nullable|boolean',
-            'exchange_rate'  => 'nullable|numeric|min:0.0001',
+            'exchange_rate'               => 'nullable|numeric|min:0.0001',
+            'source_document_id'          => 'nullable|integer',
+            'cancellation_of_document_id' => 'nullable|integer',
+            'cancellation_reason'         => 'nullable|string|max:500',
 
             // ── الأسطر ───────────────────────────────────────────────
             'lines'                            => 'required|array|min:1',
@@ -2114,11 +2244,36 @@ class StoreCommercialDocumentRequest extends FormRequest
             'lines.*.quantity'                 => 'required|numeric|min:0.001|max:9999999',
             'lines.*.unit_price_ht'            => 'required|numeric|min:0|max:9999999999',
             'lines.*.discount_percentage'      => 'nullable|numeric|min:0|max:100',
+            'lines.*.discount_amount'          => 'nullable|numeric|min:0',
             'lines.*.tva_rate'                 => 'nullable|numeric|min:0|max:100',
             'lines.*.description'              => 'nullable|string|max:1000',
             'lines.*.packaging_id'             => 'nullable|integer|exists:product_packagings,id',
             'lines.*.stock_lot_id'             => 'nullable|integer|exists:product_lots,id',
+            'lines.*.lot_number'               => 'nullable|string|max:100',
+            'lines.*.notes'                    => 'nullable|string|max:500',
             'lines.*.line_attributes'          => 'nullable|array',
+
+            // ── الدفعات (free mode) ──────────────────────────────────
+            'payments'                           => 'nullable|array',
+            'payments.*.payment_mode_id'         => 'required_with:payments|integer',
+            'payments.*.amount'                  => 'required_with:payments|numeric|min:0.01',
+            'payments.*.payment_date'            => 'required_with:payments|date',
+            'payments.*.reference'               => 'nullable|string|max:255',
+            'payments.*.treasury_account_id'     => 'nullable|integer',
+            'payments.*.check_number'            => 'nullable|string|max:100',
+            'payments.*.check_bank'              => 'nullable|string|max:200',
+            'payments.*.check_due_date'          => 'nullable|date',
+
+            // ── الدفعات الإضافية (additive mode) ─────────────────────
+            'new_payments'                           => 'nullable|array',
+            'new_payments.*.payment_mode_id'         => 'required_with:new_payments|integer',
+            'new_payments.*.amount'                  => 'required_with:new_payments|numeric|min:0.01',
+            'new_payments.*.payment_date'            => 'required_with:new_payments|date',
+            'new_payments.*.reference'               => 'nullable|string|max:255',
+            'new_payments.*.treasury_account_id'     => 'nullable|integer',
+            'new_payments.*.check_number'            => 'nullable|string|max:100',
+            'new_payments.*.check_bank'              => 'nullable|string|max:200',
+            'new_payments.*.check_due_date'          => 'nullable|date',
         ];
     }
 

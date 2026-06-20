@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductLot;
 use App\Models\StockMovement;
 use App\Services\Tax\FiscalStampCalculator;
+use App\Services\Tax\TaxRuleService;
 use Illuminate\Support\Facades\DB;
 
 class ComputeLineService
@@ -105,7 +106,9 @@ class ComputeLineService
             }
         }
 
-        $tvaRate = $isTvaExempt ? 0.0 : (float) ($product->tva?->rate ?? 0);
+        $taxRule      = app(TaxRuleService::class);
+        $effectiveTva = $taxRule->getEffectiveTvaRate($party, $product);
+        $tvaRate      = $effectiveTva['rate'];
 
         $gross       = round($unitPrice * $baseQty, 4);
         $discountAmt = round($gross * ($discountPct / 100), 4);

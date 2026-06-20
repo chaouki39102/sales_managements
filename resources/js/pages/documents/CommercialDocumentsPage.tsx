@@ -46,6 +46,8 @@ import type {
 import { useColumnStatePersistence } from "@/components/ui/DataTable";
 import CommercialDocumentModal from "./CommercialDocumentModal";
 import QuickSaleModal from "./QuickSaleModal";
+import { DeliveryProgressBar } from "./components/DeliveryProgressBar";
+import ConvertDocumentModal from "./components/ConvertDocumentModal";
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
 
 // أنماط SmartFilter الخاصة بالمشروع (مفصولة عن library)
@@ -229,6 +231,7 @@ function SummaryCards({ items = [], opColor }: { items: CommercialDocument[]; op
 
 function ExpandedLines({ doc }: { doc: CommercialDocument }) {
     const slug = useActiveSlug();
+    const docCode = ((doc as unknown as Record<string, unknown>).documentType as Record<string, unknown> | undefined)?.code as string ?? '';
 
     const { data: full, isLoading } = useQuery({
         queryKey: [slug, "doc-lines", doc.id],
@@ -250,12 +253,17 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
     const lines = ((full as unknown as Record<string, unknown>)?.lines as Record<string, unknown>[] | undefined) ?? [];
     if (lines.length === 0) return <div style={{ color: "var(--t4)", fontSize: 12 }}>لا توجد أسطر</div>;
 
+    const TRACKS_DELIVERY = docCode === 'BCC';
+
     return (
         <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                     <tr style={{ background: "var(--bg3)" }}>
-                        {["#", "المنتج", "الكمية", "سعر HT", "خصم", "TVA%", "الإجمالي TTC"].map(h => (
+                        {["#", "المنتج", "الكمية"].concat(
+                            TRACKS_DELIVERY ? ["التسليم"] : [],
+                            ["سعر HT", "خصم", "TVA%", "الإجمالي TTC"]
+                        ).map(h => (
                             <th key={h} style={{ padding: "5px 12px", textAlign: "right", fontWeight: 700, color: "var(--t4)", fontSize: 10, whiteSpace: "nowrap" }}>{h}</th>
                         ))}
                     </tr>
@@ -266,11 +274,23 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
                             ((line.product as Record<string, unknown> | undefined)?.name as string) ??
                             (line.description as string) ?? "—";
                         const disc = parseFloat(String(line.discount_percentage ?? 0));
+                        const qty = Number(line.quantity ?? 1);
+                        const delivered = Number((line as Record<string, unknown>).delivered_quantity ?? 0);
+                        const returned  = Number((line as Record<string, unknown>).returned_quantity ?? 0);
                         return (
                             <tr key={String(line.id ?? idx)} style={{ borderBottom: "1px solid var(--b1)" }}>
                                 <td style={{ padding: "6px 12px", color: "var(--t4)" }}>{idx + 1}</td>
                                 <td style={{ padding: "6px 12px", fontWeight: 600 }}>{name}</td>
                                 <td style={{ padding: "6px 12px", textAlign: "left" }}>{String(line.quantity ?? "")}</td>
+                                {TRACKS_DELIVERY && (
+                                    <td style={{ padding: "6px 12px" }}>
+                                        <DeliveryProgressBar
+                                            quantity={qty}
+                                            deliveredQuantity={delivered}
+                                            returnedQuantity={returned}
+                                        />
+                                    </td>
+                                )}
                                 <td style={{ padding: "6px 12px", direction: "ltr", textAlign: "left" }}>
                                     <MoneyCell value={line.unit_price_ht as number} />
                                 </td>
@@ -513,6 +533,9 @@ export default function CommercialDocumentsPage() {
     type ModalMode = "add" | "edit" | "view" | "quick" | null;
     const [modal, setModal]           = useState<ModalMode>(null);
     const [viewDocId, setViewDocId]   = useState<number | null>(null);
+    const [convertDocId, setConvertDocId]     = useState<number | null>(null);
+    const [convertSourceCode, setConvertSourceCode] = useState('');
+    const [convertSourceDate, setConvertSourceDate] = useState('');
     const [editDocFull, setEditDocFull] = useState<CommercialDocument | null>(null);
     const [loadingEdit, setLoadingEdit] = useState(false);
 
@@ -1182,6 +1205,24 @@ export default function CommercialDocumentsPage() {
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
+
+        // ── التسليم (لأوامر العميل BCC خاصة) ────────────────────────────────
+        {
+            key: "delivery_date",
+            header: "تاريخ التسليم",
+            exportHeader: "تاريخ التسليم",
+            width: 120,
+            sortable: true,
+            defaultHidden: true,
+            filter: { type: "date" as const },
+            accessor: (r: CommercialDocument) => String((r as unknown as Record<string,unknown>).delivery_date ?? ""),
+            render: (row: CommercialDocument) => {
+                const d = (row as unknown as Record<string,unknown>).delivery_date as string | null | undefined;
+                return d
+                    ? <span style={{ fontSize: 12, color: "var(--t3)" }}>{fmtDate(d)}</span>
+                    : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
+            },
+        },
     ], [isPurch, opColor]);
 
     // ── إدارة الأعمدة المخفية — مُفوَّضة بالكامل لـ DataTable الداخلي ──────────
@@ -1282,6 +1323,19 @@ export default function CommercialDocumentsPage() {
                     disabled: !row,
                     onClick: () => { if (row) { setViewDocId(row.id); setModal("view"); } },
                 },
+                {
+                    label: "تحويل",
+                    icon: "arrows-exchange",
+                    disabled: !row || getDocStatus(row) === 'cancelled',
+                    onClick: () => {
+                        if (!row) return;
+                        const docType = (row as unknown as Record<string, unknown>).document_type as Record<string, unknown> | undefined;
+                        const code = String(docType?.code ?? '');
+                        setConvertSourceCode(code);
+                        setConvertSourceDate(String(row.document_date ?? ''));
+                        setConvertDocId(row.id);
+                    },
+                },
             );
         }
 
@@ -1309,6 +1363,19 @@ export default function CommercialDocumentsPage() {
                     icon: "eye",
                     disabled: !row,
                     onClick: () => { if (row) { setViewDocId(row.id); setModal("view"); } },
+                },
+                {
+                    label: "تحويل",
+                    icon: "arrows-exchange",
+                    disabled: !row || getDocStatus(row) === 'cancelled',
+                    onClick: () => {
+                        if (!row) return;
+                        const docType = (row as unknown as Record<string, unknown>).document_type as Record<string, unknown> | undefined;
+                        const code = String(docType?.code ?? '');
+                        setConvertSourceCode(code);
+                        setConvertSourceDate(String(row.document_date ?? ''));
+                        setConvertDocId(row.id);
+                    },
                 },
             );
 
@@ -1733,6 +1800,17 @@ export default function CommercialDocumentsPage() {
                         if (doc) { closeModal(); openEditModal(doc); }
                     }}
                     isReadOnly={!!isReadOnly}
+                />
+            )}
+
+            {convertDocId != null && (
+                <ConvertDocumentModal
+                    isOpen
+                    onClose={() => setConvertDocId(null)}
+                    onDone={() => { invalidateDocs(); showToast('تم تحويل المستند بنجاح', 'success'); }}
+                    documentId={convertDocId}
+                    sourceCode={convertSourceCode}
+                    sourceDate={convertSourceDate}
                 />
             )}
 

@@ -36,6 +36,7 @@ const FinancePage  = lazy(() => import('@/pages/finance/FinancePage'));
 const ExpensesPage = lazy(() => import('@/pages/expenses/ExpensesPage'));
 const DebtsPage    = lazy(() => import('@/pages/debts/DebtsPage'));
 const TvaPage      = lazy(() => import('@/pages/fiscal/TvaPage'));
+const ChecksPage   = lazy(() => import('@/pages/checks/ChecksPage'));
 
 // ── Fiscal / Reports ───────────────────────────────────────────────────────
 const FiscalYearsPage = lazy(() => import('@/pages/fiscal/FiscalYearsPage'));
@@ -205,6 +206,7 @@ export function AppRoutes() {
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="debts"    element={<DebtsPage />} />
           <Route path="tva"      element={<TvaPage />} />
+          <Route path="checks"  element={<ChecksPage />} />
 
           {/* Fiscal */}
           <Route path="fiscalyears" element={<FiscalYearsPage />} />

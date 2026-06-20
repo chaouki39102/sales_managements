@@ -9,10 +9,12 @@ use App\Models\DocumentStatus;
 use App\Models\DocumentType;
 use App\Models\FiscalYear;
 use App\Models\NumberingSeries;
+use App\Models\Product;
 use App\Models\StockMovement;
 use App\Services\CompanyContextService;
 use App\Services\InventoryValuationService;
 use App\Services\Tax\FiscalStampCalculator;
+use App\Services\Tax\TaxRuleService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -33,6 +35,9 @@ use Illuminate\Support\Facades\Log;
 class CommercialDocumentService extends \App\Core\Services\BaseService
 {
     use ValidatesTenantRelations;
+
+    /** @var bool علامة للتحويل من مبدئي → حقيقي (تُستخدم في afterUpdate) */
+    private bool $convertingFromProforma = false;
 
     protected string $model        = CommercialDocument::class;
     protected string $resourceName = 'commercial_document';
@@ -132,13 +137,13 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         // ✅ حركات المخزون فوراً بعد الإنشاء (لأن الوثيقة معتمدة مباشرةً)
         $item->load('documentType', 'lines.product');
 
-        if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
+        if (($item->documentType?->affects_stock_direction ?? 0) !== 0 && !$item->is_proforma) {
             $this->createStockMovements($item);
         }
 
-        // ✅ ربط الدفعات إذا أُرسلت مع المستند
+        // ✅ ربط الدفعات إذا أُرسلت مع المستند (للمستندات غير المبدئية فقط)
         $payments = $request?->input('payments') ?? $data['payments'] ?? [];
-        if (!empty($payments)) {
+        if (!empty($payments) && !$item->is_proforma) {
             $this->attachPayments($item, $payments);
         }
     }
@@ -151,6 +156,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     protected function beforeUpdate(Model $item, array $data, $request): void
     {
         parent::beforeUpdate($item, $data, $request);
+
+        // علامة للتحويل من مبدئي → حقيقي (تُستخدم في afterUpdate)
+        if (isset($data['is_proforma']) && $data['is_proforma'] === false && $item->is_proforma === true) {
+            $this->convertingFromProforma = true;
+        }
 
         // R1
         if ($item->is_locked) {
@@ -227,7 +237,22 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             }
         }
 
-        // AU2: دفعات جديدة (additive mode)
+        // AU2: تحويل مبدئي → حقيقي — إنشاء حركات المخزون المفقودة
+        if ($this->convertingFromProforma) {
+            $item->load('documentType', 'lines.product');
+            // إنشاء حركات المخزون إذا كانت مفقودة
+            if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
+                $hasMovements = \App\Models\StockMovement::whereHas(
+                    'commercialDocumentLine',
+                    fn($q) => $q->where('commercial_document_id', $item->id)
+                )->exists();
+                if (!$hasMovements) {
+                    $this->createStockMovements($item);
+                }
+            }
+        }
+
+        // AU3: دفعات جديدة (additive mode)
         if (!empty($newPayments)) {
             $this->attachNewPayments($item, $newPayments);
         }
@@ -409,7 +434,22 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             );
         }
 
+        // Load party for TVA exemption enforcement
+        $party  = $document->party;
+        $taxSvc = app(TaxRuleService::class);
+
         foreach ($lines as $order => $lineData) {
+            // Override TVA rate if party is exempt
+            $product = isset($lineData['product_id'])
+                ? Product::find((int) $lineData['product_id'])
+                : null;
+            if ($party && $product) {
+                $rule = $taxSvc->getEffectiveTvaRate($party, $product);
+                if ($rule['forced']) {
+                    $lineData['tva_rate'] = $rule['rate'];
+                }
+            }
+
             $totals = $this->computeLineTotals($lineData);
 
             $document->lines()->create([
@@ -459,6 +499,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function attachPayments(CommercialDocument $document, array $payments): void
     {
+        if ($document->is_proforma) return;
+
         foreach ($payments as $paymentData) {
             if (empty($paymentData['payment_mode_id']) || empty($paymentData['amount'])) {
                 continue;
@@ -592,14 +634,31 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // PUBLIC: إضافة أسطر لمستند موجود + إعادة حساب الإجماليات
+    // يُستخدم من DocumentConversionService لأن BaseService::beforeCreate
+    // يزيل المفاتيح غير المرتبطة بعمود (مثل 'lines') من $data
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function addLinesToDocument(CommercialDocument $document, array $linesData): void
+    {
+        $this->createDocumentLines($document, $linesData);
+        $this->recalculateTotals($document);
+        $document->load('documentType', 'lines.product');
+        if (($document->documentType?->affects_stock_direction ?? 0) !== 0 && !$document->is_proforma) {
+            $this->createStockMovements($document);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // PRIVATE: إنشاء حركات المخزون
     // ═══════════════════════════════════════════════════════════════════════
 
     private function createStockMovements(CommercialDocument $document): void
     {
+        if ($document->is_proforma) return;
+
         $documentType = $document->documentType;
         $direction    = (int) ($documentType?->affects_stock_direction ?? 0);
-
         if ($direction === 0) return;
 
         if (!$document->warehouse_id || !$document->fiscal_year_id) {

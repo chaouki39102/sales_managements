@@ -45,15 +45,25 @@ import { useDocumentForm }     from './hooks/useDocumentForm';
 import type { PartyChangeResult } from './hooks/useDocumentForm';
 import { useDocumentChain, useConvertDocument } from './hooks/useDocumentChain';
 import { useCreditCheck }      from './hooks/useCreditCheck';
+import { useCustomerInsights } from './hooks/useCustomerInsights';
 import { DocumentChainPanel }  from './components/DocumentChainPanel';
 import { CreditCheckBar }      from './components/CreditCheckBar';
 import { ReturnDocumentModal } from './components/ReturnDocumentModal';
+import { CheckFormFields }     from './components/CheckFormFields';
+import { ShippingInfoSection } from './components/ShippingInfoSection';
+import { PaymentTermsTable }   from './components/PaymentTermsTable';
 import { DocumentLineRow }     from './components/DocumentLineRow';
+import { CustomerInsightPanel } from './components/CustomerInsightPanel';
+import { useProductSuggestions } from './hooks/useProductSuggestions';
+import { useAdvancePayments } from './hooks/useAdvancePayments';
+import { SmartSuggestionsPanel } from './components/SmartSuggestionsPanel';
+import { AdvancePaymentsPanel } from './components/AdvancePaymentsPanel';
 import {
   Section, Label, FieldError, Toggle, TotalCard,
-  ComboBox, ColumnManager, AlertBanner,
+  ComboBox, ColumnManager, AlertBanner, Tabs,
 } from './components/DocumentUIPrimitives';
-import { ALL_COLUMNS, PURCHASE_CODES, CONVERSION_MAP, RETURNABLE_CODES } from './types/document.types';
+import type { Tab } from './components/DocumentUIPrimitives';
+import { ALL_COLUMNS, PURCHASE_CODES, CONVERSION_MAP, RETURNABLE_CODES, SHIPPING_CODES } from './types/document.types';
 import type { ColKey, PaymentEntry } from './types/document.types';
 import {
   fmtDZD, fmtDate, loadVisibleCols, saveVisibleCols,
@@ -279,6 +289,7 @@ export default function CommercialDocumentModal({
     selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
     paymentModes:       lookups.paymentModes,
     parties:            lookups.parties,
+    products:           lookups.products,
     stockData:          {},
     isPurchase,
     open,
@@ -361,13 +372,30 @@ export default function CommercialDocumentModal({
   } | null>(null);
 
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [extraTab, setExtraTab] = useState('shipping');
 
   // ─── Document chain ───────────────────────────────────────────────────────
   const { data: chain, isLoading: isLoadingChain } = useDocumentChain(
     isEdit ? Number(existingDocument?.id) : null,
   );
   const convertMutation = useConvertDocument();
-  const allowedTargets  = CONVERSION_MAP[docCode] ?? [];
+
+  const { data: docTypes = [] } = useQuery({
+    queryKey: [slug, 'document-types'],
+    queryFn:  () => apiGet<DocumentType[]>('/document-types', { per_page: 500 })
+      .then(r => (Array.isArray(r) ? r : (r as unknown as { data: DocumentType[] })?.data ?? [])),
+    staleTime: 10 * 60_000,
+    enabled:   !!slug,
+  });
+
+  const targetCodes  = CONVERSION_MAP[docCode] ?? [];
+  const allowedTargets = useMemo(() =>
+    targetCodes.map(code => {
+      const dt = docTypes.find(d => d.code === code);
+      return { code, name: dt?.name ?? code };
+    }),
+    [targetCodes, docTypes],
+  );
 
   // ─── Credit check ─────────────────────────────────────────────────────────
   const { data: creditCheck, isLoading: isLoadingCredit } = useCreditCheck({
@@ -377,6 +405,22 @@ export default function CommercialDocumentModal({
     isPurchase,
     enabled:    open && needsParty && !isPurchase,
   });
+
+  const { data: customerInsights, isLoading: isLoadingInsights } = useCustomerInsights(
+    form.party_id ? parseInt(form.party_id) : null,
+    !!open && needsParty && !!form.party_id,
+  );
+
+  const { data: productSuggestions, isLoading: isLoadingSuggestions } = useProductSuggestions(
+    form.party_id ? parseInt(form.party_id) : null,
+    isPurchase,
+    !!open && needsParty && !!form.party_id && !isLinesReadOnly,
+  );
+
+  const { data: advancePayments, isLoading: isLoadingAdvances } = useAdvancePayments(
+    form.party_id ? parseInt(form.party_id) : null,
+    !!open && needsParty && !!form.party_id && (documentType?.affects_accounting ?? false) && !form.is_proforma,
+  );
 
   const handlePartyChangeWithWarning = (id: string) => {
     setPartyChangeWarning(null);
@@ -490,16 +534,38 @@ export default function CommercialDocumentModal({
     deleteMut.mutate();
   };
 
-  const isPending = saveMut.isPending || deleteMut.isPending || checkingDocNumber;
+  const confirmProformaMut = useMutation({
+    mutationFn: () => apiPut(`/documents/${existingDocument!.id}`, { is_proforma: false }),
+    onSuccess: () => {
+      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+      setSuccessMsg('تم تحويل المستند إلى فاتورة حقيقية ✓');
+      setTimeout(() => { setSuccessMsg(''); onSaved(); onClose(); }, 1800);
+    },
+    onError: (e: unknown) => {
+      const err = e as Record<string, unknown>;
+      setApiErr(String(err?.message ?? 'فشل التحويل'));
+    },
+  });
+
+  const handleConfirmProforma = () => {
+    if (!window.confirm('سيتم تحويل هذا المستند المبدئي إلى فاتورة حقيقية. سيتم إنشاء حركات المخزون والدفعات. هل تتابع؟')) return;
+    confirmProformaMut.mutate();
+  };
+
+  const isPending = saveMut.isPending || deleteMut.isPending || confirmProformaMut.isPending || checkingDocNumber;
 
   // ─── Memos ────────────────────────────────────────────────────────────────
+
+  const isPartyExempt = lookups.parties.find(
+    (p) => String(p.id) === form.party_id,
+  )?.is_tva_exempt ?? false;
 
   const partyOptions = useMemo(() =>
     lookups.parties.map((p) => ({
       id:    p.id,
       label: p.name,
       sub:   [(p as Record<string, unknown>).code, (p as Record<string, unknown>).phone].filter(Boolean).join(' · '),
-      badge: p.price_level?.name,
+      badge: (p as Record<string, unknown>).is_tva_exempt ? 'معفى' : p.price_level?.name,
     })),
     [lookups.parties],
   );
@@ -655,6 +721,17 @@ export default function CommercialDocumentModal({
                     background: 'var(--blueb)', border: '1px solid var(--blue)',
                     fontSize: 11, fontWeight: 700, color: 'var(--blue)',
                   }}>معتمد</span>
+                )}
+                {form.is_proforma && (
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 'var(--r1)',
+                    background: 'color-mix(in srgb, var(--orange) 12%, transparent)',
+                    border: '1px solid var(--orange)',
+                    fontSize: 11, fontWeight: 700, color: 'var(--orange)',
+                  }}>
+                    <i className="ti ti-file-description" style={{ marginLeft: 4, fontSize: 10 }} />
+                    مبدئية
+                  </span>
                 )}
                 {pmMode === 'additive' && (
                   <span style={{
@@ -854,6 +931,12 @@ export default function CommercialDocumentModal({
                       partyName={selectedParty?.name}
                     />
                   )}
+
+                  {/* تحليلات المتعامل */}
+                  <CustomerInsightPanel
+                    insights={customerInsights}
+                    isLoading={isLoadingInsights}
+                  />
 
                   {balanceWarning && (
                     <AlertBanner type="warning" message={balanceWarning} />
@@ -1055,6 +1138,62 @@ export default function CommercialDocumentModal({
           </Section>
 
           {/* ══════════════════════════════════════════════════════════════
+              EXTRA TABS: الشحن والتسليم + شروط الدفع
+          ══════════════════════════════════════════════════════════════ */}
+          {(() => {
+            const extraTabs: Tab[] = [
+              { key: 'payment-terms', label: 'شروط الدفع', icon: 'ti-coin' },
+            ];
+            if (SHIPPING_CODES.has(docCode)) {
+              extraTabs.unshift({ key: 'shipping', label: 'الشحن والتسليم', icon: 'ti-truck-delivery' });
+            }
+            // if only one tab, render it directly without tab bar
+            if (extraTabs.length === 1) {
+              const tab = extraTabs[0];
+              return (
+                <Section title={tab.label} icon={tab.icon} collapsible>
+                  {tab.key === 'shipping' ? (
+                    <ShippingInfoSection
+                      value={form.shipping_info}
+                      deliveryDate={form.delivery_date}
+                      disabled={isReadOnly}
+                      onChange={(info) => set('shipping_info', info)}
+                      onDeliveryDateChange={(date) => set('delivery_date', date)}
+                    />
+                  ) : (
+                    <PaymentTermsTable
+                      terms={form.payment_terms}
+                      netToPay={totals.netToPay}
+                      disabled={isReadOnly}
+                      onChange={(terms) => set('payment_terms', terms)}
+                    />
+                  )}
+                </Section>
+              );
+            }
+            return (
+              <Tabs tabs={extraTabs} activeKey={extraTab} onChange={setExtraTab} style={{ marginBottom: 20 }}>
+                {extraTab === 'shipping' ? (
+                  <ShippingInfoSection
+                    value={form.shipping_info}
+                    deliveryDate={form.delivery_date}
+                    disabled={isReadOnly}
+                    onChange={(info) => set('shipping_info', info)}
+                    onDeliveryDateChange={(date) => set('delivery_date', date)}
+                  />
+                ) : (
+                  <PaymentTermsTable
+                    terms={form.payment_terms}
+                    netToPay={totals.netToPay}
+                    disabled={isReadOnly}
+                    onChange={(terms) => set('payment_terms', terms)}
+                  />
+                )}
+              </Tabs>
+            );
+          })()}
+
+          {/* ══════════════════════════════════════════════════════════════
               SECTION 2: الأسطر
           ══════════════════════════════════════════════════════════════ */}
           <Section
@@ -1149,12 +1288,29 @@ export default function CommercialDocumentModal({
                               onUpdate={updateLine}
                               onRemove={removeLine}
                               onDuplicate={duplicateLine}
+                              isTvaExempt={!isPurchase && isPartyExempt}
                             />
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
+                )}
+
+                {!isLinesReadOnly && needsParty && (
+                  <SmartSuggestionsPanel
+                    suggestions={productSuggestions}
+                    isLoading={isLoadingSuggestions}
+                    onAddProduct={(productId, suggestedPrice, suggestedTva) => {
+                      addLine();
+                      const lastIdx = form.lines.length;
+                      const patch: Record<string, unknown> = { product_id: String(productId) };
+                      if (suggestedPrice != null) patch.unit_price_ht = suggestedPrice;
+                      if (suggestedTva != null)   patch.tva_rate     = suggestedTva;
+                      updateLine(lastIdx, patch as Parameters<typeof updateLine>[1]);
+                    }}
+                    disabled={isReadOnly}
+                  />
                 )}
 
                 {!isLinesReadOnly && (
@@ -1184,8 +1340,9 @@ export default function CommercialDocumentModal({
           </Section>
 
           {/* ══════════════════════════════════════════════════════════════
-              SECTION 3: الدفعات
+              SECTION 3: الدفعات — تُخفى للمستندات غير المحاسبية أو المبدئية
           ══════════════════════════════════════════════════════════════ */}
+          {(documentType?.affects_accounting ?? false) && !form.is_proforma && (
           <Section title="الدفعات" icon="ti-wallet" collapsible>
 
             {/* الدفعات القديمة (للقراءة في additive mode) */}
@@ -1193,6 +1350,26 @@ export default function CommercialDocumentModal({
               payments={existingPayments}
               paymentModes={lookups.paymentModes}
               treasuryAccountMap={treasuryAccountMap}
+            />
+
+            {/* الدفعات المقدمة المتاحة للتطبيق */}
+            <AdvancePaymentsPanel
+              advances={advancePayments}
+              isLoading={isLoadingAdvances}
+              onApply={(adv) => {
+                if (pmMode === 'locked') return;
+                addPayment();
+                setTimeout(() => {
+                  const lastIdx = newPayments.length;
+                  updatePayment(lastIdx, {
+                    payment_mode_id: String(adv.payment_mode_id),
+                    amount: String(adv.unapplied_amount),
+                    reference: adv.reference ?? '',
+                    payment_date: adv.payment_date,
+                  });
+                }, 0);
+              }}
+              disabled={pmMode === 'locked'}
             />
 
             {/* تحذير تجاوز المبلغ */}
@@ -1407,6 +1584,18 @@ export default function CommercialDocumentModal({
                   >
                     <i className="ti ti-trash" style={{ fontSize: 13 }} />
                   </button>
+
+                  {/* حقول الشيك — تظهر فقط إذا كان نوع حساب الخزينة هو "شيك" */}
+                  {effectiveTreasury?.type === 'check' && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <CheckFormFields
+                        checkNumber={pay.check_number}
+                        checkBank={pay.check_bank}
+                        checkDueDate={pay.check_due_date}
+                        onChange={(fields) => updatePayment(idx, fields)}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1435,6 +1624,7 @@ export default function CommercialDocumentModal({
               </button>
             )}
           </Section>
+          )}
 
           {/* ══════════════════════════════════════════════════════════════
               SECTION 4: الإجماليات
@@ -1501,6 +1691,15 @@ export default function CommercialDocumentModal({
               </div>
             )}
 
+            {!isEdit && (
+              <Toggle
+                checked={form.is_proforma}
+                onChange={(v) => set('is_proforma', v)}
+                label="مستند مبدئي (Pro Forma)"
+                subLabel="لا يُؤثر في المخزون ولا يُنشئ دفعات — يُستخدم للعروض والموافقات الأولية"
+                disabled={isReadOnly}
+              />
+            )}
             <Toggle
               checked={form.apply_stamp}
               onChange={(v) => set('apply_stamp', v)}
@@ -1569,6 +1768,25 @@ export default function CommercialDocumentModal({
               >
                 <i className="ti ti-receipt-refund" />
                 إنشاء مرتجع
+              </button>
+            )}
+            {/* تأكيد وتحويل المبدئي إلى فاتورة حقيقية */}
+            {isEdit && form.is_proforma && !isReadOnly && (
+              <button
+                onClick={handleConfirmProforma}
+                disabled={isPending}
+                style={{
+                  padding: '8px 14px', borderRadius: 'var(--r2)',
+                  border: '1px solid var(--orange)',
+                  background: 'color-mix(in srgb, var(--orange) 12%, transparent)',
+                  color: 'var(--orange)',
+                  cursor: isPending ? 'not-allowed' : 'pointer',
+                  fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <i className="ti ti-circle-check" />
+                تأكيد وتحويل لفاتورة حقيقية
               </button>
             )}
             {/* حذف — فقط للتعديل + غير مقفل + غير ملغى */}
