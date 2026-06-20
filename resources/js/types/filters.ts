@@ -6,6 +6,7 @@ export interface InvoiceFilters {
   status?:           string;
   date_from?:        string;
   date_to?:          string;
+  fiscal_year_id?:   number;
   page?:             number;
   per_page?:         number;
   sort?:             string;

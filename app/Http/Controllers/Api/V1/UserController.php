@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 
 class UserController extends BaseApiController
 {
+    use HasUserPermissionEndpoints;
     protected string  $resourceName = 'user';
     protected ?string $resourceClass = UserResource::class;
 

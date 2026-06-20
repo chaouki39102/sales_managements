@@ -1,5 +1,5 @@
 // pages/invoices/InvoicesPage.tsx
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 
 // ✅ استيراد الـ Hooks الصحيحة للمستندات والفواتير
 import {
@@ -56,12 +56,18 @@ const PAY_ICON: Record<string, string> = {
 };
 
 export default function InvoicesPage() {
-  const [filters, setFilters] = useState<InvoiceFilters>({ page: 1, per_page: 20 });
+    const { selectedYear } = useFiscalYear();
+  const [filters, setFilters] = useState<InvoiceFilters>({ page: 1, per_page: 20, fiscal_year_id: selectedYear?.id });
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [viewing,  setViewing]  = useState<CommercialDocument | null>(null);
 
   const detail   = useModal();
   const newInv   = useModal();
+
+  // تزامن السنة المالية المحددة مع الفلاتر
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, page: 1, fiscal_year_id: selectedYear?.id }));
+  }, [selectedYear?.id]);
 
   const { data, isLoading, isFetching } = useInvoices(filters);
   const { data: customers } = useCustomers({ per_page: 200, type: 'client' }); // ✅ تمرير النوع كزبون
@@ -940,7 +946,19 @@ function NewInvoiceModal({
     const { data: docTypes } = useDocumentTypes();
     const { data: payModes } = usePaymentModes();
 
+    const defaultDate = (): string => {
+        const d = new Date().toISOString().split("T")[0];
+        if (fiscalYear?.start_date && fiscalYear?.end_date) {
+            const s = fiscalYear.start_date.substring(0, 10);
+            const e = fiscalYear.end_date.substring(0, 10);
+            if (d >= s && d <= e) return d;
+            return e;
+        }
+        return d;
+    };
+
     const [clientId, setClientId] = useState("");
+    const [docDate, setDocDate] = useState(defaultDate());
     const [lines, setLines] = useState([
         {
             description: "",
@@ -951,6 +969,10 @@ function NewInvoiceModal({
         },
     ]);
     const [note, setNote] = useState("");
+
+    useEffect(() => {
+        if (open) setDocDate(defaultDate());
+    }, [open, fiscalYear?.id]);
 
     const addLine = () =>
         setLines((l) => [
@@ -992,7 +1014,7 @@ function NewInvoiceModal({
             party_id: clientId ? Number(clientId) : null,
             warehouse_id: wh.id,
             fiscal_year_id: fiscalYear.id,
-            document_date: new Date().toISOString().split("T")[0],
+            document_date: docDate,
             notes: note || null,
             lines: lines.map((l, i) => ({
                 ...l,
@@ -1050,7 +1072,8 @@ function NewInvoiceModal({
                     <label>التاريخ</label>
                     <input
                         type="date"
-                        defaultValue={new Date().toISOString().split("T")[0]}
+                        value={docDate}
+                        onChange={e => setDocDate(e.target.value)}
                     />
                 </div>
             </div>

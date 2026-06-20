@@ -29,6 +29,7 @@ use App\Models\Notification;
 use App\Models\NumberingSeries;
 use App\Models\OpeningBalanceParty;
 use App\Models\OpeningBalanceStock;
+use App\Models\OpeningBalanceTreasury;
 use App\Models\Party;
 use App\Models\PartyType;
 use App\Models\Payment;
@@ -79,6 +80,7 @@ use App\Policies\NotificationPolicy;
 use App\Policies\NumberingSeriesPolicy;
 use App\Policies\OpeningBalancePartyPolicy;
 use App\Policies\OpeningBalanceStockPolicy;
+use App\Policies\OpeningBalanceTreasuryPolicy;
 use App\Policies\PartyPolicy;
 use App\Policies\PartyTypePolicy;
 use App\Policies\PaymentModePolicy;
@@ -126,6 +128,7 @@ class PolicyServiceProvider extends ServiceProvider
         Setting::class => SettingPolicy::class,
         OpeningBalanceStock::class => OpeningBalanceStockPolicy::class,
         OpeningBalanceParty::class => OpeningBalancePartyPolicy::class,
+        OpeningBalanceTreasury::class => OpeningBalanceTreasuryPolicy::class,
         ExchangeRate::class => ExchangeRatePolicy::class,
         DocumentPayment::class => DocumentPaymentPolicy::class,
         DocumentStatus::class => DocumentStatusPolicy::class,

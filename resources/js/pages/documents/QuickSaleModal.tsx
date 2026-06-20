@@ -62,6 +62,17 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
+function defaultDocDate(selectedYear?: { start_date?: string; end_date?: string }): string {
+  const d = today();
+  if (selectedYear?.start_date && selectedYear?.end_date) {
+    const s = selectedYear.start_date.substring(0, 10);
+    const e = selectedYear.end_date.substring(0, 10);
+    if (d >= s && d <= e) return d;
+    return e;
+  }
+  return d;
+}
+
 function fmtDZD(n: number | string | null | undefined): string {
   const v = parseFloat(String(n ?? 0));
   if (isNaN(v)) return '—';
@@ -390,7 +401,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
   // State
   const [partyId, setPartyId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
-  const [docDate, setDocDate] = useState(today());
+  const [docDate, setDocDate] = useState(defaultDocDate(selectedYear));
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<QuickLine[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -404,14 +415,14 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     treasury_account_id: defaultTreasuryId,
     amount: 0, // 0 يعني كامل المبلغ
     reference: '',
-    payment_date: today(),
+    payment_date: defaultDocDate(selectedYear),
   };
 
   // Effects for reset
   useEffect(() => {
     if (open) {
       setPartyId('');
-      setDocDate(today());
+      setDocDate(defaultDocDate(selectedYear));
       setNotes('');
       setLines([]);
       setErrors({});
@@ -422,7 +433,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     return () => {
       if (successTimer.current) clearTimeout(successTimer.current);
     };
-  }, [open, defaultWarehouseId]);
+  }, [open, defaultWarehouseId, selectedYear]);
 
   // Line helpers
   const addLine = useCallback(() => {
@@ -633,7 +644,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     treasury_account_id: defaultTreasuryId,
     amount: 0,
     reference: '',
-    payment_date: today(),
+    payment_date: defaultDocDate(selectedYear),
   });
 
   // تحديث paymentLocal عند تحميل البيانات

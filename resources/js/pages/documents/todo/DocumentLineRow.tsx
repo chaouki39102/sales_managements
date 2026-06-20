@@ -1,9 +1,18 @@
+// ════════════════════════════════════════════════════════════════════════════
+// pages/documents/components/DocumentLineRow.tsx
+//
+// صف واحد من جدول الأسطر.
+// يستقبل البيانات ويستدعي callbacks — لا يمتلك حالة إلا ما يخص UI فقط.
+// ════════════════════════════════════════════════════════════════════════════
+
 import React, { memo } from 'react';
 import { calcLineTotal, fmtDZD, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
 import { cellStyle } from './DocumentUIPrimitives';
 import type { LineItem, Product, ColKey } from '../types/document.types';
 import type { LineStockValidation } from '../utils/document.utils';
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface DocumentLineRowProps {
   line:           LineItem;
@@ -18,6 +27,8 @@ interface DocumentLineRowProps {
   onRemove:       (idx: number) => void;
   onDuplicate:    (idx: number) => void;
 }
+
+// ─── Shared cell input style ──────────────────────────────────────────────────
 
 function CellInput({
   value, onChange, type = 'number', min, step, disabled, highlight, width,
@@ -44,6 +55,8 @@ function CellInput({
   );
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export const DocumentLineRow = memo(function DocumentLineRow({
   line, idx, visibleCols, isPurchase, disabled, products, stockData,
   stockValidation, onUpdate, onRemove, onDuplicate,
@@ -51,6 +64,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
 
   const { baseQty, gross, discountAmt, discPct, ht, tva: lineTva, ttc } = calcLineTotal(line);
 
+  // نبحث عن المنتج في قائمة products (التي تحوي packagings و lots)
   const prodFromList = products.find((p) => String(p.id) === line.product_id);
   const prod         = prodFromList ?? line._product;
   const packagings   = prod?.packagings ?? [];
@@ -72,6 +86,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         background:   rowBg,
         transition:   'background .15s',
       }}>
+        {/* # */}
         {col('idx') && (
           <td style={{ padding: '4px 6px', textAlign: 'center',
             color: 'var(--t4)', fontSize: 11 }}>
@@ -79,6 +94,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* المنتج */}
         {col('product') && (
           <td style={{ padding: '3px 4px' }}>
             <ProductSearch
@@ -93,6 +109,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* التعبئة */}
         {col('packaging') && (
           <td style={{ padding: '3px 4px' }}>
             {packagings.length > 0 ? (
@@ -116,6 +133,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* الكثير */}
         {col('lot') && (
           <td style={{ padding: '3px 4px' }}>
             {isPurchase ? (
@@ -148,6 +166,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* الكمية */}
         {col('quantity') && (
           <td style={{ padding: '3px 4px' }}>
             <CellInput
@@ -161,6 +180,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* الوحدة */}
         {col('unit') && (
           <td style={{ padding: '3px 6px', textAlign: 'center',
             fontSize: 11, color: 'var(--t4)' }}>
@@ -168,6 +188,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* سعر الوحدة HT */}
         {col('unit_price') && (
           <td style={{ padding: '3px 4px' }}>
             <CellInput
@@ -180,6 +201,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* سعر التعبئة */}
         {col('pack_price') && (
           <td style={{ padding: '3px 4px' }}>
             <CellInput
@@ -192,6 +214,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* السعر الأصلي */}
         {col('orig_price') && (
           <td style={{ padding: '3px 6px', textAlign: 'left', direction: 'ltr',
             fontSize: 11, color: 'var(--t4)' }}>
@@ -199,9 +222,11 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* الخصم */}
         {col('discount') && (
           <td style={{ padding: '3px 4px' }}>
             <div style={{ display: 'flex', gap: 2 }}>
+              {/* نوع الخصم */}
               <select
                 style={{ ...cellStyle(), width: 40, padding: '5px 2px', fontSize: 10 }}
                 value={line.discount_mode}
@@ -213,6 +238,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
                 <option value="percent">%</option>
                 <option value="fixed">دج</option>
               </select>
+              {/* قيمة الخصم */}
               <CellInput
                 value={line.discount_mode === 'percent'
                   ? line.discount_percentage
@@ -228,6 +254,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* بعد الخصم HT */}
         {col('price_after') && (
           <td style={{ padding: '3px 6px', textAlign: 'left', direction: 'ltr',
             fontSize: 11, color: discountAmt > 0 ? 'var(--em)' : 'var(--t3)' }}>
@@ -235,6 +262,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* TVA % */}
         {col('tva') && (
           <td style={{ padding: '3px 4px' }}>
             <CellInput
@@ -248,6 +276,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* إجمالي HT */}
         {col('total_ht') && (
           <td style={{ padding: '3px 6px', textAlign: 'left', direction: 'ltr',
             fontSize: 11, color: 'var(--t2)' }}>
@@ -255,6 +284,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* إجمالي TTC */}
         {col('total_ttc') && (
           <td style={{ padding: '3px 6px', textAlign: 'left', direction: 'ltr',
             fontSize: 12, fontWeight: 700, color: 'var(--em)' }}>
@@ -262,6 +292,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* الهامش — فقط للبيع */}
         {col('margin') && (
           <td style={{ padding: '3px 6px', textAlign: 'center', fontSize: 11 }}>
             {(() => {
@@ -279,6 +310,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* ملاحظة السطر */}
         {col('line_note') && (
           <td style={{ padding: '3px 4px' }}>
             <input
@@ -292,6 +324,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
+        {/* الإجراءات */}
         {col('actions') && (
           <td style={{ padding: '3px 4px', textAlign: 'center' }}>
             <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>

@@ -62,7 +62,10 @@ class StoreCommercialDocumentRequest extends FormRequest
             'shipping_info'  => 'nullable|array',
             'legal_mentions' => 'nullable|array',
             'is_proforma'    => 'nullable|boolean',
-            'exchange_rate'  => 'nullable|numeric|min:0.0001',
+            'exchange_rate'               => 'nullable|numeric|min:0.0001',
+            'source_document_id'          => 'nullable|integer',
+            'cancellation_of_document_id' => 'nullable|integer',
+            'cancellation_reason'         => 'nullable|string|max:500',
 
             // ── الأسطر ───────────────────────────────────────────────
             'lines'                            => 'required|array|min:1',
@@ -70,11 +73,36 @@ class StoreCommercialDocumentRequest extends FormRequest
             'lines.*.quantity'                 => 'required|numeric|min:0.001|max:9999999',
             'lines.*.unit_price_ht'            => 'required|numeric|min:0|max:9999999999',
             'lines.*.discount_percentage'      => 'nullable|numeric|min:0|max:100',
+            'lines.*.discount_amount'          => 'nullable|numeric|min:0',
             'lines.*.tva_rate'                 => 'nullable|numeric|min:0|max:100',
             'lines.*.description'              => 'nullable|string|max:1000',
             'lines.*.packaging_id'             => 'nullable|integer|exists:product_packagings,id',
             'lines.*.stock_lot_id'             => 'nullable|integer|exists:product_lots,id',
+            'lines.*.lot_number'               => 'nullable|string|max:100',
+            'lines.*.notes'                    => 'nullable|string|max:500',
             'lines.*.line_attributes'          => 'nullable|array',
+
+            // ── الدفعات (free mode) ──────────────────────────────────
+            'payments'                           => 'nullable|array',
+            'payments.*.payment_mode_id'         => 'required_with:payments|integer',
+            'payments.*.amount'                  => 'required_with:payments|numeric|min:0.01',
+            'payments.*.payment_date'            => 'required_with:payments|date',
+            'payments.*.reference'               => 'nullable|string|max:255',
+            'payments.*.treasury_account_id'     => 'nullable|integer',
+            'payments.*.check_number'            => 'nullable|string|max:100',
+            'payments.*.check_bank'              => 'nullable|string|max:200',
+            'payments.*.check_due_date'          => 'nullable|date',
+
+            // ── الدفعات الإضافية (additive mode) ─────────────────────
+            'new_payments'                           => 'nullable|array',
+            'new_payments.*.payment_mode_id'         => 'required_with:new_payments|integer',
+            'new_payments.*.amount'                  => 'required_with:new_payments|numeric|min:0.01',
+            'new_payments.*.payment_date'            => 'required_with:new_payments|date',
+            'new_payments.*.reference'               => 'nullable|string|max:255',
+            'new_payments.*.treasury_account_id'     => 'nullable|integer',
+            'new_payments.*.check_number'            => 'nullable|string|max:100',
+            'new_payments.*.check_bank'              => 'nullable|string|max:200',
+            'new_payments.*.check_due_date'          => 'nullable|date',
         ];
     }
 

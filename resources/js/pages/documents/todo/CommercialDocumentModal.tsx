@@ -371,7 +371,7 @@ export default function CommercialDocumentModal({
 
   // ─── Credit check ─────────────────────────────────────────────────────────
   const { data: creditCheck, isLoading: isLoadingCredit } = useCreditCheck({
-    partyId:    form.party_id ? parseInt(form.party_id) : null,
+    partyId:    partyIdNum,
     amount:     totals.netToPay,
     date:       form.document_date,
     isPurchase,

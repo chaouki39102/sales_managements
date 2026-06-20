@@ -1,10 +1,10 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/documents/types/document.types.ts
-//
-// مصدر الحقيقة الوحيد لأنواع بيانات وحدة المستندات التجارية.
+// pages/documents/types/document.types.ts — محدَّث
+// التغييرات:
+//   Party: default_price_level_id + default_price_level (بدل price_level_id)
+//   QuantityDiscount: إضافة is_blocked + tier_order
+//   CONVERSION_MAP: خريطة التحويلات المسموح بها
 // ════════════════════════════════════════════════════════════════════════════
-
-// ─── Document operation constants ────────────────────────────────────────────
 
 export const PURCHASE_CODES  = new Set(['DDP', 'BCF', 'BR', 'FA', 'AA']);
 export const STOCK_IN_CODES  = new Set(['FA', 'BR', 'AV']);
@@ -28,12 +28,12 @@ export const RETURNABLE_CODES = new Set(['FV', 'FA', 'BL', 'BR']);
 // ─── Product ──────────────────────────────────────────────────────────────────
 
 export interface Packaging {
-  id:          number;
-  code:        string;
-  label:       string;
-  quantity:    number;
-  is_default:  boolean;
-  barcode?:    string | null;
+  id:         number;
+  code:       string;
+  label:      string;
+  quantity:   number;
+  is_default: boolean;
+  barcode?:   string | null;
 }
 
 export interface ProductLot {
@@ -46,14 +46,14 @@ export interface ProductLot {
 }
 
 export interface ProductPrice {
-  id:               number;
-  price_level_id:   number;
-  price_level?:     { id: number; name: string };
-  pricing_method:   'fixed' | 'rate' | 'margin';
-  price?:           number;
-  rate?:            number;
-  margin?:          number;
-  active:           boolean;
+  id:             number;
+  price_level_id: number;
+  price_level?:   { id: number; name: string };
+  pricing_method: 'fixed' | 'rate' | 'margin';
+  price?:         number;
+  rate?:          number;
+  margin?:        number;
+  active:         boolean;
 }
 
 export interface QuantityDiscount {
@@ -64,33 +64,33 @@ export interface QuantityDiscount {
   discount_amount?:     number | null;
   discount_percentage?: number | null;
   active:               boolean;
-  is_blocked?:          boolean;
-  tier_order?:          number;
+  is_blocked?:          boolean;   // ✅ محجوب — لا يُسمح بالبيع بهذا النطاق
+  tier_order?:          number;    // ✅ ترتيب النطاق
 }
 
 export interface Product {
-  id:                         number;
-  name:                       string;
-  ref?:                       string | null;
-  barcode?:                   string | null;
-  purchase_price_ht?:         number | string | null;
-  current_cost_price?:        number | string | null;
-  default_selling_price_ht?:  number | string | null;
-  family?:                    { id: number; name: string } | null;
-  brand?:                     { id: number; name: string } | null;
-  tva?:                       { id: number; rate: number; is_default?: boolean } | null;
-  unit?:                      { id: number; symbol: string; name: string } | null;
-  packagings?:                Packaging[];
-  prices?:                    ProductPrice[];
-  quantityDiscounts?:         QuantityDiscount[];
-  lots?:                      ProductLot[];
-  manages_stock?:             boolean;
+  id:                        number;
+  name:                      string;
+  ref?:                      string | null;
+  barcode?:                  string | null;
+  purchase_price_ht?:        number | string | null;
+  current_cost_price?:       number | string | null;
+  default_selling_price_ht?: number | string | null;
+  family?:                   { id: number; name: string } | null;
+  brand?:                    { id: number; name: string } | null;
+  tva?:                      { id: number; rate: number; is_default?: boolean } | null;
+  unit?:                     { id: number; symbol: string; name: string } | null;
+  packagings?:               Packaging[];
+  prices?:                   ProductPrice[];
+  quantityDiscounts?:        QuantityDiscount[];
+  lots?:                     ProductLot[];
+  manages_stock?:            boolean;
   manages_quantity_discounts?: boolean;
-  has_lots?:                  boolean;
+  has_lots?:                 boolean;
   has_expiration_date?:      boolean;
-  active?:                    boolean;
-  stock_quantity?:            number | null;
-  allow_negative_stock?:      boolean;
+  active?:                   boolean;
+  stock_quantity?:           number | null;
+  allow_negative_stock?:     boolean;
   min_stock_alert?:          number | null;
 }
 
@@ -103,10 +103,13 @@ export interface Party {
   phone?:                  string | null;
   email?:                  string | null;
   balance?:                number | null;
+  // ✅ مُصحَّح: default_price_level_id بدل price_level_id
   default_price_level_id?: number | null;
   default_price_level?:    { id: number; name: string } | null;
+  // حد الائتمان
   credit_limit?:           number | null;
   credit_days?:            number | null;
+  // ضريبة
   is_tva_exempt?:          boolean;
   is_final_consumer?:      boolean;
   is_vat_registered?:      boolean;
@@ -115,13 +118,13 @@ export interface Party {
 // ─── Payment ──────────────────────────────────────────────────────────────────
 
 export interface PaymentMode {
-  id:                    number;
-  name:                  string;
-  code?:                 string | null;
-  icon?:                 string | null;
-  treasury_account_id?:  number | null;
-  requires_reference?:   boolean;
-  is_cash?:              boolean;
+  id:                   number;
+  name:                 string;
+  code?:                string | null;
+  icon?:                string | null;
+  treasury_account_id?: number | null;
+  requires_reference?:  boolean;
+  is_cash?:             boolean;
 }
 
 export interface PaymentEntry {
@@ -130,6 +133,7 @@ export interface PaymentEntry {
   reference?:           string;
   payment_date:         string;
   treasury_account_id?: string | number;
+  // شيك
   check_number?:        string;
   check_bank?:          string;
   check_due_date?:      string;
@@ -158,7 +162,6 @@ export interface LineItem {
   description:            string;
   quantity:               number;
   unit_price_ht:          number;
-  /** سعر التعبئة = unit_price_ht × packQty */
   price_per_pack:         number;
   discount_mode:          DiscountMode;
   discount_percentage:    number;
@@ -170,6 +173,7 @@ export interface LineItem {
   line_note?:             string;
   _product?:              Product;
   _packQty:               number;
+  // تحذيرات من compute-line
   _warnings?:             Array<{ type: string; level: string; message: string }>;
   _computing?:            boolean;
 }
@@ -181,6 +185,7 @@ export interface DocumentFormState {
   document_date:  string;
   due_date:       string;
   notes:          string;
+  internal_notes: string;
   warehouse_id:   string;
   fiscal_year_id: string;
   currency_id:    string;
@@ -194,15 +199,15 @@ export interface DocumentFormState {
 // ─── Totals ───────────────────────────────────────────────────────────────────
 
 export interface DocumentTotals {
-  gross:       number;
-  ht:          number;
-  tva:         number;
-  ttc:         number;
-  discount:    number;
-  stamp:       number;
-  netToPay:    number;
-  totalPaid:   number;
-  remaining:   number;
+  gross:     number;
+  ht:        number;
+  tva:       number;
+  ttc:       number;
+  discount:  number;
+  stamp:     number;
+  netToPay:  number;
+  totalPaid: number;
+  remaining: number;
 }
 
 // ─── Document Status ──────────────────────────────────────────────────────────
@@ -218,28 +223,26 @@ export interface DocumentStatus {
 // ─── Column config ────────────────────────────────────────────────────────────
 
 export const ALL_COLUMNS = [
-  { key: 'idx',        label: '#',              w: 34,  fixed: true  },
-  { key: 'product',    label: 'المنتج',          w: 220, fixed: true  },
-  { key: 'packaging',  label: 'التعبئة',         w: 110, fixed: false },
-  { key: 'lot',        label: 'الحصة',             w: 120, fixed: false },
-  { key: 'quantity',   label: 'الكمية',          w: 75,  fixed: true  },
-  { key: 'unit',       label: 'الوحدة',          w: 60,  fixed: false },
-  { key: 'unit_price', label: 'سعر الوحدة HT',  w: 110, fixed: false },
-  { key: 'pack_price', label: 'سعر التعبئة',    w: 100, fixed: false },
-  { key: 'orig_price', label: 'السعر الأصلي',   w: 100, fixed: false },
-  { key: 'discount',   label: 'الخصم',           w: 110, fixed: false },
-  { key: 'price_after',label: 'بعد الخصم HT',   w: 100, fixed: false },
-  { key: 'tva',        label: 'TVA %',           w: 68,  fixed: false },
-  { key: 'total_ht',   label: 'إجمالي HT',      w: 100, fixed: false },
-  { key: 'total_ttc',  label: 'إجمالي TTC',     w: 110, fixed: true  },
+  { key: 'idx',        label: '#',             w: 34,  fixed: true  },
+  { key: 'product',    label: 'المنتج',         w: 220, fixed: true  },
+  { key: 'packaging',  label: 'التعبئة',        w: 110, fixed: false },
+  { key: 'lot',        label: 'الحصة',           w: 120, fixed: false },
+  { key: 'quantity',   label: 'الكمية',         w: 75,  fixed: true  },
+  { key: 'unit',       label: 'الوحدة',         w: 60,  fixed: false },
+  { key: 'unit_price', label: 'سعر الوحدة HT', w: 110, fixed: false },
+  { key: 'pack_price', label: 'سعر التعبئة',   w: 100, fixed: false },
+  { key: 'orig_price', label: 'السعر الأصلي',  w: 100, fixed: false },
+  { key: 'discount',   label: 'الخصم',          w: 110, fixed: false },
+  { key: 'price_after',label: 'بعد الخصم HT',  w: 100, fixed: false },
+  { key: 'tva',        label: 'TVA %',          w: 68,  fixed: false },
+  { key: 'total_ht',   label: 'إجمالي HT',     w: 100, fixed: false },
+  { key: 'total_ttc',  label: 'إجمالي TTC',    w: 110, fixed: true  },
   { key: 'margin',     label: 'الهامش',         w: 80,  fixed: false },
-  { key: 'line_note',  label: 'ملاحظة',          w: 100, fixed: false },
-  { key: 'actions',    label: '',                w: 36,  fixed: true  },
+  { key: 'line_note',  label: 'ملاحظة',         w: 100, fixed: false },
+  { key: 'actions',    label: '',               w: 36,  fixed: true  },
 ] as const;
 
 export type ColKey = (typeof ALL_COLUMNS)[number]['key'];
-
-// ─── Status config ────────────────────────────────────────────────────────────
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   draft:          { label: 'مسودة',        color: 'var(--t4)',     bg: 'var(--bg3)' },

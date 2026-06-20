@@ -150,7 +150,6 @@ export interface UseDocumentFormReturn {
   stockDir:               1 | -1 | 0;
   isReadOnly:             boolean;
   isLinesReadOnly:        boolean;
-  lineWarnings:           Map<number, ComputeLineWarning[]>;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────

@@ -214,22 +214,25 @@ export interface ComboOption {
 }
 
 interface ComboBoxProps {
-  options:      ComboOption[];
-  value:        string;
-  onChange:     (id: string) => void;
-  placeholder:  string;
-  disabled?:    boolean;
-  error?:       boolean;
-  maxH?:        number;
+  options:       ComboOption[];
+  value:         string;
+  onChange:      (id: string) => void;
+  placeholder:   string;
+  disabled?:     boolean;
+  error?:        boolean;
+  maxH?:         number;
+  onAfterSelect?: () => void;
 }
 
 export function ComboBox({
-  options, value, onChange, placeholder, disabled, error, maxH = 260,
+  options, value, onChange, placeholder, disabled, error, maxH = 260, onAfterSelect,
 }: ComboBoxProps) {
-  const [open,  setOpen]  = useState(false);
-  const [query, setQuery] = useState('');
-  const ref      = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [open,       setOpen]       = useState(false);
+  const [query,      setQuery]      = useState('');
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const ref          = useRef<HTMLDivElement>(null);
+  const inputRef     = useRef<HTMLInputElement>(null);
+  const listRef      = useRef<HTMLDivElement>(null);
 
   const selected = options.find((o) => String(o.id) === value);
 
@@ -240,6 +243,19 @@ export function ComboBox({
       (o) => o.label.toLowerCase().includes(q) || (o.sub ?? '').toLowerCase().includes(q),
     ).slice(0, 80);
   }, [options, query]);
+
+  // Reset highlight when filtered list changes or dropdown closes
+  useEffect(() => {
+    if (!open) setHighlightIdx(-1);
+    else if (filtered.length > 0) setHighlightIdx(0);
+  }, [open, filtered.length]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightIdx < 0 || !listRef.current) return;
+    const items = listRef.current.querySelectorAll<HTMLDivElement>('[data-combo-item]');
+    items[highlightIdx]?.scrollIntoView({ block: 'nearest' });
+  }, [highlightIdx]);
 
   useEffect(() => {
     if (!open) return;
@@ -252,6 +268,39 @@ export function ComboBox({
     document.addEventListener('mousedown', fn);
     return () => document.removeEventListener('mousedown', fn);
   }, [open]);
+
+  const selectItem = (idx: number) => {
+    const item = filtered[idx];
+    if (!item) return;
+    onChange(String(item.id));
+    setOpen(false);
+    setQuery('');
+    onAfterSelect?.();
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (filtered.length === 0) return;
+      const next = Math.min(highlightIdx + 1, filtered.length - 1);
+      setHighlightIdx(next);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (highlightIdx <= 0) {
+        setHighlightIdx(-1);
+      } else {
+        setHighlightIdx(highlightIdx - 1);
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightIdx >= 0 && highlightIdx < filtered.length) {
+        selectItem(highlightIdx);
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      setQuery('');
+    }
+  };
 
   return (
     <div ref={ref} style={{ position: 'relative', width: '100%' }}>
@@ -299,26 +348,32 @@ export function ComboBox({
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleInputKeyDown}
                 placeholder="ابحث..."
                 style={{ ...inputStyle(), paddingRight: 28, fontSize: 12, background: 'var(--bg1)' }}
               />
             </div>
           </div>
-          <div style={{ maxHeight: maxH, overflowY: 'auto' }}>
+          <div ref={listRef} style={{ maxHeight: maxH, overflowY: 'auto' }}>
             {filtered.length === 0
               ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--t4)', fontSize: 12 }}>لا توجد نتائج</div>
-              : filtered.map((o) => (
+              : filtered.map((o, i) => (
                 <div
                   key={o.id}
-                  onClick={() => { onChange(String(o.id)); setOpen(false); setQuery(''); }}
-                  style={{
-                    padding: '8px 12px', cursor: 'pointer',
-                    background: String(o.id) === value ? 'var(--emb)' : 'transparent',
-                    borderBottom: '1px solid var(--b1)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                  }}
+                  data-combo-item
+                  onClick={() => { selectItem(i); }}
                   onMouseEnter={(e) => { if (String(o.id) !== value) (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'; }}
                   onMouseLeave={(e) => { if (String(o.id) !== value) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  style={{
+                    padding: '8px 12px', cursor: 'pointer',
+                    background: highlightIdx === i
+                      ? 'var(--emb)'
+                      : String(o.id) === value ? 'var(--emb)' : 'transparent',
+                    borderBottom: '1px solid var(--b1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                    outline: highlightIdx === i ? '2px solid var(--em)' : undefined,
+                    outlineOffset: -2,
+                  }}
                 >
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, color: 'var(--t1)',

@@ -534,9 +534,21 @@ function ExpenseModal({
 }) {
     const isEdit = !!record;
     const qc = useQueryClient();
+    const { selectedYear: sy } = useFiscalYear() as any;
+
+    const defaultDate = (): string => {
+        const d = new Date().toISOString().split("T")[0];
+        if (sy?.start_date && sy?.end_date) {
+            const s = sy.start_date.substring(0, 10);
+            const e = sy.end_date.substring(0, 10);
+            if (d >= s && d <= e) return d;
+            return e;
+        }
+        return d;
+    };
 
     const emptyForm = {
-        date: new Date().toISOString().split("T")[0],
+        date: defaultDate(),
         amount: "",
         expense_category_id: "",
         payment_mode_id: "" as string | number,
@@ -558,7 +570,7 @@ function ExpenseModal({
                 setForm({
                     date:
                         record.date?.split("T")[0] ??
-                        new Date().toISOString().split("T")[0],
+                        defaultDate(),
                     amount: String(record.amount ?? ""),
                     expense_category_id: String(
                         record.expense_category_id ?? "",

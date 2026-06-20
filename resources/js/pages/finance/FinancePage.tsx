@@ -23,11 +23,55 @@ import Switch       from '@/components/ui/Switch';
 import EmptyState   from '@/components/ui/EmptyState';
 import AlertBar     from '@/components/ui/AlertBar';
 import Avatar       from '@/components/ui/Avatar';
+import { useOpeningParties, useOpeningTreasury, openingBalancesApi } from '@/lib/api/endpoints/openingBalances';
+import { ComboBox } from '@/pages/documents/components/DocumentUIPrimitives';
 import type { TreasuryAccount, PaymentMode } from '@/types';
+import type { ComboOption } from '@/pages/documents/components/DocumentUIPrimitives';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
-    n.toLocaleString('fr-DZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    n.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function inputStyle(hasError: boolean): React.CSSProperties {
+    return {
+        width: '100%', padding: '5px 8px', background: 'var(--bg1)',
+        border: `1px solid ${hasError ? '#ef4444' : 'var(--b2)'}`,
+        borderRadius: 6, color: 'var(--t1)', fontSize: 12,
+        fontFamily: 'Tajawal, sans-serif', outline: 'none', boxSizing: 'border-box',
+    };
+}
+
+function Th({ children, width }: { children?: React.ReactNode; width?: string }) {
+    return <th style={{
+        padding: '10px 12px', textAlign: 'right', fontWeight: 700,
+        fontSize: 11, color: 'var(--t3)', whiteSpace: 'nowrap', width,
+    }}>{children}</th>;
+}
+
+function ActionBtn({ icon, color, onClick, disabled }: {
+    icon: string; color: string; onClick?: () => void; disabled?: boolean;
+}) {
+    return (
+        <button onClick={onClick} disabled={disabled} title=""
+            style={{
+                width: 28, height: 28, borderRadius: 6,
+                background: 'var(--bg3)', border: '1px solid var(--b2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: disabled ? .6 : 1, transition: 'all .1s',
+            }}
+            onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = 'var(--bg1)';
+                (e.currentTarget as HTMLElement).style.borderColor = color;
+            }}
+            onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'var(--bg3)';
+                (e.currentTarget as HTMLElement).style.borderColor = 'var(--b2)';
+            }}>
+            <i className={`ti ${icon}`} style={{ fontSize: 13, color }} />
+        </button>
+    );
+}
 
 const fmtDate = (d?: string | null) =>
     d ? new Date(d).toLocaleDateString('fr-DZ') : '—';
@@ -83,6 +127,7 @@ function usePayments(slug: string, yearId: number | null, filters: PaymentFilter
     const params: Record<string, unknown> = {
         fiscal_year_id: yearId ?? undefined,
         per_page:       50,
+        include:        'party,paymentMode,treasuryAccount',
         ...filters,
     };
     // حذف القيم الفارغة
@@ -100,35 +145,6 @@ function usePayments(slug: string, yearId: number | null, filters: PaymentFilter
                 : Array.isArray(data?.data) ? data.data : [],
             meta: data?.meta ?? null,
         }),
-    });
-}
-
-// ─── Opening balances ─────────────────────────────────────────────────────────
-function useOpeningParties(slug: string, yearId: number | null) {
-    return useQuery({
-        queryKey: [slug, 'opening-balances', 'parties', yearId],
-        queryFn:  () => apiGet<any[]>('/opening-balances/parties', {
-            fiscal_year_id: yearId,
-            include: 'party',
-            per_page: 200,
-        }),
-        enabled: !!slug && !!yearId,
-        select: (data: any) =>
-            Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [],
-    });
-}
-
-function useOpeningTreasury(slug: string, yearId: number | null) {
-    return useQuery({
-        queryKey: [slug, 'opening-balances', 'treasury', yearId],
-        queryFn:  () => apiGet<any[]>('/opening-balances/treasury', {
-            fiscal_year_id: yearId,
-            include: 'treasuryAccount',
-            per_page: 200,
-        }),
-        enabled: !!slug && !!yearId,
-        select: (data: any) =>
-            Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [],
     });
 }
 
@@ -769,6 +785,7 @@ function OpeningBalancesTab({ slug, selectedYear }: {
 }) {
     const [subTab, setSubTab] = useState<'parties' | 'treasury'>('treasury');
     const yearId = selectedYear?.id ?? null;
+    const qc = useQueryClient();
 
     const { data: partiesData, isLoading: loadParties } = useOpeningParties(slug, yearId);
     const { data: treasuryData, isLoading: loadTreasury } = useOpeningTreasury(slug, yearId);
@@ -781,6 +798,110 @@ function OpeningBalancesTab({ slug, selectedYear }: {
     const totalCredit = partyRows.filter(r => r.balance_type === 'credit')
                             .reduce((s, r) => s + Number(r.opening_balance || 0), 0);
     const totalTreasury = treasuryRows.reduce((s, r) => s + Number(r.opening_balance || 0), 0);
+
+    // ── Data for dropdowns ───────────────────────────────────────────────────
+    const { data: rawAccounts } = useQuery({
+        queryKey: [slug, 'treasury-accounts'],
+        queryFn: () => apiGet<any[]>('/treasury-accounts'),
+        enabled: !!slug,
+        staleTime: 60_000,
+    });
+    const accounts: any[] = Array.isArray(rawAccounts) ? rawAccounts : Array.isArray((rawAccounts as any)?.data) ? (rawAccounts as any).data : [];
+
+    const { data: rawParties } = useQuery({
+        queryKey: [slug, 'parties', 'select'],
+        queryFn: () => apiGet<any[]>('/parties', { per_page: 200, active: 1 }),
+        enabled: !!slug,
+        staleTime: 60_000,
+    });
+    const allParties: any[] = Array.isArray(rawParties) ? rawParties : Array.isArray((rawParties as any)?.data) ? (rawParties as any).data : [];
+
+    // ── Draft rows ───────────────────────────────────────────────────────────
+    interface TreasuryDraft { treasury_account_id: number | ''; opening_balance: string; }
+    interface PartyDraft { party_id: number | ''; balance_type: 'debit' | 'credit'; opening_balance: string; }
+    const emptyTreasuryDraft = (): TreasuryDraft => ({ treasury_account_id: '', opening_balance: '' });
+    const emptyPartyDraft = (): PartyDraft => ({ party_id: '', balance_type: 'debit', opening_balance: '' });
+
+    const [treasuryDrafts, setTreasuryDrafts] = useState<TreasuryDraft[]>([]);
+    const [partyDrafts, setPartyDrafts] = useState<PartyDraft[]>([]);
+    const [editTreasuryId, setEditTreasuryId] = useState<number | null>(null);
+
+    // ── Duplicate helpers ─────────────────────────────────────────────────────
+    const existingPartyIds = new Set(partyRows.map((r: any) => r.party_id));
+    const existingTreasuryIds = new Set(
+        treasuryRows.map((r: any) => r.treasury_account_id ?? r.treasuryAccount?.id),
+    );
+    const [editPartyId, setEditPartyId] = useState<number | null>(null);
+    const [editTreasuryVal, setEditTreasuryVal] = useState('');
+    const [editPartyVal, setEditPartyVal] = useState('');
+    const [editPartyType, setEditPartyType] = useState<'debit' | 'credit'>('debit');
+    const [partyFilter, setPartyFilter] = useState('');
+
+    const filteredParties = allParties.filter(p =>
+        !partyFilter.trim() || p.name.toLowerCase().includes(partyFilter.toLowerCase()),
+    );
+
+    // ── Mutations ────────────────────────────────────────────────────────────
+    const invalidateAll = () => {
+        qc.invalidateQueries({ queryKey: tenantKeys.openingBalances.parties(slug, yearId!) });
+        qc.invalidateQueries({ queryKey: tenantKeys.openingBalances.treasury(slug, yearId!) });
+    };
+
+    const createTreasuryMut = useMutation({
+        mutationFn: (d: TreasuryDraft) =>
+            openingBalancesApi.createTreasury({ fiscal_year_id: yearId, treasury_account_id: Number(d.treasury_account_id), opening_balance: Number(d.opening_balance) }),
+        onSuccess: () => { invalidateAll(); },
+    });
+
+    const createPartyMut = useMutation({
+        mutationFn: (d: PartyDraft) =>
+            openingBalancesApi.createParty({ fiscal_year_id: yearId, party_id: Number(d.party_id), opening_balance: Number(d.opening_balance), balance_type: d.balance_type }),
+        onSuccess: () => { invalidateAll(); },
+    });
+
+    const deleteMut = useMutation({
+        mutationFn: ({ type, id }: { type: 'party' | 'treasury'; id: number }) =>
+            type === 'party' ? openingBalancesApi.deleteParty(id) : openingBalancesApi.deleteTreasury(id),
+        onSuccess: () => { invalidateAll(); },
+    });
+
+    const updateTreasuryMut = useMutation({
+        mutationFn: ({ id, opening_balance }: { id: number; opening_balance: number }) =>
+            openingBalancesApi.updateTreasury(id, { opening_balance }),
+        onSuccess: () => { invalidateAll(); setEditTreasuryId(null); },
+    });
+
+    const updatePartyMut = useMutation({
+        mutationFn: ({ id, opening_balance, balance_type }: { id: number; opening_balance: number; balance_type: string }) =>
+            openingBalancesApi.updateParty(id, { opening_balance, balance_type }),
+        onSuccess: () => { invalidateAll(); setEditPartyId(null); },
+    });
+
+    // ── Save draft helpers ──────────────────────────────────────────────────
+    const saveTreasuryDraft = async (idx: number) => {
+        const d = treasuryDrafts[idx];
+        if (!d.treasury_account_id || !d.opening_balance) return;
+        await createTreasuryMut.mutateAsync(d);
+        setTreasuryDrafts(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    const savePartyDraft = async (idx: number) => {
+        const d = partyDrafts[idx];
+        if (!d.party_id || !d.opening_balance) return;
+        await createPartyMut.mutateAsync(d);
+        setPartyDrafts(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    // ── Inline edit ─────────────────────────────────────────────────────────
+    const startEditTreasury = (row: any) => {
+        setEditTreasuryId(row.id);
+        setEditTreasuryVal(row.opening_balance ?? '');
+    };
+    const startEditParty = (row: any) => {
+        setEditPartyId(row.id);
+        setEditPartyVal(row.opening_balance ?? '');
+        setEditPartyType(row.balance_type ?? 'debit');
+    };
 
     if (!yearId) {
         return (
@@ -827,34 +948,104 @@ function OpeningBalancesTab({ slug, selectedYear }: {
                     {partyRows.length > 0 &&
                         <span className="sbi-badge" style={{ marginRight: 6 }}>{partyRows.length}</span>}
                 </div>
+                {!selectedYear?.is_closed && (
+                    <div style={{ marginRight: 'auto', display: 'flex', gap: 6 }}>
+                        <button onClick={() => {
+                            if (subTab === 'treasury') setTreasuryDrafts(prev => [...prev, emptyTreasuryDraft()]);
+                            else setPartyDrafts(prev => [...prev, emptyPartyDraft()]);
+                        }} style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '7px 16px', background: 'var(--em)',
+                            border: 'none', borderRadius: 8, color: '#fff',
+                            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                            fontFamily: 'Tajawal, sans-serif',
+                        }}>
+                            <i className="ti ti-plus" style={{ fontSize: 15 }} />
+                            إضافة سطر
+                        </button>
+                    </div>
+                )}
             </div>
 
-            {/* Tableau خزينة */}
+            {/* ═══════════════════════════════════════════════════════════════
+               TABLEAU — الخزينة
+            ═══════════════════════════════════════════════════════════════ */}
             {subTab === 'treasury' && (
                 loadTreasury ? (
                     <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div>
                         <div className="empty-tx">جاري التحميل...</div></div>
-                ) : treasuryRows.length === 0 ? (
-                    <EmptyState icon="ti-building-bank"
-                        text="لا توجد أرصدة افتتاحية للخزينة"
-                        sub={selectedYear?.is_closed
-                            ? 'السنة مقفلة — الأرصدة محوَّلة للسنة التالية'
-                            : 'أُدخِلت تلقائياً عند إقفال السنة السابقة، أو أضفها يدوياً'} />
                 ) : (
                     <Card noHeader style={{ padding: 0 }}>
                         <div className="tw">
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>الحساب</th>
-                                        <th>النوع</th>
-                                        <th>الرصيد الافتتاحي</th>
-                                        <th>آخر تحديث</th>
+                                        <Th width="36px">#</Th>
+                                        <Th width="180px">الحساب</Th>
+                                        <Th width="100px">النوع</Th>
+                                        <Th width="140px">الرصيد الافتتاحي</Th>
+                                        <Th width="100px">آخر تحديث</Th>
+                                        {!selectedYear?.is_closed && <Th width="100px"></Th>}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {treasuryRows.map((row: any) => (
+                                    {/* Draft rows — خزينة */}
+                                    {treasuryDrafts.map((d, idx) => (
+                                        <tr key={`td-${idx}`} style={{ background: 'var(--bg3)' }}>
+                                            <td style={{ textAlign: 'center', color: 'var(--em)', fontWeight: 700, fontSize: 11 }}>
+                                                D{idx + 1}
+                                            </td>
+                                            <td>
+                                                <select value={d.treasury_account_id}
+                                                    onChange={e => setTreasuryDrafts(prev => prev.map((r, i) => i === idx ? { ...r, treasury_account_id: parseInt(e.target.value) || '' } : r))}
+                                                    style={{ ...inputStyle(false),
+                                                        ...(d.treasury_account_id && (existingTreasuryIds.has(d.treasury_account_id) || treasuryDrafts.some((r, j) => j !== idx && r.treasury_account_id === d.treasury_account_id))
+                                                            ? { border: '1px solid var(--red)' } : {}),
+                                                    }}>
+                                                    <option value="">— اختر —</option>
+                                                    {accounts.map((a: any) => (
+                                                        <option key={a.id} value={a.id}>{a.name}</option>
+                                                    ))}
+                                                </select>
+                                                {d.treasury_account_id && (existingTreasuryIds.has(d.treasury_account_id) || treasuryDrafts.some((r, j) => j !== idx && r.treasury_account_id === d.treasury_account_id)) && (
+                                                    <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 3 }}>
+                                                        <i className="ti ti-alert-triangle" style={{ fontSize: 11 }} /> هذا الحساب لديه رصيد افتتاحي بالفعل
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td style={{ fontSize: 11, color: 'var(--t4)' }}>—</td>
+                                            <td>
+                                                <div className="inp-row">
+                                                    <input type="number" value={d.opening_balance}
+                                                        onChange={e => setTreasuryDrafts(prev => prev.map((r, i) => i === idx ? { ...r, opening_balance: e.target.value } : r))}
+                                                        style={{ ...inputStyle(false), width: 100 }} />
+                                                    <span style={{ fontSize: 11, color: 'var(--t4)', whiteSpace: 'nowrap' }}>دج</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ fontSize: 11, color: 'var(--t4)' }}>—</td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 4 }}>
+                                                    <ActionBtn icon="ti-device-floppy" color="var(--em)"
+                                                        disabled={!d.treasury_account_id || !d.opening_balance || createTreasuryMut.isPending
+                                                            || (!!d.treasury_account_id && (existingTreasuryIds.has(d.treasury_account_id) || treasuryDrafts.some((r, j) => j !== idx && r.treasury_account_id === d.treasury_account_id)))}
+                                                        onClick={() => saveTreasuryDraft(idx)} />
+                                                    <ActionBtn icon="ti-x" color="var(--red)"
+                                                        onClick={() => setTreasuryDrafts(prev => prev.filter((_, i) => i !== idx))} />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                    {/* Existing rows — خزينة */}
+                                    {treasuryRows.length === 0 && treasuryDrafts.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)', fontSize: 13 }}>
+                                                لا توجد أرصدة افتتاحية — أضف سطراً جديداً أعلاه
+                                            </td>
+                                        </tr>
+                                    ) : treasuryRows.map((row: any, i: number) => (
                                         <tr key={row.id}>
+                                            <td style={{ textAlign: 'center', color: 'var(--t4)', fontSize: 11 }}>{i + 1}</td>
                                             <td className="s">
                                                 {row.treasury_account?.name
                                                     ?? row.treasuryAccount?.name
@@ -867,110 +1058,307 @@ function OpeningBalancesTab({ slug, selectedYear }: {
                                                         ?? '—'}
                                                 </Badge>
                                             </td>
-                                            <td className="e" style={{ color: 'var(--em)', fontWeight: 700 }}>
-                                                {fmt(Number(row.opening_balance || 0))} دج
+                                            <td>
+                                                {editTreasuryId === row.id ? (
+                                                    <div className="inp-row">
+                                                        <input type="number" value={editTreasuryVal}
+                                                            onChange={e => setEditTreasuryVal(e.target.value)}
+                                                            style={{ ...inputStyle(false), width: 100 }} />
+                                                        <span style={{ fontSize: 11, color: 'var(--t4)', whiteSpace: 'nowrap' }}>دج</span>
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ color: 'var(--em)', fontWeight: 700, fontFamily: 'monospace' }}>
+                                                        {fmt(Number(row.opening_balance || 0))} دج
+                                                    </span>
+                                                )}
                                             </td>
                                             <td style={{ fontSize: 11, color: 'var(--t4)' }}>
                                                 {fmtDate(row.updated_at)}
                                             </td>
+                                            {!selectedYear?.is_closed && (
+                                                <td>
+                                                    {editTreasuryId === row.id ? (
+                                                        <div style={{ display: 'flex', gap: 4 }}>
+                                                            <ActionBtn icon="ti-device-floppy" color="var(--em)"
+                                                                disabled={!editTreasuryVal || updateTreasuryMut.isPending}
+                                                                onClick={() => updateTreasuryMut.mutate({ id: row.id, opening_balance: Number(editTreasuryVal) })} />
+                                                            <ActionBtn icon="ti-x" color="var(--red)"
+                                                                onClick={() => setEditTreasuryId(null)} />
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ display: 'flex', gap: 4 }}>
+                                                            <ActionBtn icon="ti-pencil" color="var(--blue)"
+                                                                onClick={() => startEditTreasury(row)} />
+                                                            <ActionBtn icon="ti-trash" color="var(--red)"
+                                                                onClick={() => { if (confirm('حذف هذا الرصيد?')) deleteMut.mutate({ type: 'treasury', id: row.id }); }} />
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colSpan={2} style={{ fontWeight: 700, textAlign: 'end',
-                                            padding: '8px 12px', color: 'var(--t3)', fontSize: 12 }}>
-                                            المجموع
-                                        </td>
-                                        <td style={{ fontWeight: 900, color: 'var(--em)',
-                                            padding: '8px 12px' }}>
+                                        <td colSpan={3} style={{ fontWeight: 700, textAlign: 'end',
+                                            padding: '8px 12px', color: 'var(--t3)', fontSize: 12 }}>المجموع</td>
+                                        <td style={{ fontWeight: 900, color: 'var(--em)', padding: '8px 12px' }}>
                                             {fmt(totalTreasury)} دج
                                         </td>
-                                        <td/>
+                                        <td colSpan={!selectedYear?.is_closed ? 2 : 1}></td>
                                     </tr>
                                 </tfoot>
                             </table>
+                            <div style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '10px 16px', borderTop: '1px solid var(--b1)', background: 'var(--bg3)',
+                            }}>
+                                <button onClick={() => setTreasuryDrafts(prev => [...prev, emptyTreasuryDraft()])} style={{
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                    padding: '6px 14px', background: 'transparent',
+                                    border: '1px dashed var(--b2)', borderRadius: 8,
+                                    color: 'var(--t3)', fontSize: 12, cursor: 'pointer',
+                                    fontFamily: 'Tajawal, sans-serif', transition: 'all .15s',
+                                }}
+                                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--em)'; e.currentTarget.style.color = 'var(--em)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--b2)'; e.currentTarget.style.color = 'var(--t3)'; }}
+                                >
+                                    <i className="ti ti-plus" style={{ fontSize: 14 }} /> إضافة سطر
+                                </button>
+                                {treasuryRows.length > 0 && (
+                                    <div style={{ display: 'flex', gap: 20, fontSize: 12, color: 'var(--t3)' }}>
+                                        <span><strong style={{ color: 'var(--t1)' }}>{treasuryRows.length}</strong> حساب</span>
+                                        <span>إجمالي{' '}<strong style={{ color: 'var(--em)' }}>{fmt(totalTreasury)} دج</strong></span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </Card>
-                )
-            )}
+                    )
+                )}
 
-            {/* Tableau المتعاملون */}
+            {/* ═══════════════════════════════════════════════════════════════
+               TABLEAU — المتعاملون
+            ═══════════════════════════════════════════════════════════════ */}
             {subTab === 'parties' && (
                 loadParties ? (
                     <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div>
                         <div className="empty-tx">جاري التحميل...</div></div>
-                ) : partyRows.length === 0 ? (
-                    <EmptyState icon="ti-users"
-                        text="لا توجد أرصدة افتتاحية للمتعاملين"
-                        sub="أُضيفت تلقائياً عند إقفال السنة السابقة" />
                 ) : (
                     <Card noHeader style={{ padding: 0 }}>
                         <div className="tw">
+                            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--b1)' }}>
+                                <input type="text" value={partyFilter}
+                                    onChange={e => setPartyFilter(e.target.value)}
+                                    placeholder="ابحث عن متعامل..."
+                                    style={{ ...inputStyle(false), maxWidth: 280, fontSize: 12 }}
+                                />
+                                {partyFilter && (
+                                    <span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 8 }}>
+                                        {filteredParties.length} من {allParties.length}
+                                    </span>
+                                )}
+                            </div>
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>المتعامل</th>
-                                        <th>النوع</th>
-                                        <th>مدين (له علينا)</th>
-                                        <th>دائن (له منا)</th>
-                                        <th>آخر تحديث</th>
+                                        <Th width="36px">#</Th>
+                                        <Th>المتعامل</Th>
+                                        <Th width="100px">النوع</Th>
+                                        <Th width="140px">الرصيد</Th>
+                                        <Th width="100px">آخر تحديث</Th>
+                                        {!selectedYear?.is_closed && <Th width="100px"></Th>}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {partyRows.map((row: any, i: number) => {
-                                        const isDebit = row.balance_type === 'debit';
-                                        const bal     = Number(row.opening_balance || 0);
+                                    {/* Draft rows — متعاملون */}
+                                    {partyDrafts.map((d, idx) => (
+                                        <tr key={`pd-${idx}`} style={{ background: 'var(--bg3)' }}>
+                                            <td style={{ textAlign: 'center', color: 'var(--em)', fontWeight: 700, fontSize: 11 }}>
+                                                D{idx + 1}
+                                            </td>
+                                            <td style={{ minWidth: 200 }}>
+                                                <ComboBox
+                                                    options={filteredParties.map(p => ({ id: p.id, label: p.name }))}
+                                                    value={String(d.party_id || '')}
+                                                    onChange={id => setPartyDrafts(prev => prev.map((r, i) => i === idx ? { ...r, party_id: parseInt(id) || '' } : r))}
+                                                    placeholder="— اختر —"
+                                                    error={!!(d.party_id && (existingPartyIds.has(d.party_id) || partyDrafts.some((r, j) => j !== idx && r.party_id === d.party_id)))}
+                                                    onAfterSelect={() => {
+                                                        const el = document.querySelector<HTMLInputElement>(`[data-amount-idx="${idx}"]`);
+                                                        el?.focus();
+                                                    }}
+                                                />
+                                                {d.party_id && (existingPartyIds.has(d.party_id) || partyDrafts.some((r, j) => j !== idx && r.party_id === d.party_id)) && (
+                                                    <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 3 }}>
+                                                        <i className="ti ti-alert-triangle" style={{ fontSize: 11 }} /> هذا المتعامل لديه رصيد افتتاحي بالفعل
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <select value={d.balance_type}
+                                                    onChange={e => setPartyDrafts(prev => prev.map((r, i) => i === idx ? { ...r, balance_type: e.target.value as 'debit' | 'credit' } : r))}
+                                                    style={inputStyle(false)}>
+                                                    <option value="debit">عليه</option>
+                                                    <option value="credit">له</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <div className="inp-row">
+                                                    <input type="number" value={d.opening_balance}
+                                                        data-amount-idx={idx}
+                                                        onChange={e => setPartyDrafts(prev => prev.map((r, i) => i === idx ? { ...r, opening_balance: e.target.value } : r))}
+                                                        style={{ ...inputStyle(false), width: 100 }} />
+                                                    <span style={{ fontSize: 11, color: 'var(--t4)', whiteSpace: 'nowrap' }}>دج</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ fontSize: 11, color: 'var(--t4)' }}>—</td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 4 }}>
+                                                    <ActionBtn icon="ti-device-floppy" color="var(--em)"
+                                                        disabled={!d.party_id || !d.opening_balance || createPartyMut.isPending
+                                                            || (!!d.party_id && (existingPartyIds.has(d.party_id) || partyDrafts.some((r, j) => j !== idx && r.party_id === d.party_id)))}
+                                                        onClick={() => savePartyDraft(idx)} />
+                                                    <ActionBtn icon="ti-x" color="var(--red)"
+                                                        onClick={() => setPartyDrafts(prev => prev.filter((_, i) => i !== idx))} />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                    {/* Existing rows — متعاملون */}
+                                    {partyRows.length === 0 && partyDrafts.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--t4)', fontSize: 13 }}>
+                                                لا توجد أرصدة افتتاحية — أضف سطراً جديداً أعلاه
+                                            </td>
+                                        </tr>
+                                    ) : partyRows.map((row: any, i: number) => {
+                                        const isDebit = editPartyId === row.id ? editPartyType === 'debit' : row.balance_type === 'debit';
+                                        const bal = editPartyId === row.id ? Number(editPartyVal) : Number(row.opening_balance || 0);
                                         return (
                                             <tr key={row.id}>
+                                                <td style={{ textAlign: 'center', color: 'var(--t4)', fontSize: 11 }}>{i + 1}</td>
                                                 <td>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                                                        <Avatar
-                                                            initials={(row.party?.name ?? '?')[0]}
-                                                            color={((i % 7) + 1) as 1|2|3|4|5|6|7}
-                                                            size={26}
-                                                        />
-                                                        <span className="s">
-                                                            {row.party?.name ?? `متعامل #${row.party_id}`}
-                                                        </span>
+                                                        <Avatar initials={(row.party?.name ?? '?')[0]}
+                                                            color={((i % 7) + 1) as 1|2|3|4|5|6|7} size={26} />
+                                                        <span className="s">{row.party?.name ?? `متعامل #${row.party_id}`}</span>
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <Badge variant={isDebit ? 'warning' : 'info'}>
-                                                        {isDebit ? 'مدين' : 'دائن'}
-                                                    </Badge>
+                                                    {editPartyId === row.id ? (
+                                                        <select value={editPartyType}
+                                                            onChange={e => setEditPartyType(e.target.value as 'debit' | 'credit')}
+                                                            style={inputStyle(false)}>
+                                                            <option value="debit">عليه</option>
+                                                            <option value="credit">له</option>
+                                                        </select>
+                                                    ) : (
+                                                        <Badge variant={isDebit ? 'warning' : 'info'}>
+                                                            {isDebit ? 'عليه' : 'له'}
+                                                        </Badge>
+                                                    )}
                                                 </td>
-                                                <td style={{ color: isDebit ? 'var(--gold)' : 'var(--t4)',
-                                                    fontWeight: isDebit ? 700 : 400, fontFamily: 'monospace' }}>
-                                                    {isDebit ? `${fmt(bal)} دج` : '—'}
-                                                </td>
-                                                <td style={{ color: !isDebit ? 'var(--blue)' : 'var(--t4)',
-                                                    fontWeight: !isDebit ? 700 : 400, fontFamily: 'monospace' }}>
-                                                    {!isDebit ? `${fmt(bal)} دج` : '—'}
+                                                <td>
+                                                    {editPartyId === row.id ? (
+                                                        <div className="inp-row">
+                                                            <input type="number" value={editPartyVal}
+                                                                onChange={e => setEditPartyVal(e.target.value)}
+                                                                style={{ ...inputStyle(false), width: 100 }} />
+                                                            <span style={{ fontSize: 11, color: 'var(--t4)', whiteSpace: 'nowrap' }}>دج</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{
+                                                            color: isDebit ? 'var(--gold)' : 'var(--blue)',
+                                                            fontWeight: 700, fontFamily: 'monospace',
+                                                        }}>
+                                                            {fmt(bal)} دج
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td style={{ fontSize: 11, color: 'var(--t4)' }}>
                                                     {fmtDate(row.updated_at)}
                                                 </td>
+                                                {!selectedYear?.is_closed && (
+                                                    <td>
+                                                        {editPartyId === row.id ? (
+                                                            <div style={{ display: 'flex', gap: 4 }}>
+                                                                <ActionBtn icon="ti-device-floppy" color="var(--em)"
+                                                                    disabled={!editPartyVal || updatePartyMut.isPending}
+                                                                    onClick={() => updatePartyMut.mutate({ id: row.id, opening_balance: Number(editPartyVal), balance_type: editPartyType })} />
+                                                                <ActionBtn icon="ti-x" color="var(--red)"
+                                                                    onClick={() => setEditPartyId(null)} />
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ display: 'flex', gap: 4 }}>
+                                                                <ActionBtn icon="ti-pencil" color="var(--blue)"
+                                                                    onClick={() => startEditParty(row)} />
+                                                                <ActionBtn icon="ti-trash" color="var(--red)"
+                                                                    onClick={() => { if (confirm('حذف هذا الرصيد?')) deleteMut.mutate({ type: 'party', id: row.id }); }} />
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                )}
                                             </tr>
                                         );
                                     })}
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colSpan={2} style={{ fontWeight: 700, textAlign: 'end',
+                                        <td colSpan={3} style={{ fontWeight: 700, textAlign: 'end',
                                             padding: '8px 12px', color: 'var(--t3)', fontSize: 12 }}>المجموع</td>
-                                        <td style={{ fontWeight: 900, color: 'var(--gold)',
-                                            padding: '8px 12px', fontFamily: 'monospace' }}>
-                                            {fmt(totalDebit)} دج
+                                        <td style={{ fontWeight: 900, fontFamily: 'monospace', padding: '8px 12px' }}>
+                                            <span style={{ color: 'var(--gold)' }}>عليه: {fmt(totalDebit)}</span>
+                                            &nbsp;|&nbsp;
+                                            <span style={{ color: 'var(--blue)' }}>له: {fmt(totalCredit)}</span>
                                         </td>
-                                        <td style={{ fontWeight: 900, color: 'var(--blue)',
-                                            padding: '8px 12px', fontFamily: 'monospace' }}>
-                                            {fmt(totalCredit)} دج
-                                        </td>
-                                        <td/>
+                                        <td colSpan={!selectedYear?.is_closed ? 2 : 1}></td>
                                     </tr>
                                 </tfoot>
                             </table>
+                            <div style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '10px 16px', borderTop: '1px solid var(--b1)', background: 'var(--bg3)',
+                            }}>
+                                <button onClick={() => setPartyDrafts(prev => [...prev, emptyPartyDraft()])} style={{
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                    padding: '6px 14px', background: 'transparent',
+                                    border: '1px dashed var(--b2)', borderRadius: 8,
+                                    color: 'var(--t3)', fontSize: 12, cursor: 'pointer',
+                                    fontFamily: 'Tajawal, sans-serif', transition: 'all .15s',
+                                }}
+                                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--em)'; e.currentTarget.style.color = 'var(--em)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--b2)'; e.currentTarget.style.color = 'var(--t3)'; }}
+                                >
+                                    <i className="ti ti-plus" style={{ fontSize: 14 }} /> إضافة سطر
+                                </button>
+                                {partyRows.length > 0 && (
+                                    <div style={{ display: 'flex', gap: 20, fontSize: 12, color: 'var(--t3)' }}>
+                                        <span><strong style={{ color: 'var(--t1)' }}>{partyRows.length}</strong> متعامل</span>
+                                        <span>إجمالي{' '}
+                                            <strong style={{ color: 'var(--gold)' }}>{fmt(totalDebit)}</strong>
+                                            {' / '}
+                                            <strong style={{ color: 'var(--blue)' }}>{fmt(totalCredit)}</strong> دج
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t4)', lineHeight: 1.6, textAlign: 'right', direction: 'rtl',
+                    padding: '14px 20px',
+    borderTop: '1px solid var(--b2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 8,
+    flexShrink: 0,
+    background: 'var(--bg3)',
+    borderRadius: '0 0 var(--r4) var 20px(--r4)', }} className="al-g">
+                                <strong style={{ color: 'var(--gold)' }}>عليه = الطرف مدين
+                                لنا (عليه دين - يجب عليه أن يدفع لنا) </strong><br />
+                                <strong style={{ color: 'var(--blue)' }}>له = نحن مدينون
+                                للطرف (له دين عندنا - يجب علينا أن ندفع له) </strong><br />
+                            </div>
                         </div>
                     </Card>
                 )
@@ -1314,10 +1702,22 @@ function PaymentModal({ open, payment, accounts, paymentModes, selectedYearId, s
 }) {
     const isEdit = !!payment;
     const qc     = useQueryClient();
+    const { selectedYear: sy } = useFiscalYear();
+
+    const defaultDate = (): string => {
+        const d = new Date().toISOString().split('T')[0];
+        if (sy?.start_date && sy?.end_date) {
+            const s = sy.start_date.substring(0, 10);
+            const e = sy.end_date.substring(0, 10);
+            if (d >= s && d <= e) return d;
+            return e;
+        }
+        return d;
+    };
 
     const emptyForm = {
         payment_number:      '',
-        payment_date:        new Date().toISOString().split('T')[0],
+        payment_date:        defaultDate(),
         amount:              '' as string | number,
         currency_id:         '',
         amount_local:        '' as string | number,
@@ -1351,7 +1751,7 @@ function PaymentModal({ open, payment, accounts, paymentModes, selectedYearId, s
         if (payment) {
             setForm({
                 payment_number:      payment.payment_number || '',
-                payment_date:        payment.payment_date?.split('T')[0] || new Date().toISOString().split('T')[0],
+                payment_date:        payment.payment_date?.split('T')[0] || defaultDate(),
                 amount:              payment.amount || '',
                 currency_id:         payment.currency_id || '',
                 amount_local:        payment.amount_local || '',

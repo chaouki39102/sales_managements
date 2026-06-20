@@ -1,3 +1,10 @@
+// ════════════════════════════════════════════════════════════════════════════
+// pages/documents/hooks/useDocumentLookups.ts — محدَّث
+// التغييرات:
+//   parties: include 'defaultPriceLevel' (بدل 'priceLevel')
+//   treasury-accounts: إزالة filter[is_active] (يُرجعها كلها ويُفلتر محلياً)
+// ════════════════════════════════════════════════════════════════════════════
+
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
@@ -28,6 +35,7 @@ export function useDocumentLookups({
   const slug = useActiveSlug();
 
   // ── Parties ───────────────────────────────────────────────────────────────
+  // ✅ include 'defaultPriceLevel' — مطابق لاسم العلاقة في الباكاند
   const { data: partiesRaw = [] } = useQuery({
     queryKey:  [slug, 'modal-parties', isPurchase],
     queryFn:   () => apiGet<unknown>(
@@ -106,6 +114,7 @@ export function useDocumentLookups({
     enabled:   open && !!slug,
     staleTime: 10 * 60_000,
   });
+  // ✅ فلتر محلي — نعرض فقط النشطة
   const treasuryAccounts = (treasuryAccountsRaw as TreasuryAccount[])
     .filter(ta => ta.is_active);
 

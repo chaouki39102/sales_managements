@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\NumberingSeriesController;
 use App\Http\Controllers\Api\V1\OpeningBalanceStockController;
 use App\Http\Controllers\Api\V1\OpeningBalancePartyController;
+use App\Http\Controllers\Api\V1\OpeningBalanceTreasuryController;
 use App\Http\Controllers\Api\V1\CheckController;
 use App\Http\Controllers\Api\V1\TreasuryAccountController;
 use App\Http\Controllers\Api\V1\QuantityDiscountController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\Api\V1\ProductLotController;
 use App\Http\Controllers\Api\V1\FiscalYearController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\StockMovementController;
+use App\Http\Controllers\Api\V1\DocumentComputeController;
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
@@ -309,6 +311,8 @@ Route::prefix('v1')->group(function () {
                 Route::put('/',                 [UserController::class, 'updateProfile']);
                 Route::post('/avatar',          [UserController::class, 'updateAvatar']);
                 Route::post('/change-password', [AuthController::class, 'changePassword']);
+                Route::get('permissions',       [UserController::class, 'myPermissions']);
+                Route::get('roles',             [UserController::class, 'myRoles']);
             });
 
             // ── ⑤-ب: للمالك/المدير (كتابة) ──────────────────
@@ -365,8 +369,9 @@ Route::prefix('v1')->group(function () {
                 Route::apiResource('employment-contracts',  EmploymentContractController::class, ['except' => ['index', 'show']]);
 
                 // أرصدة افتتاحية
-                Route::apiResource('opening-balance-stocks',  OpeningBalanceStockController::class);
-                Route::apiResource('opening-balance-parties', OpeningBalancePartyController::class);
+                Route::apiResource('opening-balance-stocks',    OpeningBalanceStockController::class);
+                Route::apiResource('opening-balance-parties',   OpeningBalancePartyController::class);
+                Route::apiResource('opening-balance-treasury',  OpeningBalanceTreasuryController::class);
 
                 // سلاسل الترقيم
                 Route::apiResource('numbering-series', NumberingSeriesController::class);
@@ -407,6 +412,16 @@ Route::prefix('v1')->group(function () {
                 Route::post('documents/{commercialDocument}/cancel',   [CommercialDocumentController::class, 'cancel']);
                 Route::post('documents/{commercialDocument}/payments', [CommercialDocumentController::class, 'addPayments']);
                 Route::get('documents/{commercialDocument}/qrcode',    [CommercialDocumentController::class, 'generateQRCode']);
+
+                // ── مسارات الحساب والتحويل والمرتجع ─────────────
+                Route::post('documents/compute-line',   [DocumentComputeController::class, 'computeLine']);
+                Route::post('documents/compute-totals', [DocumentComputeController::class, 'computeTotals']);
+                Route::post('documents/{document}/convert', [DocumentComputeController::class, 'convert']);
+                Route::get ('documents/{document}/chain',   [DocumentComputeController::class, 'chain']);
+                Route::post('documents/{document}/return',  [DocumentComputeController::class, 'createReturn']);
+
+                // ── فحص الائتمان ─────────────────────────────────
+                Route::get('parties/{party}/credit-check', [DocumentComputeController::class, 'creditCheck']);
 
                 Route::apiResource('commercial-document-lines', CommercialDocumentLineController::class);
 
