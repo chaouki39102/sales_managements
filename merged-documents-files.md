@@ -45,6 +45,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
+import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type { DocumentType } from '@/lib/api/core/types';
 
@@ -66,6 +67,9 @@ import { useProductSuggestions } from './hooks/useProductSuggestions';
 import { useAdvancePayments } from './hooks/useAdvancePayments';
 import { SmartSuggestionsPanel } from './components/SmartSuggestionsPanel';
 import { AdvancePaymentsPanel } from './components/AdvancePaymentsPanel';
+import { BarcodeInput } from './components/BarcodeInput';
+import { LineCard } from './components/LineCard';
+import { BulkImportModal } from './components/BulkImportModal';
 import {
   Section, Label, FieldError, Toggle, TotalCard,
   ComboBox, ColumnManager, AlertBanner, Tabs,
@@ -255,6 +259,14 @@ export default function CommercialDocumentModal({
 
   // ─── Column visibility ────────────────────────────────────────────────────
 
+  // ─── Settings defaults ───────────────────────────────────────────────────
+  const { data: settingsDict } = useQuery({
+    queryKey: [slug, 'settings-dict'],
+    queryFn: () => settingsApi.list(),
+    enabled: !!slug,
+    staleTime: 10 * 60_000,
+  });
+
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(
     () => loadVisibleCols(slug ?? 'default'),
   );
@@ -262,6 +274,37 @@ export default function CommercialDocumentModal({
     setVisibleCols(cols);
     saveVisibleCols(slug ?? 'default', cols);
   };
+
+  const [lineMode, setLineMode] = useState<'table' | 'card'>('table');
+
+  // تطبيق الإعدادات الافتراضية من Settings عند تحميلها
+  const initialDefaultsApplied = useRef(false);
+  useEffect(() => {
+    if (!settingsDict || initialDefaultsApplied.current) return;
+    initialDefaultsApplied.current = true;
+
+    const storedCols = (() => {
+      try { return localStorage.getItem(`doc_visible_cols_${slug ?? 'default'}`); } catch {}
+      return null;
+    })();
+    if (!storedCols) {
+      const defaultCols = settingsDict.documents_default_visible_cols?.value as string[] | undefined;
+      if (defaultCols?.length) {
+        setVisibleCols(new Set(defaultCols as ColKey[]));
+      }
+    }
+
+    const storedMode = (() => {
+      try { return localStorage.getItem(`doc_line_mode_${slug ?? 'default'}`); } catch {}
+      return null;
+    })();
+    if (!storedMode) {
+      const defaultMode = settingsDict.documents_default_line_mode?.value as string | undefined;
+      if (defaultMode === 'card' || defaultMode === 'table') {
+        setLineMode(defaultMode);
+      }
+    }
+  }, [settingsDict, slug]);
 
   // ─── Lookups ──────────────────────────────────────────────────────────────
 
@@ -272,6 +315,40 @@ export default function CommercialDocumentModal({
     warehouseId:  null,
     fiscalYearId: selectedYear?.id ?? null,
   });
+
+  // ── القيم الافتراضية من Settings (أولوية) مع الرجوع إلى اللوك أب ──────
+  const settingsWarehouseId = useMemo(() => {
+    const v = settingsDict?.default_warehouse_id?.value;
+    if (v) {
+      const found = lookups.warehouses.find((w: any) => w.id === Number(v));
+      if (found) return String(found.id);
+    }
+    return lookups.defaultWarehouseId;
+  }, [settingsDict, lookups.warehouses, lookups.defaultWarehouseId]);
+
+  const settingsCurrencyId = useMemo(() => {
+    const v = settingsDict?.default_currency_id?.value;
+    if (v) {
+      const found = lookups.currencies.find((c: any) => c.id === Number(v));
+      if (found) return String(found.id);
+    }
+    return lookups.baseCurrencyId;
+  }, [settingsDict, lookups.currencies, lookups.baseCurrencyId]);
+
+  const settingsIsProforma = useMemo(() => {
+    const v = settingsDict?.default_is_proforma?.value;
+    return v === true || v === 'true';
+  }, [settingsDict]);
+
+  const settingsPriceLevelId = useMemo(() => {
+    const v = settingsDict?.default_price_level_id?.value;
+    return v ? String(v) : '';
+  }, [settingsDict]);
+
+  const settingsApplyStamp = useMemo(() => {
+    const v = settingsDict?.default_apply_stamp?.value;
+    return v === true || v === 'true';
+  }, [settingsDict]);
 
   // ─── Form ─────────────────────────────────────────────────────────────────
 
@@ -288,12 +365,16 @@ export default function CommercialDocumentModal({
     updateStockData,
     needsParty, affectsStock, stockDir,
     isReadOnly, isLinesReadOnly,
+    lineWarnings,
   } = useDocumentForm({
     documentType,
     existingDocument,
     defaultTvaRate:     lookups.defaultTvaRate,
-    defaultWarehouseId: lookups.defaultWarehouseId,
-    baseCurrencyId:     lookups.baseCurrencyId,
+    defaultWarehouseId: settingsWarehouseId,
+    baseCurrencyId:     settingsCurrencyId,
+    defaultIsProforma:  settingsIsProforma,
+    defaultPriceLevelId: settingsPriceLevelId,
+    defaultApplyStamp:   settingsApplyStamp,
     selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
     paymentModes:       lookups.paymentModes,
     parties:            lookups.parties,
@@ -380,6 +461,7 @@ export default function CommercialDocumentModal({
   } | null>(null);
 
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [extraTab, setExtraTab] = useState('shipping');
 
   // ─── Document chain ───────────────────────────────────────────────────────
@@ -446,6 +528,33 @@ export default function CommercialDocumentModal({
   const [successMsg, setSuccessMsg] = useState('');
   const successTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
+
+  // ─── Smart Memory — حفظ مسودة تلقائي ──────────────────────────────────────
+  const draftKey = `doc-draft-${slug ?? 'default'}-${documentType?.code ?? 'new'}`;
+  useEffect(() => {
+    if (!open || !form.lines.length) return;
+    const interval = setInterval(() => {
+      try {
+        const draft = { ...form, _savedAt: Date.now() };
+        localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch { /* localStorage full */ }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [open, form, draftKey]);
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      const draft = JSON.parse(raw);
+      if (!draft.lines?.length) return null;
+      const elapsed = Date.now() - (draft._savedAt ?? 0);
+      if (elapsed > 86_400_000) { localStorage.removeItem(draftKey); return null; }
+      return draft;
+    } catch { return null; }
+  };
+
+  const savedDraft = !isEdit && open && !form.lines.length ? restoreDraft() : null;
 
   // ─── Mutations ────────────────────────────────────────────────────────────
 
@@ -540,6 +649,75 @@ export default function CommercialDocumentModal({
   const handleDelete = () => {
     if (!window.confirm('هل أنت متأكد من حذف هذا المستند؟\n\nملاحظة: الحذف غير مدعوم — استخدم الإلغاء.')) return;
     deleteMut.mutate();
+  };
+
+  const handleExport = (format: 'excel' | 'pdf' | 'json' | 'xml') => {
+    const formData = {
+      documentNumber: docNumber,
+      documentDate: form.document_date,
+      dueDate: form.due_date,
+      party: lookups.parties.find(p => String(p.id) === form.party_id)?.name ?? '',
+      notes: form.notes,
+      lines: form.lines.map((l, i) => ({
+        line: i + 1,
+        product: l.description || l._product?.name || '',
+        quantity: l.quantity,
+        unitPrice: l.unit_price_ht,
+        total: l.quantity * l.unit_price_ht,
+        tva: l.tva_rate,
+      })),
+      totals: {
+        ht: totals.ht,
+        tva: totals.tva,
+        ttc: totals.ttc,
+        stamp: totals.stamp,
+        netToPay: totals.netToPay,
+      },
+    };
+
+    if (format === 'excel') {
+      void import('exceljs').then((ExcelJS) => {
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Document');
+        ws.addRow(['البيان', 'الكمية', 'سعر الوحدة', 'الإجمالي', 'TVA']);
+        formData.lines.forEach(l => ws.addRow([l.product, l.quantity, l.unitPrice, l.total, l.tva]));
+        ws.addRow([]);
+        ws.addRow(['Net HT', formData.totals.ht]);
+        ws.addRow(['TVA', formData.totals.tva]);
+        ws.addRow(['TTC', formData.totals.ttc]);
+        wb.xlsx.writeBuffer().then(buf => {
+          const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href = url;
+          a.download = `${formData.documentNumber || 'document'}.xlsx`;
+          a.click(); URL.revokeObjectURL(url);
+        });
+      });
+    } else if (format === 'pdf') {
+      window.print();
+    } else if (format === 'json') {
+      const blob = new Blob([JSON.stringify(formData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `${formData.documentNumber || 'document'}.json`;
+      a.click(); URL.revokeObjectURL(url);
+    } else if (format === 'xml') {
+      const toXml = (obj: unknown, tag: string): string => {
+        if (Array.isArray(obj)) return obj.map(v => toXml(v, tag)).join('\n');
+        if (typeof obj === 'object' && obj !== null) {
+          const children = Object.entries(obj as Record<string, unknown>)
+            .map(([k, v]) => toXml(v, k)).join('\n');
+          return `<${tag}>\n${children}\n</${tag}>`;
+        }
+        return `<${tag}>${String(obj)}</${tag}>`;
+      };
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<document>\n${toXml(formData, 'data')}\n</document>`;
+      const blob = new Blob([xml], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `${formData.documentNumber || 'document'}.xml`;
+      a.click(); URL.revokeObjectURL(url);
+    }
   };
 
   const confirmProformaMut = useMutation({
@@ -1244,6 +1422,37 @@ export default function CommercialDocumentModal({
 
             {lineErr && <AlertBanner type="error" message={lineErr} />}
 
+            {!isLinesReadOnly && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <BarcodeInput
+                  products={lookups.products}
+                  onProductFound={(productId) => {
+                    addLine();
+                    const lastIdx = form.lines.length;
+                    updateLine(lastIdx, { product_id: String(productId) } as Parameters<typeof updateLine>[1]);
+                  }}
+                  disabled={isLinesReadOnly}
+                />
+                <button
+                  onClick={() => setLineMode((m) => {
+                    const next = m === 'table' ? 'card' : 'table';
+                    try { localStorage.setItem(`doc_line_mode_${slug ?? 'default'}`, next); } catch {}
+                    return next;
+                  })}
+                  style={{
+                    padding: '5px 10px', borderRadius: 'var(--r1)',
+                    border: '1px solid var(--b3)', background: 'transparent',
+                    color: 'var(--t3)', cursor: 'pointer', fontSize: 11,
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <i className={`ti ti-${lineMode === 'table' ? 'layout-cards' : 'table'}`} />
+                  {lineMode === 'table' ? 'عرض البطاقات' : 'عرض الجدول'}
+                </button>
+              </div>
+            )}
+
             {lookups.isLoadingProducts ? (
               <div style={{
                 textAlign: 'center', padding: 24, color: 'var(--t4)',
@@ -1255,11 +1464,84 @@ export default function CommercialDocumentModal({
             ) : (
               <>
                 {form.lines.length === 0 ? (
-                  <div style={{
-                    padding: 16, textAlign: 'center', color: 'var(--t4)',
-                    fontSize: 12, background: 'var(--bg3)', borderRadius: 'var(--r2)',
-                  }}>
-                    {isLinesReadOnly ? 'لا أسطر — المستند فارغ' : 'لا أسطر بعد — اضغط "إضافة سطر" أدناه'}
+                  <div>
+                    {savedDraft && (
+                      <div style={{
+                        padding: '10px 14px', marginBottom: 8, borderRadius: 'var(--r2)',
+                        background: 'color-mix(in srgb, var(--blue) 8%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--blue) 20%, transparent)',
+                        display: 'flex', alignItems: 'center', gap: 10, fontSize: 12,
+                      }}>
+                        <i className="ti ti-history" style={{ color: 'var(--blue)', fontSize: 16 }} />
+                        <span style={{ flex: 1, color: 'var(--t2)' }}>
+                          لديك مسودة محفوظة من قبل — هل تريد استعادتها؟
+                        </span>
+                        <button
+                          onClick={() => {
+                            const draft = restoreDraft();
+                            if (draft) {
+                              Object.keys(draft).forEach((k) => {
+                                if (k !== '_savedAt' && k in form) {
+                                  (set as (field: string, value: unknown) => void)(k, draft[k]);
+                                }
+                              });
+                              localStorage.removeItem(draftKey);
+                            }
+                          }}
+                          style={{
+                            padding: '5px 12px', borderRadius: 'var(--r1)',
+                            border: '1px solid var(--blue)', background: 'var(--emb)',
+                            color: 'var(--blue)', cursor: 'pointer', fontSize: 11,
+                            fontWeight: 700, fontFamily: 'inherit',
+                          }}
+                        >
+                          استعادة
+                        </button>
+                        <button
+                          onClick={() => localStorage.removeItem(draftKey)}
+                          style={{
+                            padding: '5px 10px', borderRadius: 'var(--r1)',
+                            border: '1px solid var(--b3)', background: 'transparent',
+                            color: 'var(--t3)', cursor: 'pointer', fontSize: 11,
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          تجاهل
+                        </button>
+                      </div>
+                    )}
+                    <div style={{
+                      padding: 16, textAlign: 'center', color: 'var(--t4)',
+                      fontSize: 12, background: 'var(--bg3)', borderRadius: 'var(--r2)',
+                    }}>
+                      {isLinesReadOnly ? 'لا أسطر — المستند فارغ' : 'لا أسطر بعد — اضغط "إضافة سطر" أدناه'}
+                    </div>
+                  </div>
+                ) : lineMode === 'card' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {form.lines.map((line, idx) => {
+                      const stockResult = line._product
+                        ? validateLineStock(line, line._product, isPurchase, stockData)
+                        : { ok: true as const };
+                      return (
+                        <LineCard
+                          key={idx}
+                          line={line}
+                          idx={idx}
+                          products={lookups.products}
+                          isPurchase={isPurchase}
+                          disabled={isLinesReadOnly}
+                          stockData={stockData}
+                          stockValidation={stockResult}
+                          isTvaExempt={!isPurchase && isPartyExempt}
+                          lineWarnings={lineWarnings.get(idx)}
+                          warehouses={lookups.warehouses}
+                          onUpdate={updateLine}
+                          onRemove={removeLine}
+                          onDuplicate={duplicateLine}
+                        />
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
@@ -1282,6 +1564,7 @@ export default function CommercialDocumentModal({
                           const stockResult = line._product
                             ? validateLineStock(line, line._product, isPurchase, stockData)
                             : { ok: true as const };
+                          const lineIdxWarnings = lineWarnings.get(idx);
                           return (
                             <DocumentLineRow
                               key={idx}
@@ -1297,6 +1580,8 @@ export default function CommercialDocumentModal({
                               onRemove={removeLine}
                               onDuplicate={duplicateLine}
                               isTvaExempt={!isPurchase && isPartyExempt}
+                              lineWarnings={lineIdxWarnings}
+                              warehouses={lookups.warehouses}
                             />
                           );
                         })}
@@ -1322,26 +1607,36 @@ export default function CommercialDocumentModal({
                 )}
 
                 {!isLinesReadOnly && (
-                  <button
-                    onClick={addLine}
-                    style={{
-                      marginTop: 10, display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '7px 14px', borderRadius: 'var(--r2)',
-                      border: '1px dashed var(--b3)', background: 'transparent',
-                      color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget).style.borderColor = 'var(--em)';
-                      (e.currentTarget).style.color = 'var(--em)';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget).style.borderColor = 'var(--b3)';
-                      (e.currentTarget).style.color = 'var(--t3)';
-                    }}
-                  >
-                    <i className="ti ti-plus" />
-                    إضافة سطر
-                  </button>
+                  <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={addLine}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '7px 14px', borderRadius: 'var(--r2)',
+                        border: '1px dashed var(--b3)', background: 'transparent',
+                        color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget).style.borderColor = 'var(--em)'; (e.currentTarget).style.color = 'var(--em)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget).style.borderColor = 'var(--b3)'; (e.currentTarget).style.color = 'var(--t3)'; }}
+                    >
+                      <i className="ti ti-plus" />
+                      إضافة سطر
+                    </button>
+                    <button
+                      onClick={() => setShowBulkImport(true)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '7px 14px', borderRadius: 'var(--r2)',
+                        border: '1px dashed var(--b3)', background: 'transparent',
+                        color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget).style.borderColor = 'var(--purple)'; (e.currentTarget).style.color = 'var(--purple)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget).style.borderColor = 'var(--b3)'; (e.currentTarget).style.color = 'var(--t3)'; }}
+                    >
+                      <i className="ti ti-upload" />
+                      استيراد من Excel
+                    </button>
+                  </div>
                 )}
               </>
             )}
@@ -1817,6 +2112,74 @@ export default function CommercialDocumentModal({
               </button>
             )}
 
+            {/* طباعة */}
+            <button
+              onClick={() => window.print()}
+              style={{
+                padding: '8px 14px', borderRadius: 'var(--r2)',
+                border: '1px solid var(--b2)', background: 'var(--bg1)',
+                color: 'var(--t2)', cursor: 'pointer',
+                fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <i className="ti ti-printer" />
+              طباعة
+            </button>
+
+            {/* تصدير */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => {
+                  const menu = document.getElementById('export-menu');
+                  if (menu) menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+                }}
+                style={{
+                  padding: '8px 14px', borderRadius: 'var(--r2)',
+                  border: '1px solid var(--b2)', background: 'var(--bg1)',
+                  color: 'var(--t2)', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <i className="ti ti-download" />
+                تصدير
+                <i className="ti ti-chevron-down" style={{ fontSize: 11 }} />
+              </button>
+              <div id="export-menu" style={{
+                display: 'none', position: 'absolute', bottom: '100%', right: 0, marginBottom: 4,
+                flexDirection: 'column', gap: 2,
+                background: 'var(--bg1)', border: '1px solid var(--b2)', borderRadius: 'var(--r2)',
+                padding: 4, zIndex: 100, minWidth: 140,
+              }}>
+                {[
+                  { label: 'Excel', icon: 'ti-file-spreadsheet', format: 'excel' },
+                  { label: 'PDF', icon: 'ti-file-type-pdf', format: 'pdf' },
+                  { label: 'JSON', icon: 'ti-file-code', format: 'json' },
+                  { label: 'XML', icon: 'ti-file-code-2', format: 'xml' },
+                ].map(opt => (
+                  <button key={opt.format}
+                    onClick={() => {
+                      document.getElementById('export-menu')!.style.display = 'none';
+                      handleExport(opt.format as 'excel' | 'pdf' | 'json' | 'xml');
+                    }}
+                    style={{
+                      padding: '6px 12px', borderRadius: 'var(--r2)',
+                      border: 'none', background: 'transparent',
+                      color: 'var(--t2)', cursor: 'pointer',
+                      fontSize: 12.5, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', gap: 8, textAlign: 'right',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--b1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <i className={`ti ${opt.icon}`} style={{ fontSize: 15 }} />
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               onClick={onClose}
               disabled={isPending || !!successMsg}
@@ -1870,6 +2233,24 @@ export default function CommercialDocumentModal({
           </div>
         </div>
       </div>
+
+      {/* Bulk import */}
+      <BulkImportModal
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        onImport={(importedLines) => {
+          importedLines.forEach((line) => {
+            addLine();
+            const lastIdx = form.lines.length;
+            const patch: Record<string, unknown> = {};
+            if (line.description) patch.description = line.description;
+            if (line.unit_price_ht) patch.unit_price_ht = line.unit_price_ht;
+            if (line.quantity) patch.quantity = line.quantity;
+            if (line.line_note) patch.line_note = line.line_note;
+            updateLine(lastIdx, patch as Parameters<typeof updateLine>[1]);
+          });
+        }}
+      />
 
       {/* Modal المرتجع */}
       {showReturnModal && existingDocument && (
@@ -3843,6 +4224,567 @@ export function AdvancePaymentsPanel({
 }
 ```
 
+## FILE: resources/js/pages/documents/components/AlertBell.tsx
+```
+import React, { useState, useRef, useEffect } from 'react';
+import { useAlerts } from '../hooks/useAlerts';
+
+export function AlertBell() {
+  const { alerts, unreadCount, isLoading, markAsRead, markAllAsRead, refresh } = useAlerts();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const severityColor = (s: string) => {
+    switch (s) {
+      case 'critical': return 'var(--red)';
+      case 'high':     return 'var(--orange)';
+      case 'medium':   return 'var(--blue)';
+      default:         return 'var(--t4)';
+    }
+  };
+
+  const typeIcon = (t: string) => {
+    switch (t) {
+      case 'overdue_invoice': return 'ti-alert-circle';
+      case 'upcoming_check':  return 'ti-checks';
+      case 'low_stock':       return 'ti-package-off';
+      case 'credit_exceeded': return 'ti-credit-card-off';
+      default:                return 'ti-bell';
+    }
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={() => { setOpen(!open); if (!open) refresh(); }}
+        style={{
+          position: 'relative', padding: '6px 10px', borderRadius: 'var(--r2)',
+          border: '1px solid var(--b2)', background: 'var(--bg2)',
+          color: 'var(--t2)', cursor: 'pointer', fontSize: 16,
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}
+      >
+        <i className="ti ti-bell" />
+        {unreadCount > 0 && (
+          <span style={{
+            position: 'absolute', top: -4, right: -4,
+            background: 'var(--red)', color: 'white',
+            borderRadius: '50%', width: 18, height: 18,
+            fontSize: 10, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, marginTop: 4,
+          width: 360, maxHeight: 420, overflowY: 'auto',
+          background: 'var(--bg1)', border: '1px solid var(--b2)',
+          borderRadius: 'var(--r2)', boxShadow: '0 8px 24px rgba(0,0,0,.15)',
+          zIndex: 1000, padding: 8,
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '4px 6px 8px', borderBottom: '1px solid var(--b2)', marginBottom: 4,
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+              التنبيهات
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {unreadCount > 0 && (
+                <button
+                  onClick={() => { markAllAsRead(); }}
+                  style={{
+                    padding: '3px 8px', borderRadius: 'var(--r1)',
+                    border: '1px solid var(--b3)', background: 'transparent',
+                    color: 'var(--t3)', cursor: 'pointer', fontSize: 10,
+                  }}
+                >
+                  تعيين الكل مقروء
+                </button>
+              )}
+            </div>
+          </div>
+
+          {isLoading && (
+            <div style={{ padding: 16, textAlign: 'center', color: 'var(--t4)', fontSize: 12 }}>
+              جاري التحميل...
+            </div>
+          )}
+
+          {!isLoading && alerts.length === 0 && (
+            <div style={{ padding: 16, textAlign: 'center', color: 'var(--t4)', fontSize: 12 }}>
+              لا توجد تنبيهات
+            </div>
+          )}
+
+          {alerts.map((alert) => (
+            <div
+              key={alert.id}
+              onClick={() => { if (!alert.is_read) markAsRead(alert.id); }}
+              style={{
+                padding: '8px 10px', borderRadius: 'var(--r1)',
+                background: alert.is_read ? 'transparent' : 'color-mix(in srgb, var(--blue) 4%, transparent)',
+                cursor: 'pointer', marginBottom: 2,
+                borderLeft: `3px solid ${severityColor(alert.severity)}`,
+                transition: 'background .12s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg3)'; }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = alert.is_read ? 'transparent' : 'color-mix(in srgb, var(--blue) 4%, transparent)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <i className={`ti ${typeIcon(alert.type)}`} style={{ fontSize: 12, color: severityColor(alert.severity) }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--t2)' }}>
+                  {alert.title}
+                </span>
+              </div>
+              <div style={{ fontSize: 10.5, color: 'var(--t3)', lineHeight: 1.4 }}>
+                {alert.body}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/documents/components/BankReconciliationPage.tsx
+```
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost } from '@/lib/api/core/client';
+import { useActiveSlug } from '@/lib/store/appStore';
+import { fmtDZD } from '../utils/document.utils';
+
+interface UnreconciledPayment {
+  id:              number;
+  payment_number:  string;
+  payment_date:    string;
+  amount:          number;
+  party_name:      string;
+  payment_mode:    string;
+  treasury_account: string | null;
+  reference:       string | null;
+  bank_reference:  string | null;
+}
+
+export function BankReconciliationPage() {
+  const slug    = useActiveSlug();
+  const client  = useQueryClient();
+  const [tab, setTab] = useState<'unreconciled' | 'reconciled'>('unreconciled');
+  const [bankRefInput, setBankRefInput] = useState<Record<number, string>>({});
+
+  const unreconciledQuery = useQuery<UnreconciledPayment[]>({
+    queryKey: [slug, 'reconciliation', 'unreconciled'],
+    queryFn: () => apiGet('/reconciliation/unreconciled'),
+    enabled: !!slug,
+  });
+
+  const reconciledQuery = useQuery<UnreconciledPayment[]>({
+    queryKey: [slug, 'reconciliation', 'reconciled'],
+    queryFn: () => apiGet('/reconciliation/reconciled'),
+    enabled: !!slug,
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: (data: { payment_id: number; bank_reference: string }) =>
+      apiPost('/reconciliation/reconcile', data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [slug, 'reconciliation'] });
+    },
+  });
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '8px 20px', borderRadius: 'var(--r2)',
+    border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+    background: active ? 'var(--emb)' : 'transparent',
+    color: active ? 'var(--em)' : 'var(--t3)',
+    fontFamily: 'inherit',
+  });
+
+  const inputStyle: React.CSSProperties = {
+    padding: '6px 10px', borderRadius: 'var(--r1)',
+    border: '1px solid var(--b3)', background: 'var(--bg1)',
+    color: 'var(--t1)', fontSize: 12, fontFamily: 'inherit',
+    width: 140, outline: 'none',
+  };
+
+  return (
+    <div style={{ padding: 24 }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: 'var(--t1)' }}>
+        المطابقة البنكية
+      </h2>
+
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+        <button style={tabStyle(tab === 'unreconciled')} onClick={() => setTab('unreconciled')}>
+          غير مطابقة ({unreconciledQuery.data?.length ?? 0})
+        </button>
+        <button style={tabStyle(tab === 'reconciled')} onClick={() => setTab('reconciled')}>
+          مطابقة ({reconciledQuery.data?.length ?? 0})
+        </button>
+      </div>
+
+      {tab === 'unreconciled' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {unreconciledQuery.isLoading && <div style={{ color: 'var(--t4)', fontSize: 13 }}>جاري التحميل...</div>}
+          {unreconciledQuery.data?.length === 0 && (
+            <div style={{ color: 'var(--t4)', fontSize: 13 }}>لا توجد مدفوعات غير مطابقة</div>
+          )}
+          {unreconciledQuery.data?.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 14px', borderRadius: 'var(--r2)',
+                background: 'var(--bg2)', border: '1px solid var(--b2)',
+              }}
+            >
+              <div style={{ flex: 2, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--t1)' }}>
+                  {p.party_name}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--t4)', display: 'flex', gap: 8 }}>
+                  <span>{p.payment_number}</span>
+                  <span>{p.payment_date}</span>
+                  <span>{p.payment_mode}</span>
+                  {p.reference && <span>مرجع: {p.reference}</span>}
+                </div>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--t1)', whiteSpace: 'nowrap' }}>
+                {fmtDZD(p.amount)}
+              </div>
+              <input
+                type="text"
+                placeholder="مرجع البنك..."
+                value={bankRefInput[p.id] ?? ''}
+                onChange={(e) => setBankRefInput((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                style={inputStyle}
+              />
+              <button
+                disabled={!bankRefInput[p.id]?.trim() || reconcileMutation.isPending}
+                onClick={() => {
+                  const ref = bankRefInput[p.id]?.trim();
+                  if (ref) {
+                    reconcileMutation.mutate({ payment_id: p.id, bank_reference: ref });
+                    setBankRefInput((prev) => ({ ...prev, [p.id]: '' }));
+                  }
+                }}
+                style={{
+                  padding: '6px 14px', borderRadius: 'var(--r1)',
+                  border: '1px solid var(--em)', background: 'var(--emb)',
+                  color: 'var(--em)', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                  fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}
+              >
+                تطابق
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'reconciled' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {reconciledQuery.data?.length === 0 && (
+            <div style={{ color: 'var(--t4)', fontSize: 13 }}>لا توجد مطابقات سابقة</div>
+          )}
+          {reconciledQuery.data?.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 14px', borderRadius: 'var(--r2)',
+                background: 'var(--bg2)', border: '1px solid var(--b2)',
+                opacity: 0.8,
+              }}
+            >
+              <div style={{ flex: 2, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--t1)' }}>
+                  {p.party_name}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--t4)', display: 'flex', gap: 8 }}>
+                  <span>{p.payment_number}</span>
+                  <span>{p.payment_date}</span>
+                  <span style={{ color: 'var(--em)' }}>✓ مطابق</span>
+                </div>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--t1)', whiteSpace: 'nowrap' }}>
+                {fmtDZD(p.amount)}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace' }}>
+                {p.bank_reference}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/documents/components/BarcodeInput.tsx
+```
+import React, { useRef, useEffect, useState } from 'react';
+import { inputStyle } from './DocumentUIPrimitives';
+
+interface BarcodeInputProps {
+  products: Array<{ id: number; name: string; barcode?: string | null; ref?: string | null }>;
+  onProductFound: (productId: number) => void;
+  disabled?: boolean;
+}
+
+export function BarcodeInput({ products, onProductFound, disabled }: BarcodeInputProps) {
+  const [value, setValue] = useState('');
+  const [notFound, setNotFound] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (!disabled && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [disabled]);
+
+  const handleChange = (raw: string) => {
+    const code = raw.trim();
+    setValue(code);
+    setNotFound(false);
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    if (code.length < 2) return;
+
+    timeoutRef.current = setTimeout(() => {
+      const product = products.find(
+        (p) => p.barcode === code || p.ref === code || String(p.id) === code,
+      );
+      if (product) {
+        onProductFound(product.id);
+        setValue('');
+      } else {
+        setNotFound(true);
+        setTimeout(() => setNotFound(false), 2000);
+      }
+    }, 300);
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+      <i className="ti ti-scan" style={{ fontSize: 16, color: 'var(--t4)' }} />
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        disabled={disabled}
+        placeholder="مسح باركود أو إدخال رمز المنتج..."
+        onChange={(e) => handleChange(e.target.value)}
+        style={{
+          ...inputStyle(notFound),
+          width: 220,
+          fontSize: 12,
+          direction: 'ltr',
+        }}
+      />
+      {notFound && (
+        <span style={{ fontSize: 11, color: 'var(--red)', whiteSpace: 'nowrap' }}>
+          لم يُعثر على المنتج
+        </span>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/documents/components/BulkImportModal.tsx
+```
+import React, { useState, useCallback, useRef } from 'react';
+import * as XLSX from 'xlsx';
+import Modal from '@/components/ui/Modal';
+import Button from '@/components/ui/Button';
+import type { LineItem } from '../types/document.types';
+
+interface ParsedRow {
+  product_ref?: string;
+  product_name?: string;
+  quantity: number;
+  unit_price_ht?: number;
+  packaging_label?: string;
+  line_note?: string;
+  _errors?: string;
+}
+
+interface BulkImportModalProps {
+  open: boolean;
+  onClose: () => void;
+  onImport: (lines: Array<Partial<LineItem>>) => void;
+}
+
+const COLUMN_MAP: Record<string, keyof ParsedRow> = {
+  'المنتج': 'product_name',
+  'المرجع': 'product_ref',
+  'الكمية': 'quantity',
+  'السعر': 'unit_price_ht',
+  'التعبئة': 'packaging_label',
+  'ملاحظة': 'line_note',
+};
+
+export function BulkImportModal({ open, onClose, onImport }: BulkImportModalProps) {
+  const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [fileName, setFileName] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+
+      const parsed: ParsedRow[] = json.map((row, i) => {
+        const out: ParsedRow = { quantity: 0 };
+        for (const [header, value] of Object.entries(row)) {
+          const key = COLUMN_MAP[header.trim()] ?? guessColumn(header.trim());
+          if (key === 'quantity') out.quantity = parseFloat(String(value)) || 0;
+          else if (key === 'unit_price_ht') out.unit_price_ht = parseFloat(String(value)) || 0;
+          else if (key) (out as any)[key] = String(value).trim();
+        }
+        if (!out.quantity) out._errors = 'الكمية مطلوبة';
+        return out;
+      });
+
+      setRows(parsed.filter(r => r.quantity > 0 || r.product_ref || r.product_name));
+    };
+    reader.readAsArrayBuffer(file);
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    const lines: Array<Partial<LineItem>> = rows.map(r => ({
+      product_id: '',
+      description: r.product_name ?? r.product_ref ?? '',
+      quantity: r.quantity,
+      unit_price_ht: r.unit_price_ht ?? 0,
+      price_per_pack: r.unit_price_ht ?? 0,
+      discount_mode: 'percent' as const,
+      discount_percentage: 0,
+      discount_amount_fixed: 0,
+      tva_rate: 0,
+      packaging_id: '',
+      stock_lot_id: '',
+      _packQty: 1,
+      line_note: r.line_note,
+    }));
+    onImport(lines);
+    setRows([]);
+    setFileName('');
+    onClose();
+  }, [rows, onImport, onClose]);
+
+  const handleClose = useCallback(() => {
+    setRows([]);
+    setFileName('');
+    onClose();
+  }, [onClose]);
+
+  return (
+    <Modal isOpen={open} onClose={handleClose} title="استيراد من Excel" style={{ maxWidth: 700 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ fontSize: 13, color: 'var(--t3)' }}>
+          ارفع ملف Excel يحتوي على أعمدة: المنتج / المرجع، الكمية، السعر (اختياري)
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFile}
+            style={{ display: 'none' }}
+          />
+          <Button size="sm" variant="outline" icon={<i className="ti ti-upload" />}
+            onClick={() => fileRef.current?.click()}>
+            اختيار ملف
+          </Button>
+          {fileName && <span style={{ fontSize: 12, color: 'var(--em)' }}>{fileName}</span>}
+        </div>
+
+        {rows.length > 0 && (
+          <>
+            <div style={{ fontSize: 12, color: 'var(--t4)' }}>
+              تم التعرف على {rows.length} سطر
+            </div>
+            <div className="tw" style={{ maxHeight: 300, overflow: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>المنتج</th>
+                    <th>الكمية</th>
+                    <th>السعر</th>
+                    <th>ملاحظة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr key={i} style={r._errors ? { background: 'var(--redb)' } : undefined}>
+                      <td>{i + 1}</td>
+                      <td>{r.product_name ?? r.product_ref ?? '—'}</td>
+                      <td>{r.quantity}</td>
+                      <td>{r.unit_price_ht?.toLocaleString('fr-DZ') ?? '—'}</td>
+                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{r.line_note ?? ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button size="sm" variant="outline" onClick={handleClose}>إلغاء</Button>
+              <Button size="sm" variant="primary" onClick={handleConfirm}>
+                إضافة {rows.length} سطر
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function guessColumn(header: string): keyof ParsedRow | null {
+  const h = header.toLowerCase().trim();
+  if (/منتج|produit|product|item|article|سلعة|صنف/i.test(h)) return 'product_name';
+  if (/مرجع|ref|code|sku|كود/i.test(h)) return 'product_ref';
+  if (/كمية|qty|quantity|quantite|عدد/i.test(h)) return 'quantity';
+  if (/سعر|prix|price|unit|ثمن/i.test(h)) return 'unit_price_ht';
+  if (/تعبئة|pack|emballage/i.test(h)) return 'packaging_label';
+  if (/ملاحظة|note|observ|remarq/i.test(h)) return 'line_note';
+  return null;
+}
+```
+
 ## FILE: resources/js/pages/documents/components/CheckFormFields.tsx
 ```
 import React from 'react';
@@ -4752,6 +5694,12 @@ import { ProductSearch } from './ProductSearch';
 import { cellStyle } from './DocumentUIPrimitives';
 import type { LineItem, Product, ColKey } from '../types/document.types';
 import type { LineStockValidation } from '../utils/document.utils';
+import type { ComputeLineWarning } from '../hooks/useComputeLine';
+
+interface WarehouseOption {
+  id:   number;
+  name: string;
+}
 
 interface DocumentLineRowProps {
   line:           LineItem;
@@ -4766,6 +5714,8 @@ interface DocumentLineRowProps {
   onRemove:       (idx: number) => void;
   onDuplicate:    (idx: number) => void;
   isTvaExempt?:   boolean;
+  lineWarnings?:  ComputeLineWarning[];
+  warehouses?:    WarehouseOption[];
 }
 
 function CellInput({
@@ -4795,7 +5745,7 @@ function CellInput({
 
 export const DocumentLineRow = memo(function DocumentLineRow({
   line, idx, visibleCols, isPurchase, disabled, products, stockData,
-  stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt,
+  stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt, lineWarnings, warehouses,
 }: DocumentLineRowProps) {
 
   const { baseQty, gross, discountAmt, discPct, ht, tva: lineTva, ttc } = calcLineTotal(line);
@@ -4808,7 +5758,11 @@ export const DocumentLineRow = memo(function DocumentLineRow({
     : [];
 
   const hasStockWarning = !stockValidation.ok;
-  const rowBg = hasStockWarning
+  const computeWarnings = line._warnings ?? lineWarnings ?? [];
+  const activeComputeWarnings = computeWarnings.filter(
+    (w) => w.level !== 'info',
+  );
+  const rowBg = hasStockWarning || activeComputeWarnings.length > 0
     ? `color-mix(in srgb, ${stockValidation.blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
     : undefined;
 
@@ -4894,6 +5848,22 @@ export const DocumentLineRow = memo(function DocumentLineRow({
                 <span style={{ fontSize: 11, color: 'var(--t4)', padding: '0 6px' }}>—</span>
               )
             )}
+          </td>
+        )}
+
+        {col('warehouse') && (
+          <td style={{ padding: '3px 4px' }}>
+            <select
+              style={{ ...cellStyle(), cursor: 'pointer', fontSize: 10 }}
+              value={line.warehouse_id ?? ''}
+              disabled={disabled}
+              onChange={(e) => onUpdate(idx, { warehouse_id: e.target.value || undefined })}
+            >
+              <option value="">— تلقائي —</option>
+              {(warehouses ?? []).map((w) => (
+                <option key={w.id} value={String(w.id)}>{w.name}</option>
+              ))}
+            </select>
           </td>
         )}
 
@@ -5023,18 +5993,36 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
-        {col('margin') && (
-          <td style={{ padding: '3px 6px', textAlign: 'center', fontSize: 11 }}>
+        {col('cost') && (
+          <td style={{ padding: '3px 6px', textAlign: 'center', fontSize: 11, whiteSpace: 'nowrap' }}>
             {(() => {
               if (isPurchase || !prod) return <span style={{ color: 'var(--t4)' }}>—</span>;
-              const cost = toNum(prod.current_cost_price ?? prod.purchase_price_ht);
-              if (!cost || !line.unit_price_ht) return <span style={{ color: 'var(--t4)' }}>—</span>;
-              const margin = ((line.unit_price_ht - cost) / line.unit_price_ht) * 100;
-              const color  = margin < 0 ? 'var(--red)' : margin < 10 ? 'var(--orange)' : 'var(--green)';
+              const costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
+              if (!costPrice) return <span style={{ color: 'var(--t4)' }}>—</span>;
+              return <span style={{ fontWeight: 600, color: 'var(--t2)' }}>{fmtDZD(costPrice)}</span>;
+            })()}
+          </td>
+        )}
+
+        {col('margin') && (
+          <td style={{ padding: '3px 6px', textAlign: 'center', fontSize: 11, whiteSpace: 'nowrap' }}>
+            {(() => {
+              if (isPurchase || !prod) return <span style={{ color: 'var(--t4)' }}>—</span>;
+              const costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
+              if (!costPrice || !line.unit_price_ht) return <span style={{ color: 'var(--t4)' }}>—</span>;
+              const unitMargin = line.unit_price_ht - costPrice;
+              const marginPct = (unitMargin / line.unit_price_ht) * 100;
+              const totalMargin = unitMargin * baseQty;
+              const color  = marginPct < 0 ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
               return (
-                <span style={{ color, fontWeight: 700 }}>
-                  {margin.toFixed(1)}%
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+                  <span style={{ color, fontWeight: 700, fontSize: 12 }}>
+                    {fmtDZD(unitMargin)} · {marginPct.toFixed(1)}%
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>
+                    {fmtDZD(totalMargin)}
+                  </span>
+                </div>
               );
             })()}
           </td>
@@ -5102,6 +6090,25 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         </tr>
       )}
+
+      {/* تحذيرات الحساب (compute) — صفوف فرعية */}
+      {activeComputeWarnings.map((w, wi) => (
+        <tr key={wi} style={{ background: rowBg }}>
+          <td
+            colSpan={visibleCols.size}
+            style={{
+              padding: '3px 10px 6px', fontSize: 11,
+              color: w.level === 'error' ? 'var(--red)' : 'var(--orange)',
+            }}
+          >
+            <i
+              className={`ti ${w.level === 'error' ? 'ti-alert-circle' : 'ti-alert-triangle'}`}
+              style={{ marginLeft: 4 }}
+            />
+            {w.message}
+          </td>
+        </tr>
+      ))}
     </>
   );
 });
@@ -5705,6 +6712,406 @@ export function Tabs({
 }
 ```
 
+## FILE: resources/js/pages/documents/components/LineCard.tsx
+```
+import React from 'react';
+import { fmtDZD, calcLineTotal, getProductStock, toNum } from '../utils/document.utils';
+import { ProductSearch } from './ProductSearch';
+import type { LineItem, Product } from '../types/document.types';
+import type { LineStockValidation } from '../utils/document.utils';
+import type { ComputeLineWarning } from '../hooks/useComputeLine';
+
+interface LineCardProps {
+  line:            LineItem;
+  idx:             number;
+  products:        Product[];
+  isPurchase:      boolean;
+  disabled:        boolean;
+  stockData:       Record<number, number>;
+  stockValidation: LineStockValidation;
+  isTvaExempt?:    boolean;
+  lineWarnings?:   ComputeLineWarning[];
+  warehouses?:     Array<{ id: number; name: string }>;
+  onUpdate:        (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
+  onRemove:        (idx: number) => void;
+  onDuplicate:     (idx: number) => void;
+}
+
+export function LineCard({
+  line, idx, products, isPurchase, disabled, stockData, stockValidation,
+  isTvaExempt, lineWarnings, warehouses,
+  onUpdate, onRemove, onDuplicate,
+}: LineCardProps) {
+  const prod = products.find((p) => String(p.id) === line.product_id) ?? line._product;
+  const { baseQty, gross, ht, tva, ttc, discountAmt, discPct } = calcLineTotal(line);
+  const packagings = prod?.packagings ?? [];
+  const selectedPack = line.packaging_id
+    ? packagings.find((p) => String(p.id) === line.packaging_id)
+    : null;
+
+  const hasStockWarning = !stockValidation.ok;
+  const computeWarnings = line._warnings ?? lineWarnings ?? [];
+  const activeComputeWarnings = computeWarnings.filter((w) => w.level !== 'info');
+  const hasWarning = hasStockWarning || activeComputeWarnings.length > 0;
+
+  const stockQty = prod ? getProductStock(prod, stockData) : null;
+
+  let stockBadge: { label: string; color: string } | null = null;
+  if (!isPurchase && prod?.manages_stock && stockQty !== null && stockQty !== Infinity) {
+    if (stockQty <= 0)
+      stockBadge = { label: 'نفد', color: 'var(--red)' };
+    else if (stockQty < 5)
+      stockBadge = { label: `متاح: ${stockQty}`, color: 'var(--orange)' };
+    else
+      stockBadge = { label: `متاح: ${stockQty}`, color: 'var(--green)' };
+  }
+
+  let marginPct: number | null = null;
+  let unitMargin = 0;
+  let totalMargin = 0;
+  let marginColor = 'var(--t4)';
+  let costPrice = 0;
+  if (!isPurchase && prod) {
+    costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
+    if (costPrice > 0 && line.unit_price_ht > 0) {
+      unitMargin = line.unit_price_ht - costPrice;
+      marginPct = (unitMargin / line.unit_price_ht) * 100;
+      totalMargin = unitMargin * baseQty;
+      marginColor = marginPct < 0 ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
+    }
+  }
+  const borderColor = hasWarning
+    ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'var(--red)' : 'var(--orange)')
+    : 'var(--b2)';
+  const bgTint = hasWarning
+    ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking
+        ? `color-mix(in srgb, var(--red) 5%, var(--bg2))`
+        : `color-mix(in srgb, var(--orange) 4%, var(--bg2))`)
+    : 'var(--bg2)';
+
+  return (
+    <div
+      style={{
+        background: bgTint,
+        border: `1px solid ${borderColor}`,
+        borderRadius: 'var(--r2)',
+        boxShadow: hasWarning ? 'none' : '0 1px 4px rgba(0,0,0,.04)',
+        padding: '12px 14px',
+        fontSize: 12,
+        position: 'relative',
+        transition: 'border-color .15s, box-shadow .15s',
+      }}
+    >
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <ProductSearch
+              products={products}
+              value={line.product_id}
+              onChange={(id, p) => onUpdate(idx, { product_id: id }, p)}
+              disabled={disabled}
+              isPurchase={isPurchase}
+              stockData={stockData}
+            />
+            {stockBadge && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, flexShrink: 0,
+                padding: '1px 6px', borderRadius: 99,
+                background: `color-mix(in srgb, ${stockBadge.color} 12%, transparent)`,
+                color: stockBadge.color,
+              }}>
+                {stockBadge.label}
+              </span>
+            )}
+            {isTvaExempt && (
+              <span style={{
+                padding: '1px 5px', borderRadius: 99, fontSize: 9, fontWeight: 700,
+                background: 'color-mix(in srgb, var(--green) 12%, transparent)',
+                color: 'var(--green)', whiteSpace: 'nowrap',
+              }}>
+                <i className="ti ti-circle-check" style={{ marginLeft: 2, fontSize: 8 }} />
+                معفى
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          {!disabled && (
+            <button
+              onClick={() => onDuplicate(idx)}
+              title="تكرار السطر"
+              style={{
+                width: 28, height: 28, borderRadius: 'var(--r1)',
+                border: '1px solid var(--b2)', background: 'var(--bg2)',
+                color: 'var(--t3)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <i className="ti ti-copy" style={{ fontSize: 11 }} />
+            </button>
+          )}
+          <button
+            disabled={disabled}
+            onClick={() => onRemove(idx)}
+            title="حذف السطر"
+            style={{
+              width: 28, height: 28, borderRadius: 'var(--r1)',
+              border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
+              background: 'var(--redb)', color: 'var(--red)',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <i className="ti ti-trash" style={{ fontSize: 11 }} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Quantity & Price Row ── */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Quantity */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ color: 'var(--t4)', fontSize: 10, width: 38 }}>الكمية:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <button
+              disabled={disabled || line.quantity <= 1}
+              onClick={() => onUpdate(idx, { quantity: Math.max(1, line.quantity - 1) })}
+              style={{
+                width: 26, height: 26, borderRadius: 'var(--r1)',
+                border: '1px solid var(--b3)', background: 'var(--bg1)',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                fontSize: 13, fontWeight: 700, color: 'var(--t3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'inherit',
+              }}
+            >
+              −
+            </button>
+            <input
+              type="number"
+              min={0.001}
+              step={1}
+              value={line.quantity}
+              disabled={disabled}
+              onChange={(e) => onUpdate(idx, { quantity: parseFloat(e.target.value) || 0 })}
+              style={{
+                width: 50, textAlign: 'center', padding: '3px 4px',
+                borderRadius: 'var(--r1)', border: '1px solid var(--b3)',
+                background: 'var(--bg1)', color: 'var(--t1)',
+                fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+                outline: 'none', fontVariantNumeric: 'tabular-nums',
+              }}
+            />
+            <button
+              disabled={disabled}
+              onClick={() => onUpdate(idx, { quantity: line.quantity + 1 })}
+              style={{
+                width: 26, height: 26, borderRadius: 'var(--r1)',
+                border: '1px solid var(--b3)', background: 'var(--bg1)',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                fontSize: 13, fontWeight: 700, color: 'var(--t3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'inherit',
+              }}
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        {/* Unit Price */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ color: 'var(--t4)', fontSize: 10 }}>السعر:</span>
+          <input
+            type="number"
+            min={0}
+            step={0.01}
+            value={line.unit_price_ht}
+            disabled={disabled}
+            onChange={(e) => onUpdate(idx, { unit_price_ht: parseFloat(e.target.value) || 0 })}
+            style={{
+              width: 80, textAlign: 'right', padding: '3px 6px',
+              borderRadius: 'var(--r1)', border: '1px solid var(--b3)',
+              background: 'var(--bg1)', color: 'var(--t1)',
+              fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              outline: 'none', direction: 'ltr', fontVariantNumeric: 'tabular-nums',
+            }}
+          />
+          <span style={{ fontSize: 10, color: 'var(--t4)' }}>دج</span>
+        </div>
+
+        {/* Packaging selector */}
+        {packagings.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: 'var(--t4)', fontSize: 10 }}>التعبئة:</span>
+            <select
+              value={line.packaging_id}
+              disabled={disabled}
+              onChange={(e) => onUpdate(idx, { packaging_id: e.target.value })}
+              style={{
+                padding: '3px 6px', borderRadius: 'var(--r1)',
+                border: '1px solid var(--b3)', background: 'var(--bg1)',
+                color: 'var(--t1)', fontSize: 11, fontFamily: 'inherit',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <option value="">—</option>
+              {packagings.map((pk) => (
+                <option key={pk.id} value={String(pk.id)}>
+                  {pk.label} ({pk.quantity}){pk.is_default ? ' ★' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Warehouse */}
+        {warehouses && warehouses.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: 'var(--t4)', fontSize: 10 }}>المستودع:</span>
+            <select
+              value={line.warehouse_id ?? ''}
+              disabled={disabled}
+              onChange={(e) => onUpdate(idx, { warehouse_id: e.target.value || undefined })}
+              style={{
+                padding: '3px 6px', borderRadius: 'var(--r1)',
+                border: '1px solid var(--b3)', background: 'var(--bg1)',
+                color: 'var(--t1)', fontSize: 11, fontFamily: 'inherit',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <option value="">— تلقائي —</option>
+              {warehouses.map((w) => (
+                <option key={w.id} value={String(w.id)}>{w.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* ── Discount Row ── */}
+      {(discountAmt > 0 || line.discount_percentage > 0) && (
+        <div style={{ display: 'flex', gap: 12, marginTop: 6, padding: '4px 8px', borderRadius: 'var(--r1)', background: 'color-mix(in srgb, var(--orange) 5%, transparent)', fontSize: 11 }}>
+          <span style={{ color: 'var(--t4)', fontSize: 10 }}>الخصم:</span>
+          <span style={{ color: 'var(--red)', fontWeight: 700 }}>
+            {line.discount_mode === 'percent'
+              ? `${line.discount_percentage}%`
+              : `${fmtDZD(line.discount_amount_fixed)} دج`}
+          </span>
+          <span style={{ color: 'var(--t4)' }}>({fmtDZD(discountAmt)} دج)</span>
+        </div>
+      )}
+
+      {/* ── Totals Row ── */}
+      <div style={{
+        display: 'flex', gap: 16, flexWrap: 'wrap',
+        marginTop: 8, paddingTop: 8,
+        borderTop: '1px solid var(--b2)',
+      }}>
+        <div>
+          <span style={{ color: 'var(--t4)', fontSize: 10 }}>المبلغ HT: </span>
+          <span style={{ fontWeight: 700, color: 'var(--t2)' }}>{fmtDZD(ht)} دج</span>
+        </div>
+        <div>
+          <span style={{ color: 'var(--t4)', fontSize: 10 }}>TVA ({line.tva_rate}%): </span>
+          <span style={{ fontWeight: 600 }}>{fmtDZD(tva)} دج</span>
+        </div>
+        <div>
+          <span style={{ color: 'var(--t4)', fontSize: 10 }}>المبلغ TTC: </span>
+          <span style={{ fontWeight: 800, color: 'var(--em)' }}>{fmtDZD(ttc)} دج</span>
+        </div>
+        {!isPurchase && (
+          <div>
+            <span style={{ color: 'var(--t4)', fontSize: 10 }}>التكلفة: </span>
+            {costPrice > 0 ? (
+              <span style={{ fontWeight: 600, color: 'var(--t2)' }}>{fmtDZD(costPrice)} دج</span>
+            ) : (
+              <span style={{ color: 'var(--t4)', fontWeight: 500 }}>—</span>
+            )}
+          </div>
+        )}
+        {!isPurchase && (
+          <div>
+            <span style={{ color: 'var(--t4)', fontSize: 10 }}>الهامش: </span>
+            {marginPct !== null ? (
+              <>
+                <span style={{ color: marginColor, fontWeight: 700 }}>{fmtDZD(unitMargin)} دج</span>
+                <span style={{ color: 'var(--t4)', margin: '0 3px' }}>·</span>
+                <span style={{ color: marginColor, fontWeight: 700 }}>{marginPct.toFixed(1)}%</span>
+                <span style={{ color: 'var(--t4)', margin: '0 3px' }}>·</span>
+                <span style={{ color: marginColor, fontWeight: 600, fontSize: 11 }}>{fmtDZD(totalMargin)} دج</span>
+              </>
+            ) : (
+              <span style={{ color: 'var(--t4)', fontWeight: 500 }}>—</span>
+            )}
+          </div>
+        )}
+        {selectedPack && (
+          <div>
+            <span style={{ color: 'var(--t4)', fontSize: 10 }}>{baseQty.toFixed(2)} و.أ</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Warnings ── */}
+      {hasStockWarning && (
+        <div style={{
+          marginTop: 6, padding: '4px 8px', borderRadius: 'var(--r1)',
+          background: stockValidation && 'blocking' in stockValidation && stockValidation.blocking
+            ? 'color-mix(in srgb, var(--red) 8%, transparent)'
+            : 'color-mix(in srgb, var(--orange) 8%, transparent)',
+          fontSize: 10.5, color: stockValidation && 'blocking' in stockValidation && stockValidation.blocking
+            ? 'var(--red)' : 'var(--orange)',
+          display: 'flex', alignItems: 'center', gap: 5,
+        }}>
+          <i className={`ti ${stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'ti-alert-circle' : 'ti-alert-triangle'}`}
+            style={{ fontSize: 11 }} />
+          {stockValidation && 'message' in stockValidation ? stockValidation.message : ''}
+        </div>
+      )}
+
+      {activeComputeWarnings.map((w, wi) => (
+        <div key={wi} style={{
+          marginTop: 4, padding: '4px 8px', borderRadius: 'var(--r1)',
+          background: w.level === 'error'
+            ? 'color-mix(in srgb, var(--red) 8%, transparent)'
+            : 'color-mix(in srgb, var(--orange) 8%, transparent)',
+          fontSize: 10.5, color: w.level === 'error' ? 'var(--red)' : 'var(--orange)',
+          display: 'flex', alignItems: 'center', gap: 5,
+        }}>
+          <i className={`ti ${w.level === 'error' ? 'ti-alert-circle' : 'ti-alert-triangle'}`}
+            style={{ fontSize: 11 }} />
+          {w.message}
+        </div>
+      ))}
+
+      {/* ── Line Note ── */}
+      {!disabled && (
+        <div style={{ marginTop: 6 }}>
+          <input
+            type="text"
+            value={line.line_note ?? ''}
+            placeholder="ملاحظة على السطر..."
+            disabled={disabled}
+            onChange={(e) => onUpdate(idx, { line_note: e.target.value })}
+            style={{
+              width: '100%', padding: '4px 8px', fontSize: 10.5,
+              borderRadius: 'var(--r1)', border: '1px solid var(--b2)',
+              background: 'transparent', color: 'var(--t3)',
+              fontFamily: 'inherit', outline: 'none',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+```
+
 ## FILE: resources/js/pages/documents/components/PaymentTermsTable.tsx
 ```
 import React from 'react';
@@ -5964,10 +7371,12 @@ export function ProductSearch({
   const [open,  setOpen]  = useState(false);
   const [query, setQuery] = useState('');
   const [pos,   setPos]   = useState<DropdownPos>({ top: 0, right: 0, width: 320 });
+  const [highlightedIdx, setHighlightedIdx] = useState(0);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropRef    = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
+  const listRef    = useRef<HTMLDivElement>(null);
 
   const selected = products.find((p) => String(p.id) === value);
 
@@ -6070,6 +7479,11 @@ export function ProductSearch({
     setQuery('');
   };
 
+  // إعادة تعيين المؤشر عند تغير الفلترة
+  useEffect(() => {
+    setHighlightedIdx(0);
+  }, [filtered.length]);
+
   // ─── Badge المخزون ────────────────────────────────────────────────────────
 
   const stockBadge = (p: Product): { label: string; color: string } | null => {
@@ -6116,7 +7530,21 @@ export function ProductSearch({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setHighlightedIdx(0); }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setHighlightedIdx((prev) => Math.min(prev + 1, filtered.length - 1));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setHighlightedIdx((prev) => Math.max(prev - 1, 0));
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (filtered[highlightedIdx]) {
+                  choose(filtered[highlightedIdx]);
+                }
+              }
+            }}
             placeholder="ابحث بالاسم أو الرمز..."
             style={{
               width: '100%', padding: '5px 28px 5px 8px',
@@ -6130,7 +7558,7 @@ export function ProductSearch({
       </div>
 
       {/* النتائج */}
-      <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+      <div ref={listRef} style={{ maxHeight: 260, overflowY: 'auto' }}>
         {filtered.length === 0
           ? (
             <div style={{
@@ -6140,34 +7568,30 @@ export function ProductSearch({
               لا توجد نتائج
             </div>
           )
-          : filtered.map((p) => {
+          : filtered.map((p, i) => {
               const badge      = stockBadge(p);
               const isSelected = String(p.id) === value;
+              const isHighlighted = i === highlightedIdx;
               return (
                 <div
                   key={p.id}
+                  ref={isHighlighted ? (el) => {
+                    if (el) el.scrollIntoView({ block: 'nearest' });
+                  } : undefined}
                   onMouseDown={(e) => {
-                    // نستخدم onMouseDown بدل onClick لنمنع blur على input البحث
                     e.preventDefault();
                     choose(p);
                   }}
+                  onMouseEnter={() => setHighlightedIdx(i)}
                   style={{
                     padding:      '8px 10px',
                     cursor:       'pointer',
-                    background:   isSelected ? 'var(--emb)' : 'transparent',
+                    background:   isHighlighted ? 'var(--bg3)' : isSelected ? 'var(--emb)' : 'transparent',
                     borderBottom: '1px solid var(--b1)',
                     display:      'flex',
                     alignItems:   'center',
                     justifyContent: 'space-between',
                     gap: 8,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected)
-                      (e.currentTarget as HTMLElement).style.background = 'var(--bg3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected)
-                      (e.currentTarget as HTMLElement).style.background = 'transparent';
                   }}
                 >
                   {/* معلومات المنتج */}
@@ -6820,6 +8244,72 @@ export function useAdvancePayments(partyId: number | null, enabled: boolean) {
 }
 ```
 
+## FILE: resources/js/pages/documents/hooks/useAlerts.ts
+```
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost } from '@/lib/api/core/client';
+import { useActiveSlug } from '@/lib/store/appStore';
+
+export interface UserAlert {
+  id:              number;
+  type:            string;
+  title:           string;
+  body:            string;
+  severity:        string;
+  document_id?:    number | null;
+  check_id?:       number | null;
+  product_id?:     number | null;
+  party_id?:       number | null;
+  is_read:         boolean;
+  read_at?:        string | null;
+  created_at:      string;
+}
+
+interface AlertsResponse {
+  alerts:       UserAlert[];
+  unread_count: number;
+}
+
+export function useAlerts() {
+  const slug   = useActiveSlug();
+  const client = useQueryClient();
+
+  const query = useQuery<AlertsResponse>({
+    queryKey: [slug, 'alerts', 'unread'],
+    queryFn: async () => {
+      return apiGet<AlertsResponse>('/alerts/unread');
+    },
+    enabled: !!slug,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
+  const markAsRead = useMutation({
+    mutationFn: (alertId: number) => apiPost(`/alerts/${alertId}/read`),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [slug, 'alerts'] });
+    },
+  });
+
+  const markAllAsRead = useMutation({
+    mutationFn: () => apiPost('/alerts/mark-all-read'),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [slug, 'alerts'] });
+    },
+  });
+
+  return {
+    alerts:       query.data?.alerts ?? [],
+    unreadCount:  query.data?.unread_count ?? 0,
+    isLoading:    query.isLoading,
+    error:        query.error,
+    refresh:      () => client.invalidateQueries({ queryKey: [slug, 'alerts'] }),
+    markAsRead:   (id: number) => markAsRead.mutate(id),
+    markAllAsRead: markAllAsRead.mutate,
+  };
+}
+```
+
 ## FILE: resources/js/pages/documents/hooks/useComputeLine.ts
 ```
 import {
@@ -7248,12 +8738,15 @@ export interface PartyChangeResult {
 }
 
 interface UseDocumentFormOptions {
-  documentType:       DocumentType | null;
-  existingDocument?:  Record<string, unknown>;
-  defaultTvaRate:     number;
-  defaultWarehouseId: string;
-  baseCurrencyId:     string;
-  selectedYearId:     string;
+  documentType:        DocumentType | null;
+  existingDocument?:   Record<string, unknown>;
+  defaultTvaRate:      number;
+  defaultWarehouseId:  string;
+  baseCurrencyId:      string;
+  defaultIsProforma?:  boolean;
+  defaultPriceLevelId?: string;
+  defaultApplyStamp?:  boolean;
+  selectedYearId:      string;
   paymentModes: Array<{
     id:                   number;
     name:                 string;
@@ -7506,7 +8999,7 @@ export function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
 
 function buildDefaultForm(
   existingDocument: Record<string, unknown> | undefined,
-  defaults: { warehouseId: string; currencyId: string; yearId: string },
+  defaults: { warehouseId: string; currencyId: string; yearId: string; isProforma?: boolean; priceLevelId?: string; applyStamp?: boolean },
   defaultTvaRate: number,
   products?: Product[],
 ): DocumentFormState {
@@ -7551,9 +9044,9 @@ function buildDefaultForm(
     fiscal_year_id: defaults.yearId,
     currency_id:    defaults.currencyId,
     exchange_rate:  '1',
-    apply_stamp:    false,
-    price_level_id: '',
-    is_proforma:    false,
+    apply_stamp:    defaults.applyStamp ?? false,
+    price_level_id: defaults.priceLevelId ?? '',
+    is_proforma:    defaults.isProforma ?? false,
     lines: [], payments: [],
     shipping_info:  { ...defaultShipping },
     payment_terms:  [...defaultPaymentTerms],
@@ -7585,6 +9078,9 @@ export function useDocumentForm({
   defaultTvaRate,
   defaultWarehouseId,
   baseCurrencyId,
+  defaultIsProforma = false,
+  defaultPriceLevelId = '',
+  defaultApplyStamp = false,
   selectedYearId,
   paymentModes,
   parties,
@@ -7637,6 +9133,9 @@ export function useDocumentForm({
       warehouseId: defaultWarehouseId,
       currencyId:  baseCurrencyId,
       yearId:      selectedYearId,
+      isProforma:  defaultIsProforma,
+      priceLevelId: defaultPriceLevelId,
+      applyStamp:  defaultApplyStamp,
     }, defaultTvaRate, products),
   );
   const [errors,  setErrors]  = useState<FormErrors>({});
@@ -7696,7 +9195,7 @@ export function useDocumentForm({
 
     setForm(buildDefaultForm(
       existingDocument,
-      { warehouseId: defaultWarehouseId, currencyId: baseCurrencyId, yearId: selectedYearId },
+      { warehouseId: defaultWarehouseId, currencyId: baseCurrencyId, yearId: selectedYearId, isProforma: defaultIsProforma, priceLevelId: defaultPriceLevelId, applyStamp: defaultApplyStamp },
       defaultTvaRate,
       productsRef.current,
     ));
@@ -7727,8 +9226,10 @@ export function useDocumentForm({
       warehouse_id:   f.warehouse_id   || defaultWarehouseId,
       currency_id:    f.currency_id    || baseCurrencyId,
       fiscal_year_id: f.fiscal_year_id || selectedYearId,
+      price_level_id: f.price_level_id || defaultPriceLevelId,
+      apply_stamp:    (!('apply_stamp' in f) || !f.apply_stamp) ? defaultApplyStamp : f.apply_stamp,
     }));
-  }, [defaultWarehouseId, baseCurrencyId, selectedYearId, isEdit, open]);
+  }, [defaultWarehouseId, baseCurrencyId, selectedYearId, defaultPriceLevelId, defaultApplyStamp, isEdit, open]);
 
   // ── set ───────────────────────────────────────────────────────────────────
 
@@ -7799,7 +9300,7 @@ export function useDocumentForm({
       };
     }
 
-    const newPriceLevelStr = newPriceLevel ? String(newPriceLevel) : '';
+    const newPriceLevelStr = newPriceLevel ? String(newPriceLevel) : defaultPriceLevelId;
 
     // due_date تلقائي من credit_days
     const creditDays = (party as Record<string, unknown> | undefined)?.credit_days as number ?? 0;
@@ -7829,7 +9330,7 @@ export function useDocumentForm({
     });
     setErrors((prev) => { const n = { ...prev }; delete n.party_id; return n; });
     return { blocked: false };
-  }, [isPurchase, existingPayments.length, newPayments]);
+  }, [isPurchase, existingPayments.length, newPayments, defaultPriceLevelId]);
 
   // ── handlePriceLevelChange ────────────────────────────────────────────────
 
@@ -8196,6 +9697,7 @@ export function useDocumentForm({
         ...(line.packaging_id ? { packaging_id: parseInt(line.packaging_id) } : {}),
         ...(line.stock_lot_id ? { stock_lot_id: parseInt(line.stock_lot_id) } : {}),
         ...(isPurchase && line.lot_number_new ? { lot_number: line.lot_number_new } : {}),
+        ...(line.warehouse_id ? { warehouse_id: parseInt(line.warehouse_id) } : {}),
         notes: line.line_note || null,
       };
     });
@@ -8966,6 +10468,7 @@ import React, {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 
@@ -9320,6 +10823,13 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     staleTime: 10 * 60_000,
   });
 
+  const { data: settingsDict } = useQuery({
+    queryKey: [slug, 'settings-dict'],
+    queryFn: () => settingsApi.list(),
+    enabled: open && !!slug,
+    staleTime: 10 * 60_000,
+  });
+
   const { data: rawWarehouses = [] } = useQuery({
     queryKey: [slug, 'quick-sale-warehouses'],
     queryFn: () => apiGet<unknown>('/warehouses', { per_page: 100 }).then(extractList),
@@ -9341,16 +10851,26 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
 
   // الدائم: طريقة الدفع نقدي (cash) وحساب الخزينة الأول
   const defaultPaymentModeId = useMemo(() => {
+    const fromSettings = settingsDict?.default_payment_mode_id?.value;
+    if (fromSettings) {
+      const found = paymentModes.find(pm => pm.id === Number(fromSettings));
+      if (found) return String(found.id);
+    }
     const cash = paymentModes.find(
       pm => pm.name.toLowerCase().includes('نقد') || pm.code?.toLowerCase() === 'cash'
     );
     return cash ? String(cash.id) : paymentModes[0] ? String(paymentModes[0].id) : '';
-  }, [paymentModes]);
+  }, [paymentModes, settingsDict]);
 
   const defaultTreasuryId = useMemo(() => {
+    const fromSettings = settingsDict?.default_treasury_account_id?.value;
+    if (fromSettings) {
+      const found = treasuryAccounts.find(t => t.id === Number(fromSettings));
+      if (found) return String(found.id);
+    }
     const def = treasuryAccounts.find(t => t.is_default);
     return def ? String(def.id) : treasuryAccounts[0] ? String(treasuryAccounts[0].id) : '';
-  }, [treasuryAccounts]);
+  }, [treasuryAccounts, settingsDict]);
 
   // State
   const [partyId, setPartyId] = useState('');
@@ -10548,766 +12068,6 @@ function selectNumStyle(disabled: boolean, hasValue: boolean): React.CSSProperti
 }
 ```
 
-## FILE: resources/js/pages/documents/todo/rest.md
-```
-# المتبقي من STUDY_extended.md
-
-> نسبة الإنجاز الكلية: ~38%
-> ما طُبِّق: todo/ بالكامل (100% من ملفات التنفيذ) + فصول 1–9
-
----
-
-## ✅ تم إنجازه
-
-| البند | الملفات |
-|---|---|
-| أنواع document.types.ts | `document.types.ts` |
-| هوك useDocumentForm | `hooks/useDocumentForm.ts` |
-| هوك useDocumentLookups | `hooks/useDocumentLookups.ts` |
-| هوك useComputeLine | `hooks/useComputeLine.ts` |
-| هوك useCreditCheck | `hooks/useCreditCheck.ts` |
-| هوك useDocumentChain | `hooks/useDocumentChain.ts` |
-| مكون DocumentChainPanel | `components/DocumentChainPanel.tsx` |
-| مكون CreditCheckBar | `components/CreditCheckBar.tsx` |
-| مكون ReturnDocumentModal | `components/ReturnDocumentModal.tsx` |
-| مكون DocumentLineRow | `components/DocumentLineRow.tsx` |
-| المودال الرئيسي | `CommercialDocumentModal.tsx` |
-| ComputeLineService | `app/Services/ComputeLineService.php` |
-| DocumentConversionService | `app/Services/DocumentConversionService.php` |
-| DocumentReturnService | `app/Services/DocumentReturnService.php` |
-| CreditCheckService | `app/Services/CreditCheckService.php` |
-| DocumentComputeController | `app/Http/Controllers/Api/V1/DocumentComputeController.php` |
-| طلب التوثيق | `app/Http/Requests/StoreCommercialDocumentRequest.php` |
-| validateDocument | `app/Services/CommercialDocumentService.php` |
-| Routes | `routes/api.php` |
-| اسم الطرف في الدفعات | `FinancePage.tsx` |
-| **الفصل 5: نظام التسليم** | `DeliveryProgressBar.tsx`, تحويل BCC→BL delivery logic |
-| **الفصل 6: معالجة الشيكات** | `CheckFormFields.tsx`, `ChecksPage.tsx`, route + nav |
-| **الفصل 7: الفاتورة المبدئية** | `is_proforma` toggle/badge/logic + تحويل مبدئي→حقيقي |
-| **الفصل 8: الشحن والتسليم** | `ShippingInfoSection.tsx` + `delivery_date`, `shipping_info` في النموذج |
-| **الفصل 9: شروط الدفع** | `PaymentTermsTable.tsx` + `payment_terms` في النموذج |
-| **تحسينات PaymentTermsTable** | حقل مبلغ قابل للكتابة + حساب عكسي (نسبة↔مبلغ) + زر المبلغ المتبقي + عملة `دج` |
-| **Tabs للمساحة** | `Tabs` component في `DocumentUIPrimitives.tsx` + دمج الشحن/شروط الدفع في tabs |
-| **مودال التحويل** | `ConvertDocumentModal.tsx` — تاريخ, اختيار نوع, لوحة مفاتيح |
-| **تحسينات سلسلة المستندات** | عرض الكود + الاسم الكامل في chain panel و قائمة التحويل |
-
----
-
-## ❌ المتبقي — فصول 10–24
-
-### الفصل 10: الإعفاء الضريبي
-**الملفات المطلوبة:**
-- `services/TaxRuleService.php` — تحديد `effective_tva_rate` لكل (منتج × زبون)
-- تحديث `ComboBox` أيقونة "معفى من TVA"
-- تحديث `DocumentLineRow.tsx` — TVA = 0 تلقائياً وقراءة فقط للزبون المعفى
-
-**المنطق:**
-- `Party.is_tva_exempt` ← 0 TVA
-- `Party.is_final_consumer` ← قواعد مختلفة
-- `Product.tva_id` × `Party.tax_regime`
-
----
-
-### الفصل 11: تحليلات مدمجة (CustomerInsightPanel)
-**الملفات المطلوبة:**
-- `components/CustomerInsightPanel.tsx`
-- `hooks/useCustomerInsights.ts`
-
-**المنطق:**
-- آخر 5 مستندات للزبون
-- متوسط قيمة الفاتورة الشهرية
-- متوسط أيام السداد الفعلية
-- المنتجات الأكثر شراءً (top 5)
-
----
-
-### الفصل 12: محرك الاقتراحات الذكية
-**الملفات المطلوبة:**
-- `hooks/useProductSuggestions.ts`
-- `components/SmartSuggestionsPanel.tsx`
-
-**المنطق:**
-- عند إضافة منتج: "اشتراه آخر مرة بسعر X"
-- Cross-sell: "يُشترى عادةً مع Y, Z"
-- Upsell: "خصم كمية عند ≥50 وحدة — أنت تطلب 30"
-
----
-
-### الفصل 13: الدفع المسبق (Advance Payment)
-**الملفات المطلوبة:**
-- `hooks/useAdvancePayments.ts`
-- تحديث `CommercialDocumentModal.tsx` — إشعار التسبيق غير المُستخدم
-
-**المنطق:**
-- `Payment.getUnappliedAmount()` موجود في الباكاند
-- إشعار "لديه تسبيق X دج — هل تريد تطبيقه؟"
-- ربط الدفعة بالفاتورة عبر `document_payment.amount_applied`
-
----
-
-### الفصل 14: المطابقة البنكية
-**الملفات المطلوبة:**
-- `pages/reconciliation/BankReconciliationPage.tsx`
-- `services/BankReconciliationService.php`
-
-**المنطق:**
-- `Payment.is_reconciled`, `reconciliation_date`, `bank_reference`
-- واجهة 3 أعمدة: النظام ← المقترحات ← كشف البنك
-
----
-
-### الفصل 15: تنبيهات ذكية
-**الملفات المطلوبة:**
-- `services/AlertEngine.php`
-- `hooks/useAlerts.ts`
-- `components/AlertBell.tsx`
-
-**المنطق:**
-- فواتير متأخرة، شيكات تستحق، مخزون منخفض — يومياً
-- تنبيهات فورية بعد الحفظ
-
----
-
-### الفصل 16: إحصاءات وتقارير مدمجة
-**الملفات المطلوبة:**
-- سرعة البيع (Velocity Report)
-- تقرير الهامش (Margin Report)
-- لوحة الديون (Aging Report — 0-30 / 31-60 / 61-90 / 90+ يوم)
-
----
-
-### الفصل 17: المخزون متعدد المستودعات في السطر
-**الملفات المطلوبة:**
-- مigration لإضافة `warehouse_id` إلى `commercial_document_lines`
-- تحديث `DocumentLineRow.tsx` — اختيار مستودع لكل سطر
-
-**المنطق:**
-- يُرث من header إذا لم يُحدَّد
-- حركة المخزون من مستودع السطر
-
----
-
-### الفصل 18: نظام الموافقات
-**الملفات المطلوبة:**
-- `models/ApprovalThreshold.php`
-- `services/ApprovalWorkflowService.php`
-- تحديث `CommercialDocumentModal.tsx` — تحذير "يتجاوز الحد — سيُرسَل للموافقة"
-
-**المنطق:**
-- `net_to_pay > threshold` ← حالة `pending_approval`
-- إشعار للمدير ← موافقة أو رفض مع سبب
-
----
-
-### الفصل 19: استيراد/تصدير
-**الملفات المطلوبة:**
-- استيراد أسطر من Excel
-- تصدير PDF / Excel / JSON / XML
-
----
-
-### الفصل 20: الذاكرة الذكية للمودال
-**الملفات المطلوبة:**
-- حفظ مسودة تلقائية في localStorage كل 30 ثانية
-- اقتراحات ذكية (المستودع المفضل، فئة السعر المعتادة)
-
----
-
-### الفصل 21: واجهة السطر — Card Mode
-**الملفات المطلوبة:**
-- `components/LineCard.tsx` — وضع البطاقة لكل سطر
-- toggle Table/Card Mode
-
----
-
-### الفصل 22: إدخال الباركود
-**الملفات المطلوبة:**
-- `components/BarcodeInput.tsx`
-- البحث بـ `Product.barcode` + إضافة سطر / زيادة كمية
-
----
-
-### الفصل 23: التواصل مع الزبون
-**الملفات المطلوبة:**
-- `services/DocumentMailService.php`
-- زر "إرسال للزبون" في footer المودال
-- إرفاق PDF تلقائياً
-
----
-
-### الفصل 24: تكامل السنة المالية
-**الملفات المطلوبة:**
-- تحقق: تاريخ المستند ضمن نطاق السنة المالية
-- تحقق: السنة المالية مفتوحة (`is_closed = false`)
-- تحذير فوري عند عدم التطابق
-
----
-
-## 🐛 مشاكل صغيرة متبقية
-
-| المشكلة | الموقع | الحل |
-|---|---|---|
-| `lineWarnings` من useDocumentForm غير مستخدمة | `CommercialDocumentModal.tsx` و `DocumentLineRow.tsx` | تمرير `lineWarnings` للـ row وعرضها |
-| `_warnings` في LineItem غير معروضة | `DocumentLineRow.tsx` | إضافة صف تحذير أسفل كل سطر من `line._warnings` |
-
----
-
-**ملخص:** 24 فصلاً، أُنجز 9 فصول كاملة (~38%)، بقي 15 فصلاً (~62%) + تحسينات PaymentTermsTable + Tabs + مشكلتين صغيرتين في `lineWarnings` و `_warnings`.
-
-
-
-```
-
-## FILE: resources/js/pages/documents/todo/STUDY_extended.md
-```
-# الدراسة الموسعة والشاملة — وحدة المستندات التجارية
-## ما يجب بناؤه من الصفر + ما هو موجود لكن غائب عن الواجهة
-
----
-
-# أولاً — الاكتشافات من قراءة الكود الكامل
-
-قبل الاقتراحات يجب فهم ما يمتلكه النظام فعلاً.
-الباكاند مكتوب بعناية ويخزن بيانات ثمينة لا يعرفها الفرونتند أبداً:
-
-**في CommercialDocument:**
-`delivery_date` — تاريخ التسليم المتوقع، غير موجود في المودال
-`issued_at` — تاريخ الإصدار الفعلي، غير مُعرَض
-`payment_terms` — JSON يخزن شروط الدفع المفصلة (array)
-`shipping_info` — JSON يخزن بيانات الشحن (array)
-`legal_mentions` — JSON للبيانات القانونية في الطباعة (array)
-`is_proforma` — فاتورة مبدئية/عرض سعر، لا يوجد تبديل في UI
-`qr_code_data` — بيانات QR موجودة لكن لا تُعرَض
-`fiscal_stamp_id` — ربط بالطابع الجبائي، لكن الفرونتند يحسبه بطريقته
-`numbering_series_id` — المستخدم لا يرى أي سلسلة ترقيمية تُستخدَم
-
-**في Party:**
-`credit_limit` — حد الائتمان، لا أحد يتحقق منه
-`credit_days` — أيام الائتمان، due_date لا يُحسَب منه تلقائياً
-`is_tva_exempt` — إعفاء ضريبي، لا يُطبَّق على الأسطر
-`is_final_consumer` — مستهلك نهائي، قواعد TVA مختلفة لكن لا أحد يطبقها
-`is_vat_registered` — مسجل في الضريبة، يؤثر على الإشعارات والمستندات
-`payment_terms` (array في additional_data) — شروط مفصلة مخزنة
-
-**في Product:**
-`min_stock_alert` — حد التنبيه لنقص المخزون، لا أحد يستخدمه
-`max_stock_alert` — حد التخزين الأقصى، مجهول
-`has_expiration_date` — المنتج له صلاحية، لكن FEFO غير مُطبَّق
-`manages_quantity_discounts` — العلَم يُخبر إذا كان المنتج له خصومات كميات
-`weight`, `volume`, `length`, `width`, `height` — أبعاد للشحن، لا تُستخدَم
-`stockOnDate()` — دالة قوية تحسب المخزون في تاريخ معين، غير مستدعاة
-`costPriceOnDate()` — سعر التكلفة في تاريخ معين، يُغني عن current_cost_price
-`finalPrice()` — يحسب السعر النهائي بعد كل الخصومات، لا أحد يستدعيه
-
-**في Payment:**
-`check_id` — دفع بشيك مرتبط بنموذج Check، الفرونتند لا يعرف Checks
-`amount_local` — المبلغ بالعملة المحلية، دائماً null لأن الفرونتند لا يُرسله
-`is_reconciled` — للمطابقة البنكية، لا توجد واجهة مطلاقاً
-`bank_reference` — مرجع البنك للتحويلات، غير موجود في نموذج الدفع
-
----
-
-# ثانياً — ما يجب بناؤه من الصفر تماماً
-
-## الفصل الأول: إعادة تصور محرك التسعير
-
-الوضع الحالي كارثي من ناحية التصميم: الباكاند يمتلك دوال تسعير ناضجة ودقيقة
-(`computedPrice`, `finalPrice`, `applicableDiscount`, `priceForPackaging`,
-`calculateDiscountedPrice`) والفرونتند يعيد بناء كل هذا المنطق محلياً بشكل
-مبسط وناقص. النتيجة: بيانات خاطئة دون أن يعرف أحد.
-
-الحل الجذري ليس "إصلاح الحسابات المحلية" — الحل هو إلغاؤها واستبدالها بـ
-**compute-line endpoint** واحد يُعيد كل شيء من الباكاند بناءً على القواعد الحقيقية.
-
-هذا الـ endpoint يجب أن يُرجع:
-- السعر الصحيح بناءً على فئة السعر وطريقة التسعير (fixed/rate/margin)
-- السعر الصحيح للعبوة بناءً على packaging المختار
-- الخصم الصحيح بناءً على الكمية بالوحدات الأساسية
-- ما إذا كان النطاق محجوباً (is_blocked)
-- TVA الصحيح (0 إذا كان الزبون معفى)
-- المخزون المتاح في المستودع المحدد
-- اقتراح الأكوام مرتبة بـ FEFO
-- هامش الربح المحسوب
-
-استخدامه في الفرونتند بـ debounce 300ms يعني أن أي تغيير في الكمية أو العبوة
-أو الزبون أو المستودع يُطلق استدعاءً واحداً يُحدِّث كل شيء في السطر دفعة واحدة
-بدلاً من منطق محلي متشعب في عشرة أماكن.
-
----
-
-## الفصل الثاني: نظام حد الائتمان والمخاطر المالية
-
-`Party.credit_limit` و`Party.credit_days` موجودان في كل زبون لكن لا أحد يسألهما.
-
-هذا يعني أنك تبيع بضاعة لزبون جاوز حده الائتماني دون أي تحذير. في السياق
-الجزائري حيث ثقافة الدين التجاري شائعة، هذا خطر مالي حقيقي.
-
-ما يجب بناؤه هو طبقة فحص ائتماني تعمل في مكانين:
-
-**على مستوى الباكاند:** قبل قبول أي مستند بيع جديد، يحسب مجموع
-الرصيد الحالي للزبون + قيمة المستند الجديد ويقارنه بـ credit_limit.
-إذا تجاوز يرفع استثناء من نوع `CreditLimitExceededException` يحمل
-تفاصيل التجاوز. الـ Controller يُعيده كـ 422 مع تفاصيل واضحة.
-
-**على مستوى الفرونتند:** عند اختيار الزبون وعند كل تغيير في الإجماليات،
-يُستدعى endpoint خفيف يُرجع حالة الائتمان. المودال يعرض شريطاً ملوناً
-يُظهر: الحد الائتماني، المستخدم منه، المتاح. إذا كان المستند الجديد سيتجاوز
-الحد يظهر تحذير واضح. صلاحية `override_credit_limit` تسمح لمدير المبيعات
-بتجاوز الحد مع تسجيل السبب.
-
-إضافةً لذلك: فحص الفواتير المتأخرة. إذا كان للزبون فواتير تجاوزت `credit_days`
-ولم تُسدَّد، يظهر تحذير منفصل "هذا الزبون لديه X فاتورة متأخرة بقيمة Y دج".
-بعض الشركات تضع سياسة عدم البيع لزبائن متأخرين — هذا قرار قابل للضبط.
-
----
-
-## الفصل الثالث: سلسلة المستندات الذكية
-
-النظام يخزن `source_document_id` و`cancellation_of_document_id` لكن
-لا يوجد أي منطق يستخدمهما في الواجهة.
-
-**سلسلة البيع الكاملة:**
-```
-DEV (عرض سعر)
-  ↓ تحويل
-BCC (أمر عميل) — يتتبع الكميات المُسلَّمة
-  ↓ تحويل جزئي ممكن
-BL (بون تسليم) — يُسقط المخزون
-  ↓ تحويل
-FV (فاتورة بيع) — تؤثر محاسبياً
-  ↓ عند الإرجاع
-AV (أوار بيع) — يُعيد المخزون ويُعدِّل الرصيد
-```
-
-**ما يجب بناؤه:**
-
-وظيفة تحويل مستند في الباكاند تنسخ المستند الأصلي بنوع مستند جديد وترتبط به
-عبر `source_document_id`. تتتبع الكميات المُحوَّلة مقابل الكميات الأصلية.
-مثلاً: BCC بـ 100 وحدة تحوّل إلى BL1 بـ 60 وحدة وBL2 بـ 40 وحدة.
-الـ BCC يعرف أن 100/100 سُلِّمت وأن حالته يجب أن تتحول.
-
-في الفرونتند: شريط "سلسلة المستند" يظهر في المودال عند التعديل يُظهر المسار
-الكامل من المستند الأول حتى الآخر. كل مستند في السلسلة قابل للنقر للانتقال إليه.
-زر "تحويل إلى" في footer المودال يفتح sub-modal يختار نوع المستند الهدف ويملأ
-المودال الجديد بكل بيانات المستند الأصلي.
-
----
-
-## الفصل الرابع: نظام الإرجاع والتصحيح
-
-`cancellation_of_document_id` موجود لكن مجهول.
-
-**ما يجب بناؤه — ReturnDocumentBuilder:**
-
-عند النقر على "إنشاء مرتجع" من فاتورة بيع، يفتح modal مخصص يعرض أسطر
-الفاتورة الأصلية مع إمكانية تحديد الكميات المُرجَعة لكل سطر (جزئية أو كاملة).
-يُضيف حقلاً لسبب الإرجاع مطلوباً. عند التأكيد ينشئ AV مرتبطاً بالفاتورة
-الأصلية عبر `cancellation_of_document_id` وحركات مخزون عكسية تلقائياً.
-`remaining_amount` في الفاتورة الأصلية لا يتغير (الإرجاع مستند منفصل)
-لكن `paid_amount` يتأثر إذا كان الإرجاع يترتب عليه استرداد مالي.
-
----
-
-## الفصل الخامس: نظام التسليم والتتبع
-
-`CommercialDocumentLine.delivered_quantity` و`returned_quantity` موجودان
-لكن لا يُحدَّثان أبداً.
-
-المشكلة: تُصدر BCC لزبون بـ 500 كرتون على دفعتين. تُسلِّم الدفعة الأولى 300
-كرتون عبر BL1. النظام لا يعرف أن 200 كرتون لا تزال معلقة.
-
-**ما يجب بناؤه:**
-
-عند تحويل BCC إلى BL، الـ Service يُحدِّث `delivered_quantity` في أسطر BCC
-بمقدار الكميات في BL. `CommercialDocumentLine::getRemainingQuantity()` موجودة
-وتحسب الكمية المتبقية (quantity - delivered_quantity - returned_quantity).
-
-في الفرونتند: أسطر BCC تُعرَض مع progress bar للتسليم:
-"300 من 500 — 60% مُسلَّم". عندما تكتمل يظهر badge "مُسلَّم بالكامل"
-وحالة BCC تتحول تلقائياً.
-
----
-
-## الفصل السادس: نظام معالجة الشيكات
-
-`Payment.check_id` يُشير لنموذج `Check` كامل في الباكاند.
-لا يوجد في الكود أي دعم لهذا.
-
-الشيك في السياق الجزائري له دورة حياة خاصة:
-استلام الشيك ← تسجيله ← إيداعه في البنك ← تأكيد الصرف أو الرفض
-
-**ما يجب بناؤه:**
-
-نموذج إدخال خاص عند اختيار طريقة دفع "شيك" في المودال يطلب:
-رقم الشيك، البنك المصدر، اسم صاحب الحساب، تاريخ الإصدار، تاريخ الاستحقاق.
-يُنشئ كيان Check مرتبطاً بـ Payment. حالة الشيك: `received` → `deposited`
-→ `cleared` أو `returned`. صفحة مستقلة لإدارة الشيكات تعرض:
-الشيكات المُستلَمة غير المودعة، تلك التي حان موعد إيداعها، تلك التي قيل
-إنها رُفضت. تنبيه تلقائي قبل أسبوع من تاريخ استحقاق الشيك.
-
----
-
-## الفصل السابع: الفاتورة المبدئية (Pro Forma)
-
-`CommercialDocument.is_proforma` موجود لكن لا يوجد أي toggle في المودال.
-
-الفاتورة المبدئية هي فاتورة للعرض تُرسَل للزبون قبل التأكيد النهائي.
-لا تُحرَّك مخزون ولا تُسجَّل محاسبياً.
-
-**ما يجب بناؤه:**
-
-في مودال FV: toggle "فاتورة مبدئية" — عند تفعيله:
-- لا تُنشَأ حركات مخزون
-- لا تؤثر على رصيد المتعامل
-- badge "مبدئية" واضح في العرض
-- زر "تأكيد وتحويل لفاتورة حقيقية" يُحوِّلها لـ FV حقيقية
-
-في الباكاند: `beforeCreate` يفحص `is_proforma` ويتخطى `createStockMovements`
-و`attachPayments` إذا كانت مبدئية.
-
----
-
-## الفصل الثامن: بيانات الشحن والتسليم
-
-`CommercialDocument.shipping_info` (JSON) و`delivery_date` موجودان.
-لا يوجد أي قسم شحن في المودال.
-
-**ما يجب بناؤه:**
-
-Section اختياري "معلومات الشحن" في المودال يُظهر عند BL وBCC:
-- تاريخ التسليم المتوقع (delivery_date)
-- عنوان التسليم (افتراضي من عنوان الزبون، قابل للتعديل)
-- وسيلة النقل (شاحنة/مندوب/استلام ذاتي)
-- ملاحظات السائق
-- رقم لوحة المركبة
-- اسم المندوب
-
-كل هذا يُخزَّن في `shipping_info` كـ JSON. يُطبَّع في الطباعة كحقول رسمية على BL.
-
----
-
-## الفصل التاسع: شروط الدفع المفصلة
-
-`CommercialDocument.payment_terms` (JSON array) موجود.
-المودال الحالي يتجاهله تماماً.
-
-**ما يجب بناؤه:**
-
-بدل تاريخ استحقاق واحد، نظام شروط دفع مرن:
-- 30% مقدماً عند الطلب
-- 40% عند التسليم
-- 30% بعد 60 يوم
-
-يُخزَّن كـ JSON في `payment_terms`:
-```json
-[
-  {"due_date": "2025-01-15", "percentage": 30, "amount": 45000, "notes": "دفعة مقدمة"},
-  {"due_date": "2025-02-01", "percentage": 40, "amount": 60000, "notes": "عند التسليم"},
-  {"due_date": "2025-04-01", "percentage": 30, "amount": 45000, "notes": "آجل 60 يوم"}
-]
-```
-
-في الفرونتند: جدول شروط الدفع يُحسَب تلقائياً من credit_days الزبون
-أو يُدخَل يدوياً. المجموع يجب أن يساوي net_to_pay.
-عند استحقاق كل دفعة يُرسَل إشعار تلقائي.
-
----
-
-## الفصل العاشر: الإعفاء الضريبي والتعقيد الجزائري
-
-`Party.is_tva_exempt`, `Party.is_final_consumer`, `Party.is_vat_registered`
-موجودة. `Party.tax_regime` موجود. لا أحد يستخدمها.
-
-السياق الجزائري يُعقِّد هذا أكثر: زبون معفى من TVA (مثل الصيدليات لبعض المنتجات)
-يجب أن تكون فواتيره بـ TVA = 0. زبون نظام forfaitaire قد لا يستحق TVA.
-
-**ما يجب بناؤه:**
-
-**على مستوى الباكاند:**
-`TaxRuleService` يُحدِّد `effective_tva_rate` لكل زوج (منتج × زبون):
-إذا `party.is_tva_exempt = true` → 0
-إذا `product.tva_id` لمعدل معين والزبون معفى من هذا المعدل → 0
-وإلا → `product.tva.rate`
-
-يُستدعى هذا من `compute-line endpoint` ليُرجع `tva_rate` الصحيح مع كل حساب.
-
-**على مستوى الفرونتند:**
-عند اختيار زبون معفى → أيقونة "معفى من TVA" بجانب اسمه في ComboBox
-عند إضافة سطر لزبون معفى → `tva_rate = 0` تلقائياً وقراءة فقط (لا يُعدَّل)
-في الإجماليات → صف "TVA (معفى): 0.00 دج" بدل عدم إظهاره
-
----
-
-## الفصل الحادي عشر: تحليلات مدمجة في لحظة البيع
-
-الفرونتند الحالي يعرض رصيد الزبون — ممتاز. لكن المعلومات التجارية الأعمق غائبة.
-
-**ما يجب بناؤه — CustomerInsightPanel:**
-
-Panel جانبي (أو قابل للطي) يظهر عند اختيار الزبون:
-- آخر 5 مستندات له مع تواريخها ومبالغها وحالتها
-- متوسط قيمة فاتورته الشهرية
-- متوسط أيام السداد الفعلية مقابل الـ credit_days
-- المنتجات الأكثر شراءً منه (top 5)
-- هل يشتري بانتظام أم موسمي؟
-
-هذا يُساعد مندوب المبيعات على اقتراح منتجات ذات صلة وتحديد الزبائن ذوي الخطر.
-
----
-
-## الفصل الثاني عشر: محرك الاقتراحات الذكية
-
-عند إضافة منتج لسطر، يظهر panel صغير يقترح:
-- "الزبون اشترى هذا المنتج آخر مرة بسعر X" (من التاريخ)
-- "يُشترى عادةً مع هذا المنتج: Y, Z" (cross-sell)
-- "المخزون يكفي X أيام فقط بمعدل البيع الحالي" (تحذير)
-- "هذا المنتج له خصم كمية عند ≥50 وحدة — أنت تطلب 30" (upsell)
-
-البيانات التاريخية موجودة في `commercial_documents` و`lines`.
-الحسابات بسيطة لا تحتاج AI.
-
----
-
-## الفصل الثالث عشر: الدفع المسبق (Advance Payment) وتسويته
-
-سيناريو شائع: الزبون يدفع 100,000 دج مقدماً قبل أي فاتورة.
-لاحقاً تُصدَر له فواتير تُخصَم من هذا الرصيد.
-
-النظام الحالي لا يتعامل مع هذا. `Payment.getUnappliedAmount()` موجود
-وهو مفتاح الحل.
-
-**ما يجب بناؤه:**
-
-نوع دفع جديد: "دفعة مسبقة / تسبيق". تُنشئ `Payment` بـ `party_id`
-بدون `commercial_document_id`. تُظهر في رصيد الزبون كـ "رصيد دائن غير مُطبَّق".
-
-عند إنشاء فاتورة جديدة لنفس الزبون: يظهر إشعار "لدى هذا الزبون تسبيق
-غير مُستخدَم بقيمة X دج — هل تريد تطبيقه؟". موافقة تُربط الدفعة بالفاتورة
-عبر جدول `document_payment` بـ `amount_applied`.
-
----
-
-## الفصل الرابع عشر: المطابقة البنكية (Bank Reconciliation)
-
-`Payment.is_reconciled`, `Payment.reconciliation_date`, `Payment.bank_reference`
-موجودة في الموديل. لا توجد أي واجهة.
-
-**ما يجب بناؤه:**
-
-صفحة مستقلة `BankReconciliationPage` بثلاث أعمدة:
-العمود الأول: حركات الخزينة في النظام (غير مطابَقة)
-العمود الثاني: حركات كشف الحساب البنكي (مُستورَد كـ CSV أو مُدخَل يدوياً)
-العمود الثالث: المتطابقات المقترحة (بناءً على المبلغ والتاريخ)
-
-المستخدم يُؤكِّد التطابق → `is_reconciled = true` و`reconciliation_date = today`.
-الفارق غير المُطابَق يُظهَر كـ "رصيد عائم" يحتاج تحقيقاً.
-
----
-
-## الفصل الخامس عشر: تنبيهات ذكية وإشعارات استباقية
-
-**ما يجب بناؤه — AlertEngine:**
-
-نظام تنبيهات يُشغِّل checks دورية:
-
-**يومياً:**
-- فواتير تجاوزت `due_date` ولم تُسدَّد → إشعار "متأخرة"
-- شيكات تستحق خلال أسبوع → إشعار "شيك يستحق"
-- منتجات وصلت `min_stock_alert` بسبب مبيعات أمس → إشعار مخزون
-
-**عند كل عملية:**
-- بعد حفظ مستند يُطلب تحقق credit_limit → تنبيه تجاوز فوري
-- بعد بيع من كوم قاربت الانتهاء → تنبيه "كوم X ستنتهي في Y يوم"
-
-التنبيهات تظهر في notification bell في الـ header وكـ toast عند حدوثها
-أثناء عمل المستخدم.
-
----
-
-## الفصل السادس عشر: الإحصاءات والتقارير المدمجة
-
-**ما يجب بناؤه — داخل صفحة CommercialDocumentsPage وليس المودال:**
-
-**تقرير سرعة البيع (Velocity Report):**
-لكل منتج: كم وحدة تُباع يومياً/أسبوعياً. يُحسَب من `stock_movements`.
-يُظهر: "بالمعدل الحالي المخزون يكفي X يوم" → يُساعد على قرار إعادة الطلب.
-
-**تقرير الهامش (Margin Report):**
-لكل سطر في كل فاتورة: الهامش الفعلي = سعر_البيع - current_cost_price.
-مجمَّع على مستوى الزبون / المنتج / الفترة. لا يوجد هذا التقرير أبداً.
-
-**لوحة الديون القابلة للتحصيل (Aging Report):**
-مدة المديونية مُجمَّعة:
-0-30 يوم / 31-60 يوم / 61-90 يوم / أكثر من 90 يوم
-لكل زبون وبالإجمالي. هذا ما يطلبه كل محاسب.
-
----
-
-## الفصل السابع عشر: المخزون المتعدد المستودعات في السطر
-
-النظام الحالي: المستند كله لمستودع واحد.
-لكن warehouse_id في الـ header يُطبَّق على كل الأسطر.
-
-**سيناريو حقيقي:** منتج A متوفر في مستودع الشمال، منتج B في مستودع الجنوب.
-الزبون يريد الاثنين في فاتورة واحدة.
-
-**ما يجب بناؤه:**
-
-إضافة `warehouse_id` على مستوى السطر (اختياري — يُرث من header إذا لم يُحدَّد).
-CommercialDocumentLine يُضاف إليه `warehouse_id` nullable.
-حركات المخزون تُنشأ من المستودع المحدد في السطر وليس في الـ header.
-
----
-
-## الفصل الثامن عشر: نظام الموافقات (Approval Workflow)
-
-السياق الجزائري غالباً يتطلب موافقة مدير على فواتير فوق حد معين.
-
-**ما يجب بناؤه:**
-
-`ApprovalThreshold` كإعداد في النظام:
-إذا `net_to_pay > threshold` → المستند يُنشأ بحالة `pending_approval`
-يُرسَل إشعار لمدير المبيعات / المدير العام
-المدير يُوافق → يتحول `validated`
-المدير يرفض مع سبب → يتحول `rejected` ويُشعَر المُنشئ
-
-في المودال: إذا كان `net_to_pay > threshold` يظهر تحذير
-"هذا المستند يتجاوز الحد المسموح — سيُرسَل للموافقة".
-
----
-
-## الفصل التاسع عشر: استيراد وتصدير
-
-**استيراد الأسطر من Excel:**
-جدول Excel بأعمدة: رمز المنتج، الكمية، السعر، الخصم.
-عند رفع الملف: يُحاوَل ربط كل رمز بمنتج في قاعدة البيانات.
-المنتجات غير الموجودة تُعلَّم باللون الأحمر.
-المستخدم يُراجع ثم يُضيف للسطر.
-
-**تصدير المستند لصيغ متعددة:**
-- PDF (الطباعة الرسمية)
-- Excel (للمراجعة الداخلية)
-- JSON (للتكامل مع برامج محاسبة خارجية)
-- XML (لبعض متطلبات التقارير الجزائرية)
-
----
-
-## الفصل العشرون: الذاكرة الذكية للمودال
-
-**ما يجب بناؤه — SmartDefaults:**
-
-النظام يتعلم من عادات المستخدم:
-- المستودع الذي يستخدمه عادةً هذا المستخدم → يُختار افتراضياً
-- فئة السعر التي يختارها لهذا الزبون دائماً → تُطبَّق تلقائياً
-- الكميات التي يطلبها الزبون عادةً لكل منتج → تُقترَح
-
-هذا يُخزَّن في `user_preferences` أو `localStorage` حسب درجة الحساسية.
-
-**حفظ مسودة تلقائية:**
-كل 30 ثانية إذا كان المودال مفتوحاً مع أسطر → حفظ في localStorage.
-عند فتح المودال: "لديك مسودة محفوظة من X دقيقة — هل تريد استعادتها؟"
-
----
-
-## الفصل الحادي والعشرون: واجهة السطر المُعاد تصورها
-
-السطر الحالي: جدول أفقي ضيق يُجبر المستخدم على التمرير.
-
-**ما يجب بناؤه — LineCard Mode:**
-
-وضعان للعرض قابلان للتبديل:
-**Table Mode (الحالي):** مناسب للشاشات الكبيرة والمستخدمين المحترفين
-**Card Mode (جديد):** كل سطر يُعرَض كبطاقة كاملة بمعلومات غنية
-- صورة المنتج (إذا كان `images` ممتلئاً)
-- الاسم الكامل والرمز والباركود
-- السعر الأصلي مشطوباً ← السعر بعد الخصم
-- الكمية مع زرَّي + و-
-- الهامش بلون (أخضر/برتقالي/أحمر)
-- المخزون المتاح
-
----
-
-## الفصل الثاني والعشرون: الباركود في الإدخال
-
-`Product.barcode` موجود. لا يوجد إدخال بالباركود.
-
-**ما يجب بناؤه:**
-
-حقل بحث بالباركود في أعلى جدول الأسطر.
-المستخدم يُدخِّل باركود (أو يمرر Scanner USB → يبعث Enter تلقائياً):
-- يبحث عن المنتج بالباركود أو رمز التعبئة
-- إذا وُجد يُضيف سطراً جديداً بكمية 1
-- إذا كان المنتج موجوداً بالفعل في أسطر يزيد كميته بـ 1
-
-هذا يُحوِّل المودال لنقطة بيع خفيفة مناسبة لمن يستخدم قارئ باركود.
-
----
-
-## الفصل الثالث والعشرون: الإشعارات والتواصل مع الزبون
-
-عند حفظ فاتورة: زر "إرسال للزبون" يفتح modal صغير:
-- البريد الإلكتروني مُعبَّأ من `party.email`
-- رسالة افتراضية بالعربية
-- إرفاق PDF تلقائياً
-- تاريخ الاستحقاق مُذكَّر في نص الرسالة
-
-في الباكاند: `DocumentMailService::sendToParty(document)` يُرسل البريد.
-يُسجَّل في `document.internal_notes` تاريخ ووقت الإرسال.
-
----
-
-## الفصل الرابع والعشرون: تكامل مع السنة المالية
-
-حقل `fiscal_year_id` في المودال يُختار يدوياً.
-لكن الباكاند ينشئ المستند في أي سنة يختارها المستخدم دون تحقق.
-
-**ما يجب بناؤه:**
-
-تحقق ثلاثي الاتجاه:
-1. `document_date` يجب أن يكون ضمن نطاق السنة المالية المختارة
-2. السنة المالية يجب أن تكون مفتوحة (`is_closed = false`)
-3. تاريخ اليوم يجب أن يكون ضمن نطاق السنة (لا يمكن إنشاء مستند بتاريخ مستقبلي
-   بعيد جداً)
-
-إذا اختار المستخدم تاريخاً لا يتطابق مع السنة المالية → تحذير فوري.
-إذا كانت السنة المختارة مغلقة → رسالة خطأ واضحة.
-
----
-
-## ملخص خارطة التنفيذ حسب الأثر
-
-**أثر مالي مباشر (الخطر الأكبر):**
-نظام حد الائتمان ← يمنع خسائر مالية حقيقية
-معالجة الإعفاء الضريبي ← تجنب غرامات ضريبية
-نظام الشيكات ← شيكات منسية = خسائر
-
-**أثر تشغيلي يومي:**
-تحويل المستندات ← يوفر 70% من وقت إدخال البيانات
-شروط الدفع المفصلة ← وضوح مالي أفضل
-تتبع التسليم ← لا تضارب بين الطلبات والتسليمات
-
-**أثر تحليلي استراتيجي:**
-تقرير الهامش ← قرارات تسعير أفضل
-Aging Report ← إدارة الديون
-تحليل سرعة البيع ← إدارة المخزون
-
-**تحسين تجربة المستخدم:**
-إدخال بالباركود ← سرعة إدخال مضاعفة
-اقتراحات ذكية ← cross-sell
-حفظ المسودة ← لا ضياع بيانات
-
-
-تم انجاز مختلف النقاط يوجد ملفات التي تم انجازها بجانب هذا الملف يمكنك التحقق منها
-الآن لدي الصورة الدقيقة الكاملة. المتبقي هو:
-مشاكل حقيقية تحتاج إكمال:
-
-lineWarnings مُرجَع من useDocumentForm لكن لا يُستخدَم في CommercialDocumentModal ولا في DocumentLineRow
-_warnings في LineItem لا تُعرَض في DocumentLineRow
-hooks_frontend.ts يحتاج تقسيم لـ 3 ملفات منفصلة
-components_new.tsx يحتاج تقسيم لـ 3 ملفات منفصلة
-Services_backend.php فيه 3 namespaces منفصلة — يجب تقسيمه لـ 3 ملفات
- اكمل هاته النقاط ثم هات نسبة التقدم في انجاز كامل نقاط هذا الملف لتكمله```
-
 ## FILE: resources/js/pages/documents/types/document.types.ts
 ```
 // ════════════════════════════════════════════════════════════════════════════
@@ -11499,6 +12259,7 @@ export interface LineItem {
   packaging_id:           string;
   stock_lot_id:           string;
   lot_number_new?:        string;
+  warehouse_id?:          string;
   line_note?:             string;
   _product?:              Product;
   _packQty:               number;
@@ -11559,6 +12320,7 @@ export const ALL_COLUMNS = [
   { key: 'product',    label: 'المنتج',          w: 220, fixed: true  },
   { key: 'packaging',  label: 'التعبئة',         w: 110, fixed: false },
   { key: 'lot',        label: 'الحصة',             w: 120, fixed: false },
+  { key: 'warehouse',  label: 'المستودع',        w: 100, fixed: false },
   { key: 'quantity',   label: 'الكمية',          w: 75,  fixed: true  },
   { key: 'unit',       label: 'الوحدة',          w: 60,  fixed: false },
   { key: 'unit_price', label: 'سعر الوحدة HT',  w: 110, fixed: false },
@@ -11569,7 +12331,8 @@ export const ALL_COLUMNS = [
   { key: 'tva',        label: 'TVA %',           w: 68,  fixed: false },
   { key: 'total_ht',   label: 'إجمالي HT',      w: 100, fixed: false },
   { key: 'total_ttc',  label: 'إجمالي TTC',     w: 110, fixed: true  },
-  { key: 'margin',     label: 'الهامش',         w: 80,  fixed: false },
+  { key: 'cost',       label: 'التكلفة',         w: 100, fixed: false },
+  { key: 'margin',     label: 'الهامش',         w: 110, fixed: false },
   { key: 'line_note',  label: 'ملاحظة',          w: 100, fixed: false },
   { key: 'actions',    label: '',                w: 36,  fixed: true  },
 ] as const;
@@ -11768,7 +12531,7 @@ export function calcTotals(
 // ─── Price resolution ─────────────────────────────────────────────────────────
 
 function resolveProductPrice(product: Product, entry: ProductPrice): number {
-  const cost = toNum(product.purchase_price_ht ?? product.current_cost_price ?? 0);
+  const cost = toNum(product.purchase_price_ht) || toNum(product.current_cost_price) || 0;
   const val  = entry.price ?? entry.rate ?? entry.margin ?? null;
   if (val === null) return 0;
   if (entry.pricing_method === 'fixed')  return val;
@@ -11799,7 +12562,7 @@ export function resolvePrice(
   const defaultPrice = toNum(product.default_selling_price_ht);
   if (defaultPrice > 0) return defaultPrice;
 
-  const costPrice = toNum(product.purchase_price_ht ?? product.current_cost_price);
+  const costPrice = toNum(product.purchase_price_ht) || toNum(product.current_cost_price);
   if (costPrice > 0) return Math.round(costPrice * 1.3 * 100) / 100;
 
   return 0;

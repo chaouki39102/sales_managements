@@ -1,9 +1,9 @@
-# Module Export: setting
-Generated at: 2026-05-30 12:36:43
+# Module Export: Setting
+Generated at: 2026-06-20 19:17:12
 
 ## Models
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\Setting.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\Setting.php
 ```php
 <?php
 
@@ -211,7 +211,7 @@ class Setting extends Model
 
 ## Controllers
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\Admin\AdminSystemSettingsController.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\Admin\AdminSystemSettingsController.php
 ```php
 <?php
 
@@ -271,7 +271,7 @@ class AdminSystemSettingsController extends Controller
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\SettingController.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\SettingController.php
 ```php
 <?php
 
@@ -441,6 +441,15 @@ class SettingController extends BaseApiController
             'alert_g12', 'alert_g12bis', 'alert_draft_docs', 'draft_docs_days',
             'email_notifications', 'notif_email',
 
+            // documents
+            'default_warehouse_id', 'default_currency_id', 'default_price_level_id',
+            'default_payment_mode_id', 'default_treasury_account_id',
+            'default_apply_stamp', 'default_is_proforma', 'default_fiscal_year_behavior',
+            'documents_default_line_mode', 'documents_default_visible_cols',
+
+            // inventory (expansion)
+            'allow_negative_stock_on_sale', 'auto_create_lot_on_purchase',
+
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',
             'timezone', 'date_format', 'time_format',
@@ -457,7 +466,7 @@ class SettingController extends BaseApiController
 
 ## Services
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\SettingService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\SettingService.php
 ```php
 <?php
 
@@ -541,49 +550,74 @@ class SettingService extends BaseService
 
         DB::transaction(function () use ($settingsDict, $companyId, $now, &$upserted) {
             foreach ($settingsDict as $key => $value) {
-                // ✅ حوِّل القيمة للتخزين (كل شيء نصي في الـ DB)
-                $storedValue = $this->prepareValueForStorage($value);
 
-                // ✅ WHERE clause
-                $where = ['key' => $key];
-                if ($companyId) {
-                    $where['company_id'] = $companyId;
-                } else {
-                    $where['company_id'] = null; // whereNull
-                }
-
-                // ✅ القيم للتحديث
-                $updateData = [
-                    'value'      => $storedValue,
-                    'updated_at' => $now,
-                ];
-
-                // ✅ القيم للإنشاء إذا لم يوجد
-                $createData = array_merge($where, $updateData, [
-                    'group'         => $this->guessGroup($key),
-                    'type'          => $this->guessType($value),
-                    'is_editable'   => true,
-                    'is_public'     => false,
-                    'display_order' => 0,
-                    'created_at'    => $now,
-                ]);
-
-                // ✅ updateOrInsert مباشر بدون Eloquent events التي قد تستدعي Cache::tags
-DB::table('settings')->updateOrInsert($where, $createData);
-
-                // جلب السجل المحدَّث
-                $setting = Setting::where('key', $key)
-                    ->when($companyId, fn($q) => $q->where('company_id', $companyId))
-                    ->when(!$companyId, fn($q) => $q->whereNull('company_id'))
+                // ① تحقق من is_editable قبل أي تعديل
+                $existing = Setting::where('key', $key)
+                    ->when(
+                        $companyId,
+                        fn($q) => $q->where('company_id', $companyId),
+                        fn($q) => $q->whereNull('company_id')
+                    )
                     ->first();
 
-                if ($setting) {
-                    $upserted->push($setting);
+                if ($existing && !$existing->is_editable) {
+                    continue; // تخطّى الإعدادات المحمية
+                }
+
+                $storedValue = $this->prepareValueForStorage($value);
+                $updateData  = ['value' => $storedValue, 'updated_at' => $now];
+
+                if ($companyId) {
+                    // ② المسار الطبيعي — tenant
+                    DB::table('settings')->updateOrInsert(
+                        ['key' => $key, 'company_id' => $companyId],
+                        array_merge($updateData, $existing ? [] : [
+                            'key'           => $key,
+                            'company_id'    => $companyId,
+                            'group'         => $this->guessGroup($key),
+                            'type'          => $this->guessType($value),
+                            'is_editable'   => true,
+                            'is_public'     => false,
+                            'display_order' => 0,
+                            'created_at'    => $now,
+                        ])
+                    );
+                } else {
+                    // ③ company_id IS NULL — updateOrInsert لا يفهم null كـ IS NULL
+                    if ($existing) {
+                        DB::table('settings')
+                            ->where('key', $key)
+                            ->whereNull('company_id')
+                            ->update($updateData);
+                    } else {
+                        DB::table('settings')->insert(array_merge($updateData, [
+                            'key'           => $key,
+                            'company_id'    => null,
+                            'group'         => $this->guessGroup($key),
+                            'type'          => $this->guessType($value),
+                            'is_editable'   => true,
+                            'is_public'     => false,
+                            'display_order' => 0,
+                            'created_at'    => $now,
+                        ]));
+                    }
+                }
+
+                // ④ جلب السجل المحدَّث — $existing قد يكون stale بعد الـ update
+                $fresh = Setting::where('key', $key)
+                    ->when(
+                        $companyId,
+                        fn($q) => $q->where('company_id', $companyId),
+                        fn($q) => $q->whereNull('company_id')
+                    )
+                    ->first();
+
+                if ($fresh) {
+                    $upserted->push($fresh);
                 }
             }
         });
 
-        // ✅ مسح cache بعد التحديث (بدون tags)
         $this->clearCache();
 
         return $upserted;
@@ -719,9 +753,9 @@ DB::table('settings')->updateOrInsert($where, $createData);
             'float', 'double' => (float) ($jsonOk ? $decoded : $raw),
             'json', 'array'   => $jsonOk && is_array($decoded) ? $decoded : [],
             default           => // string
-                $jsonOk && is_string($decoded) ? $decoded
-                    : ($jsonOk && is_scalar($decoded) ? (string) $decoded
-                        : $raw),
+            $jsonOk && is_string($decoded) ? $decoded
+                : ($jsonOk && is_scalar($decoded) ? (string) $decoded
+                    : $raw),
         };
     }
 
@@ -763,7 +797,7 @@ DB::table('settings')->updateOrInsert($where, $createData);
             'auto_adj'    => 'inventory',
             'alert_'   => 'alerts',
             'notif_'   => 'alerts',
-            'email_not'=> 'alerts',
+            'email_not' => 'alerts',
             'debt_'    => 'alerts',
             'g50_'     => 'alerts',
             'draft_'   => 'alerts',
@@ -795,7 +829,7 @@ DB::table('settings')->updateOrInsert($where, $createData);
 
 ## Requests
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\SettingRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\SettingRequest.php
 ```php
 <?php
 
@@ -848,9 +882,75 @@ class UpdateSettingRequest extends FormRequest
 }
 ```
 
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreSettingRequest.php
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+
+class StoreSettingRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'key' => 'required|string|max:150|unique:settings,key',
+            'group' => 'nullable|string|max:100',
+            'value' => 'nullable',
+            'type' => 'nullable|string|max:50',
+            'description' => 'nullable|string|max:500',
+            'is_public' => 'nullable|boolean',
+            'is_editable' => 'nullable|boolean',
+            'display_order' => 'nullable|integer|min:0',
+        ];
+    }
+}
+
+
+```
+
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateSettingRequest.php
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+
+class UpdateSettingRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'key' => 'sometimes|string|max:150|unique:settings,key,' . $this->route('setting'),
+            'group' => 'nullable|string|max:100',
+            'value' => 'nullable',
+            'type' => 'nullable|string|max:50',
+            'description' => 'nullable|string|max:500',
+            'is_public' => 'nullable|boolean',
+            'is_editable' => 'nullable|boolean',
+            'display_order' => 'nullable|integer|min:0',
+        ];
+    }
+}
+```
+
 ## Policies
 
-### 📁 D:\xampp\htdocs\sales-management\app\Policies\SettingPolicy.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Policies\SettingPolicy.php
 ```php
 <?php
 
@@ -898,5 +998,40 @@ class SettingPolicy
         return $user->can('force_delete_setting');
     }
 }
+```
+
+## Migrations
+
+### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2025_10_15_094145_create_settings_table.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('settings', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->nullable()->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate()->comment('NULL = إعداد عام للنظام');
+            $table->string('key', 100);
+            $table->string('group', 50)->default('general')->index();
+            $table->json('value')->nullable();
+            $table->string('type', 50)->default('string')->comment('string, integer, boolean, json');
+            $table->text('description')->nullable();
+            $table->boolean('is_public')->default(false);
+            $table->boolean('is_editable')->default(true);
+            $table->unsignedSmallInteger('display_order')->default(0);
+            $table->timestamps();
+            $table->unique(['company_id', 'key'], 'settings_company_key_unique');
+            $table->index(['group', 'key']);
+        });
+    }
+    public function down(): void {
+        Schema::dropIfExists('settings');
+    }
+};
+
 ```
 

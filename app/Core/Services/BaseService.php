@@ -97,7 +97,20 @@ abstract class BaseService
 
     public function create(array $data, Request $request = null): Model
     {
+        \Log::debug('[BaseService.create] BEFORE beforeCreate', [
+            'data_keys' => array_keys($data),
+            'doc_num' => $data['document_number'] ?? 'NOT_SET',
+            'company_id' => $data['company_id'] ?? 'NOT_SET',
+            'input' => $request?->all(),
+        ]);
+
         $data = $this->beforeCreate($data, $request);
+
+        \Log::debug('[BaseService.create] AFTER beforeCreate', [
+            'data_keys' => array_keys($data),
+            'doc_num' => $data['document_number'] ?? 'NOT_SET',
+            'company_id' => $data['company_id'] ?? 'NOT_SET',
+        ]);
 
         $item = DB::transaction(function () use ($data, $request) {
             $item = $this->model::create($data);

@@ -6,7 +6,7 @@ use App\Models\CommercialDocument;
 use App\Models\Party;
 use App\Models\Product;
 use App\Models\ProductLot;
-use App\Models\StockMovement;
+use App\Models\Setting;
 use App\Services\Tax\FiscalStampCalculator;
 use App\Services\Tax\TaxRuleService;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +65,10 @@ class ComputeLineService
             if (!$levelId && $party?->default_price_level_id) {
                 $levelId = $party->default_price_level_id;
             }
+        }
+
+        if (!$levelId) {
+            $levelId = Setting::getSetting('default_price_level_id', null, $companyId);
         }
 
         $unitPrice = 0.0;
@@ -127,12 +131,40 @@ class ComputeLineService
 
         $stockAvailable = null;
         if ($warehouseId && $product->manages_stock) {
-            $stockAvailable = (float) (
-                StockMovement::where('product_id', $productId)
-                    ->where('warehouse_id', $warehouseId)
-                    ->latest('id')
-                    ->value('stock_balance_after') ?? 0
-            );
+            $fySub = DB::table('fiscal_years')
+                ->where('company_id', $companyId)
+                ->whereDate('start_date', '<=', $docDate)
+                ->whereDate('end_date', '>=', $docDate)
+                ->limit(1);
+
+            $opening = DB::table('opening_balances_stock')
+                ->where('company_id', $companyId)
+                ->where('product_id', $productId)
+                ->where('warehouse_id', $warehouseId)
+                ->where('fiscal_year_id', fn($q) => $q->select('id')->fromSub($fySub, 'fy'))
+                ->sum('opening_quantity');
+
+            $incoming = DB::table('stock_movements as sm')
+                ->join('stock_movement_types as smt', 'sm.stock_movement_type_id', '=', 'smt.id')
+                ->where('sm.product_id', $productId)
+                ->where('sm.warehouse_id', $warehouseId)
+                ->where('sm.is_validated', true)
+                ->whereNull('sm.deleted_at')
+                ->whereDate('sm.movement_date', '<=', $docDate)
+                ->where('smt.direction', '>', 0)
+                ->sum('sm.quantity');
+
+            $outgoing = DB::table('stock_movements as sm')
+                ->join('stock_movement_types as smt', 'sm.stock_movement_type_id', '=', 'smt.id')
+                ->where('sm.product_id', $productId)
+                ->where('sm.warehouse_id', $warehouseId)
+                ->where('sm.is_validated', true)
+                ->whereNull('sm.deleted_at')
+                ->whereDate('sm.movement_date', '<=', $docDate)
+                ->where('smt.direction', '<', 0)
+                ->sum('sm.quantity');
+
+            $stockAvailable = (float) ($opening + $incoming - $outgoing);
         }
 
         $lotSuggestions = [];

@@ -12,6 +12,7 @@ import React, {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 
@@ -366,6 +367,13 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     staleTime: 10 * 60_000,
   });
 
+  const { data: settingsDict } = useQuery({
+    queryKey: [slug, 'settings-dict'],
+    queryFn: () => settingsApi.list(),
+    enabled: open && !!slug,
+    staleTime: 10 * 60_000,
+  });
+
   const { data: rawWarehouses = [] } = useQuery({
     queryKey: [slug, 'quick-sale-warehouses'],
     queryFn: () => apiGet<unknown>('/warehouses', { per_page: 100 }).then(extractList),
@@ -387,16 +395,26 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
 
   // الدائم: طريقة الدفع نقدي (cash) وحساب الخزينة الأول
   const defaultPaymentModeId = useMemo(() => {
+    const fromSettings = settingsDict?.default_payment_mode_id?.value;
+    if (fromSettings) {
+      const found = paymentModes.find(pm => pm.id === Number(fromSettings));
+      if (found) return String(found.id);
+    }
     const cash = paymentModes.find(
       pm => pm.name.toLowerCase().includes('نقد') || pm.code?.toLowerCase() === 'cash'
     );
     return cash ? String(cash.id) : paymentModes[0] ? String(paymentModes[0].id) : '';
-  }, [paymentModes]);
+  }, [paymentModes, settingsDict]);
 
   const defaultTreasuryId = useMemo(() => {
+    const fromSettings = settingsDict?.default_treasury_account_id?.value;
+    if (fromSettings) {
+      const found = treasuryAccounts.find(t => t.id === Number(fromSettings));
+      if (found) return String(found.id);
+    }
     const def = treasuryAccounts.find(t => t.is_default);
     return def ? String(def.id) : treasuryAccounts[0] ? String(treasuryAccounts[0].id) : '';
-  }, [treasuryAccounts]);
+  }, [treasuryAccounts, settingsDict]);
 
   // State
   const [partyId, setPartyId] = useState('');

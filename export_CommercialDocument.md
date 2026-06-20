@@ -1,9 +1,9 @@
 # Module Export: CommercialDocument
-Generated at: 2026-06-20 12:40:55
+Generated at: 2026-06-20 19:17:16
 
 ## Models
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\CommercialDocument.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\CommercialDocument.php
 ```php
 <?php
 
@@ -338,7 +338,7 @@ class CommercialDocument extends Model
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\CommercialDocumentLine.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\CommercialDocumentLine.php
 ```php
 <?php
 
@@ -440,7 +440,7 @@ class CommercialDocumentLine extends Model
 
 ## Controllers
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\CommercialDocumentController.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\CommercialDocumentController.php
 ```php
 <?php
 
@@ -813,7 +813,7 @@ class CommercialDocumentController extends BaseApiController
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\CommercialDocumentLineController.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\CommercialDocumentLineController.php
 ```php
 <?php
 
@@ -848,7 +848,7 @@ class CommercialDocumentLineController extends BaseApiController
 
 ## Services
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\CommercialDocumentLineService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\CommercialDocumentLineService.php
 ```php
 <?php
 
@@ -961,7 +961,7 @@ class CommercialDocumentLineService extends \App\Core\Services\BaseService
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\CommercialDocumentService.patches.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\CommercialDocumentService.patches.php
 ```php
 <?php
 
@@ -1370,7 +1370,7 @@ public function addPayments(Request $request, Company $company, CommercialDocume
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\CommercialDocumentService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\CommercialDocumentService.php
 ```php
 <?php
 
@@ -1382,6 +1382,7 @@ use App\Models\CommercialDocument;
 use App\Models\DocumentStatus;
 use App\Models\DocumentType;
 use App\Models\FiscalYear;
+use App\Models\Setting;
 use App\Models\NumberingSeries;
 use App\Models\Product;
 use App\Models\StockMovement;
@@ -1472,10 +1473,28 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $data['document_number'] = $this->generateDocumentNumber($documentType, $companyId);
         }
 
+        // ── الإعدادات الافتراضية من Settings ─────────────────────────────
+        if (empty($data['warehouse_id'])) {
+            $defWh = Setting::getSetting('default_warehouse_id', null, $companyId);
+            if ($defWh) $data['warehouse_id'] = $defWh;
+        }
+
+        if (empty($data['currency_id'])) {
+            $defCur = Setting::getSetting('default_currency_id', 1, $companyId);
+            if ($defCur) $data['currency_id'] = $defCur;
+        }
+
+        if (!isset($data['is_proforma'])) {
+            $data['is_proforma'] = Setting::getSetting('default_is_proforma', false, $companyId);
+        }
+
         // السنة المالية
         if (empty($data['fiscal_year_id'])) {
-            $data['fiscal_year_id'] = $this->getCurrentFiscalYearId($companyId)
-                ?? throw new BusinessRuleException('لا توجد سنة مالية مفتوحة.', 422);
+            $behavior = Setting::getSetting('default_fiscal_year_behavior', 'current', $companyId);
+            if ($behavior === 'current') {
+                $data['fiscal_year_id'] = $this->getCurrentFiscalYearId($companyId)
+                    ?? throw new BusinessRuleException('لا توجد سنة مالية مفتوحة.', 422);
+            }
         }
 
         // ✅ الحالة مباشرةً "validated" — لا مسودة
@@ -2050,9 +2069,38 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         foreach ($document->lines as $line) {
             if (!$line->product_id || !$line->product) continue;
 
+            $product = $line->product;
+            $baseQty = (float) $line->quantity;
+
+            // ── التحقق من المخزون قبل إنشاء الحركة ─────────────────────────
+            $shouldCheckStock = false;
+            if ($direction < 0 && $product->manages_stock) {
+                $allowNegativeGlobal = Setting::getSetting('allow_negative_stock_on_sale', false, $document->company_id);
+                if ($allowNegativeGlobal === false) {
+                    $shouldCheckStock = true; // السياسة العامة تمنع البيع بدون مخزون كافٍ
+                } elseif (!$product->allow_negative_stock) {
+                    $shouldCheckStock = true; // إعداد المنتج يمنع المخزون السالب
+                }
+            }
+            if ($shouldCheckStock) {
+                $available = $this->getAvailableStock(
+                    $product->id,
+                    $document->warehouse_id,
+                    $document->fiscal_year_id,
+                    $document->company_id,
+                    $document->document_date
+                );
+                if ($baseQty > $available) {
+                    throw new BusinessRuleException(
+                        "الكمية المطلوبة ({$baseQty}) للمنتج «{$product->name}» تتجاوز المخزون المتاح ({$available}).",
+                        409
+                    );
+                }
+            }
+
             $costPrice = $direction < 0
                 ? (float) $valuationService->getCostPriceForSale(
-                    $line->product, $document->warehouse_id, (float) $line->quantity
+                    $product, $document->warehouse_id, $baseQty
                 )
                 : (float) $line->unit_price_ht;
 
@@ -2161,13 +2209,45 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ->orderByDesc('date')
             ->value('rate') ?? 1.0);
     }
+
+    private function getAvailableStock(int $productId, int $warehouseId, int $fiscalYearId, int $companyId, string $date): float
+    {
+        $opening = (float) DB::table('opening_balances_stock')
+            ->where('company_id', $companyId)
+            ->where('fiscal_year_id', $fiscalYearId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->value('opening_quantity') ?? 0;
+
+        $incoming = (float) StockMovement::where('company_id', $companyId)
+            ->where('fiscal_year_id', $fiscalYearId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('is_validated', true)
+            ->where('movement_date', '<=', $date)
+            ->whereNull('deleted_at')
+            ->whereHas('stockMovementType', fn($q) => $q->where('direction', '>', 0))
+            ->sum('quantity');
+
+        $outgoing = (float) StockMovement::where('company_id', $companyId)
+            ->where('fiscal_year_id', $fiscalYearId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('is_validated', true)
+            ->where('movement_date', '<=', $date)
+            ->whereNull('deleted_at')
+            ->whereHas('stockMovementType', fn($q) => $q->where('direction', '<', 0))
+            ->sum('quantity');
+
+        return $opening + $incoming - $outgoing;
+    }
 }
 
 ```
 
 ## Requests
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreCommercialDocumentRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreCommercialDocumentRequest.php
 ```php
 <?php
 
@@ -2316,7 +2396,7 @@ class StoreCommercialDocumentRequest extends FormRequest
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateCommercialDocumentRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateCommercialDocumentRequest.php
 ```php
 <?php
 
@@ -2399,7 +2479,7 @@ class UpdateCommercialDocumentRequest extends FormRequest
 
 ## Policies
 
-### 📁 D:\xampp\htdocs\sales-management\app\Policies\CommercialDocumentLinePolicy.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Policies\CommercialDocumentLinePolicy.php
 ```php
 <?php
 
@@ -2449,7 +2529,7 @@ class CommercialDocumentLinePolicy
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Policies\CommercialDocumentPolicy.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Policies\CommercialDocumentPolicy.php
 ```php
 <?php
 

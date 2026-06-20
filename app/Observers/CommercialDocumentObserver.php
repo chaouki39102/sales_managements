@@ -112,6 +112,11 @@ class CommercialDocumentObserver
      */
     public function saved(CommercialDocument $document): void
     {
+        // لا تعديل على المستندات المقفلة أو المُصدَّرة للمحاسبة
+        if ($document->is_locked || $document->is_exported_to_accounting) {
+            return;
+        }
+
         $netToPay   = (float) $document->net_to_pay;
         $remaining  = (float) $document->remaining_amount;
         $paidAmount = (float) $document->paid_amount;

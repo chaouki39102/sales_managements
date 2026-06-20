@@ -84,6 +84,12 @@ export interface PartyBalanceInfo {
 
 export type PaymentMode = 'free' | 'additive' | 'locked';
 
+export interface PriceLevelSwitchMsg {
+  from: string;
+  to: string;
+  productName: string;
+}
+
 export interface PartyChangeResult {
   blocked:    boolean;
   reason?:    string;
@@ -91,12 +97,15 @@ export interface PartyChangeResult {
 }
 
 interface UseDocumentFormOptions {
-  documentType:       DocumentType | null;
-  existingDocument?:  Record<string, unknown>;
-  defaultTvaRate:     number;
-  defaultWarehouseId: string;
-  baseCurrencyId:     string;
-  selectedYearId:     string;
+  documentType:        DocumentType | null;
+  existingDocument?:   Record<string, unknown>;
+  defaultTvaRate:      number;
+  defaultWarehouseId:  string;
+  baseCurrencyId:      string;
+  defaultIsProforma?:  boolean;
+  defaultPriceLevelId?: string;
+  defaultApplyStamp?:  boolean;
+  selectedYearId:      string;
   paymentModes: Array<{
     id:                   number;
     name:                 string;
@@ -112,10 +121,11 @@ interface UseDocumentFormOptions {
     default_price_level_id?:  number | null;
     default_price_level?:     { id: number; name: string } | null;
   }>;
-  products:   Product[];
-  stockData:  Record<number, number>;
-  isPurchase: boolean;
-  open:       boolean;
+  products:      Product[];
+  stockData:     Record<number, number>;
+  isPurchase:    boolean;
+  open:          boolean;
+  priceLevels?:  Array<{ id: number; name: string }>;
 }
 
 export interface UseDocumentFormReturn {
@@ -153,6 +163,8 @@ export interface UseDocumentFormReturn {
   isReadOnly:             boolean;
   isLinesReadOnly:        boolean;
   lineWarnings:           Map<number, ComputeLineWarning[]>;
+  priceLevelSwitchMsg:    PriceLevelSwitchMsg | null;
+  clearPriceLevelSwitchMsg: () => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -349,7 +361,7 @@ export function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
 
 function buildDefaultForm(
   existingDocument: Record<string, unknown> | undefined,
-  defaults: { warehouseId: string; currencyId: string; yearId: string },
+  defaults: { warehouseId: string; currencyId: string; yearId: string; isProforma?: boolean; priceLevelId?: string; applyStamp?: boolean },
   defaultTvaRate: number,
   products?: Product[],
 ): DocumentFormState {
@@ -394,9 +406,9 @@ function buildDefaultForm(
     fiscal_year_id: defaults.yearId,
     currency_id:    defaults.currencyId,
     exchange_rate:  '1',
-    apply_stamp:    false,
-    price_level_id: '',
-    is_proforma:    false,
+    apply_stamp:    defaults.applyStamp ?? false,
+    price_level_id: defaults.priceLevelId ?? '',
+    is_proforma:    defaults.isProforma ?? false,
     lines: [], payments: [],
     shipping_info:  { ...defaultShipping },
     payment_terms:  [...defaultPaymentTerms],
@@ -428,6 +440,9 @@ export function useDocumentForm({
   defaultTvaRate,
   defaultWarehouseId,
   baseCurrencyId,
+  defaultIsProforma = false,
+  defaultPriceLevelId = '',
+  defaultApplyStamp = false,
   selectedYearId,
   paymentModes,
   parties,
@@ -435,6 +450,7 @@ export function useDocumentForm({
   stockData,
   isPurchase,
   open,
+  priceLevels = [],
 }: UseDocumentFormOptions): UseDocumentFormReturn {
 
   const slug    = useActiveSlug();
@@ -480,6 +496,9 @@ export function useDocumentForm({
       warehouseId: defaultWarehouseId,
       currencyId:  baseCurrencyId,
       yearId:      selectedYearId,
+      isProforma:  defaultIsProforma,
+      priceLevelId: defaultPriceLevelId,
+      applyStamp:  defaultApplyStamp,
     }, defaultTvaRate, products),
   );
   const [errors,  setErrors]  = useState<FormErrors>({});
@@ -489,6 +508,7 @@ export function useDocumentForm({
   const [existingPayments, setExistingPayments] = useState<PaymentEntry[]>([]);
   const [newPayments,      setNewPayments]      = useState<PaymentEntry[]>([]);
   const [lineWarnings, setLineWarnings] = useState<Map<number, ComputeLineWarning[]>>(new Map());
+  const [priceLevelSwitchMsg, setPriceLevelSwitchMsg] = useState<PriceLevelSwitchMsg | null>(null);
 
   useEffect(() => { formRef.current = form; }, [form]);
 
@@ -539,7 +559,7 @@ export function useDocumentForm({
 
     setForm(buildDefaultForm(
       existingDocument,
-      { warehouseId: defaultWarehouseId, currencyId: baseCurrencyId, yearId: selectedYearId },
+      { warehouseId: defaultWarehouseId, currencyId: baseCurrencyId, yearId: selectedYearId, isProforma: defaultIsProforma, priceLevelId: defaultPriceLevelId, applyStamp: defaultApplyStamp },
       defaultTvaRate,
       productsRef.current,
     ));
@@ -570,8 +590,10 @@ export function useDocumentForm({
       warehouse_id:   f.warehouse_id   || defaultWarehouseId,
       currency_id:    f.currency_id    || baseCurrencyId,
       fiscal_year_id: f.fiscal_year_id || selectedYearId,
+      price_level_id: f.price_level_id || defaultPriceLevelId,
+      apply_stamp:    (!('apply_stamp' in f) || !f.apply_stamp) ? defaultApplyStamp : f.apply_stamp,
     }));
-  }, [defaultWarehouseId, baseCurrencyId, selectedYearId, isEdit, open]);
+  }, [defaultWarehouseId, baseCurrencyId, selectedYearId, defaultPriceLevelId, defaultApplyStamp, isEdit, open]);
 
   // ── set ───────────────────────────────────────────────────────────────────
 
@@ -642,7 +664,7 @@ export function useDocumentForm({
       };
     }
 
-    const newPriceLevelStr = newPriceLevel ? String(newPriceLevel) : '';
+    const newPriceLevelStr = newPriceLevel ? String(newPriceLevel) : defaultPriceLevelId;
 
     // due_date تلقائي من credit_days
     const creditDays = (party as Record<string, unknown> | undefined)?.credit_days as number ?? 0;
@@ -672,7 +694,7 @@ export function useDocumentForm({
     });
     setErrors((prev) => { const n = { ...prev }; delete n.party_id; return n; });
     return { blocked: false };
-  }, [isPurchase, existingPayments.length, newPayments]);
+  }, [isPurchase, existingPayments.length, newPayments, defaultPriceLevelId]);
 
   // ── handlePriceLevelChange ────────────────────────────────────────────────
 
@@ -696,15 +718,43 @@ export function useDocumentForm({
 
   // ── updateLine ────────────────────────────────────────────────────────────
 
+  const priceLevelMap = useMemo(() =>
+    Object.fromEntries(priceLevels.map((pl) => [pl.id, pl.name])),
+    [priceLevels],
+  );
+
   const updateLine = useCallback((
     idx:      number,
     patch:    Partial<LineItem>,
     product?: Product | null,
   ) => {
+    // ── Auto-switch price level if product has no price for current one ──
+    const prevForm  = formRef.current;
+    const curPLRaw  = prevForm?.price_level_id ?? '';
+    const curPLId   = curPLRaw ? parseInt(curPLRaw) : null;
+    const switched  = { to: '', plChanged: false };
+
+    if (product && curPLId && product.prices?.length) {
+      const hasPriceForCur = product.prices.some((p) => p.price_level_id === curPLId && p.active);
+      if (!hasPriceForCur) {
+        const firstAvail = product.prices.find((p) => p.active);
+        if (firstAvail) {
+          switched.to       = String(firstAvail.price_level_id);
+          switched.plChanged = true;
+          setPriceLevelSwitchMsg({
+            from:        priceLevelMap[curPLId] ?? String(curPLId),
+            to:          priceLevelMap[firstAvail.price_level_id] ?? String(firstAvail.price_level_id),
+            productName: product.name,
+          });
+        }
+      }
+    }
+
     setForm((f) => {
       const lines           = [...f.lines];
       let   L               = { ...lines[idx], ...patch };
-      const curPriceLevelId = f.price_level_id ? parseInt(f.price_level_id) : null;
+      const effectivePLRaw  = switched.plChanged ? switched.to : f.price_level_id;
+      const curPriceLevelId = effectivePLRaw ? parseInt(effectivePLRaw) : null;
 
       // ─ L1: اختيار منتج جديد ──────────────────────────────────────────────
       if (product !== undefined) {
@@ -852,10 +902,10 @@ export function useDocumentForm({
       }
 
       lines[idx] = L;
-      return { ...f, lines };
+      return switched.plChanged ? { ...f, lines, price_level_id: switched.to } : { ...f, lines };
     });
     setLineErr('');
-  }, [defaultTvaRate, isPurchase]);
+  }, [defaultTvaRate, isPurchase, priceLevelMap]);
 
   // ── addLine / removeLine / duplicateLine ──────────────────────────────────
 
@@ -1039,6 +1089,7 @@ export function useDocumentForm({
         ...(line.packaging_id ? { packaging_id: parseInt(line.packaging_id) } : {}),
         ...(line.stock_lot_id ? { stock_lot_id: parseInt(line.stock_lot_id) } : {}),
         ...(isPurchase && line.lot_number_new ? { lot_number: line.lot_number_new } : {}),
+        ...(line.warehouse_id ? { warehouse_id: parseInt(line.warehouse_id) } : {}),
         notes: line.line_note || null,
       };
     });
@@ -1094,5 +1145,7 @@ export function useDocumentForm({
     docCode, isEdit, needsParty, affectsStock, stockDir,
     isReadOnly, isLinesReadOnly,
     lineWarnings,
+    priceLevelSwitchMsg,
+    clearPriceLevelSwitchMsg: () => setPriceLevelSwitchMsg(null),
   };
 }

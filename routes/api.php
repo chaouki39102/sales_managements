@@ -37,6 +37,10 @@ use App\Http\Controllers\Api\V1\BarcodeController;
 use App\Http\Controllers\Api\V1\CompanySeedController;
 use App\Http\Controllers\Api\V1\ProductVariantController;
 use App\Http\Controllers\Api\V1\InventoryController;
+use App\Http\Controllers\Api\V1\BankReconciliationController;
+use App\Http\Controllers\Api\V1\ApprovalController;
+use App\Http\Controllers\Api\V1\AlertController;
+use App\Http\Controllers\Api\V1\DocumentMailController;
 
 
 // Tenant Lookup Controllers
@@ -205,6 +209,9 @@ Route::prefix('v1')->group(function () {
                 Route::get('inventory', [ReportController::class, 'inventory']);
                 Route::get('payments',  [ReportController::class, 'payments']);
                 Route::get('taxes',     [ReportController::class, 'taxes']);
+                Route::get('velocity',  [ReportController::class, 'velocity']);
+                Route::get('margin',    [ReportController::class, 'margin']);
+                Route::get('aging',     [ReportController::class, 'aging']);
             });
 
             // جداول مرجعية (قراءة)
@@ -463,6 +470,33 @@ Route::prefix('v1')->group(function () {
 
                 Route::post('stock-movements',              [StockMovementController::class, 'store']);
                 Route::delete('stock-movements/{movement}', [StockMovementController::class, 'destroy']);
+
+                // ── المطابقة البنكية ────────────────────────────────
+                Route::get('reconciliation/unreconciled',    [BankReconciliationController::class, 'unreconciled']);
+                Route::get('reconciliation/reconciled',      [BankReconciliationController::class, 'reconciled']);
+                Route::post('reconciliation/reconcile',      [BankReconciliationController::class, 'reconcile']);
+                Route::post('reconciliation/bulk-reconcile', [BankReconciliationController::class, 'bulkReconcile']);
+                Route::post('reconciliation/suggest-matches',[BankReconciliationController::class, 'suggestMatches']);
+                Route::post('reconciliation/{paymentId}/unreconcile', [BankReconciliationController::class, 'unreconcile']);
+
+                // ── نظام الموافقات ──────────────────────────────────
+                Route::get('approvals/check/{documentId}',  [ApprovalController::class, 'check']);
+                Route::post('approvals/submit/{documentId}',[ApprovalController::class, 'submit']);
+                Route::post('approvals/{documentId}/approve',[ApprovalController::class, 'approve']);
+                Route::post('approvals/{documentId}/reject', [ApprovalController::class, 'reject']);
+                Route::get('approvals/thresholds',          [ApprovalController::class, 'thresholds']);
+                Route::post('approvals/thresholds',         [ApprovalController::class, 'storeThreshold']);
+
+                // ── تنبيهات ذكية ────────────────────────────────────
+                Route::get('alerts/unread',      [AlertController::class, 'unread']);
+                Route::get('alerts/all',         [AlertController::class, 'all']);
+                Route::get('alerts/count',       [AlertController::class, 'count']);
+                Route::post('alerts/{alertId}/read', [AlertController::class, 'markAsRead']);
+                Route::post('alerts/mark-all-read',  [AlertController::class, 'markAllAsRead']);
+                Route::post('alerts/run-daily',       [AlertController::class, 'runDaily']);
+
+                // ── إرسال المستند للزبون ────────────────────────────
+                Route::post('documents/{documentId}/send-mail', [DocumentMailController::class, 'send']);
             });
 
             // ── ⑤-د: فردية (المستخدم نفسه) ─────────────────────

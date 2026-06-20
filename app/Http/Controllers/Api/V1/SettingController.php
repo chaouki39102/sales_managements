@@ -166,6 +166,15 @@ class SettingController extends BaseApiController
             'alert_g12', 'alert_g12bis', 'alert_draft_docs', 'draft_docs_days',
             'email_notifications', 'notif_email',
 
+            // documents
+            'default_warehouse_id', 'default_currency_id', 'default_price_level_id',
+            'default_payment_mode_id', 'default_treasury_account_id',
+            'default_apply_stamp', 'default_is_proforma', 'default_fiscal_year_behavior',
+            'documents_default_line_mode', 'documents_default_visible_cols',
+
+            // inventory (expansion)
+            'allow_negative_stock_on_sale', 'auto_create_lot_on_purchase',
+
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',
             'timezone', 'date_format', 'time_format',

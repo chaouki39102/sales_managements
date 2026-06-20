@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CommercialDocument;
+use App\Models\CommercialDocumentLine;
 use App\Models\Party;
 use App\Models\Product;
 use App\Models\Payment;
@@ -254,6 +255,159 @@ class ReportService
             'summary' => [
                 'total_amount' => round($payments->sum('amount'), 2),
                 'count' => $payments->count(),
+            ],
+        ];
+    }
+
+    public function velocityReport(array $filters = []): array
+    {
+        $from = $filters['from_date'] ?? now()->subMonth(3)->toDateString();
+        $to   = $filters['to_date']   ?? now()->toDateString();
+
+        $rows = CommercialDocumentLine::select(
+            'product_id',
+            DB::raw('SUM(quantity) as total_qty'),
+            DB::raw('COUNT(DISTINCT commercial_document_id) as doc_count'),
+            DB::raw('AVG(unit_price_ht) as avg_price'),
+        )
+            ->whereHas('document', fn($q) => $q
+                ->whereHas('documentType', fn($t) => $t->whereIn('code', ['FV', 'BL', 'BCC', 'AV']))
+                ->whereDate('document_date', '>=', $from)
+                ->whereDate('document_date', '<=', $to)
+            )
+            ->groupBy('product_id')
+            ->orderByDesc('total_qty')
+            ->limit(50)
+            ->get();
+
+        $productIds = $rows->pluck('product_id');
+        $products   = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
+        $days = max(1, Carbon::parse($from)->diffInDays(Carbon::parse($to)));
+
+        $items = $rows->map(fn($r) => [
+            'product_id'   => $r->product_id,
+            'product_name' => $products->get($r->product_id)?->name ?? '—',
+            'product_ref'  => $products->get($r->product_id)?->ref ?? '—',
+            'total_qty'    => (float) $r->total_qty,
+            'doc_count'    => (int) $r->doc_count,
+            'avg_price'    => round((float) $r->avg_price, 2),
+            'velocity'     => $days > 0 ? round((float) $r->total_qty / $days, 2) : 0,
+            'days'         => $days,
+        ])->values()->toArray();
+
+        return [
+            'items' => $items,
+            'summary' => [
+                'total_qty'    => round($rows->sum('total_qty'), 2),
+                'total_docs'   => $rows->sum('doc_count'),
+                'period_days'  => $days,
+            ],
+        ];
+    }
+
+    public function marginReport(array $filters = []): array
+    {
+        $from = $filters['from_date'] ?? now()->startOfYear()->toDateString();
+        $to   = $filters['to_date']   ?? now()->toDateString();
+
+        $rows = CommercialDocumentLine::select(
+            'product_id',
+            DB::raw('SUM(quantity) as total_qty'),
+            DB::raw('SUM(quantity * unit_price_ht) as total_ht'),
+        )
+            ->whereHas('document', fn($q) => $q
+                ->whereHas('documentType', fn($t) => $t->whereIn('code', ['FV', 'BL', 'BCC', 'AV']))
+                ->whereDate('document_date', '>=', $from)
+                ->whereDate('document_date', '<=', $to)
+            )
+            ->groupBy('product_id')
+            ->orderByDesc('total_ht')
+            ->limit(50)
+            ->get();
+
+        $productIds = $rows->pluck('product_id');
+        $products   = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
+        $items = $rows->map(fn($r) => [
+            'product_id'    => $r->product_id,
+            'product_name'  => $products->get($r->product_id)?->name ?? '—',
+            'product_ref'   => $products->get($r->product_id)?->ref ?? '—',
+            'total_qty'     => (float) $r->total_qty,
+            'total_ht'      => round((float) $r->total_ht, 2),
+            'cost_price'    => $products->get($r->product_id)?->current_cost_price ?? 0,
+            'cost_total'    => round((float) $r->total_qty * ($products->get($r->product_id)?->current_cost_price ?? 0), 2),
+            'margin_amount' => 0,
+            'margin_pct'    => 0,
+        ])->map(fn($i) => [
+            ...$i,
+            'margin_amount' => round($i['total_ht'] - $i['cost_total'], 2),
+            'margin_pct'    => $i['total_ht'] > 0
+                ? round(($i['total_ht'] - $i['cost_total']) / $i['total_ht'] * 100, 2)
+                : 0,
+        ])->values()->toArray();
+
+        $totalHt  = array_sum(array_column($items, 'total_ht'));
+        $totalCost = array_sum(array_column($items, 'cost_total'));
+
+        return [
+            'items' => $items,
+            'summary' => [
+                'total_ht'      => round($totalHt, 2),
+                'total_cost'    => round($totalCost, 2),
+                'total_margin'  => round($totalHt - $totalCost, 2),
+                'margin_pct'    => $totalHt > 0 ? round(($totalHt - $totalCost) / $totalHt * 100, 2) : 0,
+            ],
+        ];
+    }
+
+    public function agingReport(array $filters = []): array
+    {
+        $refDate = $filters['as_of_date'] ?? now()->toDateString();
+        $ref     = Carbon::parse($refDate);
+
+        $invoices = CommercialDocument::with('party')
+            ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'BL', 'BCC']))
+            ->where('remaining_amount', '>', 0)
+            ->whereDate('document_date', '<=', $refDate)
+            ->orderBy('due_date')
+            ->get();
+
+        $parties = $invoices->groupBy('party_id');
+
+        $buckets = [
+            '0_30'   => ['label' => '0–30 يوم',  'total' => 0, 'count' => 0],
+            '31_60'  => ['label' => '31–60 يوم', 'total' => 0, 'count' => 0],
+            '61_90'  => ['label' => '61–90 يوم', 'total' => 0, 'count' => 0],
+            '90_plus' => ['label' => 'أكثر من 90 يوم', 'total' => 0, 'count' => 0],
+        ];
+
+        $rows = $parties->map(function ($docs, $partyId) use ($ref, &$buckets) {
+            $party = $docs->first()->party;
+            $total = $docs->sum('remaining_amount');
+            $days  = $ref->diffInDays($docs->max('due_date') ?? $docs->max('document_date'));
+            $bucket = $days <= 30 ? '0_30' : ($days <= 60 ? '31_60' : ($days <= 90 ? '61_90' : '90_plus'));
+
+            $buckets[$bucket]['total'] += $total;
+            $buckets[$bucket]['count'] += $docs->count();
+
+            return [
+                'party_id'   => (int) $partyId,
+                'party_name' => $party?->name ?? '—',
+                'total_due'  => round($total, 2),
+                'invoice_count' => $docs->count(),
+                'max_days'   => $days,
+                'bucket'     => $bucket,
+            ];
+        })->values()->toArray();
+
+        return [
+            'rows'    => $rows,
+            'buckets' => array_values($buckets),
+            'summary' => [
+                'total_due'   => round(array_sum(array_column($buckets, 'total')), 2),
+                'total_count' => array_sum(array_column($buckets, 'count')),
+                'as_of_date'  => $refDate,
             ],
         ];
     }

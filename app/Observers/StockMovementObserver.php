@@ -3,6 +3,7 @@
 
 namespace App\Observers;
 
+use App\Models\Setting;
 use App\Models\StockMovement;
 use App\Models\ProductLot;
 use App\Services\InventoryValuationService;
@@ -61,9 +62,12 @@ class StockMovementObserver
                     $this->valuationService->updateCostAfterPurchase($movement);
                 }
 
-                // 2. إنشاء دفعة جديدة (لحركات الإدخال فقط)
+                // 2. إنشاء دفعة جديدة (لحركات الإدخال فقط) — حسب إعداد auto_create_lot_on_purchase
                 if ($movement->stockMovementType->direction > 0) {
-                    $this->createProductLot($movement);
+                    $autoCreate = Setting::getSetting('auto_create_lot_on_purchase', true, $movement->company_id);
+                    if ($autoCreate) {
+                        $this->createProductLot($movement);
+                    }
                 }
 
                 // 3. تحديث أرصدة الدفعات لحركات الخروج (FIFO/LIFO)

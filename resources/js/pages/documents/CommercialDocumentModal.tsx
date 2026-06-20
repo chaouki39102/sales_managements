@@ -37,6 +37,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
+import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type { DocumentType } from '@/lib/api/core/types';
 
@@ -58,6 +59,9 @@ import { useProductSuggestions } from './hooks/useProductSuggestions';
 import { useAdvancePayments } from './hooks/useAdvancePayments';
 import { SmartSuggestionsPanel } from './components/SmartSuggestionsPanel';
 import { AdvancePaymentsPanel } from './components/AdvancePaymentsPanel';
+import { BarcodeInput } from './components/BarcodeInput';
+import { LineCard } from './components/LineCard';
+import { BulkImportModal } from './components/BulkImportModal';
 import {
   Section, Label, FieldError, Toggle, TotalCard,
   ComboBox, ColumnManager, AlertBanner, Tabs,
@@ -247,6 +251,14 @@ export default function CommercialDocumentModal({
 
   // ─── Column visibility ────────────────────────────────────────────────────
 
+  // ─── Settings defaults ───────────────────────────────────────────────────
+  const { data: settingsDict } = useQuery({
+    queryKey: [slug, 'settings-dict'],
+    queryFn: () => settingsApi.list(),
+    enabled: !!slug,
+    staleTime: 10 * 60_000,
+  });
+
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(
     () => loadVisibleCols(slug ?? 'default'),
   );
@@ -254,6 +266,37 @@ export default function CommercialDocumentModal({
     setVisibleCols(cols);
     saveVisibleCols(slug ?? 'default', cols);
   };
+
+  const [lineMode, setLineMode] = useState<'table' | 'card'>('table');
+
+  // تطبيق الإعدادات الافتراضية من Settings عند تحميلها
+  const initialDefaultsApplied = useRef(false);
+  useEffect(() => {
+    if (!settingsDict || initialDefaultsApplied.current) return;
+    initialDefaultsApplied.current = true;
+
+    const storedCols = (() => {
+      try { return localStorage.getItem(`doc_visible_cols_${slug ?? 'default'}`); } catch {}
+      return null;
+    })();
+    if (!storedCols) {
+      const defaultCols = settingsDict.documents_default_visible_cols?.value as string[] | undefined;
+      if (defaultCols?.length) {
+        setVisibleCols(new Set(defaultCols as ColKey[]));
+      }
+    }
+
+    const storedMode = (() => {
+      try { return localStorage.getItem(`doc_line_mode_${slug ?? 'default'}`); } catch {}
+      return null;
+    })();
+    if (!storedMode) {
+      const defaultMode = settingsDict.documents_default_line_mode?.value as string | undefined;
+      if (defaultMode === 'card' || defaultMode === 'table') {
+        setLineMode(defaultMode);
+      }
+    }
+  }, [settingsDict, slug]);
 
   // ─── Lookups ──────────────────────────────────────────────────────────────
 
@@ -264,6 +307,40 @@ export default function CommercialDocumentModal({
     warehouseId:  null,
     fiscalYearId: selectedYear?.id ?? null,
   });
+
+  // ── القيم الافتراضية من Settings (أولوية) مع الرجوع إلى اللوك أب ──────
+  const settingsWarehouseId = useMemo(() => {
+    const v = settingsDict?.default_warehouse_id?.value;
+    if (v) {
+      const found = lookups.warehouses.find((w: any) => w.id === Number(v));
+      if (found) return String(found.id);
+    }
+    return lookups.defaultWarehouseId;
+  }, [settingsDict, lookups.warehouses, lookups.defaultWarehouseId]);
+
+  const settingsCurrencyId = useMemo(() => {
+    const v = settingsDict?.default_currency_id?.value;
+    if (v) {
+      const found = lookups.currencies.find((c: any) => c.id === Number(v));
+      if (found) return String(found.id);
+    }
+    return lookups.baseCurrencyId;
+  }, [settingsDict, lookups.currencies, lookups.baseCurrencyId]);
+
+  const settingsIsProforma = useMemo(() => {
+    const v = settingsDict?.default_is_proforma?.value;
+    return v === true || v === 'true';
+  }, [settingsDict]);
+
+  const settingsPriceLevelId = useMemo(() => {
+    const v = settingsDict?.default_price_level_id?.value;
+    return v ? String(v) : '';
+  }, [settingsDict]);
+
+  const settingsApplyStamp = useMemo(() => {
+    const v = settingsDict?.default_apply_stamp?.value;
+    return v === true || v === 'true';
+  }, [settingsDict]);
 
   // ─── Form ─────────────────────────────────────────────────────────────────
 
@@ -280,12 +357,18 @@ export default function CommercialDocumentModal({
     updateStockData,
     needsParty, affectsStock, stockDir,
     isReadOnly, isLinesReadOnly,
+    lineWarnings,
+    priceLevelSwitchMsg,
+    clearPriceLevelSwitchMsg,
   } = useDocumentForm({
     documentType,
     existingDocument,
     defaultTvaRate:     lookups.defaultTvaRate,
-    defaultWarehouseId: lookups.defaultWarehouseId,
-    baseCurrencyId:     lookups.baseCurrencyId,
+    defaultWarehouseId: settingsWarehouseId,
+    baseCurrencyId:     settingsCurrencyId,
+    defaultIsProforma:  settingsIsProforma,
+    defaultPriceLevelId: settingsPriceLevelId,
+    defaultApplyStamp:   settingsApplyStamp,
     selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
     paymentModes:       lookups.paymentModes,
     parties:            lookups.parties,
@@ -293,6 +376,7 @@ export default function CommercialDocumentModal({
     stockData:          {},
     isPurchase,
     open,
+    priceLevels:        lookups.priceLevels,
   });
 
   // ─── حالة المستند ─────────────────────────────────────────────────────────
@@ -372,6 +456,7 @@ export default function CommercialDocumentModal({
   } | null>(null);
 
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [extraTab, setExtraTab] = useState('shipping');
 
   // ─── Document chain ───────────────────────────────────────────────────────
@@ -438,6 +523,40 @@ export default function CommercialDocumentModal({
   const [successMsg, setSuccessMsg] = useState('');
   const successTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
+
+  // ── Auto-dismiss price level switch notification ──────────────────────────
+  useEffect(() => {
+    if (!priceLevelSwitchMsg) return;
+    const t = setTimeout(clearPriceLevelSwitchMsg, 6000);
+    return () => clearTimeout(t);
+  }, [priceLevelSwitchMsg, clearPriceLevelSwitchMsg]);
+
+  // ─── Smart Memory — حفظ مسودة تلقائي ──────────────────────────────────────
+  const draftKey = `doc-draft-${slug ?? 'default'}-${documentType?.code ?? 'new'}`;
+  useEffect(() => {
+    if (!open || !form.lines.length) return;
+    const interval = setInterval(() => {
+      try {
+        const draft = { ...form, _savedAt: Date.now() };
+        localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch { /* localStorage full */ }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [open, form, draftKey]);
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      const draft = JSON.parse(raw);
+      if (!draft.lines?.length) return null;
+      const elapsed = Date.now() - (draft._savedAt ?? 0);
+      if (elapsed > 86_400_000) { localStorage.removeItem(draftKey); return null; }
+      return draft;
+    } catch { return null; }
+  };
+
+  const savedDraft = !isEdit && open && !form.lines.length ? restoreDraft() : null;
 
   // ─── Mutations ────────────────────────────────────────────────────────────
 
@@ -532,6 +651,75 @@ export default function CommercialDocumentModal({
   const handleDelete = () => {
     if (!window.confirm('هل أنت متأكد من حذف هذا المستند؟\n\nملاحظة: الحذف غير مدعوم — استخدم الإلغاء.')) return;
     deleteMut.mutate();
+  };
+
+  const handleExport = (format: 'excel' | 'pdf' | 'json' | 'xml') => {
+    const formData = {
+      documentNumber: docNumber,
+      documentDate: form.document_date,
+      dueDate: form.due_date,
+      party: lookups.parties.find(p => String(p.id) === form.party_id)?.name ?? '',
+      notes: form.notes,
+      lines: form.lines.map((l, i) => ({
+        line: i + 1,
+        product: l.description || l._product?.name || '',
+        quantity: l.quantity,
+        unitPrice: l.unit_price_ht,
+        total: l.quantity * l.unit_price_ht,
+        tva: l.tva_rate,
+      })),
+      totals: {
+        ht: totals.ht,
+        tva: totals.tva,
+        ttc: totals.ttc,
+        stamp: totals.stamp,
+        netToPay: totals.netToPay,
+      },
+    };
+
+    if (format === 'excel') {
+      void import('exceljs').then((ExcelJS) => {
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Document');
+        ws.addRow(['البيان', 'الكمية', 'سعر الوحدة', 'الإجمالي', 'TVA']);
+        formData.lines.forEach(l => ws.addRow([l.product, l.quantity, l.unitPrice, l.total, l.tva]));
+        ws.addRow([]);
+        ws.addRow(['Net HT', formData.totals.ht]);
+        ws.addRow(['TVA', formData.totals.tva]);
+        ws.addRow(['TTC', formData.totals.ttc]);
+        wb.xlsx.writeBuffer().then(buf => {
+          const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href = url;
+          a.download = `${formData.documentNumber || 'document'}.xlsx`;
+          a.click(); URL.revokeObjectURL(url);
+        });
+      });
+    } else if (format === 'pdf') {
+      window.print();
+    } else if (format === 'json') {
+      const blob = new Blob([JSON.stringify(formData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `${formData.documentNumber || 'document'}.json`;
+      a.click(); URL.revokeObjectURL(url);
+    } else if (format === 'xml') {
+      const toXml = (obj: unknown, tag: string): string => {
+        if (Array.isArray(obj)) return obj.map(v => toXml(v, tag)).join('\n');
+        if (typeof obj === 'object' && obj !== null) {
+          const children = Object.entries(obj as Record<string, unknown>)
+            .map(([k, v]) => toXml(v, k)).join('\n');
+          return `<${tag}>\n${children}\n</${tag}>`;
+        }
+        return `<${tag}>${String(obj)}</${tag}>`;
+      };
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<document>\n${toXml(formData, 'data')}\n</document>`;
+      const blob = new Blob([xml], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `${formData.documentNumber || 'document'}.xml`;
+      a.click(); URL.revokeObjectURL(url);
+    }
   };
 
   const confirmProformaMut = useMutation({
@@ -791,6 +979,12 @@ export default function CommercialDocumentModal({
           {/* Alerts عامة */}
           {successMsg         && <AlertBanner type="success" message={successMsg} />}
           {apiErr             && <AlertBanner type="error"   message={apiErr} />}
+          {priceLevelSwitchMsg && (
+            <AlertBanner
+              type="warning"
+              message={`المنتج "${priceLevelSwitchMsg.productName}" ليس له سعر في فئة "${priceLevelSwitchMsg.from}"، تم التبديل إلى "${priceLevelSwitchMsg.to}".`}
+            />
+          )}
           {isCancelled        && <AlertBanner type="error"   message="هذا المستند ملغى — جميع الحقول معطلة." />}
           {isLocked && !isCancelled && (
             <AlertBanner type="warning" message="هذا المستند مقفل. لا يمكن تعديله حتى يتم فك القفل من قِبل المسؤول." />
@@ -1236,6 +1430,37 @@ export default function CommercialDocumentModal({
 
             {lineErr && <AlertBanner type="error" message={lineErr} />}
 
+            {!isLinesReadOnly && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <BarcodeInput
+                  products={lookups.products}
+                  onProductFound={(productId) => {
+                    addLine();
+                    const lastIdx = form.lines.length;
+                    updateLine(lastIdx, { product_id: String(productId) } as Parameters<typeof updateLine>[1]);
+                  }}
+                  disabled={isLinesReadOnly}
+                />
+                <button
+                  onClick={() => setLineMode((m) => {
+                    const next = m === 'table' ? 'card' : 'table';
+                    try { localStorage.setItem(`doc_line_mode_${slug ?? 'default'}`, next); } catch {}
+                    return next;
+                  })}
+                  style={{
+                    padding: '5px 10px', borderRadius: 'var(--r1)',
+                    border: '1px solid var(--b3)', background: 'transparent',
+                    color: 'var(--t3)', cursor: 'pointer', fontSize: 11,
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <i className={`ti ti-${lineMode === 'table' ? 'layout-cards' : 'table'}`} />
+                  {lineMode === 'table' ? 'عرض البطاقات' : 'عرض الجدول'}
+                </button>
+              </div>
+            )}
+
             {lookups.isLoadingProducts ? (
               <div style={{
                 textAlign: 'center', padding: 24, color: 'var(--t4)',
@@ -1247,11 +1472,84 @@ export default function CommercialDocumentModal({
             ) : (
               <>
                 {form.lines.length === 0 ? (
-                  <div style={{
-                    padding: 16, textAlign: 'center', color: 'var(--t4)',
-                    fontSize: 12, background: 'var(--bg3)', borderRadius: 'var(--r2)',
-                  }}>
-                    {isLinesReadOnly ? 'لا أسطر — المستند فارغ' : 'لا أسطر بعد — اضغط "إضافة سطر" أدناه'}
+                  <div>
+                    {savedDraft && (
+                      <div style={{
+                        padding: '10px 14px', marginBottom: 8, borderRadius: 'var(--r2)',
+                        background: 'color-mix(in srgb, var(--blue) 8%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--blue) 20%, transparent)',
+                        display: 'flex', alignItems: 'center', gap: 10, fontSize: 12,
+                      }}>
+                        <i className="ti ti-history" style={{ color: 'var(--blue)', fontSize: 16 }} />
+                        <span style={{ flex: 1, color: 'var(--t2)' }}>
+                          لديك مسودة محفوظة من قبل — هل تريد استعادتها؟
+                        </span>
+                        <button
+                          onClick={() => {
+                            const draft = restoreDraft();
+                            if (draft) {
+                              Object.keys(draft).forEach((k) => {
+                                if (k !== '_savedAt' && k in form) {
+                                  (set as (field: string, value: unknown) => void)(k, draft[k]);
+                                }
+                              });
+                              localStorage.removeItem(draftKey);
+                            }
+                          }}
+                          style={{
+                            padding: '5px 12px', borderRadius: 'var(--r1)',
+                            border: '1px solid var(--blue)', background: 'var(--emb)',
+                            color: 'var(--blue)', cursor: 'pointer', fontSize: 11,
+                            fontWeight: 700, fontFamily: 'inherit',
+                          }}
+                        >
+                          استعادة
+                        </button>
+                        <button
+                          onClick={() => localStorage.removeItem(draftKey)}
+                          style={{
+                            padding: '5px 10px', borderRadius: 'var(--r1)',
+                            border: '1px solid var(--b3)', background: 'transparent',
+                            color: 'var(--t3)', cursor: 'pointer', fontSize: 11,
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          تجاهل
+                        </button>
+                      </div>
+                    )}
+                    <div style={{
+                      padding: 16, textAlign: 'center', color: 'var(--t4)',
+                      fontSize: 12, background: 'var(--bg3)', borderRadius: 'var(--r2)',
+                    }}>
+                      {isLinesReadOnly ? 'لا أسطر — المستند فارغ' : 'لا أسطر بعد — اضغط "إضافة سطر" أدناه'}
+                    </div>
+                  </div>
+                ) : lineMode === 'card' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {form.lines.map((line, idx) => {
+                      const stockResult = line._product
+                        ? validateLineStock(line, line._product, isPurchase, stockData)
+                        : { ok: true as const };
+                      return (
+                        <LineCard
+                          key={idx}
+                          line={line}
+                          idx={idx}
+                          products={lookups.products}
+                          isPurchase={isPurchase}
+                          disabled={isLinesReadOnly}
+                          stockData={stockData}
+                          stockValidation={stockResult}
+                          isTvaExempt={!isPurchase && isPartyExempt}
+                          lineWarnings={lineWarnings.get(idx)}
+                          warehouses={lookups.warehouses}
+                          onUpdate={updateLine}
+                          onRemove={removeLine}
+                          onDuplicate={duplicateLine}
+                        />
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
@@ -1274,6 +1572,7 @@ export default function CommercialDocumentModal({
                           const stockResult = line._product
                             ? validateLineStock(line, line._product, isPurchase, stockData)
                             : { ok: true as const };
+                          const lineIdxWarnings = lineWarnings.get(idx);
                           return (
                             <DocumentLineRow
                               key={idx}
@@ -1289,6 +1588,8 @@ export default function CommercialDocumentModal({
                               onRemove={removeLine}
                               onDuplicate={duplicateLine}
                               isTvaExempt={!isPurchase && isPartyExempt}
+                              lineWarnings={lineIdxWarnings}
+                              warehouses={lookups.warehouses}
                             />
                           );
                         })}
@@ -1314,26 +1615,36 @@ export default function CommercialDocumentModal({
                 )}
 
                 {!isLinesReadOnly && (
-                  <button
-                    onClick={addLine}
-                    style={{
-                      marginTop: 10, display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '7px 14px', borderRadius: 'var(--r2)',
-                      border: '1px dashed var(--b3)', background: 'transparent',
-                      color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget).style.borderColor = 'var(--em)';
-                      (e.currentTarget).style.color = 'var(--em)';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget).style.borderColor = 'var(--b3)';
-                      (e.currentTarget).style.color = 'var(--t3)';
-                    }}
-                  >
-                    <i className="ti ti-plus" />
-                    إضافة سطر
-                  </button>
+                  <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={addLine}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '7px 14px', borderRadius: 'var(--r2)',
+                        border: '1px dashed var(--b3)', background: 'transparent',
+                        color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget).style.borderColor = 'var(--em)'; (e.currentTarget).style.color = 'var(--em)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget).style.borderColor = 'var(--b3)'; (e.currentTarget).style.color = 'var(--t3)'; }}
+                    >
+                      <i className="ti ti-plus" />
+                      إضافة سطر
+                    </button>
+                    <button
+                      onClick={() => setShowBulkImport(true)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '7px 14px', borderRadius: 'var(--r2)',
+                        border: '1px dashed var(--b3)', background: 'transparent',
+                        color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget).style.borderColor = 'var(--purple)'; (e.currentTarget).style.color = 'var(--purple)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget).style.borderColor = 'var(--b3)'; (e.currentTarget).style.color = 'var(--t3)'; }}
+                    >
+                      <i className="ti ti-upload" />
+                      استيراد من Excel
+                    </button>
+                  </div>
                 )}
               </>
             )}
@@ -1809,6 +2120,74 @@ export default function CommercialDocumentModal({
               </button>
             )}
 
+            {/* طباعة */}
+            <button
+              onClick={() => window.print()}
+              style={{
+                padding: '8px 14px', borderRadius: 'var(--r2)',
+                border: '1px solid var(--b2)', background: 'var(--bg1)',
+                color: 'var(--t2)', cursor: 'pointer',
+                fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <i className="ti ti-printer" />
+              طباعة
+            </button>
+
+            {/* تصدير */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => {
+                  const menu = document.getElementById('export-menu');
+                  if (menu) menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+                }}
+                style={{
+                  padding: '8px 14px', borderRadius: 'var(--r2)',
+                  border: '1px solid var(--b2)', background: 'var(--bg1)',
+                  color: 'var(--t2)', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <i className="ti ti-download" />
+                تصدير
+                <i className="ti ti-chevron-down" style={{ fontSize: 11 }} />
+              </button>
+              <div id="export-menu" style={{
+                display: 'none', position: 'absolute', bottom: '100%', right: 0, marginBottom: 4,
+                flexDirection: 'column', gap: 2,
+                background: 'var(--bg1)', border: '1px solid var(--b2)', borderRadius: 'var(--r2)',
+                padding: 4, zIndex: 100, minWidth: 140,
+              }}>
+                {[
+                  { label: 'Excel', icon: 'ti-file-spreadsheet', format: 'excel' },
+                  { label: 'PDF', icon: 'ti-file-type-pdf', format: 'pdf' },
+                  { label: 'JSON', icon: 'ti-file-code', format: 'json' },
+                  { label: 'XML', icon: 'ti-file-code-2', format: 'xml' },
+                ].map(opt => (
+                  <button key={opt.format}
+                    onClick={() => {
+                      document.getElementById('export-menu')!.style.display = 'none';
+                      handleExport(opt.format as 'excel' | 'pdf' | 'json' | 'xml');
+                    }}
+                    style={{
+                      padding: '6px 12px', borderRadius: 'var(--r2)',
+                      border: 'none', background: 'transparent',
+                      color: 'var(--t2)', cursor: 'pointer',
+                      fontSize: 12.5, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', gap: 8, textAlign: 'right',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--b1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <i className={`ti ${opt.icon}`} style={{ fontSize: 15 }} />
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               onClick={onClose}
               disabled={isPending || !!successMsg}
@@ -1862,6 +2241,24 @@ export default function CommercialDocumentModal({
           </div>
         </div>
       </div>
+
+      {/* Bulk import */}
+      <BulkImportModal
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        onImport={(importedLines) => {
+          importedLines.forEach((line) => {
+            addLine();
+            const lastIdx = form.lines.length;
+            const patch: Record<string, unknown> = {};
+            if (line.description) patch.description = line.description;
+            if (line.unit_price_ht) patch.unit_price_ht = line.unit_price_ht;
+            if (line.quantity) patch.quantity = line.quantity;
+            if (line.line_note) patch.line_note = line.line_note;
+            updateLine(lastIdx, patch as Parameters<typeof updateLine>[1]);
+          });
+        }}
+      />
 
       {/* Modal المرتجع */}
       {showReturnModal && existingDocument && (

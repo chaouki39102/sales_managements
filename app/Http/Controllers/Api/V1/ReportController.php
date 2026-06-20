@@ -96,6 +96,39 @@ class ReportController extends Controller
         ]);
     }
 
+    public function velocity(Request $request): JsonResponse
+    {
+        $filters = $request->only(['from_date', 'to_date']);
+        $data = $this->reportService->velocityReport($filters);
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب تقرير سرعة البيع بنجاح',
+            'data' => $data,
+        ]);
+    }
+
+    public function margin(Request $request): JsonResponse
+    {
+        $filters = $request->only(['from_date', 'to_date']);
+        $data = $this->reportService->marginReport($filters);
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب تقرير الهوامش بنجاح',
+            'data' => $data,
+        ]);
+    }
+
+    public function aging(Request $request): JsonResponse
+    {
+        $filters = $request->only(['as_of_date']);
+        $data = $this->reportService->agingReport($filters);
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب تقرير الديون بنجاح',
+            'data' => $data,
+        ]);
+    }
+
     public function taxes(Request $request): JsonResponse
     {
         $filters = $request->only(['from_date', 'to_date']);

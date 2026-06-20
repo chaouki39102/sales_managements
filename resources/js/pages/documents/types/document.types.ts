@@ -187,6 +187,7 @@ export interface LineItem {
   packaging_id:           string;
   stock_lot_id:           string;
   lot_number_new?:        string;
+  warehouse_id?:          string;
   line_note?:             string;
   _product?:              Product;
   _packQty:               number;
@@ -247,6 +248,7 @@ export const ALL_COLUMNS = [
   { key: 'product',    label: 'المنتج',          w: 220, fixed: true  },
   { key: 'packaging',  label: 'التعبئة',         w: 110, fixed: false },
   { key: 'lot',        label: 'الحصة',             w: 120, fixed: false },
+  { key: 'warehouse',  label: 'المستودع',        w: 100, fixed: false },
   { key: 'quantity',   label: 'الكمية',          w: 75,  fixed: true  },
   { key: 'unit',       label: 'الوحدة',          w: 60,  fixed: false },
   { key: 'unit_price', label: 'سعر الوحدة HT',  w: 110, fixed: false },
@@ -257,7 +259,8 @@ export const ALL_COLUMNS = [
   { key: 'tva',        label: 'TVA %',           w: 68,  fixed: false },
   { key: 'total_ht',   label: 'إجمالي HT',      w: 100, fixed: false },
   { key: 'total_ttc',  label: 'إجمالي TTC',     w: 110, fixed: true  },
-  { key: 'margin',     label: 'الهامش',         w: 80,  fixed: false },
+  { key: 'cost',       label: 'التكلفة',         w: 100, fixed: false },
+  { key: 'margin',     label: 'الهامش',         w: 110, fixed: false },
   { key: 'line_note',  label: 'ملاحظة',          w: 100, fixed: false },
   { key: 'actions',    label: '',                w: 36,  fixed: true  },
 ] as const;

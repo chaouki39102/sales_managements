@@ -192,6 +192,79 @@ export interface TvaReportLine {
   tva_due:           number;
 }
 
+// ─── Velocity Report (سرعة البيع) ──────────────────────────────────────────────
+
+export interface VelocityReportRow {
+  product_id:   number;
+  product_name: string;
+  product_ref:  string;
+  total_qty:    number;
+  doc_count:    number;
+  avg_price:    number;
+  velocity:     number;
+  days:         number;
+}
+
+export interface VelocityReportData {
+  summary: {
+    total_qty:   number;
+    total_docs:  number;
+    period_days: number;
+  };
+  items: VelocityReportRow[];
+}
+
+// ─── Margin Report (تقرير الهوامش) ──────────────────────────────────────────────
+
+export interface MarginReportRow {
+  product_id:    number;
+  product_name:  string;
+  product_ref:   string;
+  total_qty:     number;
+  total_ht:      number;
+  cost_price:    number;
+  cost_total:    number;
+  margin_amount: number;
+  margin_pct:    number;
+}
+
+export interface MarginReportData {
+  summary: {
+    total_ht:     number;
+    total_cost:   number;
+    total_margin: number;
+    margin_pct:   number;
+  };
+  items: MarginReportRow[];
+}
+
+// ─── Aging Report (لوحة الديون) ─────────────────────────────────────────────
+
+export interface AgingBucket {
+  label: string;
+  total: number;
+  count: number;
+}
+
+export interface AgingReportRow {
+  party_id:      number;
+  party_name:    string;
+  total_due:     number;
+  invoice_count: number;
+  max_days:      number;
+  bucket:        string;
+}
+
+export interface AgingReportData {
+  summary: {
+    total_due:   number;
+    total_count: number;
+    as_of_date:  string;
+  };
+  rows:    AgingReportRow[];
+  buckets: AgingBucket[];
+}
+
 export interface TaxesReportData {
   period: { from: string; to: string };
   summary: {
@@ -219,6 +292,9 @@ export const reportsApi = {
   inventory: (p?: InventoryReportParams) => apiGet<InventoryReportData>('/reports/inventory', p),
   payments:  (p?: PaymentsReportParams)  => apiGet<PaymentsReportData> ('/reports/payments',  p),
   taxes:     (p?: TaxesReportParams)     => apiGet<TaxesReportData>    ('/reports/taxes',     p),
+  velocity:  (p?: ReportBaseParams)      => apiGet<VelocityReportData> ('/reports/velocity',  p),
+  margin:    (p?: ReportBaseParams)      => apiGet<MarginReportData>   ('/reports/margin',    p),
+  aging:     (p?: ReportBaseParams)      => apiGet<AgingReportData>    ('/reports/aging',     p),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -307,6 +383,39 @@ export function useTvaReport() {
     queryFn:   () => reportsApi.taxes({ year_id: yearId ?? undefined }),
     enabled:   !!slug && !!yearId,
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useVelocityReport(params?: ReportBaseParams) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'velocity', yearId, params],
+    queryFn:   () => reportsApi.velocity({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useMarginReport(params?: ReportBaseParams) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'margin', yearId, params],
+    queryFn:   () => reportsApi.margin({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useAgingReport(params?: ReportBaseParams) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'aging', yearId, params],
+    queryFn:   () => reportsApi.aging({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 3 * 60_000,
   });
 }
 

@@ -431,6 +431,122 @@ class SettingsSeeder extends Seeder
                 'is_editable'   => true,
                 'display_order' => 65,
             ],
+
+            // ══════════════════════════════════════════
+            // group: documents — إعدادات المستندات الافتراضية
+            // ══════════════════════════════════════════
+            'default_warehouse_id' => [
+                'value'         => null,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'المستودع الافتراضي عند إنشاء مستند (اختر من المستودعات النشطة)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 70,
+            ],
+            'default_currency_id' => [
+                'value'         => 1,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'العملة الافتراضية للمستندات (DZD = 1)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 71,
+            ],
+            'default_price_level_id' => [
+                'value'         => null,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'فئة السعر الافتراضية للزبون إذا لم تكن لديه فئة محددة',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 72,
+            ],
+            'default_payment_mode_id' => [
+                'value'         => null,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'طريقة الدفع الافتراضية للمدفوعات النقدية',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 73,
+            ],
+            'default_treasury_account_id' => [
+                'value'         => null,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'حساب الخزينة الافتراضي للمدفوعات',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 74,
+            ],
+            'default_apply_stamp' => [
+                'value'         => true,
+                'group'         => 'documents',
+                'type'          => 'boolean',
+                'description'   => 'تفعيل الطابع الجبائي تلقائياً عند إنشاء مستند جديد',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 75,
+            ],
+            'default_is_proforma' => [
+                'value'         => false,
+                'group'         => 'documents',
+                'type'          => 'boolean',
+                'description'   => 'جعل المستند الجديد مبدئي (Pro Forma) افتراضياً',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 76,
+            ],
+            'default_fiscal_year_behavior' => [
+                'value'         => 'current',
+                'group'         => 'documents',
+                'type'          => 'string',
+                'description'   => 'سلوك السنة المالية: current (تلقائي) | prompt (طلب من المستخدم)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 77,
+            ],
+            'documents_default_line_mode' => [
+                'value'         => 'table',
+                'group'         => 'documents',
+                'type'          => 'string',
+                'description'   => 'وضع عرض الأسطر الافتراضي: table | card',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 78,
+            ],
+            'documents_default_visible_cols' => [
+                'value'         => ["idx","product","packaging","quantity","unit_price","discount","tva","total_ttc","actions"],
+                'group'         => 'documents',
+                'type'          => 'json',
+                'description'   => 'الأعمدة الظاهرة في جدول الأسطر',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 79,
+            ],
+
+            // ══════════════════════════════════════════
+            // group: inventory — توسعة سياسات المخزون
+            // ══════════════════════════════════════════
+            'allow_negative_stock_on_sale' => [
+                'value'         => false,
+                'group'         => 'inventory',
+                'type'          => 'boolean',
+                'description'   => 'سياسة البيع عند نقص المخزون: true = تطبيق إعداد المنتج، false = منع البيع نهائياً',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 46,
+            ],
+            'auto_create_lot_on_purchase' => [
+                'value'         => true,
+                'group'         => 'inventory',
+                'type'          => 'boolean',
+                'description'   => 'إنشاء دفعة (Lot) تلقائياً عند شراء منتج يدير اللوطات',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 47,
+            ],
         ];
     }
 

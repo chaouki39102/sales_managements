@@ -24,10 +24,13 @@ import {
   useSalesReport, usePurchasesReport, useCustomersReport,
   useSuppliersReport, useProductsReport, useInventoryReport,
   usePaymentsReport, useTvaReport,
+  useVelocityReport, useMarginReport, useAgingReport,
   type SalesReportData, type PurchasesReportData,
   type PartyReportData, type ProductsReportData,
   type InventoryReportData, type PaymentsReportData,
   type TaxesReportData,
+  type VelocityReportData, type MarginReportData,
+  type AgingReportData,
 } from '@/lib/api/endpoints/reports';
 import apiClient from '@/lib/api/core/client';
 
@@ -51,6 +54,9 @@ const REPORT_CARDS: ReportCardMeta[] = [
   { id: 'inventory', title: 'تقرير المخزون',      description: 'تقييم المخزون، الحركات، والمنتجات المنخفضة',                icon: 'ti-building-warehouse', color: 'var(--orange)' },
   { id: 'payments',  title: 'تقرير الدفعات',      description: 'سجل الدفعات والتحصيلات حسب طريقة الدفع والفترة',            icon: 'ti-cash',               color: 'var(--em)'     },
   { id: 'taxes',     title: 'تقرير الضرائب',      description: 'تقرير TVA، الطابع الجبائي، وإقرار G50',                     icon: 'ti-calculator',         color: 'var(--red)',    badge: 'G50' },
+  { id: 'velocity',  title: 'سرعة البيع',         description: 'تحليل سرعة بيع المنتجات — الكمية المباعة لكل يوم',           icon: 'ti-rocket',             color: 'var(--teal)'   },
+  { id: 'margin',    title: 'تقرير الهوامش',      description: 'هامش الربح لكل منتج — مقارنة سعر البيع بسعر التكلفة',          icon: 'ti-coin',               color: 'var(--em)'     },
+  { id: 'aging',     title: 'لوحة الديون',        description: 'تصنيف الديون المستحقة حسب العمر — 0-30 / 31-60 / 61-90 / 90+', icon: 'ti-clock-hour-4',      color: 'var(--red)'    },
 ];
 
 type ReportId = typeof REPORT_CARDS[number]['id'];
@@ -387,6 +393,123 @@ function ReportShell({
   );
 }
 
+// ─── VelocityViewer ───────────────────────────────────────────────────────────
+
+function VelocityViewer() {
+  const { data, isLoading, isError, refetch } = useVelocityReport();
+  return <ReportShell title="سرعة البيع" isLoading={isLoading} isError={isError} refetch={refetch} reportId="velocity">
+    {data && (
+      <>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+          <KpiCard variant="teal"  icon="ti-package" label="إجمالي الكمية المباعة" value={data.summary.total_qty.toLocaleString('fr-DZ')}/>
+          <KpiCard variant="blue"  icon="ti-file-text" label="عدد الوثائق" value={data.summary.total_docs}/>
+          <KpiCard variant="gold"  icon="ti-calendar" label="فترة التحليل (أيام)" value={data.summary.period_days}/>
+        </div>
+        <Card noHeader style={{ padding: 0, marginTop: 16 }}>
+          <div className="tw"><table>
+            <thead><tr><th>المنتج</th><th>المرجع</th><th>الكمية</th><th>عدد الفواتير</th><th>السرعة (يوم)</th><th>متوسط السعر</th></tr></thead>
+            <tbody>
+              {data.items.map((row, i) => (
+                <tr key={i}>
+                  <td>{row.product_name}</td>
+                  <td style={{ color: 'var(--t4)', fontSize: 12 }}>{row.product_ref}</td>
+                  <td>{row.total_qty.toLocaleString('fr-DZ')}</td>
+                  <td>{row.doc_count}</td>
+                  <td style={{ fontWeight: 700 }}>{row.velocity.toFixed(2)}</td>
+                  <td>{row.avg_price.toLocaleString('fr-DZ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </Card>
+      </>
+    )}
+  </ReportShell>;
+}
+
+// ─── MarginViewer ─────────────────────────────────────────────────────────────
+
+function MarginViewer() {
+  const { data, isLoading, isError, refetch } = useMarginReport();
+  return <ReportShell title="تقرير الهوامش" isLoading={isLoading} isError={isError} refetch={refetch} reportId="margin">
+    {data && (
+      <>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+          <KpiCard variant="green" icon="ti-trending-up" label="إجمالي المبيعات"   value={data.summary.total_ht.toLocaleString('fr-DZ')}   unit="دج"/>
+          <KpiCard variant="blue"  icon="ti-trending-down" label="إجمالي التكلفة"  value={data.summary.total_cost.toLocaleString('fr-DZ')} unit="دج"/>
+          <KpiCard variant="gold"  icon="ti-coin"          label="إجمالي الهامش"   value={data.summary.total_margin.toLocaleString('fr-DZ')} unit="دج"/>
+          <KpiCard variant="purple" icon="ti-percentage"   label="نسبة الهامش"     value={`${data.summary.margin_pct}%`}/>
+        </div>
+        <Card noHeader style={{ padding: 0, marginTop: 16 }}>
+          <div className="tw"><table>
+            <thead><tr><th>المنتج</th><th>المرجع</th><th>الكمية</th><th>الإيراد HT</th><th>التكلفة</th><th>الهامش</th><th>%</th></tr></thead>
+            <tbody>
+              {data.items.map((row, i) => (
+                <tr key={i}>
+                  <td>{row.product_name}</td>
+                  <td style={{ color: 'var(--t4)', fontSize: 12 }}>{row.product_ref}</td>
+                  <td>{row.total_qty}</td>
+                  <td>{row.total_ht.toLocaleString('fr-DZ')}</td>
+                  <td>{row.cost_total.toLocaleString('fr-DZ')}</td>
+                  <td style={{ color: row.margin_amount >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>
+                    {row.margin_amount.toLocaleString('fr-DZ')}
+                  </td>
+                  <td style={{ color: row.margin_pct >= 0 ? 'var(--em)' : 'var(--red)' }}>
+                    {row.margin_pct}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </Card>
+      </>
+    )}
+  </ReportShell>;
+}
+
+// ─── AgingViewer ───────────────────────────────────────────────────────────────
+
+function AgingViewer() {
+  const { data, isLoading, isError, refetch } = useAgingReport();
+  return <ReportShell title="لوحة الديون" isLoading={isLoading} isError={isError} refetch={refetch} reportId="aging">
+    {data && (
+      <>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+          <KpiCard variant="red"   icon="ti-clock-hour-4" label="إجمالي الديون"      value={data.summary.total_due.toLocaleString('fr-DZ')}    unit="دج"/>
+          <KpiCard variant="gold"  icon="ti-file-text"    label="عدد الفواتير"       value={data.summary.total_count}/>
+        </div>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginTop: 8 }}>
+          {data.buckets.map((b, i) => (
+            <KpiCard key={i} variant={i === 3 ? 'red' : i === 2 ? 'gold' : i === 1 ? 'blue' : 'green'}
+              icon="ti-calendar" label={b.label} value={b.total.toLocaleString('fr-DZ')} unit="دج" subtitle={`${b.count} فاتورة`}/>
+          ))}
+        </div>
+        <Card noHeader style={{ padding: 0, marginTop: 16 }}>
+          <div className="tw"><table>
+            <thead><tr><th>الزبون</th><th>إجمالي المستحق</th><th>عدد الفواتير</th><th>أقدم (يوم)</th><th>التصنيف</th></tr></thead>
+            <tbody>
+              {data.rows.map((row, i) => (
+                <tr key={i}>
+                  <td>{row.party_name}</td>
+                  <td style={{ fontWeight: 700 }}>{row.total_due.toLocaleString('fr-DZ')}</td>
+                  <td>{row.invoice_count}</td>
+                  <td>{row.max_days}</td>
+                  <td>
+                    {row.bucket === '90_plus' ? <Badge variant="danger" noDot>أكثر من 90 يوم</Badge>
+                      : row.bucket === '61_90' ? <Badge variant="warning" noDot>61–90 يوم</Badge>
+                      : row.bucket === '31_60' ? <Badge variant="primary" noDot>31–60 يوم</Badge>
+                      : <Badge variant="success" noDot>0–30 يوم</Badge>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </Card>
+      </>
+    )}
+  </ReportShell>;
+}
+
 // ─── Map: reportId → Viewer component ────────────────────────────────────────
 
 const VIEWERS: Record<ReportId, React.FC> = {
@@ -398,6 +521,9 @@ const VIEWERS: Record<ReportId, React.FC> = {
   inventory: InventoryViewer,
   payments:  PaymentsViewer,
   taxes:     TaxesViewer,
+  velocity:  VelocityViewer,
+  margin:    MarginViewer,
+  aging:     AgingViewer,
 };
 
 // ════════════════════════════════════════════════════════════════════════════

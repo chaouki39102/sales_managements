@@ -8,6 +8,7 @@ use App\Models\CommercialDocument;
 use App\Models\DocumentStatus;
 use App\Models\DocumentType;
 use App\Models\FiscalYear;
+use App\Models\Setting;
 use App\Models\NumberingSeries;
 use App\Models\Product;
 use App\Models\StockMovement;
@@ -95,13 +96,44 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         if (empty($data['document_number'])) {
-            $data['document_number'] = $this->generateDocumentNumber($documentType, $companyId);
+            $generated = $this->generateDocumentNumber($documentType, $companyId);
+            $data['document_number'] = $generated;
+
+            \Illuminate\Support\Facades\Log::debug('[DocGen beforeCreate]', [
+                'company' => $companyId,
+                'doc_type_id' => $data['document_type_id'],
+                'generated' => $generated,
+                'data_doc_num' => $data['document_number'] ?? 'MISSING',
+            ]);
+        } else {
+            \Illuminate\Support\Facades\Log::debug('[DocGen not-empty]', [
+                'document_number' => $data['document_number'],
+                'source' => 'already in data',
+            ]);
+        }
+
+        // ── الإعدادات الافتراضية من Settings ─────────────────────────────
+        if (empty($data['warehouse_id'])) {
+            $defWh = Setting::getSetting('default_warehouse_id', null, $companyId);
+            if ($defWh) $data['warehouse_id'] = $defWh;
+        }
+
+        if (empty($data['currency_id'])) {
+            $defCur = Setting::getSetting('default_currency_id', 1, $companyId);
+            if ($defCur) $data['currency_id'] = $defCur;
+        }
+
+        if (!isset($data['is_proforma'])) {
+            $data['is_proforma'] = Setting::getSetting('default_is_proforma', false, $companyId);
         }
 
         // السنة المالية
         if (empty($data['fiscal_year_id'])) {
-            $data['fiscal_year_id'] = $this->getCurrentFiscalYearId($companyId)
-                ?? throw new BusinessRuleException('لا توجد سنة مالية مفتوحة.', 422);
+            $behavior = Setting::getSetting('default_fiscal_year_behavior', 'current', $companyId);
+            if ($behavior === 'current') {
+                $data['fiscal_year_id'] = $this->getCurrentFiscalYearId($companyId)
+                    ?? throw new BusinessRuleException('لا توجد سنة مالية مفتوحة.', 422);
+            }
         }
 
         // ✅ الحالة مباشرةً "validated" — لا مسودة
@@ -676,9 +708,38 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         foreach ($document->lines as $line) {
             if (!$line->product_id || !$line->product) continue;
 
+            $product = $line->product;
+            $baseQty = (float) $line->quantity;
+
+            // ── التحقق من المخزون قبل إنشاء الحركة ─────────────────────────
+            $shouldCheckStock = false;
+            if ($direction < 0 && $product->manages_stock) {
+                $allowNegativeGlobal = Setting::getSetting('allow_negative_stock_on_sale', false, $document->company_id);
+                if ($allowNegativeGlobal === false) {
+                    $shouldCheckStock = true; // السياسة العامة تمنع البيع بدون مخزون كافٍ
+                } elseif (!$product->allow_negative_stock) {
+                    $shouldCheckStock = true; // إعداد المنتج يمنع المخزون السالب
+                }
+            }
+            if ($shouldCheckStock) {
+                $available = $this->getAvailableStock(
+                    $product->id,
+                    $document->warehouse_id,
+                    $document->fiscal_year_id,
+                    $document->company_id,
+                    $document->document_date
+                );
+                if ($baseQty > $available) {
+                    throw new BusinessRuleException(
+                        "الكمية المطلوبة ({$baseQty}) للمنتج «{$product->name}» تتجاوز المخزون المتاح ({$available}).",
+                        409
+                    );
+                }
+            }
+
             $costPrice = $direction < 0
                 ? (float) $valuationService->getCostPriceForSale(
-                    $line->product, $document->warehouse_id, (float) $line->quantity
+                    $product, $document->warehouse_id, $baseQty
                 )
                 : (float) $line->unit_price_ht;
 
@@ -754,9 +815,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $prefix = $documentType->code;
             $year   = date('Y');
 
-            $last = CommercialDocument::where('company_id', $companyId)
+            $last = CommercialDocument::withTrashed()
+                ->where('company_id', $companyId)
                 ->where('document_number', 'like', "{$prefix}-{$year}-%")
-                ->orderByDesc('id')
+                ->orderByDesc('document_number')
                 ->lockForUpdate()
                 ->first();
 
@@ -766,7 +828,18 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 $seq   = (int) end($parts) + 1;
             }
 
-            return sprintf('%s-%s-%06d', $prefix, $year, $seq);
+            $result = sprintf('%s-%s-%06d', $prefix, $year, $seq);
+
+            \Illuminate\Support\Facades\Log::debug('[DocGen]', [
+                'prefix' => $prefix,
+                'year' => $year,
+                'company' => $companyId,
+                'last_found' => $last?->document_number,
+                'seq' => $seq,
+                'result' => $result,
+            ]);
+
+            return $result;
         });
     }
 
@@ -786,5 +859,37 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ->where('date', '<=', now())
             ->orderByDesc('date')
             ->value('rate') ?? 1.0);
+    }
+
+    private function getAvailableStock(int $productId, int $warehouseId, int $fiscalYearId, int $companyId, string $date): float
+    {
+        $opening = (float) DB::table('opening_balances_stock')
+            ->where('company_id', $companyId)
+            ->where('fiscal_year_id', $fiscalYearId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->value('opening_quantity') ?? 0;
+
+        $incoming = (float) StockMovement::where('company_id', $companyId)
+            ->where('fiscal_year_id', $fiscalYearId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('is_validated', true)
+            ->where('movement_date', '<=', $date)
+            ->whereNull('deleted_at')
+            ->whereHas('stockMovementType', fn($q) => $q->where('direction', '>', 0))
+            ->sum('quantity');
+
+        $outgoing = (float) StockMovement::where('company_id', $companyId)
+            ->where('fiscal_year_id', $fiscalYearId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('is_validated', true)
+            ->where('movement_date', '<=', $date)
+            ->whereNull('deleted_at')
+            ->whereHas('stockMovementType', fn($q) => $q->where('direction', '<', 0))
+            ->sum('quantity');
+
+        return $opening + $incoming - $outgoing;
     }
 }

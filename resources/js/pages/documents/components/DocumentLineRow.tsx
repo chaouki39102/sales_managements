@@ -4,6 +4,12 @@ import { ProductSearch } from './ProductSearch';
 import { cellStyle } from './DocumentUIPrimitives';
 import type { LineItem, Product, ColKey } from '../types/document.types';
 import type { LineStockValidation } from '../utils/document.utils';
+import type { ComputeLineWarning } from '../hooks/useComputeLine';
+
+interface WarehouseOption {
+  id:   number;
+  name: string;
+}
 
 interface DocumentLineRowProps {
   line:           LineItem;
@@ -18,6 +24,8 @@ interface DocumentLineRowProps {
   onRemove:       (idx: number) => void;
   onDuplicate:    (idx: number) => void;
   isTvaExempt?:   boolean;
+  lineWarnings?:  ComputeLineWarning[];
+  warehouses?:    WarehouseOption[];
 }
 
 function CellInput({
@@ -47,7 +55,7 @@ function CellInput({
 
 export const DocumentLineRow = memo(function DocumentLineRow({
   line, idx, visibleCols, isPurchase, disabled, products, stockData,
-  stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt,
+  stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt, lineWarnings, warehouses,
 }: DocumentLineRowProps) {
 
   const { baseQty, gross, discountAmt, discPct, ht, tva: lineTva, ttc } = calcLineTotal(line);
@@ -60,7 +68,11 @@ export const DocumentLineRow = memo(function DocumentLineRow({
     : [];
 
   const hasStockWarning = !stockValidation.ok;
-  const rowBg = hasStockWarning
+  const computeWarnings = line._warnings ?? lineWarnings ?? [];
+  const activeComputeWarnings = computeWarnings.filter(
+    (w) => w.level !== 'info',
+  );
+  const rowBg = hasStockWarning || activeComputeWarnings.length > 0
     ? `color-mix(in srgb, ${stockValidation.blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
     : undefined;
 
@@ -146,6 +158,22 @@ export const DocumentLineRow = memo(function DocumentLineRow({
                 <span style={{ fontSize: 11, color: 'var(--t4)', padding: '0 6px' }}>—</span>
               )
             )}
+          </td>
+        )}
+
+        {col('warehouse') && (
+          <td style={{ padding: '3px 4px' }}>
+            <select
+              style={{ ...cellStyle(), cursor: 'pointer', fontSize: 10 }}
+              value={line.warehouse_id ?? ''}
+              disabled={disabled}
+              onChange={(e) => onUpdate(idx, { warehouse_id: e.target.value || undefined })}
+            >
+              <option value="">— تلقائي —</option>
+              {(warehouses ?? []).map((w) => (
+                <option key={w.id} value={String(w.id)}>{w.name}</option>
+              ))}
+            </select>
           </td>
         )}
 
@@ -275,18 +303,36 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         )}
 
-        {col('margin') && (
-          <td style={{ padding: '3px 6px', textAlign: 'center', fontSize: 11 }}>
+        {col('cost') && (
+          <td style={{ padding: '3px 6px', textAlign: 'center', fontSize: 11, whiteSpace: 'nowrap' }}>
             {(() => {
               if (isPurchase || !prod) return <span style={{ color: 'var(--t4)' }}>—</span>;
-              const cost = toNum(prod.current_cost_price ?? prod.purchase_price_ht);
-              if (!cost || !line.unit_price_ht) return <span style={{ color: 'var(--t4)' }}>—</span>;
-              const margin = ((line.unit_price_ht - cost) / line.unit_price_ht) * 100;
-              const color  = margin < 0 ? 'var(--red)' : margin < 10 ? 'var(--orange)' : 'var(--green)';
+              const costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
+              if (!costPrice) return <span style={{ color: 'var(--t4)' }}>—</span>;
+              return <span style={{ fontWeight: 600, color: 'var(--t2)' }}>{fmtDZD(costPrice)}</span>;
+            })()}
+          </td>
+        )}
+
+        {col('margin') && (
+          <td style={{ padding: '3px 6px', textAlign: 'center', fontSize: 11, whiteSpace: 'nowrap' }}>
+            {(() => {
+              if (isPurchase || !prod) return <span style={{ color: 'var(--t4)' }}>—</span>;
+              const costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
+              if (!costPrice || !line.unit_price_ht) return <span style={{ color: 'var(--t4)' }}>—</span>;
+              const unitMargin = line.unit_price_ht - costPrice;
+              const marginPct = (unitMargin / line.unit_price_ht) * 100;
+              const totalMargin = unitMargin * baseQty;
+              const color  = marginPct < 0 ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
               return (
-                <span style={{ color, fontWeight: 700 }}>
-                  {margin.toFixed(1)}%
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+                  <span style={{ color, fontWeight: 700, fontSize: 12 }}>
+                    {fmtDZD(unitMargin)} · {marginPct.toFixed(1)}%
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>
+                    {fmtDZD(totalMargin)}
+                  </span>
+                </div>
               );
             })()}
           </td>
@@ -354,6 +400,25 @@ export const DocumentLineRow = memo(function DocumentLineRow({
           </td>
         </tr>
       )}
+
+      {/* تحذيرات الحساب (compute) — صفوف فرعية */}
+      {activeComputeWarnings.map((w, wi) => (
+        <tr key={wi} style={{ background: rowBg }}>
+          <td
+            colSpan={visibleCols.size}
+            style={{
+              padding: '3px 10px 6px', fontSize: 11,
+              color: w.level === 'error' ? 'var(--red)' : 'var(--orange)',
+            }}
+          >
+            <i
+              className={`ti ${w.level === 'error' ? 'ti-alert-circle' : 'ti-alert-triangle'}`}
+              style={{ marginLeft: 4 }}
+            />
+            {w.message}
+          </td>
+        </tr>
+      ))}
     </>
   );
 });

@@ -49,10 +49,12 @@ export function ProductSearch({
   const [open,  setOpen]  = useState(false);
   const [query, setQuery] = useState('');
   const [pos,   setPos]   = useState<DropdownPos>({ top: 0, right: 0, width: 320 });
+  const [highlightedIdx, setHighlightedIdx] = useState(0);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropRef    = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
+  const listRef    = useRef<HTMLDivElement>(null);
 
   const selected = products.find((p) => String(p.id) === value);
 
@@ -155,6 +157,11 @@ export function ProductSearch({
     setQuery('');
   };
 
+  // إعادة تعيين المؤشر عند تغير الفلترة
+  useEffect(() => {
+    setHighlightedIdx(0);
+  }, [filtered.length]);
+
   // ─── Badge المخزون ────────────────────────────────────────────────────────
 
   const stockBadge = (p: Product): { label: string; color: string } | null => {
@@ -201,7 +208,21 @@ export function ProductSearch({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setHighlightedIdx(0); }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setHighlightedIdx((prev) => Math.min(prev + 1, filtered.length - 1));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setHighlightedIdx((prev) => Math.max(prev - 1, 0));
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (filtered[highlightedIdx]) {
+                  choose(filtered[highlightedIdx]);
+                }
+              }
+            }}
             placeholder="ابحث بالاسم أو الرمز..."
             style={{
               width: '100%', padding: '5px 28px 5px 8px',
@@ -215,7 +236,7 @@ export function ProductSearch({
       </div>
 
       {/* النتائج */}
-      <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+      <div ref={listRef} style={{ maxHeight: 260, overflowY: 'auto' }}>
         {filtered.length === 0
           ? (
             <div style={{
@@ -225,34 +246,30 @@ export function ProductSearch({
               لا توجد نتائج
             </div>
           )
-          : filtered.map((p) => {
+          : filtered.map((p, i) => {
               const badge      = stockBadge(p);
               const isSelected = String(p.id) === value;
+              const isHighlighted = i === highlightedIdx;
               return (
                 <div
                   key={p.id}
+                  ref={isHighlighted ? (el) => {
+                    if (el) el.scrollIntoView({ block: 'nearest' });
+                  } : undefined}
                   onMouseDown={(e) => {
-                    // نستخدم onMouseDown بدل onClick لنمنع blur على input البحث
                     e.preventDefault();
                     choose(p);
                   }}
+                  onMouseEnter={() => setHighlightedIdx(i)}
                   style={{
                     padding:      '8px 10px',
                     cursor:       'pointer',
-                    background:   isSelected ? 'var(--emb)' : 'transparent',
+                    background:   isHighlighted ? 'var(--bg3)' : isSelected ? 'var(--emb)' : 'transparent',
                     borderBottom: '1px solid var(--b1)',
                     display:      'flex',
                     alignItems:   'center',
                     justifyContent: 'space-between',
                     gap: 8,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected)
-                      (e.currentTarget as HTMLElement).style.background = 'var(--bg3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected)
-                      (e.currentTarget as HTMLElement).style.background = 'transparent';
                   }}
                 >
                   {/* معلومات المنتج */}

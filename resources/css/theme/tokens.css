@@ -58,6 +58,11 @@ body {
   --goldb:  rgba(184,125,10,.08);
   --goldbo: rgba(184,125,10,.22);
 
+  /* ── Green ── */
+  --green:   #16a34a;
+  --greenb:  rgba(22,163,74,.07);
+  --greenbo: rgba(22,163,74,.20);
+
   /* ── Red ── */
   --red:   #d42b2b;
   --redb:  rgba(212,43,43,.07);
@@ -151,6 +156,10 @@ body.dark {
   --gold:   #e0a830;
   --goldb:  rgba(224,168,48,.10);
   --goldbo: rgba(224,168,48,.28);
+
+  --green:   #30c85c;
+  --greenb:  rgba(48,200,92,.10);
+  --greenbo: rgba(48,200,92,.28);
 
   --red:   #e84848;
   --redb:  rgba(232,72,72,.10);

@@ -174,7 +174,7 @@ export function calcTotals(
 // ─── Price resolution ─────────────────────────────────────────────────────────
 
 function resolveProductPrice(product: Product, entry: ProductPrice): number {
-  const cost = toNum(product.purchase_price_ht ?? product.current_cost_price ?? 0);
+  const cost = toNum(product.purchase_price_ht) || toNum(product.current_cost_price) || 0;
   const val  = entry.price ?? entry.rate ?? entry.margin ?? null;
   if (val === null) return 0;
   if (entry.pricing_method === 'fixed')  return val;
@@ -205,7 +205,7 @@ export function resolvePrice(
   const defaultPrice = toNum(product.default_selling_price_ht);
   if (defaultPrice > 0) return defaultPrice;
 
-  const costPrice = toNum(product.purchase_price_ht ?? product.current_cost_price);
+  const costPrice = toNum(product.purchase_price_ht) || toNum(product.current_cost_price);
   if (costPrice > 0) return Math.round(costPrice * 1.3 * 100) / 100;
 
   return 0;
