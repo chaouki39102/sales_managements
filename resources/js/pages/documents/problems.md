@@ -495,3 +495,7 @@ CommercialDocumentService::createStockMovements يستخدم $document->warehous
 خطأ في CommercialDocumentService::createStockMovements: لا يتحقق من allow_negative_stock، مما قد يسمح ببيع كمية أكبر من المخزون.
 
 خطأ في CommercialDocumentService::resolveNumberingSeries: قد ينشئ سلسلة جديدة لكل طلب إذا لم يجد، مما يؤدي إلى تكرار السلاسل.
+
+
+
+

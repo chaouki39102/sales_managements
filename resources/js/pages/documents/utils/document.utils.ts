@@ -125,10 +125,8 @@ export function calcLineTotal(line: LineItem): LineCalcResult {
     discPct     = line.discount_percentage;
     discountAmt = Math.round(gross * (discPct / 100) * 10_000) / 10_000;
   } else {
-    // fixed: discount_amount_fixed = خصم العبوة الواحدة
-    // إجمالي الخصم = discount_amount_fixed × عدد العبوات
-    const totalFixedDiscount = Math.round(line.discount_amount_fixed * line.quantity * 10_000) / 10_000;
-    discountAmt = Math.min(totalFixedDiscount, gross);
+    // fixed: discount_amount_fixed = خصم إجمالي على السطر كله
+    discountAmt = Math.min(line.discount_amount_fixed, gross);
     discPct     = gross > 0 ? (discountAmt / gross) * 100 : 0;
   }
 

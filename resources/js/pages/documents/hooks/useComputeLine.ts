@@ -8,14 +8,19 @@ import type { LineItem } from '../types/document.types';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ComputeLineInput {
-  product_id:     number;
-  quantity:       number;
-  packaging_id?:  number | null;
-  price_level_id?: number | null;
-  warehouse_id?:  number | null;
-  party_id?:      number | null;
-  is_purchase?:   boolean;
-  document_date?: string;
+  product_id:                    number;
+  quantity:                      number;
+  packaging_id?:                 number | null;
+  price_level_id?:               number | null;
+  warehouse_id?:                 number | null;
+  party_id?:                     number | null;
+  is_purchase?:                  boolean;
+  document_date?:                string;
+  // الخصم اليدوي — يُمرَّر للباكاند ليُدرجه في حساب الإجماليات
+  // الباكاند يُطبّقه فقط إذا لم يوجد خصم كميات تلقائي
+  manual_discount_mode?:         'percent' | 'fixed' | null;
+  manual_discount_percentage?:   number;
+  manual_discount_amount_fixed?: number;  // خصم العبوة الواحدة
 }
 
 export interface ComputeLineWarning {

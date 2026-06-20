@@ -366,6 +366,8 @@ export default function CommercialDocumentModal({
     needsParty, affectsStock, stockDir,
     isReadOnly, isLinesReadOnly,
     lineWarnings,
+    priceLevelSwitchMsg,
+    clearPriceLevelSwitchMsg,
   } = useDocumentForm({
     documentType,
     existingDocument,
@@ -382,6 +384,7 @@ export default function CommercialDocumentModal({
     stockData:          {},
     isPurchase,
     open,
+    priceLevels:        lookups.priceLevels,
   });
 
   // ─── حالة المستند ─────────────────────────────────────────────────────────
@@ -528,6 +531,13 @@ export default function CommercialDocumentModal({
   const [successMsg, setSuccessMsg] = useState('');
   const successTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
+
+  // ── Auto-dismiss price level switch notification ──────────────────────────
+  useEffect(() => {
+    if (!priceLevelSwitchMsg) return;
+    const t = setTimeout(clearPriceLevelSwitchMsg, 6000);
+    return () => clearTimeout(t);
+  }, [priceLevelSwitchMsg, clearPriceLevelSwitchMsg]);
 
   // ─── Smart Memory — حفظ مسودة تلقائي ──────────────────────────────────────
   const draftKey = `doc-draft-${slug ?? 'default'}-${documentType?.code ?? 'new'}`;
@@ -977,6 +987,12 @@ export default function CommercialDocumentModal({
           {/* Alerts عامة */}
           {successMsg         && <AlertBanner type="success" message={successMsg} />}
           {apiErr             && <AlertBanner type="error"   message={apiErr} />}
+          {priceLevelSwitchMsg && (
+            <AlertBanner
+              type="warning"
+              message={`المنتج "${priceLevelSwitchMsg.productName}" ليس له سعر في فئة "${priceLevelSwitchMsg.from}"، تم التبديل إلى "${priceLevelSwitchMsg.to}".`}
+            />
+          )}
           {isCancelled        && <AlertBanner type="error"   message="هذا المستند ملغى — جميع الحقول معطلة." />}
           {isLocked && !isCancelled && (
             <AlertBanner type="warning" message="هذا المستند مقفل. لا يمكن تعديله حتى يتم فك القفل من قِبل المسؤول." />
@@ -8731,6 +8747,12 @@ export interface PartyBalanceInfo {
 
 export type PaymentMode = 'free' | 'additive' | 'locked';
 
+export interface PriceLevelSwitchMsg {
+  from: string;
+  to: string;
+  productName: string;
+}
+
 export interface PartyChangeResult {
   blocked:    boolean;
   reason?:    string;
@@ -8762,10 +8784,11 @@ interface UseDocumentFormOptions {
     default_price_level_id?:  number | null;
     default_price_level?:     { id: number; name: string } | null;
   }>;
-  products:   Product[];
-  stockData:  Record<number, number>;
-  isPurchase: boolean;
-  open:       boolean;
+  products:      Product[];
+  stockData:     Record<number, number>;
+  isPurchase:    boolean;
+  open:          boolean;
+  priceLevels?:  Array<{ id: number; name: string }>;
 }
 
 export interface UseDocumentFormReturn {
@@ -8803,6 +8826,8 @@ export interface UseDocumentFormReturn {
   isReadOnly:             boolean;
   isLinesReadOnly:        boolean;
   lineWarnings:           Map<number, ComputeLineWarning[]>;
+  priceLevelSwitchMsg:    PriceLevelSwitchMsg | null;
+  clearPriceLevelSwitchMsg: () => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -9088,6 +9113,7 @@ export function useDocumentForm({
   stockData,
   isPurchase,
   open,
+  priceLevels = [],
 }: UseDocumentFormOptions): UseDocumentFormReturn {
 
   const slug    = useActiveSlug();
@@ -9145,6 +9171,7 @@ export function useDocumentForm({
   const [existingPayments, setExistingPayments] = useState<PaymentEntry[]>([]);
   const [newPayments,      setNewPayments]      = useState<PaymentEntry[]>([]);
   const [lineWarnings, setLineWarnings] = useState<Map<number, ComputeLineWarning[]>>(new Map());
+  const [priceLevelSwitchMsg, setPriceLevelSwitchMsg] = useState<PriceLevelSwitchMsg | null>(null);
 
   useEffect(() => { formRef.current = form; }, [form]);
 
@@ -9354,15 +9381,43 @@ export function useDocumentForm({
 
   // ── updateLine ────────────────────────────────────────────────────────────
 
+  const priceLevelMap = useMemo(() =>
+    Object.fromEntries(priceLevels.map((pl) => [pl.id, pl.name])),
+    [priceLevels],
+  );
+
   const updateLine = useCallback((
     idx:      number,
     patch:    Partial<LineItem>,
     product?: Product | null,
   ) => {
+    // ── Auto-switch price level if product has no price for current one ──
+    const prevForm  = formRef.current;
+    const curPLRaw  = prevForm?.price_level_id ?? '';
+    const curPLId   = curPLRaw ? parseInt(curPLRaw) : null;
+    const switched  = { to: '', plChanged: false };
+
+    if (product && curPLId && product.prices?.length) {
+      const hasPriceForCur = product.prices.some((p) => p.price_level_id === curPLId && p.active);
+      if (!hasPriceForCur) {
+        const firstAvail = product.prices.find((p) => p.active);
+        if (firstAvail) {
+          switched.to       = String(firstAvail.price_level_id);
+          switched.plChanged = true;
+          setPriceLevelSwitchMsg({
+            from:        priceLevelMap[curPLId] ?? String(curPLId),
+            to:          priceLevelMap[firstAvail.price_level_id] ?? String(firstAvail.price_level_id),
+            productName: product.name,
+          });
+        }
+      }
+    }
+
     setForm((f) => {
       const lines           = [...f.lines];
       let   L               = { ...lines[idx], ...patch };
-      const curPriceLevelId = f.price_level_id ? parseInt(f.price_level_id) : null;
+      const effectivePLRaw  = switched.plChanged ? switched.to : f.price_level_id;
+      const curPriceLevelId = effectivePLRaw ? parseInt(effectivePLRaw) : null;
 
       // ─ L1: اختيار منتج جديد ──────────────────────────────────────────────
       if (product !== undefined) {
@@ -9510,10 +9565,10 @@ export function useDocumentForm({
       }
 
       lines[idx] = L;
-      return { ...f, lines };
+      return switched.plChanged ? { ...f, lines, price_level_id: switched.to } : { ...f, lines };
     });
     setLineErr('');
-  }, [defaultTvaRate, isPurchase]);
+  }, [defaultTvaRate, isPurchase, priceLevelMap]);
 
   // ── addLine / removeLine / duplicateLine ──────────────────────────────────
 
@@ -9753,6 +9808,8 @@ export function useDocumentForm({
     docCode, isEdit, needsParty, affectsStock, stockDir,
     isReadOnly, isLinesReadOnly,
     lineWarnings,
+    priceLevelSwitchMsg,
+    clearPriceLevelSwitchMsg: () => setPriceLevelSwitchMsg(null),
   };
 }
 ```
@@ -10450,6 +10507,10 @@ CommercialDocumentService::createStockMovements يستخدم $document->warehous
 خطأ في CommercialDocumentService::createStockMovements: لا يتحقق من allow_negative_stock، مما قد يسمح ببيع كمية أكبر من المخزون.
 
 خطأ في CommercialDocumentService::resolveNumberingSeries: قد ينشئ سلسلة جديدة لكل طلب إذا لم يجد، مما يؤدي إلى تكرار السلاسل.
+
+
+
+
 ```
 
 ## FILE: resources/js/pages/documents/QuickSaleModal.tsx

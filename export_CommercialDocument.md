@@ -1,5 +1,5 @@
 # Module Export: CommercialDocument
-Generated at: 2026-06-20 19:17:16
+Generated at: 2026-06-20 20:32:25
 
 ## Models
 
@@ -1470,7 +1470,20 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         if (empty($data['document_number'])) {
-            $data['document_number'] = $this->generateDocumentNumber($documentType, $companyId);
+            $generated = $this->generateDocumentNumber($documentType, $companyId);
+            $data['document_number'] = $generated;
+
+            \Illuminate\Support\Facades\Log::debug('[DocGen beforeCreate]', [
+                'company' => $companyId,
+                'doc_type_id' => $data['document_type_id'],
+                'generated' => $generated,
+                'data_doc_num' => $data['document_number'] ?? 'MISSING',
+            ]);
+        } else {
+            \Illuminate\Support\Facades\Log::debug('[DocGen not-empty]', [
+                'document_number' => $data['document_number'],
+                'source' => 'already in data',
+            ]);
         }
 
         // ── الإعدادات الافتراضية من Settings ─────────────────────────────
@@ -2176,9 +2189,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $prefix = $documentType->code;
             $year   = date('Y');
 
-            $last = CommercialDocument::where('company_id', $companyId)
+            $last = CommercialDocument::withTrashed()
+                ->where('company_id', $companyId)
                 ->where('document_number', 'like', "{$prefix}-{$year}-%")
-                ->orderByDesc('id')
+                ->orderByDesc('document_number')
                 ->lockForUpdate()
                 ->first();
 
@@ -2188,7 +2202,18 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 $seq   = (int) end($parts) + 1;
             }
 
-            return sprintf('%s-%s-%06d', $prefix, $year, $seq);
+            $result = sprintf('%s-%s-%06d', $prefix, $year, $seq);
+
+            \Illuminate\Support\Facades\Log::debug('[DocGen]', [
+                'prefix' => $prefix,
+                'year' => $year,
+                'company' => $companyId,
+                'last_found' => $last?->document_number,
+                'seq' => $seq,
+                'result' => $result,
+            ]);
+
+            return $result;
         });
     }
 

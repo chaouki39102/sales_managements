@@ -342,6 +342,13 @@ export default function CommercialDocumentModal({
     return v === true || v === 'true';
   }, [settingsDict]);
 
+  // ── جاهزية اللوك أب — لا نبني الـ form حتى تصل القيم الجوهرية ──────────
+  // للمستند الجديد: ننتظر warehouse + currency (من settings أو lookups)
+  // للمستند الموجود: يمكن البناء فوراً من existingDocument بدون انتظار
+  const lookupsReady = isEdit
+    ? true
+    : (settingsWarehouseId !== '' && settingsCurrencyId !== '');
+
   // ─── Form ─────────────────────────────────────────────────────────────────
 
   const {
@@ -817,6 +824,36 @@ export default function CommercialDocumentModal({
   // ─── Guard ────────────────────────────────────────────────────────────────
 
   if (!open) return null;
+
+  // Skeleton — نعرضه ريثما تصل القيم الافتراضية (warehouse + currency)
+  // لتجنب عرض الـ form مرتين: مرة بقيم فارغة ومرة بعد وصول اللوك أب
+  if (!lookupsReady) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)',
+        direction: 'rtl',
+      }}>
+        <div style={{
+          width: '95vw', maxWidth: 1100, maxHeight: '93vh',
+          background: 'var(--bg1)', borderRadius: 'var(--r3)',
+          boxShadow: '0 24px 60px rgba(0,0,0,.3)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: 12, padding: 48,
+        }}>
+          <i className="ti ti-loader-2" style={{
+            fontSize: 32, color: 'var(--em)',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <span style={{ fontSize: 13, color: 'var(--t3)' }}>
+            {documentType?.name ?? 'جاري التحميل'}...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER

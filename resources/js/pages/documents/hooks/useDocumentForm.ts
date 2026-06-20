@@ -523,21 +523,43 @@ export function useDocumentForm({
         const lines = [...f.lines];
         const L     = lines[lineIdx];
         if (!L || !L.product_id) return f;
+
+        // ── الخصم ────────────────────────────────────────────────────────────
+        // الباكاند يُعيد خصم الكميات التلقائي فقط (quantity_discounts).
+        // إذا كان المستخدم قد أدخل خصماً يدوياً (percent أو fixed)
+        // نحتفظ بخصمه ولا نُكتب عليه — إلا إذا جاء خصم كميات جديد من الباكاند.
+        let discountMode       = L.discount_mode;
+        let discountPercentage = L.discount_percentage;
+        let discountAmountFixed = L.discount_amount_fixed;
+
+        if (result.discount_percentage > 0) {
+          // خصم كميات تلقائي من الباكاند — يُطبَّق دائماً (له الأولوية)
+          discountMode        = 'percent';
+          discountPercentage  = result.discount_percentage;
+          discountAmountFixed = 0;
+        } else if (result.quantity_discount_tier === null && L._fromCompute) {
+          // لا يوجد خصم كميات + السطر كان مُعيَّناً من compute سابق → صفّر
+          discountMode        = 'percent';
+          discountPercentage  = 0;
+          discountAmountFixed = 0;
+        }
+        // غير ذلك: نُبقي على الخصم اليدوي كما هو
+
         lines[lineIdx] = {
           ...L,
           unit_price_ht:         result.unit_price_ht,
           price_per_pack:        result.price_per_pack,
           _packQty:              result.pack_qty,
-          discount_percentage:   result.discount_percentage,
-          discount_amount_fixed: result.discount_amount_per_pack,
-          discount_mode:         result.discount_percentage > 0 ? 'percent' : 'fixed',
+          discount_mode:         discountMode,
+          discount_percentage:   discountPercentage,
+          discount_amount_fixed: discountAmountFixed,
           tva_rate:              result.tva_rate,
-          // الكوم FEFO الأول إذا لم يكن محدداً
           stock_lot_id: L.stock_lot_id || (
             result.lot_suggestions[0] ? String(result.lot_suggestions[0].id) : ''
           ),
-          _computing: false,
-          _warnings:  result.warnings,
+          _computing:   false,
+          _fromCompute: true,   // علامة: هذا السطر مرّ على compute مرة واحدة على الأقل
+          _warnings:    result.warnings,
         };
         return { ...f, lines };
       });
@@ -807,14 +829,15 @@ export function useDocumentForm({
 
           // ── استدعاء compute-line فوراً من الباكاند ──
           triggerCompute(idx, {
-            product_id:     product.id,
-            quantity:       L.quantity,
-            packaging_id:   L.packaging_id ? parseInt(L.packaging_id) : null,
-            price_level_id: curPriceLevelId,
-            warehouse_id:   warehouseIdForCompute,
-            party_id:       partyIdForCompute,
-            is_purchase:    isPurchase,
-            document_date:  formRef.current?.document_date,
+            product_id:                   product.id,
+            quantity:                     L.quantity,
+            packaging_id:                 L.packaging_id ? parseInt(L.packaging_id) : null,
+            price_level_id:               curPriceLevelId,
+            warehouse_id:                 warehouseIdForCompute,
+            party_id:                     partyIdForCompute,
+            is_purchase:                  isPurchase,
+            document_date:                formRef.current?.document_date,
+            // عند اختيار منتج جديد لا يوجد خصم يدوي بعد
           }, 0); // فوري بدون debounce عند اختيار منتج جديد
 
         } else {
@@ -889,14 +912,18 @@ export function useDocumentForm({
         // compute-line مع debounce 350ms عند تغيير الكمية
         if (L.product_id) {
           setTimeout(() => triggerCompute(idx, {
-            product_id:     parseInt(L.product_id),
-            quantity:       patch.quantity as number,
-            packaging_id:   L.packaging_id ? parseInt(L.packaging_id) : null,
-            price_level_id: curPriceLevelId,
-            warehouse_id:   warehouseIdForCompute,
-            party_id:       partyIdForCompute,
-            is_purchase:    isPurchase,
-            document_date:  formRef.current?.document_date,
+            product_id:                   parseInt(L.product_id),
+            quantity:                     patch.quantity as number,
+            packaging_id:                 L.packaging_id ? parseInt(L.packaging_id) : null,
+            price_level_id:               curPriceLevelId,
+            warehouse_id:                 warehouseIdForCompute,
+            party_id:                     partyIdForCompute,
+            is_purchase:                  isPurchase,
+            document_date:                formRef.current?.document_date,
+            // نُمرّر الخصم اليدوي للباكاند ليحسب الإجماليات الصحيحة
+            manual_discount_mode:         L.discount_mode,
+            manual_discount_percentage:   L.discount_mode === 'percent' ? L.discount_percentage : 0,
+            manual_discount_amount_fixed: L.discount_mode === 'fixed'   ? L.discount_amount_fixed : 0,
           }, 350), 0);
         }
       }

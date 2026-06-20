@@ -405,10 +405,12 @@ Route::prefix('v1')->group(function () {
             // ── ⑤-ج: للمالك والمدير والمحاسب ──────────────────
             Route::middleware('can:create_sales_document')->group(function () {
 
-                // ✅ المسارات المحددة (unpaid, overdue) يجب أن تكون
+                // ✅ المسارات المحددة (unpaid, overdue, compute-line) يجب أن تكون
                 //    قبل apiResource — وإلا Laravel يعترضها كـ {commercialDocument}
-                Route::get('documents/unpaid',  [CommercialDocumentController::class, 'unpaid']);
-                Route::get('documents/overdue', [CommercialDocumentController::class, 'overdue']);
+                Route::get('documents/unpaid',       [CommercialDocumentController::class, 'unpaid']);
+                Route::get('documents/overdue',      [CommercialDocumentController::class, 'overdue']);
+                Route::post('documents/compute-line',   [DocumentComputeController::class, 'computeLine']);
+                Route::post('documents/compute-totals', [DocumentComputeController::class, 'computeTotals']);
 
                 // ✅ apiResource بعد المسارات المحددة
                 Route::apiResource('documents', CommercialDocumentController::class);
@@ -421,9 +423,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('documents/{commercialDocument}/payments', [CommercialDocumentController::class, 'addPayments']);
                 Route::get('documents/{commercialDocument}/qrcode',    [CommercialDocumentController::class, 'generateQRCode']);
 
-                // ── مسارات الحساب والتحويل والمرتجع ─────────────
-                Route::post('documents/compute-line',   [DocumentComputeController::class, 'computeLine']);
-                Route::post('documents/compute-totals', [DocumentComputeController::class, 'computeTotals']);
+                // ── مسارات التحويل والمرتجع ─────────────
                 Route::post('documents/{document}/convert', [DocumentComputeController::class, 'convert']);
                 Route::get ('documents/{document}/chain',   [DocumentComputeController::class, 'chain']);
                 Route::post('documents/{document}/return',  [DocumentComputeController::class, 'createReturn']);

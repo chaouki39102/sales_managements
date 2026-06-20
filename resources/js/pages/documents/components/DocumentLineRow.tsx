@@ -235,9 +235,13 @@ export const DocumentLineRow = memo(function DocumentLineRow({
                 style={{ ...cellStyle(), width: 40, padding: '5px 2px', fontSize: 10 }}
                 value={line.discount_mode}
                 disabled={disabled}
-                onChange={(e) => onUpdate(idx, {
-                  discount_mode: e.target.value as 'percent' | 'fixed',
-                })}
+                onChange={(e) => {
+                  const newMode = e.target.value as 'percent' | 'fixed';
+                  onUpdate(idx, newMode === 'fixed'
+                    ? { discount_mode: 'fixed',   discount_percentage:   0 }
+                    : { discount_mode: 'percent', discount_amount_fixed: 0 }
+                  );
+                }}
               >
                 <option value="percent">%</option>
                 <option value="fixed">دج</option>
@@ -249,8 +253,9 @@ export const DocumentLineRow = memo(function DocumentLineRow({
                 min={0}
                 step={0.01}
                 onChange={(v) => onUpdate(idx, line.discount_mode === 'percent'
-                  ? { discount_percentage: toNum(v) }
-                  : { discount_amount_fixed: toNum(v) })}
+                  ? { discount_percentage:   toNum(v), discount_amount_fixed: 0 }
+                  : { discount_amount_fixed: toNum(v), discount_percentage:   0 }
+                )}
                 disabled={disabled}
               />
             </div>

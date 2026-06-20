@@ -30,6 +30,15 @@ class ComputeLineService
         $isPurchase  = (bool) ($input['is_purchase'] ?? false);
         $docDate     = $input['document_date'] ?? now()->toDateString();
 
+        // ── الخصم اليدوي من الفرونتند ─────────────────────────────────────────
+        // الفرونتند يُرسل:
+        //   manual_discount_mode:        'percent' | 'fixed' | null
+        //   manual_discount_percentage:  نسبة % (في percent mode)
+        //   manual_discount_amount_fixed: خصم العبوة الواحدة (في fixed mode)
+        $manualDiscountMode    = $input['manual_discount_mode']         ?? null;
+        $manualDiscountPct     = (float) ($input['manual_discount_percentage']   ?? 0);
+        $manualDiscountFixed   = (float) ($input['manual_discount_amount_fixed'] ?? 0); // خصم العبوة الواحدة
+
         $product = Product::with([
             'tva',
             'packagings',
@@ -106,6 +115,21 @@ class ComputeLineService
                         'max_qty'  => $discount->max_qty,
                         'tier_order' => $discount->tier_order,
                     ];
+                }
+            }
+        }
+
+        // ── تطبيق الخصم اليدوي إذا لم يوجد خصم كميات تلقائي ─────────────────
+        // خصم الكميات له الأولوية. إذا لم يوجد، نُطبّق الخصم اليدوي.
+        if ($discountPct === 0.0 && !$isQuantityBlocked && $manualDiscountMode) {
+            if ($manualDiscountMode === 'percent') {
+                $discountPct = $manualDiscountPct;
+            } elseif ($manualDiscountMode === 'fixed') {
+                // manualDiscountFixed = خصم إجمالي على السطر كله
+                // نُحوّله لنسبة مئوية بناءً على gross = unitPrice × baseQty
+                $grossTemp = $unitPrice * $baseQty;
+                if ($grossTemp > 0) {
+                    $discountPct = min(100.0, ($manualDiscountFixed / $grossTemp) * 100);
                 }
             }
         }
