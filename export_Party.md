@@ -1,5 +1,5 @@
 # Module Export: Party
-Generated at: 2026-06-21 10:37:17
+Generated at: 2026-06-21 10:55:50
 
 ## Models
 
@@ -729,11 +729,6 @@ class PartyService extends \App\Core\Services\BaseService
 
     // ─── afterCreate ─────────────────────────────────────────────────────────
 
-    /**
-     * إنشاء الرصيد الافتتاحي إذا أرسل المستخدم initial_balance.
-     * initial_balance ليس عمود في parties (تم حذفه) — يُقرأ من $data فقط.
-     * Validation rule في StorePartyRequest: 'initial_balance' => 'sometimes|numeric'
-     */
     protected function afterCreate(Model $item, array $data, $request): void
     {
         $initialBalance = (float) ($data['initial_balance'] ?? 0);
@@ -765,7 +760,6 @@ class PartyService extends \App\Core\Services\BaseService
     protected function afterCreateCommitted(Model $item, array $data, $request): void
     {
         // Send welcome notification if needed
-        // Mail::send(new PartyCreatedNotification($item));
     }
 
     // ─── beforeUpdate ─────────────────────────────────────────────────────────
@@ -868,37 +862,50 @@ class PartyService extends \App\Core\Services\BaseService
         return app(CompanyContextService::class)->get();
     }
 
-
+    // ─── getCustomers ─────────────────────────────────────────────────────────
+    // الإصلاح: إضافة دعم فلتر `active` و`per_page` بشكل صريح
 
     public function getCustomers(array $params = [])
     {
-        $companyId = $this->getCurrentCompanyId();
+        $companyId    = $this->getCurrentCompanyId();
         $clientTypeId = PartyType::where('company_id', $companyId)
             ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
             ->value('id');
 
         return Party::where('company_id', $companyId)
             ->where('party_type_id', $clientTypeId)
+            // ── فلتر البحث ──────────────────────────────────────────────────
             ->when(
                 !empty($params['search']),
                 fn($q) => $q->where(
                     fn($q2) => $q2
-                        ->where('name', 'like', "%{$params['search']}%")
-                        ->orWhere('phone', 'like', "%{$params['search']}%")
-                        ->orWhere('nif', 'like', "%{$params['search']}%")
+                        ->where('name',            'like', "%{$params['search']}%")
+                        ->orWhere('commercial_name','like', "%{$params['search']}%")
+                        ->orWhere('phone',          'like', "%{$params['search']}%")
+                        ->orWhere('nif',            'like', "%{$params['search']}%")
                 )
             )
-            ->where(fn($q) => $q->whereNull('active')->orWhere('active', true))
-            ->orderBy('name')
-            ->paginate($params['per_page'] ?? 30);
+            // ── فلتر الحالة: null = الكل، 1 = نشط، 0 = موقوف ──────────────
+            ->when(
+                isset($params['active']) && $params['active'] !== null && $params['active'] !== '',
+                fn($q) => $q->where('active', (bool) $params['active'])
+            )
+            // ── الترتيب ──────────────────────────────────────────────────────
+            ->orderBy($params['sort_by'] ?? 'name', $params['sort_dir'] ?? 'asc')
+            // ── التصفيح ──────────────────────────────────────────────────────
+            ->paginate(
+                max(5, min(100, (int) ($params['per_page'] ?? 25))),
+                ['*'],
+                'page',
+                max(1, (int) ($params['page'] ?? 1))
+            );
     }
 
-    /**
-     * Get suppliers with pagination
-     */
+    // ─── getSuppliers ─────────────────────────────────────────────────────────
+
     public function getSuppliers(array $params = [])
     {
-        $companyId = $this->getCurrentCompanyId();
+        $companyId      = $this->getCurrentCompanyId();
         $supplierTypeId = PartyType::where('company_id', $companyId)
             ->where(fn($q) => $q->where('name', 'supplier')->orWhere('slug', 'supplier'))
             ->value('id');
@@ -909,14 +916,23 @@ class PartyService extends \App\Core\Services\BaseService
                 !empty($params['search']),
                 fn($q) => $q->where(
                     fn($q2) => $q2
-                        ->where('name', 'like', "%{$params['search']}%")
-                        ->orWhere('phone', 'like', "%{$params['search']}%")
-                        ->orWhere('nif', 'like', "%{$params['search']}%")
+                        ->where('name',            'like', "%{$params['search']}%")
+                        ->orWhere('commercial_name','like', "%{$params['search']}%")
+                        ->orWhere('phone',          'like', "%{$params['search']}%")
+                        ->orWhere('nif',            'like', "%{$params['search']}%")
                 )
             )
-            ->where(fn($q) => $q->whereNull('active')->orWhere('active', true))
-            ->orderBy('name')
-            ->paginate($params['per_page'] ?? 30);
+            ->when(
+                isset($params['active']) && $params['active'] !== null && $params['active'] !== '',
+                fn($q) => $q->where('active', (bool) $params['active'])
+            )
+            ->orderBy($params['sort_by'] ?? 'name', $params['sort_dir'] ?? 'asc')
+            ->paginate(
+                max(5, min(100, (int) ($params['per_page'] ?? 25))),
+                ['*'],
+                'page',
+                max(1, (int) ($params['page'] ?? 1))
+            );
     }
 }
 

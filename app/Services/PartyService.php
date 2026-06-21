@@ -40,11 +40,6 @@ class PartyService extends \App\Core\Services\BaseService
 
     // ─── afterCreate ─────────────────────────────────────────────────────────
 
-    /**
-     * إنشاء الرصيد الافتتاحي إذا أرسل المستخدم initial_balance.
-     * initial_balance ليس عمود في parties (تم حذفه) — يُقرأ من $data فقط.
-     * Validation rule في StorePartyRequest: 'initial_balance' => 'sometimes|numeric'
-     */
     protected function afterCreate(Model $item, array $data, $request): void
     {
         $initialBalance = (float) ($data['initial_balance'] ?? 0);
@@ -76,7 +71,6 @@ class PartyService extends \App\Core\Services\BaseService
     protected function afterCreateCommitted(Model $item, array $data, $request): void
     {
         // Send welcome notification if needed
-        // Mail::send(new PartyCreatedNotification($item));
     }
 
     // ─── beforeUpdate ─────────────────────────────────────────────────────────
@@ -179,54 +173,109 @@ class PartyService extends \App\Core\Services\BaseService
         return app(CompanyContextService::class)->get();
     }
 
+    // ─── استخراج params مع دعم filter[key] و key مباشرة ─────────────────────
+    // الفرونتاند يُرسل: filter[search]=... و filter[active]=...
+    // Laravel يُحوّلها إلى: $params['filter']['search'] و $params['filter']['active']
+    // لكن النسخة القديمة كانت تقرأ: $params['search'] و $params['active'] — خطأ
 
+    private function extractParam(array $params, string $key, mixed $default = null): mixed
+    {
+        // أولاً: ابحث في filter[key] (ما يُرسله الفرونتاند)
+        if (isset($params['filter'][$key]) && $params['filter'][$key] !== '') {
+            return $params['filter'][$key];
+        }
+        // ثانياً: ابحث في المستوى الأول (للتوافق مع أي استخدام مباشر)
+        if (isset($params[$key]) && $params[$key] !== '') {
+            return $params[$key];
+        }
+        return $default;
+    }
+
+    // ─── getCustomers ─────────────────────────────────────────────────────────
 
     public function getCustomers(array $params = [])
     {
-        $companyId = $this->getCurrentCompanyId();
+        $companyId    = $this->getCurrentCompanyId();
         $clientTypeId = PartyType::where('company_id', $companyId)
             ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
             ->value('id');
 
+        // ✅ استخراج صحيح: يدعم filter[search] و filter[active] و search و active
+        $search   = $this->extractParam($params, 'search');
+        $active   = $this->extractParam($params, 'active');
+        $perPage  = (int) ($params['per_page']  ?? 25);
+        $page     = (int) ($params['page']       ?? 1);
+        $sortBy   = $params['sort_by']  ?? 'name';
+        $sortDir  = $params['sort_dir'] ?? 'asc';
+
         return Party::where('company_id', $companyId)
             ->where('party_type_id', $clientTypeId)
+            // ── فلتر البحث ──────────────────────────────────────────────────
             ->when(
-                !empty($params['search']),
+                !empty($search),
                 fn($q) => $q->where(
                     fn($q2) => $q2
-                        ->where('name', 'like', "%{$params['search']}%")
-                        ->orWhere('phone', 'like', "%{$params['search']}%")
-                        ->orWhere('nif', 'like', "%{$params['search']}%")
+                        ->where('name',             'like', "%{$search}%")
+                        ->orWhere('commercial_name', 'like', "%{$search}%")
+                        ->orWhere('phone',           'like', "%{$search}%")
+                        ->orWhere('nif',             'like', "%{$search}%")
                 )
             )
-            ->where(fn($q) => $q->whereNull('active')->orWhere('active', true))
-            ->orderBy('name')
-            ->paginate($params['per_page'] ?? 30);
+            // ── فلتر الحالة: null = الكل، 1 = نشط، 0 = موقوف ──────────────
+            ->when(
+                $active !== null,
+                fn($q) => $q->where('active', filter_var($active, FILTER_VALIDATE_BOOLEAN))
+            )
+            // ── الترتيب ──────────────────────────────────────────────────────
+            ->orderBy($sortBy, $sortDir)
+            // ── التصفيح ──────────────────────────────────────────────────────
+            ->paginate(
+                max(5, min(100, $perPage)),
+                ['*'],
+                'page',
+                max(1, $page)
+            );
     }
 
-    /**
-     * Get suppliers with pagination
-     */
+    // ─── getSuppliers ─────────────────────────────────────────────────────────
+
     public function getSuppliers(array $params = [])
     {
-        $companyId = $this->getCurrentCompanyId();
+        $companyId      = $this->getCurrentCompanyId();
         $supplierTypeId = PartyType::where('company_id', $companyId)
             ->where(fn($q) => $q->where('name', 'supplier')->orWhere('slug', 'supplier'))
             ->value('id');
 
+        // ✅ نفس الإصلاح
+        $search  = $this->extractParam($params, 'search');
+        $active  = $this->extractParam($params, 'active');
+        $perPage = (int) ($params['per_page'] ?? 25);
+        $page    = (int) ($params['page']      ?? 1);
+        $sortBy  = $params['sort_by']  ?? 'name';
+        $sortDir = $params['sort_dir'] ?? 'asc';
+
         return Party::where('company_id', $companyId)
             ->where('party_type_id', $supplierTypeId)
             ->when(
-                !empty($params['search']),
+                !empty($search),
                 fn($q) => $q->where(
                     fn($q2) => $q2
-                        ->where('name', 'like', "%{$params['search']}%")
-                        ->orWhere('phone', 'like', "%{$params['search']}%")
-                        ->orWhere('nif', 'like', "%{$params['search']}%")
+                        ->where('name',             'like', "%{$search}%")
+                        ->orWhere('commercial_name', 'like', "%{$search}%")
+                        ->orWhere('phone',           'like', "%{$search}%")
+                        ->orWhere('nif',             'like', "%{$search}%")
                 )
             )
-            ->where(fn($q) => $q->whereNull('active')->orWhere('active', true))
-            ->orderBy('name')
-            ->paginate($params['per_page'] ?? 30);
+            ->when(
+                $active !== null,
+                fn($q) => $q->where('active', filter_var($active, FILTER_VALIDATE_BOOLEAN))
+            )
+            ->orderBy($sortBy, $sortDir)
+            ->paginate(
+                max(5, min(100, $perPage)),
+                ['*'],
+                'page',
+                max(1, $page)
+            );
     }
 }
