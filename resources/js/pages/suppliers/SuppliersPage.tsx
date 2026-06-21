@@ -13,12 +13,15 @@ import EmptyState from '@/components/ui/EmptyState';
 import ProgressBar from '@/components/ui/ProgressBar';
 import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
+import ImportWizardModal from '@/pages/import/ImportWizardModal';
+import { PARTY_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import type { Party } from '@/types';
 
 export default function SuppliersPage() {
     const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<Party | null>(null);
     const modal = useModal();
+    const importModal = useModal();
 
     const { data, isLoading } = useSuppliers({ search: search || undefined, per_page: 30 });
     // استبدال السطر 30
@@ -39,6 +42,7 @@ const meta = (data as any)?.meta;
                 subtitle={`إدارة قائمة الموردين — ${meta?.total ?? '...'} مورد`}
                 actions={
                     <>
+                        <Button size="sm" icon={<i className="ti ti-table-import"/>} onClick={importModal.openModal}>استيراد</Button>
                         <Button size="sm" icon={<i className="ti ti-table-export"/>}>تصدير</Button>
                         <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus"/>} onClick={openCreate}>
                             مورد جديد
@@ -123,6 +127,12 @@ const meta = (data as any)?.meta;
 
             {/* Modal */}
             <SupplierModal open={modal.open} party={editing} onClose={modal.closeModal} />
+
+            <ImportWizardModal
+                open={importModal.open}
+                onClose={importModal.closeModal}
+                config={PARTY_IMPORT_CONFIG}
+            />
         </div>
     );
 }

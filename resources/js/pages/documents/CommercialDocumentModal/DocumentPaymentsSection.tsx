@@ -1,0 +1,305 @@
+import React from 'react';
+import { Section, Label, AlertBanner } from '../components/DocumentUIPrimitives';
+import { CheckFormFields } from '../components/CheckFormFields';
+import { AdvancePaymentsPanel } from '../components/AdvancePaymentsPanel';
+import ExistingPaymentsTable from './ExistingPaymentsTable';
+import type { PaymentEntry } from '../types/document.types';
+import { fmtDZD } from '../utils/document.utils';
+
+interface DocumentPaymentsSectionProps {
+  existingPayments: PaymentEntry[];
+  newPayments: PaymentEntry[];
+  paymentModes: Array<{ id: number; name: string }>;
+  paymentModeOptions: Array<{
+    id: number;
+    label: string;
+    treasury_account_id?: number | null;
+    requires_reference?: boolean;
+  }>;
+  treasuryAccountMap: Map<number, { id: number; name: string; type: string }>;
+  treasuryAccounts: Array<{ id: number; code: string; name: string; type: string }>;
+  addPayment: () => void;
+  addPaymentWithValues: (values: Partial<PaymentEntry>) => void;
+  removePayment: (idx: number) => void;
+  updatePayment: (idx: number, patch: Partial<PaymentEntry>) => void;
+  paymentsExceedWarning: string | null;
+  advancePayments: unknown;
+  isLoadingAdvances: boolean;
+  pmMode: string;
+  totals: { remaining: number };
+  affectsAccounting: boolean;
+  isProforma: boolean;
+}
+
+export default function DocumentPaymentsSection({
+  existingPayments, newPayments,
+  paymentModes, paymentModeOptions, treasuryAccountMap, treasuryAccounts,
+  addPayment, addPaymentWithValues, removePayment, updatePayment,
+  paymentsExceedWarning,
+  advancePayments, isLoadingAdvances,
+  pmMode, totals, affectsAccounting, isProforma,
+}: DocumentPaymentsSectionProps) {
+  if (!affectsAccounting || isProforma) return null;
+
+  return (
+    <Section title="الدفعات" icon="ti-wallet" collapsible>
+
+      <ExistingPaymentsTable
+        payments={existingPayments}
+        paymentModes={paymentModes}
+        treasuryAccountMap={treasuryAccountMap}
+      />
+
+      <AdvancePaymentsPanel
+        advances={advancePayments}
+        isLoading={isLoadingAdvances}
+        onApply={(adv) => {
+          if (pmMode === 'locked') return;
+          addPaymentWithValues({
+            payment_mode_id: String((adv as Record<string, unknown>).payment_mode_id),
+            amount: String((adv as Record<string, unknown>).unapplied_amount),
+            reference: (adv as Record<string, unknown>).reference as string ?? '',
+            payment_date: (adv as Record<string, unknown>).payment_date as string,
+          });
+        }}
+        disabled={pmMode === 'locked'}
+      />
+
+      {paymentsExceedWarning && (
+        <AlertBanner type="warning" message={paymentsExceedWarning} />
+      )}
+
+      {existingPayments.length === 0 && newPayments.length === 0 && (
+        <div style={{
+          padding: 12, fontSize: 12, color: 'var(--t4)',
+          background: 'var(--bg3)', borderRadius: 'var(--r2)', marginBottom: 12,
+        }}>
+          {pmMode === 'locked'
+            ? 'المستند محمي — لا يمكن إضافة دفعات.'
+            : 'لم تُضَف دفعات — سيتم إنشاء المستند دون تسديد.'}
+        </div>
+      )}
+
+      {pmMode === 'additive' && newPayments.length > 0 && (
+        <div style={{
+          padding: '6px 10px', fontSize: 10.5, fontWeight: 800,
+          color: 'var(--em)', textTransform: 'uppercase', letterSpacing: 0.4,
+          borderBottom: '1px solid var(--b1)', marginBottom: 8,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <i className="ti ti-plus" style={{ fontSize: 11 }} />
+          دفعات جديدة تُضاف
+        </div>
+      )}
+
+      {newPayments.map((pay, idx) => {
+        const selectedMode = paymentModes.find(
+          (pm) => String(pm.id) === pay.payment_mode_id,
+        );
+        const autoTreasuryId = selectedMode?.treasury_account_id ?? null;
+        const manualTreasuryStr = pay.treasury_account_id ? String(pay.treasury_account_id) : '';
+        const effectiveTreasury = autoTreasuryId
+          ? treasuryAccountMap.get(autoTreasuryId)
+          : (manualTreasuryStr ? treasuryAccountMap.get(parseInt(manualTreasuryStr)) : null);
+
+        const remainingForFill = totals.remaining;
+        const isLast = idx === newPayments.length - 1;
+
+        return (
+          <div key={idx} style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 130px 160px 120px 1fr 32px',
+            gap: 8, marginBottom: 10, alignItems: 'end',
+            padding: 12, borderRadius: 'var(--r2)',
+            background: 'var(--bg2)', border: '1px solid var(--b2)',
+          }}>
+            <div>
+              {idx === 0 && <Label>طريقة الدفع</Label>}
+              <select
+                style={{
+                  width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                  border: `1px solid ${!pay.payment_mode_id ? 'var(--red)' : 'var(--b3)'}`,
+                  background: 'var(--bg1)', color: 'var(--t1)',
+                  fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                  outline: 'none', cursor: 'pointer', boxSizing: 'border-box',
+                }}
+                value={pay.payment_mode_id}
+                onChange={(e) => updatePayment(idx, { payment_mode_id: e.target.value })}
+              >
+                <option value="">— اختر —</option>
+                {paymentModeOptions.map((pm) => (
+                  <option key={pm.id} value={String(pm.id)}>{pm.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              {idx === 0 && <Label>المبلغ</Label>}
+              <input
+                type="number" min={0} step={0.01}
+                style={{
+                  width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                  border: '1px solid var(--b3)',
+                  background: 'var(--bg1)', color: 'var(--t1)',
+                  fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+                value={pay.amount}
+                onChange={(e) => updatePayment(idx, { amount: e.target.value })}
+                placeholder="0.00"
+              />
+              {isLast && remainingForFill > 0.01 && (
+                <button
+                  type="button"
+                  onClick={() => updatePayment(idx, {
+                    amount: String(Math.max(0, remainingForFill)),
+                  })}
+                  style={{
+                    fontSize: 10, fontWeight: 600, color: 'var(--em)',
+                    marginTop: 3, padding: 0, background: 'none',
+                    border: 'none', cursor: 'pointer', textDecoration: 'underline',
+                  }}
+                >
+                  ملء المتبقي ({fmtDZD(remainingForFill)})
+                </button>
+              )}
+            </div>
+
+            <div>
+              {idx === 0 && <Label>المرجع</Label>}
+              <input
+                type="text"
+                style={{
+                  width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                  border: `1px solid ${
+                    selectedMode?.requires_reference && !pay.reference?.trim()
+                      ? 'var(--red)' : 'var(--b3)'
+                  }`,
+                  background: 'var(--bg1)', color: 'var(--t1)',
+                  fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+                value={pay.reference ?? ''}
+                onChange={(e) => updatePayment(idx, { reference: e.target.value })}
+                placeholder={selectedMode?.requires_reference ? 'إلزامي ★' : 'اختياري...'}
+              />
+            </div>
+
+            <div>
+              {idx === 0 && <Label>التاريخ</Label>}
+              <input
+                type="date"
+                style={{
+                  width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                  border: '1px solid var(--b3)',
+                  background: 'var(--bg1)', color: 'var(--t1)',
+                  fontSize: 13, fontFamily: 'Tajawal, sans-serif',
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+                value={pay.payment_date}
+                onChange={(e) => updatePayment(idx, { payment_date: e.target.value })}
+              />
+            </div>
+
+            <div>
+              {idx === 0 && <Label>الحساب</Label>}
+              {autoTreasuryId ? (
+                <div style={{
+                  padding: '7px 10px', borderRadius: 'var(--r2)',
+                  border: '1px solid var(--b3)', background: 'var(--bg3)',
+                  fontSize: 12, height: 38, display: 'flex', alignItems: 'center', gap: 6,
+                  overflow: 'hidden', boxSizing: 'border-box',
+                }}>
+                  {effectiveTreasury ? (
+                    <>
+                      <i className={`ti ${
+                        effectiveTreasury.type === 'bank' ? 'ti-building-bank' :
+                        effectiveTreasury.type === 'cash' ? 'ti-cash' : 'ti-credit-card'
+                      }`} style={{ fontSize: 12, color: 'var(--t4)', flexShrink: 0 }} />
+                      <span style={{
+                        color: 'var(--t2)', fontWeight: 600,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {effectiveTreasury.name}
+                      </span>
+                    </>
+                  ) : (
+                    <span style={{ color: 'var(--t4)' }}>ح/ {autoTreasuryId}</span>
+                  )}
+                </div>
+              ) : (
+                <select
+                  style={{
+                    width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
+                    border: `1px solid ${!manualTreasuryStr ? 'var(--red)' : 'var(--b3)'}`,
+                    background: 'var(--bg1)', color: 'var(--t1)',
+                    fontSize: 12, fontFamily: 'Tajawal, sans-serif',
+                    outline: 'none', cursor: 'pointer',
+                    height: 38, boxSizing: 'border-box',
+                  }}
+                  value={manualTreasuryStr}
+                  onChange={(e) => updatePayment(idx, { treasury_account_id: e.target.value })}
+                >
+                  <option value="">— اختر حساباً ★ —</option>
+                  {treasuryAccounts.map((ta) => (
+                    <option key={ta.id} value={String(ta.id)}>
+                      {ta.name} ({ta.type === 'bank' ? 'بنك' : ta.type === 'cash' ? 'نقدية' : 'شيك'})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <button
+              onClick={() => removePayment(idx)}
+              style={{
+                width: 32, height: 32, borderRadius: 'var(--r1)',
+                border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
+                background: 'var(--redb)', color: 'var(--red)',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                alignSelf: 'flex-end',
+              }}
+            >
+              <i className="ti ti-trash" style={{ fontSize: 13 }} />
+            </button>
+
+            {effectiveTreasury?.type === 'check' && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <CheckFormFields
+                  checkNumber={pay.check_number}
+                  checkBank={pay.check_bank}
+                  checkDueDate={pay.check_due_date}
+                  onChange={(fields) => updatePayment(idx, fields)}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {pmMode !== 'locked' && (
+        <button
+          onClick={addPayment}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 14px', borderRadius: 'var(--r2)',
+            border: '1px dashed var(--b3)', background: 'transparent',
+            color: 'var(--t3)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--em)';
+            e.currentTarget.style.color = 'var(--em)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--b3)';
+            e.currentTarget.style.color = 'var(--t3)';
+          }}
+        >
+          <i className="ti ti-plus" />
+          {pmMode === 'additive' ? 'إضافة دفعة جديدة' : 'إضافة دفعة'}
+        </button>
+      )}
+    </Section>
+  );
+}

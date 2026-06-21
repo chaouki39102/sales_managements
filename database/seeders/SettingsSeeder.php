@@ -567,6 +567,15 @@ class SettingsSeeder extends Seeder
         $now      = now();
         $settings = $this->getDefaultSettings();
 
+        // تعيين فئة السعر الافتراضية من أول فئة سعر is_default=true
+        $defaultPriceLevelId = DB::table('price_levels')
+            ->where('company_id', $companyId)
+            ->where('is_default', true)
+            ->value('id');
+        if ($defaultPriceLevelId) {
+            $settings['default_price_level_id']['value'] = $defaultPriceLevelId;
+        }
+
         foreach ($settings as $key => $config) {
             // تحويل القيمة إلى نص باستخدام نفس منطق SettingService
             $storedValue = $this->toStorageValue($config['value']);

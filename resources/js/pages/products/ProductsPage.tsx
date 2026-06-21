@@ -13,6 +13,8 @@ import EmptyState from '@/components/ui/EmptyState';
 import Switch from '@/components/ui/Switch';
 import ProgressBar from '@/components/ui/ProgressBar';
 import ProductModal from '@/components/products/ProductModal';
+import ImportWizardModal from '@/pages/import/ImportWizardModal';
+import { PRODUCT_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 
@@ -239,6 +241,8 @@ const { data: brands = [] } = useQuery<Brand[]>({
   const openAdd  = () => { setEditingProduct(null); modal.openModal(); };
   const openEdit = (p: Product) => { setEditingProduct(p); modal.openModal(); };
 
+  const importModal = useModal();
+
   const getFamilyName = (id: number | null) => families.find(f => f.id === id)?.name ?? '—';
   const getBrandName  = (id: number | null) => brands.find(b => b.id === id)?.name  ?? '—';
 
@@ -279,9 +283,14 @@ const { data: brands = [] } = useQuery<Brand[]>({
         title="المنتجات"
         subtitle={`إدارة المنتجات — ${meta.total} منتج`}
         actions={
-          <Button variant="primary" size="sm" icon={<i className="ti ti-plus" />} onClick={openAdd}>
-            منتج جديد
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button size="sm" icon={<i className="ti ti-table-import" />} onClick={importModal.openModal}>
+              استيراد
+            </Button>
+            <Button variant="primary" size="sm" icon={<i className="ti ti-plus" />} onClick={openAdd}>
+              منتج جديد
+            </Button>
+          </div>
         }
       />
 
@@ -592,6 +601,13 @@ const { data: brands = [] } = useQuery<Brand[]>({
           </Button>
         </div>
       </Modal>
+
+      {/* Import Wizard */}
+      <ImportWizardModal
+        open={importModal.open}
+        onClose={importModal.closeModal}
+        config={PRODUCT_IMPORT_CONFIG}
+      />
     </div>
   );
 }

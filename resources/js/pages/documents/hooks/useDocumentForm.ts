@@ -140,7 +140,7 @@ export interface UseDocumentFormReturn {
   priceLevelId:           number | null;
   addLine:                () => void;
   addLineWithProduct:     (productId: string, unitPrice?: number, tvaRate?: number) => void;
-  bulkAddLines:           (importedLines: Array<{description?: string; unit_price_ht?: number; quantity?: number; line_note?: string}>) => void;
+  bulkAddLines:           (importedLines: Array<{product_id?: string; description?: string; unit_price_ht?: number; quantity?: number; tva_rate?: number; line_note?: string}>) => void;
   removeLine:             (idx: number) => void;
   duplicateLine:          (idx: number) => void;
   updateLine:             (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
@@ -960,7 +960,7 @@ export function useDocumentForm({
   }, [defaultTvaRate]);
 
   const bulkAddLines = useCallback((importedLines: Array<{
-    description?: string; unit_price_ht?: number; quantity?: number; line_note?: string;
+    product_id?: string; description?: string; unit_price_ht?: number; quantity?: number; tva_rate?: number; line_note?: string;
   }>) => {
     setForm((f) => ({
       ...f,
@@ -968,9 +968,11 @@ export function useDocumentForm({
         ...f.lines,
         ...importedLines.map((line) => ({
           ...makeLine(defaultTvaRate),
+          product_id: line.product_id ?? '',
           description: line.description ?? '',
           unit_price_ht: line.unit_price_ht ?? 0,
           quantity: line.quantity ?? 1,
+          tva_rate: line.tva_rate ?? defaultTvaRate,
           line_note: line.line_note ?? '',
         })),
       ],
@@ -1212,7 +1214,7 @@ export function useDocumentForm({
   return {
     form, errors, lineErr, apiErr, setApiErr,
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
-    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
+    addLine, addLineWithProduct, bulkAddLines, removeLine, duplicateLine, updateLine,
     paymentMode: pmMode,
     existingPayments, newPayments,
     addPayment, addPaymentWithValues, removePayment, updatePayment,

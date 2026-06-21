@@ -391,6 +391,14 @@ Route::prefix('v1')->group(function () {
 
                 // تخفيضات الكميات
                 Route::apiResource('quantity-discounts', QuantityDiscountController::class);
+
+                // استيراد (import) للمنتجات والأطراف
+                Route::prefix('import')->group(function () {
+                    Route::post('products/preview', [\App\Http\Controllers\Api\V1\ImportController::class, 'previewProducts']);
+                    Route::post('products/execute', [\App\Http\Controllers\Api\V1\ImportController::class, 'executeProducts']);
+                    Route::post('parties/preview',  [\App\Http\Controllers\Api\V1\ImportController::class, 'previewParties']);
+                    Route::post('parties/execute',  [\App\Http\Controllers\Api\V1\ImportController::class, 'executeParties']);
+                });
             });
 
             // ── ⑤-ب-٢: السنوات المالية (manage_fiscal_year) ─────

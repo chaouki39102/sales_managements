@@ -6,6 +6,7 @@ use App\Core\Exceptions\BusinessRuleException;
 use App\Models\FiscalYear;
 use App\Models\OpeningBalanceParty;
 use App\Models\Party;
+use App\Models\PartyType;
 use Illuminate\Database\Eloquent\Model;
 
 class PartyService extends \App\Core\Services\BaseService
@@ -182,8 +183,13 @@ class PartyService extends \App\Core\Services\BaseService
 
     public function getCustomers(array $params = [])
     {
-        return Party::where('company_id', $this->getCurrentCompanyId())
-            ->where('party_type_id', 1)
+        $companyId = $this->getCurrentCompanyId();
+        $clientTypeId = PartyType::where('company_id', $companyId)
+            ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
+            ->value('id');
+
+        return Party::where('company_id', $companyId)
+            ->where('party_type_id', $clientTypeId)
             ->when(
                 !empty($params['search']),
                 fn($q) => $q->where(
@@ -199,12 +205,17 @@ class PartyService extends \App\Core\Services\BaseService
     }
 
     /**
-     * Get suppliers (party_type_id = 2) with pagination
+     * Get suppliers with pagination
      */
     public function getSuppliers(array $params = [])
     {
-        return Party::where('company_id', $this->getCurrentCompanyId())
-            ->where('party_type_id', 2)
+        $companyId = $this->getCurrentCompanyId();
+        $supplierTypeId = PartyType::where('company_id', $companyId)
+            ->where(fn($q) => $q->where('name', 'supplier')->orWhere('slug', 'supplier'))
+            ->value('id');
+
+        return Party::where('company_id', $companyId)
+            ->where('party_type_id', $supplierTypeId)
             ->when(
                 !empty($params['search']),
                 fn($q) => $q->where(

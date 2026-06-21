@@ -1,5 +1,5 @@
 # Module Export: Party
-Generated at: 2026-06-17 10:45:40
+Generated at: 2026-06-21 10:37:17
 
 ## Models
 
@@ -695,6 +695,7 @@ use App\Core\Exceptions\BusinessRuleException;
 use App\Models\FiscalYear;
 use App\Models\OpeningBalanceParty;
 use App\Models\Party;
+use App\Models\PartyType;
 use Illuminate\Database\Eloquent\Model;
 
 class PartyService extends \App\Core\Services\BaseService
@@ -871,8 +872,13 @@ class PartyService extends \App\Core\Services\BaseService
 
     public function getCustomers(array $params = [])
     {
-        return Party::where('company_id', $this->getCurrentCompanyId())
-            ->where('party_type_id', 1)
+        $companyId = $this->getCurrentCompanyId();
+        $clientTypeId = PartyType::where('company_id', $companyId)
+            ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
+            ->value('id');
+
+        return Party::where('company_id', $companyId)
+            ->where('party_type_id', $clientTypeId)
             ->when(
                 !empty($params['search']),
                 fn($q) => $q->where(
@@ -888,12 +894,17 @@ class PartyService extends \App\Core\Services\BaseService
     }
 
     /**
-     * Get suppliers (party_type_id = 2) with pagination
+     * Get suppliers with pagination
      */
     public function getSuppliers(array $params = [])
     {
-        return Party::where('company_id', $this->getCurrentCompanyId())
-            ->where('party_type_id', 2)
+        $companyId = $this->getCurrentCompanyId();
+        $supplierTypeId = PartyType::where('company_id', $companyId)
+            ->where(fn($q) => $q->where('name', 'supplier')->orWhere('slug', 'supplier'))
+            ->value('id');
+
+        return Party::where('company_id', $companyId)
+            ->where('party_type_id', $supplierTypeId)
             ->when(
                 !empty($params['search']),
                 fn($q) => $q->where(
@@ -982,6 +993,7 @@ class UpdateOpeningBalancePartyRequest extends FormRequest
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 
 class StoreOpeningBalancePartyRequest extends FormRequest
@@ -995,9 +1007,21 @@ class StoreOpeningBalancePartyRequest extends FormRequest
     {
         return [
             'fiscal_year_id' => 'required|exists:fiscal_years,id',
-            'party_id' => 'required|exists:parties,id',
+            'party_id' => [
+                'required',
+                'exists:parties,id',
+                Rule::unique('opening_balances_parties')
+                    ->where('fiscal_year_id', $this->input('fiscal_year_id')),
+            ],
             'opening_balance' => 'required|numeric',
             'balance_type' => 'required|in:debit,credit',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'party_id.unique' => 'هذا المتعامل لديه رصيد افتتاحي بالفعل لهذه السنة',
         ];
     }
 }
@@ -1322,41 +1346,13 @@ class OpeningBalancePartyPolicy
 {
     use HandlesAuthorization;
 
-    public function viewAny(User $user): bool
-    {
-        return $user->can('view_any_opening_balance_party');
-    }
-
-    public function view(User $user, $model): bool
-    {
-        return $user->can('view_opening_balance_party');
-    }
-
-    public function create(User $user): bool
-    {
-        return $user->can('create_opening_balance_party');
-    }
-
-    public function update(User $user, $model): bool
-    {
-        return $user->can('update_opening_balance_party');
-    }
-
-    public function delete(User $user, $model): bool
-    {
-        return $user->can('delete_opening_balance_party');
-    }
-
-    public function restore(User $user, $model): bool
-    {
-        return $user->can('restore_opening_balance_party');
-    }
-
-    public function forceDelete(User $user, $model): bool
-    {
-        return $user->can('force_delete_opening_balance_party');
-    }
+    public function viewAny(User $user): bool { return $user->can('manage_opening_balances'); }
+    public function view(User $user, $model): bool { return $user->can('manage_opening_balances'); }
+    public function create(User $user): bool { return $user->can('manage_opening_balances'); }
+    public function update(User $user, $model): bool { return $user->can('manage_opening_balances'); }
+    public function delete(User $user, $model): bool { return $user->can('manage_opening_balances'); }
 }
+
 ```
 
 ### 📁 D:\xampp\htdocs\sales-management\app\Policies\PartyPolicy.php

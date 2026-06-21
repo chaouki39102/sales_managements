@@ -185,6 +185,17 @@ class SettingService extends BaseService
                 ];
             }
 
+            // إذا كانت فئة السعر الافتراضية 0/null نبحث عن أول is_default في price_levels
+            if ($companyId && empty($dict['default_price_level_id']['value'])) {
+                $defaultId = DB::table('price_levels')
+                    ->where('company_id', $companyId)
+                    ->where('is_default', true)
+                    ->value('id');
+                if ($defaultId) {
+                    $dict['default_price_level_id']['value'] = (int) $defaultId;
+                }
+            }
+
             return $dict;
         });
     }

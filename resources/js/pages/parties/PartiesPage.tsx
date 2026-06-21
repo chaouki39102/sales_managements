@@ -18,6 +18,8 @@ import EmptyState      from '@/components/ui/EmptyState';
 import Card            from '@/components/ui/Card';
 import PartyFormModal  from '@/components/modals/PartyFormModal';
 import PartyStatsModal from '@/components/modals/PartyStatsModal';
+import ImportWizardModal from '@/pages/import/ImportWizardModal';
+import { PARTY_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import type { Party }  from '@/types';
 
 export const PT = { CUSTOMER: 1, SUPPLIER: 2, BOTH: 3 } as const;
@@ -111,6 +113,7 @@ export default function PartiesPage() {
   const [viewParty,    setViewParty]    = useState<Party | null>(null);
   const formModal  = useModal();
   const statsModal = useModal();
+  const importModal = useModal();
 
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedQ(search); setPage(1); }, 350);
@@ -175,6 +178,7 @@ export default function PartiesPage() {
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button size="sm" icon={<i className="ti ti-table-export" />}>تصدير</Button>
+            <Button size="sm" icon={<i className="ti ti-table-import" />} onClick={importModal.openModal}>استيراد</Button>
             <NewPartyBtn onSelect={openCreate} />
           </div>
         }
@@ -358,6 +362,12 @@ export default function PartiesPage() {
         open={statsModal.open} party={viewParty}
         onClose={statsModal.closeModal}
         onEdit={p => { statsModal.closeModal(); openEdit(p); }}
+      />
+
+      <ImportWizardModal
+        open={importModal.open}
+        onClose={importModal.closeModal}
+        config={PARTY_IMPORT_CONFIG}
       />
     </div>
   );
