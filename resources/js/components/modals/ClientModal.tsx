@@ -1,6 +1,6 @@
 // resources/js/components/modals/ClientModal.tsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import AlertBar from '@/components/ui/AlertBar';
@@ -17,17 +17,12 @@ interface ClientModalProps {
   onSubmit: (data: any) => Promise<void>;
 }
 
-let modalKeyCounter = 0;
-
 export default function ClientModal({ open, party, onClose, onSaved, isSubmitting, onSubmit }: ClientModalProps) {
   const isEdit = !!party;
   const [activeTab, setActiveTab]           = useState(0);
   const [selectedWilayaId, setSelectedWilayaId] = useState<number | null>(null);
   const [error, setError]     = useState('');
   const [success, setSuccess] = useState('');
-  const [modalKey, setModalKey] = useState(0);
-
-  const prevOpenRef = useRef(open);
 
   // ── Lookups ───────────────────────────────────────────────────────
   const { data: wilayasRaw  = [] } = useWilayas();
@@ -98,11 +93,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
     };
   };
 
-  // force remount counter to ensure form is always fresh on open/edit switch
   useEffect(() => {
-    const wasOpen = prevOpenRef.current;
-    prevOpenRef.current = open;
-
     if (!open) {
       setForm(emptyForm);
       setSelectedWilayaId(null);
@@ -117,14 +108,13 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
     setActiveTab(0);
 
     if (party) {
-      const wId = party.wilaya_id ?? null;
-      setSelectedWilayaId(wId);
+      setSelectedWilayaId(party.wilaya_id ?? null);
       setForm(buildFormFromParty(party));
     } else {
       setForm(emptyForm);
       setSelectedWilayaId(null);
     }
-  }, [open, party]);   // ✅ full party reference to catch all changes
+  }, [open, party]);
 
   const set = (key: string, value: any) =>
     setForm(prev => ({ ...prev, [key]: value }));

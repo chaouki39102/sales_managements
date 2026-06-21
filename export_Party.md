@@ -1,5 +1,5 @@
 # Module Export: Party
-Generated at: 2026-06-21 10:55:50
+Generated at: 2026-06-21 13:28:46
 
 ## Models
 
@@ -862,8 +862,25 @@ class PartyService extends \App\Core\Services\BaseService
         return app(CompanyContextService::class)->get();
     }
 
+    // ─── استخراج params مع دعم filter[key] و key مباشرة ─────────────────────
+    // الفرونتاند يُرسل: filter[search]=... و filter[active]=...
+    // Laravel يُحوّلها إلى: $params['filter']['search'] و $params['filter']['active']
+    // لكن النسخة القديمة كانت تقرأ: $params['search'] و $params['active'] — خطأ
+
+    private function extractParam(array $params, string $key, mixed $default = null): mixed
+    {
+        // أولاً: ابحث في filter[key] (ما يُرسله الفرونتاند)
+        if (isset($params['filter'][$key]) && $params['filter'][$key] !== '') {
+            return $params['filter'][$key];
+        }
+        // ثانياً: ابحث في المستوى الأول (للتوافق مع أي استخدام مباشر)
+        if (isset($params[$key]) && $params[$key] !== '') {
+            return $params[$key];
+        }
+        return $default;
+    }
+
     // ─── getCustomers ─────────────────────────────────────────────────────────
-    // الإصلاح: إضافة دعم فلتر `active` و`per_page` بشكل صريح
 
     public function getCustomers(array $params = [])
     {
@@ -872,32 +889,40 @@ class PartyService extends \App\Core\Services\BaseService
             ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
             ->value('id');
 
+        // ✅ استخراج صحيح: يدعم filter[search] و filter[active] و search و active
+        $search   = $this->extractParam($params, 'search');
+        $active   = $this->extractParam($params, 'active');
+        $perPage  = (int) ($params['per_page']  ?? 25);
+        $page     = (int) ($params['page']       ?? 1);
+        $sortBy   = $params['sort_by']  ?? 'name';
+        $sortDir  = $params['sort_dir'] ?? 'asc';
+
         return Party::where('company_id', $companyId)
             ->where('party_type_id', $clientTypeId)
             // ── فلتر البحث ──────────────────────────────────────────────────
             ->when(
-                !empty($params['search']),
+                !empty($search),
                 fn($q) => $q->where(
                     fn($q2) => $q2
-                        ->where('name',            'like', "%{$params['search']}%")
-                        ->orWhere('commercial_name','like', "%{$params['search']}%")
-                        ->orWhere('phone',          'like', "%{$params['search']}%")
-                        ->orWhere('nif',            'like', "%{$params['search']}%")
+                        ->where('name',             'like', "%{$search}%")
+                        ->orWhere('commercial_name', 'like', "%{$search}%")
+                        ->orWhere('phone',           'like', "%{$search}%")
+                        ->orWhere('nif',             'like', "%{$search}%")
                 )
             )
             // ── فلتر الحالة: null = الكل، 1 = نشط، 0 = موقوف ──────────────
             ->when(
-                isset($params['active']) && $params['active'] !== null && $params['active'] !== '',
-                fn($q) => $q->where('active', (bool) $params['active'])
+                $active !== null,
+                fn($q) => $q->where('active', filter_var($active, FILTER_VALIDATE_BOOLEAN))
             )
             // ── الترتيب ──────────────────────────────────────────────────────
-            ->orderBy($params['sort_by'] ?? 'name', $params['sort_dir'] ?? 'asc')
+            ->orderBy($sortBy, $sortDir)
             // ── التصفيح ──────────────────────────────────────────────────────
             ->paginate(
-                max(5, min(100, (int) ($params['per_page'] ?? 25))),
+                max(5, min(100, $perPage)),
                 ['*'],
                 'page',
-                max(1, (int) ($params['page'] ?? 1))
+                max(1, $page)
             );
     }
 
@@ -910,28 +935,36 @@ class PartyService extends \App\Core\Services\BaseService
             ->where(fn($q) => $q->where('name', 'supplier')->orWhere('slug', 'supplier'))
             ->value('id');
 
+        // ✅ نفس الإصلاح
+        $search  = $this->extractParam($params, 'search');
+        $active  = $this->extractParam($params, 'active');
+        $perPage = (int) ($params['per_page'] ?? 25);
+        $page    = (int) ($params['page']      ?? 1);
+        $sortBy  = $params['sort_by']  ?? 'name';
+        $sortDir = $params['sort_dir'] ?? 'asc';
+
         return Party::where('company_id', $companyId)
             ->where('party_type_id', $supplierTypeId)
             ->when(
-                !empty($params['search']),
+                !empty($search),
                 fn($q) => $q->where(
                     fn($q2) => $q2
-                        ->where('name',            'like', "%{$params['search']}%")
-                        ->orWhere('commercial_name','like', "%{$params['search']}%")
-                        ->orWhere('phone',          'like', "%{$params['search']}%")
-                        ->orWhere('nif',            'like', "%{$params['search']}%")
+                        ->where('name',             'like', "%{$search}%")
+                        ->orWhere('commercial_name', 'like', "%{$search}%")
+                        ->orWhere('phone',           'like', "%{$search}%")
+                        ->orWhere('nif',             'like', "%{$search}%")
                 )
             )
             ->when(
-                isset($params['active']) && $params['active'] !== null && $params['active'] !== '',
-                fn($q) => $q->where('active', (bool) $params['active'])
+                $active !== null,
+                fn($q) => $q->where('active', filter_var($active, FILTER_VALIDATE_BOOLEAN))
             )
-            ->orderBy($params['sort_by'] ?? 'name', $params['sort_dir'] ?? 'asc')
+            ->orderBy($sortBy, $sortDir)
             ->paginate(
-                max(5, min(100, (int) ($params['per_page'] ?? 25))),
+                max(5, min(100, $perPage)),
                 ['*'],
                 'page',
-                max(1, (int) ($params['page'] ?? 1))
+                max(1, $page)
             );
     }
 }

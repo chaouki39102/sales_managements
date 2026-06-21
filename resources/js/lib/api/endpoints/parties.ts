@@ -4,7 +4,7 @@
 import {
   useQuery, useMutation, useQueryClient, keepPreviousData,
 } from '@tanstack/react-query';
-import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
+import apiClient, { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug } from '../../store/appStore';
 import type { Party, PaginatedResponse } from '../core/types';
@@ -135,17 +135,19 @@ export async function fetchAllCustomers(search?: string, active?: boolean): Prom
   const perPage = 100;
 
   do {
-    const res = await partiesApi.clients({
-      per_page: perPage,
-      page,
-      include: 'wilaya,commune,legalForm,defaultPriceLevel',
-      ...(search ? { search } : {}),
-      ...(active !== undefined ? { active } : {}),
+    const res = await apiClient.get('/customers', {
+      params: {
+        per_page: perPage,
+        page,
+        include: 'wilaya,commune,legalForm,defaultPriceLevel',
+        ...(search ? { search } : {}),
+        ...(active !== undefined ? { active } : {}),
+      },
     });
-    const data = (res as any).data ?? [];
+    const body = res.data;
+    const data = body?.data ?? [];
     all.push(...data);
-    const meta = (res as any).meta;
-    lastPage = meta?.last_page ?? 1;
+    lastPage = body?.meta?.last_page ?? 1;
     page++;
   } while (page <= lastPage);
 

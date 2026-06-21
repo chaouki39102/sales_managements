@@ -455,21 +455,46 @@ export default function ClientsPage() {
               </Button>
               {colMenuOpen && (
                 <div style={{
-                  position: 'absolute', left: 0, top: '100%', zIndex: 500, minWidth: 220,
+                  position: 'absolute', left: 0, top: '100%', zIndex: 500, minWidth: 240,
                   background: 'var(--bg2)', border: '1px solid var(--bd)',
                   borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,.15)',
-                  padding: 8, marginTop: 4, maxHeight: 380, overflowY: 'auto',
+                  padding: 6, marginTop: 4, maxHeight: 400, overflowY: 'auto',
                 }}>
-                  {buildTableCols(new Set()).filter(c => !c.always).map(col => (
-                    <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, borderRadius: 6, transition: 'background .1s' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}>
-                      <input type="checkbox" checked={!hiddenCols.has(col.key)}
-                        onChange={() => toggleCol(col.key)}
-                        style={{ accentColor: 'var(--em)' }} />
-                      {col.label}
-                    </label>
-                  ))}
+                  {(() => {
+                    const allCols = buildTableCols(new Set()).filter(c => !c.always);
+                    const groups: { label: string; keys: string[] }[] = [
+                      { label: 'معلومات أساسية',   keys: ['commercial_name','code','phone','mobile','fax','email'] },
+                      { label: 'الموقع',            keys: ['location','address'] },
+                      { label: 'وثائق قانونية',     keys: ['legal_form','activity','nif','nis','rc','ai','capital_amount','rc_date'] },
+                      { label: 'مالية',             keys: ['balance','credit_limit','credit_days','bank_name','rib'] },
+                      { label: 'حالة',              keys: ['active','created_at'] },
+                    ];
+                    const colMap = new Map(allCols.map(c => [c.key, c]));
+                    return groups.map((g, gi) => (
+                      <div key={g.label}>
+                        <div style={{
+                          padding: '6px 10px 3px', fontSize: 11, fontWeight: 700,
+                          color: 'var(--t4)', letterSpacing: '.5px', marginTop: gi ? 4 : 0,
+                        }}>
+                          {g.label}
+                        </div>
+                        {g.keys.map(key => {
+                          const col = colMap.get(key);
+                          if (!col) return null;
+                          return (
+                            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', cursor: 'pointer', fontSize: 13, borderRadius: 6, transition: 'background .1s' }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}>
+                              <input type="checkbox" checked={!hiddenCols.has(key)}
+                                onChange={() => toggleCol(key)}
+                                style={{ accentColor: 'var(--em)' }} />
+                              {col.label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
                 </div>
               )}
             </div>
