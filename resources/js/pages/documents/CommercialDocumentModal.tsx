@@ -33,6 +33,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
@@ -62,6 +63,7 @@ import { AdvancePaymentsPanel } from './components/AdvancePaymentsPanel';
 import { BarcodeInput } from './components/BarcodeInput';
 import { LineCard } from './components/LineCard';
 import { BulkImportModal } from './components/BulkImportModal';
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
 import {
   Section, Label, FieldError, Toggle, TotalCard,
   ComboBox, ColumnManager, AlertBanner, Tabs,
@@ -243,6 +245,7 @@ export default function CommercialDocumentModal({
 
   const slug           = useActiveSlug();
   const qc             = useQueryClient();
+  const navigate       = useNavigate();
   const { selectedYear } = useFiscalYear() as { selectedYear?: { id: number; name: string } };
 
   const docCode    = documentType?.code ?? '';
@@ -531,6 +534,9 @@ export default function CommercialDocumentModal({
   const successTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
 
+  // ─── Delete confirmation modal ────────────────────────────────────────────
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
   // ── Auto-dismiss price level switch notification ──────────────────────────
   useEffect(() => {
     if (!priceLevelSwitchMsg) return;
@@ -545,7 +551,7 @@ export default function CommercialDocumentModal({
     const interval = setInterval(() => {
       try {
         const draft = { ...form, _savedAt: Date.now() };
-        localStorage.setItem(draftKey, JSON.stringify(draft));
+        localStorage.setItem(draftKey, btoa(unescape(encodeURIComponent(JSON.stringify(draft)))));
       } catch { /* localStorage full */ }
     }, 30_000);
     return () => clearInterval(interval);
@@ -555,7 +561,7 @@ export default function CommercialDocumentModal({
     try {
       const raw = localStorage.getItem(draftKey);
       if (!raw) return null;
-      const draft = JSON.parse(raw);
+      const draft = JSON.parse(decodeURIComponent(escape(atob(raw))));
       if (!draft.lines?.length) return null;
       const elapsed = Date.now() - (draft._savedAt ?? 0);
       if (elapsed > 86_400_000) { localStorage.removeItem(draftKey); return null; }
@@ -610,11 +616,12 @@ export default function CommercialDocumentModal({
       }
       const docNum = String((savedDoc as Record<string, unknown>)?.document_number ?? '—');
       setSuccessMsg(isEdit ? `تم تحديث المستند ${docNum}` : `تم إنشاء المستند ${docNum} ✓`);
+      navigator.clipboard?.writeText(docNum).catch(() => {});
       successTimer.current = setTimeout(() => {
         setSuccessMsg('');
         onSaved();
         onClose();
-      }, 1500);
+      }, 3000);
     },
     onError: (e: unknown) => {
       const err = e as Record<string, unknown>;
@@ -652,12 +659,19 @@ export default function CommercialDocumentModal({
       setDocNumberErr('رقم المستند إلزامي'); return;
     }
     if (docNumberErr) { setApiErr('رجاء التحقق من رقم المستند'); return; }
+    // فحص حد الائتمان
+    if (creditCheck?.will_exceed) {
+      if (!creditCheck.can_proceed) {
+        setApiErr('تجاوز حد الائتمان — يتطلب موافقة المدير');
+        return;
+      }
+      if (!window.confirm(`تجاوز حد الائتمان بـ ${fmtDZD(creditCheck.exceed_by)} دج — هل تريد المتابعة؟`)) return;
+    }
     if (validate()) saveMut.mutate();
   };
 
   const handleDelete = () => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المستند؟\n\nملاحظة: الحذف غير مدعوم — استخدم الإلغاء.')) return;
-    deleteMut.mutate();
+    setShowDeleteModal(true);
   };
 
   const handleExport = (format: 'excel' | 'pdf' | 'json' | 'xml') => {
@@ -670,9 +684,9 @@ export default function CommercialDocumentModal({
       lines: form.lines.map((l, i) => ({
         line: i + 1,
         product: l.description || l._product?.name || '',
-        quantity: l.quantity,
+        quantity: l.quantity * (l._packQty || 1),
         unitPrice: l.unit_price_ht,
-        total: l.quantity * l.unit_price_ht,
+        total: l.quantity * (l._packQty || 1) * l.unit_price_ht,
         tva: l.tva_rate,
       })),
       totals: {
@@ -1050,8 +1064,7 @@ export default function CommercialDocumentModal({
               }}
               onNavigate={(docId) => {
                 onClose();
-                // navigate to document — تعديل حسب router الخاص بك
-                window.location.href = `?document=${docId}`;
+                navigate(`?document=${docId}`, { replace: true });
               }}
             />
           )}
@@ -1230,7 +1243,10 @@ export default function CommercialDocumentModal({
                   }}
                   value={form.warehouse_id}
                   disabled={isReadOnly}
-                  onChange={(e) => set('warehouse_id', e.target.value)}
+                  onChange={(e) => {
+                    set('warehouse_id', e.target.value);
+                    qc.invalidateQueries({ queryKey: [slug, 'warehouse-stock', warehouseIdNum] });
+                  }}
                 >
                   <option value="">— اختر —</option>
                   {lookups.warehouses.map((w) => (
@@ -1472,9 +1488,7 @@ export default function CommercialDocumentModal({
                 <BarcodeInput
                   products={lookups.products}
                   onProductFound={(productId) => {
-                    addLine();
-                    const lastIdx = form.lines.length;
-                    updateLine(lastIdx, { product_id: String(productId) } as Parameters<typeof updateLine>[1]);
+                    addLineWithProduct(String(productId));
                   }}
                   disabled={isLinesReadOnly}
                 />
@@ -1701,16 +1715,12 @@ export default function CommercialDocumentModal({
               isLoading={isLoadingAdvances}
               onApply={(adv) => {
                 if (pmMode === 'locked') return;
-                addPayment();
-                setTimeout(() => {
-                  const lastIdx = newPayments.length;
-                  updatePayment(lastIdx, {
-                    payment_mode_id: String(adv.payment_mode_id),
-                    amount: String(adv.unapplied_amount),
-                    reference: adv.reference ?? '',
-                    payment_date: adv.payment_date,
-                  });
-                }, 0);
+                addPaymentWithValues({
+                  payment_mode_id: String(adv.payment_mode_id),
+                  amount: String(adv.unapplied_amount),
+                  reference: adv.reference ?? '',
+                  payment_date: adv.payment_date,
+                });
               }}
               disabled={pmMode === 'locked'}
             />
@@ -2278,6 +2288,7 @@ export default function CommercialDocumentModal({
       <BulkImportModal
         open={showBulkImport}
         onClose={() => setShowBulkImport(false)}
+        products={lookups.products}
         onImport={(importedLines) => {
           setForm((f) => ({
             ...f,
@@ -2285,9 +2296,11 @@ export default function CommercialDocumentModal({
               ...f.lines,
               ...importedLines.map((line) => ({
                 ...makeLine(defaultTvaRate),
+                product_id: line.product_id ?? '',
                 description: line.description ?? '',
                 unit_price_ht: line.unit_price_ht ?? 0,
                 quantity: line.quantity ?? 1,
+                tva_rate: line.tva_rate ?? defaultTvaRate,
                 line_note: line.line_note ?? '',
               })),
             ],
@@ -2311,6 +2324,19 @@ export default function CommercialDocumentModal({
           onClose={() => setShowReturnModal(false)}
         />
       )}
+
+      {/* تأكيد الحذف */}
+      <ConfirmDeleteModal
+        open={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          setShowDeleteModal(false);
+          deleteMut.mutate();
+        }}
+        loading={deleteMut.isPending}
+        itemName={existingDocument?.document_number ? `#${existingDocument.document_number}` : undefined}
+        warning="ملاحظة: الحذف غير مدعوم — استخدم الإلغاء."
+      />
     </div>
   );
 }

@@ -661,7 +661,7 @@ export function useDocumentForm({
 
     const curForm       = formRef.current!;
     const party         = partiesRef.current.find((p) => String(p.id) === id);
-    const newPriceLevel = party?.default_price_level_id ?? (defaultPriceLevelId ? parseInt(defaultPriceLevelId) : null);
+    const newPriceLevel = party?.default_price_level_id ?? party?.default_price_level?.id ?? party?.price_level?.id ?? (defaultPriceLevelId ? parseInt(defaultPriceLevelId) : null);
     const curPriceLvl   = curForm.price_level_id ? parseInt(curForm.price_level_id) : null;
 
     if (existingPayments.length > 0) {
