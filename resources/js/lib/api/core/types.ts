@@ -278,6 +278,10 @@ export interface Party extends BaseModel {
   code?:                  string | null;
   slug:                   string;
   party_type_id:          number;
+  activity?:              string | null;
+  legal_form_id?:         number | null;
+  capital_amount?:        number;
+  rc_date?:               string | null;
   nif?:                   string | null;
   nis?:                   string | null;
   rc?:                    string | null;
@@ -287,16 +291,31 @@ export interface Party extends BaseModel {
   commune_id?:            number | null;
   phone?:                 string | null;
   mobile?:                string | null;
+  fax?:                   string | null;
   email?:                 string | null;
+  avatar?:                string | null;
+  bank_name?:             string | null;
+  rib?:                   string | null;
   initial_balance:        number;
   credit_limit:           number;
   credit_days?:           number | null;
   default_price_level_id?:number | null;
   is_tva_exempt:          boolean;
+  is_taxable?:            boolean;
+  tax_option?:            string | null;
+  cnas_number?:           string | null;
+  tax_regime?:            string | null;
+  is_final_consumer?:     boolean;
+  is_vat_registered?:     boolean;
+  vat_registration_date?: string | null;
+  additional_data?:       any;
   active:                 boolean;
   company_id:             number;
   // Relations
   party_type?:            PartyType;
+  legal_form?:            LegalForm;
+  commune?:               Commune;
+  wilaya?:                Wilaya;
   default_price_level?:   PriceLevel;
   // Computed
   balance?:               number;

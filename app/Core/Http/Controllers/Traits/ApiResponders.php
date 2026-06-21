@@ -115,6 +115,11 @@ trait ApiResponders
             return $data;
         }
 
+        // لا تحوّل القيم الفارغة (مثل destroy الذي يُعيد null)
+        if ($data === null) {
+            return $data;
+        }
+
         // Collection للـ Paginator
         if ($data instanceof LengthAwarePaginator) {
             return $this->resourceClass::collection($data);

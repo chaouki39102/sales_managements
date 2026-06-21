@@ -1,10 +1,6 @@
 // resources/js/components/modals/ClientModal.tsx
-// ✅ مُصلح: اختيار الولاية والبلدية يعمل بشكل صحيح
-// - Wilaya: select عادي بدل datalist (أكثر موثوقية)
-// - Commune: تُحدَّث فور اختيار الولاية
-// - التحقق من wilaya_id يستخدم الـ id مباشرة
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import AlertBar from '@/components/ui/AlertBar';
@@ -21,21 +17,24 @@ interface ClientModalProps {
   onSubmit: (data: any) => Promise<void>;
 }
 
+let modalKeyCounter = 0;
+
 export default function ClientModal({ open, party, onClose, onSaved, isSubmitting, onSubmit }: ClientModalProps) {
   const isEdit = !!party;
   const [activeTab, setActiveTab]           = useState(0);
   const [selectedWilayaId, setSelectedWilayaId] = useState<number | null>(null);
   const [error, setError]     = useState('');
   const [success, setSuccess] = useState('');
+  const [modalKey, setModalKey] = useState(0);
+
+  const prevOpenRef = useRef(open);
 
   // ── Lookups ───────────────────────────────────────────────────────
   const { data: wilayasRaw  = [] } = useWilayas();
   const { data: legalForms  = [] } = useLegalForms();
   const { data: priceLevels = [] } = usePriceLevels();
-  // ✅ تمرير selectedWilayaId — يُفعَّل الطلب فقط عند وجود ولاية
   const { data: communes = [], isFetching: loadingCommunes } = useCommunes(selectedWilayaId);
 
-  // ✅ فرز الولايات حسب رمزها الرسمي
   const wilayas: Wilaya[] = [...wilayasRaw].sort((a: any, b: any) => a.code - b.code);
 
   // ── Form state ────────────────────────────────────────────────────
@@ -55,62 +54,77 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
   };
   const [form, setForm] = useState(emptyForm);
 
-  // ── Reset on open ─────────────────────────────────────────────────
+  const buildFormFromParty = (p: Party) => {
+    const ns = (v: any) => v == null ? '' : v;
+    const nn = (v: any, d = 0) => v ?? d;
+
+    const wId = p.wilaya_id ?? null;
+
+    return {
+      ...emptyForm,
+      name:                   ns(p.name),
+      commercial_name:        ns(p.commercial_name),
+      code:                   ns(p.code),
+      activity:               ns(p.activity),
+      rc:                     ns(p.rc),
+      nif:                    ns(p.nif),
+      nis:                    ns(p.nis),
+      ai:                     ns(p.ai),
+      address:                ns(p.address),
+      phone:                  ns(p.phone),
+      mobile:                 ns(p.mobile),
+      fax:                    ns(p.fax),
+      email:                  ns(p.email),
+      bank_name:              ns(p.bank_name),
+      rib:                    ns(p.rib),
+      rc_date:                ns(p.rc_date),
+      vat_registration_date:  ns(p.vat_registration_date),
+      cnas_number:            ns(p.cnas_number),
+      tax_regime:             ns(p.tax_regime),
+      tax_option:             p.tax_option ?? null,
+      capital_amount:         nn(p.capital_amount),
+      initial_balance:        nn(p.initial_balance),
+      credit_limit:           nn(p.credit_limit),
+      credit_days:            nn(p.credit_days, 30),
+      is_tva_exempt:          p.is_tva_exempt    ?? false,
+      is_taxable:             p.is_taxable       ?? true,
+      is_final_consumer:      p.is_final_consumer ?? false,
+      is_vat_registered:      p.is_vat_registered ?? false,
+      active:                 p.active !== false,
+      wilaya_id:              wId,
+      commune_id:             p.commune_id             ?? null,
+      legal_form_id:          p.legal_form_id          ?? null,
+      default_price_level_id: p.default_price_level_id ?? null,
+    };
+  };
+
+  // force remount counter to ensure form is always fresh on open/edit switch
   useEffect(() => {
-    if (!open) return;
+    const wasOpen = prevOpenRef.current;
+    prevOpenRef.current = open;
 
-    if (party) {
-      const ns = (v: any) => v == null ? '' : v;      // null → ''
-      const nn = (v: any, d = 0) => v ?? d;            // null → default number
-
-      const wId = party.wilaya_id ?? null;
-      setSelectedWilayaId(wId);
-
-      setForm({
-        ...emptyForm,
-        name:                   ns(party.name),
-        commercial_name:        ns(party.commercial_name),
-        code:                   ns(party.code),
-        activity:               ns(party.activity),
-        rc:                     ns(party.rc),
-        nif:                    ns(party.nif),
-        nis:                    ns(party.nis),
-        ai:                     ns(party.ai),
-        address:                ns(party.address),
-        phone:                  ns(party.phone),
-        mobile:                 ns(party.mobile),
-        fax:                    ns(party.fax),
-        email:                  ns(party.email),
-        bank_name:              ns(party.bank_name),
-        rib:                    ns(party.rib),
-        rc_date:                ns(party.rc_date),
-        vat_registration_date:  ns(party.vat_registration_date),
-        cnas_number:            ns(party.cnas_number),
-        tax_regime:             ns(party.tax_regime),
-        tax_option:             party.tax_option ?? null,
-        capital_amount:         nn(party.capital_amount),
-        initial_balance:        nn(party.initial_balance),
-        credit_limit:           nn(party.credit_limit),
-        credit_days:            nn(party.credit_days, 30),
-        is_tva_exempt:          party.is_tva_exempt    ?? false,
-        is_taxable:             party.is_taxable       ?? true,
-        is_final_consumer:      party.is_final_consumer ?? false,
-        is_vat_registered:      party.is_vat_registered ?? false,
-        active:                 party.active !== false,
-        wilaya_id:              wId,
-        commune_id:             party.commune_id             ?? null,
-        legal_form_id:          party.legal_form_id          ?? null,
-        default_price_level_id: party.default_price_level_id ?? null,
-      });
-    } else {
+    if (!open) {
       setForm(emptyForm);
       setSelectedWilayaId(null);
+      setError('');
+      setSuccess('');
+      setActiveTab(0);
+      return;
     }
 
     setError('');
     setSuccess('');
     setActiveTab(0);
-  }, [open, party?.id]);   // ✅ party?.id فقط — ليس party كاملاً
+
+    if (party) {
+      const wId = party.wilaya_id ?? null;
+      setSelectedWilayaId(wId);
+      setForm(buildFormFromParty(party));
+    } else {
+      setForm(emptyForm);
+      setSelectedWilayaId(null);
+    }
+  }, [open, party]);   // ✅ full party reference to catch all changes
 
   const set = (key: string, value: any) =>
     setForm(prev => ({ ...prev, [key]: value }));
@@ -130,7 +144,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
       const n2 = (v: any) => v === '' ? null : v;
       await onSubmit({
         ...form,
-        party_type_id:         1,
+        party_type_id: 1,
         commercial_name:       n2(form.commercial_name),
         code:                  n2(form.code),
         activity:              n2(form.activity),
@@ -150,6 +164,18 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
         cnas_number:           n2(form.cnas_number),
         tax_regime:            n2(form.tax_regime),
         tax_option:            n2(form.tax_option),
+        legal_form_id:         form.legal_form_id,
+        wilaya_id:             form.wilaya_id,
+        commune_id:            form.commune_id,
+        credit_limit:          form.credit_limit,
+        credit_days:           form.credit_days,
+        default_price_level_id: form.default_price_level_id,
+        is_tva_exempt:         form.is_tva_exempt,
+        is_taxable:            form.is_taxable,
+        is_final_consumer:     form.is_final_consumer,
+        is_vat_registered:     form.is_vat_registered,
+        capital_amount:        form.capital_amount,
+        initial_balance:       form.initial_balance,
       });
       setSuccess(isEdit ? 'تم تعديل العميل بنجاح' : 'تم إضافة العميل بنجاح');
       setTimeout(() => { onSaved(); onClose(); }, 300);

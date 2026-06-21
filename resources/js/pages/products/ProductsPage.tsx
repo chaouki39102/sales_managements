@@ -1,8 +1,9 @@
 // resources/js/pages/products/ProductsPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useERPExport } from '@/components/ui/DataTable';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -17,6 +18,7 @@ import ImportWizardModal from '@/pages/import/ImportWizardModal';
 import { PRODUCT_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
+import type { Column } from '@/components/ui/DataTable';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types — مطابقة للـ DB الحقيقي (لا variants جدول منفصل)
@@ -94,6 +96,17 @@ interface ApiResponse<T> {
   };
 }
 
+interface TableCol {
+  key: string;
+  label: string;
+  thStyle?: React.CSSProperties;
+  tdStyle?: React.CSSProperties;
+  render: (row: Product, idx: number) => React.ReactNode;
+  always?: boolean;
+  sortable?: boolean;
+  sortField?: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
@@ -123,6 +136,23 @@ export default function ProductsPage() {
   const qc = useQueryClient();
   const { activeCompany } = useAuth();
   const slug = activeCompany?.slug ?? '';
+
+  const { exportData } = useERPExport({ defaultFileName: 'المنتجات', defaultCurrency: 'DZD' });
+  const [hiddenCols, setHiddenCols]       = useState<Set<string>>(new Set(['barcode', 'description', 'has_lots', 'has_expiration', 'min_stock_alert', 'created_at']));
+  const [colMenuOpen, setColMenuOpen]     = useState(false);
+  const colMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (colMenuRef.current && !colMenuRef.current.contains(e.target as Node)) setColMenuOpen(false);
+    }
+    if (colMenuOpen) { document.addEventListener('mousedown', handleClick); return () => document.removeEventListener('mousedown', handleClick); }
+  }, [colMenuOpen]);
+
+  const toggleCol = (key: string) => setHiddenCols(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
 
   // Search & Filters
   const [search, setSearch]           = useState('');
@@ -215,7 +245,11 @@ const { data: brands = [] } = useQuery<Brand[]>({
       deleteModal.closeModal();
       setDeletingId(null);
     },
-    onError: (err: any) => showToast(err?.response?.data?.message ?? 'فشل الحذف', 'error'),
+    onError: (err: any) => {
+      showToast(err?.response?.data?.message ?? 'فشل الحذف — قد يكون للمنتج حركات مخزون أو مستندات مرتبطة', 'error');
+      deleteModal.closeModal();
+      setDeletingId(null);
+    },
   });
 
   const toggleActiveMutation = useMutation({
@@ -245,6 +279,104 @@ const { data: brands = [] } = useQuery<Brand[]>({
 
   const getFamilyName = (id: number | null) => families.find(f => f.id === id)?.name ?? '—';
   const getBrandName  = (id: number | null) => brands.find(b => b.id === id)?.name  ?? '—';
+
+  const getExportCols = (): Column<Product>[] => [
+    { key: 'name',              header: 'المنتج',            exportHeader: 'المنتج',             accessor: (r) => r.name },
+    { key: 'ref',               header: 'المرجع',            exportHeader: 'المرجع',             accessor: (r) => r.ref },
+    { key: 'barcode',           header: 'الباركود',          exportHeader: 'الباركود',           accessor: (r) => r.barcode },
+    { key: 'family',            header: 'الفئة',             exportHeader: 'الفئة',              accessor: (r) => getFamilyName(r.family_id) },
+    { key: 'brand',             header: 'العلامة',            exportHeader: 'العلامة التجارية',    accessor: (r) => getBrandName(r.brand_id) },
+    { key: 'purchase_price',    header: 'سعر الشراء',         exportHeader: 'سعر الشراء (دج)',     accessor: (r) => r.purchase_price_ht,  aggregate: 'sum' as const },
+    { key: 'sell_price',        header: 'سعر البيع',          exportHeader: 'سعر البيع (دج)',      accessor: (r) => getMinPrice(r),       aggregate: 'avg' as const },
+    { key: 'current_stock',     header: 'المخزون',            exportHeader: 'المخزون الحالي',      accessor: (r) => r.current_stock ?? 0, aggregate: 'sum' as const },
+    { key: 'manages_stock',     header: 'يدير المخزون',       exportHeader: 'يدير المخزون',        accessor: (r) => r.manages_stock ? 'نعم' : 'لا' },
+    { key: 'min_stock_alert',   header: 'الحد الأدنى',        exportHeader: 'الحد الأدنى للمخزون', accessor: (r) => r.min_stock_alert },
+    { key: 'has_lots',          header: 'دفعات',              exportHeader: 'دفعات',              accessor: (r) => r.has_lots ? 'نعم' : 'لا' },
+    { key: 'has_expiration',    header: 'صلاحية',             exportHeader: 'تاريخ صلاحية',        accessor: (r) => r.has_expiration_date ? 'نعم' : 'لا' },
+    { key: 'active',            header: 'الحالة',             exportHeader: 'الحالة',             accessor: (r) => r.active ? 'نشط' : 'غير نشط' },
+    { key: 'description',       header: 'الوصف',              exportHeader: 'الوصف',              accessor: (r) => r.description },
+    { key: 'created_at',        header: 'تاريخ الإنشاء',      exportHeader: 'تاريخ الإنشاء',       accessor: (r) => r.created_at },
+  ];
+
+  const buildTableCols = (hidden: Set<string>): TableCol[] => [
+    { key: 'checkbox', label: '', thStyle: { width: 40, textAlign: 'center' as const }, always: true,
+      render: (prod) => (
+        <input type="checkbox" checked={selectedIds.includes(prod.id)}
+          onChange={() => setSelectedIds(prev =>
+            selectedIds.includes(prod.id) ? prev.filter(id => id !== prod.id) : [...prev, prod.id]
+          )}
+          onClick={e => e.stopPropagation()} />
+      )},
+    { key: 'name', label: 'المنتج', thStyle: { cursor: 'pointer', minWidth: 180 }, tdStyle: { minWidth: 180 }, sortable: true,
+      render: (prod) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+            background: prod.active ? 'var(--emb)' : 'var(--bg3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <i className="ti ti-package" style={{ fontSize: 16, color: prod.active ? 'var(--em)' : 'var(--t4)' }} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>{prod.name}</div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+              {prod.ref && (
+                <span style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace', background: 'var(--bg3)', padding: '1px 5px', borderRadius: 3 }}>
+                  {prod.ref}
+                </span>
+              )}
+              {prod.manages_stock && (
+                <span style={{ fontSize: 10, color: 'var(--t4)' }}><i className="ti ti-building-warehouse" style={{ fontSize: 10 }} /> مخزون</span>
+              )}
+              {prod.has_lots && (
+                <span style={{ fontSize: 10, color: 'var(--t4)' }}><i className="ti ti-layers" style={{ fontSize: 10 }} /> دفعات</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )},
+    { key: 'family_brand', label: 'الفئة / العلامة',
+      render: (prod) => (
+        <div style={{ fontSize: 12 }}>{getFamilyName(prod.family_id)}</div>
+      )},
+    { key: 'purchase_price', label: 'سعر الشراء', thStyle: { textAlign: 'right' as const, cursor: 'pointer' }, tdStyle: { textAlign: 'right' as const }, sortable: true, sortField: 'purchase_price_ht',
+      render: (prod) => (
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>
+          {prod.purchase_price_ht > 0 ? formatDZD(prod.purchase_price_ht) : '—'}
+        </div>
+      )},
+    { key: 'sell_price', label: 'سعر البيع', thStyle: { textAlign: 'right' as const }, tdStyle: { textAlign: 'right' as const },
+      render: (prod) => <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--em)' }}>{(getMinPrice(prod) > 0 ? formatDZD(getMinPrice(prod)) : '—')}</div> },
+    { key: 'stock', label: 'المخزون', thStyle: { textAlign: 'center' as const }, tdStyle: { textAlign: 'center' as const },
+      render: (prod) => {
+        const stockQty = prod.current_stock ?? 0;
+        const minAlert = prod.min_stock_alert ?? 0;
+        const stockPct = minAlert > 0 ? Math.min(100, (stockQty / (minAlert * 2)) * 100) : stockQty > 0 ? 100 : 0;
+        return prod.manages_stock ? (
+          <div style={{ minWidth: 80 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+              <ProgressBar value={stockPct} height={4} />
+              <span style={{ fontSize: 11, minWidth: 28, fontWeight: 600 }}>{stockQty}</span>
+            </div>
+            <StockBadge qty={stockQty} min={minAlert} />
+          </div>
+        ) : (
+          <span style={{ fontSize: 11, color: 'var(--t4)' }}>غير محدد</span>
+        );
+      }},
+    { key: 'active', label: 'الحالة', thStyle: { textAlign: 'center' as const }, tdStyle: { textAlign: 'center' as const },
+      render: (prod) => (
+        <span onClick={e => e.stopPropagation()}>
+          <Switch checked={prod.active} onChange={val => toggleActiveMutation.mutate({ id: prod.id, active: val })} />
+        </span>
+      )},
+    { key: 'actions', label: 'إجراءات', thStyle: { textAlign: 'center' as const, width: 100 }, tdStyle: { textAlign: 'center' as const }, always: true,
+      render: (prod) => (
+        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+          <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(prod)} title="تعديل" />
+          <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(prod.id)} title="حذف" />
+        </div>
+      )},
+  ].filter(col => col.always || !hidden.has(col.key));
 
   // ── Bulk ──
   const bulkToggle = async (active: boolean) => {
@@ -287,6 +419,35 @@ const { data: brands = [] } = useQuery<Brand[]>({
             <Button size="sm" icon={<i className="ti ti-table-import" />} onClick={importModal.openModal}>
               استيراد
             </Button>
+            <Button size="sm" icon={<i className="ti ti-table-export" />}
+              onClick={async () => { if (products.length) await exportData(products as any, getExportCols() as any); }}>
+              تصدير
+            </Button>
+            <div ref={colMenuRef} style={{ position: 'relative' }}>
+              <Button size="sm" icon={<i className="ti ti-columns" />}
+                onClick={() => setColMenuOpen(v => !v)}>
+                الأعمدة
+              </Button>
+              {colMenuOpen && (
+                <div style={{
+                  position: 'absolute', left: 0, top: '100%', zIndex: 500, minWidth: 200,
+                  background: 'var(--bg2)', border: '1px solid var(--bd)',
+                  borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,.15)',
+                  padding: 8, marginTop: 4,
+                }}>
+                  {buildTableCols(new Set()).filter(c => !c.always).map(col => (
+                    <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, borderRadius: 6, transition: 'background .1s' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}>
+                      <input type="checkbox" checked={!hiddenCols.has(col.key)}
+                        onChange={() => toggleCol(col.key)}
+                        style={{ accentColor: 'var(--em)' }} />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
             <Button variant="primary" size="sm" icon={<i className="ti ti-plus" />} onClick={openAdd}>
               منتج جديد
             </Button>
@@ -379,167 +540,24 @@ const { data: brands = [] } = useQuery<Brand[]>({
             <table style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th style={{ width: 40, textAlign: 'center' }}>
-                    <input type="checkbox"
-                      checked={selectedIds.length === products.length && products.length > 0}
-                      onChange={() => setSelectedIds(selectedIds.length === products.length ? [] : products.map(p => p.id))}
-                    />
-                  </th>
-                  <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', minWidth: 180 }}>
-                    المنتج {sortField === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th>الفئة / العلامة</th>
-                  <th style={{ textAlign: 'right' }}>سعر الشراء</th>
-                  <th style={{ textAlign: 'right' }}>سعر البيع</th>
-                  <th style={{ textAlign: 'center' }}>المخزون</th>
-                  <th style={{ textAlign: 'center' }}>الحالة</th>
-                  <th style={{ textAlign: 'center', width: 100 }}>إجراءات</th>
+                  {buildTableCols(hiddenCols).map(col => (
+                    <th key={col.key} style={col.thStyle}
+                      onClick={col.sortable ? () => handleSort(col.sortField ?? col.key) : undefined}>
+                      {col.label}{col.sortable && sortField === (col.sortField ?? col.key) ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {products.map(prod => {
-                  const sellPrice    = getMinPrice(prod);
-                  const stockQty     = prod.current_stock ?? 0;
-                  const minAlert     = prod.min_stock_alert ?? 0;
-                  const stockPct     = minAlert > 0 ? Math.min(100, (stockQty / (minAlert * 2)) * 100) : stockQty > 0 ? 100 : 0;
-                  const isSelected   = selectedIds.includes(prod.id);
-                  const priceCount   = (prod.prices ?? []).filter(p => p.active).length;
-
-                  return (
-                    <tr key={prod.id} style={{ background: isSelected ? 'var(--emb)' : undefined }}>
-                      {/* Checkbox */}
-                      <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                        <input type="checkbox" checked={isSelected}
-                          onChange={() => setSelectedIds(prev =>
-                            isSelected ? prev.filter(id => id !== prod.id) : [...prev, prod.id]
-                          )}
-                        />
+                {products.map(prod => (
+                  <tr key={prod.id} style={{ background: selectedIds.includes(prod.id) ? 'var(--emb)' : undefined }}>
+                    {buildTableCols(hiddenCols).map(col => (
+                      <td key={col.key} style={col.tdStyle} onClick={col.key === 'sell_price' ? (e) => e.stopPropagation() : undefined}>
+                        {col.render(prod, products.indexOf(prod))}
                       </td>
-
-                      {/* المنتج */}
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {/* أيقونة */}
-                          <div style={{
-                            width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-                            background: prod.active ? 'var(--emb)' : 'var(--bg3)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            <i className="ti ti-package" style={{ fontSize: 16, color: prod.active ? 'var(--em)' : 'var(--t4)' }} />
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, fontSize: 13 }}>{prod.name}</div>
-                            <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                              {prod.ref && (
-                                <span style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace', background: 'var(--bg3)', padding: '1px 5px', borderRadius: 3 }}>
-                                  {prod.ref}
-                                </span>
-                              )}
-                              {prod.manages_stock && (
-                                <span style={{ fontSize: 10, color: 'var(--t4)' }}>
-                                  <i className="ti ti-building-warehouse" style={{ fontSize: 10 }} /> مخزون
-                                </span>
-                              )}
-                              {prod.has_lots && (
-                                <span style={{ fontSize: 10, color: 'var(--t4)' }}>
-                                  <i className="ti ti-layers" style={{ fontSize: 10 }} /> دفعات
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* الفئة / العلامة */}
-                      <td>
-                        <div style={{ fontSize: 12 }}>{getFamilyName(prod.family_id)}</div>
-                        {prod.brand_id && (
-                          <div style={{ fontSize: 11, color: 'var(--t4)' }}>{getBrandName(prod.brand_id)}</div>
-                        )}
-                      </td>
-
-                      {/* سعر الشراء */}
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>
-                          {prod.purchase_price_ht > 0 ? formatDZD(prod.purchase_price_ht) : '—'}
-                        </div>
-                      </td>
-
-                      {/* سعر البيع — مع tooltip للأسعار */}
-                      <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                        <div style={{ position: 'relative', display: 'inline-block' }}>
-                          <div
-                            style={{ cursor: priceCount > 1 ? 'pointer' : 'default' }}
-                            onMouseEnter={() => priceCount > 0 && setPriceTooltip(prod.id)}
-                            onMouseLeave={() => setPriceTooltip(null)}
-                          >
-                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--em)' }}>
-                              {sellPrice > 0 ? formatDZD(sellPrice) : '—'}
-                            </div>
-                            {priceCount > 1 && (
-                              <div style={{ fontSize: 10, color: 'var(--t4)' }}>
-                                {priceCount} مستوى <i className="ti ti-chevron-down" style={{ fontSize: 9 }} />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Tooltip أسعار */}
-                          {priceTooltip === prod.id && (prod.prices ?? []).length > 0 && (
-                            <div style={{
-                              position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
-                              background: 'var(--bg1)', border: '1px solid var(--b2)',
-                              borderRadius: 'var(--r2)', boxShadow: 'var(--shadow2)',
-                              padding: 8, minWidth: 200, zIndex: 200, whiteSpace: 'nowrap',
-                              marginBottom: 4,
-                            }}>
-                              {(prod.prices ?? []).filter(p => p.active).map(p => (
-                                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', fontSize: 11, gap: 12 }}>
-                                  <span style={{ color: 'var(--t3)' }}>{p.price_level?.name ?? `مستوى ${p.price_level_id}`}</span>
-                                  <span style={{ fontWeight: 600 }}>
-                                    {p.pricing_method === 'fixed'  && p.price  !== null ? formatDZD(p.price)  : ''}
-                                    {p.pricing_method === 'rate'   && p.rate   !== null ? `${p.rate}%` : ''}
-                                    {p.pricing_method === 'margin' && p.margin !== null ? `+${formatDZD(p.margin)}` : ''}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* المخزون */}
-                      <td style={{ textAlign: 'center' }}>
-                        {prod.manages_stock ? (
-                          <div style={{ minWidth: 80 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                              <ProgressBar value={stockPct} height={4} />
-                              <span style={{ fontSize: 11, minWidth: 28, fontWeight: 600 }}>{stockQty}</span>
-                            </div>
-                            <StockBadge qty={stockQty} min={minAlert} />
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: 11, color: 'var(--t4)' }}>غير محدد</span>
-                        )}
-                      </td>
-
-                      {/* الحالة */}
-                      <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                        <Switch
-                          checked={prod.active}
-                          onChange={val => toggleActiveMutation.mutate({ id: prod.id, active: val })}
-                        />
-                      </td>
-
-                      {/* إجراءات */}
-                      <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                          <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(prod)} title="تعديل" />
-                          <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(prod.id)} title="حذف" />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                    ))}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

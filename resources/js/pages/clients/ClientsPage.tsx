@@ -1,8 +1,9 @@
 // resources/js/pages/clients/ClientsPage.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { usePartyMutations } from '@/lib/api/endpoints/parties';
+import { usePartyMutations, fetchAllCustomers } from '@/lib/api/endpoints/parties';
 import { useModal } from '@/hooks/useModal';
+import { useERPExport } from '@/components/ui/DataTable';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -18,6 +19,7 @@ import { PARTY_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import apiClient from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { Party } from '@/types';
+import type { Column } from '@/components/ui/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -134,6 +136,54 @@ function ClientsPagination({
   );
 }
 
+// ─── Export Column Definitions ─────────────────────────────────────────────────
+
+const CLIENTS_EXPORT_COLS: Column<Party>[] = [
+  // ── معلومات أساسية ──
+  { key: 'name',             header: 'العميل',          exportHeader: 'العميل',              accessor: (r) => r.name },
+  { key: 'commercial_name',  header: 'الاسم التجاري',   exportHeader: 'الاسم التجاري',       accessor: (r) => r.commercial_name },
+  { key: 'code',             header: 'الرمز',            exportHeader: 'رمز العميل',          accessor: (r) => r.code },
+  { key: 'phone',            header: 'الهاتف',           exportHeader: 'الهاتف',              accessor: (r) => r.phone },
+  { key: 'mobile',           header: 'الجوال',           exportHeader: 'الجوال',              accessor: (r) => r.mobile },
+  { key: 'fax',              header: 'الفاكس',           exportHeader: 'الفاكس',              accessor: (r) => r.fax },
+  { key: 'email',            header: 'البريد',           exportHeader: 'البريد الإلكتروني',    accessor: (r) => r.email },
+  // ── الموقع ──
+  { key: 'wilaya',           header: 'الولاية',          exportHeader: 'الولاية',             accessor: (r) => r.wilaya?.name },
+  { key: 'commune',          header: 'البلدية',          exportHeader: 'البلدية',             accessor: (r) => r.commune?.name },
+  { key: 'address',          header: 'العنوان',          exportHeader: 'العنوان',             accessor: (r) => r.address },
+  // ── وثائق قانونية ──
+  { key: 'legal_form',       header: 'الشكل القانوني',   exportHeader: 'الشكل القانوني',      accessor: (r) => r.legal_form?.name },
+  { key: 'activity',         header: 'النشاط',           exportHeader: 'النشاط',              accessor: (r) => r.activity },
+  { key: 'nif',              header: 'NIF',               exportHeader: 'NIF',                 accessor: (r) => r.nif },
+  { key: 'nis',              header: 'NIS',               exportHeader: 'NIS',                 accessor: (r) => r.nis },
+  { key: 'rc',               header: 'RC',                exportHeader: 'السجل التجاري',       accessor: (r) => r.rc },
+  { key: 'ai',               header: 'AI',                exportHeader: 'المادة الجبائية',     accessor: (r) => r.ai },
+  { key: 'capital_amount',   header: 'رأس المال',         exportHeader: 'رأس المال (دج)',      accessor: (r) => r.capital_amount },
+  { key: 'rc_date',          header: 'تاريخ السجل',       exportHeader: 'تاريخ السجل التجاري', accessor: (r) => r.rc_date },
+  // ── مالية ──
+  { key: 'balance',          header: 'الرصيد',            exportHeader: 'الرصيد الحالي',       accessor: (r) => r.balance,          aggregate: 'sum' as const },
+  { key: 'credit_limit',     header: 'الحد الائتماني',    exportHeader: 'الحد الائتماني',      accessor: (r) => r.credit_limit,     aggregate: 'sum' as const },
+  { key: 'credit_days',      header: 'أجل الدفع',         exportHeader: 'أجل الدفع (يوم)',     accessor: (r) => r.credit_days },
+  { key: 'bank_name',        header: 'البنك',             exportHeader: 'اسم البنك',           accessor: (r) => r.bank_name },
+  { key: 'rib',              header: 'RIB',               exportHeader: 'RIB',                 accessor: (r) => r.rib },
+  // ── حالة ──
+  { key: 'active',           header: 'الحالة',            exportHeader: 'الحالة',              accessor: (r) => r.active ? 'نشط' : 'موقوف' },
+  { key: 'created_at',       header: 'تاريخ الإنشاء',     exportHeader: 'تاريخ الإنشاء',       accessor: (r) => r.created_at },
+];
+
+// ─── Table Column Definitions ──────────────────────────────────────────────────
+
+interface TableCol {
+  key: string;
+  label: string;
+  thStyle?: React.CSSProperties;
+  tdStyle?: React.CSSProperties;
+  render: (row: Party, idx: number, rowNum: number) => React.ReactNode;
+  always?: boolean;
+  sortable?: boolean;
+  sortField?: string;
+}
+
 // ─── Types & Helpers ──────────────────────────────────────────────────────────
 
 type StatusFilter = 'all' | 'active' | 'inactive';
@@ -149,10 +199,9 @@ function fetchClients(params: {
   activeParam: number | undefined;
   page:        number;
   perPage:     number;
+  sortField?:  string;
+  sortDir?:    string;
 }) {
-  // ✅ الإصلاح الأول: إرسال filter كـ nested object — axios يُحوّله إلى
-  //    filter[search]=... و filter[active]=... تلقائياً (القيم الصحيحة لـ Laravel)
-  //    بدلاً من مفاتيح نقطية "filter[search]" التي تُرسَل كمفتاح مسطح واحد
   const filter: Record<string, unknown> = {};
   if (params.search)                    filter['search'] = params.search;
   if (params.activeParam !== undefined) filter['active'] = params.activeParam;
@@ -163,7 +212,7 @@ function fetchClients(params: {
         per_page: params.perPage,
         page:     params.page,
         include:  'wilaya,commune,legalForm,defaultPriceLevel',
-        // ✅ filter كـ object — axios يُسلسله كـ filter[search]= و filter[active]=
+        sort: params.sortDir === 'desc' ? `-${params.sortField}` : params.sortField,
         ...(Object.keys(filter).length ? { filter } : {}),
       },
     })
@@ -173,6 +222,126 @@ function fetchClients(params: {
 // ─── الصفحة الرئيسية ──────────────────────────────────────────────────────────
 
 export default function ClientsPage() {
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+
+  const { exportData } = useERPExport({ defaultFileName: 'العملاء', defaultCurrency: 'DZD' });
+  const [hiddenCols, setHiddenCols]       = useState<Set<string>>(new Set(['mobile', 'email', 'address', 'nis', 'rc', 'ai', 'legal_form', 'activity', 'capital_amount', 'rc_date', 'bank_name', 'rib', 'commercial_name', 'fax', 'code']));
+  const [colMenuOpen, setColMenuOpen]     = useState(false);
+  const colMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (colMenuRef.current && !colMenuRef.current.contains(e.target as Node)) setColMenuOpen(false);
+    }
+    if (colMenuOpen) { document.addEventListener('mousedown', handleClick); return () => document.removeEventListener('mousedown', handleClick); }
+  }, [colMenuOpen]);
+
+  const toggleCol = (key: string) => setHiddenCols(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+  const [sortField, setSortField] = useState('name');
+  const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('asc');
+  const handleSort = (field: string) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('asc'); }
+    setCurrentPage(1);
+  };
+
+  const buildTableCols = (hidden: Set<string>): TableCol[] => [
+    // ── المجموعة 1: معلومات أساسية ──
+    { key: '#', label: '#', thStyle: { width: 48, color: 'var(--t4)' }, tdStyle: { color: 'var(--t4)', fontSize: 12 },
+      render: (_, __, rowNum) => rowNum },
+    { key: 'name', label: 'العميل', thStyle: { cursor: 'pointer' }, sortable: true,
+      render: (c, idx) => {
+        const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length] as 1|2|3|4|5|6|7;
+        return (
+          <div className="flex items-center gap-8">
+            <Avatar initials={c.name?.[0]?.toUpperCase() || '؟'} color={avatarColor} size={32} />
+            <div>
+              <div className="s font-semibold">{c.name || 'بدون اسم'}</div>
+              {c.commercial_name && (
+                <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>{c.commercial_name}</div>
+              )}
+            </div>
+          </div>
+        );
+      }},
+    { key: 'commercial_name', label: 'الاسم التجاري',
+      render: (c) => c.commercial_name || '—' },
+    { key: 'code', label: 'الرمز', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
+      render: (c) => c.code || '—' },
+    { key: 'phone', label: 'الهاتف', tdStyle: { fontSize: 14 },
+      render: (c) => c.phone || '—' },
+    { key: 'mobile', label: 'الجوال', tdStyle: { fontSize: 14 },
+      render: (c) => c.mobile || '—' },
+    { key: 'fax', label: 'الفاكس',
+      render: (c) => c.fax || '—' },
+    { key: 'email', label: 'البريد',
+      render: (c) => c.email || '—' },
+
+    // ── المجموعة 2: الموقع ──
+    { key: 'location', label: 'الولاية / البلدية', tdStyle: { fontSize: 13, color: 'var(--t4)' },
+      render: (c) => [c.wilaya?.name, c.commune?.name].filter(Boolean).join(' / ') || '—' },
+    { key: 'address', label: 'العنوان', tdStyle: { fontSize: 13, color: 'var(--t4)' },
+      render: (c) => c.address || '—' },
+
+    // ── المجموعة 3: وثائق قانونية ──
+    { key: 'legal_form', label: 'الشكل القانوني',
+      render: (c) => c.legal_form?.name || '—' },
+    { key: 'activity', label: 'النشاط', tdStyle: { fontSize: 13, color: 'var(--t4)' },
+      render: (c) => c.activity || '—' },
+    { key: 'nif', label: 'NIF', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
+      render: (c) => c.nif || '—' },
+    { key: 'nis', label: 'NIS', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
+      render: (c) => c.nis || '—' },
+    { key: 'rc', label: 'RC', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
+      render: (c) => c.rc || '—' },
+    { key: 'ai', label: 'AI', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
+      render: (c) => c.ai || '—' },
+    { key: 'capital_amount', label: 'رأس المال', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
+      render: (c) => c.capital_amount ? (
+        <><span>{(+c.capital_amount).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}</span><span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 3 }}>دج</span></>
+      ) : <span style={{ color: 'var(--t4)' }}>—</span> },
+    { key: 'rc_date', label: 'تاريخ السجل', tdStyle: { fontSize: 12 },
+      render: (c) => c.rc_date || '—' },
+
+    // ── المجموعة 4: مالية ──
+    { key: 'balance', label: 'الرصيد', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
+      render: (c) => {
+        const hasDebt = (c.balance ?? 0) > 0;
+        return (
+          <>
+            <span style={{ color: hasDebt ? 'var(--red)' : 'var(--t3)', fontWeight: hasDebt ? 600 : 400 }}>
+              {(c.balance ?? 0).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 3 }}>دج</span>
+          </>
+        );
+      }},
+    { key: 'credit_limit', label: 'الحد الائتماني', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
+      render: (c) => c.credit_limit ? (
+        <><span>{(+c.credit_limit).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}</span><span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 3 }}>دج</span></>
+      ) : <span style={{ color: 'var(--t4)' }}>—</span> },
+    { key: 'credit_days', label: 'أجل الدفع', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
+      render: (c) => c.credit_days ? <>{c.credit_days} يوم</> : <span style={{ color: 'var(--t4)' }}>—</span> },
+    { key: 'bank_name', label: 'البنك',
+      render: (c) => c.bank_name || '—' },
+    { key: 'rib', label: 'RIB', tdStyle: { fontSize: 11, fontFamily: 'monospace', direction: 'ltr', textAlign: 'left' },
+      render: (c) => c.rib || '—' },
+
+    // ── المجموعة 5: حالة ──
+    { key: 'active', label: 'الحالة',
+      render: (c) => <Badge variant={c.active ? 'success' : 'danger'}>{c.active ? 'نشط' : 'موقوف'}</Badge> },
+    { key: 'created_at', label: 'تاريخ الإضافة', tdStyle: { fontSize: 12, color: 'var(--t4)' },
+      render: (c) => c.created_at ? new Date(c.created_at).toLocaleDateString('ar-DZ') : '—' },
+
+    // ── الإجراءات ──
+    { key: 'actions', label: '', thStyle: { width: 48 }, always: true,
+      render: (c) => <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(c)} /> },
+  ].filter(col => col.always || !hidden.has(col.key));
+
   const [search, setSearch]             = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [editing, setEditing]           = useState<Party | null>(null);
@@ -194,10 +363,10 @@ export default function ClientsPage() {
     isFetching,
     refetch,
   } = useQuery<ClientsApiResponse>({
-    queryKey: ['clients', slug, search, activeParam, currentPage, perPage],
+    queryKey: ['clients', slug, search, activeParam, currentPage, perPage, sortField, sortDir],
     // ✅ الإصلاح الثالث: params تُبنى داخل queryFn — تضمن دائماً استخدام
     //    القيم الحالية وقت التنفيذ لا وقت بناء الـ object خارجها
-    queryFn: () => fetchClients({ search, activeParam, page: currentPage, perPage }),
+    queryFn: () => fetchClients({ search, activeParam, page: currentPage, perPage, sortField, sortDir }),
     placeholderData: keepPreviousData,
     staleTime: 2 * 60_000,
     enabled: !!slug,
@@ -272,9 +441,38 @@ export default function ClientsPage() {
             <Button size="sm" icon={<i className="ti ti-table-import" />} onClick={importModal.openModal}>
               استيراد
             </Button>
-            <Button size="sm" icon={<i className="ti ti-table-export" />}>
+            <Button size="sm" icon={<i className="ti ti-table-export" />}
+              onClick={async () => {
+                const exportDataArr = await fetchAllCustomers(search, activeParam as any);
+                if (exportDataArr.length) await exportData(exportDataArr as any, CLIENTS_EXPORT_COLS as any);
+              }}>
               تصدير
             </Button>
+            <div ref={colMenuRef} style={{ position: 'relative' }}>
+              <Button size="sm" icon={<i className="ti ti-columns" />}
+                onClick={() => setColMenuOpen(v => !v)}>
+                الأعمدة
+              </Button>
+              {colMenuOpen && (
+                <div style={{
+                  position: 'absolute', left: 0, top: '100%', zIndex: 500, minWidth: 220,
+                  background: 'var(--bg2)', border: '1px solid var(--bd)',
+                  borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,.15)',
+                  padding: 8, marginTop: 4, maxHeight: 380, overflowY: 'auto',
+                }}>
+                  {buildTableCols(new Set()).filter(c => !c.always).map(col => (
+                    <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, borderRadius: 6, transition: 'background .1s' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}>
+                      <input type="checkbox" checked={!hiddenCols.has(col.key)}
+                        onChange={() => toggleCol(col.key)}
+                        style={{ accentColor: 'var(--em)' }} />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
             <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus" />} onClick={openCreate}>
               زبون جديد
             </Button>
@@ -347,73 +545,22 @@ export default function ClientsPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: 48, color: 'var(--t4)' }}>#</th>
-                  <th>العميل</th>
-                  <th>الهاتف</th>
-                  <th>الولاية / البلدية</th>
-                  <th>NIF</th>
-                  <th style={{ textAlign: 'end' }}>الرصيد</th>
-                  <th style={{ textAlign: 'end' }}>الحد الائتماني</th>
-                  <th>الحالة</th>
-                  <th style={{ width: 48 }} />
+                  {buildTableCols(hiddenCols).map(col => (
+                    <th key={col.key} style={col.thStyle}
+                      onClick={col.sortable ? () => handleSort(col.sortField ?? col.key) : undefined}>
+                      {col.label}{col.sortable && sortField === (col.sortField ?? col.key) ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {clients.map((c, idx) => {
-                  const hasDebt     = (c.balance ?? 0) > 0;
-                  const location    = [c.wilaya?.name, c.commune?.name].filter(Boolean).join(' / ') || '—';
-                  const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length] as 1|2|3|4|5|6|7;
-                  const rowNum      = (currentPage - 1) * perPage + idx + 1;
-
+                  const rowNum = (currentPage - 1) * perPage + idx + 1;
                   return (
                     <tr key={c.id}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{rowNum}</td>
-
-                      <td>
-                        <div className="flex items-center gap-8">
-                          <Avatar initials={c.name?.[0]?.toUpperCase() || '؟'} color={avatarColor} size={32} />
-                          <div>
-                            <div className="s font-semibold">{c.name || 'بدون اسم'}</div>
-                            {c.commercial_name && (
-                              <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>
-                                {c.commercial_name}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="m">{c.phone || '—'}</td>
-                      <td style={{ fontSize: 13, color: 'var(--t4)' }}>{location}</td>
-                      <td style={{ fontSize: 12, fontFamily: 'monospace' }}>{c.nif || '—'}</td>
-
-                      <td style={{ textAlign: 'end' }}>
-                        <span style={{ color: hasDebt ? 'var(--red)' : 'var(--t3)', fontWeight: hasDebt ? 600 : 400 }}>
-                          {(c.balance ?? 0).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
-                        </span>
-                        <span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 3 }}>دج</span>
-                      </td>
-
-                      <td style={{ textAlign: 'end' }}>
-                        {c.credit_limit ? (
-                          <>
-                            <span>{(+c.credit_limit).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}</span>
-                            <span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 3 }}>دج</span>
-                          </>
-                        ) : (
-                          <span style={{ color: 'var(--t4)' }}>—</span>
-                        )}
-                      </td>
-
-                      <td>
-                        <Badge variant={c.active ? 'success' : 'danger'}>
-                          {c.active ? 'نشط' : 'موقوف'}
-                        </Badge>
-                      </td>
-
-                      <td>
-                        <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(c)} />
-                      </td>
+                      {buildTableCols(hiddenCols).map(col => (
+                        <td key={col.key} style={col.tdStyle}>{col.render(c, idx, rowNum)}</td>
+                      ))}
                     </tr>
                   );
                 })}

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSuppliers, usePartyMutations } from '@/lib/api/endpoints/parties';
 import { useModal } from '@/hooks/useModal';
+import { useERPExport } from '@/components/ui/DataTable';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -16,8 +17,31 @@ import AlertBar from '@/components/ui/AlertBar';
 import ImportWizardModal from '@/pages/import/ImportWizardModal';
 import { PARTY_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import type { Party } from '@/types';
+import type { Column } from '@/components/ui/DataTable';
+
+// ─── Export Column Definitions ─────────────────────────────────────────────────
+
+const SUPPLIERS_EXPORT_COLS: Column<Party>[] = [
+  { key: 'name',             header: 'المورد',           exportHeader: 'المورد',              accessor: (r) => r.name },
+  { key: 'commercial_name',  header: 'الاسم التجاري',    exportHeader: 'الاسم التجاري',       accessor: (r) => r.commercial_name },
+  { key: 'phone',            header: 'الهاتف',            exportHeader: 'الهاتف',              accessor: (r) => r.phone },
+  { key: 'mobile',           header: 'الجوال',            exportHeader: 'الجوال',              accessor: (r) => r.mobile },
+  { key: 'email',            header: 'البريد',            exportHeader: 'البريد الإلكتروني',    accessor: (r) => r.email },
+  { key: 'address',          header: 'العنوان',           exportHeader: 'العنوان',             accessor: (r) => r.address },
+  { key: 'nif',              header: 'NIF',                exportHeader: 'NIF',                 accessor: (r) => r.nif },
+  { key: 'nis',              header: 'NIS',                exportHeader: 'NIS',                 accessor: (r) => r.nis },
+  { key: 'rc',               header: 'RC',                 exportHeader: 'السجل التجاري',       accessor: (r) => r.rc },
+  { key: 'ai',               header: 'AI',                 exportHeader: 'المادة الجبائية',     accessor: (r) => r.ai },
+  { key: 'balance',          header: 'الرصيد',             exportHeader: 'الرصيد الحالي',       accessor: (r) => r.balance,          aggregate: 'sum' as const },
+  { key: 'credit_limit',     header: 'الحد الائتماني',     exportHeader: 'الحد الائتماني',      accessor: (r) => r.credit_limit,     aggregate: 'sum' as const },
+  { key: 'credit_days',      header: 'أجل الدفع',          exportHeader: 'أجل الدفع (يوم)',     accessor: (r) => r.credit_days },
+  { key: 'active',           header: 'الحالة',             exportHeader: 'الحالة',              accessor: (r) => r.active ? 'نشط' : 'موقوف' },
+  { key: 'activity',         header: 'النشاط',             exportHeader: 'النشاط',              accessor: (r) => r.activity },
+  { key: 'created_at',       header: 'تاريخ الإنشاء',      exportHeader: 'تاريخ الإنشاء',       accessor: (r) => r.created_at },
+];
 
 export default function SuppliersPage() {
+    const { exportData } = useERPExport({ defaultFileName: 'الموردون', defaultCurrency: 'DZD' });
     const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<Party | null>(null);
     const modal = useModal();
@@ -43,7 +67,8 @@ const meta = (data as any)?.meta;
                 actions={
                     <>
                         <Button size="sm" icon={<i className="ti ti-table-import"/>} onClick={importModal.openModal}>استيراد</Button>
-                        <Button size="sm" icon={<i className="ti ti-table-export"/>}>تصدير</Button>
+                        <Button size="sm" icon={<i className="ti ti-table-export"/>}
+                          onClick={async () => { if (suppliers.length) await exportData(suppliers as any, SUPPLIERS_EXPORT_COLS as any); }}>تصدير</Button>
                         <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus"/>} onClick={openCreate}>
                             مورد جديد
                         </Button>

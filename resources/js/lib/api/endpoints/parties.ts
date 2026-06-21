@@ -127,6 +127,31 @@ export function usePartyStats(id: number | null | undefined, fiscalYearId?: numb
   });
 }
 
+// ─── تصدير جميع العملاء ────────────────────────────────────────────────────────
+export async function fetchAllCustomers(search?: string, active?: boolean): Promise<Party[]> {
+  const all: Party[] = [];
+  let page = 1;
+  let lastPage = 1;
+  const perPage = 100;
+
+  do {
+    const res = await partiesApi.clients({
+      per_page: perPage,
+      page,
+      include: 'wilaya,commune,legalForm,defaultPriceLevel',
+      ...(search ? { search } : {}),
+      ...(active !== undefined ? { active } : {}),
+    });
+    const data = (res as any).data ?? [];
+    all.push(...data);
+    const meta = (res as any).meta;
+    lastPage = meta?.last_page ?? 1;
+    page++;
+  } while (page <= lastPage);
+
+  return all;
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 export function usePartyMutations() {
   const slug = useActiveSlug();
