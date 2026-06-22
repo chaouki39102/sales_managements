@@ -61,7 +61,6 @@ class StoreCommercialDocumentRequest extends FormRequest
             'payment_terms'  => 'nullable|array',
             'shipping_info'  => 'nullable|array',
             'legal_mentions' => 'nullable|array',
-            'is_proforma'    => 'nullable|boolean',
             'exchange_rate'               => 'nullable|numeric|min:0.0001',
             'source_document_id'          => 'nullable|integer',
             'cancellation_of_document_id' => 'nullable|integer',

@@ -18,9 +18,13 @@ export const CONVERSION_MAP: Record<string, string[]> = {
   DEV: ['BCC', 'BL', 'FV'],
   BCC: ['BL', 'FV'],
   BL:  ['FV'],
+  FV:  ['AV'],              // فاتورة مبيعات → إشعار دائن
+  AV:  ['FV'],              // إشعار دائن → فاتورة مبيعات (عكس)
   DDP: ['BCF'],
   BCF: ['BR', 'FA'],
   BR:  ['FA'],
+  FA:  ['AA'],              // فاتورة مشتريات → إشعار مدين
+  AA:  ['FA'],              // إشعار مدين → فاتورة مشتريات (عكس)
 };
 
 /** أنواع تدعم إنشاء مرتجع */
@@ -210,7 +214,6 @@ export interface DocumentFormState {
   exchange_rate:  string;
   apply_stamp:    boolean;
   price_level_id: string;
-  is_proforma:    boolean;
   lines:          LineItem[];
   payments:       PaymentEntry[];
   shipping_info:  ShippingInfo;

@@ -144,11 +144,6 @@ export default function CommercialDocumentModal({
     return lookups.baseCurrencyId;
   }, [settingsDict, lookups.currencies, lookups.baseCurrencyId]);
 
-  const settingsIsProforma = useMemo(() => {
-    const v = settingsDict?.default_is_proforma?.value;
-    return v === true || v === 'true';
-  }, [settingsDict]);
-
   const settingsPriceLevelId = useMemo(() => {
     const v = settingsDict?.default_price_level_id?.value;
     if (v !== null && v !== undefined && v !== '' && Number(v) > 0) {
@@ -195,7 +190,6 @@ export default function CommercialDocumentModal({
     defaultTvaRate:     lookups.defaultTvaRate,
     defaultWarehouseId: settingsWarehouseId,
     baseCurrencyId:     settingsCurrencyId,
-    defaultIsProforma:  settingsIsProforma,
     defaultPriceLevelId: settingsPriceLevelId,
     defaultApplyStamp:   settingsApplyStamp,
     selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
@@ -333,7 +327,7 @@ export default function CommercialDocumentModal({
 
   const { data: advancePayments, isLoading: isLoadingAdvances } = useAdvancePayments(
     form.party_id ? parseInt(form.party_id) : null,
-    !!open && needsParty && !!form.party_id && (documentType?.affects_accounting ?? false) && !form.is_proforma,
+    !!open && needsParty && !!form.party_id && (documentType?.affects_accounting ?? false),
   );
 
   const handlePartyChangeWithWarning = (id: string) => {
@@ -555,25 +549,7 @@ export default function CommercialDocumentModal({
     }
   };
 
-  const confirmProformaMut = useMutation({
-    mutationFn: () => apiPut(`/documents/${existingDocument!.id}`, { is_proforma: false }),
-    onSuccess: () => {
-      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
-      setSuccessMsg('تم تحويل المستند إلى فاتورة حقيقية ✓');
-      setTimeout(() => { setSuccessMsg(''); onSaved(); onClose(); }, 1800);
-    },
-    onError: (e: unknown) => {
-      const err = e as Record<string, unknown>;
-      setApiErr(String(err?.message ?? 'فشل التحويل'));
-    },
-  });
-
-  const handleConfirmProforma = () => {
-    if (!window.confirm('سيتم تحويل هذا المستند المبدئي إلى فاتورة حقيقية. سيتم إنشاء حركات المخزون والدفعات. هل تتابع؟')) return;
-    confirmProformaMut.mutate();
-  };
-
-  const isPending = saveMut.isPending || deleteMut.isPending || confirmProformaMut.isPending || checkingDocNumber;
+  const isPending = saveMut.isPending || deleteMut.isPending || checkingDocNumber;
 
   // ─── Memos ────────────────────────────────────────────────────────────────
 
@@ -710,7 +686,6 @@ export default function CommercialDocumentModal({
           docNumber={docNumber}
           existingDocument={existingDocument}
           pmMode={pmMode}
-          isProforma={form.is_proforma}
           stockBadge={stockBadge}
           onClose={onClose}
           isPending={isPending}
@@ -970,8 +945,7 @@ export default function CommercialDocumentModal({
             pmMode={pmMode}
             totals={totals}
             affectsAccounting={documentType?.affects_accounting ?? false}
-            isProforma={form.is_proforma}
-          />
+        />
 
           {/* ═══ SECTION 4: الإجماليات ═══ */}
           <DocumentTotalsSection
@@ -1002,7 +976,6 @@ export default function CommercialDocumentModal({
           successMsg={successMsg}
           docCode={docCode}
           RETURNABLE_CODES={RETURNABLE_CODES}
-          handleConfirmProforma={handleConfirmProforma}
           handleDelete={handleDelete}
           handleExport={handleExport}
           onClose={onClose}

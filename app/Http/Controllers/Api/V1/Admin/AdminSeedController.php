@@ -53,6 +53,7 @@ class AdminSeedController extends Controller
         'document-statuses'           => [\Database\Seeders\DocumentStatusSeeder::class,           'document_statuses'],
         'inventory-valuation-methods' => [\Database\Seeders\InventoryValuationMethodSeeder::class, 'inventory_valuation_methods'],
         'document-types'              => [\Database\Seeders\DocumentTypeSeeder::class,             'document_types'],
+        'document-type-conversions'   => [\Database\Seeders\DocumentTypeConversionSeeder::class,    'document_type_conversions'],
         'warehouses'                  => [\Database\Seeders\WarehouseSeeder::class,                'warehouses'],
         'treasury-accounts'           => [\Database\Seeders\TreasuryAccountSeeder::class,          'treasury_accounts'],
         'payment-modes'               => [\Database\Seeders\PaymentModeSeeder::class,              'payment_modes'],

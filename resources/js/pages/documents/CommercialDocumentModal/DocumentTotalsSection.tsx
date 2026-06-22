@@ -84,15 +84,6 @@ export default function DocumentTotalsSection({
         </div>
       )}
 
-      {!isEdit && (
-        <Toggle
-          checked={form.is_proforma}
-          onChange={(v: boolean) => set('is_proforma', v)}
-          label="مستند مبدئي (Pro Forma)"
-          subLabel="لا يُؤثر في المخزون ولا يُنشئ دفعات — يُستخدم للعروض والموافقات الأولية"
-          disabled={isReadOnly}
-        />
-      )}
       <Toggle
         checked={form.apply_stamp}
         onChange={(v: boolean) => set('apply_stamp', v)}

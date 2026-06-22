@@ -488,16 +488,7 @@ class SettingsSeeder extends Seeder
                 'is_public'     => false,
                 'is_editable'   => true,
                 'display_order' => 75,
-            ],
-            'default_is_proforma' => [
-                'value'         => false,
-                'group'         => 'documents',
-                'type'          => 'boolean',
-                'description'   => 'جعل المستند الجديد مبدئي (Pro Forma) افتراضياً',
-                'is_public'     => false,
-                'is_editable'   => true,
-                'display_order' => 76,
-            ],
+            ]            ,
             'default_fiscal_year_behavior' => [
                 'value'         => 'current',
                 'group'         => 'documents',

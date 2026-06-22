@@ -83,6 +83,12 @@ class CompanySeeder extends Seeder
             NumberingSeriesSeeder::class,
         ]);
 
+        // ─── المرحلة 4ب: خريطة التحويل بين أنواع المستندات ─────
+        // (تعتمد على معرفات document_types الموجودة مسبقاً)
+        $this->call([
+            DocumentTypeConversionSeeder::class,
+        ]);
+
         // ─── المرحلة 5: تصنيفات المصاريف ─────────────────────────
         $this->call([
             ExpenseCategorySeeder::class,

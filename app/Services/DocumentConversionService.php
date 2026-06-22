@@ -7,17 +7,22 @@ use App\Models\CommercialDocument;
 use App\Models\CommercialDocumentLine;
 use App\Models\DocumentStatus;
 use App\Models\DocumentType;
+use App\Models\DocumentTypeConversion;
 use Illuminate\Support\Facades\DB;
 
 class DocumentConversionService
 {
-    private const CONVERSION_MAP = [
+    private static ?array $staticFallbackMap = [
         'DEV' => ['BCC', 'BL', 'FV'],
         'BCC' => ['BL', 'FV'],
         'BL'  => ['FV'],
+        'FV'  => ['AV'],             // فاتورة مبيعات → إشعار دائن
+        'AV'  => ['FV'],             // إشعار دائن → فاتورة مبيعات (عكس)
         'DDP' => ['BCF'],
         'BCF' => ['BR', 'FA'],
         'BR'  => ['FA'],
+        'FA'  => ['AA'],             // فاتورة مشتريات → إشعار مدين
+        'AA'  => ['FA'],             // إشعار مدين → فاتورة مشتريات (عكس)
     ];
 
     public function __construct(
@@ -34,15 +39,17 @@ class DocumentConversionService
         $companyId  = $this->companyContext->get();
         $sourceCode = $source->documentType?->code;
 
-        if (!isset(self::CONVERSION_MAP[$sourceCode])) {
+        $map = $this->getConversionMap();
+
+        if (!isset($map[$sourceCode])) {
             throw new BusinessRuleException(
                 "لا يمكن تحويل مستند من نوع {$sourceCode}",
                 422
             );
         }
 
-        if (!in_array($targetCode, self::CONVERSION_MAP[$sourceCode], true)) {
-            $allowed = implode(', ', self::CONVERSION_MAP[$sourceCode]);
+        if (!in_array($targetCode, $map[$sourceCode], true)) {
+            $allowed = implode(', ', $map[$sourceCode]);
             throw new BusinessRuleException(
                 "التحويل من {$sourceCode} إلى {$targetCode} غير مسموح. المسموح: {$allowed}",
                 422
@@ -183,6 +190,29 @@ class DocumentConversionService
 
     public function getAllowedTargets(string $sourceCode): array
     {
-        return self::CONVERSION_MAP[$sourceCode] ?? [];
+        $map = $this->getConversionMap();
+        return $map[$sourceCode] ?? [];
+    }
+
+    private function getConversionMap(): array
+    {
+        try {
+            $rows = DocumentTypeConversion::query()
+                ->select('source_code', 'target_code')
+                ->orderBy('display_order')
+                ->get();
+
+            if ($rows->isEmpty()) {
+                return self::$staticFallbackMap ?? [];
+            }
+
+            $map = [];
+            foreach ($rows as $row) {
+                $map[$row->source_code][] = $row->target_code;
+            }
+            return $map;
+        } catch (\Throwable) {
+            return self::$staticFallbackMap ?? [];
+        }
     }
 }

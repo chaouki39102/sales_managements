@@ -60,7 +60,6 @@ class CommercialDocument extends Model
         'is_locked',
         'validated_at',
         'validated_by',
-        'is_proforma',
         'cancellation_reason',
         'source_document_id',
         'cancellation_of_document_id',
@@ -89,7 +88,6 @@ class CommercialDocument extends Model
         'legal_mentions' => 'array',
         'is_locked' => 'boolean',
         'validated_at' => 'datetime',
-        'is_proforma' => 'boolean',
         'is_exported_to_accounting' => 'boolean',
         'exported_at' => 'datetime',
         'created_at' => 'datetime',
@@ -113,7 +111,6 @@ class CommercialDocument extends Model
         'currency_id',
         'document_status_id',
         'is_locked',
-        'is_proforma',
         'is_exported_to_accounting',
         // حقول تاريخية (يدعم Spatie النطاق: filter[document_date]=2024-01-01,2024-12-31)
         'document_date',

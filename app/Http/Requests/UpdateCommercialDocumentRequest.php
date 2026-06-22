@@ -46,7 +46,6 @@ class UpdateCommercialDocumentRequest extends FormRequest
             'payment_terms'   => 'sometimes|nullable|array',
             'shipping_info'   => 'sometimes|nullable|array',
             'legal_mentions'  => 'sometimes|nullable|array',
-            'is_proforma'     => 'sometimes|nullable|boolean',
 
             // ── الأسطر (اختياري في التحديث) ──────────────────────────
             'lines'                            => 'sometimes|array|min:1',

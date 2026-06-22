@@ -230,6 +230,10 @@ Route::prefix('v1')->group(function () {
             Route::get('tvas/default', [TvaController::class, 'default']);
 
             Route::apiResource('document-types',           DocumentTypeController::class)->only(['index', 'show']);
+            Route::get('document-type-conversions',                             [\App\Http\Controllers\Api\V1\DocumentTypeConversionController::class, 'index']);
+            Route::get('document-type-conversions/document-types',              [\App\Http\Controllers\Api\V1\DocumentTypeConversionController::class, 'documentTypes']);
+            Route::get('document-type-conversions/{sourceCode}/allowed-targets', [\App\Http\Controllers\Api\V1\DocumentTypeConversionController::class, 'allowedTargets']);
+            Route::post('document-type-conversions/bulk-update',                [\App\Http\Controllers\Api\V1\DocumentTypeConversionController::class, 'bulkUpdate']);
             Route::apiResource('document-statuses',        DocumentStatusController::class)->only(['index', 'show']);
             Route::apiResource('document-base-operations', DocumentBaseOperationController::class)->only(['index', 'show']);
             Route::apiResource('fiscal-stamps',            FiscalStampController::class)->only(['index', 'show']);

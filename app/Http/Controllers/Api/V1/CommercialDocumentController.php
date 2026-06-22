@@ -31,7 +31,7 @@ class CommercialDocumentController extends BaseApiController
             'filters' => [
                 'document_type_id', 'fiscal_year_id', 'document_status_id',
                 'party_id', 'warehouse_id', 'currency_id',
-                'is_locked', 'is_proforma', 'is_exported_to_accounting',
+                'is_locked', 'is_exported_to_accounting',
                 'party.name', 'warehouse.name', 'document_status.name',
                 'document_date', 'due_date', 'total_ht', 'total_ttc',
                 'net_to_pay', 'remaining_amount', 'reference', 'search',

@@ -196,7 +196,7 @@ class PartyService extends \App\Core\Services\BaseService
     public function getCustomers(array $params = [])
     {
         $companyId    = $this->getCurrentCompanyId();
-        $clientTypeId = PartyType::where('company_id', $companyId)
+        $clientTypeId = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
             ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
             ->value('id');
 
@@ -208,7 +208,8 @@ class PartyService extends \App\Core\Services\BaseService
         $sortBy   = $params['sort_by']  ?? 'name';
         $sortDir  = $params['sort_dir'] ?? 'asc';
 
-        return Party::where('company_id', $companyId)
+        return Party::with(['commune', 'wilaya', 'legalForm', 'defaultPriceLevel'])
+            ->where('company_id', $companyId)
             ->where('party_type_id', $clientTypeId)
             // ── فلتر البحث ──────────────────────────────────────────────────
             ->when(
@@ -242,7 +243,7 @@ class PartyService extends \App\Core\Services\BaseService
     public function getSuppliers(array $params = [])
     {
         $companyId      = $this->getCurrentCompanyId();
-        $supplierTypeId = PartyType::where('company_id', $companyId)
+        $supplierTypeId = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
             ->where(fn($q) => $q->where('name', 'supplier')->orWhere('slug', 'supplier'))
             ->value('id');
 

@@ -101,7 +101,7 @@ export function BulkImportModal({ open, onClose, onImport, products }: BulkImpor
     const lines: Array<Partial<LineItem>> = rows.map(r => {
       const match = r._match;
       return {
-        product_id: match ? String(match.id) : '',
+        product_id: String(match!.id),
         description: r.product_name ?? match?.name ?? r.product_ref ?? '',
         quantity: r.quantity,
         unit_price_ht: r.unit_price_ht ?? (match?.default_selling_price_ht ? Number(match.default_selling_price_ht) : 0),
@@ -195,14 +195,14 @@ export function BulkImportModal({ open, onClose, onImport, products }: BulkImpor
               </table>
             </div>
             {unmatchedCount > 0 && (
-              <div style={{ fontSize: 12, color: 'var(--orange)', padding: '6px 10px', background: 'var(--orangeb, #fff3e0)', borderRadius: 'var(--r1)' }}>
-                {unmatchedCount} منتج غير متطابق — سيتم إضافتها كوصف فقط بدون product_id. قد يرفضها الباكاند إذا كان product_id إلزامياً.
+              <div style={{ fontSize: 12, color: 'var(--red)', padding: '6px 10px', background: 'var(--redb)', borderRadius: 'var(--r1)' }}>
+                ⚠ {unmatchedCount} منتج غير متطابق — يجب تطابق جميع المنتجات قبل الاستيراد. تأكد من صحة الاسم أو المرجع.
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button size="sm" variant="outline" onClick={handleClose}>إلغاء</Button>
-              <Button size="sm" variant="primary" onClick={handleConfirm}>
+              <Button size="sm" variant="primary" onClick={handleConfirm} disabled={!allMatched}>
                 إضافة {rows.length} سطر
               </Button>
             </div>

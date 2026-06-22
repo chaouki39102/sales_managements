@@ -28,7 +28,6 @@ interface DocumentPaymentsSectionProps {
   pmMode: string;
   totals: { remaining: number };
   affectsAccounting: boolean;
-  isProforma: boolean;
 }
 
 export default function DocumentPaymentsSection({
@@ -37,9 +36,9 @@ export default function DocumentPaymentsSection({
   addPayment, addPaymentWithValues, removePayment, updatePayment,
   paymentsExceedWarning,
   advancePayments, isLoadingAdvances,
-  pmMode, totals, affectsAccounting, isProforma,
+  pmMode, totals, affectsAccounting,
 }: DocumentPaymentsSectionProps) {
-  if (!affectsAccounting || isProforma) return null;
+  if (!affectsAccounting) return null;
 
   return (
     <Section title="الدفعات" icon="ti-wallet" collapsible>

@@ -102,7 +102,6 @@ interface UseDocumentFormOptions {
   defaultTvaRate:      number;
   defaultWarehouseId:  string;
   baseCurrencyId:      string;
-  defaultIsProforma?:  boolean;
   defaultPriceLevelId?: string;
   defaultApplyStamp?:  boolean;
   selectedYearId:      string;
@@ -364,7 +363,7 @@ export function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
 
 function buildDefaultForm(
   existingDocument: Record<string, unknown> | undefined,
-  defaults: { warehouseId: string; currencyId: string; yearId: string; isProforma?: boolean; priceLevelId?: string; applyStamp?: boolean },
+  defaults: { warehouseId: string; currencyId: string; yearId: string; priceLevelId?: string; applyStamp?: boolean },
   defaultTvaRate: number,
   products?: Product[],
 ): DocumentFormState {
@@ -392,7 +391,6 @@ function buildDefaultForm(
       exchange_rate:  String(doc.exchange_rate  ?? '1'),
       apply_stamp:    toNum(doc.total_stamp ?? doc.fiscal_stamp ?? 0) > 0,
       price_level_id: String(doc.price_level_id ?? ''),
-      is_proforma:    !!(doc as Record<string, unknown>).is_proforma,
       lines,
       payments: [],
       shipping_info:  (typeof rawShipping === 'object' && rawShipping !== null)
@@ -411,7 +409,6 @@ function buildDefaultForm(
     exchange_rate:  '1',
     apply_stamp:    defaults.applyStamp ?? false,
     price_level_id: defaults.priceLevelId ?? '',
-    is_proforma:    defaults.isProforma ?? false,
     lines: [], payments: [],
     shipping_info:  { ...defaultShipping },
     payment_terms:  [...defaultPaymentTerms],
@@ -443,7 +440,6 @@ export function useDocumentForm({
   defaultTvaRate,
   defaultWarehouseId,
   baseCurrencyId,
-  defaultIsProforma = false,
   defaultPriceLevelId = '',
   defaultApplyStamp = false,
   selectedYearId,
@@ -499,7 +495,6 @@ export function useDocumentForm({
       warehouseId: defaultWarehouseId,
       currencyId:  baseCurrencyId,
       yearId:      selectedYearId,
-      isProforma:  defaultIsProforma,
       priceLevelId: defaultPriceLevelId,
       applyStamp:  defaultApplyStamp,
     }, defaultTvaRate, products),
@@ -584,7 +579,7 @@ export function useDocumentForm({
 
     setForm(buildDefaultForm(
       existingDocument,
-      { warehouseId: defaultWarehouseId, currencyId: baseCurrencyId, yearId: selectedYearId, isProforma: defaultIsProforma, priceLevelId: defaultPriceLevelId, applyStamp: defaultApplyStamp },
+      { warehouseId: defaultWarehouseId, currencyId: baseCurrencyId, yearId: selectedYearId, priceLevelId: defaultPriceLevelId, applyStamp: defaultApplyStamp },
       defaultTvaRate,
       productsRef.current,
     ));
@@ -1188,7 +1183,6 @@ export function useDocumentForm({
       delivery_date:    f.delivery_date    || null,
       notes:            f.notes            || null,
       internal_notes:   f.internal_notes   || null,
-      is_proforma:      f.is_proforma,
       shipping_info:    Object.keys(f.shipping_info).length > 0 ? f.shipping_info : null,
       payment_terms:    f.payment_terms.length > 0 ? f.payment_terms : null,
     };

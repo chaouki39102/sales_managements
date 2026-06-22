@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Database\Seeders\CurrencySeeder;
 use Database\Seeders\DocumentBaseOperationSeeder;
 use Database\Seeders\DocumentStatusSeeder;
+use Database\Seeders\DocumentTypeConversionSeeder;
 use Database\Seeders\DocumentTypeSeeder;
 use Database\Seeders\ExpenseCategorySeeder;
 use Database\Seeders\FiscalStampSeeder;
@@ -43,6 +44,7 @@ class CompanySeedController extends Controller
         'document-base-operations'    => [DocumentBaseOperationSeeder::class,      'document_base_operations'],
         'document-statuses'           => [DocumentStatusSeeder::class,             'document_statuses'],
         'document-types'              => [DocumentTypeSeeder::class,               'document_types'],
+        'document-type-conversions'   => [DocumentTypeConversionSeeder::class,     'document_type_conversions'],
         'inventory-valuation-methods' => [InventoryValuationMethodSeeder::class,   'inventory_valuation_methods'],
         'warehouses'                  => [WarehouseSeeder::class,                  'warehouses'],
         'treasury-accounts'           => [TreasuryAccountSeeder::class,            'treasury_accounts'],

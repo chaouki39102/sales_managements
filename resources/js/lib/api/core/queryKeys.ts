@@ -173,5 +173,11 @@ export const tenantKeys = {
         parties:  (slug: string, yearId: number) => [slug, 'opening-balances', 'parties', yearId] as const,
         treasury: (slug: string, yearId: number) => [slug, 'opening-balances', 'treasury', yearId] as const,
     },
+
+    // ── Document Type Conversions ─────────────────────────────────────────
+    conversions: {
+        all:            (slug: string) => [slug, 'document-type-conversions'] as const,
+        allowedTargets: (slug: string, sourceCode: string) => [slug, 'document-type-conversions', sourceCode] as const,
+    },
 } as const;
 

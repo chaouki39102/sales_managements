@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * DatabaseSeeder — نقطة الدخول الوحيدة
@@ -28,6 +29,10 @@ use Illuminate\Database\Seeder;
  *
  *   مالك الشركة — يدوي اختياري:
  *     DataSeedingModal → POST /api/v1/{company}/seed/{key}
+ *
+ * php artisan db:seed                                  ← GlobalSeeder فقط
+ * php artisan db:seed --class=DatabaseSeeder           ← كل الشركات (للمستخدمين الجدد)
+ * php artisan db:seed --class=DocumentTypeConversionSeeder  ← جدول التحويل الحالي
  * ══════════════════════════════════════════════════════════════════
  */
 class DatabaseSeeder extends Seeder
@@ -35,5 +40,15 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(GlobalSeeder::class);
+
+        // بذر document_type_conversions للشركات القائمة
+        // (يُسكّب إذا كان الجدول فارغاً لتلك الشركة)
+        $companies = \DB::table('companies')->pluck('id');
+        foreach ($companies as $cid) {
+            if (!\DB::table('document_type_conversions')->where('company_id', $cid)->exists()) {
+                config(['seeding.company_id' => $cid]);
+                $this->call(DocumentTypeConversionSeeder::class);
+            }
+        }
     }
 }

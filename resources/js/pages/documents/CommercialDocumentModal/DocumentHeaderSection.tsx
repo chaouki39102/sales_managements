@@ -12,7 +12,6 @@ interface DocumentHeaderSectionProps {
   docNumber: string;
   existingDocument?: Record<string, unknown>;
   pmMode: string;
-  isProforma: boolean;
   stockBadge: { text: string; bg: string; color: string } | null;
   onClose: () => void;
   isPending: boolean;
@@ -21,7 +20,7 @@ interface DocumentHeaderSectionProps {
 export default function DocumentHeaderSection({
   documentType, isEdit, isCancelled, isLocked, isValidated,
   isPurchase, docCode, docNumber, existingDocument,
-  pmMode, isProforma, stockBadge, onClose, isPending,
+  pmMode, stockBadge, onClose, isPending,
 }: DocumentHeaderSectionProps) {
   return (
     <div style={{
@@ -89,17 +88,6 @@ export default function DocumentHeaderSection({
                 background: 'var(--blueb)', border: '1px solid var(--blue)',
                 fontSize: 11, fontWeight: 700, color: 'var(--blue)',
               }}>معتمد</span>
-            )}
-            {isProforma && (
-              <span style={{
-                padding: '2px 8px', borderRadius: 'var(--r1)',
-                background: 'color-mix(in srgb, var(--orange) 12%, transparent)',
-                border: '1px solid var(--orange)',
-                fontSize: 11, fontWeight: 700, color: 'var(--orange)',
-              }}>
-                <i className="ti ti-file-description" style={{ marginLeft: 4, fontSize: 10 }} />
-                مبدئية
-              </span>
             )}
             {pmMode === 'additive' && (
               <span style={{

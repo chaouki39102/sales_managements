@@ -43,7 +43,6 @@ class CommercialDocumentResource extends JsonResource
             'is_locked'                    => $this->is_locked,
             'validated_at'                 => $this->validated_at,
             'validated_by'                 => $this->validated_by,
-            'is_proforma'                  => $this->is_proforma,
             'cancellation_reason'          => $this->cancellation_reason,
             'source_document_id'           => $this->source_document_id,
             'cancellation_of_document_id'  => $this->cancellation_of_document_id,

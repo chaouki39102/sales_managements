@@ -5,7 +5,6 @@ import { fmtDZD } from '../utils/document.utils';
 interface DocumentFooterProps {
   form: {
     lines: Array<unknown>;
-    is_proforma: boolean;
   };
   totals: DocumentTotals;
   existingPayments: Array<unknown>;
@@ -18,7 +17,6 @@ interface DocumentFooterProps {
   successMsg: string;
   docCode: string;
   RETURNABLE_CODES: Set<string>;
-  handleConfirmProforma: () => void;
   handleDelete: () => void;
   handleExport: (format: 'excel' | 'pdf' | 'json' | 'xml') => void;
   onClose: () => void;
@@ -28,8 +26,8 @@ interface DocumentFooterProps {
 export default function DocumentFooter({
   form, totals, existingPayments, newPayments,
   pmMode, isEdit, isReadOnly, isCancelled, isPending,
-  successMsg, docCode, RETURNABLE_CODES,
-  handleConfirmProforma, handleDelete, handleExport,
+  successMsg, docCode,   RETURNABLE_CODES,
+  handleDelete, handleExport,
   onClose, handleSave,
 }: DocumentFooterProps) {
   return (
@@ -83,24 +81,6 @@ export default function DocumentFooter({
           >
             <i className="ti ti-receipt-refund" />
             إنشاء مرتجع
-          </button>
-        )}
-        {isEdit && form.is_proforma && !isReadOnly && (
-          <button
-            onClick={handleConfirmProforma}
-            disabled={isPending}
-            style={{
-              padding: '8px 14px', borderRadius: 'var(--r2)',
-              border: '1px solid var(--orange)',
-              background: 'color-mix(in srgb, var(--orange) 12%, transparent)',
-              color: 'var(--orange)',
-              cursor: isPending ? 'not-allowed' : 'pointer',
-              fontSize: 13, fontWeight: 600,
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            <i className="ti ti-circle-check" />
-            تأكيد وتحويل لفاتورة حقيقية
           </button>
         )}
         {isEdit && !isReadOnly && (

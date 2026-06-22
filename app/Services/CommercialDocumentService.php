@@ -37,9 +37,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 {
     use ValidatesTenantRelations;
 
-    /** @var bool علامة للتحويل من مبدئي → حقيقي (تُستخدم في afterUpdate) */
-    private bool $convertingFromProforma = false;
-
     protected string $model        = CommercialDocument::class;
     protected string $resourceName = 'commercial_document';
 
@@ -123,10 +120,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             if ($defCur) $data['currency_id'] = $defCur;
         }
 
-        if (!isset($data['is_proforma'])) {
-            $data['is_proforma'] = Setting::getSetting('default_is_proforma', false, $companyId);
-        }
-
         // السنة المالية
         if (empty($data['fiscal_year_id'])) {
             $behavior = Setting::getSetting('default_fiscal_year_behavior', 'current', $companyId);
@@ -169,13 +162,13 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         // ✅ حركات المخزون فوراً بعد الإنشاء (لأن الوثيقة معتمدة مباشرةً)
         $item->load('documentType', 'lines.product');
 
-        if (($item->documentType?->affects_stock_direction ?? 0) !== 0 && !$item->is_proforma) {
+        if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
             $this->createStockMovements($item);
         }
 
-        // ✅ ربط الدفعات إذا أُرسلت مع المستند (للمستندات غير المبدئية فقط)
+        // ✅ ربط الدفعات إذا أُرسلت مع المستند
         $payments = $request?->input('payments') ?? $data['payments'] ?? [];
-        if (!empty($payments) && !$item->is_proforma) {
+        if (!empty($payments)) {
             $this->attachPayments($item, $payments);
         }
     }
@@ -188,11 +181,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     protected function beforeUpdate(Model $item, array $data, $request): void
     {
         parent::beforeUpdate($item, $data, $request);
-
-        // علامة للتحويل من مبدئي → حقيقي (تُستخدم في afterUpdate)
-        if (isset($data['is_proforma']) && $data['is_proforma'] === false && $item->is_proforma === true) {
-            $this->convertingFromProforma = true;
-        }
 
         // R1
         if ($item->is_locked) {
@@ -266,21 +254,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $item->load('documentType', 'lines.product');
             if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
                 $this->createStockMovements($item);
-            }
-        }
-
-        // AU2: تحويل مبدئي → حقيقي — إنشاء حركات المخزون المفقودة
-        if ($this->convertingFromProforma) {
-            $item->load('documentType', 'lines.product');
-            // إنشاء حركات المخزون إذا كانت مفقودة
-            if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
-                $hasMovements = \App\Models\StockMovement::whereHas(
-                    'commercialDocumentLine',
-                    fn($q) => $q->where('commercial_document_id', $item->id)
-                )->exists();
-                if (!$hasMovements) {
-                    $this->createStockMovements($item);
-                }
             }
         }
 
@@ -531,8 +504,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function attachPayments(CommercialDocument $document, array $payments): void
     {
-        if ($document->is_proforma) return;
-
         foreach ($payments as $paymentData) {
             if (empty($paymentData['payment_mode_id']) || empty($paymentData['amount'])) {
                 continue;
@@ -676,7 +647,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $this->createDocumentLines($document, $linesData);
         $this->recalculateTotals($document);
         $document->load('documentType', 'lines.product');
-        if (($document->documentType?->affects_stock_direction ?? 0) !== 0 && !$document->is_proforma) {
+        if (($document->documentType?->affects_stock_direction ?? 0) !== 0) {
             $this->createStockMovements($document);
         }
     }
@@ -687,8 +658,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function createStockMovements(CommercialDocument $document): void
     {
-        if ($document->is_proforma) return;
-
         $documentType = $document->documentType;
         $direction    = (int) ($documentType?->affects_stock_direction ?? 0);
         if ($direction === 0) return;

@@ -2,18 +2,9 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
 import Modal from '@/components/ui/Modal';
 import { useConvertDocument } from '../hooks/useDocumentChain';
-import type { DocumentType } from '@/lib/api/core/types';
-
-const CONVERSION_MAP: Record<string, string[]> = {
-  DEV: ['BCC', 'BL', 'FV'],
-  BCC: ['BL', 'FV'],
-  BL:  ['FV'],
-  DDP: ['BCF'],
-  BCF: ['BR', 'FA'],
-  BR:  ['FA'],
-};
 
 interface ConvertDocumentModalProps {
   isOpen:    boolean;
@@ -40,21 +31,12 @@ export default function ConvertDocumentModal({
   const confirmRef = useRef<HTMLButtonElement>(null);
   const cancelRef  = useRef<HTMLButtonElement>(null);
 
-  const { data: docTypes = [] } = useQuery({
-    queryKey: [slug, 'document-types'],
-    queryFn:  () => apiGet<{ data?: DocumentType[] }>('/document-types', { per_page: 500 })
-      .then(r => (r as any)?.data ?? r ?? []),
+  const { data: allowedTypes = [] } = useQuery({
+    queryKey: tenantKeys.conversions.allowedTargets(slug, sourceCode),
+    queryFn:  () => apiGet<{ code: string; name: string }[]>(`/document-type-conversions/${sourceCode}/allowed-targets`),
     staleTime: 10 * 60_000,
+    enabled: !!sourceCode,
   });
-
-  const allowedCodes = CONVERSION_MAP[sourceCode] ?? [];
-
-  const allowedTypes = useMemo(() =>
-    docTypes
-      .filter((dt: any) => allowedCodes.includes(dt.code))
-      .map((dt: any) => ({ code: dt.code, name: dt.name })),
-    [docTypes, allowedCodes],
-  );
 
   useEffect(() => {
     if (isOpen) {
