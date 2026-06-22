@@ -15,6 +15,15 @@ class NumberingSeriesService extends \App\Core\Services\BaseService
     protected array $defaultWith = ['documentType', 'warehouse'];
     protected function getResourceName(): string { return $this->resourceName; }
 
+    public function getListConfig(): array
+    {
+        return [
+            'query_callback' => function ($query) {
+                return $query->withCount('commercialDocuments');
+            },
+        ];
+    }
+
     public function unlock(Model $item): Model
     {
         $item->update(['is_locked' => false]);

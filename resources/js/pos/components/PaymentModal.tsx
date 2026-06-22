@@ -1,9 +1,20 @@
 // pos/components/PaymentModal.tsx
+//
+// ✅ إصلاح جوهري: وضع "مختلط" (split) كان يعرض 3 حقول (نقداً/CIB/آجل) ويحسب
+//    الفارق في الواجهة فقط، لكن handleConfirm كان يتجاهلها تماماً ويُرسل دفعة
+//    واحدة بقيمة totalTtc الكاملة تحت وسيلة دفع "mixed" — أي أن تفصيل الدفعات
+//    لم يكن يصل إلى الباكاند إطلاقاً. أصبح الآن يبني مصفوفة دفعات فعلية
+//    (payments[]) ويتحقق أن المجموع المُدخل يطابق الإجمالي قبل التأكيد.
 import React, { useState, useEffect, useCallback } from 'react';
 import type { CartTotals, Party, PaymentMode } from '@/types';
 import { formatDZD, calcChange } from '../utils/calculations';
 
 type PayMethod = 'cash' | 'cib' | 'ccp' | 'bank' | 'credit' | 'split';
+
+export interface PaymentLine {
+  paymentModeId: number;
+  amount:        number;
+}
 
 interface PaymentModalProps {
   open:         boolean;
@@ -12,11 +23,12 @@ interface PaymentModalProps {
   paymentModes: PaymentMode[];
   onClose:      () => void;
   onConfirm:    (params: {
-    paymentModeId:     number;
-    treasuryAccountId?: number;
-    amountPaid:        number;
-    dueDate?:          string;
-    note?:             string;
+    amountPaid:         number;
+    dueDate?:           string;
+    note?:              string;
+    paymentModeId?:     number;
+    treasuryAccountId?: number | null;
+    payments?:          PaymentLine[];
   }) => Promise<{ ok: boolean; message?: string }>;
 }
 
@@ -40,12 +52,10 @@ export default function PaymentModal({
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
 
-  // Split amounts
   const [splitCash, setSplitCash] = useState('');
   const [splitCib,  setSplitCib]  = useState('');
   const [splitCr,   setSplitCr]   = useState('');
 
-  // Reset when opened
   useEffect(() => {
     if (open) {
       setGiven('');
@@ -57,7 +67,6 @@ export default function PaymentModal({
     }
   }, [open]);
 
-  // Numpad
   const np = useCallback((key: string) => {
     setGiven(prev => {
       if (key === 'del') return prev.slice(0, -1);
@@ -69,12 +78,12 @@ export default function PaymentModal({
   const givenNum  = parseFloat(given || '0') || 0;
   const change    = calcChange(givenNum, totals.total_ttc, totals.fiscal_stamp);
 
-  const splitSum  = (parseFloat(splitCash || '0') || 0)
-                  + (parseFloat(splitCib  || '0') || 0)
-                  + (parseFloat(splitCr   || '0') || 0);
-  const splitDiff = splitSum - totalTtc;
+  const splitCashNum = parseFloat(splitCash || '0') || 0;
+  const splitCibNum  = parseFloat(splitCib  || '0') || 0;
+  const splitCrNum   = parseFloat(splitCr   || '0') || 0;
+  const splitSum     = splitCashNum + splitCibNum + splitCrNum;
+  const splitDiff    = splitSum - totalTtc;
 
-  // Quick amounts
   const quickAmounts = [
     totalTtc,
     Math.ceil(totalTtc / 500) * 500,
@@ -82,21 +91,57 @@ export default function PaymentModal({
     Math.ceil(totalTtc / 2000) * 2000,
   ].filter((v, i, a) => a.indexOf(v) === i && v >= totalTtc).slice(0, 4);
 
+  const findMode = (code: string) => paymentModes.find(p => p.code?.toLowerCase() === code.toLowerCase());
+
   const handleConfirm = async () => {
     setError('');
+
+    if (method === 'split') {
+      if (Math.abs(splitDiff) >= 1) {
+        setError('المجموع المُدخل لا يطابق الإجمالي — تحقق من المبالغ');
+        return;
+      }
+      const payments: PaymentLine[] = [];
+      if (splitCashNum > 0) {
+        const pm = findMode('cash');
+        if (!pm) { setError('وسيلة الدفع "نقداً" غير مُفعَّلة في إعدادات الشركة'); return; }
+        payments.push({ paymentModeId: pm.id, amount: splitCashNum });
+      }
+      if (splitCibNum > 0) {
+        const pm = findMode('cib');
+        if (!pm) { setError('وسيلة الدفع "CIB" غير مُفعَّلة في إعدادات الشركة'); return; }
+        payments.push({ paymentModeId: pm.id, amount: splitCibNum });
+      }
+      // الجزء الآجل (splitCrNum) لا يُسجَّل كدفعة — يبقى ديناً على الزبون
+
+      setLoading(true);
+      const res = await onConfirm({
+        amountPaid: splitCashNum + splitCibNum,
+        payments,
+        note: note || undefined,
+      });
+      setLoading(false);
+      if (!res.ok) { setError(res.message ?? 'فشل الحفظ'); return; }
+      onClose();
+      return;
+    }
+
     let amountPaid = totalTtc;
     if (method === 'cash') amountPaid = givenNum || totalTtc;
     if (method === 'credit') amountPaid = 0;
 
-    // Find payment mode id
     const modeMap: Record<PayMethod, string> = {
       cash: 'cash', cib: 'cib', ccp: 'ccp', bank: 'bank', credit: 'credit', split: 'mixed',
     };
-    const pm = paymentModes.find(p => p.code === modeMap[method]) ?? paymentModes[0];
+    const pm = findMode(modeMap[method]);
+    if (!pm) {
+      setError(`وسيلة الدفع "${PAYMENT_BTNS.find(b => b.method === method)?.label}" غير مُفعَّلة في إعدادات الشركة`);
+      return;
+    }
 
     setLoading(true);
     const res = await onConfirm({
-      paymentModeId: pm?.id ?? 1,
+      paymentModeId: pm.id,
       amountPaid,
       dueDate: method === 'credit' ? dueDate : undefined,
       note: note || undefined,
@@ -113,7 +158,6 @@ export default function PaymentModal({
     <div className="ov on">
       <div className="modal modal-sm" style={{ maxHeight: '95vh' }} onClick={e => e.stopPropagation()}>
 
-        {/* Header */}
         <div className="m-hd" style={{ padding: '12px 16px' }}>
           <div>
             <div className="m-title">
@@ -129,7 +173,6 @@ export default function PaymentModal({
           </div>
         </div>
 
-        {/* Hero amount */}
         <div className="pay-amount-hero">
           <div className="pay-ttc-label">المبلغ الإجمالي TTC</div>
           <div className="pay-ttc-big">{formatDZD(totalTtc)}</div>
@@ -139,7 +182,6 @@ export default function PaymentModal({
           </div>
         </div>
 
-        {/* Breakdown */}
         <div className="pay-breakdown">
           <div className="pay-bd-c">
             <div className="pay-bd-l">HT</div>
@@ -163,7 +205,6 @@ export default function PaymentModal({
 
         <div style={{ overflowY: 'auto', maxHeight: 'calc(95vh - 230px)' }}>
 
-          {/* Payment method pills */}
           <div className="pay-m-grid">
             {PAYMENT_BTNS.map(({ method: m, icon, label }) => (
               <button
@@ -176,7 +217,6 @@ export default function PaymentModal({
             ))}
           </div>
 
-          {/* CASH */}
           {method === 'cash' && (
             <div>
               <div className="pay-cash-sec">
@@ -193,7 +233,6 @@ export default function PaymentModal({
                   autoFocus
                 />
               </div>
-              {/* Quick amounts */}
               <div className="qamts">
                 {quickAmounts.map(v => (
                   <button key={v} className="qamt" onClick={() => setGiven(String(v))}>
@@ -201,14 +240,12 @@ export default function PaymentModal({
                   </button>
                 ))}
               </div>
-              {/* Change */}
               <div className="change-display">
                 <span className="change-lbl2">الباقي للزبون</span>
                 <span className="change-val2" style={{ color: change >= 0 ? 'var(--em)' : 'var(--red)' }}>
                   {formatDZD(change)}
                 </span>
               </div>
-              {/* Numpad */}
               <div className="numpad" id="numpad-grid">
                 {['7','8','9','4','5','6','1','2','3'].map(k => (
                   <button key={k} className="npk" onClick={() => np(k)}>{k}</button>
@@ -221,11 +258,10 @@ export default function PaymentModal({
             </div>
           )}
 
-          {/* SPLIT */}
           {method === 'split' && (
             <div className="pay-split-sec" style={{ padding: '8px 14px' }}>
               <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--t3)', marginBottom: 10 }}>
-                الدفع المختلط
+                الدفع المختلط — كل خانة تُسجَّل كدفعة مستقلة فعلياً
               </div>
               {[
                 { label: 'نقداً', val: splitCash, set: setSplitCash },
@@ -245,6 +281,12 @@ export default function PaymentModal({
                   <span style={{ fontSize: 11, color: 'var(--t4)' }}>دج</span>
                 </div>
               ))}
+              {splitCrNum > 0 && !client && (
+                <div className="al al-b" style={{ borderRadius: 'var(--r2)', margin: '6px 0' }}>
+                  <span className="ic ic-xs" style={{ flexShrink: 0 }}><i className="ti ti-info-circle" /></span>
+                  <div>الجزء الآجل يتطلب اختيار زبون من القائمة قبل التأكيد.</div>
+                </div>
+              )}
               <div className="change-display">
                 <span className="change-lbl2">الفارق</span>
                 <span className="change-val2" style={{ color: Math.abs(splitDiff) < 1 ? 'var(--em)' : 'var(--red)' }}>
@@ -254,13 +296,18 @@ export default function PaymentModal({
             </div>
           )}
 
-          {/* CREDIT */}
           {method === 'credit' && (
             <div className="pay-credit-sec" style={{ padding: '8px 14px' }}>
               <div className="al al-b" style={{ borderRadius: 'var(--r2)', marginBottom: 10 }}>
                 <span className="ic ic-xs" style={{ flexShrink: 0 }}><i className="ti ti-info-circle" /></span>
                 <div>بيع آجل — سيُسجَّل في ديون العملاء تلقائياً عند التأكيد.</div>
               </div>
+              {!client && (
+                <div className="al al-r" style={{ borderRadius: 'var(--r2)', marginBottom: 10 }}>
+                  <span className="ic ic-xs" style={{ flexShrink: 0 }}><i className="ti ti-alert-circle" /></span>
+                  <div>يجب اختيار زبون من القائمة لتسجيل بيع آجل.</div>
+                </div>
+              )}
               <div className="fg">
                 <label>تاريخ الاستحقاق</label>
                 <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
@@ -268,7 +315,6 @@ export default function PaymentModal({
             </div>
           )}
 
-          {/* ELECTRONIC */}
           {(method === 'cib' || method === 'ccp' || method === 'bank') && (
             <div className="pay-credit-sec" style={{ padding: '8px 14px' }}>
               <div className="al al-g" style={{ borderRadius: 'var(--r2)' }}>
@@ -278,7 +324,6 @@ export default function PaymentModal({
             </div>
           )}
 
-          {/* Note */}
           <div className="pay-note-sec" style={{ padding: '4px 14px 8px' }}>
             <label>ملاحظة على الفاتورة</label>
             <input
@@ -297,10 +342,13 @@ export default function PaymentModal({
           )}
         </div>
 
-        {/* Footer */}
         <div className="m-foot">
           <button className="btn" onClick={onClose}>إلغاء</button>
-          <button className="btn btn-p" onClick={handleConfirm} disabled={loading}>
+          <button
+            className="btn btn-p"
+            onClick={handleConfirm}
+            disabled={loading || (method === 'credit' && !client) || (method === 'split' && splitCrNum > 0 && !client)}
+          >
             {loading ? (
               <span className="ic ic-xs"><i className="ti ti-loader" /></span>
             ) : (

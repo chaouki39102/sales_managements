@@ -84,7 +84,7 @@ export default function ChecksPage() {
 
   const { data: parties = [] } = useQuery({
     queryKey: ['parties-mini', slug],
-    queryFn:  () => apiGet<any[]>('/parties', { perPage: 500, sort: 'name', include: 'none' }),
+    queryFn:  () => apiGet<any[]>('/parties', { per_page: 500, sort: 'name' }),
     select:   (r: any) => (r?.data ?? r ?? []),
     staleTime: 10 * 60_000,
   });
@@ -97,7 +97,7 @@ export default function ChecksPage() {
         : apiPost('/checks', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [slug, 'checks'] });
-      createModal.close();
+      createModal.closeModal();
       setForm(emptyForm);
       setEditId(null);
     },
@@ -113,7 +113,7 @@ export default function ChecksPage() {
       apiPost(`/checks/${id}/mark-bounced`, { reason }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [slug, 'checks'] });
-      bounceModal.close();
+      bounceModal.closeModal();
       setBounceId(null);
       setBounceReason('');
     },
@@ -141,7 +141,7 @@ export default function ChecksPage() {
   const openCreate = () => {
     setForm(emptyForm);
     setEditId(null);
-    createModal.open();
+    createModal.openModal();
   };
 
   const openEdit = (c: any) => {
@@ -156,7 +156,7 @@ export default function ChecksPage() {
       notes:          c.notes ?? '',
     });
     setEditId(c.id);
-    createModal.open();
+    createModal.openModal();
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -170,7 +170,7 @@ export default function ChecksPage() {
   const openBounce = (id: number) => {
     setBounceId(id);
     setBounceReason('');
-    bounceModal.open();
+    bounceModal.openModal();
   };
 
   return (
@@ -323,7 +323,7 @@ export default function ChecksPage() {
       </div>
 
       {/* ── Create / Edit Modal ────────────────────────────────────────── */}
-      <Modal isOpen={createModal.isOpen} onClose={createModal.close} title={editId ? 'تعديل شيك' : 'إضافة شيك'}>
+      <Modal open={createModal.open} onClose={createModal.closeModal} title={editId ? 'تعديل شيك' : 'إضافة شيك'}>
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 4px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
@@ -379,7 +379,7 @@ export default function ChecksPage() {
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button type="button" onClick={createModal.close} style={secBtnStyle}>
+            <button type="button" onClick={createModal.closeModal} style={secBtnStyle}>
               إلغاء
             </button>
             <button type="submit" style={priBtnStyle} disabled={saveMutation.isPending}>
@@ -390,7 +390,7 @@ export default function ChecksPage() {
       </Modal>
 
       {/* ── Bounce Reason Modal ────────────────────────────────────────── */}
-      <Modal isOpen={bounceModal.isOpen} onClose={bounceModal.close} title="سبب الإرجاع">
+      <Modal open={bounceModal.open} onClose={bounceModal.closeModal} title="سبب الإرجاع">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 4px' }}>
           <div>
             <Label>سبب الإرجاع *</Label>
@@ -400,7 +400,7 @@ export default function ChecksPage() {
               placeholder="أدخل سبب إرجاع الشيك…" />
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button type="button" onClick={bounceModal.close} style={secBtnStyle}>إلغاء</button>
+            <button type="button" onClick={bounceModal.closeModal} style={secBtnStyle}>إلغاء</button>
             <button type="button" onClick={() => {
               if (bounceId && bounceReason.trim()) {
                 markBounced.mutate({ id: bounceId, reason: bounceReason.trim() });

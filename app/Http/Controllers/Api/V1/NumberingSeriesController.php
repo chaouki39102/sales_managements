@@ -22,10 +22,10 @@ class NumberingSeriesController extends BaseApiController
     /**
      * معاينة الرقم التالي — لا يزيد العداد (للاستعلام فقط)
      */
-    public function previewNextNumber(Request $request, int $id): JsonResponse
+    public function previewNextNumber(Request $request, $id): JsonResponse
     {
         try {
-            $series = $this->numberingSeriesService->findById($id);
+            $series = $this->numberingSeriesService->findById($this->extractId($id));
             $preview = $series->formatNumber($series->last_number + 1);
 
             return $this->successResponse([
@@ -40,10 +40,10 @@ class NumberingSeriesController extends BaseApiController
     /**
      * الحصول على الرقم التالي وزيادة العداد (مع قفل الصف لمنع Race Condition)
      */
-    public function getNextNumber(Request $request, int $id): JsonResponse
+    public function getNextNumber(Request $request, $id): JsonResponse
     {
         try {
-            $result = $this->numberingSeriesService->getNextNumberWithLock($id);
+            $result = $this->numberingSeriesService->getNextNumberWithLock($this->extractId($id));
 
             return $this->successResponse([
                 'series_id' => $result['series_id'],
@@ -57,10 +57,10 @@ class NumberingSeriesController extends BaseApiController
     /**
      * مزامنة الرقم الحالي مع أعلى رقم مستخدم فعلياً في المستندات
      */
-    public function syncNumber(Request $request, int $id): JsonResponse
+    public function syncNumber(Request $request, $id): JsonResponse
     {
         try {
-            $series = $this->numberingSeriesService->syncWithActualDocuments($id);
+            $series = $this->numberingSeriesService->syncWithActualDocuments($this->extractId($id));
 
             return $this->successResponse(
                 $this->transformItem($series),
@@ -71,10 +71,10 @@ class NumberingSeriesController extends BaseApiController
         }
     }
 
-    public function unlock(Request $request, int $id): JsonResponse
+    public function unlock(Request $request, $id): JsonResponse
     {
         try {
-            $series = $this->numberingSeriesService->findById($id);
+            $series = $this->numberingSeriesService->findById($this->extractId($id));
             $series = $this->numberingSeriesService->unlock($series);
 
             return $this->successResponse(
@@ -86,10 +86,10 @@ class NumberingSeriesController extends BaseApiController
         }
     }
 
-    public function lock(Request $request, int $id): JsonResponse
+    public function lock(Request $request, $id): JsonResponse
     {
         try {
-            $series = $this->numberingSeriesService->findById($id);
+            $series = $this->numberingSeriesService->findById($this->extractId($id));
             $series = $this->numberingSeriesService->lock($series);
 
             return $this->successResponse(

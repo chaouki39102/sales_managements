@@ -31,10 +31,10 @@ interface NumberingSeriesRecord {
   current_month: number;
   active: boolean;
   is_locked: boolean;
-  relations?: {
-    documentType?: { id: number; name: string; code: string };
-    warehouse?: { id: number; name: string };
-  };
+  // حقول العلاقات (تأتي في الجذر وليس تحت relations)
+  document_type?: { id: number; name: string; code: string };
+  warehouse?: { id: number; name: string } | null;
+  commercial_documents_count?: number;
   // حقل إضافي من الـ API بعد المزامنة
   actual_last_number?: number;
 }
@@ -80,7 +80,7 @@ function simulateNumber(series: NumberingSeriesRecord, next = true): string {
 }
 
 function haveDocumentsBeenCreated(series: NumberingSeriesRecord): boolean {
-  return series.last_number >= series.start_number;
+  return series.last_number >= series.start_number || (series.commercial_documents_count ?? 0) > 0;
 }
 
 // =============== Main Component ===============
@@ -231,15 +231,20 @@ export default function NumberingSeriesPage() {
               </thead>
               <tbody>
                 {items.map((item) => {
-                  const docType = item.relations?.documentType;
-                  const warehouse = item.relations?.warehouse;
+                  const docType = item.document_type;
+                  const warehouse = item.warehouse;
                   const hasDocuments = haveDocumentsBeenCreated(item);
+                  // الرقم الفعلي: أعلى قيمة بين last_number (من DB) و count-based number
+                  const effectiveLastNumber = Math.max(
+                    item.last_number,
+                    item.start_number + ((item.commercial_documents_count ?? 0) - 1)
+                  );
                   return (
-                    <tr key={item.id}>
+                    <tr key={item.id} onDoubleClick={() => openEdit(item)} style={{ cursor: 'pointer' }}>
                       <td>
                         <div style={{ fontWeight: 700, fontSize: 13 }}>{docType?.name ?? '—'}</div>
                         {docType?.code && <div style={{ fontSize: 11, color: 'var(--t4)', fontFamily: 'monospace' }}>{docType.code}</div>}
-                        {warehouse && <div style={{ fontSize: 10, color: 'var(--t3)' }}>🏭 {warehouse.name}</div>}
+                        {warehouse && <div style={{ fontSize: 10, color: 'var(--t3)' }}><i className="ti ti-building-warehouse" style={{ fontSize: 12, verticalAlign: 'middle', marginLeft: 2 }} /> {warehouse.name}</div>}
                       </td>
                       <td>
                         <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--em)' }}>
@@ -253,7 +258,7 @@ export default function NumberingSeriesPage() {
                       </td>
                       <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: 800, fontSize: 14 }}>
                         {hasDocuments ? (
-                          item.last_number
+                          effectiveLastNumber
                         ) : (
                           <span style={{ color: 'var(--t4)', fontWeight: 400, fontSize: 12 }}>لم يصدر بعد</span>
                         )}
@@ -269,7 +274,7 @@ export default function NumberingSeriesPage() {
                           color: 'var(--em)',
                           whiteSpace: 'nowrap',
                         }}>
-                          {hasDocuments ? simulateNumber(item, true) : '—'}
+                          {hasDocuments ? simulateNumber({ ...item, last_number: effectiveLastNumber }, true) : '—'}
                         </span>
                       </td>
                       <td><Badge variant={item.reset_yearly ? 'success' : 'gray'}>{item.reset_yearly ? 'نعم' : 'لا'}</Badge></td>
@@ -532,26 +537,46 @@ function NumberingSeriesModal({
 
         <div className="fg s2">
           <label className="req">الصيغة</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              value={form.format}
-              onChange={e => set('format', e.target.value)}
-              style={{
-                fontFamily: 'monospace', flex: 1,
-                borderColor: errors.format ? 'var(--red)' : undefined,
-                background: hasExistingDocuments ? 'var(--bg3)' : undefined,
-                opacity: hasExistingDocuments ? 0.7 : 1,
-              }}
-              readOnly={hasExistingDocuments}
-              placeholder="الصيغة"
-            />
-            {!hasExistingDocuments && (
-              <select style={{ width: 130, fontFamily: 'monospace', fontSize: 11 }} onChange={e => set('format', e.target.value)} value="">
-                <option value="">نماذج</option>
-                {['{PREFIX}-{YYYY}-{NUMBER:6}','{PREFIX}-{YY}{MM}-{NUMBER:4}','{PREFIX}/{YYYY}/{NUMBER:5}','{NUMBER:8}'].map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
-            )}
-          </div>
+          <input
+            value={form.format}
+            onChange={e => set('format', e.target.value)}
+            style={{
+              fontFamily: 'monospace',
+              borderColor: errors.format ? 'var(--red)' : undefined,
+              background: hasExistingDocuments ? 'var(--bg3)' : undefined,
+              opacity: hasExistingDocuments ? 0.7 : 1,
+              marginBottom: 6,
+            }}
+            readOnly={hasExistingDocuments}
+            placeholder="اكتب الصيغة يدوياً أو اختر نموذجاً من القائمة"
+          />
+          {!hasExistingDocuments && (
+            <select
+              style={{ width: '100%', fontFamily: 'monospace', fontSize: 12 }}
+              onChange={e => { if (e.target.value) set('format', e.target.value); }}
+              value=""
+            >
+              <option value="">— اختر نموذج صيغة —</option>
+              <optgroup label="بفاصل شرطة">
+                <option value="{PREFIX}-{YYYY}-{NUMBER:6}">{'{PREFIX}-{YYYY}-{NUMBER:6}'}  ←  FV-2026-000001</option>
+                <option value="{PREFIX}-{YY}{MM}-{NUMBER:4}">{'{PREFIX}-{YY}{MM}-{NUMBER:4}'}  ←  FV-2606-0001</option>
+                <option value="{PREFIX}-{YYYY}-{MM}-{NUMBER:4}">{'{PREFIX}-{YYYY}-{MM}-{NUMBER:4}'}  ←  FV-2026-06-0001</option>
+                <option value="{PREFIX}-{NUMBER:6}">{'{PREFIX}-{NUMBER:6}'}  ←  FV-000001</option>
+                <option value="{PREFIX}-{YYYY}-{NUMBER:6}-{SUFFIX}">{'{PREFIX}-{YYYY}-{NUMBER:6}-{SUFFIX}'}  ←  FV-2026-000001-DZ</option>
+              </optgroup>
+              <optgroup label="بفاصل شرطة مائلة">
+                <option value="{PREFIX}/{YY}/{NUMBER:6}">{'{PREFIX}/{YY}/{NUMBER:6}'}  ←  FV/26/000001</option>
+                <option value="{PREFIX}/{YYYY}/{NUMBER:5}">{'{PREFIX}/{YYYY}/{NUMBER:5}'}  ←  FV/2026/00001</option>
+                <option value="{PREFIX}/{YY}/{MM}/{NUMBER:4}">{'{PREFIX}/{YY}/{MM}/{NUMBER:4}'}  ←  FV/26/06/0001</option>
+                <option value="{PREFIX}/{NUMBER:6}">{'{PREFIX}/{NUMBER:6}'}  ←  FV/000001</option>
+              </optgroup>
+              <optgroup label="بدون فاصل">
+                <option value="{PREFIX}{NUMBER:6}">{'{PREFIX}{NUMBER:6}'}  ←  FV000001</option>
+                <option value="{PREFIX}{YY}{MM}{NUMBER:4}">{'{PREFIX}{YY}{MM}{NUMBER:4}'}  ←  FV26060001</option>
+                <option value="{NUMBER:8}">{'{NUMBER:8}'}  ←  00000001</option>
+              </optgroup>
+            </select>
+          )}
           {errors.format && <span style={{ color: 'var(--red)', fontSize: 11 }}>{errors.format}</span>}
           {hasExistingDocuments && <span style={{ fontSize: 10, color: 'var(--gold)' }}>تم تعطيل تعديل الصيغة لوجود مستندات مرتبطة</span>}
         </div>

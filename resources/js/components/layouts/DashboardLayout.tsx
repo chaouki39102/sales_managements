@@ -78,7 +78,6 @@ const NAV_GROUPS = [
       { name: 'الإعدادات',       href: 'settings',                icon: 'ti-settings'     },
       { name: 'أنواع المستندات', href: 'settings/document-types', icon: 'ti-file'         },
       { name: 'سلاسل الترقيم',   href: 'numbering-series',        icon: 'ti-list-numbers' },
-      { name: 'طرق الدفع',       href: 'payment-methods',         icon: 'ti-credit-card'  },
       { name: 'فئات المصروفات',  href: 'expense-categories',      icon: 'ti-category'     },
     ],
   },
@@ -130,7 +129,6 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   'settings':                { title: 'الإعدادات',           path: 'نظام ← إعدادات'         },
   'settings/document-types': { title: 'أنواع المستندات',    path: 'نظام ← أنواع المستندات' },
   'numbering-series':        { title: 'سلاسل الترقيم',      path: 'نظام ← سلاسل الترقيم'   },
-  'payment-methods':         { title: 'طرق الدفع',           path: 'نظام ← طرق الدفع'       },
   'expense-categories':      { title: 'فئات المصروفات',     path: 'نظام ← فئات المصروفات'  },
   'admin/companies':         { title: 'إدارة الشركات',      path: 'Super Admin ← الشركات'  },
 };

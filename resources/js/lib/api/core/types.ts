@@ -309,8 +309,9 @@ export interface Party extends BaseModel {
   is_vat_registered?:     boolean;
   vat_registration_date?: string | null;
   additional_data?:       any;
-  active:                 boolean;
-  company_id:             number;
+  active:                    boolean;
+  company_id:                number;
+  default_selling_price_ht?: number;
   // Relations
   party_type?:            PartyType;
   legal_form?:            LegalForm;
@@ -397,23 +398,45 @@ export interface ProductVariant extends BaseModel {
 }
 
 export interface Product extends BaseModel {
-  name:             string;
-  slug:             string;
-  description?:     string | null;
-  family_id?:       number | null;
-  brand_id?:        number | null;
-  product_type_id?: number | null;
-  images?:          string[] | null;
-  specifications?:  Record<string, string> | null;
-  meta_title?:      string | null;
-  meta_description?:string | null;
-  active:           boolean;
-  company_id:       number;
+  name:                      string;
+  slug:                      string;
+  ref?:                      string | null;
+  barcode?:                  string | null;
+  description?:              string | null;
+  family_id?:                number | null;
+  brand_id?:                 number | null;
+  product_type_id?:          number | null;
+  tva_id?:                   number | null;
+  unit_id?:                  number | null;
+  purchase_price_ht?:        number;
+  current_cost_price?:       number;
+  min_margin_percentage?:    number;
+  manages_stock:             boolean;
+  allow_negative_stock:      boolean;
+  has_lots:                  boolean;
+  has_expiration_date:       boolean;
+  min_stock_alert?:          number;
+  max_stock_alert?:          number | null;
+  manages_quantity_discounts:boolean;
+  weight?:                   number;
+  volume?:                   number;
+  length?:                   number;
+  width?:                    number;
+  height?:                   number;
+  valuation_method_id?:      number | null;
+  specifications?:           Record<string, string> | null;
+  images?:                   string[] | null;
+  meta_title?:               string | null;
+  meta_description?:         string | null;
+  active:                    boolean;
+  company_id:                number;
   // Relations
-  family?:      Family;
-  brand?:       Brand;
-  productType?: ProductType;
-  variants?:    ProductVariant[];
+  family?:       Family;
+  brand?:        Brand;
+  productType?:  ProductType;
+  tva?:          Tva;
+  unit?:         Unit;
+  variants?:     ProductVariant[];
 }
 
 // ─── Commercial Documents ─────────────────────────────────────────────────────

@@ -1,16 +1,33 @@
 // ════════════════════════════════════════════════════════════════════════════
 // lib/api/endpoints/products.ts
-// ✅ مصحح: variants endpoints + تصحيح active route + POS support
+//
+// ✅ يغطي:
+//   - variantsApi.list()       — تصفح المنتجات في POS (مع include كامل)
+//   - variantsApi.search()     — بحث بالاسم / الباركود
+//   - useVariantSearch()       — hook بحث (مُفعَّل عند length >= 2)
+//   - useProducts / useProduct — صفحات إدارة المنتجات
+//   - useProductMutations / useVariantMutations
+//
+// ⚠️  الـ interceptor يُضيف /{slug}/ تلقائياً — لا نمرره هنا
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete, apiUpload } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug } from '../../store/appStore';
 import type {
-  Product, ProductVariant, ProductVariantPrice,
-  QuantityDiscount, ProductLot,
-  PaginatedResponse, ListParams,
+  Product,
+  ProductVariant,
+  ProductVariantPrice,
+  QuantityDiscount,
+  ProductLot,
+  PaginatedResponse,
+  ListParams,
 } from '../core/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,21 +46,30 @@ export interface VariantListParams extends ListParams {
   active?:        boolean;
 }
 
+// ─── Include string للـ POS ───────────────────────────────────────────────────
+// يجلب كل ما يحتاجه ProductCard + useCartStore.addItem
+// ✅ أُضيف prices.priceLevel: بدونها لا يمكن لصفحة POS تطبيق مستويات
+//    السعر (تجزئة/نصف جملة/جملة) — كان الزر موجوداً في الواجهة بدون أي بيانات يعمل بها
+const POS_VARIANT_INCLUDE =
+  'product,product.family,unit,tva,prices.priceLevel';
+
 // ─── Products API ─────────────────────────────────────────────────────────────
 
 export const productsApi = {
   list: (params?: ProductListParams) =>
-    apiGet<PaginatedResponse<Product>>('/products', params),
+    apiGet<PaginatedResponse<Product>>('/products', {
+      include: 'family,brand,productType',
+      ...params,
+    }),
 
   show: (id: number, include?: string) =>
     apiGet<Product>(`/products/${id}`, {
-      include: include ?? 'family,brand,productType',
+      include: include ??
+        'family,brand,productType,variants.unit,variants.tva,variants.prices.priceLevel,variants.quantityDiscounts',
     }),
 
-  // ✅ إصلاح: active يُرسل `filter[active]=1` بدل /products/active
-  // (لأن /products/:id يتعارض مع /products/active في بعض إعدادات الـ router)
   activeList: (params?: ProductListParams) =>
-    apiGet<Product[]>('/products/active', params),
+    apiGet<Product[]>('/products/active', { include: 'family,brand', ...params }),
 
   byFamily: (familyId: number) =>
     apiGet<Product[]>(`/products/by-family/${familyId}`),
@@ -65,35 +91,55 @@ export const productsApi = {
 } as const;
 
 // ─── Variants API ─────────────────────────────────────────────────────────────
-// ✅ مفقودة في النسخة الأصلية — مطلوبة للـ POS وصفحة المنتجات
 
 export const variantsApi = {
+  /**
+   * قائمة كاملة — للـ POS browse mode
+   * include: product, product.family (للفلترة بالتصنيف), unit, tva
+   */
   list: (params?: VariantListParams) =>
-    apiGet<PaginatedResponse<ProductVariant>>('/product-variants', params),
+    apiGet<PaginatedResponse<ProductVariant>>('/product-variants', {
+      per_page:  200,
+      include:   POS_VARIANT_INCLUDE,
+      active:    true,
+      ...params,
+    }),
 
-  byProduct: (productId: number, params?: VariantListParams) =>
-    apiGet<ProductVariant[]>(`/products/${productId}/variants`),
+  /**
+   * بحث بالاسم أو الباركود — للـ POS search bar
+   */
+  search: (query: string, params?: Omit<VariantListParams, 'search'>) =>
+    apiGet<PaginatedResponse<ProductVariant>>('/product-variants', {
+      per_page: 60,
+      include:  POS_VARIANT_INCLUDE,
+      active:   true,
+      search:   query,
+      ...params,
+    }),
+
+  /**
+   * بحث بالباركود فقط — للماسح الضوئي
+   */
+  byBarcode: (barcode: string) =>
+    apiGet<PaginatedResponse<ProductVariant>>('/product-variants', {
+      barcode,
+      include:  POS_VARIANT_INCLUDE,
+      per_page: 5,
+      active:   true,
+    }),
+
+  /**
+   * متغيرات منتج واحد
+   */
+  byProduct: (productId: number) =>
+    apiGet<ProductVariant[]>(`/products/${productId}/variants`, {
+      include: POS_VARIANT_INCLUDE,
+    }),
 
   show: (id: number) =>
     apiGet<ProductVariant>(`/product-variants/${id}`, {
-      include: 'product,unit,tva,prices.priceLevel,quantityDiscounts,lots',
-    }),
-
-  // ✅ للـ POS: بحث بالباركود
-  byBarcode: (barcode: string) =>
-    apiGet<ProductVariant[]>('/product-variants', {
-      barcode,
-      include: 'product,unit,tva,prices.priceLevel',
-      per_page: 5,
-    }),
-
-  // ✅ للـ POS: بحث بالنص
-  search: (query: string, params?: VariantListParams) =>
-    apiGet<PaginatedResponse<ProductVariant>>('/product-variants', {
-      ...params,
-      search: query,
-      include: 'product,unit,tva,prices',
-      per_page: 30,
+      include:
+        'product,product.family,unit,tva,prices.priceLevel,quantityDiscounts,lots',
     }),
 
   create: (data: Partial<ProductVariant>) =>
@@ -106,7 +152,7 @@ export const variantsApi = {
     apiDelete(`/product-variants/${id}`),
 } as const;
 
-// ─── Hooks ────────────────────────────────────────────────────────────────────
+// ─── Hooks — Products ─────────────────────────────────────────────────────────
 
 export function useProducts(params?: ProductListParams) {
   const slug = useActiveSlug();
@@ -123,38 +169,65 @@ export function useProduct(id: number | null | undefined) {
   const slug = useActiveSlug();
   return useQuery({
     queryKey:  tenantKeys.products.detail(slug ?? '', id!),
-    queryFn:   () => productsApi.show(id!,
-      'family,brand,productType,variants.unit,variants.tva,variants.prices.priceLevel,variants.quantityDiscounts'
-    ),
+    queryFn:   () => productsApi.show(id!),
     enabled:   !!slug && !!id,
     staleTime: 5 * 60_000,
   });
 }
 
-// ✅ للـ POS: جلب متغير بالباركود
+// ─── Hooks — Variants ─────────────────────────────────────────────────────────
+
+/**
+ * قائمة المتغيرات — تصفح POS (browse mode)
+ * مُفعَّل دائماً عندما يكون هناك slug
+ */
+export function useVariants(params?: VariantListParams) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:        [slug, 'variants', 'list', params],
+    queryFn:         () => variantsApi.list(params),
+    enabled:         !!slug,
+    staleTime:       5 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * بحث المتغيرات — POS search bar
+ * مُفعَّل فقط عند query.length >= 2
+ */
+export function useVariantSearch(
+  query: string,
+  params?: Omit<VariantListParams, 'search'>,
+) {
+  const slug    = useActiveSlug();
+  const enabled = !!slug && query.trim().length >= 2;
+
+  return useQuery({
+    queryKey:        [slug, 'variants', 'search', query.trim(), params],
+    queryFn:         () => variantsApi.search(query.trim(), params),
+    enabled,
+    staleTime:       30_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * بحث بالباركود — ماسح ضوئي
+ */
 export function useVariantByBarcode(barcode: string | null) {
   const slug = useActiveSlug();
   return useQuery({
     queryKey:  [slug, 'variants', 'barcode', barcode],
     queryFn:   () => variantsApi.byBarcode(barcode!),
-    enabled:   !!slug && !!barcode,
+    enabled:   !!slug && !!barcode && barcode.length > 0,
     staleTime: 10 * 60_000,
   });
 }
 
-// ✅ للـ POS: بحث بالنص
-export function useVariantSearch(query: string, params?: VariantListParams) {
-  const slug = useActiveSlug();
-  return useQuery({
-    queryKey:        [slug, 'variants', 'search', query, params],
-    queryFn:         () => variantsApi.search(query, params),
-    enabled:         !!slug && query.length >= 2,
-    staleTime:       2 * 60_000,
-    placeholderData: keepPreviousData,
-  });
-}
-
-// ✅ متغيرات منتج بعينه
+/**
+ * متغيرات منتج واحد
+ */
 export function useProductVariants(productId: number | null | undefined) {
   const slug = useActiveSlug();
   return useQuery({
@@ -165,13 +238,26 @@ export function useProductVariants(productId: number | null | undefined) {
   });
 }
 
+/**
+ * تفاصيل متغير واحد
+ */
+export function useVariant(id: number | null | undefined) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:  [slug, 'variants', 'detail', id],
+    queryFn:   () => variantsApi.show(id!),
+    enabled:   !!slug && !!id,
+    staleTime: 5 * 60_000,
+  });
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export function useProductMutations() {
   const slug = useActiveSlug();
   const qc   = useQueryClient();
 
-  const invalidate = () => {
+  const invalidateAll = () => {
     if (slug) qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
   };
 
@@ -185,7 +271,7 @@ export function useProductMutations() {
   return {
     create: useMutation({
       mutationFn: productsApi.create,
-      onSuccess:  invalidate,
+      onSuccess:  invalidateAll,
     }),
 
     update: useMutation({
@@ -196,14 +282,19 @@ export function useProductMutations() {
 
     remove: useMutation({
       mutationFn: productsApi.delete,
-      onSuccess:  invalidate,
+      onSuccess:  invalidateAll,
     }),
 
     uploadImage: useMutation({
       mutationFn: ({
-        id, formData, onProgress,
-      }: { id: number; formData: FormData; onProgress?: (p: number) => void }) =>
-        productsApi.uploadImage(id, formData, onProgress),
+        id,
+        formData,
+        onProgress,
+      }: {
+        id:          number;
+        formData:    FormData;
+        onProgress?: (p: number) => void;
+      }) => productsApi.uploadImage(id, formData, onProgress),
       onSuccess: invalidateOne,
     }),
   };
@@ -213,17 +304,29 @@ export function useVariantMutations() {
   const slug = useActiveSlug();
   const qc   = useQueryClient();
 
-  const invalidate = () => {
-    if (slug) qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
+  const invalidateAll = () => {
+    if (slug) {
+      // إبطال المنتجات أيضاً — المتغيرات مرتبطة بها في الكاش
+      qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
+      qc.invalidateQueries({ queryKey: [slug, 'variants'] });
+    }
   };
 
   return {
-    create: useMutation({ mutationFn: variantsApi.create, onSuccess: invalidate }),
+    create: useMutation({
+      mutationFn: variantsApi.create,
+      onSuccess:  invalidateAll,
+    }),
+
     update: useMutation({
       mutationFn: ({ id, data }: { id: number; data: Partial<ProductVariant> }) =>
         variantsApi.update(id, data),
-      onSuccess: invalidate,
+      onSuccess: invalidateAll,
     }),
-    remove: useMutation({ mutationFn: variantsApi.delete, onSuccess: invalidate }),
+
+    remove: useMutation({
+      mutationFn: variantsApi.delete,
+      onSuccess:  invalidateAll,
+    }),
   };
 }

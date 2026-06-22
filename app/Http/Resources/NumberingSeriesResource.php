@@ -31,6 +31,9 @@ class NumberingSeriesResource extends JsonResource
             'created_at'         => $this->created_at,
             'updated_at'         => $this->updated_at,
 
+            // عدد المستندات المرتبطة (يتم جلبه عبر withCount)
+            'commercial_documents_count' => $this->commercial_documents_count ?? 0,
+
             // Relations
             'document_type'      => new DocumentTypeResource($this->whenLoaded('documentType')),
             'warehouse'          => new WarehouseResource($this->whenLoaded('warehouse')),

@@ -1,9 +1,9 @@
 # Module Export: CommercialDocument
-Generated at: 2026-06-20 23:49:04
+Generated at: 2026-06-22 12:12:30
 
 ## Models
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\CommercialDocument.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\CommercialDocument.php
 ```php
 <?php
 
@@ -67,7 +67,6 @@ class CommercialDocument extends Model
         'is_locked',
         'validated_at',
         'validated_by',
-        'is_proforma',
         'cancellation_reason',
         'source_document_id',
         'cancellation_of_document_id',
@@ -96,7 +95,6 @@ class CommercialDocument extends Model
         'legal_mentions' => 'array',
         'is_locked' => 'boolean',
         'validated_at' => 'datetime',
-        'is_proforma' => 'boolean',
         'is_exported_to_accounting' => 'boolean',
         'exported_at' => 'datetime',
         'created_at' => 'datetime',
@@ -120,7 +118,6 @@ class CommercialDocument extends Model
         'currency_id',
         'document_status_id',
         'is_locked',
-        'is_proforma',
         'is_exported_to_accounting',
         // حقول تاريخية (يدعم Spatie النطاق: filter[document_date]=2024-01-01,2024-12-31)
         'document_date',
@@ -338,7 +335,7 @@ class CommercialDocument extends Model
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\CommercialDocumentLine.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\CommercialDocumentLine.php
 ```php
 <?php
 
@@ -440,7 +437,7 @@ class CommercialDocumentLine extends Model
 
 ## Controllers
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\CommercialDocumentController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\CommercialDocumentController.php
 ```php
 <?php
 
@@ -475,7 +472,7 @@ class CommercialDocumentController extends BaseApiController
             'filters' => [
                 'document_type_id', 'fiscal_year_id', 'document_status_id',
                 'party_id', 'warehouse_id', 'currency_id',
-                'is_locked', 'is_proforma', 'is_exported_to_accounting',
+                'is_locked', 'is_exported_to_accounting',
                 'party.name', 'warehouse.name', 'document_status.name',
                 'document_date', 'due_date', 'total_ht', 'total_ttc',
                 'net_to_pay', 'remaining_amount', 'reference', 'search',
@@ -813,7 +810,7 @@ class CommercialDocumentController extends BaseApiController
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\CommercialDocumentLineController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\CommercialDocumentLineController.php
 ```php
 <?php
 
@@ -848,7 +845,7 @@ class CommercialDocumentLineController extends BaseApiController
 
 ## Services
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\CommercialDocumentLineService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\CommercialDocumentLineService.php
 ```php
 <?php
 
@@ -961,7 +958,7 @@ class CommercialDocumentLineService extends \App\Core\Services\BaseService
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\CommercialDocumentService.patches.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\CommercialDocumentService.patches.php
 ```php
 <?php
 
@@ -1370,7 +1367,7 @@ public function addPayments(Request $request, Company $company, CommercialDocume
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\CommercialDocumentService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\CommercialDocumentService.php
 ```php
 <?php
 
@@ -1410,9 +1407,6 @@ use Illuminate\Support\Facades\Log;
 class CommercialDocumentService extends \App\Core\Services\BaseService
 {
     use ValidatesTenantRelations;
-
-    /** @var bool علامة للتحويل من مبدئي → حقيقي (تُستخدم في afterUpdate) */
-    private bool $convertingFromProforma = false;
 
     protected string $model        = CommercialDocument::class;
     protected string $resourceName = 'commercial_document';
@@ -1497,10 +1491,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             if ($defCur) $data['currency_id'] = $defCur;
         }
 
-        if (!isset($data['is_proforma'])) {
-            $data['is_proforma'] = Setting::getSetting('default_is_proforma', false, $companyId);
-        }
-
         // السنة المالية
         if (empty($data['fiscal_year_id'])) {
             $behavior = Setting::getSetting('default_fiscal_year_behavior', 'current', $companyId);
@@ -1543,13 +1533,13 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         // ✅ حركات المخزون فوراً بعد الإنشاء (لأن الوثيقة معتمدة مباشرةً)
         $item->load('documentType', 'lines.product');
 
-        if (($item->documentType?->affects_stock_direction ?? 0) !== 0 && !$item->is_proforma) {
+        if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
             $this->createStockMovements($item);
         }
 
-        // ✅ ربط الدفعات إذا أُرسلت مع المستند (للمستندات غير المبدئية فقط)
+        // ✅ ربط الدفعات إذا أُرسلت مع المستند
         $payments = $request?->input('payments') ?? $data['payments'] ?? [];
-        if (!empty($payments) && !$item->is_proforma) {
+        if (!empty($payments)) {
             $this->attachPayments($item, $payments);
         }
     }
@@ -1562,11 +1552,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     protected function beforeUpdate(Model $item, array $data, $request): void
     {
         parent::beforeUpdate($item, $data, $request);
-
-        // علامة للتحويل من مبدئي → حقيقي (تُستخدم في afterUpdate)
-        if (isset($data['is_proforma']) && $data['is_proforma'] === false && $item->is_proforma === true) {
-            $this->convertingFromProforma = true;
-        }
 
         // R1
         if ($item->is_locked) {
@@ -1640,21 +1625,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $item->load('documentType', 'lines.product');
             if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
                 $this->createStockMovements($item);
-            }
-        }
-
-        // AU2: تحويل مبدئي → حقيقي — إنشاء حركات المخزون المفقودة
-        if ($this->convertingFromProforma) {
-            $item->load('documentType', 'lines.product');
-            // إنشاء حركات المخزون إذا كانت مفقودة
-            if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
-                $hasMovements = \App\Models\StockMovement::whereHas(
-                    'commercialDocumentLine',
-                    fn($q) => $q->where('commercial_document_id', $item->id)
-                )->exists();
-                if (!$hasMovements) {
-                    $this->createStockMovements($item);
-                }
             }
         }
 
@@ -1905,8 +1875,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function attachPayments(CommercialDocument $document, array $payments): void
     {
-        if ($document->is_proforma) return;
-
         foreach ($payments as $paymentData) {
             if (empty($paymentData['payment_mode_id']) || empty($paymentData['amount'])) {
                 continue;
@@ -2050,7 +2018,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $this->createDocumentLines($document, $linesData);
         $this->recalculateTotals($document);
         $document->load('documentType', 'lines.product');
-        if (($document->documentType?->affects_stock_direction ?? 0) !== 0 && !$document->is_proforma) {
+        if (($document->documentType?->affects_stock_direction ?? 0) !== 0) {
             $this->createStockMovements($document);
         }
     }
@@ -2061,8 +2029,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function createStockMovements(CommercialDocument $document): void
     {
-        if ($document->is_proforma) return;
-
         $documentType = $document->documentType;
         $direction    = (int) ($documentType?->affects_stock_direction ?? 0);
         if ($direction === 0) return;
@@ -2272,7 +2238,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
 ## Requests
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreCommercialDocumentRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreCommercialDocumentRequest.php
 ```php
 <?php
 
@@ -2337,7 +2303,6 @@ class StoreCommercialDocumentRequest extends FormRequest
             'payment_terms'  => 'nullable|array',
             'shipping_info'  => 'nullable|array',
             'legal_mentions' => 'nullable|array',
-            'is_proforma'    => 'nullable|boolean',
             'exchange_rate'               => 'nullable|numeric|min:0.0001',
             'source_document_id'          => 'nullable|integer',
             'cancellation_of_document_id' => 'nullable|integer',
@@ -2421,7 +2386,7 @@ class StoreCommercialDocumentRequest extends FormRequest
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateCommercialDocumentRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateCommercialDocumentRequest.php
 ```php
 <?php
 
@@ -2471,7 +2436,6 @@ class UpdateCommercialDocumentRequest extends FormRequest
             'payment_terms'   => 'sometimes|nullable|array',
             'shipping_info'   => 'sometimes|nullable|array',
             'legal_mentions'  => 'sometimes|nullable|array',
-            'is_proforma'     => 'sometimes|nullable|boolean',
 
             // ── الأسطر (اختياري في التحديث) ──────────────────────────
             'lines'                            => 'sometimes|array|min:1',
@@ -2504,7 +2468,7 @@ class UpdateCommercialDocumentRequest extends FormRequest
 
 ## Policies
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\CommercialDocumentLinePolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\CommercialDocumentLinePolicy.php
 ```php
 <?php
 
@@ -2554,7 +2518,7 @@ class CommercialDocumentLinePolicy
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\CommercialDocumentPolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\CommercialDocumentPolicy.php
 ```php
 <?php
 

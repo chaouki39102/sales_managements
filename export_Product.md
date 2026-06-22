@@ -1,5 +1,5 @@
 # Module Export: Product
-Generated at: 2026-06-18 12:06:35
+Generated at: 2026-06-22 12:12:29
 
 ## Models
 
@@ -48,6 +48,7 @@ class Product extends Model
         'unit_id',
         'purchase_price_ht',
         'current_cost_price',
+        'min_margin_percentage',
         'manages_stock',
         'allow_negative_stock',
         'has_lots',
@@ -81,6 +82,7 @@ class Product extends Model
         'manages_quantity_discounts' => 'boolean',
         'purchase_price_ht' => 'decimal:4',
         'current_cost_price' => 'decimal:4',
+        'min_margin_percentage' => 'decimal:4',
         'min_stock_alert' => 'decimal:4',
         'max_stock_alert' => 'decimal:4',
         'weight' => 'decimal:2',
@@ -93,7 +95,7 @@ class Product extends Model
         'deleted_at' => 'datetime',
     ];
 
-    protected $appends = ['is_low_stock'];
+    protected $appends = ['is_low_stock', 'default_selling_price_ht'];
 
     public static array $searchableFields = ['name', 'ref', 'barcode', 'description'];
     public static array $filterable = [
@@ -237,6 +239,20 @@ class Product extends Model
         if (!$this->manages_stock) return false;
         return (float) ($this->attributes['current_stock'] ?? 0)
             <= (float) $this->min_stock_alert;
+    }
+
+    public function getDefaultSellingPriceHtAttribute(): float
+    {
+        if ($this->relationLoaded('prices')) {
+            $active = $this->prices->first(fn($p) => $p->active);
+            if ($active) {
+                $price = $active->computePrice((float) ($this->purchase_price_ht ?? $this->current_cost_price ?? 0));
+                if ($price > 0) return round($price, 4);
+            }
+        }
+        // Fallback: purchase_price_ht × 1.3
+        $base = (float) ($this->purchase_price_ht ?? $this->current_cost_price ?? 0);
+        return $base > 0 ? round($base * 1.3, 4) : 0;
     }
 
     // Business Logic
@@ -1271,6 +1287,94 @@ class ProductService extends \App\Core\Services\BaseService
     // =========================================================
 
 
+}
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductSuggestionService.php
+```php
+<?php
+
+namespace App\Services;
+
+use App\Models\CommercialDocumentLine;
+use App\Models\Product;
+use Illuminate\Support\Facades\DB;
+
+class ProductSuggestionService
+{
+    public function getSuggestions(int $partyId, int $limit = 5, ?bool $isPurchase = null): array
+    {
+        $query = CommercialDocumentLine::query()
+            ->join('commercial_documents', 'commercial_document_lines.commercial_document_id', '=', 'commercial_documents.id')
+            ->join('products', 'commercial_document_lines.product_id', '=', 'products.id')
+            ->join('document_types', 'commercial_documents.document_type_id', '=', 'document_types.id')
+            ->join('document_base_operations', 'document_types.document_base_operation_id', '=', 'document_base_operations.id')
+            ->where('commercial_documents.party_id', $partyId)
+            ->whereNotNull('commercial_document_lines.product_id')
+            ->select(
+                'products.id',
+                'products.name',
+                'products.ref',
+                DB::raw('COUNT(DISTINCT commercial_documents.id) as order_count'),
+                DB::raw('SUM(commercial_document_lines.quantity) as total_qty'),
+                DB::raw('MAX(commercial_document_lines.created_at) as last_purchased_at'),
+            );
+
+        if ($isPurchase === true) {
+            $query->where('document_base_operations.name', 'purchase');
+        } elseif ($isPurchase === false) {
+            $query->where('document_base_operations.name', 'sale');
+        }
+
+        $products = $query
+            ->groupBy('products.id', 'products.name', 'products.ref')
+            ->orderByDesc('order_count')
+            ->orderByDesc('total_qty')
+            ->limit($limit)
+            ->get();
+
+        if ($products->isEmpty()) {
+            return [];
+        }
+
+        $productIds = $products->pluck('id');
+
+        $lastPrices = CommercialDocumentLine::query()
+            ->join('commercial_documents', 'commercial_document_lines.commercial_document_id', '=', 'commercial_documents.id')
+            ->whereIn('commercial_document_lines.product_id', $productIds)
+            ->where('commercial_documents.party_id', $partyId)
+            ->select(
+                'commercial_document_lines.product_id',
+                DB::raw('MAX(commercial_document_lines.created_at) as last_created'),
+            )
+            ->groupBy('commercial_document_lines.product_id')
+            ->get()
+            ->keyBy('product_id');
+
+        $priceQuery = CommercialDocumentLine::query()
+            ->whereIn('product_id', $productIds)
+            ->whereIn('created_at', $lastPrices->pluck('last_created'))
+            ->select('product_id', 'unit_price_ht', 'tva_rate')
+            ->get()
+            ->keyBy('product_id');
+
+        $result = [];
+        foreach ($products as $p) {
+            $lastPriceRow = $priceQuery->get($p->id);
+            $result[] = [
+                'id'               => $p->id,
+                'name'             => $p->name,
+                'ref'              => $p->ref,
+                'order_count'      => (int) $p->order_count,
+                'total_qty'        => (float) $p->total_qty,
+                'suggested_price'  => $lastPriceRow ? (float) $lastPriceRow->unit_price_ht : null,
+                'suggested_tva'    => $lastPriceRow ? (float) $lastPriceRow->tva_rate : null,
+            ];
+        }
+
+        return $result;
+    }
 }
 
 ```
@@ -2383,6 +2487,36 @@ return new class extends Migration {
     }
     public function down(): void {
         Schema::dropIfExists('product_variants');
+    }
+};
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_06_20_230508_add_min_margin_percentage_to_products_table.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('products', function (Blueprint $table) {
+            $table->decimal('min_margin_percentage', 5, 2)->nullable()->after('purchase_price_ht');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('products', function (Blueprint $table) {
+            $table->dropColumn('min_margin_percentage');
+        });
     }
 };
 

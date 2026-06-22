@@ -88,7 +88,7 @@ class Product extends Model
         'deleted_at' => 'datetime',
     ];
 
-    protected $appends = ['is_low_stock'];
+    protected $appends = ['is_low_stock', 'default_selling_price_ht'];
 
     public static array $searchableFields = ['name', 'ref', 'barcode', 'description'];
     public static array $filterable = [
@@ -232,6 +232,20 @@ class Product extends Model
         if (!$this->manages_stock) return false;
         return (float) ($this->attributes['current_stock'] ?? 0)
             <= (float) $this->min_stock_alert;
+    }
+
+    public function getDefaultSellingPriceHtAttribute(): float
+    {
+        if ($this->relationLoaded('prices')) {
+            $active = $this->prices->first(fn($p) => $p->active);
+            if ($active) {
+                $price = $active->computePrice((float) ($this->purchase_price_ht ?? $this->current_cost_price ?? 0));
+                if ($price > 0) return round($price, 4);
+            }
+        }
+        // Fallback: purchase_price_ht × 1.3
+        $base = (float) ($this->purchase_price_ht ?? $this->current_cost_price ?? 0);
+        return $base > 0 ? round($base * 1.3, 4) : 0;
     }
 
     // Business Logic

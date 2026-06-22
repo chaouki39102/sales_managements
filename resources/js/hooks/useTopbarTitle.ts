@@ -50,7 +50,6 @@ const STATIC: Record<string, PageMeta> = {
   '/settings':                { title: 'الإعدادات',              path: 'نظام ← إعدادات'            },
   '/settings/document-types': { title: 'أنواع المستندات',        path: 'نظام ← أنواع المستندات'    },
   '/numbering-series':        { title: 'سلاسل الترقيم',          path: 'نظام ← سلاسل الترقيم'      },
-  '/payment-methods':         { title: 'طرق الدفع',              path: 'نظام ← طرق الدفع'          },
   '/expense-categories':      { title: 'فئات المصروفات',         path: 'نظام ← فئات المصروفات'     },
   // ── Super Admin ──
   '/admin':                   { title: 'لوحة السوبر أدمن',       path: 'Admin'                      },

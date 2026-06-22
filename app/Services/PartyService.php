@@ -196,9 +196,10 @@ class PartyService extends \App\Core\Services\BaseService
     public function getCustomers(array $params = [])
     {
         $companyId    = $this->getCurrentCompanyId();
-        $clientTypeId = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+        $clientTypeIds = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
             ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
-            ->value('id');
+            ->pluck('id')
+            ->toArray();
 
         // ✅ استخراج صحيح: يدعم filter[search] و filter[active] و search و active
         $search   = $this->extractParam($params, 'search');
@@ -210,7 +211,7 @@ class PartyService extends \App\Core\Services\BaseService
 
         return Party::with(['commune', 'wilaya', 'legalForm', 'defaultPriceLevel'])
             ->where('company_id', $companyId)
-            ->where('party_type_id', $clientTypeId)
+            ->whereIn('party_type_id', $clientTypeIds)
             // ── فلتر البحث ──────────────────────────────────────────────────
             ->when(
                 !empty($search),
@@ -231,7 +232,7 @@ class PartyService extends \App\Core\Services\BaseService
             ->orderBy($sortBy, $sortDir)
             // ── التصفيح ──────────────────────────────────────────────────────
             ->paginate(
-                max(5, min(100, $perPage)),
+                max(5, min(1000, $perPage)),
                 ['*'],
                 'page',
                 max(1, $page)
@@ -243,9 +244,10 @@ class PartyService extends \App\Core\Services\BaseService
     public function getSuppliers(array $params = [])
     {
         $companyId      = $this->getCurrentCompanyId();
-        $supplierTypeId = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+        $supplierTypeIds = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
             ->where(fn($q) => $q->where('name', 'supplier')->orWhere('slug', 'supplier'))
-            ->value('id');
+            ->pluck('id')
+            ->toArray();
 
         // ✅ نفس الإصلاح
         $search  = $this->extractParam($params, 'search');
@@ -257,7 +259,7 @@ class PartyService extends \App\Core\Services\BaseService
 
         return Party::with(['commune', 'wilaya', 'legalForm', 'defaultPriceLevel'])
             ->where('company_id', $companyId)
-            ->where('party_type_id', $supplierTypeId)
+            ->whereIn('party_type_id', $supplierTypeIds)
             ->when(
                 !empty($search),
                 fn($q) => $q->where(
@@ -274,7 +276,7 @@ class PartyService extends \App\Core\Services\BaseService
             )
             ->orderBy($sortBy, $sortDir)
             ->paginate(
-                max(5, min(100, $perPage)),
+                max(5, min(1000, $perPage)),
                 ['*'],
                 'page',
                 max(1, $page)

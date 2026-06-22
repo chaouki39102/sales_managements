@@ -1,33 +1,68 @@
 // pos/components/Cart.tsx
-import React, { useState } from 'react';
-import type { Party } from '@/types';
+//
+// ✅ إصلاحات مُطبَّقة على هذا الملف:
+//   1. أزرار "تجزئة / نصف جملة / جملة" كانت مجرد حالة UI محلية (mode) بلا أي
+//      تأثير فعلي على الأسعار — أصبحت الآن تعرض مستويات السعر الحقيقية من
+//      usePriceLevels() وتُطبِّق السعر الفعلي على كل سطر في السلة عند التبديل.
+//   2. زر "ملاحظة" كان onClick بلا أي تنفيذ (TODO فاضي في POSPage) — أصبح
+//      يفتح/يطوي حقل ملاحظة فعلي مرتبط بـ useCartStore.notes/setNotes
+//      (كانت هذه الدوال معرَّفة في الـ store ولم تُستخدم في أي مكان إطلاقاً).
+//   3. زيادة الكمية (+) كانت لا تتحقق من المخزون المتاح — checkStock() في
+//      calculations.ts كانت موجودة وغير مُستخدمة. أصبحت الآن تُستدعى فعلياً
+//      وتمنع التجاوز مع رسالة تنبيه واضحة (إلا إذا كان allow_negative_stock).
+import React, { useState, useRef, useEffect } from 'react';
+import type { Party, PriceLevel } from '@/types';
 import type { CartItem, CartTotals } from '@/types';
-import { formatDZD } from '../utils/calculations';
+import { formatDZD, checkStock } from '../utils/calculations';
 
 interface CartProps {
   items:       CartItem[];
   totals:      CartTotals;
   client:      Party | null;
   customers:   Party[];
+  priceLevels: PriceLevel[];
+  selectedPriceLevelId: number | null;
+  note:        string;
   onQty:       (id: string, qty: number) => void;
   onDiscount:  (id: string, pct: number) => void;
+  onPrice:     (id: string, price: number) => void;
   onRemove:    (id: string) => void;
   onSetClient: (c: Party | null) => void;
+  onPriceLevelChange: (priceLevelId: number | null) => void;
+  onNoteChange: (note: string) => void;
   onHold:      () => void;
   onSell:      () => void;
-  onNote:      () => void;
   onClear:     () => void;
   onHeld:      () => void;
 }
 
-type PriceMode = 'retail' | 'semi' | 'wholesale';
-
 export default function Cart({
-  items, totals, client, customers,
-  onQty, onDiscount, onRemove, onSetClient,
-  onHold, onSell, onNote, onClear, onHeld,
+  items, totals, client, customers, priceLevels, selectedPriceLevelId, note,
+  onQty, onDiscount, onPrice, onRemove, onSetClient, onPriceLevelChange,
+  onNoteChange, onHold, onSell, onClear, onHeld,
 }: CartProps) {
-  const [mode, setMode] = useState<PriceMode>('retail');
+  const [showNote, setShowNote] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const [openDropdown, setOpenDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filteredCustomers = customers.filter(c =>
+    !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase())
+  );
+
+  const selectedClientName = client
+    ? client.name
+    : '👤 زبون عابر';
 
   const isEmpty = items.length === 0;
 
@@ -46,7 +81,11 @@ export default function Cart({
             <button className="btn btn-xs" onClick={onHeld} title="المعلقة">
               <span className="ic ic-xs"><i className="ti ti-clock-pause" /></span>
             </button>
-            <button className="btn btn-xs" onClick={onNote} title="ملاحظة">
+            <button
+              className={`btn btn-xs ${note ? 'btn-p' : ''}`}
+              onClick={() => setShowNote(s => !s)}
+              title="ملاحظة على الفاتورة"
+            >
               <span className="ic ic-xs"><i className="ti ti-notes" /></span>
             </button>
             <button
@@ -60,39 +99,135 @@ export default function Cart({
           </div>
         </div>
 
-        {/* Price mode */}
-        <div className="cart-modes2">
-          {(['retail','semi','wholesale'] as PriceMode[]).map(m => (
-            <button
-              key={m}
-              className={`cmode ${mode === m ? 'on' : ''}`}
-              onClick={() => setMode(m)}
-            >
-              <span className="ic ic-xs">
-                <i className={`ti ${m === 'retail' ? 'ti-user' : m === 'semi' ? 'ti-packages' : 'ti-building-store'}`} />
-              </span>
-              {m === 'retail' ? 'تجزئة' : m === 'semi' ? 'نصف جملة' : 'جملة'}
-            </button>
-          ))}
-        </div>
+        {/* حقل الملاحظة — يُفتح/يُطوى بزر الملاحظة، ومتصل فعلياً بالسلة */}
+        {showNote && (
+          <div style={{ margin: '6px 0' }}>
+            <input
+              value={note}
+              onChange={e => onNoteChange(e.target.value)}
+              placeholder="ملاحظة على الفاتورة (اختياري)..."
+              autoFocus
+              style={{
+                width: '100%', padding: '6px 9px', borderRadius: 'var(--r1)',
+                border: '1px solid var(--b2)', background: 'var(--bg3)',
+                fontFamily: 'Tajawal,sans-serif', fontSize: '12.5px', outline: 'none',
+              }}
+            />
+          </div>
+        )}
 
-        {/* Client selector */}
-        <div className="cart-client">
-          <select
-            value={client?.id ?? ''}
-            onChange={e => {
-              const id = Number(e.target.value);
-              onSetClient(id ? (customers.find(c => c.id === id) ?? null) : null);
+        {/* مستويات السعر — حقيقية من إعدادات الشركة، لا أسماء ثابتة */}
+        {priceLevels.length > 0 && (
+          <div className="cart-modes2">
+            {priceLevels.map(pl => (
+              <button
+                key={pl.id}
+                className={`cmode ${selectedPriceLevelId === pl.id ? 'on' : ''}`}
+                onClick={() => onPriceLevelChange(pl.id)}
+                title={pl.discount_percent ? `خصم ${pl.discount_percent}%` : undefined}
+              >
+                <span className="ic ic-xs"><i className="ti ti-tag" /></span>
+                {pl.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Client search combobox */}
+        <div className="cart-client" ref={dropdownRef} style={{ position: 'relative' }}>
+          <div
+            className="client-trigger"
+            onClick={() => setOpenDropdown(s => !s)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+              padding: '7px 9px', borderRadius: 'var(--r1)', border: '1px solid var(--b2)',
+              background: 'var(--bg3)', fontSize: '12.5px',
             }}
           >
-            <option value="">👤 زبون عابر</option>
-            {customers.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {(c.balance ?? 0) > 0 ? ` ⚠️ دين ${c.balance?.toLocaleString('fr-DZ')} دج` : ''}
-              </option>
-            ))}
-          </select>
+            <span style={{ fontSize: 14, opacity: 0.5 }}><i className="ti ti-user-search" /></span>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {selectedClientName}
+            </span>
+            <span style={{ fontSize: 10, opacity: 0.4 }}>▾</span>
+          </div>
+
+          {openDropdown && (
+            <div
+              className="client-dropdown"
+              style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                background: 'var(--bg0)', border: '1px solid var(--b2)',
+                borderRadius: 'var(--r1)', boxShadow: '0 4px 16px rgba(0,0,0,.15)',
+                maxHeight: 280, overflow: 'auto', marginTop: 2,
+              }}
+            >
+              <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--b3)' }}>
+                <input
+                  type="text"
+                  value={clientSearch}
+                  onChange={e => setClientSearch(e.target.value)}
+                  placeholder="🔍 ابحث عن زبون..."
+                  autoFocus
+                  style={{
+                    width: '100%', padding: '6px 8px', border: '1px solid var(--b2)',
+                    borderRadius: 'var(--r1)', background: 'var(--bg3)',
+                    fontFamily: 'Tajawal,sans-serif', fontSize: '12.5px', outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div
+                className="client-opt"
+                onClick={() => { onSetClient(null); setClientSearch(''); setOpenDropdown(false); }}
+                style={{
+                  padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                  borderBottom: '1px solid var(--b3)', fontWeight: client === null ? 700 : 400,
+                  background: client === null ? 'var(--emb)' : 'transparent',
+                }}
+              >
+                <span style={{ fontSize: 16 }}>👤</span>
+                <span>زبون عابر</span>
+              </div>
+
+              {filteredCustomers.map(c => {
+                const debt = (c.balance ?? 0) > 0;
+                return (
+                  <div
+                    key={c.id}
+                    className="client-opt"
+                    onClick={() => { onSetClient(c); setClientSearch(''); setOpenDropdown(false); }}
+                    style={{
+                      padding: '8px 10px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2,
+                      borderBottom: '1px solid var(--b3)',
+                      background: client?.id === c.id ? 'var(--emb)' : 'transparent',
+                      fontWeight: client?.id === c.id ? 700 : 400,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '13px' }}>{c.name}</span>
+                      {debt && (
+                        <span style={{ fontSize: '11px', color: 'var(--red)', fontWeight: 600, direction: 'ltr' }}>
+                          {c.balance?.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج
+                        </span>
+                      )}
+                    </div>
+                    {c.address && (
+                      <div style={{ fontSize: '10.5px', opacity: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.address}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {filteredCustomers.length === 0 && (
+                <div style={{ padding: '12px', textAlign: 'center', fontSize: '12px', opacity: 0.4 }}>
+                  لا توجد نتائج
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -112,6 +247,7 @@ export default function Cart({
               index={idx + 1}
               onQty={onQty}
               onDiscount={onDiscount}
+              onPrice={onPrice}
               onRemove={onRemove}
             />
           ))
@@ -169,15 +305,30 @@ export default function Cart({
 
 // ── Single cart item row ──────────────────────────
 function CartItemRow({
-  item, index, onQty, onDiscount, onRemove,
+  item, index, onQty, onDiscount, onPrice, onRemove,
 }: {
   item: CartItem;
   index: number;
   onQty:      (id: string, qty: number) => void;
   onDiscount: (id: string, pct: number) => void;
+  onPrice:    (id: string, price: number) => void;
   onRemove:   (id: string) => void;
 }) {
   const name = [item.product_name, item.variant_name].filter(Boolean).join(' — ');
+  const [warning, setWarning] = useState('');
+
+  const requestQty = (newQty: number) => {
+    if (newQty <= 0) { onRemove(item.id); return; }
+    const check = checkStock(item, newQty);
+    if (!check.ok) {
+      setWarning(check.message);
+      // نسمح بالوصول للحد الأقصى المتاح فقط، لا نرفض الزيادة بالكامل
+      if (item.max_stock != null) onQty(item.id, item.max_stock);
+      return;
+    }
+    setWarning('');
+    onQty(item.id, newQty);
+  };
 
   return (
     <div className="ci">
@@ -188,12 +339,16 @@ function CartItemRow({
           <input
             type="number"
             className="ci-pinp"
-            value={item.unit_price_ht}
+            defaultValue={item.unit_price_ht}
             min={0}
             step={0.01}
-            onChange={e => onDiscount(item.id, item.discount_percentage)}
             onBlur={e => {
-              // price edit — via parent handler (simplified)
+              const val = parseFloat(e.target.value);
+              if (!isNaN(val) && val !== item.unit_price_ht) onPrice(item.id, val);
+              else e.target.value = String(item.unit_price_ht);
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
             }}
           />
           <span className="ci-punit">HT/{item.unit_symbol ?? 'قطعة'}</span>
@@ -203,13 +358,18 @@ function CartItemRow({
             </span>
           )}
         </div>
+        {warning && (
+          <div style={{ fontSize: '10.5px', color: 'var(--red)', marginTop: 2 }}>
+            <i className="ti ti-alert-triangle" /> {warning}
+          </div>
+        )}
       </div>
 
       {/* Qty controls */}
       <div className="qc2">
-        <button className="qb2" onClick={() => onQty(item.id, item.quantity - 1)}>−</button>
+        <button className="qb2" onClick={() => requestQty(item.quantity - 1)}>−</button>
         <span className="qn2">{item.quantity}</span>
-        <button className="qb2" onClick={() => onQty(item.id, item.quantity + 1)}>+</button>
+        <button className="qb2" onClick={() => requestQty(item.quantity + 1)}>+</button>
       </div>
 
       {/* Total */}

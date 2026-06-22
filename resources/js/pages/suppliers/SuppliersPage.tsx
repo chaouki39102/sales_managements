@@ -47,7 +47,7 @@ export default function SuppliersPage() {
     const modal = useModal();
     const importModal = useModal();
 
-    const { data, isLoading } = useSuppliers({ search: search || undefined, per_page: 30 });
+    const { data, isLoading } = useSuppliers({ search: search || undefined, per_page: 1000 });
     // استبدال السطر 30
 const suppliers = (data as any)?.data ?? (Array.isArray(data) ? data : []);
 const meta = (data as any)?.meta;

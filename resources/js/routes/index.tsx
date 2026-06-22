@@ -51,7 +51,6 @@ const ProfilePage   = lazy(() => import('@/pages/profile/ProfilePage'));
 // ── Settings ───────────────────────────────────────────────────────────────
 const SettingsPage      = lazy(() => import('@/pages/settings/SettingsPage'));
 const DocumentTypesPage = lazy(() => import('@/pages/settings/DocumentTypesPage'));
-const PaymentMethodsPage= lazy(() => import('@/pages/settings/PaymentMethodsPage'));
 
 // ── Tenant Lookups ─────────────────────────────────────────────────────────
 const FamiliesPage          = lazy(() => import('@/pages/lookups/FamiliesPage'));
@@ -224,7 +223,6 @@ export function AppRoutes() {
           {/* Settings */}
           <Route path="settings"                element={<SettingsPage />} />
           <Route path="settings/document-types" element={<DocumentTypesPage />} />
-          <Route path="payment-methods"         element={<PaymentMethodsPage />} />
           <Route path="profile" element={<ProfilePage />} />
 
 

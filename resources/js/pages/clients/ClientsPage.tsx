@@ -129,7 +129,7 @@ function ClientsPagination({
             fontSize: 13, background: 'var(--bg1)', color: 'var(--t2)',
             outline: 'none', cursor: 'pointer',
           }}>
-          {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+          {[10, 25, 50, 100, 500, 1000].map((n) => <option key={n} value={n}>{n === 1000 ? 'الكل' : n}</option>)}
         </select>
       </div>
     </div>
@@ -202,18 +202,16 @@ function fetchClients(params: {
   sortField?:  string;
   sortDir?:    string;
 }) {
-  const filter: Record<string, unknown> = {};
-  if (params.search)                    filter['search'] = params.search;
-  if (params.activeParam !== undefined) filter['active'] = params.activeParam;
-
   return apiClient
     .get<ClientsApiResponse>('/customers', {
       params: {
         per_page: params.perPage,
         page:     params.page,
         include:  'wilaya,commune,legalForm,defaultPriceLevel',
-        sort: params.sortDir === 'desc' ? `-${params.sortField}` : params.sortField,
-        ...(Object.keys(filter).length ? { filter } : {}),
+        sort_by:  params.sortField ?? 'name',
+        sort_dir: params.sortDir ?? 'asc',
+        ...(params.search ? { search: params.search } : {}),
+        ...(params.activeParam !== undefined ? { active: params.activeParam } : {}),
       },
     })
     .then((r) => r.data);

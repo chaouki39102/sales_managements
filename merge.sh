@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-documents-files.md"
+OUTPUT="merged-pos-files.md"
 
 > "$OUTPUT"
 
@@ -62,11 +62,13 @@ EXCLUDE=(
 
 
 
-  # documents
-merge_section "📘 Documents" \
-  \( -path "*/pages/documents/*" \) "${EXCLUDE[@]}"
+  # pos
+merge_section "📘 pos" \
+  \( -path "*/pages/pos/*" \) "${EXCLUDE[@]}"
 
-
+  # pos
+merge_section "📘 pos" \
+  \( -path "*/pos/*" \) "${EXCLUDE[@]}"
 
 echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"
 echo "==================================================== */" >> "$OUTPUT"
