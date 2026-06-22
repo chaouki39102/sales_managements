@@ -36,13 +36,11 @@ class DocumentTypeConversionController extends Controller
         ]);
     }
 
-    public function allowedTargets(string $sourceCode): JsonResponse
+    public function allowedTargets(): JsonResponse
     {
         // ⚠️ Laravel passes route params positionally, not by name.
         // {company} (prefix) is the FIRST param so we MUST get sourceCode from the route.
         $src = (string) request()->route()->parameter('sourceCode');
-
-        $companyId = app(\App\Services\CompanyContextService::class)->get();
 
         $targetCodes = DocumentTypeConversion::query()
             ->where('source_code', $src)
@@ -55,8 +53,6 @@ class DocumentTypeConversionController extends Controller
             ->get(['code', 'name']);
 
         return response()->json([
-            'company_id' => $companyId,
-            'source' => $src,
             'data' => $types,
         ]);
     }

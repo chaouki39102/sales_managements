@@ -255,7 +255,8 @@ class PartyService extends \App\Core\Services\BaseService
         $sortBy  = $params['sort_by']  ?? 'name';
         $sortDir = $params['sort_dir'] ?? 'asc';
 
-        return Party::where('company_id', $companyId)
+        return Party::with(['commune', 'wilaya', 'legalForm', 'defaultPriceLevel'])
+            ->where('company_id', $companyId)
             ->where('party_type_id', $supplierTypeId)
             ->when(
                 !empty($search),
