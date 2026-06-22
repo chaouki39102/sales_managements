@@ -28,7 +28,7 @@ export function calcFiscalStamp(totalTtc: number): number {
 }
 
 /** حساب مجاميع العربة */
-export function calcTotals(items: CartItem[]): CartTotals {
+export function calcTotals(items: CartItem[], invoiceDiscountPct = 0): CartTotals {
   let totalHt       = 0;
   let totalTva      = 0;
   let totalDiscount = 0;
@@ -41,17 +41,29 @@ export function calcTotals(items: CartItem[]): CartTotals {
     itemsCount    += item.quantity;
   }
 
-  const totalTtc   = totalHt + totalTva;
-  const fiscalStamp = calcFiscalStamp(totalTtc);
+  const invoiceDiscountAmount = totalHt > 0
+    ? Math.round(totalHt * invoiceDiscountPct / 100 * 100) / 100
+    : 0;
+  const adjTotalHt  = totalHt - invoiceDiscountAmount;
+  const adjTotalTva = totalHt > 0
+    ? items.reduce((s, item) => {
+        const share = item.total_ht / totalHt;
+        return s + ((item.total_ht - invoiceDiscountAmount * share) * item.tva_rate / 100);
+      }, 0)
+    : totalTva;
+  const totalTtc     = adjTotalHt + adjTotalTva;
+  const fiscalStamp  = calcFiscalStamp(totalTtc);
 
   return {
-    total_ht:       Math.round(totalHt * 100) / 100,
-    total_tva:      Math.round(totalTva * 100) / 100,
-    total_ttc:      Math.round(totalTtc * 100) / 100,
-    total_discount: Math.round(totalDiscount * 100) / 100,
-    fiscal_stamp:   fiscalStamp,
-    items_count:    itemsCount,
-    lines_count:    items.length,
+    total_ht:                Math.round(adjTotalHt  * 100) / 100,
+    total_tva:               Math.round(adjTotalTva * 100) / 100,
+    total_ttc:               Math.round(totalTtc    * 100) / 100,
+    total_discount:          Math.round(totalDiscount * 100) / 100,
+    fiscal_stamp:            fiscalStamp,
+    items_count:             itemsCount,
+    lines_count:             items.length,
+    invoice_discount_pct:    invoiceDiscountPct || undefined,
+    invoice_discount_amount: invoiceDiscountAmount || undefined,
   };
 }
 

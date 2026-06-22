@@ -3,20 +3,20 @@
 //
 // ✅ إصلاحات:
 //   1. calcFiscalStamp مُستوردة من calculations.ts (cap 3000 دج — LF 2024)
-//   2. unit_symbol: يقرأ unit.symbol ثم unit.abbreviation كـ fallback
-//      (Unit في types.ts لها abbreviation، لكن الـ API قد يُرجع symbol)
-//   3. totals() تستخدم calcFiscalStamp أيضاً
+//   2. unit_symbol: يقرأ unit.abbreviation مع fallback
+//   3. totals() تستخدم calcFiscalStamp + خصم الفاتورة
 // ════════════════════════════════════════════════════════════════════════════
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { nanoid }  from 'nanoid';
 import type { CartItem, CartTotals, Party, ProductVariant } from '@/types';
-import { calcFiscalStamp } from '../utils/calculations';
+import { calcTotals, calcFiscalStamp } from '../utils/calculations';
 
 interface CartState {
   items:  CartItem[];
   client: Party | null;
   notes:  string;
+  invoiceDiscountPct: number;
   // actions
   addItem:        (variant: ProductVariant, qty?: number) => void;
   removeItem:     (id: string) => void;
@@ -26,6 +26,7 @@ interface CartState {
   setClient:      (client: Party | null) => void;
   setNotes:       (notes: string) => void;
   clearCart:      () => void;
+  setInvoiceDiscountPct: (pct: number) => void;
   totals:         () => CartTotals;
 }
 
@@ -42,11 +43,9 @@ function calcItemTotals(item: CartItem): CartItem {
   };
 }
 
-/** يقرأ رمز الوحدة من الفاريانت مهما كان اسم الحقل */
+/** يقرأ رمز الوحدة من الفاريانت */
 function getUnitSymbol(variant: ProductVariant): string {
-  // ✅ Unit في types.ts لها abbreviation، لكن بعض responses تُرجع symbol
-  const u = variant.unit as any;
-  return u?.symbol ?? u?.abbreviation ?? 'قطعة';
+  return variant.unit?.abbreviation ?? 'قطعة';
 }
 
 export const useCartStore = create<CartState>()(
@@ -55,6 +54,7 @@ export const useCartStore = create<CartState>()(
       items:  [],
       client: null,
       notes:  '',
+      invoiceDiscountPct: 0,
 
       addItem: (variant, qty = 1) => {
         set(state => {
@@ -132,30 +132,13 @@ export const useCartStore = create<CartState>()(
 
       setClient: (client) => set({ client }),
       setNotes:  (notes)  => set({ notes }),
-      clearCart: ()       => set({ items: [], client: null, notes: '' }),
+      clearCart: ()       => set({ items: [], client: null, notes: '', invoiceDiscountPct: 0 }),
+      setInvoiceDiscountPct: (pct) => set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)) }),
 
-      totals: () => {
-        const { items } = get();
-        const totalHt       = items.reduce((s, i) => s + i.total_ht,                    0);
-        const totalTva      = items.reduce((s, i) => s + (i.total_ht * i.tva_rate / 100), 0);
-        const totalDiscount = items.reduce((s, i) => s + i.discount_amount,              0);
-        const totalTtc      = totalHt + totalTva;
-        // ✅ calcFiscalStamp من calculations.ts — متوافقة مع LF 2024 (cap 3000 دج)
-        const fiscalStamp   = calcFiscalStamp(totalTtc);
-        return {
-          total_ht:       Math.round(totalHt       * 100) / 100,
-          total_tva:      Math.round(totalTva      * 100) / 100,
-          total_ttc:      Math.round(totalTtc      * 100) / 100,
-          total_discount: Math.round(totalDiscount * 100) / 100,
-          fiscal_stamp:   fiscalStamp,
-          items_count:    items.reduce((s, i) => s + i.quantity, 0),
-          lines_count:    items.length,
-        };
-      },
+      totals: () => calcTotals(get().items, get().invoiceDiscountPct),
     }),
     {
       name: 'pos-cart',
-      // ❌ لا نُحفظ السلة — تُصفَّر عند إعادة التحميل
       partialize: () => ({}),
     },
   ),

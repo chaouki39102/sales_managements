@@ -626,6 +626,8 @@ export interface CartTotals {
   fiscal_stamp:   number;
   items_count:    number;
   lines_count:    number;
+  invoice_discount_pct?:    number;
+  invoice_discount_amount?: number;
 }
 export interface HeldCart {
   id:        string;

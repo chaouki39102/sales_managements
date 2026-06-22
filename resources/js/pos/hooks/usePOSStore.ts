@@ -4,36 +4,32 @@
 // حالة نقطة البيع الكاملة
 //
 // ✅ useUIStore مُحذف من هنا — موجود في lib/store/uiStore.ts
+// ✅ holdCart تستقبل items, totals, client, clearCart كمعاملات
+//    (بدلاً من الاتصال المباشر بـ useCartStore.getState())
 // ════════════════════════════════════════════════════════════════════════════
 
 import { create }        from 'zustand';
 import { nanoid }        from 'nanoid';
 import { useCartStore }  from '../utils/useCartStore';
-import type { HeldCart } from '@/types';
+import type { HeldCart, CartItem, CartTotals, Party } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface POSState {
-  // Session
   sessionStarted:   boolean;
   sessionInvoices:  number;
   sessionSales:     number;
-
-  // Held carts
   heldCarts:        HeldCart[];
-
-  // UI state
   activeTab:        'products' | 'clients' | 'held';
   searchQuery:      string;
   selectedCategory: number | null;
   paymentModalOpen: boolean;
 
-  // Actions
   startSession:     () => void;
   endSession:       () => void;
   incrementSession: (amount: number) => void;
 
-  holdCart:         (label?: string) => void;
+  holdCart:         (params: { items: CartItem[]; totals: CartTotals; client: Party | null; label?: string; clearCart: () => void }) => void;
   restoreCart:      (id: string) => void;
   deleteHeldCart:   (id: string) => void;
 
@@ -67,22 +63,20 @@ export const usePOSStore = create<POSState>((set, get) => ({
       sessionSales:    s.sessionSales + amount,
     })),
 
-  holdCart: (label) => {
-    const cart  = useCartStore.getState();
-    const items = cart.items;
+  holdCart: ({ items, totals, client, label, clearCart }) => {
     if (items.length === 0) return;
 
     const held: HeldCart = {
       id:         nanoid(6),
       label:      label ?? `عربة ${get().heldCarts.length + 1}`,
       items:      [...items],
-      totals:     cart.totals(),
-      client:     cart.client,
+      totals,
+      client:     client ?? null,
       created_at: new Date().toISOString(),
     };
 
     set((s) => ({ heldCarts: [...s.heldCarts, held] }));
-    cart.clearCart();
+    clearCart();
   },
 
   restoreCart: (id) => {

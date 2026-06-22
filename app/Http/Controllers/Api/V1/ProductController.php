@@ -68,6 +68,7 @@ class ProductController extends BaseApiController
             'default_per_page'=> Product::$defaultPerPage ?? 15,
             'per_page_limit'  => Product::$perPageLimit ?? 100,
             'cache_tags'      => ['products'],
+
         ];
     }
 
