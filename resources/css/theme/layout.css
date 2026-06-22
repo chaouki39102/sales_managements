@@ -11,9 +11,28 @@
   display:flex;flex-direction:column;
   z-index:200;overflow-y:auto;
   box-shadow:var(--shadow2);
-  transition:transform .3s cubic-bezier(.4,0,.2,1);
+  transition:width .22s cubic-bezier(.4,0,.2,1),transform .3s cubic-bezier(.4,0,.2,1);
 }
 body.dark #sidebar{background:var(--bg2);}
+#sidebar.collapsed{width:58px;}
+#sidebar.collapsed .sbi{justify-content:center;padding:8px 0;}
+#sidebar.collapsed .sb-logo{justify-content:center;padding:16px 0 12px;}
+#sidebar.collapsed .sb-sec{padding:4px 0;}
+#sidebar.collapsed .sbi.on{border-right:none;border-left:2px solid var(--em);}
+#sidebar.collapsed .sb-name,
+#sidebar.collapsed .sb-sub,
+#sidebar.collapsed .sb-lbl,
+#sidebar.collapsed .sbi-name,
+#sidebar.collapsed .sbi-badge,
+#sidebar.collapsed .cs-text,
+#sidebar.collapsed .cs-text+.ti{display:none;}
+#sidebar.collapsed .sbi-ic{font-size:18px;width:auto;}
+#sidebar.collapsed .sb-foot>div{display:flex;justify-content:center;}
+#sidebar.collapsed .sb-foot a>div{justify-content:center;padding:6px 0;gap:0;}
+#sidebar.collapsed .sb-foot a>div>div:nth-child(2){display:none;}
+#sidebar.collapsed .sb-foot button{width:36px;padding:8px;justify-content:center;}
+#sidebar.collapsed .sb-foot button span{display:none;}
+
 
 /* ═══ SIDEBAR LOGO ═══ */
 .sb-logo{
@@ -151,7 +170,9 @@ body.dark #sidebar{background:var(--bg2);}
   min-height:100vh;
   display:flex;flex-direction:column;
   background:var(--bg1);
+  transition:margin-right .22s cubic-bezier(.4,0,.2,1);
 }
+#sidebar.collapsed ~ #main{margin-right:58px;}
 
 /* ═══ TOPBAR ═══ */
 #topbar{

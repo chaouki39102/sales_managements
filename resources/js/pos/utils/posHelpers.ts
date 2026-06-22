@@ -1,9 +1,11 @@
-import type { Product, ProductVariant, PriceLevel } from '@/types';
+import type { Product, ProductVariant, ProductVariantPrice, PriceLevel } from '@/types';
+
+type ProductApiResponse = Product & { current_stock?: number; prices?: ProductVariantPrice[] };
 
 export type ViewMode = 'grid' | 'list';
 export type GridSize = 'xs' | 'sm' | 'md' | 'lg';
 export type SortMode = 'name' | 'price_asc' | 'price_desc' | 'stock' | 'family';
-export type ActiveModal = 'none' | 'payment' | 'held' | 'receipt' | 'manual' | 'kbhelp' | 'session' | 'barcode';
+export type ActiveModal = 'none' | 'payment' | 'held' | 'receipt' | 'manual' | 'kbhelp' | 'session' | 'barcode' | 'customer';
 
 export interface QuickItem { variantId: number; name: string; priceHt: number; tvaRate: number; }
 
@@ -13,8 +15,8 @@ export function getVariantPrice(
   priceLevels: PriceLevel[],
 ): number {
   if (priceLevelId) {
-    const priceEntry = (v as any).prices?.find((p: any) => p.price_level_id === priceLevelId);
-    if (priceEntry) return priceEntry.price_ht;
+    const priceEntry = v.prices?.find((p: ProductVariantPrice) => p.price_level_id === priceLevelId);
+    if (priceEntry) return priceEntry.price;
     const pl = priceLevels.find(p => p.id === priceLevelId);
     if (pl?.discount_percent)
       return v.default_selling_price_ht * (1 - pl.discount_percent / 100);
@@ -44,13 +46,13 @@ export function productToVariant(p: Product): ProductVariant {
     valuation_method_id:        p.valuation_method_id,
     weight:                     p.weight,
     volume:                     p.volume,
-    current_stock:              (p as any).current_stock,
+    current_stock:              (p as ProductApiResponse).current_stock,
     active:                     p.active,
     company_id:                 p.company_id,
     product:                    p,
     unit:                       p.unit,
     tva:                        p.tva,
-    prices:                     (p as any).prices,
+    prices:                     (p as ProductApiResponse).prices,
     created_at:                 p.created_at,
     updated_at:                 p.updated_at,
   } as ProductVariant;
@@ -92,7 +94,26 @@ export function makeFakeVariant(name: string, priceHt: number, tvaRate: number):
       is_default: false, active: true, company_id: 0,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     },
-  } as any;
+  } as ProductVariant;
+}
+
+const POS_PAGE_SIZE_KEY = 'pos_page_size';
+
+export function getPosPageSize(): number {
+  try {
+    const v = localStorage.getItem(POS_PAGE_SIZE_KEY);
+    if (v) {
+      const n = parseInt(v, 10);
+      if (n >= 20 && n <= 500) return n;
+    }
+  } catch { /* localStorage not available */ }
+  return 120;
+}
+
+export function setPosPageSize(n: number): void {
+  try {
+    localStorage.setItem(POS_PAGE_SIZE_KEY, String(n));
+  } catch { /* localStorage not available */ }
 }
 
 export function familyIcon(name: string): string {

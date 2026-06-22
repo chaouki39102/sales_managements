@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import type { HeldCart, CartItem } from '@/types';
 import { formatDZD } from '../utils/calculations';
 
 interface HeldCartsModalProps {
-  carts: any[];
+  carts: HeldCart[];
   onClose: () => void;
   onRestore: (id: string) => void;
   onDelete: (id: string) => void;
@@ -13,7 +14,7 @@ export default function HeldCartsModal({
 }: HeldCartsModalProps) {
   const [search, setSearch] = useState('');
   const filtered = carts.filter(c =>
-    !search || c.items?.some((i: any) => i.product_name?.includes(search)) || c.client?.name?.includes(search)
+    !search || c.items?.some((i: CartItem) => i.product_name?.includes(search)) || c.client?.name?.includes(search)
   );
 
   return (
@@ -36,7 +37,7 @@ export default function HeldCartsModal({
                 <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث في المعلقة..." />
               </div>
               <div className="held-list">
-                {filtered.map((c: any) => (
+                {filtered.map((c: HeldCart) => (
                   <div key={c.id} className="held-card">
                     <div className="hc-info">
                       <div className="hc-client">{c.client?.name ?? 'زبون عابر'}</div>

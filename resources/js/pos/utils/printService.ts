@@ -102,7 +102,7 @@ export async function printThermalViaWebUSB(
   client: Party | null,
   docNumber?: string,
 ): Promise<ThermalPrintResult> {
-  const usb = (navigator as any).usb;
+  const usb = (navigator as Navigator & { usb?: { requestDevice: (opts: { filters: unknown[] }) => Promise<{ claimInterface: (n: number) => Promise<void>; transferOut: (ep: number, data: ArrayBuffer) => Promise<{ status: string }> }> } }).usb;
   if (!usb) {
     return { ok: false, method: 'none', message: 'WebUSB غير مدعوم في هذا المتصفح' };
   }

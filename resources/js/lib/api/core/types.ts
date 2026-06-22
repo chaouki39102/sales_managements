@@ -606,6 +606,7 @@ export interface CartItem {
   ref:                 string;
   barcode?:            string | null;
   unit_symbol?:        string | null;
+  image_url?:          string | null;
   quantity:            number;
   unit_price_ht:       number;
   selling_price_ttc:   number;

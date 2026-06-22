@@ -1,12 +1,3 @@
-// resources/js/pos/hooks/usePOS.ts
-// ════════════════════════════════════════════════════════════════════════════
-// Hook موحَّد يجمع POSStore + CartStore
-//
-// ✅ إصلاح: calcFiscalStamp مستوردة من calculations.ts
-//    (كانت مُضمَّنة inline بدون cap — الآن متطابقة مع LF 2024)
-// ✅ invoiceDiscountPct من useCartStore
-// ✅ holdCart يمرر items/totals/client/clearCart كمعاملات
-// ════════════════════════════════════════════════════════════════════════════
 import { useMemo, useCallback } from 'react';
 import { usePOSStore }   from './usePOSStore';
 import { useCartStore }  from '../utils/useCartStore';
@@ -34,19 +25,19 @@ export function usePOS() {
   const openPayment       = usePOSStore(s => s.openPayment);
   const closePayment      = usePOSStore(s => s.closePayment);
 
-  // ── Derive totals from stable selectors (NOT s.totals() which creates new ref each call) ──
   const items   = useCartStore(s => s.items);
   const client  = useCartStore(s => s.client);
   const invoiceDiscountPct = useCartStore(s => s.invoiceDiscountPct);
   const totals  = useMemo(() => calcTotals(items, invoiceDiscountPct), [items, invoiceDiscountPct]);
 
-  const addItem        = useCartStore(s => s.addItem);
-  const removeItem     = useCartStore(s => s.removeItem);
-  const updateQty      = useCartStore(s => s.updateQty);
-  const updateDiscount = useCartStore(s => s.updateDiscount);
-  const updatePrice    = useCartStore(s => s.updatePrice);
-  const clearCart      = useCartStore(s => s.clearCart);
-  const setClient      = useCartStore(s => s.setClient);
+  const addItem              = useCartStore(s => s.addItem);
+  const removeItem           = useCartStore(s => s.removeItem);
+  const updateQty            = useCartStore(s => s.updateQty);
+  const updateDiscount       = useCartStore(s => s.updateDiscount);
+  const updateDiscountAmount = useCartStore(s => s.updateDiscountAmount);
+  const updatePrice          = useCartStore(s => s.updatePrice);
+  const clearCart            = useCartStore(s => s.clearCart);
+  const setClient            = useCartStore(s => s.setClient);
   const setInvoiceDiscountPct = useCartStore(s => s.setInvoiceDiscountPct);
 
   const holdCart = useCallback((label?: string) => {
@@ -70,7 +61,7 @@ export function usePOS() {
     setTab, setSearch, setCategory, openPayment, closePayment,
 
     items, client, invoiceDiscountPct,
-    addItem, removeItem, updateQty, updateDiscount, updatePrice,
+    addItem, removeItem, updateQty, updateDiscount, updateDiscountAmount, updatePrice,
     clearCart, setClient, setInvoiceDiscountPct,
     totals,
   };

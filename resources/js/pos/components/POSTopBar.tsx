@@ -8,6 +8,7 @@ interface POSTopBarProps {
   onHeld: () => void; onNewSale: () => void; onManual: () => void;
   onReceipt: () => void; onSession: () => void; onFullscreen: () => void;
   onKbHelp: () => void; onToggleQuickbar: () => void;
+  onReturn: () => void;
   items: CartItem[]; totals: CartTotals; totalTtcFinal: number;
 }
 
@@ -15,7 +16,7 @@ export default function POSTopBar({
   sessionInvoices, sessionSales, heldCount, avgMargin,
   isEmpty, isFullscreen, showQuickbar,
   onHeld, onNewSale, onManual, onReceipt, onSession, onFullscreen, onKbHelp,
-  onToggleQuickbar, items, totals, totalTtcFinal,
+  onToggleQuickbar, onReturn, items, totals, totalTtcFinal,
 }: POSTopBarProps) {
   return (
     <div className="pos-topbar">
@@ -104,6 +105,9 @@ export default function POSTopBar({
         <button className="pos-tool-icon" onClick={onKbHelp} title="اختصارات لوحة المفاتيح — F1">
           <i className="ti ti-keyboard" />
         </button>
+        <button className="pos-tool-icon" onClick={onReturn} title="مرتجع مبيعات — F10">
+          <i className="ti ti-receipt-refund" />
+        </button>
       </div>
 
       <div className="pos-kb-strip">
@@ -114,6 +118,7 @@ export default function POSTopBar({
           { key: 'F6', label: 'يدوي' },
           { key: 'F7', label: 'معلقة' },
           { key: 'F9', label: 'طباعة' },
+          { key: 'F10', label: 'مرتجع' },
           { key: 'F11', label: 'شاشة' },
           { key: 'F12', label: 'مسح' },
         ].map(({ key, label }) => (

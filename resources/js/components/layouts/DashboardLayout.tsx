@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 import client from '@/lib/api/core/client';
 import { useTopbarTitle } from '@/hooks/useTopbarTitle';
+import OfflineIndicator from '@/components/OfflineIndicator';
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
   {
@@ -79,6 +80,7 @@ const NAV_GROUPS = [
       { name: 'أنواع المستندات', href: 'settings/document-types', icon: 'ti-file'         },
       { name: 'سلاسل الترقيم',   href: 'numbering-series',        icon: 'ti-list-numbers' },
       { name: 'فئات المصروفات',  href: 'expense-categories',      icon: 'ti-category'     },
+      { name: 'الملف الشخصي',    href: 'profile',                 icon: 'ti-user-circle'  },
     ],
   },
   {
@@ -400,7 +402,7 @@ function CompanySwitcher() {
             {(activeCompany?.name ?? '؟')[0]?.toUpperCase()}
           </div>
           {/* الاسم والـ slug */}
-          <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
+          <div className="cs-text" style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
             <div style={{
               fontSize: 13, fontWeight: 800,
               color: 'var(--t1, #fff)',
@@ -535,6 +537,7 @@ export default function DashboardLayout() {
   const navigate                        = useNavigate();
   const { dark, toggle: toggleTheme }   = useTheme();
   const [drawerOpen, setDrawerOpen]     = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // ✅ نستخدم FiscalYearContext مباشرة — بدون useParams
   const { years, selectedYear, isLoading: fiscalLoading, refetch } = useFiscalYear();
@@ -562,7 +565,7 @@ const meta = useTopbarTitle();
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       {/* ════════ SIDEBAR ════════ */}
-      <nav id="sidebar">
+      <nav id="sidebar" className={sidebarCollapsed ? 'collapsed' : ''}>
         <div className="sb-logo">
           <div className="sb-mark">ب</div>
           <div>
@@ -600,40 +603,43 @@ const meta = useTopbarTitle();
         ))}
 
         <div className="sb-foot">
-          {/* ─── بطاقة المستخدم ─── */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '10px 12px 8px', direction: 'rtl',
-          }}>
-            {/* الأفاتار */}
+          {/* ─── بطاقة المستخدم (قابلة للضغط → profile) ─── */}
+          <Link to="profile" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-              background: 'linear-gradient(135deg, var(--blue,#1a4fd6), #60a5fa)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 15, fontWeight: 900, color: '#fff',
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px 8px', direction: 'rtl',
+              borderRadius: 10, cursor: 'pointer',
             }}>
-              {userInitial}
-            </div>
-            {/* الاسم والدور */}
-            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* الأفاتار */}
               <div style={{
-                fontSize: 13, fontWeight: 800, color: 'var(--t1)',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                background: 'linear-gradient(135deg, var(--blue,#1a4fd6), #60a5fa)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 15, fontWeight: 900, color: '#fff',
               }}>
-                {user?.name ?? 'المستخدم'}
+                {userInitial}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>
-                {(user as any)?.role ?? 'مدير النظام'}
+              {/* الاسم والدور */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 13, fontWeight: 800, color: 'var(--t1)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {user?.name ?? 'المستخدم'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>
+                  {(user as any)?.role ?? 'مدير النظام'}
+                </div>
               </div>
+              {/* مؤشر الاتصال */}
+              <div style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: 'var(--em, #0dbf84)',
+                boxShadow: '0 0 6px var(--em, #0dbf84)',
+                flexShrink: 0,
+              }} title="متصل" />
             </div>
-            {/* مؤشر الاتصال */}
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: 'var(--em, #0dbf84)',
-              boxShadow: '0 0 6px var(--em, #0dbf84)',
-              flexShrink: 0,
-            }} title="متصل" />
-          </div>
+          </Link>
 
           {/* ─── زر تسجيل الخروج ─── */}
           <div style={{ padding: '0 10px 12px' }}>
@@ -677,11 +683,15 @@ const meta = useTopbarTitle();
       <main id="main">
         {/* Topbar */}
         <div id="topbar">
+          <OfflineIndicator />
           <div className="tb-info">
             <div className="tb-title">{meta.title}</div>
             <div className="tb-path">{meta.path}</div>
           </div>
           <div className="tb-actions">
+            <button className="ib" onClick={() => setSidebarCollapsed(c => !c)} title={sidebarCollapsed ? 'توسيع القائمة' : 'طي القائمة'}>
+              <span className="ic ic-sm"><i className={`ti ti-menu-2`} /></span>
+            </button>
             <FiscalYearSelector />
             <div className="srch">
               <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
@@ -770,6 +780,10 @@ const meta = useTopbarTitle();
             ))}
           </div>
           <div className="mdb-title" style={{ marginTop:8 }}>الحساب</div>
+          <div className="mdb-row" onClick={() => { navigate('profile'); setDrawerOpen(false); }}>
+            <span className="ic ic-sm"><i className="ti ti-user-circle" /></span>
+            <span style={{ fontSize:13, fontWeight:700 }}>الملف الشخصي</span>
+          </div>
           <div className="mdb-row" onClick={() => { logout(); setDrawerOpen(false); }}>
             <span className="ic ic-sm"><i className="ti ti-logout" /></span>
             <span style={{ fontSize:13, fontWeight:700, color:'var(--red)' }}>تسجيل الخروج</span>

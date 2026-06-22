@@ -1,7 +1,14 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import type { CartItem, CartTotals, Party, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import CartRow from './CartRow';
+
+interface NewClientData {
+  name:   string;
+  phone:  string;
+  mobile: string;
+  address:string;
+}
 
 interface ProfessionalCartProps {
   items:       CartItem[];
@@ -15,6 +22,7 @@ interface ProfessionalCartProps {
   onSelectItem: (id: string | null) => void;
   onQty:       (id: string, qty: number) => void;
   onDiscount:  (id: string, pct: number) => void;
+  onDiscountAmount: (id: string, amount: number) => void;
   onPrice:     (id: string, price: number) => void;
   onRemove:    (id: string) => void;
   onSetClient: (c: Party | null) => void;
@@ -24,6 +32,8 @@ interface ProfessionalCartProps {
   onSell:      () => void;
   onClear:     () => void;
   onHeld:      () => void;
+  onCreateClient: (data: NewClientData) => Promise<Party | null>;
+  onOpenCustomerSearch?: () => void;
   totalTtcFinal: number;
   invoiceDiscountPct?: number;
   onInvoiceDiscountChange?: (pct: number) => void;
@@ -33,13 +43,16 @@ interface ProfessionalCartProps {
 export default function ProfessionalCart({
   items, totals, client, customers, priceLevels, selectedPriceLevelId,
   note, selectedItemId, onSelectItem,
-  onQty, onDiscount, onPrice, onRemove, onSetClient, onPriceLevelChange,
-  onNoteChange, onHold, onSell, onClear, onHeld, totalTtcFinal,
+  onQty, onDiscount, onDiscountAmount, onPrice, onRemove, onSetClient, onPriceLevelChange,
+  onNoteChange, onHold, onSell, onClear, onHeld, onCreateClient, onOpenCustomerSearch, totalTtcFinal,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
 }: ProfessionalCartProps) {
   const [showNote,      setShowNote]    = useState(false);
   const [clientSearch,  setClientSearch] = useState('');
   const [openClient,    setOpenClient]  = useState(false);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [newClient,     setNewClient]   = useState<NewClientData>({ name: '', phone: '', mobile: '', address: '' });
+  const [creating,      setCreating]    = useState(false);
   const clientRef  = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,9 +65,26 @@ export default function ProfessionalCart({
   }, []);
 
   const filteredCustomers = useMemo(() =>
-    customers.filter(c => !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase())),
+    customers.filter(c => !clientSearch ||
+      c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+      c.phone?.includes(clientSearch) ||
+      c.mobile?.includes(clientSearch)),
     [customers, clientSearch]
   );
+
+  const handleCreateClient = useCallback(async () => {
+    if (!newClient.name.trim()) return;
+    setCreating(true);
+    const created = await onCreateClient(newClient);
+    setCreating(false);
+    if (created) {
+      onSetClient(created);
+      setShowNewClient(false);
+      setNewClient({ name: '', phone: '', mobile: '', address: '' });
+      setClientSearch('');
+      setOpenClient(false);
+    }
+  }, [newClient, onCreateClient, onSetClient]);
 
   const isEmpty = !items.length;
 
@@ -153,9 +183,20 @@ export default function ProfessionalCart({
                   type="text"
                   value={clientSearch}
                   onChange={e => setClientSearch(e.target.value)}
-                  placeholder="🔍 ابحث عن زبون..."
+                  placeholder="🔍 ابحث بالاسم / الهاتف..."
                   autoFocus
                 />
+                {onOpenCustomerSearch && (
+                  <button
+                    className="btn btn-xs"
+                    onClick={(e) => { e.stopPropagation(); onOpenCustomerSearch(); }}
+                    title="بحث متقدم"
+                    type="button"
+                    style={{ marginRight: 4, flexShrink: 0 }}
+                  >
+                    <i className="ti ti-search" />
+                  </button>
+                )}
               </div>
               <div className="cd-list">
                 <div
@@ -182,9 +223,37 @@ export default function ProfessionalCart({
                   </div>
                 ))}
                 {!filteredCustomers.length && clientSearch && (
-                  <div className="cd-empty">لا توجد نتائج</div>
+                  <>
+                    <div className="cd-empty">لا توجد نتائج لـ "{clientSearch}"</div>
+                    <div
+                      className="cd-opt cd-create"
+                      onClick={() => { setShowNewClient(true); setNewClient(prev => ({ ...prev, name: clientSearch, phone: '', mobile: '', address: '' })); }}
+                    >
+                      <span className="co-av plus"><i className="ti ti-plus" /></span>
+                      <span className="co-nm">إنشاء زبون "{clientSearch}"</span>
+                    </div>
+                  </>
                 )}
               </div>
+              {showNewClient && (
+                <div className="cd-new-client" onClick={e => e.stopPropagation()}>
+                  <div className="cdn-ttl">زبون جديد</div>
+                  <input className="cdn-inp" placeholder="الاسم *" value={newClient.name}
+                    onChange={e => setNewClient(p => ({ ...p, name: e.target.value }))} />
+                  <input className="cdn-inp" placeholder="رقم الهاتف" value={newClient.phone}
+                    onChange={e => setNewClient(p => ({ ...p, phone: e.target.value }))} />
+                  <input className="cdn-inp" placeholder="رقم الجوال" value={newClient.mobile}
+                    onChange={e => setNewClient(p => ({ ...p, mobile: e.target.value }))} />
+                  <input className="cdn-inp" placeholder="العنوان" value={newClient.address}
+                    onChange={e => setNewClient(p => ({ ...p, address: e.target.value }))} />
+                  <div className="cdn-acts">
+                    <button className="btn btn-xs" onClick={() => setShowNewClient(false)}>إلغاء</button>
+                    <button className="btn btn-xs btn-p" disabled={creating || !newClient.name.trim()} onClick={handleCreateClient}>
+                      {creating ? 'جاري الحفظ...' : 'حفظ الزبون'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -207,6 +276,7 @@ export default function ProfessionalCart({
               onSelect={() => onSelectItem(item.id)}
               onQty={qty => onQty(item.id, qty)}
               onDiscount={pct => onDiscount(item.id, pct)}
+              onDiscountAmount={amount => onDiscountAmount(item.id, amount)}
               onPrice={price => onPrice(item.id, price)}
               onRemove={() => onRemove(item.id)}
             />

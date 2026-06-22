@@ -5,12 +5,14 @@ interface FilterPanelProps {
   lowStock: boolean; onLowStock: (v: boolean) => void;
   minPrice: string; onMinPrice: (v: string) => void;
   maxPrice: string; onMaxPrice: (v: string) => void;
+  perPage: number; onPerPage: (v: number) => void;
   onReset: () => void;
 }
 
 export default function FilterPanel({
   inStock, onInStock, lowStock, onLowStock,
-  minPrice, onMinPrice, maxPrice, onMaxPrice, onReset,
+  minPrice, onMinPrice, maxPrice, onMaxPrice,
+  perPage, onPerPage, onReset,
 }: FilterPanelProps) {
   return (
     <div className="pos-filter-panel">
@@ -41,6 +43,16 @@ export default function FilterPanel({
             onChange={e => onMaxPrice(e.target.value)}
           />
           <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700 }}>دج</span>
+        </div>
+        <div className="pfp-per-page">
+          <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700 }}>عرض:</span>
+          <select value={perPage} onChange={e => onPerPage(Number(e.target.value))}
+            style={{ fontSize: 12, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--b2)', background: 'var(--bg)' }}>
+            <option value={60}>60</option>
+            <option value={120}>120</option>
+            <option value={240}>240</option>
+            <option value={500}>500</option>
+          </select>
         </div>
         <button className="btn btn-xs btn-r" onClick={onReset}>
           <i className="ti ti-x" /> إعادة ضبط
