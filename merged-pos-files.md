@@ -380,7 +380,7 @@ export default function POSPage() {
   const queryFamilyId = pos.selectedCategory ?? undefined;
 
   // ── Products query ─────────────────────────────────────────────────────────
-  const { data: productsRaw, isLoading: loadingAll, isPlaceholderData } = useQuery({
+  const { data: productsRaw, isLoading: loadingAll } = useQuery({
     queryKey: [slug, 'products', 'pos', {
       search: pos.searchQuery, cat: pos.selectedCategory, page, per_page: 120,
     }],
@@ -489,14 +489,23 @@ export default function POSPage() {
 
   useEffect(() => {
     if (negSettingRaw !== undefined) {
-      const val = String((negSettingRaw as any)?.value ?? 'false') === 'true';
+      // ✅ Defensive parsing: backend may return true/false, "true"/"false",
+      // 1/0, or "1"/"0" depending on how the boolean setting was cast.
+      // Also unwrap a possible { data: {...} } envelope just in case.
+      const raw = (negSettingRaw as any)?.value ?? (negSettingRaw as any)?.data?.value;
+      const val = raw === true || raw === 1 || raw === '1'
+        || String(raw).toLowerCase() === 'true';
       setAllowNegSetting(val);
       try { localStorage.setItem(ALLOW_NEG_KEY, val ? 'true' : 'false'); } catch {}
+      if (typeof window !== 'undefined' && (window as any).__POS_DEBUG__) {
+        // eslint-disable-next-line no-console
+        console.debug('[POS] allow_negative_stock raw=', negSettingRaw, '→ resolved=', val);
+      }
     }
   }, [negSettingRaw]);
 
   // ── Stock ──────────────────────────────────────────────────────────────────
-  const { data: stockData = {} } = useQuery<Record<number, number>>({
+  const { data: stockData = {}, isLoading: stockLoading } = useQuery<Record<number, number>>({
     queryKey: [slug, 'pos-stock', effectiveWarehouseId, fiscalYear?.id],
     queryFn:  () =>
       apiGet<unknown[]>('/inventory/stock-at', {
@@ -511,6 +520,9 @@ export default function POSPage() {
     enabled:   !!slug && !!effectiveWarehouseId,
     staleTime: 2 * 60_000,
   });
+  // True while stock is still unresolved for the first time — used by ProductGrid
+  // to avoid flashing products as "available" before we actually know their stock.
+  const stockPending = !!effectiveWarehouseId && stockLoading;
 
   const allVariants: ProductVariant[] = useMemo(() =>
     rawProducts.map(p => {
@@ -863,7 +875,7 @@ export default function POSPage() {
             onFilter={() => setShowFilter(s => !s)} filterActive={filterActive}
             inputRef={searchRef} sortBy={sortBy} onSort={setSortBy}
             resultsCount={filteredVariants.length}
-            onEnterFirst={() => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting)) pos.addItem(first); }}
+            onEnterFirst={() => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) pos.addItem(first); }}
           />
           {showFilter && (
             <FilterPanel
@@ -882,6 +894,7 @@ export default function POSPage() {
             onPin={toggleQuickItem} isPinned={isQuickItem}
             priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
+            stockPending={stockPending}
           />
         </div>
 
@@ -973,8 +986,7 @@ export default function POSPage() {
       />
     </div>
   );
-}
-```
+}```
 
 
 
@@ -1358,7 +1370,7 @@ export default function POSPage() {
   const queryFamilyId = pos.selectedCategory ?? undefined;
 
   // ── Products query ─────────────────────────────────────────────────────────
-  const { data: productsRaw, isLoading: loadingAll, isPlaceholderData } = useQuery({
+  const { data: productsRaw, isLoading: loadingAll } = useQuery({
     queryKey: [slug, 'products', 'pos', {
       search: pos.searchQuery, cat: pos.selectedCategory, page, per_page: 120,
     }],
@@ -1467,14 +1479,23 @@ export default function POSPage() {
 
   useEffect(() => {
     if (negSettingRaw !== undefined) {
-      const val = String((negSettingRaw as any)?.value ?? 'false') === 'true';
+      // ✅ Defensive parsing: backend may return true/false, "true"/"false",
+      // 1/0, or "1"/"0" depending on how the boolean setting was cast.
+      // Also unwrap a possible { data: {...} } envelope just in case.
+      const raw = (negSettingRaw as any)?.value ?? (negSettingRaw as any)?.data?.value;
+      const val = raw === true || raw === 1 || raw === '1'
+        || String(raw).toLowerCase() === 'true';
       setAllowNegSetting(val);
       try { localStorage.setItem(ALLOW_NEG_KEY, val ? 'true' : 'false'); } catch {}
+      if (typeof window !== 'undefined' && (window as any).__POS_DEBUG__) {
+        // eslint-disable-next-line no-console
+        console.debug('[POS] allow_negative_stock raw=', negSettingRaw, '→ resolved=', val);
+      }
     }
   }, [negSettingRaw]);
 
   // ── Stock ──────────────────────────────────────────────────────────────────
-  const { data: stockData = {} } = useQuery<Record<number, number>>({
+  const { data: stockData = {}, isLoading: stockLoading } = useQuery<Record<number, number>>({
     queryKey: [slug, 'pos-stock', effectiveWarehouseId, fiscalYear?.id],
     queryFn:  () =>
       apiGet<unknown[]>('/inventory/stock-at', {
@@ -1489,6 +1510,9 @@ export default function POSPage() {
     enabled:   !!slug && !!effectiveWarehouseId,
     staleTime: 2 * 60_000,
   });
+  // True while stock is still unresolved for the first time — used by ProductGrid
+  // to avoid flashing products as "available" before we actually know their stock.
+  const stockPending = !!effectiveWarehouseId && stockLoading;
 
   const allVariants: ProductVariant[] = useMemo(() =>
     rawProducts.map(p => {
@@ -1841,7 +1865,7 @@ export default function POSPage() {
             onFilter={() => setShowFilter(s => !s)} filterActive={filterActive}
             inputRef={searchRef} sortBy={sortBy} onSort={setSortBy}
             resultsCount={filteredVariants.length}
-            onEnterFirst={() => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting)) pos.addItem(first); }}
+            onEnterFirst={() => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) pos.addItem(first); }}
           />
           {showFilter && (
             <FilterPanel
@@ -1860,6 +1884,7 @@ export default function POSPage() {
             onPin={toggleQuickItem} isPinned={isQuickItem}
             priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
+            stockPending={stockPending}
           />
         </div>
 
@@ -1951,8 +1976,7 @@ export default function POSPage() {
       />
     </div>
   );
-}
-```
+}```
 
 ## FILE: resources/js/pos/components/CartRow.tsx
 ```

@@ -10,6 +10,7 @@
 //      (منطقها الآن داخل useCartStore — لا تغيير هنا)
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
@@ -52,6 +53,9 @@ import ProfessionalReceipt      from '@/pos/components/ProfessionalReceipt';
 import ManualProductModal       from '@/pos/components/ManualProductModal';
 import SessionStatsModal        from '@/pos/components/SessionStatsModal';
 import KeyboardHelpModal        from '@/pos/components/KeyboardHelpModal';
+import POSSettingsModal          from '@/pos/components/POSSettingsModal';
+import ManagerPinModal           from '@/pos/components/ManagerPinModal';
+import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
 import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
 
 type OrderType = 'dine-in' | 'takeaway' | 'delivery';
@@ -62,17 +66,27 @@ export default function POSPage() {
   const pos        = usePOS();
   const slug       = useActiveSlug();
   const fiscalYear = useSelectedFiscalYear();
+  const navigate   = useNavigate();
+
+  const { settings, setSettings, resetSettings } = usePOSSettings(slug);
 
   const [view,       setView]       = useState<ViewMode>('grid');
-  const [gridSize,   setGridSize]   = useState<GridSize>('md');
+  const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
   const [mobTab,     setMobTab]     = useState<'products' | 'cart'>('products');
   const [fullscreen, setFullscreen] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [modal,      setModal]      = useState<ActiveModal>('none');
+  const [showSettings, setShowSettings] = useState(false);
+  const [pinModal, setPinModal] = useState<{
+    requestedDiscount: number;
+    reason: 'max_exceeded' | 'pin_required';
+    onSuccess: () => void;
+  } | null>(null);
   const [cartNote,   setCartNote]   = useState('');
   const [selectedPriceLevelId, setSelectedPriceLevelId] = useState<number | null>(null);
   const [lastDocNum,  setLastDocNum]  = useState<string | undefined>();
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
+
   const [receiptSnapshot, setReceiptSnapshot] = useState<{
     items: CartItem[]; totals: CartTotals; docNum?: string;
   } | null>(null);
@@ -85,7 +99,7 @@ export default function POSPage() {
       return stored ? JSON.parse(stored) : [];
     } catch { return []; }
   });
-  const [showQuickbar, setShowQuickbar] = useState(true);
+  const [showQuickbar, setShowQuickbar] = useState(settings.showQuickbarOnStart);
 
   useEffect(() => {
     if (!slug) return;
@@ -125,7 +139,7 @@ export default function POSPage() {
     }],
     queryFn: () => productsApi.list({
       per_page:  120,
-      include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',  // ✅ أُضيف quantityDiscounts
+      include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
       search:    isSearching ? pos.searchQuery : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       page,
@@ -168,7 +182,9 @@ export default function POSPage() {
 
   const customers        = (customersData as PaginatedResponse<Party>)?.data ?? (customersData as Party[]) ?? [];
   const priceLevelsList  = priceLevels ?? [];
-  const defaultWarehouse = warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null;
+  const defaultWarehouse = settings.defaultWarehouseId
+    ? warehouses?.find(w => w.id === settings.defaultWarehouseId)
+    : (warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null);
   const realWarehouseId  = defaultWarehouse?.id ?? null;
   const defaultCurrency  = currencies?.find(c => c.is_base_currency) ?? currencies?.[0];
   const defaultTreasury  = treasuryAccounts?.find(a => a.is_default) ?? treasuryAccounts?.[0];
@@ -283,6 +299,8 @@ export default function POSPage() {
 
   const filteredVariants = useMemo(() => {
     let list = allVariants;
+    if (pos.selectedCategory !== null) list = list.filter(v => v.product?.family?.id === pos.selectedCategory);
+    if (settings.hideOutOfStock) list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
     if (filterInStock)  list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
     if (filterLowStock) list = list.filter(v => v.manages_stock && (v.current_stock ?? 0) <= (v.min_stock_alert ?? 0) && (v.current_stock ?? 0) > 0);
     if (filterMinPrice) list = list.filter(v => v.default_selling_price_ht >= parseFloat(filterMinPrice));
@@ -294,9 +312,14 @@ export default function POSPage() {
       if (sortBy === 'family')     return (a.product?.family?.name ?? '').localeCompare(b.product?.family?.name ?? '', 'ar');
       return (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'ar');
     });
-  }, [allVariants, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
+  }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
 
   const isEmpty = pos.items.length === 0;
+
+  const clearCartSafe = useCallback(() => {
+    if (settings.confirmOnClear && !isEmpty && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+    pos.clearCart();
+  }, [settings.confirmOnClear, isEmpty, pos]);
 
   // ── Invoice discount ───────────────────────────────────────────────────────
   const invoiceDiscountPct    = pos.invoiceDiscountPct;
@@ -451,7 +474,7 @@ export default function POSPage() {
     payments?:    Array<{ paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
     currencyId?:  number | null;
   }) => {
-    const typeCode = params.docTypeCode ?? 'FV';
+    const typeCode = params.docTypeCode ?? settings.defaultDocTypeCode;
     const invType  = documentTypes?.find(t => t.code === typeCode)
                   ?? documentTypes?.find(t => t.code === 'BL')
                   ?? documentTypes?.find(t => t.code === 'FAC')
@@ -521,7 +544,7 @@ export default function POSPage() {
       toast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote]);
+  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -562,7 +585,7 @@ export default function POSPage() {
         isEmpty={isEmpty}
         isFullscreen={fullscreen}
         onHeld={() => setModal('held')}
-        onNewSale={() => isEmpty ? pos.clearCart() : pos.holdCart()}
+        onNewSale={() => { if (isEmpty) { pos.clearCart(); } else { pos.holdCart(); } }}
         onManual={() => setModal('manual')}
         onReceipt={() => {
           if (!isEmpty) {
@@ -573,6 +596,8 @@ export default function POSPage() {
         onSession={() => setModal(m => m === 'session' ? 'none' : 'session')}
         onFullscreen={toggleFullscreen}
         onKbHelp={() => setModal('kbhelp')}
+        onKioskMode={() => navigate('/pos/kiosk')}
+        onSettings={() => setShowSettings(true)}
         showQuickbar={showQuickbar}
         onToggleQuickbar={() => setShowQuickbar(s => !s)}
         items={pos.items}
@@ -650,7 +675,7 @@ export default function POSPage() {
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onSetClient={pos.setClient} onPriceLevelChange={applyPriceLevel}
           onNoteChange={setCartNote} onHold={pos.holdCart}
-          onSell={() => setModal('payment')} onClear={pos.clearCart} onHeld={() => setModal('held')}
+          onSell={() => setModal('payment')} onClear={clearCartSafe} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           invoiceDiscountPct={pos.invoiceDiscountPct}
           onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
@@ -686,6 +711,7 @@ export default function POSPage() {
         <ProfessionalReceipt
           items={receiptSnapshot.items} totals={receiptSnapshot.totals}
           client={pos.client} docNumber={receiptSnapshot.docNum ?? lastDocNum}
+          settings={settings}
           onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
           onPrint={() => window.print()}
           onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
@@ -719,6 +745,28 @@ export default function POSPage() {
       )}
 
       {modal === 'kbhelp' && <KeyboardHelpModal onClose={() => setModal('none')} />}
+
+      {showSettings && (
+        <POSSettingsModal
+          settings={settings}
+          onSave={setSettings}
+          onReset={resetSettings}
+          onClose={() => setShowSettings(false)}
+          warehouses={warehouses ?? []}
+          documentTypes={documentTypes ?? []}
+        />
+      )}
+
+      {pinModal && (
+        <ManagerPinModal
+          requestedDiscount={pinModal.requestedDiscount}
+          threshold={pinModal.reason === 'max_exceeded' ? settings.maxDiscountPct : settings.discountPinThreshold}
+          reason={pinModal.reason}
+          onSuccess={() => { pinModal.onSuccess(); setPinModal(null); }}
+          onCancel={() => setPinModal(null)}
+          verifyPin={pin => pin === settings.managerPin}
+        />
+      )}
 
       <Toaster position="top-left" richColors closeButton
         toastOptions={{ style: { fontFamily: 'Tajawal, sans-serif', fontSize: 14 } }}

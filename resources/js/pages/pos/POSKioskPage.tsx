@@ -66,7 +66,8 @@ export default function POSKioskPage() {
       per_page: PER_PAGE,
       search:   searchQuery || undefined,
       family_id: selectedCategory ?? undefined,
-      with:     'variants,variants.quantity_discounts,category,family',
+      include:  'tva,unit,family,prices.priceLevel',
+      active:   true,
     }),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
@@ -87,8 +88,7 @@ export default function POSKioskPage() {
     });
   }, [products]);
 
-  const [filteredVariants, setFilteredVariants] = useState<ProductVariant[]>([]);
-  useMemo(() => setFilteredVariants(allVariants), [allVariants]);
+  const filteredVariants = useMemo(() => allVariants, [allVariants]);
 
   const handleCompleteSale = async (params: {
     paymentModeId: number; amount: number;

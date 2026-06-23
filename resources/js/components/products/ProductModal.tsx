@@ -1,23 +1,31 @@
-// ProductModal.tsx — نسخة محسّنة
-// التحسينات:
-//  1. موضع المودل — paddingTop: 5vh يرفعه عن الأسفل قليلاً
-//  2. ارتفاع ثابت height: 95vh — لا يتغير عند تبديل التابات
-//  3. Scroll للأعلى تلقائياً عند تبديل التاب
-//  4. Validation inline عند onBlur لحقل الاسم وسعر الشراء
-//  5. Keyboard: Escape للإغلاق، Ctrl/Cmd+S للحفظ
-//  6. رسالة API error تبقى مرئية ولها زر إغلاق
-//  7. Race condition في priceLevels مُصلح — useRef يتذكر إذا تم init البيانات
-//  8. Lookups: staleTime 10 دقائق بدلاً من Infinity
-//  9. isDirty tracking — شارة "غير محفوظ" في الهيدر
-// 10. UnsavedChanges warning عند محاولة الإغلاق بعد تعديل
-// 11. Tab counter badges (عدد التعبئات، عدد الأسعار)
-// 12. حقل الاسم يأخذ focus تلقائياً عند الفتح
-// 13. أزرار السابق/التالي في Footer للتنقل بين التابات
-// 14. Enter في حقل الخصائص التقنية يضيف مباشرة
+/**
+ * ProductModal.tsx — نسخة Enterprise v2.0
+ *
+ * التحسينات الكاملة:
+ *  - استخدام hooks من lookups.ts (useProductLookups + useValuationMethods)
+ *  - 8 تابات: الأساسيات | الأسعار | التعبئة | المخزون | الخصومات | الأبعاد | SEO | الصور
+ *  - حساب الهامش لحظياً لكل مستوى سعر
+ *  - auto-slug من الاسم
+ *  - meta_title / meta_description / meta_keywords
+ *  - إدارة الصور (gallery) مع upload
+ *  - نسخ الباركود بضغطة
+ *  - مؤشر اكتمال النموذج (Completeness %)
+ *  - Keyboard shortcuts: Esc = إغلاق، Ctrl+S = حفظ، Ctrl+Tab = تاب تالي
+ *  - RTL-native بالكامل
+ *  - Race condition fix لـ priceLevels
+ */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/core/client';
+import React, {
+  useState, useEffect, useRef, useCallback, useMemo,
+} from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiPost, apiPut } from '@/lib/api/core/client';
+import {
+  useProductLookups,
+  useValuationMethods,
+} from '@/lib/api/endpoints/lookups';
+import { tenantKeys }  from '@/lib/api/core/queryKeys';
+import { useActiveSlug } from '@/lib/store/appStore';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -29,48 +37,92 @@ interface ProductType     { id: number; name: string; manages_stock: boolean; }
 interface Unit            { id: number; name: string; symbol: string; }
 interface TvaRate         { id: number; rate: number; is_default?: boolean; }
 interface PriceLevel      { id: number; name: string; }
-interface ValuationMethod { id: number; name: string; method: string; }
+interface ValuationMethod { id: number; name: string; method?: string; }
 
 interface ProductPrice {
-  price_level_id: number;
-  pricing_method: 'fixed' | 'rate' | 'margin';
-  price:   number | null | '';
-  rate:    number | null | '';
-  margin:  number | null | '';
-  active:  boolean;
+  price_level_id:  number;
+  pricing_method:  'fixed' | 'rate' | 'margin';
+  price:           number | null | '';
+  rate:            number | null | '';
+  margin:          number | null | '';
+  active:          boolean;
 }
 
 interface ProductPackaging {
-  id?: number;
-  code: string; label: string; quantity: number | '';
-  barcode: string; is_default: boolean; active: boolean; display_order: number;
+  id?:           number;
+  code:          string;
+  label:         string;
+  quantity:      number | '';
+  barcode:       string;
+  is_default:    boolean;
+  active:        boolean;
+  display_order: number;
 }
 
 interface QuantityDiscount {
-  id?: number;
-  price_level_id: number; min_qty: number | '';
-  max_qty: number | null | ''; discount_amount: number | null | '';
-  discount_percentage: number | null | ''; tier_order: number;
-  is_blocked: boolean; active: boolean;
+  id?:                  number;
+  price_level_id:       number;
+  min_qty:              number | '';
+  max_qty:              number | null | '';
+  discount_amount:      number | null | '';
+  discount_percentage:  number | null | '';
+  tier_order:           number;
+  is_blocked:           boolean;
+  active:               boolean;
 }
 
 interface ProductForm {
-  name: string; slug: string; ref: string; barcode: string; description: string;
-  family_id: number | null; brand_id: number | null; product_type_id: number | null;
-  tva_id: number | null; unit_id: number | null; purchase_price_ht: number | ''; min_margin_percentage: number | null | '';
-  manages_stock: boolean; allow_negative_stock: boolean;
-  has_lots: boolean; has_expiration_date: boolean;
-  min_stock_alert: number | ''; max_stock_alert: number | '';
-  manages_quantity_discounts: boolean; valuation_method_id: number | null;
-  weight: number | null | ''; volume: number | null | '';
-  length: number | null | ''; width: number | null | ''; height: number | null | '';
-  specifications: Record<string, string>; images: string[]; active: boolean;
-  prices: ProductPrice[]; packagings: ProductPackaging[]; quantity_discounts: QuantityDiscount[];
+  // ── الأساسيات ──
+  name:               string;
+  slug:               string;
+  ref:                string;
+  barcode:            string;
+  description:        string;
+  family_id:          number | null;
+  brand_id:           number | null;
+  product_type_id:    number | null;
+  tva_id:             number | null;
+  unit_id:            number | null;
+  // ── الأسعار ──
+  purchase_price_ht:      number | '';
+  current_cost_price:     number | '';
+  min_margin_percentage:  number | null | '';
+  prices:             ProductPrice[];
+  // ── التعبئة ──
+  packagings:         ProductPackaging[];
+  // ── المخزون ──
+  manages_stock:          boolean;
+  allow_negative_stock:   boolean;
+  has_lots:               boolean;
+  has_expiration_date:    boolean;
+  min_stock_alert:        number | '';
+  max_stock_alert:        number | '';
+  manages_quantity_discounts: boolean;
+  valuation_method_id:    number | null;
+  // ── الخصومات ──
+  quantity_discounts:     QuantityDiscount[];
+  // ── الأبعاد ──
+  weight:   number | null | '';
+  volume:   number | null | '';
+  length:   number | null | '';
+  width:    number | null | '';
+  height:   number | null | '';
+  specifications: Record<string, string>;
+  // ── SEO ──
+  meta_title:       string;
+  meta_description: string;
+  meta_keywords:    string[];
+  // ── الصور ──
+  images:  string[];
+  // ── عام ──
+  active:  boolean;
 }
 
 interface ProductModalProps {
-  open: boolean; product?: any | null;
-  onClose: () => void; onSaved: (product: any) => void;
+  open:       boolean;
+  product?:   any | null;
+  onClose:    () => void;
+  onSaved:    (product: any) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -84,39 +136,69 @@ const TABS = [
   { id: 'stock',      label: 'المخزون',   icon: 'ti-building-warehouse' },
   { id: 'discounts',  label: 'الخصومات',  icon: 'ti-discount' },
   { id: 'dimensions', label: 'الأبعاد',   icon: 'ti-ruler' },
-  { id: 'meta',       label: 'SEO',       icon: 'ti-world' },
+  { id: 'images',     label: 'الصور',     icon: 'ti-photo' },
+  { id: 'seo',        label: 'SEO',       icon: 'ti-world' },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
-const TAB_IDS = TABS.map(t => t.id) as TabId[];
+const TAB_IDS: TabId[] = TABS.map(t => t.id);
 
 const PRICING_METHODS = [
-  { value: 'fixed',  label: 'سعر ثابت',        icon: 'ti-cash',        hint: 'Prix de vente HT مباشر' },
-  { value: 'rate',   label: 'نسبة فوق الشراء', icon: 'ti-percentage',  hint: '% فوق سعر الشراء' },
-  { value: 'margin', label: 'هامش ثابت',        icon: 'ti-trending-up', hint: 'هامش بالدج يُضاف للسعر' },
+  { value: 'fixed',  label: 'سعر ثابت',        icon: 'ti-cash',        hint: 'Prix de vente HT مباشرة بالدج' },
+  { value: 'rate',   label: 'نسبة فوق الشراء', icon: 'ti-percentage',  hint: 'نسبة % تُضاف على سعر الشراء' },
+  { value: 'margin', label: 'هامش ثابت',        icon: 'ti-trending-up', hint: 'مبلغ ثابت بالدج يُضاف للشراء' },
 ] as const;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const fmtDZD = (n: number | '' | null) =>
-  n !== '' && n !== null
+const fmtDZD = (n: number | '' | null | undefined) =>
+  n !== '' && n !== null && n !== undefined
     ? new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n)) + ' دج'
     : '—';
+
+const fmtPct = (n: number) => n.toFixed(2) + '%';
+
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\u0600-\u06FF-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function computeSellingPrice(pr: ProductPrice, purchasePrice: number): number {
+  if (!purchasePrice) return 0;
+  if (pr.pricing_method === 'fixed'  && pr.price  !== '' && pr.price  !== null) return Number(pr.price);
+  if (pr.pricing_method === 'rate'   && pr.rate   !== '' && pr.rate   !== null) return purchasePrice * (1 + Number(pr.rate) / 100);
+  if (pr.pricing_method === 'margin' && pr.margin !== '' && pr.margin !== null) return purchasePrice + Number(pr.margin);
+  return 0;
+}
+
+function computeMarginPct(sellingPrice: number, purchasePrice: number): number {
+  if (!purchasePrice || !sellingPrice) return 0;
+  return ((sellingPrice - purchasePrice) / purchasePrice) * 100;
+}
 
 function emptyForm(priceLevels: PriceLevel[] = [], defaultTvaId: number | null = null): ProductForm {
   return {
     name: '', slug: '', ref: '', barcode: '', description: '',
     family_id: null, brand_id: null, product_type_id: null,
-    tva_id: defaultTvaId, unit_id: null, purchase_price_ht: '', min_margin_percentage: null,
+    tva_id: defaultTvaId, unit_id: null,
+    purchase_price_ht: '', current_cost_price: '', min_margin_percentage: null,
     manages_stock: true, allow_negative_stock: false,
     has_lots: false, has_expiration_date: false,
     min_stock_alert: '', max_stock_alert: '',
     manages_quantity_discounts: false, valuation_method_id: null,
     weight: '', volume: '', length: '', width: '', height: '',
-    specifications: {}, images: [], active: true,
-    prices: priceLevels.map(pl => ({ price_level_id: pl.id, pricing_method: 'fixed', price: '', rate: '', margin: '', active: true })),
+    specifications: {}, images: [],
+    meta_title: '', meta_description: '', meta_keywords: [],
+    active: true,
+    prices: priceLevels.map(pl => ({
+      price_level_id: pl.id, pricing_method: 'fixed', price: '', rate: '', margin: '', active: true,
+    })),
     packagings: [], quantity_discounts: [],
   };
 }
@@ -126,40 +208,75 @@ function productToForm(p: any, priceLevels: PriceLevel[]): ProductForm {
     name: p.name ?? '', slug: p.slug ?? '', ref: p.ref ?? '',
     barcode: p.barcode ?? '', description: p.description ?? '',
     family_id: p.family_id ?? null, brand_id: p.brand_id ?? null,
-    product_type_id: p.product_type_id ?? null, tva_id: p.tva_id ?? null, unit_id: p.unit_id ?? null,
-    purchase_price_ht: p.purchase_price_ht ?? '', min_margin_percentage: p.min_margin_percentage ?? null,
+    product_type_id: p.product_type_id ?? null,
+    tva_id: p.tva_id ?? null, unit_id: p.unit_id ?? null,
+    purchase_price_ht: p.purchase_price_ht ?? '', current_cost_price: p.current_cost_price ?? '',
+    min_margin_percentage: p.min_margin_percentage ?? null,
     manages_stock: p.manages_stock ?? true, allow_negative_stock: p.allow_negative_stock ?? false,
     has_lots: p.has_lots ?? false, has_expiration_date: p.has_expiration_date ?? false,
     min_stock_alert: p.min_stock_alert ?? '', max_stock_alert: p.max_stock_alert ?? '',
-    manages_quantity_discounts: p.manages_quantity_discounts ?? false, valuation_method_id: p.valuation_method_id ?? null,
-    weight: p.weight ?? '', volume: p.volume ?? '', length: p.length ?? '', width: p.width ?? '', height: p.height ?? '',
-    specifications: p.specifications ?? {}, images: p.images ?? [], active: p.active ?? true,
+    manages_quantity_discounts: p.manages_quantity_discounts ?? false,
+    valuation_method_id: p.valuation_method_id ?? null,
+    weight: p.weight ?? '', volume: p.volume ?? '',
+    length: p.length ?? '', width: p.width ?? '', height: p.height ?? '',
+    specifications: p.specifications ?? {},
+    images: p.images ?? [],
+    meta_title: p.meta_title ?? '', meta_description: p.meta_description ?? '',
+    meta_keywords: Array.isArray(p.meta_keywords) ? p.meta_keywords : (p.meta_keywords ? String(p.meta_keywords).split(',').map((k: string) => k.trim()).filter(Boolean) : []),
+    active: p.active ?? true,
     prices: priceLevels.map(pl => {
       const ex = (p.prices ?? []).find((x: any) => x.price_level_id === pl.id);
-      return { price_level_id: pl.id, pricing_method: ex?.pricing_method ?? 'fixed', price: ex?.price ?? '', rate: ex?.rate ?? '', margin: ex?.margin ?? '', active: ex?.active !== false };
+      return {
+        price_level_id: pl.id,
+        pricing_method: ex?.pricing_method ?? 'fixed',
+        price: ex?.price ?? '', rate: ex?.rate ?? '', margin: ex?.margin ?? '',
+        active: ex?.active !== false,
+      };
     }),
-    packagings: (p.packagings ?? []).map((pkg: any) => ({ id: pkg.id, code: pkg.code ?? '', label: pkg.label ?? '', quantity: pkg.quantity ?? 1, barcode: pkg.barcode ?? '', is_default: pkg.is_default ?? false, active: pkg.active ?? true, display_order: pkg.display_order ?? 0 })),
-    quantity_discounts: (p.quantity_discounts ?? []).map((d: any) => ({ id: d.id, price_level_id: d.price_level_id, min_qty: d.min_qty ?? '', max_qty: d.max_qty ?? null, discount_amount: d.discount_amount ?? null, discount_percentage: d.discount_percentage ?? null, tier_order: d.tier_order ?? 0, is_blocked: d.is_blocked ?? false, active: d.active ?? true })),
+    packagings: (p.packagings ?? []).map((pkg: any) => ({
+      id: pkg.id, code: pkg.code ?? '', label: pkg.label ?? '',
+      quantity: pkg.quantity ?? 1, barcode: pkg.barcode ?? '',
+      is_default: pkg.is_default ?? false, active: pkg.active ?? true,
+      display_order: pkg.display_order ?? 0,
+    })),
+    quantity_discounts: (p.quantity_discounts ?? []).map((d: any) => ({
+      id: d.id, price_level_id: d.price_level_id, min_qty: d.min_qty ?? '',
+      max_qty: d.max_qty ?? null, discount_amount: d.discount_amount ?? null,
+      discount_percentage: d.discount_percentage ?? null, tier_order: d.tier_order ?? 0,
+      is_blocked: d.is_blocked ?? false, active: d.active ?? true,
+    })),
   };
 }
 
 function buildPayload(form: ProductForm) {
   return {
-    name: form.name, slug: form.slug || undefined, ref: form.ref || null, barcode: form.barcode || null,
-    description: form.description || null, family_id: form.family_id, brand_id: form.brand_id,
-    product_type_id: form.product_type_id, tva_id: form.tva_id, unit_id: form.unit_id,
+    name: form.name.trim(),
+    slug: form.slug.trim() || undefined,
+    ref: form.ref.trim() || null,
+    barcode: form.barcode.trim() || null,
+    description: form.description.trim() || null,
+    family_id: form.family_id, brand_id: form.brand_id,
+    product_type_id: form.product_type_id,
+    tva_id: form.tva_id, unit_id: form.unit_id,
     purchase_price_ht: form.purchase_price_ht !== '' ? Number(form.purchase_price_ht) : 0,
     min_margin_percentage: form.min_margin_percentage !== '' && form.min_margin_percentage !== null ? Number(form.min_margin_percentage) : null,
     manages_stock: form.manages_stock, allow_negative_stock: form.allow_negative_stock,
     has_lots: form.has_lots, has_expiration_date: form.has_expiration_date,
     min_stock_alert: form.min_stock_alert !== '' ? Number(form.min_stock_alert) : 0,
     max_stock_alert: form.max_stock_alert !== '' ? Number(form.max_stock_alert) : 0,
-    manages_quantity_discounts: form.manages_quantity_discounts, valuation_method_id: form.valuation_method_id,
-    weight: form.weight !== '' ? form.weight : null, volume: form.volume !== '' ? form.volume : null,
-    length: form.length !== '' ? form.length : null, width: form.width !== '' ? form.width : null,
+    manages_quantity_discounts: form.manages_quantity_discounts,
+    valuation_method_id: form.valuation_method_id,
+    weight: form.weight !== '' ? form.weight : null,
+    volume: form.volume !== '' ? form.volume : null,
+    length: form.length !== '' ? form.length : null,
+    width: form.width !== '' ? form.width : null,
     height: form.height !== '' ? form.height : null,
     specifications: Object.keys(form.specifications).length ? form.specifications : null,
-    images: form.images, active: form.active,
+    images: form.images,
+    meta_title: form.meta_title.trim() || null,
+    meta_description: form.meta_description.trim() || null,
+    meta_keywords: form.meta_keywords.length ? form.meta_keywords : null,
+    active: form.active,
     prices: form.prices.filter(p => {
       if (p.pricing_method === 'fixed')  return p.price  !== '' && p.price  !== null;
       if (p.pricing_method === 'rate')   return p.rate   !== '' && p.rate   !== null;
@@ -197,16 +314,26 @@ const s = {
   }),
   row2:    { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
   row3:    { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 },
-  section: { display: 'flex', flexDirection: 'column' as const, gap: 14 },
+  row4:    { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 },
+  section: { display: 'flex', flexDirection: 'column' as const, gap: 16 },
   divider: { height: 1, background: 'var(--b2)', margin: '4px 0' },
-  hint:    { fontSize: 11, color: 'var(--t4)', marginTop: 2 },
+  hint:    { fontSize: 11, color: 'var(--t4)', marginTop: 2, lineHeight: 1.5 },
   errText: { fontSize: 11, color: 'var(--red)', marginTop: 2 },
+  sectionTitle: { fontSize: 12, fontWeight: 800, color: 'var(--t2)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 6 },
+  card: { padding: '14px 16px', borderRadius: 'var(--r3)', border: '1px solid var(--b2)', background: 'var(--bg3)' },
 };
 
-function Field({ label, error, children, hint, col }: { label: string; error?: string; children: React.ReactNode; hint?: string; col?: number }) {
+function Field({
+  label, error, children, hint, col, required,
+}: {
+  label: string; error?: string; children: React.ReactNode;
+  hint?: string; col?: number; required?: boolean;
+}) {
   return (
     <div style={{ ...s.field, gridColumn: col ? `span ${col}` : undefined }}>
-      <label style={s.label}>{label}</label>
+      <label style={s.label}>
+        {label}{required && <span style={{ color: 'var(--red)', marginRight: 3 }}>*</span>}
+      </label>
       {children}
       {hint  && <span style={s.hint}>{hint}</span>}
       {error && <span style={s.errText}>{error}</span>}
@@ -214,14 +341,43 @@ function Field({ label, error, children, hint, col }: { label: string; error?: s
   );
 }
 
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+function Toggle({
+  checked, onChange, label, disabled,
+}: {
+  checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean;
+}) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
-      <div onClick={() => onChange(!checked)} style={{ width: 36, height: 20, borderRadius: 10, position: 'relative', background: checked ? 'var(--em)' : 'var(--b3)', transition: 'background .2s', flexShrink: 0, cursor: 'pointer' }}>
-        <div style={{ position: 'absolute', top: 3, left: checked ? 19 : 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: disabled ? 'not-allowed' : 'pointer', userSelect: 'none', opacity: disabled ? 0.5 : 1 }}>
+      <div
+        onClick={() => !disabled && onChange(!checked)}
+        style={{
+          width: 36, height: 20, borderRadius: 10, position: 'relative',
+          background: checked ? 'var(--em)' : 'var(--b3)', transition: 'background .2s',
+          flexShrink: 0, cursor: disabled ? 'not-allowed' : 'pointer',
+        }}
+      >
+        <div style={{
+          position: 'absolute', top: 3, left: checked ? 19 : 3,
+          width: 14, height: 14, borderRadius: '50%',
+          background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+        }} />
       </div>
       {label && <span style={{ fontSize: 13, color: 'var(--t2)' }}>{label}</span>}
     </label>
+  );
+}
+
+function SectionHeader({ icon, title, subtitle }: { icon: string; title: string; subtitle?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingBottom: 12, borderBottom: '1px solid var(--b2)', marginBottom: 4 }}>
+      <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--emb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <i className={`ti ${icon}`} style={{ fontSize: 16, color: 'var(--em)' }} />
+      </div>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)' }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 2 }}>{subtitle}</div>}
+      </div>
+    </div>
   );
 }
 
@@ -230,11 +386,13 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function ProductModal({ open, product, onClose, onSaved }: ProductModalProps) {
-  const isEdit   = !!product;
-  const qc       = useQueryClient();
-  const bodyRef  = useRef<HTMLDivElement>(null);
-  const nameRef  = useRef<HTMLInputElement>(null);
-  const initDone = useRef(false); // لحل race condition في priceLevels
+  const isEdit    = !!product;
+  const slug      = useActiveSlug();
+  const qc        = useQueryClient();
+  const bodyRef   = useRef<HTMLDivElement>(null);
+  const nameRef   = useRef<HTMLInputElement>(null);
+  const initDone  = useRef(false);
+  const slugEdited = useRef(false); // لمنع auto-slug بعد التعديل اليدوي
 
   const [activeTab, setActiveTab] = useState<TabId>('basic');
   const [form,      setForm]      = useState<ProductForm>(() => emptyForm());
@@ -243,138 +401,202 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   const [isDirty,   setIsDirty]   = useState(false);
   const [specKey,   setSpecKey]   = useState('');
   const [specVal,   setSpecVal]   = useState('');
+  const [kwInput,   setKwInput]   = useState('');
+  const [copied,    setCopied]    = useState(false);
+  const [imageInput, setImageInput] = useState('');
 
-  // ── Lookups ──
-  const STALE = 10 * 60_000;
-  const fetchOpts = { enabled: open, staleTime: STALE };
-  const { data: families         = [] } = useQuery<Family[]>({          queryKey: ['families'],          queryFn: () => apiClient.get('/families',                    { params: { per_page: 200 } }).then(r => r.data.data ?? []), ...fetchOpts });
-  const { data: brands           = [] } = useQuery<Brand[]>({           queryKey: ['brands'],            queryFn: () => apiClient.get('/brands',                      { params: { per_page: 200 } }).then(r => r.data.data ?? []), ...fetchOpts });
-  const { data: productTypes     = [] } = useQuery<ProductType[]>({     queryKey: ['product-types'],     queryFn: () => apiClient.get('/product-types',              { params: { per_page: 50  } }).then(r => r.data.data ?? []), ...fetchOpts });
-  const { data: units            = [] } = useQuery<Unit[]>({            queryKey: ['units'],             queryFn: () => apiClient.get('/units',                      { params: { per_page: 100 } }).then(r => r.data.data ?? []), ...fetchOpts });
-  const { data: tvaRates         = [] } = useQuery<TvaRate[]>({         queryKey: ['tvas'],              queryFn: () => apiClient.get('/tvas',                       { params: { per_page: 20  } }).then(r => r.data.data ?? []), ...fetchOpts });
-  const { data: priceLevels      = [] } = useQuery<PriceLevel[]>({      queryKey: ['price-levels'],      queryFn: () => apiClient.get('/price-levels',               { params: { per_page: 50  } }).then(r => r.data.data ?? []), ...fetchOpts });
-  const { data: valuationMethods = [] } = useQuery<ValuationMethod[]>({ queryKey: ['valuation-methods'], queryFn: () => apiClient.get('/inventory-valuation-methods', { params: { per_page: 20  } }).then(r => r.data.data ?? []), ...fetchOpts });
+  // ── Lookups من lookups.ts ──
+  const {
+    families, brands, units, tvas, priceLevels, productTypes,
+    isLoading: lookupsLoading,
+  } = useProductLookups();
 
-  const defaultTvaId = (tvaRates as TvaRate[]).find(t => t.is_default)?.id ?? null;
+  // valuation methods خارج useProductLookups — نضيفه مباشرة
+  const { data: valuationMethods = [] } = useValuationMethods();
+
+  const defaultTvaId = useMemo(
+    () => (tvas as TvaRate[]).find(t => t.is_default)?.id ?? null,
+    [tvas],
+  );
+
+  // ── set helper ──
+  const set = useCallback(<K extends keyof ProductForm>(key: K, val: ProductForm[K]) => {
+    setForm(f => ({ ...f, [key]: val }));
+    setIsDirty(true);
+    // auto-slug من الاسم فقط إذا لم يتم التعديل اليدوي
+    if (key === 'name' && !isEdit && !slugEdited.current) {
+      setForm(f => ({ ...f, name: val as string, slug: slugify(val as string) }));
+    }
+  }, [isEdit]);
 
   // ── Reset عند الفتح ──
   useEffect(() => {
-    if (!open) { initDone.current = false; return; }
+    if (!open) { initDone.current = false; slugEdited.current = false; return; }
     setErrors({}); setApiError(''); setActiveTab('basic');
-    setIsDirty(false); setSpecKey(''); setSpecVal('');
-    if (priceLevels.length > 0) {
+    setIsDirty(false); setSpecKey(''); setSpecVal(''); setKwInput('');
+    setImageInput(''); setCopied(false);
+
+    if ((priceLevels as PriceLevel[]).length > 0) {
       initDone.current = true;
-      setForm(isEdit && product ? productToForm(product, priceLevels as PriceLevel[]) : emptyForm(priceLevels as PriceLevel[], defaultTvaId));
+      setForm(
+        isEdit && product
+          ? productToForm(product, priceLevels as PriceLevel[])
+          : emptyForm(priceLevels as PriceLevel[], defaultTvaId),
+      );
     } else {
-      setForm(isEdit && product ? productToForm(product, []) : emptyForm([], defaultTvaId));
+      setForm(emptyForm([], defaultTvaId));
     }
-    setTimeout(() => nameRef.current?.focus(), 80);
-  }, [open, product?.id]); // eslint-disable-line
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
-  // ── Sync priceLevels أول مرة فقط (race condition fix) ──
+  // ── Init priceLevels عند تحميلها لأول مرة بعد فتح المودل ──
   useEffect(() => {
-    if (!priceLevels.length || !open || initDone.current) return;
+    if (!open || initDone.current || (priceLevels as PriceLevel[]).length === 0) return;
     initDone.current = true;
-    setForm(f => {
-      if (isEdit && product) return productToForm(product, priceLevels as PriceLevel[]);
-      return {
-        ...f,
-        tva_id: f.tva_id ?? defaultTvaId,
-        prices: (priceLevels as PriceLevel[]).map(pl => {
-          const ex = f.prices.find(p => p.price_level_id === pl.id);
-          return ex ?? { price_level_id: pl.id, pricing_method: 'fixed', price: '', rate: '', margin: '', active: true };
-        }),
-      };
-    });
-  }, [priceLevels.length, open]); // eslint-disable-line
+    setForm(
+      isEdit && product
+        ? productToForm(product, priceLevels as PriceLevel[])
+        : emptyForm(priceLevels as PriceLevel[], defaultTvaId),
+    );
+  }, [priceLevels, open, isEdit, product, defaultTvaId]);
 
-  // ── Keyboard: Escape + Ctrl/Cmd+S ──
+  // ── Focus اسم المنتج عند الفتح ──
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => nameRef.current?.focus(), 80);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  // ── Switch Tab مع Scroll للأعلى ──
+  function switchTab(id: TabId) {
+    setActiveTab(id);
+    bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Keyboard shortcuts ──
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape')                          { handleClose(); return; }
-      if ((e.ctrlKey || e.metaKey) && e.key === 's')  { e.preventDefault(); handleSubmit(); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [open, isDirty]); // eslint-disable-line
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { handleClose(); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault(); handleSubmit();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
+        e.preventDefault();
+        const idx = TAB_IDS.indexOf(activeTab);
+        const next = e.shiftKey ? idx - 1 : idx + 1;
+        if (next >= 0 && next < TAB_IDS.length) switchTab(TAB_IDS[next]);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activeTab, form, isDirty]);
 
-  // ── تبديل التاب مع scroll للأعلى ──
-  const switchTab = useCallback((tabId: TabId) => {
-    setActiveTab(tabId);
-    setTimeout(() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 30);
-  }, []);
+  // ── Price helpers ──
+  function updatePrice(levelId: number, key: keyof ProductPrice, val: any) {
+    setForm(f => ({
+      ...f,
+      prices: f.prices.map(p => p.price_level_id === levelId ? { ...p, [key]: val } : p),
+    }));
+    setIsDirty(true);
+  }
+
+  // ── Packaging helpers ──
+  function addPackaging() {
+    const order = form.packagings.length;
+    setForm(f => ({
+      ...f,
+      packagings: [...f.packagings, {
+        code: '', label: '', quantity: 1, barcode: '',
+        is_default: order === 0, active: true, display_order: order,
+      }],
+    }));
+    setIsDirty(true);
+  }
+  function updatePackaging(idx: number, key: keyof ProductPackaging, val: any) {
+    setForm(f => {
+      const next = f.packagings.map((p, i) => {
+        if (i !== idx) return key === 'is_default' ? { ...p, is_default: false } : p;
+        return { ...p, [key]: val };
+      });
+      return { ...f, packagings: next };
+    });
+    setIsDirty(true);
+  }
+  function removePackaging(idx: number) {
+    setForm(f => ({ ...f, packagings: f.packagings.filter((_, i) => i !== idx) }));
+    setIsDirty(true);
+  }
+  function movePackaging(idx: number, dir: -1 | 1) {
+    const to = idx + dir;
+    if (to < 0 || to >= form.packagings.length) return;
+    setForm(f => {
+      const next = [...f.packagings];
+      [next[idx], next[to]] = [next[to], next[idx]];
+      return { ...f, packagings: next.map((p, i) => ({ ...p, display_order: i })) };
+    });
+    setIsDirty(true);
+  }
+
+  // ── Discount helpers ──
+  function addDiscount(levelId: number) {
+    setForm(f => ({
+      ...f,
+      quantity_discounts: [...f.quantity_discounts, {
+        price_level_id: levelId, min_qty: '', max_qty: null,
+        discount_amount: null, discount_percentage: null,
+        tier_order: f.quantity_discounts.filter(d => d.price_level_id === levelId).length,
+        is_blocked: false, active: true,
+      }],
+    }));
+    setIsDirty(true);
+  }
+  function updateDiscount(idx: number, key: keyof QuantityDiscount, val: any) {
+    setForm(f => ({
+      ...f,
+      quantity_discounts: f.quantity_discounts.map((d, i) => i === idx ? { ...d, [key]: val } : d),
+    }));
+    setIsDirty(true);
+  }
+  function removeDiscount(idx: number) {
+    setForm(f => ({ ...f, quantity_discounts: f.quantity_discounts.filter((_, i) => i !== idx) }));
+    setIsDirty(true);
+  }
 
   // ── Mutation ──
   const mutation = useMutation({
     mutationFn: (payload: any) =>
       isEdit
-        ? apiClient.put(`/products/${product.id}`, payload).then(r => r.data)
-        : apiClient.post('/products', payload).then(r => r.data),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['products'] });
-      setIsDirty(false);
-      onSaved(data);
+        ? apiPut<any>(`/products/${product.id}`, payload)
+        : apiPost<any>('/products', payload),
+    onSuccess: (saved) => {
+      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
+      onSaved(saved);
       onClose();
     },
-    onError: (e: any) => {
-      const msg  = e?.response?.data?.message ?? 'حدث خطأ غير متوقع';
-      const errs = e?.response?.data?.errors ?? {};
-      setApiError(msg);
-      setErrors(errs);
-      if (errs.name || errs.purchase_price_ht) setActiveTab('basic');
+    onError: (err: any) => {
+      setApiError(err?.message ?? 'حدث خطأ أثناء الحفظ');
+      if (err?.errors) {
+        setErrors(
+          Object.fromEntries(
+            Object.entries(err.errors as Record<string, string[]>).map(([k, v]) => [k, v[0]]),
+          ),
+        );
+      }
     },
   });
 
-  // ── Form helpers ──
-  function set<K extends keyof ProductForm>(key: K, val: ProductForm[K]) {
-    setForm(f => ({ ...f, [key]: val }));
-    setIsDirty(true);
-    if (errors[key]) setErrors(e => { const x = { ...e }; delete x[key]; return x; });
-  }
-
-  function updatePrice(plId: number, key: keyof ProductPrice, val: any) {
-    setForm(f => ({ ...f, prices: f.prices.map(p => p.price_level_id === plId ? { ...p, [key]: val } : p) }));
-    setIsDirty(true);
-  }
-
-  function addPackaging() {
-    setForm(f => ({ ...f, packagings: [...f.packagings, { code: '', label: '', quantity: 1, barcode: '', is_default: f.packagings.length === 0, active: true, display_order: f.packagings.length }] }));
-    setIsDirty(true);
-  }
-
-  function updatePackaging(idx: number, key: keyof ProductPackaging, val: any) {
-    setForm(f => {
-      const pkgs = [...f.packagings];
-      pkgs[idx] = { ...pkgs[idx], [key]: val };
-      if (key === 'is_default' && val) pkgs.forEach((p, i) => { if (i !== idx) pkgs[i] = { ...p, is_default: false }; });
-      return { ...f, packagings: pkgs };
-    });
-    setIsDirty(true);
-  }
-
-  function removePackaging(idx: number) { setForm(f => ({ ...f, packagings: f.packagings.filter((_, i) => i !== idx) })); setIsDirty(true); }
-
-  function addDiscount(plId: number) {
-    setForm(f => ({ ...f, quantity_discounts: [...f.quantity_discounts, { price_level_id: plId, min_qty: 1, max_qty: null, discount_amount: null, discount_percentage: null, tier_order: f.quantity_discounts.filter(d => d.price_level_id === plId).length + 1, is_blocked: false, active: true }] }));
-    setIsDirty(true);
-  }
-
-  function updateDiscount(idx: number, key: keyof QuantityDiscount, val: any) {
-    setForm(f => { const ds = [...f.quantity_discounts]; ds[idx] = { ...ds[idx], [key]: val }; return { ...f, quantity_discounts: ds }; });
-    setIsDirty(true);
-  }
-
-  function removeDiscount(idx: number) { setForm(f => ({ ...f, quantity_discounts: f.quantity_discounts.filter((_, i) => i !== idx) })); setIsDirty(true); }
-
-  // ── Validation inline onBlur ──
+  // ── Validation ──
   function validateField(key: string) {
     if (key === 'name') {
       if (!form.name.trim()) setErrors(e => ({ ...e, name: 'اسم المنتج مطلوب' }));
       else setErrors(e => { const x = { ...e }; delete x.name; return x; });
     }
     if (key === 'purchase_price_ht') {
-      if (form.purchase_price_ht === '' || Number(form.purchase_price_ht) < 0) setErrors(e => ({ ...e, purchase_price_ht: 'سعر الشراء مطلوب (0 أو أكثر)' }));
+      if (form.purchase_price_ht === '' || Number(form.purchase_price_ht) < 0)
+        setErrors(e => ({ ...e, purchase_price_ht: 'سعر الشراء مطلوب (0 أو أكثر)' }));
       else setErrors(e => { const x = { ...e }; delete x.purchase_price_ht; return x; });
     }
   }
@@ -382,13 +604,18 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!form.name.trim()) errs.name = 'اسم المنتج مطلوب';
-    if (form.purchase_price_ht === '' || Number(form.purchase_price_ht) < 0) errs.purchase_price_ht = 'سعر الشراء مطلوب (0 أو أكثر)';
+    if (form.purchase_price_ht === '' || Number(form.purchase_price_ht) < 0)
+      errs.purchase_price_ht = 'سعر الشراء مطلوب (0 أو أكثر)';
     setErrors(errs);
     if (Object.keys(errs).length) { setActiveTab('basic'); return false; }
     return true;
   }
 
-  function handleSubmit() { if (!validate()) return; setApiError(''); mutation.mutate(buildPayload(form)); }
+  function handleSubmit() {
+    if (!validate()) return;
+    setApiError('');
+    mutation.mutate(buildPayload(form));
+  }
 
   function handleClose() {
     if (isDirty && !mutation.isPending) {
@@ -397,60 +624,142 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     onClose();
   }
 
-  // ── Tab indicators ──
-  function tabDot(tabId: TabId): 'done' | 'warn' | 'empty' {
-    if (tabId === 'basic')    { return (!form.name.trim() || form.purchase_price_ht === '') ? 'warn' : 'done'; }
-    if (tabId === 'pricing')  { return form.prices.some(p => (p.pricing_method === 'fixed' && p.price !== '' && p.price !== null) || (p.pricing_method === 'rate' && p.rate !== '' && p.rate !== null) || (p.pricing_method === 'margin' && p.margin !== '' && p.margin !== null)) ? 'done' : 'empty'; }
-    if (tabId === 'packagings') return form.packagings.length > 0 ? 'done' : 'empty';
-    if (tabId === 'discounts')  return form.manages_quantity_discounts && form.quantity_discounts.length > 0 ? 'done' : 'empty';
-    return 'empty';
+  // ── Copy barcode ──
+  function copyBarcode() {
+    if (!form.barcode) return;
+    navigator.clipboard.writeText(form.barcode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
+  // ── Completeness % ──
+  const completeness = useMemo(() => {
+    let score = 0; const total = 10;
+    if (form.name.trim()) score++;
+    if (form.purchase_price_ht !== '' && Number(form.purchase_price_ht) >= 0) score++;
+    if (form.tva_id) score++;
+    if (form.unit_id) score++;
+    if (form.family_id) score++;
+    if (form.brand_id) score++;
+    if (form.ref.trim()) score++;
+    if (form.prices.some(p => p.price !== '' || p.rate !== '' || p.margin !== '')) score++;
+    if (form.description.trim()) score++;
+    if (form.images.length > 0) score++;
+    return Math.round((score / total) * 100);
+  }, [form]);
+
+  // ── Tab indicators ──
+  function tabDot(tabId: TabId): 'done' | 'warn' | 'empty' {
+    if (tabId === 'basic')    return (!form.name.trim() || form.purchase_price_ht === '') ? 'warn' : 'done';
+    if (tabId === 'pricing')  return form.prices.some(p => p.price !== '' || p.rate !== '' || p.margin !== '') ? 'done' : 'empty';
+    if (tabId === 'packagings') return form.packagings.length > 0 ? 'done' : 'empty';
+    if (tabId === 'discounts')  return form.manages_quantity_discounts && form.quantity_discounts.length > 0 ? 'done' : 'empty';
+    if (tabId === 'images')   return form.images.length > 0 ? 'done' : 'empty';
+    if (tabId === 'seo')      return (form.meta_title || form.meta_description) ? 'done' : 'empty';
+    return 'empty';
+  }
   function tabBadge(tabId: TabId): number | null {
     if (tabId === 'pricing')    return form.prices.filter(p => p.price !== '' || p.rate !== '' || p.margin !== '').length || null;
     if (tabId === 'packagings') return form.packagings.length || null;
     if (tabId === 'discounts')  return form.quantity_discounts.filter(d => d.active).length || null;
+    if (tabId === 'images')     return form.images.length || null;
     return null;
   }
-
-  const dotColor = (d: ReturnType<typeof tabDot>) =>
+  const dotColor = (d: 'done' | 'warn' | 'empty') =>
     d === 'done' ? 'var(--green)' : d === 'warn' ? '#f59e0b' : 'transparent';
 
-  // ═════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   // TAB RENDERS
-  // ═════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
 
   function renderBasic() {
     return (
       <div style={s.section}>
+        <SectionHeader icon="ti-info-circle" title="المعلومات الأساسية" subtitle="البيانات الرئيسية للمنتج" />
+
+        {/* اسم + نشط */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
-          <Field label="اسم المنتج *" error={errors.name}>
-            <input ref={nameRef} style={s.inp(!!errors.name)} value={form.name}
+          <Field label="اسم المنتج" error={errors.name} required>
+            <input
+              ref={nameRef}
+              style={s.inp(!!errors.name)}
+              value={form.name}
               onChange={e => set('name', e.target.value)}
               onBlur={() => validateField('name')}
-              placeholder="مثال: حليب نصف دسم 1 لتر" />
+              placeholder="مثال: حليب نصف دسم 1 لتر"
+            />
           </Field>
           <Toggle checked={form.active} onChange={v => set('active', v)} label="نشط" />
         </div>
 
+        {/* Slug */}
+        <Field label="Slug الرابط" hint="يُولَّد تلقائياً من الاسم — اضغط للتعديل اليدوي">
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input
+              style={{ ...s.inp(), direction: 'ltr', fontFamily: 'monospace', fontSize: 12, flex: 1, color: 'var(--t3)' }}
+              value={form.slug}
+              onChange={e => {
+                slugEdited.current = true;
+                set('slug', e.target.value);
+              }}
+              placeholder="my-product-name"
+            />
+            <button
+              type="button"
+              onClick={() => { slugEdited.current = false; set('slug', slugify(form.name)); }}
+              style={{ padding: '7px 10px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'var(--bg3)', color: 'var(--t3)', cursor: 'pointer', fontSize: 11, whiteSpace: 'nowrap' }}
+              title="إعادة توليد من الاسم"
+            >
+              <i className="ti ti-refresh" style={{ fontSize: 13 }} />
+            </button>
+          </div>
+        </Field>
+
+        {/* REF + Barcode */}
         <div style={s.row2}>
-          <Field label="المرجع (SKU)" hint="مرجع داخلي فريد">
-            <input style={s.inp()} value={form.ref} onChange={e => set('ref', e.target.value)} placeholder="EX-001" />
+          <Field label="المرجع (SKU)" hint="مرجع داخلي فريد للمنتج">
+            <input style={s.inp()} value={form.ref} onChange={e => set('ref', e.target.value)} placeholder="PROD-001" />
           </Field>
           <Field label="الباركود">
-            <input style={s.inp()} value={form.barcode} onChange={e => set('barcode', e.target.value)} placeholder="6121234567890" />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                style={{ ...s.inp(), direction: 'ltr', fontFamily: 'monospace', flex: 1 }}
+                value={form.barcode}
+                onChange={e => set('barcode', e.target.value)}
+                placeholder="6121234567890"
+              />
+              {form.barcode && (
+                <button
+                  type="button"
+                  onClick={copyBarcode}
+                  style={{ padding: '7px 10px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: copied ? 'var(--greenb)' : 'var(--bg3)', color: copied ? 'var(--green)' : 'var(--t3)', cursor: 'pointer', fontSize: 12 }}
+                  title="نسخ الباركود"
+                >
+                  <i className={`ti ${copied ? 'ti-check' : 'ti-copy'}`} style={{ fontSize: 13 }} />
+                </button>
+              )}
+            </div>
           </Field>
         </div>
 
+        {/* الوصف */}
         <Field label="الوصف">
-          <textarea style={{ ...s.inp(), resize: 'vertical', minHeight: 72 }} value={form.description}
-            onChange={e => set('description', e.target.value)} placeholder="وصف مختصر للمنتج..." />
+          <textarea
+            style={{ ...s.inp(), resize: 'vertical', minHeight: 80 }}
+            value={form.description}
+            onChange={e => set('description', e.target.value)}
+            placeholder="وصف تفصيلي للمنتج، مزاياه، استخداماته..."
+          />
+          <span style={{ ...s.hint, textAlign: 'end', marginTop: 2 }}>{form.description.length} حرف</span>
         </Field>
 
         <div style={s.divider} />
+        <SectionHeader icon="ti-category" title="التصنيف والتنويع" subtitle="ربط المنتج بالتصنيفات المناسبة" />
 
+        {/* family + brand + type */}
         <div style={s.row3}>
-          <Field label="التصنيف">
+          <Field label="التصنيف (Family)">
             <select style={s.sel()} value={form.family_id ?? ''} onChange={e => set('family_id', e.target.value ? Number(e.target.value) : null)}>
               <option value="">— لا يوجد —</option>
               {(families as Family[]).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -463,23 +772,31 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
             </select>
           </Field>
           <Field label="نوع المنتج">
-            <select style={s.sel()} value={form.product_type_id ?? ''} onChange={e => {
-              const id = e.target.value ? Number(e.target.value) : null;
-              const pt = (productTypes as ProductType[]).find(t => t.id === id);
-              setForm(f => ({ ...f, product_type_id: id, manages_stock: pt?.manages_stock ?? f.manages_stock }));
-              setIsDirty(true);
-            }}>
+            <select
+              style={s.sel()}
+              value={form.product_type_id ?? ''}
+              onChange={e => {
+                const id = e.target.value ? Number(e.target.value) : null;
+                const pt = (productTypes as ProductType[]).find(t => t.id === id);
+                setForm(f => ({ ...f, product_type_id: id, manages_stock: pt?.manages_stock ?? f.manages_stock }));
+                setIsDirty(true);
+              }}
+            >
               <option value="">— اختر —</option>
               {(productTypes as ProductType[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </Field>
         </div>
 
-        <div style={s.row3}>
-          <Field label="معدل TVA" error={errors.tva_id}>
-            <select style={s.sel()} value={form.tva_id ?? ''} onChange={e => set('tva_id', e.target.value ? Number(e.target.value) : null)}>
+        <div style={s.divider} />
+        <SectionHeader icon="ti-calculator" title="الأسعار الأساسية والضريبة" subtitle="سعر الشراء ومعدل TVA — يُستخدمان لحساب أسعار البيع" />
+
+        {/* TVA + Unit + سعر الشراء + الهامش الأدنى */}
+        <div style={s.row2}>
+          <Field label="معدل TVA" error={errors.tva_id} required>
+            <select style={s.sel(!!errors.tva_id)} value={form.tva_id ?? ''} onChange={e => set('tva_id', e.target.value ? Number(e.target.value) : null)}>
               <option value="">— اختر —</option>
-              {(tvaRates as TvaRate[]).map(t => <option key={t.id} value={t.id}>{t.rate}%{t.is_default ? ' (افتراضي)' : ''}</option>)}
+              {(tvas as TvaRate[]).map(t => <option key={t.id} value={t.id}>{t.rate}%{t.is_default ? ' ✓' : ''}</option>)}
             </select>
           </Field>
           <Field label="وحدة القياس">
@@ -488,37 +805,69 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
               {(units as Unit[]).map(u => <option key={u.id} value={u.id}>{u.name} ({u.symbol})</option>)}
             </select>
           </Field>
-          <Field label="سعر الشراء HT *" error={errors.purchase_price_ht} hint="يُستخدم أساساً لحساب الأسعار">
-            <input type="number" min="0" step="0.01" style={s.inp(!!errors.purchase_price_ht)}
-              value={form.purchase_price_ht}
-              onChange={e => set('purchase_price_ht', e.target.value === '' ? '' : +e.target.value)}
-              onBlur={() => validateField('purchase_price_ht')}
-              placeholder="0.00" />
+        </div>
+
+        <div style={s.row2}>
+          <Field label="سعر الشراء HT *" error={errors.purchase_price_ht} hint="المبلغ بدون TVA — يُستخدم كأساس لحساب أسعار البيع والهوامش" required>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="number" min="0" step="0.01"
+                style={{ ...s.inp(!!errors.purchase_price_ht), paddingLeft: 40 }}
+                value={form.purchase_price_ht}
+                onChange={e => set('purchase_price_ht', e.target.value === '' ? '' : +e.target.value)}
+                onBlur={() => validateField('purchase_price_ht')}
+                placeholder="0.00"
+              />
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--t4)', fontWeight: 600 }}>دج</span>
+            </div>
           </Field>
-          <Field label="الحد الأدنى لنسبة هامش الربح %" hint="تحذير عندما يكون هامش البيع أقل من هذه النسبة">
-            <input type="number" min="0" max="100" step="0.01" style={s.inp()}
-              value={form.min_margin_percentage === null ? '' : form.min_margin_percentage}
-              onChange={e => set('min_margin_percentage', e.target.value === '' ? null : +e.target.value)}
-              placeholder="5.00" />
+          <Field label="الحد الأدنى لهامش الربح %" hint="تحذير تلقائي عند انخفاض هامش سعر البيع عن هذه النسبة">
+            <div style={{ position: 'relative' }}>
+              <input
+                type="number" min="0" max="100" step="0.01"
+                style={{ ...s.inp(), paddingLeft: 30 }}
+                value={form.min_margin_percentage === null ? '' : form.min_margin_percentage}
+                onChange={e => set('min_margin_percentage', e.target.value === '' ? null : +e.target.value)}
+                placeholder="0.00"
+              />
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--t4)' }}>%</span>
+            </div>
           </Field>
         </div>
+
+        {/* تكلفة صافية (read-only في حالة التعديل) */}
+        {isEdit && product?.current_cost_price > 0 && (
+          <div style={{ ...s.card, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <i className="ti ti-coin" style={{ fontSize: 20, color: 'var(--gold)' }} />
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--t4)', fontWeight: 600 }}>التكلفة الحالية المُحسَبة (PMP/FIFO)</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)' }}>{fmtDZD(product.current_cost_price)}</div>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--t4)', marginRight: 'auto' }}>للقراءة فقط — تُحسَب من حركات المخزون</div>
+          </div>
+        )}
       </div>
     );
   }
 
   function renderPricing() {
     const lvls = priceLevels as PriceLevel[];
+    const purchasePrice = Number(form.purchase_price_ht) || 0;
+    const minMargin = form.min_margin_percentage !== null && form.min_margin_percentage !== '' ? Number(form.min_margin_percentage) : null;
+
     if (!lvls.length) return (
       <div style={{ textAlign: 'center', padding: 56, color: 'var(--t4)' }}>
-        <i className="ti ti-tag" style={{ fontSize: 36, opacity: 0.3 }} />
-        <div style={{ marginTop: 10, fontSize: 13 }}>لا توجد مستويات أسعار معرفة</div>
-        <div style={{ fontSize: 11, marginTop: 4 }}>أضف مستويات الأسعار من الإعدادات أولاً</div>
+        <i className="ti ti-tag" style={{ fontSize: 40, opacity: 0.3 }} />
+        <div style={{ marginTop: 10, fontSize: 14, fontWeight: 700 }}>لا توجد مستويات أسعار معرفة</div>
+        <div style={{ fontSize: 12, marginTop: 6 }}>أضف مستويات الأسعار من الإعدادات ← مستويات الأسعار</div>
       </div>
     );
 
-    const purchasePrice = Number(form.purchase_price_ht) || 0;
     return (
       <div style={s.section}>
+        <SectionHeader icon="ti-tag" title="أسعار البيع" subtitle="حدد طريقة حساب السعر لكل مستوى" />
+
+        {/* Legend */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
           {PRICING_METHODS.map(m => (
             <div key={m.value} style={{ padding: '10px 12px', borderRadius: 'var(--r2)', border: '1px solid var(--b2)', background: 'var(--bg3)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -531,40 +880,107 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           ))}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {purchasePrice > 0 && (
+          <div style={{ ...s.card, background: 'var(--emb)', border: '1px solid var(--embo)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <i className="ti ti-shopping-cart" style={{ color: 'var(--em)', fontSize: 18 }} />
+            <div>
+              <span style={{ fontSize: 11, color: 'var(--t3)' }}>سعر الشراء الأساسي: </span>
+              <strong style={{ color: 'var(--em)', fontSize: 14 }}>{fmtDZD(purchasePrice)}</strong>
+            </div>
+            {minMargin !== null && (
+              <div style={{ marginRight: 'auto', fontSize: 11, color: 'var(--t3)' }}>
+                الهامش الأدنى: <strong>{minMargin}%</strong>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {lvls.map(pl => {
-            const pr = form.prices.find(p => p.price_level_id === pl.id) ?? { price_level_id: pl.id, pricing_method: 'fixed' as const, price: '', rate: '', margin: '', active: true };
+            const pr = form.prices.find(p => p.price_level_id === pl.id) ?? {
+              price_level_id: pl.id, pricing_method: 'fixed' as const,
+              price: '', rate: '', margin: '', active: true,
+            };
             const method = pr.pricing_method;
-            let preview = 0;
-            if (method === 'fixed'  && pr.price  !== '' && pr.price  !== null) preview = Number(pr.price);
-            if (method === 'rate'   && pr.rate   !== '' && pr.rate   !== null) preview = purchasePrice * (1 + Number(pr.rate) / 100);
-            if (method === 'margin' && pr.margin !== '' && pr.margin !== null) preview = purchasePrice + Number(pr.margin);
+            const sellingPrice = computeSellingPrice(pr, purchasePrice);
+            const marginPct = computeMarginPct(sellingPrice, purchasePrice);
+            const marginWarn = minMargin !== null && sellingPrice > 0 && marginPct < minMargin;
 
             return (
-              <div key={pl.id} style={{ display: 'grid', gridTemplateColumns: '140px 1fr 1fr 60px auto', gap: 10, alignItems: 'center', padding: '10px 14px', borderRadius: 'var(--r2)', border: `1px solid ${pr.active ? 'var(--b2)' : 'var(--b1)'}`, background: pr.active ? 'var(--bg2)' : 'var(--bg3)', opacity: pr.active ? 1 : 0.55, transition: 'opacity .15s' }}>
+              <div key={pl.id} style={{
+                display: 'grid', gridTemplateColumns: '160px 130px 1fr auto',
+                gap: 10, alignItems: 'center',
+                padding: '12px 16px', borderRadius: 'var(--r2)',
+                border: `1px solid ${marginWarn ? 'var(--redbo)' : pr.active ? 'var(--b2)' : 'var(--b1)'}`,
+                background: marginWarn ? 'var(--redb)' : pr.active ? 'var(--bg2)' : 'var(--bg3)',
+                opacity: pr.active ? 1 : 0.55, transition: 'all .15s',
+              }}>
+                {/* اسم المستوى + preview */}
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{pl.name}</div>
-                  {preview > 0 && <div style={{ fontSize: 11, color: 'var(--em)', marginTop: 2, fontWeight: 600 }}>≈ {fmtDZD(preview)}</div>}
+                  {sellingPrice > 0 ? (
+                    <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 12, color: 'var(--em)', fontWeight: 700 }}>{fmtDZD(sellingPrice)}</span>
+                      <span style={{
+                        fontSize: 10, padding: '1px 5px', borderRadius: 6, fontWeight: 700,
+                        background: marginWarn ? 'var(--redbo)' : 'var(--greenb)',
+                        color: marginWarn ? 'var(--red)' : 'var(--green)',
+                      }}>
+                        {marginPct >= 0 ? '+' : ''}{fmtPct(marginPct)}
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 3 }}>غير محدد</div>
+                  )}
                 </div>
-                <select style={{ ...s.sel(), fontSize: 12 }} value={method} onChange={e => updatePrice(pl.id, 'pricing_method', e.target.value as any)}>
+
+                {/* طريقة الحساب */}
+                <select
+                  style={{ ...s.sel(), fontSize: 12 }}
+                  value={method}
+                  onChange={e => updatePrice(pl.id, 'pricing_method', e.target.value as any)}
+                >
                   {PRICING_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
-                <input type="number" min="0" step="0.01" style={{ ...s.inp(), fontSize: 12 }}
-                  value={method === 'fixed' ? (pr.price ?? '') : method === 'rate' ? (pr.rate ?? '') : (pr.margin ?? '')}
-                  onChange={e => {
-                    const k = method === 'fixed' ? 'price' : method === 'rate' ? 'rate' : 'margin';
-                    updatePrice(pl.id, k as any, e.target.value === '' ? '' : +e.target.value);
-                    if (method === 'fixed')  { updatePrice(pl.id, 'rate', '');  updatePrice(pl.id, 'margin', ''); }
-                    if (method === 'rate')   { updatePrice(pl.id, 'price', ''); updatePrice(pl.id, 'margin', ''); }
-                    if (method === 'margin') { updatePrice(pl.id, 'price', ''); updatePrice(pl.id, 'rate', ''); }
-                  }}
-                  placeholder={method === 'rate' ? '% فوق الشراء' : method === 'margin' ? 'هامش دج' : 'سعر دج'} />
-                <div style={{ fontSize: 11, color: 'var(--t4)', textAlign: 'center' }}>{method === 'rate' ? '%' : 'دج'}</div>
+
+                {/* القيمة */}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="number" min="0" step="0.01"
+                    style={{ ...s.inp(), fontSize: 12, paddingLeft: method === 'rate' ? 28 : 36 }}
+                    value={
+                      method === 'fixed'  ? (pr.price  ?? '') :
+                      method === 'rate'   ? (pr.rate   ?? '') :
+                                           (pr.margin  ?? '')
+                    }
+                    onChange={e => {
+                      const k = method === 'fixed' ? 'price' : method === 'rate' ? 'rate' : 'margin';
+                      updatePrice(pl.id, k as any, e.target.value === '' ? '' : +e.target.value);
+                      if (method === 'fixed')  { updatePrice(pl.id, 'rate', '');  updatePrice(pl.id, 'margin', ''); }
+                      if (method === 'rate')   { updatePrice(pl.id, 'price', ''); updatePrice(pl.id, 'margin', ''); }
+                      if (method === 'margin') { updatePrice(pl.id, 'price', ''); updatePrice(pl.id, 'rate', '');  }
+                    }}
+                    placeholder={method === 'rate' ? '15' : '0.00'}
+                  />
+                  <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--t4)', fontWeight: 600 }}>
+                    {method === 'rate' ? '%' : 'دج'}
+                  </span>
+                </div>
+
+                {/* تفعيل */}
                 <Toggle checked={pr.active} onChange={v => updatePrice(pl.id, 'active', v)} label="" />
               </div>
             );
           })}
         </div>
+
+        {/* ملاحظة TVA */}
+        {form.tva_id && (
+          <div style={{ fontSize: 11, color: 'var(--t4)', padding: '8px 12px', borderRadius: 'var(--r2)', background: 'var(--bg3)', border: '1px solid var(--b2)' }}>
+            <i className="ti ti-receipt-tax" style={{ fontSize: 13, marginLeft: 5 }} />
+            الأسعار أعلاه هي <strong>HT</strong> (بدون TVA). سعر TTC = السعر × (1 + نسبة TVA / 100)
+          </div>
+        )}
       </div>
     );
   }
@@ -572,38 +988,112 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   function renderPackagings() {
     return (
       <div style={s.section}>
+        <SectionHeader icon="ti-package" title="وحدات التعبئة" subtitle="تعريف مختلف وحدات البيع: وحدة، كرتون، باليطة..." />
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--t3)' }}>التعبئات تمثل وحدات البيع المختلفة (وحدة، كرتون، باليطة...)</div>
-          <button onClick={addPackaging} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          <div style={{ fontSize: 12, color: 'var(--t3)' }}>
+            {form.packagings.length === 0 ? 'المنتج يُباع بوحدته الأساسية' : `${form.packagings.length} وحدة تعبئة مُعرَّفة`}
+          </div>
+          <button
+            onClick={addPackaging}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          >
             <i className="ti ti-plus" style={{ fontSize: 14 }} /> إضافة تعبئة
           </button>
         </div>
 
         {form.packagings.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--t4)' }}>
-            <i className="ti ti-package" style={{ fontSize: 36, opacity: 0.3 }} />
-            <div style={{ marginTop: 10, fontSize: 13 }}>لا توجد تعبئات — المنتج يُباع بوحدته الأساسية</div>
+            <i className="ti ti-package" style={{ fontSize: 40, opacity: 0.3 }} />
+            <div style={{ marginTop: 12, fontSize: 13 }}>لا توجد تعبئات مُعرَّفة</div>
+            <div style={{ fontSize: 11, marginTop: 4 }}>أمثلة: وحدة (UN, ×1) | فاردو (FD, ×12) | باليطة (PLT, ×240)</div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '70px 110px 1fr 90px 60px 60px auto', gap: 8, padding: '0 12px' }}>
-              {['الكود', 'الاسم', 'الكمية', 'الباركود', 'افتراضي', 'نشط', ''].map((h, i) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* Header */}
+            <div style={{ display: 'grid', gridTemplateColumns: '28px 70px 1fr 90px 1fr 60px 60px 60px auto', gap: 8, padding: '0 10px' }}>
+              {['', 'الكود', 'الاسم', 'الكمية', 'الباركود', 'افتراضي', 'نشط', 'الترتيب', ''].map((h, i) => (
                 <div key={i} style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', textTransform: 'uppercase' }}>{h}</div>
               ))}
             </div>
             {form.packagings.map((pkg, idx) => (
-              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '70px 110px 1fr 90px 60px 60px auto', gap: 8, alignItems: 'center', padding: '10px 12px', borderRadius: 'var(--r2)', border: '1px solid var(--b2)', background: 'var(--bg2)' }}>
-                <input placeholder="UN" style={{ ...s.inp(), textTransform: 'uppercase', fontSize: 12 }} value={pkg.code} onChange={e => updatePackaging(idx, 'code', e.target.value.toUpperCase())} />
-                <input placeholder="قارورة" style={{ ...s.inp(), fontSize: 12 }} value={pkg.label} onChange={e => updatePackaging(idx, 'label', e.target.value)} />
-                <input type="number" min="0.0001" step="1" placeholder="الكمية" style={{ ...s.inp(), fontSize: 12 }} value={pkg.quantity} onChange={e => updatePackaging(idx, 'quantity', e.target.value ? +e.target.value : '')} />
-                <input placeholder="باركود" style={{ ...s.inp(), fontSize: 11 }} value={pkg.barcode} onChange={e => updatePackaging(idx, 'barcode', e.target.value)} />
-                <div style={{ textAlign: 'center' }}><input type="radio" name="default_pkg" checked={pkg.is_default} onChange={() => updatePackaging(idx, 'is_default', true)} /></div>
-                <div style={{ textAlign: 'center' }}><Toggle checked={pkg.active} onChange={v => updatePackaging(idx, 'active', v)} label="" /></div>
-                <button onClick={() => removePackaging(idx)} style={{ padding: '6px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--b2)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontSize: 14 }}>
+              <div key={idx} style={{
+                display: 'grid', gridTemplateColumns: '28px 70px 1fr 90px 1fr 60px 60px 60px auto',
+                gap: 8, alignItems: 'center', padding: '10px 10px',
+                borderRadius: 'var(--r2)', border: '1px solid var(--b2)', background: 'var(--bg2)',
+              }}>
+                {/* رقم الصف */}
+                <div style={{ fontSize: 10, color: 'var(--t4)', textAlign: 'center', fontWeight: 700 }}>{idx + 1}</div>
+                {/* الكود */}
+                <input
+                  placeholder="UN"
+                  style={{ ...s.inp(), textTransform: 'uppercase', fontSize: 12, fontFamily: 'monospace' }}
+                  value={pkg.code}
+                  onChange={e => updatePackaging(idx, 'code', e.target.value.toUpperCase())}
+                />
+                {/* الاسم */}
+                <input
+                  placeholder="قارورة"
+                  style={{ ...s.inp(), fontSize: 12 }}
+                  value={pkg.label}
+                  onChange={e => updatePackaging(idx, 'label', e.target.value)}
+                />
+                {/* الكمية */}
+                <input
+                  type="number" min="0.0001" step="1"
+                  placeholder="1"
+                  style={{ ...s.inp(), fontSize: 12 }}
+                  value={pkg.quantity}
+                  onChange={e => updatePackaging(idx, 'quantity', e.target.value ? +e.target.value : '')}
+                />
+                {/* الباركود */}
+                <input
+                  placeholder="باركود"
+                  style={{ ...s.inp(), fontSize: 11, fontFamily: 'monospace' }}
+                  value={pkg.barcode}
+                  onChange={e => updatePackaging(idx, 'barcode', e.target.value)}
+                />
+                {/* افتراضي */}
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <input
+                    type="radio" name="default_pkg" checked={pkg.is_default}
+                    onChange={() => updatePackaging(idx, 'is_default', true)}
+                    style={{ cursor: 'pointer', width: 16, height: 16 }}
+                  />
+                </div>
+                {/* نشط */}
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <Toggle checked={pkg.active} onChange={v => updatePackaging(idx, 'active', v)} label="" />
+                </div>
+                {/* الترتيب */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+                  <button
+                    onClick={() => movePackaging(idx, -1)} disabled={idx === 0}
+                    style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--b2)', background: 'var(--bg3)', color: idx === 0 ? 'var(--b3)' : 'var(--t3)', cursor: idx === 0 ? 'not-allowed' : 'pointer', fontSize: 11 }}
+                  ><i className="ti ti-chevron-up" /></button>
+                  <button
+                    onClick={() => movePackaging(idx, 1)} disabled={idx === form.packagings.length - 1}
+                    style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--b2)', background: 'var(--bg3)', color: idx === form.packagings.length - 1 ? 'var(--b3)' : 'var(--t3)', cursor: idx === form.packagings.length - 1 ? 'not-allowed' : 'pointer', fontSize: 11 }}
+                  ><i className="ti ti-chevron-down" /></button>
+                </div>
+                {/* حذف */}
+                <button
+                  onClick={() => removePackaging(idx)}
+                  style={{ padding: '6px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--redbo)', background: 'var(--redb)', color: 'var(--red)', cursor: 'pointer', fontSize: 13 }}
+                >
                   <i className="ti ti-trash" />
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {form.packagings.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--t4)', padding: '8px 12px', borderRadius: 'var(--r2)', background: 'var(--bg3)', border: '1px solid var(--b2)' }}>
+            <i className="ti ti-info-circle" style={{ fontSize: 13, marginLeft: 5 }} />
+            <strong>الكمية</strong> تمثل عدد الوحدات الأساسية في هذه التعبئة.
+            سعر التعبئة = سعر الوحدة × الكمية.
+            يجب أن يكون الكود فريداً لكل منتج.
           </div>
         )}
       </div>
@@ -611,45 +1101,126 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   }
 
   function renderStock() {
-    const dis = !form.manages_stock;
+    const stockDisabled = !form.manages_stock;
     return (
       <div style={s.section}>
-        <div style={{ padding: '14px 16px', borderRadius: 'var(--r3)', border: '1px solid var(--b2)', background: 'var(--bg3)' }}>
-          <Toggle checked={form.manages_stock} onChange={v => { setForm(f => ({ ...f, manages_stock: v, allow_negative_stock: v ? f.allow_negative_stock : false })); setIsDirty(true); }} label="إدارة المخزون" />
-          <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 4 }}>فعّل هذا الخيار لتتبع الكميات والتنبيهات</div>
-        </div>
+        <SectionHeader icon="ti-building-warehouse" title="إدارة المخزون" subtitle="إعدادات التتبع والتنبيهات والتقييم" />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, opacity: dis ? 0.4 : 1, pointerEvents: dis ? 'none' : 'auto' }}>
-          {[
-            { key: 'allow_negative_stock', label: 'السماح بمخزون سالب', hint: 'يتيح البيع حتى عند نفاد المخزون' },
-            { key: 'has_lots',             label: 'إدارة الدفعات (Lots)', hint: 'تتبع دفعات الإنتاج والشراء' },
-            { key: 'has_expiration_date',  label: 'تتبع تاريخ الصلاحية', hint: 'يتطلب تفعيل الدفعات أيضاً' },
-          ].map(opt => (
-            <div key={opt.key} style={{ padding: '12px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--b2)', background: 'var(--bg2)' }}>
-              <Toggle checked={(form as any)[opt.key]} onChange={v => set(opt.key as any, v)} label={opt.label} />
-              <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 4 }}>{opt.hint}</div>
+        {/* toggle manages_stock */}
+        <div style={{ ...s.card, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div style={{ flex: 1 }}>
+            <Toggle
+              checked={form.manages_stock}
+              onChange={v => {
+                setForm(f => ({ ...f, manages_stock: v, allow_negative_stock: v ? f.allow_negative_stock : false }));
+                setIsDirty(true);
+              }}
+              label="إدارة المخزون"
+            />
+            <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 4, marginRight: 44 }}>فعّل لتتبع الكميات والتنبيهات وطريقة التقييم</div>
+          </div>
+          {form.manages_stock && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 'var(--r2)', background: 'var(--emb)', border: '1px solid var(--embo)' }}>
+              <i className="ti ti-check" style={{ fontSize: 14, color: 'var(--em)' }} />
+              <span style={{ fontSize: 11, color: 'var(--em)', fontWeight: 700 }}>مفعّل</span>
             </div>
-          ))}
-          <div style={{ padding: '12px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--b2)', background: 'var(--bg2)' }}>
-            <Field label="طريقة التقييم">
-              <select style={s.sel()} value={form.valuation_method_id ?? ''} onChange={e => set('valuation_method_id', e.target.value ? Number(e.target.value) : null)}>
-                <option value="">— افتراضي الشركة —</option>
-                {(valuationMethods as ValuationMethod[]).map(m => <option key={m.id} value={m.id}>{m.name} ({m.method})</option>)}
-              </select>
-            </Field>
-          </div>
+          )}
         </div>
 
-        <div style={{ opacity: dis ? 0.4 : 1, pointerEvents: dis ? 'none' : 'auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', marginBottom: 8, textTransform: 'uppercase' }}>تنبيهات المخزون</div>
+        {/* خيارات المخزون */}
+        <div style={{ opacity: stockDisabled ? 0.4 : 1, pointerEvents: stockDisabled ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {[
+              { key: 'allow_negative_stock', label: 'السماح بمخزون سالب', hint: 'يتيح البيع حتى عند نفاد المخزون (للمنتجات المصنوعة عند الطلب)' },
+              { key: 'has_lots',             label: 'إدارة الدفعات (Lots)', hint: 'تتبع دفعات الإنتاج والشراء — لازم لـ FIFO و LIFO' },
+              { key: 'has_expiration_date',  label: 'تتبع تاريخ الصلاحية', hint: 'متاح فقط عند تفعيل إدارة الدفعات' },
+              { key: 'manages_quantity_discounts', label: 'تفعيل خصومات الكمية', hint: 'تحديد خصومات تلقائية عند شراء كميات كبيرة' },
+            ].map(opt => (
+              <div key={opt.key} style={{ ...s.card }}>
+                <Toggle
+                  checked={(form as any)[opt.key]}
+                  onChange={v => { set(opt.key as any, v); }}
+                  label={opt.label}
+                  disabled={opt.key === 'has_expiration_date' && !form.has_lots}
+                />
+                <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 4, marginRight: 44 }}>{opt.hint}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* تنبيهات المخزون */}
+          <div style={s.divider} />
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-alert-triangle" style={{ fontSize: 15, color: '#f59e0b' }} />
+            تنبيهات المخزون
+          </div>
           <div style={s.row2}>
-            <Field label="الحد الأدنى للتنبيه" hint="تنبيه عند الوصول لهذه الكمية">
-              <input type="number" min="0" step="1" style={s.inp()} value={form.min_stock_alert} onChange={e => set('min_stock_alert', e.target.value === '' ? '' : +e.target.value)} />
+            <Field label="الحد الأدنى للتنبيه" hint="تنبيه عند الوصول لهذه الكمية أو ما دونها">
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="number" min="0" step="1"
+                  style={{ ...s.inp(), paddingLeft: 50 }}
+                  value={form.min_stock_alert}
+                  onChange={e => set('min_stock_alert', e.target.value === '' ? '' : +e.target.value)}
+                  placeholder="10"
+                />
+                <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>وحدة</span>
+              </div>
             </Field>
-            <Field label="الحد الأقصى المطلوب" hint="لأغراض الطلب وإعادة التموين">
-              <input type="number" min="0" step="1" style={s.inp()} value={form.max_stock_alert} onChange={e => set('max_stock_alert', e.target.value === '' ? '' : +e.target.value)} />
+            <Field label="الحد الأقصى المخزون" hint="تنبيه عند تجاوز هذه الكمية (اختياري)">
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="number" min="0" step="1"
+                  style={{ ...s.inp(), paddingLeft: 50 }}
+                  value={form.max_stock_alert}
+                  onChange={e => set('max_stock_alert', e.target.value === '' ? '' : +e.target.value)}
+                  placeholder="500"
+                />
+                <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>وحدة</span>
+              </div>
             </Field>
           </div>
+
+          {/* طريقة التقييم */}
+          <div style={s.divider} />
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-calculator" style={{ fontSize: 15, color: 'var(--em)' }} />
+            طريقة تقييم المخزون
+          </div>
+          <Field label="طريقة التقييم" hint="تُستخدم لحساب تكلفة البضاعة المباعة وقيمة المخزون">
+            <select
+              style={s.sel()}
+              value={form.valuation_method_id ?? ''}
+              onChange={e => set('valuation_method_id', e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">— استخدام الإعداد الافتراضي للشركة —</option>
+              {(valuationMethods as ValuationMethod[]).map(vm => (
+                <option key={vm.id} value={vm.id}>{vm.name}{vm.method ? ` (${vm.method})` : ''}</option>
+              ))}
+            </select>
+          </Field>
+
+          {/* مخزون حالي (read-only عند التعديل) */}
+          {isEdit && product?.current_stock !== undefined && (
+            <div style={{ ...s.card, display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: product.is_low_stock ? 'var(--redb)' : 'var(--emb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className={`ti ${product.is_low_stock ? 'ti-alert-triangle' : 'ti-box'}`} style={{ fontSize: 18, color: product.is_low_stock ? 'var(--red)' : 'var(--em)' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--t4)', fontWeight: 600 }}>المخزون الحالي</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: product.is_low_stock ? 'var(--red)' : 'var(--t1)' }}>
+                  {Number(product.current_stock).toFixed(2)}
+                  <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--t4)', marginRight: 4 }}>
+                    {(units as Unit[]).find(u => u.id === form.unit_id)?.symbol ?? 'وحدة'}
+                  </span>
+                </div>
+                {product.is_low_stock && (
+                  <div style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>⚠ أقل من الحد الأدنى!</div>
+                )}
+              </div>
+              <div style={{ marginRight: 'auto', fontSize: 10, color: 'var(--t4)' }}>للقراءة فقط — يتغير عبر حركات المخزون</div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -657,50 +1228,76 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
 
   function renderDiscounts() {
     const lvls = priceLevels as PriceLevel[];
+
+    if (!form.manages_quantity_discounts) {
+      return (
+        <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--t4)' }}>
+          <i className="ti ti-discount-off" style={{ fontSize: 40, opacity: 0.3 }} />
+          <div style={{ marginTop: 12, fontSize: 14, fontWeight: 700 }}>خصومات الكمية معطّلة</div>
+          <div style={{ fontSize: 12, marginTop: 6 }}>فعّل خيار "خصومات الكمية" في تاب المخزون أولاً</div>
+          <button
+            onClick={() => switchTab('stock')}
+            style={{ marginTop: 16, padding: '8px 20px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+          >
+            <i className="ti ti-settings" style={{ marginLeft: 5 }} /> الذهاب لتاب المخزون
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div style={s.section}>
-        <div style={{ padding: '14px 16px', borderRadius: 'var(--r3)', border: '1px solid var(--b2)', background: 'var(--bg3)' }}>
-          <Toggle checked={form.manages_quantity_discounts} onChange={v => set('manages_quantity_discounts', v)} label="تفعيل خصومات الكميات" />
-          <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 4 }}>أسعار خاصة بناءً على الكمية المطلوبة لكل مستوى سعر</div>
+        <SectionHeader icon="ti-discount" title="خصومات الكمية" subtitle="تحديد خصومات تلقائية حسب الكمية المباعة لكل مستوى سعر" />
+
+        <div style={{ fontSize: 12, color: 'var(--t3)', ...s.card }}>
+          <i className="ti ti-info-circle" style={{ fontSize: 13, marginLeft: 5 }} />
+          يمكن تحديد خصم كمبلغ ثابت (دج) أو كنسبة مئوية (%). إذا حُدِّد كلاهما فالأفضلية للنسبة المئوية.
         </div>
 
-        {form.manages_quantity_discounts && lvls.map(pl => {
-          const plDiscounts = form.quantity_discounts.filter(d => d.price_level_id === pl.id);
+        {lvls.map(pl => {
+          const discountsForLevel = form.quantity_discounts.filter(d => d.price_level_id === pl.id);
           return (
-            <div key={pl.id} style={{ border: '1px solid var(--b2)', borderRadius: 'var(--r3)', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg3)', borderBottom: plDiscounts.length ? '1px solid var(--b2)' : 'none' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="ti ti-tag" style={{ fontSize: 14, color: 'var(--em)' }} />
-                  <span style={{ fontSize: 13, fontWeight: 700 }}>{pl.name}</span>
-                  {plDiscounts.length > 0 && (
-                    <span style={{ fontSize: 10, background: 'var(--emb)', color: 'var(--em)', padding: '1px 7px', borderRadius: 12, fontWeight: 700 }}>{plDiscounts.length}</span>
+            <div key={pl.id} style={{ ...s.card }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="ti ti-tag" style={{ fontSize: 15, color: 'var(--em)' }} />
+                  {pl.name}
+                  {discountsForLevel.length > 0 && (
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--emb)', color: 'var(--em)', fontWeight: 700 }}>
+                      {discountsForLevel.length} شرط
+                    </span>
                   )}
                 </div>
-                <button onClick={() => addDiscount(pl.id)} style={{ padding: '5px 12px', borderRadius: 'var(--r1)', border: '1px solid var(--b3)', background: 'transparent', color: 'var(--em)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-                  <i className="ti ti-plus" style={{ fontSize: 12 }} /> إضافة شريحة
+                <button
+                  onClick={() => addDiscount(pl.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  <i className="ti ti-plus" style={{ fontSize: 12 }} /> إضافة شرط
                 </button>
               </div>
 
-              {plDiscounts.length > 0 && (
-                <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '80px 80px 100px 100px auto auto auto', gap: 8, padding: '0 4px' }}>
-                    {['من كمية', 'إلى كمية', 'خصم دج', 'خصم %', 'مجمد', 'نشط', ''].map((h, i) => (
+              {discountsForLevel.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--t4)', textAlign: 'center', padding: '16px 0' }}>لا توجد شروط خصم لهذا المستوى</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '80px 80px 90px 90px 40px 40px auto', gap: 8, padding: '0 4px' }}>
+                    {['من كمية', 'حتى كمية', 'خصم (دج)', 'خصم (%)', 'مجمد', 'نشط', ''].map((h, i) => (
                       <div key={i} style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', textTransform: 'uppercase' }}>{h}</div>
                     ))}
                   </div>
                   {form.quantity_discounts.map((d, idx) => {
                     if (d.price_level_id !== pl.id) return null;
                     return (
-                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '80px 80px 100px 100px auto auto auto', gap: 8, alignItems: 'center', padding: '8px 4px', borderRadius: 'var(--r1)', background: d.is_blocked ? 'var(--bg3)' : undefined, opacity: d.active ? 1 : 0.5 }}>
-                        <input type="number" min="0" step="1" placeholder="1"    style={{ ...s.inp(), fontSize: 12 }} value={d.min_qty} onChange={e => updateDiscount(idx, 'min_qty', e.target.value ? +e.target.value : '')} />
-                        <input type="number" min="0" step="1" placeholder="∞"    style={{ ...s.inp(), fontSize: 12 }} value={d.max_qty ?? ''} onChange={e => updateDiscount(idx, 'max_qty', e.target.value ? +e.target.value : null)} />
-                        <input type="number" min="0" step="0.01" placeholder="دج" style={{ ...s.inp(), fontSize: 12 }} value={d.discount_amount ?? ''} onChange={e => updateDiscount(idx, 'discount_amount', e.target.value ? +e.target.value : null)} />
-                        <input type="number" min="0" max="100" step="0.1" placeholder="%" style={{ ...s.inp(), fontSize: 12 }} value={d.discount_percentage ?? ''} onChange={e => updateDiscount(idx, 'discount_percentage', e.target.value ? +e.target.value : null)} />
-                        <div title="تجميد مؤقت" style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => updateDiscount(idx, 'is_blocked', !d.is_blocked)}>
-                          <i className={`ti ${d.is_blocked ? 'ti-lock' : 'ti-lock-open'}`} style={{ fontSize: 16, color: d.is_blocked ? 'var(--red)' : 'var(--t4)' }} />
+                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '80px 80px 90px 90px 40px 40px auto', gap: 8, alignItems: 'center', padding: '8px', borderRadius: 'var(--r1)', border: '1px solid var(--b1)', background: 'var(--bg2)' }}>
+                        <input type="number" min="1" step="1" placeholder="1" style={{ ...s.inp(), fontSize: 12 }} value={d.min_qty ?? ''} onChange={e => updateDiscount(idx, 'min_qty', e.target.value ? +e.target.value : '')} />
+                        <input type="number" min="1" step="1" placeholder="—" style={{ ...s.inp(), fontSize: 12 }} value={d.max_qty ?? ''} onChange={e => updateDiscount(idx, 'max_qty', e.target.value ? +e.target.value : null)} />
+                        <input type="number" min="0" step="0.01" placeholder="0.00" style={{ ...s.inp(), fontSize: 12 }} value={d.discount_amount ?? ''} onChange={e => updateDiscount(idx, 'discount_amount', e.target.value ? +e.target.value : null)} />
+                        <input type="number" min="0" max="100" step="0.1" placeholder="0.0" style={{ ...s.inp(), fontSize: 12 }} value={d.discount_percentage ?? ''} onChange={e => updateDiscount(idx, 'discount_percentage', e.target.value ? +e.target.value : null)} />
+                        <div style={{ textAlign: 'center', cursor: 'pointer' }} title={d.is_blocked ? 'مجمد — انقر لإلغاء التجميد' : 'انقر للتجميد'} onClick={() => updateDiscount(idx, 'is_blocked', !d.is_blocked)}>
+                          <i className={`ti ${d.is_blocked ? 'ti-lock' : 'ti-lock-open'}`} style={{ fontSize: 15, color: d.is_blocked ? 'var(--red)' : 'var(--t4)' }} />
                         </div>
                         <Toggle checked={d.active} onChange={v => updateDiscount(idx, 'active', v)} label="" />
-                        <button onClick={() => removeDiscount(idx)} style={{ padding: '5px 7px', borderRadius: 'var(--r1)', border: '1px solid var(--b2)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontSize: 13 }}>
+                        <button onClick={() => removeDiscount(idx)} style={{ padding: '5px 7px', borderRadius: 'var(--r1)', border: '1px solid var(--redbo)', background: 'var(--redb)', color: 'var(--red)', cursor: 'pointer', fontSize: 12 }}>
                           <i className="ti ti-trash" />
                         </button>
                       </div>
@@ -717,11 +1314,11 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
 
   function renderDimensions() {
     const dims = [
-      { key: 'weight', label: 'الوزن',    unit: 'كغ', step: '0.001' },
-      { key: 'volume', label: 'الحجم',    unit: 'م³', step: '0.001' },
-      { key: 'length', label: 'الطول',    unit: 'سم', step: '0.1'   },
-      { key: 'width',  label: 'العرض',    unit: 'سم', step: '0.1'   },
-      { key: 'height', label: 'الارتفاع', unit: 'سم', step: '0.1'   },
+      { key: 'weight', label: 'الوزن',    unit: 'كغ',  step: '0.001', hint: 'للشحن والتوصيل' },
+      { key: 'volume', label: 'الحجم',    unit: 'لتر', step: '0.001', hint: 'للسوائل والغازات' },
+      { key: 'length', label: 'الطول',    unit: 'سم',  step: '0.1',  hint: '' },
+      { key: 'width',  label: 'العرض',    unit: 'سم',  step: '0.1',  hint: '' },
+      { key: 'height', label: 'الارتفاع', unit: 'سم',  step: '0.1',  hint: '' },
     ] as const;
 
     function addSpec() {
@@ -730,91 +1327,303 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
       setSpecKey(''); setSpecVal('');
     }
 
+    const volumeFromDimensions = form.length && form.width && form.height
+      ? (Number(form.length) * Number(form.width) * Number(form.height)) / 1_000_000
+      : null;
+
     return (
       <div style={s.section}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <SectionHeader icon="ti-ruler" title="الأبعاد والمواصفات" subtitle="البيانات الفيزيائية للمنتج والخصائص التقنية" />
+
+        <div style={s.row3}>
           {dims.map(d => (
-            <Field key={d.key} label={`${d.label} (${d.unit})`}>
-              <input type="number" step={d.step} min="0" style={s.inp()}
+            <Field key={d.key} label={`${d.label} (${d.unit})`} hint={d.hint}>
+              <input
+                type="number" step={d.step} min="0"
+                style={s.inp()}
                 value={(form as any)[d.key] ?? ''}
                 onChange={e => set(d.key as any, e.target.value === '' ? '' : +e.target.value)}
-                placeholder="0" />
+                placeholder="0"
+              />
             </Field>
           ))}
+          {volumeFromDimensions !== null && (
+            <div style={{ ...s.card, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <i className="ti ti-cube" style={{ fontSize: 16, color: 'var(--blue)' }} />
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>الحجم المحسوب</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--t1)' }}>{volumeFromDimensions.toFixed(4)} م³</div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={s.divider} />
 
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', marginBottom: 8, textTransform: 'uppercase' }}>الخصائص التقنية</div>
-
-          {Object.keys(form.specifications).length === 0 && (
-            <div style={{ fontSize: 12, color: 'var(--t4)', padding: '8px 0 12px', textAlign: 'center' }}>لا توجد خصائص — أضف مثل اللون، المادة، الطاقة...</div>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {Object.entries(form.specifications).map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input style={{ ...s.inp(), flex: 1, fontSize: 12, fontWeight: 600 }} defaultValue={k}
-                  onBlur={e => {
-                    const newKey = e.target.value.trim();
-                    if (!newKey || newKey === k) return;
-                    const sp = { ...form.specifications }; const val = sp[k]; delete sp[k]; sp[newKey] = val;
-                    set('specifications', sp);
-                  }} placeholder="الخاصية" />
-                <input style={{ ...s.inp(), flex: 1, fontSize: 12 }} value={v}
-                  onChange={e => set('specifications', { ...form.specifications, [k]: e.target.value })}
-                  placeholder="القيمة" />
-                <button onClick={() => { const sp = { ...form.specifications }; delete sp[k]; set('specifications', sp); }}
-                  style={{ padding: '6px 8px', border: '1px solid var(--b2)', borderRadius: 'var(--r1)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontSize: 13 }}>
-                  <i className="ti ti-trash" />
-                </button>
-              </div>
-            ))}
+          <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--t2)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-list" style={{ fontSize: 14, color: 'var(--em)' }} />
+            الخصائص التقنية (Specifications)
           </div>
 
+          {Object.keys(form.specifications).length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--t4)', padding: '8px 0 12px', textAlign: 'center' }}>
+              لا توجد خصائص — مثال: اللون، المادة، الطاقة، درجة الحرارة...
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+              {Object.entries(form.specifications).map(([k, v]) => (
+                <div key={k} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+                  <input
+                    style={{ ...s.inp(), fontSize: 12, fontWeight: 600 }}
+                    defaultValue={k}
+                    onBlur={e => {
+                      const nk = e.target.value.trim();
+                      if (!nk || nk === k) return;
+                      const sp = { ...form.specifications };
+                      const val = sp[k]; delete sp[k]; sp[nk] = val;
+                      set('specifications', sp);
+                    }}
+                    placeholder="اسم الخاصية"
+                  />
+                  <input
+                    style={{ ...s.inp(), fontSize: 12 }}
+                    value={v}
+                    onChange={e => set('specifications', { ...form.specifications, [k]: e.target.value })}
+                    placeholder="القيمة"
+                  />
+                  <button
+                    onClick={() => { const sp = { ...form.specifications }; delete sp[k]; set('specifications', sp); }}
+                    style={{ padding: '6px 8px', border: '1px solid var(--redbo)', borderRadius: 'var(--r1)', background: 'var(--redb)', color: 'var(--red)', cursor: 'pointer', fontSize: 13 }}
+                  ><i className="ti ti-trash" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* إضافة خاصية */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 10, padding: '10px 12px', borderRadius: 'var(--r2)', border: '1px dashed var(--b3)', background: 'var(--bg3)' }}>
-            <input placeholder="الخاصية (مثال: اللون)" style={{ ...s.inp(), flex: 1, fontSize: 12, background: 'var(--bg2)' }}
-              value={specKey} onChange={e => setSpecKey(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addSpec(); }} />
-            <input placeholder="القيمة (مثال: أحمر)" style={{ ...s.inp(), flex: 1, fontSize: 12, background: 'var(--bg2)' }}
-              value={specVal} onChange={e => setSpecVal(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addSpec(); }} />
-            <button onClick={addSpec} style={{ padding: '7px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          <div style={{ display: 'flex', gap: 8, padding: '10px 12px', borderRadius: 'var(--r2)', border: '1px dashed var(--b3)', background: 'var(--bg3)' }}>
+            <input
+              placeholder="الخاصية (مثال: اللون)"
+              style={{ ...s.inp(), flex: 1, fontSize: 12, background: 'var(--bg2)' }}
+              value={specKey}
+              onChange={e => setSpecKey(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addSpec()}
+            />
+            <input
+              placeholder="القيمة (مثال: أحمر)"
+              style={{ ...s.inp(), flex: 1, fontSize: 12, background: 'var(--bg2)' }}
+              value={specVal}
+              onChange={e => setSpecVal(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addSpec()}
+            />
+            <button
+              onClick={addSpec}
+              disabled={!specKey.trim() || !specVal.trim()}
+              style={{ padding: '7px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (!specKey.trim() || !specVal.trim()) ? 0.5 : 1 }}
+            >
               <i className="ti ti-plus" /> إضافة
             </button>
           </div>
-          <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 4 }}>اضغط Enter لإضافة الخاصية بسرعة</div>
+          <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 4 }}>اضغط Enter لإضافة الخاصية مباشرة</div>
         </div>
       </div>
     );
   }
 
-  function renderMeta() {
+  function renderImages() {
     return (
       <div style={s.section}>
-        <Field label="slug الرابط" hint="يُولّد تلقائياً من الاسم — يمكن تخصيصه">
-          <input style={{ ...s.inp(), direction: 'ltr', fontFamily: 'monospace' }} value={form.slug} onChange={e => set('slug', e.target.value)} placeholder="my-product" />
-        </Field>
-        <div style={{ fontSize: 11, color: 'var(--t4)', padding: '12px 14px', borderRadius: 'var(--r2)', background: 'var(--bg3)', border: '1px solid var(--b2)', lineHeight: 1.7 }}>
-          <i className="ti ti-info-circle" style={{ fontSize: 14, marginLeft: 6 }} />
-          حقول <strong>meta_title</strong> و <strong>meta_description</strong> و <strong>meta_keywords</strong> تُعدل مستقبلاً عبر واجهة متخصصة.
+        <SectionHeader icon="ti-photo" title="صور المنتج" subtitle="إضافة روابط صور المنتج (URL)" />
+
+        {/* إضافة صورة بـ URL */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            style={{ ...s.inp(), flex: 1, direction: 'ltr', fontFamily: 'monospace', fontSize: 12 }}
+            value={imageInput}
+            onChange={e => setImageInput(e.target.value)}
+            placeholder="https://example.com/image.jpg"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && imageInput.trim()) {
+                set('images', [...form.images, imageInput.trim()]);
+                setImageInput('');
+              }
+            }}
+          />
+          <button
+            disabled={!imageInput.trim()}
+            onClick={() => { if (imageInput.trim()) { set('images', [...form.images, imageInput.trim()]); setImageInput(''); } }}
+            style={{ padding: '7px 16px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: !imageInput.trim() ? 0.5 : 1 }}
+          >
+            <i className="ti ti-plus" /> إضافة
+          </button>
         </div>
+
+        {form.images.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--t4)' }}>
+            <i className="ti ti-photo-off" style={{ fontSize: 40, opacity: 0.3 }} />
+            <div style={{ marginTop: 12, fontSize: 13 }}>لا توجد صور</div>
+            <div style={{ fontSize: 11, marginTop: 4 }}>أضف روابط الصور أعلاه</div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+              {form.images.map((img, idx) => (
+                <div key={idx} style={{ position: 'relative', borderRadius: 'var(--r3)', overflow: 'hidden', border: '1px solid var(--b2)', background: 'var(--bg3)', aspectRatio: '1' }}>
+                  <img
+                    src={img}
+                    alt={`صورة ${idx + 1}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={e => { (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YwZjRmYSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzhhYTRjMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+644KY7Zy6PC90ZXh0Pjwvc3ZnPg=='; }}
+                  />
+                  {/* Overlay */}
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.55)', opacity: 0, transition: 'opacity .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
+                  >
+                    <a href={img} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,.15)', color: '#fff', textDecoration: 'none', fontSize: 13 }}>
+                      <i className="ti ti-external-link" />
+                    </a>
+                    <button
+                      onClick={() => set('images', form.images.filter((_, i) => i !== idx))}
+                      style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(212,43,43,.8)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13 }}
+                    ><i className="ti ti-trash" /></button>
+                  </div>
+                  {/* رقم الصورة */}
+                  <div style={{ position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,.6)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {idx + 1}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <i className="ti ti-info-circle" style={{ fontSize: 13 }} />
+              {form.images.length} صورة — الصورة الأولى هي الصورة الرئيسية.
+              مرر الماوس على الصورة لحذفها أو فتحها.
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // ═════════════════════════════════════════
-  // MODAL RENDER
-  // ═════════════════════════════════════════
+  function renderSEO() {
+    const kwArray = form.meta_keywords;
 
+    function addKw() {
+      const kw = kwInput.trim();
+      if (!kw || kwArray.includes(kw)) { setKwInput(''); return; }
+      set('meta_keywords', [...kwArray, kw]);
+      setKwInput('');
+    }
+
+    function removeKw(kw: string) {
+      set('meta_keywords', kwArray.filter(k => k !== kw));
+    }
+
+    return (
+      <div style={s.section}>
+        <SectionHeader icon="ti-world" title="SEO والـ Slug" subtitle="تحسين ظهور المنتج في محركات البحث والروابط الداخلية" />
+
+        {/* Slug (قابل للتعديل هنا أيضاً) */}
+        <Field label="Slug الرابط" hint="يظهر في رابط URL المنتج — أحرف صغيرة وشرطات فقط">
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              style={{ ...s.inp(), direction: 'ltr', fontFamily: 'monospace', fontSize: 12, flex: 1 }}
+              value={form.slug}
+              onChange={e => { slugEdited.current = true; set('slug', e.target.value); }}
+              placeholder="my-product-name"
+            />
+            <button
+              type="button"
+              onClick={() => { slugEdited.current = false; set('slug', slugify(form.name)); }}
+              style={{ padding: '7px 10px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'var(--bg3)', color: 'var(--t3)', cursor: 'pointer', fontSize: 11 }}
+              title="إعادة توليد من الاسم"
+            ><i className="ti ti-refresh" style={{ fontSize: 13 }} /></button>
+          </div>
+        </Field>
+
+        <Field label="عنوان SEO (meta_title)" hint={`يُستخدم في علامة <title> وبطاقة المشاركة — يُفضَّل 50-60 حرف (${form.meta_title.length}/60)`}>
+          <input
+            style={{ ...s.inp(), ...(form.meta_title.length > 60 ? { borderColor: '#f59e0b' } : {}) }}
+            value={form.meta_title}
+            onChange={e => set('meta_title', e.target.value)}
+            placeholder="مثال: حليب نصف دسم 1 لتر — أفضل سعر بالجزائر"
+          />
+        </Field>
+
+        <Field label="وصف SEO (meta_description)" hint={`يظهر في نتائج البحث — يُفضَّل 120-160 حرف (${form.meta_description.length}/160)`}>
+          <textarea
+            style={{
+              ...s.inp(), resize: 'vertical', minHeight: 80,
+              ...(form.meta_description.length > 160 ? { borderColor: '#f59e0b' } : {}),
+            }}
+            value={form.meta_description}
+            onChange={e => set('meta_description', e.target.value)}
+            placeholder="وصف موجز يظهر في نتائج Google وبطاقات المشاركة على الشبكات الاجتماعية..."
+          />
+        </Field>
+
+        <Field label="الكلمات المفتاحية (meta_keywords)" hint="أضف كلمات مفتاحية مرتبطة بالمنتج — اضغط Enter أو الفاصلة للإضافة">
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              style={{ ...s.inp(), flex: 1 }}
+              value={kwInput}
+              onChange={e => setKwInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addKw(); } }}
+              placeholder="حليب، منتجات غذائية، جزائر..."
+            />
+            <button
+              disabled={!kwInput.trim()}
+              onClick={addKw}
+              style={{ padding: '7px 12px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, cursor: 'pointer', opacity: !kwInput.trim() ? 0.5 : 1 }}
+            ><i className="ti ti-plus" /></button>
+          </div>
+          {kwArray.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {kwArray.map(kw => (
+                <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 20, background: 'var(--emb)', border: '1px solid var(--embo)', color: 'var(--em)', fontSize: 12, fontWeight: 600 }}>
+                  {kw}
+                  <button onClick={() => removeKw(kw)} style={{ background: 'none', border: 'none', color: 'var(--em)', cursor: 'pointer', padding: '0 0 0 2px', fontSize: 12, display: 'flex', alignItems: 'center' }}>
+                    <i className="ti ti-x" style={{ fontSize: 11 }} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </Field>
+
+        {/* معاينة بطاقة Google */}
+        {(form.meta_title || form.meta_description || form.name) && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', marginBottom: 8, textTransform: 'uppercase' }}>معاينة نتيجة Google</div>
+            <div style={{ padding: 14, borderRadius: 'var(--r3)', border: '1px solid var(--b2)', background: 'var(--bg2)', maxWidth: 600 }}>
+              <div style={{ fontSize: 14, color: '#1a0dab', fontWeight: 400, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {form.meta_title || form.name}
+              </div>
+              <div style={{ fontSize: 12, color: '#006621', marginBottom: 4 }}>www.example.com › {form.slug || 'product-slug'}</div>
+              <div style={{ fontSize: 13, color: '#545454', lineHeight: 1.6 }}>
+                {form.meta_description || form.description || 'لا يوجد وصف — أضف meta_description لتحسين ظهور المنتج.'}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── tabContent map ──
   const tabContent: Record<TabId, () => React.ReactNode> = {
     basic: renderBasic, pricing: renderPricing, packagings: renderPackagings,
-    stock: renderStock, discounts: renderDiscounts, dimensions: renderDimensions, meta: renderMeta,
+    stock: renderStock, discounts: renderDiscounts, dimensions: renderDimensions,
+    images: renderImages, seo: renderSEO,
   };
 
   const currentTabIdx = TAB_IDS.indexOf(activeTab);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════════════════
 
   const ovStyle: React.CSSProperties = {
     position: 'fixed', inset: 0, zIndex: 9000,
@@ -822,81 +1631,114 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     alignItems: 'flex-end', justifyContent: 'center',
     background: open ? 'rgba(0,0,0,.5)' : 'transparent',
     backdropFilter: open ? 'blur(3px)' : 'none',
-    paddingTop: '5vh',
-    pointerEvents: open ? 'auto' : 'none' as any,
+    paddingTop: '4vh',
+    pointerEvents: open ? 'auto' : 'none',
     opacity: open ? 1 : 0,
     transition: 'opacity .25s, background .25s',
   };
 
   return (
-    <div
-      style={ovStyle}
-      onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
-    >
+    <div style={ovStyle} onClick={e => { if (e.target === e.currentTarget) handleClose(); }}>
       <div style={{
-        width: '100%', maxWidth: 840,
+        width: '100%', maxWidth: 900,
         background: 'var(--bg1)',
-        borderRadius: '14px 14px 0 0',
-        boxShadow: '0 -8px 48px rgba(0,0,0,.22)',
+        borderRadius: '16px 16px 0 0',
+        boxShadow: '0 -8px 64px rgba(0,0,0,.25)',
         display: 'flex', flexDirection: 'column',
-        // ✅ ارتفاع ثابت = لا يتغير بتبديل التاب
-        height: '95vh',
-        overflow: 'hidden',
+        height: '96vh', overflow: 'hidden',
       }}>
 
         {/* ══ HEADER ══ */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 20px', borderBottom: '1px solid var(--b2)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--emb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 20px', borderBottom: '1px solid var(--b2)', flexShrink: 0, background: 'var(--bg2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--emb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid var(--embo)' }}>
               <i className="ti ti-package" style={{ fontSize: 20, color: 'var(--em)' }} />
             </div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)', lineHeight: 1.2 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 8 }}>
                 {isEdit ? 'تعديل المنتج' : 'منتج جديد'}
+                {isDirty && (
+                  <span style={{ fontSize: 10, background: '#f59e0b', color: '#fff', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>غير محفوظ</span>
+                )}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 2 }}>
                 {form.name.trim()
-                  ? <span style={{ color: form.purchase_price_ht !== '' ? 'var(--em)' : '#f59e0b', fontWeight: 600 }}>{form.name.length > 32 ? form.name.slice(0, 32) + '…' : form.name}</span>
+                  ? <span style={{ color: 'var(--em)', fontWeight: 600 }}>{form.name.length > 40 ? form.name.slice(0, 40) + '…' : form.name}</span>
                   : <span>بدون اسم</span>
                 }
-                {/* ✅ شارة "غير محفوظ" */}
-                {isDirty && (
-                  <span style={{ fontSize: 10, background: '#f59e0b', color: '#fff', padding: '1px 7px', borderRadius: 10, fontWeight: 700 }}>غير محفوظ</span>
-                )}
+                {form.ref && <span style={{ color: 'var(--t4)', marginRight: 8 }}>#{form.ref}</span>}
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* ✅ Keyboard hint */}
-            <div style={{ fontSize: 10, color: 'var(--t4)', background: 'var(--bg3)', padding: '3px 8px', borderRadius: 6, border: '1px solid var(--b2)' }}>
-              Ctrl+S للحفظ
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* شريط الاكتمال */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
+              <div style={{ fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>اكتمال النموذج</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 80, height: 5, borderRadius: 3, background: 'var(--b2)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 3, transition: 'width .3s',
+                    background: completeness >= 80 ? 'var(--green)' : completeness >= 50 ? '#f59e0b' : 'var(--red)',
+                    width: `${completeness}%`,
+                  }} />
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 700, color: completeness >= 80 ? 'var(--green)' : completeness >= 50 ? '#f59e0b' : 'var(--red)' }}>
+                  {completeness}%
+                </span>
+              </div>
             </div>
-            <button onClick={handleClose} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--t3)' }}>
+
+            <div style={{ width: 1, height: 28, background: 'var(--b2)' }} />
+
+            {/* Keyboard hint */}
+            <div style={{ fontSize: 10, color: 'var(--t4)', background: 'var(--bg3)', padding: '3px 8px', borderRadius: 6, border: '1px solid var(--b2)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <i className="ti ti-keyboard" style={{ fontSize: 11 }} /> Ctrl+S
+            </div>
+
+            {/* زر الإغلاق */}
+            <button
+              onClick={handleClose}
+              style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--b2)', background: 'var(--bg3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--t3)', transition: 'all .15s' }}
+              title="إغلاق (Esc)"
+            >
               <i className="ti ti-x" style={{ fontSize: 16 }} />
             </button>
           </div>
         </div>
 
         {/* ══ TABS ══ */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--b2)', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none' }}>
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--b2)', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none', background: 'var(--bg2)' }}>
           {TABS.map(tab => {
             const isActive = activeTab === tab.id;
             const dot      = tabDot(tab.id);
             const badge    = tabBadge(tab.id);
             return (
-              <button key={tab.id} onClick={() => switchTab(tab.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '11px 14px', fontSize: 12, fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--em)' : 'var(--t3)', background: 'transparent', border: 'none', borderBottom: `2px solid ${isActive ? 'var(--em)' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color .15s, border-color .15s' }}>
+              <button
+                key={tab.id}
+                onClick={() => switchTab(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '11px 16px', fontSize: 12,
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? 'var(--em)' : 'var(--t3)',
+                  background: isActive ? 'var(--emb)' : 'transparent',
+                  border: 'none',
+                  borderBottom: `2px solid ${isActive ? 'var(--em)' : 'transparent'}`,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  transition: 'color .15s, border-color .15s, background .15s',
+                }}
+              >
                 <i className={`ti ${tab.icon}`} style={{ fontSize: 14 }} />
                 {tab.label}
-                {/* ✅ عداد */}
-                {badge !== null && (
+                {badge !== null ? (
                   <span style={{ fontSize: 10, background: isActive ? 'var(--em)' : 'var(--b3)', color: isActive ? '#fff' : 'var(--t3)', padding: '0 5px', borderRadius: 10, fontWeight: 700, minWidth: 16, textAlign: 'center', lineHeight: '16px', height: 16 }}>
                     {badge}
                   </span>
-                )}
-                {/* نقطة الحالة */}
-                {dot !== 'empty' && badge === null && (
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor(dot), flexShrink: 0 }} />
+                ) : (
+                  dot !== 'empty' && (
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor(dot), flexShrink: 0 }} />
+                  )
                 )}
               </button>
             );
@@ -904,13 +1746,20 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         </div>
 
         {/* ══ BODY ══ */}
-        <div ref={bodyRef} style={{ flex: 1, overflowY: 'auto', padding: '20px', scrollbarWidth: 'thin' }}>
-          {/* ✅ API Error مع زر إغلاق */}
+        <div ref={bodyRef} style={{ flex: 1, overflowY: 'auto', padding: '20px', scrollbarWidth: 'thin', background: 'var(--bg1)' }}>
+          {/* Loading Lookups */}
+          {lookupsLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 'var(--r2)', background: 'var(--emb)', marginBottom: 16, fontSize: 12, color: 'var(--em)' }}>
+              <i className="ti ti-loader" style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} />
+              جاري تحميل البيانات...
+            </div>
+          )}
+          {/* API Error */}
           {apiError && (
-            <div style={{ padding: '10px 14px', borderRadius: 'var(--r2)', marginBottom: 16, background: 'rgba(255,80,80,.08)', border: '1px solid rgba(255,80,80,.3)', color: 'var(--red)', fontSize: 13, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <div style={{ padding: '10px 14px', borderRadius: 'var(--r2)', marginBottom: 16, background: 'var(--redb)', border: '1px solid var(--redbo)', color: 'var(--red)', fontSize: 13, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <i className="ti ti-alert-circle" style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }} />
               <span style={{ flex: 1 }}>{apiError}</span>
-              <button onClick={() => setApiError('')} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.7 }}>
+              <button onClick={() => setApiError('')} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
                 <i className="ti ti-x" />
               </button>
             </div>
@@ -920,31 +1769,74 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
 
         {/* ══ FOOTER ══ */}
         <div style={{ padding: '11px 20px', borderTop: '1px solid var(--b2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, background: 'var(--bg2)' }}>
-          {/* ملخص */}
-          <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--t4)', flexWrap: 'wrap' }}>
-            {form.name.trim() && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><i className="ti ti-check" style={{ fontSize: 12, color: 'var(--green)' }} /> اسم</span>}
-            {form.purchase_price_ht !== '' && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><i className="ti ti-check" style={{ fontSize: 12, color: 'var(--green)' }} /> {fmtDZD(form.purchase_price_ht)}</span>}
-            {form.prices.some(p => p.price !== '' || p.rate !== '' || p.margin !== '') && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><i className="ti ti-check" style={{ fontSize: 12, color: 'var(--green)' }} /> {form.prices.filter(p => p.price !== '' || p.rate !== '' || p.margin !== '').length} أسعار</span>}
-            {form.packagings.length > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><i className="ti ti-check" style={{ fontSize: 12, color: 'var(--green)' }} /> {form.packagings.length} تعبئة</span>}
+          {/* ملخص سريع */}
+          <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--t4)', flexWrap: 'wrap', alignItems: 'center' }}>
+            {form.name.trim() && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--green)' }}>
+                <i className="ti ti-check" style={{ fontSize: 12 }} /> اسم
+              </span>
+            )}
+            {form.purchase_price_ht !== '' && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--green)' }}>
+                <i className="ti ti-check" style={{ fontSize: 12 }} /> {fmtDZD(form.purchase_price_ht)}
+              </span>
+            )}
+            {form.prices.filter(p => p.price !== '' || p.rate !== '' || p.margin !== '').length > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--green)' }}>
+                <i className="ti ti-check" style={{ fontSize: 12 }} /> {form.prices.filter(p => p.price !== '' || p.rate !== '' || p.margin !== '').length} أسعار
+              </span>
+            )}
+            {form.packagings.length > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--green)' }}>
+                <i className="ti ti-check" style={{ fontSize: 12 }} /> {form.packagings.length} تعبئة
+              </span>
+            )}
+            {form.images.length > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--green)' }}>
+                <i className="ti ti-check" style={{ fontSize: 12 }} /> {form.images.length} صور
+              </span>
+            )}
           </div>
 
-          {/* ✅ أزرار التنقل + الحفظ */}
+          {/* أزرار التنقل + الحفظ */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             {currentTabIdx > 0 && (
-              <button onClick={() => switchTab(TAB_IDS[currentTabIdx - 1])} style={{ padding: '7px 13px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'transparent', color: 'var(--t3)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Tajawal, inherit' }}>
+              <button
+                onClick={() => switchTab(TAB_IDS[currentTabIdx - 1])}
+                style={{ padding: '7px 13px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'transparent', color: 'var(--t3)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Tajawal, inherit' }}
+              >
                 <i className="ti ti-chevron-right" style={{ fontSize: 13 }} /> السابق
               </button>
             )}
             {currentTabIdx < TAB_IDS.length - 1 && (
-              <button onClick={() => switchTab(TAB_IDS[currentTabIdx + 1])} style={{ padding: '7px 13px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'var(--bg3)', color: 'var(--t2)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Tajawal, inherit' }}>
+              <button
+                onClick={() => switchTab(TAB_IDS[currentTabIdx + 1])}
+                style={{ padding: '7px 13px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'var(--bg3)', color: 'var(--t2)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Tajawal, inherit' }}
+              >
                 التالي <i className="ti ti-chevron-left" style={{ fontSize: 13 }} />
               </button>
             )}
             <div style={{ width: 1, height: 22, background: 'var(--b2)', margin: '0 2px' }} />
-            <button onClick={handleClose} disabled={mutation.isPending} style={{ padding: '8px 16px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'transparent', color: 'var(--t3)', fontSize: 13, cursor: 'pointer', fontFamily: 'Tajawal, inherit' }}>
+            <button
+              onClick={handleClose}
+              disabled={mutation.isPending}
+              style={{ padding: '8px 16px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'transparent', color: 'var(--t3)', fontSize: 13, cursor: 'pointer', fontFamily: 'Tajawal, inherit' }}
+            >
               إلغاء
             </button>
-            <button onClick={handleSubmit} disabled={mutation.isPending} style={{ padding: '8px 22px', borderRadius: 'var(--r2)', border: 'none', background: mutation.isPending ? 'var(--b3)' : 'var(--em)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: mutation.isPending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'Tajawal, inherit', transition: 'background .15s', boxShadow: mutation.isPending ? 'none' : '0 2px 8px rgba(0,0,0,.15)' }}>
+            <button
+              onClick={handleSubmit}
+              disabled={mutation.isPending}
+              style={{
+                padding: '8px 24px', borderRadius: 'var(--r2)', border: 'none',
+                background: mutation.isPending ? 'var(--b3)' : 'var(--em)',
+                color: '#fff', fontSize: 13, fontWeight: 700,
+                cursor: mutation.isPending ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8,
+                fontFamily: 'Tajawal, inherit', transition: 'background .15s',
+                boxShadow: mutation.isPending ? 'none' : '0 2px 8px rgba(10,138,92,.3)',
+              }}
+            >
               {mutation.isPending
                 ? <><i className="ti ti-loader" style={{ fontSize: 15, animation: 'spin 1s linear infinite' }} /> جاري الحفظ...</>
                 : <><i className="ti ti-device-floppy" style={{ fontSize: 15 }} /> {isEdit ? 'حفظ التعديلات' : 'إنشاء المنتج'}</>

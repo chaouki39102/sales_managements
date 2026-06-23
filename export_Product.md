@@ -1,9 +1,9 @@
 # Module Export: Product
-Generated at: 2026-06-22 12:12:29
+Generated at: 2026-06-23 22:50:04
 
 ## Models
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\Product.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\Product.php
 ```php
 <?php
 
@@ -337,7 +337,7 @@ class Product extends Model
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductLot.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductLot.php
 ```php
 <?php
 
@@ -440,7 +440,7 @@ class ProductLot extends Model
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductPackaging.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductPackaging.php
 ```php
 <?php
 
@@ -496,7 +496,7 @@ class ProductPackaging extends Model
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductPrice.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductPrice.php
 ```php
 <?php
 
@@ -562,7 +562,7 @@ class ProductPrice extends Model
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductType.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductType.php
 ```php
 <?php
 
@@ -615,7 +615,7 @@ class ProductType extends Model
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductVariant.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductVariant.php
 ```php
 <?php
 
@@ -712,7 +712,7 @@ class ProductVariant extends Model
 
 ## Controllers
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\ProductController.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\ProductController.php
 ```php
 <?php
 
@@ -784,6 +784,7 @@ class ProductController extends BaseApiController
             'default_per_page'=> Product::$defaultPerPage ?? 15,
             'per_page_limit'  => Product::$perPageLimit ?? 100,
             'cache_tags'      => ['products'],
+
         ];
     }
 
@@ -802,7 +803,7 @@ class ProductController extends BaseApiController
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\ProductLotController.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\ProductLotController.php
 ```php
 <?php
 
@@ -858,7 +859,7 @@ class ProductLotController extends BaseApiController
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\ProductTypeController.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\ProductTypeController.php
 ```php
 <?php
 
@@ -891,7 +892,7 @@ class ProductTypeController extends BaseApiController
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\ProductVariantController.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\ProductVariantController.php
 ```php
 <?php
 
@@ -990,7 +991,7 @@ class ProductVariantController extends BaseApiController
 
 ## Services
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductLotService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductLotService.php
 ```php
 <?php
 
@@ -1007,7 +1008,7 @@ class ProductLotService extends \App\Core\Services\BaseService
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductService.php
 ```php
 <?php
 
@@ -1291,7 +1292,7 @@ class ProductService extends \App\Core\Services\BaseService
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductSuggestionService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductSuggestionService.php
 ```php
 <?php
 
@@ -1379,7 +1380,7 @@ class ProductSuggestionService
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductTypeService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductTypeService.php
 ```php
 <?php
 
@@ -1396,7 +1397,7 @@ class ProductTypeService extends \App\Core\Services\BaseService
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductVariantService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductVariantService.php
 ```php
 <?php
 
@@ -1474,7 +1475,7 @@ class ProductVariantService extends BaseService
 
 ## Requests
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\Productlotrequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\Productlotrequest.php
 ```php
 <?php
 
@@ -1570,7 +1571,7 @@ class UpdateProductLotRequest extends FormRequest
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreProductLotRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreProductLotRequest.php
 ```php
 <?php
 
@@ -1631,7 +1632,7 @@ class StoreProductLotRequest extends FormRequest
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreProductRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreProductRequest.php
 ```php
 <?php
 
@@ -1770,7 +1771,7 @@ class StoreProductRequest extends FormRequest
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreProductVariantRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreProductVariantRequest.php
 ```php
 <?php
 
@@ -1808,7 +1809,7 @@ class StoreProductVariantRequest extends FormRequest
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateProductLotRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateProductLotRequest.php
 ```php
 <?php
 
@@ -1857,7 +1858,7 @@ class UpdateProductLotRequest extends FormRequest
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateProductRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateProductRequest.php
 ```php
 <?php
 
@@ -1986,7 +1987,7 @@ class UpdateProductRequest extends FormRequest
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateProductVariantRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateProductVariantRequest.php
 ```php
 <?php
 
@@ -2026,7 +2027,7 @@ class UpdateProductVariantRequest extends FormRequest
 
 ## Policies
 
-### 📁 D:\xampp\htdocs\sales-management\app\Policies\ProductLotPolicy.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Policies\ProductLotPolicy.php
 ```php
 <?php
 
@@ -2076,7 +2077,7 @@ class ProductLotPolicy
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Policies\ProductPolicy.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Policies\ProductPolicy.php
 ```php
 <?php
 
@@ -2126,7 +2127,7 @@ class ProductPolicy
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Policies\ProductTypePolicy.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Policies\ProductTypePolicy.php
 ```php
 <?php
 
@@ -2176,7 +2177,7 @@ class ProductTypePolicy
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Policies\ProductVariantPolicy.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Policies\ProductVariantPolicy.php
 ```php
 <?php
 
@@ -2218,7 +2219,7 @@ class ProductVariantPolicy
 
 ## Migrations
 
-### 📁 D:\xampp\htdocs\sales-management\database\migrations/2025_10_15_093205_create_product_types_table.php
+### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2025_10_15_093205_create_product_types_table.php
 ```php
 <?php
 
@@ -2248,7 +2249,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\database\migrations/2025_10_15_093308_create_products_table.php
+### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2025_10_15_093308_create_products_table.php
 ```php
 <?php
 
@@ -2316,7 +2317,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_04_28_184027_create_product_packagings_table.php
+### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_04_28_184027_create_product_packagings_table.php
 ```php
 <?php
 
@@ -2352,7 +2353,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_04_28_184054_create_product_prices_table.php
+### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_04_28_184054_create_product_prices_table.php
 ```php
 <?php
 
@@ -2390,7 +2391,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_04_28_184501_create_product_lots_table.php
+### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_04_28_184501_create_product_lots_table.php
 ```php
 <?php
 
@@ -2448,7 +2449,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_05_02_084253_create_product_variants_table.php
+### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_05_02_084253_create_product_variants_table.php
 ```php
 <?php
 
@@ -2492,7 +2493,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_06_20_230508_add_min_margin_percentage_to_products_table.php
+### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_06_20_230508_add_min_margin_percentage_to_products_table.php
 ```php
 <?php
 

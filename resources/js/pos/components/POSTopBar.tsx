@@ -9,6 +9,8 @@ interface POSTopBarProps {
   onReceipt: () => void; onSession: () => void; onFullscreen: () => void;
   onKbHelp: () => void; onToggleQuickbar: () => void;
   onReturn: () => void;
+  onKioskMode: () => void;
+  onSettings: () => void;
   items: CartItem[]; totals: CartTotals; totalTtcFinal: number;
 }
 
@@ -16,7 +18,7 @@ export default function POSTopBar({
   sessionInvoices, sessionSales, heldCount, avgMargin,
   isEmpty, isFullscreen, showQuickbar,
   onHeld, onNewSale, onManual, onReceipt, onSession, onFullscreen, onKbHelp,
-  onToggleQuickbar, onReturn, items, totals, totalTtcFinal,
+  onToggleQuickbar, onReturn, onKioskMode, onSettings, items, totals, totalTtcFinal,
 }: POSTopBarProps) {
   return (
     <div className="pos-topbar">
@@ -105,8 +107,17 @@ export default function POSTopBar({
         <button className="pos-tool-icon" onClick={onKbHelp} title="اختصارات لوحة المفاتيح — F1">
           <i className="ti ti-keyboard" />
         </button>
+        <div className="pos-tool-sep" />
+        <button className="pos-tool-icon" onClick={onSettings} title="إعدادات نقطة البيع">
+          <i className="ti ti-settings-2" />
+        </button>
         <button className="pos-tool-icon" onClick={onReturn} title="مرتجع مبيعات — F10">
           <i className="ti ti-receipt-refund" />
+        </button>
+        <div className="pos-tool-sep" />
+        <button className="pos-tool-btn" onClick={onKioskMode} title="وضع الكاشير">
+          <i className="ti ti-device-ipad-horizontal" />
+          <span>كاشير</span>
         </button>
       </div>
 
