@@ -190,11 +190,12 @@ export default function POSPage() {
   const allVariants: ProductVariant[] = useMemo(() =>
     rawProducts.map(p => {
       const v = productToVariant(p);
+      const deduction = stockDeductions[p.id] ?? 0;
       const stock = stockData[p.id];
-      if (stock !== undefined) v.current_stock = stock;
+      if (stock !== undefined) v.current_stock = Math.max(0, stock - deduction);
       return v;
     }),
-    [rawProducts, stockData],
+    [rawProducts, stockData, stockDeductions],
   );
 
   const families = useMemo(() => Array.from(
@@ -221,6 +222,16 @@ export default function POSPage() {
   }, [allVariants, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
 
   const isEmpty = pos.items.length === 0;
+
+  // ── Optimistic stock deductions ──────────────────────────────────────────
+  // يُحتسب من السلة مباشرة — يتناقص المخزون فوراً عند إضافة صنف
+  const stockDeductions = useMemo(() => {
+    const d: Record<number, number> = {};
+    pos.items.forEach(i => {
+      d[i.product_id] = (d[i.product_id] ?? 0) + i.quantity;
+    });
+    return d;
+  }, [pos.items]);
 
   // ── Invoice discount ───────────────────────────────────────────────────────
   const invoiceDiscountPct    = pos.invoiceDiscountPct;
@@ -425,7 +436,11 @@ export default function POSPage() {
         payments: apiPayments,
       });
 
-      pos.incrementSession(snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp);
+      pos.incrementSession({
+        amount:   snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp,
+        payments: params.payments,
+        items:    snapshot.items,
+      });
       setReceiptSnapshot({ items: snapshot.items, totals: snapshot.totals, docNum: res.document_number });
       setLastDocNum(res.document_number);
       setCartNote('');
@@ -622,9 +637,21 @@ export default function POSPage() {
       )}
       {modal === 'session' && (
         <SessionStatsModal
-          sessionInvoices={pos.sessionInvoices} sessionSales={pos.sessionSales}
-          heldCount={pos.heldCarts.length} avgMargin={avgMargin}
+          sessionInvoices={pos.sessionInvoices}
+          sessionSales={pos.sessionSales}
+          highestInvoice={pos.highestInvoice}
+          invoiceTotals={pos.invoiceTotals}
+          paymentsBreakdown={pos.paymentsBreakdown}
+          productsSold={pos.productsSold}
+          paymentModes={paymentModes ?? []}
+          heldCount={pos.heldCarts.length}
+          avgMargin={avgMargin}
           onClose={() => setModal('none')}
+          onEndSession={() => {
+            pos.endSession();
+            setModal('none');
+            toast.success('✅ تم إنهاء الجلسة');
+          }}
         />
       )}
       {modal === 'kbhelp' && <KeyboardHelpModal onClose={() => setModal('none')} />}

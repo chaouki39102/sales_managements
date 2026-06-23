@@ -81,6 +81,7 @@ export default function ProductGrid({
               const inCart    = inCartQty(v.id);
               const lowStock  = v.manages_stock && (v.current_stock ?? 0) > 0 && (v.current_stock ?? 0) <= (v.min_stock_alert ?? 0);
               const outStock  = v.manages_stock && (v.current_stock ?? 0) <= 0;
+              const lastPiece = v.manages_stock && (v.current_stock ?? 0) > 0 && (v.current_stock ?? 0) <= 2 && !lowStock;
               return (
                 <tr
                   key={v.id}
@@ -97,7 +98,7 @@ export default function ProductGrid({
                   <td className="prow-ttc">{formatDZD(priceTtc)}</td>
                   <td className="prow-stock">
                     {v.manages_stock
-                      ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : 'ok'}`}>{v.current_stock ?? 0}</span>
+                      ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : lastPiece ? 'last' : 'ok'}`}>{v.current_stock ?? 0}</span>
                       : <span className="stock-pill na">—</span>
                     }
                   </td>
@@ -149,6 +150,7 @@ export default function ProductGrid({
           const stock    = v.current_stock ?? 0;
           const outStock = v.manages_stock && stock <= 0 && !v.allow_negative_stock;
           const lowStock = v.manages_stock && stock > 0 && stock <= (v.min_stock_alert ?? 0);
+          const lastPiece = v.manages_stock && stock > 0 && stock <= 2 && !lowStock;
 
           const style = familyStyleFromName(v.product?.family?.name ?? '');
 
@@ -167,6 +169,7 @@ export default function ProductGrid({
                 {inCart > 0 && <span className="pcard-in-cart">{inCart}</span>}
                 {outStock && <span className="pcard-out-badge">نفذ</span>}
                 {lowStock && !outStock && <span className="pcard-low-badge">قليل</span>}
+                {lastPiece && <span className="pcard-last-badge">آخر قطعة</span>}
               </div>
 
               <div className="pcard-body">

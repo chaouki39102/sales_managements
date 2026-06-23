@@ -7,6 +7,10 @@ export function usePOS() {
   const sessionStarted    = usePOSStore(s => s.sessionStarted);
   const sessionInvoices   = usePOSStore(s => s.sessionInvoices);
   const sessionSales      = usePOSStore(s => s.sessionSales);
+  const highestInvoice    = usePOSStore(s => s.highestInvoice);
+  const invoiceTotals     = usePOSStore(s => s.invoiceTotals);
+  const paymentsBreakdown = usePOSStore(s => s.paymentsBreakdown);
+  const productsSold      = usePOSStore(s => s.productsSold);
   const heldCarts         = usePOSStore(s => s.heldCarts);
   const activeTab         = usePOSStore(s => s.activeTab);
   const searchQuery       = usePOSStore(s => s.searchQuery);
@@ -53,6 +57,7 @@ export function usePOS() {
 
   return {
     sessionStarted, sessionInvoices, sessionSales,
+    highestInvoice, invoiceTotals, paymentsBreakdown, productsSold,
     startSession, endSession, incrementSession,
 
     heldCarts, holdCart, restoreCart, deleteHeldCart,

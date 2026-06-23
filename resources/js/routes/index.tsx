@@ -22,6 +22,7 @@ const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
 const CommercialDocumentsPage = lazy(() => import('@/pages/documents/CommercialDocumentsPage'));
 const InvoicesPage            = lazy(() => import('@/pages/invoices/InvoicesPage'));
 const POSPage                 = lazy(() => import('@/pages/pos/POSPage'));
+const POSKioskPage            = lazy(() => import('@/pages/pos/POSKioskPage'));
 
 // ── Products / Inventory ───────────────────────────────────────────────────
 const ProductsPage   = lazy(() => import('@/pages/products/ProductsPage'));
@@ -187,6 +188,7 @@ export function AppRoutes() {
 
           {/* POS */}
           <Route path="pos"      element={<POSPage />} />
+          <Route path="pos/kiosk" element={<POSKioskPage />} />
           <Route path="invoices" element={<InvoicesPage />} />
 
           {/* Documents */}

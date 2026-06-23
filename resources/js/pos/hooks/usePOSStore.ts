@@ -1,12 +1,4 @@
-// ════════════════════════════════════════════════════════════════════════════
 // pos/hooks/usePOSStore.ts
-//
-// حالة نقطة البيع الكاملة
-//
-// ✅ useUIStore مُحذف من هنا — موجود في lib/store/uiStore.ts
-// ✅ holdCart تستقبل items, totals, client, clearCart كمعاملات
-//    (بدلاً من الاتصال المباشر بـ useCartStore.getState())
-// ════════════════════════════════════════════════════════════════════════════
 
 import { create }        from 'zustand';
 import { nanoid }        from 'nanoid';
@@ -15,10 +7,25 @@ import type { HeldCart, CartItem, CartTotals, Party } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface SessionPayment {
+  paymentModeId: number;
+  amount:        number;
+}
+
+export interface SessionProduct {
+  name:  string;
+  qty:   number;
+  total: number;
+}
+
 interface POSState {
   sessionStarted:   boolean;
   sessionInvoices:  number;
   sessionSales:     number;
+  highestInvoice:   number;
+  invoiceTotals:    number[];
+  paymentsBreakdown: SessionPayment[];
+  productsSold:     Record<string, SessionProduct>;
   heldCarts:        HeldCart[];
   activeTab:        'products' | 'clients' | 'held';
   searchQuery:      string;
@@ -27,7 +34,11 @@ interface POSState {
 
   startSession:     () => void;
   endSession:       () => void;
-  incrementSession: (amount: number) => void;
+  incrementSession: (data: {
+    amount:   number;
+    payments?: SessionPayment[];
+    items?:   CartItem[];
+  }) => void;
 
   holdCart:         (params: { items: CartItem[]; totals: CartTotals; client: Party | null; label?: string; clearCart: () => void }) => void;
   restoreCart:      (id: string) => void;
@@ -40,12 +51,37 @@ interface POSState {
   closePayment:     () => void;
 }
 
+function mergeProducts(existing: Record<string, SessionProduct>, items: CartItem[]) {
+  const copy = { ...existing };
+  items.forEach(i => {
+    const key = String(i.variant_id);
+    if (copy[key]) {
+      copy[key] = {
+        name:  copy[key].name,
+        qty:   copy[key].qty + i.quantity,
+        total: copy[key].total + i.total_ttc,
+      };
+    } else {
+      copy[key] = {
+        name:  i.product_name,
+        qty:   i.quantity,
+        total: i.total_ttc,
+      };
+    }
+  });
+  return copy;
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const usePOSStore = create<POSState>((set, get) => ({
   sessionStarted:   false,
   sessionInvoices:  0,
   sessionSales:     0,
+  highestInvoice:   0,
+  invoiceTotals:    [],
+  paymentsBreakdown: [],
+  productsSold:     {},
   heldCarts:        [],
   activeTab:        'products',
   searchQuery:      '',
@@ -53,14 +89,30 @@ export const usePOSStore = create<POSState>((set, get) => ({
   paymentModalOpen: false,
 
   startSession: () =>
-    set({ sessionStarted: true, sessionInvoices: 0, sessionSales: 0 }),
+    set({
+      sessionStarted: true,
+      sessionInvoices: 0,
+      sessionSales: 0,
+      highestInvoice: 0,
+      invoiceTotals: [],
+      paymentsBreakdown: [],
+      productsSold: {},
+    }),
 
   endSession: () => set({ sessionStarted: false }),
 
-  incrementSession: (amount) =>
+  incrementSession: (data) =>
     set((s) => ({
       sessionInvoices: s.sessionInvoices + 1,
-      sessionSales:    s.sessionSales + amount,
+      sessionSales:    s.sessionSales + data.amount,
+      highestInvoice:  Math.max(s.highestInvoice, data.amount),
+      invoiceTotals:   [...s.invoiceTotals, data.amount],
+      paymentsBreakdown: data.payments
+        ? [...s.paymentsBreakdown, ...data.payments]
+        : s.paymentsBreakdown,
+      productsSold:    data.items
+        ? mergeProducts(s.productsSold, data.items)
+        : s.productsSold,
     })),
 
   holdCart: ({ items, totals, client, label, clearCart }) => {

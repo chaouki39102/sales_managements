@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { CartItem, CartTotals, Party } from '@/types';
 import { formatDZD } from '../utils/calculations';
-import { printThermalViaWebUSB, isWebUsbSupported } from '../utils/printService';
+import { printThermal, isWebUsbSupported, getThermalAutoPrint, setThermalAutoPrint } from '../utils/printService';
 
 interface ProfessionalReceiptProps {
   items: CartItem[]; totals: CartTotals; client: Party | null;
@@ -12,7 +12,18 @@ export default function ProfessionalReceipt({
   items, totals, client, docNumber, onClose, onPrint, onNewSale,
 }: ProfessionalReceiptProps) {
   const [thermalStatus, setThermalStatus] = useState<string | null>(null);
+  const [autoPrint, setAutoPrint] = useState(getThermalAutoPrint());
   const totalTtcFinal = totals.total_ttc + totals.fiscal_stamp;
+
+  useEffect(() => {
+    if (!autoPrint || !isWebUsbSupported()) return;
+    (async () => {
+      setThermalStatus('جاري الطباعة التلقائية…');
+      const res = await printThermal(items, totals, client, docNumber);
+      setThermalStatus(res.ok ? '✓ تمت الطباعة' : `✗ ${res.message}`);
+      setTimeout(() => setThermalStatus(null), 3000);
+    })();
+  }, []);
   const now = new Date();
 
   return (
@@ -96,7 +107,7 @@ export default function ProfessionalReceipt({
               className="btn btn-sm btn-thermal"
               onClick={async () => {
                 setThermalStatus('جاري الاتصال بالطابعة…');
-                const res = await printThermalViaWebUSB(items, totals, client, docNumber);
+                const res = await printThermal(items, totals, client, docNumber);
                 setThermalStatus(res.ok ? '✓ تمت الطباعة' : `✗ ${res.message}`);
                 setTimeout(() => setThermalStatus(null), 3000);
               }}
@@ -108,6 +119,16 @@ export default function ProfessionalReceipt({
             <span className={`thermal-status ${thermalStatus.startsWith('✓') ? 'ok' : 'err'}`}>
               {thermalStatus}
             </span>
+          )}
+          {isWebUsbSupported() && (
+            <label className="cb" style={{ fontSize: 11, cursor: 'pointer', margin: '0 8px' }}>
+              <input
+                type="checkbox"
+                checked={autoPrint}
+                onChange={(e) => { setAutoPrint(e.target.checked); setThermalAutoPrint(e.target.checked); }}
+              />
+              {' '}طباعة تلقائية
+            </label>
           )}
           <button className="btn btn-sm" onClick={onNewSale}>
             <i className="ti ti-plus" /> بيع جديد

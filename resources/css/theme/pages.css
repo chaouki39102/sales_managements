@@ -423,6 +423,14 @@
 .cust-name   { font-size:13px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .cust-meta   { font-size:11px;color:var(--t4);display:flex;gap:8px;margin-top:2px; }
 .cust-check  { color:var(--em);font-size:16px;flex-shrink:0; }
+.stock-pill.last { background:var(--goldb);color:var(--gold);border-color:var(--goldbo); }
+.pcard-last-badge {
+  position:absolute;top:6px;right:6px;
+  padding:1px 6px;border-radius:10px;
+  background:var(--gold);color:#fff;
+  font-size:9px;font-weight:800;line-height:1.4;
+  pointer-events:none;z-index:2;
+}
 .pc-qty-disc {
   position:absolute;top:6px;left:6px;
   padding:2px 6px;border-radius:10px;
