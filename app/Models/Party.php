@@ -98,7 +98,7 @@ class Party extends Model
     public static string $defaultSort          = 'name';
     public static string $defaultSortDirection = 'asc';
     public static int $defaultPerPage          = 15;
-    public static int $perPageLimit            = 100;
+    public static int $perPageLimit            = 500;
     public static ?int $cacheTtl               = 300;
     public static array $cacheTags             = ['parties'];
     public static array $cacheInvalidateRelations = ['commercialDocuments', 'payments'];

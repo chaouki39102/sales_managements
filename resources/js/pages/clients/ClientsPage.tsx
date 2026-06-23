@@ -140,9 +140,9 @@ function ClientsPagination({
 
 const CLIENTS_EXPORT_COLS: Column<Party>[] = [
   // ── معلومات أساسية ──
-  { key: 'name',             header: 'العميل',          exportHeader: 'العميل',              accessor: (r) => r.name },
+  { key: 'name',             header: 'الزبون',          exportHeader: 'الزبون',              accessor: (r) => r.name },
   { key: 'commercial_name',  header: 'الاسم التجاري',   exportHeader: 'الاسم التجاري',       accessor: (r) => r.commercial_name },
-  { key: 'code',             header: 'الرمز',            exportHeader: 'رمز العميل',          accessor: (r) => r.code },
+  { key: 'code',             header: 'الرمز',            exportHeader: 'رمز الزبون',          accessor: (r) => r.code },
   { key: 'phone',            header: 'الهاتف',           exportHeader: 'الهاتف',              accessor: (r) => r.phone },
   { key: 'mobile',           header: 'الجوال',           exportHeader: 'الجوال',              accessor: (r) => r.mobile },
   { key: 'fax',              header: 'الفاكس',           exportHeader: 'الفاكس',              accessor: (r) => r.fax },
@@ -222,7 +222,7 @@ function fetchClients(params: {
 export default function ClientsPage() {
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
-  const { exportData } = useERPExport({ defaultFileName: 'العملاء', defaultCurrency: 'DZD' });
+  const { exportData } = useERPExport({ defaultFileName: 'الزبائن', defaultCurrency: 'DZD' });
   const [hiddenCols, setHiddenCols]       = useState<Set<string>>(new Set(['mobile', 'email', 'address', 'nis', 'rc', 'ai', 'legal_form', 'activity', 'capital_amount', 'rc_date', 'bank_name', 'rib', 'commercial_name', 'fax', 'code']));
   const [colMenuOpen, setColMenuOpen]     = useState(false);
   const colMenuRef = useRef<HTMLDivElement>(null);
@@ -251,7 +251,7 @@ export default function ClientsPage() {
     // ── المجموعة 1: معلومات أساسية ──
     { key: '#', label: '#', thStyle: { width: 48, color: 'var(--t4)' }, tdStyle: { color: 'var(--t4)', fontSize: 12 },
       render: (_, __, rowNum) => rowNum },
-    { key: 'name', label: 'العميل', thStyle: { cursor: 'pointer' }, sortable: true,
+    { key: 'name', label: 'الزبون', thStyle: { cursor: 'pointer' }, sortable: true,
       render: (c, idx) => {
         const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length] as 1|2|3|4|5|6|7;
         return (
@@ -428,11 +428,11 @@ export default function ClientsPage() {
     <div className="page on" id="p-clients">
 
       <PageHeader
-        title="العملاء"
+        title="الزبائن"
         subtitle={
           isLoading
             ? 'جاري التحميل...'
-            : `إدارة قاعدة العملاء — ${(meta?.total ?? clients.length).toLocaleString('ar-DZ')} زبون`
+            : `إدارة قاعدة الزبائن — ${(meta?.total ?? clients.length).toLocaleString('ar-DZ')} زبون`
         }
         actions={
           <>
@@ -511,7 +511,7 @@ export default function ClientsPage() {
           ))
         ) : (
           <>
-            <KpiCard variant="green" icon="ti-users" label="إجمالي العملاء"
+            <KpiCard variant="green" icon="ti-users" label="إجمالي الزبائن"
               value={(meta?.total ?? clients.length).toLocaleString('ar-DZ')} />
             <KpiCard variant="blue" icon="ti-trending-up" label="مشتريات الصفحة"
               value={totalBusiness.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
@@ -550,9 +550,9 @@ export default function ClientsPage() {
       ) : clients.length === 0 ? (
         <EmptyState
           icon="ti-users"
-          text={search ? 'لا توجد نتائج مطابقة' : 'لا يوجد عملاء'}
+          text={search ? 'لا توجد نتائج مطابقة' : 'لا يوجد زبائن'}
           sub={
-            search ? `لا يوجد عملاء يطابقون "${search}"`
+            search ? `لا يوجد زبائن يطابقون "${search}"`
             : statusFilter !== 'all' ? 'جرّب تغيير فلتر الحالة'
             : 'أضف زبونك الأول'
           }

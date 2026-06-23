@@ -918,7 +918,7 @@ function OpeningBalancesTab({ slug, selectedYear }: {
                     label="رصيد الخزينة الافتتاحي" value={fmt(totalTreasury)} unit="دج"
                     sub={`${treasuryRows.length} حساب`} />
                 <KpiCard variant="gold" icon="ti-arrow-down-circle"
-                    label="أرصدة مدينة (عملاء)" value={fmt(totalDebit)} unit="دج"
+                    label="أرصدة مدينة (زبائن)" value={fmt(totalDebit)} unit="دج"
                     sub={`${partyRows.filter(r => r.balance_type === 'debit').length} متعامل`} />
                 <KpiCard variant="purple" icon="ti-arrow-up-circle"
                     label="أرصدة دائنة (موردون)" value={fmt(totalCredit)} unit="دج"
@@ -1846,7 +1846,7 @@ function PaymentModal({ open, payment, accounts, paymentModes, selectedYearId, s
                     <label className="req">اتجاه الدفعة</label>
                     <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                         {[
-                            { val: 'in',  label: 'مقبوض (من عميل)',  icon: 'ti-arrow-down-circle', color: 'var(--em)' },
+                            { val: 'in',  label: 'مقبوض (من زبون)',  icon: 'ti-arrow-down-circle', color: 'var(--em)' },
                             { val: 'out', label: 'مدفوع (لمورد / مصروف)', icon: 'ti-arrow-up-circle', color: 'var(--red)' },
                         ].map(opt => (
                             <button key={opt.val}

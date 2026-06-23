@@ -1325,7 +1325,7 @@ export default function CommercialDocumentModal({
                 </div>
               )}
 
-              {/* ملاحظات للعميل + داخلية */}
+              {/* ملاحظات للزبون + داخلية */}
               <div style={{ gridColumn: 'span 2' }}>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 5 }}>
                   {(['public', 'internal'] as const).map(tab => (
@@ -1338,7 +1338,7 @@ export default function CommercialDocumentModal({
                         background: 'var(--bg3)', color: 'var(--t3)',
                       }}
                     >
-                      {tab === 'public' ? 'ملاحظات للعميل' : 'ملاحظات داخلية'}
+                      {tab === 'public' ? 'ملاحظات للزبون' : 'ملاحظات داخلية'}
                     </button>
                   ))}
                 </div>
@@ -1355,7 +1355,7 @@ export default function CommercialDocumentModal({
                   value={form.notes}
                   disabled={isReadOnly}
                   onChange={(e) => set('notes', e.target.value)}
-                  placeholder="ملاحظات للعميل — تظهر في الطباعة"
+                  placeholder="ملاحظات للزبون — تظهر في الطباعة"
                 />
                 <textarea
                   rows={1}
@@ -3536,7 +3536,7 @@ export default function CommercialDocumentsPage() {
             },
         },
 
-        // ── التسليم (لأوامر العميل BCC خاصة) ────────────────────────────────
+        // ── التسليم (لأوامر الزبون BCC خاصة) ────────────────────────────────
         {
             key: "delivery_date",
             header: "تاريخ التسليم",
@@ -10396,7 +10396,7 @@ CommercialDocumentModal.tsx
 
 يستخدم useMutation لحفظ المستند، والتحقق من رقم المستند.
 
-يحتوي على تحذيرات لتغيير العميل (الزبون) عند وجود دفعات أو أسطر.
+يحتوي على تحذيرات لتغيير الزبون (الزبون) عند وجود دفعات أو أسطر.
 
 يتحكم في إظهار/إخفاء الأعمدة.
 
@@ -10492,7 +10492,7 @@ queryKeys.ts
 يحتوي على مفاتيح للكاش، جيد.
 
 client.ts
-عميل HTTP مع دعم CSRF، إضافة slug تلقائياً، إدارة الأخطاء.
+زبون HTTP مع دعم CSRF، إضافة slug تلقائياً، إدارة الأخطاء.
 
 apiGet, apiPost, إلخ.
 

@@ -32,7 +32,11 @@ export default function Modal({
   }, [open]);
 
   return (
-    <div className={`ov ${open ? 'on' : ''}`} onClick={onClose}>
+    <div
+      className={`ov ${open ? 'on' : ''}`}
+      onClick={onClose}
+      style={{ display: open ? undefined : 'none' }}
+    >
       <div
         className={`modal ${sizeMap[size]}`}
         onClick={(e) => e.stopPropagation()}

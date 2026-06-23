@@ -127,7 +127,7 @@ export function usePartyStats(id: number | null | undefined, fiscalYearId?: numb
   });
 }
 
-// ─── تصدير جميع العملاء ────────────────────────────────────────────────────────
+// ─── تصدير جميع الزبائن ────────────────────────────────────────────────────────
 export async function fetchAllCustomers(search?: string, active?: boolean): Promise<Party[]> {
   const all: Party[] = [];
   let page = 1;

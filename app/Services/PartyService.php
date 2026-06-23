@@ -7,7 +7,9 @@ use App\Models\FiscalYear;
 use App\Models\OpeningBalanceParty;
 use App\Models\Party;
 use App\Models\PartyType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\QueryBuilder\AllowedFilter;
 
 class PartyService extends \App\Core\Services\BaseService
 {
@@ -20,10 +22,54 @@ class PartyService extends \App\Core\Services\BaseService
         return $this->resourceName;
     }
 
+    // ─── getListConfig ────────────────────────────────────────────────────────
+
+    public function getListConfig(): array
+    {
+        return [
+            'advanced_filters' => [
+                AllowedFilter::callback('is_client', function (Builder $query, $value) {
+                    $clientTypeIds = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+                        ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
+                        ->pluck('id')
+                        ->toArray();
+
+                    if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                        $query->whereIn('party_type_id', $clientTypeIds);
+                    } else {
+                        $query->whereNotIn('party_type_id', $clientTypeIds);
+                    }
+                }),
+            ],
+        ];
+    }
+
     // ─── beforeCreate ────────────────────────────────────────────────────────
 
     protected function beforeCreate(array $data, $request): array
     {
+        // تحويل is_client / is_supplier إلى party_type_id قبل تصفية الأعمدة
+        if (empty($data['party_type_id'])) {
+            $isClient = $data['is_client'] ?? null;
+            $isSupplier = $data['is_supplier'] ?? null;
+            if ($isClient !== null || $isSupplier !== null) {
+                $typeName = filter_var($isClient ?? $isSupplier, FILTER_VALIDATE_BOOLEAN)
+                    ? ($isClient ? 'client' : 'supplier')
+                    : ($isSupplier ? 'supplier' : 'client');
+                $type = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+                    ->where(fn($q) => $q->where('name', $typeName)->orWhere('slug', $typeName))
+                    ->first();
+                if ($type) {
+                    $data['party_type_id'] = $type->id;
+                }
+            }
+        }
+
+        // trade_name → commercial_name
+        if (isset($data['trade_name']) && !isset($data['commercial_name'])) {
+            $data['commercial_name'] = $data['trade_name'];
+        }
+
         $data = parent::beforeCreate($data, $request);
 
         if (empty($data['code'])) {

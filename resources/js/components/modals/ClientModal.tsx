@@ -129,7 +129,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
 
   // ── Submit ────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!form.name.trim()) { setError('اسم العميل مطلوب'); return; }
+    if (!form.name.trim()) { setError('اسم الزبون مطلوب'); return; }
     try {
       const n2 = (v: any) => v === '' ? null : v;
       await onSubmit({
@@ -167,7 +167,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
         capital_amount:        form.capital_amount,
         initial_balance:       form.initial_balance,
       });
-      setSuccess(isEdit ? 'تم تعديل العميل بنجاح' : 'تم إضافة العميل بنجاح');
+      setSuccess(isEdit ? 'تم تعديل الزبون بنجاح' : 'تم إضافة الزبون بنجاح');
       setTimeout(() => { onSaved(); onClose(); }, 300);
     } catch (err: any) {
       setError(err?.response?.data?.message ?? err?.message ?? 'فشل الحفظ');
@@ -181,7 +181,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
       open={open}
       onClose={onClose}
       size="lg"
-      title={isEdit ? `تعديل — ${party?.name}` : 'إضافة عميل جديد'}
+      title={isEdit ? `تعديل — ${party?.name}` : 'إضافة زبون جديد'}
       footer={
         <>
           <Button onClick={onClose}>إلغاء</Button>
@@ -290,7 +290,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
             </div>
 
             <div className="fg">
-              <label>رمز العميل</label>
+              <label>رمز الزبون</label>
               <input
                 value={form.code || ''}
                 onChange={e => set('code', e.target.value)}

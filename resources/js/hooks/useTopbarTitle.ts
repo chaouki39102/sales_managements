@@ -12,7 +12,7 @@ export interface PageMeta {
 // ── Document types (مطابق لـ api.php document codes) ──────────────────────────
 const DOCUMENT_CODES: Record<string, PageMeta> = {
   DEV: { title: 'فاتورة شكلية',          path: 'مبيعات ← عروض أسعار'   },
-  BCC: { title: 'طلبيات العملاء',        path: 'مبيعات ← طلبيات'       },
+  BCC: { title: 'طلبيات الزبائن',        path: 'مبيعات ← طلبيات'       },
   BL:  { title: 'وصل التسليم',        path: 'مبيعات ← وصل تسليم'    },
   FV:  { title: 'فواتير البيع',          path: 'مبيعات ← فواتير'        },
   AV:  { title: 'مرتجعات البيع',         path: 'مبيعات ← مرتجعات'      },
@@ -34,7 +34,7 @@ const STATIC: Record<string, PageMeta> = {
   '/units':                   { title: 'وحدات القياس',           path: 'مخزون ← وحدات'             },
   '/suppliers':               { title: 'الموردون',               path: 'مخزون ← موردون'            },
   '/warehouses':              { title: 'المستودعات',              path: 'مخزون ← مستودعات'          },
-  '/clients':                 { title: 'العملاء',                path: 'محاسبة ← عملاء'            },
+  '/clients':                 { title: 'الزبائن',                path: 'محاسبة ← زبائن'            },
   '/finance':                 { title: 'الخزينة',                path: 'محاسبة ← خزينة'            },
   '/expenses':                { title: 'المصروفات',              path: 'محاسبة ← مصروفات'          },
   '/debts':                   { title: 'الديون',                 path: 'محاسبة ← ديون'             },

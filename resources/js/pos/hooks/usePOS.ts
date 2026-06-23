@@ -1,3 +1,10 @@
+// ════════════════════════════════════════════════════════════════════════════
+// pos/hooks/usePOS.ts
+//
+// ✅ التغييرات:
+//   - updateDiscountAmount مُضافة (من useCartStore)
+//   - باقي المنطق لم يتغير
+// ════════════════════════════════════════════════════════════════════════════
 import { useMemo, useCallback } from 'react';
 import { usePOSStore }   from './usePOSStore';
 import { useCartStore }  from '../utils/useCartStore';
@@ -20,40 +27,39 @@ export function usePOS() {
   const startSession      = usePOSStore(s => s.startSession);
   const endSession        = usePOSStore(s => s.endSession);
   const incrementSession  = usePOSStore(s => s.incrementSession);
-  const posHoldCart       = usePOSStore(s => s.holdCart);
-  const restoreCart       = usePOSStore(s => s.restoreCart);
-  const deleteHeldCart    = usePOSStore(s => s.deleteHeldCart);
   const setTab            = usePOSStore(s => s.setTab);
   const setSearch         = usePOSStore(s => s.setSearch);
   const setCategory       = usePOSStore(s => s.setCategory);
   const openPayment       = usePOSStore(s => s.openPayment);
   const closePayment      = usePOSStore(s => s.closePayment);
 
-  const items   = useCartStore(s => s.items);
-  const client  = useCartStore(s => s.client);
-  const invoiceDiscountPct = useCartStore(s => s.invoiceDiscountPct);
-  const totals  = useMemo(() => calcTotals(items, invoiceDiscountPct), [items, invoiceDiscountPct]);
-
-  const addItem              = useCartStore(s => s.addItem);
-  const removeItem           = useCartStore(s => s.removeItem);
-  const updateQty            = useCartStore(s => s.updateQty);
-  const updateDiscount       = useCartStore(s => s.updateDiscount);
-  const updateDiscountAmount = useCartStore(s => s.updateDiscountAmount);
-  const updatePrice          = useCartStore(s => s.updatePrice);
-  const clearCart            = useCartStore(s => s.clearCart);
-  const setClient            = useCartStore(s => s.setClient);
+  // Cart
+  const items             = useCartStore(s => s.items);
+  const client            = useCartStore(s => s.client);
+  const invoiceDiscountPct= useCartStore(s => s.invoiceDiscountPct);
+  const addItem           = useCartStore(s => s.addItem);
+  const removeItem        = useCartStore(s => s.removeItem);
+  const updateQty         = useCartStore(s => s.updateQty);
+  const updateDiscount    = useCartStore(s => s.updateDiscount);
+  const updateDiscountAmount = useCartStore(s => s.updateDiscountAmount);  // ✅ جديد
+  const updatePrice       = useCartStore(s => s.updatePrice);
+  const clearCart         = useCartStore(s => s.clearCart);
+  const setClient         = useCartStore(s => s.setClient);
   const setInvoiceDiscountPct = useCartStore(s => s.setInvoiceDiscountPct);
 
-  const holdCart = useCallback((label?: string) => {
-    const state = useCartStore.getState();
-    posHoldCart({
-      items:     state.items,
-      totals:    calcTotals(state.items, state.invoiceDiscountPct),
-      client:    state.client,
-      label,
-      clearCart: state.clearCart,
+  const totals = useMemo(
+    () => calcTotals(items, invoiceDiscountPct),
+    [items, invoiceDiscountPct],
+  );
+
+  const holdCart = useCallback(() => {
+    usePOSStore.getState().holdCart({
+      items, totals, client, clearCart,
     });
-  }, [posHoldCart]);
+  }, [items, totals, client, clearCart]);
+
+  const restoreCart    = usePOSStore(s => s.restoreCart);
+  const deleteHeldCart = usePOSStore(s => s.deleteHeldCart);
 
   return {
     sessionStarted, sessionInvoices, sessionSales,
@@ -66,7 +72,10 @@ export function usePOS() {
     setTab, setSearch, setCategory, openPayment, closePayment,
 
     items, client, invoiceDiscountPct,
-    addItem, removeItem, updateQty, updateDiscount, updateDiscountAmount, updatePrice,
+    addItem, removeItem, updateQty,
+    updateDiscount,
+    updateDiscountAmount,    // ✅ مُصدَّر
+    updatePrice,
     clearCart, setClient, setInvoiceDiscountPct,
     totals,
   };

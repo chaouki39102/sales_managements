@@ -50,7 +50,7 @@ return new class extends Migration
         });
 
         // 2. إضافة direction على payments لتحديد اتجاه التدفق على الخزينة
-        //    'in'  = دفعة واردة  (العميل يدفع لنا   → يزيد رصيد الخزينة)
+        //    'in'  = دفعة واردة  (الزبون يدفع لنا   → يزيد رصيد الخزينة)
         //    'out' = دفعة صادرة (نحن ندفع للمورد   → ينقص رصيد الخزينة)
         Schema::table('payments', function (Blueprint $table) {
             $table->enum('direction', ['in', 'out'])

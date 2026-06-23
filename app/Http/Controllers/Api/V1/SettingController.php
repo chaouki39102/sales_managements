@@ -79,6 +79,7 @@ class SettingController extends BaseApiController
     public function byGroup(Request $request, string $group): JsonResponse
     {
         try {
+            $group = $request->route('group');
             $settings = $this->settingService->getGroupAsArray($group);
             return $this->successResponse($settings, "إعدادات المجموعة: {$group}");
         } catch (\Throwable $e) {
@@ -91,10 +92,16 @@ class SettingController extends BaseApiController
     public function getValue(Request $request, string $key): JsonResponse
     {
         try {
+            $key = $request->route('key');
             $setting = $this->settingService->findByKey($key);
 
             if (!$setting) {
-                return $this->errorResponse("الإعداد '{$key}' غير موجود", 404, 'SETTING_NOT_FOUND');
+                return $this->successResponse([
+                    'key'   => $key,
+                    'value' => null,
+                    'group' => null,
+                    'type'  => 'string',
+                ]);
             }
 
             return $this->successResponse([

@@ -35,7 +35,7 @@ class PartyBalanceService
 
         // 2. Documents balance
         // ── منطق الإشارة ──────────────────────────────────────────────────────
-        // مبيعات  (sale)     → + : العميل مدين لنا  (يجب أن يدفع)
+        // مبيعات  (sale)     → + : الزبون مدين لنا  (يجب أن يدفع)
         // مشتريات (purchase) → - : نحن مدينون للمورد (يجب أن ندفع)
         // ──────────────────────────────────────────────────────────────────────
         $documentsBalance = (float) (DB::table('commercial_documents as cd')
@@ -56,7 +56,7 @@ class PartyBalanceService
             ->value('balance') ?? 0);
 
         // 3. Payments
-        // الدفعات تُقلّل الرصيد دائماً (سواء دفع العميل أو دفعنا للمورد)
+        // الدفعات تُقلّل الرصيد دائماً (سواء دفع الزبون أو دفعنا للمورد)
         $paymentsTotal = (float) (DB::table('payments')
             ->where('company_id',     $companyId)
             ->where('party_id',       $partyId)
@@ -74,11 +74,11 @@ class PartyBalanceService
         // ── منطق balance_type ─────────────────────────────────────────────────
         // نستخدم القيمة المطلقة للعرض وnbalance_type لتحديد الاتجاه:
         //
-        // currentBalance > 0 → الطرف مدين لنا   (debit)  = عميل لم يدفع
+        // currentBalance > 0 → الطرف مدين لنا   (debit)  = زبون لم يدفع
         // currentBalance < 0 → نحن مدينون له    (credit) = مورد لم ندفع له
         //
         // لكن من منظور المستخدم:
-        //   العميل المدين   = "مدين (علينا)"  ← خطأ لغوي في الـ UI، الصحيح: "مدين لنا"
+        //   الزبون المدين   = "مدين (علينا)"  ← خطأ لغوي في الـ UI، الصحيح: "مدين لنا"
         //   المورد الدائن   = "نحن مدينون له" ← يُعرض كـ credit
         //
         // نُرجع current_balance بإشارته الأصلية لأغراض الحسابات
@@ -99,9 +99,11 @@ class PartyBalanceService
 
     public function getAllBalancesAt(string $date, ?int $partyTypeId = null, ?string $search = null): array
     {
-        $date      = substr($date, 0, 10);
-        $companyId = $this->companyContext->get();
+        $date          = substr($date, 0, 10);
+        $companyId     = $this->companyContext->get();
+        $fiscalYearId  = $this->resolveFiscalYearId($companyId, $date);
 
+        // 1. Parties
         $partyQuery = DB::table('parties as p')
             ->join('party_types as pt', 'p.party_type_id', '=', 'pt.id')
             ->where('p.company_id', $companyId)
@@ -124,16 +126,78 @@ class PartyBalanceService
             ->select('p.id', 'p.name', 'p.party_type_id', 'pt.name as party_type_name')
             ->get();
 
+        if ($parties->isEmpty()) {
+            return [];
+        }
+
+        $partyIds = $parties->pluck('id');
+
+        // 2. Opening balances (batch)
+        $openingMap = DB::table('opening_balances_parties')
+            ->where('company_id',     $companyId)
+            ->where('fiscal_year_id', $fiscalYearId)
+            ->whereIn('party_id',     $partyIds)
+            ->selectRaw("party_id, COALESCE(SUM(CASE WHEN balance_type = 'debit' THEN opening_balance ELSE -opening_balance END), 0) as total")
+            ->groupBy('party_id')
+            ->pluck('total', 'party_id');
+
+        // 3. Documents balance (batch)
+        $documentsMap = DB::table('commercial_documents as cd')
+            ->join('document_types as dt',            'cd.document_type_id',         '=', 'dt.id')
+            ->join('document_base_operations as dbo', 'dt.document_base_operation_id', '=', 'dbo.id')
+            ->where('cd.company_id',          $companyId)
+            ->where('cd.fiscal_year_id',      $fiscalYearId)
+            ->whereIn('cd.party_id',          $partyIds)
+            ->where('dt.affects_accounting',  true)
+            ->whereDate('cd.document_date',   '<=', $date)
+            ->whereNull('cd.deleted_at')
+            ->selectRaw("
+                cd.party_id,
+                COALESCE(SUM(CASE WHEN dbo.name = 'sale' THEN cd.net_to_pay ELSE 0 END), 0)
+                -
+                COALESCE(SUM(CASE WHEN dbo.name = 'purchase' THEN cd.net_to_pay ELSE 0 END), 0)
+                as total
+            ")
+            ->groupBy('cd.party_id')
+            ->pluck('total', 'party_id');
+
+        // 4. Payments (batch)
+        $paymentsMap = DB::table('payments')
+            ->where('company_id',     $companyId)
+            ->where('fiscal_year_id', $fiscalYearId)
+            ->whereIn('party_id',     $partyIds)
+            ->where('status',         'confirmed')
+            ->whereDate('payment_date', '<=', $date)
+            ->whereNull('deleted_at')
+            ->selectRaw('party_id, COALESCE(SUM(amount), 0) as total')
+            ->groupBy('party_id')
+            ->pluck('total', 'party_id');
+
+        // 5. Merge
         $balances = [];
         foreach ($parties as $party) {
-            $balance          = $this->getBalanceAt($party->id, $date);
-            $balance['party'] = [
-                'id'            => $party->id,
-                'name'          => $party->name,
-                'party_type_id' => $party->party_type_id,
-                'party_type'    => ['name' => $party->party_type_name],
+            $opening   = (float) ($openingMap[$party->id]   ?? 0);
+            $documents = (float) ($documentsMap[$party->id] ?? 0);
+            $payments  = (float) ($paymentsMap[$party->id]  ?? 0);
+            $current   = round($opening + $documents - $payments, 4);
+
+            $balances[] = [
+                'party_id'          => $party->id,
+                'date'              => $date,
+                'fiscal_year_id'    => $fiscalYearId,
+                'opening_balance'   => round($opening,   4),
+                'documents_balance' => round($documents, 4),
+                'payments_total'    => round($payments,  4),
+                'current_balance'   => abs($current),
+                'signed_balance'    => $current,
+                'balance_type'      => $current >= 0 ? 'debit' : 'credit',
+                'party' => [
+                    'id'            => $party->id,
+                    'name'          => $party->name,
+                    'party_type_id' => $party->party_type_id,
+                    'party_type'    => ['name' => $party->party_type_name],
+                ],
             ];
-            $balances[] = $balance;
         }
 
         return $balances;

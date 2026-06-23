@@ -32,7 +32,7 @@ class StorePaymentRequest extends FormRequest
             // الشيك المرتبط — مطلوب فقط إذا كانت طريقة الدفع شيك
             'check_id'            => 'nullable|integer|exists:checks,id',
 
-            // الطرف (عميل أو مورد)
+            // الطرف (زبون أو مورد)
             'party_id'            => 'nullable|integer|exists:parties,id',
 
             // السنة المالية

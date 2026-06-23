@@ -2068,7 +2068,7 @@ const DESIGNS = [
         id: "professional",
         label: "Professional",
         icon: "ti-briefcase",
-        desc: "ترويسة مزدوجة شركة + عميل",
+        desc: "ترويسة مزدوجة شركة + زبون",
     },
 ] as const;
 type DesignId = (typeof DESIGNS)[number]["id"];
@@ -2721,7 +2721,7 @@ function InvoiceLivePreview({
                         marginBottom: 8,
                     }}
                 >
-                    العميل: محمد بن علي
+                    الزبون: محمد بن علي
                 </div>
                 {tableBody}
                 {stampBox}
@@ -2766,7 +2766,7 @@ function InvoiceLivePreview({
                         marginBottom: 8,
                     }}
                 >
-                    <span>العميل: محمد بن علي</span>
+                    <span>الزبون: محمد بن علي</span>
                     <span>{new Date().toLocaleDateString("fr-DZ")}</span>
                 </div>
                 {tableBody}
@@ -3331,6 +3331,15 @@ function InventoryTab({
         qc.invalidateQueries({
             queryKey: [...tenantKeys.settings.current(slug), "inventory"],
         });
+        // Sync POS negative-stock cache in localStorage
+        if ("allow_negative_stock" in diff) {
+            try {
+                localStorage.setItem(
+                    `pos-neg-stock-${slug}`,
+                    allowNegativeStock ? "true" : "false",
+                );
+            } catch { /* ignore */ }
+        }
         markClean();
         onClean?.();
     };

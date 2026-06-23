@@ -1,5 +1,5 @@
 # Module Export: CommercialDocument
-Generated at: 2026-06-22 12:12:30
+Generated at: 2026-06-23 12:17:37
 
 ## Models
 
@@ -1454,7 +1454,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         if ($documentType->requires_party && empty($data['party_id'])) {
-            throw new BusinessRuleException('يجب تحديد العميل/المورد لهذا النوع من الوثائق.', 422);
+            throw new BusinessRuleException('يجب تحديد الزبون/المورد لهذا النوع من الوثائق.', 422);
         }
 
         // السلسلة الترقيمية ورقم المستند
@@ -2054,9 +2054,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             // ── التحقق من المخزون قبل إنشاء الحركة ─────────────────────────
             $shouldCheckStock = false;
             if ($direction < 0 && $product->manages_stock) {
-                $allowNegativeGlobal = Setting::getSetting('allow_negative_stock_on_sale', false, $document->company_id);
-                if ($allowNegativeGlobal === false) {
-                    $shouldCheckStock = true; // السياسة العامة تمنع البيع بدون مخزون كافٍ
+                $allowNegativeGlobal = Setting::getSetting('allow_negative_stock', false, $document->company_id);
+                if ($allowNegativeGlobal) {
+                    $shouldCheckStock = false; // الإعداد العام يسمح بالمخزون السالب
                 } elseif (!$product->allow_negative_stock) {
                     $shouldCheckStock = true; // إعداد المنتج يمنع المخزون السالب
                 }
@@ -2273,7 +2273,7 @@ class StoreCommercialDocumentRequest extends FormRequest
 
     public function rules(): array
     {
-        // تحديد إذا كان نوع الوثيقة يتطلب طرفاً (عميل/مورد)
+        // تحديد إذا كان نوع الوثيقة يتطلب طرفاً (زبون/مورد)
         $partyRequired = $this->resolvePartyRequired();
 
         return [
@@ -2351,7 +2351,7 @@ class StoreCommercialDocumentRequest extends FormRequest
     {
         return [
             'document_type_id.required'   => 'يجب تحديد نوع الوثيقة.',
-            'party_id.required'           => 'يجب تحديد العميل أو المورد لهذا النوع من الوثائق.',
+            'party_id.required'           => 'يجب تحديد الزبون أو المورد لهذا النوع من الوثائق.',
             'lines.required'              => 'يجب إضافة سطر واحد على الأقل.',
             'lines.min'                   => 'يجب إضافة سطر واحد على الأقل.',
             'lines.*.product_id.required' => 'يجب تحديد المنتج لكل سطر.',

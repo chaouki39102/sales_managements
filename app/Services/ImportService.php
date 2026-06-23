@@ -586,7 +586,7 @@ class ImportService
     {
         $value = mb_strtolower(trim($value));
         $map = [
-            'زبون' => 'client', 'عميل' => 'client', 'client' => 'client', 'customer' => 'client',
+            'زبون' => 'client', 'زبون' => 'client', 'client' => 'client', 'customer' => 'client',
             'مورد' => 'supplier', 'fournisseur' => 'supplier', 'supplier' => 'supplier',
             'كلاهما' => 'both', 'mixed' => 'both', 'les deux' => 'both',
         ];

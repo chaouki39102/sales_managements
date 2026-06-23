@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 /**
  * Party Controller
  *
- * إدارة الأطراف (العملاء والموردين) مع:
+ * إدارة الأطراف (الزبائن والموردين) مع:
  * - CRUD كامل
  * - تصفية حسب النوع (زبون/مورد)
  * - البحث والترتيب
@@ -44,7 +44,7 @@ class PartyController extends BaseApiController
 
             return $this->successResponse(
                 PartyResource::collection($result),  // ✅ يدعم paginator تلقائياً
-                'تم جلب قائمة العملاء بنجاح'
+                'تم جلب قائمة الزبائن بنجاح'
             );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'customers');

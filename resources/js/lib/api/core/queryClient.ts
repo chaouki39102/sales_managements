@@ -46,7 +46,7 @@ export const queryClient = new QueryClient({
       // إعادة المحاولة مرة واحدة فقط — بسرعة
       retry: (failureCount, error) => {
         if (error instanceof ApiError) {
-          // لا إعادة محاولة لأخطاء العميل
+          // لا إعادة محاولة لأخطاء الزبون
           if (error.status >= 400 && error.status < 500) return false;
         }
         return failureCount < 1;

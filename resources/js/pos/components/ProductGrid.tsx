@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
-import { getVariantPrice, familyStyleFromName } from '../utils/posHelpers';
+import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
 
 interface ProductGridProps {
   variants: ProductVariant[];
@@ -18,6 +18,7 @@ interface ProductGridProps {
   priceLevels: PriceLevel[];
   selectedPriceLevelId: number | null;
   cartItems: CartItem[];
+  allowNegativeStock?: boolean | undefined;
 }
 
 function LoadMore({ hasMore, loading, onLoadMore }: { hasMore?: boolean; loading: boolean; onLoadMore?: () => void }) {
@@ -33,34 +34,38 @@ function LoadMore({ hasMore, loading, onLoadMore }: { hasMore?: boolean; loading
 
 export default function ProductGrid({
   variants, view, gridSize, loading, hasMore, onLoadMore, onAdd, onAddManual,
-  onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems,
+  onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
 }: ProductGridProps) {
   const inCartQty = useCallback((variantId: number) => {
     return cartItems.find(i => i.variant_id === variantId)?.quantity ?? 0;
   }, [cartItems]);
 
   if (loading) return (
-    <div className="pos-loading">
-      {Array.from({ length: 12 }).map((_, i) => (
-        <div key={i} className="pos-skel" style={{ animationDelay: `${i * 0.04}s` }} />
-      ))}
+    <div className="pos-grid-area">
+      <div className="pos-loading">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div key={i} className="pos-skel" style={{ animationDelay: `${i * 0.04}s` }} />
+        ))}
+      </div>
     </div>
   );
 
   if (!variants.length) return (
-    <div className="pos-empty">
-      <div className="pos-empty-ico"><i className="ti ti-package-off" /></div>
-      <div className="pos-empty-ttl">لا توجد منتجات</div>
-      <div className="pos-empty-sub">جرّب البحث بكلمة أخرى أو أضف منتجاً يدوياً</div>
-      <button className="btn btn-sm" onClick={onAddManual}>
-        <i className="ti ti-plus" /> إضافة يدوية
-      </button>
+    <div className="pos-grid-area">
+      <div className="pos-empty">
+        <div className="pos-empty-ico"><i className="ti ti-package-off" /></div>
+        <div className="pos-empty-ttl">لا توجد منتجات</div>
+        <div className="pos-empty-sub">جرّب البحث بكلمة أخرى أو أضف منتجاً يدوياً</div>
+        <button className="btn btn-sm" onClick={onAddManual}>
+          <i className="ti ti-plus" /> إضافة يدوية
+        </button>
+      </div>
     </div>
   );
 
   if (view === 'list') {
     return (
-      <div className="pos-list-wrap">
+      <div className="pos-grid-area">
         <table className="pos-ptable">
           <thead>
             <tr>
@@ -79,15 +84,17 @@ export default function ProductGrid({
               const tvaRate   = v.tva?.rate ?? 19;
               const priceTtc  = priceHt * (1 + tvaRate / 100);
               const inCart    = inCartQty(v.id);
-              const lowStock  = v.manages_stock && (v.current_stock ?? 0) > 0 && (v.current_stock ?? 0) <= (v.min_stock_alert ?? 0);
-              const outStock  = v.manages_stock && (v.current_stock ?? 0) <= 0;
-              const lastPiece = v.manages_stock && (v.current_stock ?? 0) > 0 && (v.current_stock ?? 0) <= 2 && !lowStock;
+              const stockVal  = v.current_stock;
+              const unknownSt = stockVal === undefined;
+              const outStock  = isVariantOutOfStock(v, allowNegativeStock);
+              const lowStock  = v.manages_stock && !unknownSt && (stockVal ?? 0) > 0 && (stockVal ?? 0) <= (v.min_stock_alert ?? 0);
+              const lastPiece = v.manages_stock && !unknownSt && (stockVal ?? 0) > 0 && (stockVal ?? 0) <= 2 && !lowStock;
               return (
-                <tr
-                  key={v.id}
-                  className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''}`}
-                  onDoubleClick={() => !outStock && onAdd(v)}
-                >
+                  <tr
+                    key={v.id}
+                    className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''}`}
+                    onDoubleClick={() => !outStock && onAdd(v)}
+                  >
                   <td className="prow-name">
                     <div className="prow-nm">{v.product?.name}</div>
                     {v.barcode && <div className="prow-bc">{v.barcode}</div>}
@@ -97,8 +104,10 @@ export default function ProductGrid({
                   <td className="prow-tva">{tvaRate}%</td>
                   <td className="prow-ttc">{formatDZD(priceTtc)}</td>
                   <td className="prow-stock">
-                    {v.manages_stock
-                      ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : lastPiece ? 'last' : 'ok'}`}>{v.current_stock ?? 0}</span>
+                    {v.manages_stock && !unknownSt
+                      ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : lastPiece ? 'last' : 'ok'}`}>{stockVal ?? 0}</span>
+                      : v.manages_stock && unknownSt
+                      ? <span className="stock-pill na">—</span>
                       : <span className="stock-pill na">—</span>
                     }
                   </td>
@@ -115,7 +124,7 @@ export default function ProductGrid({
                       <button
                         className="prow-add"
                         onClick={() => !outStock && onAdd(v)}
-                        disabled={outStock && !v.allow_negative_stock}
+                        disabled={outStock}
                         title="إضافة للسلة (دبل كليك)"
                       >
                         <i className="ti ti-plus" />
@@ -140,17 +149,18 @@ export default function ProductGrid({
   };
 
   return (
-    <>
+    <div className="pos-grid-area">
       <div className={`pgrid ${colsMap[gridSize]}`}>
         {variants.map(v => {
           const priceHt  = getVariantPrice(v, selectedPriceLevelId, priceLevels);
           const tvaRate  = v.tva?.rate ?? 19;
           const priceTtc = priceHt * (1 + tvaRate / 100);
           const inCart   = inCartQty(v.id);
-          const stock    = v.current_stock ?? 0;
-          const outStock = v.manages_stock && stock <= 0 && !v.allow_negative_stock;
-          const lowStock = v.manages_stock && stock > 0 && stock <= (v.min_stock_alert ?? 0);
-          const lastPiece = v.manages_stock && stock > 0 && stock <= 2 && !lowStock;
+          const stock    = v.current_stock;
+          const unknownStock = stock === undefined;
+          const outStock = isVariantOutOfStock(v, allowNegativeStock);
+          const lowStock = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= (v.min_stock_alert ?? 0);
+          const lastPiece = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= 2 && !lowStock;
 
           const style = familyStyleFromName(v.product?.family?.name ?? '');
 
@@ -183,10 +193,15 @@ export default function ProductGrid({
                   )}
                 </div>
 
-                {v.manages_stock && (
+                {v.manages_stock && !unknownStock && (
                   <div className={`pcard-stock ${outStock ? 'out' : lowStock ? 'low' : 'ok'}`}>
                     <i className={`ti ti-${outStock ? 'alert-circle' : lowStock ? 'alert-triangle' : 'package'}`} />
                     {outStock ? 'نفذ المخزون' : `${stock} ${v.unit?.abbreviation ?? ''}`}
+                  </div>
+                )}
+                {v.manages_stock && unknownStock && (
+                  <div className="pcard-stock na">
+                    <i className="ti ti-minus" />—
                   </div>
                 )}
               </div>
@@ -213,6 +228,6 @@ export default function ProductGrid({
         })}
       </div>
       <LoadMore hasMore={hasMore} loading={loading} onLoadMore={onLoadMore} />
-    </>
+    </div>
   );
 }

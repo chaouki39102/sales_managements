@@ -1676,7 +1676,7 @@ class DashboardController extends Controller
         
         return response()->json([
             'success' => true,
-            'message' => 'تم جلب أفضل العملاء بنجاح',
+            'message' => 'تم جلب أفضل الزبائن بنجاح',
             'data' => $data,
         ]);
     }
@@ -2790,7 +2790,7 @@ use Illuminate\Http\Request;
 /**
  * Party Controller
  *
- * إدارة الأطراف (العملاء والموردين) مع:
+ * إدارة الأطراف (الزبائن والموردين) مع:
  * - CRUD كامل
  * - تصفية حسب النوع (زبون/مورد)
  * - البحث والترتيب
@@ -2820,7 +2820,7 @@ class PartyController extends BaseApiController
 
             return $this->successResponse(
                 PartyResource::collection($result),  // ✅ يدعم paginator تلقائياً
-                'تم جلب قائمة العملاء بنجاح'
+                'تم جلب قائمة الزبائن بنجاح'
             );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'customers');
@@ -3471,7 +3471,7 @@ class ReportController extends Controller
         
         return response()->json([
             'success' => true,
-            'message' => 'تم جلب تقرير العملاء بنجاح',
+            'message' => 'تم جلب تقرير الزبائن بنجاح',
             'data' => $data,
         ]);
     }

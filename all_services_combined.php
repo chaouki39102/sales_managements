@@ -612,7 +612,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         if ($documentType->requires_party && empty($data['party_id'])) {
-            throw new BusinessRuleException('يجب تحديد العميل/المورد لهذا النوع من الوثائق.', 422);
+            throw new BusinessRuleException('يجب تحديد الزبون/المورد لهذا النوع من الوثائق.', 422);
         }
 
         if (empty($data['numbering_series_id'])) {
@@ -1284,7 +1284,7 @@ class CompanyRoleService
             [
                 'name'         => 'salesperson',
                 'display_name' => 'بائع',
-                'description'  => 'إنشاء مستندات البيع وإدارة العملاء',
+                'description'  => 'إنشاء مستندات البيع وإدارة الزبائن',
             ],
             [
                 'name'         => 'warehouse',
@@ -1477,7 +1477,7 @@ class CompanyRoleService
             ],
 
             // ══════════════════════════════════════════════════════
-            // البائع — مبيعات وعملاء فقط
+            // البائع — مبيعات وزبائن فقط
             // ══════════════════════════════════════════════════════
             'salesperson' => [
                 // الأطراف (إنشاء وتعديل)
@@ -3389,7 +3389,7 @@ use Illuminate\Http\Request;
 /**
  * Party Service
  *
- * إدارة الأطراف (العملاء والموردين) مع المتطلبات الجزائرية:
+ * إدارة الأطراف (الزبائن والموردين) مع المتطلبات الجزائرية:
  * - RC, NIF, NIS, AI
  * - التحقق من صحة البيانات
  * - إدارة الأرصدة والحدود الائتمانية

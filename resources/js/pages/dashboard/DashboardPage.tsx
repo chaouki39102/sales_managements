@@ -162,7 +162,7 @@ export default function DashboardPage() {
         />
         <KpiCard
           variant="blue" icon="ti-users"
-          label="عملاء جدد — أفريل" value="47"
+          label="زبائن جدد — أفريل" value="47"
           trend="▲ 3" trendDir="up"
           sub="إجمالي: 284 زبون"
         />
@@ -204,9 +204,9 @@ export default function DashboardPage() {
         />
         <KpiCard
           variant="red" icon="ti-receipt"
-          label="ديون العملاء" value="56,200" unit="دج"
+          label="ديون الزبائن" value="56,200" unit="دج"
           trend="مستحقة" trendDir="down"
-          sub="3 عملاء متأخرون"
+          sub="3 زبائن متأخرون"
           onClick={() => navigate('/dashboard/debts')}
         />
       </div>

@@ -76,7 +76,7 @@ const GROUPS: SeederGroup[] = [
   {
     key: 'demo', label: 'بيانات تجريبية', icon: 'ti-sparkles', color: 'var(--teal)',
     seeders: [
-      { key: 'parties_demo', class: 'PartierSeeder',   label: 'عملاء وموردون تجريبيون', description: '10 عملاء + 5 موردون جزائريون مع بيانات واقعية', icon: 'ti-users',   color: 'var(--teal)',   required: false },
+      { key: 'parties_demo', class: 'PartierSeeder',   label: 'زبائن وموردون تجريبيون', description: '10 زبائن + 5 موردون جزائريون مع بيانات واقعية', icon: 'ti-users',   color: 'var(--teal)',   required: false },
       { key: 'fiscal_year',  class: 'FiscalYearSeeder', label: 'سنة مالية',              description: `سنة مالية ${new Date().getFullYear()} جاهزة للاستخدام`,    icon: 'ti-calendar', color: 'var(--teal)',  required: false },
     ],
   },

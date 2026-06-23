@@ -222,8 +222,10 @@ class ComputeLineService
         }
 
         if ($stockAvailable !== null && !$isPurchase && $product->manages_stock) {
+            $allowNegativeGlobal = Setting::getSetting('allow_negative_stock', false, $companyId);
+            $allowNeg = $allowNegativeGlobal || $product->allow_negative_stock;
             if ($baseQty > $stockAvailable) {
-                if (!$product->allow_negative_stock) {
+                if (!$allowNeg) {
                     $warnings[] = [
                         'type'    => 'insufficient_stock',
                         'level'   => 'warning',

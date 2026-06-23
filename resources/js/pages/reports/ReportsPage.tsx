@@ -48,7 +48,7 @@ interface ReportCardMeta {
 const REPORT_CARDS: ReportCardMeta[] = [
   { id: 'sales',     title: 'تقرير المبيعات',     description: 'تحليل المبيعات حسب الفترة، المنتج، والزبون مع مقارنة سنوية', icon: 'ti-trending-up',        color: 'var(--em)',     badge: 'الأكثر استخداماً' },
   { id: 'purchases', title: 'تقرير المشتريات',    description: 'تحليل المشتريات والموردين مع تتبع التكاليف',                  icon: 'ti-trending-down',      color: 'var(--blue)'   },
-  { id: 'customers', title: 'تقرير العملاء',      description: 'كشف حساب العملاء، الديون المستحقة، وأفضل العملاء',           icon: 'ti-users',              color: 'var(--purple)' },
+  { id: 'customers', title: 'تقرير الزبائن',      description: 'كشف حساب الزبائن، الديون المستحقة، وأفضل الزبائن',           icon: 'ti-users',              color: 'var(--purple)' },
   { id: 'suppliers', title: 'تقرير الموردين',     description: 'كشف حساب الموردين، المستحقات، وأفضل الموردين',              icon: 'ti-truck',              color: 'var(--gold)'   },
   { id: 'products',  title: 'تقرير المنتجات',     description: 'حركة المنتجات، الأكثر مبيعاً، والأقل مبيعاً',               icon: 'ti-package',            color: 'var(--teal)'   },
   { id: 'inventory', title: 'تقرير المخزون',      description: 'تقييم المخزون، الحركات، والمنتجات المنخفضة',                icon: 'ti-building-warehouse', color: 'var(--orange)' },
@@ -127,7 +127,7 @@ function PurchasesViewer() {
 
 function CustomersViewer() {
   const { data, isLoading, isError, refetch } = useCustomersReport();
-  return <PartyReportView title="تقرير العملاء" data={data} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers"/>;
+  return <PartyReportView title="تقرير الزبائن" data={data} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers"/>;
 }
 
 function SuppliersViewer() {

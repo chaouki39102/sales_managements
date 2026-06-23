@@ -16,7 +16,7 @@ class DocumentBaseOperationSeeder extends Seeder
                 'company_id'    => $companyId,
                 'name'          => 'sale',
                 'label'         => 'مبيعات',
-                'description'   => 'عمليات البيع للعملاء',
+                'description'   => 'عمليات البيع للزبائن',
                 'active'     => true,
                 'display_order' => 1,
                 'created_at'    => now(),

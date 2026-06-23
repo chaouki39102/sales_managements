@@ -11,5 +11,7 @@
 
 /* استدعاء الأنظمة الخاصة والأدوات المساعدة */
 @import 'theme/pos.css';
+@import 'theme/pos-cart-v4.css';
 @import 'theme/modern-utilities.css';
 @import 'theme/utilities.css';
+

@@ -64,7 +64,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         if ($documentType->requires_party && empty($data['party_id'])) {
-            throw new BusinessRuleException('يجب تحديد العميل/المورد لهذا النوع من الوثائق.', 422);
+            throw new BusinessRuleException('يجب تحديد الزبون/المورد لهذا النوع من الوثائق.', 422);
         }
 
         if (empty($data['numbering_series_id'])) {

@@ -66,7 +66,7 @@ return new class extends Migration {
         });
 
         if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("ALTER TABLE parties COMMENT 'لإدارة الأطراف (عملاء، موردون) مع المعلومات القانونية الجزائرية'");
+            DB::statement("ALTER TABLE parties COMMENT 'لإدارة الأطراف (زبائن، موردون) مع المعلومات القانونية الجزائرية'");
         }
     }
 

@@ -286,7 +286,7 @@ export default function DocumentInfoSection({
                   background: 'var(--bg3)', color: 'var(--t3)',
                 }}
               >
-                {tab === 'public' ? 'ملاحظات للعميل' : 'ملاحظات داخلية'}
+                {tab === 'public' ? 'ملاحظات للزبون' : 'ملاحظات داخلية'}
               </button>
             ))}
           </div>
@@ -303,7 +303,7 @@ export default function DocumentInfoSection({
             value={form.notes as string}
             disabled={isReadOnly}
             onChange={(e) => set('notes', e.target.value)}
-            placeholder="ملاحظات للعميل — تظهر في الطباعة"
+            placeholder="ملاحظات للزبون — تظهر في الطباعة"
           />
           <textarea
             rows={1}

@@ -4,7 +4,7 @@
 
 ```
 DEV  | affects_accounting=false | affects_stock_direction=0  | ← عرض سعر
-BCC  | affects_accounting=false | affects_stock_direction=0  | ← طلب عميل
+BCC  | affects_accounting=false | affects_stock_direction=0  | ← طلب زبون
 BL   | affects_accounting=false | affects_stock_direction=-1 | ← تسليم
 FV   | affects_accounting=true  | affects_stock_direction=-1 | ← فاتورة
 AV   | affects_accounting=true  | affects_stock_direction=+1 | ← أفوار
@@ -44,7 +44,7 @@ FV with is_proforma=true تُنشئ حركات مخزون وقيود محاسب�
 
 الـ Seeder يمنحك بالفعل DEV وBCC وهما يلعبان دور الـ Proforma:
 - **DEV** = عرض السعر (Quote/Pro Forma)
-- **BCC** = أمر العميل المؤكد
+- **BCC** = أمر الزبون المؤكد
 - التحويل عبر CONVERSION_MAP: DEV → [BCC, BL, FV]
 
 **خطوات الحذف:**

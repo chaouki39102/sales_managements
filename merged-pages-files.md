@@ -3112,7 +3112,7 @@ export default function LoginPage() {
                             { icon: "ti-calculator", text: "حسابات TVA دقيقة مع إصدار تلقائي لـ G50/G12" },
                             { icon: "ti-chart-pie", text: "لوحات تحكم تفاعلية لتقارير الأداء اللحظية" },
                             { icon: "ti-shield-check", text: "أمان بيانات متطور مع نسخ احتياطي دوري" },
-                            { icon: "ti-users", text: "إدارة متكاملة لبيانات العملاء والموردين" },
+                            { icon: "ti-users", text: "إدارة متكاملة لبيانات الزبائن والموردين" },
                         ].map(({ icon, text }) => (
                             <div
                                 key={text}
@@ -4016,7 +4016,7 @@ export default function ClientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const modal = useModal();
 
-  // جلب العملاء مع العلاقات المطلوبة
+  // جلب الزبائن مع العلاقات المطلوبة
   const { data, isLoading, refetch } = useClients({
     search: search || undefined,
     per_page: 10,
@@ -4089,8 +4089,8 @@ export default function ClientsPage() {
   return (
     <div className="page on" id="p-clients">
       <PageHeader
-        title="العملاء"
-        subtitle={`إدارة قاعدة العملاء — ${meta?.total ?? clients.length} زبون`}
+        title="الزبائن"
+        subtitle={`إدارة قاعدة الزبائن — ${meta?.total ?? clients.length} زبون`}
         actions={
           <>
             <Button size="sm" icon={<i className="ti ti-table-export" />}>تصدير</Button>
@@ -4103,10 +4103,10 @@ export default function ClientsPage() {
 
       {/* بطاقات الأداء */}
       <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
-        <KpiCard variant="green" icon="ti-users" label="إجمالي العملاء" value={meta?.total ?? clients.length} />
+        <KpiCard variant="green" icon="ti-users" label="إجمالي الزبائن" value={meta?.total ?? clients.length} />
         <KpiCard variant="blue" icon="ti-trending-up" label="إجمالي المشتريات" value={totalBusiness.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" />
-        <KpiCard variant="red" icon="ti-receipt" label="ديون العملاء" value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} زبون متأخر`} />
-        <KpiCard variant="gold" icon="ti-star" label="عملاء نشطون" value={activeCount} />
+        <KpiCard variant="red" icon="ti-receipt" label="ديون الزبائن" value={totalDebt.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} unit="دج" sub={`${withDebt} زبون متأخر`} />
+        <KpiCard variant="gold" icon="ti-star" label="زبائن نشطون" value={activeCount} />
       </div>
 
       {/* فلاتر البحث والحالة */}
@@ -4132,11 +4132,11 @@ export default function ClientsPage() {
         </select>
       </div>
 
-      {/* جدول العملاء */}
+      {/* جدول الزبائن */}
       {filteredClients.length === 0 ? (
         <EmptyState
           icon="ti-users"
-          text="لا يوجد عملاء"
+          text="لا يوجد زبائن"
           sub="أضف زبونك الأول"
           action={<Button variant="primary" onClick={openCreate}>زبون جديد</Button>}
         />
@@ -4147,7 +4147,7 @@ export default function ClientsPage() {
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>العميل</th>
+                  <th>الزبون</th>
                   <th>الهاتف</th>
                   <th>الولاية / البلدية</th>
                   <th>NIF</th>
@@ -4224,7 +4224,7 @@ export default function ClientsPage() {
         </div>
       )}
 
-      {/* مودال إضافة/تعديل العميل */}
+      {/* مودال إضافة/تعديل الزبون */}
       <ClientModal
         open={modal.open}
         party={editing}
@@ -4409,7 +4409,7 @@ export default function DashboardPage() {
         />
         <KpiCard
           variant="blue" icon="ti-users"
-          label="عملاء جدد — أفريل" value="47"
+          label="زبائن جدد — أفريل" value="47"
           trend="▲ 3" trendDir="up"
           sub="إجمالي: 284 زبون"
         />
@@ -4451,9 +4451,9 @@ export default function DashboardPage() {
         />
         <KpiCard
           variant="red" icon="ti-receipt"
-          label="ديون العملاء" value="56,200" unit="دج"
+          label="ديون الزبائن" value="56,200" unit="دج"
           trend="مستحقة" trendDir="down"
-          sub="3 عملاء متأخرون"
+          sub="3 زبائن متأخرون"
           onClick={() => navigate('/dashboard/debts')}
         />
       </div>
@@ -13112,7 +13112,7 @@ import {
     useDocumentMutations,
 } from "@/lib/api/endpoints/documents";
 
-// ✅ استيراد الـ Hooks الصحيحة للعملاء والزبائن
+// ✅ استيراد الـ Hooks الصحيحة للزبائن والزبائن
 import { useParties as useCustomers } from "@/lib/api/endpoints/parties";
 
 // ✅ تصحيح الاسم: useDocumentTypes بدلاً من useDocumentTypes
@@ -13322,7 +13322,7 @@ export default function InvoicesPage() {
                         }))
                     }
                 >
-                    <option value="">كل العملاء</option>
+                    <option value="">كل الزبائن</option>
                     {customers?.data.map((c) => (
                         <option key={c.id} value={c.id}>
                             {c.name}
@@ -20296,7 +20296,7 @@ interface ReportCardMeta {
 const REPORT_CARDS: ReportCardMeta[] = [
   { id: 'sales',     title: 'تقرير المبيعات',     description: 'تحليل المبيعات حسب الفترة، المنتج، والزبون مع مقارنة سنوية', icon: 'ti-trending-up',        color: 'var(--em)',     badge: 'الأكثر استخداماً' },
   { id: 'purchases', title: 'تقرير المشتريات',    description: 'تحليل المشتريات والموردين مع تتبع التكاليف',                  icon: 'ti-trending-down',      color: 'var(--blue)'   },
-  { id: 'customers', title: 'تقرير العملاء',      description: 'كشف حساب العملاء، الديون المستحقة، وأفضل العملاء',           icon: 'ti-users',              color: 'var(--purple)' },
+  { id: 'customers', title: 'تقرير الزبائن',      description: 'كشف حساب الزبائن، الديون المستحقة، وأفضل الزبائن',           icon: 'ti-users',              color: 'var(--purple)' },
   { id: 'suppliers', title: 'تقرير الموردين',     description: 'كشف حساب الموردين، المستحقات، وأفضل الموردين',              icon: 'ti-truck',              color: 'var(--gold)'   },
   { id: 'products',  title: 'تقرير المنتجات',     description: 'حركة المنتجات، الأكثر مبيعاً، والأقل مبيعاً',               icon: 'ti-package',            color: 'var(--teal)'   },
   { id: 'inventory', title: 'تقرير المخزون',      description: 'تقييم المخزون، الحركات، والمنتجات المنخفضة',                icon: 'ti-building-warehouse', color: 'var(--orange)' },
@@ -20372,7 +20372,7 @@ function PurchasesViewer() {
 
 function CustomersViewer() {
   const { data, isLoading, isError, refetch } = useCustomersReport();
-  return <PartyReportView title="تقرير العملاء" data={data} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers"/>;
+  return <PartyReportView title="تقرير الزبائن" data={data} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers"/>;
 }
 
 function SuppliersViewer() {
@@ -22019,7 +22019,7 @@ function BackupPanel() {
             { label: 'تصدير قاعدة البيانات كاملة',   icon: 'ti-database', variant: 'primary' as const },
             { label: 'تصدير المنتجات (Excel)',        icon: 'ti-table',    variant: 'default' as const },
             { label: 'تصدير الفواتير (Excel/PDF)',   icon: 'ti-file-zip', variant: 'default' as const },
-            { label: 'تصدير العملاء والموردين',      icon: 'ti-users',    variant: 'default' as const },
+            { label: 'تصدير الزبائن والموردين',      icon: 'ti-users',    variant: 'default' as const },
           ].map(({ label, icon, variant }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--r2)', border: '1px solid var(--b2)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -22124,7 +22124,7 @@ const GROUPS: SeederGroup[] = [
   {
     key: 'demo', label: 'بيانات تجريبية', icon: 'ti-sparkles', color: 'var(--teal)',
     seeders: [
-      { key: 'parties_demo', class: 'PartierSeeder',   label: 'عملاء وموردون تجريبيون', description: '10 عملاء + 5 موردون جزائريون مع بيانات واقعية', icon: 'ti-users',   color: 'var(--teal)',   required: false },
+      { key: 'parties_demo', class: 'PartierSeeder',   label: 'زبائن وموردون تجريبيون', description: '10 زبائن + 5 موردون جزائريون مع بيانات واقعية', icon: 'ti-users',   color: 'var(--teal)',   required: false },
       { key: 'fiscal_year',  class: 'FiscalYearSeeder', label: 'سنة مالية',              description: `سنة مالية ${new Date().getFullYear()} جاهزة للاستخدام`,    icon: 'ti-calendar', color: 'var(--teal)',  required: false },
     ],
   },

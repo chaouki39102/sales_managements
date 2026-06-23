@@ -44,7 +44,7 @@ class ReportController extends Controller
         
         return response()->json([
             'success' => true,
-            'message' => 'تم جلب تقرير العملاء بنجاح',
+            'message' => 'تم جلب تقرير الزبائن بنجاح',
             'data' => $data,
         ]);
     }

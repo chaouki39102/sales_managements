@@ -161,7 +161,7 @@ export default function LoginPage() {
                             { icon: "ti-calculator", text: "حسابات TVA دقيقة مع إصدار تلقائي لـ G50/G12" },
                             { icon: "ti-chart-pie", text: "لوحات تحكم تفاعلية لتقارير الأداء اللحظية" },
                             { icon: "ti-shield-check", text: "أمان بيانات متطور مع نسخ احتياطي دوري" },
-                            { icon: "ti-users", text: "إدارة متكاملة لبيانات العملاء والموردين" },
+                            { icon: "ti-users", text: "إدارة متكاملة لبيانات الزبائن والموردين" },
                         ].map(({ icon, text }) => (
                             <div
                                 key={text}

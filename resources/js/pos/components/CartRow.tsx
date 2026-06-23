@@ -1,40 +1,103 @@
-import React, { useState, useRef, useEffect } from 'react';
+// pos/components/CartRow.tsx — v4 (تصميم محسّن بالكامل)
+// ════════════════════════════════════════════════════════════════════════════
+// التحسينات عن النسخة السابقة:
+//   1. تصميم البطاقة منفصلة بكارد مرتفع بدل صف مسطح
+//   2. زر الخصم: inline popover حقيقي (يظهر فوق الصف، لا يزيح المحتوى)
+//   3. تبديل % / دج بصرياً واضح داخل الـ popover
+//   4. السعر HT قابل للتعديل بـ popover أيضاً
+//   5. الكمية: input يظهر مباشرة عند النقر على الرقم
+//   6. مؤشر خصم ملون يبقى ظاهراً دائماً عند وجود خصم
+//   7. شريط اللون الأيمن يتغير مع الحالة (عادي / مختار / خصم)
+// ════════════════════════════════════════════════════════════════════════════
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { CartItem } from '@/types';
 import { formatDZD } from '../utils/calculations';
 
 interface CartRowProps {
-  item:       CartItem;
-  idx:        number;
-  isSelected: boolean;
-  onSelect:   () => void;
-  onQty:      (qty: number) => void;
-  onDiscount: (pct: number) => void;
+  item:             CartItem;
+  idx:              number;
+  isSelected:       boolean;
+  onSelect:         () => void;
+  onQty:            (qty: number) => void;
+  onDiscount:       (pct: number) => void;
   onDiscountAmount: (amount: number) => void;
-  onPrice:    (price: number) => void;
-  onRemove:   () => void;
+  onPrice:          (price: number) => void;
+  onRemove:         () => void;
 }
 
-type DiscMode = 'pct' | 'amount';
+type DiscMode  = 'pct' | 'amount';
+type PopupType = 'disc' | 'price' | null;
 
 export default function CartRow({
   item, idx, isSelected, onSelect,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
 }: CartRowProps) {
+  const [popup,      setPopup]      = useState<PopupType>(null);
   const [editQty,    setEditQty]    = useState(false);
-  const [editDisc,   setEditDisc]   = useState(false);
-  const [editPrice,  setEditPrice]  = useState(false);
-  const [qtyVal,     setQtyVal]     = useState('');
+  const [discMode,   setDiscMode]   = useState<DiscMode>('pct');
   const [discVal,    setDiscVal]    = useState('');
   const [priceVal,   setPriceVal]   = useState('');
-  const [discMode,   setDiscMode]   = useState<DiscMode>('pct');
+  const [qtyVal,     setQtyVal]     = useState('');
 
-  const qtyRef   = useRef<HTMLInputElement>(null);
-  const discRef  = useRef<HTMLInputElement>(null);
-  const priceRef = useRef<HTMLInputElement>(null);
+  const discInpRef  = useRef<HTMLInputElement>(null);
+  const priceInpRef = useRef<HTMLInputElement>(null);
+  const qtyInpRef   = useRef<HTMLInputElement>(null);
+  const rowRef      = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { if (editQty  && qtyRef.current)   qtyRef.current.select();   }, [editQty]);
-  useEffect(() => { if (editDisc && discRef.current)   discRef.current.select();  }, [editDisc]);
-  useEffect(() => { if (editPrice && priceRef.current) priceRef.current.select(); }, [editPrice]);
+  // focus input عند فتح الـ popup
+  useEffect(() => {
+    if (popup === 'disc'  && discInpRef.current)  { discInpRef.current.focus();  discInpRef.current.select(); }
+    if (popup === 'price' && priceInpRef.current) { priceInpRef.current.focus(); priceInpRef.current.select(); }
+  }, [popup]);
+
+  useEffect(() => {
+    if (editQty && qtyInpRef.current) { qtyInpRef.current.focus(); qtyInpRef.current.select(); }
+  }, [editQty]);
+
+  // إغلاق الـ popup عند الضغط خارج الصف
+  useEffect(() => {
+    if (!popup) return;
+    const h = (e: MouseEvent) => {
+      if (rowRef.current && !rowRef.current.contains(e.target as Node)) {
+        setPopup(null);
+      }
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [popup]);
+
+  // ── فتح popup الخصم ──────────────────────────────────────────────────────
+  const openDisc = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentVal = discMode === 'pct'
+      ? String(item.discount_percentage || 0)
+      : String(item.discount_amount || 0);
+    setDiscVal(currentVal);
+    setPopup(p => p === 'disc' ? null : 'disc');
+  }, [discMode, item.discount_percentage, item.discount_amount]);
+
+  // ── فتح popup السعر ───────────────────────────────────────────────────────
+  const openPrice = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPriceVal(item.unit_price_ht.toFixed(2));
+    setPopup(p => p === 'price' ? null : 'price');
+  }, [item.unit_price_ht]);
+
+  // ── Commit ────────────────────────────────────────────────────────────────
+  const commitDisc = () => {
+    const n = parseFloat(discVal);
+    if (!isNaN(n) && n >= 0) {
+      if (discMode === 'pct') onDiscount(Math.min(100, n));
+      else                    onDiscountAmount(Math.max(0, n));
+    }
+    setPopup(null);
+  };
+
+  const commitPrice = () => {
+    const n = parseFloat(priceVal);
+    if (!isNaN(n) && n >= 0) onPrice(n);
+    setPopup(null);
+  };
 
   const commitQty = () => {
     const n = parseFloat(qtyVal);
@@ -42,162 +105,234 @@ export default function CartRow({
     setEditQty(false);
   };
 
-  const commitDisc = () => {
-    const n = parseFloat(discVal);
-    if (!isNaN(n) && n >= 0) {
-      if (discMode === 'pct')    onDiscount(Math.min(100, n));
-      else                       onDiscountAmount(Math.max(0, n));
-    }
-    setEditDisc(false);
-  };
-
-  const commitPrice = () => {
-    const n = parseFloat(priceVal);
-    if (!isNaN(n) && n >= 0) onPrice(n);
-    setEditPrice(false);
-  };
-
+  // ── Derived values ────────────────────────────────────────────────────────
   const maxQty    = item.max_stock !== null ? item.max_stock : Infinity;
   const stockFull = item.manages_stock && item.quantity >= maxQty;
-
   const hasDisc   = item.discount_percentage > 0 || item.discount_amount > 0;
   const discLabel = item.discount_percentage > 0
-    ? `-${item.discount_percentage.toFixed(1)}%`
+    ? `-${item.discount_percentage % 1 === 0 ? item.discount_percentage : item.discount_percentage.toFixed(1)}%`
     : item.discount_amount > 0
       ? `-${formatDZD(item.discount_amount)}`
       : null;
 
+  const tvaRate = item.tva_rate;
+
   return (
     <div
-      className={`cr ${isSelected ? 'sel' : ''}`}
+      ref={rowRef}
+      className={`cr ${isSelected ? 'sel' : ''} ${hasDisc ? 'has-disc' : ''} ${popup ? 'cr--popup-open' : ''}`}
       onClick={onSelect}
     >
+      {/* شريط اللون الجانبي */}
+      <div className="cr-accent" />
+
+      {/* ── الرقم ── */}
       <div className="cr-num">{idx + 1}</div>
 
+      {/* ── معلومات المنتج ── */}
       <div className="cr-info">
-        <div className="cr-name-row">
-          {item.image_url && (
-            <img
-              className="cr-img"
-              src={item.image_url}
-              alt={item.product_name}
-              onError={e => { (e.target as HTMLElement).style.display = 'none'; }}
-            />
+        <div className="cr-name" title={item.product_name}>
+          {item.product_name}
+          {item.variant_name && (
+            <span className="cr-variant"> — {item.variant_name}</span>
           )}
-          <div className="cr-name">{item.product_name}</div>
         </div>
 
+        {/* صف السعر + الخصم */}
         <div className="cr-price-row">
-          {editPrice ? (
-            <input
-              ref={priceRef}
-              className="cr-edit-inp"
-              type="number"
-              value={priceVal}
-              onChange={e => setPriceVal(e.target.value)}
-              onBlur={commitPrice}
-              onKeyDown={e => {
-                if (e.key === 'Enter')  commitPrice();
-                if (e.key === 'Escape') setEditPrice(false);
-              }}
-              onClick={e => e.stopPropagation()}
-              style={{ width: 70 }}
-            />
-          ) : (
-            <span
-              className="cr-price"
-              onClick={e => {
-                e.stopPropagation();
-                setEditPrice(true);
-                setPriceVal(String(item.unit_price_ht));
-              }}
-              title="انقر لتعديل السعر"
-            >
-              {formatDZD(item.unit_price_ht)}
-              <span className="cr-price-unit"> HT</span>
+
+          {/* ── السعر قابل للتعديل ── */}
+          <button
+            className={`cr-price ${popup === 'price' ? 'cr-price--active' : ''}`}
+            onClick={openPrice}
+            title="انقر لتعديل السعر HT"
+            type="button"
+          >
+            <span className="cr-price-num">
+              {item.unit_price_ht.toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
             </span>
+            <span className="cr-price-unit">HT</span>
+            <span className="cr-price-edit-ic">✎</span>
+          </button>
+
+          {/* ── الخصم ── */}
+          {hasDisc ? (
+            <button
+              className={`cr-disc ${popup === 'disc' ? 'cr-disc--active' : ''}`}
+              onClick={openDisc}
+              title="انقر لتعديل الخصم"
+              type="button"
+            >
+              <i className="ti ti-discount" />
+              {discLabel}
+            </button>
+          ) : (
+            <button
+              className={`cr-disc-add ${popup === 'disc' ? 'cr-disc-add--active' : ''}`}
+              onClick={openDisc}
+              title="إضافة خصم"
+              type="button"
+            >
+              <i className="ti ti-tag" />
+              خصم
+            </button>
           )}
 
-          {editDisc ? (
-            <div
-              className="cr-disc-edit"
-              onClick={e => e.stopPropagation()}
-              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-            >
-              <button
-                className={`cr-disc-mode-btn ${discMode === 'pct' ? 'on' : ''}`}
-                onClick={() => setDiscMode('pct')}
-                type="button"
-                title="خصم نسبي %"
-              >%</button>
-              <button
-                className={`cr-disc-mode-btn ${discMode === 'amount' ? 'on' : ''}`}
-                onClick={() => setDiscMode('amount')}
-                type="button"
-                title="خصم ثابت دج"
-              >دج</button>
+          {/* TVA badge */}
+          {tvaRate > 0 && (
+            <span className="cr-tva">TVA {tvaRate}%</span>
+          )}
+        </div>
 
+        {/* ── Popup الخصم ── */}
+        {popup === 'disc' && (
+          <div className="cr-popup cr-popup--disc" onClick={e => e.stopPropagation()}>
+            <div className="cr-popup-arrow" />
+
+            {/* تبديل الوضع */}
+            <div className="cr-popup-modes">
+              <button
+                className={`cr-popup-mode ${discMode === 'pct' ? 'on' : ''}`}
+                onClick={() => { setDiscMode('pct'); setDiscVal(String(item.discount_percentage || 0)); }}
+                type="button"
+              >
+                <i className="ti ti-percentage" /> نسبة %
+              </button>
+              <button
+                className={`cr-popup-mode ${discMode === 'amount' ? 'on' : ''}`}
+                onClick={() => { setDiscMode('amount'); setDiscVal(String(item.discount_amount || 0)); }}
+                type="button"
+              >
+                <i className="ti ti-currency-dinar" /> مبلغ دج
+              </button>
+            </div>
+
+            {/* حقل الإدخال */}
+            <div className="cr-popup-inp-row">
               <input
-                ref={discRef}
-                className="cr-edit-inp"
+                ref={discInpRef}
+                className="cr-popup-inp"
                 type="number"
                 value={discVal}
                 onChange={e => setDiscVal(e.target.value)}
-                onBlur={commitDisc}
                 onKeyDown={e => {
                   if (e.key === 'Enter')  commitDisc();
-                  if (e.key === 'Escape') setEditDisc(false);
+                  if (e.key === 'Escape') setPopup(null);
                 }}
-                style={{ width: 60 }}
+                min={0}
+                max={discMode === 'pct' ? 100 : undefined}
+                step={discMode === 'pct' ? 0.5 : 1}
+                placeholder={discMode === 'pct' ? '0' : '0.00'}
               />
-              <span style={{ fontSize: 10, color: 'var(--t4)' }}>
-                {discMode === 'pct' ? '%' : 'دج'}
-              </span>
+              <span className="cr-popup-unit">{discMode === 'pct' ? '%' : 'دج'}</span>
             </div>
-          ) : hasDisc ? (
-            <span
-              className="cr-disc"
-              onClick={e => {
-                e.stopPropagation();
-                setEditDisc(true);
-                setDiscVal(
-                  discMode === 'pct'
-                    ? String(item.discount_percentage)
-                    : String(item.discount_amount),
-                );
-              }}
-              title="انقر لتعديل الخصم"
-            >
-              {discLabel}
-            </span>
-          ) : (
-            <span
-              className="cr-disc-add"
-              onClick={e => {
-                e.stopPropagation();
-                setEditDisc(true);
-                setDiscVal('0');
-              }}
-              title="إضافة خصم"
-            >
-              + خصم
-            </span>
-          )}
-        </div>
+
+            {/* معاينة */}
+            {discVal && parseFloat(discVal) > 0 && (
+              <div className="cr-popup-preview">
+                وفر:{' '}
+                <strong>
+                  {discMode === 'pct'
+                    ? formatDZD(item.unit_price_ht * item.quantity * parseFloat(discVal) / 100)
+                    : formatDZD(parseFloat(discVal))
+                  }
+                </strong>
+              </div>
+            )}
+
+            {/* أزرار سريعة (نسب شائعة) */}
+            {discMode === 'pct' && (
+              <div className="cr-popup-quick">
+                {[5, 10, 15, 20, 25, 30].map(p => (
+                  <button
+                    key={p}
+                    className={`cr-popup-qbtn ${parseFloat(discVal) === p ? 'on' : ''}`}
+                    onClick={() => { setDiscVal(String(p)); }}
+                    type="button"
+                  >
+                    {p}%
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* أزرار تأكيد */}
+            <div className="cr-popup-actions">
+              {hasDisc && (
+                <button
+                  className="cr-popup-clear"
+                  onClick={() => { onDiscount(0); onDiscountAmount(0); setPopup(null); }}
+                  type="button"
+                  title="إزالة الخصم"
+                >
+                  <i className="ti ti-x" /> إزالة
+                </button>
+              )}
+              <button className="cr-popup-cancel" onClick={() => setPopup(null)} type="button">
+                إلغاء
+              </button>
+              <button className="cr-popup-ok" onClick={commitDisc} type="button">
+                <i className="ti ti-check" /> تطبيق
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Popup السعر ── */}
+        {popup === 'price' && (
+          <div className="cr-popup cr-popup--price" onClick={e => e.stopPropagation()}>
+            <div className="cr-popup-arrow" />
+            <div className="cr-popup-label">سعر البيع HT</div>
+            <div className="cr-popup-inp-row">
+              <input
+                ref={priceInpRef}
+                className="cr-popup-inp"
+                type="number"
+                value={priceVal}
+                onChange={e => setPriceVal(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter')  commitPrice();
+                  if (e.key === 'Escape') setPopup(null);
+                }}
+                min={0}
+                step={0.01}
+                placeholder="0.00"
+              />
+              <span className="cr-popup-unit">دج</span>
+            </div>
+            {priceVal && parseFloat(priceVal) > 0 && (
+              <div className="cr-popup-preview">
+                TTC: <strong>{(parseFloat(priceVal) * (1 + tvaRate / 100)).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })} دج</strong>
+              </div>
+            )}
+            <div className="cr-popup-actions">
+              <button className="cr-popup-cancel" onClick={() => setPopup(null)} type="button">إلغاء</button>
+              <button className="cr-popup-ok" onClick={commitPrice} type="button">
+                <i className="ti ti-check" /> تطبيق
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* ── تحكم الكمية ── */}
       <div className="cr-qty-ctrl" onClick={e => e.stopPropagation()}>
         <button
-          className="cq-btn"
-          onClick={() => onQty(Math.max(0.001, item.quantity - 1))}
-          title="إنقاص (NumPad -)"
+          className="cq-btn cq-btn--minus"
+          onClick={() => {
+            const next = item.quantity - 1;
+            if (next <= 0) onRemove();
+            else onQty(next);
+          }}
+          title="إنقاص"
+          type="button"
         >
           <i className="ti ti-minus" />
         </button>
 
         {editQty ? (
           <input
-            ref={qtyRef}
+            ref={qtyInpRef}
             className="cr-edit-inp cq-inp"
             type="number"
             value={qtyVal}
@@ -214,47 +349,51 @@ export default function CartRow({
             onClick={() => { setEditQty(true); setQtyVal(String(item.quantity)); }}
             title="انقر لتعديل الكمية"
           >
-            {item.quantity}
+            {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(2)}
           </span>
         )}
 
         <button
-          className="cq-btn"
-          onClick={() => {
-            if (stockFull) return;
-            onQty(item.quantity + 1);
-          }}
-          title={stockFull ? 'نفد المخزون' : 'زيادة (NumPad +)'}
+          className="cq-btn cq-btn--plus"
+          onClick={() => { if (!stockFull) onQty(item.quantity + 1); }}
           disabled={stockFull}
-          style={stockFull ? { opacity: 0.35 } : undefined}
+          title={stockFull ? `الحد الأقصى: ${item.max_stock}` : 'زيادة'}
+          type="button"
         >
           <i className="ti ti-plus" />
         </button>
 
-        <span className="cq-unit">{item.unit_symbol}</span>
+        {item.unit_symbol && (
+          <span className="cq-unit">{item.unit_symbol}</span>
+        )}
 
         {stockFull && (
-          <span
-            className="cq-stock-warn"
-            title={`الحد الأقصى: ${item.max_stock}`}
-          >
+          <span className="cq-stock-warn" title={`المخزون المتاح: ${item.max_stock}`}>
             <i className="ti ti-alert-triangle" />
           </span>
         )}
       </div>
 
+      {/* ── الإجمالي ── */}
       <div className="cr-total">
-        <div className="cr-ttc">{formatDZD(item.total_ttc)}</div>
-        <div className="cr-ht">HT: {formatDZD(item.total_ht)}</div>
-        {item.tva_rate > 0 && (
-          <div className="cr-tva-badge">TVA {item.tva_rate}%</div>
+        <div className="cr-ttc" style={{ direction: 'ltr' }}>
+          {item.total_ttc.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+          <span className="cr-dzd"> دج</span>
+        </div>
+        {hasDisc && (
+          <div className="cr-ht cr-ht--strike" style={{ direction: 'ltr' }}>
+            {(item.unit_price_ht * item.quantity * (1 + tvaRate / 100))
+              .toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+          </div>
         )}
       </div>
 
+      {/* ── حذف ── */}
       <button
         className="cr-del"
         onClick={e => { e.stopPropagation(); onRemove(); }}
-        title="حذف الصنف (Del)"
+        title="حذف (Del)"
+        type="button"
       >
         <i className="ti ti-x" />
       </button>

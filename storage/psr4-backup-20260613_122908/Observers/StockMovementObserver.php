@@ -34,7 +34,7 @@ if ($movement->stockMovementType->direction < 0) {
         $movement->warehouse_id,
         $movement->quantity
     );
-    // unit_price يبقى كما أرسله الـ Service (سعر البيع للعميل)
+    // unit_price يبقى كما أرسله الـ Service (سعر البيع للزبون)
     $movement->total_price = $movement->quantity * $movement->unit_price;
 }
 

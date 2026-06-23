@@ -202,7 +202,7 @@ apiPut(`/documents/${id}`, { is_proforma: false });
 ### 🟡 M3: مسودة تلقائية (Auto-Draft) — خطر data leak
 ```tsx
 // سطر 553-560: localStorage يخزن form كاملاً كل 30 ثانية
-// المشكلة: يشمل أسعار + عملاء + معلومات حساسة
+// المشكلة: يشمل أسعار + زبائن + معلومات حساسة
 // في بيئة مشتركة (مختبر، مقهى) → data leak
 
 // الحل: تخزين ID فقط (draft reference)
@@ -294,7 +294,7 @@ CommercialDocumentModal (1642 سطر)
 ├── useDocumentLookups     — البيانات المرجعية ✓
 ├── useDocumentChain       — سلسلة المستندات ✓
 ├── useCreditCheck         — فحص الائتمان ✓
-├── useCustomerInsights    — تحليلات العميل ✓
+├── useCustomerInsights    — تحليلات الزبون ✓
 ├── useProductSuggestions  — اقتراحات المنتجات ✓
 └── useAdvancePayments     — الدفعات المقدمة ✓
 ```

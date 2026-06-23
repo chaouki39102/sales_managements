@@ -31,7 +31,7 @@ class StoreCommercialDocumentRequest extends FormRequest
 
     public function rules(): array
     {
-        // تحديد إذا كان نوع الوثيقة يتطلب طرفاً (عميل/مورد)
+        // تحديد إذا كان نوع الوثيقة يتطلب طرفاً (زبون/مورد)
         $partyRequired = $this->resolvePartyRequired();
 
         return [
@@ -109,7 +109,7 @@ class StoreCommercialDocumentRequest extends FormRequest
     {
         return [
             'document_type_id.required'   => 'يجب تحديد نوع الوثيقة.',
-            'party_id.required'           => 'يجب تحديد العميل أو المورد لهذا النوع من الوثائق.',
+            'party_id.required'           => 'يجب تحديد الزبون أو المورد لهذا النوع من الوثائق.',
             'lines.required'              => 'يجب إضافة سطر واحد على الأقل.',
             'lines.min'                   => 'يجب إضافة سطر واحد على الأقل.',
             'lines.*.product_id.required' => 'يجب تحديد المنتج لكل سطر.',

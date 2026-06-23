@@ -417,7 +417,7 @@ use Illuminate\Http\Request;
 /**
  * Party Controller
  *
- * إدارة الأطراف (العملاء والموردين) مع:
+ * إدارة الأطراف (الزبائن والموردين) مع:
  * - CRUD كامل
  * - تصفية حسب النوع (زبون/مورد)
  * - البحث والترتيب
@@ -447,7 +447,7 @@ class PartyController extends BaseApiController
 
             return $this->successResponse(
                 PartyResource::collection($result),  // ✅ يدعم paginator تلقائياً
-                'تم جلب قائمة العملاء بنجاح'
+                'تم جلب قائمة الزبائن بنجاح'
             );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'customers');
@@ -578,7 +578,7 @@ class PartyBalanceService
 
         // 2. Documents balance
         // ── منطق الإشارة ──────────────────────────────────────────────────────
-        // مبيعات  (sale)     → + : العميل مدين لنا  (يجب أن يدفع)
+        // مبيعات  (sale)     → + : الزبون مدين لنا  (يجب أن يدفع)
         // مشتريات (purchase) → - : نحن مدينون للمورد (يجب أن ندفع)
         // ──────────────────────────────────────────────────────────────────────
         $documentsBalance = (float) (DB::table('commercial_documents as cd')
@@ -599,7 +599,7 @@ class PartyBalanceService
             ->value('balance') ?? 0);
 
         // 3. Payments
-        // الدفعات تُقلّل الرصيد دائماً (سواء دفع العميل أو دفعنا للمورد)
+        // الدفعات تُقلّل الرصيد دائماً (سواء دفع الزبون أو دفعنا للمورد)
         $paymentsTotal = (float) (DB::table('payments')
             ->where('company_id',     $companyId)
             ->where('party_id',       $partyId)
@@ -617,11 +617,11 @@ class PartyBalanceService
         // ── منطق balance_type ─────────────────────────────────────────────────
         // نستخدم القيمة المطلقة للعرض وnbalance_type لتحديد الاتجاه:
         //
-        // currentBalance > 0 → الطرف مدين لنا   (debit)  = عميل لم يدفع
+        // currentBalance > 0 → الطرف مدين لنا   (debit)  = زبون لم يدفع
         // currentBalance < 0 → نحن مدينون له    (credit) = مورد لم ندفع له
         //
         // لكن من منظور المستخدم:
-        //   العميل المدين   = "مدين (علينا)"  ← خطأ لغوي في الـ UI، الصحيح: "مدين لنا"
+        //   الزبون المدين   = "مدين (علينا)"  ← خطأ لغوي في الـ UI، الصحيح: "مدين لنا"
         //   المورد الدائن   = "نحن مدينون له" ← يُعرض كـ credit
         //
         // نُرجع current_balance بإشارته الأصلية لأغراض الحسابات

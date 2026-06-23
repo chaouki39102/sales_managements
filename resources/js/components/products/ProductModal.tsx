@@ -397,8 +397,6 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     onClose();
   }
 
-  if (!open) return null;
-
   // ── Tab indicators ──
   function tabDot(tabId: TabId): 'done' | 'warn' | 'empty' {
     if (tabId === 'basic')    { return (!form.name.trim() || form.purchase_price_ht === '') ? 'warn' : 'done'; }
@@ -818,16 +816,21 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
 
   const currentTabIdx = TAB_IDS.indexOf(activeTab);
 
+  const ovStyle: React.CSSProperties = {
+    position: 'fixed', inset: 0, zIndex: 9000,
+    display: open ? 'flex' : 'none',
+    alignItems: 'flex-end', justifyContent: 'center',
+    background: open ? 'rgba(0,0,0,.5)' : 'transparent',
+    backdropFilter: open ? 'blur(3px)' : 'none',
+    paddingTop: '5vh',
+    pointerEvents: open ? 'auto' : 'none' as any,
+    opacity: open ? 1 : 0,
+    transition: 'opacity .25s, background .25s',
+  };
+
   return (
     <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9000,
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-        background: 'rgba(0,0,0,.5)',
-        backdropFilter: 'blur(3px)',
-        // ✅ المودل يظهر أعلى قليلاً من حافة الشاشة السفلية
-        paddingTop: '5vh',
-      }}
+      style={ovStyle}
       onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div style={{

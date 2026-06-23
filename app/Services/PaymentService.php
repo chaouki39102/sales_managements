@@ -27,7 +27,7 @@ use Illuminate\Http\Request;
  * direction (in/out):
  *   يُحدَّد تلقائياً إن لم يُرسَل من الواجهة:
  *   - بدون party                → out (مصروف)
- *   - party + sale/unknown      → in  (عميل يدفع)
+ *   - party + sale/unknown      → in  (زبون يدفع)
  *   - party + purchase          → out (نحن ندفع للمورد)
  *
  * current_balance على TreasuryAccount:
@@ -230,7 +230,7 @@ class PaymentService extends \App\Core\Services\BaseService
      * تحديد direction من بيانات الدفعة:
      *   بدون party               → out (مصروف)
      *   party + purchase          → out (ندفع للمورد)
-     *   party + sale أو unknown  → in  (نقبض من العميل)
+     *   party + sale أو unknown  → in  (نقبض من الزبون)
      */
     private function resolveDirection(array $data): string
     {

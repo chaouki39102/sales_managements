@@ -69,6 +69,11 @@ class StorePartyRequest extends FormRequest
             // Additional settings
             'additional_data' => 'nullable|array',
             'active' => 'nullable|boolean',
+
+            // Fields from POS modal (converted in prepareForValidation)
+            'is_client' => 'nullable|boolean',
+            'is_supplier' => 'nullable|boolean',
+            'trade_name' => 'nullable|string|max:150',
         ];
     }
 
@@ -124,6 +129,28 @@ class StorePartyRequest extends FormRequest
 
     public function prepareForValidation()
     {
+        // تحويل is_client / is_supplier إلى party_type_id
+        if (!$this->has('party_type_id')) {
+            $isClient   = $this->input('is_client');
+            $isSupplier = $this->input('is_supplier');
+            if ($isClient !== null || $isSupplier !== null) {
+                $typeName = filter_var($isClient ?? $isSupplier, FILTER_VALIDATE_BOOLEAN)
+                    ? ($isClient ? 'client' : 'supplier')
+                    : ($isSupplier ? 'supplier' : 'client');
+                $type = \App\Models\PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+                    ->where(fn($q) => $q->where('name', $typeName)->orWhere('slug', $typeName))
+                    ->first();
+                if ($type) {
+                    $this->merge(['party_type_id' => $type->id]);
+                }
+            }
+        }
+
+        // trade_name → commercial_name
+        if ($this->has('trade_name') && !$this->has('commercial_name')) {
+            $this->merge(['commercial_name' => $this->input('trade_name')]);
+        }
+
         // Set default values
         if (!$this->has('active')) {
             $this->merge(['active' => true]);

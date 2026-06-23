@@ -350,6 +350,15 @@ export default function CommercialDocumentModal({
   // ─── Delete confirmation modal ────────────────────────────────────────────
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // تنظيف حالة الـ sub-modals عند الإغلاق — منع الوميض
+  useEffect(() => {
+    if (!open) {
+      setShowDeleteModal(false);
+      setShowReturnModal(false);
+      setShowBulkImport(false);
+    }
+  }, [open]);
+
   // ── Auto-dismiss price level switch notification ──────────────────────────
   useEffect(() => {
     if (!priceLevelSwitchMsg) return;
@@ -623,47 +632,24 @@ export default function CommercialDocumentModal({
 
   // ─── Guard ────────────────────────────────────────────────────────────────
 
-  if (!open) return null;
-
-  if (!lookupsReady) {
-    return (
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)',
-        direction: 'rtl',
-      }}>
-        <div style={{
-          width: '95vw', maxWidth: 1100, maxHeight: '93vh',
-          background: 'var(--bg1)', borderRadius: 'var(--r3)',
-          boxShadow: '0 24px 60px rgba(0,0,0,.3)',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          gap: 12, padding: 48,
-        }}>
-          <i className="ti ti-loader-2" style={{
-            fontSize: 32, color: 'var(--em)',
-            animation: 'spin 0.8s linear infinite',
-          }} />
-          <span style={{ fontSize: 13, color: 'var(--t3)' }}>
-            {documentType?.name ?? 'جاري التحميل'}...
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ════════════════════════════════════════════════════════════════════════════
-
-  return (
+  const modalContent = !lookupsReady ? (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)',
-      direction: 'rtl',
+      width: '95vw', maxWidth: 1100, maxHeight: '93vh',
+      background: 'var(--bg1)', borderRadius: 'var(--r3)',
+      boxShadow: '0 24px 60px rgba(0,0,0,.3)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: 12, padding: 48,
     }}>
+      <i className="ti ti-loader-2" style={{
+        fontSize: 32, color: 'var(--em)',
+        animation: 'spin 0.8s linear infinite',
+      }} />
+      <span style={{ fontSize: 13, color: 'var(--t3)' }}>
+        {documentType?.name ?? 'جاري التحميل'}...
+      </span>
+    </div>
+  ) : (<>
       <div style={{
         width: '95vw', maxWidth: 1100, maxHeight: '93vh',
         display: 'flex', flexDirection: 'column',
@@ -982,7 +968,6 @@ export default function CommercialDocumentModal({
           handleSave={handleSave}
         />
       </div>
-
       {/* Bulk import */}
       <BulkImportModal
         open={showBulkImport}
@@ -1022,6 +1007,25 @@ export default function CommercialDocumentModal({
         itemName={existingDocument?.document_number ? `#${existingDocument.document_number}` : undefined}
         warning="ملاحظة: الحذف غير مدعوم — استخدم الإلغاء."
       />
+    </>
+  );
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // RENDER — حاوية دائمة في DOM مع تحكم CSS بالظهور
+  // ════════════════════════════════════════════════════════════════════════════
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      direction: 'rtl',
+      pointerEvents: open ? 'auto' : 'none' as any,
+      opacity: open ? 1 : 0,
+      background: open ? 'rgba(0,0,0,.45)' : 'transparent',
+      backdropFilter: open ? 'blur(3px)' : 'none',
+      transition: 'opacity .25s, background .25s',
+    }}>
+      {modalContent}
     </div>
   );
 }

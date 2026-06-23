@@ -83,7 +83,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         if ($documentType->requires_party && empty($data['party_id'])) {
-            throw new BusinessRuleException('يجب تحديد العميل/المورد لهذا النوع من الوثائق.', 422);
+            throw new BusinessRuleException('يجب تحديد الزبون/المورد لهذا النوع من الوثائق.', 422);
         }
 
         // السلسلة الترقيمية ورقم المستند
@@ -683,9 +683,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             // ── التحقق من المخزون قبل إنشاء الحركة ─────────────────────────
             $shouldCheckStock = false;
             if ($direction < 0 && $product->manages_stock) {
-                $allowNegativeGlobal = Setting::getSetting('allow_negative_stock_on_sale', false, $document->company_id);
-                if ($allowNegativeGlobal === false) {
-                    $shouldCheckStock = true; // السياسة العامة تمنع البيع بدون مخزون كافٍ
+                $allowNegativeGlobal = Setting::getSetting('allow_negative_stock', false, $document->company_id);
+                if ($allowNegativeGlobal) {
+                    $shouldCheckStock = false; // الإعداد العام يسمح بالمخزون السالب
                 } elseif (!$product->allow_negative_stock) {
                     $shouldCheckStock = true; // إعداد المنتج يمنع المخزون السالب
                 }

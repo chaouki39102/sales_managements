@@ -761,9 +761,6 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, finalSaveMut.isPending, success, handleFinalSave]);
 
-  // ========== EARLY RETURN ==========
-  if (!open) return null;
-
   const isPending = finalSaveMut.isPending;
 
   // ========== JSX ==========
@@ -773,14 +770,17 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
         position: 'fixed',
         inset: 0,
         zIndex: 600,
-        background: 'rgba(0,0,0,.6)',
-        backdropFilter: 'blur(5px)',
+        background: open ? 'rgba(0,0,0,.6)' : 'transparent',
+        backdropFilter: open ? 'blur(5px)' : 'none',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 16,
+        pointerEvents: open ? 'auto' : 'none' as any,
+        opacity: open ? 1 : 0,
+        transition: 'opacity .25s, background .25s',
       }}
-      onClick={!isPending ? onClose : undefined}
+      onClick={!isPending && open ? onClose : undefined}
     >
       <div
         style={{

@@ -1,9 +1,26 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// ════════════════════════════════════════════════════════════════════════════
+// pos/components/CustomerSearchModal.tsx
+//
+// ✅ ميزات:
+//   1. بحث فوري بالاسم / الهاتف / رقم التعريف الجبائي
+//      — debounced 250ms — يبدأ من حرفين
+//   2. إنشاء زبون جديد من POS بدون مغادرة الشاشة
+//      الحقول: الاسم + الهاتف + النوع (زبون/مورد) فقط
+//      — الباقي اختياري ويُكمَل لاحقاً من صفحة الزبائن
+//   3. عرض آخر X زبائن للاختيار السريع
+//   4. يُغلَق بـ Escape
+// ════════════════════════════════════════════════════════════════════════════
+import React, {
+  useState, useEffect, useRef, useCallback, useMemo,
+} from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { useActiveSlug }   from '@/lib/store/appStore';
+import { formatCurrency }  from '@/lib/utils';
 import type { Party }      from '@/types';
-import type { PaginatedResponse } from '@/lib/api/core/types';
+import type { PaginatedResponse, PartyBalance } from '@/lib/api/core/types';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
   currentClient: Party | null;
@@ -12,16 +29,24 @@ interface Props {
 }
 
 interface NewClientForm {
-  name:   string;
-  phone:  string;
-  email:  string;
-  nif:    string;
-  is_client: boolean;
+  name:         string;
+  phone:        string;
+  email:        string;
+  trade_name:   string;
+  nif:          string;
+  is_client:    boolean;
 }
 
 const EMPTY_FORM: NewClientForm = {
-  name: '', phone: '', email: '', nif: '', is_client: true,
+  name:       '',
+  phone:      '',
+  email:      '',
+  trade_name: '',
+  nif:        '',
+  is_client:  true,
 };
+
+// ─── Debounce hook ────────────────────────────────────────────────────────────
 
 function useDebounce<T>(value: T, delay: number): T {
   const [dv, setDv] = useState(value);
@@ -31,6 +56,25 @@ function useDebounce<T>(value: T, delay: number): T {
   }, [value, delay]);
   return dv;
 }
+
+// ─── BalanceLabel ─────────────────────────────────────────────────────────────
+
+function BalanceLabel({ balance }: { balance: PartyBalance | undefined }) {
+  if (!balance || balance.current_balance === 0) return null;
+  const isDebit = balance.balance_type === 'debit';
+  return (
+    <div style={{
+      fontSize: 11, marginTop: 2, direction: 'ltr', textAlign: 'right',
+      color: isDebit ? '#e53935' : '#43a047',
+      fontWeight: 600,
+    }}>
+      {isDebit ? 'مدين: ' : 'دائن: '}
+      {formatCurrency(balance.current_balance)}
+    </div>
+  );
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CustomerSearchModal({
   currentClient, onSelect, onClose,
@@ -47,10 +91,12 @@ export default function CustomerSearchModal({
   const debouncedQuery = useDebounce(query.trim(), 250);
   const isSearching    = debouncedQuery.length >= 2;
 
+  // Focus البحث عند الفتح
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 80);
   }, []);
 
+  // Escape يُغلق
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -59,14 +105,13 @@ export default function CustomerSearchModal({
     return () => window.removeEventListener('keydown', h);
   }, [onClose]);
 
+  // ── بحث فوري ──────────────────────────────────────────────────────────────
   const { data: searchResults, isLoading: searching } = useQuery<Party[]>({
-    queryKey: [slug, 'parties', 'pos-search', debouncedQuery],
+    queryKey: [slug, 'customers', 'pos-search', debouncedQuery],
     queryFn:  () =>
-      apiGet<PaginatedResponse<Party>>('/parties', {
-        search:    debouncedQuery,
-        per_page:  15,
-        is_client: 1,
-        include:   'partyType',
+      apiGet<PaginatedResponse<Party>>('/customers', {
+        search:   debouncedQuery,
+        per_page: 15,
       }).then(r => {
         const data = (r as any)?.data ?? r;
         return Array.isArray(data) ? data : [];
@@ -75,13 +120,13 @@ export default function CustomerSearchModal({
     staleTime: 30_000,
   });
 
+  // ── آخر زبائن (بدون بحث) ──────────────────────────────────────────────────
   const { data: recentClients } = useQuery<Party[]>({
-    queryKey: [slug, 'parties', 'pos-recent'],
+    queryKey: [slug, 'customers', 'pos-recent'],
     queryFn:  () =>
-      apiGet<PaginatedResponse<Party>>('/parties', {
-        per_page:  10,
-        is_client: 1,
-        sort:      '-updated_at',
+      apiGet<PaginatedResponse<Party>>('/customers', {
+        per_page: 500,
+        sort_by:  'name',
       }).then(r => {
         const data = (r as any)?.data ?? r;
         return Array.isArray(data) ? data : [];
@@ -90,19 +135,40 @@ export default function CustomerSearchModal({
     staleTime: 5 * 60_000,
   });
 
+  // ── أرصدة الزبائن ─────────────────────────────────────────────────────────
+  const { data: balances } = useQuery<PartyBalance[]>({
+    queryKey: [slug, 'party-balances'],
+    queryFn:  () =>
+      apiGet<PartyBalance[]>('/party-balances').then(r => {
+        const data = (r as any)?.data ?? r;
+        return Array.isArray(data) ? data : [];
+      }),
+    enabled:   !!slug,
+    staleTime: 60_000,
+  });
+
+  const balanceMap = useMemo(() => {
+    if (!balances) return new Map<number, PartyBalance>();
+    const m = new Map<number, PartyBalance>();
+    for (const b of balances) m.set(b.party_id, b);
+    return m;
+  }, [balances]);
+
   const displayList: Party[] = isSearching
     ? (searchResults ?? [])
     : (recentClients ?? []);
 
+  // ── إنشاء زبون جديد ───────────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (data: Partial<Party>) =>
       apiPost<Party>('/parties', data),
     onSuccess: (newParty) => {
+      // invalidate قائمة الزبائن
       if (slug) qc.invalidateQueries({ queryKey: [slug, 'parties'] });
       onSelect(newParty);
     },
     onError: (err: any) => {
-      setFormError(err?.message ?? 'فشل إنشاء العميل');
+      setFormError(err?.message ?? 'فشل إنشاء الزبون');
     },
   });
 
@@ -113,6 +179,7 @@ export default function CustomerSearchModal({
       name:       form.name.trim(),
       phone:      form.phone.trim() || null,
       email:      form.email.trim() || null,
+      trade_name: form.trade_name.trim() || null,
       nif:        form.nif.trim() || null,
       is_client:  form.is_client,
       is_supplier: !form.is_client,
@@ -126,6 +193,7 @@ export default function CustomerSearchModal({
     setFormError('');
   }, []);
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="ov on" onClick={onClose}>
       <div
@@ -133,10 +201,11 @@ export default function CustomerSearchModal({
         onClick={e => e.stopPropagation()}
         style={{ maxWidth: 520 }}
       >
+        {/* Header */}
         <div className="m-hd">
           <div className="m-title">
             <i className="ti ti-users" style={{ marginLeft: 6 }} />
-            {showCreate ? 'عميل جديد' : 'اختيار العميل'}
+            {showCreate ? 'زبون جديد' : 'اختيار الزبون'}
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             {!showCreate && (
@@ -154,8 +223,10 @@ export default function CustomerSearchModal({
 
         <div className="m-body" style={{ padding: 16 }}>
 
+          {/* ════ وضع البحث ════ */}
           {!showCreate && (
             <>
+              {/* شريط البحث */}
               <div className="pos-inp" style={{ marginBottom: 12 }}>
                 <i className="ti ti-search" style={{ fontSize: 14, color: 'var(--t4)' }} />
                 <input
@@ -180,6 +251,7 @@ export default function CustomerSearchModal({
                 )}
               </div>
 
+              {/* زبون عابر */}
               <button
                 className={`cust-row cust-anon ${!currentClient ? 'on' : ''}`}
                 onClick={() => onSelect(null)}
@@ -195,13 +267,15 @@ export default function CustomerSearchModal({
                 {!currentClient && <i className="ti ti-check cust-check" />}
               </button>
 
+              {/* عنوان القائمة */}
               <div className="cust-list-title">
                 {isSearching
                   ? searching ? 'جارٍ البحث...' : `${displayList.length} نتيجة`
-                  : 'آخر العملاء'
+                  : 'آخر الزبائن'
                 }
               </div>
 
+              {/* القائمة */}
               <div className="cust-list">
                 {displayList.length === 0 && !searching && isSearching && (
                   <div className="cust-empty">
@@ -233,8 +307,8 @@ export default function CustomerSearchModal({
                       <div className="cust-meta">
                         {c.phone && <span><i className="ti ti-phone" style={{ fontSize: 10 }} /> {c.phone}</span>}
                         {c.nif   && <span>NIF: {c.nif}</span>}
-                        {!c.phone && !c.nif && <span style={{ opacity: 0.5 }}>لا معلومات إضافية</span>}
                       </div>
+                      <BalanceLabel balance={balanceMap.get(c.id)} />
                     </div>
                     {currentClient?.id === c.id && (
                       <i className="ti ti-check cust-check" />
@@ -245,19 +319,23 @@ export default function CustomerSearchModal({
             </>
           )}
 
+          {/* ════ وضع الإنشاء ════ */}
           {showCreate && (
             <div className="fgrid">
+              {/* الاسم */}
               <div className="fg s2">
                 <label className="req">الاسم / السبب الاجتماعي</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={e => setField('name', e.target.value)}
-                  placeholder="اسم العميل"
+                  placeholder="اسم الزبون"
                   autoFocus
                   onKeyDown={e => e.key === 'Enter' && handleCreate()}
                 />
               </div>
+
+              {/* الهاتف */}
               <div className="fg">
                 <label>الهاتف</label>
                 <input
@@ -267,6 +345,8 @@ export default function CustomerSearchModal({
                   placeholder="06XXXXXXXX"
                 />
               </div>
+
+              {/* البريد */}
               <div className="fg">
                 <label>البريد الإلكتروني</label>
                 <input
@@ -276,6 +356,19 @@ export default function CustomerSearchModal({
                   placeholder="exemple@mail.com"
                 />
               </div>
+
+              {/* الاسم التجاري */}
+              <div className="fg">
+                <label>الاسم التجاري</label>
+                <input
+                  type="text"
+                  value={form.trade_name}
+                  onChange={e => setField('trade_name', e.target.value)}
+                  placeholder="اختياري"
+                />
+              </div>
+
+              {/* NIF */}
               <div className="fg">
                 <label>رقم التعريف الجبائي (NIF)</label>
                 <input
@@ -285,6 +378,8 @@ export default function CustomerSearchModal({
                   placeholder="اختياري"
                 />
               </div>
+
+              {/* نوع الطرف */}
               <div className="fg s2">
                 <label>النوع</label>
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -294,7 +389,7 @@ export default function CustomerSearchModal({
                       checked={form.is_client}
                       onChange={() => setField('is_client', true)}
                     />
-                    عميل
+                    زبون
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                     <input
@@ -306,6 +401,8 @@ export default function CustomerSearchModal({
                   </label>
                 </div>
               </div>
+
+              {/* خطأ */}
               {formError && (
                 <div className="fg s2">
                   <div className="al al-r">
@@ -317,6 +414,7 @@ export default function CustomerSearchModal({
           )}
         </div>
 
+        {/* Footer */}
         <div className="m-foot">
           {showCreate ? (
             <>

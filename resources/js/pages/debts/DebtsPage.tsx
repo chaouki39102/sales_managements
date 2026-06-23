@@ -78,7 +78,7 @@ export default function DebtsPage() {
                 const t = b.party?.party_type?.name;
                 return (
                     <Badge variant="gray">
-                        {t === 'client' ? 'عميل' : t === 'supplier' ? 'مورد' : t === 'both' ? 'عميل/مورد' : '—'}
+                        {t === 'client' ? 'زبون' : t === 'supplier' ? 'مورد' : t === 'both' ? 'زبون/مورد' : '—'}
                     </Badge>
                 );
             },
@@ -143,7 +143,7 @@ export default function DebtsPage() {
         <div className="page on" id="p-debts">
             <PageHeader
                 title="أرصدة المتعاملين"
-                subtitle="الرصيد اللحظي لكل عميل ومورد"
+                subtitle="الرصيد اللحظي لكل زبون ومورد"
                 actions={
                     <>
                         {selectedYear && (
@@ -182,7 +182,7 @@ export default function DebtsPage() {
                     value={fmtNumber(totalCredit)}
                     unit="دج"
                 />
-                <KpiCard variant="green"  icon="ti-users" label="العملاء"  value={clientsCount} />
+                <KpiCard variant="green"  icon="ti-users" label="الزبائن"  value={clientsCount} />
                 <KpiCard variant="purple" icon="ti-truck" label="الموردون" value={suppliersCount} />
             </div>
 
@@ -197,7 +197,7 @@ export default function DebtsPage() {
                     className={`tab ${filterType === 1 ? 'on' : ''}`}
                     onClick={() => setFilterType(1)}
                 >
-                    عملاء ({clientsCount})
+                    زبائن ({clientsCount})
                 </div>
                 <div
                     className={`tab ${filterType === 2 ? 'on' : ''}`}
@@ -250,9 +250,9 @@ function BalanceDetailModal({
 
     const t = balance.party?.party_type?.name;
     const typeLabel =
-        t === 'client'   ? 'عميل'      :
+        t === 'client'   ? 'زبون'      :
         t === 'supplier' ? 'مورد'       :
-        t === 'both'     ? 'عميل/مورد' : '—';
+        t === 'both'     ? 'زبون/مورد' : '—';
 
     return (
         <Modal

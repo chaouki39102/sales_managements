@@ -55,7 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'المحاسبة والمالية',
     color: 'var(--gold)',
     items: [
-      { id: 'clients',     label: 'العملاء',            href: '/clients',     icon: 'ti-users'           },
+      { id: 'clients',     label: 'الزبائن',            href: '/clients',     icon: 'ti-users'           },
       { id: 'finance',     label: 'الخزينة',             href: '/finance',     icon: 'ti-building-bank'   },
       { id: 'expenses',    label: 'المصروفات',           href: '/expenses',    icon: 'ti-credit-card'     },
       { id: 'debts',       label: 'الديون',              href: '/debts',       icon: 'ti-receipt'         },

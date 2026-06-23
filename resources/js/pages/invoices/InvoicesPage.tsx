@@ -7,7 +7,7 @@ import {
     useDocumentMutations,
 } from "@/lib/api/endpoints/documents";
 
-// ✅ استيراد الـ Hooks الصحيحة للعملاء والزبائن
+// ✅ استيراد الـ Hooks الصحيحة للزبائن والزبائن
 import { useParties as useCustomers } from "@/lib/api/endpoints/parties";
 
 // ✅ تصحيح الاسم: useDocumentTypes بدلاً من useDocumentTypes
@@ -223,7 +223,7 @@ export default function InvoicesPage() {
                         }))
                     }
                 >
-                    <option value="">كل العملاء</option>
+                    <option value="">كل الزبائن</option>
                     {customers?.data.map((c) => (
                         <option key={c.id} value={c.id}>
                             {c.name}

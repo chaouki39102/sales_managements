@@ -55,7 +55,7 @@ class DashboardController extends Controller
         
         return response()->json([
             'success' => true,
-            'message' => 'تم جلب أفضل العملاء بنجاح',
+            'message' => 'تم جلب أفضل الزبائن بنجاح',
             'data' => $data,
         ]);
     }
