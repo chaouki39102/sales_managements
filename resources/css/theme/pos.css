@@ -214,6 +214,33 @@
 }
 .pqb-rm:hover { background: var(--redb); color: var(--red); }
 
+.pos-quickbar-wrapper {
+  display: flex;
+  align-items: center;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--b2);
+  flex-shrink: 0;
+  position: relative;
+}
+.pqb-scroll {
+  flex-shrink: 0;
+  width: 28px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg2);
+  border: none;
+  border-right: 1px solid var(--b2);
+  cursor: pointer;
+  color: var(--t4);
+  font-size: 16px;
+  z-index: 1;
+  transition: .12s;
+}
+.pqb-scroll-r { border-right: none; border-left: 1px solid var(--b2); }
+.pqb-scroll:hover { color: var(--t1); background: var(--bg3); }
+
 /* ════════════════════════════════════════════════════
    LAYOUT
 ════════════════════════════════════════════════════ */

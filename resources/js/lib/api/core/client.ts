@@ -212,10 +212,14 @@ export function extractData<T>(response: { data: unknown }): T {
     const obj = outer as Record<string, unknown>;
     if ('data' in obj) {
       const inner = obj.data;
-      if (Array.isArray(inner)) return inner as T;
+      if (Array.isArray(inner)) {
+        // Paginated response: outer has both 'data'(array) and 'meta' — preserve full shape
+        if ('meta' in obj) return outer as T;
+        return inner as T;
+      }
       if (inner !== null && typeof inner === 'object') {
         const io = inner as Record<string, unknown>;
-        if ('data' in io && 'meta' in io) return inner as T; // Paginated
+        if ('data' in io && 'meta' in io) return inner as T; // Nested paginated
         return inner as T;
       }
       if (inner !== undefined) return inner as T;

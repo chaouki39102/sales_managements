@@ -1,17 +1,9 @@
-// ════════════════════════════════════════════════════════════════════════════
-// lib/api/endpoints/posSession.ts
-//
-// API + hooks لنظام جلسات POS
-// ════════════════════════════════════════════════════════════════════════════
-
 import {
   useQuery, useMutation, useQueryClient, keepPreviousData,
 } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../core/client';
 import { useActiveSlug }   from '../../store/appStore';
 import type { CartItem }   from '@/types';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface PosSessionPaymentLine {
   payment_mode_id: number;
@@ -90,16 +82,12 @@ export interface CloseSessionInput {
   closing_note?:        string;
 }
 
-// ─── Query Keys ───────────────────────────────────────────────────────────────
-
 const sessionKeys = {
   all:     (slug: string) => [slug, 'pos-sessions'] as const,
   current: (slug: string) => [slug, 'pos-sessions', 'current'] as const,
   list:    (slug: string, p?: object) => [slug, 'pos-sessions', 'list', p] as const,
   detail:  (slug: string, id: number) => [slug, 'pos-sessions', id] as const,
 };
-
-// ─── API ──────────────────────────────────────────────────────────────────────
 
 export const posSessionApi = {
   current: ()                        => apiGet<PosSession | null>('/pos-sessions/current'),
@@ -113,21 +101,19 @@ export const posSessionApi = {
   show:    (id: number) => apiGet<PosSession>(`/pos-sessions/${id}`),
 } as const;
 
-// ─── Hooks ────────────────────────────────────────────────────────────────────
-
-/** الجلسة المفتوحة للمستخدم الحالي — يُستدعى عند تحميل POSPage */
 export function useCurrentPosSession() {
   const slug = useActiveSlug();
   return useQuery({
-    queryKey:  sessionKeys.current(slug ?? ''),
-    queryFn:   posSessionApi.current,
-    enabled:   !!slug,
-    staleTime: 0,  // دائماً نتحقق من الخادم
-    retry:     false,
+    queryKey:            sessionKeys.current(slug ?? ''),
+    queryFn:             posSessionApi.current,
+    enabled:             !!slug,
+    staleTime:           0,
+    refetchOnWindowFocus: true,
+    refetchInterval:     15_000,
+    retry:               false,
   });
 }
 
-/** قائمة الجلسات (للمدير) */
 export function usePosSessionList(params?: object) {
   const slug = useActiveSlug();
   return useQuery({
@@ -139,7 +125,6 @@ export function usePosSessionList(params?: object) {
   });
 }
 
-/** تفاصيل جلسة واحدة */
 export function usePosSession(id: number | null) {
   const slug = useActiveSlug();
   return useQuery({
@@ -150,7 +135,6 @@ export function usePosSession(id: number | null) {
   });
 }
 
-/** فتح جلسة جديدة */
 export function useOpenSession() {
   const slug = useActiveSlug();
   const qc   = useQueryClient();
@@ -165,7 +149,6 @@ export function useOpenSession() {
   });
 }
 
-/** تسجيل بيع في الجلسة */
 export function useIncrementSession(sessionId: number | null) {
   const slug = useActiveSlug();
   const qc   = useQueryClient();
@@ -178,12 +161,10 @@ export function useIncrementSession(sessionId: number | null) {
         qc.setQueryData(sessionKeys.detail(slug, session.id), session);
       }
     },
-    // لا نعطّل البيع إذا فشل تسجيل الجلسة
     onError: (err) => console.warn('[POS Session increment failed]', err),
   });
 }
 
-/** إغلاق الجلسة */
 export function useCloseSession(sessionId: number | null) {
   const slug = useActiveSlug();
   const qc   = useQueryClient();
@@ -199,8 +180,6 @@ export function useCloseSession(sessionId: number | null) {
     },
   });
 }
-
-// ─── Helper: بناء IncrementSessionInput من بيانات الفاتورة ───────────────────
 
 export function buildIncrementInput(params: {
   items:          CartItem[];

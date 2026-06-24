@@ -193,7 +193,7 @@ export default function ProfessionalPaymentModal({
   );
   const remaining = Math.max(0, totalTtcFinal - totalPaid);
   const change    = totalPaid > totalTtcFinal + 0.009 ? totalPaid - totalTtcFinal : 0;
-  const canSubmit = totalPaid > 0.009 && !submitting;
+  const canSubmit = !submitting;
 
   // ── أزرار المبالغ السريعة ─────────────────────────────────────────────────
   // تُظهر الأوراق النقدية المساوية أو الأكبر من المبلغ المتبقي

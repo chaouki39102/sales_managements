@@ -14,7 +14,8 @@ const NAV_GROUPS = [
     label: 'الرئيسية',
     items: [
       { name: 'لوحة التحكم', href: 'dashboard', icon: 'ti-layout-dashboard' },
-      { name: 'نقطة البيع',  href: 'pos',        icon: 'ti-shopping-cart'   },
+      { name: 'نقطة البيع',  href: 'pos',         icon: 'ti-shopping-cart'   },
+      { name: 'جلسات POS',   href: 'pos/sessions', icon: 'ti-chart-bar'      },
     ],
   },
   {

@@ -1,7 +1,5 @@
 <?php
-// ══════════════════════════════════════════════════════════════════
-// app/Models/PosSession.php
-// ══════════════════════════════════════════════════════════════════
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +22,8 @@ class PosSession extends Model
         'cash_difference', 'closing_note', 'manager_note', 'status',
     ];
 
+    protected $appends = ['duration'];
+
     protected $casts = [
         'opened_at'              => 'datetime',
         'closed_at'              => 'datetime',
@@ -45,7 +45,6 @@ class PosSession extends Model
         'cash_difference'        => 'decimal:2',
     ];
 
-    // ── Relations ─────────────────────────────────────────────────
     public function company(): BelongsTo   { return $this->belongsTo(Company::class); }
     public function user(): BelongsTo      { return $this->belongsTo(User::class); }
     public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
@@ -53,13 +52,11 @@ class PosSession extends Model
     public function payments(): HasMany    { return $this->hasMany(PosSessionPayment::class); }
     public function products(): HasMany    { return $this->hasMany(PosSessionProduct::class); }
 
-    // ── Scopes ────────────────────────────────────────────────────
     public function scopeOpen($q)     { return $q->where('status', 'open'); }
     public function scopeForCompany($q, int $companyId) {
         return $q->where('company_id', $companyId);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────
     public function isOpen(): bool   { return $this->status === 'open'; }
     public function isClosed(): bool { return $this->status === 'closed'; }
 
@@ -72,24 +69,4 @@ class PosSession extends Model
         $m = $mins % 60;
         return $h > 0 ? "{$h}س {$m}د" : "{$m}د";
     }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// app/Models/PosSessionPayment.php
-// ══════════════════════════════════════════════════════════════════
-// (ملف منفصل في الواقع — مدمج هنا للإيجاز)
-namespace App\Models;
-class PosSessionPayment extends Model
-{
-    protected $fillable = ['pos_session_id', 'payment_mode_id', 'amount', 'count'];
-    protected $casts    = ['amount' => 'decimal:2'];
-    public function paymentMode(): BelongsTo { return $this->belongsTo(PaymentMode::class); }
-}
-
-namespace App\Models;
-class PosSessionProduct extends Model
-{
-    protected $fillable = ['pos_session_id', 'product_id', 'product_name', 'quantity_sold', 'total_ht', 'total_ttc'];
-    protected $casts    = ['quantity_sold' => 'decimal:3', 'total_ht' => 'decimal:2', 'total_ttc' => 'decimal:2'];
-    public function product(): BelongsTo { return $this->belongsTo(Product::class); }
 }

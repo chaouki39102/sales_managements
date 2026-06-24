@@ -68,9 +68,11 @@ export function calcTotals(items: CartItem[], invoiceDiscountPct = 0): CartTotal
 }
 
 /** تنسيق المبلغ بالدينار الجزائري */
-export function formatDZD(amount: number): string {
+export function formatDZD(amount: number | string | null | undefined): string {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return '0 دج';
   return new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-    .format(amount) + ' دج';
+    .format(n) + ' دج';
 }
 
 /** حساب الباقي من الدفع */

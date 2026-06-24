@@ -22,7 +22,7 @@ import {
 import { productsApi }        from '@/lib/api/endpoints/products';
 import { settingsApi }        from '@/lib/api/endpoints/settings';
 import { apiGet }             from '@/lib/api/core/client';
-import { useSelectedFiscalYear } from '@/lib/api/endpoints/fiscalYears';
+import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
 import { documentsApi }       from '@/lib/api/endpoints/documents';
 import { useActiveSlug }      from '@/lib/store/appStore';
 import {
@@ -51,7 +51,16 @@ import ProfessionalPaymentModal from '@/pos/components/ProfessionalPaymentModal'
 import HeldCartsModal           from '@/pos/components/HeldCartsModal';
 import ProfessionalReceipt      from '@/pos/components/ProfessionalReceipt';
 import ManualProductModal       from '@/pos/components/ManualProductModal';
+import OpenSessionModal         from '@/pos/components/OpenSessionModal';
+import CloseSessionModal        from '@/pos/components/CloseSessionModal';
 import SessionStatsModal        from '@/pos/components/SessionStatsModal';
+import {
+  useCurrentPosSession,
+  useOpenSession,
+  useCloseSession,
+  useIncrementSession,
+  buildIncrementInput,
+} from '@/lib/api/endpoints/posSession';
 import KeyboardHelpModal        from '@/pos/components/KeyboardHelpModal';
 import POSSettingsModal          from '@/pos/components/POSSettingsModal';
 import ManagerPinModal           from '@/pos/components/ManagerPinModal';
@@ -63,10 +72,37 @@ type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 const QUICK_ITEMS_KEY = (slug: string) => `pos-quick-items-${slug}`;
 
 export default function POSPage() {
-  const pos        = usePOS();
-  const slug       = useActiveSlug();
-  const fiscalYear = useSelectedFiscalYear();
-  const navigate   = useNavigate();
+  const pos         = usePOS();
+  const slug        = useActiveSlug();
+  const fiscalYear  = useSelectedFiscalYear();
+  const navigate    = useNavigate();
+
+  const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
+  const openSessionMut   = useOpenSession();
+  const closeSessionMut  = useCloseSession(currentSession?.id ?? null);
+  const incrementMut     = useIncrementSession(currentSession?.id ?? null);
+  const [showCloseSession, setShowCloseSession] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  const handleOpenSession = async (data: {
+    warehouse_id: number; fiscal_year_id: number; opening_cash: number; opening_note?: string;
+  }) => {
+    setSessionError(null);
+    try { await openSessionMut.mutateAsync(data); }
+    catch (e: any) { setSessionError(e?.message ?? 'فشل فتح الجلسة'); }
+  };
+
+  const handleCloseSession = async (data: {
+    closing_cash_counted: number; closing_note?: string;
+  }) => {
+    try {
+      await closeSessionMut.mutateAsync(data);
+      setShowCloseSession(false);
+      toast.success('تم إغلاق الجلسة بنجاح');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'فشل إغلاق الجلسة');
+    }
+  };
 
   const { settings, setSettings, resetSettings } = usePOSSettings(slug);
 
@@ -172,6 +208,9 @@ export default function POSPage() {
   const hasMore     = productsMeta ? !productsMeta.is_last_page : false;
 
   // ── Lookups ─────────────────────────────────────────────────────────────────
+  const { data: fiscalYearsData } = useFiscalYears();
+  const fiscalYears = fiscalYearsData?.years ?? [];
+
   const { data: customersData    } = useClients({ per_page: 200 });
   const { data: paymentModes     } = usePaymentModes();
   const { data: warehouses       } = useWarehouses();
@@ -528,7 +567,22 @@ export default function POSPage() {
         payments: apiPayments,
       });
 
-      pos.incrementSession(snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp);
+      if (currentSession?.id) {
+        incrementMut.mutate(
+          buildIncrementInput({
+            items:            currentItems,
+            totalHt:          snapshot.totals.total_ht,
+            totalTva:         snapshot.totals.total_tva,
+            totalFiscalStamp: snapshot.totals.fiscal_stamp,
+            totalDiscount:    snapshot.totals.total_discount + invoiceDiscountAmount,
+            grandTotal:       snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp,
+            payments:         apiPayments.map(p => ({
+              payment_mode_id: p.payment_mode_id,
+              amount:          p.amount,
+            })),
+          }),
+        );
+      }
       setReceiptSnapshot({ items: snapshot.items, totals: snapshot.totals, docNum: res.document_number });
       setLastDocNum(res.document_number);
       setCartNote('');
@@ -577,9 +631,33 @@ export default function POSPage() {
       id="p-pos"
       dir="rtl"
     >
+      {/* جلسة مطلوبة — تظهر إذا لم تكن هناك جلسة مفتوحة */}
+      {!sessionLoading && !currentSession && (
+        <OpenSessionModal
+          warehouses={warehouses ?? []}
+          fiscalYears={fiscalYears ?? []}
+          defaultWarehouseId={defaultWarehouse?.id}
+          defaultFiscalYearId={fiscalYear?.id}
+          isLoading={openSessionMut.isPending}
+          error={sessionError}
+          onOpen={handleOpenSession}
+        />
+      )}
+
+      {/* نافذة إغلاق الجلسة */}
+      {showCloseSession && currentSession && (
+        <CloseSessionModal
+          session={currentSession}
+          isLoading={closeSessionMut.isPending}
+          error={closeSessionMut.error?.message ?? null}
+          onClose={() => setShowCloseSession(false)}
+          onConfirm={handleCloseSession}
+        />
+      )}
+
       <POSTopBar
-        sessionInvoices={pos.sessionInvoices}
-        sessionSales={pos.sessionSales}
+        sessionInvoices={currentSession?.invoices_count ?? 0}
+        sessionSales={currentSession?.net_sales ?? 0}
         heldCount={pos.heldCarts.length}
         avgMargin={avgMargin}
         isEmpty={isEmpty}
@@ -728,19 +806,11 @@ export default function POSPage() {
         />
       )}
 
-      {modal === 'session' && (
+      {modal === 'session' && currentSession && (
         <SessionStatsModal
-          sessionInvoices={pos.sessionInvoices}
-          sessionSales={pos.sessionSales}
-          highestInvoice={pos.highestInvoice}
-          invoiceTotals={pos.invoiceTotals}
-          paymentsBreakdown={pos.paymentsBreakdown}
-          productsSold={pos.productsSold}
-          paymentModes={paymentModes ?? []}
-          heldCount={pos.heldCarts.length}
-          avgMargin={avgMargin}
+          session={currentSession}
           onClose={() => setModal('none')}
-          onEndSession={() => { pos.endSession(); setModal('none'); }}
+          onEndSession={() => { setModal('none'); setShowCloseSession(true); }}
         />
       )}
 

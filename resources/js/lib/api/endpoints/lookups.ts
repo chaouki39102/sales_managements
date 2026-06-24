@@ -36,12 +36,20 @@ export const globalLookupsApi = {
   allCommunes: ()           => apiGet<Commune[]>('/communes', { per_page: 1600 }),
 } as const;
 
+function extractArray<T>(d: unknown): T[] {
+  if (Array.isArray(d)) return d;
+  if (d && typeof d === 'object' && 'data' in (d as object) && Array.isArray((d as Record<'data', unknown>)['data'])) {
+    return (d as Record<string, unknown>)['data'] as T[];
+  }
+  return [];
+}
+
 export function useWilayas() {
   return useQuery<Wilaya[]>({
     queryKey: globalKeys.wilayas,
     queryFn:  globalLookupsApi.wilayas,
     staleTime: GLOBAL_STALE,
-    select:   (d) => Array.isArray(d) ? d : [],
+    select:   extractArray<Wilaya>,
   });
 }
 
@@ -51,7 +59,7 @@ export function useCommunes(wilayaId: number | null | undefined) {
     queryFn:  () => globalLookupsApi.communes(wilayaId!),
     staleTime: GLOBAL_STALE,
     enabled:  !!wilayaId,
-    select:   (d) => Array.isArray(d) ? d : [],
+    select:   extractArray<Commune>,
   });
 }
 
@@ -100,7 +108,13 @@ function useTenantLookup<T>(
     queryFn:  apiFn,
     enabled:  !!slug && enabled,
     staleTime: TENANT_STALE,
-    select:   (d) => Array.isArray(d) ? d : [],
+    select:   (d) => {
+      if (Array.isArray(d)) return d;
+      if (d && typeof d === 'object' && 'data' in (d as object) && Array.isArray((d as Record<'data', unknown>)['data'])) {
+        return (d as Record<string, unknown>)['data'] as T[];
+      }
+      return [];
+    },
   });
 }
 

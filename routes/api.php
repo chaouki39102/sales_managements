@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\V1\BankReconciliationController;
 use App\Http\Controllers\Api\V1\ApprovalController;
 use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\DocumentMailController;
+use App\Http\Controllers\Api\V1\PosSessionController;
 
 
 // Tenant Lookup Controllers
@@ -509,6 +510,16 @@ Route::prefix('v1')->group(function () {
 
                 // ── إرسال المستند للزبون ────────────────────────────
                 Route::post('documents/{documentId}/send-mail', [DocumentMailController::class, 'send']);
+            });
+
+            // ── POS Sessions ──────────────────────────────────────
+            Route::prefix('pos-sessions')->group(function () {
+                Route::get('current',                [PosSessionController::class, 'current']);
+                Route::post('/',                     [PosSessionController::class, 'open']);
+                Route::post('{session}/increment',   [PosSessionController::class, 'increment']);
+                Route::post('{session}/close',       [PosSessionController::class, 'close']);
+                Route::get('/',                      [PosSessionController::class, 'index']);
+                Route::get('{session}',              [PosSessionController::class, 'show']);
             });
 
             // ── ⑤-د: فردية (المستخدم نفسه) ─────────────────────

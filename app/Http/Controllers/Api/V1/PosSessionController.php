@@ -1,13 +1,13 @@
 <?php
-// ══════════════════════════════════════════════════════════════════
-// app/Http/Controllers/Api/PosSessionController.php
-// ══════════════════════════════════════════════════════════════════
-namespace App\Http\Controllers\Api;
 
+namespace App\Http\Controllers\Api\V1;
+
+use App\Core\Http\Controllers\Traits\ApiResponders;
 use App\Http\Controllers\Controller;
 use App\Models\PosSession;
 use App\Models\PosSessionPayment;
 use App\Models\PosSessionProduct;
+use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -15,22 +15,26 @@ use Illuminate\Support\Facades\Auth;
 
 class PosSessionController extends Controller
 {
-    // ── GET /{company}/pos-sessions/current ───────────────────────
-    // الجلسة المفتوحة للمستخدم الحالي في هذه الشركة
+    use ApiResponders;
+    private function company(Request $request): Company
+    {
+        return $request->input('_company');
+    }
+
     public function current(Request $request): JsonResponse
     {
-        $session = PosSession::forCompany($request->company->id)
+        $session = PosSession::forCompany($this->company($request)->id)
             ->open()
             ->where('user_id', Auth::id())
             ->with(['user:id,name', 'warehouse:id,name', 'payments.paymentMode', 'products'])
             ->latest('opened_at')
             ->first();
 
-        return response()->json(['data' => $session]);
+        return response()->json([
+            'data' => $session ? $this->formatSession($session) : null,
+        ]);
     }
 
-    // ── POST /{company}/pos-sessions ──────────────────────────────
-    // فتح جلسة جديدة
     public function open(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -40,8 +44,7 @@ class PosSessionController extends Controller
             'opening_note'   => 'nullable|string|max:255',
         ]);
 
-        // منع فتح جلستين في نفس الوقت
-        $existing = PosSession::forCompany($request->company->id)
+        $existing = PosSession::forCompany($this->company($request)->id)
             ->open()
             ->where('user_id', Auth::id())
             ->first();
@@ -54,7 +57,7 @@ class PosSessionController extends Controller
         }
 
         $session = PosSession::create([
-            'company_id'     => $request->company->id,
+            'company_id'     => $this->company($request)->id,
             'user_id'        => Auth::id(),
             'warehouse_id'   => $data['warehouse_id'],
             'fiscal_year_id' => $data['fiscal_year_id'],
@@ -70,11 +73,9 @@ class PosSessionController extends Controller
         ], 201);
     }
 
-    // ── POST /{company}/pos-sessions/{session}/increment ─────────
-    // تسجيل بيع جديد — يُستدعى من الفرونتند بعد كل فاتورة
-    public function increment(Request $request, int $sessionId): JsonResponse
+    public function increment(Request $request): JsonResponse
     {
-        $session = $this->findOpenSession($request, $sessionId);
+        $session = $this->findOpenSession($request, $request->route('session'));
 
         $data = $request->validate([
             'invoice_total'       => 'required|numeric|min:0',
@@ -83,11 +84,9 @@ class PosSessionController extends Controller
             'total_fiscal_stamp'  => 'required|numeric|min:0',
             'total_discount'      => 'required|numeric|min:0',
             'is_return'           => 'boolean',
-            // وسائل الدفع: [{payment_mode_id, amount}]
             'payments'            => 'nullable|array',
             'payments.*.payment_mode_id' => 'required|integer',
             'payments.*.amount'          => 'required|numeric|min:0',
-            // المنتجات: [{product_id, product_name, quantity, total_ht, total_ttc}]
             'items'               => 'nullable|array',
             'items.*.product_id'  => 'required|integer',
             'items.*.product_name'=> 'required|string',
@@ -100,7 +99,6 @@ class PosSessionController extends Controller
             $isReturn = $data['is_return'] ?? false;
             $amount   = $data['invoice_total'];
 
-            // ── تحديث الإجماليات ──────────────────────────────────
             if ($isReturn) {
                 $session->increment('returns_count');
                 $session->increment('returns_total', $amount);
@@ -116,22 +114,30 @@ class PosSessionController extends Controller
             $session->increment('total_fiscal_stamp', $data['total_fiscal_stamp']);
             $session->increment('total_discount',     $data['total_discount']);
 
-            // net_sales يُحدَّث دائماً
             $session->update([
                 'net_sales' => $session->gross_sales - $session->returns_total,
             ]);
 
-            // ── وسائل الدفع ───────────────────────────────────────
             foreach ($data['payments'] ?? [] as $p) {
                 $modeId = $p['payment_mode_id'];
                 $pamt   = $p['amount'];
 
-                PosSessionPayment::updateOrCreate(
-                    ['pos_session_id' => $session->id, 'payment_mode_id' => $modeId],
-                    ['amount' => DB::raw("amount + {$pamt}"), 'count' => DB::raw('count + 1')],
-                );
+                $payment = PosSessionPayment::where('pos_session_id', $session->id)
+                    ->where('payment_mode_id', $modeId)
+                    ->first();
 
-                // تحديث أعمدة الاختصار
+                if ($payment) {
+                    $payment->increment('amount', $pamt);
+                    $payment->increment('count');
+                } else {
+                    PosSessionPayment::create([
+                        'pos_session_id' => $session->id,
+                        'payment_mode_id' => $modeId,
+                        'amount' => $pamt,
+                        'count' => 1,
+                    ]);
+                }
+
                 $modeCode = \App\Models\PaymentMode::find($modeId)?->code ?? '';
                 $colMap = [
                     'cash' => 'cash_collected', 'cib' => 'cib_collected',
@@ -143,28 +149,36 @@ class PosSessionController extends Controller
                 }
             }
 
-            // ── المنتجات ──────────────────────────────────────────
             foreach ($data['items'] ?? [] as $item) {
-                PosSessionProduct::updateOrCreate(
-                    ['pos_session_id' => $session->id, 'product_id' => $item['product_id']],
-                    [
-                        'product_name'  => $item['product_name'],
-                        'quantity_sold' => DB::raw("quantity_sold + {$item['quantity']}"),
-                        'total_ht'      => DB::raw("total_ht + {$item['total_ht']}"),
-                        'total_ttc'     => DB::raw("total_ttc + {$item['total_ttc']}"),
-                    ],
-                );
+                $product = PosSessionProduct::where('pos_session_id', $session->id)
+                    ->where('product_id', $item['product_id'])
+                    ->first();
+
+                if ($product) {
+                    $product->increment('quantity_sold', $item['quantity']);
+                    $product->increment('total_ht', $item['total_ht']);
+                    $product->increment('total_ttc', $item['total_ttc']);
+                } else {
+                    PosSessionProduct::create([
+                        'pos_session_id' => $session->id,
+                        'product_id'     => $item['product_id'],
+                        'product_name'   => $item['product_name'],
+                        'quantity_sold'  => $item['quantity'],
+                        'total_ht'       => $item['total_ht'],
+                        'total_ttc'      => $item['total_ttc'],
+                    ]);
+                }
             }
         });
 
-        return response()->json(['data' => $session->fresh()]);
+        return response()->json(['data' => $this->formatSession($session->fresh()
+            ->load(['user:id,name', 'warehouse:id,name', 'payments.paymentMode', 'products'])
+        )]);
     }
 
-    // ── POST /{company}/pos-sessions/{session}/close ──────────────
-    // إغلاق الجلسة مع جرد الصندوق
-    public function close(Request $request, int $sessionId): JsonResponse
+    public function close(Request $request): JsonResponse
     {
-        $session = $this->findOpenSession($request, $sessionId);
+        $session = $this->findOpenSession($request, $request->route('session'));
 
         $data = $request->validate([
             'closing_cash_counted' => 'required|numeric|min:0',
@@ -190,11 +204,9 @@ class PosSessionController extends Controller
         ]);
     }
 
-    // ── GET /{company}/pos-sessions ───────────────────────────────
-    // قائمة الجلسات (للمدير)
     public function index(Request $request): JsonResponse
     {
-        $sessions = PosSession::forCompany($request->company->id)
+        $sessions = PosSession::forCompany($this->company($request)->id)
             ->with(['user:id,name', 'warehouse:id,name'])
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->user_id, fn($q) => $q->where('user_id', $request->user_id))
@@ -203,23 +215,21 @@ class PosSessionController extends Controller
             ->orderByDesc('opened_at')
             ->paginate($request->per_page ?? 20);
 
-        return response()->json($sessions);
+        return $this->successResponse($sessions, 'تم جلب الجلسات بنجاح');
     }
 
-    // ── GET /{company}/pos-sessions/{session} ─────────────────────
-    public function show(Request $request, int $sessionId): JsonResponse
+    public function show(Request $request): JsonResponse
     {
-        $session = PosSession::forCompany($request->company->id)
+        $session = PosSession::forCompany($this->company($request)->id)
             ->with(['user:id,name', 'warehouse:id,name', 'payments.paymentMode', 'products.product:id,name'])
-            ->findOrFail($sessionId);
+            ->findOrFail($request->route('session'));
 
         return response()->json(['data' => $this->formatSession($session)]);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────
     private function findOpenSession(Request $request, int $id): PosSession
     {
-        return PosSession::forCompany($request->company->id)
+        return PosSession::forCompany($this->company($request)->id)
             ->open()
             ->where('user_id', Auth::id())
             ->findOrFail($id);
