@@ -160,6 +160,7 @@ export default function POSPage() {
   const [filterInStock,   setFilterInStock]   = useState(false);
   const [filterLowStock,  setFilterLowStock]  = useState(false);
   const [sortBy,          setSortBy]          = useState<SortMode>('name');
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const searchRef    = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -352,6 +353,10 @@ export default function POSPage() {
       return (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'ar');
     });
   }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [filteredVariants.length, pos.searchQuery]);
 
   const isEmpty = pos.items.length === 0;
 
@@ -617,6 +622,29 @@ export default function POSPage() {
   const isQuickItem = useCallback((variantId: number) =>
     quickItems.some(q => q.variantId === variantId), [quickItems]);
 
+  const handleAddItem = useCallback((v: ProductVariant) => {
+    pos.addItem(v);
+    if (settings.clearSearchOnAdd) {
+      pos.setSearch('');
+      searchRef.current?.focus();
+    }
+  }, [pos, settings.clearSearchOnAdd]);
+
+  const handleArrowUp = useCallback(() => {
+    setHighlightedIndex(prev => prev > 0 ? prev - 1 : filteredVariants.length - 1);
+  }, [filteredVariants.length]);
+
+  const handleArrowDown = useCallback(() => {
+    setHighlightedIndex(prev => prev < filteredVariants.length - 1 ? prev + 1 : 0);
+  }, [filteredVariants.length]);
+
+  const handleEnterHighlighted = useCallback(() => {
+    const v = filteredVariants[highlightedIndex];
+    if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending)) {
+      handleAddItem(v);
+    }
+  }, [filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
+
   const orderTypeLabels: Record<OrderType, { icon: string; label: string }> = {
     'dine-in':  { icon: 'ti-building-store', label: 'طاولة' },
     'takeaway': { icon: 'ti-shopping-bag',   label: 'استلام' },
@@ -695,7 +723,7 @@ export default function POSPage() {
         <QuickItemsBar
           quickItems={quickItems}
           allVariants={allVariants}
-          onAdd={v => pos.addItem(v)}
+          onAdd={handleAddItem}
           onRemove={variantId => setQuickItems(p => p.filter(q => q.variantId !== variantId))}
           allowNegativeStock={allowNegSetting}
         />
@@ -717,7 +745,11 @@ export default function POSPage() {
             onFilter={() => setShowFilter(s => !s)} filterActive={filterActive}
             inputRef={searchRef} sortBy={sortBy} onSort={setSortBy}
             resultsCount={filteredVariants.length}
-            onEnterFirst={() => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) pos.addItem(first); }}
+            onEnterFirst={settings.keyboardNav ? handleEnterHighlighted : () => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) handleAddItem(first); }}
+            highlightedIndex={highlightedIndex}
+            onArrowUp={handleArrowUp}
+            onArrowDown={handleArrowDown}
+            keyboardNavEnabled={settings.keyboardNav}
           />
           {showFilter && (
             <FilterPanel
@@ -732,7 +764,9 @@ export default function POSPage() {
           <ProductGrid
             variants={filteredVariants} view={view} gridSize={gridSize}
             loading={loadingAll} hasMore={hasMore} onLoadMore={() => setPage(p => p + 1)}
-            onAdd={v => pos.addItem(v)} onAddManual={() => setModal('manual')}
+            onAdd={handleAddItem} onAddManual={() => setModal('manual')}
+            highlightedIndex={highlightedIndex}
+            onHighlightIndexChange={setHighlightedIndex}
             onPin={toggleQuickItem} isPinned={isQuickItem}
             priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
             cartItems={pos.items} allowNegativeStock={allowNegSetting}

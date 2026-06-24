@@ -26,8 +26,8 @@ import type {
   PriceLevel, Party, PaymentMode, DocumentType,
 } from '@/types';
 
-import ProductSearchBar   from '@/pos/components/ProductSearchBar';
-import CategoryTabs       from '@/pos/components/CategoryTabs';
+import ProductSearchBarEnhanced from '@/pos/components/ProductSearchBarEnhanced';
+import CategoryTabsEnhanced     from '@/pos/components/CategoryTabsEnhanced';
 import ProductGrid        from '@/pos/components/ProductGrid';
 import ProfessionalPaymentModal from '@/pos/components/ProfessionalPaymentModal';
 import ProfessionalReceipt      from '@/pos/components/ProfessionalReceipt';
@@ -39,7 +39,6 @@ export default function POSKioskPage() {
   const slug       = useActiveSlug();
   const fiscalYear = useSelectedFiscalYear();
 
-  const [searchQuery,      setSearchQuery]      = useState('');
   const [selectedCategory, setSelectedCategory]  = useState<number | null>(null);
   const [gridSize,         setGridSize]          = useState<GridSize>('md');
   const [view,             setView]              = useState<ViewMode>('grid');
@@ -61,10 +60,9 @@ export default function POSKioskPage() {
   const priceLevelsList  = priceLevels ?? [];
 
   const { data: productsRaw   } = useQuery({
-    queryKey: ['pos-products-kiosk', slug, searchQuery, selectedCategory],
+    queryKey: ['pos-products-kiosk', slug, selectedCategory],
     queryFn: () => productsApi.list({
       per_page: PER_PAGE,
-      search:   searchQuery || undefined,
       family_id: selectedCategory ?? undefined,
       include:  'tva,unit,family,prices.priceLevel',
       active:   true,
@@ -87,8 +85,6 @@ export default function POSKioskPage() {
       return [{ ...p.family, _count: { products: products.filter(x => x.family?.name === p.family?.name).length } }];
     });
   }, [products]);
-
-  const filteredVariants = useMemo(() => allVariants, [allVariants]);
 
   const handleCompleteSale = async (params: {
     paymentModeId: number; amount: number;
@@ -174,20 +170,17 @@ export default function POSKioskPage() {
 
       <div className="pos-kiosk-body">
         <div className="pos-kiosk-search">
-          <ProductSearchBar
-            query={searchQuery} onQuery={setSearchQuery}
-            view={view} gridSize={gridSize}
-            onView={setView} onGridSize={setGridSize}
-            onFilter={() => {}} filterActive={false}
-            sortBy={sortBy} onSort={setSortBy}
-            resultsCount={filteredVariants.length}
-            onEnterFirst={() => { const first = filteredVariants[0]; if (first) pos.addItem(first); }}
+          <ProductSearchBarEnhanced
+            variants={allVariants}
+            families={families}
+            onSelectVariant={v => pos.addItem(v)}
+            maxSuggestions={8}
           />
         </div>
-        <CategoryTabs families={families} selected={selectedCategory} onSelect={setSelectedCategory} />
+        <CategoryTabsEnhanced selected={selectedCategory} onSelect={setSelectedCategory} families={families} />
         <div className="pos-kiosk-grid">
           <ProductGrid
-            variants={filteredVariants} view={view} gridSize={gridSize}
+            variants={allVariants} view={view} gridSize={gridSize}
             loading={false} hasMore={false} onLoadMore={() => {}}
             onAdd={v => pos.addItem(v)} onAddManual={() => {}}
             onPin={() => {}} isPinned={() => false}

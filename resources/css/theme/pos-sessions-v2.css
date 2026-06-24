@@ -1272,7 +1272,7 @@
 .pss-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
   padding: 22px;
   min-height: 100%;
 }

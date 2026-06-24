@@ -25,6 +25,7 @@ import '../css/theme/components.css';
 import '../css/theme/pages.css';
 import '../css/theme/utilities.css';
 import '../css/theme/pos.css';
+import '../css/theme/pos-search-enhanced.css';
 
 // ربط Zustand بالـ interceptor — مرة واحدة عند تحميل الـ module
 connectSlugToInterceptor(() => appActions.getActiveSlug());

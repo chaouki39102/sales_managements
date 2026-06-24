@@ -164,6 +164,8 @@ export default function POSSettingsModal({
                 { key: 'playSoundOnSale',     label: 'صوت عند إتمام البيع (success chime)' },
                 { key: 'showStockOnCard',     label: 'إظهار الرصيد في بطاقة المنتج' },
                 { key: 'hideOutOfStock',      label: 'إخفاء المنتجات النافذة من الشبكة' },
+                { key: 'clearSearchOnAdd',   label: 'تفريغ البحث بعد إضافة منتج' },
+                { key: 'keyboardNav',        label: 'التنقل عبر النتائج بلوحة المفاتيح (↑↓)' },
               ].map(({ key, label }) => (
                 <div className="fg s2" key={key}>
                   <label className="pos-set-toggle">

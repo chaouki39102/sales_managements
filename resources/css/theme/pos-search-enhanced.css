@@ -1,0 +1,175 @@
+/* ===========================
+   POS Search Bar Enhanced
+   =========================== */
+
+.psbe-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.psbe-inp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--b1);
+  border: 1px solid var(--b3);
+  border-radius: 8px;
+  padding: 6px 10px;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.psbe-inp.psbe-focus {
+  border-color: var(--p);
+  box-shadow: 0 0 0 2px rgba(var(--pr), .15);
+}
+
+.psbe-inp input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--t1);
+  direction: rtl;
+  min-width: 0;
+}
+
+.psbe-inp input::placeholder {
+  color: var(--t4);
+}
+
+.psbe-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: var(--b3);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--t2);
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+
+.psbe-clear:hover {
+  background: var(--b4);
+}
+
+/* ———— Dropdown ———— */
+
+.psbe-drop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--b1);
+  border: 1px solid var(--b3);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.12);
+  z-index: 1000;
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  direction: rtl;
+}
+
+.psbe-drop--simple {
+  /* no category grouping — simpler styling */
+}
+
+.psbe-grp + .psbe-grp {
+  border-top: 1px solid var(--b3);
+}
+
+.psbe-grp-hd {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t4);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 8px 12px 4px;
+  position: sticky;
+  top: 0;
+  background: var(--b1);
+  z-index: 1;
+}
+
+.psbe-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background .1s;
+  gap: 8px;
+}
+
+.psbe-item:hover,
+.psbe-hl {
+  background: var(--bh);
+}
+
+.psbe-item:active {
+  background: var(--ba);
+}
+
+.psbe-item-name {
+  font-size: 13px;
+  color: var(--t1);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.psbe-item-price {
+  font-size: 12px;
+  color: var(--p);
+  font-weight: 700;
+  white-space: nowrap;
+  direction: ltr;
+  text-align: right;
+}
+
+.psbe-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--t4);
+  border-top: 1px solid var(--b3);
+  direction: rtl;
+}
+
+.psbe-nav-hint {
+  font-weight: 700;
+  font-size: 11px;
+  direction: ltr;
+}
+
+/* ———— Loading spinner ———— */
+
+@keyframes psbe-spin {
+  to { transform: rotate(360deg); }
+}
+
+.psbe-inp .ti-loader.spin {
+  animation: psbe-spin .8s linear infinite;
+}
+
+/* ———— Responsive ———— */
+
+@media (max-width: 600px) {
+  .psbe-drop {
+    max-height: min(320px, 50vh);
+  }
+  .psbe-item {
+    padding: 6px 10px;
+  }
+}

@@ -451,6 +451,7 @@
 .pcard:active { transform: translateY(0); }
 .pcard.pcard-out { opacity: .55; cursor: not-allowed; }
 .pcard.pcard-out:hover { transform: none; border-color: var(--b2); box-shadow: none; }
+.pcard.pcard-hl { outline: 2.5px solid var(--em); outline-offset: -2.5px; box-shadow: 0 0 0 4px var(--emb); }
 .pcard.pcard-incart { border-color: var(--embo); background: var(--emb); }
 
 .pcard-img {
@@ -610,6 +611,7 @@
 .prow:hover { background: var(--bg3); }
 .prow.prow-incart { background: var(--emb); }
 .prow.prow-out { opacity: .5; cursor: not-allowed; }
+.prow.prow-hl { outline: 2px solid var(--em); outline-offset: -2px; background: var(--emb); }
 .prow td { padding: 8px 10px; vertical-align: middle; }
 .prow-nm   { font-weight: 700; color: var(--t1); }
 .prow-bc   { font-size: 10px; color: var(--t4); font-family: monospace; }

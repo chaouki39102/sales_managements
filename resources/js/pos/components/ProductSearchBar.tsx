@@ -29,11 +29,16 @@ interface ProductSearchBarProps {
   onSort: (s: SortMode) => void;
   resultsCount: number;
   onEnterFirst: () => void;
+  highlightedIndex?: number;
+  onArrowUp?: () => void;
+  onArrowDown?: () => void;
+  keyboardNavEnabled?: boolean;
 }
 
 export default function ProductSearchBar({
   query, onQuery, view, gridSize, onView, onGridSize,
   onFilter, filterActive, inputRef, sortBy, onSort, resultsCount, onEnterFirst,
+  highlightedIndex, onArrowUp, onArrowDown, keyboardNavEnabled,
 }: ProductSearchBarProps) {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -60,6 +65,8 @@ export default function ProductSearchBar({
           onKeyDown={e => {
             if (e.key === 'Enter') { e.preventDefault(); onEnterFirst(); }
             if (e.key === 'Escape') { e.preventDefault(); onQuery(''); }
+            if (keyboardNavEnabled && onArrowUp && e.key === 'ArrowUp') { e.preventDefault(); onArrowUp(); }
+            if (keyboardNavEnabled && onArrowDown && e.key === 'ArrowDown') { e.preventDefault(); onArrowDown(); }
           }}
         />
         {query && (
@@ -74,6 +81,11 @@ export default function ProductSearchBar({
 
       {query && (
         <span className="srch-count">{resultsCount} نتيجة</span>
+      )}
+      {query && keyboardNavEnabled && highlightedIndex !== undefined && resultsCount > 0 && (
+        <span className="srch-pos" style={{ fontSize: 11, color: 'var(--t4)', fontWeight: 700, direction: 'ltr' }}>
+          {highlightedIndex + 1}/{resultsCount}
+        </span>
       )}
 
       <div className="pos-sort-wrap" ref={sortRef}>

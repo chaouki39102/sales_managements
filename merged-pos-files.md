@@ -74,7 +74,8 @@ export default function POSKioskPage() {
       per_page: PER_PAGE,
       search:   searchQuery || undefined,
       family_id: selectedCategory ?? undefined,
-      with:     'variants,variants.quantity_discounts,category,family',
+      include:  'tva,unit,family,prices.priceLevel',
+      active:   true,
     }),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
@@ -95,8 +96,7 @@ export default function POSKioskPage() {
     });
   }, [products]);
 
-  const [filteredVariants, setFilteredVariants] = useState<ProductVariant[]>([]);
-  useMemo(() => setFilteredVariants(allVariants), [allVariants]);
+  const filteredVariants = useMemo(() => allVariants, [allVariants]);
 
   const handleCompleteSale = async (params: {
     paymentModeId: number; amount: number;
@@ -271,6 +271,7 @@ export default function POSKioskPage() {
 //      (منطقها الآن داخل useCartStore — لا تغيير هنا)
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
@@ -282,7 +283,7 @@ import {
 import { productsApi }        from '@/lib/api/endpoints/products';
 import { settingsApi }        from '@/lib/api/endpoints/settings';
 import { apiGet }             from '@/lib/api/core/client';
-import { useSelectedFiscalYear } from '@/lib/api/endpoints/fiscalYears';
+import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
 import { documentsApi }       from '@/lib/api/endpoints/documents';
 import { useActiveSlug }      from '@/lib/store/appStore';
 import {
@@ -311,8 +312,20 @@ import ProfessionalPaymentModal from '@/pos/components/ProfessionalPaymentModal'
 import HeldCartsModal           from '@/pos/components/HeldCartsModal';
 import ProfessionalReceipt      from '@/pos/components/ProfessionalReceipt';
 import ManualProductModal       from '@/pos/components/ManualProductModal';
+import OpenSessionModal         from '@/pos/components/OpenSessionModal';
+import CloseSessionModal        from '@/pos/components/CloseSessionModal';
 import SessionStatsModal        from '@/pos/components/SessionStatsModal';
+import {
+  useCurrentPosSession,
+  useOpenSession,
+  useCloseSession,
+  useIncrementSession,
+  buildIncrementInput,
+} from '@/lib/api/endpoints/posSession';
 import KeyboardHelpModal        from '@/pos/components/KeyboardHelpModal';
+import POSSettingsModal          from '@/pos/components/POSSettingsModal';
+import ManagerPinModal           from '@/pos/components/ManagerPinModal';
+import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
 import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
 
 type OrderType = 'dine-in' | 'takeaway' | 'delivery';
@@ -320,20 +333,57 @@ type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 const QUICK_ITEMS_KEY = (slug: string) => `pos-quick-items-${slug}`;
 
 export default function POSPage() {
-  const pos        = usePOS();
-  const slug       = useActiveSlug();
-  const fiscalYear = useSelectedFiscalYear();
+  const pos         = usePOS();
+  const slug        = useActiveSlug();
+  const fiscalYear  = useSelectedFiscalYear();
+  const navigate    = useNavigate();
+
+  const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
+  const openSessionMut   = useOpenSession();
+  const closeSessionMut  = useCloseSession(currentSession?.id ?? null);
+  const incrementMut     = useIncrementSession(currentSession?.id ?? null);
+  const [showCloseSession, setShowCloseSession] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  const handleOpenSession = async (data: {
+    warehouse_id: number; fiscal_year_id: number; opening_cash: number; opening_note?: string;
+  }) => {
+    setSessionError(null);
+    try { await openSessionMut.mutateAsync(data); }
+    catch (e: any) { setSessionError(e?.message ?? 'فشل فتح الجلسة'); }
+  };
+
+  const handleCloseSession = async (data: {
+    closing_cash_counted: number; closing_note?: string;
+  }) => {
+    try {
+      await closeSessionMut.mutateAsync(data);
+      setShowCloseSession(false);
+      toast.success('تم إغلاق الجلسة بنجاح');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'فشل إغلاق الجلسة');
+    }
+  };
+
+  const { settings, setSettings, resetSettings } = usePOSSettings(slug);
 
   const [view,       setView]       = useState<ViewMode>('grid');
-  const [gridSize,   setGridSize]   = useState<GridSize>('md');
+  const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
   const [mobTab,     setMobTab]     = useState<'products' | 'cart'>('products');
   const [fullscreen, setFullscreen] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [modal,      setModal]      = useState<ActiveModal>('none');
+  const [showSettings, setShowSettings] = useState(false);
+  const [pinModal, setPinModal] = useState<{
+    requestedDiscount: number;
+    reason: 'max_exceeded' | 'pin_required';
+    onSuccess: () => void;
+  } | null>(null);
   const [cartNote,   setCartNote]   = useState('');
   const [selectedPriceLevelId, setSelectedPriceLevelId] = useState<number | null>(null);
   const [lastDocNum,  setLastDocNum]  = useState<string | undefined>();
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
+
   const [receiptSnapshot, setReceiptSnapshot] = useState<{
     items: CartItem[]; totals: CartTotals; docNum?: string;
   } | null>(null);
@@ -346,7 +396,7 @@ export default function POSPage() {
       return stored ? JSON.parse(stored) : [];
     } catch { return []; }
   });
-  const [showQuickbar, setShowQuickbar] = useState(true);
+  const [showQuickbar, setShowQuickbar] = useState(settings.showQuickbarOnStart);
 
   useEffect(() => {
     if (!slug) return;
@@ -371,6 +421,7 @@ export default function POSPage() {
   const [filterInStock,   setFilterInStock]   = useState(false);
   const [filterLowStock,  setFilterLowStock]  = useState(false);
   const [sortBy,          setSortBy]          = useState<SortMode>('name');
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const searchRef    = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -386,7 +437,7 @@ export default function POSPage() {
     }],
     queryFn: () => productsApi.list({
       per_page:  120,
-      include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',  // ✅ أُضيف quantityDiscounts
+      include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
       search:    isSearching ? pos.searchQuery : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       page,
@@ -419,6 +470,9 @@ export default function POSPage() {
   const hasMore     = productsMeta ? !productsMeta.is_last_page : false;
 
   // ── Lookups ─────────────────────────────────────────────────────────────────
+  const { data: fiscalYearsData } = useFiscalYears();
+  const fiscalYears = fiscalYearsData?.years ?? [];
+
   const { data: customersData    } = useClients({ per_page: 200 });
   const { data: paymentModes     } = usePaymentModes();
   const { data: warehouses       } = useWarehouses();
@@ -429,7 +483,9 @@ export default function POSPage() {
 
   const customers        = (customersData as PaginatedResponse<Party>)?.data ?? (customersData as Party[]) ?? [];
   const priceLevelsList  = priceLevels ?? [];
-  const defaultWarehouse = warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null;
+  const defaultWarehouse = settings.defaultWarehouseId
+    ? warehouses?.find(w => w.id === settings.defaultWarehouseId)
+    : (warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null);
   const realWarehouseId  = defaultWarehouse?.id ?? null;
   const defaultCurrency  = currencies?.find(c => c.is_base_currency) ?? currencies?.[0];
   const defaultTreasury  = treasuryAccounts?.find(a => a.is_default) ?? treasuryAccounts?.[0];
@@ -544,6 +600,8 @@ export default function POSPage() {
 
   const filteredVariants = useMemo(() => {
     let list = allVariants;
+    if (pos.selectedCategory !== null) list = list.filter(v => v.product?.family?.id === pos.selectedCategory);
+    if (settings.hideOutOfStock) list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
     if (filterInStock)  list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
     if (filterLowStock) list = list.filter(v => v.manages_stock && (v.current_stock ?? 0) <= (v.min_stock_alert ?? 0) && (v.current_stock ?? 0) > 0);
     if (filterMinPrice) list = list.filter(v => v.default_selling_price_ht >= parseFloat(filterMinPrice));
@@ -555,9 +613,18 @@ export default function POSPage() {
       if (sortBy === 'family')     return (a.product?.family?.name ?? '').localeCompare(b.product?.family?.name ?? '', 'ar');
       return (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'ar');
     });
-  }, [allVariants, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
+  }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [filteredVariants.length, pos.searchQuery]);
 
   const isEmpty = pos.items.length === 0;
+
+  const clearCartSafe = useCallback(() => {
+    if (settings.confirmOnClear && !isEmpty && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+    pos.clearCart();
+  }, [settings.confirmOnClear, isEmpty, pos]);
 
   // ── Invoice discount ───────────────────────────────────────────────────────
   const invoiceDiscountPct    = pos.invoiceDiscountPct;
@@ -712,7 +779,7 @@ export default function POSPage() {
     payments?:    Array<{ paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
     currencyId?:  number | null;
   }) => {
-    const typeCode = params.docTypeCode ?? 'FV';
+    const typeCode = params.docTypeCode ?? settings.defaultDocTypeCode;
     const invType  = documentTypes?.find(t => t.code === typeCode)
                   ?? documentTypes?.find(t => t.code === 'BL')
                   ?? documentTypes?.find(t => t.code === 'FAC')
@@ -766,7 +833,22 @@ export default function POSPage() {
         payments: apiPayments,
       });
 
-      pos.incrementSession(snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp);
+      if (currentSession?.id) {
+        incrementMut.mutate(
+          buildIncrementInput({
+            items:            currentItems,
+            totalHt:          snapshot.totals.total_ht,
+            totalTva:         snapshot.totals.total_tva,
+            totalFiscalStamp: snapshot.totals.fiscal_stamp,
+            totalDiscount:    snapshot.totals.total_discount + invoiceDiscountAmount,
+            grandTotal:       snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp,
+            payments:         apiPayments.map(p => ({
+              payment_mode_id: p.payment_mode_id,
+              amount:          p.amount,
+            })),
+          }),
+        );
+      }
       setReceiptSnapshot({ items: snapshot.items, totals: snapshot.totals, docNum: res.document_number });
       setLastDocNum(res.document_number);
       setCartNote('');
@@ -782,7 +864,7 @@ export default function POSPage() {
       toast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote]);
+  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -801,6 +883,29 @@ export default function POSPage() {
   const isQuickItem = useCallback((variantId: number) =>
     quickItems.some(q => q.variantId === variantId), [quickItems]);
 
+  const handleAddItem = useCallback((v: ProductVariant) => {
+    pos.addItem(v);
+    if (settings.clearSearchOnAdd) {
+      pos.setSearch('');
+      searchRef.current?.focus();
+    }
+  }, [pos, settings.clearSearchOnAdd]);
+
+  const handleArrowUp = useCallback(() => {
+    setHighlightedIndex(prev => prev > 0 ? prev - 1 : filteredVariants.length - 1);
+  }, [filteredVariants.length]);
+
+  const handleArrowDown = useCallback(() => {
+    setHighlightedIndex(prev => prev < filteredVariants.length - 1 ? prev + 1 : 0);
+  }, [filteredVariants.length]);
+
+  const handleEnterHighlighted = useCallback(() => {
+    const v = filteredVariants[highlightedIndex];
+    if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending)) {
+      handleAddItem(v);
+    }
+  }, [filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
+
   const orderTypeLabels: Record<OrderType, { icon: string; label: string }> = {
     'dine-in':  { icon: 'ti-building-store', label: 'طاولة' },
     'takeaway': { icon: 'ti-shopping-bag',   label: 'استلام' },
@@ -815,15 +920,39 @@ export default function POSPage() {
       id="p-pos"
       dir="rtl"
     >
+      {/* جلسة مطلوبة — تظهر إذا لم تكن هناك جلسة مفتوحة */}
+      {!sessionLoading && !currentSession && (
+        <OpenSessionModal
+          warehouses={warehouses ?? []}
+          fiscalYears={fiscalYears ?? []}
+          defaultWarehouseId={defaultWarehouse?.id}
+          defaultFiscalYearId={fiscalYear?.id}
+          isLoading={openSessionMut.isPending}
+          error={sessionError}
+          onOpen={handleOpenSession}
+        />
+      )}
+
+      {/* نافذة إغلاق الجلسة */}
+      {showCloseSession && currentSession && (
+        <CloseSessionModal
+          session={currentSession}
+          isLoading={closeSessionMut.isPending}
+          error={closeSessionMut.error?.message ?? null}
+          onClose={() => setShowCloseSession(false)}
+          onConfirm={handleCloseSession}
+        />
+      )}
+
       <POSTopBar
-        sessionInvoices={pos.sessionInvoices}
-        sessionSales={pos.sessionSales}
+        sessionInvoices={currentSession?.invoices_count ?? 0}
+        sessionSales={currentSession?.net_sales ?? 0}
         heldCount={pos.heldCarts.length}
         avgMargin={avgMargin}
         isEmpty={isEmpty}
         isFullscreen={fullscreen}
         onHeld={() => setModal('held')}
-        onNewSale={() => isEmpty ? pos.clearCart() : pos.holdCart()}
+        onNewSale={() => { if (isEmpty) { pos.clearCart(); } else { pos.holdCart(); } }}
         onManual={() => setModal('manual')}
         onReceipt={() => {
           if (!isEmpty) {
@@ -834,6 +963,8 @@ export default function POSPage() {
         onSession={() => setModal(m => m === 'session' ? 'none' : 'session')}
         onFullscreen={toggleFullscreen}
         onKbHelp={() => setModal('kbhelp')}
+        onKioskMode={() => navigate('/pos/kiosk')}
+        onSettings={() => setShowSettings(true)}
         showQuickbar={showQuickbar}
         onToggleQuickbar={() => setShowQuickbar(s => !s)}
         items={pos.items}
@@ -853,7 +984,7 @@ export default function POSPage() {
         <QuickItemsBar
           quickItems={quickItems}
           allVariants={allVariants}
-          onAdd={v => pos.addItem(v)}
+          onAdd={handleAddItem}
           onRemove={variantId => setQuickItems(p => p.filter(q => q.variantId !== variantId))}
           allowNegativeStock={allowNegSetting}
         />
@@ -875,7 +1006,11 @@ export default function POSPage() {
             onFilter={() => setShowFilter(s => !s)} filterActive={filterActive}
             inputRef={searchRef} sortBy={sortBy} onSort={setSortBy}
             resultsCount={filteredVariants.length}
-            onEnterFirst={() => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) pos.addItem(first); }}
+            onEnterFirst={settings.keyboardNav ? handleEnterHighlighted : () => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) handleAddItem(first); }}
+            highlightedIndex={highlightedIndex}
+            onArrowUp={handleArrowUp}
+            onArrowDown={handleArrowDown}
+            keyboardNavEnabled={settings.keyboardNav}
           />
           {showFilter && (
             <FilterPanel
@@ -890,7 +1025,9 @@ export default function POSPage() {
           <ProductGrid
             variants={filteredVariants} view={view} gridSize={gridSize}
             loading={loadingAll} hasMore={hasMore} onLoadMore={() => setPage(p => p + 1)}
-            onAdd={v => pos.addItem(v)} onAddManual={() => setModal('manual')}
+            onAdd={handleAddItem} onAddManual={() => setModal('manual')}
+            highlightedIndex={highlightedIndex}
+            onHighlightIndexChange={setHighlightedIndex}
             onPin={toggleQuickItem} isPinned={isQuickItem}
             priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
@@ -911,7 +1048,7 @@ export default function POSPage() {
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onSetClient={pos.setClient} onPriceLevelChange={applyPriceLevel}
           onNoteChange={setCartNote} onHold={pos.holdCart}
-          onSell={() => setModal('payment')} onClear={pos.clearCart} onHeld={() => setModal('held')}
+          onSell={() => setModal('payment')} onClear={clearCartSafe} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           invoiceDiscountPct={pos.invoiceDiscountPct}
           onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
@@ -947,6 +1084,7 @@ export default function POSPage() {
         <ProfessionalReceipt
           items={receiptSnapshot.items} totals={receiptSnapshot.totals}
           client={pos.client} docNumber={receiptSnapshot.docNum ?? lastDocNum}
+          settings={settings}
           onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
           onPrint={() => window.print()}
           onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
@@ -963,23 +1101,37 @@ export default function POSPage() {
         />
       )}
 
-      {modal === 'session' && (
+      {modal === 'session' && currentSession && (
         <SessionStatsModal
-          sessionInvoices={pos.sessionInvoices}
-          sessionSales={pos.sessionSales}
-          highestInvoice={pos.highestInvoice}
-          invoiceTotals={pos.invoiceTotals}
-          paymentsBreakdown={pos.paymentsBreakdown}
-          productsSold={pos.productsSold}
-          paymentModes={paymentModes ?? []}
-          heldCount={pos.heldCarts.length}
-          avgMargin={avgMargin}
+          session={currentSession}
           onClose={() => setModal('none')}
-          onEndSession={() => { pos.endSession(); setModal('none'); }}
+          onEndSession={() => { setModal('none'); setShowCloseSession(true); }}
         />
       )}
 
       {modal === 'kbhelp' && <KeyboardHelpModal onClose={() => setModal('none')} />}
+
+      {showSettings && (
+        <POSSettingsModal
+          settings={settings}
+          onSave={setSettings}
+          onReset={resetSettings}
+          onClose={() => setShowSettings(false)}
+          warehouses={warehouses ?? []}
+          documentTypes={documentTypes ?? []}
+        />
+      )}
+
+      {pinModal && (
+        <ManagerPinModal
+          requestedDiscount={pinModal.requestedDiscount}
+          threshold={pinModal.reason === 'max_exceeded' ? settings.maxDiscountPct : settings.discountPinThreshold}
+          reason={pinModal.reason}
+          onSuccess={() => { pinModal.onSuccess(); setPinModal(null); }}
+          onCancel={() => setPinModal(null)}
+          verifyPin={pin => pin === settings.managerPin}
+        />
+      )}
 
       <Toaster position="top-left" richColors closeButton
         toastOptions={{ style: { fontFamily: 'Tajawal, sans-serif', fontSize: 14 } }}
@@ -987,6 +1139,214 @@ export default function POSPage() {
     </div>
   );
 }```
+
+## FILE: resources/js/pages/pos/PosSessionsPage.tsx
+```
+import { usePosSessions } from '@/pos/hooks/usePosSessions';
+import { formatDZD }      from '@/pos/utils/calculations';
+
+import OpenSessionModal  from '@/pos/components/OpenSessionModal';
+import CloseSessionModal from '@/pos/components/CloseSessionModal';
+import SessionStatsModal from '@/pos/components/SessionStatsModal';
+import LiveSessionBanner from '@/pos/components/LiveSessionBanner';
+import PosSessionsFilters from '@/pos/components/PosSessionsFilters';
+import PosSessionsTable  from '@/pos/components/PosSessionsTable';
+import PosSessionsCards  from '@/pos/components/PosSessionsCards';
+import PosSessionsPagination from '@/pos/components/PosSessionsPagination';
+
+import PageHeader from '@/components/ui/PageHeader';
+import KpiCard    from '@/components/ui/KpiCard';
+import Button     from '@/components/ui/Button';
+import EmptyState from '@/components/ui/EmptyState';
+
+export default function PosSessionsPage() {
+  const {
+    page, setPage,
+    statusFilter, setStatusFilter,
+    dateFrom, setDateFrom,
+    dateTo, setDateTo,
+    viewMode, setViewMode,
+    search, setSearch,
+    selectedId, setSelectedId,
+    showOpenModal, setShowOpenModal,
+    showCloseModal, setShowCloseModal,
+    showStatsModal, setShowStatsModal,
+    openError, closeError,
+
+    isLoading, isFetching,
+    currentSession, sessionLoading,
+    selectedSession,
+    warehouses,
+    fiscalYears, defaultFiscalYearId, defaultWarehouseId,
+    openMut, closeMut,
+
+    meta,
+    filtered,
+    totalSales, totalInvoices, openCount, closedCount, avgSale, maxSale,
+    hasFilters,
+
+    handleOpenSession, handleCloseSession,
+    openStats, openClose,
+    resetFilters,
+  } = usePosSessions();
+
+  return (
+    <div className="page on pss-page" id="p-pos-sessions">
+
+      <PageHeader
+        title="جلسات نقاط البيع"
+        description={
+          meta?.total != null
+            ? `${meta.total} جلسة${currentSession ? ' · جلسة نشطة الآن' : ''}`
+            : undefined
+        }
+        actions={
+          <>
+            <div className="pss-view-toggle">
+              <button
+                className={`pss-vt-btn ${viewMode === 'table' ? 'on' : ''}`}
+                onClick={() => setViewMode('table')}
+                title="جدول"
+              >
+                <i className="ti ti-layout-list" />
+              </button>
+              <button
+                className={`pss-vt-btn ${viewMode === 'cards' ? 'on' : ''}`}
+                onClick={() => setViewMode('cards')}
+                title="بطاقات"
+              >
+                <i className="ti ti-layout-grid" />
+              </button>
+            </div>
+            {currentSession ? (
+              <Button variant="danger" icon={<i className="ti ti-door-exit" />} onClick={() => openClose(currentSession.id)}>
+                إغلاق الجلسة الحالية
+              </Button>
+            ) : (
+              <Button variant="primary" icon={<i className="ti ti-plus" />} onClick={() => setShowOpenModal(true)} disabled={sessionLoading}>
+                فتح جلسة جديدة
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      {currentSession && (
+        <LiveSessionBanner
+          session={currentSession}
+          onStats={openStats}
+          onClose={openClose}
+        />
+      )}
+
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(5,1fr)' }}>
+        <KpiCard variant="green" icon="ti-cash" label="إجمالي المبيعات" value={formatDZD(totalSales)} sub={meta?.total ? `من ${meta.total} جلسة` : undefined} />
+        <KpiCard variant="blue" icon="ti-receipt" label="الفواتير" value={totalInvoices.toLocaleString('fr-DZ')} sub={`متوسط: ${formatDZD(avgSale)}`} />
+        <KpiCard variant="green" icon="ti-door-enter" label="جلسات مفتوحة" value={openCount} />
+        <KpiCard variant="teal" icon="ti-door-exit" label="جلسات مغلقة" value={closedCount} />
+        <KpiCard variant="purple" icon="ti-trending-up" label="أعلى مبيعات" value={formatDZD(maxSale)} />
+      </div>
+
+      <PosSessionsFilters
+        search={search}
+        onSearchChange={v => { setSearch(v); setPage(1); }}
+        statusFilter={statusFilter}
+        onStatusChange={v => { setStatusFilter(v); setPage(1); }}
+        dateFrom={dateFrom}
+        onDateFromChange={v => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo}
+        onDateToChange={v => { setDateTo(v); setPage(1); }}
+        hasFilters={hasFilters}
+        onReset={resetFilters}
+        isSyncing={isFetching && !isLoading}
+      />
+
+      {isLoading ? (
+        <div className="pss-loading">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="pss-skeleton" style={{ animationDelay: `${i * 0.07}s` }} />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon="ti-device-desktop-off"
+          text="لا توجد جلسات"
+          sub={hasFilters ? 'لا توجد جلسات تطابق معايير البحث الحالية' : 'ابدأ بفتح أول جلسة بيع'}
+          action={
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              {hasFilters && (
+                <Button icon={<i className="ti ti-refresh" />} onClick={resetFilters}>
+                  إعادة ضبط الفلاتر
+                </Button>
+              )}
+              {!currentSession && (
+                <Button variant="primary" icon={<i className="ti ti-plus" />} onClick={() => setShowOpenModal(true)}>
+                  فتح جلسة جديدة
+                </Button>
+              )}
+            </div>
+          }
+        />
+      ) : viewMode === 'table' ? (
+        <PosSessionsTable
+          sessions={filtered}
+          isFetching={isFetching}
+          selectedId={selectedId}
+          maxSale={maxSale}
+          onStats={openStats}
+          onClose={openClose}
+        />
+      ) : (
+        <PosSessionsCards
+          sessions={filtered}
+          isFetching={isFetching}
+          selectedId={selectedId}
+          onStats={openStats}
+          onClose={openClose}
+        />
+      )}
+
+      {meta && meta.last_page > 1 && (
+        <PosSessionsPagination meta={meta} page={page} onPageChange={setPage} />
+      )}
+
+      {showStatsModal && selectedId && selectedSession && (
+        <SessionStatsModal
+          session={selectedSession}
+          onClose={() => { setShowStatsModal(false); setSelectedId(null); }}
+          onEndSession={() => {
+            setShowStatsModal(false);
+            setShowCloseModal(true);
+          }}
+        />
+      )}
+
+      {showOpenModal && (
+        <OpenSessionModal
+          warehouses={warehouses}
+          fiscalYears={fiscalYears}
+          defaultWarehouseId={defaultWarehouseId}
+          defaultFiscalYearId={defaultFiscalYearId}
+          isLoading={openMut.isPending}
+          error={openError}
+          onOpen={handleOpenSession}
+          onClose={() => setShowOpenModal(false)}
+        />
+      )}
+
+      {showCloseModal && selectedSession && (
+        <CloseSessionModal
+          session={selectedSession}
+          isLoading={closeMut.isPending}
+          error={closeError}
+          onClose={() => { setShowCloseModal(false); setCloseError(null); }}
+          onConfirm={handleCloseSession}
+        />
+      )}
+    </div>
+  );
+}
+```
 
 
 
@@ -1064,7 +1424,8 @@ export default function POSKioskPage() {
       per_page: PER_PAGE,
       search:   searchQuery || undefined,
       family_id: selectedCategory ?? undefined,
-      with:     'variants,variants.quantity_discounts,category,family',
+      include:  'tva,unit,family,prices.priceLevel',
+      active:   true,
     }),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
@@ -1085,8 +1446,7 @@ export default function POSKioskPage() {
     });
   }, [products]);
 
-  const [filteredVariants, setFilteredVariants] = useState<ProductVariant[]>([]);
-  useMemo(() => setFilteredVariants(allVariants), [allVariants]);
+  const filteredVariants = useMemo(() => allVariants, [allVariants]);
 
   const handleCompleteSale = async (params: {
     paymentModeId: number; amount: number;
@@ -1261,6 +1621,7 @@ export default function POSKioskPage() {
 //      (منطقها الآن داخل useCartStore — لا تغيير هنا)
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
@@ -1272,7 +1633,7 @@ import {
 import { productsApi }        from '@/lib/api/endpoints/products';
 import { settingsApi }        from '@/lib/api/endpoints/settings';
 import { apiGet }             from '@/lib/api/core/client';
-import { useSelectedFiscalYear } from '@/lib/api/endpoints/fiscalYears';
+import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
 import { documentsApi }       from '@/lib/api/endpoints/documents';
 import { useActiveSlug }      from '@/lib/store/appStore';
 import {
@@ -1301,8 +1662,20 @@ import ProfessionalPaymentModal from '@/pos/components/ProfessionalPaymentModal'
 import HeldCartsModal           from '@/pos/components/HeldCartsModal';
 import ProfessionalReceipt      from '@/pos/components/ProfessionalReceipt';
 import ManualProductModal       from '@/pos/components/ManualProductModal';
+import OpenSessionModal         from '@/pos/components/OpenSessionModal';
+import CloseSessionModal        from '@/pos/components/CloseSessionModal';
 import SessionStatsModal        from '@/pos/components/SessionStatsModal';
+import {
+  useCurrentPosSession,
+  useOpenSession,
+  useCloseSession,
+  useIncrementSession,
+  buildIncrementInput,
+} from '@/lib/api/endpoints/posSession';
 import KeyboardHelpModal        from '@/pos/components/KeyboardHelpModal';
+import POSSettingsModal          from '@/pos/components/POSSettingsModal';
+import ManagerPinModal           from '@/pos/components/ManagerPinModal';
+import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
 import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
 
 type OrderType = 'dine-in' | 'takeaway' | 'delivery';
@@ -1310,20 +1683,57 @@ type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 const QUICK_ITEMS_KEY = (slug: string) => `pos-quick-items-${slug}`;
 
 export default function POSPage() {
-  const pos        = usePOS();
-  const slug       = useActiveSlug();
-  const fiscalYear = useSelectedFiscalYear();
+  const pos         = usePOS();
+  const slug        = useActiveSlug();
+  const fiscalYear  = useSelectedFiscalYear();
+  const navigate    = useNavigate();
+
+  const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
+  const openSessionMut   = useOpenSession();
+  const closeSessionMut  = useCloseSession(currentSession?.id ?? null);
+  const incrementMut     = useIncrementSession(currentSession?.id ?? null);
+  const [showCloseSession, setShowCloseSession] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  const handleOpenSession = async (data: {
+    warehouse_id: number; fiscal_year_id: number; opening_cash: number; opening_note?: string;
+  }) => {
+    setSessionError(null);
+    try { await openSessionMut.mutateAsync(data); }
+    catch (e: any) { setSessionError(e?.message ?? 'فشل فتح الجلسة'); }
+  };
+
+  const handleCloseSession = async (data: {
+    closing_cash_counted: number; closing_note?: string;
+  }) => {
+    try {
+      await closeSessionMut.mutateAsync(data);
+      setShowCloseSession(false);
+      toast.success('تم إغلاق الجلسة بنجاح');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'فشل إغلاق الجلسة');
+    }
+  };
+
+  const { settings, setSettings, resetSettings } = usePOSSettings(slug);
 
   const [view,       setView]       = useState<ViewMode>('grid');
-  const [gridSize,   setGridSize]   = useState<GridSize>('md');
+  const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
   const [mobTab,     setMobTab]     = useState<'products' | 'cart'>('products');
   const [fullscreen, setFullscreen] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [modal,      setModal]      = useState<ActiveModal>('none');
+  const [showSettings, setShowSettings] = useState(false);
+  const [pinModal, setPinModal] = useState<{
+    requestedDiscount: number;
+    reason: 'max_exceeded' | 'pin_required';
+    onSuccess: () => void;
+  } | null>(null);
   const [cartNote,   setCartNote]   = useState('');
   const [selectedPriceLevelId, setSelectedPriceLevelId] = useState<number | null>(null);
   const [lastDocNum,  setLastDocNum]  = useState<string | undefined>();
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
+
   const [receiptSnapshot, setReceiptSnapshot] = useState<{
     items: CartItem[]; totals: CartTotals; docNum?: string;
   } | null>(null);
@@ -1336,7 +1746,7 @@ export default function POSPage() {
       return stored ? JSON.parse(stored) : [];
     } catch { return []; }
   });
-  const [showQuickbar, setShowQuickbar] = useState(true);
+  const [showQuickbar, setShowQuickbar] = useState(settings.showQuickbarOnStart);
 
   useEffect(() => {
     if (!slug) return;
@@ -1361,6 +1771,7 @@ export default function POSPage() {
   const [filterInStock,   setFilterInStock]   = useState(false);
   const [filterLowStock,  setFilterLowStock]  = useState(false);
   const [sortBy,          setSortBy]          = useState<SortMode>('name');
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const searchRef    = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1376,7 +1787,7 @@ export default function POSPage() {
     }],
     queryFn: () => productsApi.list({
       per_page:  120,
-      include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',  // ✅ أُضيف quantityDiscounts
+      include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
       search:    isSearching ? pos.searchQuery : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       page,
@@ -1409,6 +1820,9 @@ export default function POSPage() {
   const hasMore     = productsMeta ? !productsMeta.is_last_page : false;
 
   // ── Lookups ─────────────────────────────────────────────────────────────────
+  const { data: fiscalYearsData } = useFiscalYears();
+  const fiscalYears = fiscalYearsData?.years ?? [];
+
   const { data: customersData    } = useClients({ per_page: 200 });
   const { data: paymentModes     } = usePaymentModes();
   const { data: warehouses       } = useWarehouses();
@@ -1419,7 +1833,9 @@ export default function POSPage() {
 
   const customers        = (customersData as PaginatedResponse<Party>)?.data ?? (customersData as Party[]) ?? [];
   const priceLevelsList  = priceLevels ?? [];
-  const defaultWarehouse = warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null;
+  const defaultWarehouse = settings.defaultWarehouseId
+    ? warehouses?.find(w => w.id === settings.defaultWarehouseId)
+    : (warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null);
   const realWarehouseId  = defaultWarehouse?.id ?? null;
   const defaultCurrency  = currencies?.find(c => c.is_base_currency) ?? currencies?.[0];
   const defaultTreasury  = treasuryAccounts?.find(a => a.is_default) ?? treasuryAccounts?.[0];
@@ -1534,6 +1950,8 @@ export default function POSPage() {
 
   const filteredVariants = useMemo(() => {
     let list = allVariants;
+    if (pos.selectedCategory !== null) list = list.filter(v => v.product?.family?.id === pos.selectedCategory);
+    if (settings.hideOutOfStock) list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
     if (filterInStock)  list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
     if (filterLowStock) list = list.filter(v => v.manages_stock && (v.current_stock ?? 0) <= (v.min_stock_alert ?? 0) && (v.current_stock ?? 0) > 0);
     if (filterMinPrice) list = list.filter(v => v.default_selling_price_ht >= parseFloat(filterMinPrice));
@@ -1545,9 +1963,18 @@ export default function POSPage() {
       if (sortBy === 'family')     return (a.product?.family?.name ?? '').localeCompare(b.product?.family?.name ?? '', 'ar');
       return (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'ar');
     });
-  }, [allVariants, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
+  }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [filteredVariants.length, pos.searchQuery]);
 
   const isEmpty = pos.items.length === 0;
+
+  const clearCartSafe = useCallback(() => {
+    if (settings.confirmOnClear && !isEmpty && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+    pos.clearCart();
+  }, [settings.confirmOnClear, isEmpty, pos]);
 
   // ── Invoice discount ───────────────────────────────────────────────────────
   const invoiceDiscountPct    = pos.invoiceDiscountPct;
@@ -1702,7 +2129,7 @@ export default function POSPage() {
     payments?:    Array<{ paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
     currencyId?:  number | null;
   }) => {
-    const typeCode = params.docTypeCode ?? 'FV';
+    const typeCode = params.docTypeCode ?? settings.defaultDocTypeCode;
     const invType  = documentTypes?.find(t => t.code === typeCode)
                   ?? documentTypes?.find(t => t.code === 'BL')
                   ?? documentTypes?.find(t => t.code === 'FAC')
@@ -1756,7 +2183,22 @@ export default function POSPage() {
         payments: apiPayments,
       });
 
-      pos.incrementSession(snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp);
+      if (currentSession?.id) {
+        incrementMut.mutate(
+          buildIncrementInput({
+            items:            currentItems,
+            totalHt:          snapshot.totals.total_ht,
+            totalTva:         snapshot.totals.total_tva,
+            totalFiscalStamp: snapshot.totals.fiscal_stamp,
+            totalDiscount:    snapshot.totals.total_discount + invoiceDiscountAmount,
+            grandTotal:       snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp,
+            payments:         apiPayments.map(p => ({
+              payment_mode_id: p.payment_mode_id,
+              amount:          p.amount,
+            })),
+          }),
+        );
+      }
       setReceiptSnapshot({ items: snapshot.items, totals: snapshot.totals, docNum: res.document_number });
       setLastDocNum(res.document_number);
       setCartNote('');
@@ -1772,7 +2214,7 @@ export default function POSPage() {
       toast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote]);
+  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -1791,6 +2233,29 @@ export default function POSPage() {
   const isQuickItem = useCallback((variantId: number) =>
     quickItems.some(q => q.variantId === variantId), [quickItems]);
 
+  const handleAddItem = useCallback((v: ProductVariant) => {
+    pos.addItem(v);
+    if (settings.clearSearchOnAdd) {
+      pos.setSearch('');
+      searchRef.current?.focus();
+    }
+  }, [pos, settings.clearSearchOnAdd]);
+
+  const handleArrowUp = useCallback(() => {
+    setHighlightedIndex(prev => prev > 0 ? prev - 1 : filteredVariants.length - 1);
+  }, [filteredVariants.length]);
+
+  const handleArrowDown = useCallback(() => {
+    setHighlightedIndex(prev => prev < filteredVariants.length - 1 ? prev + 1 : 0);
+  }, [filteredVariants.length]);
+
+  const handleEnterHighlighted = useCallback(() => {
+    const v = filteredVariants[highlightedIndex];
+    if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending)) {
+      handleAddItem(v);
+    }
+  }, [filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
+
   const orderTypeLabels: Record<OrderType, { icon: string; label: string }> = {
     'dine-in':  { icon: 'ti-building-store', label: 'طاولة' },
     'takeaway': { icon: 'ti-shopping-bag',   label: 'استلام' },
@@ -1805,15 +2270,39 @@ export default function POSPage() {
       id="p-pos"
       dir="rtl"
     >
+      {/* جلسة مطلوبة — تظهر إذا لم تكن هناك جلسة مفتوحة */}
+      {!sessionLoading && !currentSession && (
+        <OpenSessionModal
+          warehouses={warehouses ?? []}
+          fiscalYears={fiscalYears ?? []}
+          defaultWarehouseId={defaultWarehouse?.id}
+          defaultFiscalYearId={fiscalYear?.id}
+          isLoading={openSessionMut.isPending}
+          error={sessionError}
+          onOpen={handleOpenSession}
+        />
+      )}
+
+      {/* نافذة إغلاق الجلسة */}
+      {showCloseSession && currentSession && (
+        <CloseSessionModal
+          session={currentSession}
+          isLoading={closeSessionMut.isPending}
+          error={closeSessionMut.error?.message ?? null}
+          onClose={() => setShowCloseSession(false)}
+          onConfirm={handleCloseSession}
+        />
+      )}
+
       <POSTopBar
-        sessionInvoices={pos.sessionInvoices}
-        sessionSales={pos.sessionSales}
+        sessionInvoices={currentSession?.invoices_count ?? 0}
+        sessionSales={currentSession?.net_sales ?? 0}
         heldCount={pos.heldCarts.length}
         avgMargin={avgMargin}
         isEmpty={isEmpty}
         isFullscreen={fullscreen}
         onHeld={() => setModal('held')}
-        onNewSale={() => isEmpty ? pos.clearCart() : pos.holdCart()}
+        onNewSale={() => { if (isEmpty) { pos.clearCart(); } else { pos.holdCart(); } }}
         onManual={() => setModal('manual')}
         onReceipt={() => {
           if (!isEmpty) {
@@ -1824,6 +2313,8 @@ export default function POSPage() {
         onSession={() => setModal(m => m === 'session' ? 'none' : 'session')}
         onFullscreen={toggleFullscreen}
         onKbHelp={() => setModal('kbhelp')}
+        onKioskMode={() => navigate('/pos/kiosk')}
+        onSettings={() => setShowSettings(true)}
         showQuickbar={showQuickbar}
         onToggleQuickbar={() => setShowQuickbar(s => !s)}
         items={pos.items}
@@ -1843,7 +2334,7 @@ export default function POSPage() {
         <QuickItemsBar
           quickItems={quickItems}
           allVariants={allVariants}
-          onAdd={v => pos.addItem(v)}
+          onAdd={handleAddItem}
           onRemove={variantId => setQuickItems(p => p.filter(q => q.variantId !== variantId))}
           allowNegativeStock={allowNegSetting}
         />
@@ -1865,7 +2356,11 @@ export default function POSPage() {
             onFilter={() => setShowFilter(s => !s)} filterActive={filterActive}
             inputRef={searchRef} sortBy={sortBy} onSort={setSortBy}
             resultsCount={filteredVariants.length}
-            onEnterFirst={() => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) pos.addItem(first); }}
+            onEnterFirst={settings.keyboardNav ? handleEnterHighlighted : () => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) handleAddItem(first); }}
+            highlightedIndex={highlightedIndex}
+            onArrowUp={handleArrowUp}
+            onArrowDown={handleArrowDown}
+            keyboardNavEnabled={settings.keyboardNav}
           />
           {showFilter && (
             <FilterPanel
@@ -1880,7 +2375,9 @@ export default function POSPage() {
           <ProductGrid
             variants={filteredVariants} view={view} gridSize={gridSize}
             loading={loadingAll} hasMore={hasMore} onLoadMore={() => setPage(p => p + 1)}
-            onAdd={v => pos.addItem(v)} onAddManual={() => setModal('manual')}
+            onAdd={handleAddItem} onAddManual={() => setModal('manual')}
+            highlightedIndex={highlightedIndex}
+            onHighlightIndexChange={setHighlightedIndex}
             onPin={toggleQuickItem} isPinned={isQuickItem}
             priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
@@ -1901,7 +2398,7 @@ export default function POSPage() {
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onSetClient={pos.setClient} onPriceLevelChange={applyPriceLevel}
           onNoteChange={setCartNote} onHold={pos.holdCart}
-          onSell={() => setModal('payment')} onClear={pos.clearCart} onHeld={() => setModal('held')}
+          onSell={() => setModal('payment')} onClear={clearCartSafe} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           invoiceDiscountPct={pos.invoiceDiscountPct}
           onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
@@ -1937,6 +2434,7 @@ export default function POSPage() {
         <ProfessionalReceipt
           items={receiptSnapshot.items} totals={receiptSnapshot.totals}
           client={pos.client} docNumber={receiptSnapshot.docNum ?? lastDocNum}
+          settings={settings}
           onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
           onPrint={() => window.print()}
           onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
@@ -1953,23 +2451,37 @@ export default function POSPage() {
         />
       )}
 
-      {modal === 'session' && (
+      {modal === 'session' && currentSession && (
         <SessionStatsModal
-          sessionInvoices={pos.sessionInvoices}
-          sessionSales={pos.sessionSales}
-          highestInvoice={pos.highestInvoice}
-          invoiceTotals={pos.invoiceTotals}
-          paymentsBreakdown={pos.paymentsBreakdown}
-          productsSold={pos.productsSold}
-          paymentModes={paymentModes ?? []}
-          heldCount={pos.heldCarts.length}
-          avgMargin={avgMargin}
+          session={currentSession}
           onClose={() => setModal('none')}
-          onEndSession={() => { pos.endSession(); setModal('none'); }}
+          onEndSession={() => { setModal('none'); setShowCloseSession(true); }}
         />
       )}
 
       {modal === 'kbhelp' && <KeyboardHelpModal onClose={() => setModal('none')} />}
+
+      {showSettings && (
+        <POSSettingsModal
+          settings={settings}
+          onSave={setSettings}
+          onReset={resetSettings}
+          onClose={() => setShowSettings(false)}
+          warehouses={warehouses ?? []}
+          documentTypes={documentTypes ?? []}
+        />
+      )}
+
+      {pinModal && (
+        <ManagerPinModal
+          requestedDiscount={pinModal.requestedDiscount}
+          threshold={pinModal.reason === 'max_exceeded' ? settings.maxDiscountPct : settings.discountPinThreshold}
+          reason={pinModal.reason}
+          onSuccess={() => { pinModal.onSuccess(); setPinModal(null); }}
+          onCancel={() => setPinModal(null)}
+          verifyPin={pin => pin === settings.managerPin}
+        />
+      )}
 
       <Toaster position="top-left" richColors closeButton
         toastOptions={{ style: { fontFamily: 'Tajawal, sans-serif', fontSize: 14 } }}
@@ -1977,6 +2489,214 @@ export default function POSPage() {
     </div>
   );
 }```
+
+## FILE: resources/js/pages/pos/PosSessionsPage.tsx
+```
+import { usePosSessions } from '@/pos/hooks/usePosSessions';
+import { formatDZD }      from '@/pos/utils/calculations';
+
+import OpenSessionModal  from '@/pos/components/OpenSessionModal';
+import CloseSessionModal from '@/pos/components/CloseSessionModal';
+import SessionStatsModal from '@/pos/components/SessionStatsModal';
+import LiveSessionBanner from '@/pos/components/LiveSessionBanner';
+import PosSessionsFilters from '@/pos/components/PosSessionsFilters';
+import PosSessionsTable  from '@/pos/components/PosSessionsTable';
+import PosSessionsCards  from '@/pos/components/PosSessionsCards';
+import PosSessionsPagination from '@/pos/components/PosSessionsPagination';
+
+import PageHeader from '@/components/ui/PageHeader';
+import KpiCard    from '@/components/ui/KpiCard';
+import Button     from '@/components/ui/Button';
+import EmptyState from '@/components/ui/EmptyState';
+
+export default function PosSessionsPage() {
+  const {
+    page, setPage,
+    statusFilter, setStatusFilter,
+    dateFrom, setDateFrom,
+    dateTo, setDateTo,
+    viewMode, setViewMode,
+    search, setSearch,
+    selectedId, setSelectedId,
+    showOpenModal, setShowOpenModal,
+    showCloseModal, setShowCloseModal,
+    showStatsModal, setShowStatsModal,
+    openError, closeError,
+
+    isLoading, isFetching,
+    currentSession, sessionLoading,
+    selectedSession,
+    warehouses,
+    fiscalYears, defaultFiscalYearId, defaultWarehouseId,
+    openMut, closeMut,
+
+    meta,
+    filtered,
+    totalSales, totalInvoices, openCount, closedCount, avgSale, maxSale,
+    hasFilters,
+
+    handleOpenSession, handleCloseSession,
+    openStats, openClose,
+    resetFilters,
+  } = usePosSessions();
+
+  return (
+    <div className="page on pss-page" id="p-pos-sessions">
+
+      <PageHeader
+        title="جلسات نقاط البيع"
+        description={
+          meta?.total != null
+            ? `${meta.total} جلسة${currentSession ? ' · جلسة نشطة الآن' : ''}`
+            : undefined
+        }
+        actions={
+          <>
+            <div className="pss-view-toggle">
+              <button
+                className={`pss-vt-btn ${viewMode === 'table' ? 'on' : ''}`}
+                onClick={() => setViewMode('table')}
+                title="جدول"
+              >
+                <i className="ti ti-layout-list" />
+              </button>
+              <button
+                className={`pss-vt-btn ${viewMode === 'cards' ? 'on' : ''}`}
+                onClick={() => setViewMode('cards')}
+                title="بطاقات"
+              >
+                <i className="ti ti-layout-grid" />
+              </button>
+            </div>
+            {currentSession ? (
+              <Button variant="danger" icon={<i className="ti ti-door-exit" />} onClick={() => openClose(currentSession.id)}>
+                إغلاق الجلسة الحالية
+              </Button>
+            ) : (
+              <Button variant="primary" icon={<i className="ti ti-plus" />} onClick={() => setShowOpenModal(true)} disabled={sessionLoading}>
+                فتح جلسة جديدة
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      {currentSession && (
+        <LiveSessionBanner
+          session={currentSession}
+          onStats={openStats}
+          onClose={openClose}
+        />
+      )}
+
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(5,1fr)' }}>
+        <KpiCard variant="green" icon="ti-cash" label="إجمالي المبيعات" value={formatDZD(totalSales)} sub={meta?.total ? `من ${meta.total} جلسة` : undefined} />
+        <KpiCard variant="blue" icon="ti-receipt" label="الفواتير" value={totalInvoices.toLocaleString('fr-DZ')} sub={`متوسط: ${formatDZD(avgSale)}`} />
+        <KpiCard variant="green" icon="ti-door-enter" label="جلسات مفتوحة" value={openCount} />
+        <KpiCard variant="teal" icon="ti-door-exit" label="جلسات مغلقة" value={closedCount} />
+        <KpiCard variant="purple" icon="ti-trending-up" label="أعلى مبيعات" value={formatDZD(maxSale)} />
+      </div>
+
+      <PosSessionsFilters
+        search={search}
+        onSearchChange={v => { setSearch(v); setPage(1); }}
+        statusFilter={statusFilter}
+        onStatusChange={v => { setStatusFilter(v); setPage(1); }}
+        dateFrom={dateFrom}
+        onDateFromChange={v => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo}
+        onDateToChange={v => { setDateTo(v); setPage(1); }}
+        hasFilters={hasFilters}
+        onReset={resetFilters}
+        isSyncing={isFetching && !isLoading}
+      />
+
+      {isLoading ? (
+        <div className="pss-loading">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="pss-skeleton" style={{ animationDelay: `${i * 0.07}s` }} />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon="ti-device-desktop-off"
+          text="لا توجد جلسات"
+          sub={hasFilters ? 'لا توجد جلسات تطابق معايير البحث الحالية' : 'ابدأ بفتح أول جلسة بيع'}
+          action={
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              {hasFilters && (
+                <Button icon={<i className="ti ti-refresh" />} onClick={resetFilters}>
+                  إعادة ضبط الفلاتر
+                </Button>
+              )}
+              {!currentSession && (
+                <Button variant="primary" icon={<i className="ti ti-plus" />} onClick={() => setShowOpenModal(true)}>
+                  فتح جلسة جديدة
+                </Button>
+              )}
+            </div>
+          }
+        />
+      ) : viewMode === 'table' ? (
+        <PosSessionsTable
+          sessions={filtered}
+          isFetching={isFetching}
+          selectedId={selectedId}
+          maxSale={maxSale}
+          onStats={openStats}
+          onClose={openClose}
+        />
+      ) : (
+        <PosSessionsCards
+          sessions={filtered}
+          isFetching={isFetching}
+          selectedId={selectedId}
+          onStats={openStats}
+          onClose={openClose}
+        />
+      )}
+
+      {meta && meta.last_page > 1 && (
+        <PosSessionsPagination meta={meta} page={page} onPageChange={setPage} />
+      )}
+
+      {showStatsModal && selectedId && selectedSession && (
+        <SessionStatsModal
+          session={selectedSession}
+          onClose={() => { setShowStatsModal(false); setSelectedId(null); }}
+          onEndSession={() => {
+            setShowStatsModal(false);
+            setShowCloseModal(true);
+          }}
+        />
+      )}
+
+      {showOpenModal && (
+        <OpenSessionModal
+          warehouses={warehouses}
+          fiscalYears={fiscalYears}
+          defaultWarehouseId={defaultWarehouseId}
+          defaultFiscalYearId={defaultFiscalYearId}
+          isLoading={openMut.isPending}
+          error={openError}
+          onOpen={handleOpenSession}
+          onClose={() => setShowOpenModal(false)}
+        />
+      )}
+
+      {showCloseModal && selectedSession && (
+        <CloseSessionModal
+          session={selectedSession}
+          isLoading={closeMut.isPending}
+          error={closeError}
+          onClose={() => { setShowCloseModal(false); setCloseError(null); }}
+          onConfirm={handleCloseSession}
+        />
+      )}
+    </div>
+  );
+}
+```
 
 ## FILE: resources/js/pos/components/CartRow.tsx
 ```
@@ -2420,6 +3140,454 @@ export default function CategoryTabs({
           {idx < 9 && <kbd className="cat-kb">Alt+{idx + 1}</kbd>}
         </button>
       ))}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pos/components/CloseSessionModal.tsx
+```
+// resources/js/pos/components/CloseSessionModal.tsx — v2 احترافي
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { formatDZD } from '@/pos/utils/calculations';
+import type { PosSession } from '@/lib/api/endpoints/posSession';
+
+interface Props {
+  session:   PosSession;
+  isLoading: boolean;
+  error?:    string | null;
+  onClose:   () => void;
+  onConfirm: (data: { closing_cash_counted: number; closing_note?: string }) => Promise<void>;
+}
+
+type Step = 'recap' | 'cash' | 'confirm';
+
+const STEPS: { key: Step; label: string; icon: string }[] = [
+  { key: 'recap',   label: 'ملخص الجلسة',  icon: 'ti-chart-bar'  },
+  { key: 'cash',    label: 'جرد الصندوق',  icon: 'ti-wallet'     },
+  { key: 'confirm', label: 'تأكيد الإغلاق', icon: 'ti-door-exit'  },
+];
+
+export default function CloseSessionModal({
+  session, isLoading, error, onClose, onConfirm,
+}: Props) {
+  const [step,    setStep]    = useState<Step>('recap');
+  const [counted, setCounted] = useState('');
+  const [note,    setNote]    = useState('');
+  const cashRef               = useRef<HTMLInputElement>(null);
+
+  const countedNum = parseFloat(counted) || 0;
+  const expected   = (session.opening_cash ?? 0) + (session.cash_collected ?? 0);
+  const difference = countedNum - expected;
+  const hasCounted = counted !== '';
+
+  const diffState: 'ok' | 'short' | 'over' =
+    !hasCounted || Math.abs(difference) < 0.01 ? 'ok'
+    : difference < 0 ? 'short' : 'over';
+
+  const diffColors = {
+    ok:    { color: 'var(--green)',  bg: 'var(--greenb)',  border: 'var(--greenbo)', label: 'الصندوق متطابق ✓' },
+    short: { color: 'var(--red)',    bg: 'var(--redb)',    border: 'var(--redbo)',   label: 'الصندوق ناقص ⚠️' },
+    over:  { color: 'var(--gold)',   bg: 'var(--goldb)',   border: 'var(--goldbo)',  label: 'الصندوق زائد ⚠️'  },
+  }[diffState];
+
+  const currentIdx = STEPS.findIndex(s => s.key === step);
+  const isLast     = currentIdx === STEPS.length - 1;
+
+  useEffect(() => {
+    if (step === 'cash') setTimeout(() => cashRef.current?.focus(), 100);
+  }, [step]);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && isLast && !isLoading) handleConfirm();
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [step, isLast, isLoading, countedNum, note]);
+
+  const goNext = () => { if (!isLast) setStep(STEPS[currentIdx + 1].key); };
+  const goBack = () => { if (currentIdx > 0) setStep(STEPS[currentIdx - 1].key); };
+
+  const handleConfirm = async () => {
+    if (isLoading) return;
+    await onConfirm({ closing_cash_counted: countedNum, closing_note: note.trim() || undefined });
+  };
+
+  // numpad cash
+  const np = (key: string) => {
+    setCounted(prev => {
+      if (key === 'del') return prev.slice(0, -1);
+      if (key === '000') return prev + '000';
+      return prev + key;
+    });
+  };
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const paymentRows = useMemo(() =>
+    (session.payments ?? []).filter(p => p.amount > 0).sort((a, b) => b.amount - a.amount),
+    [session.payments],
+  );
+  const topProducts = useMemo(() =>
+    (session.top_products ?? []).sort((a, b) => b.total_ttc - a.total_ttc).slice(0, 8),
+    [session.top_products],
+  );
+  const totalCollected = (session.cash_collected ?? 0)
+    + (session.cib_collected ?? 0)
+    + (session.ccp_collected ?? 0)
+    + (session.bank_collected ?? 0);
+  const maxPayAmt = Math.max(...paymentRows.map(p => p.amount), 1);
+
+  const kpis = [
+    { label: 'الفواتير',         val: String(session.invoices_count),          ic: 'ti-receipt',        c: 'var(--em)',     bg: 'var(--emb)'   },
+    { label: 'المبيعات الصافية', val: formatDZD(session.net_sales),            ic: 'ti-cash',           c: 'var(--gold)',   bg: 'var(--goldb)' },
+    { label: 'متوسط الفاتورة',  val: formatDZD(session.avg_invoice ?? 0),      ic: 'ti-chart-bar',      c: 'var(--blue)',   bg: 'var(--blueb)' },
+    { label: 'أعلى فاتورة',     val: formatDZD(session.highest_invoice ?? 0),  ic: 'ti-trending-up',    c: 'var(--purple)', bg: 'var(--purb)'  },
+    { label: 'الخصومات',        val: formatDZD(session.total_discount ?? 0),   ic: 'ti-discount',       c: 'var(--orange)', bg: 'var(--orb)'   },
+    { label: 'TVA المحصَّل',     val: formatDZD(session.total_tva ?? 0),        ic: 'ti-percentage',     c: 'var(--teal)',   bg: 'var(--tealb)' },
+    { label: 'مدة الجلسة',      val: session.duration ?? '—',                  ic: 'ti-clock',          c: 'var(--t2)',     bg: 'var(--bg4)'   },
+    { label: 'المرتجعات',       val: `${session.returns_count ?? 0} (${formatDZD(session.returns_total ?? 0)})`, ic: 'ti-receipt-refund', c: 'var(--red)', bg: 'var(--redb)' },
+    { label: 'رأس المال الأولي', val: formatDZD(session.opening_cash ?? 0),     ic: 'ti-wallet',         c: 'var(--em)',     bg: 'var(--emb)'   },
+  ];
+
+  return (
+    <div className="ov on" onClick={e => e.stopPropagation()} style={{ zIndex: 9998 }}>
+      <div className="csm-wrap">
+
+        {/* ════ Header ════ */}
+        <div className="csm-header">
+          <div className="csm-header-left">
+            <div className="csm-header-icon">
+              <i className="ti ti-door-exit" />
+            </div>
+            <div>
+              <div className="csm-header-title">إغلاق الجلسة</div>
+              <div className="csm-header-meta">
+                <span><i className="ti ti-user" />{session.user?.name}</span>
+                <span>·</span>
+                <span><i className="ti ti-building-warehouse" />{session.warehouse?.name}</span>
+                <span>·</span>
+                <span><i className="ti ti-clock" />{session.duration}</span>
+              </div>
+            </div>
+          </div>
+          <button className="m-x" onClick={onClose} type="button">
+            <i className="ti ti-x" />
+          </button>
+        </div>
+
+        {/* ════ Step Tabs ════ */}
+        <div className="csm-steps">
+          {STEPS.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              className={`csm-step ${step === s.key ? 'active' : ''} ${i < currentIdx ? 'done' : ''}`}
+              onClick={() => setStep(s.key)}
+            >
+              <div className="csm-step-num">
+                {i < currentIdx ? <i className="ti ti-check" /> : i + 1}
+              </div>
+              <i className={`ti ${s.icon} csm-step-ic`} />
+              <span>{s.label}</span>
+            </button>
+          ))}
+          {/* progress bar */}
+          <div className="csm-steps-progress">
+            <div
+              className="csm-steps-progress-fill"
+              style={{ width: `${(currentIdx / (STEPS.length - 1)) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* ════ Body ════ */}
+        <div className="csm-body">
+
+          {/* ══ ملخص الجلسة ══ */}
+          {step === 'recap' && (
+            <div className="csm-recap">
+
+              {/* شريط الإجمالي البارز */}
+              <div className="csm-total-banner">
+                <div className="csm-tb-left">
+                  <div className="csm-tb-label">إجمالي المبيعات الصافية</div>
+                  <div className="csm-tb-amount" style={{ direction: 'ltr' }}>
+                    {session.net_sales.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+                    <span className="csm-tb-dzd"> دج</span>
+                  </div>
+                </div>
+                <div className="csm-tb-right">
+                  <div className="csm-tb-stat">
+                    <span>{session.invoices_count}</span>
+                    <small>فاتورة</small>
+                  </div>
+                  <div className="csm-tb-stat">
+                    <span>{session.duration}</span>
+                    <small>مدة</small>
+                  </div>
+                </div>
+              </div>
+
+              {/* KPIs 3x3 */}
+              <div className="csm-kpi-grid">
+                {kpis.map(k => (
+                  <div
+                    key={k.label}
+                    className="csm-kpi"
+                    style={{ '--kc': k.c, '--kb': k.bg } as any}
+                  >
+                    <div className="csm-kpi-ic">
+                      <i className={`ti ${k.ic}`} />
+                    </div>
+                    <div className="csm-kpi-label">{k.label}</div>
+                    <div className="csm-kpi-val" style={{ direction: 'ltr' }}>{k.val}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* وسائل الدفع */}
+              {paymentRows.length > 0 && (
+                <div className="csm-section">
+                  <div className="csm-section-title">
+                    <i className="ti ti-credit-card" /> توزيع وسائل الدفع
+                    <span className="csm-section-total">{formatDZD(totalCollected)}</span>
+                  </div>
+                  <div className="csm-pay-bars">
+                    {paymentRows.map(p => {
+                      const pct = session.net_sales > 0
+                        ? (p.amount / session.net_sales) * 100 : 0;
+                      const widthPct = (p.amount / maxPayAmt) * 100;
+                      return (
+                        <div key={p.payment_mode_id} className="csm-pay-row">
+                          <div className="csm-pay-info">
+                            <span className="csm-pay-name">
+                              {p.payment_mode?.name ?? `#${p.payment_mode_id}`}
+                            </span>
+                            <span className="csm-pay-count">{p.count} عملية</span>
+                          </div>
+                          <div className="csm-pay-bar-wrap">
+                            <div className="csm-pay-bar">
+                              <div
+                                className="csm-pay-bar-fill"
+                                style={{ width: `${widthPct}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="csm-pay-amount">
+                            <span style={{ direction: 'ltr' }}>{formatDZD(p.amount)}</span>
+                            <span className="csm-pay-pct">{pct.toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* أكثر المنتجات */}
+              {topProducts.length > 0 && (
+                <div className="csm-section">
+                  <div className="csm-section-title">
+                    <i className="ti ti-package" /> أكثر المنتجات مبيعاً
+                  </div>
+                  <div className="csm-products">
+                    {topProducts.map((p, i) => (
+                      <div key={p.product_id} className="csm-product-row">
+                        <div className={`csm-prod-rank ${i < 3 ? 'top' : ''}`}>{i + 1}</div>
+                        <div className="csm-prod-name">{p.product_name}</div>
+                        <div className="csm-prod-qty">×{p.quantity_sold}</div>
+                        <div className="csm-prod-amount" style={{ direction: 'ltr' }}>
+                          {formatDZD(p.total_ttc)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══ جرد الصندوق ══ */}
+          {step === 'cash' && (
+            <div className="csm-cash">
+
+              {/* المبلغ المتوقع */}
+              <div className="csm-expected-box">
+                <div className="csm-exp-label">المبلغ المتوقع في الدرج</div>
+                <div className="csm-exp-amount" style={{ direction: 'ltr' }}>
+                  {formatDZD(expected)}
+                </div>
+                <div className="csm-exp-breakdown">
+                  <span>رأس مال أولي: <strong>{formatDZD(session.opening_cash ?? 0)}</strong></span>
+                  <span>+</span>
+                  <span>نقداً محصَّل: <strong>{formatDZD(session.cash_collected ?? 0)}</strong></span>
+                </div>
+              </div>
+
+              {/* عرض المبلغ المُدخَل */}
+              <div className="csm-counted-display">
+                <div className="csm-counted-label">المبلغ الفعلي في الدرج</div>
+                <div className="csm-counted-amount" style={{ direction: 'ltr' }}>
+                  {counted || <span className="csm-counted-placeholder">0</span>}
+                  <span className="csm-counted-dzd">دج</span>
+                </div>
+
+                {/* نتيجة فورية */}
+                {hasCounted && (
+                  <div
+                    className="csm-diff-badge"
+                    style={{
+                      background: diffColors.bg,
+                      borderColor: diffColors.border,
+                      color:       diffColors.color,
+                    }}
+                  >
+                    <span style={{ direction: 'ltr', fontWeight: 900 }}>
+                      {difference >= 0 ? '+' : ''}{formatDZD(difference)}
+                    </span>
+                    <span>{diffColors.label}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Numpad */}
+              <div className="csm-numpad">
+                {['7','8','9','4','5','6','1','2','3','000','0','del'].map(k => (
+                  <button
+                    key={k}
+                    type="button"
+                    className={`csm-npk ${k === 'del' ? 'del' : ''}`}
+                    onClick={() => np(k)}
+                  >
+                    {k === 'del' ? <i className="ti ti-backspace" /> : k}
+                  </button>
+                ))}
+              </div>
+
+              {/* مبالغ سريعة */}
+              <div className="csm-quick-amounts">
+                <button
+                  type="button"
+                  className={`csm-qa-btn ${countedNum === expected ? 'on' : ''}`}
+                  onClick={() => setCounted(expected.toFixed(0))}
+                >
+                  مطابق ({formatDZD(expected)})
+                </button>
+              </div>
+
+              {/* ملاحظة */}
+              <div className="osm-field" style={{ marginTop: 10 }}>
+                <label className="osm-label">
+                  <i className="ti ti-notes" />
+                  ملاحظة على الجرد (اختياري)
+                </label>
+                <textarea
+                  className="osm-inp csm-textarea"
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  placeholder="أي ملاحظة على الصندوق..."
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ══ تأكيد الإغلاق ══ */}
+          {step === 'confirm' && (
+            <div className="csm-confirm">
+
+              {/* ملخص نهائي واضح */}
+              <div className="csm-confirm-header">
+                <i className="ti ti-alert-triangle" style={{ color: 'var(--red)', fontSize: 32 }} />
+                <div className="csm-confirm-title">مراجعة نهائية قبل الإغلاق</div>
+                <div className="csm-confirm-hint">
+                  بعد الإغلاق لا يمكن البيع حتى تفتح جلسة جديدة
+                </div>
+              </div>
+
+              {/* جدول المراجعة */}
+              <div className="csm-review-table">
+                {[
+                  { label: 'المبيعات الصافية',    val: formatDZD(session.net_sales),   type: 'highlight' },
+                  { label: 'عدد الفواتير',         val: String(session.invoices_count), type: 'normal'    },
+                  { label: 'نقداً محصَّل',          val: formatDZD(session.cash_collected ?? 0), type: 'normal' },
+                  { label: 'بطاقات وتحويل',        val: formatDZD((session.cib_collected ?? 0) + (session.ccp_collected ?? 0) + (session.bank_collected ?? 0)), type: 'normal' },
+                  { label: 'آجل / دين',            val: formatDZD(session.credit_total ?? 0), type: 'normal' },
+                  { label: 'TVA',                  val: formatDZD(session.total_tva ?? 0), type: 'normal' },
+                  null, // separator
+                  { label: 'المبلغ المتوقع بالدرج', val: formatDZD(expected),           type: 'normal'    },
+                  { label: 'المبلغ الفعلي بالدرج',  val: counted ? formatDZD(countedNum) : 'لم يُحدَّد', type: 'normal' },
+                  {
+                    label: 'الفرق',
+                    val: counted ? `${difference >= 0 ? '+' : ''}${formatDZD(difference)}` : '—',
+                    type: diffState === 'ok' ? 'success' : 'danger',
+                  },
+                ].map((row, i) =>
+                  row === null ? (
+                    <div key={`sep-${i}`} className="csm-review-sep" />
+                  ) : (
+                    <div
+                      key={i}
+                      className={`csm-review-row csm-review-row--${row.type}`}
+                    >
+                      <span className="csm-review-label">{row.label}</span>
+                      <span className="csm-review-val" style={{ direction: 'ltr' }}>{row.val}</span>
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* ملاحظة */}
+              {note && (
+                <div className="csm-note-preview">
+                  <i className="ti ti-notes" />
+                  {note}
+                </div>
+              )}
+
+              {error && (
+                <div className="csm-error-box">
+                  <i className="ti ti-alert-circle" />
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ════ Footer ════ */}
+        <div className="csm-footer">
+          <button type="button" className="csm-btn-cancel" onClick={onClose}>
+            <i className="ti ti-x" /> إلغاء
+          </button>
+          <div style={{ flex: 1 }} />
+          {currentIdx > 0 && (
+            <button type="button" className="csm-btn-back" onClick={goBack}>
+              <i className="ti ti-arrow-right" /> رجوع
+            </button>
+          )}
+          {!isLast ? (
+            <button type="button" className="csm-btn-next" onClick={goNext}>
+              التالي <i className="ti ti-arrow-left" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="csm-btn-close-session"
+              onClick={handleConfirm}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <><i className="ti ti-loader-2 spin" /> جاري الإغلاق...</>
+              ) : (
+                <><i className="ti ti-door-exit" /> تأكيد الإغلاق</>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -3254,6 +4422,303 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
 }
 ```
 
+## FILE: resources/js/pos/components/LiveSessionBanner.tsx
+```
+import { formatDZD } from '@/pos/utils/calculations';
+import type { PosSession } from '@/lib/api/endpoints/posSession';
+
+export default function LiveSessionBanner({
+  session,
+  onStats,
+  onClose,
+}: {
+  session: PosSession;
+  onStats: (id: number) => void;
+  onClose: (id: number) => void;
+}) {
+  return (
+    <div className="pss-live-banner">
+      <div className="pss-live-left">
+        <div className="pss-live-pulse">
+          <i className="ti ti-device-desktop-analytics" />
+        </div>
+        <div>
+          <div className="pss-live-title">
+            جلسة نشطة — {session.warehouse?.name}
+          </div>
+          <div className="pss-live-sub">
+            <i className="ti ti-user" /> {session.user?.name}
+            <span>·</span>
+            <i className="ti ti-clock" /> {session.duration}
+            <span>·</span>
+            <i className="ti ti-receipt" /> {session.invoices_count} فاتورة
+          </div>
+        </div>
+      </div>
+      <div className="pss-live-stats">
+        <div className="pss-live-stat">
+          <span className="pss-live-stat-val" style={{ direction: 'ltr' }}>
+            {formatDZD(Number(session.net_sales))}
+          </span>
+          <span className="pss-live-stat-lbl">المبيعات الصافية</span>
+        </div>
+        <div className="pss-live-stat">
+          <span className="pss-live-stat-val">{session.invoices_count}</span>
+          <span className="pss-live-stat-lbl">الفواتير</span>
+        </div>
+        <div className="pss-live-stat">
+          <span className="pss-live-stat-val" style={{ direction: 'ltr' }}>
+            {formatDZD(Number(session.avg_invoice ?? 0))}
+          </span>
+          <span className="pss-live-stat-lbl">متوسط الفاتورة</span>
+        </div>
+      </div>
+      <div className="pss-live-actions">
+        <button
+          className="pss-live-btn pss-live-btn--stats"
+          onClick={() => onStats(session.id)}
+        >
+          <i className="ti ti-chart-bar" /> الإحصائيات
+        </button>
+        <button
+          className="pss-live-btn pss-live-btn--close"
+          onClick={() => onClose(session.id)}
+        >
+          <i className="ti ti-door-exit" /> إغلاق
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pos/components/ManagerPinModal.tsx
+```
+// ════════════════════════════════════════════════════════════════════════════
+// pos/components/ManagerPinModal.tsx
+//
+// نافذة PIN المدير — تظهر عندما يحاول الكاشير تطبيق خصم فوق الحد المسموح
+// تُستخدَم مع checkDiscountAllowed() من usePOSSettings
+// ════════════════════════════════════════════════════════════════════════════
+
+import React, { useState, useEffect, useRef } from 'react';
+
+interface ManagerPinModalProps {
+  /** النسبة التي طلبها الكاشير */
+  requestedDiscount: number;
+  /** الحد المضبوط في الإعدادات */
+  threshold:         number;
+  /** هل السبب تجاوز الحد الكلي أم تجاوز عتبة الـ PIN */
+  reason:            'max_exceeded' | 'pin_required';
+  /** يُستدعى بعد التحقق الناجح */
+  onSuccess: () => void;
+  /** يُستدعى عند الإلغاء */
+  onCancel:  () => void;
+  /** دالة التحقق من الـ PIN */
+  verifyPin: (pin: string) => boolean;
+}
+
+export default function ManagerPinModal({
+  requestedDiscount, threshold, reason, onSuccess, onCancel, verifyPin,
+}: ManagerPinModalProps) {
+  const [pin,     setPin]     = useState('');
+  const [error,   setError]   = useState('');
+  const [shaking, setShaking] = useState(false);
+  const inputRef              = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // focus تلقائي عند فتح الـ modal
+    setTimeout(() => inputRef.current?.focus(), 80);
+  }, []);
+
+  const handleSubmit = () => {
+    if (pin.length !== 4) {
+      triggerError('يجب إدخال 4 أرقام');
+      return;
+    }
+    if (!verifyPin(pin)) {
+      triggerError('PIN غير صحيح');
+      setPin('');
+      return;
+    }
+    onSuccess();
+  };
+
+  const triggerError = (msg: string) => {
+    setError(msg);
+    setShaking(true);
+    setTimeout(() => setShaking(false), 500);
+  };
+
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter')  handleSubmit();
+    if (e.key === 'Escape') onCancel();
+  };
+
+  const dots = [0, 1, 2, 3].map(i => (
+    <div
+      key={i}
+      style={{
+        width: 14, height: 14, borderRadius: '50%',
+        background: i < pin.length ? 'var(--em)' : 'var(--b3)',
+        transition: 'background .15s',
+      }}
+    />
+  ));
+
+  return (
+    <div className="ov on" style={{ zIndex: 9999 }} onClick={e => e.stopPropagation()}>
+      <div
+        className={`modal modal-sm ${shaking ? 'shake' : ''}`}
+        style={{ maxWidth: 340, textAlign: 'center' }}
+        onKeyDown={handleKey}
+      >
+        {/* Icon */}
+        <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 54, height: 54, borderRadius: '50%',
+            background: 'var(--goldb)', border: '2px solid var(--goldbo)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, color: 'var(--gold)',
+          }}>
+            <i className="ti ti-lock" />
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)' }}>
+            تأكيد صلاحية المدير
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
+            {reason === 'max_exceeded'
+              ? `الخصم المطلوب (${requestedDiscount}%) يتجاوز الحد الأقصى المسموح (${threshold}%)`
+              : `الخصم المطلوب (${requestedDiscount}%) يتجاوز العتبة المحددة (${threshold}%)`
+            }
+            <br />أدخل PIN المدير للمتابعة
+          </div>
+        </div>
+
+        {/* PIN display */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 12, margin: '20px 0 8px' }}>
+          {dots}
+        </div>
+
+        {/* Hidden input */}
+        <input
+          ref={inputRef}
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={4}
+          value={pin}
+          onChange={e => {
+            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+            setPin(val);
+            setError('');
+            if (val.length === 4) {
+              // تحقق تلقائي عند إدخال 4 أرقام
+              setTimeout(() => {
+                if (!verifyPin(val)) {
+                  triggerError('PIN غير صحيح');
+                  setPin('');
+                } else {
+                  onSuccess();
+                }
+              }, 120);
+            }
+          }}
+          style={{
+            position: 'absolute', opacity: 0, width: 1, height: 1,
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Numpad */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: '0 20px 8px' }}>
+          {['1','2','3','4','5','6','7','8','9'].map(k => (
+            <button
+              key={k}
+              type="button"
+              className="npk"
+              style={{ padding: 14, fontSize: 18 }}
+              onClick={() => {
+                if (pin.length < 4) {
+                  const next = pin + k;
+                  setPin(next);
+                  setError('');
+                  if (next.length === 4) {
+                    setTimeout(() => {
+                      if (!verifyPin(next)) {
+                        triggerError('PIN غير صحيح');
+                        setPin('');
+                      } else {
+                        onSuccess();
+                      }
+                    }, 120);
+                  }
+                }
+              }}
+            >
+              {k}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="npk del"
+            onClick={() => { setPin(p => p.slice(0, -1)); setError(''); }}
+          >
+            <i className="ti ti-backspace" />
+          </button>
+          <button
+            type="button"
+            className="npk zero"
+            style={{ gridColumn: 'span 2', padding: 14, fontSize: 18 }}
+            onClick={() => {
+              if (pin.length < 4) {
+                const next = pin + '0';
+                setPin(next);
+                setError('');
+                if (next.length === 4) {
+                  setTimeout(() => {
+                    if (!verifyPin(next)) {
+                      triggerError('PIN غير صحيح');
+                      setPin('');
+                    } else {
+                      onSuccess();
+                    }
+                  }, 120);
+                }
+              }
+            }}
+          >
+            0
+          </button>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="al al-r" style={{ margin: '0 16px 8px', justifyContent: 'center', fontSize: 12 }}>
+            <i className="ti ti-alert-circle" />
+            {error}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="m-foot" style={{ justifyContent: 'center', gap: 10 }}>
+          <button className="btn" onClick={onCancel} type="button">إلغاء</button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60%  { transform: translateX(-8px); }
+          40%, 80%  { transform: translateX(8px); }
+        }
+        .shake { animation: shake .4s ease; }
+      `}</style>
+    </div>
+  );
+}
+```
+
 ## FILE: resources/js/pos/components/ManualProductModal.tsx
 ```
 import React, { useState, useRef, useEffect } from 'react';
@@ -3392,6 +4857,1219 @@ export default function MobileTabs({
 }
 ```
 
+## FILE: resources/js/pos/components/OpenSessionModal.tsx
+```
+// resources/js/pos/components/OpenSessionModal.tsx — v2 احترافي
+import React, { useState, useEffect } from 'react';
+import { formatDZD } from '@/pos/utils/calculations';
+import type { Warehouse, FiscalYear } from '@/types';
+
+interface Props {
+  warehouses:           Warehouse[];
+  fiscalYears:          FiscalYear[];
+  defaultWarehouseId?:  number | null;
+  defaultFiscalYearId?: number | null;
+  isLoading:            boolean;
+  error?:               string | null;
+  onClose?:             () => void;
+  onOpen: (data: {
+    warehouse_id:   number;
+    fiscal_year_id: number;
+    opening_cash:   number;
+    opening_note?:  string;
+  }) => Promise<void>;
+}
+
+// لوحة أرقام سريعة
+const QUICK_CASH = [0, 5000, 10000, 20000, 50000, 100000];
+
+export default function OpenSessionModal({
+  warehouses, fiscalYears,
+  defaultWarehouseId, defaultFiscalYearId,
+  isLoading, error, onOpen, onClose,
+}: Props) {
+  const initWh = defaultWarehouseId
+    ?? warehouses.find(w => w.is_default)?.id
+    ?? warehouses[0]?.id ?? 0;
+  const initFy = defaultFiscalYearId
+    ?? fiscalYears.find(y => y.is_current && !y.is_closed)?.id
+    ?? fiscalYears[0]?.id ?? 0;
+
+  const [step,         setStep]         = useState<1 | 2>(1);
+  const [warehouseId,  setWarehouseId]  = useState<number>(initWh);
+  const [fiscalYearId, setFiscalYearId] = useState<number>(initFy);
+  const [openingCash,  setOpeningCash]  = useState('');
+  const [confirmCash,  setConfirmCash]  = useState('');
+  const [note,         setNote]         = useState('');
+  const [cashMode,     setCashMode]     = useState<'quick' | 'manual'>('quick');
+
+  const cashNum    = parseFloat(openingCash)  || 0;
+  const confirmNum = parseFloat(confirmCash)  || 0;
+  const cashOk     = confirmCash === '' || cashNum === confirmNum;
+  const canNext    = !!warehouseId && !!fiscalYearId;
+  const canOpen    = cashOk && !isLoading;
+
+  const selectedWh = warehouses.find(w => w.id === warehouseId);
+  const selectedFy = fiscalYears.find(y => y.id === fiscalYearId);
+  const now        = new Date();
+  const timeStr    = now.toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' });
+  const dateStr    = now.toLocaleDateString('ar-DZ', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  // numpad
+  const np = (key: string) => {
+    setCashMode('manual');
+    setOpeningCash(prev => {
+      if (key === 'del') return prev.slice(0, -1);
+      if (key === '000') return prev + '000';
+      if (prev === '0')  return key;
+      return prev + key;
+    });
+    setConfirmCash('');
+  };
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && step === 2 && canOpen) handleOpen();
+      if (e.key === 'ArrowRight' && step === 2) setStep(1);
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [step, canOpen, cashNum]);
+
+  const handleOpen = async () => {
+    if (!canOpen) return;
+    await onOpen({
+      warehouse_id:   warehouseId,
+      fiscal_year_id: fiscalYearId,
+      opening_cash:   cashNum,
+      opening_note:   note.trim() || undefined,
+    });
+  };
+
+  return (
+    <div className="ov on" style={{ zIndex: 9998, alignItems: 'center' }}>
+      <div className="osm-wrap">
+
+        {/* ════ Header شعار + وقت ════ */}
+        <div className="osm-hero">
+          <div className="osm-hero-icon">
+            <i className="ti ti-door-enter" />
+          </div>
+          <div className="osm-hero-text">
+            <div className="osm-hero-title">فتح جلسة بيع</div>
+            <div className="osm-hero-time">{dateStr} · {timeStr}</div>
+          </div>
+          {/* مؤشر الخطوات */}
+          <div className="osm-steps-mini">
+            {[1, 2].map(s => (
+              <div
+                key={s}
+                className={`osm-step-dot ${step >= s ? 'on' : ''}`}
+              />
+            ))}
+          </div>
+          {/* زر الإغلاق */}
+          {onClose && (
+            <button
+              type="button"
+              className="m-x"
+              onClick={onClose}
+              style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff' }}
+            >
+              <i className="ti ti-x" />
+            </button>
+          )}
+        </div>
+
+        {/* ════ Step 1: الإعداد ════ */}
+        {step === 1 && (
+          <div className="osm-body">
+            <div className="osm-section-title">
+              <i className="ti ti-settings" />
+              إعداد الجلسة
+            </div>
+
+            {/* المستودع */}
+            <div className="osm-field">
+              <label className="osm-label">
+                <i className="ti ti-building-warehouse" />
+                المستودع
+              </label>
+              <div className="osm-warehouse-grid">
+                {warehouses.map(w => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    className={`osm-wh-card ${warehouseId === w.id ? 'on' : ''}`}
+                    onClick={() => setWarehouseId(w.id)}
+                  >
+                    <i className="ti ti-building-warehouse" />
+                    <span>{w.name}</span>
+                    {w.is_default && <span className="osm-default-tag">افتراضي</span>}
+                    {warehouseId === w.id && (
+                      <i className="ti ti-check osm-wh-check" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* السنة المالية */}
+            <div className="osm-field">
+              <label className="osm-label">
+                <i className="ti ti-calendar" />
+                السنة المالية
+              </label>
+              <div className="osm-fy-list">
+                {fiscalYears.filter(y => !y.is_closed).map(y => (
+                  <button
+                    key={y.id}
+                    type="button"
+                    className={`osm-fy-row ${fiscalYearId === y.id ? 'on' : ''}`}
+                    onClick={() => setFiscalYearId(y.id)}
+                  >
+                    <div className="osm-fy-radio" />
+                    <div className="osm-fy-info">
+                      <span className="osm-fy-name">{y.name}</span>
+                      <span className="osm-fy-dates">
+                        {y.start_date} — {y.end_date}
+                      </span>
+                    </div>
+                    {y.is_current && (
+                      <span className="osm-current-tag">الحالية</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ملاحظة وردية */}
+            <div className="osm-field">
+              <label className="osm-label">
+                <i className="ti ti-notes" />
+                ملاحظة الوردية (اختياري)
+              </label>
+              <input
+                className="osm-inp"
+                type="text"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder="مثال: وردية صباح، صندوق 1..."
+              />
+            </div>
+
+            {/* ملخص الاختيار */}
+            {selectedWh && selectedFy && (
+              <div className="osm-summary-bar">
+                <span className="ic ic-xs"><i className="ti ti-check" /></span>
+                <strong>{selectedWh.name}</strong>
+                <span className="osm-summary-sep">·</span>
+                <strong>{selectedFy.name}</strong>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════ Step 2: رأس مال الدرج ════ */}
+        {step === 2 && (
+          <div className="osm-body">
+            <div className="osm-section-title">
+              <i className="ti ti-wallet" />
+              رأس مال الدرج
+            </div>
+
+            {/* المبلغ المُدخَل */}
+            <div className="osm-cash-display">
+              <div className="osm-cash-label">مبلغ الدرج</div>
+              <div className="osm-cash-big" style={{ direction: 'ltr' }}>
+                {cashNum > 0
+                  ? cashNum.toLocaleString('fr-DZ')
+                  : <span className="osm-cash-placeholder">0</span>
+                }
+                <span className="osm-cash-dzd">دج</span>
+              </div>
+              {cashNum > 0 && (
+                <div className="osm-cash-words">
+                  {formatDZD(cashNum)}
+                </div>
+              )}
+            </div>
+
+            {/* مبالغ سريعة */}
+            <div className="osm-quick-grid">
+              {QUICK_CASH.map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`osm-quick-btn ${cashNum === v ? 'on' : ''}`}
+                  onClick={() => {
+                    setCashMode('quick');
+                    setOpeningCash(String(v));
+                    setConfirmCash('');
+                  }}
+                >
+                  {v === 0 ? 'بدون' : v.toLocaleString('fr-DZ')}
+                </button>
+              ))}
+            </div>
+
+            {/* Numpad */}
+            <div className="osm-numpad">
+              {['7','8','9','4','5','6','1','2','3','000','0','del'].map(k => (
+                <button
+                  key={k}
+                  type="button"
+                  className={`osm-npk ${k === 'del' ? 'del' : ''}`}
+                  onClick={() => np(k)}
+                >
+                  {k === 'del' ? <i className="ti ti-backspace" /> : k}
+                </button>
+              ))}
+            </div>
+
+            {/* تأكيد المبلغ — يظهر فقط عند إدخال يدوي */}
+            {cashNum > 0 && cashMode === 'manual' && (
+              <div className="osm-field">
+                <label className="osm-label">
+                  <i className="ti ti-refresh" />
+                  تأكيد المبلغ
+                </label>
+                <div className={`osm-confirm-inp-wrap ${!cashOk && confirmCash ? 'err' : ''}`}>
+                  <input
+                    className="osm-inp"
+                    type="number"
+                    value={confirmCash}
+                    onChange={e => setConfirmCash(e.target.value)}
+                    placeholder={String(cashNum)}
+                    inputMode="numeric"
+                  />
+                  {cashOk && confirmCash && (
+                    <i className="ti ti-check osm-confirm-ok" />
+                  )}
+                </div>
+                {!cashOk && confirmCash && (
+                  <div className="osm-field-err">
+                    <i className="ti ti-alert-circle" /> المبلغان غير متطابقان
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ملخص الجلسة */}
+            <div className="osm-session-preview">
+              <div className="osm-preview-row">
+                <i className="ti ti-building-warehouse" />
+                <span>{selectedWh?.name}</span>
+              </div>
+              <div className="osm-preview-row">
+                <i className="ti ti-calendar" />
+                <span>{selectedFy?.name}</span>
+              </div>
+              <div className="osm-preview-row">
+                <i className="ti ti-clock" />
+                <span>{timeStr}</span>
+              </div>
+              {note && (
+                <div className="osm-preview-row">
+                  <i className="ti ti-notes" />
+                  <span>{note}</span>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="osm-error">
+                <i className="ti ti-alert-circle" />
+                {error}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════ Footer ════ */}
+        <div className="osm-footer">
+          {step === 2 && (
+            <button
+              type="button"
+              className="osm-btn-back"
+              onClick={() => setStep(1)}
+            >
+              <i className="ti ti-arrow-right" /> رجوع
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          {step === 1 ? (
+            <button
+              type="button"
+              className="osm-btn-next"
+              onClick={() => setStep(2)}
+              disabled={!canNext}
+            >
+              التالي <i className="ti ti-arrow-left" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="osm-btn-open"
+              onClick={handleOpen}
+              disabled={!canOpen}
+            >
+              {isLoading ? (
+                <><i className="ti ti-loader-2 spin" /> جاري الفتح...</>
+              ) : (
+                <><i className="ti ti-door-enter" /> فتح الجلسة</>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pos/components/PosSessionsCards.tsx
+```
+import Badge      from '@/components/ui/Badge';
+import { STATUS_VARIANT, STATUS_LABEL } from '@/pos/hooks/usePosSessions';
+import { formatDZD } from '@/pos/utils/calculations';
+import type { PosSession } from '@/lib/api/endpoints/posSession';
+
+export default function PosSessionsCards({
+  sessions,
+  isFetching,
+  selectedId,
+  onStats,
+  onClose,
+}: {
+  sessions: PosSession[];
+  isFetching: boolean;
+  selectedId: number | null;
+  onStats: (id: number) => void;
+  onClose: (id: number) => void;
+}) {
+  return (
+    <div className="pss-cards-grid" style={{ opacity: isFetching ? 0.65 : 1 }}>
+      {sessions.map(sess => (
+        <div
+          key={sess.id}
+          className={`pss-card ${sess.status === 'open' ? 'pss-card--live' : ''}`}
+          onClick={() => onStats(sess.id)}
+        >
+          <div className="pss-card-header">
+            <div className="pss-card-av">
+              {(sess.user?.name ?? '?').charAt(0)}
+            </div>
+            <div className="pss-card-info">
+              <div className="pss-card-name">{sess.user?.name ?? '—'}</div>
+              <div className="pss-card-wh">
+                <i className="ti ti-building-warehouse" />
+                {sess.warehouse?.name ?? '—'}
+              </div>
+            </div>
+            <Badge variant={STATUS_VARIANT[sess.status] ?? 'gray'}>{STATUS_LABEL[sess.status] ?? sess.status}</Badge>
+          </div>
+
+          <div className="pss-card-sales">
+            <div className="pss-card-sales-val" style={{ direction: 'ltr' }}>
+              {formatDZD(Number(sess.net_sales))}
+            </div>
+            <div className="pss-card-sales-lbl">المبيعات الصافية</div>
+          </div>
+
+          <div className="pss-card-stats">
+            <div className="pss-card-stat">
+              <span className="pss-card-stat-val">{sess.invoices_count}</span>
+              <span className="pss-card-stat-lbl">فاتورة</span>
+            </div>
+            <div className="pss-card-stat-sep" />
+            <div className="pss-card-stat">
+              <span className="pss-card-stat-val">{sess.duration ?? '—'}</span>
+              <span className="pss-card-stat-lbl">المدة</span>
+            </div>
+            <div className="pss-card-stat-sep" />
+            <div className="pss-card-stat">
+              <span className="pss-card-stat-val" style={{ direction: 'ltr' }}>
+                {formatDZD(Number(sess.avg_invoice ?? 0))}
+              </span>
+              <span className="pss-card-stat-lbl">المتوسط</span>
+            </div>
+          </div>
+
+          <div className="pss-card-footer">
+            <span className="pss-card-date">
+              <i className="ti ti-calendar" />
+              {new Date(sess.opened_at).toLocaleDateString('ar-DZ', { day: 'numeric', month: 'long' })}
+            </span>
+            <div className="pss-card-actions" onClick={e => e.stopPropagation()}>
+              <button className="pss-action-btn" onClick={() => onStats(sess.id)}>
+                <i className="ti ti-chart-bar" />
+              </button>
+              {sess.status === 'open' && (
+                <button
+                  className="pss-action-btn pss-action-btn--danger"
+                  onClick={() => onClose(sess.id)}
+                >
+                  <i className="ti ti-door-exit" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {sess.status === 'open' && <div className="pss-card-live-bar" />}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pos/components/PosSessionsFilters.tsx
+```
+import type { StatusFilter } from '@/pos/hooks/usePosSessions';
+
+export default function PosSessionsFilters({
+  search, onSearchChange,
+  statusFilter, onStatusChange,
+  dateFrom, onDateFromChange,
+  dateTo, onDateToChange,
+  hasFilters, onReset,
+  isSyncing,
+}: {
+  search: string;
+  onSearchChange: (v: string) => void;
+  statusFilter: StatusFilter;
+  onStatusChange: (v: StatusFilter) => void;
+  dateFrom: string;
+  onDateFromChange: (v: string) => void;
+  dateTo: string;
+  onDateToChange: (v: string) => void;
+  hasFilters: boolean;
+  onReset: () => void;
+  isSyncing: boolean;
+}) {
+  return (
+    <div className="pss-filters">
+      <div className="pss-search">
+        <i className="ti ti-search pss-search-ic" />
+        <input
+          className="pss-search-inp"
+          type="text"
+          placeholder="بحث باسم الكاشير أو المستودع..."
+          value={search}
+          onChange={e => onSearchChange(e.target.value)}
+        />
+        {search && (
+          <button className="pss-search-clear" onClick={() => onSearchChange('')}>
+            <i className="ti ti-x" />
+          </button>
+        )}
+      </div>
+
+      <div className="pss-filter-pills">
+        {(['', 'open', 'closed', 'suspended'] as const).map(s => (
+          <button
+            key={s || 'all'}
+            className={`pss-pill ${statusFilter === s ? 'on' : ''}`}
+            onClick={() => onStatusChange(s)}
+          >
+            {s === ''          && 'الكل'}
+            {s === 'open'      && <><i className="ti ti-circle-check" /> مفتوحة</>}
+            {s === 'closed'    && <><i className="ti ti-circle-x" /> مغلقة</>}
+            {s === 'suspended' && <><i className="ti ti-circle-pause" /> معلقة</>}
+          </button>
+        ))}
+      </div>
+
+      <div className="pss-date-range">
+        <div className="pss-date-inp-wrap">
+          <i className="ti ti-calendar pss-date-ic" />
+          <input
+            type="date"
+            className="pss-date-inp"
+            value={dateFrom}
+            onChange={e => onDateFromChange(e.target.value)}
+          />
+        </div>
+        <span className="pss-date-sep">—</span>
+        <div className="pss-date-inp-wrap">
+          <i className="ti ti-calendar pss-date-ic" />
+          <input
+            type="date"
+            className="pss-date-inp"
+            value={dateTo}
+            onChange={e => onDateToChange(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {hasFilters && (
+        <button className="pss-reset-btn" onClick={onReset}>
+          <i className="ti ti-refresh" /> إعادة ضبط
+        </button>
+      )}
+
+      <div className="pss-filter-spacer" />
+
+      {isSyncing && (
+        <span className="pss-sync-badge">
+          <i className="ti ti-loader-2 spin" /> تحديث...
+        </span>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pos/components/PosSessionsPagination.tsx
+```
+interface PaginationMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+}
+
+export default function PosSessionsPagination({
+  meta,
+  page,
+  onPageChange,
+}: {
+  meta: PaginationMeta;
+  page: number;
+  onPageChange: (p: number) => void;
+}) {
+  if (meta.last_page <= 1) return null;
+
+  return (
+    <div className="pss-pagination">
+      <span className="pss-pagination-info">
+        {meta.from}–{meta.to} من {meta.total}
+      </span>
+      <div className="pss-pagination-btns">
+        <button
+          className="pss-page-btn"
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        >
+          <i className="ti ti-chevron-right" />
+        </button>
+
+        {Array.from({ length: Math.min(7, meta.last_page) }, (_, i) => {
+          const p = Math.max(1, Math.min(meta.last_page - 6, page - 3)) + i;
+          return (
+            <button
+              key={p}
+              className={`pss-page-btn ${p === page ? 'on' : ''}`}
+              onClick={() => onPageChange(p)}
+            >
+              {p}
+            </button>
+          );
+        })}
+
+        <button
+          className="pss-page-btn"
+          disabled={page >= meta.last_page}
+          onClick={() => onPageChange(Math.min(meta.last_page, page + 1))}
+        >
+          <i className="ti ti-chevron-left" />
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pos/components/PosSessionsTable.tsx
+```
+import Badge      from '@/components/ui/Badge';
+import { STATUS_VARIANT, STATUS_LABEL } from '@/pos/hooks/usePosSessions';
+import { formatDZD } from '@/pos/utils/calculations';
+import Sparkline     from './Sparkline';
+import type { PosSession } from '@/lib/api/endpoints/posSession';
+
+export default function PosSessionsTable({
+  sessions,
+  isFetching,
+  selectedId,
+  maxSale,
+  onStats,
+  onClose,
+}: {
+  sessions: PosSession[];
+  isFetching: boolean;
+  selectedId: number | null;
+  maxSale: number;
+  onStats: (id: number) => void;
+  onClose: (id: number) => void;
+}) {
+  return (
+    <div className="pss-table-wrap" style={{ opacity: isFetching ? 0.65 : 1 }}>
+      <table className="pss-table">
+        <thead>
+          <tr>
+            <th>الحالة</th>
+            <th>الكاشير</th>
+            <th>المستودع</th>
+            <th>الفتح</th>
+            <th>الإغلاق</th>
+            <th className="pss-th-num">الفواتير</th>
+            <th className="pss-th-num">المبيعات</th>
+            <th className="pss-th-num">المدة</th>
+            <th className="pss-th-actions" />
+          </tr>
+        </thead>
+        <tbody>
+          {sessions.map(sess => (
+            <tr
+              key={sess.id}
+              className={[
+                'pss-tr',
+                sess.status === 'open'   ? 'pss-tr--live'     : '',
+                selectedId  === sess.id  ? 'pss-tr--selected' : '',
+              ].join(' ')}
+              onClick={() => onStats(sess.id)}
+            >
+              <td><Badge variant={STATUS_VARIANT[sess.status] ?? 'gray'}>{STATUS_LABEL[sess.status] ?? sess.status}</Badge></td>
+
+              <td>
+                <div className="pss-user-cell">
+                  <div className="pss-user-av">
+                    {(sess.user?.name ?? '?').charAt(0)}
+                  </div>
+                  <span className="pss-user-name">{sess.user?.name ?? '—'}</span>
+                </div>
+              </td>
+
+              <td>
+                <div className="pss-wh-cell">
+                  <i className="ti ti-building-warehouse" />
+                  {sess.warehouse?.name ?? '—'}
+                </div>
+              </td>
+
+              <td className="pss-date-cell">
+                {new Date(sess.opened_at).toLocaleDateString('ar-DZ', { day: 'numeric', month: 'short' })}
+                <span className="pss-time">
+                  {new Date(sess.opened_at).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </td>
+
+              <td className="pss-date-cell">
+                {sess.closed_at ? (
+                  <>
+                    {new Date(sess.closed_at).toLocaleDateString('ar-DZ', { day: 'numeric', month: 'short' })}
+                    <span className="pss-time">
+                      {new Date(sess.closed_at).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </>
+                ) : (
+                  <span className="pss-live-indicator">
+                    <span className="pss-live-dot pss-live-dot--sm" />
+                    نشطة
+                  </span>
+                )}
+              </td>
+
+              <td className="pss-num-cell">
+                <span className="pss-num">{sess.invoices_count}</span>
+              </td>
+
+              <td className="pss-num-cell">
+                <div className="pss-sales-cell">
+                  <span className="pss-sales-val" style={{ direction: 'ltr' }}>
+                    {formatDZD(Number(sess.net_sales))}
+                  </span>
+                  <Sparkline value={Number(sess.net_sales)} max={maxSale} color="var(--em)" />
+                </div>
+              </td>
+
+              <td className="pss-num-cell">
+                <span className="pss-duration">{sess.duration ?? '—'}</span>
+              </td>
+
+              <td onClick={e => e.stopPropagation()}>
+                <div className="pss-row-actions">
+                  <button className="pss-action-btn" title="عرض التفاصيل" onClick={() => onStats(sess.id)}>
+                    <i className="ti ti-chart-bar" />
+                  </button>
+                  {sess.status === 'open' && (
+                    <button className="pss-action-btn pss-action-btn--danger" title="إغلاق الجلسة" onClick={() => onClose(sess.id)}>
+                      <i className="ti ti-door-exit" />
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pos/components/POSSettingsModal.tsx
+```
+// ════════════════════════════════════════════════════════════════════════════
+// pos/components/POSSettingsModal.tsx
+//
+// واجهة إعدادات POS — يفتحها المدير من الـ TopBar
+// يُعدِّل usePOSSettings مباشرة (يُحفظ في localStorage)
+// ════════════════════════════════════════════════════════════════════════════
+
+import React, { useState } from 'react';
+import type { POSSettings, PriceDisplayMode, GridDefaultSize } from '@/pos/hooks/usePOSSettings';
+import { isWebUsbSupported } from '@/pos/utils/printService';
+import type { Warehouse, DocumentType } from '@/types';
+
+interface POSSettingsModalProps {
+  settings:      POSSettings;
+  onSave:        (patch: Partial<POSSettings>) => void;
+  onReset:       () => void;
+  onClose:       () => void;
+  warehouses:    Warehouse[];
+  documentTypes: DocumentType[];
+}
+
+type Tab = 'general' | 'pricing' | 'print' | 'receipt' | 'security';
+
+export default function POSSettingsModal({
+  settings, onSave, onReset, onClose, warehouses, documentTypes,
+}: POSSettingsModalProps) {
+  const [local,     setLocal]     = useState<POSSettings>({ ...settings });
+  const [activeTab, setActiveTab] = useState<Tab>('general');
+  const [dirty,     setDirty]     = useState(false);
+  const [showPin,   setShowPin]   = useState(false);
+
+  const patch = (p: Partial<POSSettings>) => {
+    setLocal(prev => ({ ...prev, ...p }));
+    setDirty(true);
+  };
+
+  const handleSave = () => {
+    onSave(local);
+    setDirty(false);
+    onClose();
+  };
+
+  const handleReset = () => {
+    if (!confirm('هل تريد إعادة ضبط كل الإعدادات للقيم الافتراضية؟')) return;
+    onReset();
+    onClose();
+  };
+
+  const tabs: { key: Tab; label: string; icon: string }[] = [
+    { key: 'general',  label: 'عام',       icon: 'ti-settings' },
+    { key: 'pricing',  label: 'الأسعار',   icon: 'ti-tag' },
+    { key: 'print',    label: 'الطباعة',   icon: 'ti-printer' },
+    { key: 'receipt',  label: 'الإيصال',   icon: 'ti-receipt' },
+    { key: 'security', label: 'الأمان',    icon: 'ti-lock' },
+  ];
+
+  const invoiceTypes = documentTypes.filter(t =>
+    ['FV', 'BL', 'FAC', 'PRO', 'DEV'].includes(t.code),
+  );
+
+  return (
+    <div className="ov on" onClick={onClose}>
+      <div
+        className="modal"
+        style={{ maxWidth: 680, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="m-hd">
+          <div>
+            <div className="m-title">
+              <i className="ti ti-settings-2" style={{ color: 'var(--em)', marginLeft: 7 }} />
+              إعدادات نقطة البيع
+            </div>
+            <div className="m-sub">تُحفَظ محلياً لهذا الجهاز</div>
+          </div>
+          <button className="m-x" onClick={onClose} type="button">
+            <i className="ti ti-x" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="pos-set-tabs">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              className={`pos-set-tab ${activeTab === t.key ? 'on' : ''}`}
+              onClick={() => setActiveTab(t.key)}
+              type="button"
+            >
+              <i className={`ti ${t.icon}`} />
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="m-body" style={{ flex: 1, overflowY: 'auto' }}>
+
+          {/* ── عام ── */}
+          {activeTab === 'general' && (
+            <div className="fgrid">
+              <div className="fg s2">
+                <label>المستودع الافتراضي</label>
+                <select
+                  value={local.defaultWarehouseId ?? ''}
+                  onChange={e => patch({ defaultWarehouseId: e.target.value ? parseInt(e.target.value) : null })}
+                >
+                  <option value="">— تلقائي (is_default) —</option>
+                  {warehouses.map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="fg s2">
+                <label>نوع الفاتورة الافتراضي</label>
+                <select
+                  value={local.defaultDocTypeCode}
+                  onChange={e => patch({ defaultDocTypeCode: e.target.value })}
+                >
+                  {invoiceTypes.map(t => (
+                    <option key={t.id} value={t.code}>{t.name} ({t.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="fg s2">
+                <label>طريقة الدفع الافتراضية</label>
+                <select
+                  value={local.defaultPaymentCode}
+                  onChange={e => patch({ defaultPaymentCode: e.target.value })}
+                >
+                  <option value="cash">💵 نقداً</option>
+                  <option value="cib">💳 CIB</option>
+                  <option value="ccp">📮 CCP</option>
+                  <option value="credit">📋 آجل</option>
+                </select>
+              </div>
+
+              <div className="fg s2">
+                <label>حجم شبكة المنتجات الافتراضي</label>
+                <select
+                  value={local.defaultGridSize}
+                  onChange={e => patch({ defaultGridSize: e.target.value as GridDefaultSize })}
+                >
+                  <option value="xs">XS — كثيف جداً</option>
+                  <option value="sm">SM — كثيف</option>
+                  <option value="md">MD — متوسط (افتراضي)</option>
+                  <option value="lg">LG — كبير</option>
+                </select>
+              </div>
+
+              {/* Toggles */}
+              <div className="fg s2">
+                <div className="pos-set-section">سلوك الواجهة</div>
+              </div>
+
+              {[
+                { key: 'showQuickbarOnStart', label: 'إظهار شريط المنتجات السريعة عند الفتح' },
+                { key: 'confirmOnClear',      label: 'طلب تأكيد قبل مسح السلة' },
+                { key: 'autoClosePayment',    label: 'إغلاق نافذة الدفع تلقائياً بعد النجاح' },
+                { key: 'playSoundOnAdd',      label: 'صوت عند إضافة منتج (beep)' },
+                { key: 'playSoundOnSale',     label: 'صوت عند إتمام البيع (success chime)' },
+                { key: 'showStockOnCard',     label: 'إظهار الرصيد في بطاقة المنتج' },
+                { key: 'hideOutOfStock',      label: 'إخفاء المنتجات النافذة من الشبكة' },
+                { key: 'clearSearchOnAdd',   label: 'تفريغ البحث بعد إضافة منتج' },
+                { key: 'keyboardNav',        label: 'التنقل عبر النتائج بلوحة المفاتيح (↑↓)' },
+              ].map(({ key, label }) => (
+                <div className="fg s2" key={key}>
+                  <label className="pos-set-toggle">
+                    <input
+                      type="checkbox"
+                      checked={(local as any)[key]}
+                      onChange={e => patch({ [key]: e.target.checked } as any)}
+                    />
+                    <span className="toggle-track" />
+                    <span className="toggle-label">{label}</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── الأسعار ── */}
+          {activeTab === 'pricing' && (
+            <div className="fgrid">
+              <div className="fg s2">
+                <label>طريقة عرض الأسعار في بطاقات المنتجات</label>
+                <div className="pos-set-radio-group">
+                  {([
+                    { value: 'ttc', label: 'السعر TTC (شامل الضريبة)', desc: 'ما يدفعه الزبون فعلياً' },
+                    { value: 'ht',  label: 'السعر HT (قبل الضريبة)',   desc: 'للمحلات التجارية B2B' },
+                  ] as { value: PriceDisplayMode; label: string; desc: string }[]).map(opt => (
+                    <label key={opt.value} className={`pos-set-radio ${local.priceDisplayMode === opt.value ? 'on' : ''}`}>
+                      <input
+                        type="radio"
+                        name="priceDisplayMode"
+                        value={opt.value}
+                        checked={local.priceDisplayMode === opt.value}
+                        onChange={() => patch({ priceDisplayMode: opt.value })}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{opt.label}</div>
+                        <div style={{ fontSize: 11, color: 'var(--t4)' }}>{opt.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="fg">
+                <label>الحد الأقصى للخصم (%)</label>
+                <div className="inp-row">
+                  <input
+                    type="number"
+                    min={0} max={100} step={1}
+                    value={local.maxDiscountPct}
+                    onChange={e => patch({ maxDiscountPct: parseInt(e.target.value) || 0 })}
+                  />
+                  <div className="inp-suf">%</div>
+                </div>
+                <div className="fg-hint">0 = بدون حد أقصى</div>
+              </div>
+
+              <div className="fg">
+                <label>عتبة تطبيق خصم الكمية</label>
+                <div className="inp-row">
+                  <input
+                    type="number" min={0} max={100} step={1}
+                    value={local.discountPinThreshold}
+                    onChange={e => patch({ discountPinThreshold: parseInt(e.target.value) || 0 })}
+                  />
+                  <div className="inp-suf">%</div>
+                </div>
+                <div className="fg-hint">فوق هذه النسبة يُطلب PIN المدير</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── الطباعة ── */}
+          {activeTab === 'print' && (
+            <div className="fgrid">
+              <div className="fg s2">
+                <label>طريقة الطباعة</label>
+                <div className="pos-set-radio-group">
+                  {[
+                    { value: 'browser',  label: '🖨️ طباعة المتصفح (الافتراضي)', desc: 'يفتح dialog الطباعة العادي' },
+                    { value: 'thermal',  label: '🔌 طابعة حرارية ESC/POS',        desc: `WebUSB — ${isWebUsbSupported() ? '✅ مدعوم في متصفحك' : '❌ غير مدعوم — استخدم Chrome/Edge'}` },
+                  ].map(opt => (
+                    <label key={opt.value} className={`pos-set-radio ${local.printMode === opt.value ? 'on' : ''}`}>
+                      <input
+                        type="radio" name="printMode" value={opt.value}
+                        checked={local.printMode === opt.value}
+                        onChange={() => patch({ printMode: opt.value as any })}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{opt.label}</div>
+                        <div style={{ fontSize: 11, color: 'var(--t4)' }}>{opt.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="fg">
+                <label>عدد النسخ</label>
+                <select
+                  value={local.printCopies}
+                  onChange={e => patch({ printCopies: parseInt(e.target.value) as 1 | 2 | 3 })}
+                >
+                  <option value={1}>نسخة واحدة</option>
+                  <option value={2}>نسختان</option>
+                  <option value={3}>3 نسخ</option>
+                </select>
+              </div>
+
+              <div className="fg s2">
+                <label className="pos-set-toggle">
+                  <input
+                    type="checkbox"
+                    checked={local.autoPrint}
+                    onChange={e => patch({ autoPrint: e.target.checked })}
+                  />
+                  <span className="toggle-track" />
+                  <span className="toggle-label">طباعة تلقائية بعد كل بيع</span>
+                </label>
+              </div>
+
+              <div className="fg s2">
+                <label className="pos-set-toggle">
+                  <input
+                    type="checkbox"
+                    checked={local.openCashDrawer}
+                    onChange={e => patch({ openCashDrawer: e.target.checked })}
+                  />
+                  <span className="toggle-track" />
+                  <span className="toggle-label">
+                    فتح درج النقود تلقائياً عند الدفع نقداً
+                    <span style={{ fontSize: 11, color: 'var(--t4)', display: 'block' }}>
+                      يعمل مع طابعات ESC/POS المتصلة بالدرج
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* ── الإيصال ── */}
+          {activeTab === 'receipt' && (
+            <div className="fgrid">
+              <div className="fg s2">
+                <label>اسم الشركة في رأس الإيصال</label>
+                <input
+                  type="text"
+                  value={local.receiptCompanyName ?? ''}
+                  onChange={e => patch({ receiptCompanyName: e.target.value || null })}
+                  placeholder="اتركه فارغاً لقراءته من بيانات الشركة"
+                />
+                <div className="fg-hint">اتركه فارغاً ليُقرأ من activeCompany.name تلقائياً</div>
+              </div>
+
+              <div className="fg s2">
+                <label>سطر رأس إضافي (عنوان، هاتف...)</label>
+                <input
+                  type="text"
+                  value={local.receiptHeader2}
+                  onChange={e => patch({ receiptHeader2: e.target.value })}
+                  placeholder="مثال: ورقلة، شارع العربي بن مهيدي | 029 71 23 45"
+                />
+              </div>
+
+              <div className="fg s2">
+                <label>رسالة تذييل الإيصال</label>
+                <input
+                  type="text"
+                  value={local.receiptFooter}
+                  onChange={e => patch({ receiptFooter: e.target.value })}
+                  placeholder="شكراً لتعاملكم معنا"
+                />
+              </div>
+
+              <div className="fg s2">
+                <label className="pos-set-toggle">
+                  <input
+                    type="checkbox"
+                    checked={local.receiptShowQr}
+                    onChange={e => patch({ receiptShowQr: e.target.checked })}
+                  />
+                  <span className="toggle-track" />
+                  <span className="toggle-label">إظهار QR Code في الإيصال</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* ── الأمان ── */}
+          {activeTab === 'security' && (
+            <div className="fgrid">
+              <div className="fg s2">
+                <div className="al al-b" style={{ marginBottom: 0 }}>
+                  <i className="ti ti-info-circle" />
+                  <div>
+                    يمكن تعيين PIN للمدير لتقييد صلاحيات الكاشير على الخصومات الكبيرة.
+                    PIN يُخزَّن محلياً — لا يُرسَل للسيرفر.
+                  </div>
+                </div>
+              </div>
+
+              <div className="fg s2">
+                <label className="pos-set-toggle">
+                  <input
+                    type="checkbox"
+                    checked={local.discountRequirePin}
+                    onChange={e => patch({ discountRequirePin: e.target.checked })}
+                  />
+                  <span className="toggle-track" />
+                  <span className="toggle-label">
+                    طلب PIN المدير عند تجاوز حد الخصم
+                  </span>
+                </label>
+              </div>
+
+              {local.discountRequirePin && (
+                <>
+                  <div className="fg">
+                    <label>عتبة طلب الـ PIN</label>
+                    <div className="inp-row">
+                      <input
+                        type="number" min={1} max={100}
+                        value={local.discountPinThreshold}
+                        onChange={e => patch({ discountPinThreshold: parseInt(e.target.value) || 20 })}
+                      />
+                      <div className="inp-suf">%</div>
+                    </div>
+                  </div>
+
+                  <div className="fg">
+                    <label>PIN المدير (4 أرقام)</label>
+                    <div className="inp-row">
+                      <input
+                        type={showPin ? 'text' : 'password'}
+                        maxLength={4}
+                        pattern="[0-9]{4}"
+                        inputMode="numeric"
+                        value={local.managerPin}
+                        onChange={e => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                          patch({ managerPin: val });
+                        }}
+                        placeholder="••••"
+                        style={{ fontFamily: 'monospace', letterSpacing: 6, textAlign: 'center' }}
+                      />
+                      <button
+                        type="button"
+                        className="inp-suf"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setShowPin(p => !p)}
+                      >
+                        <i className={`ti ${showPin ? 'ti-eye-off' : 'ti-eye'}`} />
+                      </button>
+                    </div>
+                    {local.managerPin && local.managerPin.length !== 4 && (
+                      <div className="fg-hint" style={{ color: 'var(--red)' }}>
+                        PIN يجب أن يكون 4 أرقام بالضبط
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="m-foot">
+          <button className="btn btn-r" onClick={handleReset} type="button">
+            <i className="ti ti-refresh" /> إعادة ضبط
+          </button>
+          <div style={{ flex: 1 }} />
+          <button className="btn" onClick={onClose} type="button">إلغاء</button>
+          <button
+            className="btn btn-p"
+            onClick={handleSave}
+            disabled={!dirty}
+            type="button"
+          >
+            <i className="ti ti-device-floppy" /> حفظ الإعدادات
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
 ## FILE: resources/js/pos/components/POSTopBar.tsx
 ```
 import React from 'react';
@@ -3405,6 +6083,8 @@ interface POSTopBarProps {
   onReceipt: () => void; onSession: () => void; onFullscreen: () => void;
   onKbHelp: () => void; onToggleQuickbar: () => void;
   onReturn: () => void;
+  onKioskMode: () => void;
+  onSettings: () => void;
   items: CartItem[]; totals: CartTotals; totalTtcFinal: number;
 }
 
@@ -3412,7 +6092,7 @@ export default function POSTopBar({
   sessionInvoices, sessionSales, heldCount, avgMargin,
   isEmpty, isFullscreen, showQuickbar,
   onHeld, onNewSale, onManual, onReceipt, onSession, onFullscreen, onKbHelp,
-  onToggleQuickbar, onReturn, items, totals, totalTtcFinal,
+  onToggleQuickbar, onReturn, onKioskMode, onSettings, items, totals, totalTtcFinal,
 }: POSTopBarProps) {
   return (
     <div className="pos-topbar">
@@ -3501,8 +6181,17 @@ export default function POSTopBar({
         <button className="pos-tool-icon" onClick={onKbHelp} title="اختصارات لوحة المفاتيح — F1">
           <i className="ti ti-keyboard" />
         </button>
+        <div className="pos-tool-sep" />
+        <button className="pos-tool-icon" onClick={onSettings} title="إعدادات نقطة البيع">
+          <i className="ti ti-settings-2" />
+        </button>
         <button className="pos-tool-icon" onClick={onReturn} title="مرتجع مبيعات — F10">
           <i className="ti ti-receipt-refund" />
+        </button>
+        <div className="pos-tool-sep" />
+        <button className="pos-tool-btn" onClick={onKioskMode} title="وضع الكاشير">
+          <i className="ti ti-device-ipad-horizontal" />
+          <span>كاشير</span>
         </button>
       </div>
 
@@ -3625,7 +6314,7 @@ function familyStyle(family: string): { icon: string; color: string; bg: string 
 
 ## FILE: resources/js/pos/components/ProductGrid.tsx
 ```
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
@@ -3646,6 +6335,8 @@ interface ProductGridProps {
   selectedPriceLevelId: number | null;
   cartItems: CartItem[];
   allowNegativeStock?: boolean | undefined;
+  highlightedIndex?: number;
+  onHighlightIndexChange?: (idx: number) => void;
 }
 
 function LoadMore({ hasMore, loading, onLoadMore }: { hasMore?: boolean; loading: boolean; onLoadMore?: () => void }) {
@@ -3662,10 +6353,18 @@ function LoadMore({ hasMore, loading, onLoadMore }: { hasMore?: boolean; loading
 export default function ProductGrid({
   variants, view, gridSize, loading, hasMore, onLoadMore, onAdd, onAddManual,
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
+  highlightedIndex, onHighlightIndexChange,
 }: ProductGridProps) {
+  const gridRef = useRef<HTMLDivElement>(null);
   const inCartQty = useCallback((variantId: number) => {
     return cartItems.find(i => i.variant_id === variantId)?.quantity ?? 0;
   }, [cartItems]);
+
+  useEffect(() => {
+    if (highlightedIndex === undefined || !gridRef.current) return;
+    const el = gridRef.current.querySelector(`[data-hl-idx="${highlightedIndex}"]`);
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [highlightedIndex]);
 
   if (loading) return (
     <div className="pos-grid-area">
@@ -3692,7 +6391,7 @@ export default function ProductGrid({
 
   if (view === 'list') {
     return (
-      <div className="pos-grid-area">
+      <div className="pos-grid-area" ref={gridRef}>
         <table className="pos-ptable">
           <thead>
             <tr>
@@ -3706,7 +6405,7 @@ export default function ProductGrid({
             </tr>
           </thead>
           <tbody>
-            {variants.map(v => {
+            {variants.map((v, idx) => {
               const priceHt   = getVariantPrice(v, selectedPriceLevelId, priceLevels);
               const tvaRate   = v.tva?.rate ?? 19;
               const priceTtc  = priceHt * (1 + tvaRate / 100);
@@ -3719,7 +6418,9 @@ export default function ProductGrid({
               return (
                   <tr
                     key={v.id}
-                    className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''}`}
+                    data-hl-idx={idx}
+                    className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''} ${highlightedIndex === idx ? 'prow-hl' : ''}`}
+                    onClick={() => { if (onHighlightIndexChange !== undefined) onHighlightIndexChange(idx); }}
                     onDoubleClick={() => !outStock && onAdd(v)}
                   >
                   <td className="prow-name">
@@ -3776,9 +6477,9 @@ export default function ProductGrid({
   };
 
   return (
-    <div className="pos-grid-area">
+    <div className="pos-grid-area" ref={gridRef}>
       <div className={`pgrid ${colsMap[gridSize]}`}>
-        {variants.map(v => {
+        {variants.map((v, idx) => {
           const priceHt  = getVariantPrice(v, selectedPriceLevelId, priceLevels);
           const tvaRate  = v.tva?.rate ?? 19;
           const priceTtc = priceHt * (1 + tvaRate / 100);
@@ -3794,8 +6495,12 @@ export default function ProductGrid({
           return (
             <div
               key={v.id}
-              className={`pcard ${outStock ? 'pcard-out' : ''} ${inCart > 0 ? 'pcard-incart' : ''}`}
-              onClick={() => !outStock && onAdd(v)}
+              data-hl-idx={idx}
+              className={`pcard ${outStock ? 'pcard-out' : ''} ${inCart > 0 ? 'pcard-incart' : ''} ${highlightedIndex === idx ? 'pcard-hl' : ''}`}
+              onClick={() => {
+                if (!outStock) onAdd(v);
+                if (onHighlightIndexChange !== undefined) onHighlightIndexChange(idx);
+              }}
               title={v.product?.name}
             >
               <div className="pcard-img" style={{ background: style.bg }}>
@@ -3893,11 +6598,16 @@ interface ProductSearchBarProps {
   onSort: (s: SortMode) => void;
   resultsCount: number;
   onEnterFirst: () => void;
+  highlightedIndex?: number;
+  onArrowUp?: () => void;
+  onArrowDown?: () => void;
+  keyboardNavEnabled?: boolean;
 }
 
 export default function ProductSearchBar({
   query, onQuery, view, gridSize, onView, onGridSize,
   onFilter, filterActive, inputRef, sortBy, onSort, resultsCount, onEnterFirst,
+  highlightedIndex, onArrowUp, onArrowDown, keyboardNavEnabled,
 }: ProductSearchBarProps) {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -3924,6 +6634,8 @@ export default function ProductSearchBar({
           onKeyDown={e => {
             if (e.key === 'Enter') { e.preventDefault(); onEnterFirst(); }
             if (e.key === 'Escape') { e.preventDefault(); onQuery(''); }
+            if (keyboardNavEnabled && onArrowUp && e.key === 'ArrowUp') { e.preventDefault(); onArrowUp(); }
+            if (keyboardNavEnabled && onArrowDown && e.key === 'ArrowDown') { e.preventDefault(); onArrowDown(); }
           }}
         />
         {query && (
@@ -3938,6 +6650,11 @@ export default function ProductSearchBar({
 
       {query && (
         <span className="srch-count">{resultsCount} نتيجة</span>
+      )}
+      {query && keyboardNavEnabled && highlightedIndex !== undefined && resultsCount > 0 && (
+        <span className="srch-pos" style={{ fontSize: 11, color: 'var(--t4)', fontWeight: 700, direction: 'ltr' }}>
+          {highlightedIndex + 1}/{resultsCount}
+        </span>
       )}
 
       <div className="pos-sort-wrap" ref={sortRef}>
@@ -4575,7 +7292,7 @@ export default function ProfessionalPaymentModal({
   );
   const remaining = Math.max(0, totalTtcFinal - totalPaid);
   const change    = totalPaid > totalTtcFinal + 0.009 ? totalPaid - totalTtcFinal : 0;
-  const canSubmit = totalPaid > 0.009 && !submitting;
+  const canSubmit = !submitting;
 
   // ── أزرار المبالغ السريعة ─────────────────────────────────────────────────
   // تُظهر الأوراق النقدية المساوية أو الأكبر من المبلغ المتبقي
@@ -5019,142 +7736,249 @@ export default function ProfessionalPaymentModal({
 
 ## FILE: resources/js/pos/components/ProfessionalReceipt.tsx
 ```
-import React, { useState, useEffect } from 'react';
+// ════════════════════════════════════════════════════════════════════════════
+// pos/components/ProfessionalReceipt.tsx
+//
+// ✅ إصلاحات:
+//   1. بيانات الشركة تُقرأ من activeCompany (لا بيانات ثابتة)
+//   2. receiptFooter و receiptHeader2 من usePOSSettings
+//   3. receiptShowQr: إظهار QR code برقم الفاتورة
+//   4. printCopies: طباعة نسخ متعددة
+//   5. priceDisplayMode: الأسعار HT أو TTC
+// ════════════════════════════════════════════════════════════════════════════
+
+import React, { useRef } from 'react';
 import type { CartItem, CartTotals, Party } from '@/types';
-import { formatDZD } from '../utils/calculations';
-import { printThermal, isWebUsbSupported, getThermalAutoPrint, setThermalAutoPrint } from '../utils/printService';
+import { formatDZD }      from '@/pos/utils/calculations';
+import { useActiveCompany } from '@/lib/store/appStore';
+import type { POSSettings } from '@/pos/hooks/usePOSSettings';
 
 interface ProfessionalReceiptProps {
-  items: CartItem[]; totals: CartTotals; client: Party | null;
-  docNumber?: string; onClose: () => void; onPrint: () => void; onNewSale: () => void;
+  items:      CartItem[];
+  totals:     CartTotals;
+  client:     Party | null;
+  docNumber?: string;
+  settings:   POSSettings;
+  onClose:    () => void;
+  onPrint:    () => void;
+  onNewSale:  () => void;
 }
 
 export default function ProfessionalReceipt({
-  items, totals, client, docNumber, onClose, onPrint, onNewSale,
+  items, totals, client, docNumber, settings, onClose, onPrint, onNewSale,
 }: ProfessionalReceiptProps) {
-  const [thermalStatus, setThermalStatus] = useState<string | null>(null);
-  const [autoPrint, setAutoPrint] = useState(getThermalAutoPrint());
-  const totalTtcFinal = totals.total_ttc + totals.fiscal_stamp;
+  const printRef    = useRef<HTMLDivElement>(null);
+  const activeCompany = useActiveCompany();
+  const now           = new Date();
 
-  useEffect(() => {
-    if (!autoPrint || !isWebUsbSupported()) return;
-    (async () => {
-      setThermalStatus('جاري الطباعة التلقائية…');
-      const res = await printThermal(items, totals, client, docNumber);
-      setThermalStatus(res.ok ? '✓ تمت الطباعة' : `✗ ${res.message}`);
-      setTimeout(() => setThermalStatus(null), 3000);
-    })();
-  }, []);
-  const now = new Date();
+  // ✅ بيانات الشركة من activeCompany — لا بيانات ثابتة
+  const companyName = settings.receiptCompanyName ?? activeCompany?.name ?? 'نظام المبيعات';
+  const companyNif  = activeCompany?.nif  ?? '';
+  const companyNis  = activeCompany?.nis  ?? '';
+  const companyRc   = activeCompany?.rc   ?? '';
+  const companyPhone = activeCompany?.phone ?? '';
+  const companyAddress = activeCompany?.address ?? '';
+
+  const grandTotal = totals.total_ttc + totals.fiscal_stamp;
+
+  const handlePrint = () => {
+    const copies = settings.printCopies ?? 1;
+    for (let i = 0; i < copies; i++) {
+      window.print();
+    }
+  };
+
+  // QR code بسيط عبر api.qrserver.com
+  const qrUrl = docNumber
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(docNumber)}`
+    : null;
 
   return (
     <div className="ov on" onClick={onClose}>
-      <div className="modal modal-receipt" onClick={e => e.stopPropagation()}>
+      <div
+        className="modal modal-md"
+        style={{ maxHeight: '95vh', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
         <div className="m-hd">
-          <div className="m-title">
-            <i className="ti ti-receipt" style={{ marginLeft: 6 }} />
-            إيصال البيع
-            {docNumber && <span className="m-docnum"># {docNumber}</span>}
+          <div>
+            <div className="m-title">
+              <i className="ti ti-receipt" style={{ color: 'var(--em)', marginLeft: 7 }} />
+              معاينة الإيصال
+            </div>
+            {docNumber && (
+              <div className="m-sub">رقم الفاتورة: {docNumber}</div>
+            )}
           </div>
-          <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
+          <button className="m-x" onClick={onClose} type="button">
+            <i className="ti ti-x" />
+          </button>
         </div>
 
-        <div className="m-body" id="invoice-preview">
+        {/* Print area */}
+        <div
+          className="m-body"
+          style={{ flex: 1, overflowY: 'auto', padding: 16 }}
+          id="pos-receipt-print"
+          ref={printRef}
+        >
           <div className="receipt-wrap">
-            <div className="receipt-header">
-              <div className="rh-logo">🏪 نظام المبيعات</div>
-              <div className="rh-meta">
-                الجزائر — نظام ERP المتكامل<br />
-                {now.toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' })}
+
+            {/* Company header */}
+            <div className="receipt-head">
+              <div style={{ flex: 1 }}>
+                <div className="receipt-logo">{companyName}</div>
+                <div className="receipt-meta">
+                  {companyAddress && <>{companyAddress}<br /></>}
+                  {settings.receiptHeader2 && <>{settings.receiptHeader2}<br /></>}
+                  {companyNif  && <>NIF: {companyNif}<br /></>}
+                  {companyRc   && <>RC: {companyRc}<br /></>}
+                  {companyNis  && <>NIS: {companyNis}<br /></>}
+                  {companyPhone && <>📞 {companyPhone}</>}
+                </div>
               </div>
-              <div className="rh-doc">
-                <div className="rh-docnum">{docNumber ?? 'مسودة'}</div>
-                <div className="rh-date">{now.toLocaleTimeString('ar-DZ')}</div>
-                {client && <div className="rh-client"><i className="ti ti-user" /> {client.name}</div>}
+
+              {/* QR code */}
+              {settings.receiptShowQr && qrUrl && (
+                <div style={{ flexShrink: 0, marginRight: 12 }}>
+                  <img
+                    src={qrUrl}
+                    alt="QR"
+                    width={80}
+                    height={80}
+                    style={{ display: 'block' }}
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
+              )}
+
+              <div className="receipt-num" style={{ textAlign: 'left', minWidth: 120 }}>
+                <div style={{ fontWeight: 900, fontSize: 14, color: 'var(--em)' }}>
+                  {docNumber ?? 'مسودة'}
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                  {now.toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b' }}>
+                  {now.toLocaleTimeString('ar-DZ')}
+                </div>
+                {client && (
+                  <div style={{ fontSize: 11, color: '#334155', marginTop: 4, fontWeight: 700 }}>
+                    <i className="ti ti-user" /> {client.name}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="receipt-divider">المنتجات</div>
-
-            <table className="receipt-table">
+            {/* Items table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 10 }}>
               <thead>
-                <tr>
-                  <th>الصنف</th>
-                  <th style={{ textAlign: 'center' }}>الكمية</th>
-                  <th style={{ textAlign: 'center' }}>السعر</th>
-                  <th style={{ textAlign: 'left' }}>الإجمالي</th>
+                <tr style={{ background: '#f1f5f9', borderBottom: '1.5px solid #cbd5e1' }}>
+                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 700 }}>البيان</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'center', fontWeight: 700 }}>الكمية</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'center', fontWeight: 700 }}>
+                    السعر {settings.priceDisplayMode === 'ht' ? 'HT' : 'TTC'}
+                  </th>
+                  <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 700 }}>الإجمالي</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div className="rt-name">{item.product_name}</div>
-                      {item.discount_percentage > 0 && (
-                        <div className="rt-variant">خصم {item.discount_percentage}%</div>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>{item.quantity} {item.unit_symbol}</td>
-                    <td style={{ textAlign: 'center' }}>{formatDZD(item.unit_price_ht)}</td>
-                    <td style={{ textAlign: 'left' }}>{formatDZD(item.total_ttc)}</td>
-                  </tr>
-                ))}
+                {items.map(item => {
+                  const unitPrice = settings.priceDisplayMode === 'ht'
+                    ? item.unit_price_ht
+                    : item.unit_price_ht * (1 + item.tva_rate / 100);
+                  const lineTotal = settings.priceDisplayMode === 'ht'
+                    ? item.total_ht
+                    : item.total_ttc;
+
+                  return (
+                    <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '5px 6px' }}>
+                        <div style={{ fontWeight: 600 }}>{item.product_name}</div>
+                        {item.variant_name && (
+                          <div style={{ fontSize: 10.5, color: '#64748b' }}>{item.variant_name}</div>
+                        )}
+                        {item.discount_percentage > 0 && (
+                          <div style={{ fontSize: 10.5, color: '#d42b2b' }}>
+                            خصم {item.discount_percentage.toFixed(1)}%
+                          </div>
+                        )}
+                        {item.tva_rate > 0 && (
+                          <div style={{ fontSize: 10, color: '#94a3b8' }}>TVA {item.tva_rate}%</div>
+                        )}
+                      </td>
+                      <td style={{ padding: '5px 6px', textAlign: 'center' }}>
+                        {item.quantity} {item.unit_symbol ?? 'قطعة'}
+                      </td>
+                      <td style={{ padding: '5px 6px', textAlign: 'center', direction: 'ltr' }}>
+                        {formatDZD(unitPrice)}
+                      </td>
+                      <td style={{ padding: '5px 6px', textAlign: 'left', direction: 'ltr', fontWeight: 700 }}>
+                        {formatDZD(lineTotal)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 
-            <div className="receipt-totals-wrap">
+            {/* Totals */}
+            <div className="receipt-totals">
               <div className="receipt-totals-inner">
-                <div className="rt-sum-row"><span>المجموع HT</span><span>{formatDZD(totals.total_ht)}</span></div>
-                {totals.total_discount > 0 && <div className="rt-sum-row"><span>إجمالي الخصم</span><span>- {formatDZD(totals.total_discount)}</span></div>}
-                <div className="rt-sum-row"><span>TVA</span><span>{formatDZD(totals.total_tva)}</span></div>
-                {totals.fiscal_stamp > 0 && <div className="rt-sum-row"><span>طابع مالي</span><span>{formatDZD(totals.fiscal_stamp)}</span></div>}
-                <div className="rt-grand-row"><span>الإجمالي TTC</span><strong>{formatDZD(totalTtcFinal)}</strong></div>
+                <div className="receipt-row">
+                  <span>المجموع HT</span>
+                  <span style={{ direction: 'ltr' }}>{formatDZD(totals.total_ht)}</span>
+                </div>
+                {totals.total_discount > 0 && (
+                  <div className="receipt-row" style={{ color: '#d42b2b' }}>
+                    <span>إجمالي الخصومات</span>
+                    <span style={{ direction: 'ltr' }}>- {formatDZD(totals.total_discount)}</span>
+                  </div>
+                )}
+                <div className="receipt-row">
+                  <span>TVA</span>
+                  <span style={{ direction: 'ltr' }}>{formatDZD(totals.total_tva)}</span>
+                </div>
+                {totals.fiscal_stamp > 0 && (
+                  <div className="receipt-row">
+                    <span>الطابع الجبائي</span>
+                    <span style={{ direction: 'ltr' }}>{formatDZD(totals.fiscal_stamp)}</span>
+                  </div>
+                )}
+                <div className="receipt-grand">
+                  <span>الإجمالي TTC</span>
+                  <span style={{ direction: 'ltr' }}>{formatDZD(grandTotal)}</span>
+                </div>
               </div>
             </div>
 
-            <div className="receipt-footer">
-              شكراً على تعاملكم معنا<br />
-              نظام ERP الجزائر — {now.getFullYear()}
+            {/* Footer message */}
+            <div className="receipt-foot">
+              {settings.receiptFooter || 'شكراً لتعاملكم معنا'}
+              <div style={{ marginTop: 4, fontSize: 9, color: '#cbd5e1' }}>
+                يُعتبر هذا المستند ملزماً قانونياً وفق التشريع الجزائري
+              </div>
             </div>
           </div>
         </div>
 
+        {/* Actions */}
         <div className="m-foot">
-          <button className="btn btn-sm btn-p" onClick={onPrint}>
-            <i className="ti ti-printer" /> طباعة
-          </button>
-          {isWebUsbSupported() && (
-            <button
-              className="btn btn-sm btn-thermal"
-              onClick={async () => {
-                setThermalStatus('جاري الاتصال بالطابعة…');
-                const res = await printThermal(items, totals, client, docNumber);
-                setThermalStatus(res.ok ? '✓ تمت الطباعة' : `✗ ${res.message}`);
-                setTimeout(() => setThermalStatus(null), 3000);
-              }}
-            >
-              <i className="ti ti-printer" /> طباعة حرارية
-            </button>
-          )}
-          {thermalStatus && (
-            <span className={`thermal-status ${thermalStatus.startsWith('✓') ? 'ok' : 'err'}`}>
-              {thermalStatus}
-            </span>
-          )}
-          {isWebUsbSupported() && (
-            <label className="cb" style={{ fontSize: 11, cursor: 'pointer', margin: '0 8px' }}>
-              <input
-                type="checkbox"
-                checked={autoPrint}
-                onChange={(e) => { setAutoPrint(e.target.checked); setThermalAutoPrint(e.target.checked); }}
-              />
-              {' '}طباعة تلقائية
-            </label>
-          )}
-          <button className="btn btn-sm" onClick={onNewSale}>
+          <button className="btn btn-p" onClick={onNewSale} type="button">
             <i className="ti ti-plus" /> بيع جديد
           </button>
-          <button className="btn btn-sm" onClick={onClose}>إغلاق</button>
+          <div style={{ flex: 1 }} />
+          <button className="btn" onClick={onClose} type="button">إغلاق</button>
+          <button className="btn btn-p" onClick={handlePrint} type="button">
+            <i className="ti ti-printer" />
+            طباعة
+            {(settings.printCopies ?? 1) > 1 && (
+              <span style={{ fontSize: 10, opacity: 0.8, marginRight: 4 }}>
+                ({settings.printCopies} نسخ)
+              </span>
+            )}
+          </button>
         </div>
       </div>
     </div>
@@ -5164,7 +7988,7 @@ export default function ProfessionalReceipt({
 
 ## FILE: resources/js/pos/components/QuickItemsBar.tsx
 ```
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import type { ProductVariant } from '@/types';
 import type { QuickItem } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
@@ -5181,30 +8005,74 @@ interface QuickItemsBarProps {
 export default function QuickItemsBar({
   quickItems, allVariants, onAdd, onRemove, allowNegativeStock,
 }: QuickItemsBarProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  };
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkScroll);
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', checkScroll);
+      ro.disconnect();
+    };
+  }, [quickItems.length]);
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const itemW =
+      (el.querySelector<HTMLElement>('.pqb-item')?.offsetWidth ?? 120) + 6;
+    el.scrollBy({ left: dir === 'left' ? -itemW : itemW, behavior: 'smooth' });
+  };
+
   return (
-    <div className="pos-quickbar">
-      <span className="pqb-label">
-        <i className="ti ti-star" /> مفضلة
-      </span>
-      {quickItems.map(q => {
-        const variant = allVariants.find(v => v.id === q.variantId);
-        const outStock = variant ? isVariantOutOfStock(variant, allowNegativeStock) : false;
-        return (
-          <div key={q.variantId} className="pqb-item" title={q.name}>
-            <button
-              className="pqb-add"
-              onClick={() => variant && !outStock && onAdd(variant)}
-              disabled={!variant || outStock}
-            >
-              <span className="pqb-name">{q.name}</span>
-              <span className="pqb-price">{formatDZD(q.priceHt * (1 + q.tvaRate / 100))}</span>
-            </button>
-            <button className="pqb-rm" onClick={() => onRemove(q.variantId)} title="إزالة من المفضلة">
-              <i className="ti ti-x" />
-            </button>
-          </div>
-        );
-      })}
+    <div className="pos-quickbar-wrapper">
+      {canScrollLeft && (
+        <button className="pqb-scroll pqb-scroll-l" onClick={() => scroll('left')} aria-label="السابق">
+          <i className="ti ti-chevron-right" />
+        </button>
+      )}
+      <div className="pos-quickbar" ref={scrollRef}>
+        <span className="pqb-label">
+          <i className="ti ti-star" /> مفضلة
+        </span>
+        {quickItems.map(q => {
+          const variant = allVariants.find(v => v.id === q.variantId);
+          const outStock = variant ? isVariantOutOfStock(variant, allowNegativeStock) : false;
+          return (
+            <div key={q.variantId} className="pqb-item" title={q.name}>
+              <button
+                className="pqb-add"
+                onClick={() => variant && !outStock && onAdd(variant)}
+                disabled={!variant || outStock}
+              >
+                <span className="pqb-name">{q.name}</span>
+                <span className="pqb-price">{formatDZD(q.priceHt * (1 + q.tvaRate / 100))}</span>
+              </button>
+              <button className="pqb-rm" onClick={() => onRemove(q.variantId)} title="إزالة من المفضلة">
+                <i className="ti ti-x" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {canScrollRight && (
+        <button className="pqb-scroll pqb-scroll-r" onClick={() => scroll('right')} aria-label="التالي">
+          <i className="ti ti-chevron-left" />
+        </button>
+      )}
     </div>
   );
 }
@@ -5405,116 +8273,361 @@ export default function ReturnsModal({
 
 ## FILE: resources/js/pos/components/SessionStatsModal.tsx
 ```
-import React, { useMemo } from 'react';
-import type { PaymentMode } from '@/types';
-import type { SessionPayment, SessionProduct } from '@/pos/hooks/usePOSStore';
-import { formatDZD } from '../utils/calculations';
+// resources/js/pos/components/SessionStatsModal.tsx — v2 احترافي
+import React, { useState, useMemo } from 'react';
+import { formatDZD } from '@/pos/utils/calculations';
+import type { PosSession } from '@/lib/api/endpoints/posSession';
 
-interface SessionStatsModalProps {
-  sessionInvoices:   number;
-  sessionSales:      number;
-  highestInvoice:    number;
-  invoiceTotals:     number[];
-  paymentsBreakdown: SessionPayment[];
-  productsSold:      Record<string, SessionProduct>;
-  paymentModes:      PaymentMode[];
-  heldCount:         number;
-  avgMargin:         number;
-  onClose:           () => void;
-  onEndSession:      () => void;
+interface Props {
+  session:      PosSession;
+  onClose:      () => void;
+  onEndSession: () => void;
 }
 
-export default function SessionStatsModal({
-  sessionInvoices, sessionSales, highestInvoice, invoiceTotals,
-  paymentsBreakdown, productsSold, paymentModes, heldCount, avgMargin,
-  onClose, onEndSession,
-}: SessionStatsModalProps) {
-  const avgInvoice = sessionInvoices > 0 ? sessionSales / sessionInvoices : 0;
+type Tab = 'overview' | 'payments' | 'products' | 'timeline';
 
-  const paymentSummary = useMemo(() => {
-    const map = new Map<number, number>();
-    paymentsBreakdown.forEach(p => {
-      map.set(p.paymentModeId, (map.get(p.paymentModeId) ?? 0) + p.amount);
-    });
-    return Array.from(map.entries())
-      .map(([modeId, amount]) => {
-        const mode = paymentModes.find(m => m.id === modeId);
-        return { modeId, name: mode?.name ?? `#${modeId}`, amount, pct: sessionSales > 0 ? (amount / sessionSales) * 100 : 0 };
-      })
-      .sort((a, b) => b.amount - a.amount);
-  }, [paymentsBreakdown, paymentModes, sessionSales]);
+const TABS: { key: Tab; label: string; icon: string }[] = [
+  { key: 'overview',  label: 'لوحة البيانات',  icon: 'ti-layout-dashboard' },
+  { key: 'payments',  label: 'وسائل الدفع',   icon: 'ti-credit-card'       },
+  { key: 'products',  label: 'المنتجات',       icon: 'ti-package'            },
+];
 
+export default function SessionStatsModal({ session, onClose, onEndSession }: Props) {
+  const [tab, setTab] = useState<Tab>('overview');
+
+  const paymentRows = useMemo(() =>
+    (session.payments ?? []).filter(p => p.amount > 0).sort((a, b) => b.amount - a.amount),
+    [session.payments],
+  );
   const topProducts = useMemo(() =>
-    Object.values(productsSold)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10),
-  [productsSold]);
+    (session.top_products ?? []).sort((a, b) => b.total_ttc - a.total_ttc).slice(0, 10),
+    [session.top_products],
+  );
+
+  const totalCollected = Number(session.cash_collected ?? 0)
+    + Number(session.cib_collected ?? 0)
+    + Number(session.ccp_collected ?? 0)
+    + Number(session.bank_collected ?? 0);
+  const maxPayAmt   = Math.max(...paymentRows.map(p => p.amount), 1);
+  const maxProdTtc  = Math.max(...topProducts.map(p => p.total_ttc), 1);
+  const netSalesPct = session.gross_sales > 0
+    ? (session.net_sales / session.gross_sales) * 100 : 100;
+
+  // KPI cards
+  const kpiBlocks = [
+    {
+      title: 'المبيعات الصافية',
+      value: formatDZD(session.net_sales),
+      sub: `إجمالي: ${formatDZD(session.gross_sales)}`,
+      icon: 'ti-cash', color: 'var(--em)', bg: 'var(--emb)', size: 'lg',
+    },
+    {
+      title: 'الفواتير',
+      value: String(session.invoices_count),
+      sub: `متوسط: ${formatDZD(session.avg_invoice ?? 0)}`,
+      icon: 'ti-receipt', color: 'var(--blue)', bg: 'var(--blueb)', size: 'md',
+    },
+    {
+      title: 'أعلى فاتورة',
+      value: formatDZD(session.highest_invoice ?? 0),
+      sub: `مدة الجلسة: ${session.duration}`,
+      icon: 'ti-trending-up', color: 'var(--purple)', bg: 'var(--purb)', size: 'md',
+    },
+    {
+      title: 'الخصومات',
+      value: formatDZD(session.total_discount ?? 0),
+      sub: 'إجمالي الخصومات المُمنوحة',
+      icon: 'ti-discount', color: 'var(--orange)', bg: 'var(--orb)', size: 'sm',
+    },
+    {
+      title: 'TVA',
+      value: formatDZD(session.total_tva ?? 0),
+      sub: 'ضريبة القيمة المضافة',
+      icon: 'ti-percentage', color: 'var(--teal)', bg: 'var(--tealb)', size: 'sm',
+    },
+    {
+      title: 'المرتجعات',
+      value: formatDZD(session.returns_total ?? 0),
+      sub: `${session.returns_count ?? 0} مرتجع`,
+      icon: 'ti-receipt-refund', color: 'var(--red)', bg: 'var(--redb)', size: 'sm',
+    },
+  ];
 
   return (
     <div className="ov on" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-        <div className="m-hd">
-          <div className="m-title"><i className="ti ti-chart-bar" style={{ marginLeft: 6 }} /> إحصاءات الجلسة</div>
-          <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
-        </div>
-        <div className="m-body">
-          {/* ── بطاقات المؤشرات ── */}
-          <div className="session-grid">
-            {[
-              { label: 'عدد الفواتير',      value: sessionInvoices,       icon: 'ti-receipt',     cls: 'g' },
-              { label: 'إجمالي المبيعات',    value: formatDZD(sessionSales), icon: 'ti-cash',    cls: 'o' },
-              { label: 'متوسط الفاتورة',     value: formatDZD(avgInvoice),   icon: 'ti-chart-bar', cls: 'p' },
-              { label: 'أعلى فاتورة',        value: formatDZD(highestInvoice), icon: 'ti-arrow-up-right', cls: 'e' },
-              { label: 'فواتير معلقة',       value: heldCount,             icon: 'ti-clock-pause', cls: 'b' },
-              { label: 'متوسط الهامش',       value: `${avgMargin.toFixed(1)}%`, icon: 'ti-trending-up', cls: 'b' },
-            ].map(s => (
-              <div key={s.label} className={`session-card pos-chip ${s.cls}`}>
-                <i className={`ti ${s.icon}`} style={{ fontSize: 22 }} />
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.7, fontWeight: 700 }}>{s.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 900 }}>{s.value}</div>
-                </div>
+      <div
+        className="ssm-wrap"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ════ Header ════ */}
+        <div className="ssm-header">
+          {/* شريط الجلسة */}
+          <div className="ssm-session-bar">
+            <div className="ssm-session-avatar">
+              {session.user?.name?.charAt(0) ?? '?'}
+            </div>
+            <div className="ssm-session-info">
+              <div className="ssm-session-name">{session.user?.name}</div>
+              <div className="ssm-session-meta">
+                <i className="ti ti-building-warehouse" />
+                {session.warehouse?.name}
+                <span>·</span>
+                <i className="ti ti-clock" />
+                فُتحت {new Date(session.opened_at).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
+                <span>·</span>
+                <i className="ti ti-hourglass" />
+                {session.duration}
               </div>
-            ))}
+            </div>
+            <div className={`ssm-status-pill ${session.status !== 'open' ? 'ssm-status-pill--closed' : ''}`}>
+              <span className={`ssm-status-dot ${session.status !== 'open' ? 'ssm-status-dot--closed' : ''}`} />
+              {session.status === 'open' ? 'جلسة مفتوحة' : session.status === 'closed' ? 'جلسة مغلقة' : 'جلسة معلقة'}
+            </div>
           </div>
 
-          {/* ── توزيع وسائل الدفع ── */}
-          {paymentSummary.length > 0 && (
-            <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, color: 'var(--t2)' }}><i className="ti ti-credit-card" style={{ marginLeft: 6 }} /> توزيع وسائل الدفع</div>
-              {paymentSummary.map(p => (
-                <div key={p.modeId} className="sr">
-                  <span className="sr-l">{p.name}</span>
-                  <span className="sr-v">{formatDZD(p.amount)} <span style={{ fontSize: 11, color: 'var(--t4)' }}>({p.pct.toFixed(0)}%)</span></span>
+          {/* tabs */}
+          <div className="ssm-tabs">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                type="button"
+                className={`ssm-tab ${tab === t.key ? 'on' : ''}`}
+                onClick={() => setTab(t.key)}
+              >
+                <i className={`ti ${t.icon}`} />
+                {t.label}
+              </button>
+            ))}
+            <div style={{ flex: 1 }} />
+            <button className="m-x" onClick={onClose} type="button">
+              <i className="ti ti-x" />
+            </button>
+          </div>
+        </div>
+
+        {/* ════ Body ════ */}
+        <div className="ssm-body">
+
+          {/* ══ لوحة البيانات ══ */}
+          {tab === 'overview' && (
+            <>
+              {/* KPI Grid */}
+              <div className="ssm-kpi-grid">
+                {kpiBlocks.map(k => (
+                  <div
+                    key={k.title}
+                    className={`ssm-kpi ssm-kpi--${k.size}`}
+                    style={{ '--kc': k.color, '--kb': k.bg } as any}
+                  >
+                    <div className="ssm-kpi-header">
+                      <div className="ssm-kpi-icon">
+                        <i className={`ti ${k.icon}`} />
+                      </div>
+                      <div className="ssm-kpi-title">{k.title}</div>
+                    </div>
+                    <div className="ssm-kpi-value" style={{ direction: 'ltr' }}>{k.value}</div>
+                    <div className="ssm-kpi-sub">{k.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* شريط صافي المبيعات */}
+              <div className="ssm-progress-section">
+                <div className="ssm-ps-row">
+                  <span className="ssm-ps-label">الصافي من الإجمالي (بعد المرتجعات)</span>
+                  <span className="ssm-ps-pct">{netSalesPct.toFixed(1)}%</span>
                 </div>
-              ))}
+                <div className="ssm-progress-bar">
+                  <div className="ssm-pb-fill" style={{ width: `${netSalesPct}%` }} />
+                </div>
+              </div>
+
+              {/* ملخص سريع وسائل الدفع */}
+              {paymentRows.length > 0 && (
+                <div className="ssm-quick-pay">
+                  <div className="ssm-section-title">
+                    <i className="ti ti-credit-card" /> ملخص الدفع
+                  </div>
+                  <div className="ssm-quick-pay-grid">
+                    {paymentRows.map(p => (
+                      <div key={p.payment_mode_id} className="ssm-qp-item">
+                        <div className="ssm-qp-name">
+                          {p.payment_mode?.name ?? `#${p.payment_mode_id}`}
+                        </div>
+                        <div className="ssm-qp-amount" style={{ direction: 'ltr' }}>
+                          {formatDZD(p.amount)}
+                        </div>
+                        <div className="ssm-qp-count">{p.count} عملية</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ملاحظة الفتح */}
+              {session.opening_note && (
+                <div className="ssm-note-row">
+                  <i className="ti ti-notes" />
+                  <span>{session.opening_note}</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ══ وسائل الدفع ══ */}
+          {tab === 'payments' && (
+            <div className="ssm-payments">
+              {/* إجمالي بارز */}
+              <div className="ssm-pay-total-banner">
+                <div className="ssm-ptb-label">إجمالي المحصَّل (نقد + بطاقات + تحويل)</div>
+                <div className="ssm-ptb-amount" style={{ direction: 'ltr' }}>
+                  {formatDZD(totalCollected)}
+                </div>
+                {(session.credit_total ?? 0) > 0 && (
+                  <div className="ssm-ptb-credit">
+                    + {formatDZD(session.credit_total ?? 0)} آجل غير مقبوض
+                  </div>
+                )}
+              </div>
+
+              {paymentRows.length === 0 ? (
+                <div className="ssm-empty">
+                  <i className="ti ti-credit-card" />
+                  <span>لا توجد مدفوعات مسجَّلة بعد</span>
+                </div>
+              ) : (
+                <div className="ssm-pay-list">
+                  {paymentRows.map((p, i) => {
+                    const pct = session.net_sales > 0
+                      ? (p.amount / session.net_sales) * 100 : 0;
+                    const barW = (p.amount / maxPayAmt) * 100;
+                    const colors = [
+                      ['var(--em)',     'var(--emb)'],
+                      ['var(--blue)',   'var(--blueb)'],
+                      ['var(--purple)', 'var(--purb)'],
+                      ['var(--teal)',   'var(--tealb)'],
+                      ['var(--orange)', 'var(--orb)'],
+                      ['var(--gold)',   'var(--goldb)'],
+                    ][i % 6];
+
+                    return (
+                      <div key={p.payment_mode_id} className="ssm-pay-card">
+                        <div className="ssm-pay-card-header">
+                          <div
+                            className="ssm-pay-icon"
+                            style={{ background: colors[1], color: colors[0] }}
+                          >
+                            <i className="ti ti-credit-card" />
+                          </div>
+                          <div className="ssm-pay-card-info">
+                            <div className="ssm-pay-card-name">
+                              {p.payment_mode?.name ?? `#${p.payment_mode_id}`}
+                            </div>
+                            <div className="ssm-pay-card-meta">
+                              {p.count} عملية · {pct.toFixed(1)}% من الإجمالي
+                            </div>
+                          </div>
+                          <div
+                            className="ssm-pay-card-amount"
+                            style={{ color: colors[0], direction: 'ltr' }}
+                          >
+                            {formatDZD(p.amount)}
+                          </div>
+                        </div>
+                        <div className="ssm-pay-card-bar">
+                          <div
+                            className="ssm-pay-card-bar-fill"
+                            style={{ width: `${barW}%`, background: colors[0] }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
-          {/* ── أكثر المنتجات مبيعاً ── */}
-          {topProducts.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, color: 'var(--t2)' }}><i className="ti ti-package" style={{ marginLeft: 6 }} /> أكثر المنتجات مبيعاً</div>
-              {topProducts.map((p, i) => (
-                <div key={p.name} className="sr">
-                  <span className="sr-l">
-                    <span style={{ color: 'var(--t4)', marginLeft: 6, fontWeight: 800, fontSize: 11 }}>#{i + 1}</span>
-                    {p.name}
-                    <span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 6 }}>×{p.qty}</span>
-                  </span>
-                  <span className="sr-v">{formatDZD(p.total)}</span>
+          {/* ══ المنتجات ══ */}
+          {tab === 'products' && (
+            <div className="ssm-products">
+              {topProducts.length === 0 ? (
+                <div className="ssm-empty">
+                  <i className="ti ti-package" />
+                  <span>لا توجد منتجات مسجَّلة بعد</span>
                 </div>
-              ))}
+              ) : (
+                <>
+                  <div className="ssm-prod-header-row">
+                    <span>#</span>
+                    <span>المنتج</span>
+                    <span style={{ textAlign: 'center' }}>الكمية</span>
+                    <span style={{ textAlign: 'left' }}>الإجمالي</span>
+                    <span style={{ textAlign: 'left', minWidth: 80 }}>النسبة</span>
+                  </div>
+                  {topProducts.map((p, i) => {
+                    const barW = (p.total_ttc / maxProdTtc) * 100;
+                    return (
+                      <div key={p.product_id} className="ssm-prod-row">
+                        <div className={`ssm-prod-rank ${i < 3 ? 'top' : ''}`}>{i + 1}</div>
+                        <div className="ssm-prod-info">
+                          <div className="ssm-prod-name">{p.product_name}</div>
+                          <div className="ssm-prod-bar">
+                            <div
+                              className="ssm-prod-bar-fill"
+                              style={{ width: `${barW}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="ssm-prod-qty">
+                          <span>×{p.quantity_sold % 1 === 0 ? p.quantity_sold : p.quantity_sold.toFixed(2)}</span>
+                        </div>
+                        <div className="ssm-prod-ttc" style={{ direction: 'ltr' }}>
+                          {formatDZD(p.total_ttc)}
+                        </div>
+                        <div className="ssm-prod-pct">
+                          {session.net_sales > 0
+                            ? ((p.total_ttc / session.net_sales) * 100).toFixed(1)
+                            : 0}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           )}
         </div>
-        <div className="m-foot">
-          <button className="btn btn-r" onClick={onEndSession} type="button">
-            <i className="ti ti-square-off" /> إنهاء الجلسة
+
+        {/* ════ Footer ════ */}
+        <div className="ssm-footer">
+          {session.status === 'open' && (
+            <button
+              type="button"
+              className="ssm-btn-end"
+              onClick={onEndSession}
+            >
+              <i className="ti ti-door-exit" /> إغلاق الجلسة
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          <button type="button" className="ssm-btn-close" onClick={onClose}>
+            <i className="ti ti-x" /> إغلاق
           </button>
-          <button className="btn btn-p" onClick={onClose}>إغلاق</button>
         </div>
       </div>
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pos/components/Sparkline.tsx
+```
+export default function Sparkline({ value, max, color }: { value: number; max: number; color: string }) {
+  const w = max > 0 ? Math.max(4, (value / max) * 100) : 4;
+  return (
+    <div className="pss-spark">
+      <div className="pss-spark-bar" style={{ width: `${w}%`, background: color }} />
     </div>
   );
 }
@@ -5833,42 +8946,27 @@ export function matchOverride(slug: string | null, action: string, e: KeyboardEv
 
 ## FILE: resources/js/pos/hooks/usePOS.ts
 ```
-// ════════════════════════════════════════════════════════════════════════════
-// pos/hooks/usePOS.ts
-//
-// ✅ التغييرات:
-//   - updateDiscountAmount مُضافة (من useCartStore)
-//   - باقي المنطق لم يتغير
-// ════════════════════════════════════════════════════════════════════════════
 import { useMemo, useCallback } from 'react';
 import { usePOSStore }   from './usePOSStore';
 import { useCartStore }  from '../utils/useCartStore';
 import { calcTotals }    from '../utils/calculations';
 
 export function usePOS() {
-  const sessionStarted    = usePOSStore(s => s.sessionStarted);
-  const sessionInvoices   = usePOSStore(s => s.sessionInvoices);
-  const sessionSales      = usePOSStore(s => s.sessionSales);
-  const highestInvoice    = usePOSStore(s => s.highestInvoice);
-  const invoiceTotals     = usePOSStore(s => s.invoiceTotals);
-  const paymentsBreakdown = usePOSStore(s => s.paymentsBreakdown);
-  const productsSold      = usePOSStore(s => s.productsSold);
   const heldCarts         = usePOSStore(s => s.heldCarts);
   const activeTab         = usePOSStore(s => s.activeTab);
   const searchQuery       = usePOSStore(s => s.searchQuery);
   const selectedCategory  = usePOSStore(s => s.selectedCategory);
   const paymentModalOpen  = usePOSStore(s => s.paymentModalOpen);
 
-  const startSession      = usePOSStore(s => s.startSession);
-  const endSession        = usePOSStore(s => s.endSession);
-  const incrementSession  = usePOSStore(s => s.incrementSession);
+  const holdCart          = usePOSStore(s => s.holdCart);
+  const restoreCart       = usePOSStore(s => s.restoreCart);
+  const deleteHeldCart    = usePOSStore(s => s.deleteHeldCart);
   const setTab            = usePOSStore(s => s.setTab);
   const setSearch         = usePOSStore(s => s.setSearch);
   const setCategory       = usePOSStore(s => s.setCategory);
   const openPayment       = usePOSStore(s => s.openPayment);
   const closePayment      = usePOSStore(s => s.closePayment);
 
-  // Cart
   const items             = useCartStore(s => s.items);
   const client            = useCartStore(s => s.client);
   const invoiceDiscountPct= useCartStore(s => s.invoiceDiscountPct);
@@ -5876,7 +8974,7 @@ export function usePOS() {
   const removeItem        = useCartStore(s => s.removeItem);
   const updateQty         = useCartStore(s => s.updateQty);
   const updateDiscount    = useCartStore(s => s.updateDiscount);
-  const updateDiscountAmount = useCartStore(s => s.updateDiscountAmount);  // ✅ جديد
+  const updateDiscountAmount = useCartStore(s => s.updateDiscountAmount);
   const updatePrice       = useCartStore(s => s.updatePrice);
   const clearCart         = useCartStore(s => s.clearCart);
   const setClient         = useCartStore(s => s.setClient);
@@ -5887,21 +8985,14 @@ export function usePOS() {
     [items, invoiceDiscountPct],
   );
 
-  const holdCart = useCallback(() => {
-    usePOSStore.getState().holdCart({
+  const doHoldCart = useCallback(() => {
+    holdCart({
       items, totals, client, clearCart,
     });
-  }, [items, totals, client, clearCart]);
-
-  const restoreCart    = usePOSStore(s => s.restoreCart);
-  const deleteHeldCart = usePOSStore(s => s.deleteHeldCart);
+  }, [items, totals, client, clearCart, holdCart]);
 
   return {
-    sessionStarted, sessionInvoices, sessionSales,
-    highestInvoice, invoiceTotals, paymentsBreakdown, productsSold,
-    startSession, endSession, incrementSession,
-
-    heldCarts, holdCart, restoreCart, deleteHeldCart,
+    heldCarts, holdCart: doHoldCart, restoreCart, deleteHeldCart,
 
     activeTab, searchQuery, selectedCategory, paymentModalOpen,
     setTab, setSearch, setCategory, openPayment, closePayment,
@@ -5909,7 +9000,7 @@ export function usePOS() {
     items, client, invoiceDiscountPct,
     addItem, removeItem, updateQty,
     updateDiscount,
-    updateDiscountAmount,    // ✅ مُصدَّر
+    updateDiscountAmount,
     updatePrice,
     clearCart, setClient, setInvoiceDiscountPct,
     totals,
@@ -5917,49 +9008,391 @@ export function usePOS() {
 }
 ```
 
+## FILE: resources/js/pos/hooks/usePosSessions.ts
+```
+import { useState, useMemo, useCallback } from 'react';
+import {
+  useCurrentPosSession,
+  usePosSessionList,
+  usePosSession,
+  useOpenSession,
+  useCloseSession,
+} from '@/lib/api/endpoints/posSession';
+import { useWarehouses } from '@/lib/api/endpoints/lookups';
+import { useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
+import type { PosSession } from '@/lib/api/endpoints/posSession';
+
+export type StatusFilter = '' | 'open' | 'closed' | 'suspended';
+export type ViewMode = 'table' | 'cards';
+
+export const STATUS_VARIANT: Record<string, 'success' | 'gray' | 'warning'> = {
+  open:      'success',
+  closed:    'gray',
+  suspended: 'warning',
+};
+
+export const STATUS_LABEL: Record<string, string> = {
+  open:      'مفتوحة',
+  closed:    'مغلقة',
+  suspended: 'معلقة',
+};
+
+export function usePosSessions() {
+
+  const [page,         setPage]         = useState(1);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const [dateFrom,     setDateFrom]     = useState('');
+  const [dateTo,       setDateTo]       = useState('');
+  const [viewMode,     setViewMode]     = useState<ViewMode>('table');
+  const [search,       setSearch]       = useState('');
+
+  const [selectedId,     setSelectedId]     = useState<number | null>(null);
+  const [showOpenModal,  setShowOpenModal]   = useState(false);
+  const [showCloseModal, setShowCloseModal]  = useState(false);
+  const [showStatsModal, setShowStatsModal]  = useState(false);
+  const [openError,      setOpenError]       = useState<string | null>(null);
+  const [closeError,     setCloseError]      = useState<string | null>(null);
+
+  const { data: paginated, isLoading, isFetching } = usePosSessionList({
+    per_page: 25,
+    page,
+    ...(statusFilter && { status: statusFilter }),
+    ...(dateFrom     && { date_from: dateFrom }),
+    ...(dateTo       && { date_to:   dateTo   }),
+  });
+
+  const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
+
+  const { data: selectedSession, isLoading: selectedLoading } = usePosSession(selectedId);
+
+  const { data: warehouses = [] } = useWarehouses();
+  const { data: fyData } = useFiscalYears();
+  const fiscalYears = fyData?.open ?? fyData?.years ?? [];
+  const defaultFiscalYearId = fyData?.current?.id ?? null;
+  const defaultWarehouseId = (warehouses[0] as any)?.id ?? null;
+
+  const openMut = useOpenSession();
+  const closeSessionId = selectedId ?? currentSession?.id ?? null;
+  const closeMut = useCloseSession(closeSessionId);
+
+  const sessions: PosSession[] = paginated?.data ?? [];
+  const meta = paginated?.meta;
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return sessions;
+    const q = search.toLowerCase();
+    return sessions.filter(s =>
+      s.user?.name?.toLowerCase().includes(q) ||
+      s.warehouse?.name?.toLowerCase().includes(q),
+    );
+  }, [sessions, search]);
+
+  const totalSales    = useMemo(() => sessions.reduce((acc, x) => acc + Number(x.net_sales   ?? 0), 0), [sessions]);
+  const totalInvoices = useMemo(() => sessions.reduce((acc, x) => acc + Number(x.invoices_count ?? 0), 0), [sessions]);
+  const openCount     = useMemo(() => sessions.filter(x => x.status === 'open').length,   [sessions]);
+  const closedCount   = useMemo(() => sessions.filter(x => x.status === 'closed').length, [sessions]);
+  const avgSale       = totalInvoices > 0 ? totalSales / totalInvoices : 0;
+  const maxSale       = useMemo(() => Math.max(...sessions.map(s => Number(s.net_sales ?? 0)), 0), [sessions]);
+
+  const hasFilters = !!(statusFilter || dateFrom || dateTo || search);
+
+  const handleOpenSession = async (data: {
+    warehouse_id:   number;
+    fiscal_year_id: number;
+    opening_cash:   number;
+    opening_note?:  string;
+  }) => {
+    setOpenError(null);
+    try {
+      await openMut.mutateAsync(data);
+      setShowOpenModal(false);
+    } catch (e: any) {
+      setOpenError(
+        e?.response?.data?.message ??
+        e?.message ??
+        'فشل فتح الجلسة',
+      );
+    }
+  };
+
+  const handleCloseSession = async (data: {
+    closing_cash_counted: number;
+    closing_note?:        string;
+  }) => {
+    setCloseError(null);
+    try {
+      await closeMut.mutateAsync(data);
+      setShowCloseModal(false);
+      setSelectedId(null);
+    } catch (e: any) {
+      setCloseError(
+        e?.response?.data?.message ??
+        e?.message ??
+        'فشل إغلاق الجلسة',
+      );
+    }
+  };
+
+  const openStats = useCallback((id: number) => {
+    setSelectedId(id);
+    setShowStatsModal(true);
+  }, []);
+
+  const openClose = useCallback((id: number) => {
+    setSelectedId(id);
+    setShowCloseModal(true);
+  }, []);
+
+  const resetFilters = () => {
+    setStatusFilter('');
+    setDateFrom('');
+    setDateTo('');
+    setSearch('');
+    setPage(1);
+  };
+
+  return {
+    page, setPage,
+    statusFilter, setStatusFilter,
+    dateFrom, setDateFrom,
+    dateTo, setDateTo,
+    viewMode, setViewMode,
+    search, setSearch,
+    selectedId, setSelectedId,
+    showOpenModal, setShowOpenModal,
+    showCloseModal, setShowCloseModal,
+    showStatsModal, setShowStatsModal,
+    openError, setOpenError,
+    closeError, setCloseError,
+
+    paginated, isLoading, isFetching,
+    currentSession, sessionLoading,
+    selectedSession, selectedLoading,
+    warehouses,
+    fiscalYears, defaultFiscalYearId, defaultWarehouseId,
+    openMut, closeMut,
+
+    sessions, meta,
+    filtered,
+    totalSales, totalInvoices, openCount, closedCount, avgSale, maxSale,
+    hasFilters,
+
+    handleOpenSession, handleCloseSession,
+    openStats, openClose,
+    resetFilters,
+  };
+}
+```
+
+## FILE: resources/js/pos/hooks/usePOSSettings.ts
+```
+// ════════════════════════════════════════════════════════════════════════════
+// pos/hooks/usePOSSettings.ts
+//
+// إعدادات POS الكاملة — محفوظة في localStorage بـ slug منفصل لكل شركة
+//
+// يُستخدَم في:
+//   - POSPage:    قراءة defaultWarehouseId, defaultDocTypeCode, priceMode...
+//   - CartStore:  maxDiscountPct لمنع تجاوز الكاشير حد الخصم
+//   - Receipt:    companyHeader, footerMessage
+//   - PaymentModal: defaultPaymentModeCode, openCashDrawer
+//   - ProductCard:  priceDisplayMode (ht | ttc)
+//
+// للتعديل: <POSSettingsModal /> يستدعي setSettings()
+// ════════════════════════════════════════════════════════════════════════════
+
+import { useState, useEffect, useCallback } from 'react';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type PriceDisplayMode = 'ttc' | 'ht';
+export type GridDefaultSize  = 'xs' | 'sm' | 'md' | 'lg';
+
+export interface POSSettings {
+  // ── مستودع وفاتورة ──────────────────────────────────────────────────────
+  /** ID المستودع الافتراضي — null يعني يُقرأ من warehouses[is_default] */
+  defaultWarehouseId:   number | null;
+  /** كود نوع الفاتورة الافتراضي عند الإنهاء — FV, BL, FAC */
+  defaultDocTypeCode:   string;
+
+  // ── أسعار وخصومات ───────────────────────────────────────────────────────
+  /** عرض الأسعار في بطاقات المنتجات — HT أو TTC */
+  priceDisplayMode:     PriceDisplayMode;
+  /** الحد الأقصى للخصم الذي يستطيع الكاشير تطبيقه — 0 = لا حد */
+  maxDiscountPct:       number;
+  /** هل يحتاج الخصم فوق X% تأكيد مدير (PIN) */
+  discountRequirePin:   boolean;
+  /** النسبة التي فوقها يُطلب PIN */
+  discountPinThreshold: number;
+  /** PIN رقمي 4 أرقام للمدير */
+  managerPin:           string;
+
+  // ── طباعة ───────────────────────────────────────────────────────────────
+  /** فتح درج النقود تلقائياً عند الدفع نقداً */
+  openCashDrawer:       boolean;
+  /** طباعة تلقائية بعد كل بيع */
+  autoPrint:            boolean;
+  /** عدد نسخ الطباعة */
+  printCopies:          1 | 2 | 3;
+  /** طريقة الطباعة */
+  printMode:            'thermal' | 'browser';
+
+  // ── رأس وتذييل الإيصال ─────────────────────────────────────────────────
+  /** اسم المؤسسة في رأس الإيصال — null يعني يُقرأ من activeCompany */
+  receiptCompanyName:   string | null;
+  /** سطر إضافي في رأس الإيصال (العنوان، الهاتف...) */
+  receiptHeader2:       string;
+  /** رسالة في تذييل الإيصال */
+  receiptFooter:        string;
+  /** إظهار QR code في الإيصال */
+  receiptShowQr:        boolean;
+
+  // ── واجهة المستخدم ───────────────────────────────────────────────────────
+  /** حجم شبكة المنتجات الافتراضي */
+  defaultGridSize:      GridDefaultSize;
+  /** إظهار شريط Quick Items عند فتح الصفحة */
+  showQuickbarOnStart:  boolean;
+  /** تشغيل صوت عند إضافة منتج */
+  playSoundOnAdd:       boolean;
+  /** تشغيل صوت عند إتمام البيع */
+  playSoundOnSale:      boolean;
+  /** إغلاق نافذة الدفع تلقائياً بعد النجاح (بدلاً من الانتظار للطباعة) */
+  autoClosePayment:     boolean;
+  /** طلب تأكيد قبل مسح السلة */
+  confirmOnClear:       boolean;
+  /** الوضع الافتراضي لطريقة الدفع */
+  defaultPaymentCode:   string;
+
+  // ── بطاقة المنتج ────────────────────────────────────────────────────────
+  /** إظهار المخزون في بطاقة المنتج */
+  showStockOnCard:      boolean;
+  /** إخفاء المنتجات النافذة من الشبكة */
+  hideOutOfStock:       boolean;
+  /** تفريغ حقل البحث بعد إضافة منتج */
+  clearSearchOnAdd:     boolean;
+  /** التنقل عبر نتائج البحث بلوحة المفاتيح */
+  keyboardNav:          boolean;
+}
+
+// ─── Default Settings ─────────────────────────────────────────────────────────
+
+export const DEFAULT_POS_SETTINGS: POSSettings = {
+  defaultWarehouseId:   null,
+  defaultDocTypeCode:   'FV',
+  priceDisplayMode:     'ttc',
+  maxDiscountPct:       0,
+  discountRequirePin:   false,
+  discountPinThreshold: 20,
+  managerPin:           '',
+  openCashDrawer:       false,
+  autoPrint:            false,
+  printCopies:          1,
+  printMode:            'browser',
+  receiptCompanyName:   null,
+  receiptHeader2:       '',
+  receiptFooter:        'شكراً لتعاملكم معنا',
+  receiptShowQr:        false,
+  defaultGridSize:      'md',
+  showQuickbarOnStart:  true,
+  playSoundOnAdd:       false,
+  playSoundOnSale:      false,
+  autoClosePayment:     false,
+  confirmOnClear:       true,
+  defaultPaymentCode:   'cash',
+  showStockOnCard:      true,
+  hideOutOfStock:       false,
+  clearSearchOnAdd:     false,
+  keyboardNav:          true,
+};
+
+// ─── Storage key ──────────────────────────────────────────────────────────────
+
+const settingsKey = (slug: string | null) =>
+  slug ? `pos-settings-${slug}` : 'pos-settings-global';
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function usePOSSettings(slug: string | null) {
+  const [settings, setSettingsState] = useState<POSSettings>(() => {
+    try {
+      const stored = localStorage.getItem(settingsKey(slug));
+      if (!stored) return DEFAULT_POS_SETTINGS;
+      // merge: القيم الجديدة المضافة في DEFAULT تُرث قيمتها الافتراضية
+      return { ...DEFAULT_POS_SETTINGS, ...JSON.parse(stored) };
+    } catch {
+      return DEFAULT_POS_SETTINGS;
+    }
+  });
+
+  // تحديث عند تغيير الـ slug (تبديل الشركة)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(settingsKey(slug));
+      if (stored) {
+        setSettingsState({ ...DEFAULT_POS_SETTINGS, ...JSON.parse(stored) });
+      } else {
+        setSettingsState(DEFAULT_POS_SETTINGS);
+      }
+    } catch {
+      setSettingsState(DEFAULT_POS_SETTINGS);
+    }
+  }, [slug]);
+
+  const setSettings = useCallback((patch: Partial<POSSettings>) => {
+    setSettingsState(prev => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(settingsKey(slug), JSON.stringify(next)); }
+      catch { /* storage full */ }
+      return next;
+    });
+  }, [slug]);
+
+  const resetSettings = useCallback(() => {
+    setSettingsState(DEFAULT_POS_SETTINGS);
+    try { localStorage.removeItem(settingsKey(slug)); } catch {}
+  }, [slug]);
+
+  return { settings, setSettings, resetSettings };
+}
+
+// ─── Discount gate ────────────────────────────────────────────────────────────
+
+/**
+ * يتحقق هل يستطيع الكاشير تطبيق الخصم المطلوب
+ * Returns: { allowed: true } | { allowed: false, reason: 'max_exceeded' | 'pin_required' }
+ */
+export function checkDiscountAllowed(
+  discountPct: number,
+  settings:    POSSettings,
+): { allowed: boolean; reason?: 'max_exceeded' | 'pin_required' } {
+  const max = settings.maxDiscountPct;
+  if (max > 0 && discountPct > max) {
+    return { allowed: false, reason: 'max_exceeded' };
+  }
+  if (
+    settings.discountRequirePin &&
+    settings.managerPin &&
+    discountPct > settings.discountPinThreshold
+  ) {
+    return { allowed: false, reason: 'pin_required' };
+  }
+  return { allowed: true };
+}
+```
+
 ## FILE: resources/js/pos/hooks/usePOSStore.ts
 ```
-// pos/hooks/usePOSStore.ts
-
 import { create }        from 'zustand';
 import { nanoid }        from 'nanoid';
 import { useCartStore }  from '../utils/useCartStore';
 import type { HeldCart, CartItem, CartTotals, Party } from '@/types';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface SessionPayment {
-  paymentModeId: number;
-  amount:        number;
-}
-
-export interface SessionProduct {
-  name:  string;
-  qty:   number;
-  total: number;
-}
-
 interface POSState {
-  sessionStarted:   boolean;
-  sessionInvoices:  number;
-  sessionSales:     number;
-  highestInvoice:   number;
-  invoiceTotals:    number[];
-  paymentsBreakdown: SessionPayment[];
-  productsSold:     Record<string, SessionProduct>;
   heldCarts:        HeldCart[];
   activeTab:        'products' | 'clients' | 'held';
   searchQuery:      string;
   selectedCategory: number | null;
   paymentModalOpen: boolean;
-
-  startSession:     () => void;
-  endSession:       () => void;
-  incrementSession: (data: {
-    amount:   number;
-    payments?: SessionPayment[];
-    items?:   CartItem[];
-  }) => void;
 
   holdCart:         (params: { items: CartItem[]; totals: CartTotals; client: Party | null; label?: string; clearCart: () => void }) => void;
   restoreCart:      (id: string) => void;
@@ -5972,69 +9405,12 @@ interface POSState {
   closePayment:     () => void;
 }
 
-function mergeProducts(existing: Record<string, SessionProduct>, items: CartItem[]) {
-  const copy = { ...existing };
-  items.forEach(i => {
-    const key = String(i.variant_id);
-    if (copy[key]) {
-      copy[key] = {
-        name:  copy[key].name,
-        qty:   copy[key].qty + i.quantity,
-        total: copy[key].total + i.total_ttc,
-      };
-    } else {
-      copy[key] = {
-        name:  i.product_name,
-        qty:   i.quantity,
-        total: i.total_ttc,
-      };
-    }
-  });
-  return copy;
-}
-
-// ─── Store ────────────────────────────────────────────────────────────────────
-
 export const usePOSStore = create<POSState>((set, get) => ({
-  sessionStarted:   false,
-  sessionInvoices:  0,
-  sessionSales:     0,
-  highestInvoice:   0,
-  invoiceTotals:    [],
-  paymentsBreakdown: [],
-  productsSold:     {},
   heldCarts:        [],
   activeTab:        'products',
   searchQuery:      '',
   selectedCategory: null,
   paymentModalOpen: false,
-
-  startSession: () =>
-    set({
-      sessionStarted: true,
-      sessionInvoices: 0,
-      sessionSales: 0,
-      highestInvoice: 0,
-      invoiceTotals: [],
-      paymentsBreakdown: [],
-      productsSold: {},
-    }),
-
-  endSession: () => set({ sessionStarted: false }),
-
-  incrementSession: (data) =>
-    set((s) => ({
-      sessionInvoices: s.sessionInvoices + 1,
-      sessionSales:    s.sessionSales + data.amount,
-      highestInvoice:  Math.max(s.highestInvoice, data.amount),
-      invoiceTotals:   [...s.invoiceTotals, data.amount],
-      paymentsBreakdown: data.payments
-        ? [...s.paymentsBreakdown, ...data.payments]
-        : s.paymentsBreakdown,
-      productsSold:    data.items
-        ? mergeProducts(s.productsSold, data.items)
-        : s.productsSold,
-    })),
 
   holdCart: ({ items, totals, client, label, clearCart }) => {
     if (items.length === 0) return;
@@ -6048,19 +9424,19 @@ export const usePOSStore = create<POSState>((set, get) => ({
       created_at: new Date().toISOString(),
     };
 
-    set((s) => ({ heldCarts: [...s.heldCarts, held] }));
+    set(s => ({ heldCarts: [...s.heldCarts, held] }));
     clearCart();
   },
 
   restoreCart: (id) => {
-    const held = get().heldCarts.find((c) => c.id === id);
+    const held = get().heldCarts.find(c => c.id === id);
     if (!held) return;
     useCartStore.setState({ items: held.items, client: held.client ?? null });
-    set((s) => ({ heldCarts: s.heldCarts.filter((c) => c.id !== id) }));
+    set(s => ({ heldCarts: s.heldCarts.filter(c => c.id !== id) }));
   },
 
   deleteHeldCart: (id) =>
-    set((s) => ({ heldCarts: s.heldCarts.filter((c) => c.id !== id) })),
+    set(s => ({ heldCarts: s.heldCarts.filter(c => c.id !== id) })),
 
   setTab:       (tab) => set({ activeTab: tab }),
   setSearch:    (q)   => set({ searchQuery: q }),
@@ -6068,6 +9444,184 @@ export const usePOSStore = create<POSState>((set, get) => ({
   openPayment:  ()    => set({ paymentModalOpen: true }),
   closePayment: ()    => set({ paymentModalOpen: false }),
 }));
+```
+
+## FILE: resources/js/pos/POSPage_session_patch.tsx
+```
+// ════════════════════════════════════════════════════════════════════════════
+// POSPage.tsx — التعديلات المطلوبة لنظام الجلسات
+// اجعل ملف POSPage.tsx الكامل يحتوي على هذه الإضافات
+// ════════════════════════════════════════════════════════════════════════════
+
+// 1. أضف هذه الـ imports في أعلى الملف:
+// ─────────────────────────────────────────────────────────────────────────────
+import OpenSessionModal  from '@/pos/components/OpenSessionModal';
+import CloseSessionModal from '@/pos/components/CloseSessionModal';
+import SessionStatsModal from '@/pos/components/SessionStatsModal';
+import {
+  useCurrentPosSession,
+  useOpenSession,
+  useCloseSession,
+  useIncrementSession,
+  buildIncrementInput,
+} from '@/lib/api/endpoints/posSession';
+import { useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 2. داخل POSPage() أضف هذه الأسطر (بعد تعريف slug):
+// ─────────────────────────────────────────────────────────────────────────────
+const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
+const { data: fiscalYearsData }  = useFiscalYears();
+const openSessionMut             = useOpenSession();
+const closeSessionMut            = useCloseSession(currentSession?.id ?? null);
+const incrementMut               = useIncrementSession(currentSession?.id ?? null);
+const [showCloseSession, setShowCloseSession] = useState(false);
+const [sessionError,     setSessionError]     = useState<string | null>(null);
+
+const fiscalYears = fiscalYearsData?.years ?? [];
+
+const handleOpenSession = async (data: {
+  warehouse_id:   number;
+  fiscal_year_id: number;
+  opening_cash:   number;
+  opening_note?:  string;
+}) => {
+  setSessionError(null);
+  try {
+    await openSessionMut.mutateAsync(data);
+  } catch (e: any) {
+    setSessionError(e?.message ?? 'فشل فتح الجلسة');
+  }
+};
+
+const handleCloseSession = async (data: {
+  closing_cash_counted: number;
+  closing_note?:        string;
+}) => {
+  try {
+    await closeSessionMut.mutateAsync(data);
+    setShowCloseSession(false);
+    toast.success('تم إغلاق الجلسة بنجاح');
+  } catch (e: any) {
+    toast.error(e?.message ?? 'فشل إغلاق الجلسة');
+  }
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 3. في handleCompleteSale — أضف بعد سطر pos.incrementSession(...):
+// ─────────────────────────────────────────────────────────────────────────────
+if (currentSession?.id) {
+  incrementMut.mutate(
+    buildIncrementInput({
+      items:            currentItems,
+      totalHt:          snapshot.totals.total_ht,
+      totalTva:         snapshot.totals.total_tva,
+      totalFiscalStamp: snapshot.totals.fiscal_stamp,
+      totalDiscount:    snapshot.totals.total_discount + invoiceDiscountAmount,
+      grandTotal:       snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp,
+      payments:         apiPayments.map(p => ({
+        payment_mode_id: p.payment_mode_id,
+        amount:          p.amount,
+      })),
+    }),
+    // لا نُعطِّل البيع إذا فشل تسجيل الجلسة — silent fail
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 4. في JSX — أضف مباشرة داخل <div className="pos-wrap ...">
+//    قبل أي شيء آخر:
+// ─────────────────────────────────────────────────────────────────────────────
+{/* جلسة مطلوبة — تظهر هذه النافذة إذا لم تكن هناك جلسة مفتوحة */}
+{!sessionLoading && !currentSession && (
+  <OpenSessionModal
+    warehouses={warehouses ?? []}
+    fiscalYears={fiscalYears}
+    defaultWarehouseId={defaultWarehouse?.id}
+    defaultFiscalYearId={fiscalYear?.id}
+    isLoading={openSessionMut.isPending}
+    error={sessionError}
+    onOpen={handleOpenSession}
+  />
+)}
+
+{/* نافذة إغلاق الجلسة */}
+{showCloseSession && currentSession && (
+  <CloseSessionModal
+    session={currentSession}
+    isLoading={closeSessionMut.isPending}
+    error={closeSessionMut.error?.message ?? null}
+    onClose={() => setShowCloseSession(false)}
+    onConfirm={handleCloseSession}
+  />
+)}
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 5. استبدل modal === 'session' بهذا:
+// ─────────────────────────────────────────────────────────────────────────────
+{modal === 'session' && currentSession && (
+  <SessionStatsModal
+    session={currentSession}
+    onClose={() => setModal('none')}
+    onEndSession={() => {
+      setModal('none');
+      setShowCloseSession(true);
+    }}
+  />
+)}
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 6. في POSTopBar — استبدل sessionInvoices/sessionSales بقيم من currentSession:
+// ─────────────────────────────────────────────────────────────────────────────
+<POSTopBar
+  sessionInvoices={currentSession?.invoices_count ?? 0}
+  sessionSales={currentSession?.net_sales ?? 0}
+  // ... باقي الـ props كما هي
+/>
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 7. في api.php — أضف routes الجلسات داخل Route::prefix('{company}'):
+// ─────────────────────────────────────────────────────────────────────────────
+/*
+Route::prefix('pos-sessions')->group(function () {
+    Route::get('current',                [PosSessionController::class, 'current']);
+    Route::post('/',                     [PosSessionController::class, 'open']);
+    Route::post('{session}/increment',   [PosSessionController::class, 'increment']);
+    Route::post('{session}/close',       [PosSessionController::class, 'close']);
+    Route::get('/',                      [PosSessionController::class, 'index']);
+    Route::get('{session}',              [PosSessionController::class, 'show']);
+});
+*/
+// ─────────────────────────────────────────────────────────────────────────────
+```
+
+## FILE: resources/js/pos/TODO.MD
+```
+ما لا يزال ناقصاً مقارنة بأفضل الأنظمة العالمية (Square, Lightspeed, Toast):
+تحكم المستخدم:
+
+لا يوجد إعدادات POS قابلة للتخصيص من واجهة بدون كود — مثل اختيار المستودع الافتراضي، نوع الفاتورة الافتراضي، عدد الأصناف في الشبكة
+لا يوجد حد أقصى للخصم قابل للإعداد — الكاشير يستطيع وضع 100% خصم بدون قيود
+لا يوجد نظام صلاحيات داخل الـ POS — مدير يعطي إذن للكاشير لتجاوز السعر
+نظام Order Types موجود في الـ state لكن لا يُرسل للباكاند ولا يؤثر على الفاتورة فعلياً
+لا يوجد حقل "وقت التحضير" أو "رقم الطلب" للطلبات (مهم لمطاعم)
+لا يوجد فلتر "المنتجات الأكثر مبيعاً" في شبكة المنتجات — Square يضعها أولاً تلقائياً
+لا يوجد وضع "عرض الأسعار بـ TTC" مقابل "HT" — بعض المحلات تعمل بـ TTC فقط
+
+الأداء والأجهزة:
+
+BarcodeDetector API غير مُستخدَم — الكود لا يزال يعتمد على keyboard buffer فقط
+لا يوجد دعم مقياس وزن Serial API — للمحلات التي تبيع بالكيلو
+لا يوجد دعم Cash Drawer عبر ESC/POS — الدرج لا يفتح تلقائياً عند الدفع نقداً
+لا يوجد Customer Display عبر BroadcastChannel — الشاشة الثانية للعميل
+
+المبيعات:
+
+لا يوجد Layaway — حجز منتج مع دفعة أولى وتسليم لاحق
+لا يوجد تكامل مع برنامج ولاء النقاط loyalty points — أنظمة مثل Square تُحسبها تلقائياً
+لا يوجد تطبيق كوبون أو رمز ترويجي promo code من داخل الـ POS
+فاتورة الـ Receipt ثابتة بيانات شركة وهمية — لا تسحب من بيانات activeCompany
+
 ```
 
 ## FILE: resources/js/pos/utils/calculations.test.ts
@@ -6327,9 +9881,11 @@ export function calcTotals(items: CartItem[], invoiceDiscountPct = 0): CartTotal
 }
 
 /** تنسيق المبلغ بالدينار الجزائري */
-export function formatDZD(amount: number): string {
+export function formatDZD(amount: number | string | null | undefined): string {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return '0 دج';
   return new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-    .format(amount) + ' دج';
+    .format(n) + ' دج';
 }
 
 /** حساب الباقي من الدفع */
@@ -6616,6 +10172,7 @@ export function productToVariant(p: Product): ProductVariant {
 
     // relations
     product:           p,
+    image_url:         p.images?.[0] ?? null,
     unit:              p.unit,
     tva:               p.tva,
     current_stock:     pr.current_stock,

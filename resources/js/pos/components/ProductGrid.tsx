@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
@@ -19,6 +19,8 @@ interface ProductGridProps {
   selectedPriceLevelId: number | null;
   cartItems: CartItem[];
   allowNegativeStock?: boolean | undefined;
+  highlightedIndex?: number;
+  onHighlightIndexChange?: (idx: number) => void;
 }
 
 function LoadMore({ hasMore, loading, onLoadMore }: { hasMore?: boolean; loading: boolean; onLoadMore?: () => void }) {
@@ -35,10 +37,18 @@ function LoadMore({ hasMore, loading, onLoadMore }: { hasMore?: boolean; loading
 export default function ProductGrid({
   variants, view, gridSize, loading, hasMore, onLoadMore, onAdd, onAddManual,
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
+  highlightedIndex, onHighlightIndexChange,
 }: ProductGridProps) {
+  const gridRef = useRef<HTMLDivElement>(null);
   const inCartQty = useCallback((variantId: number) => {
     return cartItems.find(i => i.variant_id === variantId)?.quantity ?? 0;
   }, [cartItems]);
+
+  useEffect(() => {
+    if (highlightedIndex === undefined || !gridRef.current) return;
+    const el = gridRef.current.querySelector(`[data-hl-idx="${highlightedIndex}"]`);
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [highlightedIndex]);
 
   if (loading) return (
     <div className="pos-grid-area">
@@ -65,7 +75,7 @@ export default function ProductGrid({
 
   if (view === 'list') {
     return (
-      <div className="pos-grid-area">
+      <div className="pos-grid-area" ref={gridRef}>
         <table className="pos-ptable">
           <thead>
             <tr>
@@ -79,7 +89,7 @@ export default function ProductGrid({
             </tr>
           </thead>
           <tbody>
-            {variants.map(v => {
+            {variants.map((v, idx) => {
               const priceHt   = getVariantPrice(v, selectedPriceLevelId, priceLevels);
               const tvaRate   = v.tva?.rate ?? 19;
               const priceTtc  = priceHt * (1 + tvaRate / 100);
@@ -92,7 +102,9 @@ export default function ProductGrid({
               return (
                   <tr
                     key={v.id}
-                    className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''}`}
+                    data-hl-idx={idx}
+                    className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''} ${highlightedIndex === idx ? 'prow-hl' : ''}`}
+                    onClick={() => { if (onHighlightIndexChange !== undefined) onHighlightIndexChange(idx); }}
                     onDoubleClick={() => !outStock && onAdd(v)}
                   >
                   <td className="prow-name">
@@ -149,9 +161,9 @@ export default function ProductGrid({
   };
 
   return (
-    <div className="pos-grid-area">
+    <div className="pos-grid-area" ref={gridRef}>
       <div className={`pgrid ${colsMap[gridSize]}`}>
-        {variants.map(v => {
+        {variants.map((v, idx) => {
           const priceHt  = getVariantPrice(v, selectedPriceLevelId, priceLevels);
           const tvaRate  = v.tva?.rate ?? 19;
           const priceTtc = priceHt * (1 + tvaRate / 100);
@@ -167,8 +179,12 @@ export default function ProductGrid({
           return (
             <div
               key={v.id}
-              className={`pcard ${outStock ? 'pcard-out' : ''} ${inCart > 0 ? 'pcard-incart' : ''}`}
-              onClick={() => !outStock && onAdd(v)}
+              data-hl-idx={idx}
+              className={`pcard ${outStock ? 'pcard-out' : ''} ${inCart > 0 ? 'pcard-incart' : ''} ${highlightedIndex === idx ? 'pcard-hl' : ''}`}
+              onClick={() => {
+                if (!outStock) onAdd(v);
+                if (onHighlightIndexChange !== undefined) onHighlightIndexChange(idx);
+              }}
               title={v.product?.name}
             >
               <div className="pcard-img" style={{ background: style.bg }}>

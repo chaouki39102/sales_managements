@@ -80,6 +80,10 @@ export interface POSSettings {
   showStockOnCard:      boolean;
   /** إخفاء المنتجات النافذة من الشبكة */
   hideOutOfStock:       boolean;
+  /** تفريغ حقل البحث بعد إضافة منتج */
+  clearSearchOnAdd:     boolean;
+  /** التنقل عبر نتائج البحث بلوحة المفاتيح */
+  keyboardNav:          boolean;
 }
 
 // ─── Default Settings ─────────────────────────────────────────────────────────
@@ -109,6 +113,8 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   defaultPaymentCode:   'cash',
   showStockOnCard:      true,
   hideOutOfStock:       false,
+  clearSearchOnAdd:     false,
+  keyboardNav:          true,
 };
 
 // ─── Storage key ──────────────────────────────────────────────────────────────
