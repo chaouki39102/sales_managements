@@ -111,14 +111,12 @@ const NotificationBell: React.FC = () => {
             )}
           </div>
 
-          {notifications.length > 0 && (
-            <div className="ntf-bell__ft">
-              <Link to="/notifications" className="ntf-bell__ft-link" onClick={() => setOpen(false)}>
-                عرض جميع الإشعارات
-                <span className="ic ic-xs"><i className="ti ti-arrow-left" /></span>
-              </Link>
-            </div>
-          )}
+          <div className="ntf-bell__ft">
+            <Link to="/notifications" className="ntf-bell__ft-link" onClick={() => setOpen(false)}>
+              عرض جميع الإشعارات
+              <span className="ic ic-xs"><i className="ti ti-arrow-left" /></span>
+            </Link>
+          </div>
         </div>
       )}
     </div>

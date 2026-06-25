@@ -9,6 +9,7 @@ use App\Http\Resources\CommercialDocumentResource;
 use App\Services\QRCodeService;
 use App\Services\CommercialDocumentService;
 use App\Models\CommercialDocument;
+use App\Services\NotificationService;
 use App\Models\Company;          // ✅ أضفنا هذا
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,8 @@ class CommercialDocumentController extends BaseApiController
 
     public function __construct(
         private CommercialDocumentService $commercialDocumentService,
-        private QRCodeService $qrCodeService
+        private QRCodeService $qrCodeService,
+        private NotificationService $notificationService,
     ) {
         parent::__construct();
     }
@@ -241,6 +243,10 @@ class CommercialDocumentController extends BaseApiController
         try {
             $this->authorizeAction('update', $commercialDocument);
             $this->commercialDocumentService->validateDocument($commercialDocument, $request);
+            $this->notificationService->success(
+                'تم التحقق من المستند',
+                $commercialDocument->document_number ?? '',
+            );
             return $this->successResponse(
                 new CommercialDocumentResource($commercialDocument->fresh()),
                 'تم التحقق من الوثيقة بنجاح'
@@ -273,6 +279,11 @@ class CommercialDocumentController extends BaseApiController
                 $validated['payments']
             );
 
+            $this->notificationService->success(
+                'تمت إضافة دفعات',
+                $commercialDocument->document_number ?? '',
+            );
+
             return $this->successResponse(
                 new CommercialDocumentResource($commercialDocument->fresh(['payments.paymentMode', 'payments.treasuryAccount', 'documentStatus'])),
                 'تمت إضافة الدفعات بنجاح'
@@ -291,6 +302,10 @@ class CommercialDocumentController extends BaseApiController
         try {
             $this->authorizeAction('update', $commercialDocument);
             $this->commercialDocumentService->lockDocument($commercialDocument);
+            $this->notificationService->warning(
+                'تم قفل المستند',
+                $commercialDocument->document_number ?? '',
+            );
             return $this->successResponse(
                 new CommercialDocumentResource($commercialDocument->fresh()),
                 'تم قفل الوثيقة بنجاح'
@@ -308,6 +323,10 @@ class CommercialDocumentController extends BaseApiController
         try {
             $this->authorizeAction('update', $commercialDocument);
             $this->commercialDocumentService->unlockDocument($commercialDocument);
+            $this->notificationService->info(
+                'تم فتح قفل المستند',
+                $commercialDocument->document_number ?? '',
+            );
             return $this->successResponse(
                 new CommercialDocumentResource($commercialDocument->fresh()),
                 'تم فتح قفل الوثيقة بنجاح'
@@ -334,6 +353,10 @@ class CommercialDocumentController extends BaseApiController
                 $validated['cancellation_reason']
             );
 
+            $this->notificationService->warning(
+                'تم إلغاء المستند',
+                $commercialDocument->document_number ?? '',
+            );
             return $this->successResponse(
                 new CommercialDocumentResource($commercialDocument->fresh()),
                 'تم إلغاء الوثيقة بنجاح'

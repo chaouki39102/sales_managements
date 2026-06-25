@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import PageHeader         from '@/components/ui/PageHeader';
 import Card               from '@/components/ui/Card';
 import Button             from '@/components/ui/Button';
 import Badge              from '@/components/ui/Badge';
@@ -41,6 +42,15 @@ const TYPE_FILTER_OPTIONS: { value: RemoteNotificationType | 'all'; label: strin
 
 const PER_PAGE = 20;
 
+const thStyle: React.CSSProperties = {
+  padding: '10px 12px', textAlign: 'right', fontWeight: 700,
+  fontSize: 11, color: 'var(--t3)', whiteSpace: 'nowrap',
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: '9px 12px', verticalAlign: 'middle',
+};
+
 export default function NotificationsPage() {
   const notify = useNotification();
 
@@ -69,8 +79,6 @@ export default function NotificationsPage() {
 
   const notifications = data?.data ?? [];
   const meta          = data?.meta;
-
-  const unreadInPage = notifications.filter((n) => !n.is_read).length;
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -158,24 +166,15 @@ export default function NotificationsPage() {
   const isDeleting = deleteOneMutation.isPending || deleteManyMutation.isPending;
 
   return (
-    <div className="ntf-page" dir="rtl">
-
-      <Card noHeader>
-        <div className="ntf-page__header">
-          <div className="ntf-page__header-title-group">
-            <h1 className="ntf-page__title">مركز التنبيهات</h1>
-            {meta && (
-              <Badge variant="info" noDot>
-                {meta.total} إشعار
-              </Badge>
-            )}
-            {unreadInPage > 0 && (
-              <Badge variant="danger">
-                {unreadInPage} غير مقروء (هذه الصفحة)
-              </Badge>
-            )}
-          </div>
-
+    <div>
+      <PageHeader
+        title="مركز التنبيهات"
+        subtitle={
+          meta
+            ? `إجمالي ${meta.total} إشعار${meta.total !== 1 ? '' : ''}`
+            : undefined
+        }
+        actions={
           <Button
             variant="primary"
             size="sm"
@@ -185,46 +184,56 @@ export default function NotificationsPage() {
           >
             تحديد الكل كمقروء
           </Button>
+        }
+      />
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', marginInlineEnd: 4 }}>
+            الحالة:
+          </span>
+          {READ_FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => handleReadFilterChange(opt.value)}
+              style={{
+                padding: '6px 14px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                border: 'none', cursor: 'pointer', transition: 'all .15s',
+                background: readFilter === opt.value ? 'var(--em)' : 'var(--bg2)',
+                color: readFilter === opt.value ? '#fff' : 'var(--t3)',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
 
-        <div className="ntf-page__filters">
-
-          <div className="ntf-page__filter-group">
-            <span className="ntf-page__filter-label">الحالة:</span>
-            {READ_FILTER_OPTIONS.map((opt) => (
-              <Button
-                key={opt.value}
-                size="xs"
-                variant={readFilter === opt.value ? 'primary' : 'default'}
-                onClick={() => handleReadFilterChange(opt.value)}
-              >
-                {opt.label}
-              </Button>
-            ))}
-          </div>
-
-          <div className="ntf-page__filter-group">
-            <span className="ntf-page__filter-label">النوع:</span>
-            {TYPE_FILTER_OPTIONS.map((opt) => (
-              <Button
-                key={opt.value}
-                size="xs"
-                variant={typeFilter === opt.value ? 'primary' : 'default'}
-                onClick={() => handleTypeFilterChange(opt.value)}
-              >
-                {opt.label}
-              </Button>
-            ))}
-          </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', marginInlineEnd: 4 }}>
+            النوع:
+          </span>
+          {TYPE_FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => handleTypeFilterChange(opt.value)}
+              style={{
+                padding: '6px 14px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                border: 'none', cursor: 'pointer', transition: 'all .15s',
+                background: typeFilter === opt.value ? 'var(--em)' : 'var(--bg2)',
+                color: typeFilter === opt.value ? '#fff' : 'var(--t3)',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
-      </Card>
+      </div>
 
-      <Card noHeader style={{ marginTop: 16 }}>
-
+      <Card noHeader style={{ padding: 0 }}>
         {isLoading ? (
-          <div className="ntf-page__skeleton-list">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 24 }}>
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="ntf-page__skeleton-row">
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                 <Skeleton variant="circle" width={36} height={36} />
                 <div style={{ flex: 1 }}>
                   <Skeleton variant="text" rows={2} />
@@ -233,27 +242,126 @@ export default function NotificationsPage() {
             ))}
           </div>
         ) : notifications.length === 0 ? (
-          <EmptyState
-            icon="ti-bell-off"
-            text="لا توجد إشعارات"
-            sub={
-              readFilter !== 'all' || typeFilter !== 'all'
-                ? 'لا توجد إشعارات مطابقة لهذا الفلتر'
-                : 'ستظهر هنا أي إشعارات جديدة'
-            }
-          />
+          <div style={{ padding: '40px 20px' }}>
+            <EmptyState
+              icon="ti-bell-off"
+              text="لا توجد إشعارات"
+              sub={
+                readFilter !== 'all' || typeFilter !== 'all'
+                  ? 'لا توجد إشعارات مطابقة لهذا الفلتر'
+                  : 'ستظهر هنا أي إشعارات جديدة'
+              }
+            />
+          </div>
         ) : (
-          <div className={`ntf-page__list ${isFetching ? 'ntf-page__list--fetching' : ''}`}>
-            {notifications.map((n) => (
-              <NotificationRow
-                key={n.id}
-                notification={n}
-                selected={selectedIds.has(n.id)}
-                onToggleSelect={() => toggleSelect(n.id)}
-                onMarkAsRead={() => handleMarkOneAsRead(n.id)}
-                onDelete={() => openDeleteSingle(n.id)}
-              />
-            ))}
+          <div style={{ overflow: 'hidden', opacity: isFetching ? 0.6 : 1, transition: 'opacity .15s' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: 'var(--bg3)' }}>
+                  <th style={{ ...thStyle, width: 36, textAlign: 'center' }} />
+                  <th style={{ ...thStyle, width: 1 }}>النوع</th>
+                  <th style={thStyle}>المحتوى</th>
+                  <th style={{ ...thStyle, width: 100 }}>التاريخ</th>
+                  <th style={{ ...thStyle, width: 80, textAlign: 'center' }}>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notifications.map((n) => (
+                  <tr
+                    key={n.id}
+                    style={{
+                      borderBottom: '1px solid var(--b1)',
+                      background: !n.is_read ? 'var(--emb)' : undefined,
+                      transition: 'background .1s',
+                    }}
+                    onMouseEnter={e => {
+                      if (n.is_read) e.currentTarget.style.background = 'var(--bg2)';
+                    }}
+                    onMouseLeave={e => {
+                      if (n.is_read) e.currentTarget.style.background = '';
+                    }}
+                  >
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(n.id)}
+                        onChange={() => toggleSelect(n.id)}
+                        style={{ accentColor: 'var(--em)', cursor: 'pointer', width: 15, height: 15 }}
+                      />
+                    </td>
+
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <span className="ic ic-sm" style={{ color: NOTIFICATION_TYPE_COLOR[n.type] }}>
+                        <i className={`ti ${NOTIFICATION_TYPE_ICON[n.type]}`} />
+                      </span>
+                    </td>
+
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--t1)', fontSize: 12.5 }}>
+                          {n.title}
+                        </span>
+                        <Badge variant={NOTIFICATION_TYPE_BADGE_VARIANT[n.type]} noDot>
+                          {NOTIFICATION_TYPE_LABEL[n.type]}
+                        </Badge>
+                        {!n.is_read && (
+                          <span style={{
+                            display: 'inline-block', width: 6, height: 6,
+                            borderRadius: '50%', background: 'var(--em)', flexShrink: 0,
+                          }} />
+                        )}
+                      </div>
+                      {n.message && (
+                        <div style={{ color: 'var(--t3)', fontSize: 11.5, marginTop: 3 }}>
+                          {n.message}
+                        </div>
+                      )}
+                    </td>
+
+                    <td style={{ ...tdStyle, color: 'var(--t4)', fontSize: 11 }}>
+                      <time>{n.created_at_human}</time>
+                    </td>
+
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                        {!n.is_read && (
+                          <button
+                            onClick={() => handleMarkOneAsRead(n.id)}
+                            title="تحديد كمقروء"
+                            style={{
+                              width: 28, height: 28, borderRadius: 6,
+                              border: '1px solid var(--b2)', background: 'var(--bg3)',
+                              cursor: 'pointer', display: 'inline-flex',
+                              alignItems: 'center', justifyContent: 'center',
+                              color: 'var(--t4)', transition: 'all .15s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--emb)'; e.currentTarget.style.color = 'var(--em)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg3)'; e.currentTarget.style.color = 'var(--t4)'; }}
+                          >
+                            <i className="ti ti-check" style={{ fontSize: 14 }} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openDeleteSingle(n.id)}
+                          title="حذف"
+                          style={{
+                            width: 28, height: 28, borderRadius: 6,
+                            border: '1px solid var(--b2)', background: 'var(--bg3)',
+                            cursor: 'pointer', display: 'inline-flex',
+                            alignItems: 'center', justifyContent: 'center',
+                            color: 'var(--t4)', transition: 'all .15s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--redb)'; e.currentTarget.style.color = 'var(--red)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg3)'; e.currentTarget.style.color = 'var(--t4)'; }}
+                        >
+                          <i className="ti ti-trash" style={{ fontSize: 14 }} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -263,29 +371,24 @@ export default function NotificationsPage() {
       </Card>
 
       {selectedIds.size > 0 && (
-        <div className="ntf-page__floating-bar">
-          <span className="ntf-page__floating-count">
+        <div style={{
+          position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 4000, display: 'flex', alignItems: 'center', gap: 16,
+          padding: '10px 16px', background: 'var(--bg2)',
+          border: '1px solid var(--b3)', borderRadius: 'var(--r3)',
+          boxShadow: 'var(--shadow3)',
+        }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--t2)', whiteSpace: 'nowrap' }}>
             {selectedIds.size} عنصر محدَّد
           </span>
-          <div className="ntf-page__floating-actions">
-            <Button
-              size="sm"
-              icon={<i className="ti ti-check" />}
-              onClick={handleMarkSelectedAsRead}
-            >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Button size="sm" icon={<i className="ti ti-check" />} onClick={handleMarkSelectedAsRead}>
               تحديد كمقروء
             </Button>
-            <Button
-              size="sm"
-              variant="danger"
-              icon={<i className="ti ti-trash" />}
-              onClick={openDeleteBulk}
-            >
+            <Button size="sm" variant="danger" icon={<i className="ti ti-trash" />} onClick={openDeleteBulk}>
               حذف ({selectedIds.size})
             </Button>
-            <Button size="sm" onClick={clearSelection}>
-              إلغاء التحديد
-            </Button>
+            <Button size="sm" onClick={clearSelection}>إلغاء التحديد</Button>
           </div>
         </div>
       )}
@@ -296,90 +399,12 @@ export default function NotificationsPage() {
         onConfirm={handleConfirmDelete}
         loading={isDeleting}
         itemName={
-          deleteTarget === 'bulk'
-            ? `${selectedIds.size} إشعار`
-            : undefined
+          deleteTarget === 'bulk' ? `${selectedIds.size} إشعار` : undefined
         }
         warning={
-          deleteTarget === 'bulk'
-            ? 'سيتم حذف جميع الإشعارات المحددة نهائياً.'
-            : undefined
+          deleteTarget === 'bulk' ? 'سيتم حذف جميع الإشعارات المحددة نهائياً.' : undefined
         }
       />
-    </div>
-  );
-}
-
-interface NotificationRowProps {
-  notification: RemoteNotification;
-  selected: boolean;
-  onToggleSelect: () => void;
-  onMarkAsRead: () => void;
-  onDelete: () => void;
-}
-
-function NotificationRow({
-  notification: n,
-  selected,
-  onToggleSelect,
-  onMarkAsRead,
-  onDelete,
-}: NotificationRowProps) {
-  return (
-    <div className={`ntf-page__row ${!n.is_read ? 'ntf-page__row--unread' : ''}`}>
-
-      <label className="ntf-page__row-checkbox">
-        <input type="checkbox" checked={selected} onChange={onToggleSelect} />
-      </label>
-
-      <span
-        className="ntf-page__row-icon ic ic-sm"
-        style={{ color: NOTIFICATION_TYPE_COLOR[n.type] }}
-      >
-        <i className={`ti ${NOTIFICATION_TYPE_ICON[n.type]}`} />
-      </span>
-
-      <div className="ntf-page__row-body">
-        <div className="ntf-page__row-title-line">
-          <p className="ntf-page__row-title">{n.title}</p>
-          <Badge variant={NOTIFICATION_TYPE_BADGE_VARIANT[n.type]} noDot>
-            {n.type === 'success' ? 'نجاح' : n.type === 'error' ? 'خطأ' : n.type === 'warning' ? 'تحذير' : 'معلومة'}
-          </Badge>
-        </div>
-
-        {n.message && <p className="ntf-page__row-msg">{n.message}</p>}
-
-        <div className="ntf-page__row-meta">
-          <time className="ntf-page__row-time">{n.created_at_human}</time>
-          {n.action_url && (
-            <a href={n.action_url} className="ntf-page__row-link">
-              عرض التفاصيل
-              <i className="ti ti-arrow-left" />
-            </a>
-          )}
-        </div>
-      </div>
-
-      <div className="ntf-page__row-actions">
-        {!n.is_read && (
-          <button
-            className="ntf-page__row-action-btn"
-            onClick={onMarkAsRead}
-            title="تحديد كمقروء"
-          >
-            <i className="ti ti-check" />
-          </button>
-        )}
-        <button
-          className="ntf-page__row-action-btn ntf-page__row-action-btn--danger"
-          onClick={onDelete}
-          title="حذف"
-        >
-          <i className="ti ti-trash" />
-        </button>
-      </div>
-
-      {!n.is_read && <span className="ntf-page__row-dot" />}
     </div>
   );
 }

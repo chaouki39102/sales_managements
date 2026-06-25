@@ -78,6 +78,7 @@ const NAV_GROUPS = [
     items: [
       { name: 'الموظفون',        href: 'employees',               icon: 'ti-id-badge'     },
       { name: 'المستخدمون',      href: 'users',                   icon: 'ti-user'         },
+      { name: 'التنبيهات',       href: 'notifications',           icon: 'ti-bell'         },
       { name: 'الإعدادات',       href: 'settings',                icon: 'ti-settings'     },
       { name: 'أنواع المستندات', href: 'settings/document-types', icon: 'ti-file'         },
       { name: 'سلاسل الترقيم',   href: 'numbering-series',        icon: 'ti-list-numbers' },
@@ -129,6 +130,7 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   'employees':               { title: 'الموظفون',            path: 'موارد بشرية ← موظفون'   },
   'reports':                 { title: 'التقارير',            path: 'تقارير'                  },
   'balance':                 { title: 'الميزانية التقديرية', path: 'تقارير ← ميزانية'       },
+  'notifications':           { title: 'التنبيهات',           path: 'نظام ← تنبيهات'          },
   'users':                   { title: 'المستخدمون',          path: 'نظام ← مستخدمون'        },
   'settings':                { title: 'الإعدادات',           path: 'نظام ← إعدادات'         },
   'settings/document-types': { title: 'أنواع المستندات',    path: 'نظام ← أنواع المستندات' },

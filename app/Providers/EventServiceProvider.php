@@ -2,12 +2,14 @@
 
 namespace App\Providers;
 
+use App\Listeners\NotificationEventSubscriber;
 use App\Models\CommercialDocument;
 use App\Models\CommercialDocumentLine;
 use App\Models\StockMovement;
 use App\Observers\CommercialDocumentLineObserver;
 use App\Observers\CommercialDocumentObserver;
 use App\Observers\StockMovementObserver;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -25,9 +27,10 @@ class EventServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // parent::boot();
         StockMovement::observe(StockMovementObserver::class);
         CommercialDocumentLine::observe(CommercialDocumentLineObserver::class);
         CommercialDocument::observe(CommercialDocumentObserver::class);
+
+        Event::subscribe(NotificationEventSubscriber::class);
     }
 }

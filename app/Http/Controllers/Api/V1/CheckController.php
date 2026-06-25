@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Core\Http\Controllers\BaseApiController;
 use App\Http\Resources\CheckResource;
 use App\Services\CheckService;
+use App\Services\NotificationService;
 use App\Models\Check;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,8 +15,10 @@ class CheckController extends BaseApiController
     protected string $resourceName = 'check';
     protected ?string $resourceClass = CheckResource::class;
 
-    public function __construct(private CheckService $checkService)
-    {
+    public function __construct(
+        private CheckService $checkService,
+        private NotificationService $notificationService,
+    ) {
         parent::__construct();
     }
 
@@ -50,6 +53,10 @@ class CheckController extends BaseApiController
         try {
             $check = $this->checkService->findById($id);
             $check = $this->checkService->markAsCleared($check);
+            $this->notificationService->success(
+                'تم صرف الشيك',
+                'شيك رقم ' . ($check->check_number ?? ''),
+            );
             return $this->successResponse(
                 new CheckResource($check),
                 'تم تصفيه الشيك بنجاح'
@@ -65,6 +72,10 @@ class CheckController extends BaseApiController
             $reason = $request->get('reason', 'Reason not provided');
             $check = $this->checkService->findById($id);
             $check = $this->checkService->markAsBounced($check, $reason);
+            $this->notificationService->error(
+                'تم رفض الشيك',
+                'شيك رقم ' . ($check->check_number ?? ''),
+            );
             return $this->successResponse(
                 new CheckResource($check),
                 'تم رفض الشيك بنجاح'

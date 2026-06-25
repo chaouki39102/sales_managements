@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Core\Http\Controllers\BaseApiController;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,8 +16,10 @@ class UserController extends BaseApiController
     protected string  $resourceName = 'user';
     protected ?string $resourceClass = UserResource::class;
 
-    public function __construct(private UserService $userService)
-    {
+    public function __construct(
+        private UserService $userService,
+        private NotificationService $notificationService,
+    ) {
         parent::__construct();
     }
 
@@ -161,6 +164,7 @@ class UserController extends BaseApiController
             $this->authorizeAction('update', $user);
             $user = $this->userService->toggleActive($user);
             $msg  = $user->active ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم';
+            $this->notificationService->info($msg, $user->name ?? '');
             return $this->successResponse(new UserResource($user), $msg);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'toggleActive');
@@ -183,6 +187,10 @@ class UserController extends BaseApiController
         app(\App\Services\CompanyRoleService::class)
             ->assignRole($user, $data['role'], $companyId);
 
+        $this->notificationService->info(
+            'تم تعيين دور للمستخدم',
+            "{$user->name} ← {$data['role']}",
+        );
         return $this->successResponse(
             new UserResource($user->load('roles')),
             'تم تعيين الدور'

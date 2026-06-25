@@ -8,6 +8,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
+use App\Services\NotificationService;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,8 +18,10 @@ class AuthController extends BaseApiController
     protected string $resourceName = 'user';
     protected ?string $resourceClass = null;
 
-    public function __construct(protected AuthService $authService)
-    {
+    public function __construct(
+        protected AuthService $authService,
+        private NotificationService $notificationService,
+    ) {
         parent::__construct();
     }
 
@@ -43,6 +46,8 @@ class AuthController extends BaseApiController
         try {
             $user = $this->authService->login($request->email, $request->password);
             $user->load('roles');   // ✅ الأساس — بدونه الواجهة لا تعرف الدور
+
+            $this->notificationService->success('تسجيل دخول', "مرحباً {$user->name}");
 
             return $this->successResponse([
                 'user'       => new UserResource($user),
