@@ -98,21 +98,18 @@ export const roleKeys = {
  * ✅ جلب كل الأدوار مع صلاحياتها
  * يحل مشكلة التكرار لأن الباكاند يُضيف ->distinct()
  */
-// في roles.ts — useRoles hook
 export function useRoles() {
     const slug = useActiveSlug() ?? "";
 
     return useQuery({
         queryKey: roleKeys.list(slug),
-        queryFn: rolesApi.list,
+        queryFn: () => rolesApi.list().then(r => r?.data ?? r ?? []),
         enabled: !!slug,
         staleTime: 5 * 60_000,
         select: (data) => {
-            // ✅ إزالة التكرار: نبقي فقط دور واحد لكل اسم
-            // الباكاند يجب أن يُرجع فقط أدوار الشركة الحالية
-            // هذا خط دفاع ثانٍ فقط
-            const seen = new Map<string, typeof data[0]>();
-            for (const role of data) {
+            const items = Array.isArray(data) ? data : [];
+            const seen = new Map<string, typeof items[0]>();
+            for (const role of items) {
                 if (!seen.has(role.name)) {
                     seen.set(role.name, role);
                 }

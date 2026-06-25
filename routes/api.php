@@ -307,12 +307,8 @@ Route::prefix('v1')->group(function () {
             Route::get('permissions',              [PermissionController::class, 'index']);
             Route::get('permissions/{permission}', [PermissionController::class, 'show']);
 
-            // ✅ notifications: المسارات المحددة قبل المورد
-            Route::get('notifications/unread',                       [NotificationController::class, 'unread']);
-            Route::get('notifications',                              [NotificationController::class, 'index']);
-            Route::get('notifications/{notification}',               [NotificationController::class, 'show']);
-            Route::post('notifications/{notification}/mark-read',    [NotificationController::class, 'markAsRead']);
-            Route::post('notifications/mark-all-read',               [NotificationController::class, 'markAllAsRead']);
+            // ✅ notifications (routes/notifications.php)
+            require __DIR__ . '/notifications.php';
 
             Route::get('audits',               [AuditController::class, 'index']);
             Route::get('audits/{audit}',       [AuditController::class, 'show']);

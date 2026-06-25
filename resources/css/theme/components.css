@@ -99,6 +99,14 @@ body:not(.dark) .kpi.ko{background:linear-gradient(150deg,#fff 60%,#fff7ed);}
 .g65{display:grid;grid-template-columns:1.8fr 1fr;gap:16px;}
 .g35{display:grid;grid-template-columns:1fr 1.8fr;gap:16px;}
 .g73{display:grid;grid-template-columns:2.2fr 1fr;gap:16px;}
+@media(max-width:768px){
+  .g2,.g3,.g4,.g65,.g35,.g73{
+    grid-template-columns:1fr !important;
+    width:100% !important;
+    max-width:100% !important;
+    overflow:hidden;
+  }
+}
 
 /* ═══ TABLE ═══ */
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}

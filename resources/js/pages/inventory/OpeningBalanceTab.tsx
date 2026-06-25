@@ -43,21 +43,20 @@ export default function OpeningBalanceTab() {
 
   const { data: productsData } = useQuery({
     queryKey:  tenantKeys.products.list(slug ?? ''),
-    queryFn:   () => apiGet<ProductOption[]>('/products', {
+    queryFn:   () => apiGet<any>('/products', {
       per_page: 500, manages_stock: 1,
-    }),
+    }).then(r => r?.data ?? []),
     enabled:   !!slug,
     staleTime: 10 * 60_000,
   });
 
   const { data: warehousesData } = useQuery({
     queryKey:  tenantKeys.lookups.warehouses(slug ?? ''),
-    queryFn:   () => apiGet<WarehouseOption[]>('/warehouses', { per_page: 200 }),
+    queryFn:   () => apiGet<any>('/warehouses', { per_page: 200 }).then(r => r?.data ?? []),
     enabled:   !!slug,
     staleTime: 10 * 60_000,
   });
 
-  // extractData يرجع المصفوفة مباشرة
   const products:   ProductOption[]   = productsData   ?? [];
   const warehouses: WarehouseOption[] = warehousesData ?? [];
 

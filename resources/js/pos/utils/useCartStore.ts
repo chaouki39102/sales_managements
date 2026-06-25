@@ -9,6 +9,7 @@ interface CartState {
   client:             Party | null;
   notes:              string;
   invoiceDiscountPct: number;
+  _isDirty:           boolean;
 
   addItem:              (variant: ProductVariant, qty?: number) => void;
   removeItem:           (id: string) => void;
@@ -21,6 +22,7 @@ interface CartState {
   clearCart:            () => void;
   setInvoiceDiscountPct:(pct: number) => void;
   totals:               () => CartTotals;
+  markClean:            () => void;
 }
 
 function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: number): number {
@@ -74,6 +76,7 @@ export const useCartStore = create<CartState>()(
       client:             null,
       notes:              '',
       invoiceDiscountPct: 0,
+      _isDirty:           false,
 
       addItem: (variant, qty = 1) => {
         set(state => {
@@ -90,6 +93,7 @@ export const useCartStore = create<CartState>()(
               items: state.items.map(i =>
                 i.variant_id === variant.id ? updated : i,
               ),
+              _isDirty: true,
             };
           }
 
@@ -122,12 +126,12 @@ export const useCartStore = create<CartState>()(
               : null,
           });
 
-          return { items: [...state.items, newItem] };
+          return { items: [...state.items, newItem], _isDirty: true };
         });
       },
 
       removeItem: (id) =>
-        set(state => ({ items: state.items.filter(i => i.id !== id) })),
+        set(state => ({ items: state.items.filter(i => i.id !== id), _isDirty: true })),
 
       updateQty: (id, qty) =>
         set(state => {
@@ -135,7 +139,7 @@ export const useCartStore = create<CartState>()(
           if (!item) return state;
           const safeQty = Math.max(0.001, qty);
           const updated = recalcItem({ ...item, quantity: safeQty });
-          return { items: state.items.map(i => i.id === id ? updated : i) };
+          return { items: state.items.map(i => i.id === id ? updated : i), _isDirty: true };
         }),
 
       updateDiscount: (id, pct) =>
@@ -149,6 +153,7 @@ export const useCartStore = create<CartState>()(
                 })
               : i,
           ),
+          _isDirty: true,
         })),
 
       updateDiscountAmount: (id, amount) =>
@@ -162,6 +167,7 @@ export const useCartStore = create<CartState>()(
                 })
               : i,
           ),
+          _isDirty: true,
         })),
 
       updatePrice: (id, price) =>
@@ -171,13 +177,16 @@ export const useCartStore = create<CartState>()(
               ? recalcItem({ ...i, unit_price_ht: Math.max(0, price) })
               : i,
           ),
+          _isDirty: true,
         })),
 
-      setClient: (client) => set({ client }),
-      setNotes:  (notes)  => set({ notes }),
-      clearCart: ()       => set({ items: [], client: null, notes: '', invoiceDiscountPct: 0 }),
+      setClient: (client) => set({ client, _isDirty: true }),
+      setNotes:  (notes)  => set({ notes, _isDirty: true }),
+      clearCart: ()       => set({ items: [], client: null, notes: '', invoiceDiscountPct: 0, _isDirty: false }),
       setInvoiceDiscountPct: (pct) =>
-        set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)) }),
+        set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)), _isDirty: true }),
+
+      markClean: () => set({ _isDirty: false }),
 
       totals: () => calcTotals(get().items, get().invoiceDiscountPct),
     }),

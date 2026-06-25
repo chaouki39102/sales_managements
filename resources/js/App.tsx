@@ -17,6 +17,7 @@ import { appActions }                from '@/lib/store/appStore';
 import { AuthProvider }              from '@/context/AuthContext';
 import { FiscalYearProvider }        from '@/context/FiscalYearContext';
 import { AppRoutes }                 from '@/routes/index';
+import NotificationContainer        from '@/components/notifications/NotificationContainer';
 
 // CSS
 import '../css/theme/tokens.css';
@@ -37,6 +38,7 @@ export default function App() {
         <AuthProvider>
           <FiscalYearProvider>
             <AppRoutes />
+            <NotificationContainer />
           </FiscalYearProvider>
         </AuthProvider>
       </BrowserRouter>

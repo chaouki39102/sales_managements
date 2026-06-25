@@ -1414,7 +1414,7 @@ function CompanyTab({
 
     const { data: wilayas = [] } = useQuery({
         queryKey: globalKeys.wilayas,
-        queryFn: () => apiGet<any[]>("/wilayas", { per_page: 60 }),
+        queryFn: () => apiGet<any>("/wilayas", { per_page: 60 }).then(r => r?.data ?? []),
         staleTime: 60 * 60_000,
     });
     const { data: communes = [] } = useQuery({
@@ -1425,7 +1425,7 @@ function CompanyTab({
     });
     const { data: legalForms = [] } = useQuery({
         queryKey: tenantKeys.lookups.legalForms(slug),
-        queryFn: () => apiGet<any[]>("/legal-forms", { per_page: 50 }),
+        queryFn: () => apiGet<any>("/legal-forms", { per_page: 50 }).then(r => r?.data ?? []),
         enabled: !!slug,
         staleTime: 60 * 60_000,
     });
@@ -2817,7 +2817,7 @@ function FiscalTab({
 
     const { data: currencies = [] } = useQuery({
         queryKey: tenantKeys.lookups.currencies(slug),
-        queryFn: () => apiGet<any[]>("/currencies", { per_page: 50 }),
+        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(r => r?.data ?? []),
         enabled: !!slug,
         staleTime: 60 * 60_000,
     });
@@ -3270,7 +3270,7 @@ function InventoryTab({
 
     const { data: warehouses = [] } = useQuery({
         queryKey: tenantKeys.lookups.warehouses(slug),
-        queryFn: () => apiGet<any[]>("/warehouses", { per_page: 50 }),
+        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(r => r?.data ?? []),
         enabled: !!slug,
         staleTime: 10 * 60_000,
     });
@@ -3642,31 +3642,31 @@ function DocumentsTab({
 
     const { data: warehouses = [] } = useQuery({
         queryKey: tenantKeys.lookups.warehouses(slug),
-        queryFn: () => apiGet<any[]>("/warehouses", { per_page: 50 }),
+        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(r => r?.data ?? []),
         enabled: !!slug,
         staleTime: 10 * 60_000,
     });
     const { data: currencies = [] } = useQuery({
         queryKey: [slug, "currencies"],
-        queryFn: () => apiGet<any[]>("/currencies", { per_page: 50 }),
+        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(r => r?.data ?? []),
         enabled: !!slug,
         staleTime: 10 * 60_000,
     });
     const { data: priceLevels = [] } = useQuery({
         queryKey: [slug, "price-levels"],
-        queryFn: () => apiGet<any[]>("/price-levels", { per_page: 50 }),
+        queryFn: () => apiGet<any>("/price-levels", { per_page: 50 }).then(r => r?.data ?? []),
         enabled: !!slug,
         staleTime: 10 * 60_000,
     });
     const { data: paymentModes = [] } = useQuery({
         queryKey: [slug, "payment-modes"],
-        queryFn: () => apiGet<any[]>("/payment-modes", { per_page: 50 }),
+        queryFn: () => apiGet<any>("/payment-modes", { per_page: 50 }).then(r => r?.data ?? []),
         enabled: !!slug,
         staleTime: 10 * 60_000,
     });
     const { data: treasuryAccounts = [] } = useQuery({
         queryKey: [slug, "treasury-accounts"],
-        queryFn: () => apiGet<any[]>("/treasury-accounts", { per_page: 50 }),
+        queryFn: () => apiGet<any>("/treasury-accounts", { per_page: 50 }).then(r => r?.data ?? []),
         enabled: !!slug,
         staleTime: 10 * 60_000,
     });

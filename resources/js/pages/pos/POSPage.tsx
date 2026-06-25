@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
+import { useCartStore }       from '@/pos/utils/useCartStore';
 import { useClients }         from '@/lib/api/endpoints/parties';
 import {
   usePaymentModes, useWarehouses, usePriceLevels,
@@ -24,7 +25,7 @@ import { settingsApi }        from '@/lib/api/endpoints/settings';
 import { apiGet }             from '@/lib/api/core/client';
 import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
 import { documentsApi }       from '@/lib/api/endpoints/documents';
-import { useActiveSlug }      from '@/lib/store/appStore';
+import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import {
   calcFiscalStamp, formatDZD, htToTtc, ttcToHt, calcMargin,
 } from '@/pos/utils/calculations';
@@ -34,9 +35,11 @@ import {
 import { isVariantOutOfStock } from '@/pos/utils/posHelpers';
 import type { ActiveModal, QuickItem, ViewMode, GridSize, SortMode } from '@/pos/utils/posHelpers';
 import type { PaginatedResponse } from '@/lib/api/core/types';
+import { nanoid }   from 'nanoid';
 import type {
   Product, ProductVariant, CartItem, CartTotals,
   PriceLevel, Party, PaymentMode, DocumentType,
+  CommercialDocument,
 } from '@/types';
 
 import POSTopBar                from '@/pos/components/POSTopBar';
@@ -61,6 +64,8 @@ import {
   useIncrementSession,
   buildIncrementInput,
 } from '@/lib/api/endpoints/posSession';
+import ReturnsModal             from '@/pos/components/ReturnsModal';
+import SessionInvoicesModal     from '@/pos/components/SessionInvoicesModal';
 import KeyboardHelpModal        from '@/pos/components/KeyboardHelpModal';
 import POSSettingsModal          from '@/pos/components/POSSettingsModal';
 import ManagerPinModal           from '@/pos/components/ManagerPinModal';
@@ -75,6 +80,7 @@ export default function POSPage() {
   const pos         = usePOS();
   const slug        = useActiveSlug();
   const fiscalYear  = useSelectedFiscalYear();
+  const company     = useActiveCompany();
   const navigate    = useNavigate();
 
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
@@ -82,6 +88,7 @@ export default function POSPage() {
   const closeSessionMut  = useCloseSession(currentSession?.id ?? null);
   const incrementMut     = useIncrementSession(currentSession?.id ?? null);
   const [showCloseSession, setShowCloseSession] = useState(false);
+  const [showSessionInvoices, setShowSessionInvoices] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
   const handleOpenSession = async (data: {
@@ -364,6 +371,51 @@ export default function POSPage() {
     if (settings.confirmOnClear && !isEmpty && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
     pos.clearCart();
   }, [settings.confirmOnClear, isEmpty, pos]);
+
+  const handleOpenInvoice = useCallback(async (docId: number) => {
+    const cartState = useCartStore.getState();
+    if (!isEmpty && cartState._isDirty) pos.holdCart();
+    try {
+      const doc = await apiGet<CommercialDocument>(`/documents/${docId}`, {
+        include: 'party,lines,lines.product_variant',
+      });
+      if (!doc?.lines?.length) {
+        toast.error('لا توجد أصناف في هذه الفاتورة');
+        return;
+      }
+      const items: CartItem[] = doc.lines.map(line => {
+        const v = (line as any).product_variant;
+        return {
+          id:                  nanoid(8),
+          product_id:          v?.product_id ?? 0,
+          variant_id:          line.product_variant_id ?? 0,
+          product_name:        (line as any).description ?? v?.product?.name ?? '',
+          variant_name:        v?.variant_name ?? null,
+          ref:                 v?.ref ?? '',
+          barcode:             v?.barcode ?? null,
+          unit_symbol:         v?.unit?.abbreviation ?? 'قطعة',
+          image_url:           null,
+          quantity:            Number(line.quantity),
+          unit_price_ht:       Number(line.unit_price_ht),
+          selling_price_ttc:   Number(line.unit_price_ht) * (1 + Number(line.tva_rate) / 100),
+          tva_rate:            Number(line.tva_rate),
+          tva_id:              v?.tva_id ?? null,
+          discount_percentage: Number(line.discount_percentage),
+          discount_amount:     Number(line.discount_amount),
+          total_ht:            Number(line.total_ht),
+          total_ttc:           Number(line.total_ttc),
+          max_stock:           null,
+          manages_stock:       false,
+        };
+      });
+      useCartStore.setState({ items, client: (doc as any).party ?? null });
+      useCartStore.getState().markClean();
+      setShowSessionInvoices(false);
+      toast.success(`تم فتح الفاتورة ${(doc as any).document_number}`);
+    } catch {
+      toast.error('فشل تحميل الفاتورة');
+    }
+  }, [isEmpty, pos]);
 
   // ── Invoice discount ───────────────────────────────────────────────────────
   const invoiceDiscountPct    = pos.invoiceDiscountPct;
@@ -684,15 +736,19 @@ export default function POSPage() {
       )}
 
       <POSTopBar
-        sessionInvoices={currentSession?.invoices_count ?? 0}
-        sessionSales={currentSession?.net_sales ?? 0}
+        session={currentSession}
         heldCount={pos.heldCarts.length}
         avgMargin={avgMargin}
         isEmpty={isEmpty}
         isFullscreen={fullscreen}
+        showQuickbar={showQuickbar}
+        items={pos.items}
+        totals={pos.totals}
+        totalTtcFinal={adjustedTotalTtcFinal}
         onHeld={() => setModal('held')}
-        onNewSale={() => { if (isEmpty) { pos.clearCart(); } else { pos.holdCart(); } }}
+        onNewSale={() => isEmpty ? pos.clearCart() : pos.holdCart()}
         onManual={() => setModal('manual')}
+        onReturn={() => setModal('returns')}
         onReceipt={() => {
           if (!isEmpty) {
             setReceiptSnapshot({ items: [...pos.items], totals: { ...pos.totals } });
@@ -700,15 +756,12 @@ export default function POSPage() {
           }
         }}
         onSession={() => setModal(m => m === 'session' ? 'none' : 'session')}
+        onSessionInvoices={() => setShowSessionInvoices(true)}
         onFullscreen={toggleFullscreen}
         onKbHelp={() => setModal('kbhelp')}
-        onKioskMode={() => navigate('/pos/kiosk')}
         onSettings={() => setShowSettings(true)}
-        showQuickbar={showQuickbar}
         onToggleQuickbar={() => setShowQuickbar(s => !s)}
-        items={pos.items}
-        totals={pos.totals}
-        totalTtcFinal={adjustedTotalTtcFinal}
+        onKioskMode={() => navigate('/pos/kiosk')}
       />
 
       <div className="pos-order-type">
@@ -840,11 +893,29 @@ export default function POSPage() {
         />
       )}
 
+      {showSessionInvoices && currentSession && (
+        <SessionInvoicesModal
+          session={currentSession}
+          onClose={() => setShowSessionInvoices(false)}
+          onOpen={handleOpenInvoice}
+        />
+      )}
+
       {modal === 'session' && currentSession && (
         <SessionStatsModal
           session={currentSession}
           onClose={() => setModal('none')}
           onEndSession={() => { setModal('none'); setShowCloseSession(true); }}
+        />
+      )}
+
+      {modal === 'returns' && (
+        <ReturnsModal
+          documentTypes={documentTypes ?? []}
+          defaultWarehouseId={defaultWarehouse?.id}
+          fiscalYearId={fiscalYear?.id}
+          onClose={() => setModal('none')}
+          onDone={() => setModal('none')}
         />
       )}
 

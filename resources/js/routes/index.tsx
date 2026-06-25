@@ -43,6 +43,9 @@ const ChecksPage   = lazy(() => import('@/pages/checks/ChecksPage'));
 const FiscalYearsPage = lazy(() => import('@/pages/fiscal/FiscalYearsPage'));
 const ReportsPage     = lazy(() => import('@/pages/reports/ReportsPage'));
 
+// ── Notifications ───────────────────────────────────────────
+const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
+
 // ── Users / Roles / Employees ─────────────────────────────────────────────
 const UsersPage     = lazy(() => import('@/pages/users/UsersPage'));
 const RolesPage     = lazy(() => import('@/pages/users/RolesPage'));
@@ -222,6 +225,9 @@ export function AppRoutes() {
           {/* Users */}
           <Route path="users" element={<UsersPage />} />
           <Route path="roles" element={<RolesPage />} />
+
+          {/* Notifications */}
+          <Route path="notifications" element={<NotificationsPage />} />
 
           {/* Settings */}
           <Route path="settings"                element={<SettingsPage />} />

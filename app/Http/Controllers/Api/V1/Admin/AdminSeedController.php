@@ -163,8 +163,12 @@ class AdminSeedController extends Controller
                 }
 
                 // أدوار الشركة
-                $this->roleService->seedRoles($company->id);
-                $applied[] = 'roles';
+                if (!DB::table('roles')->where('company_id', $company->id)->exists()) {
+                    $this->roleService->seedRoles($company->id);
+                    $applied[] = 'roles';
+                } else {
+                    $skipped[] = 'roles';
+                }
 
                 // تعيين admin للمالك
                 $this->assignOwnerRole($company);

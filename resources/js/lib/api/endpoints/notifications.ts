@@ -1,13 +1,7 @@
-// ─────────────────────────────────────────────────────────────
-//  notifications.ts  (lib/api/endpoints)
-//  طبقة API للتنبيهات المخزنة في قاعدة البيانات
-// ─────────────────────────────────────────────────────────────
-import client from '@/lib/api/core/client';
+import { apiGet, apiPost, apiDelete } from '@/lib/api/core/client';
 
-// ── Types ──────────────────────────────────────────────────
 export type RemoteNotificationType = 'success' | 'error' | 'warning' | 'info';
 
-/** البيانات المُستقبَلة من الـ API (تعكس حقل data في النموذج) */
 export interface RemoteNotification {
   id: string;
   type: RemoteNotificationType;
@@ -15,7 +9,7 @@ export interface RemoteNotification {
   message?: string;
   action_url?: string;
   icon?: string;
-  is_read: boolean;        // = read_at !== null
+  is_read: boolean;
   created_at: string;
   created_at_human: string;
 }
@@ -25,16 +19,43 @@ export interface NotificationsResponse {
   unread_count: number;
 }
 
-// ── Endpoints ─────────────────────────────────────────────
+export interface NotificationsMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+  is_first_page: boolean;
+  is_last_page: boolean;
+}
 
-/** جلب التنبيهات غير المقروءة */
+export interface PaginatedNotificationsResponse {
+  data: RemoteNotification[];
+  meta: NotificationsMeta;
+}
+
+export interface NotificationsFilters {
+  type?: RemoteNotificationType;
+  is_read?: boolean;
+  page?: number;
+  per_page?: number;
+}
+
 export const getUnreadNotifications = () =>
-  client.get<NotificationsResponse>('/notifications/unread');
+  apiGet<NotificationsResponse>('/notifications/unread');
 
-/** تعليم تنبيه واحد كمقروء */
 export const markNotificationAsRead = (id: string) =>
-  client.post<{ message: string }>(`/notifications/${id}/read`);
+  apiPost<{ message: string }>(`/notifications/${id}/read`);
 
-/** تعليم جميع التنبيهات كمقروءة */
 export const markAllNotificationsAsRead = () =>
-  client.post<{ message: string }>('/notifications/read-all');
+  apiPost<{ message: string }>('/notifications/read-all');
+
+export const getNotifications = (filters: NotificationsFilters = {}) =>
+  apiGet<PaginatedNotificationsResponse>('/notifications', filters);
+
+export const deleteNotification = (id: string) =>
+  apiDelete(`/notifications/${id}`);
+
+export const deleteMultipleNotifications = (ids: string[]) =>
+  apiPost<{ deleted_count: number }>('/notifications/delete-multiple', { ids });

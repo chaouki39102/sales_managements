@@ -123,7 +123,7 @@ class CompanyRoleService
 
     private function assignPermissionsToRoles(int $companyId): void
     {
-        $globalPerms = Permission::whereNull('company_id')->get()->keyBy('name');
+        $globalPerms = Permission::whereNull('company_id')->get();
 
         foreach ($this->getRolePermissionsMap() as $roleName => $permNames) {
 
@@ -137,7 +137,7 @@ class CompanyRoleService
                 continue;
             }
 
-            $perms = $globalPerms->only($permNames)->values();
+            $perms = $globalPerms->whereIn('name', $permNames);
             $role->syncPermissions($perms);
         }
     }

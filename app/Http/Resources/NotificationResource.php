@@ -9,17 +9,25 @@ class NotificationResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $notificationData = $this->data ?? [];
+
+        $iconMap = [
+            'success' => 'CircleCheck',
+            'error'   => 'CircleX',
+            'warning' => 'AlertTriangle',
+            'info'    => 'InfoCircle',
+        ];
+
         return [
-            'id'              => $this->id,
-            'type'            => $this->type,
-            'company_id'      => $this->company_id,
-            'notifiable_type' => $this->notifiable_type,
-            'notifiable_id'   => $this->notifiable_id,
-            'data'            => $this->data,
-            'read_at'         => $this->read_at?->toDateTimeString(),
-            'is_read'         => ! is_null($this->read_at),
-            'created_at'      => $this->created_at?->toDateTimeString(),
-            'updated_at'      => $this->updated_at?->toDateTimeString(),
+            'id'               => $this->id,
+            'type'             => $notificationData['type'] ?? 'info',
+            'title'            => $notificationData['title'] ?? '',
+            'message'          => $notificationData['message'] ?? null,
+            'action_url'       => $notificationData['action_url'] ?? null,
+            'icon'             => $iconMap[$notificationData['type'] ?? 'info'] ?? 'InfoCircle',
+            'is_read'          => ! is_null($this->read_at),
+            'created_at'       => $this->created_at?->toDateTimeString(),
+            'created_at_human' => $this->created_at?->diffForHumans(),
         ];
     }
 }

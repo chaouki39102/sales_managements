@@ -4,32 +4,30 @@ import { useCartStore }  from '../utils/useCartStore';
 import { calcTotals }    from '../utils/calculations';
 
 export function usePOS() {
-  const heldCarts         = usePOSStore(s => s.heldCarts);
-  const activeTab         = usePOSStore(s => s.activeTab);
-  const searchQuery       = usePOSStore(s => s.searchQuery);
-  const selectedCategory  = usePOSStore(s => s.selectedCategory);
-  const paymentModalOpen  = usePOSStore(s => s.paymentModalOpen);
+  const heldCarts        = usePOSStore(s => s.heldCarts);
+  const searchQuery      = usePOSStore(s => s.searchQuery);
+  const selectedCategory = usePOSStore(s => s.selectedCategory);
+  const paymentModalOpen = usePOSStore(s => s.paymentModalOpen);
 
-  const holdCart          = usePOSStore(s => s.holdCart);
-  const restoreCart       = usePOSStore(s => s.restoreCart);
-  const deleteHeldCart    = usePOSStore(s => s.deleteHeldCart);
-  const setTab            = usePOSStore(s => s.setTab);
-  const setSearch         = usePOSStore(s => s.setSearch);
-  const setCategory       = usePOSStore(s => s.setCategory);
-  const openPayment       = usePOSStore(s => s.openPayment);
-  const closePayment      = usePOSStore(s => s.closePayment);
+  const setSearch              = usePOSStore(s => s.setSearch);
+  const setCategory            = usePOSStore(s => s.setCategory);
+  const openPayment            = usePOSStore(s => s.openPayment);
+  const closePayment           = usePOSStore(s => s.closePayment);
+  const restoreCart            = usePOSStore(s => s.restoreCart);
+  const deleteHeldCart         = usePOSStore(s => s.deleteHeldCart);
 
-  const items             = useCartStore(s => s.items);
-  const client            = useCartStore(s => s.client);
-  const invoiceDiscountPct= useCartStore(s => s.invoiceDiscountPct);
-  const addItem           = useCartStore(s => s.addItem);
-  const removeItem        = useCartStore(s => s.removeItem);
-  const updateQty         = useCartStore(s => s.updateQty);
-  const updateDiscount    = useCartStore(s => s.updateDiscount);
+  const items              = useCartStore(s => s.items);
+  const client             = useCartStore(s => s.client);
+  const invoiceDiscountPct = useCartStore(s => s.invoiceDiscountPct);
+
+  const addItem              = useCartStore(s => s.addItem);
+  const removeItem           = useCartStore(s => s.removeItem);
+  const updateQty            = useCartStore(s => s.updateQty);
+  const updateDiscount       = useCartStore(s => s.updateDiscount);
   const updateDiscountAmount = useCartStore(s => s.updateDiscountAmount);
-  const updatePrice       = useCartStore(s => s.updatePrice);
-  const clearCart         = useCartStore(s => s.clearCart);
-  const setClient         = useCartStore(s => s.setClient);
+  const updatePrice          = useCartStore(s => s.updatePrice);
+  const clearCart            = useCartStore(s => s.clearCart);
+  const setClient            = useCartStore(s => s.setClient);
   const setInvoiceDiscountPct = useCartStore(s => s.setInvoiceDiscountPct);
 
   const totals = useMemo(
@@ -37,23 +35,21 @@ export function usePOS() {
     [items, invoiceDiscountPct],
   );
 
-  const doHoldCart = useCallback(() => {
-    holdCart({
-      items, totals, client, clearCart,
+  const holdCart = useCallback((label?: string) => {
+    usePOSStore.getState().holdCart({
+      items, totals, client, label, clearCart,
     });
-  }, [items, totals, client, clearCart, holdCart]);
+  }, [items, totals, client, clearCart]);
 
   return {
-    heldCarts, holdCart: doHoldCart, restoreCart, deleteHeldCart,
+    heldCarts, holdCart, restoreCart, deleteHeldCart,
 
-    activeTab, searchQuery, selectedCategory, paymentModalOpen,
-    setTab, setSearch, setCategory, openPayment, closePayment,
+    searchQuery, selectedCategory, paymentModalOpen,
+    setSearch, setCategory, openPayment, closePayment,
 
     items, client, invoiceDiscountPct,
     addItem, removeItem, updateQty,
-    updateDiscount,
-    updateDiscountAmount,
-    updatePrice,
+    updateDiscount, updateDiscountAmount, updatePrice,
     clearCart, setClient, setInvoiceDiscountPct,
     totals,
   };

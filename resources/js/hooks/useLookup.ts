@@ -55,13 +55,12 @@ export function useLookup<T extends { id: number; name: string }>(
 
     const { data, isLoading, error, refetch } = useQuery<T[]>({
         queryKey,
-        queryFn: () => apiGet<T[]>(endpoint, { per_page: 500 }),
+        queryFn: () => apiGet<any>(endpoint, { per_page: 500 }).then(r => r?.data ?? []),
         enabled: global ? true : !!slug,
         staleTime: global
             ? Infinity // wilayas/communes لا تتغير أبداً
             : 30 * 60_000, // lookups tenant: 30 دقيقة
         gcTime: 24 * 60 * 60_000, // يبقى في الذاكرة 24 ساعة
-        select: (data) => (Array.isArray(data) ? data : []),
     });
 
     const [saving, setSaving] = useState(false);

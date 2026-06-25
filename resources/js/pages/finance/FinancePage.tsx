@@ -91,7 +91,7 @@ const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'danger' | 'gray'> 
 function useTreasuryAccountTypes() {
     return useQuery({
         queryKey: ['treasury-account-types'],
-        queryFn:  () => apiGet<any[]>('/treasury-account-types'),
+        queryFn:  () => apiGet<any>('/treasury-account-types').then(r => r?.data ?? []),
         staleTime: Infinity,
     });
 }
@@ -99,7 +99,7 @@ function useTreasuryAccountTypes() {
 function useTreasuryAccounts(slug: string) {
     return useQuery({
         queryKey: [slug, 'treasury-accounts'],
-        queryFn:  () => apiGet<TreasuryAccount[]>('/treasury-accounts'),
+        queryFn:  () => apiGet<any>('/treasury-accounts').then(r => r?.data ?? []),
         enabled:  !!slug,
     });
 }
@@ -107,7 +107,7 @@ function useTreasuryAccounts(slug: string) {
 function usePaymentModes(slug: string) {
     return useQuery({
         queryKey: [slug, 'payment-modes'],
-        queryFn:  () => apiGet<PaymentMode[]>('/payment-modes'),
+        queryFn:  () => apiGet<any>('/payment-modes').then(r => r?.data ?? []),
         enabled:  !!slug,
     });
 }

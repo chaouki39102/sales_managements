@@ -76,12 +76,23 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; icon
 const getRoleMeta = (name: string) =>
   ROLE_META[name] ?? { label: name, color: "var(--em)", bg: "var(--emb)", icon: "ti-user" };
 
-// dedup helper — يُزيل التكرار حسب id
-function dedup<T extends { id: number }>(arr: T[]): T[] {
+// يزيل التكرار حسب id أولاً، ثم حسب الاسم ثانياً (لأن الباكاند يُرجع أدواراً متعددة بنفس الاسم ولكن بمعرفات مختلفة)
+function dedup<T extends { id: number; name?: string }>(arr: T[]): T[] {
   const seen = new Set<number>();
-  return arr.filter(item => {
+
+  // أولاً: dedup حسب id (التكرار الحقيقي)
+  let result = arr.filter(item => {
     if (seen.has(item.id)) return false;
     seen.add(item.id);
+    return true;
+  });
+
+  // ثانياً: dedup حسب الاسم للأدوار فقط — نبقي الأول فقط لكل اسم
+  const seenName = new Set<string>();
+  return result.filter(item => {
+    const key = item.name;
+    if (key && seenName.has(key)) return false;
+    if (key) seenName.add(key);
     return true;
   });
 }

@@ -1,35 +1,41 @@
-import { create }        from 'zustand';
-import { nanoid }        from 'nanoid';
-import { useCartStore }  from '../utils/useCartStore';
+// resources/js/pos/hooks/usePOSStore.ts
+import { create }       from 'zustand';
+import { nanoid }       from 'nanoid';
+import { useCartStore } from '../utils/useCartStore';
 import type { HeldCart, CartItem, CartTotals, Party } from '@/types';
 
 interface POSState {
-  heldCarts:        HeldCart[];
-  activeTab:        'products' | 'clients' | 'held';
-  searchQuery:      string;
-  selectedCategory: number | null;
-  paymentModalOpen: boolean;
+  heldCarts:          HeldCart[];
+  searchQuery:        string;
+  selectedCategory:   number | null;
+  paymentModalOpen:   boolean;
+  invoiceDiscountPct: number;
 
-  holdCart:         (params: { items: CartItem[]; totals: CartTotals; client: Party | null; label?: string; clearCart: () => void }) => void;
-  restoreCart:      (id: string) => void;
-  deleteHeldCart:   (id: string) => void;
-
-  setTab:           (tab: POSState['activeTab']) => void;
-  setSearch:        (q: string) => void;
-  setCategory:      (id: number | null) => void;
-  openPayment:      () => void;
-  closePayment:     () => void;
+  holdCart:   (params: {
+    items:     CartItem[];
+    totals:    CartTotals;
+    client:    Party | null;
+    label?:    string;
+    clearCart: () => void;
+  }) => void;
+  restoreCart:           (id: string) => void;
+  deleteHeldCart:        (id: string) => void;
+  setSearch:             (q: string) => void;
+  setCategory:           (id: number | null) => void;
+  openPayment:           () => void;
+  closePayment:          () => void;
+  setInvoiceDiscountPct: (pct: number) => void;
 }
 
 export const usePOSStore = create<POSState>((set, get) => ({
-  heldCarts:        [],
-  activeTab:        'products',
-  searchQuery:      '',
-  selectedCategory: null,
-  paymentModalOpen: false,
+  heldCarts:          [],
+  searchQuery:        '',
+  selectedCategory:   null,
+  paymentModalOpen:   false,
+  invoiceDiscountPct: 0,
 
   holdCart: ({ items, totals, client, label, clearCart }) => {
-    if (items.length === 0) return;
+    if (!items.length) return;
 
     const held: HeldCart = {
       id:         nanoid(6),
@@ -54,9 +60,11 @@ export const usePOSStore = create<POSState>((set, get) => ({
   deleteHeldCart: (id) =>
     set(s => ({ heldCarts: s.heldCarts.filter(c => c.id !== id) })),
 
-  setTab:       (tab) => set({ activeTab: tab }),
-  setSearch:    (q)   => set({ searchQuery: q }),
-  setCategory:  (id)  => set({ selectedCategory: id }),
-  openPayment:  ()    => set({ paymentModalOpen: true }),
-  closePayment: ()    => set({ paymentModalOpen: false }),
+  setSearch:   (q)   => set({ searchQuery: q }),
+  setCategory: (id)  => set({ selectedCategory: id }),
+  openPayment: ()    => set({ paymentModalOpen: true }),
+  closePayment: ()   => set({ paymentModalOpen: false }),
+
+  setInvoiceDiscountPct: (pct) =>
+    set({ invoiceDiscountPct: Math.max(0, Math.min(100, pct)) }),
 }));

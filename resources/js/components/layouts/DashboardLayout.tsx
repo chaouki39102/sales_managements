@@ -8,6 +8,7 @@ import { useTheme } from '@/hooks/useTheme';
 import client from '@/lib/api/core/client';
 import { useTopbarTitle } from '@/hooks/useTopbarTitle';
 import OfflineIndicator from '@/components/OfflineIndicator';
+import NotificationBell from '@/components/topbar/NotificationBell';
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
   {
@@ -698,10 +699,7 @@ const meta = useTopbarTitle();
               <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
               <input type="text" placeholder="بحث سريع..." />
             </div>
-            <div className="ib" title="الإشعارات">
-              <span className="ic ic-sm"><i className="ti ti-bell" /></span>
-              <div className="ib-n">5</div>
-            </div>
+            <NotificationBell />
             <button className="ib" onClick={toggleTheme} title={dark ? 'الوضع الفاتح' : 'الوضع الداكن'}>
               <span className="ic ic-sm"><i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`} /></span>
             </button>
