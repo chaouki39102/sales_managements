@@ -104,5 +104,7 @@ export const appActions = {
   getActiveSlug:    () => useAppStore.getState().activeCompany?.slug ?? null,
   setActiveCompany: (company: ActiveCompany | null) =>
     useAppStore.getState().setActiveCompany(company),
+  setSelectedYearId: (id: number | null) =>
+    useAppStore.getState().setSelectedYearId(id),
   reset:            () => useAppStore.getState().reset(),
 };

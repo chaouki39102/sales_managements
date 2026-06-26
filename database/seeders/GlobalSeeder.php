@@ -27,6 +27,9 @@ class GlobalSeeder extends Seeder
         // 3. الصلاحيات العالمية + دور super-admin
         $this->call(GlobalRolesAndPermissionsSeeder::class);
 
+        // 4. إعدادات النظام العامة
+        $this->call(SettingsSeeder::class);
+
         $this->command?->info('');
         $this->command?->info('══════════════════════════════════════════════');
         $this->command?->info('✅ النظام جاهز — سجّل دخولك وابدأ العمل');

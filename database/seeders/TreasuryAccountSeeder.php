@@ -20,11 +20,9 @@ class TreasuryAccountSeeder extends Seeder
                 'name'                     => 'الصندوق الرئيسي',
                 'code'                     => 'CASH01',
                 'treasury_account_type_id' => $cashTypeId,
-                'bank_name'                => null,           // ← مهم
-                'account_number'           => null,           // ← مهم
+                'bank_name'                => null,
+                'account_number'           => null,
                 'currency_id'              => $currencyId,
-                'initial_balance'          => 0.00,
-                'current_balance'          => 0.00,
                 'is_default'               => true,
                 'active'                   => true,
                 'created_at'               => now(),
@@ -36,10 +34,8 @@ class TreasuryAccountSeeder extends Seeder
                 'code'                     => 'BNA710',
                 'treasury_account_type_id' => $bankTypeId,
                 'bank_name'                => 'BNA',
-                'account_number'           => '00123456789',  // نص وليس عدد
+                'account_number'           => '00123456789',
                 'currency_id'              => $currencyId,
-                'initial_balance'          => 0.00,
-                'current_balance'          => 0.00,
                 'is_default'               => false,
                 'active'                   => true,
                 'created_at'               => now(),

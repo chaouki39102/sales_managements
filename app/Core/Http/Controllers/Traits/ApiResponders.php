@@ -120,6 +120,12 @@ trait ApiResponders
             return $data;
         }
 
+        // لا تحوّل القيم الأولية (مصفوفات، أرقام، نصوص)
+        // Resource يتوقع Model أو Collection — تحويل array يسبب 500
+        if (!is_object($data)) {
+            return $data;
+        }
+
         // Collection للـ Paginator
         if ($data instanceof LengthAwarePaginator) {
             return $this->resourceClass::collection($data);

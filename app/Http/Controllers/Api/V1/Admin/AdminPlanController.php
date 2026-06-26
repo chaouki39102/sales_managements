@@ -3,25 +3,15 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Plan;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AdminPlanController extends Controller
 {
-    // تعريف الخطط الثابتة
-    private const PLANS = [
-        'free'         => ['label' => 'مجاني',    'max_users' => 1,   'max_products' => 100,   'max_warehouses' => 1],
-        'starter'      => ['label' => 'مبتدئ',    'max_users' => 5,   'max_products' => 500,   'max_warehouses' => 1],
-        'professional' => ['label' => 'احترافي',  'max_users' => 15,  'max_products' => 5000,  'max_warehouses' => 5],
-        'enterprise'   => ['label' => 'مؤسسة',    'max_users' => 50,  'max_products' => 0,     'max_warehouses' => 20],
-        'custom'       => ['label' => 'مخصص',     'max_users' => 0,   'max_products' => 0,     'max_warehouses' => 0],
-    ];
-
-    // GET /admin/plans
     public function index(): JsonResponse
     {
-        // احسب عدد الشركات في كل خطة
         $counts = DB::table('companies')
             ->whereNull('deleted_at')
             ->select('plan', DB::raw('count(*) as total'))
@@ -29,49 +19,92 @@ class AdminPlanController extends Controller
             ->pluck('total', 'plan')
             ->toArray();
 
-        $plans = collect(self::PLANS)->map(function ($plan, $key) use ($counts) {
+        $plans = Plan::orderBy('sort_order')->get()->map(function ($plan) use ($counts) {
             return [
-                'key'            => $key,
-                'label'          => $plan['label'],
-                'max_users'      => $plan['max_users'],
-                'max_products'   => $plan['max_products'],
-                'max_warehouses' => $plan['max_warehouses'],
-                'companies_count'=> $counts[$key] ?? 0,
+                'id'               => $plan->id,
+                'key'              => $plan->key,
+                'label'            => $plan->label,
+                'description'      => $plan->description,
+                'max_users'        => $plan->max_users,
+                'max_products'     => $plan->max_products,
+                'max_warehouses'   => $plan->max_warehouses,
+                'is_active'        => $plan->is_active,
+                'sort_order'       => $plan->sort_order,
+                'companies_count'  => $counts[$plan->key] ?? 0,
             ];
-        })->values();
+        });
 
         return response()->json(['data' => $plans]);
     }
 
-    // GET /admin/plans/{plan}
-    public function show(string $plan): JsonResponse
+    public function show(int $planId): JsonResponse
     {
-        if (!isset(self::PLANS[$plan])) {
-            return response()->json(['message' => 'الخطة غير موجودة'], 404);
-        }
+        $plan = Plan::findOrFail($planId);
 
         $count = DB::table('companies')
             ->whereNull('deleted_at')
-            ->where('plan', $plan)
+            ->where('plan', $plan->key)
             ->count();
 
         return response()->json([
-            'data' => array_merge(
-                ['key' => $plan, 'companies_count' => $count],
-                self::PLANS[$plan]
-            ),
+            'data' => array_merge($plan->toArray(), ['companies_count' => $count]),
         ]);
     }
 
-    // POST /admin/plans (للمستقبل — حالياً الخطط ثابتة)
     public function store(Request $request): JsonResponse
     {
-        return response()->json(['message' => 'الخطط ثابتة في هذا الإصدار'], 422);
+        $data = $request->validate([
+            'key'            => 'required|string|max:50|unique:plans,key',
+            'label'          => 'required|string|max:100',
+            'description'    => 'nullable|string|max:500',
+            'max_users'      => 'required|integer|min:0',
+            'max_products'   => 'required|integer|min:0',
+            'max_warehouses' => 'required|integer|min:0',
+            'is_active'      => 'boolean',
+            'sort_order'     => 'integer|min:0',
+        ]);
+
+        $plan = Plan::create($data);
+
+        return response()->json([
+            'data' => $plan->fresh()
+        ], 201);
     }
 
-    // PUT /admin/plans/{plan}
-    public function update(Request $request, string $plan): JsonResponse
+    public function update(Request $request, int $planId): JsonResponse
     {
-        return response()->json(['message' => 'الخطط ثابتة في هذا الإصدار'], 422);
+        $plan = Plan::findOrFail($planId);
+
+        $data = $request->validate([
+            'key'            => 'sometimes|string|max:50|unique:plans,key,' . $plan->id,
+            'label'          => 'sometimes|string|max:100',
+            'description'    => 'nullable|string|max:500',
+            'max_users'      => 'sometimes|integer|min:0',
+            'max_products'   => 'sometimes|integer|min:0',
+            'max_warehouses' => 'sometimes|integer|min:0',
+            'is_active'      => 'boolean',
+            'sort_order'     => 'integer|min:0',
+        ]);
+
+        $plan->update($data);
+
+        return response()->json([
+            'data' => $plan->fresh()
+        ]);
+    }
+
+    public function destroy(int $planId): JsonResponse
+    {
+        $plan = Plan::findOrFail($planId);
+
+        $companiesCount = DB::table('companies')->where('plan', $plan->key)->count();
+        if ($companiesCount > 0) {
+            return response()->json([
+                'message' => "لا يمكن حذف الخطة، $companiesCount شركة (شركات) تستخدمها حالياً"
+            ], 422);
+        }
+
+        $plan->delete();
+        return response()->json(null, 204);
     }
 }

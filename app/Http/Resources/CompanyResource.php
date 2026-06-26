@@ -51,6 +51,12 @@ class CompanyResource extends JsonResource
             'updated_at'          => $this->updated_at,
             'deleted_at'          => $this->deleted_at,
 
+            // Computed
+            'is_suspended'        => !is_null($this->suspended_at),
+            'is_verified'         => !is_null($this->verified_at),
+            'is_operational'      => $this->active && is_null($this->suspended_at),
+            'users_count'         => $this->when($this->users_count !== null, $this->users_count),
+
             // Relations
             'legal_form'          => new LegalFormResource($this->whenLoaded('legalForm')),
             'commune'             => new CommuneResource($this->whenLoaded('commune')),

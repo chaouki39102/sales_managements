@@ -35,7 +35,8 @@ class AdminSystemBootController extends Controller
         $superAdminRole   = \Spatie\Permission\Models\Role::where('name', 'super-admin')
                                 ->whereNull('company_id')->exists();
         $superAdminUser   = \App\Models\User::whereHas('roles', fn($q) =>
-                                $q->where('name', 'super-admin')->whereNull('company_id')
+                                $q->where('name', 'super-admin')
+                                  ->whereNull('roles.company_id')
                             )->exists();
 
         $isReady = $wilayasCount >= 48

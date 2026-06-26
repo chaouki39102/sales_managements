@@ -1,9 +1,9 @@
-# Module Export: FiscalYear
-Generated at: 2026-06-14 09:15:52
+# Module Export: FISCALYEAR
+Generated at: 2026-06-25 23:48:51
 
 ## Models
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\FiscalYear.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\FiscalYear.php
 ```php
 <?php
 
@@ -52,7 +52,8 @@ class FiscalYear extends Model
     public static array $defaultWith = [];
     public static array $allowedIncludes = [
         'closedBy', 'commercialDocuments', 'stockMovements', 'payments',
-        'expenses', 'openingBalancesStock', 'openingBalancesParties'
+        'expenses', 'openingBalancesStock', 'openingBalancesParties',
+        'openingBalancesTreasury', 'posSessions'
     ];
     public static string $defaultSort = 'start_date';
     public static string $defaultSortDirection = 'desc';
@@ -98,6 +99,16 @@ class FiscalYear extends Model
         return $this->hasMany(OpeningBalanceParty::class);
     }
 
+    public function openingBalancesTreasury(): HasMany
+    {
+        return $this->hasMany(OpeningBalanceTreasury::class);
+    }
+
+    public function posSessions(): HasMany
+    {
+        return $this->hasMany(PosSession::class);
+    }
+
     public function scopeCurrent(Builder $query): Builder
     {
         return $query->where('is_current', true);
@@ -140,7 +151,7 @@ class FiscalYear extends Model
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Models\Traits\BelongsToFiscalYear.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Models\Traits\BelongsToFiscalYear.php
 ```php
 <?php
 
@@ -256,7 +267,7 @@ trait BelongsToFiscalYear
 
 ## Controllers
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\FiscalYearController.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\FiscalYearController.php
 ```php
 <?php
 
@@ -268,6 +279,7 @@ use App\Services\FiscalYearService;
 use App\Models\FiscalYear;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class FiscalYearController extends BaseApiController
 {
@@ -279,15 +291,11 @@ class FiscalYearController extends BaseApiController
         parent::__construct();
     }
 
-    /**
-     * ✅ index: تحميل علاقة closedBy تلقائياً إذا طُلبت
-     */
     public function index(Request $request): JsonResponse
     {
         try {
             $query = FiscalYear::query();
 
-            // تحميل العلاقات المطلوبة
             if ($request->has('include')) {
                 $includes = array_map('trim', explode(',', $request->get('include')));
                 $allowed  = ['closedBy'];
@@ -298,7 +306,7 @@ class FiscalYearController extends BaseApiController
             $years   = $query->orderBy('start_date', 'desc')->paginate($perPage);
 
             return $this->successResponse(
-                FiscalYearResource::collection($years->items()),
+                $years,
                 'تم جلب السنوات المالية بنجاح'
             );
         } catch (\Throwable $e) {
@@ -332,10 +340,6 @@ class FiscalYearController extends BaseApiController
         }
     }
 
-    /**
-     * ✅ إصلاح close: تحميل العلاقة closedBy بعد الإقفال
-     *    حتى يعود الـ Resource بـ closed_by_user صحيحاً
-     */
     public function close(Request $request, int $id): JsonResponse
     {
         try {
@@ -343,7 +347,6 @@ class FiscalYearController extends BaseApiController
             $notes = $request->get('notes');
             $year  = $this->service->close($year, auth()->id(), $notes);
 
-            // ✅ تحميل العلاقة بعد الإقفال حتى لا يظهر [object Object]
             $year->load('closedBy');
 
             return $this->successResponse(
@@ -353,6 +356,200 @@ class FiscalYearController extends BaseApiController
         } catch (\Throwable $e) {
             return $this->handleError($e, 'close');
         }
+    }
+
+    /**
+     * حذف السنة المالية مع كل البيانات المرتبطة بها
+     */
+    public function destroy($id): JsonResponse
+    {
+        try {
+            $year = FiscalYear::findOrFail($this->extractId($id));
+            $this->authorizeAction('delete', $year);
+
+            if ($year->is_closed) {
+                return $this->errorResponse('لا يمكن حذف سنة مالية مقفلة.', 400);
+            }
+
+            if ($year->is_current) {
+                return $this->errorResponse('لا يمكن حذف السنة المالية الحالية. عيّن سنة أخرى كحالية أولاً.', 400);
+            }
+
+            $relatedCounts = $this->getRelatedCounts($year);
+
+            DB::transaction(function () use ($year) {
+                DB::table('commercial_document_lines')
+                    ->whereIn('commercial_document_id', $year->commercialDocuments()->pluck('id'))
+                    ->delete();
+                $year->commercialDocuments()->delete();
+                $year->payments()->delete();
+                $year->expenses()->delete();
+                $year->stockMovements()->delete();
+                $year->openingBalancesTreasury()->delete();
+                $year->openingBalancesStock()->delete();
+                $year->openingBalancesParties()->delete();
+                $year->delete();
+            });
+
+            return $this->successResponse(
+                ['deleted' => $relatedCounts],
+                'تم حذف السنة المالية وكل البيانات المرتبطة بها بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'destroy');
+        }
+    }
+
+    /**
+     * استيراد الأرصدة الافتتاحية من سنة أخرى
+     * POST /fiscal-years/{year}/import-from/{sourceYear}
+     */
+    public function importBalances(Request $request): JsonResponse
+    {
+        try {
+            $yearId       = (int) $request->route('year');
+            $sourceYearId = (int) $request->route('sourceYear');
+            $year         = FiscalYear::findOrFail($yearId);
+            $sourceYear   = FiscalYear::findOrFail($sourceYearId);
+
+            if ($year->company_id !== $sourceYear->company_id) {
+                return $this->errorResponse('يجب أن تكون السنتان لنفس الشركة.', 400);
+            }
+
+            $importStock    = $request->boolean('stock', true);
+            $importParties  = $request->boolean('parties', true);
+            $importTreasury = $request->boolean('treasury', true);
+
+            $imported = ['stock' => 0, 'parties' => 0, 'treasury' => 0];
+
+            DB::transaction(function () use ($year, $sourceYear, $importStock, $importParties, $importTreasury, &$imported) {
+                if ($importStock) {
+                    $rows = DB::table('opening_balances_stock')
+                        ->where('fiscal_year_id', $sourceYear->id)
+                        ->where('company_id', $year->company_id)
+                        ->get()
+                        ->map(fn($r) => [
+                            'company_id'       => $year->company_id,
+                            'fiscal_year_id'   => $year->id,
+                            'product_id'       => $r->product_id,
+                            'warehouse_id'     => $r->warehouse_id,
+                            'opening_quantity' => $r->opening_quantity,
+                            'opening_value'    => $r->opening_value,
+                            'lot_number'       => $r->lot_number,
+                            'manufacturing_date' => $r->manufacturing_date,
+                            'expiration_date'  => $r->expiration_date,
+                            'created_at'       => now(),
+                            'updated_at'       => now(),
+                        ])->toArray();
+
+                    if (!empty($rows)) {
+                        DB::table('opening_balances_stock')->upsert(
+                            $rows,
+                            ['company_id', 'fiscal_year_id', 'product_id', 'warehouse_id'],
+                            ['opening_quantity', 'opening_value', 'updated_at']
+                        );
+                        $imported['stock'] = count($rows);
+                    }
+                }
+
+                if ($importParties) {
+                    $rows = DB::table('opening_balances_parties')
+                        ->where('fiscal_year_id', $sourceYear->id)
+                        ->where('company_id', $year->company_id)
+                        ->get()
+                        ->map(fn($r) => [
+                            'company_id'     => $year->company_id,
+                            'fiscal_year_id' => $year->id,
+                            'party_id'       => $r->party_id,
+                            'opening_balance'=> $r->opening_balance,
+                            'balance_type'   => $r->balance_type,
+                            'created_at'     => now(),
+                            'updated_at'     => now(),
+                        ])->toArray();
+
+                    if (!empty($rows)) {
+                        DB::table('opening_balances_parties')->upsert(
+                            $rows,
+                            ['company_id', 'fiscal_year_id', 'party_id'],
+                            ['opening_balance', 'balance_type', 'updated_at']
+                        );
+                        $imported['parties'] = count($rows);
+                    }
+                }
+
+                if ($importTreasury) {
+                    $rows = DB::table('opening_balances_treasury')
+                        ->where('fiscal_year_id', $sourceYear->id)
+                        ->where('company_id', $year->company_id)
+                        ->get()
+                        ->map(fn($r) => [
+                            'company_id'          => $year->company_id,
+                            'fiscal_year_id'      => $year->id,
+                            'treasury_account_id' => $r->treasury_account_id,
+                            'opening_balance'     => $r->opening_balance,
+                            'created_at'          => now(),
+                            'updated_at'          => now(),
+                        ])->toArray();
+
+                    if (!empty($rows)) {
+                        DB::table('opening_balances_treasury')->upsert(
+                            $rows,
+                            ['company_id', 'fiscal_year_id', 'treasury_account_id'],
+                            ['opening_balance', 'updated_at']
+                        );
+                        $imported['treasury'] = count($rows);
+                    }
+                }
+            });
+
+            return $this->successResponse($imported, 'تم استيراد الأرصدة بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'importBalances');
+        }
+    }
+
+    /**
+     * ترحيل الأرصدة الافتتاحية من سنة إلى أخرى
+     * POST /fiscal-years/{year}/transfer-to/{targetYear}
+     */
+    public function transferBalances(Request $request, int $yearId, int $targetYearId): JsonResponse
+    {
+        return $this->importBalances($request, $targetYearId, $yearId);
+    }
+
+    /**
+     * إحصائيات البيانات المرتبطة قبل الحذف
+     */
+    public function relatedData(Request $request, int $id): JsonResponse
+    {
+        try {
+            $year = FiscalYear::findOrFail($id);
+            return $this->successResponse($this->getRelatedCounts($year));
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'relatedData');
+        }
+    }
+
+    private function getRelatedCounts(FiscalYear $year): array
+    {
+        return [
+            'documents'    => $year->commercialDocuments()->count(),
+            'payments'     => $year->payments()->count(),
+            'expenses'     => $year->expenses()->count(),
+            'stock_movements' => $year->stockMovements()->count(),
+            'stock_balances'  => $year->openingBalancesStock()->count(),
+            'party_balances'  => $year->openingBalancesParties()->count(),
+            'treasury_balances' => $year->openingBalancesTreasury()->count(),
+            'pos_sessions' => $year->posSessions()->count(),
+            'total'        => $year->commercialDocuments()->count()
+                           + $year->payments()->count()
+                           + $year->expenses()->count()
+                           + $year->stockMovements()->count()
+                           + $year->openingBalancesStock()->count()
+                           + $year->openingBalancesParties()->count()
+                           + $year->openingBalancesTreasury()->count()
+                           + $year->posSessions()->count(),
+        ];
     }
 
     protected function getService(): FiscalYearService
@@ -370,7 +567,7 @@ class FiscalYearController extends BaseApiController
 
 ## Services
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\Accounting\FiscalYearClosureService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\Accounting\FiscalYearClosureService.php
 ```php
 <?php
 
@@ -598,7 +795,310 @@ class FiscalYearClosureService
 }
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Services\FiscalYearService.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\FiscalYearClosureService.php
+```php
+<?php
+
+namespace App\Services\Accounting;
+
+use App\Exceptions\FiscalYearClosedException;
+use App\Models\FiscalYear;
+use App\Models\Traits\BelongsToFiscalYear;
+use App\Services\PartyBalanceService;
+use App\Services\TreasuryBalanceService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Exception;
+
+/**
+ * FiscalYearClosureService — النسخة المدمجة النهائية
+ * ══════════════════════════════════════════════════════════════════
+ * إصلاحات عن النسخة الأصلية:
+ *
+ * 1. transferPartyBalances:
+ *    قبل: SUM(remaining_amount) + status!='cancelled' → خاطئ
+ *    بعد: PartyBalanceService::getBalanceAt() → نفس معادلة العرض
+ *
+ * 2. transferStockBalances:
+ *    قبل: AVG(cost_price) → خاطئ محاسبياً
+ *    بعد: PMP = SUM(qty×price)/SUM(qty) → صحيح
+ *
+ * 3. transferStockBalances:
+ *    قبل: Subquery لكل direction → بطيء
+ *    بعد: JOIN مباشر مع stock_movement_types → أسرع
+ *
+ * 4. createNextFiscalYear:
+ *    قبل: company_id مفقود → bug
+ *    بعد: company_id مضاف صراحةً
+ *
+ * 5. validateBeforeClosure:
+ *    قبل: status='draft' على commercial_documents → عمود غير موجود
+ *    بعد: is_locked=false → صحيح
+ *    قبل: journalEntries() → جدول غير موجود في النظام الحالي
+ *    بعد: تحقق محذوف (لا محاسبة SCF في هذا النظام)
+ *
+ * 6. upsert() بدل insert():
+ *    آمن لإعادة التشغيل — UNIQUE constraints لا تسبب فشلاً
+ *
+ * 7. transferTreasuryBalances: جديد كلياً
+ *    ينقل أرصدة الخزينة = العمود الثالث في جدول التناظر
+ *
+ * 8. whereNull('deleted_at') على كل DB::table() queries
+ *    SoftDeletes لا تعمل تلقائياً مع DB::table()
+ *
+ * جدول التناظر مكتمل 100%:
+ *   المخزون      → transferStockBalances   → opening_balances_stock
+ *   المتعاملون   → transferPartyBalances   → opening_balances_parties
+ *   الخزينة      → transferTreasuryBalances → opening_balances_treasury
+ * ══════════════════════════════════════════════════════════════════
+ */
+class FiscalYearClosureService
+{
+    public function __construct(
+        private PartyBalanceService    $partyBalanceService,
+        private TreasuryBalanceService $treasuryBalanceService,
+    ) {}
+
+    public function closeYear(FiscalYear $yearToClose, int $closedBy): FiscalYear
+    {
+        $this->validateBeforeClosure($yearToClose);
+
+        try {
+            return DB::transaction(function () use ($yearToClose, $closedBy) {
+
+                $newYear = $this->createNextFiscalYear($yearToClose);
+
+                $this->transferPartyBalances($yearToClose, $newYear);
+                $this->transferStockBalances($yearToClose, $newYear);
+                $this->transferTreasuryBalances($yearToClose, $newYear);
+
+                $yearToClose->update([
+                    'is_closed'  => true,
+                    'is_current' => false,
+                    'closed_at'  => now(),
+                    'closed_by'  => $closedBy,
+                ]);
+
+                $newYear->update(['is_current' => true]);
+
+                // تحديث كاش BelongsToFiscalYear trait
+                BelongsToFiscalYear::refreshClosedYearsCache();
+
+                Log::info("تم إقفال السنة المالية {$yearToClose->name} — السنة الجديدة: {$newYear->name}");
+
+                return $newYear;
+            });
+        } catch (Exception $e) {
+            Log::error("فشل إقفال السنة المالية {$yearToClose->name}: {$e->getMessage()}");
+            throw $e;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
+    protected function validateBeforeClosure(FiscalYear $year): void
+    {
+        if ($year->is_closed) {
+            throw new FiscalYearClosedException('السنة المالية مقفلة بالفعل.');
+        }
+
+        // is_locked=false → مستند غير مؤكد (مسودة)
+        // commercial_documents لا يحتوي عمود 'status' مباشرة
+        $openDocs = $year->commercialDocuments()
+            ->where('is_locked', false)
+            ->count();
+
+        if ($openDocs > 0) {
+            throw new Exception(
+                "لا يمكن الإقفال: يوجد {$openDocs} مستند غير مؤكد."
+            );
+        }
+    }
+
+    protected function createNextFiscalYear(FiscalYear $currentYear): FiscalYear
+    {
+        return FiscalYear::create([
+            'company_id' => $currentYear->company_id, // ✅ مطلوب صراحةً
+            'name'       => (string) ((int) $currentYear->name + 1),
+            'start_date' => $currentYear->end_date->copy()->addDay(),
+            'end_date'   => $currentYear->end_date->copy()->addYear(),
+            'is_current' => false,
+            'is_closed'  => false,
+        ]);
+    }
+
+    /**
+     * ترحيل أرصدة المتعاملين.
+     *
+     * Fix: يستخدم PartyBalanceService::getBalanceAt() بدل SUM(remaining_amount)
+     * لأن remaining_amount يتجاهل الرصيد الافتتاحي للسنة المُقفلة.
+     *
+     * يجمع المتعاملين من المستندات والدفعات معاً لتجنب إغفال
+     * من لديهم دفعات فقط بدون مستندات.
+     *
+     * upsert() → آمن لإعادة التشغيل
+     * (UNIQUE: company_id + fiscal_year_id + party_id)
+     */
+    protected function transferPartyBalances(FiscalYear $oldYear, FiscalYear $newYear): void
+    {
+        $partyIds = DB::table('commercial_documents')
+            ->where('fiscal_year_id', $oldYear->id)
+            ->whereNotNull('party_id')
+            ->whereNull('deleted_at')
+            ->distinct()
+            ->pluck('party_id')
+            ->merge(
+                DB::table('payments')
+                    ->where('fiscal_year_id', $oldYear->id)
+                    ->whereNotNull('party_id')
+                    ->whereNull('deleted_at')
+                    ->distinct()
+                    ->pluck('party_id')
+            )
+            ->unique();
+
+        $rows = [];
+        foreach ($partyIds as $partyId) {
+            $result  = $this->partyBalanceService->getBalanceAt(
+                $partyId,
+                $oldYear->end_date->toDateString()
+            );
+            $balance = $result['current_balance'];
+
+            if (abs($balance) < 0.0001) continue;
+
+            $rows[] = [
+                'company_id'      => $oldYear->company_id,
+                'fiscal_year_id'  => $newYear->id,
+                'party_id'        => $partyId,
+                'opening_balance' => abs($balance),
+                'balance_type'    => $balance >= 0 ? 'debit' : 'credit',
+                'created_at'      => now(),
+                'updated_at'      => now(),
+            ];
+        }
+
+        if (empty($rows)) return;
+
+        DB::table('opening_balances_parties')->upsert(
+            $rows,
+            ['company_id', 'fiscal_year_id', 'party_id'],
+            ['opening_balance', 'balance_type', 'updated_at']
+        );
+    }
+
+    /**
+     * ترحيل أرصدة المخزون.
+     *
+     * Fix 1: JOIN مباشر مع stock_movement_types بدل Subquery داخل CASE
+     * Fix 2: PMP = SUM(qty×cost_price)/SUM(qty) بدل AVG(cost_price)
+     * Fix 3: whereNull('deleted_at') — SoftDeletes لا تعمل مع DB::table()
+     * Fix 4: upsert() بدل insert() — آمن لإعادة التشغيل
+     * (UNIQUE: company_id + fiscal_year_id + product_id + warehouse_id)
+     */
+    protected function transferStockBalances(FiscalYear $oldYear, FiscalYear $newYear): void
+    {
+        $stockBalances = DB::table('stock_movements as sm')
+            ->join('stock_movement_types as smt', 'sm.stock_movement_type_id', '=', 'smt.id')
+            ->where('sm.fiscal_year_id', $oldYear->id)
+            ->where('sm.is_validated',   true)
+            ->whereNull('sm.deleted_at')
+            ->select(
+                'sm.product_id',
+                'sm.warehouse_id',
+                DB::raw("
+                    SUM(
+                        CASE WHEN smt.direction =  1 THEN  sm.quantity
+                             WHEN smt.direction = -1 THEN -sm.quantity
+                             ELSE 0 END
+                    ) as final_quantity
+                "),
+                // PMP = SUM(qty_in × cost_price) / SUM(qty_in)
+                DB::raw("
+                    SUM(CASE WHEN smt.direction = 1 THEN sm.quantity * sm.cost_price ELSE 0 END)
+                    /
+                    NULLIF(SUM(CASE WHEN smt.direction = 1 THEN sm.quantity ELSE 0 END), 0)
+                    as pmp_cost_price
+                ")
+            )
+            ->groupBy('sm.product_id', 'sm.warehouse_id')
+            ->having('final_quantity', '>', 0)
+            ->get();
+
+        $rows = [];
+        foreach ($stockBalances as $b) {
+            $rows[] = [
+                'company_id'       => $oldYear->company_id,
+                'fiscal_year_id'   => $newYear->id,
+                'product_id'       => $b->product_id,
+                'warehouse_id'     => $b->warehouse_id,
+                'opening_quantity' => $b->final_quantity,
+                'opening_value'    => round(
+                    $b->final_quantity * ($b->pmp_cost_price ?? 0), 4
+                ),
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ];
+        }
+
+        if (empty($rows)) return;
+
+        DB::table('opening_balances_stock')->upsert(
+            $rows,
+            ['company_id', 'fiscal_year_id', 'product_id', 'warehouse_id'],
+            ['opening_quantity', 'opening_value', 'updated_at']
+        );
+    }
+
+    /**
+     * ترحيل أرصدة الخزينة — جديد كلياً.
+     *
+     * يستخدم TreasuryBalanceService::getTreasuryBalanceAt()
+     * نفس معادلة العرض: opening + in - out
+     *
+     * upsert() → آمن لإعادة التشغيل
+     * (UNIQUE: company_id + fiscal_year_id + treasury_account_id)
+     */
+    protected function transferTreasuryBalances(FiscalYear $oldYear, FiscalYear $newYear): void
+    {
+        $accountIds = DB::table('treasury_accounts')
+            ->where('company_id', $oldYear->company_id)
+            ->whereNull('deleted_at')
+            ->pluck('id');
+
+        $rows = [];
+        foreach ($accountIds as $accountId) {
+            $result  = $this->treasuryBalanceService->getTreasuryBalanceAt(
+                $accountId,
+                $oldYear->end_date->toDateString()
+            );
+            $balance = $result['current_balance'];
+
+            if (abs($balance) < 0.0001) continue;
+
+            $rows[] = [
+                'company_id'          => $oldYear->company_id,
+                'fiscal_year_id'      => $newYear->id,
+                'treasury_account_id' => $accountId,
+                'opening_balance'     => $balance,
+                'created_at'          => now(),
+                'updated_at'          => now(),
+            ];
+        }
+
+        if (empty($rows)) return;
+
+        DB::table('opening_balances_treasury')->upsert(
+            $rows,
+            ['company_id', 'fiscal_year_id', 'treasury_account_id'],
+            ['opening_balance', 'updated_at']
+        );
+    }
+}
+
+```
+
+### 📁 C:\xampp\htdocs\sales_managements\app\Services\FiscalYearService.php
 ```php
 <?php
 
@@ -695,7 +1195,7 @@ class FiscalYearService extends \App\Core\Services\BaseService
 
 ## Requests
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\Fiscalyearrequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\Fiscalyearrequest.php
 ```php
 <?php
 
@@ -768,7 +1268,7 @@ class UpdateFiscalYearRequest extends FormRequest
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreFiscalYearRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreFiscalYearRequest.php
 ```php
 <?php
 
@@ -812,7 +1312,7 @@ class StoreFiscalYearRequest extends FormRequest
 
 ```
 
-### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateFiscalYearRequest.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateFiscalYearRequest.php
 ```php
 <?php
 
@@ -857,7 +1357,7 @@ class UpdateFiscalYearRequest extends FormRequest
 
 ## Policies
 
-### 📁 D:\xampp\htdocs\sales-management\app\Policies\FiscalYearPolicy.php
+### 📁 C:\xampp\htdocs\sales_managements\app\Policies\FiscalYearPolicy.php
 ```php
 <?php
 

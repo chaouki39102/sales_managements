@@ -13,6 +13,11 @@ use Illuminate\Support\Facades\DB;
 
 class AdminCompanyController extends Controller
 {
+    private function findCompany(int $id): Company
+    {
+        return Company::withCount('users')->with('owner:id,name,email')->findOrFail($id);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $query = Company::query()
@@ -70,9 +75,9 @@ class AdminCompanyController extends Controller
         ]);
     }
 
-    public function show(Company $company): JsonResponse
+    public function show(int $companyId): JsonResponse
     {
-        $company->loadCount('users')->load('owner:id,name,email');
+        $company = $this->findCompany($companyId);
         return response()->json([
             'data' => new CompanyResource($company)
         ]);
@@ -83,7 +88,7 @@ class AdminCompanyController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:100',
-            'plan' => 'required|in:free,starter,professional,enterprise',
+            'plan' => 'required|string|max:50',
             'max_users'      => 'nullable|integer|min:1',
             'max_products'   => 'nullable|integer|min:1',
             'max_warehouses' => 'nullable|integer|min:1',
@@ -95,7 +100,7 @@ class AdminCompanyController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, Company $company): JsonResponse
+    public function update(Request $request, int $companyId): JsonResponse
     {
         $data = $request->validate([
             'name' => 'sometimes|string|max:255',
@@ -103,73 +108,83 @@ class AdminCompanyController extends Controller
             'active' => 'sometimes|boolean',
         ]);
 
+        $company = $this->findCompany($companyId);
         $company->update($data);
         return response()->json([
-            'data' => new CompanyResource($company->fresh())
+            'data' => new CompanyResource($company->fresh()->loadCount('users')->load('owner:id,name,email'))
         ]);
     }
 
-    public function destroy(Company $company): JsonResponse
+    public function destroy(int $companyId): JsonResponse
     {
+        $company = $this->findCompany($companyId);
         $company->delete();
         return response()->json(null, 204);
     }
 
-    public function suspend(Request $request, Company $company): JsonResponse
+    public function suspend(Request $request, int $companyId): JsonResponse
     {
         $data = $request->validate(['reason' => 'required|string|max:500']);
+        $company = $this->findCompany($companyId);
         $company->suspend($data['reason'], auth()->id());
         return response()->json([
-            'data' => new CompanyResource($company->fresh())
+            'data' => new CompanyResource($company->fresh()->loadCount('users')->load('owner:id,name,email'))
         ]);
     }
 
-    public function unsuspend(Company $company): JsonResponse
+    public function unsuspend(int $companyId): JsonResponse
     {
+        $company = $this->findCompany($companyId);
         $company->unsuspend();
         return response()->json([
-            'data' => new CompanyResource($company->fresh())
+            'data' => new CompanyResource($company->fresh()->loadCount('users')->load('owner:id,name,email'))
         ]);
     }
 
-    public function activate(Company $company): JsonResponse
+    public function activate(int $companyId): JsonResponse
     {
+        $company = $this->findCompany($companyId);
         $company->activate();
         return response()->json([
-            'data' => new CompanyResource($company->fresh())
+            'data' => new CompanyResource($company->fresh()->loadCount('users')->load('owner:id,name,email'))
         ]);
     }
 
-    public function deactivate(Company $company): JsonResponse
+    public function deactivate(int $companyId): JsonResponse
     {
+        $company = $this->findCompany($companyId);
         $company->deactivate(auth()->id());
         return response()->json([
-            'data' => new CompanyResource($company->fresh())
+            'data' => new CompanyResource($company->fresh()->loadCount('users')->load('owner:id,name,email'))
         ]);
     }
 
-    public function verify(Company $company): JsonResponse
+    public function verify(int $companyId): JsonResponse
     {
+        $company = $this->findCompany($companyId);
         $company->verify(auth()->id());
         return response()->json([
-            'data' => new CompanyResource($company->fresh())
+            'data' => new CompanyResource($company->fresh()->loadCount('users')->load('owner:id,name,email'))
         ]);
     }
 
-    public function unverify(Company $company): JsonResponse
+    public function unverify(int $companyId): JsonResponse
     {
+        $company = $this->findCompany($companyId);
         $company->unverify();
         return response()->json(['message' => 'تم إلغاء التوثيق']);
     }
 
-    public function changePlan(Request $request, Company $company): JsonResponse
+    public function changePlan(Request $request, int $companyId): JsonResponse
     {
         $data = $request->validate([
-            'plan'           => ['required', 'string', 'in:free,starter,professional,enterprise'],
+            'plan'           => ['required', 'string', 'max:50'],
             'max_users'      => 'nullable|integer|min:1',
             'max_warehouses' => 'nullable|integer|min:1',
             'max_products'   => 'nullable|integer|min:1',
         ]);
+
+        $company = $this->findCompany($companyId);
 
         $customLimits = array_filter([
             'max_users'      => $data['max_users']      ?? null,
@@ -179,19 +194,21 @@ class AdminCompanyController extends Controller
 
         $company->upgradePlan($data['plan'], $customLimits ?: null);
         return response()->json([
-            'data' => new CompanyResource($company->fresh())
+            'data' => new CompanyResource($company->fresh()->loadCount('users')->load('owner:id,name,email'))
         ]);
     }
 
-    public function updateNotes(Request $request, Company $company): JsonResponse
+    public function updateNotes(Request $request, int $companyId): JsonResponse
     {
         $data = $request->validate(['notes' => 'nullable|string|max:5000']);
+        $company = $this->findCompany($companyId);
         $company->update(['notes' => $data['notes']]);
         return response()->json(['message' => 'تم تحديث الملاحظات']);
     }
 
-    public function users(Request $request, Company $company): JsonResponse
+    public function users(Request $request, int $companyId): JsonResponse
     {
+        $company = $this->findCompany($companyId);
         $users = $company->users()
             ->withPivot(['role', 'active', 'created_at'])
             ->orderByPivot('created_at', 'desc')
@@ -218,12 +235,14 @@ class AdminCompanyController extends Controller
         ]);
     }
 
-    public function addUser(Request $request, Company $company): JsonResponse
+    public function addUser(Request $request, int $companyId): JsonResponse
     {
         $data = $request->validate([
             'user_id' => 'required|exists:users,id',
             'role'    => 'nullable|string|max:50',
         ]);
+
+        $company = $this->findCompany($companyId);
 
         if (DB::table('company_user')->where('company_id', $company->id)->where('user_id', $data['user_id'])->exists()) {
             return response()->json(['message' => 'المستخدم موجود بالفعل'], 422);
@@ -239,14 +258,16 @@ class AdminCompanyController extends Controller
         return response()->json(['message' => 'تمت إضافة المستخدم للشركة'], 201);
     }
 
-    public function removeUser(Company $company, User $user): JsonResponse
+    public function removeUser(int $companyId, User $user): JsonResponse
     {
+        $company = $this->findCompany($companyId);
         $company->users()->detach($user->id);
         return response()->json(['message' => 'تم إزالة المستخدم من الشركة']);
     }
 
-    public function toggleUserStatus(Company $company, User $user): JsonResponse
+    public function toggleUserStatus(int $companyId, User $user): JsonResponse
     {
+        $company = $this->findCompany($companyId);
         $membership = DB::table('company_user')
             ->where('company_id', $company->id)
             ->where('user_id', $user->id)

@@ -2952,6 +2952,345 @@ return new class extends Migration
 
 
 
+// ===== ملف: 2026_06_20_000001_create_approval_thresholds_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('approval_thresholds', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('document_type_id')->constrained('document_types')->restrictOnDelete()->cascadeOnUpdate();
+            $table->decimal('min_amount', 15, 4);
+            $table->decimal('max_amount', 15, 4)->nullable();
+            $table->boolean('requires_approval')->default(true);
+            $table->foreignId('role_id')->nullable()->constrained('roles')->nullOnDelete()->cascadeOnUpdate();
+            $table->string('notes', 500)->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
+            $table->timestamps();
+
+            $table->index(['company_id', 'document_type_id', 'is_active']);
+        });
+    }
+    public function down(): void {
+        Schema::dropIfExists('approval_thresholds');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_20_000002_create_user_alerts_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('user_alerts', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->string('type', 50)->index();
+            $table->string('title', 255);
+            $table->text('body')->nullable();
+            $table->string('severity', 20)->default('medium')->index();
+            $table->unsignedBigInteger('document_id')->nullable()->index();
+            $table->unsignedBigInteger('check_id')->nullable()->index();
+            $table->unsignedBigInteger('product_id')->nullable()->index();
+            $table->unsignedBigInteger('party_id')->nullable()->index();
+            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->boolean('is_read')->default(false)->index();
+            $table->timestamp('read_at')->nullable();
+            $table->timestamps();
+
+            $table->index(['company_id', 'is_read', 'created_at']);
+            $table->index(['company_id', 'type']);
+        });
+    }
+    public function down(): void {
+        Schema::dropIfExists('user_alerts');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_20_000003_add_document_indexes.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('commercial_documents', function (Blueprint $table) {
+            $table->index(['company_id', 'document_status_id', 'remaining_amount'], 'idx_docs_status_remaining');
+            $table->index(['company_id', 'document_date'], 'idx_docs_date');
+        });
+
+        Schema::table('commercial_document_lines', function (Blueprint $table) {
+            $table->index(['company_id', 'commercial_document_id'], 'idx_cdl_doc');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('commercial_documents', function (Blueprint $table) {
+            $table->dropIndex('idx_docs_status_remaining');
+            $table->dropIndex('idx_docs_date');
+        });
+
+        Schema::table('commercial_document_lines', function (Blueprint $table) {
+            $table->dropIndex('idx_cdl_doc');
+        });
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_20_230508_add_min_margin_percentage_to_products_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('products', function (Blueprint $table) {
+            $table->decimal('min_margin_percentage', 5, 2)->nullable()->after('purchase_price_ht');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('products', function (Blueprint $table) {
+            $table->dropColumn('min_margin_percentage');
+        });
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_21_201646_drop_is_proforma_from_commercial_documents.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('commercial_documents', function (Blueprint $table) {
+            $table->dropColumn('is_proforma');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('commercial_documents', function (Blueprint $table) {
+            $table->boolean('is_proforma')->default(false)->after('validated_by')->comment('Is this a proforma invoice?');
+        });
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_21_201647_create_document_type_conversions_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('document_type_conversions', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
+            $table->string('source_code', 10)->comment('Source document type code (e.g., DEV)');
+            $table->string('target_code', 10)->comment('Allowed target document type code (e.g., BCC)');
+            $table->integer('display_order')->default(0);
+            $table->timestamps();
+
+            $table->unique(['company_id', 'source_code', 'target_code'], 'uk_source_target');
+            $table->index(['company_id', 'source_code'], 'idx_source');
+        });
+
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE document_type_conversions COMMENT 'جدول يحدد أنواع المستندات المسموح التحويل بينها'");
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('document_type_conversions');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_24_000001_create_pos_sessions_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('pos_sessions', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('warehouse_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('fiscal_year_id')->constrained()->cascadeOnDelete();
+
+            $table->timestamp('opened_at');
+            $table->timestamp('closed_at')->nullable();
+
+            $table->decimal('opening_cash', 15, 2)->default(0);
+            $table->string('opening_note')->nullable();
+
+            $table->integer('invoices_count')->default(0);
+            $table->integer('returns_count')->default(0);
+            $table->decimal('gross_sales', 15, 2)->default(0);
+            $table->decimal('returns_total', 15, 2)->default(0);
+            $table->decimal('net_sales', 15, 2)->default(0);
+            $table->decimal('total_tva', 15, 2)->default(0);
+            $table->decimal('total_fiscal_stamp', 15, 2)->default(0);
+            $table->decimal('total_discount', 15, 2)->default(0);
+            $table->decimal('highest_invoice', 15, 2)->default(0);
+
+            $table->decimal('cash_collected', 15, 2)->default(0);
+            $table->decimal('cib_collected', 15, 2)->default(0);
+            $table->decimal('ccp_collected', 15, 2)->default(0);
+            $table->decimal('bank_collected', 15, 2)->default(0);
+            $table->decimal('credit_total', 15, 2)->default(0);
+
+            $table->decimal('closing_cash_counted', 15, 2)->nullable();
+            $table->decimal('closing_cash_expected', 15, 2)->nullable();
+            $table->decimal('cash_difference', 15, 2)->nullable();
+            $table->text('closing_note')->nullable();
+            $table->text('manager_note')->nullable();
+
+            $table->string('status', 20)->default('open');
+
+            $table->timestamps();
+
+            $table->index(['company_id', 'status']);
+            $table->index(['company_id', 'user_id', 'opened_at']);
+            $table->index(['company_id', 'warehouse_id', 'status']);
+        });
+
+        Schema::create('pos_session_payments', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('pos_session_id')->constrained('pos_sessions')->cascadeOnDelete();
+            $table->foreignId('payment_mode_id')->constrained()->cascadeOnDelete();
+            $table->decimal('amount', 15, 2)->default(0);
+            $table->integer('count')->default(0);
+            $table->timestamps();
+
+            $table->unique(['pos_session_id', 'payment_mode_id']);
+        });
+
+        Schema::create('pos_session_products', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('pos_session_id')->constrained('pos_sessions')->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->string('product_name');
+            $table->decimal('quantity_sold', 12, 3)->default(0);
+            $table->decimal('total_ht', 15, 2)->default(0);
+            $table->decimal('total_ttc', 15, 2)->default(0);
+            $table->timestamps();
+
+            $table->unique(['pos_session_id', 'product_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('pos_session_products');
+        Schema::dropIfExists('pos_session_payments');
+        Schema::dropIfExists('pos_sessions');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_25_000001_create_plans_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('plans', function (Blueprint $table) {
+            $table->id();
+            $table->string('key', 50)->unique();
+            $table->string('label', 100);
+            $table->text('description')->nullable();
+            $table->integer('max_users')->default(0);
+            $table->integer('max_products')->default(0);
+            $table->integer('max_warehouses')->default(0);
+            $table->boolean('is_active')->default(true);
+            $table->integer('sort_order')->default(0);
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('plans');
+    }
+};
+
+
+
+
+// ===== ملف: 2026_06_25_202532_add_is_approved_to_users_table.php =====
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->boolean('is_approved')->default(false)->after('active');
+            $table->index('is_approved');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropIndex(['is_approved']);
+            $table->dropColumn('is_approved');
+        });
+    }
+};
+
+
+
+
 // ===== ملف: Migration_CurrentStockCached.php =====
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;

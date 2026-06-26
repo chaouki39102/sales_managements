@@ -65,15 +65,18 @@ function useFiscalYearsAuth() {
     enabled,
     staleTime: 5 * 60_000,
     retry:     false,  // ✅ لا نُعيد المحاولة إذا فشل (يمنع loops)
-    select: (years) => ({
-      years,
-      current: years.find(y => y.is_current) ??
-               years.find(y => !y.is_closed)  ??
-               years[0] ??
-               null,
-      open:    years.filter(y => !y.is_closed),
-      closed:  years.filter(y => y.is_closed),
-    }),
+    select: (response) => {
+      const years = response.data;
+      return {
+        years,
+        current: years.find(y => y.is_current) ??
+                 years.find(y => !y.is_closed)  ??
+                 years[0] ??
+                 null,
+        open:    years.filter(y => !y.is_closed),
+        closed:  years.filter(y => y.is_closed),
+      };
+    },
   });
 }
 

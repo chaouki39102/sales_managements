@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\Admin\AdminCompanyController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
+use App\Http\Controllers\Api\V1\Admin\AdminApprovalController;
 use App\Http\Controllers\Api\V1\Admin\AdminDashboardController;
 use App\Http\Controllers\Api\V1\Admin\AdminActivityController;
 use App\Http\Controllers\Api\V1\Admin\AdminPlanController;
@@ -61,31 +62,31 @@ Route::prefix('v1/admin')
         Route::prefix('companies')->name('companies.')->group(function () {
             Route::get('/',    [AdminCompanyController::class, 'index']);
             Route::post('/',   [AdminCompanyController::class, 'store']);
-            Route::get('{company}',    [AdminCompanyController::class, 'show']);
-            Route::put('{company}',    [AdminCompanyController::class, 'update']);
-            Route::delete('{company}', [AdminCompanyController::class, 'destroy']);
+            Route::get('{companyId}',    [AdminCompanyController::class, 'show']);
+            Route::put('{companyId}',    [AdminCompanyController::class, 'update']);
+            Route::delete('{companyId}', [AdminCompanyController::class, 'destroy']);
 
             // إجراءات الشركة
-            Route::post('{company}/suspend',      [AdminCompanyController::class, 'suspend']);
-            Route::post('{company}/unsuspend',    [AdminCompanyController::class, 'unsuspend']);
-            Route::post('{company}/activate',     [AdminCompanyController::class, 'activate']);
-            Route::post('{company}/deactivate',   [AdminCompanyController::class, 'deactivate']);
-            Route::post('{company}/verify',       [AdminCompanyController::class, 'verify']);
-            Route::post('{company}/unverify',     [AdminCompanyController::class, 'unverify']);
-            Route::post('{company}/change-plan',  [AdminCompanyController::class, 'changePlan']);
-            Route::patch('{company}/notes',       [AdminCompanyController::class, 'updateNotes']);
+            Route::post('{companyId}/suspend',      [AdminCompanyController::class, 'suspend']);
+            Route::post('{companyId}/unsuspend',    [AdminCompanyController::class, 'unsuspend']);
+            Route::post('{companyId}/activate',     [AdminCompanyController::class, 'activate']);
+            Route::post('{companyId}/deactivate',   [AdminCompanyController::class, 'deactivate']);
+            Route::post('{companyId}/verify',       [AdminCompanyController::class, 'verify']);
+            Route::post('{companyId}/unverify',     [AdminCompanyController::class, 'unverify']);
+            Route::post('{companyId}/change-plan',  [AdminCompanyController::class, 'changePlan']);
+            Route::patch('{companyId}/notes',       [AdminCompanyController::class, 'updateNotes']);
 
             // أعضاء الشركة
-            Route::get('{company}/users',                      [AdminCompanyController::class, 'users']);
-            Route::post('{company}/users',                     [AdminCompanyController::class, 'addUser']);
-            Route::delete('{company}/users/{user}',            [AdminCompanyController::class, 'removeUser']);
-            Route::patch('{company}/users/{user}/toggle',      [AdminCompanyController::class, 'toggleUserStatus']);
+            Route::get('{companyId}/users',                      [AdminCompanyController::class, 'users']);
+            Route::post('{companyId}/users',                     [AdminCompanyController::class, 'addUser']);
+            Route::delete('{companyId}/users/{user}',            [AdminCompanyController::class, 'removeUser']);
+            Route::patch('{companyId}/users/{user}/toggle',      [AdminCompanyController::class, 'toggleUserStatus']);
 
             // ── بذر بيانات شركة محددة ─────────────────────────
-            // POST /api/v1/admin/companies/{company}/seed
-            Route::post('{company}/seed',          [AdminSeedController::class, 'seedCompany'])      ->name('seed');
-            // POST /api/v1/admin/companies/{company}/seed/{seeder}
-            Route::post('{company}/seed/{seeder}', [AdminSeedController::class, 'seedCompanySingle'])->name('seed.single');
+            // POST /api/v1/admin/companies/{companyId}/seed
+            Route::post('{companyId}/seed',          [AdminSeedController::class, 'seedCompany'])      ->name('seed');
+            // POST /api/v1/admin/companies/{companyId}/seed/{seeder}
+            Route::post('{companyId}/seed/{seeder}', [AdminSeedController::class, 'seedCompanySingle'])->name('seed.single');
         });
 
         // ══════════════════════════════════════════════════════════
@@ -100,6 +101,10 @@ Route::prefix('v1/admin')
             Route::post('{user}/reset-password',  [AdminUserController::class, 'resetPassword']);
             Route::post('{user}/toggle-active',   [AdminUserController::class, 'toggleActive']);
             Route::get('{user}/companies',        [AdminUserController::class, 'companies']);
+            // موافقات التسجيل
+            Route::get('pending-approval',     [AdminApprovalController::class, 'pending'])->name('users.pending');
+            Route::post('{user}/approve',      [AdminApprovalController::class, 'approve'])->name('users.approve');
+            Route::post('{user}/reject',       [AdminApprovalController::class, 'reject'])->name('users.reject');
         });
 
         // ══════════════════════════════════════════════════════════
@@ -107,7 +112,10 @@ Route::prefix('v1/admin')
         // ══════════════════════════════════════════════════════════
         Route::prefix('plans')->name('plans.')->group(function () {
             Route::get('/',       [AdminPlanController::class, 'index']);
-            Route::get('{plan}',  [AdminPlanController::class, 'show']);
+            Route::post('/',      [AdminPlanController::class, 'store']);
+            Route::get('{planId}',  [AdminPlanController::class, 'show']);
+            Route::put('{planId}',  [AdminPlanController::class, 'update']);
+            Route::delete('{planId}', [AdminPlanController::class, 'destroy']);
         });
 
         // ══════════════════════════════════════════════════════════

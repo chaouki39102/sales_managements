@@ -1,62 +1,62 @@
-// ════════════════════════════════════════════════════════════════════════════
-// routes/index.tsx — Routing الكامل للنظام
-// ════════════════════════════════════════════════════════════════════════════
+// â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
+// routes/index.tsx â€” Routing ط§ظ„ظƒط§ظ…ظ„ ظ„ظ„ظ†ط¸ط§ظ…
+// â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
 import React, { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, Outlet } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useActiveCompany } from '@/lib/store/appStore';
 
-// ── Layouts ────────────────────────────────────────────────────────────────
+// â”€â”€ Layouts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DashboardLayout = lazy(() => import('@/components/layouts/DashboardLayout'));
 const AdminLayout     = lazy(() => import('@/components/layouts/AdminLayout'));
 
-// ── Auth & Onboarding ──────────────────────────────────────────────────────
+// â”€â”€ Auth & Onboarding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const LoginPage      = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage   = lazy(() => import('@/pages/auth/RegisterPage'));
 const OnboardingPage = lazy(() => import('@/pages/onboarding/OnboardingPage'));
 
-// ── Dashboard ──────────────────────────────────────────────────────────────
+// â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
 
-// ── Documents / POS ────────────────────────────────────────────────────────
+// â”€â”€ Documents / POS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CommercialDocumentsPage = lazy(() => import('@/pages/documents/CommercialDocumentsPage'));
 const InvoicesPage            = lazy(() => import('@/pages/invoices/InvoicesPage'));
 const POSPage                 = lazy(() => import('@/pages/pos/POSPage'));
 const POSKioskPage            = lazy(() => import('@/pages/pos/POSKioskPage'));const PosSessionsPage         = lazy(() => import('@/pages/pos/PosSessionsPage'));
 
-// ── Products / Inventory ───────────────────────────────────────────────────
+// â”€â”€ Products / Inventory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ProductsPage   = lazy(() => import('@/pages/products/ProductsPage'));
 const InventoryPage  = lazy(() => import('@/pages/inventory/InventoryPage'));
 
-// ── Parties ────────────────────────────────────────────────────────────────
+// â”€â”€ Parties â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ClientsPage   = lazy(() => import('@/pages/clients/ClientsPage'));
 const SuppliersPage = lazy(() => import('@/pages/suppliers/SuppliersPage'));
 
-// ── Finance ────────────────────────────────────────────────────────────────
+// â”€â”€ Finance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FinancePage  = lazy(() => import('@/pages/finance/FinancePage'));
 const ExpensesPage = lazy(() => import('@/pages/expenses/ExpensesPage'));
 const DebtsPage    = lazy(() => import('@/pages/debts/DebtsPage'));
 const TvaPage      = lazy(() => import('@/pages/fiscal/TvaPage'));
 const ChecksPage   = lazy(() => import('@/pages/checks/ChecksPage'));
 
-// ── Fiscal / Reports ───────────────────────────────────────────────────────
+// â”€â”€ Fiscal / Reports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FiscalYearsPage = lazy(() => import('@/pages/fiscal/FiscalYearsPage'));
 const ReportsPage     = lazy(() => import('@/pages/reports/ReportsPage'));
 
-// ── Notifications ───────────────────────────────────────────
+// â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
 
-// ── Users / Roles / Employees ─────────────────────────────────────────────
+// â”€â”€ Users / Roles / Employees â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const UsersPage     = lazy(() => import('@/pages/users/UsersPage'));
 const RolesPage     = lazy(() => import('@/pages/users/RolesPage'));
 const EmployeesPage = lazy(() => import('@/pages/users/EmployeesPage'));
 const ProfilePage   = lazy(() => import('@/pages/profile/ProfilePage'));
 
-// ── Settings ───────────────────────────────────────────────────────────────
+// â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SettingsPage      = lazy(() => import('@/pages/settings/SettingsPage'));
 const DocumentTypesPage = lazy(() => import('@/pages/settings/DocumentTypesPage'));
 
-// ── Tenant Lookups ─────────────────────────────────────────────────────────
+// â”€â”€ Tenant Lookups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FamiliesPage          = lazy(() => import('@/pages/lookups/FamiliesPage'));
 const BrandsPage            = lazy(() => import('@/pages/lookups/BrandsPage'));
 const UnitsPage             = lazy(() => import('@/pages/lookups/UnitsPage'));
@@ -65,11 +65,11 @@ const PriceLevelsPage       = lazy(() => import('@/pages/lookups/PriceLevelsPage
 const NumberingSeriesPage   = lazy(() => import('@/pages/lookups/NumberingSeriesPage'));
 const ExpenseCategoriesPage = lazy(() => import('@/pages/lookups/ExpenseCategoriesPage'));
 
-// ── Global Lookups ─────────────────────────────────────────────────────────
+// â”€â”€ Global Lookups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CurrenciesPage = lazy(() => import('@/pages/lookups/CurrenciesPage'));
 const TvasPage       = lazy(() => import('@/pages/lookups/TvasPage'));
 
-// ── Admin Panel ────────────────────────────────────────────────────────────
+// â”€â”€ Admin Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AdminBootPage      = lazy(() => import('@/pages/admin/AdminBootPage'));
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'));
 const AdminCompaniesPage = lazy(() => import('@/pages/admin/AdminCompaniesPage'));
@@ -79,9 +79,9 @@ const AdminSettingsPage  = lazy(() => import('@/pages/admin/AdminSettingsPage'))
 const AdminPlansPage     = lazy(() => import('@/pages/admin/AdminPlansPage'));
 const AdminReportsPage   = lazy(() => import('@/pages/admin/AdminReportsPage'));
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Loader
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function PageLoader() {
   return (
     <div style={{
@@ -95,11 +95,11 @@ function PageLoader() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Guards
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/** يتطلب تسجيل دخول فقط */
+/** ظٹطھط·ظ„ط¨ طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ ظپظ‚ط· */
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <PageLoader />;
@@ -107,31 +107,31 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/** تسجيل دخول + لا شركة نشطة + ليس super-admin */
+/** طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ + ظ„ط§ ط´ط±ظƒط© ظ†ط´ط·ط© + ظ„ظٹط³ super-admin */
 function RequireNoCompany({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
   const activeCompany = useActiveCompany();
   if (isLoading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  // السوبر أدمن لا يمر من هنا أبداً — له داشبورده الخاص
+  // ط§ظ„ط³ظˆط¨ط± ط£ط¯ظ…ظ† ظ„ط§ ظٹظ…ط± ظ…ظ† ظ‡ظ†ط§ ط£ط¨ط¯ط§ظ‹ â€” ظ„ظ‡ ط¯ط§ط´ط¨ظˆط±ط¯ظ‡ ط§ظ„ط®ط§طµ
   if (isSuperAdmin) return <Navigate to="/admin/dashboard" replace />;
-  if (activeCompany?.slug) return <Navigate to="/dashboard" replace />;
+
   return <>{children}</>;
 }
 
-/** تسجيل دخول + شركة نشطة (مستخدم عادي فقط) */
+/** طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ + ط´ط±ظƒط© ظ†ط´ط·ط© (ظ…ط³طھط®ط¯ظ… ط¹ط§ط¯ظٹ ظپظ‚ط·) */
 function RequireCompany({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
   const activeCompany = useActiveCompany();
   if (isLoading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  // السوبر أدمن له مساره الخاص
+  // ط§ظ„ط³ظˆط¨ط± ط£ط¯ظ…ظ† ظ„ظ‡ ظ…ط³ط§ط±ظ‡ ط§ظ„ط®ط§طµ
   if (isSuperAdmin) return <Navigate to="/admin/dashboard" replace />;
   if (!activeCompany?.slug) return <Navigate to="/onboarding" replace />;
   return <>{children}</>;
 }
 
-/** Super Admin فقط — يتحقق من Auth أولاً */
+/** Super Admin ظپظ‚ط· â€” ظٹطھط­ظ‚ظ‚ ظ…ظ† Auth ط£ظˆظ„ط§ظ‹ */
 function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
   if (isLoading) return <PageLoader />;
@@ -140,19 +140,19 @@ function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // AppRoutes
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
 
-        {/* ① Auth */}
+        {/* â‘  Auth */}
         <Route path="/login"    element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* ② Onboarding */}
+        {/* â‘، Onboarding */}
         <Route
           path="/onboarding"
           element={
@@ -162,7 +162,7 @@ export function AppRoutes() {
           }
         />
 
-        {/* ③ Admin Boot — إعداد النظام (يصل إليه السوبر أدمن يدوياً عند الحاجة) */}
+        {/* â‘¢ Admin Boot â€” ط¥ط¹ط¯ط§ط¯ ط§ظ„ظ†ط¸ط§ظ… (ظٹطµظ„ ط¥ظ„ظٹظ‡ ط§ظ„ط³ظˆط¨ط± ط£ط¯ظ…ظ† ظٹط¯ظˆظٹط§ظ‹ ط¹ظ†ط¯ ط§ظ„ط­ط§ط¬ط©) */}
         <Route
           path="/admin/boot"
           element={
@@ -174,7 +174,7 @@ export function AppRoutes() {
           }
         />
 
-        {/* ④ App — يتطلب شركة نشطة */}
+        {/* â‘£ App â€” ظٹطھط·ظ„ط¨ ط´ط±ظƒط© ظ†ط´ط·ط© */}
         <Route
           element={
             <RequireCompany>
@@ -250,7 +250,7 @@ export function AppRoutes() {
           <Route path="tvas"       element={<TvasPage />} />
         </Route>
 
-        {/* ⑤ Admin Panel */}
+        {/* â‘¤ Admin Panel */}
         <Route
           path="/admin"
           element={

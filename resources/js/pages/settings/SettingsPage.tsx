@@ -34,6 +34,7 @@ import Badge from "@/components/ui/Badge";
 import AlertBar from "@/components/ui/AlertBar";
 import {
     useUpdateCompany,
+    useDeactivateCompany,
     useCompanyMemberMutations,
 } from "@/lib/api/endpoints/companies";
 import {
@@ -44,9 +45,11 @@ import {
 } from "@/lib/api/endpoints/settings";
 import { apiGet, apiPost, apiUpload } from "@/lib/api/core/client";
 import { companyKeys, globalKeys, tenantKeys } from "@/lib/api/core/queryKeys";
-import { useActiveSlug } from "@/lib/store/appStore";
+import { useActiveSlug, useAppStore } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
 import { useAuth } from "@/context/AuthContext";
+import { useModal } from "@/hooks/useModal";
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 import type { Company } from "@/lib/api/core/types";
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
@@ -1348,6 +1351,9 @@ function CompanyTab({
     const slug = useActiveSlug() ?? "";
     const { activeCompany: company, isLoading, setActiveCompany } = useAuth();
     const updateMutation = useUpdateCompany();
+    const deactivateMutation = useDeactivateCompany();
+    const navigate = useNavigate();
+    const deleteModal = useModal();
     const qc = useQueryClient();
     const { isDirty, markDirty, markClean } = useDirtyState();
 
@@ -1764,6 +1770,30 @@ function CompanyTab({
                 <LogoUpload company={company} />
                 <InvoicePreviewCard form={form} company={company} />
                 <CompanyStatusCard company={company} />
+                <Card>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
+                    <SecHead icon="ti-alert-triangle" label="إجراءات الحساب" color="var(--red)" />
+                    <p style={{ fontSize: 12, color: "var(--t4)", lineHeight: 1.5 }}>
+                      سيتم تعطيل الشركة ولن تظهر في قائمة الشركات. يمكنك التواصل مع الدعم لاستعادتها.
+                    </p>
+                    <Button variant="danger" fullWidth onClick={deleteModal.openModal}>
+                      تعطيل الشركة
+                    </Button>
+                  </div>
+                </Card>
+                <ConfirmDeleteModal
+                  open={deleteModal.open}
+                  onClose={deleteModal.closeModal}
+                  onConfirm={async () => {
+                    try {
+                      await deactivateMutation.mutateAsync(slug);
+                      useAppStore.getState().setActiveCompany(null);
+                      navigate("/onboarding", { replace: true });
+                    } catch {}
+                  }}
+                  loading={deactivateMutation.isPending}
+                  itemName={company?.name}
+                />
             </div>
         </div>
     );

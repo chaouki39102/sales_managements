@@ -1,6 +1,7 @@
 // hooks/admin/useAdminSystem.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dashboardApi, plansApi, settingsApi, maintenanceApi } from '@/lib/api/admin';
+import type { AdminPlan } from '@/types/admin';
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
@@ -21,6 +22,27 @@ export function useAdminPlans() {
     queryFn:   plansApi.list,
     staleTime: 10 * 60_000,
   });
+}
+
+export function usePlanMutations() {
+  const qc  = useQueryClient();
+  const inv = () => qc.invalidateQueries({ queryKey: ['admin', 'plans'] });
+
+  return {
+    create: useMutation({
+      mutationFn: (data: Partial<AdminPlan>) => plansApi.create(data),
+      onSuccess:  inv,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, data }: { id: number; data: Partial<AdminPlan> }) =>
+        plansApi.update(id, data),
+      onSuccess:  inv,
+    }),
+    remove: useMutation({
+      mutationFn: (id: number) => plansApi.remove(id),
+      onSuccess:  inv,
+    }),
+  };
 }
 
 // ─── Settings ────────────────────────────────────────────────────────────────

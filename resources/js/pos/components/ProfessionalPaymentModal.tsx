@@ -314,7 +314,7 @@ export default function ProfessionalPaymentModal({
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape')              { e.preventDefault(); onClose(); }
-      if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); handleSubmit(); }
+      if (e.key === 'Enter')               { e.preventDefault(); handleSubmit(); }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);

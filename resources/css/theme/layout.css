@@ -33,6 +33,26 @@ body.dark #sidebar{background:var(--bg2);}
 #sidebar.collapsed .sb-foot button{width:36px;padding:8px;justify-content:center;}
 #sidebar.collapsed .sb-foot button span{display:none;}
 
+/* ── Hover expand for collapsed sidebar ── */
+#sidebar.collapsed:hover{width:var(--sb);overflow-y:auto;}
+#sidebar.collapsed:hover .sbi{justify-content:normal;padding:8px 10px;}
+#sidebar.collapsed:hover .sb-logo{justify-content:normal;padding:16px 14px 12px;}
+#sidebar.collapsed:hover .sb-sec{padding:4px 10px;}
+#sidebar.collapsed:hover .sbi.on{border-right:2px solid var(--em);border-left:none;}
+#sidebar.collapsed:hover .sb-name,
+#sidebar.collapsed:hover .sb-sub,
+#sidebar.collapsed:hover .sb-lbl,
+#sidebar.collapsed:hover .sbi-name,
+#sidebar.collapsed:hover .sbi-badge,
+#sidebar.collapsed:hover .cs-text,
+#sidebar.collapsed:hover .cs-text+.ti{display:block;}
+#sidebar.collapsed:hover .sbi-ic{font-size:16px;width:22px;}
+#sidebar.collapsed:hover .sb-foot>div{display:flex;flex-direction:column;}
+#sidebar.collapsed:hover .sb-foot a>div{justify-content:normal;padding:10px 12px;gap:10px;}
+#sidebar.collapsed:hover .sb-foot a>div>div:nth-child(2){display:block;}
+#sidebar.collapsed:hover .sb-foot button{width:100%;padding:8px 10px;justify-content:normal;}
+#sidebar.collapsed:hover .sb-foot button span{display:inline;}
+
 
 /* ═══ SIDEBAR LOGO ═══ */
 .sb-logo{

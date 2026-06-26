@@ -7,13 +7,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiPatch } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug, useSelectedYearId, useAppStore } from '../../store/appStore';
-import type { FiscalYear, ListParams } from '../core/types';
+import type { FiscalYear, ListParams, PaginatedResponse } from '../core/types';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 export const fiscalYearsApi = {
   list: (params?: ListParams) =>
-    apiGet<FiscalYear[]>('/fiscal-years', { per_page: 50, ...params }),
+    apiGet<PaginatedResponse<FiscalYear>>('/fiscal-years', { per_page: 50, ...params }),
 
   show: (id: number) =>
     apiGet<FiscalYear>(`/fiscal-years/${id}`),
@@ -44,15 +44,18 @@ export function useFiscalYears() {
     enabled:   !!slug,
     staleTime: 5 * 60_000,
     // ✅ select يُحوِّل المصفوفة إلى كائن منظم
-    select: (years) => ({
-      years,
-      current: years.find(y => y.is_current) ??
-               years.find(y => !y.is_closed)  ??
-               years[0] ??
-               null,
-      open:   years.filter(y => !y.is_closed),
-      closed: years.filter(y => y.is_closed),
-    }),
+    select: (response) => {
+      const years = response.data;
+      return {
+        years,
+        current: years.find(y => y.is_current) ??
+                 years.find(y => !y.is_closed)  ??
+                 years[0] ??
+                 null,
+        open:   years.filter(y => !y.is_closed),
+        closed: years.filter(y => y.is_closed),
+      };
+    },
   });
 }
 

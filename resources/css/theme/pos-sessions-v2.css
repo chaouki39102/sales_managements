@@ -227,6 +227,17 @@
   color: var(--em);
   flex-shrink: 0;
 }
+.osm-fy-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r2);
+  border: 1.5px solid var(--em);
+  background: var(--emb);
+}
+.osm-fy-badge-name { font-size: 13px; font-weight: 700; color: var(--t1); }
+.osm-fy-badge-dates { font-size: 10.5px; color: var(--t4); margin-left: auto; }
 
 /* Summary bar */
 .osm-summary-bar {

@@ -84,6 +84,7 @@ const NAV_GROUPS = [
       { name: 'سلاسل الترقيم',   href: 'numbering-series',        icon: 'ti-list-numbers' },
       { name: 'فئات المصروفات',  href: 'expense-categories',      icon: 'ti-category'     },
       { name: 'الملف الشخصي',    href: 'profile',                 icon: 'ti-user-circle'  },
+      { name: 'الإعداد الأولي',  href: '/onboarding',            icon: 'ti-rocket'       },
     ],
   },
   {
@@ -694,7 +695,7 @@ const meta = useTopbarTitle();
           </div>
           <div className="tb-actions">
             <button className="ib" onClick={() => setSidebarCollapsed(c => !c)} title={sidebarCollapsed ? 'توسيع القائمة' : 'طي القائمة'}>
-              <span className="ic ic-sm"><i className={`ti ti-menu-2`} /></span>
+              <span className="ic ic-sm"><i className={`ti ${sidebarCollapsed ? 'ti-layout-sidebar-right-expand' : 'ti-layout-sidebar-right-collapse'}`} /></span>
             </button>
             <FiscalYearSelector />
             <div className="srch">

@@ -135,8 +135,9 @@ class AdminSeedController extends Controller
     // POST /api/v1/admin/companies/{company}/seed
     // ─────────────────────────────────────────────────────────────
 
-    public function seedCompany(Company $company): JsonResponse
+    public function seedCompany(int $companyId): JsonResponse
     {
+        $company = Company::findOrFail($companyId);
         config(['seeding.company_id' => $company->id]);
 
         $applied = [];
@@ -195,8 +196,9 @@ class AdminSeedController extends Controller
     // POST /api/v1/admin/companies/{company}/seed/{seeder}
     // ─────────────────────────────────────────────────────────────
 
-    public function seedCompanySingle(Company $company, string $seeder): JsonResponse
+    public function seedCompanySingle(int $companyId, string $seeder): JsonResponse
     {
+        $company = Company::findOrFail($companyId);
         if (!isset(self::COMPANY_SEEDERS[$seeder])) {
             return response()->json([
                 'message'   => "seeder غير معروف: {$seeder}",

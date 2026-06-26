@@ -51,8 +51,10 @@ export default function OpenSessionModal({
   const selectedWh = warehouses.find(w => w.id === warehouseId);
   const selectedFy = fiscalYears.find(y => y.id === fiscalYearId);
   const now        = new Date();
-  const timeStr    = now.toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' });
-  const dateStr    = now.toLocaleDateString('ar-DZ', { weekday: 'long', day: 'numeric', month: 'long' });
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const timeStr    = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const dateStr    = `${pad(now.getDate())}-${pad(now.getMonth()+1)}-${now.getFullYear()}`;
+  const fmtDate = (d: string) => d.split('.')[0];
 
   // numpad
   const np = (key: string) => {
@@ -159,27 +161,18 @@ export default function OpenSessionModal({
                 <i className="ti ti-calendar" />
                 السنة المالية
               </label>
-              <div className="osm-fy-list">
-                {fiscalYears.filter(y => !y.is_closed).map(y => (
-                  <button
-                    key={y.id}
-                    type="button"
-                    className={`osm-fy-row ${fiscalYearId === y.id ? 'on' : ''}`}
-                    onClick={() => setFiscalYearId(y.id)}
-                  >
-                    <div className="osm-fy-radio" />
-                    <div className="osm-fy-info">
-                      <span className="osm-fy-name">{y.name}</span>
-                      <span className="osm-fy-dates">
-                        {y.start_date} — {y.end_date}
-                      </span>
-                    </div>
-                    {y.is_current && (
-                      <span className="osm-current-tag">الحالية</span>
-                    )}
-                  </button>
-                ))}
-              </div>
+              {(() => {
+                const currentFy = fiscalYears.find(y => y.id === fiscalYearId);
+                return currentFy ? (
+                  <div className="osm-fy-badge">
+                    <span className="osm-fy-badge-name">{currentFy.name}</span>
+                    <span className="osm-fy-badge-dates">
+                      {fmtDate(currentFy.start_date)} — {fmtDate(currentFy.end_date)}
+                    </span>
+                    <span className="osm-current-tag">الحالية</span>
+                  </div>
+                ) : null;
+              })()}
             </div>
 
             {/* ملاحظة وردية */}

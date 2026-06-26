@@ -17,9 +17,11 @@
 //   الحل: الصفحة سليمة لكن نضيف error handling واضح
 // ════════════════════════════════════════════════════════════════════════════
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAdminCompanies } from '@/hooks/admin';
 import { useDebounce }       from '@/hooks/useDebounce';
 import CompanyDrawer         from '@/components/admin/CompanyDrawer';
+import { companiesApi, plansApi } from '@/lib/api/admin';
 import {
   Avatar, StatusBadge, EmptyState, Spinner, fmtDate,
 } from '@/components/admin/shared';
@@ -27,12 +29,8 @@ import PageHeader  from '@/components/ui/PageHeader';
 import Card        from '@/components/ui/Card';
 import Button      from '@/components/ui/Button';
 import SearchInput from '@/components/ui/SearchInput';
-import type { AdminCompany, AdminCompaniesFilter, Paginated } from '@/types/admin';
+import type { AdminCompany, AdminPlan, AdminCompaniesFilter, Paginated } from '@/types/admin';
 
-const PLANS: Record<string, string> = {
-  free: 'مجاني', starter: 'مبتدئ', professional: 'احترافي',
-  enterprise: 'مؤسسة', custom: 'مخصص',
-};
 const PLAN_COLORS: Record<string, string> = {
   free: '#6b7280', starter: '#6366f1', professional: '#0ea5e9',
   enterprise: '#f59e0b', custom: '#8b5cf6',
@@ -47,6 +45,13 @@ export default function AdminCompaniesPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page,    setPage]    = useState(1);
   const [selected, setSelected] = useState<AdminCompany | null>(null);
+
+  const { data: plans = [] } = useQuery<AdminPlan[]>({
+    queryKey: ['admin', 'plans'],
+    queryFn:  () => plansApi.list(),
+    staleTime: 60_000,
+  });
+  const planLabels = Object.fromEntries(plans.map(p => [p.key, p.label]));
 
   const filter = useMemo<AdminCompaniesFilter>(() => ({
     search:   search || undefined,
@@ -125,7 +130,7 @@ export default function AdminCompaniesPage() {
           }}
         >
           <option value="">كل الخطط</option>
-          {Object.entries(PLANS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          {plans.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
         </select>
       </div>
 
@@ -216,7 +221,7 @@ export default function AdminCompaniesPage() {
                       background: (PLAN_COLORS[co.plan] ?? '#6b7280') + '22',
                       color: PLAN_COLORS[co.plan] ?? '#6b7280',
                     }}>
-                      {PLANS[co.plan] ?? co.plan}
+                      {planLabels[co.plan] ?? co.plan}
                     </span>
                   </td>
                   <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--t2)', fontWeight: 600 }}>

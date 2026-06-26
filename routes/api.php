@@ -404,11 +404,14 @@ Route::prefix('v1')->group(function () {
 
             // ── ⑤-ب-٢: السنوات المالية (manage_fiscal_year) ─────
             Route::middleware('can:manage_fiscal_year')->group(function () {
-                Route::post('fiscal-years',              [FiscalYearController::class, 'store']);
-                Route::put('fiscal-years/{year}',        [FiscalYearController::class, 'update']);
-                Route::patch('fiscal-years/{year}',      [FiscalYearController::class, 'update']);
-                Route::delete('fiscal-years/{year}',     [FiscalYearController::class, 'destroy']);
-                Route::post('fiscal-years/{year}/close', [FiscalYearController::class, 'close']);
+                Route::post('fiscal-years',                       [FiscalYearController::class, 'store']);
+                Route::put('fiscal-years/{year}',                 [FiscalYearController::class, 'update']);
+                Route::patch('fiscal-years/{year}',               [FiscalYearController::class, 'update']);
+                Route::delete('fiscal-years/{year}',              [FiscalYearController::class, 'destroy']);
+                Route::post('fiscal-years/{year}/close',          [FiscalYearController::class, 'close']);
+                Route::post('fiscal-years/{year}/import-from/{sourceYear}', [FiscalYearController::class, 'importBalances']);
+                Route::post('fiscal-years/{year}/transfer-to/{targetYear}', [FiscalYearController::class, 'transferBalances']);
+                Route::get('fiscal-years/{year}/related-data',    [FiscalYearController::class, 'relatedData']);
             });
 
             // ── ⑤-ج: للمالك والمدير والمحاسب ──────────────────

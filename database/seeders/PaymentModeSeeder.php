@@ -11,7 +11,7 @@ class PaymentModeSeeder extends Seeder
     {
         $companyId    = config('seeding.company_id') ?? DB::table('companies')->value('id');
         $cashAccountId = DB::table('treasury_accounts')->where('company_id', $companyId)->where('code', 'CASH01')->value('id');
-        $bankAccountId = DB::table('treasury_accounts')->where('company_id', $companyId)->where('code', 'BNA01')->value('id');
+        $bankAccountId = DB::table('treasury_accounts')->where('company_id', $companyId)->where('code', 'BNA710')->value('id');
 
         DB::table('payment_modes')->insert([
             ['company_id' => $companyId, 'name' => 'نقداً',         'code' => 'CASH',  'treasury_account_id' => $cashAccountId, 'requires_reference' => false, 'is_cash' => true,  'active' => true, 'display_order' => 1, 'created_at' => now(), 'updated_at' => now()],

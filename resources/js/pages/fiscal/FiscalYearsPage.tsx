@@ -133,10 +133,14 @@ export default function FiscalYearsPage() {
     const [editingYear, setEditingYear] = useState<FiscalYear | null>(null);
     const [closingYear, setClosingYear] = useState<FiscalYear | null>(null);
     const [viewingYear, setViewingYear] = useState<FiscalYear | null>(null);
+    const [importingYear, setImportingYear] = useState<FiscalYear | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<FiscalYear | null>(null);
+    const [relatedData, setRelatedData] = useState<any>(null);
 
     const addModal = useModal();
     const closeModal = useModal();
     const detailModal = useModal();
+    const importModal = useModal();
 
     const { data, isLoading, isError, refetch } = useQuery({
         queryKey: ['fiscal-years'],
@@ -168,18 +172,38 @@ export default function FiscalYearsPage() {
     // حذف سنة
     const deleteYear = useMutation({
         mutationFn: (id: number) => apiClient.delete(`/fiscal-years/${id}`),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ['fiscal-years'] }),
+        onSuccess: (res) => {
+            qc.invalidateQueries({ queryKey: ['fiscal-years'] });
+            setDeleteTarget(null);
+            setRelatedData(null);
+        },
+    });
+
+    const fetchRelatedData = useMutation({
+        mutationFn: (id: number) => apiClient.get(`/fiscal-years/${id}/related-data`).then(r => r.data.data),
+        onSuccess: (data) => setRelatedData(data),
     });
 
     const openAdd = () => { setEditingYear(null); addModal.openModal(); };
     const openEdit = (y: FiscalYear) => { if (!y.is_closed) { setEditingYear(y); addModal.openModal(); } };
     const openClose = (y: FiscalYear) => { setClosingYear(y); closeModal.openModal(); };
+    const openImport = (y: FiscalYear) => { setImportingYear(y); importModal.openModal(); };
     const openDetail = (y: FiscalYear) => { setViewingYear(y); detailModal.openModal(); };
 
-    const handleDelete = async (y: FiscalYear) => {
+    const handleDeleteClick = async (y: FiscalYear) => {
         if (y.is_closed || y.is_current) return;
-        if (!confirm(`هل أنت متأكد من حذف السنة المالية "${y.name}"؟`)) return;
-        deleteYear.mutate(y.id);
+        setDeleteTarget(y);
+        fetchRelatedData.mutate(y.id);
+    };
+
+    const confirmDelete = () => {
+        if (!deleteTarget) return;
+        deleteYear.mutate(deleteTarget.id);
+    };
+
+    const cancelDelete = () => {
+        setDeleteTarget(null);
+        setRelatedData(null);
     };
 
     return (
@@ -355,9 +379,12 @@ export default function FiscalYearsPage() {
                                                                     onClick={() => setCurrent.mutate(y.id)} disabled={setCurrent.isPending}/>
                                                             )}
                                                             <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(y)}/>
+                                                            <Button size="xs" variant="info" icon={<i className="ti ti-import"/>} onClick={() => openImport(y)}>استيراد</Button>
                                                             {y.is_current && (
                                                                 <Button size="xs" variant="warning" icon={<i className="ti ti-lock"/>} onClick={() => openClose(y)}>إقفال</Button>
                                                             )}
+                                                            <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
+                                                                onClick={() => handleDeleteClick(y)} disabled={deleteYear.isPending}/>
                                                         </>
                                                     )}
                                                 </div>
@@ -377,6 +404,15 @@ export default function FiscalYearsPage() {
             <FiscalYearDetailModal open={detailModal.open} year={viewingYear}
                 onClose={detailModal.closeModal}
                 onClose2={() => { detailModal.closeModal(); openClose(viewingYear!); }}/>
+            <ImportModal open={importModal.open} year={importingYear} years={years} onClose={importModal.closeModal}/>
+            <DeleteConfirmModal
+                open={deleteTarget !== null}
+                year={deleteTarget}
+                relatedData={relatedData}
+                loading={fetchRelatedData.isPending || deleteYear.isPending}
+                onConfirm={confirmDelete}
+                onClose={cancelDelete}
+            />
         </div>
     );
 }
@@ -416,14 +452,19 @@ function FiscalYearModal({ open, year, years, onClose }: {
 
     const overlapError = useMemo(() => {
         if (!form.start_date || !form.end_date) return '';
+        if (form.start_date >= form.end_date) return 'تاريخ البداية يجب أن يكون قبل تاريخ النهاية';
+        if (isEdit && year) {
+            const origStart = toInput(year.start_date);
+            const origEnd   = toInput(year.end_date);
+            if (form.start_date === origStart && form.end_date === origEnd) return '';
+        }
         for (const y of years.filter(y => !isEdit || y.id !== year?.id)) {
             const s = toInput(y.start_date), e = toInput(y.end_date);
             if (form.start_date <= e && form.end_date >= s)
                 return `تتداخل مع السنة المالية ${y.name} (${fmtDate(s)} — ${fmtDate(e)})`;
         }
-        if (form.start_date >= form.end_date) return 'تاريخ البداية يجب أن يكون قبل تاريخ النهاية';
         return '';
-    }, [form.start_date, form.end_date, years, year?.id, isEdit]);
+    }, [form.start_date, form.end_date, years, year?.id, isEdit, year?.start_date, year?.end_date]);
 
     const duration = form.start_date && form.end_date && !overlapError
         ? `${Math.round(daysBetween(form.start_date, form.end_date) / 30.44)} شهراً`
@@ -726,6 +767,200 @@ function FiscalYearDetailModal({ open, year, onClose, onClose2 }: {
                     </div>
                 )}
             </div>
+        </Modal>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODAL: استيراد الأرصدة من سنة أخرى
+// ─────────────────────────────────────────────────────────────
+function ImportModal({ open, year, years, onClose }: {
+    open: boolean; year: FiscalYear | null; years: FiscalYear[]; onClose: () => void;
+}) {
+    const [sourceYearId, setSourceYearId] = useState<number | null>(null);
+    const [importStock, setImportStock] = useState(true);
+    const [importParties, setImportParties] = useState(true);
+    const [importTreasury, setImportTreasury] = useState(true);
+    const [error, setError] = useState('');
+    const [result, setResult] = useState<any>(null);
+
+    const qc = useQueryClient();
+
+    useEffect(() => {
+        if (open) { setSourceYearId(null); setError(''); setResult(null); }
+    }, [open]);
+
+    const importMut = useMutation({
+        mutationFn: () => {
+            if (!year || !sourceYearId) throw new Error('Missing data');
+            return apiClient.post(`/fiscal-years/${year.id}/import-from/${sourceYearId}`, {
+                stock: importStock, parties: importParties, treasury: importTreasury,
+            }).then(r => r.data.data);
+        },
+        onSuccess: (data) => {
+            setResult(data);
+            qc.invalidateQueries({ queryKey: ['fiscal-years'] });
+        },
+        onError: (err: unknown) => {
+            setError(parseApiError(err, 'فشل استيراد الأرصدة'));
+        },
+    });
+
+    const sourceYears = useMemo(() =>
+        years.filter(y => !y.is_closed && y.id !== year?.id),
+        [years, year]
+    );
+
+    if (!year) return null;
+
+    return (
+        <Modal open={open} onClose={onClose} size="md"
+            title={result ? 'تم الاستيراد بنجاح' : `استيراد أرصدة افتتاحية — ${year.name}`}
+            subtitle={result ? '' : 'انسخ الأرصدة من سنة مالية أخرى'}
+            footer={result ? (
+                <Button onClick={onClose} icon={<i className="ti ti-check"/>}>تم</Button>
+            ) : (
+                <>
+                    <Button onClick={onClose}>إلغاء</Button>
+                    <Button variant="primary" icon={<i className="ti ti-import"/>}
+                        onClick={() => importMut.mutate()}
+                        disabled={!sourceYearId || importMut.isPending}>
+                        {importMut.isPending ? 'جاري الاستيراد...' : 'استيراد'}
+                    </Button>
+                </>
+            )}>
+            {error && <AlertBar variant="red">{error}</AlertBar>}
+
+            {result ? (
+                <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                    <div style={{
+                        width: 56, height: 56, borderRadius: '50%',
+                        background: 'var(--emb)', border: '2px solid var(--embo)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '0 auto 14px',
+                    }}>
+                        <i className="ti ti-circle-check" style={{ fontSize: 28, color: 'var(--em)' }}/>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--t1)', marginBottom: 8 }}>
+                        تم استيراد الأرصدة بنجاح
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {result.stock > 0 && <span style={{ fontSize: 12, color: 'var(--t3)' }}>المخزون: {result.stock} منتج</span>}
+                        {result.parties > 0 && <span style={{ fontSize: 12, color: 'var(--t3)' }}>المتعاملون: {result.parties} طرف</span>}
+                        {result.treasury > 0 && <span style={{ fontSize: 12, color: 'var(--t3)' }}>الخزينة: {result.treasury} حساب</span>}
+                        {result.stock === 0 && result.parties === 0 && result.treasury === 0 && (
+                            <span style={{ fontSize: 12, color: 'var(--t4)' }}>لم يتم استيراد أي أرصدة (المصدر فارغ)</span>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {sourceYears.length === 0 ? (
+                        <AlertBar variant="gold">لا توجد سنوات مالية مفتوحة أخرى لاستيراد الأرصدة منها.</AlertBar>
+                    ) : (
+                        <div className="fg">
+                            <label className="req">استيراد من السنة</label>
+                            <select value={sourceYearId ?? ''}
+                                onChange={e => { setSourceYearId(Number(e.target.value)); setError(''); }}
+                                style={{ padding: '11px 14px', borderRadius: 10, border: '1.5px solid var(--b3)', width: '100%', fontSize: 14 }}>
+                                <option value="">اختر السنة المصدر...</option>
+                                {sourceYears.map(y => (
+                                    <option key={y.id} value={y.id}>
+                                        {y.name} ({fmtDate(y.start_date)} — {fmtDate(y.end_date)})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t3)' }}>اختر البيانات المراد استيرادها:</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--r2)', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={importStock} onChange={e => setImportStock(e.target.checked)}
+                                style={{ accentColor: 'var(--em)', width: 16, height: 16 }}/>
+                            <span><i className="ti ti-package" style={{ marginLeft: 6, color: 'var(--blue)' }}/> أرصدة المخزون</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--r2)', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={importParties} onChange={e => setImportParties(e.target.checked)}
+                                style={{ accentColor: 'var(--em)', width: 16, height: 16 }}/>
+                            <span><i className="ti ti-users" style={{ marginLeft: 6, color: 'var(--em)' }}/> أرصدة المتعاملين</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--r2)', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={importTreasury} onChange={e => setImportTreasury(e.target.checked)}
+                                style={{ accentColor: 'var(--em)', width: 16, height: 16 }}/>
+                            <span><i className="ti ti-wallet" style={{ marginLeft: 6, color: 'var(--gold)' }}/> أرصدة الخزينة</span>
+                        </label>
+                    </div>
+                </div>
+            )}
+        </Modal>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODAL: تأكيد الحذف مع عرض البيانات المرتبطة
+// ─────────────────────────────────────────────────────────────
+function DeleteConfirmModal({ open, year, relatedData, loading, onConfirm, onClose }: {
+    open: boolean; year: FiscalYear | null; relatedData: any; loading: boolean;
+    onConfirm: () => void; onClose: () => void;
+}) {
+    if (!year) return null;
+
+    const items = relatedData ? [
+        { label: 'المستندات', value: relatedData.documents, icon: 'ti-file-text', color: 'var(--blue)' },
+        { label: 'الدفعات', value: relatedData.payments, icon: 'ti-coin', color: 'var(--em)' },
+        { label: 'المصاريف', value: relatedData.expenses, icon: 'ti-receipt', color: 'var(--red)' },
+        { label: 'حركات المخزون', value: relatedData.stock_movements, icon: 'ti-package', color: 'var(--blue)' },
+        { label: 'أرصدة مخزون', value: relatedData.stock_balances, icon: 'ti-archive', color: 'var(--t4)' },
+        { label: 'أرصدة متعاملين', value: relatedData.party_balances, icon: 'ti-users', color: 'var(--em)' },
+        { label: 'أرصدة خزينة', value: relatedData.treasury_balances, icon: 'ti-wallet', color: 'var(--gold)' },
+    ].filter(i => i.value > 0) : [];
+
+    return (
+        <Modal open={open} onClose={onClose} size="sm"
+            title={<span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="ti ti-alert-triangle" style={{ color: 'var(--red)', fontSize: 20 }}/>
+                حذف السنة المالية {year.name}
+            </span>}
+            subtitle="سيتم حذف كل البيانات المرتبطة بهذه السنة نهائياً"
+            footer={
+                <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+                    <Button onClick={onClose} disabled={loading} style={{ flex: 1 }}>إلغاء</Button>
+                    <Button variant="danger" icon={<i className="ti ti-trash"/>}
+                        onClick={onConfirm} disabled={loading || !relatedData}
+                        style={{ flex: 1 }}>
+                        {loading ? 'جاري التحميل...' : `تأكيد الحذف${relatedData?.total > 0 ? ` (${relatedData.total})` : ''}`}
+                    </Button>
+                </div>
+            }>
+            {!relatedData ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--t4)' }}>
+                    <div style={{ display: 'inline-block', animation: 'spin 1s linear infinite', fontSize: 28, marginBottom: 8 }}>⟳</div>
+                    <div style={{ fontSize: 13 }}>جاري إحصائ البيانات المرتبطة...</div>
+                </div>
+            ) : relatedData.total === 0 ? (
+                <AlertBar variant="gold">لا توجد بيانات مرتبطة بهذه السنة. سيتم حذفها مباشرة.</AlertBar>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <AlertBar variant="red">
+                        <strong>{relatedData.total}</strong> سجل مرتبط بهذه السنة المالية. هذا الإجراء لا يمكن التراجع عنه.
+                    </AlertBar>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        {items.map(({ label, value, icon, color }) => (
+                            <div key={label} style={{
+                                padding: '10px 12px', background: 'var(--bg3)', borderRadius: 'var(--r1)',
+                                border: '1px solid var(--b1)', display: 'flex', alignItems: 'center', gap: 8,
+                            }}>
+                                <i className={`ti ${icon}`} style={{ fontSize: 16, color }}/>
+                                <div>
+                                    <div style={{ fontSize: 9, color: 'var(--t4)' }}>{label}</div>
+                                    <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--t1)' }}>{value}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </Modal>
     );
 }

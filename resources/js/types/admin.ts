@@ -70,12 +70,16 @@ export interface ActivityLog {
 }
 
 export interface AdminPlan {
-  key:             string;
-  label:           string;
-  max_users:       number;
-  max_products:    number;
-  max_warehouses:  number;
-  companies_count: number;
+  id:               number;
+  key:              string;
+  label:            string;
+  description?:     string | null;
+  max_users:        number;
+  max_products:     number;
+  max_warehouses:   number;
+  is_active:        boolean;
+  sort_order:       number;
+  companies_count:  number;
 }
 
 export interface SystemSettings {

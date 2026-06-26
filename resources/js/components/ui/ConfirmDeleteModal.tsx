@@ -114,7 +114,8 @@ export default function ConfirmDeleteModal({
                     <p style={{
                         margin: '6px 0 0',
                         fontSize: 13,
-                        color: 'var(--t4)',
+                        fontWeight: 700,
+                        color: 'var(--red)',
                         lineHeight: 1.6,
                     }}>
                         {warning ?? 'لا يمكن التراجع عن هذا الإجراء بعد التأكيد.'}

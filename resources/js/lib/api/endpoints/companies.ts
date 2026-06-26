@@ -59,6 +59,7 @@ export const companiesApi = {
         apiPatch(`/companies/${slug}/members/${userId}/deactivate`, {}),
     transferOwnership: (slug: string, userId: number) =>
         apiPost(`/companies/${slug}/transfer-ownership`, { user_id: userId }),
+    remove: (slug: string) => apiDelete(`/companies/${slug}`),
 } as const;
 
 // ─── Hooks ─────────────────────────────────────────────────────────────────────
@@ -142,6 +143,16 @@ export function useUpdateCompany() {
             }
             // ✅ أبطل mine لتحديث القائمة
             qc.invalidateQueries({ queryKey: companyKeys.mine });
+        },
+    });
+}
+
+export function useDeactivateCompany() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (slug: string) => companiesApi.remove(slug),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: companyKeys.all });
         },
     });
 }

@@ -70,8 +70,8 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
                   <th>#</th>
                   <th>رقم الفاتورة</th>
                   <th>العميل</th>
+                  <th>التاريخ</th>
                   <th>الإجمالي</th>
-                  <th>الحالة</th>
                 </tr>
               </thead>
               <tbody>
@@ -85,12 +85,8 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
                     <td>{i + 1}</td>
                     <td><strong>{doc.document_number}</strong></td>
                     <td>{doc.party?.name ?? <span style={{ color: 'var(--t4)' }}>—</span>}</td>
-                    <td>{formatDZD(doc.total_ttc)}</td>
-                    <td>
-                      <span className={`badge badge-${doc.status === 'paid' ? 'g' : doc.status === 'validated' ? 'b' : 'y'}`}>
-                        {doc.status === 'paid' ? 'مدفوعة' : doc.status === 'validated' ? 'مؤكدة' : 'مسودة'}
-                      </span>
-                    </td>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
+                    <td style={{ fontWeight: 600 }}>{formatDZD(doc.total_ttc)}</td>
                   </tr>
                 ))}
               </tbody>

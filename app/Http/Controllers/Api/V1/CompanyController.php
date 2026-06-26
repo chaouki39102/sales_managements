@@ -73,10 +73,11 @@ class CompanyController extends BaseApiController
             $user  = auth()->user();
             $query = Company::query()->with(['owner:id,name,email']);
 
-            // Super Admin → كل الشركات | غيره → شركاته فقط
+            // Super Admin → كل الشركات | غيره → شركاته النشطة فقط
             if (!$user->isSuperAdmin()) {
                 // ✅ الإصلاح: users.id وليس user_id (whereHas يبحث في users table)
-                $query->whereHas('users', fn($q) => $q->where('users.id', $user->id));
+                $query->whereHas('users', fn($q) => $q->where('users.id', $user->id))
+                      ->active();
             }
 
             // فلاتر الحالة — Super Admin فقط

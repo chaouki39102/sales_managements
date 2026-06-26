@@ -1,5 +1,5 @@
 // lib/api/admin/system.ts
-import { apiGet, apiPost, apiPut } from '@/lib/api/core/client';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '@/lib/api/core/client';
 import { apiGetPaginated }         from './client';
 import type {
   AdminDashboardStats,
@@ -15,7 +15,10 @@ export const dashboardApi = {
 
 export const plansApi = {
   list: () => apiGet<AdminPlan[]>('/admin/plans'),
-  show: (key: string) => apiGet<AdminPlan>(`/admin/plans/${key}`),
+  show: (id: number) => apiGet<AdminPlan>(`/admin/plans/${id}`),
+  create: (data: Partial<AdminPlan>) => apiPost<AdminPlan>('/admin/plans', data),
+  update: (id: number, data: Partial<AdminPlan>) => apiPut<AdminPlan>(`/admin/plans/${id}`, data),
+  remove: (id: number) => apiDelete(`/admin/plans/${id}`),
 } as const;
 
 export const settingsApi = {

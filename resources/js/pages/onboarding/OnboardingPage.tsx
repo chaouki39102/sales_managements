@@ -92,11 +92,11 @@ function FiscalYearModal({
   const fetchYears = () => {
     setLoading(true);
     setError(null);
-    // ✅ المسار الصحيح: /{slug}/fiscal-years
     apiClient
-      .get(`/${company.slug}/fiscal-years`, { params: { per_page: 50 } })
+      .get(`/${company.slug}/fiscal-years`, { params: { per_page: 50 }, _skipSlug: true } as any)
       .then(r => {
-        const data: FiscalYear[] = r.data?.data ?? (Array.isArray(r.data) ? r.data : []);
+        const raw = r.data?.data;
+        const data: FiscalYear[] = Array.isArray(raw) ? raw : (raw?.data ?? []);
         setYears(data);
         const current = data.find(y => y.is_current) ?? data.find(y => !y.is_closed) ?? data[0] ?? null;
         if (current) setSelected(current.id);
@@ -119,13 +119,12 @@ function FiscalYearModal({
     setCreating(true);
     setCreateError(null);
     try {
-      // ✅ المسار الصحيح: /{slug}/fiscal-years
       await apiClient.post(`/${company.slug}/fiscal-years`, {
         name,
         start_date: `${year}-01-01`,
         end_date:   `${year}-12-31`,
         is_current: true,
-      });
+      }, { _skipSlug: true } as any);
       fetchYears();
     } catch (e: any) {
       setCreateError(e?.response?.data?.message ?? 'فشل إنشاء السنة المالية');
@@ -345,6 +344,15 @@ const CARD_COLORS = [
 function CompanyCard({ company, index, onClick }: { company: Company; index: number; onClick: () => void }) {
   const c = CARD_COLORS[index % CARD_COLORS.length];
   const suspended = company.is_suspended;
+  const plan = company.plan ?? 'free';
+  const PLAN_COLORS: Record<string, string> = {
+    free: '#6b7280', starter: '#6366f1',
+    professional: '#0ea5e9', enterprise: '#f59e0b', custom: '#8b5cf6',
+  };
+  const PLAN_LABELS: Record<string, string> = {
+    free:'مجاني', starter:'Starter', professional:'Professional', enterprise:'Enterprise', custom:'مخصص',
+  };
+  const pColor = PLAN_COLORS[plan] ?? '#6b7280';
 
   return (
     <div
@@ -376,8 +384,15 @@ function CompanyCard({ company, index, onClick }: { company: Company; index: num
         {getInitials(company.name)}
       </div>
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontSize:15, fontWeight:800, color:'var(--t1)', marginBottom:3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+        <div style={{ fontSize:15, fontWeight:800, color:'var(--t1)', marginBottom:3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', display:'flex', alignItems:'center', gap:8 }}>
           {company.name}
+          <span style={{
+            fontSize:9, fontWeight:800, padding:'2px 8px', borderRadius:20,
+            background: pColor + '22', color: pColor, border: '1px solid ' + pColor + '44',
+            whiteSpace:'nowrap', flexShrink:0,
+          }}>
+            {PLAN_LABELS[plan] ?? plan}
+          </span>
         </div>
         <div style={{ fontSize:11, color:'var(--t4)', display:'flex', alignItems:'center', gap:8 }}>
           {suspended ? (
@@ -419,6 +434,10 @@ function CompanyCard({ company, index, onClick }: { company: Company; index: num
 const PLANS = ['free','starter','professional','enterprise'] as const;
 const PLAN_LABELS: Record<string, string> = {
   free:'مجاني', starter:'Starter', professional:'Professional', enterprise:'Enterprise',
+};
+const PLAN_BADGE_COLORS: Record<string, string> = {
+  free: '#6b7280', starter: '#6366f1',
+  professional: '#0ea5e9', enterprise: '#f59e0b', custom: '#8b5cf6',
 };
 
 function AdminModal({
@@ -679,9 +698,17 @@ function AdminModal({
                               {co.name}
                               {verified && <i className="ti ti-rosette-discount-check" style={{ color:'var(--em)', fontSize:13 }} />}
                             </div>
-                            <div style={{ fontSize:10, color:'var(--t4)', fontFamily:'monospace' }}>
-                              {co.slug} · {PLAN_LABELS[plan] ?? plan}
-                              {suspended && <span style={{ color:'var(--red)', marginRight:8 }}>· معلّقة</span>}
+                            <div style={{ fontSize:10, color:'var(--t4)', fontFamily:'monospace', display:'flex', alignItems:'center', gap:6 }}>
+                              <span>{co.slug}</span>
+                              <span style={{
+                                fontSize:8, fontWeight:800, padding:'1px 7px', borderRadius:20,
+                                background: (PLAN_BADGE_COLORS[plan] ?? '#6b7280') + '22',
+                                color: PLAN_BADGE_COLORS[plan] ?? '#6b7280',
+                                border: '1px solid ' + (PLAN_BADGE_COLORS[plan] ?? '#6b7280') + '44',
+                              }}>
+                                {PLAN_LABELS[plan] ?? plan}
+                              </span>
+                              {suspended && <span style={{ color:'var(--red)' }}>· معلّقة</span>}
                             </div>
                           </div>
                           {/* actions */}
@@ -1011,9 +1038,8 @@ export default function OnboardingPage() {
   const handleFiscalConfirm = (yearId: number | null) => {
     if (!pendingCompany) return;
     if (yearId) {
-      try { sessionStorage.setItem('selected_fiscal_year', String(yearId)); } catch {}
+      appActions.setSelectedYearId(yearId);
     }
-    // ✅ تحديث AuthContext بالشركة النشطة
     setActiveCompany({
       id:   pendingCompany.id,
       name: pendingCompany.name,
@@ -1023,11 +1049,11 @@ export default function OnboardingPage() {
     navigate('/dashboard', { replace: true });
   };
 
-   // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
+  // ✅ بعد إنشاء شركة جديدة + سنة مالية من المودال الشامل
 const handleNewCompanyCreated = (company: Company, fiscalYear: { id: number }) => {
   setShowCreate(false);
   setCompanies(prev => [...prev, company]);
-  try { sessionStorage.setItem('selected_fiscal_year', String(fiscalYear.id)); } catch {}
+  appActions.setSelectedYearId(fiscalYear.id);
 
   // ✅ فقط افتح مودال السيدر، ولا تحدث activeCompany
   setSeedingCompany({ slug: company.slug, name: company.name, id: company.id });

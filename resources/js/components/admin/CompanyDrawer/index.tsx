@@ -6,9 +6,9 @@ import {
   InfoRow, SectionTitle, EmptyState, Spinner, fmtDate,
 } from '../shared';
 import type { TabDef } from '../shared';
-import { companiesApi } from '@/lib/api/admin';
+import { companiesApi, plansApi } from '@/lib/api/admin';
 import { useCompanyMutations } from '@/hooks/admin';
-import type { AdminCompany, AdminUser } from '@/types/admin';
+import type { AdminCompany, AdminUser, AdminPlan } from '@/types/admin';
 
 const PLANS: Record<string, string> = {
   free:         'مجاني',
@@ -46,6 +46,14 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
 
   const muts = useCompanyMutations();
   const close = (refresh = false) => onClose(refresh);
+
+  const { data: plans = [] } = useQuery<AdminPlan[]>({
+    queryKey: ['admin', 'plans'],
+    queryFn:  () => plansApi.list(),
+    staleTime: 60_000,
+  });
+
+  const planMap = Object.fromEntries(plans.map(p => [p.key, p]));
 
   // ─── Flash helper ────────────────────────────────────────────────────────────
   const flash$ = (ok: boolean, msg: string) => {
@@ -261,11 +269,20 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
             <label style={lbl}>الخطة</label>
             <select
               value={planForm.plan}
-              onChange={e => setPlanForm(f => ({ ...f, plan: e.target.value }))}
+              onChange={e => {
+                const p = planMap[e.target.value];
+                setPlanForm(f => ({
+                  ...f,
+                  plan: e.target.value,
+                  max_users:      p?.max_users      ?? f.max_users,
+                  max_products:   p?.max_products   ?? f.max_products,
+                  max_warehouses: p?.max_warehouses ?? f.max_warehouses,
+                }));
+              }}
               style={sel}
             >
-              {Object.entries(PLANS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
+              {plans.map(p => (
+                <option key={p.key} value={p.key}>{p.label}</option>
               ))}
             </select>
           </div>

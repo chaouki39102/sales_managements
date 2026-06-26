@@ -45,7 +45,8 @@ class FiscalYear extends Model
     public static array $defaultWith = [];
     public static array $allowedIncludes = [
         'closedBy', 'commercialDocuments', 'stockMovements', 'payments',
-        'expenses', 'openingBalancesStock', 'openingBalancesParties'
+        'expenses', 'openingBalancesStock', 'openingBalancesParties',
+        'openingBalancesTreasury', 'posSessions'
     ];
     public static string $defaultSort = 'start_date';
     public static string $defaultSortDirection = 'desc';
@@ -89,6 +90,16 @@ class FiscalYear extends Model
     public function openingBalancesParties(): HasMany
     {
         return $this->hasMany(OpeningBalanceParty::class);
+    }
+
+    public function openingBalancesTreasury(): HasMany
+    {
+        return $this->hasMany(OpeningBalanceTreasury::class);
+    }
+
+    public function posSessions(): HasMany
+    {
+        return $this->hasMany(PosSession::class);
     }
 
     public function scopeCurrent(Builder $query): Builder

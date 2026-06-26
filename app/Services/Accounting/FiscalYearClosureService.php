@@ -34,6 +34,12 @@ class FiscalYearClosureService
                 $this->transferPartyBalances($yearToClose, $newYear);
                 $this->transferStockBalances($yearToClose, $newYear);
 
+                // ✅ ترحيل TVA وأرصدة الجرد وفق قانون الضرائب الجزائري
+                $this->transferTvaBalances($yearToClose, $newYear);
+                $this->transferAdvanceBalances($yearToClose, $newYear);
+                $this->transferForexDifferences($yearToClose, $newYear);
+                $this->transferTimbreFiscal($yearToClose, $newYear);
+
                 // 4. إقفال السنة القديمة
                 $yearToClose->update([
                     'is_closed' => true,
@@ -48,7 +54,7 @@ class FiscalYearClosureService
                 // 6. تحديث الـ Cache
                 BelongsToFiscalYear::refreshClosedYearsCache();
 
-                Log::info("تم إقفال السنة المالية {$yearToClose->name} بنجاح");
+                Log::info("تم إقفال {$yearToClose->name} — ترحيل: أطراف + مخزون + خزينة + TVA + تسبيقات + صرف + طابع");
 
                 return $newYear;
             });
@@ -220,5 +226,233 @@ class FiscalYearClosureService
         if (!empty($openingBalances)) {
             DB::table('opening_balances_stock')->insert($openingBalances);
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  الطرق الجديدة — الامتثال لقانون الضرائب الجزائري
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * ترحيل رصيد TVA الصافي وفق المادة 76 من قانون الرسوم على رقم الأعمال.
+     */
+    protected function transferTvaBalances(FiscalYear $oldYear, FiscalYear $newYear): void
+    {
+        $tvaCollectee = DB::table('commercial_documents as cd')
+            ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
+            ->where('cd.fiscal_year_id', $oldYear->id)
+            ->where('cd.is_locked', true)
+            ->whereNull('cd.deleted_at')
+            ->where('dt.base_operation', 'sale')
+            ->sum('cd.tva_amount');
+
+        $tvaDeductible = DB::table('commercial_documents as cd')
+            ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
+            ->where('cd.fiscal_year_id', $oldYear->id)
+            ->where('cd.is_locked', true)
+            ->whereNull('cd.deleted_at')
+            ->where('dt.base_operation', 'purchase')
+            ->sum('cd.tva_amount');
+
+        $rows = [];
+        $now  = now();
+
+        if ($tvaCollectee > 0.0001) {
+            $rows[] = [
+                'company_id'           => $oldYear->company_id,
+                'fiscal_year_id'       => $newYear->id,
+                'source_fiscal_year_id'=> $oldYear->id,
+                'category'             => 'tva_collectee',
+                'amount'               => round($tvaCollectee, 4),
+                'currency_id'          => null,
+                'exchange_rate'        => null,
+                'amount_dzd'           => round($tvaCollectee, 4),
+                'notes'                => "TVA collectée SY {$oldYear->name}",
+                'created_at'           => $now,
+                'updated_at'           => $now,
+            ];
+        }
+
+        if ($tvaDeductible > 0.0001) {
+            $rows[] = [
+                'company_id'           => $oldYear->company_id,
+                'fiscal_year_id'       => $newYear->id,
+                'source_fiscal_year_id'=> $oldYear->id,
+                'category'             => 'tva_deductible',
+                'amount'               => round($tvaDeductible, 4),
+                'currency_id'          => null,
+                'exchange_rate'        => null,
+                'amount_dzd'           => round($tvaDeductible, 4),
+                'notes'                => "TVA déductible SY {$oldYear->name}",
+                'created_at'           => $now,
+                'updated_at'           => $now,
+            ];
+        }
+
+        if (empty($rows)) return;
+
+        DB::table('fiscal_year_carry_forward')->upsert(
+            $rows,
+            ['company_id', 'fiscal_year_id', 'category', 'currency_id'],
+            ['amount', 'amount_dzd', 'notes', 'updated_at']
+        );
+    }
+
+    /**
+     * ترحيل التسبيقات غير المستهلكة (avances non apurées).
+     */
+    protected function transferAdvanceBalances(FiscalYear $oldYear, FiscalYear $newYear): void
+    {
+        if (! \Schema::hasColumn('payments', 'payment_type')) {
+            Log::info("transferAdvanceBalances: عمود payment_type غير موجود — تم التخطي");
+            return;
+        }
+
+        $now = now();
+        $rows = [];
+
+        foreach ([
+            'advance_client'   => 'customer',
+            'advance_supplier' => 'supplier',
+        ] as $category => $partyType) {
+
+            $total = DB::table('payments as p')
+                ->join('parties as pa', 'p.party_id', '=', 'pa.id')
+                ->where('p.fiscal_year_id', $oldYear->id)
+                ->where('p.payment_type', 'advance')
+                ->where('pa.party_type', $partyType)
+                ->whereNull('p.deleted_at')
+                ->sum('p.amount');
+
+            if (abs($total) < 0.0001) continue;
+
+            $rows[] = [
+                'company_id'           => $oldYear->company_id,
+                'fiscal_year_id'       => $newYear->id,
+                'source_fiscal_year_id'=> $oldYear->id,
+                'category'             => $category,
+                'amount'               => round(abs($total), 4),
+                'currency_id'          => null,
+                'exchange_rate'        => null,
+                'amount_dzd'           => round(abs($total), 4),
+                'notes'                => "تسبيقات {$partyType} SY {$oldYear->name}",
+                'created_at'           => $now,
+                'updated_at'           => $now,
+            ];
+        }
+
+        if (empty($rows)) return;
+
+        DB::table('fiscal_year_carry_forward')->upsert(
+            $rows,
+            ['company_id', 'fiscal_year_id', 'category', 'currency_id'],
+            ['amount', 'amount_dzd', 'notes', 'updated_at']
+        );
+    }
+
+    /**
+     * ترحيل فروق إعادة تقييم العملات الأجنبية (scaffold فقط).
+     */
+    protected function transferForexDifferences(FiscalYear $oldYear, FiscalYear $newYear): void
+    {
+        if (! \Schema::hasTable('exchange_rates')) {
+            Log::info("transferForexDifferences: جدول exchange_rates غير موجود — تم التخطي");
+            return;
+        }
+
+        $now = now();
+
+        $foreignAccounts = DB::table('treasury_accounts as ta')
+            ->join('currencies as c', 'ta.currency_id', '=', 'c.id')
+            ->where('ta.company_id', $oldYear->company_id)
+            ->where('c.is_base_currency', false)
+            ->whereNull('ta.deleted_at')
+            ->select('ta.id', 'ta.currency_id')
+            ->get();
+
+        if ($foreignAccounts->isEmpty()) return;
+
+        $rows = [];
+        $endDate = $oldYear->end_date->toDateString();
+
+        foreach ($foreignAccounts as $account) {
+            $rateRecord = DB::table('exchange_rates')
+                ->where('currency_id', $account->currency_id)
+                ->where('rate_date', '<=', $endDate)
+                ->orderByDesc('rate_date')
+                ->first();
+
+            if (!$rateRecord) continue;
+
+            $openingDzd = DB::table('opening_balances_treasury')
+                ->where('fiscal_year_id', $oldYear->id)
+                ->where('treasury_account_id', $account->id)
+                ->value('opening_balance') ?? 0;
+
+            $diff = 0;
+
+            if (abs($diff) < 0.0001) continue;
+
+            $rows[] = [
+                'company_id'           => $oldYear->company_id,
+                'fiscal_year_id'       => $newYear->id,
+                'source_fiscal_year_id'=> $oldYear->id,
+                'category'             => 'forex_diff',
+                'amount'               => round(abs($diff), 4),
+                'currency_id'          => $account->currency_id,
+                'exchange_rate'        => $rateRecord->rate,
+                'amount_dzd'           => round(abs($diff), 4),
+                'notes'                => "فرق صرف SY {$oldYear->name}",
+                'created_at'           => $now,
+                'updated_at'           => $now,
+            ];
+        }
+
+        if (empty($rows)) return;
+
+        DB::table('fiscal_year_carry_forward')->upsert(
+            $rows,
+            ['company_id', 'fiscal_year_id', 'category', 'currency_id'],
+            ['amount', 'exchange_rate', 'amount_dzd', 'notes', 'updated_at']
+        );
+    }
+
+    /**
+     * ترحيل الطابع المالي المستحق غير المدفوع — LF 2024/2025.
+     */
+    protected function transferTimbreFiscal(FiscalYear $oldYear, FiscalYear $newYear): void
+    {
+        if (! \Schema::hasColumn('commercial_documents', 'timbre_fiscal_amount')) {
+            Log::info("transferTimbreFiscal: عمود timbre_fiscal_amount غير موجود — تم التخطي");
+            return;
+        }
+
+        $total = DB::table('commercial_documents as cd')
+            ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
+            ->where('cd.fiscal_year_id', $oldYear->id)
+            ->where('cd.is_locked', true)
+            ->whereNull('cd.deleted_at')
+            ->whereIn('dt.base_operation', ['sale'])
+            ->sum('cd.timbre_fiscal_amount');
+
+        if (abs($total) < 0.0001) return;
+
+        $now = now();
+        DB::table('fiscal_year_carry_forward')->upsert(
+            [[
+                'company_id'           => $oldYear->company_id,
+                'fiscal_year_id'       => $newYear->id,
+                'source_fiscal_year_id'=> $oldYear->id,
+                'category'             => 'timbre_fiscal',
+                'amount'               => round($total, 4),
+                'currency_id'          => null,
+                'exchange_rate'        => null,
+                'amount_dzd'           => round($total, 4),
+                'notes'                => "طابع مالي مستحق SY {$oldYear->name}",
+                'created_at'           => $now,
+                'updated_at'           => $now,
+            ]],
+            ['company_id', 'fiscal_year_id', 'category', 'currency_id'],
+            ['amount', 'amount_dzd', 'notes', 'updated_at']
+        );
     }
 }
