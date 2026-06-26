@@ -26,6 +26,7 @@ import { apiGet }             from '@/lib/api/core/client';
 import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
 import { documentsApi }       from '@/lib/api/endpoints/documents';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
+import { useAuthUser } from '@/context/AuthContext';
 import {
   calcFiscalStamp, formatDZD, htToTtc, ttcToHt, calcMargin,
 } from '@/pos/utils/calculations';
@@ -71,6 +72,12 @@ import POSSettingsModal          from '@/pos/components/POSSettingsModal';
 import ManagerPinModal           from '@/pos/components/ManagerPinModal';
 import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
 import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
+import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
+import { useReceiptRenderer }   from '@/pos/hooks/useReceiptRenderer';
+import { printReceiptDirect }   from '@/pos/utils/printUtils';
+import { printThermalViaWebUSB } from '@/pos/utils/printService';
+import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
+import type { CompanyPreviewData } from '@/pages/settings/print-settings/types';
 
 type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 
@@ -83,6 +90,7 @@ export default function POSPage() {
   const company     = useActiveCompany();
   const navigate    = useNavigate();
 
+  const user = useAuthUser();
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
   const openSessionMut   = useOpenSession();
   const closeSessionMut  = useCloseSession(currentSession?.id ?? null);
@@ -133,6 +141,8 @@ export default function POSPage() {
   const [receiptSnapshot, setReceiptSnapshot] = useState<{
     items: CartItem[]; totals: CartTotals; docNum?: string;
   } | null>(null);
+
+  const lastPaymentRef = useRef<{ paid: number; payments: Array<{ paymentModeId: number; amount: number }> }>();
   const [orderType, setOrderType] = useState<OrderType>('dine-in');
 
   const [quickItems, setQuickItems] = useState<QuickItem[]>(() => {
@@ -561,6 +571,134 @@ export default function POSPage() {
     });
   }, [priceLevelsList, allVariants, pos.items, pos.updatePrice]);
 
+  // ── Print Settings ──────────────────────────────────────────────────────────
+  const { template, isPrintEnabled, copies, paperWidth, selectedPrinter, docConfig }
+    = usePrintSettings('FV');
+  const { buildHtml } = useReceiptRenderer();
+
+  const companyData: CompanyPreviewData | null = useMemo(() => {
+    if (!company) return null;
+    return {
+      name:    company.name    ?? '',
+      address: company.address ?? '',
+      phone:   company.phone   ?? '',
+      nif:     company.nif     ?? '',
+      rc:      company.rc      ?? '',
+      nis:     company.nis     ?? '',
+      ice:     '',
+      article: company.ai      ?? '',
+      logoUrl: company.avatar  ?? null,
+    };
+  }, [company]);
+
+  const handlePrintDirect = useCallback(async (
+    printItems:  CartItem[],
+    printTotals: CartTotals,
+    printDocNumber?: string,
+  ) => {
+    try {
+      const resolvedDocNum = printDocNumber ?? lastDocNum;
+      const totalTtc = printTotals.total_ttc + printTotals.fiscal_stamp;
+      const paid     = lastPaymentRef.current?.paid ?? totalTtc;
+      const change   = paid > totalTtc ? paid - totalTtc : 0;
+      const invoiceRemaining = paid < totalTtc ? totalTtc - paid : 0;
+
+      let prevBalance = 0;
+      if (pos.client?.id) {
+        try {
+          const balanceRes = await partyBalancesApi.getOne(pos.client.id);
+          const balanceData = (balanceRes as any)?.data ?? balanceRes;
+          const currentBalance = Number(balanceData?.current_balance ?? 0);
+          prevBalance = Math.max(0, currentBalance - totalTtc + paid);
+        } catch { /* prevBalance stays 0 */ }
+      }
+      const newBalance = prevBalance + invoiceRemaining;
+
+      const payments = (lastPaymentRef.current?.payments ?? []).map(p => ({
+        mode: paymentModes?.find(pm => pm.id === p.paymentModeId)?.name ?? `طريقة دفع #${p.paymentModeId}`,
+        amount: p.amount,
+      }));
+
+      const html = buildHtml({
+        template,
+        company: companyData,
+        liveData: {
+          docNumber: resolvedDocNum,
+          docDate: new Date().toISOString().slice(0, 10),
+          cashierName: user?.name ?? 'الكاشير',
+          items: printItems.map(i => ({
+            name: i.product_name,
+            ref: i.ref,
+            qty: i.quantity,
+            unit_price_ht: i.unit_price_ht,
+            unit: i.unit_symbol ?? undefined,
+            tva_rate: i.tva_rate / 100,
+            discount_percentage: i.discount_percentage,
+            total_ht: i.total_ht,
+          })),
+          totals: {
+            total_ht:       printTotals.total_ht,
+            total_tva:      printTotals.total_tva,
+            total_ttc:      printTotals.total_ttc,
+            fiscal_stamp:   printTotals.fiscal_stamp,
+            total_discount: printTotals.total_discount,
+            paid,
+            change,
+            remaining: invoiceRemaining,
+          },
+          client: pos.client ? {
+            name:    pos.client.name,
+            nif:     (pos.client as any).nif,
+            phone:   (pos.client as any).phone,
+            address: (pos.client as any).address,
+          } : null,
+          payments,
+          prevBalance,
+          newBalance,
+        },
+      });
+
+      if (settings.printMode === 'thermal' && resolvedDocNum) {
+        const result = await printThermalViaWebUSB(
+          printItems, printTotals,
+          pos.client ? { ...pos.client, name: pos.client.name } as any : null,
+          resolvedDocNum,
+          {
+            companyName: companyData?.name ?? company?.name,
+            companyAddress: companyData?.address,
+            companyPhone: companyData?.phone,
+            companyNIF: companyData?.nif,
+            footerText: template.footerLine1 || settings.receiptFooter,
+            printQR: template.showQr,
+          },
+        );
+        if (result.ok) {
+          toast.success('✅ تمت الطباعة الحرارية');
+        } else {
+          toast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
+          // fallback إلى طباعة المتصفح
+          await printReceiptDirect({
+            html, paperWidth, copies,
+            printerName: selectedPrinter?.name,
+            onError: (e) => toast.error(`خطأ في طباعة المتصفح: ${e.message}`),
+          });
+        }
+      } else {
+        await printReceiptDirect({
+          html, paperWidth, copies,
+          printerName: selectedPrinter?.name,
+          onDone:  () => toast.success('✅ تم إرسال الطباعة'),
+          onError: (e) => toast.error(`خطأ في الطباعة: ${e.message}`),
+        });
+      }
+    } catch (e: any) {
+      toast.error(`خطأ في تجهيز الطباعة: ${e.message}`);
+    }
+  }, [template, companyData, pos.client, paperWidth, copies, selectedPrinter, buildHtml, settings.printMode, settings.receiptFooter, company, paymentModes, user, lastDocNum]);
+
+  const autoPrint   = docConfig?.autoPrint   ?? false;
+  const showPreview = docConfig?.showPreview ?? true;
+
   // ── Complete Sale ──────────────────────────────────────────────────────────
   const handleCompleteSale = useCallback(async (params: {
     amountPaid:   number;
@@ -640,13 +778,34 @@ export default function POSPage() {
           }),
         );
       }
+      lastPaymentRef.current = {
+        paid: params.amountPaid,
+        payments: params.payments?.filter(p => p.amount > 0).map(p => ({
+          paymentModeId: p.paymentModeId, amount: p.amount,
+        })) ?? [],
+      };
       setReceiptSnapshot({ items: snapshot.items, totals: snapshot.totals, docNum: res.document_number });
       setLastDocNum(res.document_number);
       setCartNote('');
       pos.setInvoiceDiscountPct(0);
       pos.clearCart();
       setSelectedCartItemId(null);
-      setModal('receipt');
+
+      if (autoPrint && isPrintEnabled) {
+        setTimeout(() => {
+          handlePrintDirect(snapshot.items, snapshot.totals, res.document_number);
+        }, 300);
+        if (!showPreview) {
+          setModal('none');
+        } else {
+          setModal('receipt');
+        }
+      } else if (showPreview) {
+        setModal('receipt');
+      } else {
+        setModal('none');
+      }
+
       toast.success(`✅ تم حفظ الفاتورة ${res.document_number ?? ''}`);
       return { ok: true, docNumber: res.document_number };
 
@@ -655,7 +814,7 @@ export default function POSPage() {
       toast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode]);
+  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode, autoPrint, isPrintEnabled, handlePrintDirect, showPreview, invoiceDiscountAmount, buildIncrementInput]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -878,7 +1037,9 @@ export default function POSPage() {
           client={pos.client} docNumber={receiptSnapshot.docNum ?? lastDocNum}
           settings={settings}
           onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
-          onPrint={() => window.print()}
+          onPrint={() => {
+            handlePrintDirect(receiptSnapshot.items, receiptSnapshot.totals, receiptSnapshot.docNum);
+          }}
           onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
         />
       )}

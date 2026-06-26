@@ -7,3 +7,4 @@ export { default as TotalsSectionControls } from './sections/TotalsSection';
 export { default as FooterSectionControls } from './sections/FooterSection';
 export { default as FormattingSectionControls } from './sections/FormattingSection';
 export * from './types';
+export type { ReceiptLiveData } from './types';

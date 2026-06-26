@@ -102,6 +102,7 @@
 .ps-printer-dot--unk   { background: var(--gold); }
 .ps-printer-info { flex: 1; min-width: 0; }
 .ps-printer-name { font-size: 13px; font-weight: 700; color: var(--t1); margin-bottom: 3px; }
+.ps-printer-name-input { font-size: 13px; font-weight: 700; padding: 2px 6px; margin-bottom: 3px; }
 .ps-printer-meta { display: flex; align-items: center; gap: 7px; }
 .ps-printer-status { font-size: 11px; font-weight: 700; }
 .ps-printer-status--ready   { color: var(--green); }
@@ -112,6 +113,26 @@
   background: var(--em); color: #fff;
 }
 .ps-printer-actions { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+
+.ps-printer-source-tag {
+  font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 20px;
+}
+.ps-printer-source-tag--usb {
+  background: var(--blueb, #eff6ff); color: var(--blue, #2563eb);
+  border: 1px solid var(--bluebo, #bfdbfe);
+}
+.ps-printer-source-tag--demo {
+  background: var(--goldb, #fef3c7); color: var(--gold, #d97706);
+  border: 1px solid var(--goldbo, #fde68a);
+}
+
+.ps-usb-section {
+  background: var(--bg2); border: 1px solid var(--b2); border-radius: var(--r3);
+  padding: 16px 20px;
+}
+.ps-usb-info {
+  font-size: 12px; color: var(--t4); margin: 0 0 10px; display: flex; align-items: center; gap: 6px;
+}
 
 .ps-add-printer {
   background: var(--bg2); border: 1px solid var(--b2); border-radius: var(--r3);

@@ -44,9 +44,11 @@ export default function ProfessionalReceipt({
   const grandTotal = totals.total_ttc + totals.fiscal_stamp;
 
   const handlePrint = () => {
-    const copies = settings.printCopies ?? 1;
-    for (let i = 0; i < copies; i++) {
-      window.print();
+    if (onPrint) {
+      onPrint();
+    } else {
+      const copies = settings.printCopies ?? 1;
+      for (let i = 0; i < copies; i++) window.print();
     }
   };
 

@@ -1,8 +1,9 @@
 // resources/js/pages/settings/print-settings/ReceiptPreview.tsx
 // معاينة الإيصال الحراري 80mm — كل العناصر تتحكم بها قيم القالب
+// تدعم بيانات حية (liveData) أو بيانات تجريبية (MOCK) كـ fallback
 
 import React from 'react';
-import type { ReceiptTemplate80mm, ColumnKey, CompanyPreviewData } from './types';
+import type { ReceiptTemplate80mm, ColumnKey, CompanyPreviewData, ReceiptLiveData } from './types';
 
 const MOCK_COMPANY: CompanyPreviewData = {
   name:    'سوبيرات الوفرة',
@@ -50,6 +51,84 @@ const MOCK = {
   payments: [{ mode: 'نقداً', amount: 669 }],
 };
 
+interface ReceiptData {
+  number: string;
+  date: string;
+  time: string;
+  dueDate: string;
+  cashier: string;
+  client: string;
+  clientTaxId: string;
+  clientPhone: string;
+  clientAddress: string;
+  session: string;
+  paymentTerm: string;
+  items: Array<{ ref: string; name: string; qty: number; price: number; total: number; tva: number; discount: number; unit: string }>;
+  tvaByRate: Array<{ rate: number; base: number; amount: number }>;
+  totalHt: number;
+  totalTva: number;
+  totalDiscount: number;
+  fiscalStamp: number;
+  totalTtc: number;
+  paid: number;
+  change: number;
+  remaining: number;
+  prevBalance: number;
+  newBalance: number;
+  payments: Array<{ mode: string; amount: number }>;
+}
+
+function buildTvaByRate(items: ReceiptLiveData['items'] = []): Array<{ rate: number; base: number; amount: number }> {
+  const map = new Map<number, { base: number; amount: number }>();
+  for (const item of items) {
+    const rate = Math.round((item.tva_rate ?? 0) * 100);
+    const base = item.total_ht ?? 0;
+    const tva  = base * (item.tva_rate ?? 0);
+    const prev = map.get(rate) ?? { base: 0, amount: 0 };
+    map.set(rate, { base: prev.base + base, amount: prev.amount + tva });
+  }
+  return Array.from(map.entries()).map(([rate, v]) => ({ rate, ...v }));
+}
+
+function buildReceiptData(tpl: ReceiptTemplate80mm, liveData?: ReceiptLiveData | null): ReceiptData {
+  if (!liveData) return MOCK;
+  return {
+    number:  liveData.docNumber  ?? '',
+    date:    liveData.docDate    ?? new Date().toLocaleDateString('ar-DZ'),
+    time:    new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
+    dueDate: '',
+    cashier: liveData.cashierName ?? '',
+    client:  liveData.client?.name ?? '',
+    clientTaxId: liveData.client?.nif ?? '',
+    clientPhone: liveData.client?.phone ?? '',
+    clientAddress: liveData.client?.address ?? '',
+    session: '',
+    paymentTerm: '',
+    items: (liveData.items ?? []).map((item, i) => ({
+      ref:      item.ref ?? `P${i + 1}`,
+      name:     item.name,
+      qty:      item.qty,
+      price:    item.unit_price_ht,
+      total:    item.total_ht,
+      tva:      Math.round((item.tva_rate ?? 0) * 100),
+      discount: item.discount_percentage ?? 0,
+      unit:     item.unit ?? '',
+    })),
+    tvaByRate: buildTvaByRate(liveData.items),
+    totalHt:       liveData.totals?.total_ht       ?? 0,
+    totalTva:      liveData.totals?.total_tva      ?? 0,
+    totalDiscount: liveData.totals?.total_discount ?? 0,
+    fiscalStamp:   liveData.totals?.fiscal_stamp   ?? 0,
+    totalTtc:      liveData.totals?.total_ttc      ?? 0,
+    paid:          liveData.totals?.paid           ?? 0,
+    change:        liveData.totals?.change         ?? 0,
+    remaining:     liveData.totals?.remaining      ?? 0,
+    prevBalance:   liveData.prevBalance            ?? 0,
+    newBalance:    liveData.newBalance             ?? 0,
+    payments:      liveData.payments               ?? [],
+  };
+}
+
 function getCompany(tpl: ReceiptTemplate80mm, api?: CompanyPreviewData | null): CompanyPreviewData {
   return {
     name:    tpl.companyName    || api?.name    || MOCK_COMPANY.name,
@@ -66,13 +145,22 @@ function getCompany(tpl: ReceiptTemplate80mm, api?: CompanyPreviewData | null): 
 
 const px = (mm: number) => mm * 3.78;
 
-export default function ReceiptPreview({ tpl, company }: { tpl: ReceiptTemplate80mm; company?: CompanyPreviewData | null }) {
+interface PreviewProps {
+  tpl: ReceiptTemplate80mm;
+  company?: CompanyPreviewData | null;
+  liveData?: ReceiptLiveData | null;
+}
+
+export default function ReceiptPreview({ tpl, company, liveData }: PreviewProps) {
   const co = getCompany(tpl, company);
+  const data = buildReceiptData(tpl, liveData);
+
+  const paperPx = Math.round(tpl.paperWidth * 3.78);
 
   return (
     <div
       style={{
-        width: 302,
+        width: paperPx,
         fontFamily: tpl.itemsFontFamily === 'monospace' ? "'Courier New', monospace" : "'Tajawal', sans-serif",
         fontSize: tpl.baseFontSize,
         padding: `${px(tpl.marginTop)}px ${px(tpl.marginSides)}px ${px(tpl.marginBottom)}px`,
@@ -82,23 +170,12 @@ export default function ReceiptPreview({ tpl, company }: { tpl: ReceiptTemplate8
         direction: 'rtl',
       }}
     >
-      {/* ═══ HEADER ═══ */}
       <HeaderSection tpl={tpl} company={co} />
-
-      {/* ═══ DOCUMENT INFO ═══ */}
-      <DocInfoSection tpl={tpl} />
-
-      {/* ═══ ITEMS TABLE ═══ */}
-      <ItemsSection tpl={tpl} />
-
-      {/* ═══ TOTALS ═══ */}
-      <TotalsSection tpl={tpl} />
-
-      {/* ═══ PAYMENTS ═══ */}
-      {tpl.showPaymentDetails && <PaymentsSection tpl={tpl} />}
-
-      {/* ═══ FOOTER ═══ */}
-      <FooterSection tpl={tpl} />
+      <DocInfoSection tpl={tpl} data={data} />
+      <ItemsSection tpl={tpl} items={data.items} />
+      <TotalsSection tpl={tpl} data={data} />
+      {tpl.showPaymentDetails && <PaymentsSection tpl={tpl} payments={data.payments} />}
+      <FooterSection tpl={tpl} data={data} />
     </div>
   );
 }
@@ -169,10 +246,9 @@ function CompanyInfoBlock({ tpl, company }: { tpl: ReceiptTemplate80mm; company:
 }
 
 // ─── Document Info ───────────────────────────────────────────────────────────
-function DocInfoSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
+function DocInfoSection({ tpl, data }: { tpl: ReceiptTemplate80mm; data: ReceiptData }) {
   return (
     <div style={{ marginBottom: 4 }}>
-      {/* Title */}
       <div style={{
         textAlign: tpl.titleAlign,
         fontSize: tpl.titleFontSize,
@@ -182,20 +258,19 @@ function DocInfoSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
         ── {tpl.titleText} ──
       </div>
 
-      {/* Info rows */}
       <table style={{ width: '100%', fontSize: tpl.companyInfoFontSize, borderCollapse: 'collapse' }}>
         <tbody>
-          {tpl.showDocNumber && <InfoRow label="رقم الفاتورة" value={MOCK.number} />}
-          {tpl.showDate      && <InfoRow label="التاريخ"      value={MOCK.date} />}
-          {tpl.showTime      && <InfoRow label="الوقت"        value={MOCK.time} />}
-          {tpl.showDueDate   && <InfoRow label="تاريخ الاستحقاق" value={MOCK.dueDate} />}
-          {tpl.showCashier   && <InfoRow label="الكاشير"      value={MOCK.cashier} />}
-          {tpl.showClient    && <InfoRow label="العميل"       value={MOCK.client} />}
-          {tpl.showClientTaxId && <InfoRow label="رقم ضريبة العميل" value={MOCK.clientTaxId} />}
-          {tpl.showClientPhone && <InfoRow label="هاتف العميل" value={MOCK.clientPhone} />}
-          {tpl.showClientAddress && <InfoRow label="عنوان العميل" value={MOCK.clientAddress} />}
-          {tpl.showSession   && <InfoRow label="الجلسة"      value={MOCK.session} />}
-          {tpl.showPaymentTerm && <InfoRow label="شروط الدفع" value={MOCK.paymentTerm} />}
+          {tpl.showDocNumber && <InfoRow label="رقم الفاتورة" value={data.number} />}
+          {tpl.showDate      && <InfoRow label="التاريخ"      value={data.date} />}
+          {tpl.showTime      && <InfoRow label="الوقت"        value={data.time} />}
+          {tpl.showDueDate   && <InfoRow label="تاريخ الاستحقاق" value={data.dueDate} />}
+          {tpl.showCashier   && <InfoRow label="الكاشير"      value={data.cashier} />}
+          {tpl.showClient    && <InfoRow label="العميل"       value={data.client} />}
+          {tpl.showClientTaxId && <InfoRow label="رقم ضريبة العميل" value={data.clientTaxId} />}
+          {tpl.showClientPhone && <InfoRow label="هاتف العميل" value={data.clientPhone} />}
+          {tpl.showClientAddress && <InfoRow label="عنوان العميل" value={data.clientAddress} />}
+          {tpl.showSession   && <InfoRow label="الجلسة"      value={data.session} />}
+          {tpl.showPaymentTerm && <InfoRow label="شروط الدفع" value={data.paymentTerm} />}
         </tbody>
       </table>
 
@@ -214,7 +289,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 // ─── Items Table ─────────────────────────────────────────────────────────────
-function ItemsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
+function ItemsSection({ tpl, items }: { tpl: ReceiptTemplate80mm; items: ReceiptData['items'] }) {
   const cols = getVisibleCols(tpl);
   if (cols.length === 0) return null;
 
@@ -222,7 +297,6 @@ function ItemsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
 
   return (
     <div style={{ marginBottom: 4 }}>
-      {/* Table header */}
       {tpl.showColHeader && (
         <div style={{
           display: 'grid',
@@ -245,8 +319,7 @@ function ItemsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
         </div>
       )}
 
-      {/* Items */}
-      {MOCK.items.map((item, i) => (
+      {items.map((item, i) => (
         <div key={i} style={{
           display: 'grid',
           gridTemplateColumns: gridCols,
@@ -273,9 +346,6 @@ function ItemsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
 
 function getVisibleCols(tpl: ReceiptTemplate80mm): ColumnKey[] {
   const alwaysCols: ColumnKey[] = ['name', 'quantity', 'price', 'total'];
-  const extras: ColumnKey[] = ['rowNumber', 'barcode', 'ref', 'unit', 'discount', 'tva'];
-
-  // Build based on tpl.colOrder + visibility
   const visible: ColumnKey[] = [];
   for (const key of tpl.colOrder) {
     if (key === 'name' || key === 'quantity' || key === 'price' || key === 'total') {
@@ -312,7 +382,7 @@ function colLabel(c: ColumnKey): string {
   return labels[c];
 }
 
-function colValue(c: ColumnKey, item: typeof MOCK.items[0], tpl: ReceiptTemplate80mm) {
+function colValue(c: ColumnKey, item: ReceiptData['items'][0], tpl: ReceiptTemplate80mm) {
   switch (c) {
     case 'name': return item.name;
     case 'quantity': return String(item.qty);
@@ -327,7 +397,7 @@ function colValue(c: ColumnKey, item: typeof MOCK.items[0], tpl: ReceiptTemplate
 }
 
 // ─── Totals ──────────────────────────────────────────────────────────────────
-function TotalsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
+function TotalsSection({ tpl, data }: { tpl: ReceiptTemplate80mm; data: ReceiptData }) {
   const fs = tpl.totalsFontSize;
   return (
     <div style={{
@@ -336,16 +406,16 @@ function TotalsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
       textAlign: tpl.totalsAlign,
       marginBottom: 4,
     }}>
-      {tpl.showTotalHt   && <TotalRow label="المجموع HT"       val={MOCK.totalHt} />}
-      {tpl.showDiscountTotal && MOCK.totalDiscount > 0 && (
-        <TotalRow label="إجمالي الخصومات" val={-MOCK.totalDiscount} red />
+      {tpl.showTotalHt   && <TotalRow label="المجموع HT"       val={data.totalHt} />}
+      {tpl.showDiscountTotal && data.totalDiscount > 0 && (
+        <TotalRow label="إجمالي الخصومات" val={-data.totalDiscount} red />
       )}
-      {tpl.showTotalTva  && <TotalRow label="TVA"              val={MOCK.totalTva} />}
-      {tpl.showTvaBreakdown && MOCK.tvaByRate.map(r => (
+      {tpl.showTotalTva  && <TotalRow label="TVA"              val={data.totalTva} />}
+      {tpl.showTvaBreakdown && data.tvaByRate.map(r => (
         <TotalRow key={r.rate} label={`  TVA ${r.rate}%`} val={r.amount} />
       ))}
-      {tpl.showFiscalStamp && MOCK.fiscalStamp > 0 && (
-        <TotalRow label="الطابع الجبائي" val={MOCK.fiscalStamp} />
+      {tpl.showFiscalStamp && data.fiscalStamp > 0 && (
+        <TotalRow label="الطابع الجبائي" val={data.fiscalStamp} />
       )}
 
       {tpl.showTotalTtc && (
@@ -360,7 +430,7 @@ function TotalsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
           fontFamily: "'Tajawal', sans-serif",
         }}>
           <span>المجموع TTC:</span>
-          <span style={{ direction: 'ltr' }}>{MOCK.totalTtc.toFixed(2)}</span>
+          <span style={{ direction: 'ltr' }}>{data.totalTtc.toFixed(2)}</span>
         </div>
       )}
 
@@ -370,11 +440,11 @@ function TotalsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
         </div>
       )}
 
-      {tpl.showPaidAmount  && <TotalRow label="المدفوع"       val={MOCK.paid} bold />}
-      {tpl.showChange      && <TotalRow label="الباقي"        val={MOCK.change} />}
-      {tpl.showRemaining   && <TotalRow label="المبلغ المتبقي" val={MOCK.remaining} />}
-      {tpl.showPrevBalance && <TotalRow label="الرصيد السابق"  val={MOCK.prevBalance} />}
-      {tpl.showNewBalance  && <TotalRow label="الرصيد الجديد"  val={MOCK.newBalance} bold />}
+      {tpl.showPaidAmount  && <TotalRow label="المدفوع"       val={data.paid} bold />}
+      {tpl.showChange      && <TotalRow label="الباقي"        val={data.change} />}
+      {tpl.showRemaining   && <TotalRow label="المبلغ المتبقي" val={data.remaining} />}
+      {tpl.showPrevBalance && <TotalRow label="الرصيد السابق"  val={data.prevBalance} />}
+      {tpl.showNewBalance  && <TotalRow label="الرصيد الجديد"  val={data.newBalance} bold />}
     </div>
   );
 }
@@ -392,11 +462,11 @@ function TotalRow({ label, val, red, bold }: { label: string; val: number; red?:
 }
 
 // ─── Payments ────────────────────────────────────────────────────────────────
-function PaymentsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
+function PaymentsSection({ tpl, payments }: { tpl: ReceiptTemplate80mm; payments: ReceiptData['payments'] }) {
   return (
     <div style={{ fontSize: tpl.paymentFontSize, marginBottom: 4 }}>
       <Sep style="dashed" />
-      {MOCK.payments.map((p, i) => (
+      {payments.map((p, i) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
           <span>{p.mode}</span>
           <span style={{ direction: 'ltr' }}>{p.amount.toFixed(2)}</span>
@@ -408,7 +478,7 @@ function PaymentsSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
 }
 
 // ─── Footer ──────────────────────────────────────────────────────────────────
-function FooterSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
+function FooterSection({ tpl, data }: { tpl: ReceiptTemplate80mm; data: ReceiptData }) {
   const hasFooterContent =
     tpl.footerLine1 || tpl.footerLine2 || tpl.footerLine3 ||
     tpl.showThankYou || tpl.showReturnsPolicy || tpl.footerLegalText ||
@@ -448,7 +518,6 @@ function FooterSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
         </div>
       )}
 
-      {/* Barcode */}
       {tpl.showBarcode && (
         <div style={{ textAlign: 'center', margin: '8px 0 4px' }}>
           <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
@@ -461,12 +530,11 @@ function FooterSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
             ))}
           </div>
           <div style={{ fontSize: tpl.baseFontSize - 1, letterSpacing: 2, marginTop: 2 }}>
-            {tpl.barcodeContent === 'custom' ? tpl.barcodeCustomText : MOCK.number.replace('FV-2025-', '')}
+            {tpl.barcodeContent === 'custom' ? tpl.barcodeCustomText : data.number.replace(/^[A-Z]+-\d+-/, '')}
           </div>
         </div>
       )}
 
-      {/* QR */}
       {tpl.showQr && (
         <div style={{ textAlign: 'center', margin: '4px 0' }}>
           <div style={{
@@ -483,7 +551,6 @@ function FooterSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
         </div>
       )}
 
-      {/* Signatures */}
       {(tpl.showCashierSignature || tpl.showClientSignature) && (
         <div style={{
           display: 'flex', justifyContent: 'space-between',
@@ -521,7 +588,7 @@ function FooterSection({ tpl }: { tpl: ReceiptTemplate80mm }) {
 
 // ─── Common ──────────────────────────────────────────────────────────────────
 function Sep({ style: s }: { style: BorderStyle }) {
-  const borderMap = { solid: 'solid', dashed: 'dashed', double: 'double', none: 'solid' };
+  const borderMap: Record<string, string> = { solid: 'solid', dashed: 'dashed', double: 'double', none: 'solid' };
   return <div style={{ borderTop: `1px ${borderMap[s]} #888`, margin: '5px 0' }} />;
 }
 

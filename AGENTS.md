@@ -98,6 +98,15 @@ resources/js/pages/settings/print-settings/
 
 ---
 
+## Balance Calculation for Receipt Print (`handlePrintDirect`)
+- **`prevBalance`**: fetched via `partyBalancesApi.getOne(clientId)` AFTER the sale is completed. The API returns `current_balance` which INCLUDES the new invoice. We reverse its impact: `prevBalance = max(0, currentBalance - totalTtc + paid)`.
+- **`remaining`** (المبلغ المتبقي): unpaid portion of THIS invoice only = `max(0, totalTtc - paid)`.
+- **`newBalance`** (الرصيد الجديد): client's total debt after this invoice = `prevBalance + remaining`.
+- The balance API call is wrapped in try/catch — if it fails, all values default to 0.
+- `lastPaymentRef` stores the paid amount and payment modes from the last completed sale (set in `handleCompleteSale` after API success).
+
+---
+
 ## Related API / Backend
 - `GET /api/v1/companies/current` → `useCurrentCompany()` → `Company` object with fields: `name`, `address`, `phone`, `nif`, `nis`, `rc`, `ai` (article), `avatar` (logo URL)
 - `CompanyPreviewData` maps `ai` → `article`; there is no `ice` field in backend — only template override handles ICE

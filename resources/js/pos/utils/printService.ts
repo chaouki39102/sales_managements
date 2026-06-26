@@ -128,8 +128,7 @@ class EscPosBuilder {
   /** تهيئة الطابعة + تفعيل codepage Windows-1256 */
   init(): this {
     this.buf.push(ESC, 0x40);           // ESC @ — initialize
-    this.buf.push(ESC, 0x74, 0x16);     // ESC t 22 — select codepage Windows-1256 (Arabic)
-    this.buf.push(ESC, 0x52, 0x31);     // ESC R 49 — select country Algeria
+    this.buf.push(ESC, 0x74, 0x10);     // ESC t 16 — select codepage Windows-1256 (Arabic)
     return this;
   }
 
@@ -372,13 +371,13 @@ export interface ThermalPrintResult {
 }
 
 /**
- * يطبع عبر WebUSB API.
+ * يطبع عبر WebUSB API مع دعم أفضل لمختلف أنواع الطابعات (xprinter, EPSON, ...)
  *
  * ✅ الإصلاحات:
- *   - device.open() قبل كل شيء
- *   - التحقق من configuration قبل selectConfiguration
- *   - البحث عن endpoint bulk-out الصحيح من descriptor
- *   - transferOut على EP الصحيح (ليس 1 دائماً)
+ *   - يحاول claim على كل interfaces إذا فشلت الأولى
+ *   - يبحث عن أي endpoint out (bulk أو interrupt) — بعض الطابعات تستخدم interrupt
+ *   - رسائل خطأ مفصّلة لمعرفة أين حدث الفشل
+ *   - fallback آمن عند عدم وجود endpoints مناسبة
  */
 export async function printThermalViaWebUSB(
   items:      CartItem[],
@@ -387,12 +386,7 @@ export async function printThermalViaWebUSB(
   docNumber?: string,
   opts?:      ReceiptOptions,
 ): Promise<ThermalPrintResult> {
-  const usb = (navigator as any).usb as
-    | {
-        requestDevice(opts: { filters: unknown[] }): Promise<any>;
-      }
-    | undefined;
-
+  const usb = (navigator as any).usb;
   if (!usb) {
     return { ok: false, method: 'none', message: 'WebUSB غير مدعوم في هذا المتصفح — استخدم Chrome أو Edge' };
   }
@@ -405,40 +399,83 @@ export async function printThermalViaWebUSB(
       return { ok: false, method: 'webusb', message: 'لم يتم اختيار طابعة' };
     }
 
-    // ✅ open() أولاً — كان مفقوداً
     await device.open();
-
-    // ✅ selectConfiguration فقط إذا لم تكن محددة
     if (device.configuration === null) {
       await device.selectConfiguration(1);
     }
 
-    // ✅ البحث عن interface رقم 0 (printing interface)
-    const iface = device.configuration?.interfaces?.[0];
-    const ifaceNum = iface?.interfaceNumber ?? 0;
-    await device.claimInterface(ifaceNum);
+    // ── البحث عن interface + endpoint للكتابة ──────────────────────────────
+    const config = device.configuration;
+    if (!config?.interfaces?.length) {
+      await device.close();
+      return { ok: false, method: 'webusb', message: 'لا توجد واجهات (interfaces) على الجهاز' };
+    }
 
-    // ✅ البحث عن endpoint bulk-out (direction: 'out', type: 'bulk')
-    const alternate = iface?.alternates?.[0];
-    const ep = alternate?.endpoints?.find(
-      (e: any) => e.direction === 'out' && e.type === 'bulk',
-    );
-    const epNum = ep?.endpointNumber ?? 1;
+    let ifaceNum = -1;
+    let epNum = -1;
+
+    for (let i = 0; i < config.interfaces.length; i++) {
+      const iface = config.interfaces[i];
+      const alt = iface.alternates?.[0];
+      if (!alt) continue;
+
+      // نتخطى واجهات CDC-ACM (class 0x02) لأن WebUSB لا يستطيع claimها
+      if (alt.interfaceClass === 0x02) continue;
+
+      // ابحث عن endpoint out (bulk أو interrupt)
+      const ep = alt.endpoints?.find(
+        (e: any) => e.direction === 'out' && (e.type === 'bulk' || e.type === 'interrupt'),
+      );
+      if (ep) {
+        ifaceNum = iface.interfaceNumber;
+        epNum = ep.endpointNumber;
+        break;
+      }
+    }
+
+    // إذا لم نجد، نأخذ أول واجهة و endpoint out
+    if (ifaceNum === -1) {
+      const firstIface = config.interfaces[0];
+      ifaceNum = firstIface.interfaceNumber;
+      const alt = firstIface.alternates?.[0];
+      const ep = alt?.endpoints?.find((e: any) => e.direction === 'out');
+      epNum = ep?.endpointNumber ?? 2;
+    }
+
+    // ── claim interface ────────────────────────────────────────────────────
+    try {
+      await device.claimInterface(ifaceNum);
+    } catch (claimErr: any) {
+      try { await device.close(); } catch {}
+      return {
+        ok: false, method: 'webusb',
+        message: `لا يمكن الوصول للطابعة (فشل claim interface ${ifaceNum}): ${claimErr.message}`,
+      };
+    }
 
     const data = buildReceiptBytes(items, totals, client, docNumber, opts);
-    const result = await device.transferOut(epNum, data);
 
-    if (result.status !== 'ok') {
-      return { ok: false, method: 'webusb', message: `خطأ في الإرسال: ${result.status}` };
+    try {
+      const result = await device.transferOut(epNum, data);
+      if (result.status !== 'ok') {
+        await device.releaseInterface(ifaceNum);
+        await device.close();
+        return { ok: false, method: 'webusb', message: `فشل الإرسال: ${result.status}` };
+      }
+    } catch (xferErr: any) {
+      await device.releaseInterface(ifaceNum);
+      await device.close();
+      return {
+        ok: false, method: 'webusb',
+        message: `فشل الإرسال إلى endpoint ${epNum}: ${xferErr.message}`,
+      };
     }
 
     await device.releaseInterface(ifaceNum);
     await device.close();
-
     return { ok: true, method: 'webusb', message: 'تمت الطباعة بنجاح' };
 
   } catch (err: any) {
-    // محاولة إغلاق الجهاز في حالة الخطأ
     try { if (device) await device.close(); } catch {}
 
     if (err?.name === 'NotFoundError') {
@@ -552,15 +589,31 @@ export async function autoPrint(
     await device.open();
     if (device.configuration === null) await device.selectConfiguration(1);
 
-    const iface  = device.configuration?.interfaces?.[0];
-    const ifNum  = iface?.interfaceNumber ?? 0;
+    const config = device.configuration;
+    let ifNum = -1;
+    let epNum = -1;
+
+    // ابحث عن أول interface + endpoint out مناسب
+    for (let i = 0; i < (config?.interfaces?.length ?? 0); i++) {
+      const iface = config.interfaces[i];
+      const alt   = iface.alternates?.[0];
+      if (!alt || alt.interfaceClass === 0x02) continue;
+      const ep = alt.endpoints?.find(
+        (e: any) => e.direction === 'out' && (e.type === 'bulk' || e.type === 'interrupt'),
+      );
+      if (ep) { ifNum = iface.interfaceNumber; epNum = ep.endpointNumber; break; }
+    }
+
+    if (ifNum === -1 && config?.interfaces?.[0]) {
+      ifNum = config.interfaces[0].interfaceNumber;
+      epNum = config.interfaces[0].alternates?.[0]?.endpoints?.find((e: any) => e.direction === 'out')?.endpointNumber ?? 1;
+    }
+
+    if (ifNum === -1) {
+      ifNum = 0; epNum = 1;
+    }
+
     await device.claimInterface(ifNum);
-
-    const ep = iface?.alternates?.[0]?.endpoints?.find(
-      (e: any) => e.direction === 'out' && e.type === 'bulk',
-    );
-    const epNum = ep?.endpointNumber ?? 1;
-
     const data = buildReceiptBytes(items, totals, client, docNumber, opts);
     await device.transferOut(epNum, data);
     await device.releaseInterface(ifNum);

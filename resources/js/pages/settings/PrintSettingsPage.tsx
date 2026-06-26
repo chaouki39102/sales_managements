@@ -63,45 +63,113 @@ export default function PrintSettingsPage() {
     logoUrl:  apiCompany.avatar || null,
   } : null;
 
-  // ── اكتشاف الطابعات ─────────────────────────────────────────────────────────
+  // ── اكتشاف الطابعات (WebUSB + localStorage) ────────────────────────────────
   const detectPrinters = useCallback(async () => {
     setScanning(true);
     try {
       const detected: DetectedPrinter[] = [];
-      if ('printer' in navigator) {
-        // @ts-ignore
-        const printerList = await (navigator as any).printer?.getPrinters?.();
-        if (printerList) {
-          printerList.forEach((p: any, i: number) => {
+
+      // 1. WebUSB — الطابعات الحرارية المتصلة سابقاً
+      if (typeof navigator !== 'undefined' && 'usb' in navigator) {
+        try {
+          const usbDevices = await (navigator as any).usb.getDevices();
+          usbDevices.forEach((dev: any, i: number) => {
+            const name = dev.productName || dev.manufacturerName || `طابعة USB`;
             detected.push({
-              id:        p.id ?? `printer-${i}`,
-              name:      p.name ?? `Printer ${i + 1}`,
-              isDefault: i === 0,
+              id:        `usb-${dev.serialNumber ?? i}`,
+              name,
+              isDefault: detected.length === 0,
               status:    'ready',
+              source:    'usb',
             });
           });
-        }
+        } catch { /* ignore */ }
       }
+
+      // 2. localStorage cache
       if (detected.length === 0) {
         const saved = localStorage.getItem('erp_printers');
         if (saved) {
           detected.push(...JSON.parse(saved));
-        } else {
-          detected.push(
-            { id: 'thermal-1', name: 'XP-58 Thermal Receipt Printer', isDefault: true,  status: 'ready'   },
-            { id: 'thermal-2', name: 'EPSON TM-T82 Receipt Printer',  isDefault: false, status: 'ready'   },
-            { id: 'laser-1',   name: 'HP LaserJet Pro M404dn',        isDefault: false, status: 'unknown' },
-            { id: 'pdf-1',     name: 'Microsoft Print to PDF',         isDefault: false, status: 'ready'   },
-          );
         }
       }
-      await new Promise(r => setTimeout(r, 1200));
+
+      // 3. Fallback — نموذجان فقط للعرض
+      if (detected.length === 0) {
+        detected.push(
+          { id: 'thermal-1', name: 'طابعة حرارية 80mm',   isDefault: true,  status: 'ready',   source: 'demo' },
+          { id: 'pdf-1',     name: 'Microsoft Print to PDF', isDefault: false, status: 'ready', source: 'demo' },
+        );
+      }
+
+      await new Promise(r => setTimeout(r, 800));
       setPrinters(detected);
       localStorage.setItem('erp_printers', JSON.stringify(detected));
     } finally {
       setScanning(false);
     }
   }, []);
+
+  // ── طباعة اختبار حراري ESC/POS عبر أول طابعة USB ─────────────────────────
+  const handleThermalTest = useCallback(async () => {
+    const usb = (navigator as any).usb;
+    if (!usb) { alert('WebUSB غير مدعوم — استخدم Chrome أو Edge'); return; }
+    try {
+      const devices = await usb.getDevices();
+      const device = devices[0] ?? await usb.requestDevice({ filters: [] });
+      if (!device) return;
+      await device.open();
+      if (device.configuration === null) await device.selectConfiguration(1);
+      const config = device.configuration;
+      let ifNum = -1, epNum = -1;
+      for (let i = 0; i < (config?.interfaces?.length ?? 0); i++) {
+        const iface = config.interfaces[i];
+        const alt = iface.alternates?.[0];
+        if (!alt || alt.interfaceClass === 2) continue;
+        const ep = alt.endpoints?.find((e: any) => e.direction === 'out');
+        if (ep) { ifNum = iface.interfaceNumber; epNum = ep.endpointNumber; break; }
+      }
+      if (ifNum === -1) { await device.close(); alert('لم يُعثَر على منفذ كتابة في الطابعة'); return; }
+      await device.claimInterface(ifNum);
+      const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
+      const enc = (s: string) => { const r: number[] = []; for (const c of s) { const cp = c.codePointAt(0) ?? 63; r.push(cp < 128 ? cp : 63); } return r; };
+      const buf: number[] = [ESC, 0x40, ESC, 0x74, 0x10, ESC, 0x61, 1, ESC, 0x45, 1, ...enc(companyPreviewData?.name || 'طابعة 80mm'), LF, ESC, 0x45, 0, ...enc('طباعة اختبارية'), LF, ...enc('تم الاتصال بنجاح!'), LF, LF, GS, 0x56, 0];
+      await device.transferOut(epNum, new Uint8Array(buf));
+      await device.releaseInterface(ifNum);
+      await device.close();
+      alert('✅ تمت الطباعة الحرارية بنجاح!');
+    } catch (err: any) {
+      alert('❌ فشلت الطباعة الحرارية: ' + (err.message || 'خطأ غير معروف'));
+    }
+  }, [companyPreviewData]);
+
+  // ── إقران طابعة USB جديدة عبر WebUSB ──────────────────────────────────────
+  const handlePairUsb = useCallback(async () => {
+    if (typeof navigator === 'undefined' || !('usb' in navigator)) {
+      alert('متصفحك لا يدعم WebUSB. استخدم Chrome أو Edge.');
+      return;
+    }
+    try {
+      const device = await (navigator as any).usb.requestDevice({ filters: [] });
+      const name = device.productName || device.manufacturerName || 'طابعة حرارية USB';
+      const newPrinter: DetectedPrinter = {
+        id:        `usb-${device.serialNumber ?? Date.now()}`,
+        name,
+        isDefault: printers.length === 0,
+        status:    'ready',
+        source:    'usb',
+      };
+      setPrinters(prev => {
+        const updated = [...prev, newPrinter];
+        localStorage.setItem('erp_printers', JSON.stringify(updated));
+        return updated;
+      });
+    } catch (err: any) {
+      if (err.name !== 'NotFoundError') {
+        alert('تعذر الاتصال بالطابعة: ' + err.message);
+      }
+    }
+  }, [printers]);
 
   useEffect(() => {
     const cached = localStorage.getItem('erp_printers');
@@ -137,8 +205,10 @@ export default function PrintSettingsPage() {
       const printWin = window.open('', '_blank');
       if (printWin) {
         printWin.document.write(
-          '<html><head><style>' +
-          'body { margin: 0; padding: 10px; display: flex; justify-content: center; background: #fff; }' +
+          '<html><head>' +
+          '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"/>' +
+          '<style>' +
+          'body { margin: 0; padding: 10px; display: flex; justify-content: center; background: #fff; font-family: "Tajawal", sans-serif; }' +
           '@page { margin: 0; }' +
           '</style></head><body>' +
           paper.outerHTML +
@@ -211,14 +281,19 @@ export default function PrintSettingsPage() {
                 يتم اكتشاف الطابعات المثبتة على الجهاز تلقائياً
               </div>
             </div>
-            <button
-              className={`ps-btn ps-btn--primary ${scanning ? 'ps-btn--loading' : ''}`}
-              onClick={detectPrinters}
-              disabled={scanning}
-            >
-              <i className={`ti ${scanning ? 'ti-loader-2 spin' : 'ti-refresh'}`} />
-              {scanning ? 'جاري الاكتشاف...' : 'اكتشاف الطابعات'}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className={`ps-btn ps-btn--primary ${scanning ? 'ps-btn--loading' : ''}`}
+                onClick={detectPrinters}
+                disabled={scanning}
+              >
+                <i className={`ti ${scanning ? 'ti-loader-2 spin' : 'ti-refresh'}`} />
+                {scanning ? 'جاري الاكتشاف...' : 'اكتشاف الطابعات'}
+              </button>
+              <button className="ps-btn ps-btn--ghost" onClick={handleThermalTest}>
+                <i className="ti ti-printer" /> طباعة اختبار حراري
+              </button>
+            </div>
           </div>
 
           {printers.length === 0 ? (
@@ -238,11 +313,22 @@ export default function PrintSettingsPage() {
                     {p.status === 'unknown' && <span className="ps-printer-dot ps-printer-dot--unk" />}
                   </div>
                   <div className="ps-printer-info">
-                    <div className="ps-printer-name">{p.name}</div>
+                    <EditablePrinterName
+                      name={p.name}
+                      onSave={v => {
+                        setPrinters(prev => {
+                          const next = prev.map(x => x.id === p.id ? { ...x, name: v } : x);
+                          localStorage.setItem('erp_printers', JSON.stringify(next));
+                          return next;
+                        });
+                      }}
+                    />
                     <div className="ps-printer-meta">
                       <span className={`ps-printer-status ps-printer-status--${p.status}`}>
                         {p.status === 'ready' ? 'جاهزة' : p.status === 'offline' ? 'غير متصلة' : 'غير معروف'}
                       </span>
+                      {p.source === 'usb' && <span className="ps-printer-source-tag ps-printer-source-tag--usb">USB</span>}
+                      {p.source === 'demo' && <span className="ps-printer-source-tag ps-printer-source-tag--demo">نموذج</span>}
                       {p.isDefault && <span className="ps-printer-default-tag">افتراضية</span>}
                     </div>
                   </div>
@@ -268,6 +354,18 @@ export default function PrintSettingsPage() {
               ))}
             </div>
           )}
+
+          <div className="ps-usb-section">
+            <div className="ps-section-title" style={{ marginBottom: 12 }}>ربط طابعة حرارية عبر USB</div>
+            <p className="ps-usb-info">
+              <i className="ti ti-info-circle" />
+              استخدم زر "ربط طابعة USB" لربط طابعة حرارية عبر منفذ USB.
+              تعمل هذه الخاصية على متصفح Chrome أو Edge فقط.
+            </p>
+            <button className="ps-btn ps-btn--primary" onClick={handlePairUsb}>
+              <i className="ti ti-plug-connected" /> ربط طابعة USB
+            </button>
+          </div>
 
           <div className="ps-add-printer">
             <div className="ps-section-title" style={{ marginBottom: 12 }}>إضافة طابعة يدوياً</div>
@@ -498,6 +596,26 @@ function AddPrinterForm({ onAdd }: { onAdd: (p: DetectedPrinter) => void }) {
       >
         <i className="ti ti-plus" /> إضافة
       </button>
+    </div>
+  );
+}
+
+function EditablePrinterName({ name, onSave }: { name: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(name);
+  return editing ? (
+    <input
+      className="ps-input ps-printer-name-input"
+      value={val}
+      autoFocus
+      onBlur={() => { onSave(val.trim() || name); setEditing(false); }}
+      onKeyDown={e => { if (e.key === 'Enter') { onSave(val.trim() || name); setEditing(false); } }}
+      onChange={e => setVal(e.target.value)}
+      onClick={e => e.stopPropagation()}
+    />
+  ) : (
+    <div className="ps-printer-name" onClick={() => setVal(name) || setEditing(true)} style={{ cursor: 'pointer' }}>
+      {name} <i className="ti ti-pencil" style={{ fontSize: 10, opacity: .4 }} />
     </div>
   );
 }

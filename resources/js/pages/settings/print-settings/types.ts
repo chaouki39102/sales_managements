@@ -6,6 +6,7 @@ export interface DetectedPrinter {
   name:      string;
   isDefault: boolean;
   status:    'ready' | 'offline' | 'unknown';
+  source?:   'usb' | 'demo' | 'manual';
 }
 
 export type PaperSize = '80mm' | 'A4' | 'A5' | 'none';
@@ -170,6 +171,36 @@ export interface ReceiptTemplate80mm {
   marginSides:  number;
   lineSpacing:  number;
   baseFontSize: number;
+}
+
+export interface ReceiptLiveData {
+  docNumber?: string;
+  docDate?: string;
+  cashierName?: string;
+  items?: Array<{
+    name: string;
+    ref?: string;
+    qty: number;
+    unit_price_ht: number;
+    unit?: string;
+    tva_rate: number;
+    discount_percentage?: number;
+    total_ht: number;
+  }>;
+  totals?: {
+    total_ht:       number;
+    total_tva:      number;
+    total_ttc:      number;
+    fiscal_stamp:   number;
+    total_discount: number;
+    paid?:          number;
+    change?:        number;
+    remaining?:     number;
+  };
+  client?: { name?: string; nif?: string; phone?: string; address?: string } | null;
+  payments?: Array<{ mode: string; amount: number }>;
+  prevBalance?: number;
+  newBalance?: number;
 }
 
 export interface CompanyPreviewData {
