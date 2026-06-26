@@ -40,8 +40,13 @@ const TvaPage      = lazy(() => import('@/pages/fiscal/TvaPage'));
 const ChecksPage   = lazy(() => import('@/pages/checks/ChecksPage'));
 
 // â”€â”€ Fiscal / Reports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const FiscalYearsPage = lazy(() => import('@/pages/fiscal/FiscalYearsPage'));
-const ReportsPage     = lazy(() => import('@/pages/reports/ReportsPage'));
+const FiscalYearsPage       = lazy(() => import('@/pages/fiscal/FiscalYearsPage'));
+const TaxSettingsPage       = lazy(() => import('@/pages/fiscal/TaxSettingsPage'));
+const RegulatedProductsPage = lazy(() => import('@/pages/fiscal/RegulatedProductsPage'));
+const SubsidizedProductsPage = lazy(() => import('@/pages/fiscal/SubsidizedProductsPage'));
+const G50DeclarationPage    = lazy(() => import('@/pages/fiscal/G50DeclarationPage'));
+const IFUDeclarationPage    = lazy(() => import('@/pages/fiscal/IFUDeclarationPage'));
+const ReportsPage           = lazy(() => import('@/pages/reports/ReportsPage'));
 
 // â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
@@ -53,8 +58,9 @@ const EmployeesPage = lazy(() => import('@/pages/users/EmployeesPage'));
 const ProfilePage   = lazy(() => import('@/pages/profile/ProfilePage'));
 
 // â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const SettingsPage      = lazy(() => import('@/pages/settings/SettingsPage'));
-const DocumentTypesPage = lazy(() => import('@/pages/settings/DocumentTypesPage'));
+const SettingsPage       = lazy(() => import('@/pages/settings/SettingsPage'));
+const DocumentTypesPage  = lazy(() => import('@/pages/settings/DocumentTypesPage'));
+const PrintSettingsPage  = lazy(() => import('@/pages/settings/PrintSettingsPage'));
 
 // â”€â”€ Tenant Lookups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FamiliesPage          = lazy(() => import('@/pages/lookups/FamiliesPage'));
@@ -214,7 +220,12 @@ export function AppRoutes() {
           <Route path="checks"  element={<ChecksPage />} />
 
           {/* Fiscal */}
-          <Route path="fiscalyears" element={<FiscalYearsPage />} />
+          <Route path="fiscalyears"     element={<FiscalYearsPage />} />
+          <Route path="fiscal/tax-settings"    element={<TaxSettingsPage />} />
+          <Route path="fiscal/regulated-products" element={<RegulatedProductsPage />} />
+          <Route path="fiscal/subsidized-products" element={<SubsidizedProductsPage />} />
+          <Route path="fiscal/g50"       element={<G50DeclarationPage />} />
+          <Route path="fiscal/ifu"       element={<IFUDeclarationPage />} />
 
           {/* Reports */}
           <Route path="reports" element={<ReportsPage />} />
@@ -230,8 +241,9 @@ export function AppRoutes() {
           <Route path="notifications" element={<NotificationsPage />} />
 
           {/* Settings */}
-          <Route path="settings"                element={<SettingsPage />} />
-          <Route path="settings/document-types" element={<DocumentTypesPage />} />
+          <Route path="settings"                 element={<SettingsPage />} />
+          <Route path="settings/document-types"  element={<DocumentTypesPage />} />
+          <Route path="settings/print"           element={<PrintSettingsPage />} />
           <Route path="profile" element={<ProfilePage />} />
 
 

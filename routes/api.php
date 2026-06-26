@@ -42,6 +42,11 @@ use App\Http\Controllers\Api\V1\ApprovalController;
 use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\DocumentMailController;
 use App\Http\Controllers\Api\V1\PosSessionController;
+use App\Http\Controllers\Api\V1\TaxConfigController;
+use App\Http\Controllers\Api\V1\RegulatedProductsController;
+use App\Http\Controllers\Api\V1\SubsidizedSalesController;
+use App\Http\Controllers\Api\V1\G50DeclarationController;
+use App\Http\Controllers\Api\V1\IFUDeclarationController;
 
 
 // Tenant Lookup Controllers
@@ -509,6 +514,40 @@ Route::prefix('v1')->group(function () {
 
                 // ── إرسال المستند للزبون ────────────────────────────
                 Route::post('documents/{documentId}/send-mail', [DocumentMailController::class, 'send']);
+            });
+
+            // ── Fiscal / Tax Management ──────────────────────────
+            Route::get('tax-config/ifu-settings',           [TaxConfigController::class, 'ifuSettings']);
+            Route::get('tax-config/{regime}',               [TaxConfigController::class, 'show']);
+            Route::get('tax-config/{regime}/history',       [TaxConfigController::class, 'history']);
+
+            Route::get('regulated-products',                [RegulatedProductsController::class, 'index']);
+
+            Route::get('subsidized-sales/summary',          [SubsidizedSalesController::class, 'summary']);
+            Route::get('subsidized-sales/violations',       [SubsidizedSalesController::class, 'violations']);
+
+            Route::get('g50-declaration',                   [G50DeclarationController::class, 'show']);
+            Route::get('g50-declaration/history',           [G50DeclarationController::class, 'history']);
+
+            Route::get('ifu-declaration',                   [IFUDeclarationController::class, 'show']);
+            Route::get('ifu-declaration/history',           [IFUDeclarationController::class, 'history']);
+
+            // ── Write routes (can:update_company) ──────────────
+            Route::middleware('can:update_company')->group(function () {
+                Route::put('tax-config/{regime}',                  [TaxConfigController::class, 'update']);
+                Route::post('regulated-products',                   [RegulatedProductsController::class, 'store']);
+                Route::put('regulated-products/{id}',               [RegulatedProductsController::class, 'update']);
+                Route::patch('regulated-products/{id}/toggle',      [RegulatedProductsController::class, 'toggle']);
+                Route::delete('regulated-products/{id}',            [RegulatedProductsController::class, 'destroy']);
+                Route::post('regulated-products/seed-defaults',     [RegulatedProductsController::class, 'seedDefaults']);
+
+                Route::post('subsidized-sales/compute',             [SubsidizedSalesController::class, 'compute']);
+                Route::put('subsidized-sales/{id}',                  [SubsidizedSalesController::class, 'update']);
+                Route::patch('subsidized-sales/{id}',                [SubsidizedSalesController::class, 'update']);
+                Route::delete('subsidized-sales/{id}',               [SubsidizedSalesController::class, 'destroy']);
+
+                Route::post('g50-declaration/save-period',          [G50DeclarationController::class, 'savePeriod']);
+                Route::post('ifu-declaration/save-period',          [IFUDeclarationController::class, 'savePeriod']);
             });
 
             // ── POS Sessions ──────────────────────────────────────

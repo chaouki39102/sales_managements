@@ -179,5 +179,31 @@ export const tenantKeys = {
         all:            (slug: string) => [slug, 'document-type-conversions'] as const,
         allowedTargets: (slug: string, sourceCode: string) => [slug, 'document-type-conversions', sourceCode] as const,
     },
+
+    // ── Tax Management ────────────────────────────────────────────────────
+    taxConfig: {
+        detail:  (slug: string, regime: string)          => [slug, 'tax-config', regime]             as const,
+        history: (slug: string, regime: string)           => [slug, 'tax-config', regime, 'history'] as const,
+    },
+
+    regulatedProducts: {
+        all:    (slug: string)                            => [slug, 'regulated-products']             as const,
+        list:   (slug: string, p?: Record<string, unknown>) => [slug, 'regulated-products', 'list', p] as const,
+    },
+
+    subsidizedSales: {
+        summary:    (slug: string, yearId: number, month?: number)  => [slug, 'subsidized-sales', 'summary', yearId, month]    as const,
+        violations: (slug: string, yearId: number)                  => [slug, 'subsidized-sales', 'violations', yearId]        as const,
+    },
+
+    g50Declaration: {
+        detail:  (slug: string, yearId: number, month: number) => [slug, 'g50', yearId, month]                               as const,
+        history: (slug: string, yearId: number)                 => [slug, 'g50', yearId, 'history']                          as const,
+    },
+
+    ifuDeclaration: {
+        detail:  (slug: string, yearId: number, month?: number)  => [slug, 'ifu', yearId, month]                             as const,
+        history: (slug: string, yearId: number)                  => [slug, 'ifu', yearId, 'history']                         as const,
+    },
 } as const;
 

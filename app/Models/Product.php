@@ -50,6 +50,8 @@ class Product extends Model
         'max_stock_alert',
         'manages_quantity_discounts',
         'valuation_method_id',
+        'is_subsidized',
+        'regulated_product_config_id',
         'weight',
         'volume',
         'length',
@@ -68,6 +70,7 @@ class Product extends Model
         'images' => 'array',
         'meta_keywords' => 'array',
         'active' => 'boolean',
+        'is_subsidized' => 'boolean',
         'manages_stock' => 'boolean',
         'allow_negative_stock' => 'boolean',
         'has_lots' => 'boolean',
@@ -123,7 +126,8 @@ class Product extends Model
         'documentLines',
         'openingBalances',
         'barcodes',
-        'primaryBarcode'
+        'primaryBarcode',
+        'regulatedProductConfig'
     ];
     public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
@@ -152,6 +156,11 @@ class Product extends Model
     {
         return $this->belongsTo(ProductType::class);
     }
+    public function regulatedProductConfig(): BelongsTo
+    {
+        return $this->belongsTo(RegulatedProductConfig::class);
+    }
+
     public function tva(): BelongsTo
     {
         return $this->belongsTo(Tva::class);

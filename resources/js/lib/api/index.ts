@@ -29,5 +29,6 @@ export * from './endpoints/users';
 export * as settings from './endpoints/settings';
 export * from './endpoints/dashboard';
 export * from './endpoints/reports';
+export * from './endpoints/taxManagement';
 
 

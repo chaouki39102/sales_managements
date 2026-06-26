@@ -26,6 +26,7 @@ import {
 } from '@/lib/api/endpoints/lookups';
 import { tenantKeys }  from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
+import { useRegulatedProducts } from '@/lib/api/endpoints/taxManagement';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -114,6 +115,9 @@ interface ProductForm {
   meta_keywords:    string[];
   // ── الصور ──
   images:  string[];
+  // ── الدعم (المواد المدعمة) ──
+  is_subsidized:           boolean;
+  regulated_product_config_id: number | null;
   // ── عام ──
   active:  boolean;
 }
@@ -195,6 +199,7 @@ function emptyForm(priceLevels: PriceLevel[] = [], defaultTvaId: number | null =
     weight: '', volume: '', length: '', width: '', height: '',
     specifications: {}, images: [],
     meta_title: '', meta_description: '', meta_keywords: [],
+    is_subsidized: false, regulated_product_config_id: null,
     active: true,
     prices: priceLevels.map(pl => ({
       price_level_id: pl.id, pricing_method: 'fixed', price: '', rate: '', margin: '', active: true,
@@ -223,6 +228,8 @@ function productToForm(p: any, priceLevels: PriceLevel[]): ProductForm {
     images: p.images ?? [],
     meta_title: p.meta_title ?? '', meta_description: p.meta_description ?? '',
     meta_keywords: Array.isArray(p.meta_keywords) ? p.meta_keywords : (p.meta_keywords ? String(p.meta_keywords).split(',').map((k: string) => k.trim()).filter(Boolean) : []),
+    is_subsidized: p.is_subsidized ?? false,
+    regulated_product_config_id: p.regulated_product_config_id ?? null,
     active: p.active ?? true,
     prices: priceLevels.map(pl => {
       const ex = (p.prices ?? []).find((x: any) => x.price_level_id === pl.id);
@@ -276,6 +283,8 @@ function buildPayload(form: ProductForm) {
     meta_title: form.meta_title.trim() || null,
     meta_description: form.meta_description.trim() || null,
     meta_keywords: form.meta_keywords.length ? form.meta_keywords : null,
+    is_subsidized: form.is_subsidized,
+    regulated_product_config_id: form.regulated_product_config_id || null,
     active: form.active,
     prices: form.prices.filter(p => {
       if (p.pricing_method === 'fixed')  return p.price  !== '' && p.price  !== null;
@@ -413,6 +422,9 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
 
   // valuation methods خارج useProductLookups — نضيفه مباشرة
   const { data: valuationMethods = [] } = useValuationMethods();
+
+  // المواد المقننة (للمنتجات المدعمة)
+  const { data: regulatedProducts = [] } = useRegulatedProducts(true);
 
   const defaultTvaId = useMemo(
     () => (tvas as TvaRate[]).find(t => t.is_default)?.id ?? null,
@@ -786,6 +798,29 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
               {(productTypes as ProductType[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </Field>
+        </div>
+
+        <div style={s.divider} />
+        <SectionHeader icon="ti-package-off" title="الدعم والمواد المدعمة" subtitle="تحديد إذا كان المنتج مدعماً من الدولة وربطه بالمادة المقننة" />
+
+        <div style={s.row2}>
+          <Field label="منتج مدعم" hint="المنتجات المدعمة تخضع لضريبة IFU على الهامش (5%) بدلاً من IFU على المشتريات">
+            <Toggle checked={form.is_subsidized} onChange={v => {
+              set('is_subsidized', v);
+              if (!v) set('regulated_product_config_id', null);
+            }} label={form.is_subsidized ? 'مدعم' : 'غير مدعم'} />
+          </Field>
+          {form.is_subsidized && (
+            <Field label="المادة المقننة" hint="اختر المادة التي ينتمي إليها هذا المنتج" required>
+              <select style={s.sel()} value={form.regulated_product_config_id ?? ''}
+                onChange={e => set('regulated_product_config_id', e.target.value ? Number(e.target.value) : null)}>
+                <option value="">— اختر المادة المقننة —</option>
+                {regulatedProducts.map((rp: any) => (
+                  <option key={rp.id} value={rp.id}>{rp.label} ({rp.unit_label}) — {rp.category}</option>
+                ))}
+              </select>
+            </Field>
+          )}
         </div>
 
         <div style={s.divider} />

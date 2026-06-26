@@ -62,6 +62,7 @@ interface Product {
   product_type_id: number | null;
   tva_id:    number | null;
   unit_id:   number | null;
+  is_subsidized: boolean;
   purchase_price_ht:   number;
   current_cost_price:  number;
   current_stock:       number;  // appended accessor
@@ -326,6 +327,9 @@ const { data: brands = [] } = useQuery<Brand[]>({
               )}
               {prod.manages_stock && (
                 <span style={{ fontSize: 10, color: 'var(--t4)' }}><i className="ti ti-building-warehouse" style={{ fontSize: 10 }} /> مخزون</span>
+              )}
+              {prod.is_subsidized && (
+                <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'var(--emb)', color: 'var(--em)', fontWeight: 600 }}>مدعم</span>
               )}
               {prod.has_lots && (
                 <span style={{ fontSize: 10, color: 'var(--t4)' }}><i className="ti ti-layers" style={{ fontSize: 10 }} /> دفعات</span>
