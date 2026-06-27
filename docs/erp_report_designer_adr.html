@@ -1,0 +1,612 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans, sans-serif); }
+.page { padding: 24px; max-width: 860px; }
+.section { margin-bottom: 32px; }
+.section-title {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+  border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 16px;
+}
+.adr-title { font-size: 20px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; }
+.adr-meta { font-size: 13px; color: var(--text-secondary); margin-bottom: 24px; }
+.status-badge {
+  display: inline-block; font-size: 11px; font-weight: 500;
+  padding: 2px 8px; border-radius: 4px;
+  background: var(--bg-success); color: var(--text-success);
+}
+
+.layer-stack { display: flex; flex-direction: column; gap: 8px; }
+.layer {
+  border-radius: 8px; padding: 12px 16px;
+  border: 1px solid var(--border);
+}
+.layer-name { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; }
+.layer-desc { font-size: 12px; color: var(--text-secondary); }
+.layer-modules { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 12px;
+  background: var(--surface-1); border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.chip.new { background: var(--bg-accent); border-color: var(--border-accent); color: var(--text-accent); }
+.chip.keep { background: var(--bg-success); border-color: var(--border-success); color: var(--text-success); }
+.chip.deprecate { background: var(--bg-danger); border-color: var(--border-danger); color: var(--text-danger); }
+
+.l1 { background: #EEEDFE; border-color: #AFA9EC; }
+.l2 { background: #E1F5EE; border-color: #5DCAA5; }
+.l3 { background: #E6F1FB; border-color: #85B7EB; }
+.l4 { background: #FAEEDA; border-color: #EF9F27; }
+.l5 { background: var(--surface-1); }
+
+@media (prefers-color-scheme: dark) {
+  .l1 { background: #26215C; border-color: #534AB7; }
+  .l2 { background: #04342C; border-color: #0F6E56; }
+  .l3 { background: #042C53; border-color: #185FA5; }
+  .l4 { background: #412402; border-color: #854F0B; }
+}
+
+.decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.decision-card {
+  border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+}
+.decision-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.decision-value { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.decision-note { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+.risk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.risk-table th { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); font-weight: 500; font-size: 12px; color: var(--text-secondary); }
+.risk-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.risk-high { color: var(--text-danger); font-weight: 500; }
+.risk-med { color: var(--text-warning); font-weight: 500; }
+.risk-low { color: var(--text-success); font-weight: 500; }
+
+.roadmap { display: flex; flex-direction: column; gap: 0; }
+.phase {
+  display: flex; gap: 16px; position: relative;
+}
+.phase-line { display: flex; flex-direction: column; align-items: center; }
+.phase-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; }
+.phase-connector { flex: 1; width: 2px; background: var(--border); margin: 4px 0; }
+.phase-content { padding-bottom: 24px; flex: 1; }
+.phase-title { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
+.phase-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+.phase-items { list-style: none; }
+.phase-items li { font-size: 12px; color: var(--text-secondary); padding: 2px 0; }
+.phase-items li::before { content: '→ '; color: var(--text-muted); }
+
+.p0 .phase-dot { background: #EEEDFE; color: #3C3489; }
+.p1 .phase-dot { background: #E1F5EE; color: #085041; }
+.p2 .phase-dot { background: #E6F1FB; color: #0C447C; }
+.p3 .phase-dot { background: #FAEEDA; color: #633806; }
+.p4 .phase-dot { background: #FCEBEB; color: #791F1F; }
+.p5 .phase-dot { background: var(--surface-1); color: var(--text-primary); }
+
+.flow-row { display: flex; align-items: stretch; gap: 0; margin: 8px 0; }
+.flow-box {
+  flex: 1; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 12px;
+}
+.flow-box .fb-title { font-weight: 500; color: var(--text-primary); margin-bottom: 3px; font-size: 13px; }
+.flow-box .fb-sub { color: var(--text-secondary); }
+.flow-arrow {
+  display: flex; align-items: center; padding: 0 8px;
+  color: var(--text-muted); font-size: 16px;
+}
+.fb-purple { background: #EEEDFE; border-color: #AFA9EC; }
+.fb-teal   { background: #E1F5EE; border-color: #5DCAA5; }
+.fb-blue   { background: #E6F1FB; border-color: #85B7EB; }
+.fb-amber  { background: #FAEEDA; border-color: #EF9F27; }
+.fb-coral  { background: #FAECE7; border-color: #F0997B; }
+@media (prefers-color-scheme: dark) {
+  .fb-purple { background: #26215C; border-color: #534AB7; }
+  .fb-teal   { background: #04342C; border-color: #0F6E56; }
+  .fb-blue   { background: #042C53; border-color: #185FA5; }
+  .fb-amber  { background: #412402; border-color: #854F0B; }
+  .fb-coral  { background: #4A1B0C; border-color: #D85A30; }
+}
+
+.compat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.compat-cell { border: 1px solid var(--border); border-radius: 6px; padding: 8px; text-align: center; }
+.compat-cell .cc-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.compat-cell .cc-value { font-size: 12px; font-weight: 500; }
+.cc-yes { color: var(--text-success); }
+.cc-no  { color: var(--text-danger); }
+.cc-partial { color: var(--text-warning); }
+
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.tab-btn {
+  padding: 8px 14px; font-size: 13px; cursor: pointer;
+  border: none; background: none; color: var(--text-secondary);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn.active { color: var(--text-accent); border-bottom-color: var(--text-accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.legend { display: flex; gap: 12px; margin-bottom: 12px; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+</style>
+
+<div class="page">
+  <div class="adr-title">Architecture Design Document</div>
+  <div class="adr-meta">ERP Report Designer Framework — v1.0 · 2026-06-27</div>
+  <div style="margin-bottom:24px"><span class="status-badge">Draft — Awaiting Validation</span></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('layers')">Layer Architecture</button>
+    <button class="tab-btn" onclick="switchTab('pipeline')">Rendering Pipeline</button>
+    <button class="tab-btn" onclick="switchTab('decisions')">Key Decisions</button>
+    <button class="tab-btn" onclick="switchTab('roadmap')">Roadmap</button>
+    <button class="tab-btn" onclick="switchTab('risks')">Risk Analysis</button>
+  </div>
+
+  <!-- LAYERS TAB -->
+  <div id="tab-layers" class="tab-panel active">
+    <div class="section">
+      <div class="section-title">Clean Architecture — 5 Layers</div>
+      <div class="layer-stack">
+        <div class="layer l1">
+          <div class="layer-name">Layer 1 — Domain Core <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(zero dependencies)</span></div>
+          <div class="layer-desc">Pure TypeScript. No React, no Axios, no Zustand. Framework-agnostic forever.</div>
+          <div class="layer-modules">
+            <span class="chip new">ReportDocument</span>
+            <span class="chip new">ReportSection</span>
+            <span class="chip new">ReportElement</span>
+            <span class="chip new">FormulaEngine</span>
+            <span class="chip new">RulesEngine</span>
+            <span class="chip new">LayoutEngine</span>
+            <span class="chip keep">PrintTemplate (extended)</span>
+            <span class="chip new">DataBinding</span>
+            <span class="chip new">ThemeSystem</span>
+          </div>
+        </div>
+        <div class="layer l2">
+          <div class="layer-name">Layer 2 — Data Contract <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(ReceiptLiveData → UniversalDocumentData)</span></div>
+          <div class="layer-desc">Single source of truth for all printable data. All previews consume this. No mock/demo data in components.</div>
+          <div class="layer-modules">
+            <span class="chip new">UniversalDocumentData</span>
+            <span class="chip new">DocumentDataBuilder</span>
+            <span class="chip keep">ReceiptLiveData (alias)</span>
+            <span class="chip new">FieldRegistry</span>
+            <span class="chip new">CalculatedFieldService</span>
+            <span class="chip deprecate">MOCK / MOCK_COMPANY</span>
+          </div>
+        </div>
+        <div class="layer l3">
+          <div class="layer-name">Layer 3 — Rendering Engine <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(renderer adapters)</span></div>
+          <div class="layer-desc">Pluggable renderers. Core logic never touches DOM directly. Each renderer is swappable.</div>
+          <div class="layer-modules">
+            <span class="chip new">ReactRenderer</span>
+            <span class="chip new">ESCPOSRenderer</span>
+            <span class="chip new">PDFRenderer (future)</span>
+            <span class="chip keep">printService.ts (adapted)</span>
+            <span class="chip new">RenderContext</span>
+            <span class="chip new">PaperSizeAdapter</span>
+          </div>
+        </div>
+        <div class="layer l4">
+          <div class="layer-name">Layer 4 — UI Components <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(React only)</span></div>
+          <div class="layer-desc">Designer canvas, preview components, settings panels. Depend on Layers 1–3, never reverse.</div>
+          <div class="layer-modules">
+            <span class="chip new">DesignerCanvas</span>
+            <span class="chip new">ElementPalette</span>
+            <span class="chip new">PropertyPanel</span>
+            <span class="chip new">UniversalPreview</span>
+            <span class="chip keep">PreviewSelector (simplified)</span>
+            <span class="chip new">TemplateManager</span>
+            <span class="chip new">ThemeEditor</span>
+          </div>
+        </div>
+        <div class="layer l5">
+          <div class="layer-name">Layer 5 — Integration <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(POS, Documents, Settings)</span></div>
+          <div class="layer-desc">Thin wrappers. Existing pages call the framework. No print logic lives here.</div>
+          <div class="layer-modules">
+            <span class="chip keep">POSPage (adapted)</span>
+            <span class="chip keep">CommercialDocumentModal (upgraded)</span>
+            <span class="chip keep">usePrintSettings (adapted)</span>
+            <span class="chip deprecate">printStore.ts dual-save</span>
+            <span class="chip deprecate">SettingsPage print block</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--bg-accent)"></div> New</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--bg-success)"></div> Keep / Adapt</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--bg-danger)"></div> Deprecate</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Directory Structure</div>
+      <pre style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);line-height:1.7;background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto">resources/js/
+└── reporting/                    ← NEW: the framework root
+    ├── core/                     ← Layer 1 (zero deps)
+    │   ├── domain/
+    │   │   ├── ReportDocument.ts
+    │   │   ├── ReportSection.ts
+    │   │   └── ReportElement.ts
+    │   ├── engines/
+    │   │   ├── FormulaEngine.ts
+    │   │   ├── RulesEngine.ts
+    │   │   └── LayoutEngine.ts
+    │   └── theme/
+    │       └── ThemeSystem.ts
+    ├── data/                     ← Layer 2 (data contract)
+    │   ├── UniversalDocumentData.ts
+    │   ├── DocumentDataBuilder.ts
+    │   ├── FieldRegistry.ts
+    │   └── CalculatedFieldService.ts
+    ├── renderers/                ← Layer 3 (rendering)
+    │   ├── IRenderer.ts
+    │   ├── ReactRenderer.tsx
+    │   ├── ESCPOSRenderer.ts
+    │   └── PDFRenderer.ts       (future)
+    ├── components/               ← Layer 4 (UI)
+    │   ├── designer/
+    │   │   ├── DesignerCanvas.tsx
+    │   │   ├── ElementPalette.tsx
+    │   │   └── PropertyPanel.tsx
+    │   ├── preview/
+    │   │   ├── UniversalPreview.tsx
+    │   │   ├── ThermalPreview.tsx
+    │   │   ├── A4Preview.tsx
+    │   │   └── A5Preview.tsx
+    │   └── shared/
+    ├── api/                      ← Layer 5 (integration)
+    │   └── reportingApi.ts
+    └── index.ts                  ← public API</pre>
+    </div>
+  </div>
+
+  <!-- PIPELINE TAB -->
+  <div id="tab-pipeline" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Rendering Pipeline — Print Request Flow</div>
+      <div class="flow-row">
+        <div class="flow-box fb-purple"><div class="fb-title">Trigger</div><div class="fb-sub">POS sale / Document print / Preview</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-teal"><div class="fb-title">DocumentDataBuilder</div><div class="fb-sub">Builds UniversalDocumentData from raw API response</div></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-box fb-teal"><div class="fb-title">UniversalDocumentData</div><div class="fb-sub">Single contract: entity fields + calculated fields + metadata</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-blue"><div class="fb-title">TemplateResolver</div><div class="fb-sub">Loads PrintTemplate for (docType, paperSize). Falls back to default.</div></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-box fb-blue"><div class="fb-title">RulesEngine</div><div class="fb-sub">Evaluates show/hide, conditional formatting, page breaks</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-blue"><div class="fb-title">FormulaEngine</div><div class="fb-sub">Resolves all expressions: IF(), SUM(), FORMAT(), custom functions</div></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-box fb-amber"><div class="fb-title">LayoutEngine</div><div class="fb-sub">Computes positions: Absolute / Flow / Flex / Grid</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-coral"><div class="fb-title">Renderer</div><div class="fb-sub">ReactRenderer → HTML/DOM<br>ESCPOSRenderer → thermal bytes<br>PDFRenderer → PDF stream (future)</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Data Contract — UniversalDocumentData shape</div>
+      <pre style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);line-height:1.7;background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto">interface UniversalDocumentData {
+  // ─── Document identity ─────────────────────────────
+  doc:      DocumentInfo;        // number, date, type, status, notes
+  // ─── Parties ──────────────────────────────────────
+  company:  CompanyInfo;         // name, address, nif, rc, nis, ice, logo
+  party:    PartyInfo | null;    // customer or supplier
+  // ─── Warehouse / Branch ───────────────────────────
+  warehouse: WarehouseInfo | null;
+  // ─── Session (POS) ────────────────────────────────
+  session:   SessionInfo | null;
+  // ─── Lines ────────────────────────────────────────
+  lines:     DocumentLine[];     // full product + packaging + lot data
+  // ─── Totals ───────────────────────────────────────
+  totals:    DocumentTotals;     // ht, tva, ttc, stamp, discount, paid, change
+  // ─── Tax breakdown ────────────────────────────────
+  taxBreakdown: TaxRate[];       // per-rate: base, tva, total
+  // ─── Payments ─────────────────────────────────────
+  payments:  Payment[];
+  // ─── Balances ─────────────────────────────────────
+  balance:   BalanceInfo | null; // prev, current, new, due
+  // ─── Currency ─────────────────────────────────────
+  currency:  CurrencyInfo;
+  // ─── Calculated (runtime) ─────────────────────────
+  computed:  Record<string, unknown>; // formula results, custom fields
+}</pre>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Template Resolution Priority</div>
+      <pre style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);line-height:1.7;background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:16px">1. User-selected template for (docTypeCode, paperSize)
+2. Default template for (docTypeCode, any paperSize)
+3. Default template for ('*', paperSize)          ← global fallback
+4. createDefaultTemplate(docTypeCode, paperSize)   ← built-in hardcoded default
+
+Storage: settings table only (key: print:templates:{docTypeCode}:{id})
+Legacy: print_templates table → read-only migration path, no new writes</pre>
+    </div>
+  </div>
+
+  <!-- DECISIONS TAB -->
+  <div id="tab-decisions" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Architecture Decision Records</div>
+      <div class="decision-grid">
+        <div class="decision-card">
+          <div class="decision-label">Storage backend</div>
+          <div class="decision-value">settings table only</div>
+          <div class="decision-note">Eliminate dual-save. print_templates table becomes read-only migration source. Single PATCH /settings endpoint.</div>
+        </div>
+        <div class="decision-card">
+          <div class="decision-label">Data contract</div>
+          <div class="decision-value">UniversalDocumentData</div>
+          <div class="decision-note">ReceiptLiveData becomes a type alias. All previews (thermal, A4, A5, future) consume the same object. No component-local MOCK data.</div>
+        </div>
+        <div class="decision-card">
+          <div class="decision-label">Rendering strategy</div>
+          <div class="decision-value">Renderer interface + adapters</div>
+          <div class="decision-note">IRenderer interface. ReactRenderer for screen/window.print(). ESCPOSRenderer for WebUSB. PDFRenderer as future plugin. Core has zero renderer knowledge.</div>
+        </div>
+        <div class="decision-card">
+          <div class="decision-label">Formula engine</div>
+          <div class="decision-value">Custom expression evaluator</div>
+          <div class="decision-note">No external dependency. Supports IF/SUM/CONCAT/FORMAT/TODAY + custom functions. Sandboxed, no eval(). Results cached per document.</div>
+        </div>
+        <div class="decision-card">
+          <div class="decision-label">Designer approach</div>
+          <div class="decision-value">Section-based (Phase 3+)</div>
+          <div class="decision-note">Phase 2: enhanced property panel (current UX). Phase 3: section drag/reorder. Phase 4: free-form canvas. Progressive — don't break existing UX.</div>
+        </div>
+        <div class="decision-card">
+          <div class="decision-label">Migration strategy</div>
+          <div class="decision-value">Additive + versioned templates</div>
+          <div class="decision-note">All existing PrintTemplate properties preserved. New framework adds optional fields. Template version field for future migrations. Zero breaking changes.</div>
+        </div>
+        <div class="decision-card">
+          <div class="decision-label">CommercialDocumentModal</div>
+          <div class="decision-value">Replace window.print()</div>
+          <div class="decision-note">Modal's print button calls UniversalPreview + ReactRenderer. Template resolved by document type. No window.print() in production paths.</div>
+        </div>
+        <div class="decision-card">
+          <div class="decision-label">Performance</div>
+          <div class="decision-value">Virtual table + memoization</div>
+          <div class="decision-note">Lines table virtualized (react-virtual). Formula results memoized per (template, data) pair. Preview debounced 200ms. No blocking renders.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Compatibility Matrix — Current vs Target</div>
+      <div class="compat-grid">
+        <div class="compat-cell"><div class="cc-label">Thermal 80mm</div><div class="cc-value cc-yes">✓ preserved</div></div>
+        <div class="compat-cell"><div class="cc-label">Thermal 58mm</div><div class="cc-value cc-yes">✓ preserved</div></div>
+        <div class="compat-cell"><div class="cc-label">A4 Invoice</div><div class="cc-value cc-yes">✓ upgraded</div></div>
+        <div class="compat-cell"><div class="cc-label">A5 Receipt</div><div class="cc-value cc-yes">✓ upgraded</div></div>
+        <div class="compat-cell"><div class="cc-label">POS flow</div><div class="cc-value cc-yes">✓ no change</div></div>
+        <div class="compat-cell"><div class="cc-label">Kiosk flow</div><div class="cc-value cc-yes">✓ no change</div></div>
+        <div class="compat-cell"><div class="cc-label">Document print</div><div class="cc-value cc-partial">⚡ upgraded</div></div>
+        <div class="compat-cell"><div class="cc-label">Existing templates</div><div class="cc-value cc-yes">✓ no migration</div></div>
+        <div class="compat-cell"><div class="cc-label">WebUSB thermal</div><div class="cc-value cc-yes">✓ preserved</div></div>
+        <div class="compat-cell"><div class="cc-label">PDF export</div><div class="cc-value cc-partial">⚡ Phase 3</div></div>
+        <div class="compat-cell"><div class="cc-label">Excel export</div><div class="cc-value cc-partial">⚡ Phase 4</div></div>
+        <div class="compat-cell"><div class="cc-label">Formula engine</div><div class="cc-value cc-partial">⚡ Phase 2</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROADMAP TAB -->
+  <div id="tab-roadmap" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Implementation Roadmap</div>
+      <div class="roadmap">
+        <div class="phase p0">
+          <div class="phase-line">
+            <div class="phase-dot">0</div>
+            <div class="phase-connector"></div>
+          </div>
+          <div class="phase-content">
+            <div class="phase-title">Phase 0 — Foundation (now, ~1 week)</div>
+            <div class="phase-sub">Architecture validated. No user-visible changes.</div>
+            <ul class="phase-items">
+              <li>Create reporting/ directory structure</li>
+              <li>Define UniversalDocumentData interface (superset of ReceiptLiveData)</li>
+              <li>Implement DocumentDataBuilder (maps existing data → UDD)</li>
+              <li>Define IRenderer interface</li>
+              <li>Audit all existing PrintTemplate properties (100% coverage checklist)</li>
+              <li>Eliminate MOCK/MOCK_COMPANY from preview components</li>
+              <li>Fix dual-save: remove printTemplatesApi writes, settings table only</li>
+            </ul>
+          </div>
+        </div>
+        <div class="phase p1">
+          <div class="phase-line">
+            <div class="phase-dot">1</div>
+            <div class="phase-connector"></div>
+          </div>
+          <div class="phase-content">
+            <div class="phase-title">Phase 1 — Core Engines (~2 weeks)</div>
+            <div class="phase-sub">Internal engines. UX unchanged.</div>
+            <ul class="phase-items">
+              <li>FormulaEngine: IF/SUM/AVG/ROUND/CONCAT/FORMAT/TODAY + validation</li>
+              <li>RulesEngine: show/hide/highlight conditions</li>
+              <li>LayoutEngine: flow + flex modes (absolute deferred to Phase 3)</li>
+              <li>ThemeSystem: variables, palettes, presets</li>
+              <li>FieldRegistry: all entity fields catalogued with types</li>
+              <li>CalculatedFieldService: balance, margin, running totals</li>
+            </ul>
+          </div>
+        </div>
+        <div class="phase p2">
+          <div class="phase-line">
+            <div class="phase-dot">2</div>
+            <div class="phase-connector"></div>
+          </div>
+          <div class="phase-content">
+            <div class="phase-title">Phase 2 — Universal Preview + CommercialDoc (~2 weeks)</div>
+            <div class="phase-sub">First user-visible improvement.</div>
+            <ul class="phase-items">
+              <li>UniversalPreview component (replaces A4Preview, A5Preview, ReceiptPreview)</li>
+              <li>PreviewSelector delegates to UniversalPreview</li>
+              <li>Wire CommercialDocumentModal to template system (remove window.print())</li>
+              <li>Wire all document types to DocumentDataBuilder</li>
+              <li>Enhanced PropertyPanel: formula editor, field picker, rule builder</li>
+              <li>Section visibility + reordering UI</li>
+            </ul>
+          </div>
+        </div>
+        <div class="phase p3">
+          <div class="phase-line">
+            <div class="phase-dot">3</div>
+            <div class="phase-connector"></div>
+          </div>
+          <div class="phase-content">
+            <div class="phase-title">Phase 3 — Designer Canvas (~3 weeks)</div>
+            <div class="phase-sub">Professional drag-and-drop designer.</div>
+            <ul class="phase-items">
+              <li>DesignerCanvas: drag/resize/select, snap-to-grid, rulers</li>
+              <li>ElementPalette: all component types (text, table, image, QR, barcode, line, spacer)</li>
+              <li>Layer panel, grouping, lock/unlock, undo/redo history</li>
+              <li>Absolute layout engine</li>
+              <li>PDF export via browser print + @page CSS</li>
+              <li>Template versioning system</li>
+            </ul>
+          </div>
+        </div>
+        <div class="phase p4">
+          <div class="phase-line">
+            <div class="phase-dot">4</div>
+            <div class="phase-connector"></div>
+          </div>
+          <div class="phase-content">
+            <div class="phase-title">Phase 4 — Export + Plugin System (~2 weeks)</div>
+            <div class="phase-sub">Multi-format output + extensibility.</div>
+            <ul class="phase-items">
+              <li>PDFRenderer (jsPDF or server-side wkhtmltopdf)</li>
+              <li>Excel export plugin</li>
+              <li>Plugin registry: custom components, functions, exporters</li>
+              <li>Chart component (recharts integration)</li>
+              <li>Performance: virtual table for 10k+ lines</li>
+            </ul>
+          </div>
+        </div>
+        <div class="phase p5">
+          <div class="phase-line">
+            <div class="phase-dot">5</div>
+          </div>
+          <div class="phase-content">
+            <div class="phase-title">Phase 5 — Tests + Documentation (~1 week)</div>
+            <div class="phase-sub">Production-ready certification.</div>
+            <ul class="phase-items">
+              <li>Unit tests: FormulaEngine, RulesEngine, LayoutEngine, DataBuilder</li>
+              <li>Snapshot tests: all preview components</li>
+              <li>Rendering tests: thermal bytes, A4 output</li>
+              <li>Developer docs: architecture, components, data flow, plugin API</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RISKS TAB -->
+  <div id="tab-risks" class="tab-panel">
+    <div class="section">
+      <div class="section-title">Risk Analysis</div>
+      <table class="risk-table">
+        <thead>
+          <tr>
+            <th>Risk</th>
+            <th>Impact</th>
+            <th>Likelihood</th>
+            <th>Mitigation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Dual-save bug: POS reads stale template after settings write fails</td>
+            <td class="risk-high">High</td>
+            <td class="risk-high">Current</td>
+            <td>Phase 0: eliminate dual-save immediately. settings table is sole backend.</td>
+          </tr>
+          <tr>
+            <td>CommercialDocumentModal window.print() ignores template system entirely</td>
+            <td class="risk-high">High</td>
+            <td class="risk-high">Current</td>
+            <td>Phase 2: wire to UniversalPreview. Until then, document as known limitation.</td>
+          </tr>
+          <tr>
+            <td>MOCK data in A4Preview / A5Preview renders in production if liveData is null</td>
+            <td class="risk-med">Medium</td>
+            <td class="risk-med">Possible</td>
+            <td>Phase 0: remove MOCK fallbacks. UniversalPreview renders empty state explicitly.</td>
+          </tr>
+          <tr>
+            <td>FormulaEngine performance with 10k+ lines</td>
+            <td class="risk-med">Medium</td>
+            <td class="risk-low">Low</td>
+            <td>Phase 1: memoize by (formula, args). Phase 4: virtual table. Lazy evaluation.</td>
+          </tr>
+          <tr>
+            <td>Existing print_templates DB rows become orphaned</td>
+            <td class="risk-low">Low</td>
+            <td class="risk-high">Certain (Phase 0)</td>
+            <td>One-time migration script: read print_templates → write to settings table → mark migrated.</td>
+          </tr>
+          <tr>
+            <td>Designer Canvas coordinate math complexity</td>
+            <td class="risk-med">Medium</td>
+            <td class="risk-med">Medium</td>
+            <td>Phase 3: use react-dnd or @dnd-kit. Don't write custom drag math. Snap grid simplifies placement.</td>
+          </tr>
+          <tr>
+            <td>RTL/Arabic rendering in PDF export</td>
+            <td class="risk-high">High</td>
+            <td class="risk-high">Likely</td>
+            <td>Phase 3: use browser @page CSS print (Tajawal font already loaded). jsPDF has poor RTL support — avoid.</td>
+          </tr>
+          <tr>
+            <td>WebUSB thermal: ESC/POS Arabic Win-1256 encoding breaks with new data fields</td>
+            <td class="risk-med">Medium</td>
+            <td class="risk-low">Low</td>
+            <td>ESCPOSRenderer wraps existing printService.ts. Encoding logic unchanged.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Immediate Actions (Phase 0 — this week)</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--border-danger);border-radius:8px;background:var(--bg-danger)">
+          <i class="ti ti-alert-triangle" style="color:var(--text-danger);margin-top:1px;flex-shrink:0" aria-hidden="true"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text-danger)">Fix dual-save</div><div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Remove printTemplatesApi.ts writes from PrintSettingsPage. POS already reads only settings table.</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--border-warning);border-radius:8px;background:var(--bg-warning)">
+          <i class="ti ti-database" style="color:var(--text-warning);margin-top:1px;flex-shrink:0" aria-hidden="true"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text-warning)">Define UniversalDocumentData</div><div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Superset of ReceiptLiveData. TemplateLiveData becomes alias. No existing code breaks.</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--border-accent);border-radius:8px;background:var(--bg-accent)">
+          <i class="ti ti-clipboard-list" style="color:var(--text-accent);margin-top:1px;flex-shrink:0" aria-hidden="true"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text-accent)">PrintTemplate property audit</div><div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Every field in types.ts: verify DB / API / UI / Preview / Print coverage. Document gaps before adding new features.</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1)">
+          <i class="ti ti-folder" style="color:var(--text-secondary);margin-top:1px;flex-shrink:0" aria-hidden="true"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text-primary)">Create reporting/ directory</div><div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Scaffold the 5-layer structure. Empty files with correct exports. No logic yet.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('[onclick="switchTab(\''+id+'\')"]').classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+}
+</script>

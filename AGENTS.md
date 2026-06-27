@@ -1,17 +1,17 @@
 # AGENTS.md — Context Cache for AI Coding Agents
 
 ## Date
-2026-06-26
+2026-06-27
 
 ---
 
 ## Goal
-Finish the 80mm receipt template designer — connected to real company data from the API, with full control over columns, totals, footer, margins, and all receipt elements. Printer detection, document-level print config.
+Build the ERP Report Designer Framework incrementally: Phase 0 (Foundation) → Phase 1 (Core Engines) → Phase 2 (Universal Preview + UI Components) → Phase 3+ (Rules, Rich Reports, Enhancement, Advanced Features).
 
 ---
 
 ## Build / Test / Lint
-- **Build**: `npm run build` — uses Vite + Rollup (rolldown). Must pass cleanly.
+- **Build**: `npm run build` — uses Vite + Rolldown. Must pass cleanly (currently ~985 modules, ~1.2s).
 - **Lint**: `npm run lint` — ESLint (config missing in project, not our fault).
 - **Laravel**: `php artisan` commands in the project root.
 
@@ -22,104 +22,112 @@ Laravel + React SPA (full SPA with own routing). Vite build with `@vitejs/plugin
 
 Key directories:
 - `resources/js/` — React source (pages, components, hooks, routes)
+- `resources/js/reporting/` — ERP Report Designer Framework (5-layer clean architecture)
 - `resources/css/` — styles (app.css imports theme/*.css)
 - `routes/` — Laravel backend routes (for API)
 - `app/` — Laravel PHP backend
 
 ---
 
+## Architecture — ERP Report Designer Framework (`resources/js/reporting/`)
+
+```
+resources/js/reporting/
+├── index.ts                          # Public API — only entry point for consumer code
+├── core/
+│   ├── domain/
+│   │   └── PrintTemplate.ts          # Canonical 177-property PrintTemplate type + createDefaultTemplate()
+│   ├── engines/
+│   │   ├── FormulaEngine.ts          # Expression evaluator (no eval) — tokenizer → parser → AST → executor
+│   │   ├── RulesEngine.ts            # Declarative show/hide/highlight rule evaluator
+│   │   └── LayoutEngine.ts           # Flow/flex/absolute layout computation with pagination
+│   └── theme/
+│       └── ThemeSystem.ts            # 3 presets (default-light, minimal, compact) + CSS vars
+├── data/
+│   ├── UniversalDocumentData.ts      # Single data contract — DocumentInfo, CompanyInfo, PartyInfo, DocumentLine, DocumentTotals, Payment, BalanceInfo, CurrencyInfo
+│   ├── DocumentDataBuilder.ts        # Builds UniversalDocumentData from API/POS/legacy sources
+│   ├── FieldRegistry.ts              # 79 cataloged fields with Arabic labels, aggregation hints, wildcard paths
+│   └── CalculatedFieldService.ts     # 8 computed fields (movement, amountInWords, profit, profitMargin, runningTotal, lineCount, itemCount, averageLineTotal)
+├── renderers/
+│   ├── IRenderer.ts                  # Renderer interface + RendererRegistry (for extensibility)
+│   ├── CsvRenderer.ts                # CSV export (BOM, company/doc info, lines, totals, report)
+│   ├── ExcelRenderer.ts              # SpreadsheetML Excel export (styled, no deps)
+│   ├── PrintJobQueue.ts              # Singleton print job queue with events
+│   └── useExportDocument.ts          # React hook + standalone export utilities
+└── components/
+    ├── preview/
+    │   ├── UniversalPreview.tsx       # Unified preview — thermal flexbox for 58/80mm, HTML tables for A4/A5
+    │   └── shared.tsx                 # Styling helpers (mm, align, fontFamily, borderStyle), CompanyData, DocRow, TotalRow, InfoRow, Separator
+    └── shared/
+        ├── FormulaEditor.tsx          # Formula expression editor with field picker + validation + function chips
+        ├── TemplatePrintModal.tsx     # Modal for template-based printing (replaces window.print())
+        ├── RulesSection.tsx           # Condition builder — rules list, section visibility toggles, highlight style editor
+        ├── ChartSection.tsx           # BarChart/PieChart via recharts for report summaries
+        └── PrintQueuePanel.tsx        # Floating queue status panel (jobs, status, elapsed, cancel)
+```
+
+### Layers
+1. **Core/Domain** — PrintTemplate, DocTypeCode, ColumnKey (no React/DOM)
+2. **Data** — UniversalDocumentData, DocumentDataBuilder, FieldRegistry (data contract)
+3. **Engines** — FormulaEngine, RulesEngine, LayoutEngine, ThemeSystem (computation)
+4. **Renderers** — IRenderer interface (pluggable output: HTML, PDF, text)
+5. **UI** — UniversalPreview, FormulaEditor, TemplatePrintModal (React components)
+
+---
+
+## Current State (Phase 6 complete)
+- **Phase 0 (Foundation)**: reporting/ directory created with UniversalDocumentData, DocumentDataBuilder, PrintTemplate, IRenderer. Patch 1 (dual-save bugfix in PrintSettingsPage.tsx). Patches 2-3 (MOCK data → emptyDocumentData() in A4Preview/A5Preview/ReceiptPreview). `@/reporting` vite alias. Build: 389 modules, 0 errors.
+- **Phase 1 (Core Engines)**: FormulaEngine (no-eval expression evaluator with IF/SUM/AVG/ROUND/CONCAT/FORMAT/TODAY/MIN/MAX/COUNT/ABS/LEN/UPPER/LOWER). RulesEngine (declarative show/hide/highlight/disable). LayoutEngine (flow/flex/absolute + pagination). ThemeSystem (3 presets, toCSSVariables(), applyTemplateOverrides()). FieldRegistry (79 cataloged fields). CalculatedFieldService (8 computed fields). Build: 395 modules, 0 errors.
+- **Phase 2 (Universal Preview + UI)**: UniversalPreview (~630 lines, handles all paper sizes via flexbox/tables). PreviewSelector delegates to UniversalPreview with legacy→UniversalDocumentData conversion. FormulaEditor (field picker dropdown with search, validation, function chips, Ctrl+Space). TemplatePrintModal (template-based print preview replacing window.print()). Build: ~397 modules, 0 errors.
+- **Phase 3 (Rules & Conditions)**: Added `rules: ReportRule[]` and `show_*_section` visibility booleans to `PrintTemplate`. Created `RulesSection` component (condition builder with FormulaEditor integration, action/target/priority selectors, highlight style editor, section visibility toggles). Added rules accordion to PrintSettingsPage template controls + QuickNav. Integrated `RulesEngine.evaluate()` into `UniversalPreview` — sections respect rule-based visibility and apply highlight styles. Build: clean.
+- **Phase 4 (Commercial Document Integration)**: Wired `TemplatePrintModal` into `CommercialDocumentModal`. Added template selector dropdown + "طباعة بالقوالب" button in `DocumentFooter` (visible only in edit mode). Integrated `usePrintTemplates(docCode)` for doc-type-specific template loading. `DocumentDataBuilder.fromApiDocument()` builds `UniversalDocumentData` from the existing document API data. Build: clean.
+- **Phase 5 (Rich Report Templates)**: Added `ReportSummary` type to `UniversalDocumentData` with aggregated session data (payment breakdown, top products, KPIs). Extended `PrintTemplate` with report fields (show_charts, chart_type, group_by, sort_by, show_report_header/footer, period, cashier, summary cards, payment breakdown, top products toggles). Created `ChartSection` component using recharts (BarChart + PieChart). Added `renderReport()` to `UniversalPreview` — KPI cards grid, charts, top products table, report header/footer. Added report controls accordion to `PrintSettingsPage` (chart type, toggles, header/footer text, grouping/sorting controls). Added `DocumentDataBuilder.fromSessionReport()` for building report data from POS session API. Wired session report print button into SessionStatsModal. Build: clean.
+- **Phase 6 (Advanced Features)**: CSV/Excel export via CsvRenderer + ExcelRenderer (SpreadsheetML, no deps), `useExportDocument` hook. Batch printing via BatchPrintModal + DataTable selectable/bulkActions. PrintJobQueue singleton with `usePrintJobQueue` hook + PrintQueuePanel UI. UI polish: TinyBtn loading states, delete modal (replaced confirm()), report accordion conditional rendering, empty state icons, TemplatePrintModal uses CSS vars, FormulaEditor Tabler icon, ErrorBoundary around preview. Build: 985 modules, 0 errors.
+
+---
+
 ## Constraints & Preferences
-- All CSS must live in `.css` files imported globally via `app.css`.
-- Control section components follow `(tpl, update)` prop signature; `HeaderSectionControls` also accepts optional `company` prop.
-- `ReceiptTemplate80mm` in `types.ts` is the single source of truth — do not add nested objects beyond its current structure.
-- `ReceiptPreview` is stateless; receives `tpl` + optional `company` prop, renders mock data with real company fallback.
-- Sidebar `<Link>` hrefs use absolute paths (React Router v7 resolves relative paths from current route, causing bugs).
-- `ToggleSwitch.tsx` is the home for shared primitives (`Toggle`, `SliderField`, `Section`, `ColorToggle`) — do NOT create duplicates.
-
----
-
-## Architecture — New Files
-
-```
-resources/js/pages/settings/print-settings/
-├── index.ts                          # re-exports all section components & types
-├── types.ts                          # ReceiptTemplate80mm, CompanyPreviewData, DetectedPrinter, DocumentPrintConfig + defaultTemplate()
-├── ReceiptPreview.tsx                # stateless 302px-wide receipt preview with real company data fallback + logo rendering
-└── sections/
-    ├── ToggleSwitch.tsx              # shared <Toggle>, <SliderField>, <Section> (accepts id prop), <ColorToggle>
-    ├── HeaderSection.tsx             # logo size/align, company info toggles, CompanyField with API badge
-    ├── DocumentSection.tsx           # title text/size/bold/align, doc info toggles
-    ├── ItemsSection.tsx              # column order/width/visibility, table styling
-    ├── TotalsSection.tsx             # HT/TVA/TTC/balance toggles & styling
-    ├── FooterSection.tsx             # 3 footer lines, barcode, QR, signatures, stamp
-    └── FormattingSection.tsx         # paper width, 4 margins, line spacing, base font size
-```
-
----
-
-## Current State (all complete)
-- **PrintSettingsPage.tsx** refactored with 3 tabs: printers, documents, templates
-- **Company data integrated**: `useCurrentCompany()` fetches API data → `CompanyPreviewData` → passed to `ReceiptPreview` + `HeaderSectionControls`
-- **useSettingsByGroup('print')** imported (placeholder for future API save/load migration)
-- **Logo**: renders real `<img>` from `company.logoUrl` or first-letter-in-circle fallback; alignment fixed (flex `justifyContent` in RTL)
-- **CompanyField** in `HeaderSection.tsx`: shows "تلقائي من الشركة" badge + API value as placeholder when override field is empty
-- **Print CSS**: `@media print` hides UI chrome, shows only receipt paper centered on page
-- **QuickNav** in controls column: scrolls to each section via `id`
-- **Source info banner** in preview column: shows company name or fallback text
-- **handleTestPrint**: opens new window with only receipt paper HTML, then calls `print()`
-- **Section** component accepts optional `id` prop for QuickNav anchoring
-- Build passes (380 modules, ~2.5s, chunk ~50 kB / 12 kB gzip)
-
----
-
-## Routing
-- `resources/js/routes/index.tsx` → lazy import `/settings/print` → `PrintSettingsPage`
-- Sidebar entry in `DashboardLayout.tsx`: `النظام ← إعدادات الطباعة` uses **absolute href** `/settings/print`
-
----
-
-## CSS
-- `resources/css/theme/print-settings.css` (~440 lines) — all print settings styles including:
-  - QuickNav (`.ps-tpl-quicknav` with sticky position)
-  - Source info banner (`.ps-preview-source-info`)
-  - API badge (`.ps-badge-api`)
-  - `@media print` rules hiding UI chrome
-  - Responsive: `max-width: 900px` collapses grid, hides QuickNav
-- Imported globally via `resources/css/app.css` → `@import 'theme/print-settings.css'`
+- All CSS lives in `.css` files imported globally via `app.css`.
+- Zero breaking changes to existing production code.
+- UniversalDocumentData is the single data contract; old ReceiptLiveData aliases migrate via fromLegacyLiveData() adapter.
+- No eval() — FormulaEngine uses custom recursive-descent parser.
+- Build must remain clean after every phase.
+- All new UI components use inline styles (no external CSS dependencies).
+- Sidebar `<Link>` hrefs use absolute paths (React Router v7 resolves relative from current route).
 
 ---
 
 ## Key Design Decisions
-- **Company data fallback chain**: template override → API company data → mock data (`MOCK_COMPANY`). Each step falls back to next if empty.
-- **`company` prop on HeaderSectionControls only**: other sections (Document, Items, Totals, Footer, Formatting) don't need company data.
-- **Print via `handleTestPrint`**: opens clean window with only receipt paper HTML, avoids browser full-page print.
-- **QuickNav as wrapper `<div id>`**: simpler than adding `id` to each `Section`'s internal div.
-- **`useSettingsByGroup('print')` called but unused**: placeholder for future migration from `localStorage` to server-side API.
+- **UniversalDocumentData** is single source of truth; ReceiptLiveData stays unchanged in old types.ts, bridged via fromLegacyLiveData().
+- **Phase 0 purely additive** — no existing production files changed except the dual-save bugfix and MOCK removal.
+- **FormulaEngine uses custom parser** — tokenize → recursive descent → binary ops, member access, function calls, wildcard aggregation.
+- **PreviewSelector acts as conversion boundary** — accepts legacy snake_case, converts to UniversalDocumentData, passes to UniversalPreview.
+- **UniversalPreview handles all paper sizes** — switches between thermal flexbox (58/80mm) and HTML table layout (A4/A5).
+- **FormulaEngine singleton** clears cache on template changes.
+- **LayoutEngine uses auto-height defaults**: text=5mm, table=20mm, image=20mm, barcode=15mm, qr=15mm, line=1mm, spacer=5mm.
 
 ---
 
-## Balance Calculation for Receipt Print (`handlePrintDirect`)
-- **`prevBalance`**: fetched via `partyBalancesApi.getOne(clientId)` AFTER the sale is completed. The API returns `current_balance` which INCLUDES the new invoice. We reverse its impact: `prevBalance = max(0, currentBalance - totalTtc + paid)`.
-- **`remaining`** (المبلغ المتبقي): unpaid portion of THIS invoice only = `max(0, totalTtc - paid)`.
-- **`newBalance`** (الرصيد الجديد): client's total debt after this invoice = `prevBalance + remaining`.
-- The balance API call is wrapped in try/catch — if it fails, all values default to 0.
-- `lastPaymentRef` stores the paid amount and payment modes from the last completed sale (set in `handleCompleteSale` after API success).
-
----
-
-## Related API / Backend
-- `GET /api/v1/companies/current` → `useCurrentCompany()` → `Company` object with fields: `name`, `address`, `phone`, `nif`, `nis`, `rc`, `ai` (article), `avatar` (logo URL)
-- `CompanyPreviewData` maps `ai` → `article`; there is no `ice` field in backend — only template override handles ICE
-- `settings` API group `'print'` → `useSettingsByGroup('print')` (unused placeholder)
-
----
-
-## Completed Tasks
-- **✅ API Integration**: Template/DocConfig/Printer CRUD uses DB-first architecture (`PATCH /settings` + `GET /settings/{key}`) with localStorage as cache/fallback.
-- **✅ POS Receipt Integration**: `ProfessionalReceipt.tsx` refactored to use `ReceiptPreview` from the template system. Now renders according to `ReceiptTemplate80mm` — pixel-perfect match between preview and printed output. `POSPage` and `POSKioskPage` both build `ReceiptLiveData` from sale snapshots.
-- **✅ WebUSB/WebSerial printer communication**: `printThermalViaWebUSB` implemented with device enumeration (no dialog) + fallback dialog. Demo printers only appear when no USB devices detected.
-- **✅ Import/Export**: JSON file export/import for template configs added in PrintSettingsPage header.
-
-## Remaining / Future
-- **#4 — A4/A5 template types**: Only 80mm receipt template is implemented. A4 (full-page invoice) and A5 (half-page receipt) would need their own preview components, section controls, and printing pipeline. This is a substantial feature.
-- **Minor polish**: QuickNav scroll behavior, edge cases in template loading, keyboard shortcuts in the designer.
+## Relevant Files
+- `docs/erp_report_designer_adr.html`: full architecture document
+- `resources/js/reporting/index.ts`: framework public API
+- `resources/js/reporting/core/domain/PrintTemplate.ts`: canonical type
+- `resources/js/reporting/data/UniversalDocumentData.ts`: single data contract
+- `resources/js/reporting/data/DocumentDataBuilder.ts`: builds from API/POS
+- `resources/js/reporting/core/engines/FormulaEngine.ts`: expression evaluator
+- `resources/js/reporting/core/engines/RulesEngine.ts`: condition evaluator
+- `resources/js/reporting/core/engines/LayoutEngine.ts`: layout computation
+- `resources/js/reporting/core/theme/ThemeSystem.ts`: theme presets + CSS vars
+- `resources/js/reporting/data/FieldRegistry.ts`: 79 cataloged fields
+- `resources/js/reporting/data/CalculatedFieldService.ts`: 8 computed fields
+- `resources/js/reporting/renderers/IRenderer.ts`: renderer interface + registry
+- `resources/js/reporting/components/preview/UniversalPreview.tsx`: unified preview (~630 lines)
+- `resources/js/reporting/components/preview/shared.tsx`: shared helpers
+- `resources/js/reporting/components/shared/FormulaEditor.tsx`: formula editor with field picker
+- `resources/js/reporting/components/shared/TemplatePrintModal.tsx`: template-based print
+- `resources/js/reporting/components/shared/RulesSection.tsx`: condition builder with rules UI
+- `resources/js/pages/settings/print-settings/components/PreviewSelector.tsx`: delegates to UniversalPreview
+- `resources/js/pages/settings/PrintSettingsPage.tsx`: dual-save fix applied
+- `resources/js/pages/settings/print-settings/A4Preview.tsx`, `A5Preview.tsx`, `components/ReceiptPreview.tsx`: MOCK data removed
+- `resources/js/pages/documents/CommercialDocumentModal/`: target for Phase 4 wiring
+- `resources/css/theme/print-settings.css`: print settings page styles

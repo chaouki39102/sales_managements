@@ -1,12 +1,17 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
-import { useActiveSlug } from '@/lib/store/appStore';
+import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type { DocumentType } from '@/lib/api/core/types';
+import TemplatePrintModal from '@/reporting/components/shared/TemplatePrintModal';
+import { DocumentDataBuilder } from '@/reporting/data/DocumentDataBuilder';
+import type { CompanyInfo } from '@/reporting/data/UniversalDocumentData';
+import type { PrintTemplate } from '@/reporting/core/domain/PrintTemplate';
+import { usePrintTemplates } from '../../settings/print-settings/api/printTemplatesApi';
 
 import { useDocumentLookups }  from '../hooks/useDocumentLookups';
 import { useDocumentForm }     from '../hooks/useDocumentForm';
@@ -346,6 +351,35 @@ export default function CommercialDocumentModal({
   const [successMsg, setSuccessMsg] = useState('');
   const successTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
+
+  // ─── Template-based printing ──────────────────────────────────────────────
+
+  const activeCompany = useActiveCompany();
+  const companyInfo: CompanyInfo | null = useMemo(() => activeCompany ? {
+    name:    activeCompany.name    ?? '',
+    address: activeCompany.address ?? '',
+    phone:   activeCompany.phone   ?? '',
+    nif:     activeCompany.nif     ?? '',
+    rc:      activeCompany.rc      ?? '',
+    nis:     activeCompany.nis     ?? '',
+    ice:    (activeCompany as any).ice ?? '',
+    article: (activeCompany as any).ai ?? '',
+    logoUrl: (activeCompany as any).avatar ?? null,
+  } : null, [activeCompany]);
+
+  const { data: printTemplates = [] } = usePrintTemplates(docCode);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const selectedTemplate = useMemo(() => {
+    if (selectedTemplateId) return printTemplates.find(t => t.id === selectedTemplateId);
+    return printTemplates[0] || null;
+  }, [selectedTemplateId, printTemplates]);
+
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+
+  const handlePrint = useCallback(() => {
+    if (!existingDocument || !companyInfo) return;
+    setPrintModalOpen(true);
+  }, [existingDocument, companyInfo]);
 
   // ─── Delete confirmation modal ────────────────────────────────────────────
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -966,6 +1000,10 @@ export default function CommercialDocumentModal({
           handleExport={handleExport}
           onClose={onClose}
           handleSave={handleSave}
+          onPrint={isEdit ? handlePrint : undefined}
+          templates={printTemplates}
+          selectedTemplateId={selectedTemplateId}
+          onTemplateChange={setSelectedTemplateId}
         />
       </div>
       {/* Bulk import */}
@@ -1007,6 +1045,19 @@ export default function CommercialDocumentModal({
         itemName={existingDocument?.document_number ? `#${existingDocument.document_number}` : undefined}
         warning="ملاحظة: الحذف غير مدعوم — استخدم الإلغاء."
       />
+
+      {/* طباعة حسب القالب */}
+      {printModalOpen && existingDocument && companyInfo && (
+        <TemplatePrintModal
+          open={printModalOpen}
+          onClose={() => setPrintModalOpen(false)}
+          document={existingDocument as Record<string, unknown>}
+          company={companyInfo as any}
+          template={selectedTemplate || undefined}
+          templates={printTemplates}
+          docTypeCode={docCode}
+        />
+      )}
     </>
   );
 

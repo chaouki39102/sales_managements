@@ -48,6 +48,7 @@ import CommercialDocumentModal from "./CommercialDocumentModal";
 import QuickSaleModal from "./QuickSaleModal";
 import { DeliveryProgressBar } from "./components/DeliveryProgressBar";
 import ConvertDocumentModal from "./components/ConvertDocumentModal";
+import BatchPrintModal from "./components/BatchPrintModal";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
@@ -543,6 +544,10 @@ export default function CommercialDocumentsPage() {
 
     // ── Cancel modal state ────────────────────────────────────────────────────
     const [cancelModal, setCancelModal] = useState<{ id: number; reason: string } | null>(null);
+
+    // ── Batch print ───────────────────────────────────────────────────────────
+    const [batchPrintOpen, setBatchPrintOpen] = useState(false);
+    const [batchDocs, setBatchDocs] = useState<CommercialDocument[]>([]);
 
     // ── Server-side state ─────────────────────────────────────────────────────
     const [page, setPage]               = useState(1);
@@ -1712,6 +1717,19 @@ export default function CommercialDocumentsPage() {
                         }}
                         allData={items as unknown as Record<string, unknown>[]}
 
+                        // ── Selection + Batch Print ──────────────────────
+                        selectable
+                        bulkActions={(selectedRows: CommercialDocument[], clearSelection: () => void) => (
+                            <button
+                                onClick={() => { setBatchDocs(selectedRows as CommercialDocument[]); setBatchPrintOpen(true); }}
+                                className="dt-bulk-btn"
+                                type="button"
+                            >
+                                <i className="ti ti-printer" />
+                                طباعة بالجملة ({selectedRows.length})
+                            </button>
+                        )}
+
                         // ── الميزات الأساسية ────────────────────────────
                         searchable
                         searchPlaceholder="بحث برقم المستند أو اسم المتعامل…"
@@ -1863,6 +1881,12 @@ export default function CommercialDocumentsPage() {
                     </div>
                 </Modal>
             )}
+
+            <BatchPrintModal
+                open={batchPrintOpen}
+                onClose={() => setBatchPrintOpen(false)}
+                documents={batchDocs}
+            />
 
             <ToastContainer />
         </>

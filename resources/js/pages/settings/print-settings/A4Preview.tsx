@@ -1,55 +1,8 @@
-// resources/js/pages/settings/print-settings/A4Preview.tsx
-// معاينة فاتورة بحجم A4 — تصميم احترافي كامل الصفحة
+﻿import React from 'react';
+import { emptyDocumentData } from '@/reporting';
+import type { PrintTemplate, ColumnKey, CompanyData, ReceiptLiveData, AlignOption, BorderStyle } from './types';
 
-import React from 'react';
-import type { ReceiptTemplate80mm, ColumnKey, CompanyPreviewData, ReceiptLiveData } from './types';
 
-const MOCK_COMPANY: CompanyPreviewData = {
-  name:    'سوبيرات الوفرة',
-  address: 'حي 08 ماي، بجانب القاعدة الجنوبية — الوادي',
-  phone:   '029 123 456',
-  nif:     '099217700002',
-  rc:      '13/B.0123456',
-  nis:     '099217700002',
-  ice:     '099217700002',
-  article: 'تجارة التجزئة للمواد الغذائية',
-};
-
-const MOCK = {
-  number: 'FV-2025-001770',
-  date:   '2026-06-26',
-  time:   '14:35',
-  dueDate: '2026-07-26',
-  cashier: 'أحمد بن علي',
-  client:  'مؤسسة البركة للتوزيع',
-  clientTaxId: '099217700002',
-  clientPhone: '029 123 456',
-  clientAddress: 'حي 08 ماي، بجانب القاعدة الجنوبية — الوادي',
-  deliveryAddress: 'المنطقة الصناعية، طريق وادي سوف — الوادي',
-  session: 'جلسة #1770',
-  paymentTerm: '30 يوم',
-  items: [
-    { ref: 'R001', name: 'روز أبيض فراكة 500غ',    qty: 3,  price: 85,  total: 255,  tva: 9,  discount: 0,    unit: 'قطعة' },
-    { ref: 'L002', name: 'عدس فراكة 500غ',          qty: 1,  price: 109, total: 109,  tva: 9,  discount: 0,    unit: 'قطعة' },
-    { ref: 'L003', name: 'لبن صومام بالفيدوس 1ل',  qty: 1,  price: 140, total: 140,  tva: 19, discount: 10,   unit: 'لتر'  },
-    { ref: 'S004', name: 'سيدي السعادة 1ل',         qty: 1,  price: 165, total: 165,  tva: 9,  discount: 0,    unit: 'قطعة' },
-  ],
-  tvaByRate: [
-    { rate: 9,  base: 420, amount: 37.80 },
-    { rate: 19, base: 140, amount: 26.60 },
-  ],
-  totalHt:      614.50,
-  totalTva:      54.50,
-  totalDiscount: 10,
-  fiscalStamp:   50,
-  totalTtc:     709.00,
-  paid:         669.00,
-  change:       0,
-  remaining:    40,
-  prevBalance:  1200.00,
-  newBalance:   1240.00,
-  payments: [{ mode: 'نقداً', amount: 669 }],
-};
 
 interface A4Data {
   number: string;
@@ -58,7 +11,7 @@ interface A4Data {
   dueDate: string;
   cashier: string;
   client: string;
-  clientTaxId: string;
+  clientNif: string;
   clientPhone: string;
   clientAddress: string;
   deliveryAddress: string;
@@ -91,23 +44,23 @@ function buildTvaByRate(items: ReceiptLiveData['items'] = []): Array<{ rate: num
   return Array.from(map.entries()).map(([rate, v]) => ({ rate, ...v }));
 }
 
-function buildData(tpl: ReceiptTemplate80mm, liveData?: ReceiptLiveData | null): A4Data {
-  if (!liveData) return MOCK;
+function buildData(tpl: PrintTemplate, liveData?: ReceiptLiveData | null): A4Data {
+  if (!liveData) return emptyDocumentData();
   return {
     number:  liveData.docNumber  ?? '',
     date:    liveData.docDate    ?? new Date().toLocaleDateString('ar-DZ'),
     time:    new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
-    dueDate: '',
+    dueDate: liveData.dueDate ?? '',
     cashier: liveData.cashierName ?? '',
     client:  liveData.client?.name ?? '',
-    clientTaxId: liveData.client?.nif ?? '',
+    clientNif: liveData.client?.nif ?? '',
     clientPhone: liveData.client?.phone ?? '',
     clientAddress: liveData.client?.address ?? '',
     deliveryAddress: '',
     session: '',
     paymentTerm: '',
     items: (liveData.items ?? []).map((item, i) => ({
-      ref:      item.ref ?? `P${i + 1}`,
+      ref:      item.ref ?? 'P' + (i + 1),
       name:     item.name,
       qty:      item.qty,
       price:    item.unit_price_ht,
@@ -131,23 +84,58 @@ function buildData(tpl: ReceiptTemplate80mm, liveData?: ReceiptLiveData | null):
   };
 }
 
-function getCompany(tpl: ReceiptTemplate80mm, api?: CompanyPreviewData | null): CompanyPreviewData {
+function getCompany(tpl: PrintTemplate, api?: CompanyData | null): CompanyData {
   return {
-    name:    tpl.companyName    || api?.name    || MOCK_COMPANY.name,
-    address: tpl.companyAddress || api?.address  || MOCK_COMPANY.address,
-    phone:   tpl.companyPhone   || api?.phone   || MOCK_COMPANY.phone,
-    nif:     tpl.companyNif     || api?.nif     || MOCK_COMPANY.nif,
-    rc:      tpl.companyRc      || api?.rc      || MOCK_COMPANY.rc,
-    nis:     tpl.companyNis     || api?.nis     || MOCK_COMPANY.nis,
-    ice:     tpl.companyIce     || api?.ice     || MOCK_COMPANY.ice,
-    article: tpl.companyArticle || api?.article || MOCK_COMPANY.article,
+    name:    tpl.company_name_text || api?.name    || '',
+    address: tpl.override_address  || api?.address  || '',
+    phone:   tpl.override_phone    || api?.phone   || '',
+    nif:     tpl.override_nif      || api?.nif     || '',
+    rc:      tpl.override_rc       || api?.rc      || '',
+    nis:     tpl.override_nis      || api?.nis     || '',
+    ice:     tpl.override_ice      || api?.ice     || '',
+    article: tpl.override_article  || api?.article || '',
     logoUrl: api?.logoUrl,
   };
 }
 
+function getVisibleCols(tpl: PrintTemplate): ColumnKey[] {
+  return tpl.col_order.filter(k => tpl.col_show[k] !== false);
+}
+
+function colLabel(c: ColumnKey): string {
+  const labels: Record<ColumnKey, string> = {
+    rowNumber: '#', barcode: 'باركود', ref: 'مرجع',
+    name: 'البيان', unit: 'وحدة', quantity: 'الكمية',
+    price: 'السعر', discount: 'خصم', tva: 'TVA', total: 'المجموع',
+  };
+  return labels[c];
+}
+
+function colValue(c: ColumnKey, item: A4Data['items'][0]) {
+  switch (c) {
+    case 'name': return item.name;
+    case 'quantity': return String(item.qty);
+    case 'price': return item.price.toFixed(2);
+    case 'total': return item.total.toFixed(2);
+    case 'ref': return item.ref;
+    case 'unit': return item.unit;
+    case 'discount': return item.discount > 0 ? item.discount + '%' : '';
+    case 'tva': return 'TVA ' + item.tva + '%';
+    default: return '';
+  }
+}
+
+function align(a: AlignOption): React.CSSProperties['textAlign'] {
+  return a === 'right' ? 'right' : a === 'left' ? 'left' : 'center';
+}
+
+const borderMap: Record<BorderStyle, string> = {
+  solid: 'solid', dashed: 'dashed', double: 'double', none: 'none',
+};
+
 interface A4PreviewProps {
-  tpl:      ReceiptTemplate80mm;
-  company?: CompanyPreviewData | null;
+  tpl:      PrintTemplate;
+  company?: CompanyData | null;
   liveData?: ReceiptLiveData | null;
 }
 
@@ -156,7 +144,7 @@ export default function A4Preview({ tpl, company, liveData }: A4PreviewProps) {
   const data = buildData(tpl, liveData);
 
   const paperWidth = 794;
-  const fs = tpl.baseFontSize;
+  const fs = tpl.base_font_size;
 
   return (
     <div
@@ -166,81 +154,81 @@ export default function A4Preview({ tpl, company, liveData }: A4PreviewProps) {
         fontFamily: "'Tajawal', sans-serif",
         fontSize: fs,
         padding: '40px 50px',
-        lineHeight: tpl.lineSpacing,
+        lineHeight: tpl.line_spacing,
         background: '#fff',
         color: '#111',
         direction: 'rtl',
         boxSizing: 'border-box',
       }}
     >
-      <A4Header tpl={tpl} company={co} data={data} />
+      <A4Header tpl={tpl} co={co} data={data} />
       <AddressBlock tpl={tpl} data={data} />
       <A4ItemsTable tpl={tpl} items={data.items} />
       <A4Totals tpl={tpl} data={data} />
-      {tpl.showPaymentDetails && <A4Payments tpl={tpl} payments={data.payments} />}
+      {tpl.show_payment_details && <A4Payments tpl={tpl} payments={data.payments} />}
       <A4Footer tpl={tpl} data={data} />
     </div>
   );
 }
 
-function A4Header({ tpl, company, data }: { tpl: ReceiptTemplate80mm; company: CompanyPreviewData; data: A4Data }) {
+function A4Header({ tpl, co, data }: { tpl: PrintTemplate; co: CompanyData; data: A4Data }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 30, paddingBottom: 20, borderBottom: '2px solid #111' }}>
       <div style={{ flex: 1 }}>
-        {tpl.showLogo && (
+        {tpl.show_logo && (
           <div style={{ marginBottom: 8 }}>
-            {company.logoUrl ? (
-              <img src={company.logoUrl} alt="logo"
-                style={{ width: tpl.logoSize * 1.5, height: tpl.logoSize * 1.5, objectFit: 'contain', borderRadius: 4 }} />
+            {co.logoUrl ? (
+              <img src={co.logoUrl} alt="logo"
+                style={{ width: tpl.logo_size * 1.5, height: tpl.logo_size * 1.5, objectFit: 'contain', borderRadius: 4 }} />
             ) : (
               <div style={{
-                width: tpl.logoSize * 1.5, height: tpl.logoSize * 1.5,
+                width: tpl.logo_size * 1.5, height: tpl.logo_size * 1.5,
                 background: '#111', borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontSize: tpl.logoSize * 0.4, fontWeight: 900,
+                color: '#fff', fontSize: tpl.logo_size * 0.4, fontWeight: 900,
               }}>
-                {company.name.charAt(0)}
+                {co.name.charAt(0)}
               </div>
             )}
           </div>
         )}
-        {tpl.showCompanyName && (
+        {tpl.show_company_name && (
           <div style={{
-            fontSize: tpl.companyNameSize + 4,
-            fontWeight: tpl.companyNameBold ? 900 : 400,
+            fontSize: tpl.company_name_size + 4,
+            fontWeight: tpl.company_name_bold ? 900 : 400,
             fontFamily: "'Tajawal', sans-serif",
             marginBottom: 4,
           }}>
-            {company.name}
+            {co.name}
           </div>
         )}
-        <div style={{ fontSize: tpl.companyInfoFontSize, color: '#555' }}>
-          {tpl.showAddress && <div>{company.address}</div>}
-          {tpl.showPhone && <div>☎ {company.phone}</div>}
-          {tpl.showTaxId && <div>NIF: {company.nif}</div>}
-          {tpl.showRc && <div>RC: {company.rc}</div>}
-          {tpl.showNis && <div>NIS: {company.nis}</div>}
+        <div style={{ fontSize: tpl.company_info_size, color: '#555' }}>
+          {tpl.show_address && <div>{co.address}</div>}
+          {tpl.show_phone && <div>☎ {co.phone}</div>}
+          {tpl.show_tax_id && <div>NIF: {co.nif}</div>}
+          {tpl.show_rc && <div>RC: {co.rc}</div>}
+          {tpl.show_nis && <div>NIS: {co.nis}</div>}
         </div>
       </div>
 
       <div style={{ textAlign: 'left', minWidth: 250 }}>
         <div style={{
-          fontSize: tpl.titleFontSize + 4,
-          fontWeight: tpl.titleBold ? 900 : 400,
+          fontSize: tpl.title_size + 4,
+          fontWeight: tpl.title_bold ? 900 : 400,
           color: '#111',
           marginBottom: 12,
           textAlign: 'left',
         }}>
-          {tpl.titleText}
+          {tpl.title_text}
         </div>
-        <table style={{ fontSize: tpl.companyInfoFontSize, borderCollapse: 'collapse' }}>
+        <table style={{ fontSize: tpl.company_info_size, borderCollapse: 'collapse' }}>
           <tbody>
-            {tpl.showDocNumber && <A4InfoRow label="رقم الفاتورة" value={data.number} />}
-            {tpl.showDate && <A4InfoRow label="التاريخ" value={data.date} />}
-            {tpl.showTime && <A4InfoRow label="الوقت" value={data.time} />}
-            {tpl.showDueDate && <A4InfoRow label="تاريخ الاستحقاق" value={data.dueDate} />}
-            {tpl.showCashier && <A4InfoRow label="الكاشير" value={data.cashier} />}
-            {tpl.showPaymentTerm && <A4InfoRow label="شروط الدفع" value={data.paymentTerm} />}
+            {tpl.show_doc_number && <A4InfoRow label="رقم الفاتورة" value={data.number} />}
+            {tpl.show_date && <A4InfoRow label="التاريخ" value={data.date} />}
+            {tpl.show_time && <A4InfoRow label="الوقت" value={data.time} />}
+            {tpl.show_due_date && <A4InfoRow label="تاريخ الاستحقاق" value={data.dueDate} />}
+            {tpl.show_cashier && <A4InfoRow label="الكاشير" value={data.cashier} />}
+            {tpl.show_payment_term && <A4InfoRow label="شروط الدفع" value={data.paymentTerm} />}
           </tbody>
         </table>
       </div>
@@ -257,24 +245,24 @@ function A4InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AddressBlock({ tpl, data }: { tpl: ReceiptTemplate80mm; data: A4Data }) {
+function AddressBlock({ tpl, data }: { tpl: PrintTemplate; data: A4Data }) {
   return (
     <div style={{ display: 'flex', gap: 30, marginBottom: 24 }}>
-      {tpl.showClient && (
+      {tpl.show_client && (
         <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
-          <div style={{ fontWeight: 700, fontSize: tpl.companyInfoFontSize + 1, marginBottom: 6, color: '#111' }}>بيانات العميل</div>
-          <div style={{ fontSize: tpl.companyInfoFontSize, color: '#333' }}>
+          <div style={{ fontWeight: 700, fontSize: tpl.company_info_size + 1, marginBottom: 6, color: '#111' }}>بيانات العميل</div>
+          <div style={{ fontSize: tpl.company_info_size, color: '#333' }}>
             <div style={{ fontWeight: 600, marginBottom: 2 }}>{data.client}</div>
-            {tpl.showClientTaxId && data.clientTaxId && <div>NIF: {data.clientTaxId}</div>}
-            {tpl.showClientPhone && data.clientPhone && <div>☎ {data.clientPhone}</div>}
-            {tpl.showClientAddress && data.clientAddress && <div>{data.clientAddress}</div>}
+            {tpl.show_client_nif && data.clientNif && <div>NIF: {data.clientNif}</div>}
+            {tpl.show_client_phone && data.clientPhone && <div>☎ {data.clientPhone}</div>}
+            {tpl.show_client_address && data.clientAddress && <div>{data.clientAddress}</div>}
           </div>
         </div>
       )}
-      {tpl.showDeliveryAddress && data.deliveryAddress && (
+      {tpl.show_delivery_address && data.deliveryAddress && (
         <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
-          <div style={{ fontWeight: 700, fontSize: tpl.companyInfoFontSize + 1, marginBottom: 6, color: '#111' }}>عنوان التسليم</div>
-          <div style={{ fontSize: tpl.companyInfoFontSize, color: '#333' }}>
+          <div style={{ fontWeight: 700, fontSize: tpl.company_info_size + 1, marginBottom: 6, color: '#111' }}>عنوان التسليم</div>
+          <div style={{ fontSize: tpl.company_info_size, color: '#333' }}>
             {data.deliveryAddress}
           </div>
         </div>
@@ -283,34 +271,27 @@ function AddressBlock({ tpl, data }: { tpl: ReceiptTemplate80mm; data: A4Data })
   );
 }
 
-function A4ItemsTable({ tpl, items }: { tpl: ReceiptTemplate80mm; items: A4Data['items'] }) {
+function A4ItemsTable({ tpl, items }: { tpl: PrintTemplate; items: A4Data['items'] }) {
   const cols = getVisibleCols(tpl);
   if (cols.length === 0) return null;
 
-  const totalWidth = 100;
-  const colWidths = cols.map(c => {
-    const w = tpl.colWidths[c] ?? 20;
-    return `${(w / 100) * totalWidth}%`;
-  });
-
   return (
     <div style={{ marginBottom: 20 }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: tpl.fontSizeItems }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: tpl.items_font_size }}>
         <thead>
           <tr style={{
-            background: tpl.tableHeaderBg ? '#111' : '#f5f5f5',
-            borderBottom: `2px solid #111`,
+            background: tpl.table_header_bg ? '#111' : '#f5f5f5',
+            borderBottom: '2px solid #111',
           }}>
             {cols.map(c => (
               <th key={c} style={{
                 padding: '8px 10px',
                 textAlign: c === 'name' || c === 'ref' ? 'right' as const : 'left' as const,
-                fontWeight: tpl.tableHeaderBold ? 700 : 600,
-                color: tpl.tableHeaderBg ? '#fff' : '#111',
-                fontSize: tpl.fontSizeItems,
-                width: colWidths[cols.indexOf(c)],
+                fontWeight: tpl.table_header_bold ? 700 : 600,
+                color: tpl.table_header_bg ? '#fff' : '#111',
+                fontSize: tpl.items_font_size,
               }}>
-                {tpl.colHeaders[c] ?? colLabel(c)}
+                {tpl.col_headers[c] ?? colLabel(c)}
               </th>
             ))}
           </tr>
@@ -318,15 +299,15 @@ function A4ItemsTable({ tpl, items }: { tpl: ReceiptTemplate80mm; items: A4Data[
         <tbody>
           {items.map((item, i) => (
             <tr key={i} style={{
-              borderBottom: tpl.tableBorderStyle !== 'none' ? `1px ${tpl.tableBorderStyle} #ddd` : 'none',
-              background: tpl.alternatingRows && i % 2 === 1 ? '#fafafa' : 'transparent',
+              borderBottom: tpl.table_border_style !== 'none' ? '1px ' + tpl.table_border_style + ' #ddd' : 'none',
+              background: tpl.alternating_rows && i % 2 === 1 ? '#fafafa' : 'transparent',
             }}>
               {cols.map(c => (
                 <td key={c} style={{
                   padding: '10px',
                   textAlign: c === 'name' || c === 'ref' ? 'right' as const : 'left' as const,
                   fontWeight: c === 'total' ? 700 : 400,
-                  fontSize: tpl.fontSizeItems,
+                  fontSize: tpl.items_font_size,
                 }}>
                   {colValue(c, item)}
                 </td>
@@ -339,92 +320,51 @@ function A4ItemsTable({ tpl, items }: { tpl: ReceiptTemplate80mm; items: A4Data[
   );
 }
 
-function getVisibleCols(tpl: ReceiptTemplate80mm): ColumnKey[] {
-  const alwaysCols: ColumnKey[] = ['name', 'quantity', 'price', 'total'];
-  const visible = tpl.colOrder.filter(key => {
-    if (key === 'name' || key === 'quantity' || key === 'price' || key === 'total') return true;
-    const showMap: Partial<Record<ColumnKey, boolean>> = {
-      rowNumber: tpl.showRowNumber,
-      barcode: tpl.showItemBarcode,
-      ref: tpl.showRef,
-      unit: tpl.showUnit,
-      discount: tpl.showItemDiscount,
-      tva: tpl.showItemTva,
-    };
-    return showMap[key] ?? false;
-  });
-  return visible.length > 0 ? visible : alwaysCols;
-}
-
-function colLabel(c: ColumnKey): string {
-  const labels: Record<ColumnKey, string> = {
-    rowNumber: '#', barcode: 'باركود', ref: 'مرجع',
-    name: 'البيان', unit: 'وحدة', quantity: 'الكمية',
-    price: 'السعر', discount: 'خصم', tva: 'TVA', total: 'المجموع',
-  };
-  return labels[c];
-}
-
-function colValue(c: ColumnKey, item: A4Data['items'][0]) {
-  switch (c) {
-    case 'name': return item.name;
-    case 'quantity': return String(item.qty);
-    case 'price': return `${item.price.toFixed(2)}`;
-    case 'total': return `${item.total.toFixed(2)}`;
-    case 'ref': return item.ref;
-    case 'unit': return item.unit;
-    case 'discount': return item.discount > 0 ? `${item.discount}%` : '';
-    case 'tva': return `TVA ${item.tva}%`;
-    default: return '';
-  }
-}
-
-function A4Totals({ tpl, data }: { tpl: ReceiptTemplate80mm; data: A4Data }) {
+function A4Totals({ tpl, data }: { tpl: PrintTemplate; data: A4Data }) {
   return (
     <div style={{
       display: 'flex', justifyContent: 'flex-end',
-      fontSize: tpl.totalsFontSize,
-      fontWeight: tpl.totalsBold ? 700 : 400,
-      textAlign: tpl.totalsAlign,
+      fontSize: tpl.totals_font_size,
+      fontWeight: tpl.totals_bold ? 700 : 400,
       marginBottom: 24,
       direction: 'ltr',
     }}>
       <table style={{ width: 320, borderCollapse: 'collapse' }}>
         <tbody>
-          {tpl.showTotalHt && <A4TotalRow label="المجموع HT" val={data.totalHt} />}
-          {tpl.showDiscountTotal && data.totalDiscount > 0 && <A4TotalRow label="إجمالي الخصومات" val={-data.totalDiscount} red />}
-          {tpl.showTotalTva && <A4TotalRow label="TVA" val={data.totalTva} />}
-          {tpl.showTvaBreakdown && data.tvaByRate.map(r => (
-            <A4TotalRow key={r.rate} label={`  TVA ${r.rate}%`} val={r.amount} />
+          {tpl.show_total_ht && <A4TotalRow label="المجموع HT" val={data.totalHt} />}
+          {tpl.show_discount_total && data.totalDiscount > 0 && <A4TotalRow label="إجمالي الخصومات" val={-data.totalDiscount} red />}
+          {tpl.show_total_tva && <A4TotalRow label="TVA" val={data.totalTva} />}
+          {tpl.show_tva_breakdown && data.tvaByRate.map(r => (
+            <A4TotalRow key={r.rate} label={'  TVA ' + r.rate + '%'} val={r.amount} />
           ))}
-          {tpl.showFiscalStamp && data.fiscalStamp > 0 && <A4TotalRow label="الطابع الجبائي" val={data.fiscalStamp} />}
-          {tpl.showTotalTtc && (
+          {tpl.show_fiscal_stamp && data.fiscalStamp > 0 && <A4TotalRow label="الطابع الجبائي" val={data.fiscalStamp} />}
+          {tpl.show_total_ttc && (
             <tr>
               <td style={{
                 padding: '10px 12px',
-                borderTop: `3px double #111`,
-                fontWeight: tpl.totalTtcBold ? 900 : 700,
-                fontSize: tpl.totalTtcFontSize,
+                borderTop: '3px double #111',
+                fontWeight: tpl.total_ttc_bold ? 900 : 700,
+                fontSize: tpl.total_ttc_font_size,
                 textAlign: 'right',
               }}>
                 المجموع TTC:
               </td>
               <td style={{
                 padding: '10px 12px',
-                borderTop: `3px double #111`,
-                fontWeight: tpl.totalTtcBold ? 900 : 700,
-                fontSize: tpl.totalTtcFontSize,
+                borderTop: '3px double #111',
+                fontWeight: tpl.total_ttc_bold ? 900 : 700,
+                fontSize: tpl.total_ttc_font_size,
                 textAlign: 'right',
               }}>
                 {data.totalTtc.toFixed(2)}
               </td>
             </tr>
           )}
-          {tpl.showPaidAmount && <A4TotalRow label="المدفوع" val={data.paid} bold />}
-          {tpl.showChange && <A4TotalRow label="الباقي" val={data.change} />}
-          {tpl.showRemaining && <A4TotalRow label="المبلغ المتبقي" val={data.remaining} />}
-          {tpl.showPrevBalance && <A4TotalRow label="الرصيد السابق" val={data.prevBalance} />}
-          {tpl.showNewBalance && <A4TotalRow label="الرصيد الجديد" val={data.newBalance} bold />}
+          {tpl.show_paid_amount && <A4TotalRow label="المدفوع" val={data.paid} bold />}
+          {tpl.show_change && <A4TotalRow label="الباقي" val={data.change} />}
+          {tpl.show_remaining && <A4TotalRow label="المبلغ المتبقي" val={data.remaining} />}
+          {tpl.show_prev_balance && <A4TotalRow label="الرصيد السابق" val={data.prevBalance} />}
+          {tpl.show_new_balance && <A4TotalRow label="الرصيد الجديد" val={data.newBalance} bold />}
         </tbody>
       </table>
     </div>
@@ -454,10 +394,10 @@ function A4TotalRow({ label, val, red, bold }: { label: string; val: number; red
   );
 }
 
-function A4Payments({ tpl, payments }: { tpl: ReceiptTemplate80mm; payments: A4Data['payments'] }) {
+function A4Payments({ tpl, payments }: { tpl: PrintTemplate; payments: A4Data['payments'] }) {
   if (payments.length === 0) return null;
   return (
-    <div style={{ fontSize: tpl.paymentFontSize, marginBottom: 16 }}>
+    <div style={{ fontSize: tpl.payment_font_size, marginBottom: 16 }}>
       <div style={{ fontWeight: 700, marginBottom: 8 }}>تفاصيل الدفع</div>
       <table style={{ width: 320, borderCollapse: 'collapse', direction: 'ltr' }}>
         <tbody>
@@ -473,73 +413,64 @@ function A4Payments({ tpl, payments }: { tpl: ReceiptTemplate80mm; payments: A4D
   );
 }
 
-function A4Footer({ tpl, data }: { tpl: ReceiptTemplate80mm; data: A4Data }) {
-  const hasContent = tpl.footerLine1 || tpl.footerLine2 || tpl.footerLine3 ||
-    tpl.showThankYou || tpl.showReturnsPolicy || tpl.footerLegalText ||
-    tpl.showPaymentConditions || tpl.showBankDetails;
+function A4Footer({ tpl, data }: { tpl: PrintTemplate; data: A4Data }) {
+  const hasContent = tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
+    tpl.show_thank_you || tpl.show_returns_policy || tpl.footer_legal_text ||
+    tpl.show_bank_details;
 
   if (!hasContent) return null;
 
   return (
     <div style={{
-      fontSize: tpl.baseFontSize - 0.5,
+      fontSize: tpl.base_font_size - 0.5,
       borderTop: '2px solid #111',
       paddingTop: 16,
       marginTop: 12,
     }}>
-      {tpl.showPaymentConditions && (
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>شروط الدفع</div>
-          <div style={{ fontSize: tpl.baseFontSize - 1, color: '#555', lineHeight: 1.6 }}>
-            مدة السداد: {data.paymentTerm || 'غير محدد'}
-          </div>
-        </div>
-      )}
-
-      {tpl.showBankDetails && tpl.bankDetailsText && (
+      {tpl.show_bank_details && tpl.bank_details_text && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>البيانات البنكية</div>
-          <div style={{ fontSize: tpl.baseFontSize - 1, color: '#555', whiteSpace: 'pre-line' }}>
-            {tpl.bankDetailsText}
+          <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', whiteSpace: 'pre-line' }}>
+            {tpl.bank_details_text}
           </div>
         </div>
       )}
 
-      {tpl.footerLine1 && <div style={{ margin: '4px 0' }}>{tpl.footerLine1}</div>}
-      {tpl.footerLine2 && <div style={{ margin: '4px 0' }}>{tpl.footerLine2}</div>}
-      {tpl.footerLine3 && <div style={{ margin: '4px 0' }}>{tpl.footerLine3}</div>}
+      {tpl.footer_line1 && <div style={{ margin: '4px 0' }}>{tpl.footer_line1}</div>}
+      {tpl.footer_line2 && <div style={{ margin: '4px 0' }}>{tpl.footer_line2}</div>}
+      {tpl.footer_line3 && <div style={{ margin: '4px 0' }}>{tpl.footer_line3}</div>}
 
-      {tpl.showReturnsPolicy && tpl.returnsPolicyText && (
-        <div style={{ fontSize: tpl.baseFontSize - 1, color: '#555', margin: '6px 0' }}>
-          {tpl.returnsPolicyText}
+      {tpl.show_returns_policy && tpl.returns_policy_text && (
+        <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', margin: '6px 0' }}>
+          {tpl.returns_policy_text}
         </div>
       )}
 
-      {tpl.showThankYou && (
+      {tpl.show_thank_you && (
         <div style={{
           fontWeight: 700, margin: '8px 0',
-          fontSize: tpl.thankYouFontSize,
+          fontSize: tpl.thank_you_size,
           textAlign: 'center',
         }}>
-          {tpl.thankYouText}
+          {tpl.thank_you_text}
         </div>
       )}
 
-      {tpl.footerLegalText && (
-        <div style={{ fontSize: tpl.baseFontSize - 1.5, color: '#888', margin: '6px 0', textAlign: 'center' }}>
-          {tpl.footerLegalText}
+      {tpl.footer_legal_text && (
+        <div style={{ fontSize: tpl.base_font_size - 1.5, color: '#888', margin: '6px 0', textAlign: 'center' }}>
+          {tpl.footer_legal_text}
         </div>
       )}
 
-      {(tpl.showCashierSignature || tpl.showClientSignature) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, fontSize: tpl.baseFontSize }}>
-          {tpl.showCashierSignature && (
+      {(tpl.show_cashier_signature || tpl.show_client_signature) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, fontSize: tpl.base_font_size }}>
+          {tpl.show_cashier_signature && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ width: 150, height: 1, borderTop: '1px solid #111', marginBottom: 4 }} />
               <span>إمضاء الكاشير</span>
             </div>
           )}
-          {tpl.showClientSignature && (
+          {tpl.show_client_signature && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ width: 150, height: 1, borderTop: '1px solid #111', marginBottom: 4 }} />
               <span>إمضاء العميل</span>
@@ -548,7 +479,7 @@ function A4Footer({ tpl, data }: { tpl: ReceiptTemplate80mm; data: A4Data }) {
         </div>
       )}
 
-      {tpl.showStamp && (
+      {tpl.show_stamp && (
         <div style={{
           width: 60, height: 60, margin: '16px auto',
           border: '2px solid #111', borderRadius: '50%',

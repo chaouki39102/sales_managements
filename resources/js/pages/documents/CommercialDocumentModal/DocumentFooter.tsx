@@ -21,6 +21,10 @@ interface DocumentFooterProps {
   handleExport: (format: 'excel' | 'pdf' | 'json' | 'xml') => void;
   onClose: () => void;
   handleSave: () => void;
+  onPrint?: () => void;
+  templates?: Array<{ id: number | null; name: string }>;
+  selectedTemplateId?: number | null;
+  onTemplateChange?: (id: number | null) => void;
 }
 
 export default function DocumentFooter({
@@ -29,6 +33,7 @@ export default function DocumentFooter({
   successMsg, docCode,   RETURNABLE_CODES,
   handleDelete, handleExport,
   onClose, handleSave,
+  onPrint, templates, selectedTemplateId, onTemplateChange,
 }: DocumentFooterProps) {
   return (
     <div style={{
@@ -102,19 +107,40 @@ export default function DocumentFooter({
           </button>
         )}
 
-        <button
-          onClick={() => window.print()}
-          style={{
-            padding: '8px 14px', borderRadius: 'var(--r2)',
-            border: '1px solid var(--b2)', background: 'var(--bg1)',
-            color: 'var(--t2)', cursor: 'pointer',
-            fontSize: 13, fontWeight: 600,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}
-        >
-          <i className="ti ti-printer" />
-          طباعة
-        </button>
+        {isEdit && onPrint && (
+          <>
+            {(templates && templates.length > 1) && (
+              <select
+                value={selectedTemplateId ?? ''}
+                onChange={e => onTemplateChange?.(e.target.value ? Number(e.target.value) : null)}
+                style={{
+                  padding: '6px 8px', borderRadius: 'var(--r2)',
+                  border: '1px solid var(--b2)', background: 'var(--bg1)',
+                  fontSize: 12, color: 'var(--t2)', outline: 'none', cursor: 'pointer',
+                  maxWidth: 120,
+                }}
+              >
+                <option value="">القالب الافتراضي</option>
+                {templates.map(t => (
+                  <option key={t.id} value={t.id ?? ''}>{t.name}</option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={onPrint}
+              style={{
+                padding: '8px 14px', borderRadius: 'var(--r2)',
+                border: '1px solid var(--em)', background: 'color-mix(in srgb, var(--em) 12%, transparent)',
+                color: 'var(--em)', cursor: 'pointer',
+                fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <i className="ti ti-printer" />
+              طباعة بالقوالب
+            </button>
+          </>
+        )}
 
         <div style={{ position: 'relative' }}>
           <button

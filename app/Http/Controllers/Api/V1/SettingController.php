@@ -188,11 +188,13 @@ class SettingController extends BaseApiController
 
             // print — تخصيص قوالب الطباعة (80mm, A4, A5)
             'print_doc_configs', 'print_printers',
+            'print:templates', 'print:doc_configs',
         ];
 
-        // إضافة المفاتيح الديناميكية التي تبدأ بـ print_tpl_
+        // إضافة المفاتيح الديناميكية التي تبدأ بـ print_tpl_ أو print:
         foreach ($data as $key => $value) {
-            if (str_starts_with($key, 'print_tpl_') && $value !== null) {
+            if ($value === null) continue;
+            if (str_starts_with($key, 'print_tpl_') || str_starts_with($key, 'print:')) {
                 $allowedKeys[] = $key;
             }
         }

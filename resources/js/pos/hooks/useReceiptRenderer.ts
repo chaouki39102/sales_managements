@@ -4,7 +4,7 @@
 import { useCallback } from 'react';
 import ReactDOMServer from 'react-dom/server.browser';
 import React from 'react';
-import { ReceiptPreview } from '@/pages/settings/print-settings';
+import { PreviewSelector } from '@/pages/settings/print-settings';
 import type { ReceiptTemplate80mm, CompanyPreviewData, ReceiptLiveData } from '@/pages/settings/print-settings/types';
 
 export function useReceiptRenderer() {
@@ -15,7 +15,7 @@ export function useReceiptRenderer() {
   }): string => {
     const { template, company, liveData } = input;
 
-    const element = React.createElement(ReceiptPreview, {
+    const element = React.createElement(PreviewSelector, {
       tpl: template,
       company,
       liveData,

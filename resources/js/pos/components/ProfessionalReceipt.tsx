@@ -6,7 +6,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import React from 'react';
-import { ReceiptPreview } from '@/pages/settings/print-settings';
+import { PreviewSelector } from '@/pages/settings/print-settings';
 import type { ReceiptTemplate80mm, CompanyPreviewData, ReceiptLiveData } from '@/pages/settings/print-settings/types';
 
 interface ProfessionalReceiptProps {
@@ -48,7 +48,7 @@ export default function ProfessionalReceipt({
           style={{ flex: 1, overflowY: 'auto', padding: 16 }}
           id="pos-receipt-print"
         >
-          <ReceiptPreview tpl={template} company={company} liveData={liveData} />
+          <PreviewSelector tpl={template} company={company} liveData={liveData} />
         </div>
 
         <div className="m-foot">

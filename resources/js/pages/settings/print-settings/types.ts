@@ -174,6 +174,42 @@ export interface PrintTemplate {
   show_cashier_signature: boolean;
   show_client_signature:  boolean;
   show_stamp:             boolean;
+
+  show_header_section:    boolean;
+  show_doc_info_section:  boolean;
+  show_items_section:     boolean;
+  show_totals_section:    boolean;
+  show_payments_section:  boolean;
+  show_footer_section:    boolean;
+
+  rules: ReportRule[];
+
+  show_report_header:        boolean;
+  report_header_text:        string;
+  show_report_footer:        boolean;
+  report_footer_text:        string;
+  show_charts:               boolean;
+  chart_type:                'bar' | 'pie';
+  chart_title:               string;
+  group_by:                  string;
+  sort_by:                   string;
+  sort_direction:            'asc' | 'desc';
+  show_report_period:        boolean;
+  show_report_cashier:       boolean;
+  show_report_summary_cards: boolean;
+  show_report_payment_breakdown: boolean;
+  show_report_top_products:  boolean;
+}
+
+export type SectionTarget = 'header' | 'doc-info' | 'items' | 'totals' | 'payments' | 'footer';
+
+export interface ReportRule {
+  id: string;
+  condition: string;
+  action: 'show' | 'hide' | 'highlight' | 'disable';
+  target: string;
+  priority?: number;
+  highlightStyle?: Record<string, string>;
 }
 
 // ─── Default template factory ─────────────────────────────────────────────────
@@ -316,6 +352,31 @@ export function createDefaultTemplate(
     show_cashier_signature: false,
     show_client_signature:  false,
     show_stamp:             false,
+
+    show_header_section:    true,
+    show_doc_info_section:  true,
+    show_items_section:     true,
+    show_totals_section:    true,
+    show_payments_section:  true,
+    show_footer_section:    true,
+
+    rules: [],
+
+    show_report_header:        true,
+    report_header_text:        '',
+    show_report_footer:        true,
+    report_footer_text:        '',
+    show_charts:               true,
+    chart_type:                'bar',
+    chart_title:               '',
+    group_by:                  '',
+    sort_by:                   '',
+    sort_direction:            'asc',
+    show_report_period:        true,
+    show_report_cashier:       true,
+    show_report_summary_cards: true,
+    show_report_payment_breakdown: true,
+    show_report_top_products:  true,
   };
 }
 
@@ -338,6 +399,7 @@ export interface PrintTemplateApiResponse {
 export interface TemplateLiveData {
   docNumber?:   string;
   docDate?:     string;
+  dueDate?:     string;
   cashierName?: string;
   client?:      { name?: string; nif?: string; phone?: string; address?: string } | null;
   items?:       Array<{

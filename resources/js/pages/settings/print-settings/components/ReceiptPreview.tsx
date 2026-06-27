@@ -1,32 +1,6 @@
 import React, { useMemo } from 'react';
 import type { PrintTemplate, ColumnKey, CompanyData, TemplateLiveData, BorderStyle, AlignOption } from '../types';
-
-const MOCK_COMPANY: CompanyData = {
-  name:    'سوبيرات الوفرة',
-  address: 'حي 08 ماي، بجانب القاعدة الجنوبية — الوادي',
-  phone:   '029 123 456',
-  nif:     '099217700002',
-  rc:      '13/B.0123456',
-  nis:     '099217700002',
-  ice:     '099217700002',
-  article: 'تجارة التجزئة للمواد الغذائية',
-};
-
-const MOCK_ITEMS = [
-  { ref: 'R001', name: 'روز أبيض فراكة 500غ',   qty: 3, price: 85,  total: 255,  tva: 9,  discount: 0,  unit: 'قطعة' },
-  { ref: 'L002', name: 'عدس فراكة 500غ',         qty: 1, price: 109, total: 109,  tva: 9,  discount: 0,  unit: 'قطعة' },
-  { ref: 'L003', name: 'لبن صومام 1ل',           qty: 1, price: 140, total: 126,  tva: 19, discount: 10, unit: 'لتر'  },
-  { ref: 'S004', name: 'سيدي السعادة 1ل',        qty: 1, price: 165, total: 165,  tva: 9,  discount: 0,  unit: 'قطعة' },
-];
-
-const MOCK_TOTALS = {
-  totalHt: 614.50, totalTva: 54.50, totalDiscount: 14,
-  fiscalStamp: 0, totalTtc: 655.00,
-  paid: 655, change: 0, remaining: 0,
-  prevBalance: 1200, newBalance: 1855,
-  tvaByRate: [{ rate: 9, base: 475, amount: 42.75 }, { rate: 19, base: 140, amount: 26.60 }],
-  payments: [{ mode: 'نقداً', amount: 655 }],
-};
+import { emptyDocumentData } from '@/reporting';
 
 const mm = (v: number) => v * 3.78;
 
@@ -49,6 +23,17 @@ function fontFamily(f: PrintTemplate['font_family']): string {
   }
 }
 
+interface PreviewItem {
+  ref: string; name: string; qty: number; price: number; total: number; tva: number; discount: number; unit: string;
+}
+
+interface PreviewTotals {
+  totalHt: number; totalTva: number; totalDiscount: number; fiscalStamp: number;
+  totalTtc: number; paid: number; change: number; remaining: number;
+  prevBalance: number; newBalance: number;
+  tvaByRate: Array<{ rate: number; base: number; amount: number }>;
+}
+
 interface Props {
   tpl:      PrintTemplate;
   company?: CompanyData | null;
@@ -57,14 +42,14 @@ interface Props {
 
 export default function ReceiptPreview({ tpl, company, live }: Props) {
   const co = useMemo(() => ({
-    name:    tpl.company_name_text  || company?.name    || MOCK_COMPANY.name,
-    address: tpl.override_address   || company?.address || MOCK_COMPANY.address,
-    phone:   tpl.override_phone     || company?.phone   || MOCK_COMPANY.phone,
-    nif:     tpl.override_nif       || company?.nif     || MOCK_COMPANY.nif,
-    rc:      tpl.override_rc        || company?.rc      || MOCK_COMPANY.rc,
-    nis:     tpl.override_nis       || company?.nis     || MOCK_COMPANY.nis,
-    ice:     tpl.override_ice       || company?.ice     || MOCK_COMPANY.ice,
-    article: tpl.override_article   || company?.article || MOCK_COMPANY.article,
+    name:    tpl.company_name_text  || company?.name    || '',
+    address: tpl.override_address   || company?.address || '',
+    phone:   tpl.override_phone     || company?.phone   || '',
+    nif:     tpl.override_nif       || company?.nif     || '',
+    rc:      tpl.override_rc        || company?.rc      || '',
+    nis:     tpl.override_nis       || company?.nis     || '',
+    ice:     tpl.override_ice       || company?.ice     || '',
+    article: tpl.override_article   || company?.article || '',
     logoUrl: company?.logoUrl,
   }), [tpl, company]);
 
@@ -74,7 +59,7 @@ export default function ReceiptPreview({ tpl, company, live }: Props) {
         price: it.unit_price_ht, total: it.total_ht,
         tva: it.tva_rate, discount: it.discount_percentage ?? 0, unit: it.unit ?? '',
       }))
-    : MOCK_ITEMS, [live]);
+    : [], [live]);
 
   const doc = useMemo(() => ({
     number:  live?.docNumber   ?? 'FV-2025-001770',
@@ -82,7 +67,7 @@ export default function ReceiptPreview({ tpl, company, live }: Props) {
     time:    new Date().toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' }),
     cashier: live?.cashierName ?? 'أحمد بن علي',
     client:  live?.client,
-    payments:live?.payments    ?? MOCK_TOTALS.payments,
+    payments:live?.payments    ?? [],
     totals:  live?.totals ? {
       totalHt:      live.totals.total_ht,
       totalTva:     live.totals.total_tva,
@@ -93,9 +78,9 @@ export default function ReceiptPreview({ tpl, company, live }: Props) {
       change:       live.totals.change ?? 0,
       remaining:    live.totals.remaining ?? 0,
       tvaByRate:    [],
-    } : MOCK_TOTALS,
-    prevBalance: live?.prevBalance ?? MOCK_TOTALS.prevBalance,
-    newBalance:  live?.newBalance  ?? MOCK_TOTALS.newBalance,
+    } : { ...emptyDocumentData().totals, prevBalance: 0, newBalance: 0, tvaByRate: [] },
+    prevBalance: live?.prevBalance ?? 0,
+    newBalance:  live?.newBalance  ?? 0,
   }), [live]);
 
   const paperPx = tpl.paper_width_mm * 3.78;
@@ -233,7 +218,7 @@ function DocRow({ label, value, mono }: { label: string; value: string; mono?: b
   );
 }
 
-function ItemsTable({ tpl, items }: { tpl: PrintTemplate; items: typeof MOCK_ITEMS }) {
+function ItemsTable({ tpl, items }: { tpl: PrintTemplate; items: PreviewItem[] }) {
   const visibleCols = tpl.col_order.filter(k => tpl.col_show[k] !== false);
   const ff = tpl.items_font_family === 'monospace' ? "'Courier New', monospace" : "'Tajawal', sans-serif";
 
@@ -296,7 +281,7 @@ function colDefaultHeader(col: ColumnKey): string {
   return map[col] ?? col;
 }
 
-function colValue(col: ColumnKey, item: typeof MOCK_ITEMS[0], idx: number, tpl: PrintTemplate): string {
+function colValue(col: ColumnKey, item: PreviewItem, idx: number, tpl: PrintTemplate): string {
   const price = tpl.price_display === 'ttc'
     ? item.price * (1 + item.tva / 100)
     : item.price;
@@ -319,7 +304,7 @@ function colValue(col: ColumnKey, item: typeof MOCK_ITEMS[0], idx: number, tpl: 
   }
 }
 
-function Totals({ tpl, t }: { tpl: PrintTemplate; t: typeof MOCK_TOTALS }) {
+function Totals({ tpl, t }: { tpl: PrintTemplate; t: PreviewTotals }) {
   const { totals_font_size: fs } = tpl;
 
   const borderMap: Record<string, string> = {

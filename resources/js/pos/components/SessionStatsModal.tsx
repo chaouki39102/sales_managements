@@ -2,6 +2,11 @@
 import React, { useState, useMemo } from 'react';
 import { formatDZD } from '@/pos/utils/calculations';
 import type { PosSession } from '@/lib/api/endpoints/posSession';
+import { useActiveCompany } from '@/lib/store/appStore';
+import { usePrintTemplates } from '../../pages/settings/print-settings/api/printTemplatesApi';
+import TemplatePrintModal from '@/reporting/components/shared/TemplatePrintModal';
+import { DocumentDataBuilder } from '@/reporting/data/DocumentDataBuilder';
+import type { CompanyInfo } from '@/reporting/data/UniversalDocumentData';
 
 interface Props {
   session:      PosSession;
@@ -19,6 +24,27 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 
 export default function SessionStatsModal({ session, onClose, onEndSession }: Props) {
   const [tab, setTab] = useState<Tab>('overview');
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+
+  const activeCompany = useActiveCompany();
+  const companyInfo: CompanyInfo | null = useMemo(() => activeCompany ? {
+    name:    activeCompany.name    ?? '',
+    address: activeCompany.address ?? '',
+    phone:   activeCompany.phone   ?? '',
+    nif:     activeCompany.nif     ?? '',
+    rc:      activeCompany.rc      ?? '',
+    nis:     activeCompany.nis     ?? '',
+    ice:    (activeCompany as any).ice ?? '',
+    article: (activeCompany as any).ai ?? '',
+    logoUrl: (activeCompany as any).avatar ?? null,
+  } : null, [activeCompany]);
+
+  const { data: reportTemplates = [] } = usePrintTemplates('RPT');
+
+  const reportData = useMemo(
+    () => companyInfo ? DocumentDataBuilder.fromSessionReport(session as unknown as Record<string, unknown>, companyInfo) : null,
+    [session, companyInfo],
+  );
 
   const paymentRows = useMemo(() =>
     (session.payments ?? []).filter(p => p.amount > 0).sort((a, b) => b.amount - a.amount),
@@ -336,11 +362,30 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
             </button>
           )}
           <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            className="ssm-btn-print"
+            onClick={() => setPrintModalOpen(true)}
+          >
+            <i className="ti ti-printer" /> طباعة التقرير
+          </button>
           <button type="button" className="ssm-btn-close" onClick={onClose}>
             <i className="ti ti-x" /> إغلاق
           </button>
         </div>
       </div>
+
+      {/* ════ Template Print Modal ════ */}
+      {reportData && companyInfo && (
+        <TemplatePrintModal
+          open={printModalOpen}
+          onClose={() => setPrintModalOpen(false)}
+          data={reportData}
+          company={companyInfo}
+          templates={reportTemplates}
+          docTypeCode="RPT"
+        />
+      )}
     </div>
   );
 }

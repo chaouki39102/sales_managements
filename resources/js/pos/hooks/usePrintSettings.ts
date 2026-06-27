@@ -1,154 +1,191 @@
 // resources/js/pos/hooks/usePrintSettings.ts
-import { useMemo } from 'react';
+// ════════════════════════════════════════════════════════════════════════════
+//  Hook موحَّد لإعدادات الطباعة
+//  بسيط — يفوِّض كل عمليات DB/Device إلى printStore
+// ════════════════════════════════════════════════════════════════════════════
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPatch } from '@/lib/api/core/client';
-import { useActiveSlug } from '@/lib/store/appStore';
-import type { DocumentPrintConfig, ReceiptTemplate80mm, PaperSize, DetectedPrinter } from '@/pages/settings/print-settings/types';
-import { defaultTemplate } from '@/pages/settings/print-settings/types';
+import { useActiveSlug }    from '@/lib/store/appStore';
+import { defaultTemplate }  from '@/pages/settings/print-settings/types';
+import {
+  dbFetchTemplates, dbFetchDocConfigs,
+  dbSaveTemplate, dbSaveDocConfigs, dbCopyTemplate,
+  deviceGetPrinters, deviceSavePrinters,
+  tplKey,
+} from '../store/printStore';
+import type {
+  ReceiptTemplate80mm, DocumentPrintConfig,
+  DetectedPrinter, PaperSize,
+} from '@/pages/settings/print-settings/types';
 
-export const TPL_KEY = (docCode: string, size: PaperSize) => `print_tpl_${docCode}_${size}`;
-export const DOC_CONFIGS_KEY = 'print_doc_configs';
-export const PRINTERS_KEY = 'print_printers';
+// ─── Query Keys ──────────────────────────────────────────────────────────────
 
-const printKeys = {
-  all:        (slug: string) => [slug, 'print-settings'] as const,
-  template:   (slug: string, docCode: string, size: PaperSize) => [slug, 'print-settings', 'tpl', docCode, size] as const,
-  docConfigs: (slug: string) => [slug, 'print-settings', 'doc-configs'] as const,
-  printers:   (slug: string) => [slug, 'print-settings', 'printers'] as const,
+const K = {
+  templates:  (slug: string) => [slug, 'print', 'templates']   as const,
+  docConfigs: (slug: string) => [slug, 'print', 'doc-configs'] as const,
+  printers:   (slug: string) => [slug, 'print', 'printers']    as const,
 };
 
-async function fetchSetting<T>(key: string, fallback: T): Promise<T> {
-  try {
-    const res = await apiGet<{ key: string; value: unknown }>(`/settings/${key}`);
-    const raw = (res as any)?.value ?? (res as any)?.data?.value;
-    if (raw === null || raw === undefined || raw === '') return fallback;
-    if (typeof raw === 'string') {
-      try { return JSON.parse(raw) as T; } catch { return raw as unknown as T; }
-    }
-    return raw as T;
-  } catch {
-    try {
-      const cached = localStorage.getItem(`erp_${key}`);
-      if (cached) return JSON.parse(cached) as T;
-    } catch {}
-    return fallback;
-  }
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+
+/** كل القوالب من DB */
+export function useAllTemplates() {
+  const slug = useActiveSlug() ?? '';
+  return useQuery({
+    queryKey:  K.templates(slug),
+    queryFn:   dbFetchTemplates,
+    enabled:   !!slug,
+    staleTime: 5 * 60_000,
+  });
 }
 
-async function saveSetting(key: string, value: unknown): Promise<void> {
-  const payload = { [key]: typeof value === 'string' ? value : JSON.stringify(value) };
-  await apiPatch('/settings', payload);
-  try { localStorage.setItem(`erp_${key}`, JSON.stringify(value)); } catch {}
-}
-
+/** قالب مستند واحد مع merge مع defaultTemplate */
 export function usePrintTemplate(docCode: string, size: PaperSize) {
-  const slug = useActiveSlug();
-  const key  = TPL_KEY(docCode, size);
+  const slug  = useActiveSlug() ?? '';
+  const key   = tplKey(docCode, size);
+  const query = useAllTemplates();
 
-  return useQuery({
-    queryKey: printKeys.template(slug ?? '', docCode, size),
-    queryFn:  () => fetchSetting<ReceiptTemplate80mm>(key, defaultTemplate()),
-    enabled:  !!slug && !!docCode && size !== 'none',
-    staleTime: 5 * 60_000,
-    select: (data) => ({ ...defaultTemplate(), ...data }),
-  });
+  const template = query.data?.[key]
+    ? { ...defaultTemplate(), ...query.data[key] }
+    : defaultTemplate();
+
+  return { template, isLoading: query.isLoading };
 }
 
+/** تكوين المستندات من DB */
 export function useDocPrintConfigs() {
-  const slug = useActiveSlug();
-
+  const slug = useActiveSlug() ?? '';
   return useQuery({
-    queryKey: printKeys.docConfigs(slug ?? ''),
-    queryFn:  () => fetchSetting<DocumentPrintConfig[]>(DOC_CONFIGS_KEY, []),
-    enabled:  !!slug,
+    queryKey:  K.docConfigs(slug),
+    queryFn:   dbFetchDocConfigs,
+    enabled:   !!slug,
     staleTime: 5 * 60_000,
   });
 }
 
+/** الطابعات من localStorage (device-specific) */
 export function usePrintersList() {
-  const slug = useActiveSlug();
-
+  const slug = useActiveSlug() ?? '';
   return useQuery({
-    queryKey: printKeys.printers(slug ?? ''),
-    queryFn:  () => fetchSetting<DetectedPrinter[]>(PRINTERS_KEY, []),
+    queryKey: K.printers(slug),
+    queryFn:  () => deviceGetPrinters(slug),
     enabled:  !!slug,
-    staleTime: 60_000,
+    staleTime: Infinity, // لا تُعاد الجلب — localStorage لا يتغير من تلقاء نفسه
   });
 }
 
-export function useSavePrintTemplate() {
-  const slug = useActiveSlug();
+// ─── Mutations ────────────────────────────────────────────────────────────────
+
+/** حفظ قالب في DB */
+export function useSaveTemplate() {
+  const slug = useActiveSlug() ?? '';
   const qc   = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ docCode, size, template }: { docCode: string; size: PaperSize; template: ReceiptTemplate80mm }) => {
-      await saveSetting(TPL_KEY(docCode, size), template);
+    mutationFn: ({ docCode, size, tpl }: {
+      docCode: string; size: PaperSize; tpl: ReceiptTemplate80mm;
+    }) => dbSaveTemplate(docCode, size, tpl),
+
+    // Optimistic update — الـ UI يتحدث فوراً قبل DB
+    onMutate: async ({ docCode, size, tpl }) => {
+      await qc.cancelQueries({ queryKey: K.templates(slug) });
+      const prev = qc.getQueryData<Record<string, ReceiptTemplate80mm>>(K.templates(slug));
+      qc.setQueryData(K.templates(slug), (old: Record<string, ReceiptTemplate80mm> = {}) => ({
+        ...old,
+        [tplKey(docCode, size)]: tpl,
+      }));
+      return { prev };
     },
-    onSuccess: (_, { docCode, size }) => {
-      if (slug) qc.invalidateQueries({ queryKey: printKeys.template(slug, docCode, size) });
+
+    onError: (_, __, ctx) => {
+      // rollback عند الخطأ
+      if (ctx?.prev) qc.setQueryData(K.templates(slug), ctx.prev);
+    },
+
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: K.templates(slug) });
     },
   });
 }
 
+/** نسخ قالب لمستند آخر */
+export function useCopyTemplate() {
+  const slug = useActiveSlug() ?? '';
+  const qc   = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sourceCode, targetCode, size }: {
+      sourceCode: string; targetCode: string; size: PaperSize;
+    }) => dbCopyTemplate(sourceCode, targetCode, size),
+
+    onSuccess: () => qc.invalidateQueries({ queryKey: K.templates(slug) }),
+  });
+}
+
+/** حفظ تكوين المستندات */
 export function useSaveDocConfigs() {
-  const slug = useActiveSlug();
+  const slug = useActiveSlug() ?? '';
   const qc   = useQueryClient();
 
   return useMutation({
-    mutationFn: async (configs: DocumentPrintConfig[]) => {
-      await saveSetting(DOC_CONFIGS_KEY, configs);
+    mutationFn: (configs: DocumentPrintConfig[]) => dbSaveDocConfigs(configs),
+
+    onMutate: async (configs) => {
+      await qc.cancelQueries({ queryKey: K.docConfigs(slug) });
+      const prev = qc.getQueryData(K.docConfigs(slug));
+      qc.setQueryData(K.docConfigs(slug), configs);
+      return { prev };
     },
-    onSuccess: () => {
-      if (slug) qc.invalidateQueries({ queryKey: printKeys.docConfigs(slug) });
+
+    onError: (_, __, ctx) => {
+      if (ctx?.prev) qc.setQueryData(K.docConfigs(slug), ctx.prev);
     },
+
+    onSettled: () => qc.invalidateQueries({ queryKey: K.docConfigs(slug) }),
   });
 }
 
+/** حفظ الطابعات في localStorage */
 export function useSavePrinters() {
-  const slug = useActiveSlug();
+  const slug = useActiveSlug() ?? '';
   const qc   = useQueryClient();
 
   return useMutation({
-    mutationFn: async (printers: DetectedPrinter[]) => {
-      await saveSetting(PRINTERS_KEY, printers);
+    mutationFn: (printers: DetectedPrinter[]) => {
+      deviceSavePrinters(slug, printers);
+      return Promise.resolve(printers);
     },
-    onSuccess: () => {
-      if (slug) qc.invalidateQueries({ queryKey: printKeys.printers(slug) });
+    onSuccess: (printers) => {
+      qc.setQueryData(K.printers(slug), printers);
     },
   });
 }
 
+// ─── للاستخدام في POS (بسيط) ─────────────────────────────────────────────────
+
+const PAPER_WIDTH_MAP: Record<string, number> = {
+  '80mm': 80,
+  '58mm': 58,
+  'A4': 210,
+  'A5': 148,
+};
+
+/** hook للاستخدام في POSPage — يُرجع إعدادات الطباعة لنوع مستند */
 export function usePrintSettings(docTypeCode: string) {
-  const { data: allConfigs = [] } = useDocPrintConfigs();
-
-  const docConfig = useMemo(
-    () => allConfigs.find(c => c.docTypeCode === docTypeCode) ?? null,
-    [allConfigs, docTypeCode],
-  );
-
-  const size = docConfig?.paperSize ?? 'none';
-  const { data: template } = usePrintTemplate(docTypeCode, size as PaperSize);
-  const finalTemplate = useMemo(() => template ?? defaultTemplate(), [template]);
-  const paperWidth = finalTemplate.paperWidth ?? 80;
-
-  const printers = usePrintersList();
-  const selectedPrinter = useMemo(() => {
-    const list = printers.data ?? [];
-    if (docConfig?.printerId) {
-      return list.find(p => p.id === docConfig.printerId) ?? null;
-    }
-    return list.find(p => p.isDefault) ?? list[0] ?? null;
-  }, [printers.data, docConfig]);
+  const { data: configs = [] } = useDocPrintConfigs();
+  const config = configs.find(c => c.docTypeCode === docTypeCode) ?? null;
+  const size   = (config?.paperSize ?? 'none') as PaperSize;
+  const { template } = usePrintTemplate(docTypeCode, size !== 'none' ? size : '80mm');
 
   return {
-    docConfig,
-    template:         finalTemplate,
-    selectedPrinter,
-    isPrintEnabled:   !!(docConfig?.enabled && size !== 'none'),
-    copies:           docConfig?.copies ?? 1,
-    paperWidth,
-    autoPrint:        docConfig?.autoPrint ?? false,
-    showPreview:      docConfig?.showPreview ?? true,
-    paperSize:        size as PaperSize,
+    config,
+    template,
+    enabled:     !!(config?.enabled && size !== 'none'),
+    autoPrint:   config?.autoPrint   ?? false,
+    showPreview: config?.showPreview ?? true,
+    copies:      config?.copies      ?? 1,
+    paperSize:   size,
+    paperWidth:  PAPER_WIDTH_MAP[size] ?? 80,
+    printerId:   config?.printerId ?? null,
   };
 }

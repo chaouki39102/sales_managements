@@ -145,6 +145,9 @@ export default function POSPage() {
     client:   Party | null;
     paid:     number;
     payments: Array<{ paymentModeId: number; amount: number }>;
+    dueDate?: string;
+    prevBalance?: number;
+    newBalance?: number;
   } | null>(null);
 
   const { data: paymentModes } = usePaymentModes();
@@ -159,6 +162,7 @@ export default function POSPage() {
     return {
       docNumber:  snap.docNum ?? lastDocNum,
       docDate:    new Date().toISOString().slice(0, 10),
+      dueDate:    snap.dueDate ?? snap.docDate,
       cashierName: user?.name ?? 'الكاشير',
       items: snap.items.map(i => ({
         name: i.product_name,
@@ -188,10 +192,16 @@ export default function POSPage() {
         mode:   paymentModes?.find(pm => pm.id === p.paymentModeId)?.name ?? `طريقة دفع #${p.paymentModeId}`,
         amount: p.amount,
       })),
+      prevBalance: snap.prevBalance ?? 0,
+      newBalance:  snap.newBalance ?? 0,
     };
   }, [receiptSnapshot, user, paymentModes, lastDocNum]);
 
-  const lastPaymentRef = useRef<{ paid: number; payments: Array<{ paymentModeId: number; amount: number }> }>();
+  const lastPaymentRef = useRef<{
+    paid: number;
+    payments: Array<{ paymentModeId: number; amount: number }>;
+    dueDate?: string;
+  }>();
   const [orderType, setOrderType] = useState<OrderType>('dine-in');
 
   const [quickItems, setQuickItems] = useState<QuickItem[]>(() => {
@@ -620,7 +630,7 @@ export default function POSPage() {
   }, [priceLevelsList, allVariants, pos.items, pos.updatePrice]);
 
   // ── Print Settings ──────────────────────────────────────────────────────────
-  const { template, isPrintEnabled, copies, paperWidth, selectedPrinter, autoPrint, showPreview }
+  const { template, enabled: isPrintEnabled, copies, paperWidth, autoPrint, showPreview }
     = usePrintSettings('FV');
   const { buildHtml } = useReceiptRenderer();
 
@@ -673,6 +683,7 @@ export default function POSPage() {
         liveData: {
           docNumber: resolvedDocNum,
           docDate: new Date().toISOString().slice(0, 10),
+          dueDate: lastPaymentRef.current?.dueDate ?? new Date().toISOString().slice(0, 10),
           cashierName: user?.name ?? 'الكاشير',
           items: printItems.map(i => ({
             name: i.product_name,
@@ -706,7 +717,8 @@ export default function POSPage() {
         },
       });
 
-      if (settings.printMode === 'thermal' && resolvedDocNum) {
+      const isThermalPaper = template.paper_size === '80mm' || template.paper_size === '58mm';
+      if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const result = await printThermalViaWebUSB(
           printItems, printTotals,
           pos.client ? { ...pos.client, name: pos.client.name } as any : null,
@@ -716,8 +728,8 @@ export default function POSPage() {
             companyAddress: companyData?.address,
             companyPhone: companyData?.phone,
             companyNIF: companyData?.nif,
-            footerText: template.footerLine1 || settings.receiptFooter,
-            printQR: template.showQr,
+            footerText: template.footer_line1 || settings.receiptFooter,
+            printQR: template.show_qr,
           },
         );
         if (result.ok) {
@@ -742,7 +754,7 @@ export default function POSPage() {
     } catch (e: any) {
       toast.error(`خطأ في تجهيز الطباعة: ${e.message}`);
     }
-  }, [template, companyData, pos.client, paperWidth, copies, selectedPrinter, buildHtml, settings.printMode, settings.receiptFooter, company, paymentModes, user, lastDocNum]);
+  }, [template, companyData, pos.client, paperWidth, copies, buildHtml, settings.printMode, settings.receiptFooter, company, paymentModes, user, lastDocNum]);
 
   // ── Complete Sale ──────────────────────────────────────────────────────────
   const handleCompleteSale = useCallback(async (params: {
@@ -828,7 +840,23 @@ export default function POSPage() {
         payments: params.payments?.filter(p => p.amount > 0).map(p => ({
           paymentModeId: p.paymentModeId, amount: p.amount,
         })) ?? [],
+        dueDate: params.dueDate,
       };
+
+      const totalTtcFinal = snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp;
+      const invoiceRemaining = Math.max(0, totalTtcFinal - params.amountPaid);
+      let prevBalance = 0;
+      let newBalance = 0;
+      if (currentClient?.id) {
+        try {
+          const balanceRes = await partyBalancesApi.getOne(currentClient.id);
+          const balanceData = (balanceRes as any)?.data ?? balanceRes;
+          const currentBalance = Number(balanceData?.current_balance ?? 0);
+          prevBalance = Math.max(0, currentBalance - totalTtcFinal + params.amountPaid);
+          newBalance = prevBalance + invoiceRemaining;
+        } catch {}
+      }
+
       setReceiptSnapshot({
         items:  snapshot.items,
         totals: snapshot.totals,
@@ -838,6 +866,9 @@ export default function POSPage() {
         payments: params.payments?.filter(p => p.amount > 0).map(p => ({
           paymentModeId: p.paymentModeId, amount: p.amount,
         })) ?? [],
+        dueDate: params.dueDate,
+        prevBalance,
+        newBalance,
       });
       setLastDocNum(res.document_number);
       setCartNote('');
