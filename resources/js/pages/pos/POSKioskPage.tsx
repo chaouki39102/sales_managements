@@ -22,8 +22,11 @@ import {
 } from '@/pos/utils/posHelpers';
 import { formatDZD, ttcToHt }         from '@/pos/utils/calculations';
 import { printThermal, isWebUsbSupported, getThermalAutoPrint } from '@/pos/utils/printService';
+import { usePrintSettings }           from '@/pos/hooks/usePrintSettings';
+import { defaultTemplate }            from '@/pages/settings/print-settings/types';
 import type { PaginatedResponse }      from '@/lib/api/core/types';
 import type { Product, ProductVariant, CartItem, CartTotals } from '@/types';
+import type { ReceiptLiveData, CompanyPreviewData } from '@/pages/settings/print-settings/types';
 
 import ProductSearchBar         from '@/pos/components/ProductSearchBar';
 import CategoryTabs             from '@/pos/components/CategoryTabs';
@@ -53,6 +56,38 @@ export default function POSKioskPage() {
     items: CartItem[]; totals: CartTotals; docNum?: string;
   } | null>(null);
 
+  const kioskLiveData = useMemo((): ReceiptLiveData | null => {
+    if (!receiptSnapshot) return null;
+    const snap = receiptSnapshot;
+    const totalTtc = snap.totals.total_ttc + snap.totals.fiscal_stamp;
+    return {
+      docNumber: snap.docNum ?? lastDocNum,
+      docDate:   new Date().toISOString().slice(0, 10),
+      items: snap.items.map(i => ({
+        name: i.product_name,
+        ref: i.ref,
+        qty: i.quantity,
+        unit_price_ht: i.unit_price_ht,
+        unit: i.unit_symbol,
+        tva_rate: i.tva_rate / 100,
+        discount_percentage: i.discount_percentage,
+        total_ht: i.total_ht,
+      })),
+      totals: {
+        total_ht:       snap.totals.total_ht,
+        total_tva:      snap.totals.total_tva,
+        total_ttc:      snap.totals.total_ttc,
+        fiscal_stamp:   snap.totals.fiscal_stamp,
+        total_discount: snap.totals.total_discount,
+        paid:   totalTtc,
+        change: 0,
+        remaining: 0,
+      },
+      client: null,
+      payments: [],
+    };
+  }, [receiptSnapshot, lastDocNum]);
+
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
   const { data: fyData }  = useFiscalYears();
   const fiscalYearsList   = fyData?.years ?? [];
@@ -75,6 +110,23 @@ export default function POSKioskPage() {
   const { data: documentTypes    } = useDocumentTypes();
 
   const defaultWarehouse = warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null;
+
+  const { template } = usePrintSettings('FV');
+
+  const companyData: CompanyPreviewData | null = useMemo(() => {
+    if (!company) return null;
+    return {
+      name:    company.name    ?? '',
+      address: company.address ?? '',
+      phone:   company.phone   ?? '',
+      nif:     company.nif     ?? '',
+      rc:      company.rc      ?? '',
+      nis:     company.nis     ?? '',
+      ice:     '',
+      article: company.ai      ?? '',
+      logoUrl: company.avatar  ?? null,
+    };
+  }, [company]);
 
   const { data: productsRaw } = useQuery({
     queryKey: ['pos-products-kiosk', slug, searchQuery, selectedCategory],
@@ -331,12 +383,11 @@ export default function POSKioskPage() {
         />
       )}
 
-      {modal === 'receipt' && receiptSnapshot && (
+      {modal === 'receipt' && receiptSnapshot && kioskLiveData && (
         <ProfessionalReceipt
-          items={receiptSnapshot.items}
-          totals={receiptSnapshot.totals}
-          client={null}
-          docNumber={receiptSnapshot.docNum ?? lastDocNum}
+          template={template ?? defaultTemplate()}
+          company={companyData}
+          liveData={kioskLiveData}
           onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
           onPrint={() => window.print()}
           onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}

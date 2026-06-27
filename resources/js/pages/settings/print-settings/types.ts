@@ -1,5 +1,383 @@
-// resources/js/pages/settings/print-settings/types.ts
-// أنواع بيانات إعدادات الطباعة — القالب الحراري 80mm
+// ════════════════════════════════════════════════════════════════════════════
+// print-settings/types.ts
+// النظام الكامل لإدارة قوالب الطباعة:
+//   - كل مستند يدعم أكثر من نموذج
+//   - كل نموذج محفوظ في قاعدة البيانات
+//   - المستخدم يتحكم في كل شيء
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── Enums & unions ───────────────────────────────────────────────────────────
+
+export type PaperSize       = '80mm' | '58mm' | 'A4' | 'A5' | 'none';
+export type AlignOption     = 'right' | 'center' | 'left';
+export type BorderStyle     = 'solid' | 'dashed' | 'double' | 'none';
+export type PriceMode       = 'ht' | 'ttc';
+export type PageOrientation = 'portrait' | 'landscape';
+export type FontFamily      = 'tajawal' | 'monospace' | 'times' | 'arial';
+
+export type ColumnKey =
+  | 'rowNumber' | 'barcode' | 'ref' | 'name'
+  | 'unit' | 'quantity' | 'price' | 'discount' | 'tva' | 'total';
+
+// ─── Document types ───────────────────────────────────────────────────────────
+
+export const DOC_TYPE_LIST = [
+  { code: 'FV',  name: 'فاتورة المبيعات',   category: 'sales'     },
+  { code: 'BL',  name: 'وصل التسليم',       category: 'sales'     },
+  { code: 'DEV', name: 'عرض السعر',         category: 'sales'     },
+  { code: 'BCC', name: 'طلب العميل',        category: 'sales'     },
+  { code: 'AA',  name: 'مرتجع المبيعات',   category: 'sales'     },
+  { code: 'FA',  name: 'فاتورة الشراء',    category: 'purchase'  },
+  { code: 'BR',  name: 'وصل الاستلام',     category: 'purchase'  },
+  { code: 'AV',  name: 'أمر الشراء',       category: 'purchase'  },
+  { code: 'DDP', name: 'إذن التسليم',      category: 'warehouse' },
+  { code: 'BT',  name: 'تحويل المخزون',   category: 'warehouse' },
+  { code: 'POS', name: 'إيصال POS',        category: 'pos'       },
+  { code: 'RPT', name: 'تقرير الجلسة',    category: 'pos'       },
+] as const;
+
+export type DocTypeCode = typeof DOC_TYPE_LIST[number]['code'];
+
+// ─── PrintTemplate — القالب الكامل ───────────────────────────────────────────
+
+export interface PrintTemplate {
+  id:           number | null;
+  name:         string;
+  doc_type_code: DocTypeCode;
+  paper_size:   PaperSize;
+  is_default:   boolean;
+  is_active:    boolean;
+  created_at?:  string;
+  updated_at?:  string;
+
+  paper_width_mm:   58 | 80;
+  page_orientation: PageOrientation;
+  margin_top:       number;
+  margin_bottom:    number;
+  margin_sides:     number;
+  line_spacing:     number;
+  base_font_size:   number;
+  font_family:      FontFamily;
+
+  show_logo:         boolean;
+  logo_size:         number;
+  logo_align:        AlignOption;
+  logo_border_radius: number;
+
+  show_company_name:   boolean;
+  company_name_text:   string;
+  company_name_size:   number;
+  company_name_bold:   boolean;
+  company_name_align:  AlignOption;
+  company_name_color:  string;
+
+  show_address:        boolean;
+  show_phone:          boolean;
+  show_tax_id:         boolean;
+  show_rc:             boolean;
+  show_nis:            boolean;
+  show_ice:            boolean;
+  show_article:        boolean;
+  company_info_align:  AlignOption;
+  company_info_size:   number;
+  override_address:    string;
+  override_phone:      string;
+  override_nif:        string;
+  override_rc:         string;
+  override_nis:        string;
+  override_ice:        string;
+  override_article:    string;
+
+  header_custom_text:  string;
+  header_separator:    BorderStyle;
+
+  title_text:       string;
+  title_size:       number;
+  title_bold:       boolean;
+  title_align:      AlignOption;
+  title_color:      string;
+  show_doc_number:  boolean;
+  show_date:        boolean;
+  show_time:        boolean;
+  show_due_date:    boolean;
+  show_cashier:     boolean;
+  show_client:      boolean;
+  show_client_nif:  boolean;
+  show_client_phone:boolean;
+  show_client_address: boolean;
+  show_delivery_address: boolean;
+  show_session:     boolean;
+  show_payment_term:boolean;
+  show_bank_details:boolean;
+  bank_details_text:string;
+  doc_separator:    BorderStyle;
+
+  col_order:   ColumnKey[];
+  col_show:    Partial<Record<ColumnKey, boolean>>;
+  col_widths:  Partial<Record<ColumnKey, number>>;
+  col_headers: Partial<Record<ColumnKey, string>>;
+  col_aligns:  Partial<Record<ColumnKey, AlignOption>>;
+
+  items_font_size:    number;
+  items_font_family:  FontFamily;
+  show_col_header:    boolean;
+  table_header_bold:  boolean;
+  table_header_bg:    boolean;
+  table_header_color: string;
+  table_border_style: BorderStyle;
+  alternating_rows:   boolean;
+  alternating_color:  string;
+  price_display:      PriceMode;
+  show_line_total_ttc:boolean;
+
+  totals_font_size:    number;
+  totals_bold:         boolean;
+  totals_align:        AlignOption;
+  show_total_ht:       boolean;
+  show_total_tva:      boolean;
+  show_tva_breakdown:  boolean;
+  show_discount_total: boolean;
+  show_fiscal_stamp:   boolean;
+  show_total_ttc:      boolean;
+  total_ttc_font_size: number;
+  total_ttc_bold:      boolean;
+  total_ttc_color:     string;
+  total_border_style:  BorderStyle;
+  show_amount_in_words:boolean;
+  show_paid_amount:    boolean;
+  show_change:         boolean;
+  show_remaining:      boolean;
+  show_prev_balance:   boolean;
+  show_new_balance:    boolean;
+
+  show_payment_details:boolean;
+  payment_font_size:   number;
+
+  footer_line1:        string;
+  footer_line2:        string;
+  footer_line3:        string;
+  footer_separator:    BorderStyle;
+  show_thank_you:      boolean;
+  thank_you_text:      string;
+  thank_you_size:      number;
+  thank_you_color:     string;
+  show_returns_policy: boolean;
+  returns_policy_text: string;
+  footer_legal_text:   string;
+
+  show_barcode:         boolean;
+  barcode_content:      'doc-number' | 'total' | 'custom';
+  barcode_custom_text:  string;
+  show_qr:              boolean;
+  qr_content:           'doc-number' | 'company-info' | 'both';
+
+  show_cashier_signature: boolean;
+  show_client_signature:  boolean;
+  show_stamp:             boolean;
+}
+
+// ─── Default template factory ─────────────────────────────────────────────────
+
+export function createDefaultTemplate(
+  docTypeCode: DocTypeCode = 'POS',
+  paperSize: PaperSize = '80mm',
+  name = 'القالب الافتراضي',
+): PrintTemplate {
+  const is80mm = paperSize === '80mm' || paperSize === '58mm';
+  return {
+    id:             null,
+    name,
+    doc_type_code:  docTypeCode,
+    paper_size:     paperSize,
+    is_default:     true,
+    is_active:      true,
+
+    paper_width_mm:   paperSize === '58mm' ? 58 : 80,
+    page_orientation: 'portrait',
+    margin_top:       3,
+    margin_bottom:    3,
+    margin_sides:     3,
+    line_spacing:     1.3,
+    base_font_size:   10,
+    font_family:      'tajawal',
+
+    show_logo:          true,
+    logo_size:          56,
+    logo_align:         'center',
+    logo_border_radius: 50,
+
+    show_company_name:  true,
+    company_name_text:  '',
+    company_name_size:  15,
+    company_name_bold:  true,
+    company_name_align: 'center',
+    company_name_color: '#111111',
+
+    show_address:       true,
+    show_phone:         true,
+    show_tax_id:        true,
+    show_rc:            true,
+    show_nis:           false,
+    show_ice:           false,
+    show_article:       false,
+    company_info_align: 'center',
+    company_info_size:  9,
+    override_address:   '',
+    override_phone:     '',
+    override_nif:       '',
+    override_rc:        '',
+    override_nis:       '',
+    override_ice:       '',
+    override_article:   '',
+
+    header_custom_text: '',
+    header_separator:   'dashed',
+
+    title_text:       docTypeCode === 'POS' ? 'إيصال بيع' : 'فاتورة بيع',
+    title_size:       13,
+    title_bold:       true,
+    title_align:      'center',
+    title_color:      '#111111',
+    show_doc_number:  true,
+    show_date:        true,
+    show_time:        true,
+    show_due_date:    false,
+    show_cashier:     true,
+    show_client:      true,
+    show_client_nif:  false,
+    show_client_phone:false,
+    show_client_address: false,
+    show_delivery_address: false,
+    show_session:     docTypeCode === 'POS',
+    show_payment_term:false,
+    show_bank_details:false,
+    bank_details_text:'',
+    doc_separator:    'dashed',
+
+    col_order:   ['name', 'quantity', 'price', 'total'],
+    col_show:    { name: true, quantity: true, price: true, total: true },
+    col_widths:  { name: 40, quantity: 15, price: 22, total: 23 },
+    col_headers: { name: 'البيان', quantity: 'الكمية', price: 'السعر', total: 'الإجمالي' },
+    col_aligns:  { name: 'right', quantity: 'center', price: 'center', total: 'center' },
+
+    items_font_size:    10,
+    items_font_family:  'tajawal',
+    show_col_header:    true,
+    table_header_bold:  true,
+    table_header_bg:    false,
+    table_header_color: '#333333',
+    table_border_style: 'dashed',
+    alternating_rows:   false,
+    alternating_color:  '#f5f5f5',
+    price_display:      'ht',
+    show_line_total_ttc:false,
+
+    totals_font_size:    10,
+    totals_bold:         true,
+    totals_align:        'right',
+    show_total_ht:       true,
+    show_total_tva:      true,
+    show_tva_breakdown:  false,
+    show_discount_total: true,
+    show_fiscal_stamp:   true,
+    show_total_ttc:      true,
+    total_ttc_font_size: 14,
+    total_ttc_bold:      true,
+    total_ttc_color:     '#111111',
+    total_border_style:  'double',
+    show_amount_in_words:false,
+    show_paid_amount:    true,
+    show_change:         true,
+    show_remaining:      false,
+    show_prev_balance:   true,
+    show_new_balance:    true,
+
+    show_payment_details:true,
+    payment_font_size:   9,
+
+    footer_line1:        '',
+    footer_line2:        '',
+    footer_line3:        '',
+    footer_separator:    'solid',
+    show_thank_you:      true,
+    thank_you_text:      'شكراً لزيارتكم!',
+    thank_you_size:      11,
+    thank_you_color:     '#111111',
+    show_returns_policy: true,
+    returns_policy_text: 'كل الاحتجاجات لا تتعدى 48 ساعة',
+    footer_legal_text:   '',
+
+    show_barcode:        true,
+    barcode_content:     'doc-number',
+    barcode_custom_text: '',
+    show_qr:             false,
+    qr_content:          'doc-number',
+
+    show_cashier_signature: false,
+    show_client_signature:  false,
+    show_stamp:             false,
+  };
+}
+
+// ─── API types ────────────────────────────────────────────────────────────────
+
+export interface PrintTemplateApiResponse {
+  id:            number;
+  name:          string;
+  doc_type_code: string;
+  paper_size:    string;
+  is_default:    boolean;
+  is_active:     boolean;
+  config:        Omit<PrintTemplate, 'id' | 'name' | 'doc_type_code' | 'paper_size' | 'is_default' | 'is_active' | 'created_at' | 'updated_at'>;
+  created_at:    string;
+  updated_at:    string;
+}
+
+// ─── Live data ───────────────────────────────────────────────────────────────
+
+export interface TemplateLiveData {
+  docNumber?:   string;
+  docDate?:     string;
+  cashierName?: string;
+  client?:      { name?: string; nif?: string; phone?: string; address?: string } | null;
+  items?:       Array<{
+    name:               string;
+    ref?:               string;
+    qty:                number;
+    unit_price_ht:      number;
+    unit?:              string;
+    tva_rate:           number;
+    discount_percentage?: number;
+    total_ht:           number;
+  }>;
+  totals?: {
+    total_ht:       number;
+    total_tva:      number;
+    total_ttc:      number;
+    fiscal_stamp:   number;
+    total_discount: number;
+    paid?:          number;
+    change?:        number;
+    remaining?:     number;
+  };
+  payments?:    Array<{ mode: string; amount: number }>;
+  prevBalance?: number;
+  newBalance?:  number;
+}
+
+export interface CompanyData {
+  name:     string;
+  address:  string;
+  phone:    string;
+  nif:      string;
+  rc:       string;
+  nis:      string;
+  ice:      string;
+  article:  string;
+  logoUrl?: string | null;
+}
+
+// ─── Detected printer & doc config (لإعدادات الطابعات) ─────────────────────
 
 export interface DetectedPrinter {
   id:        string;
@@ -8,8 +386,6 @@ export interface DetectedPrinter {
   status:    'ready' | 'offline' | 'unknown';
   source?:   'usb' | 'demo' | 'manual';
 }
-
-export type PaperSize = '80mm' | 'A4' | 'A5' | 'none';
 
 export interface DocumentPrintConfig {
   docTypeCode:   string;
@@ -23,320 +399,13 @@ export interface DocumentPrintConfig {
   templates:     PaperSize[];
 }
 
-export type ColumnKey =
-  | 'rowNumber'
-  | 'barcode'
-  | 'ref'
-  | 'name'
-  | 'unit'
-  | 'quantity'
-  | 'price'
-  | 'discount'
-  | 'tva'
-  | 'total';
+// ─── Backward-compat aliases ──────────────────────────────────────────────────
+// تُستخدم في POS والمكونات القديمة
 
-export type AlignOption = 'right' | 'center' | 'left';
-export type BorderStyle = 'solid' | 'dashed' | 'double' | 'none';
-export type PriceMode   = 'ht' | 'ttc';
+export type ReceiptTemplate80mm = PrintTemplate;
+export type CompanyPreviewData = CompanyData;
+export type ReceiptLiveData = TemplateLiveData;
 
-export interface ReceiptTemplate80mm {
-  // ── Paper ──
-  paperWidth: 58 | 80;
-
-  // ── HEADER ──
-  showLogo:        boolean;
-  logoSize:        number;
-  logoAlign:       AlignOption;
-  showCompanyName: boolean;
-  companyNameSize: number;
-  companyNameBold: boolean;
-  companyNameAlign: AlignOption;
-  headerSeparator: BorderStyle;
-  headerCustomText: string;
-
-  // ── Company Info ──
-  showAddress:       boolean;
-  showPhone:         boolean;
-  showTaxId:         boolean;
-  showRc:            boolean;
-  showNis:           boolean;
-  showIce:           boolean;
-  showArticle:       boolean;
-  companyInfoAlign:  AlignOption;
-  companyInfoFontSize: number;
-
-  // ── Company Data Override ──
-  companyName:    string;
-  companyAddress: string;
-  companyPhone:   string;
-  companyNif:     string;
-  companyRc:      string;
-  companyNis:     string;
-  companyIce:     string;
-  companyArticle: string;
-
-  // ── Document Info ──
-  titleText:        string;
-  titleFontSize:    number;
-  titleBold:        boolean;
-  titleAlign:       AlignOption;
-  showDocNumber:    boolean;
-  showDate:         boolean;
-  showTime:         boolean;
-  showDueDate:      boolean;
-  showCashier:      boolean;
-  showClient:       boolean;
-  showClientTaxId:  boolean;
-  showClientPhone:  boolean;
-  showClientAddress: boolean;
-  showSession:      boolean;
-  showPaymentTerm:  boolean;
-  docSeparator:     BorderStyle;
-
-  // ── Items Table ──
-  fontSizeItems:    number;
-  itemsFontFamily:  'monospace' | 'tajawal';
-
-  colOrder:    ColumnKey[];
-  colWidths:   Partial<Record<ColumnKey, number>>;
-  colHeaders:  Partial<Record<ColumnKey, string>>;
-  colShow:     Partial<Record<ColumnKey, boolean>>;
-  showColHeader:    boolean;
-  tableHeaderBold:  boolean;
-  tableHeaderBg:    boolean;
-  tableBorderStyle: BorderStyle;
-  alternatingRows:  boolean;
-
-  showRowNumber:    boolean;
-  showItemBarcode:  boolean;
-  showRef:          boolean;
-  showUnit:         boolean;
-  showItemTva:      boolean;
-  showItemDiscount: boolean;
-  priceDisplay:     PriceMode;
-  showLineTotalTtc: boolean;
-
-  // ── Totals ──
-  totalsFontSize:   number;
-  totalsBold:       boolean;
-  totalsAlign:      AlignOption;
-  showTotalHt:      boolean;
-  showTotalTva:     boolean;
-  showTvaBreakdown: boolean;
-  showDiscountTotal: boolean;
-  showFiscalStamp:  boolean;
-  showTotalTtc:     boolean;
-  totalTtcFontSize: number;
-  totalTtcBold:     boolean;
-  totalBorderStyle: BorderStyle;
-  showAmountInWords: boolean;
-  showPaidAmount:   boolean;
-  showChange:       boolean;
-  showRemaining:    boolean;
-  showPrevBalance:  boolean;
-  showNewBalance:   boolean;
-
-  // ── Payments ──
-  showPaymentDetails: boolean;
-  paymentFontSize:    number;
-
-  // ── Footer ──
-  footerLine1:       string;
-  footerLine2:       string;
-  footerLine3:       string;
-  footerSeparator:   BorderStyle;
-
-  showThankYou:      boolean;
-  thankYouText:      string;
-  thankYouFontSize:  number;
-
-  showBarcode:       boolean;
-  barcodeContent:    'doc-number' | 'total' | 'custom';
-  barcodeCustomText: string;
-
-  showQr:            boolean;
-  qrContent:         'doc-number' | 'company-info' | 'both';
-
-  showCashierSignature: boolean;
-  showClientSignature:  boolean;
-  showStamp:            boolean;
-
-  showReturnsPolicy: boolean;
-  returnsPolicyText: string;
-  footerLegalText:   string;
-
-  // ── Formatting ──
-  marginTop:    number;
-  marginBottom: number;
-  marginSides:  number;
-  lineSpacing:  number;
-  baseFontSize: number;
-}
-
-export interface ReceiptLiveData {
-  docNumber?: string;
-  docDate?: string;
-  cashierName?: string;
-  items?: Array<{
-    name: string;
-    ref?: string;
-    qty: number;
-    unit_price_ht: number;
-    unit?: string;
-    tva_rate: number;
-    discount_percentage?: number;
-    total_ht: number;
-  }>;
-  totals?: {
-    total_ht:       number;
-    total_tva:      number;
-    total_ttc:      number;
-    fiscal_stamp:   number;
-    total_discount: number;
-    paid?:          number;
-    change?:        number;
-    remaining?:     number;
-  };
-  client?: { name?: string; nif?: string; phone?: string; address?: string } | null;
-  payments?: Array<{ mode: string; amount: number }>;
-  prevBalance?: number;
-  newBalance?: number;
-}
-
-export interface CompanyPreviewData {
-  name:     string;
-  address:  string;
-  phone:    string;
-  nif:      string;
-  rc:       string;
-  nis:      string;
-  ice:      string;
-  article:  string;
-  logoUrl?: string | null;
-}
-
-export function defaultTemplate(): ReceiptTemplate80mm {
-  return {
-    paperWidth: 80,
-
-    showLogo: true,
-    logoSize: 60,
-    logoAlign: 'center',
-    showCompanyName: true,
-    companyNameSize: 16,
-    companyNameBold: true,
-    companyNameAlign: 'center',
-    headerSeparator: 'solid',
-    headerCustomText: '',
-
-    showAddress: true,
-    showPhone: true,
-    showTaxId: true,
-    showRc: true,
-    showNis: true,
-    showIce: false,
-    showArticle: false,
-    companyInfoAlign: 'center',
-    companyInfoFontSize: 10,
-
-    companyName:    '',
-    companyAddress: '',
-    companyPhone:   '',
-    companyNif:     '',
-    companyRc:      '',
-    companyNis:     '',
-    companyIce:     '',
-    companyArticle: '',
-
-    titleText: 'فاتورة بيع',
-    titleFontSize: 14,
-    titleBold: true,
-    titleAlign: 'center',
-    showDocNumber: true,
-    showDate: true,
-    showTime: true,
-    showDueDate: false,
-    showCashier: true,
-    showClient: true,
-    showClientTaxId: false,
-    showClientPhone: false,
-    showClientAddress: false,
-    showSession: false,
-    showPaymentTerm: false,
-    docSeparator: 'dashed',
-
-    fontSizeItems: 10,
-    itemsFontFamily: 'tajawal',
-
-    colOrder: ['name', 'quantity', 'price', 'total'],
-    colWidths: { name: 40, quantity: 15, price: 22, total: 23 },
-    colHeaders: { name: 'البيان', quantity: 'الكمية', price: 'السعر', total: 'الإجمالي' },
-    colShow: { name: true, quantity: true, price: true, total: true },
-    showColHeader: true,
-    tableHeaderBold: true,
-    tableHeaderBg: true,
-    tableBorderStyle: 'dashed',
-    alternatingRows: false,
-
-    showRowNumber: false,
-    showItemBarcode: false,
-    showRef: false,
-    showUnit: true,
-    showItemTva: false,
-    showItemDiscount: false,
-    priceDisplay: 'ht',
-    showLineTotalTtc: false,
-
-    totalsFontSize: 11,
-    totalsBold: true,
-    totalsAlign: 'right',
-    showTotalHt: true,
-    showTotalTva: true,
-    showTvaBreakdown: false,
-    showDiscountTotal: true,
-    showFiscalStamp: true,
-    showTotalTtc: true,
-    totalTtcFontSize: 15,
-    totalTtcBold: true,
-    totalBorderStyle: 'double',
-    showAmountInWords: false,
-    showPaidAmount: true,
-    showChange: true,
-    showRemaining: true,
-    showPrevBalance: true,
-    showNewBalance: true,
-
-    showPaymentDetails: true,
-    paymentFontSize: 10,
-
-    footerLine1: '',
-    footerLine2: '',
-    footerLine3: '',
-    footerSeparator: 'solid',
-
-    showThankYou: true,
-    thankYouText: 'شكراً لزيارتكم!',
-    thankYouFontSize: 12,
-
-    showBarcode: true,
-    barcodeContent: 'doc-number',
-    barcodeCustomText: '',
-
-    showQr: false,
-    qrContent: 'doc-number',
-
-    showCashierSignature: false,
-    showClientSignature: false,
-    showStamp: false,
-
-    showReturnsPolicy: false,
-    returnsPolicyText: 'كل الاحتجاجات لا تتعدى 48 ساعة',
-    footerLegalText: '',
-
-    marginTop: 3,
-    marginBottom: 3,
-    marginSides: 3,
-    lineSpacing: 1.3,
-    baseFontSize: 10,
-  };
+export function defaultTemplate(): PrintTemplate {
+  return createDefaultTemplate('FV', '80mm');
 }

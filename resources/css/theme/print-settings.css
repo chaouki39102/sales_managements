@@ -208,6 +208,14 @@
   border-radius: var(--r2);
 }
 .ps-tpl-doc-label { font-size: 12px; font-weight: 800; color: var(--t4); white-space: nowrap; }
+.ps-tpl-pill-size {
+  font-size: 9px; color: var(--t4); font-family: monospace;
+  background: var(--bg0); padding: 0 6px; border-radius: 6px;
+  margin-left: 4px; flex-shrink: 0;
+}
+.ps-tpl-doc-pill--80mm .ps-tpl-pill-size { color: var(--em); }
+.ps-tpl-doc-pill--A4 .ps-tpl-pill-size { color: #2563eb; }
+.ps-tpl-doc-pill--A5 .ps-tpl-pill-size { color: #7c3aed; }
 .ps-tpl-doc-pill {
   padding: 4px 12px; border-radius: 20px; border: 1.5px solid var(--b2);
   background: var(--bg3); font-size: 12px; font-weight: 700; color: var(--t3);
@@ -367,6 +375,11 @@
   border-radius: 2px; overflow: hidden;
   flex-shrink: 0;
 }
+.ps-preview-paper--a4 {
+  max-height: 800px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
 .ps-preview-size-badge {
   font-size: 10px; color: var(--t4); font-family: monospace;
   background: var(--bg3); border: 1px solid var(--b2);
@@ -439,8 +452,15 @@
     border: none !important;
     border-radius: 0 !important;
     margin: 0 auto;
-    width: 302px !important;
     font-family: 'Tajawal', sans-serif;
+  }
+  .ps-preview-paper:not(.ps-preview-paper--a4) {
+    width: 302px !important;
+  }
+  .ps-preview-paper--a4 {
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 }
 

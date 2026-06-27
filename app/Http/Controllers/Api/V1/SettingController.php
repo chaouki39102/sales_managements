@@ -185,7 +185,17 @@ class SettingController extends BaseApiController
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',
             'timezone', 'date_format', 'time_format',
+
+            // print — تخصيص قوالب الطباعة (80mm, A4, A5)
+            'print_doc_configs', 'print_printers',
         ];
+
+        // إضافة المفاتيح الديناميكية التي تبدأ بـ print_tpl_
+        foreach ($data as $key => $value) {
+            if (str_starts_with($key, 'print_tpl_') && $value !== null) {
+                $allowedKeys[] = $key;
+            }
+        }
 
         return array_filter(
             array_intersect_key($data, array_flip($allowedKeys)),

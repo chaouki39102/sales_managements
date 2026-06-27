@@ -292,8 +292,8 @@ class CompanyController extends BaseApiController
             $companyId = $this->context->get();
 
             if (!$companyId) {
-                // ✅ 404 واضح — الـ frontend يعالجه
-                return $this->errorResponse('لا توجد شركة نشطة', 404, 'NO_ACTIVE_COMPANY');
+                // ✅ 200 مع null — ليس خطأ، حالة طبيعية (مستخدم جديد لم يختر شركة)
+                return $this->successResponse(null, 'لا توجد شركة نشطة');
             }
 
             $company = $this->companyService->findById($companyId);

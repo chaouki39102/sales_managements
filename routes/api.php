@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\V1\RegulatedProductsController;
 use App\Http\Controllers\Api\V1\SubsidizedSalesController;
 use App\Http\Controllers\Api\V1\G50DeclarationController;
 use App\Http\Controllers\Api\V1\IFUDeclarationController;
+use App\Http\Controllers\Api\V1\PrintTemplateController;
 
 
 // Tenant Lookup Controllers
@@ -573,6 +574,15 @@ Route::prefix('v1')->group(function () {
             Route::get('settings',                 [SettingController::class, 'index']);
             Route::patch('settings',               [SettingController::class, 'update']);
             Route::put('settings',                 [SettingController::class, 'update']);
+
+            // ✅ print-templates: قوالب الطباعة — لكل أعضاء الشركة (قراءة وكتابة)
+            Route::get('print-templates',                    [PrintTemplateController::class, 'index']);
+            Route::get('print-templates/{id}',               [PrintTemplateController::class, 'show']);
+            Route::post('print-templates',                   [PrintTemplateController::class, 'store']);
+            Route::put('print-templates/{id}',               [PrintTemplateController::class, 'update']);
+            Route::delete('print-templates/{id}',            [PrintTemplateController::class, 'destroy']);
+            Route::post('print-templates/{id}/set-default',  [PrintTemplateController::class, 'setDefault']);
+            Route::post('print-templates/{id}/duplicate',    [PrintTemplateController::class, 'duplicate']);
             // جلب الملف الشخصي للمستخدم المسجل
             Route::get('/profile',          [UserController::class, 'profile']);
 

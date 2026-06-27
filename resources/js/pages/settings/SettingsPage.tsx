@@ -1430,10 +1430,15 @@ function CompanyTab({
         staleTime: 30 * 60_000,
     });
     const { data: legalForms = [] } = useQuery({
-        queryKey: tenantKeys.lookups.legalForms(slug),
-        queryFn: () => apiGet<any>("/legal-forms", { per_page: 50 }).then(r => r?.data ?? []),
+        queryKey: [...tenantKeys.lookups.legalForms(slug), 'settings-company-tab'],
+        queryFn: () => apiGet<any>("/legal-forms", { per_page: 50 }).then(r => {
+            if (Array.isArray(r)) return r;
+            if (r?.data && Array.isArray(r.data)) return r.data;
+            return [];
+        }),
         enabled: !!slug,
         staleTime: 60 * 60_000,
+        placeholderData: [],
     });
 
     const handleSave = async () => {
@@ -2846,10 +2851,15 @@ function FiscalTab({
     >({});
 
     const { data: currencies = [] } = useQuery({
-        queryKey: tenantKeys.lookups.currencies(slug),
-        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(r => r?.data ?? []),
+        queryKey: [...tenantKeys.lookups.currencies(slug), 'settings-fiscal-tab'],
+        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(r => {
+            if (Array.isArray(r)) return r;
+            if (r?.data && Array.isArray(r.data)) return r.data;
+            return [];
+        }),
         enabled: !!slug,
         staleTime: 60 * 60_000,
+        placeholderData: [],
     });
 
     const initialSettings = useMemo(
@@ -3299,10 +3309,15 @@ function InventoryTab({
     const [autoAdjust, setAutoAdjust] = useState(true);
 
     const { data: warehouses = [] } = useQuery({
-        queryKey: tenantKeys.lookups.warehouses(slug),
-        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(r => r?.data ?? []),
+        queryKey: [...tenantKeys.lookups.warehouses(slug), 'inventory-tab'],
+        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(r => {
+            if (Array.isArray(r)) return r;
+            if (r?.data && Array.isArray(r.data)) return r.data;
+            return [];
+        }),
         enabled: !!slug,
         staleTime: 10 * 60_000,
+        placeholderData: [],
     });
 
     const initialSettings = useMemo(
@@ -3671,34 +3686,59 @@ function DocumentsTab({
     const [autoCreateLot, setAutoCreateLot] = useState(true);
 
     const { data: warehouses = [] } = useQuery({
-        queryKey: tenantKeys.lookups.warehouses(slug),
-        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(r => r?.data ?? []),
+        queryKey: [...tenantKeys.lookups.warehouses(slug), 'settings-tab'],
+        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(r => {
+            if (Array.isArray(r)) return r;
+            if (r?.data && Array.isArray(r.data)) return r.data;
+            return [];
+        }),
         enabled: !!slug,
         staleTime: 10 * 60_000,
+        placeholderData: [],
     });
     const { data: currencies = [] } = useQuery({
-        queryKey: [slug, "currencies"],
-        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(r => r?.data ?? []),
+        queryKey: [slug, "currencies", "settings-tab"],
+        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(r => {
+            if (Array.isArray(r)) return r;
+            if (r?.data && Array.isArray(r.data)) return r.data;
+            return [];
+        }),
         enabled: !!slug,
         staleTime: 10 * 60_000,
+        placeholderData: [],
     });
     const { data: priceLevels = [] } = useQuery({
-        queryKey: [slug, "price-levels"],
-        queryFn: () => apiGet<any>("/price-levels", { per_page: 50 }).then(r => r?.data ?? []),
+        queryKey: [slug, "price-levels", "settings-tab"],
+        queryFn: () => apiGet<any>("/price-levels", { per_page: 50 }).then(r => {
+            if (Array.isArray(r)) return r;
+            if (r?.data && Array.isArray(r.data)) return r.data;
+            return [];
+        }),
         enabled: !!slug,
         staleTime: 10 * 60_000,
+        placeholderData: [],
     });
     const { data: paymentModes = [] } = useQuery({
-        queryKey: [slug, "payment-modes"],
-        queryFn: () => apiGet<any>("/payment-modes", { per_page: 50 }).then(r => r?.data ?? []),
+        queryKey: [slug, "payment-modes", "settings-tab"],
+        queryFn: () => apiGet<any>("/payment-modes", { per_page: 50 }).then(r => {
+            if (Array.isArray(r)) return r;
+            if (r?.data && Array.isArray(r.data)) return r.data;
+            return [];
+        }),
         enabled: !!slug,
         staleTime: 10 * 60_000,
+        placeholderData: [],
     });
     const { data: treasuryAccounts = [] } = useQuery({
-        queryKey: [slug, "treasury-accounts"],
-        queryFn: () => apiGet<any>("/treasury-accounts", { per_page: 50 }).then(r => r?.data ?? []),
+        queryKey: [slug, "treasury-accounts", "settings-tab"],
+        queryFn: () => apiGet<any>("/treasury-accounts", { per_page: 50 }).then(r => {
+            if (Array.isArray(r)) return r;
+            if (r?.data && Array.isArray(r.data)) return r.data;
+            return [];
+        }),
         enabled: !!slug,
         staleTime: 10 * 60_000,
+        placeholderData: [],
     });
 
     const initialSettings = useMemo(

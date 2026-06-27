@@ -114,9 +114,12 @@ resources/js/pages/settings/print-settings/
 
 ---
 
-## Next Steps / TODOs
-1. Connect saved settings from `rawPrintSettings` (API) to populate template + doc configs (migrate from `localStorage` to server-side).
-2. Connect the template config (`erp_print_tpl_FV_80mm` in localStorage) to the POS `ProfessionalReceipt.tsx` component.
-3. Implement actual WebUSB / WebSerial printer communication (currently mock/demo printers).
-4. Add more template types (A4 invoice, A5 receipt) after 80mm is stable.
-5. Add import/export of template configs (JSON file).
+## Completed Tasks
+- **✅ API Integration**: Template/DocConfig/Printer CRUD uses DB-first architecture (`PATCH /settings` + `GET /settings/{key}`) with localStorage as cache/fallback.
+- **✅ POS Receipt Integration**: `ProfessionalReceipt.tsx` refactored to use `ReceiptPreview` from the template system. Now renders according to `ReceiptTemplate80mm` — pixel-perfect match between preview and printed output. `POSPage` and `POSKioskPage` both build `ReceiptLiveData` from sale snapshots.
+- **✅ WebUSB/WebSerial printer communication**: `printThermalViaWebUSB` implemented with device enumeration (no dialog) + fallback dialog. Demo printers only appear when no USB devices detected.
+- **✅ Import/Export**: JSON file export/import for template configs added in PrintSettingsPage header.
+
+## Remaining / Future
+- **#4 — A4/A5 template types**: Only 80mm receipt template is implemented. A4 (full-page invoice) and A5 (half-page receipt) would need their own preview components, section controls, and printing pipeline. This is a substantial feature.
+- **Minor polish**: QuickNav scroll behavior, edge cases in template loading, keyboard shortcuts in the designer.

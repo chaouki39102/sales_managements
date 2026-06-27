@@ -77,7 +77,7 @@ import { useReceiptRenderer }   from '@/pos/hooks/useReceiptRenderer';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
 import { printThermalViaWebUSB } from '@/pos/utils/printService';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
-import type { CompanyPreviewData } from '@/pages/settings/print-settings/types';
+import type { CompanyPreviewData, ReceiptLiveData } from '@/pages/settings/print-settings/types';
 
 type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 
@@ -139,8 +139,57 @@ export default function POSPage() {
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
 
   const [receiptSnapshot, setReceiptSnapshot] = useState<{
-    items: CartItem[]; totals: CartTotals; docNum?: string;
+    items:    CartItem[];
+    totals:   CartTotals;
+    docNum?:  string;
+    client:   Party | null;
+    paid:     number;
+    payments: Array<{ paymentModeId: number; amount: number }>;
   } | null>(null);
+
+  const { data: paymentModes } = usePaymentModes();
+
+  const receiptLiveData = useMemo((): ReceiptLiveData | null => {
+    if (!receiptSnapshot) return null;
+    const snap = receiptSnapshot;
+    const totalTtc = snap.totals.total_ttc + snap.totals.fiscal_stamp;
+    const paid    = snap.paid ?? totalTtc;
+    const change  = paid > totalTtc ? paid - totalTtc : 0;
+    const remain  = paid < totalTtc ? totalTtc - paid : 0;
+    return {
+      docNumber:  snap.docNum ?? lastDocNum,
+      docDate:    new Date().toISOString().slice(0, 10),
+      cashierName: user?.name ?? 'الكاشير',
+      items: snap.items.map(i => ({
+        name: i.product_name,
+        ref: i.ref,
+        qty: i.quantity,
+        unit_price_ht: i.unit_price_ht,
+        unit: i.unit_symbol,
+        tva_rate: i.tva_rate / 100,
+        discount_percentage: i.discount_percentage,
+        total_ht: i.total_ht,
+      })),
+      totals: {
+        total_ht:       snap.totals.total_ht,
+        total_tva:      snap.totals.total_tva,
+        total_ttc:      snap.totals.total_ttc,
+        fiscal_stamp:   snap.totals.fiscal_stamp,
+        total_discount: snap.totals.total_discount,
+        paid, change, remaining: remain,
+      },
+      client: snap.client ? {
+        name: snap.client.name,
+        nif:  (snap.client as any).nif,
+        phone: (snap.client as any).phone,
+        address: (snap.client as any).address,
+      } : null,
+      payments: (snap.payments ?? []).map(p => ({
+        mode:   paymentModes?.find(pm => pm.id === p.paymentModeId)?.name ?? `طريقة دفع #${p.paymentModeId}`,
+        amount: p.amount,
+      })),
+    };
+  }, [receiptSnapshot, user, paymentModes, lastDocNum]);
 
   const lastPaymentRef = useRef<{ paid: number; payments: Array<{ paymentModeId: number; amount: number }> }>();
   const [orderType, setOrderType] = useState<OrderType>('dine-in');
@@ -230,7 +279,6 @@ export default function POSPage() {
   const fiscalYears = fiscalYearsData?.years ?? [];
 
   const { data: customersData    } = useClients({ per_page: 200 });
-  const { data: paymentModes     } = usePaymentModes();
   const { data: warehouses       } = useWarehouses();
   const { data: documentTypes    } = useDocumentTypes();
   const { data: priceLevels      } = usePriceLevels();
@@ -572,7 +620,7 @@ export default function POSPage() {
   }, [priceLevelsList, allVariants, pos.items, pos.updatePrice]);
 
   // ── Print Settings ──────────────────────────────────────────────────────────
-  const { template, isPrintEnabled, copies, paperWidth, selectedPrinter, docConfig }
+  const { template, isPrintEnabled, copies, paperWidth, selectedPrinter, autoPrint, showPreview }
     = usePrintSettings('FV');
   const { buildHtml } = useReceiptRenderer();
 
@@ -696,9 +744,6 @@ export default function POSPage() {
     }
   }, [template, companyData, pos.client, paperWidth, copies, selectedPrinter, buildHtml, settings.printMode, settings.receiptFooter, company, paymentModes, user, lastDocNum]);
 
-  const autoPrint   = docConfig?.autoPrint   ?? false;
-  const showPreview = docConfig?.showPreview ?? true;
-
   // ── Complete Sale ──────────────────────────────────────────────────────────
   const handleCompleteSale = useCallback(async (params: {
     amountPaid:   number;
@@ -784,7 +829,16 @@ export default function POSPage() {
           paymentModeId: p.paymentModeId, amount: p.amount,
         })) ?? [],
       };
-      setReceiptSnapshot({ items: snapshot.items, totals: snapshot.totals, docNum: res.document_number });
+      setReceiptSnapshot({
+        items:  snapshot.items,
+        totals: snapshot.totals,
+        docNum: res.document_number,
+        client: currentClient,
+        paid:   params.amountPaid,
+        payments: params.payments?.filter(p => p.amount > 0).map(p => ({
+          paymentModeId: p.paymentModeId, amount: p.amount,
+        })) ?? [],
+      });
       setLastDocNum(res.document_number);
       setCartNote('');
       pos.setInvoiceDiscountPct(0);
@@ -1031,11 +1085,11 @@ export default function POSPage() {
         />
       )}
 
-      {modal === 'receipt' && receiptSnapshot && (
+      {modal === 'receipt' && receiptSnapshot && receiptLiveData && (
         <ProfessionalReceipt
-          items={receiptSnapshot.items} totals={receiptSnapshot.totals}
-          client={pos.client} docNumber={receiptSnapshot.docNum ?? lastDocNum}
-          settings={settings}
+          template={template}
+          company={companyData}
+          liveData={receiptLiveData}
           onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
           onPrint={() => {
             handlePrintDirect(receiptSnapshot.items, receiptSnapshot.totals, receiptSnapshot.docNum);
