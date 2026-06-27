@@ -87,9 +87,11 @@ interface ApiDocument {
     nif?:     string | null;
     rc?:      string | null;
     nis?:     string | null;
-    phones?:  Array<{ number: string }>;
-    emails?:  Array<{ email: string }>;
-    addresses?: Array<{ address: string; is_default?: boolean }>;
+    /** Actual API returns flat strings, not arrays */
+    phone?:   string | null;
+    mobile?:  string | null;
+    email?:   string | null;
+    address?: string | null;
   } | null;
   warehouse?: {
     id?:     number;
@@ -174,6 +176,12 @@ export const DocumentDataBuilder = {
     const lines  = buildLinesFromApi(doc.lines ?? []);
     const totals = buildTotalsFromApi(doc, lines);
 
+    // Auto-compute balance from document when no explicit options provided:
+    // remaining > 0 indicates the party still owes this amount after this doc.
+    const balance = options?.prevBalance != null && options?.newBalance != null
+      ? buildBalance(options.prevBalance, options.newBalance)
+      : buildBalance(0, totals.remaining);
+
     return {
       doc:         buildDocInfo(doc),
       company,
@@ -184,7 +192,7 @@ export const DocumentDataBuilder = {
       totals,
       taxBreakdown: buildTaxBreakdown(lines),
       payments:     buildPaymentsFromApi(doc.payments ?? []),
-      balance:      buildBalance(options?.prevBalance, options?.newBalance),
+      balance,
       currency:     buildCurrencyFromApi(doc.currency),
       computed:     {},
     };
@@ -374,11 +382,6 @@ function buildPartyFromApi(
   deliveryAddress?: string | null,
 ): PartyInfo | null {
   if (!party) return null;
-  const defaultPhone   = party.phones?.[0]?.number ?? null;
-  const defaultEmail   = party.emails?.[0]?.email  ?? null;
-  const defaultAddress = party.addresses?.find(a => a.is_default)?.address
-                      ?? party.addresses?.[0]?.address
-                      ?? null;
   return {
     id:      party.id,
     name:    party.name ?? '',
@@ -386,9 +389,9 @@ function buildPartyFromApi(
     nif:     party.nif ?? null,
     rc:      party.rc  ?? null,
     nis:     party.nis ?? null,
-    phone:   defaultPhone,
-    email:   defaultEmail,
-    address: defaultAddress,
+    phone:   party.phone ?? null,
+    email:   party.email ?? null,
+    address: party.address ?? null,
     deliveryAddress: deliveryAddress ?? null,
   };
 }

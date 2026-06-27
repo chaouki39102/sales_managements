@@ -4,9 +4,8 @@ import { formatDZD } from '@/pos/utils/calculations';
 import type { PosSession } from '@/lib/api/endpoints/posSession';
 import { useActiveCompany } from '@/lib/store/appStore';
 import { usePrintTemplates } from '../../pages/settings/print-settings/api/printTemplatesApi';
-import TemplatePrintModal from '@/reporting/components/shared/TemplatePrintModal';
-import { DocumentDataBuilder } from '@/reporting/data/DocumentDataBuilder';
-import type { CompanyInfo } from '@/reporting/data/UniversalDocumentData';
+import { TemplatePrintModal, DocumentDataBuilder } from '@/reporting';
+import type { CompanyInfo } from '@/reporting';
 
 interface Props {
   session:      PosSession;

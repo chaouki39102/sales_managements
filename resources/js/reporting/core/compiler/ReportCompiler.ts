@@ -1,7 +1,7 @@
-import type { PrintTemplate } from '../domain/PrintTemplate';
+﻿import type { PrintTemplate } from '../domain/PrintTemplate';
 import type { UniversalDocumentData, CompanyInfo, DocumentLine, Payment } from '../../data/UniversalDocumentData';
 
-// ─── Compiled Report ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Compiled Report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface CompiledSection {
   id: string;
@@ -85,7 +85,7 @@ export interface CompilerWarning {
   message: string;
 }
 
-// ─── Compiler ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Compiler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function compileReport(tpl: PrintTemplate): CompiledReport {
   const errors: CompilerError[] = [];
@@ -114,43 +114,43 @@ export function compileReport(tpl: PrintTemplate): CompiledReport {
       orientation: tpl.orientation ?? 'portrait',
       marginTop: tpl.margin_top ?? 10,
       marginBottom: tpl.margin_bottom ?? 10,
-      marginRight: tpl.margin_right ?? 10,
-      marginLeft: tpl.margin_left ?? 10,
+      marginRight: tpl.margin_sides ?? 10,
+      marginLeft: tpl.margin_sides ?? 10,
     },
     styles: {
       fontFamily: tpl.font_family ?? 'Tajawal',
-      fontSize: tpl.font_size ?? 10,
-      color: tpl.color ?? '#111111',
-      backgroundColor: tpl.background_color ?? '#ffffff',
-      headerBackground: tpl.header_background ?? '#fafafa',
-      headerColor: tpl.header_color ?? '#111111',
-      tableBorder: tpl.table_border ?? '1px solid #999999',
-      altRowBackground: tpl.alt_row_background ?? '#fafafa',
+      fontSize: tpl.base_font_size ?? 10,
+      color: tpl.company_name_color ?? '#111111',
+      backgroundColor: '#ffffff',
+      headerBackground: '#fafafa',
+      headerColor: tpl.table_header_color ?? '#111111',
+      tableBorder: tpl.table_border_style === 'none' ? 'none' : '1px solid #999999',
+      altRowBackground: tpl.alternating_color ?? '#fafafa',
     },
     sections,
     columns,
     companyOverrides: {
-      name: tpl.override_company_name ?? undefined,
-      address: tpl.override_company_address ?? undefined,
-      phone: tpl.override_company_phone ?? undefined,
-      nif: tpl.override_company_nif ?? undefined,
-      rc: tpl.override_company_rc ?? undefined,
-      nis: tpl.override_company_nis ?? undefined,
-      ice: tpl.override_company_ice ?? undefined,
-      article: tpl.override_company_article ?? undefined,
-      logoUrl: tpl.override_logo ?? undefined,
+      name: undefined,
+      address: tpl.override_address || undefined,
+      phone: tpl.override_phone || undefined,
+      nif: tpl.override_nif || undefined,
+      rc: tpl.override_rc || undefined,
+      nis: tpl.override_nis || undefined,
+      ice: tpl.override_ice || undefined,
+      article: tpl.override_article || undefined,
+      logoUrl: undefined,
     },
-    rules: (tpl as any).rules ?? [],
+    rules: tpl.rules ?? [],
     reportOptions: {
-      showCharts: (tpl as any).show_charts ?? false,
-      chartType: (tpl as any).chart_type ?? 'bar',
-      groupBy: (tpl as any).group_by ?? '',
-      sortBy: (tpl as any).sort_by ?? '',
-      sortDirection: (tpl as any).sort_direction ?? 'asc',
-      showReportHeader: (tpl as any).show_report_header ?? false,
-      showReportFooter: (tpl as any).show_report_footer ?? false,
-      reportHeaderText: (tpl as any).report_header_text ?? '',
-      reportFooterText: (tpl as any).report_footer_text ?? '',
+      showCharts: tpl.show_charts ?? false,
+      chartType: tpl.chart_type ?? 'bar',
+      groupBy: tpl.group_by ?? '',
+      sortBy: tpl.sort_by ?? '',
+      sortDirection: tpl.sort_direction ?? 'asc',
+      showReportHeader: tpl.show_report_header ?? false,
+      showReportFooter: tpl.show_report_footer ?? false,
+      reportHeaderText: tpl.report_header_text ?? '',
+      reportFooterText: tpl.report_footer_text ?? '',
     },
     validation: {
       valid: errors.length === 0,

@@ -1,5 +1,4 @@
 ﻿import React from 'react';
-import { emptyDocumentData } from '@/reporting';
 import type { PrintTemplate, ColumnKey, CompanyData, ReceiptLiveData, AlignOption, BorderStyle } from './types';
 
 
@@ -35,9 +34,9 @@ interface A4Data {
 function buildTvaByRate(items: ReceiptLiveData['items'] = []): Array<{ rate: number; base: number; amount: number }> {
   const map = new Map<number, { base: number; amount: number }>();
   for (const item of items) {
-    const rate = Math.round((item.tva_rate ?? 0) * 100);
+    const rate = Math.round(item.tva_rate ?? 0);
     const base = item.total_ht ?? 0;
-    const tva  = base * (item.tva_rate ?? 0);
+    const tva  = base * (item.tva_rate ?? 0) / 100;
     const prev = map.get(rate) ?? { base: 0, amount: 0 };
     map.set(rate, { base: prev.base + base, amount: prev.amount + tva });
   }
@@ -45,7 +44,14 @@ function buildTvaByRate(items: ReceiptLiveData['items'] = []): Array<{ rate: num
 }
 
 function buildData(tpl: PrintTemplate, liveData?: ReceiptLiveData | null): A4Data {
-  if (!liveData) return emptyDocumentData();
+  if (!liveData) return {
+    number: '', date: '', time: '', dueDate: '', cashier: '', client: '',
+    clientNif: '', clientPhone: '', clientAddress: '', deliveryAddress: '',
+    session: '', paymentTerm: '', items: [], tvaByRate: [],
+    totalHt: 0, totalTva: 0, totalDiscount: 0, fiscalStamp: 0,
+    totalTtc: 0, paid: 0, change: 0, remaining: 0,
+    prevBalance: 0, newBalance: 0, payments: [],
+  };
   return {
     number:  liveData.docNumber  ?? '',
     date:    liveData.docDate    ?? new Date().toLocaleDateString('ar-DZ'),
@@ -65,7 +71,7 @@ function buildData(tpl: PrintTemplate, liveData?: ReceiptLiveData | null): A4Dat
       qty:      item.qty,
       price:    item.unit_price_ht,
       total:    item.total_ht,
-      tva:      Math.round((item.tva_rate ?? 0) * 100),
+      tva:      Math.round(item.tva_rate ?? 0),
       discount: item.discount_percentage ?? 0,
       unit:     item.unit ?? '',
     })),

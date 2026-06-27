@@ -18,8 +18,10 @@ import React, {
   useState, useCallback, useEffect, useMemo, useRef,
   useDeferredValue, useTransition,
 } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useActiveCompany } from '@/lib/store/appStore';
+import { useActiveCompany, useActiveSlug } from '@/lib/store/appStore';
+import { apiGet } from '@/lib/api/core/client';
 import {
   usePrintTemplates, usePrintTemplateMutations,
 } from './print-settings/api/printTemplatesApi';
@@ -32,7 +34,17 @@ import {
   type AlignOption, type BorderStyle, type FontFamily,
   type CompanyData,
 } from './print-settings/types';
-import RulesSection from '@/reporting/components/shared/RulesSection';
+import { Section } from './print-settings/sections/ToggleSwitch';
+import { DocumentDataBuilder } from '@/reporting';
+import type { UniversalDocumentData } from '@/reporting';
+import type { CommercialDocument } from '@/lib/api/core/types';
+import { RulesSection } from '@/reporting';
+import HeaderSectionControls from './print-settings/sections/HeaderSection';
+import DocumentSectionControls from './print-settings/sections/DocumentSection';
+import ItemsSectionControls from './print-settings/sections/ItemsSection';
+import TotalsSectionControls from './print-settings/sections/TotalsSection';
+import FooterSectionControls from './print-settings/sections/FooterSection';
+import FormattingSectionControls from './print-settings/sections/FormattingSection';
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  UI PRIMITIVES — مكونات بسيطة بلا إعادة render غير ضرورية
@@ -369,244 +381,101 @@ function ColumnManager({ tpl, update }: { tpl: PrintTemplate; update: Updater })
 //  TEMPLATE CONTROLS — all sections
 // ═════════════════════════════════════════════════════════════════════════════
 
-function TemplateControls({ tpl, update }: { tpl: PrintTemplate; update: Updater }) {
+function TemplateControls({ tpl, update, companyData }: {
+  tpl: PrintTemplate; update: Updater; companyData: CompanyData | null;
+}) {
+  const [allCollapsed, setAllCollapsed] = useState(false);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
 
-      {/* ── رأس الفاتورة ── */}
-      <Accordion id="s-header" title="رأس الفاتورة — الشعار والشركة" icon="ti-building-store">
-        <Toggle value={tpl.show_logo} onChange={v => update('show_logo', v)} label="إظهار الشعار" />
-        {tpl.show_logo && (
-          <>
-            <Slider label="حجم الشعار" value={tpl.logo_size} min={30} max={150} unit="px" onChange={v => update('logo_size', v)} />
-            <Slider label="تدوير الزوايا" value={tpl.logo_border_radius} min={0} max={50} unit="%" onChange={v => update('logo_border_radius', v)} />
-            <Field label="محاذاة الشعار">
-              <Pills options={ALIGN_OPTS} value={tpl.logo_align} onChange={v => update('logo_align', v)} />
-            </Field>
-          </>
-        )}
-        <Divider />
-        <Toggle value={tpl.show_company_name} onChange={v => update('show_company_name', v)} label="اسم المؤسسة" />
-        {tpl.show_company_name && (
-          <>
-            <Field label="نص الاسم" hint="(فارغ = من الشركة)">
-              <Input value={tpl.company_name_text} onChange={v => update('company_name_text', v)} placeholder="اسم المؤسسة..." />
-            </Field>
-            <Slider label="حجم الخط" value={tpl.company_name_size} min={10} max={30} unit="px" onChange={v => update('company_name_size', v)} />
-            <Toggle value={tpl.company_name_bold} onChange={v => update('company_name_bold', v)} label="خط عريض" />
-            <Field label="محاذاة"><Pills options={ALIGN_OPTS} value={tpl.company_name_align} onChange={v => update('company_name_align', v)} /></Field>
-            <ColorField label="لون الاسم" value={tpl.company_name_color} onChange={v => update('company_name_color', v)} />
-          </>
-        )}
-        <Divider />
-        <SectionTitle>معلومات الشركة</SectionTitle>
-        <Toggle value={tpl.show_address} onChange={v => update('show_address', v)} label="العنوان" />
-        <Toggle value={tpl.show_phone}   onChange={v => update('show_phone', v)}   label="الهاتف" />
-        <Toggle value={tpl.show_tax_id}  onChange={v => update('show_tax_id', v)}  label="رقم NIF" />
-        <Toggle value={tpl.show_rc}      onChange={v => update('show_rc', v)}      label="السجل التجاري RC" />
-        <Toggle value={tpl.show_nis}     onChange={v => update('show_nis', v)}     label="رقم NIS / STAT" />
-        <Toggle value={tpl.show_ice}     onChange={v => update('show_ice', v)}     label="رقم ICE" />
-        <Toggle value={tpl.show_article} onChange={v => update('show_article', v)} label="النشاط" />
-        <Slider label="حجم خط المعلومات" value={tpl.company_info_size} min={7} max={14} unit="px" onChange={v => update('company_info_size', v)} />
-        <Field label="محاذاة"><Pills options={ALIGN_OPTS} value={tpl.company_info_align} onChange={v => update('company_info_align', v)} /></Field>
-        <Divider />
-        <SectionTitle>بيانات مخصصة <span style={{ fontWeight: 400, color: 'var(--t4)' }}>(تستبدل بيانات الشركة)</span></SectionTitle>
-        <Field label="العنوان"><Input value={tpl.override_address} onChange={v => update('override_address', v)} placeholder="فارغ = من الشركة" /></Field>
-        <Field label="الهاتف"><Input value={tpl.override_phone} onChange={v => update('override_phone', v)} /></Field>
-        <Field label="NIF"><Input value={tpl.override_nif} onChange={v => update('override_nif', v)} /></Field>
-        <Field label="RC"><Input value={tpl.override_rc} onChange={v => update('override_rc', v)} /></Field>
-        <Field label="NIS"><Input value={tpl.override_nis} onChange={v => update('override_nis', v)} /></Field>
-        <Field label="ICE"><Input value={tpl.override_ice} onChange={v => update('override_ice', v)} /></Field>
-        <Divider />
-        <Field label="نص إضافي في الرأس">
-          <Input value={tpl.header_custom_text} onChange={v => update('header_custom_text', v)} placeholder="مثال: مفتوح 08:00–20:00" />
-        </Field>
-        <Field label="فاصل الرأس"><Pills options={BORDER_OPTS} value={tpl.header_separator} onChange={v => update('header_separator', v)} /></Field>
-      </Accordion>
+      {/* زر طي/فتح الكل */}
+      <button onClick={() => setAllCollapsed(c => !c)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+          background: 'var(--bg3)', border: '1px solid var(--b2)', borderRadius: 'var(--r2)',
+          cursor: 'pointer', fontSize: 12, color: 'var(--t2)', marginBottom: 4,
+        }}>
+        <i className={`ti ${allCollapsed ? 'ti-arrows-vertical' : 'ti-arrows-vertical'}`} />
+        {allCollapsed ? 'فتح الكل' : 'طي الكل'}
+      </button>
 
-      {/* ── معلومات المستند ── */}
-      <Accordion id="s-doc" title="معلومات المستند" icon="ti-file-description">
-        <Field label="عنوان المستند"><Input value={tpl.title_text} onChange={v => update('title_text', v)} /></Field>
-        <Slider label="حجم العنوان" value={tpl.title_size} min={10} max={24} unit="px" onChange={v => update('title_size', v)} />
-        <Toggle value={tpl.title_bold} onChange={v => update('title_bold', v)} label="خط عريض" />
-        <Field label="محاذاة"><Pills options={ALIGN_OPTS} value={tpl.title_align} onChange={v => update('title_align', v)} /></Field>
-        <ColorField label="لون العنوان" value={tpl.title_color} onChange={v => update('title_color', v)} />
-        <Divider />
-        <Toggle value={tpl.show_doc_number}   onChange={v => update('show_doc_number', v)}   label="رقم الوثيقة" />
-        <Toggle value={tpl.show_date}         onChange={v => update('show_date', v)}         label="التاريخ" />
-        <Toggle value={tpl.show_time}         onChange={v => update('show_time', v)}         label="الوقت" />
-        <Toggle value={tpl.show_due_date}     onChange={v => update('show_due_date', v)}     label="تاريخ الاستحقاق" />
-        <Toggle value={tpl.show_cashier}      onChange={v => update('show_cashier', v)}      label="اسم الكاشير" />
-        <Toggle value={tpl.show_session}      onChange={v => update('show_session', v)}      label="رقم الجلسة" />
-        <Toggle value={tpl.show_payment_term} onChange={v => update('show_payment_term', v)} label="شروط الدفع" />
-        <Toggle value={tpl.show_client}       onChange={v => update('show_client', v)}       label="بيانات العميل" />
-        {tpl.show_client && (
-          <>
-            <Toggle value={tpl.show_client_nif}      onChange={v => update('show_client_nif', v)}      label="  ↳ NIF العميل" />
-            <Toggle value={tpl.show_client_phone}    onChange={v => update('show_client_phone', v)}    label="  ↳ هاتف العميل" />
-            <Toggle value={tpl.show_client_address}  onChange={v => update('show_client_address', v)}  label="  ↳ عنوان العميل" />
-            <Toggle value={tpl.show_delivery_address} onChange={v => update('show_delivery_address', v)} label="  ↳ عنوان التسليم" />
-          </>
-        )}
-        <Toggle value={tpl.show_bank_details} onChange={v => update('show_bank_details', v)} label="البيانات البنكية" />
-        {tpl.show_bank_details && (
-          <Field label="نص البيانات البنكية">
-            <Textarea value={tpl.bank_details_text} onChange={v => update('bank_details_text', v)} placeholder="CCP: 001 234 567 — بنك الفلاحة" rows={3} />
-          </Field>
-        )}
-        <Field label="فاصل المعلومات"><Pills options={BORDER_OPTS} value={tpl.doc_separator} onChange={v => update('doc_separator', v)} /></Field>
-      </Accordion>
-
-      {/* ── جدول المنتجات ── */}
-      <Accordion id="s-items" title="جدول المنتجات — الأعمدة والتنسيق" icon="ti-list-details">
-        <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 5 }}>
-          فعّل الأعمدة، رتّبها واضبط عرض كل منها
+      {/* ── رأس الفاتورة (HeaderSection) ── */}
+      <Section id="s-header" title="رأس الفاتورة — الشعار والشركة" icon="ti-building-store" expanded={!allCollapsed}>
+        <HeaderSectionControls tpl={tpl} update={update} company={companyData} />
+        <div style={{ padding: '8px 11px', borderTop: '1px solid var(--b2)' }}>
+          <Slider label="تدوير الزوايا" value={tpl.logo_border_radius} min={0} max={50} unit="%" onChange={v => update('logo_border_radius', v)} />
+          <ColorField label="لون الاسم" value={tpl.company_name_color} onChange={v => update('company_name_color', v)} />
         </div>
-        <ColumnManager tpl={tpl} update={update} />
-        <Divider />
-        <Slider label="حجم الخط" value={tpl.items_font_size} min={7} max={14} unit="px" onChange={v => update('items_font_size', v)} />
-        <Field label="نوع الخط">
-          <Select value={tpl.items_font_family} onChange={v => update('items_font_family', v as FontFamily)}>
-            <option value="tajawal">Tajawal — عربي واضح</option>
-            <option value="monospace">Courier — أحادي المسافة</option>
-            <option value="arial">Arial — لاتيني</option>
-            <option value="times">Times New Roman</option>
-          </Select>
-        </Field>
-        <Toggle value={tpl.show_col_header}   onChange={v => update('show_col_header', v)}   label="إظهار رأس الجدول" />
-        {tpl.show_col_header && (
-          <>
-            <Toggle value={tpl.table_header_bold} onChange={v => update('table_header_bold', v)} label="خط عريض للرأس" />
-            <Toggle value={tpl.table_header_bg}   onChange={v => update('table_header_bg', v)}   label="خلفية ملونة للرأس" />
-            <ColorField label="لون نص الرأس" value={tpl.table_header_color} onChange={v => update('table_header_color', v)} />
-          </>
-        )}
-        <Field label="حدود الجدول"><Pills options={BORDER_OPTS} value={tpl.table_border_style} onChange={v => update('table_border_style', v)} /></Field>
-        <Toggle value={tpl.alternating_rows} onChange={v => update('alternating_rows', v)} label="تلوين متناوب للأسطر" />
-        {tpl.alternating_rows && (
-          <ColorField label="لون الأسطر الزوجية" value={tpl.alternating_color} onChange={v => update('alternating_color', v)} />
-        )}
-        <Field label="عرض الأسعار">
-          <Select value={tpl.price_display} onChange={v => update('price_display', v as 'ht' | 'ttc')}>
-            <option value="ht">HT — بدون ضريبة</option>
-            <option value="ttc">TTC — بالضريبة</option>
-          </Select>
-        </Field>
-        <Toggle value={tpl.show_line_total_ttc} onChange={v => update('show_line_total_ttc', v)} label="الإجمالي TTC لكل سطر" />
-      </Accordion>
+      </Section>
 
-      {/* ── الإجماليات ── */}
-      <Accordion id="s-totals" title="الإجماليات والمدفوعات" icon="ti-cash">
-        <Slider label="حجم خط الإجماليات" value={tpl.totals_font_size} min={8} max={16} unit="px" onChange={v => update('totals_font_size', v)} />
-        <Toggle value={tpl.totals_bold} onChange={v => update('totals_bold', v)} label="خط عريض" />
-        <Field label="محاذاة"><Pills options={ALIGN_OPTS} value={tpl.totals_align} onChange={v => update('totals_align', v)} /></Field>
-        <Divider />
-        <Toggle value={tpl.show_total_ht}       onChange={v => update('show_total_ht', v)}       label="المجموع HT" />
-        <Toggle value={tpl.show_total_tva}      onChange={v => update('show_total_tva', v)}      label="مبلغ TVA" />
-        <Toggle value={tpl.show_tva_breakdown}  onChange={v => update('show_tva_breakdown', v)}  label="تفصيل TVA حسب النسبة" />
-        <Toggle value={tpl.show_discount_total} onChange={v => update('show_discount_total', v)} label="إجمالي الخصومات" />
-        <Toggle value={tpl.show_fiscal_stamp}   onChange={v => update('show_fiscal_stamp', v)}   label="الطابع الجبائي" />
-        <Divider />
-        <Toggle value={tpl.show_total_ttc} onChange={v => update('show_total_ttc', v)} label="الإجمالي TTC" />
-        {tpl.show_total_ttc && (
-          <>
-            <Slider label="حجم خط TTC" value={tpl.total_ttc_font_size} min={11} max={26} unit="px" onChange={v => update('total_ttc_font_size', v)} />
-            <Toggle value={tpl.total_ttc_bold} onChange={v => update('total_ttc_bold', v)} label="خط عريض" />
-            <ColorField label="لون TTC" value={tpl.total_ttc_color} onChange={v => update('total_ttc_color', v)} />
-            <Field label="إطار TTC"><Pills options={BORDER_OPTS} value={tpl.total_border_style} onChange={v => update('total_border_style', v)} /></Field>
-          </>
-        )}
-        <Toggle value={tpl.show_amount_in_words} onChange={v => update('show_amount_in_words', v)} label="المبلغ بالكتابة" />
-        <Divider />
-        <SectionTitle>الأرصدة والدفع</SectionTitle>
-        <Toggle value={tpl.show_payment_details} onChange={v => update('show_payment_details', v)} label="تفصيل وسائل الدفع" />
-        {tpl.show_payment_details && (
-          <Slider label="حجم الخط" value={tpl.payment_font_size} min={8} max={14} unit="px" onChange={v => update('payment_font_size', v)} />
-        )}
-        <Toggle value={tpl.show_paid_amount}  onChange={v => update('show_paid_amount', v)}  label="المبلغ المدفوع" />
-        <Toggle value={tpl.show_change}       onChange={v => update('show_change', v)}       label="الباقي (الصرف)" />
-        <Toggle value={tpl.show_remaining}    onChange={v => update('show_remaining', v)}    label="المبلغ المتبقي" />
-        <Toggle value={tpl.show_prev_balance} onChange={v => update('show_prev_balance', v)} label="الرصيد السابق" />
-        <Toggle value={tpl.show_new_balance}  onChange={v => update('show_new_balance', v)}  label="الرصيد الجديد" />
-      </Accordion>
+      {/* ── معلومات المستند (DocumentSection) ── */}
+      <Section id="s-doc" title="معلومات المستند" icon="ti-file-description" expanded={!allCollapsed}>
+        <DocumentSectionControls tpl={tpl} update={update} />
+        <div style={{ padding: '8px 11px' }}>
+          <ColorField label="لون العنوان" value={tpl.title_color} onChange={v => update('title_color', v)} />
+          <Toggle value={tpl.show_delivery_address} onChange={v => update('show_delivery_address', v)} label="  ↳ عنوان التسليم" />
+          <Toggle value={tpl.show_bank_details} onChange={v => update('show_bank_details', v)} label="البيانات البنكية" />
+          {tpl.show_bank_details && (
+            <Field label="نص البيانات البنكية">
+              <Textarea value={tpl.bank_details_text} onChange={v => update('bank_details_text', v)} placeholder="CCP: 001 234 567 — بنك الفلاحة" rows={3} />
+            </Field>
+          )}
+        </div>
+      </Section>
 
-      {/* ── التذييل ── */}
-      <Accordion id="s-footer" title="التذييل — النصوص والباركود" icon="ti-file-text">
-        <Field label="سطر 1"><Input value={tpl.footer_line1} onChange={v => update('footer_line1', v)} placeholder="مثال: مفتوح يومياً 08:00–20:00" /></Field>
-        <Field label="سطر 2"><Input value={tpl.footer_line2} onChange={v => update('footer_line2', v)} /></Field>
-        <Field label="سطر 3"><Input value={tpl.footer_line3} onChange={v => update('footer_line3', v)} /></Field>
-        <Field label="فاصل التذييل"><Pills options={BORDER_OPTS} value={tpl.footer_separator} onChange={v => update('footer_separator', v)} /></Field>
-        <Divider />
-        <Toggle value={tpl.show_thank_you} onChange={v => update('show_thank_you', v)} label="رسالة الشكر" />
-        {tpl.show_thank_you && (
-          <>
-            <Field label="نص رسالة الشكر"><Input value={tpl.thank_you_text} onChange={v => update('thank_you_text', v)} /></Field>
-            <Slider label="حجم الخط" value={tpl.thank_you_size} min={9} max={20} unit="px" onChange={v => update('thank_you_size', v)} />
-            <ColorField label="لون الشكر" value={tpl.thank_you_color} onChange={v => update('thank_you_color', v)} />
-          </>
-        )}
-        <Toggle value={tpl.show_returns_policy} onChange={v => update('show_returns_policy', v)} label="سياسة الإرجاع" />
-        {tpl.show_returns_policy && (
-          <Field label="نص السياسة"><Textarea value={tpl.returns_policy_text} onChange={v => update('returns_policy_text', v)} /></Field>
-        )}
-        <Field label="نص قانوني سفلي">
-          <Textarea value={tpl.footer_legal_text} onChange={v => update('footer_legal_text', v)} placeholder="يُعتبر هذا المستند ملزماً..." />
-        </Field>
-        <Divider />
-        <Toggle value={tpl.show_barcode} onChange={v => update('show_barcode', v)} label="الباركود" />
-        {tpl.show_barcode && (
-          <Field label="محتوى الباركود">
-            <Select value={tpl.barcode_content} onChange={v => update('barcode_content', v as any)}>
-              <option value="doc-number">رقم المستند</option>
-              <option value="total">المبلغ الإجمالي</option>
-              <option value="custom">نص مخصص</option>
-            </Select>
-            {tpl.barcode_content === 'custom' && (
-              <div style={{ marginTop: 3 }}>
-                <Input value={tpl.barcode_custom_text} onChange={v => update('barcode_custom_text', v)} placeholder="النص..." />
-              </div>
-            )}
-          </Field>
-        )}
-        <Toggle value={tpl.show_qr} onChange={v => update('show_qr', v)} label="QR Code" />
-        {tpl.show_qr && (
-          <Field label="محتوى QR">
-            <Select value={tpl.qr_content} onChange={v => update('qr_content', v as any)}>
-              <option value="doc-number">رقم المستند</option>
-              <option value="company-info">معلومات الشركة</option>
-              <option value="both">الاثنين معاً</option>
+      {/* ── جدول المنتجات (ItemsSection) ── */}
+      <Section id="s-items" title="جدول المنتجات — الأعمدة والتنسيق" icon="ti-table" expanded={!allCollapsed}>
+        <ItemsSectionControls tpl={tpl} update={update} />
+        <div style={{ padding: '8px 11px' }}>
+          <ColorField label="لون نص الرأس" value={tpl.table_header_color} onChange={v => update('table_header_color', v)} />
+          {tpl.alternating_rows && (
+            <ColorField label="لون الأسطر الزوجية" value={tpl.alternating_color} onChange={v => update('alternating_color', v)} />
+          )}
+          <Toggle value={tpl.show_line_total_ttc} onChange={v => update('show_line_total_ttc', v)} label="الإجمالي TTC لكل سطر" />
+        </div>
+      </Section>
+
+      {/* ── الإجماليات (TotalsSection) ── */}
+      <Section id="s-totals" title="الإجماليات — الحسابات" icon="ti-cash" expanded={!allCollapsed}>
+        <TotalsSectionControls tpl={tpl} update={update} />
+        <div style={{ padding: '8px 11px' }}>
+          <ColorField label="لون TTC" value={tpl.total_ttc_color} onChange={v => update('total_ttc_color', v)} />
+          <Toggle value={tpl.show_payment_details} onChange={v => update('show_payment_details', v)} label="تفصيل وسائل الدفع" />
+          {tpl.show_payment_details && (
+            <Slider label="حجم الخط" value={tpl.payment_font_size} min={8} max={14} unit="px" onChange={v => update('payment_font_size', v)} />
+          )}
+        </div>
+      </Section>
+
+      {/* ── التذييل (FooterSection) ── */}
+      <Section id="s-footer" title="التذييل — النصوص والتواقيع" icon="ti-file-text" expanded={!allCollapsed}>
+        <FooterSectionControls tpl={tpl} update={update} />
+        <div style={{ padding: '8px 11px' }}>
+          <ColorField label="لون الشكر" value={tpl.thank_you_color} onChange={v => update('thank_you_color', v)} />
+        </div>
+      </Section>
+
+      {/* ── التنسيق (FormattingSection) ── */}
+      <Section id="s-format" title="تنسيق الطباعة — الهوامش والمسافات" icon="ti-settings" expanded={!allCollapsed}>
+        <FormattingSectionControls tpl={tpl} update={update} />
+        <div style={{ padding: '8px 11px' }}>
+          <Field label="نوع الخط الأساسي">
+            <Select value={tpl.font_family} onChange={v => update('font_family', v as FontFamily)}>
+              <option value="tajawal">Tajawal — عربي</option>
+              <option value="monospace">Courier — أحادي</option>
+              <option value="arial">Arial — لاتيني</option>
+              <option value="times">Times New Roman</option>
             </Select>
           </Field>
-        )}
-        <Divider />
-        <Toggle value={tpl.show_cashier_signature} onChange={v => update('show_cashier_signature', v)} label="إمضاء الكاشير" />
-        <Toggle value={tpl.show_client_signature}  onChange={v => update('show_client_signature', v)}  label="إمضاء العميل" />
-        <Toggle value={tpl.show_stamp}             onChange={v => update('show_stamp', v)}             label="ختم المؤسسة" />
-      </Accordion>
-
-      {/* ── التنسيق ── */}
-      <Accordion id="s-format" title="تنسيق الطباعة — ورق وهوامش" icon="ti-settings">
-        <Slider label="هامش علوي"  value={tpl.margin_top}    min={0} max={15} unit="mm" onChange={v => update('margin_top', v)} />
-        <Slider label="هامش سفلي"  value={tpl.margin_bottom} min={0} max={15} unit="mm" onChange={v => update('margin_bottom', v)} />
-        <Slider label="هامش جانبي" value={tpl.margin_sides}  min={0} max={15} unit="mm" onChange={v => update('margin_sides', v)} />
-        <Slider label="تباعد الأسطر" value={tpl.line_spacing} min={1} max={2.5} step={0.1} unit="×" onChange={v => update('line_spacing', v)} />
-        <Slider label="حجم الخط الأساسي" value={tpl.base_font_size} min={8} max={14} unit="px" onChange={v => update('base_font_size', v)} />
-        <Field label="نوع الخط الأساسي">
-          <Select value={tpl.font_family} onChange={v => update('font_family', v as FontFamily)}>
-            <option value="tajawal">Tajawal — عربي</option>
-            <option value="monospace">Courier — أحادي</option>
-            <option value="arial">Arial — لاتيني</option>
-            <option value="times">Times New Roman</option>
-          </Select>
-        </Field>
-        <Field label="اتجاه الصفحة (A4/A5)">
-          <Pills
-            options={[{ v: 'portrait' as const, l: 'عمودي' }, { v: 'landscape' as const, l: 'أفقي' }]}
-            value={tpl.page_orientation}
-            onChange={v => update('page_orientation', v)}
-          />
-        </Field>
-      </Accordion>
+          <Field label="اتجاه الصفحة (A4/A5)">
+            <Pills
+              options={[{ v: 'portrait' as const, l: 'عمودي' }, { v: 'landscape' as const, l: 'أفقي' }]}
+              value={tpl.page_orientation}
+              onChange={v => update('page_orientation', v)}
+            />
+          </Field>
+        </div>
+      </Section>
 
       {/* ── القواعد والشروط ── */}
       <Accordion id="s-rules" title="القواعد — الإظهار/الإخفاء الشرطي" icon="ti-adjustments">
@@ -789,6 +658,8 @@ export default function PrintSettingsPage() {
   const [editingName,   setEditingName]   = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [deleteTarget,  setDeleteTarget]  = useState<number | null>(null);
+  const [useRealData,       setUseRealData]       = useState(true);
+  const [useLegacyPreview,  setUseLegacyPreview]  = useState(false);
 
   const historyRef    = useRef<PrintTemplate[]>([]);
   const historyPos    = useRef(-1);
@@ -798,8 +669,38 @@ export default function PrintSettingsPage() {
   const deferredTpl = useDeferredValue(localTpl);
 
   // ── Data ────────────────────────────────────────────────────────────────────
-  const { data: templates = [], isLoading } = usePrintTemplates(activeDoc);
+  const { data: templatesRaw, isLoading } = usePrintTemplates(activeDoc);
+  const templates = useMemo(() => templatesRaw ?? [], [templatesRaw]);
   const mutations = usePrintTemplateMutations();
+
+  const slug = useActiveSlug();
+  const { data: previewDoc } = useQuery({
+    queryKey: [slug, 'preview-latest-doc', activeDoc],
+    queryFn: async () => {
+      // Step 1: get the latest doc ID
+      const list = await apiGet<{ data: { id: number }[] }>('/documents', {
+        'filter[document_type.code]': activeDoc,
+        'page[size]': 1,
+        sort: '-id',
+        'fields[commercial_documents]': 'id',
+      });
+      const docs = (list as any)?.data ?? [];
+      const first = docs[0] as { id?: number } | undefined;
+      if (!first?.id) return null;
+      // Step 2: fetch full doc with all relations via show endpoint
+      const full = await apiGet<{ data: CommercialDocument }>(`/documents/${first.id}`, {
+        include: ['party', 'lines', 'lines.product', 'lines.packaging', 'lines.stockLot', 'payments', 'payments.paymentMode'].join(','),
+      });
+      const doc = (full as any)?.data ?? full;
+      return doc ?? null;
+    },
+    enabled: !!slug && useRealData,
+    staleTime: 60_000,
+  });
+  const previewData: UniversalDocumentData | null = useMemo(() => {
+    if (!previewDoc || !companyData) return null;
+    return DocumentDataBuilder.fromApiDocument(previewDoc, companyData as any);
+  }, [previewDoc, companyData]);
 
   useEffect(() => {
     if (templates.length > 0) {
@@ -927,6 +828,15 @@ export default function PrintSettingsPage() {
     setDeleteTarget(id);
   }, []);
 
+  const handleToggleActive = useCallback(async (tpl: PrintTemplate) => {
+    if (!tpl.id) return;
+    setActionLoading(`toggle-${tpl.id}`);
+    if (localTpl?.id === tpl.id) setLocalTpl(p => p ? { ...p, is_active: !p.is_active } : p);
+    try { await mutations.update.mutateAsync({ id: tpl.id, data: { is_active: !tpl.is_active } }); toast.success(tpl.is_active ? 'تم تعطيل القالب' : 'تم تفعيل القالب'); }
+    catch { toast.error('فشل التحديث'); }
+    finally { setActionLoading(null); }
+  }, [mutations, localTpl]);
+
   const confirmDelete = useCallback(async () => {
     if (deleteTarget === null) return;
     const id = deleteTarget;
@@ -994,7 +904,7 @@ export default function PrintSettingsPage() {
     import('react-dom/client').then(({ createRoot }) => {
       const root = win.document.getElementById('r');
       if (root) createRoot(root).render(
-        React.createElement(PreviewSelector, { tpl: localTpl, company: companyData }),
+        React.createElement(PreviewSelector, { tpl: localTpl, company: companyData, overrideData: useRealData ? previewData : null, useLegacy: useLegacyPreview }),
       );
     });
   }, [localTpl, companyData]);
@@ -1021,7 +931,7 @@ export default function PrintSettingsPage() {
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <><div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '100vh', direction: 'rtl' }}>
+    <><div style={{ display: 'flex', flexDirection: 'column', height: '100vh', direction: 'rtl', overflow: 'hidden' }}>
 
       {/* ══ TOP BAR ══ */}
       <div style={{
@@ -1213,6 +1123,9 @@ export default function PrintSettingsPage() {
                   {!tpl.is_default && (
                     <TinyBtn icon="ti-star"  color="var(--gold)"  title="افتراضي" loading={actionLoading === ('default-' + tpl.id)} onClick={() => handleSetDefault(tpl.id!)} />
                   )}
+                  <TinyBtn icon={tpl.is_active ? 'ti-eye' : 'ti-eye-off'} color="var(--t4)" title={tpl.is_active ? 'تعطيل' : 'تفعيل'}
+                    loading={actionLoading === ('toggle-' + tpl.id)}
+                    onClick={() => handleToggleActive(tpl)} />
                   <TinyBtn icon="ti-copy"   color="var(--blue)"  title="نسخ"     loading={actionLoading === ('duplicate-' + tpl.id)} onClick={() => handleDuplicate(tpl)} />
                   <TinyBtn icon="ti-trash"  color="var(--red)"   title="حذف"     loading={actionLoading === ('delete-' + tpl.id)} onClick={() => handleDelete(tpl.id!)} />
                 </div>
@@ -1287,7 +1200,7 @@ export default function PrintSettingsPage() {
               </div>
 
               <QuickNav controlsRef={controlsRef} />
-              <TemplateControls tpl={localTpl} update={update} />
+              <TemplateControls tpl={localTpl} update={update} companyData={companyData} />
             </div>
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--t4)', fontSize: 13, gap: 8 }}>
@@ -1301,6 +1214,7 @@ export default function PrintSettingsPage() {
         <div style={{
           flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
           background: 'var(--bg1)', overflow: 'hidden',
+          position: 'sticky', top: 0, alignSelf: 'flex-start', maxHeight: '100vh',
         }}>
           {/* Preview toolbar */}
           <div style={{
@@ -1331,6 +1245,40 @@ export default function PrintSettingsPage() {
             )}
             <div style={{ flex: 1 }} />
             {localTpl && (
+              <button
+                onClick={() => setUseRealData(v => !v)}
+                type="button"
+                title={useRealData ? 'استخدام بيانات فارغة' : 'استخدام آخر مستند حقيقي'}
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 8px', fontSize: 11,
+                  color: useRealData ? 'var(--em)' : 'var(--t3)',
+                  borderColor: useRealData ? 'var(--em)' : 'var(--b2)',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <i className={`ti ${useRealData ? 'ti-database' : 'ti-database-off'}`} />
+                {useRealData ? 'بيانات حقيقية' : 'بيانات تجريبية'}
+              </button>
+            )}
+            {localTpl && (
+              <button
+                onClick={() => setUseLegacyPreview(v => !v)}
+                type="button"
+                title={useLegacyPreview ? 'عرض المعاينة الحديثة' : 'عرض المعاينة الكلاسيكية'}
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 8px', fontSize: 11,
+                  color: useLegacyPreview ? 'var(--em)' : 'var(--t3)',
+                  borderColor: useLegacyPreview ? 'var(--em)' : 'var(--b2)',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <i className={`ti ${useLegacyPreview ? 'ti-adjustments-alt' : 'ti-adjustments-off'}`} />
+                {useLegacyPreview ? 'كلاسيكي' : 'حديث'}
+              </button>
+            )}
+            {localTpl && (
               <button onClick={handleTestPrint} type="button"
                 style={{
                   ...toolBtnStyle,
@@ -1353,7 +1301,7 @@ export default function PrintSettingsPage() {
                 display: 'inline-block',
               }}>
                 <ErrorBoundary>
-                  <PreviewSelector tpl={deferredTpl} company={companyData} />
+                  <PreviewSelector tpl={deferredTpl} company={companyData} overrideData={useRealData ? previewData : null} useLegacy={useLegacyPreview} />
                 </ErrorBoundary>
               </div>
             ) : (

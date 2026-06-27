@@ -19,6 +19,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ id, depth }) => {
 
   const [expanded, setExpanded] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
 
   const isSelected = selectedIds.includes(id);
   const hasChildren = element.children.length > 0;
@@ -81,7 +82,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ id, depth }) => {
     <div>
       <div
         onClick={handleClick}
-        onContextMenu={e => { e.preventDefault(); setShowMenu(!showMenu); }}
+        onContextMenu={e => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); setShowMenu(!showMenu); }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -143,6 +144,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({ id, depth }) => {
         <div
           style={{
             position: 'fixed',
+            top: menuPos.y,
+            left: menuPos.x,
             background: '#fff',
             border: '1px solid #d9d9d9',
             borderRadius: 4,

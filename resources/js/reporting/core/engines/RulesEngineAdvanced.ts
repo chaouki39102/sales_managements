@@ -178,7 +178,7 @@ class RulesEngineAdvancedService {
       }
 
       if (evaluated && result) {
-        rulesEngine['applyAction'](finalResult, rule);
+        rulesEngine.applyAction(finalResult, rule);
       }
 
       steps.push({
@@ -247,7 +247,7 @@ class RulesEngineAdvancedService {
         const raw = formulaEngine.evaluate(rule.condition, context);
         const truthy = raw !== null && raw !== 0 && raw !== '' && raw !== false;
         if (!truthy) return rulesEngine.emptyResult();
-        rulesEngine['applyAction'](result, rule);
+        rulesEngine.applyAction(result, rule);
       } catch {
         return rulesEngine.emptyResult();
       }
@@ -262,7 +262,7 @@ class RulesEngineAdvancedService {
         const truthy = raw !== null && raw !== 0 && raw !== '' && raw !== false;
         if (truthy) {
           const result = rulesEngine.emptyResult();
-          rulesEngine['applyAction'](result, rule);
+          rulesEngine.applyAction(result, rule);
           return result;
         }
       } catch {
@@ -280,7 +280,7 @@ class RulesEngineAdvancedService {
       const truthy = raw !== null && raw !== 0 && raw !== '' && raw !== false;
 
       if (truthy) {
-        rulesEngine['applyAction'](result, rule);
+        rulesEngine.applyAction(result, rule);
 
         if (rule.children && rule.children.length > 0) {
           const childResult = this.evaluateNested(
@@ -297,7 +297,7 @@ class RulesEngineAdvancedService {
               const eiRaw = formulaEngine.evaluate(ei.condition, context);
               const eiTruthy = eiRaw !== null && eiRaw !== 0 && eiRaw !== '' && eiRaw !== false;
               if (eiTruthy) {
-                rulesEngine['applyAction'](result, { ...rule, action: ei.action, target: ei.target, highlightStyle: ei.highlightStyle });
+                rulesEngine.applyAction(result, { ...rule, action: ei.action, target: ei.target, highlightStyle: ei.highlightStyle });
                 break;
               }
             } catch { continue; }
@@ -306,7 +306,7 @@ class RulesEngineAdvancedService {
 
         // Else rule
         if (rule.elseRule) {
-          rulesEngine['applyAction'](result, rule.elseRule);
+          rulesEngine.applyAction(result, rule.elseRule);
           if (rule.elseRule.children) {
             const elseChildResult = this.evaluateNested(
               rule.elseRule.children.map(c => ({ ...c, priority: (rule.priority ?? 0) + 1 })),

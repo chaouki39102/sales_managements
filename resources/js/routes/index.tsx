@@ -61,6 +61,7 @@ const ProfilePage   = lazy(() => import('@/pages/profile/ProfilePage'));
 const SettingsPage       = lazy(() => import('@/pages/settings/SettingsPage'));
 const DocumentTypesPage  = lazy(() => import('@/pages/settings/DocumentTypesPage'));
 const PrintSettingsPage  = lazy(() => import('@/pages/settings/PrintSettingsPage'));
+const ReportDesignerPage = lazy(() => import('@/pages/settings/report-designer/ReportDesignerPage'));
 
 // â”€â”€ Tenant Lookups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FamiliesPage          = lazy(() => import('@/pages/lookups/FamiliesPage'));
@@ -244,6 +245,7 @@ export function AppRoutes() {
           <Route path="settings"                 element={<SettingsPage />} />
           <Route path="settings/document-types"  element={<DocumentTypesPage />} />
           <Route path="settings/print"           element={<PrintSettingsPage />} />
+          <Route path="settings/print/designer" element={<ReportDesignerPage />} />
           <Route path="profile" element={<ProfilePage />} />
 
 

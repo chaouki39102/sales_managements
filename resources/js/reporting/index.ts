@@ -241,3 +241,4 @@ export { DesignerCanvas } from './components/designer/DesignerCanvas';
 export { DesignerToolbar } from './components/designer/DesignerToolbar';
 export { PropertyInspector } from './components/designer/PropertyInspector';
 export { ComponentTree } from './components/designer/ComponentTree';
+export { printTemplateToDesignerElements, designerElementsToPrintTemplate, DESIGNER_ELEMENT_TYPES } from './components/designer/DesignerConverter';

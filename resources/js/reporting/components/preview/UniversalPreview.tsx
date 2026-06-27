@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import type { UniversalDocumentData, DocumentLine } from '../../data/UniversalDocumentData';
 import type { PrintTemplate, ColumnKey, AlignOption, BorderStyle } from '../../core/domain/PrintTemplate';
 import {
@@ -9,6 +9,7 @@ import {
 } from './shared';
 import { rulesEngine } from '../../core/engines/RulesEngine';
 import { formulaEngine } from '../../core/engines/FormulaEngine';
+import { calculatedFieldService } from '../../data/CalculatedFieldService';
 import ChartSection from '../shared/ChartSection';
 
 // ─── Props ──────────────────────────────────────────────────────────────────────
@@ -29,18 +30,23 @@ function colValue(col: ColumnKey, line: DocumentLine, tpl: PrintTemplate): strin
     case 'name':      return line.name;
     case 'unit':      return line.unit ?? '';
     case 'quantity':  return String(line.quantity);
-    case 'price':     return tpl.price_display === 'ttc' ? line.unitPriceTtc.toFixed(2) : line.unitPriceHt.toFixed(2);
+    case 'price':     return tpl.price_display === 'ttc' ? Number(line.unitPriceTtc).toFixed(2) : Number(line.unitPriceHt).toFixed(2);
     case 'discount':  return line.discountPct > 0 ? `${line.discountPct}%` : '';
     case 'tva':       return `${line.tvaPct}%`;
-    case 'total':     return tpl.show_line_total_ttc ? line.totalTtc.toFixed(2) : line.totalHt.toFixed(2);
+    case 'total':     return tpl.show_line_total_ttc ? Number(line.totalTtc).toFixed(2) : Number(line.totalHt).toFixed(2);
   }
+}
+
+function formatDate(iso: string): string {
+  if (!iso) return '';
+  return iso.slice(0, 10);
 }
 
 // ─── Barcode / QR helpers ───────────────────────────────────────────────────────
 
 function barcodeText(tpl: PrintTemplate, data: UniversalDocumentData): string {
   if (tpl.barcode_content === 'custom') return tpl.barcode_custom_text;
-  if (tpl.barcode_content === 'total') return `${data.totals.totalTtc.toFixed(2)} دج`;
+  if (tpl.barcode_content === 'total') return `${Number(data.totals.totalTtc).toFixed(2)} دج`;
   return data.doc.number;
 }
 
@@ -67,11 +73,11 @@ function SectionWrap({ highlight, children }: {
 
 // ─── buildEvalContext — builds EvaluationContext for RuleEngine ─────────────────
 
-import type { EvaluationContext } from '../../core/engines/FormulaEngine';
+import type { EvaluationContext, ExpressionValue } from '../../core/engines/FormulaEngine';
 
 function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
   const t = data.totals;
-  return {
+  const computed: Record<string, ExpressionValue> = {
     totalHt:      t.totalHt,
     totalTva:     t.totalTva,
     totalTtc:     t.totalTtc,
@@ -87,11 +93,18 @@ function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
     docNumber:    data.doc.number,
     docDate:      data.doc.date,
   };
+  // Merge calculated fields from CalculatedFieldService
+  const calcFields = calculatedFieldService.computeAll(data);
+  Object.assign(computed, calcFields);
+  return { data, computed };
 }
 
 // ─── Main component ─────────────────────────────────────────────────────────────
 
 function UniversalPreview({ tpl, data, company }: UniversalPreviewProps) {
+  // Clear formula expression cache when document data changes
+  useEffect(() => { formulaEngine.clearCache(); }, [data]);
+
   const isThermal = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
   const isA4      = tpl.paper_size === 'A4';
   const isA5      = tpl.paper_size === 'A5';
@@ -231,7 +244,7 @@ function renderReport(tpl: PrintTemplate, data: UniversalDocumentData, isThermal
                 <div style={{
                   fontSize: isThermal ? 13 : 18, fontWeight: 900, color: card.color,
                 }}>
-                  {card.isCount ? card.val : `${card.val.toFixed(2)} دج`}
+                  {card.isCount ? card.val : `${Number(card.val).toFixed(2)} دج`}
                 </div>
               </div>
             );
@@ -268,7 +281,7 @@ function renderReport(tpl: PrintTemplate, data: UniversalDocumentData, isThermal
                 <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '3px 6px' }}>{p.name}</td>
                   <td style={{ textAlign: 'center', padding: '3px 6px' }}>{p.quantity}</td>
-                  <td style={{ textAlign: 'center', padding: '3px 6px' }}>{p.totalTtc.toFixed(2)}</td>
+                  <td style={{ textAlign: 'center', padding: '3px 6px' }}>{Number(p.totalTtc).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -385,7 +398,7 @@ function renderPageHeader(tpl: PrintTemplate, co: CompanyData, data: UniversalDo
         <table style={{ fontSize: tpl.company_info_size, borderCollapse: 'collapse' }}>
           <tbody>
             {tpl.show_doc_number && <InfoRow label={isA4 ? 'رقم الفاتورة' : 'رقم'} value={data.doc.number} />}
-            {tpl.show_date && <InfoRow label="التاريخ" value={data.doc.date + (tpl.show_time && data.doc.time ? ' ' + data.doc.time : '')} />}
+            {tpl.show_date && <InfoRow label="التاريخ" value={formatDate(data.doc.date) + (tpl.show_time && data.doc.time ? ' ' + data.doc.time : '')} />}
             {tpl.show_due_date && data.doc.dueDate && <InfoRow label="تاريخ الاستحقاق" value={data.doc.dueDate} />}
             {tpl.show_cashier && (data.party?.cashierName || data.session?.cashierName) && (
               <InfoRow label="الكاشير" value={data.party?.cashierName || data.session?.cashierName || ''} />
@@ -457,7 +470,7 @@ function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
 
       <div style={{ fontSize: tpl.base_font_size }}>
         {tpl.show_doc_number && <DocRow label="رقم:" value={doc.number} mono />}
-        {tpl.show_date && <DocRow label="التاريخ:" value={`${doc.date}${tpl.show_time && doc.time ? ' ' + doc.time : ''}`} />}
+        {tpl.show_date && <DocRow label="التاريخ:" value={`${formatDate(doc.date)}${tpl.show_time && doc.time ? ' ' + doc.time : ''}`} />}
         {tpl.show_due_date && doc.dueDate && <DocRow label="تاريخ الاستحقاق:" value={doc.dueDate} />}
         {tpl.show_cashier && (party?.cashierName || data.session?.cashierName) && (
           <DocRow label="الكاشير:" value={party?.cashierName || data.session?.cashierName || ''} />
@@ -690,7 +703,7 @@ function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
           fontFamily: "'Tajawal', sans-serif",
         }}>
           <span>المجموع TTC:</span>
-          <span dir="ltr">{t.totalTtc.toFixed(2)} دج</span>
+          <span dir="ltr">{Number(t.totalTtc).toFixed(2)} دج</span>
         </div>
       )}
 
@@ -754,7 +767,7 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
                 fontSize: tpl.total_ttc_font_size,
                 textAlign: 'right',
               }}>
-                {t.totalTtc.toFixed(2)}
+                {Number(t.totalTtc).toFixed(2)}
               </td>
             </tr>
           )}
@@ -787,7 +800,7 @@ function PageTotalRow({ label, val, red, bold }: { label: string; val: number; r
         fontWeight: bold ? 800 : 400,
         color: red ? '#c00' : 'inherit',
       }}>
-        {val.toFixed(2)}
+        {Number(val).toFixed(2)}
       </td>
     </tr>
   );
@@ -811,7 +824,7 @@ function renderThermalPayments(tpl: PrintTemplate, data: UniversalDocumentData) 
       {data.payments.map((p, i) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
           <span>{p.mode}</span>
-          <span dir="ltr">{p.amount.toFixed(2)}</span>
+          <span dir="ltr">{Number(p.amount).toFixed(2)}</span>
         </div>
       ))}
       <Separator style="dashed" />
@@ -830,7 +843,7 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
             {data.payments.map((p, i) => (
               <tr key={i}>
                 <td style={{ padding: '4px 12px', textAlign: 'right' }}>{p.mode}</td>
-                <td style={{ padding: '4px 12px', textAlign: 'right' }}>{p.amount.toFixed(2)}</td>
+                <td style={{ padding: '4px 12px', textAlign: 'right' }}>{Number(p.amount).toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
@@ -846,7 +859,7 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
       {data.payments.map((p, i) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', width: 200 }}>
           <span>{p.mode}</span>
-          <span>{p.amount.toFixed(2)}</span>
+          <span>{Number(p.amount).toFixed(2)}</span>
         </div>
       ))}
     </div>

@@ -305,13 +305,24 @@ function compareValues(a: ExpressionValue, b: ExpressionValue): number {
   return String(a).localeCompare(String(b));
 }
 
+// ─── Cache Entry ───────────────────────────────────────────────────────────────
+
+interface CacheEntry {
+  value: ExpressionValue;
+  timestamp: number;
+}
+
 // ─── FormulaEngine ─────────────────────────────────────────────────────────────
 
 export class FormulaEngine {
   private readonly functions = new Map<string, ExpressionFunction>();
-  private readonly cache = new Map<string, ExpressionValue>();
+  private readonly cache = new Map<string, CacheEntry>();
+  private readonly cacheOrder: string[] = [];
   private cacheHits = 0;
   private cacheMisses = 0;
+  private static readonly CACHE_TTL = 60_000; // 60 seconds
+  private static readonly CACHE_MAX = 500; // max entries
+  private _dataVersion = 0;
 
   constructor() {
     this.registerBuiltins();
@@ -323,12 +334,24 @@ export class FormulaEngine {
     this.functions.set(name.toUpperCase(), fn);
   }
 
+  /** Increment data version to invalidate all cached evaluations */
+  bumpDataVersion(): void {
+    this._dataVersion++;
+  }
+
   evaluate(expression: string, context: EvaluationContext): ExpressionValue {
-    const cacheKey = expression;
+    // Context-aware cache key: expression + data version + computed keys hash
+    const ctxHash = this._hashContext(context);
+    const cacheKey = `${expression}::v${this._dataVersion}::${ctxHash}`;
     const cached = this.cache.get(cacheKey);
     if (cached !== undefined) {
-      this.cacheHits++;
-      return cached;
+      if (Date.now() - cached.timestamp < FormulaEngine.CACHE_TTL) {
+        this.cacheHits++;
+        return cached.value;
+      }
+      this.cache.delete(cacheKey);
+      const idx = this.cacheOrder.indexOf(cacheKey);
+      if (idx >= 0) this.cacheOrder.splice(idx, 1);
     }
     this.cacheMisses++;
 
@@ -336,7 +359,7 @@ export class FormulaEngine {
       const parser = new Parser(expression);
       const ast = parser.parse();
       const result = this.evaluateNode(ast, context);
-      this.cache.set(cacheKey, result);
+      this._setCache(cacheKey, result);
       return result;
     } catch (e) {
       if (e instanceof ParseError) return null;
@@ -356,15 +379,46 @@ export class FormulaEngine {
 
   clearCache(): void {
     this.cache.clear();
+    this.cacheOrder.length = 0;
     this.cacheHits = 0;
     this.cacheMisses = 0;
+    this._dataVersion++;
   }
 
   get stats() {
-    return { size: this.cache.size, hits: this.cacheHits, misses: this.cacheMisses };
+    return { size: this.cache.size, hits: this.cacheHits, misses: this.cacheMisses, dataVersion: this._dataVersion };
   }
 
   // ── Private ─────────────────────────────────────────────────────────────────
+
+  private _setCache(key: string, value: ExpressionValue): void {
+    if (this.cache.size >= FormulaEngine.CACHE_MAX) {
+      const oldest = this.cacheOrder.shift();
+      if (oldest) this.cache.delete(oldest);
+    }
+    this.cache.set(key, { value, timestamp: Date.now() });
+    this.cacheOrder.push(key);
+  }
+
+  private _hashContext(ctx: EvaluationContext): string {
+    const d = ctx.data;
+    const parts: string[] = [
+      String(d.doc.number),
+      d.doc.date,
+      String(d.totals.totalHt),
+      String(d.totals.totalTtc),
+      String(d.totals.paid),
+      String(d.lines.length),
+    ];
+    if (d.balance) {
+      parts.push(String(d.balance.previous));
+      parts.push(String(d.balance.current));
+    }
+    if (ctx.currentLineIndex !== undefined) {
+      parts.push(`i${ctx.currentLineIndex}`);
+    }
+    return parts.join('|');
+  }
 
   private evaluateNode(node: ASTNode, context: EvaluationContext): ExpressionValue {
     switch (node.kind) {

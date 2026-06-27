@@ -9,6 +9,7 @@ import client from '@/lib/api/core/client';
 import { useTopbarTitle } from '@/hooks/useTopbarTitle';
 import OfflineIndicator from '@/components/OfflineIndicator';
 import NotificationBell from '@/components/topbar/NotificationBell';
+import PrintQueuePanel from '@/reporting/components/shared/PrintQueuePanel';
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
   {
@@ -85,6 +86,7 @@ const NAV_GROUPS = [
       { name: 'الإعدادات',       href: 'settings',                icon: 'ti-settings'     },
       { name: 'أنواع المستندات', href: 'settings/document-types', icon: 'ti-file'         },
       { name: 'إعدادات الطباعة', href: '/settings/print',         icon: 'ti-printer'       },
+      { name: 'مصمم القوالب',   href: '/settings/print/designer', icon: 'ti-brush'         },
       { name: 'سلاسل الترقيم',   href: 'numbering-series',        icon: 'ti-list-numbers' },
       { name: 'فئات المصروفات',  href: 'expense-categories',      icon: 'ti-category'     },
       { name: 'الملف الشخصي',    href: 'profile',                 icon: 'ti-user-circle'  },
@@ -140,6 +142,7 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   'settings':                { title: 'الإعدادات',           path: 'نظام ← إعدادات'         },
   'settings/document-types': { title: 'أنواع المستندات',    path: 'نظام ← أنواع المستندات' },
   'settings/print':          { title: 'إعدادات الطباعة',     path: 'نظام ← إعدادات الطباعة' },
+  'settings/print/designer': { title: 'مصمم القوالب',        path: 'نظام ← مصمم القوالب' },
   'numbering-series':        { title: 'سلاسل الترقيم',      path: 'نظام ← سلاسل الترقيم'   },
   'expense-categories':      { title: 'فئات المصروفات',     path: 'نظام ← فئات المصروفات'  },
   'admin/companies':         { title: 'إدارة الشركات',      path: 'Super Admin ← الشركات'  },
@@ -734,6 +737,7 @@ const meta = useTopbarTitle();
 
           {fiscalState === 'ready' && <Outlet />}
         </div>
+        <PrintQueuePanel />
       </main>
 
       {/* ════════ MOBILE NAV ════════ */}

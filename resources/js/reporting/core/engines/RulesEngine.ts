@@ -91,9 +91,9 @@ export class RulesEngine {
     };
   }
 
-  // ── Private ─────────────────────────────────────────────────────────────────
+  // ── Public (used by RulesEngineAdvanced) ────────────────────────────────────
 
-  private applyAction(result: RuleEvaluationResult, rule: ReportRule): void {
+  applyAction(result: RuleEvaluationResult, rule: ReportRule): void {
     switch (rule.action) {
       case 'show':
         result.visibility[rule.target] = true;

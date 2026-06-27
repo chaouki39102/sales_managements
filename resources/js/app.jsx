@@ -2,8 +2,10 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { registerOfflineInterceptor } from '@/lib/offline/offlineAwareApi';
+import { registerAdvancedFunctions } from '@/reporting';
 
 registerOfflineInterceptor();
+registerAdvancedFunctions();
 
 const container = document.getElementById('app');
 if (container) {

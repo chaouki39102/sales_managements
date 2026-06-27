@@ -3,6 +3,15 @@
 ## Date
 2026-06-27
 
+## Session Notes (Post-Phase-6)
+- Restored 7 `print-settings/sections/` files deleted in commit `88d2075` from parent commit `3a771af`
+- Rewrote ~130 snake_case property access mismatches in restored section files to match the canonical `PrintTemplate` type
+- Integrated section components into `PrintSettingsPage.tsx` — `HeaderSectionControls`, `DocumentSectionControls`, `ItemsSectionControls`, `TotalsSectionControls`, `FooterSectionControls`, `FormattingSectionControls` replace inline accordion blocks; extra fields not covered by sections appended inline after each component
+- Fixed 3 legacy preview files' `emptyDocumentData()` type bugs — A4Preview/A5Preview/ReceiptPreview used `emptyDocumentData()` (returns `UniversalDocumentData`) where their internal types (`A4Data`, `A5Data`, `PreviewTotals`) were expected; replaced with proper empty typed objects
+- Wired legacy previews into `PreviewSelector.tsx` via optional `useLegacy` prop — routes to `A4Preview`/`A5Preview`/`ReceiptPreview` based on `tpl.paper_size`; defaults to `UniversalPreview` when `false`
+- Added "كلاسيكي"/"حديث" toggle button in `PrintSettingsPage` preview toolbar that sets `useLegacyPreview` state, passed to both `PreviewSelector` usages (inline + test-print window)
+- Remaining dead code: `RulesEngineAdvanced.ts` — uses private `rulesEngine['applyAction']()` bracket notation, nested/else rules not wired
+
 ---
 
 ## Goal
@@ -11,7 +20,7 @@ Build the ERP Report Designer Framework incrementally: Phase 0 (Foundation) → 
 ---
 
 ## Build / Test / Lint
-- **Build**: `npm run build` — uses Vite + Rolldown. Must pass cleanly (currently ~985 modules, ~1.2s).
+- **Build**: `npm run build` — uses Vite + Rolldown. Must pass cleanly (currently ~1014 modules, ~2.5s).
 - **Lint**: `npm run lint` — ESLint (config missing in project, not our fault).
 - **Laravel**: `php artisan` commands in the project root.
 
@@ -82,7 +91,8 @@ resources/js/reporting/
 - **Phase 3 (Rules & Conditions)**: Added `rules: ReportRule[]` and `show_*_section` visibility booleans to `PrintTemplate`. Created `RulesSection` component (condition builder with FormulaEditor integration, action/target/priority selectors, highlight style editor, section visibility toggles). Added rules accordion to PrintSettingsPage template controls + QuickNav. Integrated `RulesEngine.evaluate()` into `UniversalPreview` — sections respect rule-based visibility and apply highlight styles. Build: clean.
 - **Phase 4 (Commercial Document Integration)**: Wired `TemplatePrintModal` into `CommercialDocumentModal`. Added template selector dropdown + "طباعة بالقوالب" button in `DocumentFooter` (visible only in edit mode). Integrated `usePrintTemplates(docCode)` for doc-type-specific template loading. `DocumentDataBuilder.fromApiDocument()` builds `UniversalDocumentData` from the existing document API data. Build: clean.
 - **Phase 5 (Rich Report Templates)**: Added `ReportSummary` type to `UniversalDocumentData` with aggregated session data (payment breakdown, top products, KPIs). Extended `PrintTemplate` with report fields (show_charts, chart_type, group_by, sort_by, show_report_header/footer, period, cashier, summary cards, payment breakdown, top products toggles). Created `ChartSection` component using recharts (BarChart + PieChart). Added `renderReport()` to `UniversalPreview` — KPI cards grid, charts, top products table, report header/footer. Added report controls accordion to `PrintSettingsPage` (chart type, toggles, header/footer text, grouping/sorting controls). Added `DocumentDataBuilder.fromSessionReport()` for building report data from POS session API. Wired session report print button into SessionStatsModal. Build: clean.
-- **Phase 6 (Advanced Features)**: CSV/Excel export via CsvRenderer + ExcelRenderer (SpreadsheetML, no deps), `useExportDocument` hook. Batch printing via BatchPrintModal + DataTable selectable/bulkActions. PrintJobQueue singleton with `usePrintJobQueue` hook + PrintQueuePanel UI. UI polish: TinyBtn loading states, delete modal (replaced confirm()), report accordion conditional rendering, empty state icons, TemplatePrintModal uses CSS vars, FormulaEditor Tabler icon, ErrorBoundary around preview. Build: 985 modules, 0 errors.
+- **Phase 6 (Advanced Features)**: CSV/Excel export via CsvRenderer + ExcelRenderer (SpreadsheetML, no deps), `useExportDocument` hook. Batch printing via BatchPrintModal + DataTable selectable/bulkActions. PrintJobQueue singleton with `usePrintJobQueue` hook + PrintQueuePanel UI. UI polish: TinyBtn loading states, delete modal (replaced confirm()), report accordion conditional rendering, empty state icons, TemplatePrintModal uses CSS vars, FormulaEditor Tabler icon, ErrorBoundary around preview. Build: ~985 modules, 0 errors.
+- **Phase 6.5 (Section Integration + Legacy Wiring)**: Restored 7 deleted section files from git history with fixed snake_case property access. Integrated section components into `PrintSettingsPage`, replacing inline accordion blocks. Wired 3 legacy previews (`A4Preview`, `A5Preview`, `ReceiptPreview`) into `PreviewSelector` via `useLegacy` prop with modern/legacy toggle in preview toolbar. Fixed 3 `emptyDocumentData()` type bugs in legacy previews. Build: 1014 modules, 0 errors.
 
 ---
 
@@ -101,7 +111,7 @@ resources/js/reporting/
 - **UniversalDocumentData** is single source of truth; ReceiptLiveData stays unchanged in old types.ts, bridged via fromLegacyLiveData().
 - **Phase 0 purely additive** — no existing production files changed except the dual-save bugfix and MOCK removal.
 - **FormulaEngine uses custom parser** — tokenize → recursive descent → binary ops, member access, function calls, wildcard aggregation.
-- **PreviewSelector acts as conversion boundary** — accepts legacy snake_case, converts to UniversalDocumentData, passes to UniversalPreview.
+- **PreviewSelector acts as conversion boundary** — accepts legacy snake_case, converts to UniversalDocumentData, passes to UniversalPreview. Also accepts optional `useLegacy` prop to route directly to A4/A5/Receipt legacy previews without conversion.
 - **UniversalPreview handles all paper sizes** — switches between thermal flexbox (58/80mm) and HTML table layout (A4/A5).
 - **FormulaEngine singleton** clears cache on template changes.
 - **LayoutEngine uses auto-height defaults**: text=5mm, table=20mm, image=20mm, barcode=15mm, qr=15mm, line=1mm, spacer=5mm.
@@ -126,8 +136,15 @@ resources/js/reporting/
 - `resources/js/reporting/components/shared/FormulaEditor.tsx`: formula editor with field picker
 - `resources/js/reporting/components/shared/TemplatePrintModal.tsx`: template-based print
 - `resources/js/reporting/components/shared/RulesSection.tsx`: condition builder with rules UI
-- `resources/js/pages/settings/print-settings/components/PreviewSelector.tsx`: delegates to UniversalPreview
-- `resources/js/pages/settings/PrintSettingsPage.tsx`: dual-save fix applied
-- `resources/js/pages/settings/print-settings/A4Preview.tsx`, `A5Preview.tsx`, `components/ReceiptPreview.tsx`: MOCK data removed
+- `resources/js/pages/settings/print-settings/components/PreviewSelector.tsx`: delegates to UniversalPreview or legacy A4/A5/Receipt previews via `useLegacy` prop
+- `resources/js/pages/settings/PrintSettingsPage.tsx`: section-integrated template controls; modern/legacy preview toggle
+- `resources/js/pages/settings/print-settings/sections/ToggleSwitch.tsx`: restored — base accordion/toggle primitives
+- `resources/js/pages/settings/print-settings/sections/HeaderSection.tsx`: restored — logo, company, info visibility controls
+- `resources/js/pages/settings/print-settings/sections/DocumentSection.tsx`: restored — title, doc fields, client, separator
+- `resources/js/pages/settings/print-settings/sections/ItemsSection.tsx`: restored — column manager, table formatting
+- `resources/js/pages/settings/print-settings/sections/TotalsSection.tsx`: restored — totals visibility, TTC, payments
+- `resources/js/pages/settings/print-settings/sections/FooterSection.tsx`: restored — footer lines, barcode, signatures
+- `resources/js/pages/settings/print-settings/sections/FormattingSection.tsx`: restored — margins, spacing, fonts
+- `resources/js/pages/settings/print-settings/A4Preview.tsx`, `A5Preview.tsx`, `components/ReceiptPreview.tsx`: wired via `PreviewSelector.useLegacy`; type bugs fixed
 - `resources/js/pages/documents/CommercialDocumentModal/`: target for Phase 4 wiring
 - `resources/css/theme/print-settings.css`: print settings page styles

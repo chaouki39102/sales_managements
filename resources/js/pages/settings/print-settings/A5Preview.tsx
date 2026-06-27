@@ -1,5 +1,4 @@
 import React from 'react';
-import { emptyDocumentData } from '@/reporting';
 import type { PrintTemplate, ColumnKey, CompanyData, ReceiptLiveData, AlignOption, BorderStyle } from './types';
 
 interface A5Data {
@@ -16,13 +15,19 @@ interface A5Data {
 }
 
 function buildData(tpl: PrintTemplate, liveData?: ReceiptLiveData | null): A5Data {
-  if (!liveData) return emptyDocumentData();
+  if (!liveData) return {
+    number: '', date: '', time: '', cashier: '', client: '',
+    clientNif: '', clientPhone: '', items: [], tvaByRate: [],
+    totalHt: 0, totalTva: 0, totalDiscount: 0, fiscalStamp: 0,
+    totalTtc: 0, paid: 0, change: 0, remaining: 0,
+    prevBalance: 0, newBalance: 0, payments: [],
+  };
   const buildTvaByRate = (items: ReceiptLiveData['items'] = []) => {
     const map = new Map<number, { base: number; amount: number }>();
     for (const item of items) {
-      const rate = Math.round((item.tva_rate ?? 0) * 100);
+      const rate = Math.round(item.tva_rate ?? 0);
       const base = item.total_ht ?? 0;
-      const tva  = base * (item.tva_rate ?? 0);
+      const tva  = base * (item.tva_rate ?? 0) / 100;
       const prev = map.get(rate) ?? { base: 0, amount: 0 };
       map.set(rate, { base: prev.base + base, amount: prev.amount + tva });
     }
@@ -39,7 +44,7 @@ function buildData(tpl: PrintTemplate, liveData?: ReceiptLiveData | null): A5Dat
     items: (liveData.items ?? []).map((item, i) => ({
       ref: item.ref ?? 'P' + (i + 1), name: item.name, qty: item.qty,
       price: item.unit_price_ht, total: item.total_ht,
-      tva: Math.round((item.tva_rate ?? 0) * 100),
+      tva: Math.round(item.tva_rate ?? 0),
       discount: item.discount_percentage ?? 0, unit: item.unit ?? '',
     })),
     tvaByRate: buildTvaByRate(liveData.items),

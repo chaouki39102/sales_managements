@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import { CommandHistory, type Command } from '../../core/history/CommandHistory';
 import type { ComponentStyle } from '../../core/theme/StyleSystem';
 
@@ -574,7 +575,7 @@ export const useDesignerStore = create<DesignerStore>((set, get) => ({
 // ─── Selectors ───────────────────────────────────────────────────────────────
 
 export function useSelectedElements() {
-  return useDesignerStore(s => s.selectedIds.map(id => s.elements[id]).filter(Boolean));
+  return useDesignerStore(useShallow(s => s.selectedIds.map(id => s.elements[id]).filter(Boolean)));
 }
 
 export function useElementAtPosition(x: number, y: number) {

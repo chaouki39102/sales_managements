@@ -64,11 +64,8 @@ EXCLUDE=(
 
   # pos
 merge_section "📘 pos" \
-  \( -path "*/pages/pos/*" \) "${EXCLUDE[@]}"
-
-  # pos
-merge_section "📘 pos" \
-  \( -path "*/pos/*" \) "${EXCLUDE[@]}"
+  \( -path "*/pages/settings/print-settings/*" \) "${EXCLUDE[@]}"
+  
 
 echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"
 echo "==================================================== */" >> "$OUTPUT"

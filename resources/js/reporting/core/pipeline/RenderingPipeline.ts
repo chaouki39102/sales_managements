@@ -1,11 +1,12 @@
-import type { PrintTemplate } from '../domain/PrintTemplate';
+﻿import type { PrintTemplate } from '../domain/PrintTemplate';
 import type { UniversalDocumentData } from '../../data/UniversalDocumentData';
 import { compileReport, type CompiledReport } from '../compiler/ReportCompiler';
 import { formulaEngine } from '../engines/FormulaEngine';
 import { rulesEngine } from '../engines/RulesEngine';
 import { layoutEngine } from '../engines/LayoutEngine';
+import type { EvaluationContext } from '../engines/FormulaEngine';
 
-// ─── Pipeline Stages ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Pipeline Stages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type PipelineStage = 'validate' | 'compile' | 'optimize' | 'layout' | 'paginate' | 'render';
 
@@ -32,7 +33,7 @@ export interface PipelineContext {
   };
 }
 
-// ─── Pipeline ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class RenderingPipelineService {
   private _metrics: PipelineMetrics[] = [];
@@ -93,13 +94,16 @@ class RenderingPipelineService {
 
   private _optimize(report: CompiledReport, ctx: PipelineContext): CompiledReport {
     const withExpressions = { ...report };
-    withExpressions.rules = rulesEngine.evaluateAll(ctx.template, ctx.data);
+    const evalContext: EvaluationContext = { data: ctx.data, computed: {} };
+    withExpressions.rules = [rulesEngine.evaluate(ctx.template.rules ?? [], evalContext, formulaEngine)] as unknown as unknown[];
     return withExpressions;
   }
 
   private _layout(report: CompiledReport, ctx: PipelineContext): CompiledReport {
-    const layout = layoutEngine.compute(ctx.template, ctx.data);
-    return { ...report, layout: layout as any };
+    // TODO: Convert PrintTemplate sections to LayoutElement[] for proper layout computation
+    // layoutEngine.compute expects (elements: LayoutElement[], paperWidth: number, startY?: number, maxHeight?: number)
+    // For now, skip layout computation since template-to-elements conversion is not implemented
+    return { ...report, layout: null as any };
   }
 
   private _paginate(report: CompiledReport, _ctx: PipelineContext): CompiledReport {

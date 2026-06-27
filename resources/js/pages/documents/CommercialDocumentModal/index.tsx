@@ -7,10 +7,8 @@ import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type { DocumentType } from '@/lib/api/core/types';
-import TemplatePrintModal from '@/reporting/components/shared/TemplatePrintModal';
-import { DocumentDataBuilder } from '@/reporting/data/DocumentDataBuilder';
-import type { CompanyInfo } from '@/reporting/data/UniversalDocumentData';
-import type { PrintTemplate } from '@/reporting/core/domain/PrintTemplate';
+import { TemplatePrintModal, DocumentDataBuilder } from '@/reporting';
+import type { CompanyInfo, PrintTemplate } from '@/reporting';
 import { usePrintTemplates } from '../../settings/print-settings/api/printTemplatesApi';
 
 import { useDocumentLookups }  from '../hooks/useDocumentLookups';

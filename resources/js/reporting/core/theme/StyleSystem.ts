@@ -1,7 +1,7 @@
-import type { PrintTemplate } from '../domain/PrintTemplate';
+﻿import type { PrintTemplate } from '../domain/PrintTemplate';
 import { themeSystem, type ReportTheme } from './ThemeSystem';
 
-// ─── Style Layers ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Style Layers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type StyleLayer = 'global' | 'section' | 'component' | 'local';
 
@@ -96,7 +96,7 @@ export interface StylePreset {
   sections?: Record<string, ComponentStyle>;
 }
 
-// ─── StyleSystem ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ StyleSystem â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class StyleSystemService {
   private _presets = new Map<string, StylePreset>();
@@ -107,7 +107,7 @@ class StyleSystemService {
     this._registerDefaultPresets();
   }
 
-  // ── Preset Management ──
+  // â”€â”€ Preset Management â”€â”€
 
   registerPreset(preset: StylePreset): void {
     this._presets.set(preset.id, preset);
@@ -135,7 +135,7 @@ class StyleSystemService {
     return this._currentThemePreset;
   }
 
-  // ── Theme Mode ──
+  // â”€â”€ Theme Mode â”€â”€
 
   get themeMode(): 'light' | 'dark' {
     return this._themeMode;
@@ -150,7 +150,7 @@ class StyleSystemService {
     this.setThemeMode(this._themeMode === 'light' ? 'dark' : 'light');
   }
 
-  // ── Style Resolution ──
+  // â”€â”€ Style Resolution â”€â”€
 
   resolveStyle(
     componentStyles: ComponentStyle,
@@ -191,7 +191,7 @@ class StyleSystemService {
 
   cssVariables(template?: PrintTemplate): Record<string, string> {
     const preset = this._presets.get(this._currentThemePreset);
-    const theme = preset ? themeSystem.getTheme(preset.theme) : themeSystem.getTheme('default-light');
+    const theme = preset ? themeSystem.get(preset.theme) : themeSystem.get('default-light');
     if (!theme) return {};
 
     const vars: Record<string, string> = {};
@@ -221,7 +221,7 @@ class StyleSystemService {
     return vars;
   }
 
-  // ── Private ──
+  // â”€â”€ Private â”€â”€
 
   private _registerDefaultPresets(): void {
     this.registerPreset({

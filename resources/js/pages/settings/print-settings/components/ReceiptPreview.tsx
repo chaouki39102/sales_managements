@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import type { PrintTemplate, ColumnKey, CompanyData, TemplateLiveData, BorderStyle, AlignOption } from '../types';
-import { emptyDocumentData } from '@/reporting';
 
 const mm = (v: number) => v * 3.78;
 
@@ -77,8 +76,12 @@ export default function ReceiptPreview({ tpl, company, live }: Props) {
       paid:         live.totals.paid ?? 0,
       change:       live.totals.change ?? 0,
       remaining:    live.totals.remaining ?? 0,
-      tvaByRate:    [],
-    } : { ...emptyDocumentData().totals, prevBalance: 0, newBalance: 0, tvaByRate: [] },
+      tvaByRate: [],
+    } : {
+      totalHt: 0, totalTva: 0, totalDiscount: 0, fiscalStamp: 0,
+      totalTtc: 0, paid: 0, change: 0, remaining: 0,
+      prevBalance: 0, newBalance: 0, tvaByRate: [],
+    },
     prevBalance: live?.prevBalance ?? 0,
     newBalance:  live?.newBalance  ?? 0,
   }), [live]);

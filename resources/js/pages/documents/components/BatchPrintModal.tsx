@@ -2,9 +2,8 @@ import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { usePrintTemplates } from '../../settings/print-settings/api/printTemplatesApi';
-import { DocumentDataBuilder } from '@/reporting/data/DocumentDataBuilder';
-import type { CompanyInfo } from '@/reporting/data/UniversalDocumentData';
-import type { PrintTemplate } from '@/reporting/core/domain/PrintTemplate';
+import { DocumentDataBuilder } from '@/reporting';
+import type { CompanyInfo, PrintTemplate } from '@/reporting';
 import type { CommercialDocument } from '@/lib/api/core/types';
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
