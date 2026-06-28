@@ -192,7 +192,13 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name:       'pos-cart',
-      partialize: () => ({}),
+      partialize: (state) => ({
+        items:              state.items,
+        client:             state.client,
+        notes:              state.notes,
+        invoiceDiscountPct: state.invoiceDiscountPct,
+        _isDirty:           true,
+      }),
     },
   ),
 );

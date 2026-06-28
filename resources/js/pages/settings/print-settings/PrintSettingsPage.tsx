@@ -24,8 +24,8 @@ import { useActiveCompany, useActiveSlug } from '@/lib/store/appStore';
 import { apiGet } from '@/lib/api/core/client';
 import {
   usePrintTemplates, usePrintTemplateMutations,
-} from './print-settings/api/printTemplatesApi';
-import PreviewSelector from './print-settings/components/PreviewSelector';
+} from './api/printTemplatesApi';
+import PreviewSelector from './components/PreviewSelector';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { dbSaveTemplate } from '@/pos/store/printStore';
 import {
@@ -33,18 +33,18 @@ import {
   type PrintTemplate, type DocTypeCode, type ColumnKey,
   type AlignOption, type BorderStyle, type FontFamily,
   type CompanyData,
-} from './print-settings/types';
-import { Section } from './print-settings/sections/ToggleSwitch';
+} from './types';
+import { Section } from './sections/ToggleSwitch';
 import { DocumentDataBuilder } from '@/reporting';
 import type { UniversalDocumentData } from '@/reporting';
 import type { CommercialDocument } from '@/lib/api/core/types';
 import { RulesSection, TemplateLibraryModal } from '@/reporting';
-import HeaderSectionControls from './print-settings/sections/HeaderSection';
-import DocumentSectionControls from './print-settings/sections/DocumentSection';
-import ItemsSectionControls from './print-settings/sections/ItemsSection';
-import TotalsSectionControls from './print-settings/sections/TotalsSection';
-import FooterSectionControls from './print-settings/sections/FooterSection';
-import FormattingSectionControls from './print-settings/sections/FormattingSection';
+import HeaderSectionControls from './sections/HeaderSection';
+import DocumentSectionControls from './sections/DocumentSection';
+import ItemsSectionControls from './sections/ItemsSection';
+import TotalsSectionControls from './sections/TotalsSection';
+import FooterSectionControls from './sections/FooterSection';
+import FormattingSectionControls from './sections/FormattingSection';
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  UI PRIMITIVES — مكونات بسيطة بلا إعادة render غير ضرورية
@@ -126,12 +126,12 @@ const styledInput: React.CSSProperties = {
 };
 
 function Input({ value, onChange, placeholder, onEnter }: {
-  value: string; onChange: (v: string) => void;
+  value: string | null; onChange: (v: string) => void;
   placeholder?: string; onEnter?: () => void;
 }) {
   return (
     <input
-      value={value} onChange={e => onChange(e.target.value)}
+      value={value ?? ''} onChange={e => onChange(e.target.value)}
       placeholder={placeholder} style={styledInput}
       onKeyDown={e => { if (e.key === 'Enter') onEnter?.(); }}
       onFocus={e => { e.currentTarget.style.borderColor = 'var(--em)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--emb)'; }}
@@ -1325,6 +1325,25 @@ export default function PrintSettingsPage() {
                 }}
               >
                 <i className="ti ti-printer" /> طباعة تجريبية
+              </button>
+            )}
+            {localTpl && (
+              <button onClick={handleSave} disabled={!isDirty || isSaving} type="button"
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 11px', fontSize: 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  background: isDirty ? 'var(--em)' : 'var(--bg5)',
+                  color: isDirty ? '#fff' : 'var(--t4)',
+                  border: 'none',
+                  cursor: isDirty && !isSaving ? 'pointer' : 'not-allowed',
+                  fontWeight: 700,
+                }}
+              >
+                {isSaving
+                  ? <><i className="ti ti-loader-2 spin" /> جارٍ الحفظ...</>
+                  : <><i className="ti ti-device-floppy" /> حفظ</>
+                }
               </button>
             )}
           </div>

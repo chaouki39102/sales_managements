@@ -739,14 +739,12 @@ export default function POSPage() {
           // fallback إلى طباعة المتصفح
           await printReceiptDirect({
             html, paperWidth, copies,
-            printerName: selectedPrinter?.name,
             onError: (e) => toast.error(`خطأ في طباعة المتصفح: ${e.message}`),
           });
         }
       } else {
         await printReceiptDirect({
           html, paperWidth, copies,
-          printerName: selectedPrinter?.name,
           onDone:  () => toast.success('✅ تم إرسال الطباعة'),
           onError: (e) => toast.error(`خطأ في الطباعة: ${e.message}`),
         });

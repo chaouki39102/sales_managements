@@ -10,7 +10,7 @@ class TemplateLibraryService
      */
     private static array $templates = [
         'dz-invoice-a4' => [
-            'name'          => 'الفاتورة الجزائرية A4',
+            'name'          => 'فاتورة بيع A4',
             'doc_type_code' => 'FV',
             'paper_size'    => 'A4',
             'is_default'    => false,
@@ -26,6 +26,8 @@ class TemplateLibraryService
                 'font_family'          => 'tajawal',
 
                 'show_logo'            => true,
+                'logo_source'          => 'company',
+                'custom_logo_url'      => null,
                 'logo_size'            => 75,
                 'logo_align'           => 'left',
                 'logo_border_radius'   => 0,
@@ -184,6 +186,8 @@ class TemplateLibraryService
                 'font_family'          => 'tajawal',
 
                 'show_logo'            => true,
+                'logo_source'          => 'company',
+                'custom_logo_url'      => null,
                 'logo_size'            => 75,
                 'logo_align'           => 'left',
                 'logo_border_radius'   => 0,
@@ -342,7 +346,9 @@ class TemplateLibraryService
                 'font_family'          => 'tajawal',
 
                 'show_logo'            => true,
-                'logo_size'            => 55,
+                'logo_source'          => 'company',
+                'custom_logo_url'      => null,
+                'logo_size'            => 75,
                 'logo_align'           => 'left',
                 'logo_border_radius'   => 0,
 

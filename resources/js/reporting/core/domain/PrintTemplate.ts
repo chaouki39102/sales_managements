@@ -80,9 +80,11 @@ export interface PrintTemplate {
 
   // ── Logo ─────────────────────────────────────────────────────────────────
   show_logo:          boolean;
+  logo_source:        'default' | 'company' | 'custom';
   logo_size:          number;
   logo_align:         AlignOption;
   logo_border_radius: number;
+  custom_logo_url:    string | null;
 
   // ── Company header ────────────────────────────────────────────────────────
   show_company_name:   boolean;
@@ -282,9 +284,11 @@ export function createDefaultTemplate(
     font_family:      'tajawal',
 
     show_logo:          true,
+    logo_source:        'company',
     logo_size:          56,
     logo_align:         'center',
     logo_border_radius: 50,
+    custom_logo_url:    null,
 
     show_company_name:   true,
     company_name_text:   '',

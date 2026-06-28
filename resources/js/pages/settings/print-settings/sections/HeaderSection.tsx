@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import type { ReceiptTemplate80mm, AlignOption, CompanyPreviewData } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
+import { printTemplatesApi } from '../api/printTemplatesApi';
+import ImagePreviewModal from '../components/ImagePreviewModal';
 
 interface Props {
   tpl: ReceiptTemplate80mm;
@@ -9,17 +11,90 @@ interface Props {
 }
 
 export default function HeaderSectionControls({ tpl, update, company }: Props) {
+  const [uploading, setUploading] = useState(false);
+  const [zoomImg, setZoomImg] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const logoPreviewUrl = tpl.logo_source === 'custom' ? tpl.custom_logo_url
+    : tpl.logo_source === 'company' ? (company?.logoUrl ?? null)
+    : null;
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await printTemplatesApi.uploadLogo(file);
+      update('custom_logo_url', res.url);
+      update('logo_source', 'custom');
+    } catch {
+      // toast handled by apiUpload interceptor
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
   return (
     <>
       <Toggle value={tpl.show_logo} onChange={v => update('show_logo', v)} label="إظهار الشعار" />
       {tpl.show_logo && (
         <>
+          <div className="ps-field">
+            <label className="ps-field-label">مصدر الشعار</label>
+            <div className="ps-paper-pills" style={{ marginTop: 2 }}>
+              {(['default', 'company', 'custom'] as const).map(s => (
+                <button key={s} className={`ps-paper-pill ${tpl.logo_source === s ? 'on' : ''}`}
+                  onClick={() => update('logo_source', s)}>
+                  {s === 'default' ? 'افتراضي' : s === 'company' ? 'شعار الشركة' : 'شعار مخصص'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="ps-field">
+            <label className="ps-field-label">معاينة الشعار</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 36 }}>
+              {logoPreviewUrl ? (
+                <img src={logoPreviewUrl} alt="logo preview"
+                  onClick={() => setZoomImg(logoPreviewUrl)}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 6, cursor: 'zoom-in', border: '1px solid var(--b2)' }} />
+              ) : (
+                <span style={{ fontSize: 11, color: 'var(--t4)' }}>
+                  {tpl.logo_source === 'default' ? 'سيتم استخدام الحرف الأول من اسم المؤسسة' : 'لا يوجد شعار'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {tpl.logo_source === 'custom' && (
+            <div className="ps-field">
+              <label className="ps-field-label">رفع شعار مخصص</label>
+              <input ref={fileRef} type="file" accept="image/*" hidden
+                onChange={handleLogoUpload} />
+              <button onClick={() => fileRef.current?.click()} type="button"
+                disabled={uploading}
+                style={{
+                  padding: '5px 10px', borderRadius: 'var(--r1)', fontSize: 11,
+                  border: '1px solid var(--b2)', background: 'var(--bg3)',
+                  color: 'var(--t2)', cursor: uploading ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                <i className={`ti ${uploading ? 'ti-loader-2 spin' : 'ti-upload'}`} />
+                {uploading ? 'رفع...' : 'اختيار صورة'}
+              </button>
+            </div>
+          )}
+
           <SliderField label="حجم الشعار" value={tpl.logo_size} min={30} max={120} unit="px"
             onChange={v => update('logo_size', v)} />
           <AlignButtons label="محاذاة الشعار" value={tpl.logo_align}
             onChange={v => update('logo_align', v)} />
         </>
       )}
+
+      <ImagePreviewModal open={!!zoomImg} src={zoomImg ?? ''} onClose={() => setZoomImg(null)} />
 
       <Toggle value={tpl.show_company_name} onChange={v => update('show_company_name', v)} label="اسم المؤسسة" />
       {tpl.show_company_name && (

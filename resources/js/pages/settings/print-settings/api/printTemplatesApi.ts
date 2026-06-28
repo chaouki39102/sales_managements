@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api/core/client';
+import { apiGet, apiPost, apiPut, apiDelete, apiUpload } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { PrintTemplate, PrintTemplateApiResponse, DocTypeCode } from '../types';
 import type { LibraryApiResponse } from '@/reporting';
@@ -77,6 +77,12 @@ export const printTemplatesApi = {
   installLibrary: (templateId: string) =>
     apiPost<PrintTemplateApiResponse>('/print-templates/library/install', { template_id: templateId })
       .then(fromApiResponse),
+
+  uploadLogo: (file: File, onProgress?: (p: number) => void) => {
+    const fd = new FormData();
+    fd.append('logo', file);
+    return apiUpload<{ path: string; url: string }>('/print-templates/upload-logo', fd, onProgress);
+  },
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

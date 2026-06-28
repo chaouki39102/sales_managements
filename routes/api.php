@@ -130,6 +130,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
         Route::get('/current', [CompanyController::class, 'current']);
         Route::post('/switch', [CompanyController::class, 'switch']);
+        Route::post('/{company}/avatar', [CompanyController::class, 'uploadAvatar']);
 
         Route::get('/',  [CompanyController::class, 'index']);
         Route::post('/', [CompanyController::class, 'store']);
@@ -583,6 +584,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('print-templates/{id}',            [PrintTemplateController::class, 'destroy']);
             Route::post('print-templates/{id}/set-default',  [PrintTemplateController::class, 'setDefault']);
             Route::post('print-templates/{id}/duplicate',    [PrintTemplateController::class, 'duplicate']);
+            Route::post('print-templates/upload-logo',       [PrintTemplateController::class, 'uploadLogo']);
             // مكتبة القوالب الجاهزة
             Route::get('print-templates/library',            [PrintTemplateController::class, 'library']);
             Route::post('print-templates/library/install',   [PrintTemplateController::class, 'installLibrary']);

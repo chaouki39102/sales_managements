@@ -7,6 +7,7 @@ use App\Models\PrintTemplate;
 use App\Services\TemplateLibraryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class PrintTemplateController extends BaseApiController
@@ -33,7 +34,7 @@ class PrintTemplateController extends BaseApiController
         }
     }
 
-    public function show($id): JsonResponse
+    public function show($company, $id): JsonResponse
     {
         try {
             $template = PrintTemplate::findOrFail($id);
@@ -66,7 +67,7 @@ class PrintTemplateController extends BaseApiController
         }
     }
 
-    public function update(Request $request, $id): JsonResponse
+    public function update(Request $request, $company, $id): JsonResponse
     {
         try {
             $template = PrintTemplate::findOrFail($id);
@@ -91,7 +92,7 @@ class PrintTemplateController extends BaseApiController
         }
     }
 
-    public function destroy($id): JsonResponse
+    public function destroy($company, $id): JsonResponse
     {
         try {
             $template = PrintTemplate::findOrFail($id);
@@ -102,7 +103,7 @@ class PrintTemplateController extends BaseApiController
         }
     }
 
-    public function setDefault(int $id): JsonResponse
+    public function setDefault($company, int $id): JsonResponse
     {
         try {
             $template = PrintTemplate::findOrFail($id);
@@ -114,7 +115,7 @@ class PrintTemplateController extends BaseApiController
         }
     }
 
-    public function duplicate(Request $request, int $id): JsonResponse
+    public function duplicate(Request $request, $company, int $id): JsonResponse
     {
         try {
             $original = PrintTemplate::findOrFail($id);
@@ -128,6 +129,26 @@ class PrintTemplateController extends BaseApiController
             return $this->successResponse($duplicate, 'تم نسخ القالب', 201);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'duplicate');
+        }
+    }
+
+    public function uploadLogo(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'logo' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->errorResponse($validator->errors()->first(), 422);
+            }
+
+            $path = $request->file('logo')->store('print-logos', 'public');
+            $url  = Storage::disk('public')->url($path);
+
+            return $this->successResponse(['path' => $path, 'url' => $url], 'تم رفع الشعار');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'uploadLogo');
         }
     }
 

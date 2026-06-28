@@ -10,6 +10,7 @@ use App\Services\CompanyContextService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class CompanyController extends BaseApiController
@@ -490,6 +491,33 @@ class CompanyController extends BaseApiController
             return $this->successResponse(null, 'تم تفعيل العضو');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'activateMember');
+        }
+    }
+
+    public function uploadAvatar(Request $request, Company $company): JsonResponse
+    {
+        try {
+            $this->authorizeAction('update', $company);
+
+            $data = $request->validate([
+                'avatar' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            ]);
+
+            $file = $request->file('avatar');
+
+            if ($company->avatar) {
+                Storage::disk('public')->delete($company->avatar);
+            }
+
+            $path = $file->store('avatars', 'public');
+            $company->update(['avatar' => $path]);
+
+            return $this->successResponse(
+                new CompanyResource($company->fresh()),
+                'تم رفع الشعار'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'uploadAvatar');
         }
     }
 

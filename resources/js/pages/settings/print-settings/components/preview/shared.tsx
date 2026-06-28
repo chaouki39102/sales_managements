@@ -1,12 +1,12 @@
 import React from 'react';
-import type { DocumentLine } from '../../data/UniversalDocumentData';
+import type { DocumentLine } from '@/reporting';
 import type {
   PrintTemplate,
   ColumnKey,
   AlignOption,
   BorderStyle,
   FontFamily,
-} from '../../core/domain/PrintTemplate';
+} from '@/reporting';
 
 // ─── Styling helpers ────────────────────────────────────────────────────────────
 

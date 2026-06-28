@@ -50,7 +50,8 @@ import { useFiscalYear } from "@/context/FiscalYearContext";
 import { useAuth } from "@/context/AuthContext";
 import { useModal } from "@/hooks/useModal";
 import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
-import type { Company } from "@/lib/api/core/types";
+import type { Company, ActiveCompany } from "@/lib/api/core/types";
+import ImagePreviewModal from './print-settings/components/ImagePreviewModal';
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 const TABS = [
@@ -1805,11 +1806,11 @@ function CompanyTab({
 }
 
 function LogoUpload({ company }: { company?: any }) {
-    const qc = useQueryClient();
     const slug = useActiveSlug() ?? "";
     const inputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
+    const [zoomImg, setZoomImg] = useState<string | null>(null);
 
     useEffect(() => {
         if (company?.avatar) setPreview(company.avatar);
@@ -1822,8 +1823,15 @@ function LogoUpload({ company }: { company?: any }) {
         try {
             const fd = new FormData();
             fd.append("avatar", file);
-            await apiUpload(`/companies/${slug}/avatar`, fd);
-            qc.invalidateQueries({ queryKey: companyKeys.current });
+            const res: any = await apiUpload(`/companies/${slug}/avatar`, fd);
+            const newAvatar = res?.avatar ?? res?.avatar_url ?? null;
+            if (newAvatar) {
+                useAppStore.getState().setActiveCompany({
+                    ...useAppStore.getState().activeCompany,
+                    avatar: newAvatar,
+                } as ActiveCompany);
+                setPreview(newAvatar);
+            }
         } catch {
             setPreview(company?.avatar ?? null);
         } finally {
@@ -1861,11 +1869,13 @@ function LogoUpload({ company }: { company?: any }) {
                     <img
                         src={preview}
                         alt="logo"
+                        onClick={(e) => { e.stopPropagation(); setZoomImg(preview); }}
                         style={{
                             maxHeight: 70,
                             maxWidth: "100%",
                             objectFit: "contain",
                             marginBottom: 8,
+                            cursor: 'zoom-in',
                         }}
                     />
                 ) : (
@@ -1902,6 +1912,7 @@ function LogoUpload({ company }: { company?: any }) {
                     if (f) upload(f);
                 }}
             />
+            <ImagePreviewModal open={!!zoomImg} src={zoomImg ?? ''} onClose={() => setZoomImg(null)} />
         </Card>
     );
 }
