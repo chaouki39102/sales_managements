@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import type { PrintTemplate, SectionTarget, ReportRule } from '../../core/domain/PrintTemplate';
+import type { PrintTemplate, ReportRule } from '../../core/domain/PrintTemplate';
 import FormulaEditor from './FormulaEditor';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────

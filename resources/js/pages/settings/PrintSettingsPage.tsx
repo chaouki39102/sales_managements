@@ -38,7 +38,7 @@ import { Section } from './print-settings/sections/ToggleSwitch';
 import { DocumentDataBuilder } from '@/reporting';
 import type { UniversalDocumentData } from '@/reporting';
 import type { CommercialDocument } from '@/lib/api/core/types';
-import { RulesSection } from '@/reporting';
+import { RulesSection, TemplateLibraryModal } from '@/reporting';
 import HeaderSectionControls from './print-settings/sections/HeaderSection';
 import DocumentSectionControls from './print-settings/sections/DocumentSection';
 import ItemsSectionControls from './print-settings/sections/ItemsSection';
@@ -225,17 +225,18 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // ── Accordion ─────────────────────────────────────────────────────────────────
 
-function Accordion({ title, icon, id, children, defaultOpen = false }: {
+function Accordion({ title, icon, id, children, defaultOpen = false, collapseVersion }: {
   title: string; icon: string; id?: string;
-  children: React.ReactNode; defaultOpen?: boolean;
+  children: React.ReactNode; defaultOpen?: boolean; collapseVersion?: number;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => { setOpen(defaultOpen); }, [collapseVersion]);
   return (
     <div
       id={id}
       style={{
         marginBottom: 4, border: '1px solid var(--b2)',
-        borderRadius: 'var(--r2)', overflow: 'hidden',
+        borderRadius: 'var(--r2)', overflow: 'visible',
       }}
     >
       <button
@@ -245,6 +246,7 @@ function Accordion({ title, icon, id, children, defaultOpen = false }: {
           padding: '8px 11px', background: 'var(--bg3)',
           border: 'none', cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
           borderBottom: open ? '1px solid var(--b2)' : 'none',
+          position: 'sticky', top: 0, zIndex: 5,
         }}
       >
         <i className={`ti ${icon}`} style={{ color: 'var(--em)', fontSize: 13, flexShrink: 0 }} />
@@ -385,22 +387,26 @@ function TemplateControls({ tpl, update, companyData }: {
   tpl: PrintTemplate; update: Updater; companyData: CompanyData | null;
 }) {
   const [allCollapsed, setAllCollapsed] = useState(false);
+  const [collapseVersion, setCollapseVersion] = useState(0);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
 
       {/* زر طي/فتح الكل */}
-      <button onClick={() => setAllCollapsed(c => !c)}
+      <button onClick={() => {
+        setAllCollapsed(c => !c);
+        setCollapseVersion(v => v + 1);
+      }}
         style={{
           display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
           background: 'var(--bg3)', border: '1px solid var(--b2)', borderRadius: 'var(--r2)',
           cursor: 'pointer', fontSize: 12, color: 'var(--t2)', marginBottom: 4,
         }}>
-        <i className={`ti ${allCollapsed ? 'ti-arrows-vertical' : 'ti-arrows-vertical'}`} />
+        <i className="ti ti-arrows-vertical" />
         {allCollapsed ? 'فتح الكل' : 'طي الكل'}
       </button>
 
       {/* ── رأس الفاتورة (HeaderSection) ── */}
-      <Section id="s-header" title="رأس الفاتورة — الشعار والشركة" icon="ti-building-store" expanded={!allCollapsed}>
+      <Section id="s-header" title="رأس الفاتورة — الشعار والشركة" icon="ti-building-store" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
         <HeaderSectionControls tpl={tpl} update={update} company={companyData} />
         <div style={{ padding: '8px 11px', borderTop: '1px solid var(--b2)' }}>
           <Slider label="تدوير الزوايا" value={tpl.logo_border_radius} min={0} max={50} unit="%" onChange={v => update('logo_border_radius', v)} />
@@ -409,7 +415,7 @@ function TemplateControls({ tpl, update, companyData }: {
       </Section>
 
       {/* ── معلومات المستند (DocumentSection) ── */}
-      <Section id="s-doc" title="معلومات المستند" icon="ti-file-description" expanded={!allCollapsed}>
+      <Section id="s-doc" title="معلومات المستند" icon="ti-file-description" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
         <DocumentSectionControls tpl={tpl} update={update} />
         <div style={{ padding: '8px 11px' }}>
           <ColorField label="لون العنوان" value={tpl.title_color} onChange={v => update('title_color', v)} />
@@ -424,7 +430,7 @@ function TemplateControls({ tpl, update, companyData }: {
       </Section>
 
       {/* ── جدول المنتجات (ItemsSection) ── */}
-      <Section id="s-items" title="جدول المنتجات — الأعمدة والتنسيق" icon="ti-table" expanded={!allCollapsed}>
+      <Section id="s-items" title="جدول المنتجات — الأعمدة والتنسيق" icon="ti-table" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
         <ItemsSectionControls tpl={tpl} update={update} />
         <div style={{ padding: '8px 11px' }}>
           <ColorField label="لون نص الرأس" value={tpl.table_header_color} onChange={v => update('table_header_color', v)} />
@@ -436,7 +442,7 @@ function TemplateControls({ tpl, update, companyData }: {
       </Section>
 
       {/* ── الإجماليات (TotalsSection) ── */}
-      <Section id="s-totals" title="الإجماليات — الحسابات" icon="ti-cash" expanded={!allCollapsed}>
+      <Section id="s-totals" title="الإجماليات — الحسابات" icon="ti-cash" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
         <TotalsSectionControls tpl={tpl} update={update} />
         <div style={{ padding: '8px 11px' }}>
           <ColorField label="لون TTC" value={tpl.total_ttc_color} onChange={v => update('total_ttc_color', v)} />
@@ -448,7 +454,7 @@ function TemplateControls({ tpl, update, companyData }: {
       </Section>
 
       {/* ── التذييل (FooterSection) ── */}
-      <Section id="s-footer" title="التذييل — النصوص والتواقيع" icon="ti-file-text" expanded={!allCollapsed}>
+      <Section id="s-footer" title="التذييل — النصوص والتواقيع" icon="ti-file-text" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
         <FooterSectionControls tpl={tpl} update={update} />
         <div style={{ padding: '8px 11px' }}>
           <ColorField label="لون الشكر" value={tpl.thank_you_color} onChange={v => update('thank_you_color', v)} />
@@ -456,7 +462,7 @@ function TemplateControls({ tpl, update, companyData }: {
       </Section>
 
       {/* ── التنسيق (FormattingSection) ── */}
-      <Section id="s-format" title="تنسيق الطباعة — الهوامش والمسافات" icon="ti-settings" expanded={!allCollapsed}>
+      <Section id="s-format" title="تنسيق الطباعة — الهوامش والمسافات" icon="ti-settings" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
         <FormattingSectionControls tpl={tpl} update={update} />
         <div style={{ padding: '8px 11px' }}>
           <Field label="نوع الخط الأساسي">
@@ -478,12 +484,12 @@ function TemplateControls({ tpl, update, companyData }: {
       </Section>
 
       {/* ── القواعد والشروط ── */}
-      <Accordion id="s-rules" title="القواعد — الإظهار/الإخفاء الشرطي" icon="ti-adjustments">
+      <Accordion id="s-rules" title="القواعد — الإظهار/الإخفاء الشرطي" icon="ti-adjustments" collapseVersion={collapseVersion} defaultOpen={!allCollapsed}>
         <RulesSection tpl={tpl} update={update} />
       </Accordion>
 
       {/* ── التقرير (Phase 5) ── */}
-      <Accordion id="s-report" title="التقارير — الرسوم البيانية والتجميع" icon="ti-report-analytics">
+      <Accordion id="s-report" title="التقارير — الرسوم البيانية والتجميع" icon="ti-report-analytics" collapseVersion={collapseVersion} defaultOpen={!allCollapsed}>
         <Field label="نص رأس التقرير">
           <Input value={tpl.report_header_text} onChange={v => update('report_header_text', v)} />
         </Field>
@@ -659,7 +665,8 @@ export default function PrintSettingsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [deleteTarget,  setDeleteTarget]  = useState<number | null>(null);
   const [useRealData,       setUseRealData]       = useState(true);
-  const [useLegacyPreview,  setUseLegacyPreview]  = useState(false);
+  const [showLibrary,       setShowLibrary]       = useState(false);
+
 
   const historyRef    = useRef<PrintTemplate[]>([]);
   const historyPos    = useRef(-1);
@@ -674,7 +681,7 @@ export default function PrintSettingsPage() {
   const mutations = usePrintTemplateMutations();
 
   const slug = useActiveSlug();
-  const { data: previewDoc } = useQuery({
+  const { data: previewDoc, refetch, isFetching } = useQuery({
     queryKey: [slug, 'preview-latest-doc', activeDoc],
     queryFn: async () => {
       // Step 1: get the latest doc ID
@@ -697,6 +704,12 @@ export default function PrintSettingsPage() {
     enabled: !!slug && useRealData,
     staleTime: 60_000,
   });
+  // auto-refetch when user toggles Real Data back on
+  const prevUseRealData = useRef(useRealData);
+  useEffect(() => {
+    if (useRealData && !prevUseRealData.current) refetch();
+    prevUseRealData.current = useRealData;
+  }, [useRealData, refetch]);
   const previewData: UniversalDocumentData | null = useMemo(() => {
     if (!previewDoc || !companyData) return null;
     return DocumentDataBuilder.fromApiDocument(previewDoc, companyData as any);
@@ -848,10 +861,24 @@ export default function PrintSettingsPage() {
   }, [deleteTarget, mutations]);
 
   const handleNewTemplate = useCallback(() => {
-    setLocalTpl(createDefaultTemplate(activeDoc, '80mm', 'قالب جديد'));
-    setSelectedTplId(null);
-    setIsDirty(true);
-  }, [activeDoc]);
+    setShowLibrary(true);
+  }, []);
+
+  const handleInstallLibrary = useCallback(async (_templateId: string, tpl: PrintTemplate) => {
+    try {
+      const saved = await mutations.installLibrary.mutateAsync(_templateId);
+      setSelectedTplId(saved.id);
+      setLocalTpl({ ...saved });
+      setIsDirty(false);
+      setShowLibrary(false);
+      try {
+        await dbSaveTemplate(activeDoc, saved.paper_size, saved as any);
+      } catch { /* ignore legacy sync */ }
+      toast.success(`✅ تم تثبيت القالب "${saved.name}"`);
+    } catch (e: any) {
+      toast.error(e?.message ?? 'فشل تثبيت القالب');
+    }
+  }, [activeDoc, templates.length, mutations]);
 
   const handleExport = useCallback(() => {
     if (!localTpl) return;
@@ -885,29 +912,40 @@ export default function PrintSettingsPage() {
     input.click();
   }, [activeDoc, localTpl?.id]);
 
-  const handleTestPrint = useCallback(() => {
+  const handleTestPrint = useCallback(async () => {
     if (!localTpl) return;
     const mmW = PAPER_DIM[localTpl.paper_size]?.w ?? localTpl.paper_width_mm;
     const winW = Math.min(Math.round(mmW * 3.78) + 60, 900);
     const win  = window.open('', '_blank', `width=${winW},height=700`);
     if (!win) { window.print(); return; }
-    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"/>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"/>
-<style>body{margin:0;background:#fff;display:flex;justify-content:center;padding:10px}</style>
-</head><body><div id="r"></div>
-<script>
-  document.fonts.ready.then(() => {
-    setTimeout(() => { window.print(); setTimeout(() => window.close(), 500); }, 300);
-  });
-</script></body></html>`);
+    const printCss = `
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #fff; display: flex; justify-content: center; }
+      @media print { body { padding: 0; } @page { margin: 0; } }
+    `;
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head>
+      <meta charset="UTF-8"/>
+      <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+      <style>${printCss}</style>
+    </head><body><div id="r"></div></body></html>`);
     win.document.close();
-    import('react-dom/client').then(({ createRoot }) => {
-      const root = win.document.getElementById('r');
-      if (root) createRoot(root).render(
-        React.createElement(PreviewSelector, { tpl: localTpl, company: companyData, overrideData: useRealData ? previewData : null, useLegacy: useLegacyPreview }),
-      );
-    });
-  }, [localTpl, companyData]);
+    const { createRoot } = await import('react-dom/client');
+    const root = win.document.getElementById('r');
+    if (!root) return;
+    const reactRoot = createRoot(root);
+    reactRoot.render(
+      React.createElement(PreviewSelector, {
+        tpl: localTpl, company: companyData,
+        overrideData: useRealData ? previewData : null,
+      }),
+    );
+    await win.document.fonts.ready;
+    await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => setTimeout(r, 400));
+    win.focus();
+    win.print();
+    setTimeout(() => win.close(), 500);
+  }, [localTpl, companyData, previewData, useRealData]);
 
   // ── Keyboard ──────────────────────────────────────────────────────────────
   const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving });
@@ -1261,21 +1299,21 @@ export default function PrintSettingsPage() {
                 {useRealData ? 'بيانات حقيقية' : 'بيانات تجريبية'}
               </button>
             )}
-            {localTpl && (
+            {localTpl && useRealData && (
               <button
-                onClick={() => setUseLegacyPreview(v => !v)}
+                onClick={() => refetch()}
+                disabled={isFetching}
                 type="button"
-                title={useLegacyPreview ? 'عرض المعاينة الحديثة' : 'عرض المعاينة الكلاسيكية'}
+                title="تحديث البيانات من الخادم"
                 style={{
                   ...toolBtnStyle,
                   padding: '5px 8px', fontSize: 11,
-                  color: useLegacyPreview ? 'var(--em)' : 'var(--t3)',
-                  borderColor: useLegacyPreview ? 'var(--em)' : 'var(--b2)',
+                  opacity: isFetching ? 0.5 : 1,
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}
               >
-                <i className={`ti ${useLegacyPreview ? 'ti-adjustments-alt' : 'ti-adjustments-off'}`} />
-                {useLegacyPreview ? 'كلاسيكي' : 'حديث'}
+                <i className={`ti ${isFetching ? 'ti-loader-2 spin' : 'ti-refresh'}`} />
+                تحديث
               </button>
             )}
             {localTpl && (
@@ -1301,7 +1339,7 @@ export default function PrintSettingsPage() {
                 display: 'inline-block',
               }}>
                 <ErrorBoundary>
-                  <PreviewSelector tpl={deferredTpl} company={companyData} overrideData={useRealData ? previewData : null} useLegacy={useLegacyPreview} />
+                  <PreviewSelector tpl={deferredTpl} company={companyData} overrideData={useRealData ? previewData : null} />
                 </ErrorBoundary>
               </div>
             ) : (
@@ -1314,6 +1352,14 @@ export default function PrintSettingsPage() {
         </div>
       </div>
     </div>
+
+      {/* ── Template Library Modal ── */}
+      <TemplateLibraryModal
+        open={showLibrary}
+        onClose={() => setShowLibrary(false)}
+        onInstall={handleInstallLibrary}
+        activeDoc={activeDoc}
+      />
 
       {/* ── Delete confirmation modal ── */}
       {deleteTarget !== null && (

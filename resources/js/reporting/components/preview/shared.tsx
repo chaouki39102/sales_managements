@@ -1,10 +1,5 @@
 import React from 'react';
-import type {
-  UniversalDocumentData,
-  DocumentLine,
-  DocumentTotals,
-  Payment,
-} from '../../data/UniversalDocumentData';
+import type { DocumentLine } from '../../data/UniversalDocumentData';
 import type {
   PrintTemplate,
   ColumnKey,

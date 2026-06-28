@@ -155,90 +155,23 @@ export type { PrintJob, PrintJobInput, PrintJobStatus } from './renderers/PrintJ
 export { usePrintJobQueue, statusColor, statusLabel } from './renderers/usePrintJobQueue';
 export { default as PrintQueuePanel } from './components/shared/PrintQueuePanel';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// V2 Infrastructure
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// ─── Command History ─────────────────────────────────────────────────────────
-export type { Command, HistorySnapshot } from './core/history/CommandHistory';
-export { CommandHistory } from './core/history/CommandHistory';
-
-// ─── Report Compiler ─────────────────────────────────────────────────────────
+// ─── Template Library (Phase 7) ─────────────────────────────────────────────
+export {
+  TemplateLibraryModal, templateRegistry, registerBuiltinTemplates,
+  buildTemplate, createMeta,
+  TEMPLATE_CATEGORIES, ALL_TAGS, categoryFromDocType,
+  paperConfig, typographyConfig, headerConfig,
+  INVOICE_COLUMNS, DELIVERY_COLUMNS, DELIVERY_A5_COLUMNS,
+  INVOICE_TOTALS, DELIVERY_TOTALS, DELIVERY_A5_TOTALS,
+  INVOICE_FOOTER, DELIVERY_FOOTER, DELIVERY_A5_FOOTER,
+} from './templates/library';
 export type {
-  CompiledReport,
-  CompiledSection,
-  CompiledColumn,
-  CompilerError,
-  CompilerWarning,
-} from './core/compiler/ReportCompiler';
-export { compileReport, reportCompiler } from './core/compiler/ReportCompiler';
-
-// ─── Rendering Pipeline ──────────────────────────────────────────────────────
-export type {
-  PipelineStage,
-  PipelineMetrics,
-  PipelineResult,
-  PipelineContext,
-} from './core/pipeline/RenderingPipeline';
-export { renderingPipeline } from './core/pipeline/RenderingPipeline';
-
-// ─── Plugin Registry ─────────────────────────────────────────────────────────
-export type {
-  PluginManifest,
-  PluginHooks,
-  ReportPlugin,
-  FormulaFunctionRegistration,
-  ExporterRegistration,
-  ThemeRegistration,
-  BarcodeTypeRegistration,
-  ChartTypeRegistration,
-  ComponentRegistration,
-  PaperSizeRegistration,
-} from './core/plugin/PluginRegistry';
-export { pluginRegistry } from './core/plugin/PluginRegistry';
+  LibraryTemplateEntry, LibraryTemplateMeta, LibraryApiResponse,
+  TemplateVersion, TemplateTags, TemplateCategory,
+  PaperConfig, TypographyConfig, HeaderConfig,
+  TableConfig, TotalsConfig, FooterConfig,
+  LibraryFilterState, FavoriteEntry, InstallHistoryEntry,
+} from './templates/library';
 
 // ─── Advanced Formula Functions ──────────────────────────────────────────────
 export { registerAdvancedFunctions } from './core/engines/AdvancedFunctions';
-
-// ─── Advanced Rules Engine ───────────────────────────────────────────────────
-export type {
-  RuleCombiner,
-  RuleGroup,
-  NestedRule,
-  RuleTemplate,
-  RuleVariable,
-  AdvancedRuleConfig,
-  RuleDebugStep,
-  RuleDebugResult,
-  RuleSimulationInput,
-} from './core/engines/RulesEngineAdvanced';
-export { rulesEngineAdvanced } from './core/engines/RulesEngineAdvanced';
-
-// ─── Style System ────────────────────────────────────────────────────────────
-export type {
-  StyleLayer,
-  ComponentStyle,
-  SectionStyle,
-  StylePreset,
-} from './core/theme/StyleSystem';
-export { styleSystem } from './core/theme/StyleSystem';
-
-// ─── Diagnostics ─────────────────────────────────────────────────────────────
-export type { DiagnosticsReport } from './core/diagnostics/DiagnosticsService';
-export { diagnosticsService } from './core/diagnostics/DiagnosticsService';
-export { DiagnosticsPanel } from './core/diagnostics/DiagnosticsPanel';
-
-// ─── Visual Designer ─────────────────────────────────────────────────────────
-export type {
-  DesignerElement,
-  DesignerState,
-  DesignerActions,
-} from './components/designer/useDesignerStore';
-export { useDesignerStore, useSelectedElements, useElementAtPosition } from './components/designer/useDesignerStore';
-export { ReportDesigner } from './components/designer/ReportDesigner';
-export type { ReportDesignerProps } from './components/designer/ReportDesigner';
-export { DesignerCanvas } from './components/designer/DesignerCanvas';
-export { DesignerToolbar } from './components/designer/DesignerToolbar';
-export { PropertyInspector } from './components/designer/PropertyInspector';
-export { ComponentTree } from './components/designer/ComponentTree';
-export { printTemplateToDesignerElements, designerElementsToPrintTemplate, DESIGNER_ELEMENT_TYPES } from './components/designer/DesignerConverter';

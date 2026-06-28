@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Core\Http\Controllers\BaseApiController;
 use App\Models\PrintTemplate;
+use App\Services\TemplateLibraryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -127,6 +128,50 @@ class PrintTemplateController extends BaseApiController
             return $this->successResponse($duplicate, 'تم نسخ القالب', 201);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'duplicate');
+        }
+    }
+
+    // ─── Template Library ───────────────────────────────────────────────────
+
+    public function library(): JsonResponse
+    {
+        try {
+            $templates = TemplateLibraryService::getMetadata();
+
+            return $this->successResponse($templates, 'تم جلب قوالب المكتبة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'library');
+        }
+    }
+
+    public function installLibrary(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'template_id' => 'required|string|max:50',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->errorResponse($validator->errors()->first(), 422);
+            }
+
+            $templateId = $request->input('template_id');
+
+            if (!TemplateLibraryService::exists($templateId)) {
+                return $this->errorResponse('القالب غير موجود في المكتبة', 404);
+            }
+
+            $payload = TemplateLibraryService::getFlatPayload($templateId);
+
+            if (!$payload) {
+                return $this->errorResponse('فشل تحميل القالب', 500);
+            }
+
+            $template = PrintTemplate::create($payload);
+
+            return $this->successResponse($template, 'تم تثبيت القالب من المكتبة', 201);
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'installLibrary');
         }
     }
 }

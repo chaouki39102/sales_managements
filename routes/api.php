@@ -583,6 +583,9 @@ Route::prefix('v1')->group(function () {
             Route::delete('print-templates/{id}',            [PrintTemplateController::class, 'destroy']);
             Route::post('print-templates/{id}/set-default',  [PrintTemplateController::class, 'setDefault']);
             Route::post('print-templates/{id}/duplicate',    [PrintTemplateController::class, 'duplicate']);
+            // مكتبة القوالب الجاهزة
+            Route::get('print-templates/library',            [PrintTemplateController::class, 'library']);
+            Route::post('print-templates/library/install',   [PrintTemplateController::class, 'installLibrary']);
             // جلب الملف الشخصي للمستخدم المسجل
             Route::get('/profile',          [UserController::class, 'profile']);
 

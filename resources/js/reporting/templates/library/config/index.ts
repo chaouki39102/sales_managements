@@ -1,0 +1,12 @@
+export type { PaperConfig } from './PaperConfig';
+export { paperConfig } from './PaperConfig';
+export type { TypographyConfig } from './TypographyConfig';
+export { typographyConfig } from './TypographyConfig';
+export type { HeaderConfig } from './HeaderConfig';
+export { headerConfig } from './HeaderConfig';
+export type { TableConfig } from './TableConfig';
+export { INVOICE_COLUMNS, DELIVERY_COLUMNS, DELIVERY_A5_COLUMNS } from './TableConfig';
+export type { TotalsConfig } from './TotalsConfig';
+export { INVOICE_TOTALS, DELIVERY_TOTALS, DELIVERY_A5_TOTALS } from './TotalsConfig';
+export type { FooterConfig } from './FooterConfig';
+export { INVOICE_FOOTER, DELIVERY_FOOTER, DELIVERY_A5_FOOTER } from './FooterConfig';

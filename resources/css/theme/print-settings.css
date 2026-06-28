@@ -262,7 +262,9 @@
   background: var(--bg3); border: none; cursor: pointer; width: 100%;
   font-size: 13px; font-weight: 800; color: var(--t1);
   font-family: 'Tajawal', sans-serif; transition: .12s; text-align: right;
+  position: sticky; top: 0; z-index: 10;
 }
+.ps-section-head.stuck { box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .ps-section-head i { font-size: 15px; color: var(--em); }
 .ps-section-head:hover { background: var(--bg4); }
 .ps-section-chevron { margin-right: auto; color: var(--t4) !important; font-size: 12px !important; transition: transform .15s; }

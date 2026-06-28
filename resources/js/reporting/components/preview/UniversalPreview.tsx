@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
 import type { UniversalDocumentData, DocumentLine } from '../../data/UniversalDocumentData';
-import type { PrintTemplate, ColumnKey, AlignOption, BorderStyle } from '../../core/domain/PrintTemplate';
+import type { PrintTemplate, ColumnKey } from '../../core/domain/PrintTemplate';
 import {
   mm, align, fontFamily, colDefaultHeader,
   Separator, DocRow, TotalRow, InfoRow,

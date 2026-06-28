@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { PrintTemplate, PrintTemplateApiResponse, DocTypeCode } from '../types';
+import type { LibraryApiResponse } from '@/reporting';
 
 export const printTemplateKeys = {
   all:     (slug: string)              => [slug, 'print-templates']              as const,
@@ -67,6 +68,14 @@ export const printTemplatesApi = {
 
   duplicate: (id: number, newName: string) =>
     apiPost<PrintTemplateApiResponse>(`/print-templates/${id}/duplicate`, { name: newName })
+      .then(fromApiResponse),
+
+  library: () =>
+    apiGet<LibraryApiResponse[]>('/print-templates/library')
+      .then(r => (Array.isArray(r) ? r : (r as any)?.data ?? [])),
+
+  installLibrary: (templateId: string) =>
+    apiPost<PrintTemplateApiResponse>('/print-templates/library/install', { template_id: templateId })
       .then(fromApiResponse),
 } as const;
 
@@ -136,5 +145,11 @@ export function usePrintTemplateMutations() {
     onSuccess: invalidateAll,
   });
 
-  return { create, update, remove, setDefault, duplicate };
+  const installLibrary = useMutation({
+    mutationFn: (payload: Parameters<typeof printTemplatesApi.installLibrary>[0]) =>
+      printTemplatesApi.installLibrary(payload),
+    onSuccess: invalidateAll,
+  });
+
+  return { create, update, remove, setDefault, duplicate, installLibrary };
 }

@@ -13,7 +13,7 @@ export default function DocumentSectionControls({ tpl, update }: Props) {
     <>
       <div className="ps-field">
         <label className="ps-field-label">عنوان المستند</label>
-        <input className="ps-input" value={tpl.title_text}
+        <input className="ps-input" value={tpl.title_text ?? ''}
           onChange={e => update('title_text', e.target.value)} />
       </div>
       <SliderField label="حجم عنوان المستند" value={tpl.title_size} min={10} max={22} unit="px"

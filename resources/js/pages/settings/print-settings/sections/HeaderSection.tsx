@@ -34,7 +34,7 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
 
       <div className="ps-field">
         <label className="ps-field-label">نص إضافي في الرأس</label>
-        <input className="ps-input" value={tpl.header_custom_text}
+        <input className="ps-input" value={tpl.header_custom_text ?? ''}
           onChange={e => update('header_custom_text', e.target.value)}
           placeholder="مثال: السجل التجاري: 13/B.0123456" />
       </div>
@@ -122,7 +122,7 @@ export function CompanyField({ label, value, onChange, placeholder, apiValue }: 
           <span className="ps-badge-api">تلقائي من الشركة</span>
         )}
       </label>
-      <input className="ps-input" style={{ fontSize: 12 }} value={value}
+      <input className="ps-input" style={{ fontSize: 12 }} value={value ?? ''}
         onChange={e => onChange(e.target.value)}
         placeholder={apiValue || placeholder} />
     </div>

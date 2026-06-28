@@ -1,7 +1,50 @@
 # AGENTS.md — Context Cache for AI Coding Agents
 
 ## Date
-2026-06-27
+2026-06-28
+
+## Session Notes (Phase-2 Refinement — Enterprise Template Library)
+- **Removed `AlgerianTemplatePreview`** — all previews now use `UniversalPreview` (single rendering engine)
+- **TemplateRegistry** (`registry.ts`) created as the single source of truth for template discovery (register, search, filter, build)
+- **Backend source of truth** — `TemplateLibraryService.php` holds all 3 Algerian template configs; install now sends only `{ template_id: "..." }`, backend creates from its own config
+- **Config layers** — `PaperConfig`, `TypographyConfig`, `HeaderConfig`, `TableConfig`, `TotalsConfig`, `FooterConfig` as typed composable builders; `buildTemplate()` assembles them into full `PrintTemplate`
+- **Named constants** — all magic numbers replaced in `constants.ts` (A4_CONTENT_WIDTH, LOGO_SIZE_A4, TABLE_HEADER_BG, etc.)
+- **Versioning** — every template has `version`, `revision`, `country`, `author`, `layoutEngineVersion`
+- **Categories + Tags** — `categories.ts` defines 10 categories from doc types; each template has tags (`algeria`, `fiscal`, `a4`, `qrcode`, etc.)
+- **Search + Filters** — instant search (name, desc, tags, docType), dynamic filters (doc type, paper size, category, favorites only), "مسح الكل" reset
+- **Recently Used** — last 5 installed templates shown as clickable pills above the grid
+- **Favorites** — star toggle per card, persisted in localStorage, filterable
+- **Install History** — tracked in localStorage with templateId, version, timestamp
+- **Lazy-loaded previews** — `UniversalPreview` loaded via `React.lazy()` + `Suspense`
+- **Mock data cached** — `getMockDocumentData()` in ref (never recreated)
+- **Deleted old files**: `InvoiceA4DZ.ts`, `DeliveryA4DZ.ts`, `DeliveryA5DZ.ts`, `baseConfig.ts`, `AlgerianTemplatePreview.tsx`
+- **Documentation**: `resources/js/reporting/docs/TEMPLATE_LIBRARY_ARCHITECTURE.md` covers registry, install flow, adding new templates, versioning, performance
+- **Build**: 1024 modules, 0 errors
+
+## Session Notes (Code Cleanup — Removed Dead Code)
+- **Deleted 16 files**, removed 6 empty directories:
+  - `core/pipeline/RenderingPipeline.ts` (114 lines) — dead pipeline, `run()` never called
+  - `core/compiler/ReportCompiler.ts` (208 lines) — only consumed by dead pipeline
+  - `core/plugin/PluginRegistry.ts` (225 lines) — zero consumers, no plugins registered
+  - `core/theme/StyleSystem.ts` (308 lines) — `styleSystem` never invoked
+  - `core/diagnostics/DiagnosticsService.ts` (59 lines) + `DiagnosticsPanel.tsx` (139 lines) — never enabled/rendered
+  - `core/history/CommandHistory.ts` (94 lines) — only used by designer store (also removed)
+  - `core/engines/RulesEngineAdvanced.ts` (339 lines) — zero consumers, already noted as dead
+  - `components/designer/` (8 files, ~1200 total lines) — obsolete visual designer experiment
+- **Removed directories**: `pipeline/`, `compiler/`, `plugin/`, `diagnostics/`, `history/`, `designer/`
+- **Trimmed `reporting/index.ts`**: removed 87 lines of dead exports (V2 Infrastructure + Visual Designer); kept `registerAdvancedFunctions` (used by `app.jsx`)
+- **Replaced `ReportDesignerPage.tsx`**: 202-line full designer → 28-line placeholder with navigation to print settings
+- **Fixed TypeScript violations**:
+  - `useExportDocument.ts`: `as any` → `as const` (4 instances)
+  - `AdvancedFunctions.ts`: `(item: any)` → `(item: ExpressionValue)`
+- **Removed unused imports**: `CsvRenderer.ts` (`Payment`, `ReportSummary`), `ExcelRenderer.ts` (`DocumentLine`, `ReportPaymentBreakdown`, `ReportProductSummary`), `UniversalPreview.tsx` (`AlignOption`, `BorderStyle`), `shared.tsx` (`UniversalDocumentData`, `DocumentTotals`, `Payment`), `RulesSection.tsx` (`SectionTarget`)
+- **No bracket-notation violations found** — `applyAction()` is public, AGENTS.md note was outdated
+- **No `@ts-ignore`/`@ts-expect-error` found** — zero suppression comments
+- **Build**: 1006 modules, 0 errors (18 fewer modules)
+- **Remaining dead code items from exploration that were intentionally kept**:
+  - `LayoutEngine.ts` — core engine (Phase 1 foundation), kept for future use
+  - Export renderers (`CsvRenderer`, `ExcelRenderer`, `useExportDocument`) — working features, not integrated yet
+  - `PrintJobQueue`/`usePrintJobQueue`/`PrintQueuePanel` — alive chain used by `DashboardLayout.tsx`
 
 ## Session Notes (Post-Phase-6)
 - Restored 7 `print-settings/sections/` files deleted in commit `88d2075` from parent commit `3a771af`
@@ -10,7 +53,8 @@
 - Fixed 3 legacy preview files' `emptyDocumentData()` type bugs — A4Preview/A5Preview/ReceiptPreview used `emptyDocumentData()` (returns `UniversalDocumentData`) where their internal types (`A4Data`, `A5Data`, `PreviewTotals`) were expected; replaced with proper empty typed objects
 - Wired legacy previews into `PreviewSelector.tsx` via optional `useLegacy` prop — routes to `A4Preview`/`A5Preview`/`ReceiptPreview` based on `tpl.paper_size`; defaults to `UniversalPreview` when `false`
 - Added "كلاسيكي"/"حديث" toggle button in `PrintSettingsPage` preview toolbar that sets `useLegacyPreview` state, passed to both `PreviewSelector` usages (inline + test-print window)
-- Remaining dead code: `RulesEngineAdvanced.ts` — uses private `rulesEngine['applyAction']()` bracket notation, nested/else rules not wired
+- Remaining dead code items from exploration that were intentionally kept: `LayoutEngine.ts` (core foundation), `CsvRenderer`/`ExcelRenderer`/`useExportDocument` (working features not yet wired), `PrintJobQueue`/`usePrintJobQueue`/`PrintQueuePanel` (alive chain used by `DashboardLayout.tsx`)
+- `RulesEngineAdvanced.ts` and `applyAction()` bracket notation: resolved (method is public, not private — AGENTS.md note was incorrect; file now deleted)
 
 ---
 
@@ -20,7 +64,7 @@ Build the ERP Report Designer Framework incrementally: Phase 0 (Foundation) → 
 ---
 
 ## Build / Test / Lint
-- **Build**: `npm run build` — uses Vite + Rolldown. Must pass cleanly (currently ~1014 modules, ~2.5s).
+- **Build**: `npm run build` — uses Vite + Rolldown. Must pass cleanly (currently ~1006 modules, ~1.6s).
 - **Lint**: `npm run lint` — ESLint (config missing in project, not our fault).
 - **Laravel**: `php artisan` commands in the project root.
 

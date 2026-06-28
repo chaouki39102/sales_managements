@@ -14,18 +14,18 @@ export default function FooterSectionControls({ tpl, update }: Props) {
       <Section title="التذييل — النصوص والتواقيع" icon="ti-file-text">
         <div className="ps-field">
           <label className="ps-field-label">سطر التذييل 1</label>
-          <input className="ps-input" value={tpl.footer_line1}
+          <input className="ps-input" value={tpl.footer_line1 ?? ''}
             onChange={e => update('footer_line1', e.target.value)}
             placeholder="مثال: مفتوح من 08:00 إلى 20:00" />
         </div>
         <div className="ps-field">
           <label className="ps-field-label">سطر التذييل 2</label>
-          <input className="ps-input" value={tpl.footer_line2}
+          <input className="ps-input" value={tpl.footer_line2 ?? ''}
             onChange={e => update('footer_line2', e.target.value)} />
         </div>
         <div className="ps-field">
           <label className="ps-field-label">سطر التذييل 3</label>
-          <input className="ps-input" value={tpl.footer_line3}
+          <input className="ps-input" value={tpl.footer_line3 ?? ''}
             onChange={e => update('footer_line3', e.target.value)} />
         </div>
 
@@ -39,7 +39,7 @@ export default function FooterSectionControls({ tpl, update }: Props) {
           <>
             <div className="ps-field">
               <label className="ps-field-label">نص رسالة الشكر</label>
-              <input className="ps-input" value={tpl.thank_you_text}
+              <input className="ps-input" value={tpl.thank_you_text ?? ''}
                 onChange={e => update('thank_you_text', e.target.value)} />
             </div>
             <SliderField label="حجم خط الشكر" value={tpl.thank_you_size} min={9} max={18} unit="px"
@@ -51,14 +51,14 @@ export default function FooterSectionControls({ tpl, update }: Props) {
         {tpl.show_returns_policy && (
           <div className="ps-field">
             <label className="ps-field-label">نص سياسة الإرجاع</label>
-            <textarea className="ps-input ps-textarea" value={tpl.returns_policy_text}
+            <textarea className="ps-input ps-textarea" value={tpl.returns_policy_text ?? ''}
               onChange={e => update('returns_policy_text', e.target.value)} rows={2} />
           </div>
         )}
 
         <div className="ps-field">
           <label className="ps-field-label">نص قانوني (تذييل سفلي)</label>
-          <textarea className="ps-input ps-textarea" value={tpl.footer_legal_text}
+          <textarea className="ps-input ps-textarea" value={tpl.footer_legal_text ?? ''}
             onChange={e => update('footer_legal_text', e.target.value)}
             placeholder="مثال: يُعتبر هذا المستند ملزماً قانونياً وفق التشريع الجزائري"
             rows={2} />
@@ -77,7 +77,7 @@ export default function FooterSectionControls({ tpl, update }: Props) {
               <option value="custom">نص مخصص</option>
             </select>
             {tpl.barcode_content === 'custom' && (
-              <input className="ps-input" style={{ marginTop: 4 }} value={tpl.barcode_custom_text}
+              <input className="ps-input" style={{ marginTop: 4 }} value={tpl.barcode_custom_text ?? ''}
                 onChange={e => update('barcode_custom_text', e.target.value)}
                 placeholder="أدخل النص للباركود" />
             )}

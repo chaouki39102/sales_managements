@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-pos-files.md"
+OUTPUT="merged-print-settings-files.md"
 
 > "$OUTPUT"
 
@@ -62,10 +62,10 @@ EXCLUDE=(
 
 
 
-  # pos
-merge_section "📘 pos" \
+  # print settings
+merge_section "📘 print settings" \
   \( -path "*/pages/settings/print-settings/*" \) "${EXCLUDE[@]}"
-  
+
 
 echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"
 echo "==================================================== */" >> "$OUTPUT"

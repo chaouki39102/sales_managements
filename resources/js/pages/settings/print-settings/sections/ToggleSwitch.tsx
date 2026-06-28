@@ -30,20 +30,23 @@ export function SliderField({
   );
 }
 
-export function Section({ title, icon, children, defaultOpen = true, id, expanded }: {
-  title: string; icon: string; children: React.ReactNode; defaultOpen?: boolean; id?: string; expanded?: boolean;
+export function Section({ title, icon, children, defaultOpen = true, id, collapseVersion }: {
+  title: string; icon: string; children: React.ReactNode; defaultOpen?: boolean; id?: string; collapseVersion?: number;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const bodyRef = React.useRef<HTMLDivElement>(null);
-  const isOpen = expanded !== undefined ? expanded : open;
+  React.useEffect(() => {
+    setOpen(defaultOpen);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseVersion]);
   return (
     <div className="ps-section" id={id}>
       <button className="ps-section-head" onClick={() => setOpen(o => !o)}>
         <i className={`ti ${icon}`} />
         <span>{title}</span>
-        <i className={`ti ti-chevron-down ps-section-chevron ${isOpen ? 'open' : ''}`} />
+        <i className={`ti ti-chevron-down ps-section-chevron ${open ? 'open' : ''}`} />
       </button>
-      {isOpen && <div ref={bodyRef} className="ps-section-body">{children}</div>}
+      {open && <div ref={bodyRef} className="ps-section-body">{children}</div>}
     </div>
   );
 }

@@ -221,7 +221,7 @@ const FILTER: ExpressionFunction = ([arr, cond]) => {
   if (!isArray(arr)) return [];
   const condVal = (cond as ExpressionValue);
   if (typeof condVal === 'function') {
-    return (arr as ExpressionValue[]).filter((item: any) => condVal(item));
+    return (arr as ExpressionValue[]).filter((item: ExpressionValue) => condVal(item));
   }
   return (arr as ExpressionValue[]).filter(() => isTruthy(condVal));
 };
