@@ -77,7 +77,7 @@ import { useReceiptRenderer }   from '@/pos/hooks/useReceiptRenderer';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
 import { printThermalViaWebUSB } from '@/pos/utils/printService';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
-import type { CompanyPreviewData, ReceiptLiveData } from '@/pages/settings/print-settings/types';
+import type { CompanyPreviewData, ReceiptLiveData } from '@/reporting';
 
 type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 

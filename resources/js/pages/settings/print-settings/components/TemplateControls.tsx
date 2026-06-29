@@ -3,7 +3,7 @@ import type { PrintTemplate, FontFamily } from '../types';
 import type { CompanyData } from '../types';
 import { Toggle, Slider, Field, Input, Textarea, Select, Pills, ColorField, SectionTitle } from './ui';
 import { Accordion } from './Accordion';
-import { ColumnManager, type Updater } from './ColumnManager';
+import type { Updater } from './ColumnManager';
 import { Section } from '../sections/ToggleSwitch';
 import HeaderSectionControls from '../sections/HeaderSection';
 import DocumentSectionControls from '../sections/DocumentSection';

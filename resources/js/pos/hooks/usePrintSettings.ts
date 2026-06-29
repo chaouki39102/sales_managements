@@ -6,7 +6,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActiveSlug }    from '@/lib/store/appStore';
-import { defaultTemplate }  from '@/pages/settings/print-settings/types';
+import { defaultTemplate }  from '@/reporting';
 import {
   dbFetchTemplates, dbFetchDocConfigs,
   dbSaveTemplate, dbSaveDocConfigs, dbCopyTemplate,
@@ -16,7 +16,7 @@ import {
 import type {
   ReceiptTemplate80mm, DocumentPrintConfig,
   DetectedPrinter, PaperSize,
-} from '@/pages/settings/print-settings/types';
+} from '@/reporting';
 
 // ─── Query Keys ──────────────────────────────────────────────────────────────
 

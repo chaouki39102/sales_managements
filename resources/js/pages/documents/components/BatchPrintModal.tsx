@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
-import { usePrintTemplates } from '../../settings/print-settings/api/printTemplatesApi';
-import { DocumentDataBuilder } from '@/reporting';
+import { usePrintTemplates, DocumentDataBuilder } from '@/reporting';
 import type { CompanyInfo, PrintTemplate } from '@/reporting';
 import type { CommercialDocument } from '@/lib/api/core/types';
 
@@ -75,7 +74,7 @@ function printDocument(docNum: string, data: Record<string, unknown>, tpl: Print
     import('react-dom/client').then(({ createRoot }) => {
       const root = win!.document.getElementById('r');
       if (root) {
-        import('@/reporting/components/preview/UniversalPreview').then(({ default: UniversalPreview }) => {
+        import('@/pages/settings/print-settings/components/preview/UniversalPreview').then(({ default: UniversalPreview }) => {
           import('react').then((React) => {
             const data = DocumentDataBuilder.fromApiDocument(data, company);
             createRoot(root).render(

@@ -1,4 +1,4 @@
-import { formulaEngine, type ExpressionFunction, type ExpressionValue } from './FormulaEngine';
+import { formulaEngine, type ExpressionFunction, type ExpressionValue } from '@/pages/settings/print-settings/services/engines/FormulaEngine';
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 

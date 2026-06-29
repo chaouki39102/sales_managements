@@ -11,6 +11,7 @@ import {
 } from './config';
 import { headerConfig, paperConfig, typographyConfig } from './config';
 import { categoryFromDocType } from './categories';
+import { getMockDocumentData } from './mockData';
 
 // ─── TemplateRegistry — single source of truth for built-in templates ─────────
 
@@ -97,7 +98,6 @@ class TemplateRegistryClass {
 
   private getMockData(): UniversalDocumentData {
     if (this.mockData) return this.mockData;
-    const { getMockDocumentData } = require('./mockData');
     this.mockData = getMockDocumentData();
     return this.mockData!;
   }

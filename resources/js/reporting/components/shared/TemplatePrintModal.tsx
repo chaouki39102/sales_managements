@@ -1,10 +1,10 @@
 import React, { useMemo, useEffect, useRef, useCallback } from 'react';
-import { DocumentDataBuilder } from '../../data/DocumentDataBuilder';
-import type { UniversalDocumentData } from '../../data/UniversalDocumentData';
-import type { PrintTemplate, DocTypeCode, PaperSize } from '../../core/domain/PrintTemplate';
-import { createDefaultTemplate } from '../../core/domain/PrintTemplate';
-import UniversalPreview from '../preview/UniversalPreview';
-import type { CompanyData } from '../preview/shared';
+import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data/DocumentDataBuilder';
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
+import type { PrintTemplate, DocTypeCode, PaperSize } from '@/pages/settings/print-settings/types';
+import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
+import UniversalPreview from '@/pages/settings/print-settings/components/preview/UniversalPreview';
+import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
 
 // ─── ApiDocument ────────────────────────────────────────────────────────────
 // Minimal shape expected by DocumentDataBuilder.fromApiDocument().

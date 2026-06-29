@@ -10,8 +10,8 @@
 //                    ← PDFRenderer (future)
 // ════════════════════════════════════════════════════════════════════════════
 
-import type { UniversalDocumentData } from '../data/UniversalDocumentData';
-import type { PrintTemplate } from '../core/domain/PrintTemplate';
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 
 // ─── Render output ────────────────────────────────────────────────────────────
 

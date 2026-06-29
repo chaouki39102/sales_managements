@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { UniversalDocumentData } from '../data/UniversalDocumentData';
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
 import { RendererRegistry } from './IRenderer';
 
 /**

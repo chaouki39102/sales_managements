@@ -6,8 +6,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import React from 'react';
-import { PreviewSelector } from '@/pages/settings/print-settings';
-import type { ReceiptTemplate80mm, CompanyPreviewData, ReceiptLiveData } from '@/pages/settings/print-settings/types';
+import { PreviewSelector } from '@/reporting';
+import type { ReceiptTemplate80mm, CompanyPreviewData, ReceiptLiveData } from '@/reporting';
 
 interface ProfessionalReceiptProps {
   template:  ReceiptTemplate80mm;

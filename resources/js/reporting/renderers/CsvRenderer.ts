@@ -1,5 +1,5 @@
 import type { IRenderer, RenderContext, RenderResult } from './IRenderer';
-import type { DocumentLine } from '../data/UniversalDocumentData';
+import type { DocumentLine } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
 
 function escapeCsv(val: unknown): string {
   const s = String(val ?? '');

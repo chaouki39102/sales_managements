@@ -4,8 +4,8 @@
 import { useCallback } from 'react';
 import ReactDOMServer from 'react-dom/server.browser';
 import React from 'react';
-import { PreviewSelector } from '@/pages/settings/print-settings';
-import type { ReceiptTemplate80mm, CompanyPreviewData, ReceiptLiveData } from '@/pages/settings/print-settings/types';
+import { PreviewSelector } from '@/reporting';
+import type { ReceiptTemplate80mm, CompanyPreviewData, ReceiptLiveData } from '@/reporting';
 
 export function useReceiptRenderer() {
   const buildHtml = useCallback((input: {

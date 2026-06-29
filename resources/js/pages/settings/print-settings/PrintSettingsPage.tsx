@@ -16,7 +16,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React, {
   useState, useCallback, useEffect, useMemo, useRef,
-  useDeferredValue, useTransition,
+  useDeferredValue,
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -42,7 +42,7 @@ import { DocumentDataBuilder } from './types/data/DocumentDataBuilder';
 import type { UniversalDocumentData } from './types/data';
 import type { CommercialDocument } from '@/lib/api/core/types';
 import { TemplateLibraryModal } from './template-library';
-
+import DeleteConfirmModal from './components/DeleteConfirmModal';
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -303,7 +303,7 @@ export default function PrintSettingsPage() {
     setShowLibrary(true);
   }, []);
 
-  const handleInstallLibrary = useCallback(async (_templateId: string, tpl: PrintTemplate) => {
+  const handleInstallLibrary = useCallback(async (_templateId: string, _tpl: PrintTemplate) => {
     try {
       const saved = await mutations.installLibrary.mutateAsync(_templateId);
       setSelectedTplId(saved.id);
@@ -317,7 +317,7 @@ export default function PrintSettingsPage() {
     } catch (e: any) {
       toast.error(e?.message ?? 'فشل تثبيت القالب');
     }
-  }, [activeDoc, templates.length, mutations]);
+  }, [activeDoc, mutations]);
 
   const handleExport = useCallback(() => {
     if (!localTpl) return;
@@ -819,39 +819,12 @@ export default function PrintSettingsPage() {
         activeDoc={activeDoc}
       />
 
-      {/* ── Delete confirmation modal ── */}
-      {deleteTarget !== null && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-          zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }} onClick={() => setDeleteTarget(null)}>
-          <div style={{
-            background: '#fff', borderRadius: 8, padding: 24, width: 380, maxWidth: '90vw',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--red)' }}>
-              <i className="ti ti-alert-triangle" style={{ marginLeft: 8 }} />
-              تأكيد الحذف
-            </div>
-            <p style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 20, lineHeight: 1.6 }}>
-              هل تريد حذف هذا القالب نهائياً؟ لا يمكن التراجع عن هذا الإجراء.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setDeleteTarget(null)} style={{
-                padding: '8px 16px', border: '1px solid var(--b2)', borderRadius: 6,
-                background: 'var(--bg2)', color: 'var(--t2)', cursor: 'pointer', fontSize: 13,
-              }} type="button">إلغاء</button>
-              <button onClick={confirmDelete} disabled={actionLoading !== null} style={{
-                padding: '8px 16px', border: 'none', borderRadius: 6,
-                background: 'var(--red)', color: '#fff', cursor: actionLoading ? 'not-allowed' : 'pointer',
-                fontSize: 13, fontWeight: 600, opacity: actionLoading ? 0.6 : 1,
-              }} type="button">
-                {actionLoading ? 'جاري الحذف…' : 'حذف'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        deleteTarget={deleteTarget}
+        actionLoading={actionLoading}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </>
   );
 }

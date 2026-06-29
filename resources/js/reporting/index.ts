@@ -6,8 +6,8 @@
 // Consumer code imports ONLY from here:
 //   import { DocumentDataBuilder, UniversalDocumentData } from '@/reporting';
 //
-// Shared items (engines, services, data, components) re-export from
-// print-settings/ which is now the canonical source of truth.
+// All implementation lives in print-settings/ — this barrel re-exports from
+// there as the canonical source of truth.
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── Data contract (canonical source: print-settings/types/data) ───────────
@@ -38,7 +38,7 @@ export {
 export { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data/DocumentDataBuilder';
 export type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data/DocumentDataBuilder';
 
-// ─── Domain types (keep internal — PrintTemplate used by LayoutEngine etc.) ─
+// ─── Domain types (canonical source: print-settings/types) ─────────────────
 export type {
   PrintTemplate,
   PaperSize,
@@ -49,14 +49,23 @@ export type {
   FontFamily,
   ColumnKey,
   DocTypeCode,
-} from './core/domain/PrintTemplate';
+  SectionTarget,
+  ReportRule,
+  PrintTemplateApiResponse,
+  TemplateLiveData,
+  CompanyData,
+  DetectedPrinter,
+  DocumentPrintConfig,
+  ReceiptTemplate80mm,
+  CompanyPreviewData,
+  ReceiptLiveData,
+} from '@/pages/settings/print-settings/types';
 
 export {
   DOC_TYPE_LIST,
   createDefaultTemplate,
-} from './core/domain/PrintTemplate';
-
-export type { SectionTarget } from './core/domain/PrintTemplate';
+  defaultTemplate,
+} from '@/pages/settings/print-settings/types';
 
 // ─── Renderer infrastructure ──────────────────────────────────────────────────
 export type {
@@ -68,7 +77,7 @@ export type {
 
 export { RendererRegistry } from './renderers/IRenderer';
 
-// ─── Export renderers (Phase 6) ────────────────────────────────────────────────
+// ─── Export renderers ─────────────────────────────────────────────────────────
 export { CsvRenderer, csvRenderer } from './renderers/CsvRenderer';
 export { ExcelRenderer, excelRenderer } from './renderers/ExcelRenderer';
 export { useExportDocument, exportDocumentCsv, exportDocumentXlsx } from './renderers/useExportDocument';
@@ -84,14 +93,14 @@ export type {
 export { FormulaEngine, formulaEngine } from '@/pages/settings/print-settings/services/engines/FormulaEngine';
 
 export type {
-  ReportRule,
+  ReportRule as RulesEngineReportRule,
   RuleAction,
   RuleEvaluationResult,
 } from '@/pages/settings/print-settings/services/engines/RulesEngine';
 
 export { RulesEngine, rulesEngine } from '@/pages/settings/print-settings/services/engines/RulesEngine';
 
-// ─── Layout engine (reporting-only — not part of print-settings) ──────────────
+// ─── Layout engine ────────────────────────────────────────────────────────────
 export type {
   LayoutMode,
   LayoutElement,
@@ -101,7 +110,7 @@ export type {
 
 export { LayoutEngine, layoutEngine } from './core/engines/LayoutEngine';
 
-// ─── Theme (Phase 1) ──────────────────────────────────────────────────────────
+// ─── Theme ────────────────────────────────────────────────────────────────────
 export type {
   ReportTheme,
   ThemeColors,
@@ -129,7 +138,7 @@ export { calculatedFieldService } from '@/pages/settings/print-settings/services
 // ─── Preview components (canonical source: print-settings) ────────────────────
 export { default as UniversalPreview } from '@/pages/settings/print-settings/components/preview/UniversalPreview';
 
-export type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
+export { default as PreviewSelector } from '@/pages/settings/print-settings/components/PreviewSelector';
 
 // ─── Shared UI components ─────────────────────────────────────────────────────
 export { default as FormulaEditor } from '@/pages/settings/print-settings/components/FormulaEditor';
@@ -142,7 +151,7 @@ export { default as RulesSection } from '@/pages/settings/print-settings/compone
 // ─── Charts (canonical source: print-settings) ────────────────────────────────
 export { default as ChartSection } from '@/pages/settings/print-settings/components/ChartSection';
 
-// ─── Batch Print / Print Queue (Phase 6) ────────────────────────────────────
+// ─── Batch Print / Print Queue ────────────────────────────────────────────────
 export { printJobQueue } from './renderers/PrintJobQueue';
 export type { PrintJob, PrintJobInput, PrintJobStatus } from './renderers/PrintJobQueue';
 export { usePrintJobQueue, statusColor, statusLabel } from './renderers/usePrintJobQueue';
@@ -165,6 +174,13 @@ export type {
   TableConfig, TotalsConfig, FooterConfig,
   LibraryFilterState, FavoriteEntry, InstallHistoryEntry,
 } from '@/pages/settings/print-settings/template-library';
+
+// ─── Template API (canonical source: print-settings/api) ──────────────────────
+export {
+  usePrintTemplates,
+  usePrintTemplate,
+  usePrintTemplateMutations,
+} from '@/pages/settings/print-settings/api/printTemplatesApi';
 
 // ─── Advanced Formula Functions ──────────────────────────────────────────────
 export { registerAdvancedFunctions } from './core/engines/AdvancedFunctions';

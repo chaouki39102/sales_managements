@@ -23,10 +23,10 @@ import {
 import { formatDZD, ttcToHt }         from '@/pos/utils/calculations';
 import { printThermal, isWebUsbSupported, getThermalAutoPrint } from '@/pos/utils/printService';
 import { usePrintSettings }           from '@/pos/hooks/usePrintSettings';
-import { defaultTemplate }            from '@/pages/settings/print-settings/types';
+import { defaultTemplate }            from '@/reporting';
 import type { PaginatedResponse }      from '@/lib/api/core/types';
 import type { Product, ProductVariant, CartItem, CartTotals } from '@/types';
-import type { ReceiptLiveData, CompanyPreviewData } from '@/pages/settings/print-settings/types';
+import type { ReceiptLiveData, CompanyPreviewData } from '@/reporting';
 
 import ProductSearchBar         from '@/pos/components/ProductSearchBar';
 import CategoryTabs             from '@/pos/components/CategoryTabs';

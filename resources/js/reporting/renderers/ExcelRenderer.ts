@@ -1,5 +1,5 @@
 import type { IRenderer, RenderContext, RenderResult } from './IRenderer';
-import type { UniversalDocumentData } from '../data/UniversalDocumentData';
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
 
 function escXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

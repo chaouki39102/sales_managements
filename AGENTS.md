@@ -180,7 +180,7 @@ resources/js/reporting/
 ## Critical Context
 - **`formulaEngine` و `rulesEngine` هما singleton instances** — `reporting/index.ts` يُعيد التصدير من `print-settings/services/engines/...` لضمان مرجع واحد في التطبيق بكامله
 - **`print-settings/index.ts`** هو الواجهة العامة للوحدة — يُصدّر `PrintSettingsPage`, `PreviewSelector`, وأنواع PrintTemplate
-- **`PrintSettingsPage.tsx` الآن ~857 سطر** (بدلاً من 1449) — لا يزال يحتوي callbacks كبيرة (handleSave, handleTestPrint) وحوار الحذف المضمّن، لكن لا يحتوي أي مكون واجهة مضمّن
+- **`PrintSettingsPage.tsx` الآن ~830 سطر** (بدلاً من 1449) — لا يزال يحتوي callbacks كبيرة (handleSave, handleTestPrint) وحوار الحذف المضمّن، لكن لا يحتوي أي مكون واجهة مضمّن
 - **`UniversalPreview.tsx` الآن ~280 سطر** (بدلاً من 1067) — يقوم فقط ببناء سياق التقييم وتوزيع العرض للمكونات المستخرجة
 - **`components/ui.tsx`** يحتوي جميع الـ UI primitives (Toggle, Slider, Field, Input, Textarea, Select, Pills, ColorField, Divider, SectionTitle) وثوابت (ALIGN_OPTS, BORDER_OPTS) — 194 سطر
 - **جميع مستوردات `@/reporting` من `print-settings/`** أُزيلت — 0 مستوردات متبقية للـ modules الأخرى
@@ -201,7 +201,7 @@ resources/js/reporting/
 ---
 
 ## Relevant Files
-- `resources/js/pages/settings/print-settings/PrintSettingsPage.tsx`: ~857 سطر — لا يزال يحتوي callbacks كبيرة وحوار الحذف المضمّن لكن لا يحتوي أي مكون واجهة مضمّن
+- `resources/js/pages/settings/print-settings/PrintSettingsPage.tsx`: ~830 سطر — لا يزال يحتوي callbacks كبيرة وحوار الحذف المضمّن لكن لا يحتوي أي مكون واجهة مضمّن
 - `resources/js/pages/settings/print-settings/components/preview/UniversalPreview.tsx`: ~280 سطر — يستورد من 8 ملفات render منفصلة
 - `resources/js/pages/settings/print-settings/components/ui.tsx`: ~194 سطر — جميع الـ UI primitives (Toggle, Slider, Field, Input, Textarea, Select, Pills, ColorField, Divider, SectionTitle, ALIGN_OPTS, BORDER_OPTS)
 - `resources/js/pages/settings/print-settings/components/TemplateControls.tsx`: ~160 سطر — يُركّب جميع أقسام القوالب
@@ -214,3 +214,36 @@ resources/js/reporting/
 - `resources/js/pages/settings/print-settings/ARCHITECTURE.md`: توثيق المعمارية الكامل
 - `resources/js/reporting/index.ts`: يُعيد التصدير من `@/pages/settings/print-settings/...`
 - `resources/js/pos/store/printStore.ts`: يُعيد التصدير من `services/printStoreService.ts`
+
+## Session Notes (Consolidation — Phase 7-10 cleanup + static analysis)
+- **Phase 7**: Deleted dead code — `hooks/useUndoRedo.ts`, `hooks/useKeyboardShortcuts.ts`, `hooks/index.ts`, `render/index.ts`, `page/index.ts`, `types/domain/index.ts` (+ empty dirs)
+- **Phase 8a**: Split `types.ts` (477 lines → 24-line barrel) into `types/domain.ts` (201 lines, types + DOC_TYPE_LIST), `types/defaults.ts` (172 lines, factory functions), `types/api.ts` (13 lines), `types/live-data.ts` (46 lines)
+- **Phase 8b**: Extracted `DeleteConfirmModal` (30 lines) from `PrintSettingsPage.tsx` into `components/DeleteConfirmModal.tsx`
+- **Phase 9**: Created `tsconfig.json` (strict checking + path aliases) + `eslint.config.js` (flat config with `typescript-eslint`, React, React-Hooks). Installed `typescript-eslint` as dev dep. Fixed errors in print-settings (`require()` → top-level import in `registry.ts`, removed unused `is80mm` in `defaults.ts`, removed unused `useTransition` import, renamed unused `tpl` → `_tpl`, removed unused `ColumnManager` import)
+- **Phase 10** (Final Audit — print-settings scope only):
+  - Built comprehensive audit pipeline: file map, single-implementation verification, duplication check, dead code analysis, module boundary check, ESLint scoped scan, bundle measurement
+  - Verified 12/12 key implementations exist exactly once (PrintTemplate, FormulaEngine, RulesEngine, fieldRegistry, etc.)
+  - Confirmed 0 duplicate exports, 0 dead exports, 0 circular dependencies
+  - Deleted 2 dead files (66 lines): `types/index.ts` (50 lines — never resolved, `types.ts` preferred), `components/preview/index.ts` (16 lines — never imported, bypassed by `components/index.ts`)
+  - ESLint within module: **0 errors, 47 warnings** (28 `any` casts, 10 unused vars, 4 hook deps, 5 misc)
+  - Build: **1,025 modules, 0 errors, 1.82s**; PrintSettingsPage chunk: **59.77 KB**; UniversalPreview: 435 KB (known large chunk)
+  - Final score: **9/10** — single-source architecture, self-contained, no duplication, clean module boundary
+  - Full audit report: `docs/reports/print-settings-final-audit.md`
+
+## Remaining minor issues (warnings only, not errors)
+- `any` types throughout codebase (~958 warnings) — gradual opt-in needed
+- Missing hook deps (e.g., `defaultOpen` in Accordion, `gs` in legacy files)
+- `UniversalPreview` 435 KB chunk — could be code-split further in future
+
+## Session Notes (Phase 10 — Feature Isolation Audit)
+- **Feature Isolation Audit** written to `docs/reports/print-settings-feature-isolation.md`
+- **6 npm packages** external (react, react-dom, recharts, sonner, @tanstack/react-query) — 2 are expected, 2 are medium-coupling, 1 is low
+- **4 app shared modules** identified as isolation problems:
+  - `@/lib/api/core/client` — 🔴 CRITICAL: 3 files import concrete HTTP client
+  - `@/lib/api/core/types` — 🔴 CRITICAL: PrintSettingsPage imports CommercialDocument type
+  - `@/lib/store/appStore` — 🔴 CRITICAL: 2 files read from zustand store directly
+  - `@/components/ui/ErrorBoundary` — ⚠️ MEDIUM: 30-line component, easy to fix
+- **3 files** breach the isolation boundary (PrintSettingsPage, printTemplatesApi, printStoreService)
+- **Scores**: Feature Isolation 6/10, Cohesion 9/10, Coupling 8/10, Maintainability 7/10, Reusability 5/10
+- **Verdict**: "This module still requires architectural work before extraction."
+- **5 critical fixes** needed before extraction: prop-inject company data, interface the API client, remove CommercialDocument dep, copy ErrorBoundary in, abstract sonner
