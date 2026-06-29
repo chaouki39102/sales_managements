@@ -136,6 +136,33 @@ export function TemplateControls({ tpl, update, companyData }: {
         <Toggle value={tpl.show_report_summary_cards} onChange={v => update('show_report_summary_cards', v)} label="عرض بطاقات الملخص" />
         <Toggle value={tpl.show_report_payment_breakdown} onChange={v => update('show_report_payment_breakdown', v)} label="توزيع وسائل الدفع" />
         <Toggle value={tpl.show_report_top_products} onChange={v => update('show_report_top_products', v)} label="أفضل المنتجات" />
+        {tpl.show_report_top_products && (
+          <div style={{ padding: '4px 0', borderBottom: '1px solid var(--b1)', marginBottom: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', marginBottom: 4 }}>عرض أعمدة الجدول</div>
+            {([['product', 'المنتج'], ['quantity', 'الكمية'], ['total', 'الإجمالي']] as const).map(([k, label]) => (
+              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                <span style={{ fontSize: 11, color: 'var(--t2)', minWidth: 50 }}>{label}</span>
+                <input type="range" min={10} max={70} step={1}
+                  value={tpl.report_col_widths[k] ?? 30}
+                  onChange={e => update('report_col_widths', { ...tpl.report_col_widths, [k]: Number(e.target.value) })}
+                  style={{ flex: 1, height: 3, accentColor: 'var(--em)' }} />
+                <span style={{ fontSize: 10, color: 'var(--t4)', minWidth: 28, textAlign: 'left' }}>
+                  {tpl.report_col_widths[k] ?? 30}%
+                </span>
+                <input
+                  value={tpl.report_col_headers[k] ?? ''}
+                  onChange={e => update('report_col_headers', { ...tpl.report_col_headers, [k]: e.target.value })}
+                  placeholder={label}
+                  style={{
+                    width: 60, fontSize: 10, padding: '1px 4px',
+                    border: '1px solid var(--b2)', borderRadius: 'var(--r1)',
+                    background: 'var(--bg3)', color: 'var(--t2)',
+                    fontFamily: 'Tajawal, sans-serif',
+                  }} />
+              </div>
+            ))}
+          </div>
+        )}
         <SectionTitle>ترتيب وتجميع</SectionTitle>
         <Field label="تجميع حسب">
           <Input value={tpl.group_by} onChange={v => update('group_by', v)} placeholder="مثال: category" />

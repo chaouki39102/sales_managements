@@ -59,9 +59,16 @@ function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
 function UniversalPreview({ tpl, data, company }: UniversalPreviewProps) {
   useEffect(() => { formulaEngine.clearCache(); }, [data]);
 
-  const isThermal = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
-  const isA4      = tpl.paper_size === 'A4';
-  const isA5      = tpl.paper_size === 'A5';
+  const isThermal   = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
+  const isA4        = tpl.paper_size === 'A4';
+  const isA5        = tpl.paper_size === 'A5';
+  const isLandscape = !isThermal && tpl.page_orientation === 'landscape';
+
+  const portraitW = isA4 ? 794 : 559;
+  const portraitH = isA4 ? 1123 : 794;
+  const paperWidth   = isThermal ? tpl.paper_width_mm * 3.78 : (isLandscape ? portraitH : portraitW);
+  const minHeight    = isThermal ? 'auto' : (isLandscape ? portraitW : portraitH);
+
   const co = useMemo(() => getCompany(tpl, company), [tpl, company]);
 
   const ruleResult = useMemo(() => {
@@ -84,11 +91,9 @@ function UniversalPreview({ tpl, data, company }: UniversalPreviewProps) {
     return null;
   };
 
-  const paperWidth   = isThermal ? tpl.paper_width_mm * 3.78 : (isA4 ? 794 : 559);
   const paddingTop   = isThermal ? mm(tpl.margin_top) : (isA4 ? 40 : 20);
   const paddingSide  = isThermal ? mm(tpl.margin_sides) : (isA4 ? 50 : 24);
   const paddingBottom = isThermal ? mm(tpl.margin_bottom) : (isA4 ? 40 : 20);
-  const minHeight    = isThermal ? 'auto' : (isA4 ? 1123 : 794);
 
   return (
     <div style={{

@@ -186,8 +186,20 @@ export default function PrintSettingsPage() {
     try {
       let savedTpl: PrintTemplate;
       if (localTpl.id) {
-        savedTpl = await mutations.update.mutateAsync({ id: localTpl.id, data: localTpl });
-        setLocalTpl({ ...savedTpl });
+        try {
+          savedTpl = await mutations.update.mutateAsync({ id: localTpl.id, data: localTpl });
+        } catch (e: any) {
+          if (e?.response?.status === 404) {
+            savedTpl = await mutations.create.mutateAsync({
+              ...localTpl, id: undefined,
+              doc_type_code: activeDoc,
+              is_default: templates.length === 0,
+            });
+            setSelectedTplId(savedTpl.id);
+          } else {
+            throw e;
+          }
+        }
       } else {
         savedTpl = await mutations.create.mutateAsync({
           ...localTpl,
@@ -195,8 +207,8 @@ export default function PrintSettingsPage() {
           is_default: templates.length === 0,
         });
         setSelectedTplId(savedTpl.id);
-        setLocalTpl({ ...savedTpl });
       }
+      setLocalTpl({ ...savedTpl });
       setIsDirty(false);
       try {
         await dbSaveTemplate(apiClient, activeDoc, savedTpl.paper_size, savedTpl as ReceiptTemplate80mm);

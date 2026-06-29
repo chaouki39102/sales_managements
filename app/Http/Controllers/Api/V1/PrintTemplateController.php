@@ -70,7 +70,11 @@ class PrintTemplateController extends BaseApiController
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            $template = PrintTemplate::findOrFail($id);
+            $template = PrintTemplate::find($id);
+
+            if (!$template) {
+                $template = new PrintTemplate();
+            }
 
             $validator = Validator::make($request->all(), [
                 'name'          => 'sometimes|string|max:255',
@@ -85,7 +89,9 @@ class PrintTemplateController extends BaseApiController
                 return $this->errorResponse($validator->errors()->first(), 422);
             }
 
-            $template->update($request->all());
+            $template->fill($request->all());
+            $template->save();
+
             return $this->successResponse($template->fresh(), 'تم تحديث القالب');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'update');

@@ -72,26 +72,53 @@ export function renderReport(tpl: PrintTemplate, data: UniversalDocumentData, is
       {tpl.show_report_top_products && r.topProducts.length > 0 && (
         <div style={{ marginTop: isThermal ? 4 : 12 }}>
           <div style={{ fontWeight: 700, fontSize: isThermal ? 11 : 13, marginBottom: 4 }}>
-            أفضل المنتجات مبيعاً
+            {tpl.group_by ? `تقرير حسب ${tpl.group_by}` : 'أفضل المنتجات مبيعاً'}
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: tpl.items_font_size }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #ddd' }}>
-                <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 700 }}>المنتج</th>
-                <th style={{ textAlign: 'center', padding: '4px 6px', fontWeight: 700 }}>الكمية</th>
-                <th style={{ textAlign: 'center', padding: '4px 6px', fontWeight: 700 }}>الإجمالي</th>
-              </tr>
-            </thead>
-            <tbody>
-              {r.topProducts.map((p, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '3px 6px' }}>{p.name}</td>
-                  <td style={{ textAlign: 'center', padding: '3px 6px' }}>{p.quantity}</td>
-                  <td style={{ textAlign: 'center', padding: '3px 6px' }}>{Number(p.totalTtc).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {(() => {
+            const sorted = [...r.topProducts];
+            if (tpl.sort_by === 'quantity') {
+              sorted.sort((a, b) => tpl.sort_direction === 'asc' ? a.quantity - b.quantity : b.quantity - a.quantity);
+            } else if (tpl.sort_by === 'total') {
+              sorted.sort((a, b) => tpl.sort_direction === 'asc' ? a.totalTtc - b.totalTtc : b.totalTtc - a.totalTtc);
+            } else {
+              sorted.sort((a, b) => {
+                const cmp = a.name.localeCompare(b.name);
+                return tpl.sort_direction === 'asc' ? cmp : -cmp;
+              });
+            }
+            return (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: tpl.items_font_size }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #ddd' }}>
+                    {(['product', 'quantity', 'total'] as const).map(col => (
+                      <th key={col} style={{
+                        width: `${tpl.report_col_widths[col] ?? (col === 'product' ? 50 : col === 'quantity' ? 20 : 30)}%`,
+                        textAlign: col === 'product' ? 'right' : 'center',
+                        padding: '4px 6px', fontWeight: 700,
+                      }}>
+                        {tpl.report_col_headers[col] || (col === 'product' ? 'المنتج' : col === 'quantity' ? 'الكمية' : 'الإجمالي')}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((p, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                      {(['product', 'quantity', 'total'] as const).map(col => (
+                        <td key={col} style={{
+                          width: `${tpl.report_col_widths[col] ?? (col === 'product' ? 50 : col === 'quantity' ? 20 : 30)}%`,
+                          textAlign: col === 'product' ? 'right' : 'center',
+                          padding: '3px 6px',
+                        }}>
+                          {col === 'product' ? p.name : col === 'quantity' ? p.quantity : Number(p.totalTtc).toFixed(2)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()}
         </div>
       )}
 

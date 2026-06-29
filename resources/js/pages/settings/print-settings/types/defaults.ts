@@ -164,6 +164,9 @@ export function createDefaultTemplate(
     show_report_summary_cards: true,
     show_report_payment_breakdown: true,
     show_report_top_products:  true,
+
+    report_col_widths:  { product: 50, quantity: 20, total: 30 },
+    report_col_headers: { product: 'المنتج', quantity: 'الكمية', total: 'الإجمالي' },
   };
 }
 

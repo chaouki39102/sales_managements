@@ -187,6 +187,9 @@ export interface PrintTemplate {
   show_report_summary_cards: boolean;
   show_report_payment_breakdown: boolean;
   show_report_top_products:  boolean;
+
+  report_col_widths:  Partial<Record<'product' | 'quantity' | 'total', number>>;
+  report_col_headers: Partial<Record<'product' | 'quantity' | 'total', string>>;
 }
 
 export type SectionTarget = 'header' | 'doc-info' | 'items' | 'totals' | 'payments' | 'footer';

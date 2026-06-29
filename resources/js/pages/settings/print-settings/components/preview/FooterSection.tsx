@@ -24,13 +24,23 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
     tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
     tpl.show_thank_you || tpl.show_returns_policy || tpl.footer_legal_text ||
     tpl.show_barcode || tpl.show_qr ||
-    tpl.show_cashier_signature || tpl.show_client_signature || tpl.show_stamp;
+    tpl.show_cashier_signature || tpl.show_client_signature || tpl.show_stamp ||
+    tpl.show_bank_details;
 
   if (!hasContent) return null;
 
   return (
     <div style={{ textAlign: 'center', fontSize: tpl.base_font_size - 0.5 }}>
       <Separator style={tpl.footer_separator} />
+
+      {tpl.show_bank_details && tpl.bank_details_text && (
+        <div style={{ marginBottom: 6, padding: '4px 0', borderBottom: '1px solid #ddd' }}>
+          <div style={{ fontWeight: 700, fontSize: tpl.base_font_size - 0.5, marginBottom: 2 }}>البيانات البنكية</div>
+          <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', whiteSpace: 'pre-line' }}>
+            {tpl.bank_details_text}
+          </div>
+        </div>
+      )}
 
       {tpl.footer_line1 && <div style={{ marginBottom: 2 }}>{tpl.footer_line1}</div>}
       {tpl.footer_line2 && <div style={{ marginBottom: 2 }}>{tpl.footer_line2}</div>}
@@ -218,7 +228,8 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
   const hasContent =
     tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
     tpl.show_thank_you || tpl.footer_legal_text ||
-    tpl.show_cashier_signature || tpl.show_client_signature;
+    tpl.show_cashier_signature || tpl.show_client_signature ||
+    tpl.show_bank_details;
 
   if (!hasContent) return null;
 
@@ -229,6 +240,14 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       borderTop: tpl.footer_separator === 'none' ? 'none' : '1.5px solid #111',
       paddingTop: 10,
     }}>
+      {tpl.show_bank_details && tpl.bank_details_text && (
+        <div style={{ marginBottom: 6, padding: '4px 0', borderBottom: '1px solid #ddd' }}>
+          <div style={{ fontWeight: 700, fontSize: tpl.base_font_size - 0.5, marginBottom: 2 }}>البيانات البنكية</div>
+          <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', whiteSpace: 'pre-line' }}>
+            {tpl.bank_details_text}
+          </div>
+        </div>
+      )}
       {tpl.footer_line1 && <div style={{ marginBottom: 1 }}>{tpl.footer_line1}</div>}
       {tpl.footer_line2 && <div style={{ marginBottom: 1 }}>{tpl.footer_line2}</div>}
 
