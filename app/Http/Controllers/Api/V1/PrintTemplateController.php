@@ -34,7 +34,7 @@ class PrintTemplateController extends BaseApiController
         }
     }
 
-    public function show($company, $id): JsonResponse
+    public function show($id): JsonResponse
     {
         try {
             $template = PrintTemplate::findOrFail($id);
@@ -67,7 +67,7 @@ class PrintTemplateController extends BaseApiController
         }
     }
 
-    public function update(Request $request, $company, $id): JsonResponse
+    public function update(Request $request, $id): JsonResponse
     {
         try {
             $template = PrintTemplate::findOrFail($id);
@@ -92,7 +92,7 @@ class PrintTemplateController extends BaseApiController
         }
     }
 
-    public function destroy($company, $id): JsonResponse
+    public function destroy($id): JsonResponse
     {
         try {
             $template = PrintTemplate::findOrFail($id);

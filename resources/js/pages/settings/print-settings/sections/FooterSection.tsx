@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ReceiptTemplate80mm } from '../types';
+import type { ReceiptTemplate80mm, BorderStyle } from '../types';
 import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { BorderSelect } from './HeaderSection';
 
@@ -30,7 +30,7 @@ export default function FooterSectionControls({ tpl, update }: Props) {
         </div>
 
         <BorderSelect label="فاصل التذييل" value={tpl.footer_separator}
-          onChange={v => update('footer_separator', v as any)} />
+          onChange={v => update('footer_separator', v as BorderStyle)} />
 
         <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
 
@@ -71,7 +71,7 @@ export default function FooterSectionControls({ tpl, update }: Props) {
           <div className="ps-field">
             <label className="ps-field-label">محتوى الباركود</label>
             <select className="ps-select" value={tpl.barcode_content}
-              onChange={e => update('barcode_content', e.target.value as any)}>
+              onChange={e => update('barcode_content', e.target.value as 'doc-number' | 'total' | 'custom')}>
               <option value="doc-number">رقم المستند</option>
               <option value="total">المبلغ الإجمالي</option>
               <option value="custom">نص مخصص</option>
@@ -89,7 +89,7 @@ export default function FooterSectionControls({ tpl, update }: Props) {
           <div className="ps-field">
             <label className="ps-field-label">محتوى QR</label>
             <select className="ps-select" value={tpl.qr_content}
-              onChange={e => update('qr_content', e.target.value as any)}>
+              onChange={e => update('qr_content', e.target.value as 'doc-number' | 'company-info' | 'both')}>
               <option value="doc-number">رقم المستند</option>
               <option value="company-info">معلومات الشركة</option>
               <option value="both">الاثنين معاً</option>

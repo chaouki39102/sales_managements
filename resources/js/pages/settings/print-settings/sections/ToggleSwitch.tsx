@@ -37,8 +37,7 @@ export function Section({ title, icon, children, defaultOpen = true, id, collaps
   const bodyRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     setOpen(defaultOpen);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapseVersion]);
+  }, [collapseVersion, defaultOpen]);
   return (
     <div className="ps-section" id={id}>
       <button className="ps-section-head" onClick={() => setOpen(o => !o)}>

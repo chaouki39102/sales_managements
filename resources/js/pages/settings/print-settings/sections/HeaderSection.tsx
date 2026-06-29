@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
-import type { ReceiptTemplate80mm, AlignOption, CompanyPreviewData } from '../types';
+import type { ReceiptTemplate80mm, AlignOption, CompanyPreviewData, BorderStyle } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
-import { printTemplatesApi } from '../api/printTemplatesApi';
+import { usePrintTemplatesApi } from '../providers/PrintSettingsContext';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 
 interface Props {
@@ -14,6 +14,7 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
   const [uploading, setUploading] = useState(false);
   const [zoomImg, setZoomImg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const templatesApi = usePrintTemplatesApi();
 
   const logoPreviewUrl = tpl.logo_source === 'custom' ? tpl.custom_logo_url
     : tpl.logo_source === 'company' ? (company?.logoUrl ?? null)
@@ -24,7 +25,7 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
     if (!file) return;
     setUploading(true);
     try {
-      const res = await printTemplatesApi.uploadLogo(file);
+      const res = await templatesApi.uploadLogo(file);
       update('custom_logo_url', res.url);
       update('logo_source', 'custom');
     } catch {
@@ -145,7 +146,7 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
       <CompanyField label="النشاط" value={tpl.override_article} onChange={v => update('override_article', v)} placeholder="نشاط المؤسسة" apiValue={company?.article} />
 
       <BorderSelect label="فاصل الرأس" value={tpl.header_separator}
-        onChange={v => update('header_separator', v as any)} />
+        onChange={v => update('header_separator', v as BorderStyle)} />
     </>
   );
 }
@@ -169,7 +170,7 @@ export function AlignButtons({ label, value, onChange }: {
 }
 
 export function BorderSelect({ label, value, onChange }: {
-  label: string; value: 'solid' | 'dashed' | 'double' | 'none'; onChange: (v: any) => void;
+  label: string; value: BorderStyle; onChange: (v: BorderStyle) => void;
 }) {
   return (
     <div className="ps-field">

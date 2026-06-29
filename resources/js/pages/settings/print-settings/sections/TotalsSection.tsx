@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ReceiptTemplate80mm } from '../types';
+import type { ReceiptTemplate80mm, BorderStyle } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { AlignButtons, BorderSelect } from './HeaderSection';
 
@@ -33,7 +33,7 @@ export default function TotalsSectionControls({ tpl, update }: Props) {
             onChange={v => update('total_ttc_font_size', v)} />
           <Toggle value={tpl.total_ttc_bold} onChange={v => update('total_ttc_bold', v)} label="خط عريض" />
           <BorderSelect label="إطار TTC" value={tpl.total_border_style}
-            onChange={v => update('total_border_style', v as any)} />
+            onChange={v => update('total_border_style', v as BorderStyle)} />
         </>
       )}
 

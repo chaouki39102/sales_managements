@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ReceiptTemplate80mm } from '../types';
+import type { ReceiptTemplate80mm, BorderStyle } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { AlignButtons, BorderSelect } from './HeaderSection';
 
@@ -44,7 +44,7 @@ export default function DocumentSectionControls({ tpl, update }: Props) {
       <Toggle value={tpl.show_payment_term} onChange={v => update('show_payment_term', v)} label="شروط الدفع" />
 
       <BorderSelect label="فاصل المستند" value={tpl.doc_separator}
-        onChange={v => update('doc_separator', v as any)} />
+        onChange={v => update('doc_separator', v as BorderStyle)} />
     </>
   );
 }

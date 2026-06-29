@@ -5,7 +5,7 @@ export function Accordion({ title, icon, id, children, defaultOpen = false, coll
   children: React.ReactNode; defaultOpen?: boolean; collapseVersion?: number;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  useEffect(() => { setOpen(defaultOpen); }, [collapseVersion]);
+  useEffect(() => { setOpen(defaultOpen); }, [collapseVersion, defaultOpen]);
   return (
     <div
       id={id}

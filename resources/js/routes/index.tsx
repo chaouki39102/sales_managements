@@ -60,7 +60,7 @@ const ProfilePage   = lazy(() => import('@/pages/profile/ProfilePage'));
 // â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SettingsPage       = lazy(() => import('@/pages/settings/SettingsPage'));
 const DocumentTypesPage  = lazy(() => import('@/pages/settings/DocumentTypesPage'));
-const PrintSettingsPage  = lazy(() => import('@/pages/settings/print-settings/PrintSettingsPage'));
+const PrintSettingsPage  = lazy(() => import('@/pages/settings/print-settings-adapter'));
 const ReportDesignerPage = lazy(() => import('@/pages/settings/report-designer/ReportDesignerPage'));
 
 // â”€â”€ Tenant Lookups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

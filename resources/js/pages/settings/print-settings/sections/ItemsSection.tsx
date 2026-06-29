@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ReceiptTemplate80mm, ColumnKey } from '../types';
+import type { ReceiptTemplate80mm, ColumnKey, FontFamily, BorderStyle } from '../types';
 import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { BorderSelect } from './HeaderSection';
 
@@ -129,7 +129,7 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
         <div className="ps-field">
           <label className="ps-field-label">نوع الخط</label>
           <select className="ps-select" value={tpl.items_font_family}
-            onChange={e => update('items_font_family', e.target.value as any)}>
+            onChange={e => update('items_font_family', e.target.value as FontFamily)}>
             <option value="tajawal">Tajawal (واضح)</option>
             <option value="monospace">Courier (أحادي)</option>
           </select>
@@ -153,7 +153,7 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
         )}
 
         <BorderSelect label="حدود الجدول" value={tpl.table_border_style}
-          onChange={v => update('table_border_style', v as any)} />
+          onChange={v => update('table_border_style', v as BorderStyle)} />
         <Toggle value={tpl.alternating_rows} onChange={v => update('alternating_rows', v)} label="تلوين متناوب للأسطر" />
       </Section>
 

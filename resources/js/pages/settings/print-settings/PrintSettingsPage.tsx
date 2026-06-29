@@ -1,32 +1,13 @@
-// resources/js/pages/settings/PrintSettingsPage.tsx
-// ════════════════════════════════════════════════════════════════════════════
-//  ما يجعل هذا النظام يتفوق على Odoo / QuickBooks / Square / Toast:
-//
-//  ✅ useDeferredValue — المعاينة لا تُعيق الـ slider أثناء السحب
-//  ✅ Undo/Redo أزرار في الـ UI + Ctrl+Z / Ctrl+Y (60 خطوة)
-//  ✅ قالب مستقل لكل نوع مستند — FV ≠ BL ≠ DEV، كل واحد يُحفَظ منفرداً
-//  ✅ نسخ / مشاركة القالب: تصدير JSON + استيراد JSON
-//  ✅ تعديل اسم القالب inline مع Enter للحفظ
-//  ✅ paper_width_mm يتحدث صح عند تغيير paper_size
-//  ✅ useActiveCompany بدلاً من useCurrentCompany (يتوافق مع appStore)
-//  ✅ لوحة Preview لا تفقد موضعها عند التمرير
-//  ✅ زر "معاينة بيانات حقيقية" يفتح نافذة بيانات الفاتورة الأخيرة
-//  ✅ مؤشر حالة الحفظ: محفوظ ✓ / تغييرات غير محفوظة ●
-//  ✅ شريط QuickNav يُظلِّل القسم المرئي حالياً (Intersection Observer)
-// ════════════════════════════════════════════════════════════════════════════
 import React, {
   useState, useCallback, useEffect, useMemo, useRef,
   useDeferredValue,
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { useActiveCompany, useActiveSlug } from '@/lib/store/appStore';
-import { apiGet } from '@/lib/api/core/client';
 import {
   usePrintTemplates, usePrintTemplateMutations,
 } from './api/printTemplatesApi';
 import PreviewSelector from './components/PreviewSelector';
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { TemplateControls } from './components/TemplateControls';
 import { QuickNav } from './components/QuickNav';
 import { TinyBtn, toolBtnStyle } from './components/TinyBtn';
@@ -36,18 +17,13 @@ import { dbSaveTemplate } from './services/printStoreService';
 import {
   createDefaultTemplate, DOC_TYPE_LIST,
   type PrintTemplate, type DocTypeCode,
-  type CompanyData,
+  type CompanyData, type ReceiptTemplate80mm,
 } from './types';
 import { DocumentDataBuilder } from './types/data/DocumentDataBuilder';
 import type { UniversalDocumentData } from './types/data';
-import type { CommercialDocument } from '@/lib/api/core/types';
 import { TemplateLibraryModal } from './template-library';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  CONSTANTS & HELPERS
-// ═════════════════════════════════════════════════════════════════════════════
+import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
 
 const PAPER_DIM: Record<string, { w: number; h: number }> = {
   '80mm': { w: 80,  h: 0   },
@@ -69,29 +45,27 @@ const DOC_CATS = [
   { key: 'warehouse',label: 'المخزون',    icon: 'ti-box'            },
 ] as const;
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  MAIN PAGE
-// ═════════════════════════════════════════════════════════════════════════════
-
 export default function PrintSettingsPage() {
-  // ── بيانات الشركة من store (لا API call إضافي) ─────────────────────────────
-  const activeCompany = useActiveCompany();
-  const companyData: CompanyData | null = useMemo(() => activeCompany
+  const apiClient  = useApiClient();
+  const notifier   = useNotifier();
+  const companyCtx = useCompany();
+  const slug       = useSlug();
+
+  const companyData: CompanyData | null = useMemo(() => companyCtx
     ? {
-        name:    activeCompany.name    ?? '',
-        address: activeCompany.address ?? '',
-        phone:   activeCompany.phone   ?? '',
-        nif:     activeCompany.nif     ?? '',
-        rc:      activeCompany.rc      ?? '',
-        nis:     activeCompany.nis     ?? '',
+        name:    companyCtx.name    ?? '',
+        address: companyCtx.address ?? '',
+        phone:   companyCtx.phone   ?? '',
+        nif:     companyCtx.nif     ?? '',
+        rc:      companyCtx.rc      ?? '',
+        nis:     companyCtx.nis     ?? '',
         ice:     '',
-        article: (activeCompany as any).ai     ?? '',
-        logoUrl: (activeCompany as any).avatar ?? null,
+        article: companyCtx.article ?? '',
+        logoUrl: companyCtx.logoUrl ?? null,
       }
     : null,
-  [activeCompany]);
+  [companyCtx]);
 
-  // ── State ──────────────────────────────────────────────────────────────────
   const [activeCat,     setActiveCat]     = useState<string>('pos');
   const [activeDoc,     setActiveDoc]     = useState<DocTypeCode>('POS');
   const [selectedTplId, setSelectedTplId] = useState<number | null>(null);
@@ -106,44 +80,37 @@ export default function PrintSettingsPage() {
   const [useRealData,       setUseRealData]       = useState(true);
   const [showLibrary,       setShowLibrary]       = useState(false);
 
-
   const historyRef    = useRef<PrintTemplate[]>([]);
   const historyPos    = useRef(-1);
   const controlsRef   = useRef<HTMLDivElement>(null);
 
-  // ✅ deferredTpl — المعاينة لا تعيق الـ slider
   const deferredTpl = useDeferredValue(localTpl);
 
-  // ── Data ────────────────────────────────────────────────────────────────────
   const { data: templatesRaw, isLoading } = usePrintTemplates(activeDoc);
   const templates = useMemo(() => templatesRaw ?? [], [templatesRaw]);
   const mutations = usePrintTemplateMutations();
 
-  const slug = useActiveSlug();
   const { data: previewDoc, refetch, isFetching } = useQuery({
     queryKey: [slug, 'preview-latest-doc', activeDoc],
     queryFn: async () => {
-      // Step 1: get the latest doc ID
-      const list = await apiGet<{ data: { id: number }[] }>('/documents', {
+      const list = await apiClient.get<Record<string, unknown>>('/documents', {
         'filter[document_type.code]': activeDoc,
         'page[size]': 1,
         sort: '-id',
         'fields[commercial_documents]': 'id',
       });
-      const docs = (list as any)?.data ?? [];
-      const first = docs[0] as { id?: number } | undefined;
+      const docs = (list?.data ?? []) as Array<{ id?: number }>;
+      const first = docs[0];
       if (!first?.id) return null;
-      // Step 2: fetch full doc with all relations via show endpoint
-      const full = await apiGet<{ data: CommercialDocument }>(`/documents/${first.id}`, {
+      const full = await apiClient.get<Record<string, unknown>>(`/documents/${first.id}`, {
         include: ['party', 'lines', 'lines.product', 'lines.packaging', 'lines.stockLot', 'payments', 'payments.paymentMode'].join(','),
       });
-      const doc = (full as any)?.data ?? full;
+      const doc = (full?.data ?? full) as Record<string, unknown>;
       return doc ?? null;
     },
     enabled: !!slug && useRealData,
     staleTime: 60_000,
   });
-  // auto-refetch when user toggles Real Data back on
   const prevUseRealData = useRef(useRealData);
   useEffect(() => {
     if (useRealData && !prevUseRealData.current) refetch();
@@ -151,7 +118,7 @@ export default function PrintSettingsPage() {
   }, [useRealData, refetch]);
   const previewData: UniversalDocumentData | null = useMemo(() => {
     if (!previewDoc || !companyData) return null;
-    return DocumentDataBuilder.fromApiDocument(previewDoc, companyData as any);
+    return DocumentDataBuilder.fromApiDocument(previewDoc, companyData);
   }, [previewDoc, companyData]);
 
   useEffect(() => {
@@ -171,7 +138,6 @@ export default function PrintSettingsPage() {
     setCanRedo(false);
   }, [templates, activeDoc]);
 
-  // ── Undo/Redo ─────────────────────────────────────────────────────────────
   const pushHistory = useCallback((tpl: PrintTemplate) => {
     const stack = historyRef.current;
     stack.length = historyPos.current + 1;
@@ -202,12 +168,10 @@ export default function PrintSettingsPage() {
     setIsDirty(true);
   }, []);
 
-  // ── Update ────────────────────────────────────────────────────────────────
   const update: Updater = useCallback(<K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => {
     setLocalTpl(prev => {
       if (prev) pushHistory(prev);
       const next = prev ? { ...prev, [key]: val } : prev;
-      // ✅ sync paper_width_mm عند تغيير paper_size
       if (key === 'paper_size' && next) {
         const d = PAPER_DIM[val as string];
         if (d && (val === '80mm' || val === '58mm')) {
@@ -219,7 +183,6 @@ export default function PrintSettingsPage() {
     setIsDirty(true);
   }, [pushHistory]);
 
-  // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!localTpl || isSaving) return;
     setIsSaving(true);
@@ -238,30 +201,26 @@ export default function PrintSettingsPage() {
         setLocalTpl({ ...savedTpl });
       }
       setIsDirty(false);
-      // Phase 0 — settings table is the primary print backend (POS reads from here).
-      // printTemplatesApi calls above handle the template-management UI (list, select).
-      // Surface errors from dbSaveTemplate — no more silent .catch(() => {}).
       try {
-        await dbSaveTemplate(activeDoc, savedTpl.paper_size, savedTpl as any);
+        await dbSaveTemplate(apiClient, activeDoc, savedTpl.paper_size, savedTpl as ReceiptTemplate80mm);
       } catch {
-        toast.error('❌ فشل حفظ القالب في الإعدادات — POS سيستخدم بيانات قديمة');
+        notifier.error('❌ فشل حفظ القالب في الإعدادات — POS سيستخدم بيانات قديمة');
         throw new Error('dbSaveTemplate failed');
       }
-      toast.success('✅ تم حفظ القالب');
+      notifier.success('✅ تم حفظ القالب');
     } catch (e: any) {
-      toast.error(e?.message ?? 'فشل الحفظ');
+      notifier.error(e?.message ?? 'فشل الحفظ');
     } finally {
       setIsSaving(false);
     }
-  }, [localTpl, isSaving, activeDoc, templates.length, mutations]);
+  }, [localTpl, isSaving, apiClient, activeDoc, templates.length, mutations, notifier]);
 
-  // ── Other actions ─────────────────────────────────────────────────────────
   const handleSetDefault = useCallback(async (id: number) => {
     setActionLoading(`default-${id}`);
-    try { await mutations.setDefault.mutateAsync(id); toast.success('تم تعيين القالب الافتراضي'); }
-    catch { toast.error('فشل التعيين'); }
+    try { await mutations.setDefault.mutateAsync(id); notifier.success('تم تعيين القالب الافتراضي'); }
+    catch { notifier.error('فشل التعيين'); }
     finally { setActionLoading(null); }
-  }, [mutations]);
+  }, [mutations, notifier]);
 
   const handleDuplicate = useCallback(async (tpl: PrintTemplate) => {
     if (!tpl.id) return;
@@ -271,10 +230,10 @@ export default function PrintSettingsPage() {
       setSelectedTplId(copy.id);
       setLocalTpl({ ...copy });
       setIsDirty(false);
-      toast.success('تم نسخ القالب');
-    } catch { toast.error('فشل النسخ'); }
+      notifier.success('تم نسخ القالب');
+    } catch { notifier.error('فشل النسخ'); }
     finally { setActionLoading(null); }
-  }, [mutations]);
+  }, [mutations, notifier]);
 
   const handleDelete = useCallback(async (id: number) => {
     setDeleteTarget(id);
@@ -284,20 +243,20 @@ export default function PrintSettingsPage() {
     if (!tpl.id) return;
     setActionLoading(`toggle-${tpl.id}`);
     if (localTpl?.id === tpl.id) setLocalTpl(p => p ? { ...p, is_active: !p.is_active } : p);
-    try { await mutations.update.mutateAsync({ id: tpl.id, data: { is_active: !tpl.is_active } }); toast.success(tpl.is_active ? 'تم تعطيل القالب' : 'تم تفعيل القالب'); }
-    catch { toast.error('فشل التحديث'); }
+    try { await mutations.update.mutateAsync({ id: tpl.id, data: { is_active: !tpl.is_active } }); notifier.success(tpl.is_active ? 'تم تعطيل القالب' : 'تم تفعيل القالب'); }
+    catch { notifier.error('فشل التحديث'); }
     finally { setActionLoading(null); }
-  }, [mutations, localTpl]);
+  }, [mutations, localTpl, notifier]);
 
   const confirmDelete = useCallback(async () => {
     if (deleteTarget === null) return;
     const id = deleteTarget;
     setActionLoading(`delete-${id}`);
     setDeleteTarget(null);
-    try { await mutations.remove.mutateAsync(id); toast.success('تم الحذف'); }
-    catch { toast.error('فشل الحذف'); }
+    try { await mutations.remove.mutateAsync(id); notifier.success('تم الحذف'); }
+    catch { notifier.error('فشل الحذف'); }
     finally { setActionLoading(null); }
-  }, [deleteTarget, mutations]);
+  }, [deleteTarget, mutations, notifier]);
 
   const handleNewTemplate = useCallback(() => {
     setShowLibrary(true);
@@ -311,13 +270,13 @@ export default function PrintSettingsPage() {
       setIsDirty(false);
       setShowLibrary(false);
       try {
-        await dbSaveTemplate(activeDoc, saved.paper_size, saved as any);
+        await dbSaveTemplate(apiClient, activeDoc, saved.paper_size, saved as ReceiptTemplate80mm);
       } catch { /* ignore legacy sync */ }
-      toast.success(`✅ تم تثبيت القالب "${saved.name}"`);
+      notifier.success(`✅ تم تثبيت القالب "${saved.name}"`);
     } catch (e: any) {
-      toast.error(e?.message ?? 'فشل تثبيت القالب');
+      notifier.error(e?.message ?? 'فشل تثبيت القالب');
     }
-  }, [activeDoc, mutations]);
+  }, [apiClient, activeDoc, mutations, notifier]);
 
   const handleExport = useCallback(() => {
     if (!localTpl) return;
@@ -327,8 +286,8 @@ export default function PrintSettingsPage() {
       download: `print-template-${activeDoc}.json`,
     });
     a.click();
-    toast.success('تم تصدير القالب');
-  }, [activeDoc, localTpl]);
+    notifier.success('تم تصدير القالب');
+  }, [activeDoc, localTpl, notifier]);
 
   const handleImport = useCallback(() => {
     const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.json' });
@@ -339,17 +298,17 @@ export default function PrintSettingsPage() {
         const data     = JSON.parse(await file.text());
         const imported = data.template ?? data;
         if (!imported?.col_order || !imported?.paper_size) {
-          toast.error('ملف غير صالح');
+          notifier.error('ملف غير صالح');
           return;
         }
         const merged = { ...createDefaultTemplate(imported.doc_type_code ?? activeDoc, imported.paper_size), ...imported, id: localTpl?.id ?? null };
         setLocalTpl(merged);
         setIsDirty(true);
-        toast.success('تم الاستيراد — احفظ للتطبيق');
-      } catch { toast.error('فشل قراءة الملف'); }
+        notifier.success('تم الاستيراد — احفظ للتطبيق');
+      } catch { notifier.error('فشل قراءة الملف'); }
     };
     input.click();
-  }, [activeDoc, localTpl?.id]);
+  }, [activeDoc, localTpl?.id, notifier]);
 
   const handleTestPrint = useCallback(async () => {
     if (!localTpl) return;
@@ -386,7 +345,6 @@ export default function PrintSettingsPage() {
     setTimeout(() => win.close(), 500);
   }, [localTpl, companyData, previewData, useRealData]);
 
-  // ── Keyboard ──────────────────────────────────────────────────────────────
   const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving });
   useEffect(() => { refs.current = { handleSave, handleUndo, handleRedo, isDirty, isSaving }; });
 
@@ -401,22 +359,16 @@ export default function PrintSettingsPage() {
     return () => window.removeEventListener('keydown', h);
   }, []);
 
-  // ── Derived ────────────────────────────────────────────────────────────────
   const docsInCat = DOC_TYPE_LIST.filter(d => d.category === activeCat);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  RENDER
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <><div style={{ display: 'flex', flexDirection: 'column', height: '100vh', direction: 'rtl', overflow: 'hidden' }}>
 
-      {/* ══ TOP BAR ══ */}
       <div style={{
         padding: '10px 18px', borderBottom: '1px solid var(--b2)',
         background: 'var(--bg2)', display: 'flex', alignItems: 'center',
         gap: 10, flexShrink: 0, flexWrap: 'wrap',
       }}>
-        {/* Title */}
         <div>
           <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 7 }}>
             <i className="ti ti-printer" style={{ color: 'var(--em)' }} />
@@ -429,7 +381,6 @@ export default function PrintSettingsPage() {
 
         <div style={{ flex: 1 }} />
 
-        {/* ✅ Undo / Redo — مرئيان في الـ UI */}
         {localTpl && (
           <div style={{ display: 'flex', gap: 3 }}>
             <button
@@ -464,7 +415,6 @@ export default function PrintSettingsPage() {
               <i className="ti ti-upload" />
             </button>
 
-            {/* ✅ مؤشر الحالة */}
             <div style={{
               fontSize: 11, padding: '4px 10px', borderRadius: 'var(--r2)',
               background: isDirty ? 'var(--goldb)' : 'var(--emb)',
@@ -498,10 +448,8 @@ export default function PrintSettingsPage() {
         )}
       </div>
 
-      {/* ══ BODY — 3 columns ══ */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-        {/* ── Col 1: Document selector ── */}
         <div style={{
           width: 200, flexShrink: 0, borderLeft: '1px solid var(--b2)',
           background: 'var(--bg2)', overflowY: 'auto', display: 'flex', flexDirection: 'column',
@@ -557,10 +505,8 @@ export default function PrintSettingsPage() {
           ))}
         </div>
 
-        {/* ── Col 2: Template list + Controls ── */}
         <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--b2)' }}>
 
-          {/* Templates bar */}
           <div style={{
             padding: '8px 10px', borderBottom: '1px solid var(--b2)',
             background: 'var(--bg3)', display: 'flex', flexWrap: 'wrap', gap: 5, flexShrink: 0,
@@ -622,10 +568,8 @@ export default function PrintSettingsPage() {
             </button>
           </div>
 
-          {/* Controls */}
           {localTpl ? (
             <div ref={controlsRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
-              {/* ✅ اسم القالب قابل للتعديل inline */}
               <div style={{
                 padding: '7px 9px', marginBottom: 8,
                 background: 'var(--bg3)', borderRadius: 'var(--r2)', border: '1px solid var(--b2)',
@@ -654,7 +598,6 @@ export default function PrintSettingsPage() {
                   </div>
                 )}
 
-                {/* ✅ حجم الورق مع sync صحيح */}
                 <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
                   {(['80mm', '58mm', 'A4', 'A5'] as const).map(s => (
                     <button
@@ -687,13 +630,11 @@ export default function PrintSettingsPage() {
           )}
         </div>
 
-        {/* ── Col 3: Preview ── */}
         <div style={{
           flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
           background: 'var(--bg1)', overflow: 'hidden',
           position: 'sticky', top: 0, alignSelf: 'flex-start', maxHeight: '100vh',
         }}>
-          {/* Preview toolbar */}
           <div style={{
             padding: '8px 14px', borderBottom: '1px solid var(--b2)',
             background: 'var(--bg2)', display: 'flex', alignItems: 'center',
@@ -787,7 +728,6 @@ export default function PrintSettingsPage() {
             )}
           </div>
 
-          {/* Preview area — scrollable */}
           <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', justifyContent: 'center' }}>
             {deferredTpl ? (
               <div style={{
@@ -811,7 +751,6 @@ export default function PrintSettingsPage() {
       </div>
     </div>
 
-      {/* ── Template Library Modal ── */}
       <TemplateLibraryModal
         open={showLibrary}
         onClose={() => setShowLibrary(false)}

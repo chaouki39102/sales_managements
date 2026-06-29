@@ -1,14 +1,18 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { apiGet, apiPost, apiPut, apiDelete, apiUpload } from '@/lib/api/core/client';
-import { useActiveSlug } from '@/lib/store/appStore';
+import type { ApiClient } from '../contracts/ApiClient';
+import type { PrintTemplatesApi } from '../contracts/TemplateRepository';
 import type { PrintTemplate, PrintTemplateApiResponse, DocTypeCode } from '../types';
 import type { LibraryApiResponse } from '../template-library/types';
+import { usePrintTemplatesApi, useSlug } from '../providers/PrintSettingsContext';
 
+// ─── Query key factory ─────────────────────────────────────────────────────
 export const printTemplateKeys = {
   all:     (slug: string)              => [slug, 'print-templates']              as const,
   list:    (slug: string, code?: string) => [slug, 'print-templates', 'list', code] as const,
   detail:  (slug: string, id: number)  => [slug, 'print-templates', id]         as const,
 };
+
+// ─── Pure helpers (no external deps) ───────────────────────────────────────
 
 function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
   const {
@@ -16,7 +20,6 @@ function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
     created_at, updated_at,
     ...config
   } = tpl as PrintTemplate;
-
   return {
     name:          name          ?? 'قالب جديد',
     doc_type_code: doc_type_code ?? 'FV',
@@ -41,57 +44,62 @@ function fromApiResponse(r: PrintTemplateApiResponse): PrintTemplate {
   } as PrintTemplate;
 }
 
-export const printTemplatesApi = {
-  list: (docTypeCode?: string) =>
-    apiGet<PrintTemplateApiResponse[]>('/print-templates', docTypeCode
-      ? { doc_type_code: docTypeCode } : undefined)
-      .then(r => (Array.isArray(r) ? r : (r as any)?.data ?? []).map(fromApiResponse)),
+// ─── Factory: creates PrintTemplatesApi from an ApiClient ──────────────────
 
-  show: (id: number) =>
-    apiGet<PrintTemplateApiResponse>(`/print-templates/${id}`)
-      .then(fromApiResponse),
+export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
+  return {
+    list: (docTypeCode?: string) =>
+      api.get<PrintTemplateApiResponse[]>('/print-templates', docTypeCode
+        ? { doc_type_code: docTypeCode } : undefined)
+        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as PrintTemplateApiResponse[]).map(fromApiResponse)),
 
-  create: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) =>
-    apiPost<PrintTemplateApiResponse>('/print-templates', toApiPayload(tpl as any))
-      .then(fromApiResponse),
+    show: (id: number) =>
+      api.get<PrintTemplateApiResponse>(`/print-templates/${id}`)
+        .then(fromApiResponse),
 
-  update: (id: number, tpl: Partial<PrintTemplate>) =>
-    apiPut<PrintTemplateApiResponse>(`/print-templates/${id}`, toApiPayload(tpl))
-      .then(fromApiResponse),
+    create: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) =>
+      api.post<PrintTemplateApiResponse>('/print-templates', toApiPayload(tpl as unknown as Partial<PrintTemplate>))
+        .then(fromApiResponse),
 
-  delete: (id: number) =>
-    apiDelete(`/print-templates/${id}`),
+    update: (id: number, tpl: Partial<PrintTemplate>) =>
+      api.put<PrintTemplateApiResponse>(`/print-templates/${id}`, toApiPayload(tpl))
+        .then(fromApiResponse),
 
-  setDefault: (id: number) =>
-    apiPost<PrintTemplateApiResponse>(`/print-templates/${id}/set-default`)
-      .then(fromApiResponse),
+    delete: (id: number) =>
+      api.delete(`/print-templates/${id}`),
 
-  duplicate: (id: number, newName: string) =>
-    apiPost<PrintTemplateApiResponse>(`/print-templates/${id}/duplicate`, { name: newName })
-      .then(fromApiResponse),
+    setDefault: (id: number) =>
+      api.post<PrintTemplateApiResponse>(`/print-templates/${id}/set-default`)
+        .then(fromApiResponse),
 
-  library: () =>
-    apiGet<LibraryApiResponse[]>('/print-templates/library')
-      .then(r => (Array.isArray(r) ? r : (r as any)?.data ?? [])),
+    duplicate: (id: number, newName: string) =>
+      api.post<PrintTemplateApiResponse>(`/print-templates/${id}/duplicate`, { name: newName })
+        .then(fromApiResponse),
 
-  installLibrary: (templateId: string) =>
-    apiPost<PrintTemplateApiResponse>('/print-templates/library/install', { template_id: templateId })
-      .then(fromApiResponse),
+    library: () =>
+      api.get<LibraryApiResponse[]>('/print-templates/library')
+        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as LibraryApiResponse[])),
 
-  uploadLogo: (file: File, onProgress?: (p: number) => void) => {
-    const fd = new FormData();
-    fd.append('logo', file);
-    return apiUpload<{ path: string; url: string }>('/print-templates/upload-logo', fd, onProgress);
-  },
-} as const;
+    installLibrary: (templateId: string) =>
+      api.post<PrintTemplateApiResponse>('/print-templates/library/install', { template_id: templateId })
+        .then(fromApiResponse),
 
-// ─── Hooks ────────────────────────────────────────────────────────────────────
+    uploadLogo: (file: File, onProgress?: (p: number) => void) => {
+      const fd = new FormData();
+      fd.append('logo', file);
+      return api.upload<{ path: string; url: string }>('/print-templates/upload-logo', fd, onProgress);
+    },
+  };
+}
+
+// ─── React Query hooks (depend on context for api + slug) ─────────────────
 
 export function usePrintTemplates(docTypeCode?: DocTypeCode) {
-  const slug = useActiveSlug();
+  const api = usePrintTemplatesApi();
+  const slug = useSlug();
   return useQuery({
     queryKey:        printTemplateKeys.list(slug ?? '', docTypeCode),
-    queryFn:         () => printTemplatesApi.list(docTypeCode),
+    queryFn:         () => api.list(docTypeCode),
     enabled:         !!slug,
     staleTime:       5 * 60_000,
     placeholderData: keepPreviousData,
@@ -99,17 +107,19 @@ export function usePrintTemplates(docTypeCode?: DocTypeCode) {
 }
 
 export function usePrintTemplate(id: number | null | undefined) {
-  const slug = useActiveSlug();
+  const api = usePrintTemplatesApi();
+  const slug = useSlug();
   return useQuery({
     queryKey:  printTemplateKeys.detail(slug ?? '', id!),
-    queryFn:   () => printTemplatesApi.show(id!),
+    queryFn:   () => api.show(id!),
     enabled:   !!slug && !!id,
     staleTime: 5 * 60_000,
   });
 }
 
 export function usePrintTemplateMutations() {
-  const slug = useActiveSlug();
+  const api = usePrintTemplatesApi();
+  const slug = useSlug();
   const qc   = useQueryClient();
 
   const invalidateAll = () => {
@@ -125,35 +135,34 @@ export function usePrintTemplateMutations() {
 
   const create = useMutation({
     mutationFn: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) =>
-      printTemplatesApi.create(tpl),
+      api.create(tpl),
     onSuccess: invalidateAll,
   });
 
   const update = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<PrintTemplate> }) =>
-      printTemplatesApi.update(id, data),
+      api.update(id, data),
     onSuccess: invalidateOne,
   });
 
   const remove = useMutation({
-    mutationFn: printTemplatesApi.delete,
+    mutationFn: api.delete,
     onSuccess:  invalidateAll,
   });
 
   const setDefault = useMutation({
-    mutationFn: printTemplatesApi.setDefault,
+    mutationFn: api.setDefault,
     onSuccess:  invalidateAll,
   });
 
   const duplicate = useMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) =>
-      printTemplatesApi.duplicate(id, name),
+      api.duplicate(id, name),
     onSuccess: invalidateAll,
   });
 
   const installLibrary = useMutation({
-    mutationFn: (payload: Parameters<typeof printTemplatesApi.installLibrary>[0]) =>
-      printTemplatesApi.installLibrary(payload),
+    mutationFn: api.installLibrary,
     onSuccess: invalidateAll,
   });
 

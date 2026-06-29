@@ -2,15 +2,34 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  POS Print Store — Device layer only (localStorage printer selection).
 //
-//  DB layer functions (dbSaveTemplate, dbFetchTemplates, etc.) are now
-//  canonical in print-settings/. Re-exported here for backward compat.
+//  DB layer functions are now in print-settings/ with an ApiClient-first
+//  signature. We wrap them here with the host's HTTP client so POS code
+//  retains the same calling convention it always had.
 // ════════════════════════════════════════════════════════════════════════════
 
-export {
-  DB_KEY_TEMPLATES, DB_KEY_DOC_CONFIGS, tplKey,
-  dbFetchTemplates, dbFetchTemplate, dbSaveTemplate,
-  dbCopyTemplate, dbSaveDocConfigs, dbFetchDocConfigs,
+import { apiGet, apiPatch } from '@/lib/api/core/client';
+import {
+  dbFetchTemplates as _dbFetchTemplates,
+  dbFetchTemplate   as _dbFetchTemplate,
+  dbSaveTemplate    as _dbSaveTemplate,
+  dbCopyTemplate    as _dbCopyTemplate,
+  dbSaveDocConfigs  as _dbSaveDocConfigs,
+  dbFetchDocConfigs as _dbFetchDocConfigs,
 } from '@/pages/settings/print-settings/services/printStoreService';
+
+// Minimal ApiClient adapter — only the methods printStoreService uses
+const hostApi = { get: apiGet, patch: apiPatch } as any;
+
+export const DB_KEY_TEMPLATES   = 'print:templates';
+export const DB_KEY_DOC_CONFIGS = 'print:doc_configs';
+export const tplKey = (docCode: string, size: string) => `${docCode}_${size}`;
+
+export const dbFetchTemplates = ()         => _dbFetchTemplates(hostApi);
+export const dbFetchTemplate  = (docCode: string, size: string) => _dbFetchTemplate(hostApi, docCode, size as any);
+export const dbSaveTemplate   = (docCode: string, size: string, tpl: any) => _dbSaveTemplate(hostApi, docCode, size as any, tpl);
+export const dbCopyTemplate   = (sourceCode: string, targetCode: string, size: string) => _dbCopyTemplate(hostApi, sourceCode, targetCode, size as any);
+export const dbSaveDocConfigs = (configs: any[]) => _dbSaveDocConfigs(hostApi, configs);
+export const dbFetchDocConfigs = ()         => _dbFetchDocConfigs(hostApi);
 
 import type { DetectedPrinter, PaperSize } from '@/pages/settings/print-settings/types';
 import type { DocumentPrintConfig, ReceiptTemplate80mm } from '@/pages/settings/print-settings/types';
