@@ -177,6 +177,18 @@ resources/js/reporting/
 
 ---
 
+## Critical Context
+- **`formulaEngine` و `rulesEngine` هما singleton instances** — `reporting/index.ts` يُعيد التصدير من `print-settings/services/engines/...` لضمان مرجع واحد في التطبيق بكامله
+- **`print-settings/index.ts`** هو الواجهة العامة للوحدة — يُصدّر `PrintSettingsPage`, `PreviewSelector`, وأنواع PrintTemplate
+- **`PrintSettingsPage.tsx` الآن ~857 سطر** (بدلاً من 1449) — لا يزال يحتوي callbacks كبيرة (handleSave, handleTestPrint) وحوار الحذف المضمّن، لكن لا يحتوي أي مكون واجهة مضمّن
+- **`UniversalPreview.tsx` الآن ~280 سطر** (بدلاً من 1067) — يقوم فقط ببناء سياق التقييم وتوزيع العرض للمكونات المستخرجة
+- **`components/ui.tsx`** يحتوي جميع الـ UI primitives (Toggle, Slider, Field, Input, Textarea, Select, Pills, ColorField, Divider, SectionTitle) وثوابت (ALIGN_OPTS, BORDER_OPTS) — 194 سطر
+- **جميع مستوردات `@/reporting` من `print-settings/`** أُزيلت — 0 مستوردات متبقية للـ modules الأخرى
+- **جميع مستوردات `@/pos/store/printStore`** أُزيلت من `print-settings/` — استبدلت بـ `./services/printStoreService`
+- **`template-library/config/`** أُصلح (تمت إزالة المستوى المكرّر `config/config/`)
+- **حوار تأكيد الحذف** بقي مضمّناً في `PrintSettingsPage.tsx` (لا فائدة من استخراجه — مرتبط بشدة بـ deleteTarget state)
+- **`AGENTS.md`** يُحدّث في نهاية كل دورة عمل
+
 ## Key Design Decisions
 - **UniversalDocumentData** is single source of truth; ReceiptLiveData stays unchanged in old types.ts, bridged via fromLegacyLiveData().
 - **Phase 0 purely additive** — no existing production files changed except the dual-save bugfix and MOCK removal.
@@ -189,32 +201,16 @@ resources/js/reporting/
 ---
 
 ## Relevant Files
-- `docs/erp_report_designer_adr.html`: full architecture document
-- `resources/js/reporting/index.ts`: framework public API
-- `resources/js/reporting/core/domain/PrintTemplate.ts`: canonical type
-- `resources/js/reporting/data/UniversalDocumentData.ts`: single data contract
-- `resources/js/reporting/data/DocumentDataBuilder.ts`: builds from API/POS
-- `resources/js/reporting/core/engines/FormulaEngine.ts`: expression evaluator
-- `resources/js/reporting/core/engines/RulesEngine.ts`: condition evaluator
-- `resources/js/reporting/core/engines/LayoutEngine.ts`: layout computation
-- `resources/js/reporting/core/theme/ThemeSystem.ts`: theme presets + CSS vars
-- `resources/js/reporting/data/FieldRegistry.ts`: 79 cataloged fields
-- `resources/js/reporting/data/CalculatedFieldService.ts`: 8 computed fields
-- `resources/js/reporting/renderers/IRenderer.ts`: renderer interface + registry
-- `resources/js/reporting/components/preview/UniversalPreview.tsx`: unified preview (~630 lines)
-- `resources/js/reporting/components/preview/shared.tsx`: shared helpers
-- `resources/js/reporting/components/shared/FormulaEditor.tsx`: formula editor with field picker
-- `resources/js/reporting/components/shared/TemplatePrintModal.tsx`: template-based print
-- `resources/js/reporting/components/shared/RulesSection.tsx`: condition builder with rules UI
-- `resources/js/pages/settings/print-settings/components/PreviewSelector.tsx`: delegates to UniversalPreview or legacy A4/A5/Receipt previews via `useLegacy` prop
-- `resources/js/pages/settings/PrintSettingsPage.tsx`: section-integrated template controls; modern/legacy preview toggle
-- `resources/js/pages/settings/print-settings/sections/ToggleSwitch.tsx`: restored — base accordion/toggle primitives
-- `resources/js/pages/settings/print-settings/sections/HeaderSection.tsx`: restored — logo, company, info visibility controls
-- `resources/js/pages/settings/print-settings/sections/DocumentSection.tsx`: restored — title, doc fields, client, separator
-- `resources/js/pages/settings/print-settings/sections/ItemsSection.tsx`: restored — column manager, table formatting
-- `resources/js/pages/settings/print-settings/sections/TotalsSection.tsx`: restored — totals visibility, TTC, payments
-- `resources/js/pages/settings/print-settings/sections/FooterSection.tsx`: restored — footer lines, barcode, signatures
-- `resources/js/pages/settings/print-settings/sections/FormattingSection.tsx`: restored — margins, spacing, fonts
-- `resources/js/pages/settings/print-settings/A4Preview.tsx`, `A5Preview.tsx`, `components/ReceiptPreview.tsx`: wired via `PreviewSelector.useLegacy`; type bugs fixed
-- `resources/js/pages/documents/CommercialDocumentModal/`: target for Phase 4 wiring
-- `resources/css/theme/print-settings.css`: print settings page styles
+- `resources/js/pages/settings/print-settings/PrintSettingsPage.tsx`: ~857 سطر — لا يزال يحتوي callbacks كبيرة وحوار الحذف المضمّن لكن لا يحتوي أي مكون واجهة مضمّن
+- `resources/js/pages/settings/print-settings/components/preview/UniversalPreview.tsx`: ~280 سطر — يستورد من 8 ملفات render منفصلة
+- `resources/js/pages/settings/print-settings/components/ui.tsx`: ~194 سطر — جميع الـ UI primitives (Toggle, Slider, Field, Input, Textarea, Select, Pills, ColorField, Divider, SectionTitle, ALIGN_OPTS, BORDER_OPTS)
+- `resources/js/pages/settings/print-settings/components/TemplateControls.tsx`: ~160 سطر — يُركّب جميع أقسام القوالب
+- `resources/js/pages/settings/print-settings/components/Accordion.tsx`: ~42 سطر — مكون قابل للطي
+- `resources/js/pages/settings/print-settings/components/ColumnManager.tsx`: ~111 سطر — إدارة أعمدة الجدول
+- `resources/js/pages/settings/print-settings/components/QuickNav.tsx`: ~65 سطر — تنقل سريع مع IntersectionObserver
+- `resources/js/pages/settings/print-settings/components/TinyBtn.tsx`: ~28 سطر — زر أيقونة صغير
+- `resources/js/pages/settings/print-settings/components/index.ts`: barrel index — يُصدّر جميع المكونات ودوال render
+- `resources/js/pages/settings/print-settings/services/printStoreService.ts`: دوال طبقة DB (dbSaveTemplate, dbFetchTemplates)
+- `resources/js/pages/settings/print-settings/ARCHITECTURE.md`: توثيق المعمارية الكامل
+- `resources/js/reporting/index.ts`: يُعيد التصدير من `@/pages/settings/print-settings/...`
+- `resources/js/pos/store/printStore.ts`: يُعيد التصدير من `services/printStoreService.ts`
