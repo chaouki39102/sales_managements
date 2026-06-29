@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import type { ReceiptTemplate80mm, ColumnKey, FontFamily, BorderStyle } from '../types';
 import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { BorderSelect } from './HeaderSection';
@@ -22,6 +22,10 @@ interface Props {
 }
 
 export default function ItemsSectionControls({ tpl, update }: Props) {
+  const [dragKey, setDragKey] = useState<ColumnKey | null>(null);
+  const dragOverKey = useRef<ColumnKey | null>(null);
+  const lastDropTarget = useRef<ColumnKey | null>(null);
+
   const toggleCol = (key: ColumnKey, show: boolean) => {
     const newShow = { ...tpl.col_show, [key]: show };
     update('col_show', newShow);
@@ -38,6 +42,32 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
     if (target < 0 || target >= newOrder.length) return;
     [newOrder[idx], newOrder[target]] = [newOrder[target], newOrder[idx]];
     update('col_order', newOrder);
+  };
+
+  const handleDragStart = (key: ColumnKey) => {
+    setDragKey(key);
+  };
+
+  const handleDragOver = (e: React.DragEvent, key: ColumnKey) => {
+    e.preventDefault();
+    if (!dragKey || dragKey === key) return;
+    if (lastDropTarget.current === key) return; // deduplicate fast events
+    lastDropTarget.current = key;
+    dragOverKey.current = key;
+    const from = tpl.col_order.indexOf(dragKey);
+    const to = tpl.col_order.indexOf(key);
+    if (from < 0 || to < 0) return;
+    const newOrder = [...tpl.col_order];
+    newOrder.splice(from, 1);
+    newOrder.splice(to, 0, dragKey);
+    update('col_order', newOrder);
+    setDragKey(key);
+  };
+
+  const handleDragEnd = () => {
+    setDragKey(null);
+    dragOverKey.current = null;
+    lastDropTarget.current = null;
   };
 
   const changeColWidth = (key: ColumnKey, width: number) => {
@@ -62,17 +92,27 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
     <>
       <Section title="الأعمدة — إظهار / ترتيب / عرض" icon="ti-list-details">
         <div className="ps-section-sub" style={{ marginBottom: 8 }}>
-          اختر الأعمدة التي تظهر في جدول المنتجات، ورتبها حسب ما تريد
+          اختر الأعمدة التي تظهر في جدول المنتجات، ورتبها حسب ما تريد — اسحب وأفلت لإعادة الترتيب
         </div>
 
         {COLUMNS.map(col => {
           const visible = tpl.col_show[col.key] !== false;
           const idx = tpl.col_order.indexOf(col.key);
+          const isDragging = dragKey === col.key;
           return (
-            <div key={col.key} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 0', borderBottom: '1px solid var(--b1)',
-            }}>
+            <div key={col.key} draggable
+              onDragStart={() => handleDragStart(col.key)}
+              onDragOver={e => handleDragOver(e, col.key)}
+              onDragEnd={handleDragEnd}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 0', borderBottom: '1px solid var(--b1)',
+                cursor: 'grab',
+                opacity: isDragging ? 0.4 : 1,
+                background: isDragging ? 'var(--emb)' : 'transparent',
+                borderTop: dragOverKey.current === col.key && dragKey !== col.key ? '2px solid var(--em)' : 'none',
+                borderTopStyle: dragOverKey.current === col.key && dragKey !== col.key ? 'dashed' : 'none',
+              }}>
               <div
                 className={`ps-toggle-track ${visible ? 'on' : ''}`}
                 onClick={() => toggleCol(col.key, !visible)}
@@ -81,7 +121,11 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
                 <div className="ps-toggle-thumb" />
               </div>
 
-              <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--t2)' }}>
+              <span style={{
+                flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--t2)',
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <i className="ti ti-grip-vertical" style={{ fontSize: 10, opacity: 0.3 }} />
                 {col.label}
               </span>
 

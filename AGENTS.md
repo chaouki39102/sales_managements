@@ -248,6 +248,34 @@ resources/js/reporting/
 - **Verdict**: "This module still requires architectural work before extraction."
 - **5 critical fixes** needed before extraction: prop-inject company data, interface the API client, remove CommercialDocument dep, copy ErrorBoundary in, abstract sonner
 
+## Session Notes (Functional Restoration — Print Settings)
+
+### Date: 2026-06-29
+
+### Completed: Full Functional Audit & Restoration
+
+### Issues Fixed (11 total):
+
+1. **colWidth runtime crash** — Made 3rd param optional in `shared.tsx`
+2. **A4/A5 column widths** — Added percentage-based widths using `colWidth()` with scale normalization in preview `ItemsSection.tsx`
+3. **A4/A5 column alignment** — Replaced hardcoded `textAlign` with `colAlign(tpl, col)` in preview `ItemsSection.tsx`
+4. **Column Drag & Drop** — Added HTML5 DnD to `sections/ItemsSection.tsx` + `components/ColumnManager.tsx` with grab handles, drop indicators, dedup ref
+5. **Preview lag** — Removed `useDeferredValue` from `PrintSettingsPage.tsx` (preview now uses `localTpl` directly)
+6. **paper_size double history push** — Removed redundant `update('paper_width_mm')` call
+7. **`table_header_color` not applied to A4/A5** — Fixed hardcoded `#fff` → reads `tpl.table_header_color`
+8. **`alternating_color` not applied to A4/A5** — Fixed hardcoded `#fafafa` → reads `tpl.alternating_color`
+9. **`total_ttc_color` not applied to A4/A5** — Added `color` property to TTC row cells in page mode
+10. **`totals_align` had zero effect** — Both thermal and page modes now read `tpl.totals_align`
+11. **`ColumnManager.tsx` missing DnD** — Added consistent DnD behavior
+
+### Build: 1028 modules, 0 errors (print-settings-adapter chunk: 61.15 KB)
+
+### Known remaining (low priority):
+- `page_orientation` has UI but no effect (landscape requires major layout work)
+- `group_by`, `sort_by`, `sort_direction` are UI scaffolding with no backend logic
+- `show_bank_details` only renders in A4 footer, not thermal/A5
+- Full functional audit report: `docs/reports/print-settings-functional-audit.md`
+
 ## Session Notes (Feature Isolation Implementation — Phase 10 Complete)
 - **All 5 critical fixes implemented** to achieve 100% feature isolation:
 

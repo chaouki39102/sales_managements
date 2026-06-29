@@ -34,7 +34,7 @@ function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
     <div style={{
       fontSize: fs,
       fontWeight: tpl.totals_bold ? 700 : 400,
-      textAlign: 'right' as const,
+      textAlign: tpl.totals_align === 'left' ? 'left' : tpl.totals_align === 'center' ? 'center' : 'right',
       marginBottom: 4,
     }}>
       {tpl.show_total_ht      && <TotalRow label="المجموع HT"        val={t.totalHt} />}
@@ -90,9 +90,11 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
     ? 'none'
     : `${isA4 ? '3px' : '2px'} ${borderStyle(tpl.total_border_style)} #111`;
 
+  const totalsJustify = tpl.totals_align === 'left' ? 'flex-start' : tpl.totals_align === 'center' ? 'center' : 'flex-end';
+
   return (
     <div style={{
-      display: 'flex', justifyContent: 'flex-end',
+      display: 'flex', justifyContent: totalsJustify,
       fontSize: tpl.totals_font_size,
       fontWeight: tpl.totals_bold ? 700 : 400,
       marginBottom: isA4 ? 24 : 12,
@@ -116,6 +118,7 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
                 fontWeight: tpl.total_ttc_bold ? 900 : 700,
                 fontSize: tpl.total_ttc_font_size,
                 textAlign: 'right',
+                color: tpl.total_ttc_color,
               }}>
                 المجموع TTC:
               </td>
@@ -125,6 +128,7 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
                 fontWeight: tpl.total_ttc_bold ? 900 : 700,
                 fontSize: tpl.total_ttc_font_size,
                 textAlign: 'right',
+                color: tpl.total_ttc_color,
               }}>
                 {Number(t.totalTtc).toFixed(2)}
               </td>

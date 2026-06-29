@@ -82,9 +82,9 @@ export function getVisibleCols(tpl: PrintTemplate): ColumnKey[] {
 export function colWidth(
   tpl: PrintTemplate,
   col: ColumnKey,
-  defaults: Record<ColumnKey, number>,
+  defaults?: Partial<Record<ColumnKey, number>>,
 ): number {
-  return tpl.col_widths[col] ?? defaults[col] ?? 20;
+  return tpl.col_widths[col] ?? defaults?.[col] ?? 20;
 }
 
 export function colAlign(tpl: PrintTemplate, col: ColumnKey): AlignOption {

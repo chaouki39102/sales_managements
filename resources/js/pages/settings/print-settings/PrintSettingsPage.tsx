@@ -1,6 +1,5 @@
 import React, {
   useState, useCallback, useEffect, useMemo, useRef,
-  useDeferredValue,
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -83,8 +82,6 @@ export default function PrintSettingsPage() {
   const historyRef    = useRef<PrintTemplate[]>([]);
   const historyPos    = useRef(-1);
   const controlsRef   = useRef<HTMLDivElement>(null);
-
-  const deferredTpl = useDeferredValue(localTpl);
 
   const { data: templatesRaw, isLoading } = usePrintTemplates(activeDoc);
   const templates = useMemo(() => templatesRaw ?? [], [templatesRaw]);
@@ -602,11 +599,7 @@ export default function PrintSettingsPage() {
                   {(['80mm', '58mm', 'A4', 'A5'] as const).map(s => (
                     <button
                       key={s} type="button"
-                      onClick={() => {
-                        update('paper_size', s);
-                        if (s === '58mm') update('paper_width_mm', 58);
-                        else if (s === '80mm') update('paper_width_mm', 80);
-                      }}
+                      onClick={() => update('paper_size', s)}
                       style={{
                         flex: 1, padding: '3px 0', fontSize: 11, borderRadius: 'var(--r1)',
                         border: `1px solid ${localTpl.paper_size === s ? 'var(--em)' : 'var(--b2)'}`,
@@ -729,7 +722,7 @@ export default function PrintSettingsPage() {
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', justifyContent: 'center' }}>
-            {deferredTpl ? (
+            {localTpl ? (
               <div style={{
                 boxShadow: '0 4px 24px rgba(0,0,0,.14)',
                 border: '1px solid var(--b3)',
@@ -737,7 +730,7 @@ export default function PrintSettingsPage() {
                 display: 'inline-block',
               }}>
                 <ErrorBoundary>
-                  <PreviewSelector tpl={deferredTpl} company={companyData} overrideData={useRealData ? previewData : null} />
+                  <PreviewSelector tpl={localTpl} company={companyData} overrideData={useRealData ? previewData : null} />
                 </ErrorBoundary>
               </div>
             ) : (

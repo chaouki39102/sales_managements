@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import type { PrintTemplate, ColumnKey } from '../types';
 
 export type Updater = <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
@@ -23,6 +24,8 @@ const miniBtn: React.CSSProperties = {
 };
 
 export function ColumnManager({ tpl, update }: { tpl: PrintTemplate; update: Updater }) {
+  const [dragKey, setDragKey] = useState<ColumnKey | null>(null);
+
   const toggleCol = (key: ColumnKey, show: boolean) => {
     update('col_show', { ...tpl.col_show, [key]: show });
     if (show && !tpl.col_order.includes(key))
@@ -37,20 +40,38 @@ export function ColumnManager({ tpl, update }: { tpl: PrintTemplate; update: Upd
     [arr[idx], arr[t]] = [arr[t], arr[idx]];
     update('col_order', arr);
   };
+  const handleDragOver = (e: React.DragEvent, key: ColumnKey) => {
+    e.preventDefault();
+    if (!dragKey || dragKey === key) return;
+    const from = tpl.col_order.indexOf(dragKey);
+    const to = tpl.col_order.indexOf(key);
+    if (from < 0 || to < 0) return;
+    const arr = [...tpl.col_order];
+    arr.splice(from, 1);
+    arr.splice(to, 0, dragKey);
+    update('col_order', arr);
+    setDragKey(key);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {ALL_COLS.map(col => {
         const visible = tpl.col_show[col.key] !== false;
         const idx     = tpl.col_order.indexOf(col.key);
+        const isDragging = dragKey === col.key;
         return (
           <div
             key={col.key}
+            draggable
+            onDragStart={() => setDragKey(col.key)}
+            onDragOver={e => handleDragOver(e, col.key)}
+            onDragEnd={() => setDragKey(null)}
             style={{
               display: 'flex', alignItems: 'center', gap: 5, padding: '4px 6px',
               borderRadius: 'var(--r1)',
               background: visible ? 'var(--emb)' : 'var(--bg3)',
               border: `1px solid ${visible ? 'var(--embo)' : 'var(--b1)'}`,
+              cursor: 'grab', opacity: isDragging ? 0.4 : 1,
             }}
           >
             <div
@@ -72,8 +93,9 @@ export function ColumnManager({ tpl, update }: { tpl: PrintTemplate; update: Upd
 
             <span style={{
               flex: 1, fontSize: 11.5, fontWeight: 600, color: 'var(--t2)',
-              minWidth: 0,
+              minWidth: 0, display: 'flex', alignItems: 'center', gap: 3,
             }}>
+              <i className="ti ti-grip-vertical" style={{ fontSize: 9, opacity: 0.3 }} />
               {col.label}
               {visible && idx >= 0 && (
                 <span style={{ fontSize: 10, color: 'var(--t4)', marginRight: 4 }}>#{idx + 1}</span>
