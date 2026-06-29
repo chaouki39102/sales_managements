@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts';
-import type { UniversalDocumentData } from '@/reporting';
+import type { UniversalDocumentData } from '../types/data';
 
 interface ChartSectionProps {
   data: UniversalDocumentData;

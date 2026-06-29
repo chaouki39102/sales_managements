@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { apiGet, apiPost, apiPut, apiDelete, apiUpload } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { PrintTemplate, PrintTemplateApiResponse, DocTypeCode } from '../types';
-import type { LibraryApiResponse } from '@/reporting';
+import type { LibraryApiResponse } from '../template-library/types';
 
 export const printTemplateKeys = {
   all:     (slug: string)              => [slug, 'print-templates']              as const,

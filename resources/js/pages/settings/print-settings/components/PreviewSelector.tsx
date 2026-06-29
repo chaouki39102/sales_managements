@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import type { PrintTemplate, CompanyData, ReceiptLiveData } from '../types';
-import { UniversalPreview } from '@/reporting';
-import { DocumentDataBuilder, emptyDocumentData } from '@/reporting';
-import type { UniversalDocumentData } from '@/reporting';
+import UniversalPreview from './preview/UniversalPreview';
+import { DocumentDataBuilder, emptyDocumentData } from '../types/data';
+import type { UniversalDocumentData } from '../types/data';
 
 interface Props {
   tpl:          PrintTemplate;

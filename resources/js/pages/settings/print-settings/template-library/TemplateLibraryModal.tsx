@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense, useRe
 import { templateRegistry } from './registry';
 import { TEMPLATE_CATEGORIES, ALL_TAGS } from './categories';
 import type { LibraryTemplateEntry, LibraryFilterState, FavoriteEntry, InstallHistoryEntry } from './types';
-import type { PrintTemplate, PaperSize, DocTypeCode } from '@/reporting';
-import type { UniversalDocumentData } from '@/reporting';
+import type { PrintTemplate, PaperSize, DocTypeCode } from '../types';
+import type { UniversalDocumentData } from '../types/data';
 import {
   MODAL_MAX_WIDTH, CARD_MIN_WIDTH, CARD_PREVIEW_HEIGHT,
   CARD_PREVIEW_SCALE, MODAL_BORDER_RADIUS, CARD_BORDER_RADIUS,

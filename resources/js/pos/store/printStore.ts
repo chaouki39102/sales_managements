@@ -1,109 +1,25 @@
 // resources/js/pos/store/printStore.ts
 // ════════════════════════════════════════════════════════════════════════════
-//  نظام إعدادات الطباعة — المصدر الوحيد للحقيقة
+//  POS Print Store — Device layer only (localStorage printer selection).
 //
-//  طبقتان واضحتان:
-//  ① DEVICE  — localStorage  — إعدادات هذا الجهاز فقط (الطابعة المختارة)
-//  ② COMPANY — DB/settings   — مشترك بين كل الفريق (القوالب، تكوين المستندات)
-//
-//  القاعدة:
-//  - ما يختلف من جهاز لجهاز     → localStorage
-//  - ما يجب أن يراه كل الفريق   → DB
-//
-//  مفاتيح DB (settings table):
-//    print:templates   → { FV_80mm: {...}, BL_80mm: {...}, ... }
-//    print:doc_configs → [ { docTypeCode, enabled, paperSize, copies, ... } ]
-//
-//  مفاتيح localStorage (per-slug per-device):
-//    print:printers:{slug}    → DetectedPrinter[]
-//    print:device_doc:{slug}  → { [docTypeCode]: { printerId } }
+//  DB layer functions (dbSaveTemplate, dbFetchTemplates, etc.) are now
+//  canonical in print-settings/. Re-exported here for backward compat.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { apiPatch, apiGet } from '@/lib/api/core/client';
-import type {
-  ReceiptTemplate80mm, DocumentPrintConfig,
-  DetectedPrinter, PaperSize,
-} from '@/pages/settings/print-settings/types';
+export {
+  DB_KEY_TEMPLATES, DB_KEY_DOC_CONFIGS, tplKey,
+  dbFetchTemplates, dbFetchTemplate, dbSaveTemplate,
+  dbCopyTemplate, dbSaveDocConfigs, dbFetchDocConfigs,
+} from '@/pages/settings/print-settings/services/printStoreService';
+
+import type { DetectedPrinter, PaperSize } from '@/pages/settings/print-settings/types';
+import type { DocumentPrintConfig, ReceiptTemplate80mm } from '@/pages/settings/print-settings/types';
 import { defaultTemplate } from '@/pages/settings/print-settings/types';
-
-// ─── DB Keys ─────────────────────────────────────────────────────────────────
-
-export const DB_KEY_TEMPLATES   = 'print:templates';
-export const DB_KEY_DOC_CONFIGS = 'print:doc_configs';
 
 // ─── Device Keys (localStorage) ──────────────────────────────────────────────
 
 const DEV_KEY_PRINTERS   = (slug: string) => `print:printers:${slug}`;
 const DEV_KEY_DOC_DEVICE = (slug: string) => `print:device_doc:${slug}`;
-
-// ─── Template Key ─────────────────────────────────────────────────────────────
-// مفتاح داخل print:templates dictionary
-export const tplKey = (docCode: string, size: PaperSize) => `${docCode}_${size}`;
-
-// ════════════════════════════════════════════════════════════════════════════
-//  DB Layer — القوالب وتكوين المستندات (مشترك)
-// ════════════════════════════════════════════════════════════════════════════
-
-/** جلب كل القوالب من DB كـ dictionary */
-export async function dbFetchTemplates(): Promise<Record<string, ReceiptTemplate80mm>> {
-  try {
-    const res = await apiGet<{ value: string | object }>(`/settings/${DB_KEY_TEMPLATES}`);
-    const raw = (res as any)?.value ?? (res as any)?.data?.value ?? null;
-    if (!raw) return {};
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    return parsed as Record<string, ReceiptTemplate80mm>;
-  } catch {
-    return {};
-  }
-}
-
-/** جلب قالب مستند واحد */
-export async function dbFetchTemplate(
-  docCode: string, size: PaperSize,
-): Promise<ReceiptTemplate80mm> {
-  const all = await dbFetchTemplates();
-  const key = tplKey(docCode, size);
-  return all[key] ? { ...defaultTemplate(), ...all[key] } : defaultTemplate();
-}
-
-/** حفظ قالب واحد في DB — يدمج مع بقية القوالب */
-export async function dbSaveTemplate(
-  docCode: string, size: PaperSize, template: ReceiptTemplate80mm,
-): Promise<void> {
-  const all = await dbFetchTemplates();
-  const key = tplKey(docCode, size);
-  all[key]  = template;
-  await apiPatch('/settings', { [DB_KEY_TEMPLATES]: JSON.stringify(all) });
-}
-
-/** نسخ قالب إلى مستند آخر في نفس حجم الورق */
-export async function dbCopyTemplate(
-  sourceCode: string, targetCode: string, size: PaperSize,
-): Promise<void> {
-  const all       = await dbFetchTemplates();
-  const sourceKey = tplKey(sourceCode, size);
-  const targetKey = tplKey(targetCode, size);
-  if (!all[sourceKey]) throw new Error(`لا يوجد قالب لـ ${sourceCode}`);
-  all[targetKey] = { ...all[sourceKey] };
-  await apiPatch('/settings', { [DB_KEY_TEMPLATES]: JSON.stringify(all) });
-}
-
-/** حفظ تكوين المستندات */
-export async function dbSaveDocConfigs(configs: DocumentPrintConfig[]): Promise<void> {
-  await apiPatch('/settings', { [DB_KEY_DOC_CONFIGS]: JSON.stringify(configs) });
-}
-
-/** جلب تكوين المستندات */
-export async function dbFetchDocConfigs(): Promise<DocumentPrintConfig[]> {
-  try {
-    const res = await apiGet<{ value: string | object }>(`/settings/${DB_KEY_DOC_CONFIGS}`);
-    const raw = (res as any)?.value ?? (res as any)?.data?.value ?? null;
-    if (!raw) return [];
-    return typeof raw === 'string' ? JSON.parse(raw) : raw;
-  } catch {
-    return [];
-  }
-}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Device Layer — الطابعات واختيار الطابعة per-doc (localStorage)

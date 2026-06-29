@@ -1,4 +1,4 @@
-import type { UniversalDocumentData } from '@/reporting';
+import type { UniversalDocumentData } from '../types/data';
 
 let _mockCache: UniversalDocumentData | null = null;
 

@@ -3,6 +3,24 @@
 ## Date
 2026-06-28
 
+## Session Notes (Print-Settings Self-Containment Refactoring)
+- **Architectural audit** written to `docs/report.md` — 12-step plan, dead code analysis, code duplication review (Architecture 5.5/10, Maintainability 4/10, Scalability 6/10)
+- **Fixed POS cart persistence** — `useCartStore.partialize` was `() => ({})` (empty), changed to save `items, client, notes, invoiceDiscountPct`
+- **Created new directory structure**: `types/`, `types/domain/`, `types/data/`, `services/`, `services/engines/`, `hooks/`, `render/`, `render/preview/`, `render/helpers/`, `config/`, `utils/`, `sections/ui/`, `page/`
+- **Copied 6 files from `@/reporting`** into local structure with fixed import paths:
+  - `types/data/UniversalDocumentData.ts` — canonical data contract
+  - `types/data/DocumentDataBuilder.ts` — document builder
+  - `services/FieldRegistry.ts` — 79 cataloged fields
+  - `services/CalculatedFieldService.ts` — 8 computed fields
+  - `services/engines/FormulaEngine.ts` — expression evaluator (no eval)
+  - `services/engines/RulesEngine.ts` — declarative rule evaluator
+- **Removed all 26 `@/reporting` imports** across 14 print-settings files — now fully self-contained
+- **Fixed template-library config nesting** — removed extra `config/config/` dir, moved files to `config/` directly, fixed `../constants` import resolution
+- **Made local copies alive** — UniversalPreview, RulesSection, FormulaEditor, ChartSection now use local singletons (`formulaEngine`, `rulesEngine`, `fieldRegistry`, `calculatedFieldService`)
+- **Updated `reporting/index.ts`** to re-export shared items from `@/pages/settings/print-settings/...` — single canonical source for all singletons (no duplicate instances)
+- **Deleted `todo/` directory** — dead design reference files
+- **Build**: 1016 modules, 0 errors (PrintSettingsPage chunk: 161KB → 95KB)
+
 ## Session Notes (Phase-2 Refinement — Enterprise Template Library)
 - **Removed `AlgerianTemplatePreview`** — all previews now use `UniversalPreview` (single rendering engine)
 - **TemplateRegistry** (`registry.ts`) created as the single source of truth for template discovery (register, search, filter, build)

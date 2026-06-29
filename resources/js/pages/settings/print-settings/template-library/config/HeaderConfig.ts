@@ -1,6 +1,5 @@
-import type { AlignOption, BorderStyle } from '../../../core/domain/PrintTemplate';
+import type { AlignOption, BorderStyle, PaperSize } from '../../../types';
 import { LOGO_SIZE_A4, LOGO_SIZE_A5, COLOR_PRIMARY } from '../constants';
-import type { PaperSize } from '../../../core/domain/PrintTemplate';
 
 export interface HeaderConfig {
   showLogo: boolean;

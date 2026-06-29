@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import type { PrintTemplate, ReportRule } from '@/reporting';
+import type { PrintTemplate, ReportRule } from '../types';
 import FormulaEditor from './FormulaEditor';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────

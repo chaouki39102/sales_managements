@@ -1,4 +1,4 @@
-import type { FontFamily, AlignOption } from '../../../core/domain/PrintTemplate';
+import type { FontFamily, AlignOption, PaperSize } from '../../../types';
 import {
   TITLE_SIZE_A4, TITLE_SIZE_A5,
   COMPANY_NAME_SIZE_A4, COMPANY_NAME_SIZE_A5,
@@ -9,7 +9,6 @@ import {
   TOTAL_TTC_FONT_SIZE, TOTAL_TTC_FONT_SIZE_A5,
   THANK_YOU_SIZE, THANK_YOU_SIZE_A5,
 } from '../constants';
-import type { PaperSize } from '../../../core/domain/PrintTemplate';
 
 export interface TypographyConfig {
   fontFamily: FontFamily;

@@ -1,4 +1,4 @@
-import type { ColumnKey, AlignOption, BorderStyle, FontFamily } from '@/reporting';
+import type { ColumnKey, AlignOption, BorderStyle, FontFamily } from '../../../types';
 import {
   TABLE_HEADER_BG, TABLE_HEADER_COLOR, TABLE_ROW_ALT,
   COLUMN_REF_WIDTH, COLUMN_NAME_WIDTH, COLUMN_QTY_WIDTH,

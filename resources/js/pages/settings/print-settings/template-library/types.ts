@@ -1,4 +1,4 @@
-import type { PrintTemplate, DocTypeCode, PaperSize } from '@/reporting';
+import type { PrintTemplate, DocTypeCode, PaperSize } from '../types';
 
 // ─── Versioning ─────────────────────────────────────────────────────────────────
 export interface TemplateVersion {

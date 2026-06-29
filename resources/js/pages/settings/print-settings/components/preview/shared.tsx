@@ -1,12 +1,17 @@
 import React from 'react';
-import type { DocumentLine } from '@/reporting';
+import type { DocumentLine } from '../../types/data';
 import type {
   PrintTemplate,
   ColumnKey,
   AlignOption,
   BorderStyle,
   FontFamily,
-} from '@/reporting';
+} from '../../types';
+
+export function formatDate(iso: string): string {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
 
 // ─── Styling helpers ────────────────────────────────────────────────────────────
 
@@ -198,3 +203,13 @@ function InfoRowFn({ label, value }: InfoRowProps): JSX.Element {
 }
 
 export const InfoRow = React.memo(InfoRowFn);
+
+// ─── SectionWrap — applies highlight styling from rules ──────────────────────
+
+export function SectionWrap({ highlight, children }: {
+  highlight: Record<string, string> | null;
+  children: React.ReactNode;
+}) {
+  if (!highlight) return <>{children}</>;
+  return <div style={highlight}>{children}</div>;
+}

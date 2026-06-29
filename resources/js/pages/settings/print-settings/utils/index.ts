@@ -1,0 +1,1 @@
+export { numberToArabicWords } from './numberToArabic';

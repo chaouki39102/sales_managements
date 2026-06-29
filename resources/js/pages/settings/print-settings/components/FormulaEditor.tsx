@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { fieldRegistry } from '@/reporting';
-import { formulaEngine } from '@/reporting';
+import { fieldRegistry } from '../services/FieldRegistry';
+import { formulaEngine } from '../services/engines/FormulaEngine';
 
 interface FormulaEditorProps {
   value: string;

@@ -1,4 +1,5 @@
-import type { PrintTemplate, PaperSize, DocTypeCode } from '@/reporting';
+import type { PrintTemplate, PaperSize, DocTypeCode, CompanyData } from '../types';
+import type { UniversalDocumentData } from '../types/data';
 import type { LibraryTemplateEntry, LibraryTemplateMeta } from './types';
 import {
   TEMPLATE_AUTHOR, LAYOUT_ENGINE_VERSION, TEMPLATE_COUNTRY_DZ,
@@ -10,8 +11,6 @@ import {
 } from './config';
 import { headerConfig, paperConfig, typographyConfig } from './config';
 import { categoryFromDocType } from './categories';
-import type { CompanyData } from '@/reporting';
-import type { UniversalDocumentData } from '@/reporting';
 
 // ─── TemplateRegistry — single source of truth for built-in templates ─────────
 
