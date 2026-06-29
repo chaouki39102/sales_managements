@@ -1,7 +1,15 @@
 # AGENTS.md — Context Cache for AI Coding Agents
 
 ## Date
-2026-06-28
+2026-06-29
+
+## Session Notes (Phase-7 — Extract all Inline Components from PrintSettingsPage)
+- **PrintSettingsPage.tsx**: 1449 → 857 lines ( –592 ), now orchestrator only — no inline components remain
+- **Removed all 6 inline blocks**: UI Primitives (Toggle, Slider, Field, Input, Textarea, Select, Pills, ColorField, Divider, SectionTitle, ALIGN_OPTS, BORDER_OPTS), Accordion, ColumnManager+ALL_COLS+Updater+miniBtn, TemplateControls, QuickNav+NAV_SECTIONS, TinyBtn+toolBtnStyle
+- **Updated imports**: 0 `@/reporting` imports remain; all changed to local barrel paths (`./components/`, `./template-library/`, `./types/data/`, `./services/`)
+- **dbSaveTemplate** import changed from `@/pos/store/printStore` → `./services/printStoreService`
+- **Delete confirmation modal** stayed inline (tightly coupled UI/no abstraction benefit)
+- **Build: 1032 modules, 0 errors** (PrintSettingsPage chunk: 95.40 KB)
 
 ## Session Notes (Print-Settings Self-Containment Refactoring)
 - **Architectural audit** written to `docs/report.md` — 12-step plan, dead code analysis, code duplication review (Architecture 5.5/10, Maintainability 4/10, Scalability 6/10)
@@ -146,7 +154,7 @@ resources/js/reporting/
 
 ---
 
-## Current State (Phase 6 complete)
+## Current State (Phase 7 complete)
 - **Phase 0 (Foundation)**: reporting/ directory created with UniversalDocumentData, DocumentDataBuilder, PrintTemplate, IRenderer. Patch 1 (dual-save bugfix in PrintSettingsPage.tsx). Patches 2-3 (MOCK data → emptyDocumentData() in A4Preview/A5Preview/ReceiptPreview). `@/reporting` vite alias. Build: 389 modules, 0 errors.
 - **Phase 1 (Core Engines)**: FormulaEngine (no-eval expression evaluator with IF/SUM/AVG/ROUND/CONCAT/FORMAT/TODAY/MIN/MAX/COUNT/ABS/LEN/UPPER/LOWER). RulesEngine (declarative show/hide/highlight/disable). LayoutEngine (flow/flex/absolute + pagination). ThemeSystem (3 presets, toCSSVariables(), applyTemplateOverrides()). FieldRegistry (79 cataloged fields). CalculatedFieldService (8 computed fields). Build: 395 modules, 0 errors.
 - **Phase 2 (Universal Preview + UI)**: UniversalPreview (~630 lines, handles all paper sizes via flexbox/tables). PreviewSelector delegates to UniversalPreview with legacy→UniversalDocumentData conversion. FormulaEditor (field picker dropdown with search, validation, function chips, Ctrl+Space). TemplatePrintModal (template-based print preview replacing window.print()). Build: ~397 modules, 0 errors.
