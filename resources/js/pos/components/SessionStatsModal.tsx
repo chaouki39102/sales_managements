@@ -3,8 +3,10 @@ import React, { useState, useMemo } from 'react';
 import { formatDZD } from '@/pos/utils/calculations';
 import type { PosSession } from '@/lib/api/endpoints/posSession';
 import { useActiveCompany } from '@/lib/store/appStore';
-import { usePrintTemplates, TemplatePrintModal, DocumentDataBuilder } from '@/reporting';
-import type { CompanyInfo } from '@/reporting';
+import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
+import TemplatePrintModal from '@/pages/settings/print-settings/components/shared/TemplatePrintModal';
+import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
+import type { CompanyInfo } from '@/pages/settings/print-settings/types/data';
 
 interface Props {
   session:      PosSession;

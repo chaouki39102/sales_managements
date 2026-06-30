@@ -13,6 +13,7 @@ use App\Models\Wilaya;
 use App\Models\Commune;
 use App\Models\LegalForm;
 use App\Models\PartyType;
+use App\Models\ProductPrice;
 use App\Models\ProductType;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -217,7 +218,26 @@ class ImportService
                         unset($data['_pending_unit']);
                     }
 
-                    Product::create($data);
+                    // Extract selling price before create (not in $fillable)
+                    $sellPrice = $data['default_selling_price_ht'] ?? null;
+                    unset($data['default_selling_price_ht']);
+
+                    $product = Product::create($data);
+
+                    // Create a price record if selling price was provided
+                    if ($sellPrice !== null && $sellPrice > 0) {
+                        $defaultLevel = PriceLevel::where('company_id', $companyId)
+                            ->where('is_default', true)
+                            ->first();
+                        ProductPrice::create([
+                            'company_id'      => $companyId,
+                            'product_id'      => $product->id,
+                            'price_level_id'  => $defaultLevel?->id,
+                            'price'           => $sellPrice,
+                            'active'          => true,
+                        ]);
+                    }
+
                     $imported++;
                 } catch (\Throwable $e) {
                     $failed[] = ['line' => $i + 1, 'error' => $e->getMessage()];

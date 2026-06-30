@@ -1,18 +1,14 @@
 // resources/js/pos/store/printStore.ts
 // ════════════════════════════════════════════════════════════════════════════
-//  POS Print Store — Device layer only (localStorage printer selection).
+//  POS Print Store — Device layer only (localStorage printer selection)
+//  and document print config (settings API).
 //
-//  DB layer functions are now in print-settings/ with an ApiClient-first
-//  signature. We wrap them here with the host's HTTP client so POS code
-//  retains the same calling convention it always had.
+//  Template loading has been migrated to the Print Runtime
+//  (usePrintTemplatesList + TemplateResolver via /print-templates API).
 // ════════════════════════════════════════════════════════════════════════════
 
 import { apiGet, apiPatch } from '@/lib/api/core/client';
 import {
-  dbFetchTemplates as _dbFetchTemplates,
-  dbFetchTemplate   as _dbFetchTemplate,
-  dbSaveTemplate    as _dbSaveTemplate,
-  dbCopyTemplate    as _dbCopyTemplate,
   dbSaveDocConfigs  as _dbSaveDocConfigs,
   dbFetchDocConfigs as _dbFetchDocConfigs,
 } from '@/pages/settings/print-settings/services/printStoreService';
@@ -20,20 +16,13 @@ import {
 // Minimal ApiClient adapter — only the methods printStoreService uses
 const hostApi = { get: apiGet, patch: apiPatch } as any;
 
-export const DB_KEY_TEMPLATES   = 'print:templates';
 export const DB_KEY_DOC_CONFIGS = 'print:doc_configs';
 export const tplKey = (docCode: string, size: string) => `${docCode}_${size}`;
 
-export const dbFetchTemplates = ()         => _dbFetchTemplates(hostApi);
-export const dbFetchTemplate  = (docCode: string, size: string) => _dbFetchTemplate(hostApi, docCode, size as any);
-export const dbSaveTemplate   = (docCode: string, size: string, tpl: any) => _dbSaveTemplate(hostApi, docCode, size as any, tpl);
-export const dbCopyTemplate   = (sourceCode: string, targetCode: string, size: string) => _dbCopyTemplate(hostApi, sourceCode, targetCode, size as any);
 export const dbSaveDocConfigs = (configs: any[]) => _dbSaveDocConfigs(hostApi, configs);
 export const dbFetchDocConfigs = ()         => _dbFetchDocConfigs(hostApi);
 
-import type { DetectedPrinter, PaperSize } from '@/pages/settings/print-settings/types';
-import type { DocumentPrintConfig, ReceiptTemplate80mm } from '@/pages/settings/print-settings/types';
-import { defaultTemplate } from '@/pages/settings/print-settings/types';
+import type { DetectedPrinter } from '@/pages/settings/print-settings/types';
 
 // ─── Device Keys (localStorage) ──────────────────────────────────────────────
 
@@ -73,51 +62,4 @@ export function deviceSetPrinterForDoc(slug: string, docCode: string, printerId:
     else map[docCode] = printerId;
     localStorage.setItem(DEV_KEY_DOC_DEVICE(slug), JSON.stringify(map));
   } catch { /* ignore */ }
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-//  Unified getPrintConfig — للاستخدام في POS عند الطباعة
-// ════════════════════════════════════════════════════════════════════════════
-
-export interface ResolvedPrintConfig {
-  template:    ReceiptTemplate80mm;
-  printerId:   string | null;
-  copies:      number;
-  autoPrint:   boolean;
-  showPreview: boolean;
-  paperSize:   PaperSize;
-  enabled:     boolean;
-}
-
-/** يُستدعى في POS قبل الطباعة — يدمج DB + Device */
-export async function getResolvedPrintConfig(
-  slug: string, docCode: string, configs: DocumentPrintConfig[],
-): Promise<ResolvedPrintConfig> {
-  const config = configs.find(c => c.docTypeCode === docCode);
-
-  if (!config || !config.enabled || config.paperSize === 'none') {
-    return {
-      template:    defaultTemplate(),
-      printerId:   null,
-      copies:      1,
-      autoPrint:   false,
-      showPreview: false,
-      paperSize:   'none',
-      enabled:     false,
-    };
-  }
-
-  const size     = config.paperSize as PaperSize;
-  const template = await dbFetchTemplate(docCode, size);
-  const printerId = deviceGetPrinterForDoc(slug, docCode) ?? config.printerId ?? null;
-
-  return {
-    template,
-    printerId,
-    copies:      config.copies ?? 1,
-    autoPrint:   config.autoPrint ?? false,
-    showPreview: config.showPreview ?? true,
-    paperSize:   size,
-    enabled:     true,
-  };
 }

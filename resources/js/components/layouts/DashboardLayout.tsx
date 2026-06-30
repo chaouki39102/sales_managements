@@ -9,7 +9,7 @@ import client from '@/lib/api/core/client';
 import { useTopbarTitle } from '@/hooks/useTopbarTitle';
 import OfflineIndicator from '@/components/OfflineIndicator';
 import NotificationBell from '@/components/topbar/NotificationBell';
-import PrintQueuePanel from '@/reporting/components/shared/PrintQueuePanel';
+import PrintQueuePanel from '@/pages/settings/print-settings/components/shared/PrintQueuePanel';
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
   {

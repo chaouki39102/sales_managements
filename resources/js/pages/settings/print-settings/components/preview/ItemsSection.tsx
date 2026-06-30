@@ -1,25 +1,48 @@
 import type { PrintTemplate, ColumnKey, AlignOption } from '../../types';
 import type { UniversalDocumentData, DocumentLine } from '../../types/data';
 import { getVisibleCols, colWidth, colAlign, colDefaultHeader, borderStyle, align } from './shared';
+import { COLUMN_DEFAULTS } from '../../services/SettingsRegistry';
+import { printFieldResolver } from '../../services';
 
-const COL_WIDTH_DEFAULTS: Partial<Record<ColumnKey, number>> = {
-  rowNumber: 8, barcode: 18, ref: 18, name: 30, unit: 10,
-  quantity: 12, price: 15, discount: 10, tva: 10, total: 18,
+const COL_WIDTH_DEFAULTS: Partial<Record<ColumnKey, number>> = Object.fromEntries(
+  (Object.keys(COLUMN_DEFAULTS) as ColumnKey[]).map(k => [k, COLUMN_DEFAULTS[k].width]),
+) as Partial<Record<ColumnKey, number>>;
+
+const FIELD_MAP: Record<string, string> = {
+  rowNumber: 'item.index',
+  name:      'item.name',
+  ref:       'item.code',
+  barcode:   'item.barcode',
+  unit:      'item.unit',
+  quantity:  'item.quantity',
+  price:     'item.price',
+  discount:  'item.discount',
+  tva:       'item.tva',
+  total:     'item.total',
 };
 
-function colValue(col: ColumnKey, line: DocumentLine, tpl: PrintTemplate): string {
-  switch (col) {
-    case 'rowNumber': return String(line.rowNumber);
-    case 'barcode':   return line.barcode ?? '';
-    case 'ref':       return line.ref ?? '';
-    case 'name':      return line.name;
-    case 'unit':      return line.unit ?? '';
-    case 'quantity':  return String(line.quantity);
-    case 'price':     return tpl.price_display === 'ttc' ? Number(line.unitPriceTtc).toFixed(2) : Number(line.unitPriceHt).toFixed(2);
-    case 'discount':  return line.discountPct > 0 ? `${line.discountPct}%` : '';
-    case 'tva':       return `${line.tvaPct}%`;
-    case 'total':     return tpl.show_line_total_ttc ? Number(line.totalTtc).toFixed(2) : Number(line.totalHt).toFixed(2);
+function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: number): string {
+  const fieldId = FIELD_MAP[col];
+  if (!fieldId) return '';
+
+  const val = printFieldResolver.resolveItemField(fieldId, line, idx);
+  if (col === 'discount') {
+    const pct = printFieldResolver.resolveItemField('item.discount', line, idx) as number;
+    return pct > 0 ? `${pct}%` : '';
   }
+  if (col === 'tva') {
+    const pct = printFieldResolver.resolveItemField('item.tvaPct', line, idx) as number;
+    return `${pct}%`;
+  }
+  if (col === 'price') {
+    const display = _tpl.price_display === 'ttc' ? line.unitPriceTtc : line.unitPriceHt;
+    return Number(display).toFixed(2);
+  }
+  if (col === 'total') {
+    const display = _tpl.show_line_total_ttc ? line.totalTtc : line.totalHt;
+    return Number(display).toFixed(2);
+  }
+  return val !== undefined ? String(val) : '';
 }
 
 function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
@@ -68,7 +91,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
               textAlign: align(colAlign(tpl, col)),
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: col === 'name' ? 'normal' : 'nowrap',
             }}>
-              {colValue(col, line, tpl)}
+              {colValue(col, line, tpl, idx)}
             </div>
           ))}
         </div>
@@ -123,7 +146,7 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
                   fontWeight: col === 'total' ? 700 : 400,
                   fontSize: tpl.items_font_size,
                 }}>
-                  {colValue(col, line, tpl)}
+                  {colValue(col, line, tpl, i)}
                 </td>
               ))}
             </tr>

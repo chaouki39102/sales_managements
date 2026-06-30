@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Toaster, toast }             from 'sonner';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { usePOS }                     from '@/pos/hooks/usePOS';
@@ -21,12 +21,15 @@ import {
   type ViewMode, type GridSize, type SortMode,
 } from '@/pos/utils/posHelpers';
 import { formatDZD, ttcToHt }         from '@/pos/utils/calculations';
-import { printThermal, isWebUsbSupported, getThermalAutoPrint } from '@/pos/utils/printService';
+import { isWebUsbSupported, getThermalAutoPrint, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
+import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import { usePrintSettings }           from '@/pos/hooks/usePrintSettings';
-import { defaultTemplate }            from '@/reporting';
+import { defaultTemplate }            from '@/pages/settings/print-settings/types';
 import type { PaginatedResponse }      from '@/lib/api/core/types';
 import type { Product, ProductVariant, CartItem, CartTotals } from '@/types';
-import type { ReceiptLiveData, CompanyPreviewData } from '@/reporting';
+import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
+import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
+import type { CompanyPreviewData } from '@/pages/settings/print-settings/types';
 
 import ProductSearchBar         from '@/pos/components/ProductSearchBar';
 import CategoryTabs             from '@/pos/components/CategoryTabs';
@@ -56,13 +59,14 @@ export default function POSKioskPage() {
     items: CartItem[]; totals: CartTotals; docNum?: string;
   } | null>(null);
 
-  const kioskLiveData = useMemo((): ReceiptLiveData | null => {
+  const posSaleSnapshot = useMemo((): POSSaleSnapshot | null => {
     if (!receiptSnapshot) return null;
     const snap = receiptSnapshot;
     const totalTtc = snap.totals.total_ttc + snap.totals.fiscal_stamp;
     return {
       docNumber: snap.docNum ?? lastDocNum,
       docDate:   new Date().toISOString().slice(0, 10),
+      client: null,
       items: snap.items.map(i => ({
         name: i.product_name,
         ref: i.ref,
@@ -83,10 +87,18 @@ export default function POSKioskPage() {
         change: 0,
         remaining: 0,
       },
-      client: null,
       payments: [],
+      cashierName: undefined,
     };
   }, [receiptSnapshot, lastDocNum]);
+
+  const receiptSource = useMemo((): PipelineSource | null => {
+    if (!posSaleSnapshot) return null;
+    return { type: 'pos-snapshot', snapshot: posSaleSnapshot };
+  }, [posSaleSnapshot]);
+
+  const posSaleSnapshotRef = useRef(posSaleSnapshot);
+  posSaleSnapshotRef.current = posSaleSnapshot;
 
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
   const { data: fyData }  = useFiscalYears();
@@ -230,19 +242,10 @@ export default function POSKioskPage() {
 
       if (isWebUsbSupported() && getThermalAutoPrint()) {
         setTimeout(async () => {
-          const r = await printThermal(
-            snapshot.items,
-            snapshot.totals,
-            pos.client,
-            res.document_number,
-            {
-              companyName:    company?.name,
-              companyAddress: company?.address,
-              companyNIF:     company?.nif,
-              footerText:     'شكراً لتعاملكم معنا',
-              printQR:        !!res.document_number,
-            },
-          );
+          const snap = posSaleSnapshotRef.current;
+          if (!snap) return;
+          const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? {} as any);
+          const r = await printThermalViaWebUSBFromTemplate(template, data, res.document_number);
           if (!r.ok) toast.error(r.message);
         }, 500);
       }
@@ -383,11 +386,12 @@ export default function POSKioskPage() {
         />
       )}
 
-      {modal === 'receipt' && receiptSnapshot && kioskLiveData && (
+      {modal === 'receipt' && receiptSnapshot && receiptSource && (
         <ProfessionalReceipt
           template={template ?? defaultTemplate()}
           company={companyData}
-          liveData={kioskLiveData}
+          source={receiptSource}
+          docNumber={receiptSnapshot.docNum}
           onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
           onPrint={() => window.print()}
           onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}

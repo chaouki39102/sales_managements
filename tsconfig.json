@@ -16,8 +16,7 @@
     "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["resources/js/*"],
-      "@/reporting": ["resources/js/reporting/index.ts"]
+      "@/*": ["resources/js/*"]
     }
   },
   "include": ["resources/js/**/*.ts", "resources/js/**/*.tsx"]

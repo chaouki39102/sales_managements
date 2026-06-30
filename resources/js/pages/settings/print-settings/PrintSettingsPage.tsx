@@ -12,17 +12,17 @@ import { QuickNav } from './components/QuickNav';
 import { TinyBtn, toolBtnStyle } from './components/TinyBtn';
 import { Input } from './components/ui';
 import { type Updater } from './components/ColumnManager';
-import { dbSaveTemplate } from './services/printStoreService';
 import {
-  createDefaultTemplate, DOC_TYPE_LIST,
+  DOC_TYPE_LIST,
   type PrintTemplate, type DocTypeCode,
-  type CompanyData, type ReceiptTemplate80mm,
+  type CompanyData,
 } from './types';
 import { DocumentDataBuilder } from './types/data/DocumentDataBuilder';
 import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
+import { normalizeTemplate } from './services/SettingsSerializer';
 
 const PAPER_DIM: Record<string, { w: number; h: number }> = {
   '80mm': { w: 80,  h: 0   },
@@ -122,11 +122,11 @@ export default function PrintSettingsPage() {
     if (templates.length > 0) {
       const tpl = templates.find(t => t.is_default) ?? templates[0];
       setSelectedTplId(tpl.id);
-      setLocalTpl({ ...createDefaultTemplate(activeDoc, tpl.paper_size), ...tpl });
+      setLocalTpl(normalizeTemplate(tpl, activeDoc, tpl.paper_size));
       setIsDirty(false);
     } else {
       setSelectedTplId(null);
-      setLocalTpl(createDefaultTemplate(activeDoc));
+      setLocalTpl(normalizeTemplate({ id: null, doc_type_code: activeDoc, name: 'قالب جديد' }, activeDoc));
       setIsDirty(true);
     }
     historyRef.current = [];
@@ -170,10 +170,8 @@ export default function PrintSettingsPage() {
       if (prev) pushHistory(prev);
       const next = prev ? { ...prev, [key]: val } : prev;
       if (key === 'paper_size' && next) {
-        const d = PAPER_DIM[val as string];
-        if (d && (val === '80mm' || val === '58mm')) {
-          next.paper_width_mm = val === '58mm' ? 58 : 80;
-        }
+        if (val === '80mm') next.paper_width_mm = 80;
+        else if (val === '58mm') next.paper_width_mm = 58;
       }
       return next;
     });
@@ -210,19 +208,13 @@ export default function PrintSettingsPage() {
       }
       setLocalTpl({ ...savedTpl });
       setIsDirty(false);
-      try {
-        await dbSaveTemplate(apiClient, activeDoc, savedTpl.paper_size, savedTpl as ReceiptTemplate80mm);
-      } catch {
-        notifier.error('❌ فشل حفظ القالب في الإعدادات — POS سيستخدم بيانات قديمة');
-        throw new Error('dbSaveTemplate failed');
-      }
       notifier.success('✅ تم حفظ القالب');
     } catch (e: any) {
       notifier.error(e?.message ?? 'فشل الحفظ');
     } finally {
       setIsSaving(false);
     }
-  }, [localTpl, isSaving, apiClient, activeDoc, templates.length, mutations, notifier]);
+  }, [localTpl, isSaving, activeDoc, templates.length, mutations, notifier]);
 
   const handleSetDefault = useCallback(async (id: number) => {
     setActionLoading(`default-${id}`);
@@ -278,14 +270,11 @@ export default function PrintSettingsPage() {
       setLocalTpl({ ...saved });
       setIsDirty(false);
       setShowLibrary(false);
-      try {
-        await dbSaveTemplate(apiClient, activeDoc, saved.paper_size, saved as ReceiptTemplate80mm);
-      } catch { /* ignore legacy sync */ }
       notifier.success(`✅ تم تثبيت القالب "${saved.name}"`);
     } catch (e: any) {
       notifier.error(e?.message ?? 'فشل تثبيت القالب');
     }
-  }, [apiClient, activeDoc, mutations, notifier]);
+  }, [activeDoc, mutations, notifier]);
 
   const handleExport = useCallback(() => {
     if (!localTpl) return;
@@ -310,7 +299,8 @@ export default function PrintSettingsPage() {
           notifier.error('ملف غير صالح');
           return;
         }
-        const merged = { ...createDefaultTemplate(imported.doc_type_code ?? activeDoc, imported.paper_size), ...imported, id: localTpl?.id ?? null };
+        imported.id = localTpl?.id ?? null;
+        const merged = normalizeTemplate(imported, imported.doc_type_code ?? activeDoc, imported.paper_size);
         setLocalTpl(merged);
         setIsDirty(true);
         notifier.success('تم الاستيراد — احفظ للتطبيق');
@@ -343,7 +333,7 @@ export default function PrintSettingsPage() {
     reactRoot.render(
       React.createElement(PreviewSelector, {
         tpl: localTpl, company: companyData,
-        overrideData: useRealData ? previewData : null,
+        data: useRealData ? previewData : null,
       }),
     );
     await win.document.fonts.ready;
@@ -538,7 +528,9 @@ export default function PrintSettingsPage() {
                 }}
               >
                 <button
-                  onClick={() => { setSelectedTplId(tpl.id); setLocalTpl({ ...createDefaultTemplate(activeDoc, tpl.paper_size), ...tpl }); setIsDirty(false); }}
+                  onClick={() => {
+                    setSelectedTplId(tpl.id); setLocalTpl(normalizeTemplate(tpl, activeDoc, tpl.paper_size)); setIsDirty(false);
+                  }}
                   type="button"
                   style={{
                     padding: '4px 9px', border: 'none', background: 'transparent',
@@ -742,7 +734,7 @@ export default function PrintSettingsPage() {
                 display: 'inline-block',
               }}>
                 <ErrorBoundary>
-                  <PreviewSelector tpl={localTpl} company={companyData} overrideData={useRealData ? previewData : null} />
+                  <PreviewSelector tpl={localTpl} company={companyData} data={useRealData ? previewData : null} />
                 </ErrorBoundary>
               </div>
             ) : (

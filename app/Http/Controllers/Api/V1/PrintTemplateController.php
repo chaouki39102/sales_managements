@@ -48,19 +48,25 @@ class PrintTemplateController extends BaseApiController
     {
         try {
             $validator = Validator::make($request->all(), [
-                'name'          => 'required|string|max:255',
-                'doc_type_code' => 'required|string|max:10',
-                'paper_size'    => 'required|string|max:10',
-                'is_default'    => 'boolean',
-                'is_active'     => 'boolean',
-                'config'        => 'nullable|array',
+                'name'             => 'required|string|max:255',
+                'doc_type_code'    => 'required|string|max:10',
+                'paper_size'       => 'required|string|max:10',
+                'is_default'       => 'boolean',
+                'is_active'        => 'boolean',
+                'template_version' => 'integer|min:1',
+                'config'           => 'nullable|array',
             ]);
 
             if ($validator->fails()) {
                 return $this->errorResponse($validator->errors()->first(), 422);
             }
 
-            $template = PrintTemplate::create($request->all());
+            $data = $request->all();
+            if (!isset($data['config']) || !is_array($data['config'])) {
+                $data['config'] = [];
+            }
+
+            $template = PrintTemplate::create($data);
             return $this->successResponse($template, 'تم إنشاء القالب', 201);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'store');
@@ -73,23 +79,29 @@ class PrintTemplateController extends BaseApiController
             $template = PrintTemplate::find($id);
 
             if (!$template) {
-                $template = new PrintTemplate();
+                return $this->errorResponse('القالب غير موجود', 404);
             }
 
             $validator = Validator::make($request->all(), [
-                'name'          => 'sometimes|string|max:255',
-                'doc_type_code' => 'sometimes|string|max:10',
-                'paper_size'    => 'sometimes|string|max:10',
-                'is_default'    => 'boolean',
-                'is_active'     => 'boolean',
-                'config'        => 'nullable|array',
+                'name'             => 'sometimes|string|max:255',
+                'doc_type_code'    => 'sometimes|string|max:10',
+                'paper_size'       => 'sometimes|string|max:10',
+                'is_default'       => 'boolean',
+                'is_active'        => 'boolean',
+                'template_version' => 'integer|min:1',
+                'config'           => 'nullable|array',
             ]);
 
             if ($validator->fails()) {
                 return $this->errorResponse($validator->errors()->first(), 422);
             }
 
-            $template->fill($request->all());
+            $data = $request->all();
+            if (isset($data['config']) && !is_array($data['config'])) {
+                unset($data['config']);
+            }
+
+            $template->fill($data);
             $template->save();
 
             return $this->successResponse($template->fresh(), 'تم تحديث القالب');
@@ -164,7 +176,6 @@ class PrintTemplateController extends BaseApiController
     {
         try {
             $templates = TemplateLibraryService::getMetadata();
-
             return $this->successResponse($templates, 'تم جلب قوالب المكتبة');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'library');

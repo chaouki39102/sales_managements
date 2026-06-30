@@ -1,7 +1,11 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { TotalRow, borderStyle } from './shared';
-import { numberToArabicWords } from '../../utils';
+import { printFieldResolver } from '../../services';
+
+function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
+  return printFieldResolver.resolve(fieldId, data, tpl);
+}
 
 function PageTotalRow({ label, val, red, bold }: { label: string; val: number; red?: boolean; bold?: boolean }) {
   return (
@@ -27,8 +31,10 @@ function PageTotalRow({ label, val, red, bold }: { label: string; val: number; r
 }
 
 function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
-  const t = data.totals;
   const fs = tpl.totals_font_size;
+  const totalTtc = r('totals.ttc', data, tpl) as number;
+  const totalDiscount = r('totals.discount', data, tpl) as number;
+  const taxBreakdown = data.taxBreakdown;
 
   return (
     <div style={{
@@ -37,16 +43,16 @@ function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
       textAlign: tpl.totals_align === 'left' ? 'left' : tpl.totals_align === 'center' ? 'center' : 'right',
       marginBottom: 4,
     }}>
-      {tpl.show_total_ht      && <TotalRow label="المجموع HT"        val={t.totalHt} />}
-      {tpl.show_discount_total && t.totalDiscount > 0 && (
-        <TotalRow label="إجمالي الخصومات" val={-t.totalDiscount} red />
+      {tpl.show_total_ht      && <TotalRow label="المجموع HT"        val={r('totals.ht', data, tpl) as number} />}
+      {tpl.show_discount_total && totalDiscount > 0 && (
+        <TotalRow label="إجمالي الخصومات" val={-totalDiscount} red />
       )}
-      {tpl.show_total_tva     && <TotalRow label="TVA"               val={t.totalTva} />}
-      {tpl.show_tva_breakdown && data.taxBreakdown.map(r => (
-        <TotalRow key={r.rate} label={`  TVA ${r.rate}%`} val={r.tva} />
+      {tpl.show_total_tva     && <TotalRow label="TVA"               val={r('totals.tva', data, tpl) as number} />}
+      {tpl.show_tva_breakdown && taxBreakdown.map(rr => (
+        <TotalRow key={rr.rate} label={`  TVA ${rr.rate}%`} val={rr.tva} />
       ))}
-      {tpl.show_fiscal_stamp  && t.fiscalStamp > 0 && (
-        <TotalRow label="الطابع الجبائي" val={t.fiscalStamp} />
+      {tpl.show_fiscal_stamp  && (r('totals.fiscalStamp', data, tpl) as number) > 0 && (
+        <TotalRow label="الطابع الجبائي" val={r('totals.fiscalStamp', data, tpl) as number} />
       )}
 
       {tpl.show_total_ttc && (
@@ -62,29 +68,31 @@ function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
           fontFamily: "'Tajawal', sans-serif",
         }}>
           <span>المجموع TTC:</span>
-          <span dir="ltr">{Number(t.totalTtc).toFixed(2)} دج</span>
+          <span dir="ltr">{Number(totalTtc).toFixed(2)} دج</span>
         </div>
       )}
 
-      {tpl.show_amount_in_words && (
+      {tpl.show_amount_in_words && r('totals.amountInWords', data, tpl) && (
         <div style={{ fontSize: fs - 1, textAlign: 'center', color: '#555', marginTop: 2 }}>
-          <em>فقط: {numberToArabicWords(t.totalTtc)} ديناراً جزائرياً</em>
+          <em>فقط: {r('totals.amountInWords', data, tpl)} ديناراً جزائرياً</em>
         </div>
       )}
 
-      {tpl.show_paid_amount   && <TotalRow label="المدفوع"        val={t.paid} bold />}
-      {tpl.show_change        && <TotalRow label="الباقي"         val={t.change} />}
-      {tpl.show_remaining     && t.remaining > 0 && <TotalRow label="المتبقي"  val={t.remaining} red />}
-      {tpl.show_prev_balance  && data.balance && <TotalRow label="الرصيد السابق"  val={data.balance.previous} />}
-      {tpl.show_new_balance   && data.balance && <TotalRow label="الرصيد الجديد"  val={data.balance.current} bold />}
+      {tpl.show_paid_amount   && <TotalRow label="المدفوع"        val={r('totals.paid', data, tpl) as number} bold />}
+      {tpl.show_change        && <TotalRow label="الباقي"         val={r('totals.change', data, tpl) as number} />}
+      {tpl.show_remaining     && (r('totals.remaining', data, tpl) as number) > 0 && <TotalRow label="المتبقي"  val={r('totals.remaining', data, tpl) as number} red />}
+      {tpl.show_prev_balance  && data.balance && <TotalRow label="الرصيد السابق"  val={r('balance.previous', data, tpl) as number} />}
+      {tpl.show_new_balance   && data.balance && <TotalRow label="الرصيد الجديد"  val={r('balance.current', data, tpl) as number} bold />}
     </div>
   );
 }
 
 function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
-  const t = data.totals;
   const isA4 = tpl.paper_size === 'A4';
   const tblW = isA4 ? 320 : 260;
+  const totalTtc = r('totals.ttc', data, tpl) as number;
+  const totalDiscount = r('totals.discount', data, tpl) as number;
+  const taxBreakdown = data.taxBreakdown;
 
   const borderTop = tpl.total_border_style === 'none'
     ? 'none'
@@ -102,13 +110,13 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
     }}>
       <table style={{ width: tblW, borderCollapse: 'collapse' }}>
         <tbody>
-          {tpl.show_total_ht      && <PageTotalRow label="المجموع HT"      val={t.totalHt} />}
-          {tpl.show_discount_total && t.totalDiscount > 0 && <PageTotalRow label="إجمالي الخصومات" val={-t.totalDiscount} red />}
-          {tpl.show_total_tva     && <PageTotalRow label="TVA"             val={t.totalTva} />}
-          {tpl.show_tva_breakdown && data.taxBreakdown.map(r => (
-            <PageTotalRow key={r.rate} label={`  TVA ${r.rate}%`} val={r.tva} />
+          {tpl.show_total_ht      && <PageTotalRow label="المجموع HT"      val={r('totals.ht', data, tpl) as number} />}
+          {tpl.show_discount_total && totalDiscount > 0 && <PageTotalRow label="إجمالي الخصومات" val={-totalDiscount} red />}
+          {tpl.show_total_tva     && <PageTotalRow label="TVA"             val={r('totals.tva', data, tpl) as number} />}
+          {tpl.show_tva_breakdown && taxBreakdown.map(rr => (
+            <PageTotalRow key={rr.rate} label={`  TVA ${rr.rate}%`} val={rr.tva} />
           ))}
-          {tpl.show_fiscal_stamp  && t.fiscalStamp > 0 && <PageTotalRow label="الطابع الجبائي" val={t.fiscalStamp} />}
+          {tpl.show_fiscal_stamp  && (r('totals.fiscalStamp', data, tpl) as number) > 0 && <PageTotalRow label="الطابع الجبائي" val={r('totals.fiscalStamp', data, tpl) as number} />}
 
           {tpl.show_total_ttc && (
             <tr>
@@ -130,16 +138,16 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
                 textAlign: 'right',
                 color: tpl.total_ttc_color,
               }}>
-                {Number(t.totalTtc).toFixed(2)}
+                {Number(totalTtc).toFixed(2)}
               </td>
             </tr>
           )}
 
-          {tpl.show_paid_amount  && <PageTotalRow label="المدفوع"       val={t.paid} bold />}
-          {tpl.show_change       && <PageTotalRow label="الباقي"        val={t.change} />}
-          {tpl.show_remaining    && t.remaining > 0 && <PageTotalRow label="المبلغ المتبقي" val={t.remaining} red />}
-          {tpl.show_prev_balance && data.balance && <PageTotalRow label="الرصيد السابق" val={data.balance.previous} />}
-          {tpl.show_new_balance  && data.balance && <PageTotalRow label="الرصيد الجديد" val={data.balance.current} bold />}
+          {tpl.show_paid_amount  && <PageTotalRow label="المدفوع"       val={r('totals.paid', data, tpl) as number} bold />}
+          {tpl.show_change       && <PageTotalRow label="الباقي"        val={r('totals.change', data, tpl) as number} />}
+          {tpl.show_remaining    && (r('totals.remaining', data, tpl) as number) > 0 && <PageTotalRow label="المبلغ المتبقي" val={r('totals.remaining', data, tpl) as number} red />}
+          {tpl.show_prev_balance && data.balance && <PageTotalRow label="الرصيد السابق" val={r('balance.previous', data, tpl) as number} />}
+          {tpl.show_new_balance  && data.balance && <PageTotalRow label="الرصيد الجديد" val={r('balance.current', data, tpl) as number} bold />}
         </tbody>
       </table>
     </div>

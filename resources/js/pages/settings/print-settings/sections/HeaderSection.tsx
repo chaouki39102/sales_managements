@@ -1,16 +1,21 @@
 import React, { useRef, useState } from 'react';
-import type { ReceiptTemplate80mm, AlignOption, CompanyPreviewData, BorderStyle } from '../types';
+import type { AlignOption, BorderStyle } from '../types';
+import type { PrintTemplate } from '../types';
+import type { CompanyData } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
+import { Field, ColorField, Input } from '../components/ui';
 import { usePrintTemplatesApi } from '../providers/PrintSettingsContext';
+import { isSettingVisible } from '../services/SettingsRegistry';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 
 interface Props {
-  tpl: ReceiptTemplate80mm;
-  update: <K extends keyof ReceiptTemplate80mm>(key: K, val: ReceiptTemplate80mm[K]) => void;
-  company?: CompanyPreviewData | null;
+  tpl: PrintTemplate;
+  update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
+  company?: CompanyData | null;
 }
 
 export default function HeaderSectionControls({ tpl, update, company }: Props) {
+  const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
   const [uploading, setUploading] = useState(false);
   const [zoomImg, setZoomImg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -29,7 +34,6 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
       update('custom_logo_url', res.url);
       update('logo_source', 'custom');
     } catch {
-      // toast handled by apiUpload interceptor
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -38,8 +42,8 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
 
   return (
     <>
-      <Toggle value={tpl.show_logo} onChange={v => update('show_logo', v)} label="إظهار الشعار" />
-      {tpl.show_logo && (
+      {sec('show_logo') && <Toggle value={tpl.show_logo} onChange={v => update('show_logo', v)} label="إظهار الشعار" />}
+      {sec('show_logo') && tpl.show_logo && (
         <>
           <div className="ps-field">
             <label className="ps-field-label">مصدر الشعار</label>
@@ -97,37 +101,37 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
 
       <ImagePreviewModal open={!!zoomImg} src={zoomImg ?? ''} onClose={() => setZoomImg(null)} />
 
-      <Toggle value={tpl.show_company_name} onChange={v => update('show_company_name', v)} label="اسم المؤسسة" />
-      {tpl.show_company_name && (
+      {sec('show_company_name') && <Toggle value={tpl.show_company_name} onChange={v => update('show_company_name', v)} label="اسم المؤسسة" />}
+      {sec('show_company_name') && tpl.show_company_name && (
         <>
           <SliderField label="حجم الخط" value={tpl.company_name_size} min={10} max={28} unit="px"
             onChange={v => update('company_name_size', v)} />
           <Toggle value={tpl.company_name_bold} onChange={v => update('company_name_bold', v)} label="خط عريض" />
           <AlignButtons label="محاذاة الاسم" value={tpl.company_name_align}
             onChange={v => update('company_name_align', v)} />
+          <ColorField label="لون الاسم" value={tpl.company_name_color} onChange={v => update('company_name_color', v)} />
         </>
       )}
 
-      <div className="ps-field">
-        <label className="ps-field-label">نص إضافي في الرأس</label>
-        <input className="ps-input" value={tpl.header_custom_text ?? ''}
-          onChange={e => update('header_custom_text', e.target.value)}
+      {sec('header_custom_text') && <Field label="نص إضافي في الرأس">
+        <Input value={tpl.header_custom_text}
+          onChange={v => update('header_custom_text', v)}
           placeholder="مثال: السجل التجاري: 13/B.0123456" />
-      </div>
+      </Field>}
 
       <div className="ps-section-title" style={{ marginTop: 8, fontSize: 12 }}>معلومات الشركة</div>
-      <Toggle value={tpl.show_address} onChange={v => update('show_address', v)} label="العنوان" />
-      <Toggle value={tpl.show_phone}   onChange={v => update('show_phone', v)} label="الهاتف" />
-      <Toggle value={tpl.show_tax_id}   onChange={v => update('show_tax_id', v)} label="رقم NIF" />
-      <Toggle value={tpl.show_rc}      onChange={v => update('show_rc', v)} label="السجل التجاري RC" />
-      <Toggle value={tpl.show_nis}     onChange={v => update('show_nis', v)} label="رقم NIS / STAT" />
-      <Toggle value={tpl.show_ice}     onChange={v => update('show_ice', v)} label="رقم ICE" />
-      <Toggle value={tpl.show_article} onChange={v => update('show_article', v)} label="النشاط (Article)" />
+      {sec('show_address') && <Toggle value={tpl.show_address} onChange={v => update('show_address', v)} label="العنوان" />}
+      {sec('show_phone') && <Toggle value={tpl.show_phone}   onChange={v => update('show_phone', v)} label="الهاتف" />}
+      {sec('show_tax_id') && <Toggle value={tpl.show_tax_id}   onChange={v => update('show_tax_id', v)} label="رقم NIF" />}
+      {sec('show_rc') && <Toggle value={tpl.show_rc}      onChange={v => update('show_rc', v)} label="السجل التجاري RC" />}
+      {sec('show_nis') && <Toggle value={tpl.show_nis}     onChange={v => update('show_nis', v)} label="رقم NIS / STAT" />}
+      {sec('show_ice') && <Toggle value={tpl.show_ice}     onChange={v => update('show_ice', v)} label="رقم ICE" />}
+      {sec('show_article') && <Toggle value={tpl.show_article} onChange={v => update('show_article', v)} label="النشاط (Article)" />}
 
-      <SliderField label="حجم خط معلومات الشركة" value={tpl.company_info_size} min={7} max={14} unit="px"
-        onChange={v => update('company_info_size', v)} />
-      <AlignButtons label="محاذاة معلومات الشركة" value={tpl.company_info_align}
-        onChange={v => update('company_info_align', v)} />
+      {sec('company_info_size') && <SliderField label="حجم خط معلومات الشركة" value={tpl.company_info_size} min={7} max={14} unit="px"
+        onChange={v => update('company_info_size', v)} />}
+      {sec('company_info_align') && <AlignButtons label="محاذاة معلومات الشركة" value={tpl.company_info_align}
+        onChange={v => update('company_info_align', v)} />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
       <div className="ps-section-title" style={{ fontSize: 12, marginBottom: 4 }}>
@@ -136,17 +140,18 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
           (اتركها فارغة لاستخدام بيانات الشركة تلقائياً)
         </span>
       </div>
-      <CompanyField label="الاسم" value={tpl.company_name_text} onChange={v => update('company_name_text', v)} placeholder="اسم المؤسسة" apiValue={company?.name} />
-      <CompanyField label="العنوان" value={tpl.override_address} onChange={v => update('override_address', v)} placeholder="عنوان المؤسسة" apiValue={company?.address} />
-      <CompanyField label="الهاتف" value={tpl.override_phone} onChange={v => update('override_phone', v)} placeholder="رقم الهاتف" apiValue={company?.phone} />
-      <CompanyField label="NIF" value={tpl.override_nif} onChange={v => update('override_nif', v)} placeholder="الرقم الضريبي" apiValue={company?.nif} />
-      <CompanyField label="RC" value={tpl.override_rc} onChange={v => update('override_rc', v)} placeholder="السجل التجاري" apiValue={company?.rc} />
-      <CompanyField label="NIS" value={tpl.override_nis} onChange={v => update('override_nis', v)} placeholder="رقم NIS" apiValue={company?.nis} />
-      <CompanyField label="ICE" value={tpl.override_ice} onChange={v => update('override_ice', v)} placeholder="رقم ICE" />
-      <CompanyField label="النشاط" value={tpl.override_article} onChange={v => update('override_article', v)} placeholder="نشاط المؤسسة" apiValue={company?.article} />
+      {sec('company_name_text') && <CompanyField label="الاسم" value={tpl.company_name_text} onChange={v => update('company_name_text', v)} placeholder="اسم المؤسسة" apiValue={company?.name} />}
+      {sec('override_address') && <CompanyField label="العنوان" value={tpl.override_address} onChange={v => update('override_address', v)} placeholder="عنوان المؤسسة" apiValue={company?.address} />}
+      {sec('override_phone') && <CompanyField label="الهاتف" value={tpl.override_phone} onChange={v => update('override_phone', v)} placeholder="رقم الهاتف" apiValue={company?.phone} />}
+      {sec('override_nif') && <CompanyField label="NIF" value={tpl.override_nif} onChange={v => update('override_nif', v)} placeholder="الرقم الضريبي" apiValue={company?.nif} />}
+      {sec('override_rc') && <CompanyField label="RC" value={tpl.override_rc} onChange={v => update('override_rc', v)} placeholder="السجل التجاري" apiValue={company?.rc} />}
+      {sec('override_nis') && <CompanyField label="NIS" value={tpl.override_nis} onChange={v => update('override_nis', v)} placeholder="رقم NIS" apiValue={company?.nis} />}
+      {sec('override_ice') && <CompanyField label="ICE" value={tpl.override_ice} onChange={v => update('override_ice', v)} placeholder="رقم ICE" />}
+      {sec('override_article') && <CompanyField label="النشاط" value={tpl.override_article} onChange={v => update('override_article', v)} placeholder="نشاط المؤسسة" apiValue={company?.article} />}
 
-      <BorderSelect label="فاصل الرأس" value={tpl.header_separator}
-        onChange={v => update('header_separator', v as BorderStyle)} />
+      {sec('logo_border_radius') && <SliderField label="تدوير الزوايا" value={tpl.logo_border_radius} min={0} max={50} unit="%" onChange={v => update('logo_border_radius', v)} />}
+      {sec('header_separator') && <BorderSelect label="فاصل الرأس" value={tpl.header_separator}
+        onChange={v => update('header_separator', v as BorderStyle)} />}
     </>
   );
 }

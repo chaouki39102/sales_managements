@@ -1,58 +1,35 @@
 // resources/js/pos/hooks/usePrintSettings.ts
 // ════════════════════════════════════════════════════════════════════════════
 //  Hook موحَّد لإعدادات الطباعة
-//  بسيط — يفوِّض كل عمليات DB/Device إلى printStore
+//  — Template loading via Print Runtime (API) instead of legacy settings API
+//  — Document config still uses settings API for printing behavior
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActiveSlug }    from '@/lib/store/appStore';
-import { defaultTemplate }  from '@/reporting';
 import {
-  dbFetchTemplates, dbFetchDocConfigs,
-  dbSaveTemplate, dbSaveDocConfigs, dbCopyTemplate,
+  dbFetchDocConfigs, dbSaveDocConfigs,
   deviceGetPrinters, deviceSavePrinters,
-  tplKey,
 } from '../store/printStore';
+import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
+import { resolveTemplate } from '@/pages/settings/print-settings/runtime';
+import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
+import type { DocTypeCode } from '@/pages/settings/print-settings/types';
 import type {
-  ReceiptTemplate80mm, DocumentPrintConfig,
+  DocumentPrintConfig,
   DetectedPrinter, PaperSize,
-} from '@/reporting';
+} from '@/pages/settings/print-settings/types';
 
 // ─── Query Keys ──────────────────────────────────────────────────────────────
 
 const K = {
-  templates:  (slug: string) => [slug, 'print', 'templates']   as const,
   docConfigs: (slug: string) => [slug, 'print', 'doc-configs'] as const,
   printers:   (slug: string) => [slug, 'print', 'printers']    as const,
 };
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
-/** كل القوالب من DB */
-export function useAllTemplates() {
-  const slug = useActiveSlug() ?? '';
-  return useQuery({
-    queryKey:  K.templates(slug),
-    queryFn:   dbFetchTemplates,
-    enabled:   !!slug,
-    staleTime: 5 * 60_000,
-  });
-}
-
-/** قالب مستند واحد مع merge مع defaultTemplate */
-export function usePrintTemplate(docCode: string, size: PaperSize) {
-  const slug  = useActiveSlug() ?? '';
-  const key   = tplKey(docCode, size);
-  const query = useAllTemplates();
-
-  const template = query.data?.[key]
-    ? { ...defaultTemplate(), ...query.data[key] }
-    : defaultTemplate();
-
-  return { template, isLoading: query.isLoading };
-}
-
-/** تكوين المستندات من DB */
+/** تكوين المستندات من DB (طباعة: نسخ، auto-print، طابعة، إلخ) */
 export function useDocPrintConfigs() {
   const slug = useActiveSlug() ?? '';
   return useQuery({
@@ -75,52 +52,6 @@ export function usePrintersList() {
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
-
-/** حفظ قالب في DB */
-export function useSaveTemplate() {
-  const slug = useActiveSlug() ?? '';
-  const qc   = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ docCode, size, tpl }: {
-      docCode: string; size: PaperSize; tpl: ReceiptTemplate80mm;
-    }) => dbSaveTemplate(docCode, size, tpl),
-
-    // Optimistic update — الـ UI يتحدث فوراً قبل DB
-    onMutate: async ({ docCode, size, tpl }) => {
-      await qc.cancelQueries({ queryKey: K.templates(slug) });
-      const prev = qc.getQueryData<Record<string, ReceiptTemplate80mm>>(K.templates(slug));
-      qc.setQueryData(K.templates(slug), (old: Record<string, ReceiptTemplate80mm> = {}) => ({
-        ...old,
-        [tplKey(docCode, size)]: tpl,
-      }));
-      return { prev };
-    },
-
-    onError: (_, __, ctx) => {
-      // rollback عند الخطأ
-      if (ctx?.prev) qc.setQueryData(K.templates(slug), ctx.prev);
-    },
-
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: K.templates(slug) });
-    },
-  });
-}
-
-/** نسخ قالب لمستند آخر */
-export function useCopyTemplate() {
-  const slug = useActiveSlug() ?? '';
-  const qc   = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ sourceCode, targetCode, size }: {
-      sourceCode: string; targetCode: string; size: PaperSize;
-    }) => dbCopyTemplate(sourceCode, targetCode, size),
-
-    onSuccess: () => qc.invalidateQueries({ queryKey: K.templates(slug) }),
-  });
-}
 
 /** حفظ تكوين المستندات */
 export function useSaveDocConfigs() {
@@ -170,12 +101,15 @@ const PAPER_WIDTH_MAP: Record<string, number> = {
   'A5': 148,
 };
 
-/** hook للاستخدام في POSPage — يُرجع إعدادات الطباعة لنوع مستند */
+/** hook للاستخدام في POSPage — يُرجع القالب والإعدادات لنوع مستند */
 export function usePrintSettings(docTypeCode: string) {
   const { data: configs = [] } = useDocPrintConfigs();
   const config = configs.find(c => c.docTypeCode === docTypeCode) ?? null;
   const size   = (config?.paperSize ?? 'none') as PaperSize;
-  const { template } = usePrintTemplate(docTypeCode, size !== 'none' ? size : '80mm');
+
+  const { data: templates = [] } = usePrintTemplatesList(docTypeCode as DocTypeCode);
+  const resolved = resolveTemplate(templates, docTypeCode, size !== 'none' ? size : '80mm');
+  const template = resolved ?? createDefaultTemplate(docTypeCode as DocTypeCode, '80mm');
 
   return {
     config,

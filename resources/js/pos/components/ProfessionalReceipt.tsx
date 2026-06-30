@@ -1,26 +1,28 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pos/components/ProfessionalReceipt.tsx
 //
-// معاينة الإيصال قبل الطباعة — تستخدم ReceiptPreview من نظام تصميم القوالب
+// معاينة الإيصال قبل الطباعة — تستخدم UniversalPrintPipeline
 // لتطابق تام بين المعاينة والطباعة الفعلية
 // ════════════════════════════════════════════════════════════════════════════
 
 import React from 'react';
-import { PreviewSelector } from '@/reporting';
-import type { ReceiptTemplate80mm, CompanyPreviewData, ReceiptLiveData } from '@/reporting';
+import UniversalPrintPipeline from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
+import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
+import type { PrintTemplate, CompanyData } from '@/pages/settings/print-settings/types';
 
-interface ProfessionalReceiptProps {
-  template:  ReceiptTemplate80mm;
-  company:   CompanyPreviewData | null;
-  liveData:  ReceiptLiveData;
+interface Props {
+  template: PrintTemplate;
+  company:  CompanyData | null;
+  source:   PipelineSource;
+  docNumber?: string;
   onClose:   () => void;
   onPrint:   () => void;
   onNewSale: () => void;
 }
 
 export default function ProfessionalReceipt({
-  template, company, liveData, onClose, onPrint, onNewSale,
-}: ProfessionalReceiptProps) {
+  template, company, source, docNumber, onClose, onPrint, onNewSale,
+}: Props) {
   return (
     <div className="ov on" onClick={onClose}>
       <div
@@ -34,8 +36,8 @@ export default function ProfessionalReceipt({
               <i className="ti ti-receipt" style={{ color: 'var(--em)', marginLeft: 7 }} />
               معاينة الإيصال
             </div>
-            {liveData.docNumber && (
-              <div className="m-sub">رقم الفاتورة: {liveData.docNumber}</div>
+            {docNumber && (
+              <div className="m-sub">رقم الفاتورة: {docNumber}</div>
             )}
           </div>
           <button className="m-x" onClick={onClose} type="button">
@@ -48,7 +50,7 @@ export default function ProfessionalReceipt({
           style={{ flex: 1, overflowY: 'auto', padding: 16 }}
           id="pos-receipt-print"
         >
-          <PreviewSelector tpl={template} company={company} liveData={liveData} />
+          <UniversalPrintPipeline source={source} template={template} company={company} />
         </div>
 
         <div className="m-foot">

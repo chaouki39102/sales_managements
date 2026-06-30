@@ -4,7 +4,6 @@
 // Builds UniversalDocumentData from various source shapes:
 //   - CommercialDocument (from /api/v1/{company}/documents/{id})
 //   - POSSaleSnapshot (from POSPage.handleCompleteSale)
-//   - LegacyLiveDataShape (backward compat — existing POS flow)
 //
 // Principles:
 //   - No component builds its own data shape. Call a builder method instead.
@@ -28,7 +27,7 @@ import type {
   CurrencyInfo,
 } from './UniversalDocumentData';
 
-import { fromLegacyLiveData, emptyDocumentData, type LegacyLiveDataShape } from './UniversalDocumentData';
+import { emptyDocumentData } from './UniversalDocumentData';
 
 // ─── Source type: CommercialDocument from API ─────────────────────────────────
 //
@@ -251,17 +250,6 @@ export const DocumentDataBuilder = {
       currency:     { code: 'DZD', symbol: 'دج', rate: 1 },
       computed:     {},
     };
-  },
-
-  /**
-   * Build from the legacy ReceiptLiveData / TemplateLiveData shape.
-   * Migration shim — remove once all call sites use fromPOSSnapshot.
-   */
-  fromLegacy(
-    legacy:  LegacyLiveDataShape,
-    company: CompanyInfo,
-  ): UniversalDocumentData {
-    return fromLegacyLiveData(legacy, company);
   },
 
   /**

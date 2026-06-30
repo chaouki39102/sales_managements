@@ -50,5 +50,7 @@ class DatabaseSeeder extends Seeder
                 $this->call(DocumentTypeConversionSeeder::class);
             }
         }
+
+        $this->call(PrintTemplateSeeder::class);
     }
 }

@@ -22,6 +22,9 @@
 //      - تنسيق أفضل للأرقام (اتجاه LTR)
 // ════════════════════════════════════════════════════════════════════════════
 import type { CartItem, CartTotals, Party } from '@/types';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
+import type { UniversalDocumentData, DocumentLine } from '@/pages/settings/print-settings/types/data';
+import { printFieldResolver } from '@/pages/settings/print-settings/services';
 
 // ─── ESC/POS Constants ────────────────────────────────────────────────────────
 
@@ -568,6 +571,125 @@ export async function printThermal(
   opts?:      ReceiptOptions,
 ): Promise<ThermalPrintResult> {
   return autoPrint(items, totals, client, docNumber, opts);
+}
+
+/**
+ * Build ESC/POS bytes from the universal data contract + template.
+ * Respects template visibility flags so thermal output matches the
+ * visual preview rendered by UniversalPreview.
+ */
+export function buildReceiptBytesFromTemplate(
+  template:  PrintTemplate,
+  data:      UniversalDocumentData,
+  docNumber?: string,
+): Uint8Array {
+  const co = data.company ?? {} as any;
+
+  // Convert DocumentLine[] → CartItem[] for the ESC/POS builder
+  const items: CartItem[] = (data.lines ?? []).map((line, idx) => ({
+    product_name:        line.name,
+    ref:                 line.ref  ?? '',
+    quantity:            line.quantity,
+    unit_price_ht:       line.unitPriceHt,
+    unit_symbol:         line.unit  ?? null,
+    tva_rate:            line.tvaPct,
+    discount_percentage: line.discountPct,
+    total_ht:            line.totalHt,
+    id:                  String(idx),
+    product_id:          0,
+    variant_id:          0,
+    unit_price_ttc:      0,
+    total_ttc:           0,
+    tva_id:              null,
+    discount_amount:     0,
+    max_stock:           null,
+    manages_stock:       false,
+    selling_price_ttc:   line.unitPriceTtc,
+  }));
+
+  const totals: CartTotals = {
+    total_ht:       data.totals?.totalHt       ?? 0,
+    total_tva:      data.totals?.totalTva      ?? 0,
+    total_ttc:      data.totals?.totalTtc      ?? 0,
+    total_discount: data.totals?.totalDiscount ?? 0,
+    fiscal_stamp:   data.totals?.fiscalStamp   ?? 0,
+    items_count:    items.length,
+    lines_count:    items.length,
+  };
+
+  const client: Party | null = data.party
+    ? { ...data.party, name: data.party.name, address: data.party.address ?? null } as any
+    : null;
+
+  // Use canonical field resolver for template-aware company overrides
+  const opts: ReceiptOptions = {
+    companyName:    String(printFieldResolver.resolve('company.name', data, template) ?? co.name ?? ''),
+    companyAddress: String(printFieldResolver.resolve('company.address', data, template) ?? co.address ?? ''),
+    companyPhone:   String(printFieldResolver.resolve('company.phone', data, template) ?? co.phone ?? ''),
+    companyNIF:     String(printFieldResolver.resolve('company.nif', data, template) ?? co.nif ?? ''),
+    footerText:     template.show_thank_you ? template.thank_you_text : '',
+    printQR:        !!template.show_qr,
+  };
+
+  return buildReceiptBytes(items, totals, client, docNumber, opts);
+}
+
+/**
+ * Print thermal receipt from the universal data contract + template.
+ * This is the canonical entry point for thermal printing — same data and
+ * visibility controls as the visual preview (UniversalPreview).
+ */
+export async function printThermalViaWebUSBFromTemplate(
+  template:  PrintTemplate,
+  data:      UniversalDocumentData,
+  docNumber?: string,
+): Promise<ThermalPrintResult> {
+  const bytes = buildReceiptBytesFromTemplate(template, data, docNumber);
+  return sendBytesToReceiptPrinter(bytes);
+}
+
+async function sendBytesToReceiptPrinter(bytes: Uint8Array): Promise<ThermalPrintResult> {
+  const usb = (navigator as any).usb;
+  if (!usb) {
+    return { ok: false, method: 'none', message: 'WebUSB غير مدعوم في هذا المتصفح' };
+  }
+  try {
+    const devices: any[] = await usb.getDevices();
+    if (!devices.length) {
+      return { ok: false, method: 'none', message: 'لم يتم العثور على طابعة حرارية' };
+    }
+
+    const device = devices[0];
+    await device.open();
+
+    if (device.configuration === null) {
+      await device.selectConfiguration(1);
+    }
+    const config = device.configuration;
+    let ifaceNum = 0;
+    let epNum = 2;
+    for (let i = 0; i < (config?.interfaces?.length ?? 0); i++) {
+      const iface = config.interfaces[i];
+      const alt = iface.alternates?.[0];
+      if (!alt || alt.interfaceClass === 0x02) continue;
+      const ep = alt.endpoints?.find(
+        (e: any) => e.direction === 'out' && (e.type === 'bulk' || e.type === 'interrupt'),
+      );
+      if (ep) { ifaceNum = iface.interfaceNumber; epNum = ep.endpointNumber; break; }
+    }
+
+    await device.claimInterface(ifaceNum);
+    const result = await device.transferOut(epNum, bytes);
+    await device.releaseInterface(ifaceNum);
+    try { await device.close(); } catch {}
+
+    if (result.status !== 'ok') {
+      return { ok: false, method: 'webusb', message: `فشل الإرسال: ${result.status}` };
+    }
+    return { ok: true, method: 'webusb', message: 'تمت الطباعة بنجاح' };
+  } catch (err: any) {
+    return { ok: false, method: 'webusb', message: err?.message ?? 'فشلت الطباعة' };
+  }
 }
 
 export async function autoPrint(

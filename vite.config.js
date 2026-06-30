@@ -20,7 +20,6 @@ export default defineConfig({
     resolve: {
         alias: {
             '@':             path.resolve(__dirname, './resources/js'),
-            '@/reporting':   path.resolve(__dirname, './resources/js/reporting/index.ts'),
         },
     },
     server: {
@@ -30,7 +29,8 @@ export default defineConfig({
     test: {
         globals: true,
         environment: 'node',
-        include: ['resources/js/**/*.test.{ts,tsx}'],
+        include: ['resources/js/**/*.{test,spec}.{ts,tsx}'],
+        exclude: ['resources/js/**/*.pw.spec.ts'],
         root: '.',
     },
 });

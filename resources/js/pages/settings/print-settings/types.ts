@@ -17,11 +17,9 @@ export type {
 } from './types/api';
 
 export type {
-  TemplateLiveData,
   CompanyData,
   DetectedPrinter,
   DocumentPrintConfig,
   ReceiptTemplate80mm,
   CompanyPreviewData,
-  ReceiptLiveData,
 } from './types/live-data';

@@ -11,11 +11,9 @@ export type {
   Payment,
   BalanceInfo,
   CurrencyInfo,
-  LegacyLiveDataShape,
 } from './UniversalDocumentData';
 
 export {
-  fromLegacyLiveData,
   emptyDocumentData,
 } from './UniversalDocumentData';
 

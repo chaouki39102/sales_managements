@@ -1,16 +1,7 @@
-// resources/js/pages/settings/print-settings/sections/ToggleSwitch.tsx
 import React from 'react';
+import { Toggle as UIToggle } from '../components/ui';
 
-export function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <label className="ps-toggle">
-      <div className={`ps-toggle-track ${value ? 'on' : ''}`} onClick={() => onChange(!value)}>
-        <div className="ps-toggle-thumb" />
-      </div>
-      <span className="ps-toggle-label">{label}</span>
-    </label>
-  );
-}
+export const Toggle = UIToggle;
 
 export function SliderField({
   label, value, min, max, step = 1, unit = '', onChange,
@@ -50,6 +41,4 @@ export function Section({ title, icon, children, defaultOpen = true, id, collaps
   );
 }
 
-export function ColorToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
-  return <Toggle value={value} onChange={onChange} label={label} />;
-}
+

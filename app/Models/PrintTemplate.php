@@ -19,14 +19,26 @@ class PrintTemplate extends Model
         'paper_size',
         'is_default',
         'is_active',
+        'template_version',
         'config',
     ];
 
     protected $casts = [
-        'is_default' => 'boolean',
-        'is_active'  => 'boolean',
-        'config'     => 'array',
+        'is_default'       => 'boolean',
+        'is_active'        => 'boolean',
+        'template_version' => 'integer',
+        'config'           => 'array',
     ];
+
+    protected $attributes = [
+        'config' => '{}',
+    ];
+
+    public function getConfigAttribute(?string $value): array
+    {
+        $decoded = json_decode($value ?? '{}', true);
+        return is_array($decoded) ? $decoded : [];
+    }
 
     public function company(): BelongsTo
     {

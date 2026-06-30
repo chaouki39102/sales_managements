@@ -1,15 +1,24 @@
 import type { PrintTemplate } from '../../types';
-import type { CompanyData } from './shared';
+import type { UniversalDocumentData } from '../../types/data';
 
-export function renderLogo(tpl: PrintTemplate, co: CompanyData) {
+function resolveLogoUrl(tpl: PrintTemplate, data: UniversalDocumentData): string | null {
+  if (tpl.logo_source === 'custom') return tpl.custom_logo_url || null;
+  if (tpl.logo_source === 'default') return null;
+  return data.company?.logoUrl || null;
+}
+
+export function renderLogo(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const logoUrl = resolveLogoUrl(tpl, data);
+  const companyName = data.company?.name || '';
+
   return (
     <div style={{
       display: 'flex',
       justifyContent: tpl.logo_align === 'right' ? 'flex-start' : tpl.logo_align === 'left' ? 'flex-end' : 'center',
       marginBottom: 4,
     }}>
-      {co.logoUrl ? (
-        <img src={co.logoUrl} alt="logo"
+      {logoUrl ? (
+        <img src={logoUrl} alt="logo"
           style={{
             width: tpl.logo_size, height: tpl.logo_size,
             objectFit: 'contain',
@@ -25,7 +34,7 @@ export function renderLogo(tpl: PrintTemplate, co: CompanyData) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontSize: tpl.logo_size * 0.35, fontWeight: 900,
         }}>
-          {co.name.charAt(0)}
+          {companyName.charAt(0)}
         </div>
       )}
     </div>

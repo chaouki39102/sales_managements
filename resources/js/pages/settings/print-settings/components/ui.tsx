@@ -98,11 +98,11 @@ export function Input({ value, onChange, placeholder, onEnter }: {
 // ── Textarea ──────────────────────────────────────────────────────────────────
 
 export function Textarea({ value, onChange, placeholder, rows = 2 }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+  value: string | null | undefined; onChange: (v: string) => void; placeholder?: string; rows?: number;
 }) {
   return (
     <textarea
-      value={value} onChange={e => onChange(e.target.value)}
+      value={value ?? ''} onChange={e => onChange(e.target.value)}
       placeholder={placeholder} rows={rows}
       style={{ ...styledInput, resize: 'vertical' }}
     />

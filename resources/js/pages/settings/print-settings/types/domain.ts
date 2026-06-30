@@ -33,6 +33,7 @@ export interface PrintTemplate {
   paper_size:   PaperSize;
   is_default:   boolean;
   is_active:    boolean;
+  template_version?: number;
   created_at?:  string;
   updated_at?:  string;
 

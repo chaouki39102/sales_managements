@@ -4,6 +4,7 @@ import type { PrintTemplatesApi } from '../contracts/TemplateRepository';
 import type { PrintTemplate, PrintTemplateApiResponse, DocTypeCode } from '../types';
 import type { LibraryApiResponse } from '../template-library/types';
 import { usePrintTemplatesApi, useSlug } from '../providers/PrintSettingsContext';
+import { toApiPayload as serializePayload, normalizeTemplate } from '../services/SettingsSerializer';
 
 // ─── Query key factory ─────────────────────────────────────────────────────
 export const printTemplateKeys = {
@@ -14,25 +15,9 @@ export const printTemplateKeys = {
 
 // ─── Pure helpers (no external deps) ───────────────────────────────────────
 
-function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
-  const {
-    id, name, doc_type_code, paper_size, is_default, is_active,
-    created_at, updated_at,
-    ...config
-  } = tpl as PrintTemplate;
-  return {
-    name:          name          ?? 'قالب جديد',
-    doc_type_code: doc_type_code ?? 'FV',
-    paper_size:    paper_size    ?? '80mm',
-    is_default:    is_default    ?? false,
-    is_active:     is_active     ?? true,
-    config,
-  };
-}
-
 function fromApiResponse(r: PrintTemplateApiResponse): PrintTemplate {
-  return {
-    id:            r.id,
+  const raw: Partial<PrintTemplate> = {
+    id:            r.id as any,
     name:          r.name,
     doc_type_code: r.doc_type_code as DocTypeCode,
     paper_size:    r.paper_size as PrintTemplate['paper_size'],
@@ -40,8 +25,16 @@ function fromApiResponse(r: PrintTemplateApiResponse): PrintTemplate {
     is_active:     r.is_active,
     created_at:    r.created_at,
     updated_at:    r.updated_at,
-    ...(r.config ?? {}),
-  } as PrintTemplate;
+  };
+  const config = r.config ?? {};
+  for (const key of Object.keys(config)) {
+    (raw as any)[key] = (config as any)[key];
+  }
+  return normalizeTemplate(raw, raw.doc_type_code, raw.paper_size);
+}
+
+function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
+  return serializePayload(tpl) as unknown as Record<string, unknown>;
 }
 
 // ─── Factory: creates PrintTemplatesApi from an ApiClient ──────────────────
@@ -103,17 +96,6 @@ export function usePrintTemplates(docTypeCode?: DocTypeCode) {
     enabled:         !!slug,
     staleTime:       5 * 60_000,
     placeholderData: keepPreviousData,
-  });
-}
-
-export function usePrintTemplate(id: number | null | undefined) {
-  const api = usePrintTemplatesApi();
-  const slug = useSlug();
-  return useQuery({
-    queryKey:  printTemplateKeys.detail(slug ?? '', id!),
-    queryFn:   () => api.show(id!),
-    enabled:   !!slug && !!id,
-    staleTime: 5 * 60_000,
   });
 }
 

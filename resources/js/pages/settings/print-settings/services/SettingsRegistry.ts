@@ -1,0 +1,280 @@
+import type { DocTypeCode, PaperSize, PrintTemplate, ColumnKey, AlignOption, BorderStyle, PriceMode, PageOrientation, FontFamily } from '../types/domain';
+
+export type SettingComponent = 'toggle' | 'input' | 'select' | 'pills' | 'slider' | 'color' | 'textarea' | 'column-manager' | 'rules-editor' | 'logo-upload';
+
+export interface SettingMeta {
+  key: keyof PrintTemplate;
+  label: string;
+  labelAr: string;
+  category: 'global' | 'paper' | 'header' | 'company' | 'document' | 'columns' | 'items' | 'totals' | 'payments' | 'footer' | 'barcode' | 'qr' | 'signature' | 'section-visibility' | 'rules' | 'report' | 'charts' | 'formatting';
+  component: SettingComponent;
+  defaultValue: unknown;
+  supportedPapers: PaperSize[];
+  supportedDocs: DocTypeCode[];
+  description?: string;
+  groupKey?: string;
+  dependsOn?: keyof PrintTemplate;
+  options?: readonly { v: string; l: string }[];
+  min?: number;
+  max?: number;
+  step?: number;
+  /** Canonical field ID from PrintFieldRegistry (show_* settings only) */
+  field?: string;
+}
+
+const ALL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT'];
+const COMMERCIAL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV'];
+const POS_DOCS: DocTypeCode[] = ['POS', 'RPT'];
+const WAREHOUSE_DOCS: DocTypeCode[] = ['DDP', 'BT'];
+const REPORT_DOC: DocTypeCode[] = ['RPT'];
+const NON_REPORT_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS'];
+const THERMAL: PaperSize[] = ['80mm', '58mm'];
+const PAGE: PaperSize[] = ['A4', 'A5'];
+const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5'];
+
+const ALIGN_OPTS = [
+  { v: 'right' as const, l: 'يمين' },
+  { v: 'center' as const, l: 'وسط' },
+  { v: 'left' as const, l: 'يسار' },
+];
+
+const BORDER_OPTS = [
+  { v: 'solid' as const, l: 'صلبة' },
+  { v: 'dashed' as const, l: 'متقطعة' },
+  { v: 'double' as const, l: 'مزدوجة' },
+  { v: 'none' as const, l: 'بدون' },
+];
+
+export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
+  // ── Global ──
+  id:             { key: 'id', label: 'ID', labelAr: 'المعرف', category: 'global', component: 'input', defaultValue: null, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  name:           { key: 'name', label: 'Name', labelAr: 'الاسم', category: 'global', component: 'input', defaultValue: 'قالب جديد', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  doc_type_code:  { key: 'doc_type_code', label: 'Document Type', labelAr: 'نوع المستند', category: 'global', component: 'select', defaultValue: 'FV', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  paper_size:     { key: 'paper_size', label: 'Paper Size', labelAr: 'حجم الورق', category: 'paper', component: 'pills', defaultValue: '80mm' as PaperSize, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  is_default:     { key: 'is_default', label: 'Default', labelAr: 'افتراضي', category: 'global', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  is_active:      { key: 'is_active', label: 'Active', labelAr: 'مفعل', category: 'global', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // ── Paper / Formatting ──
+  paper_width_mm:   { key: 'paper_width_mm', label: 'Paper Width (mm)', labelAr: 'عرض الورق (ملم)', category: 'paper', component: 'select', defaultValue: 80, supportedPapers: THERMAL, supportedDocs: ALL_DOCS, options: [{ v: '58', l: '58mm' }, { v: '80', l: '80mm' }] },
+  page_orientation: { key: 'page_orientation', label: 'Page Orientation', labelAr: 'اتجاه الصفحة', category: 'paper', component: 'pills', defaultValue: 'portrait' as PageOrientation, supportedPapers: PAGE, supportedDocs: ALL_DOCS, options: [{ v: 'portrait', l: 'عمودي' }, { v: 'landscape', l: 'أفقي' }] },
+  margin_top:       { key: 'margin_top', label: 'Top Margin (mm)', labelAr: 'الهامش العلوي (ملم)', category: 'formatting', component: 'slider', defaultValue: 3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0, max: 20, step: 0.5 },
+  margin_bottom:    { key: 'margin_bottom', label: 'Bottom Margin (mm)', labelAr: 'الهامش السفلي (ملم)', category: 'formatting', component: 'slider', defaultValue: 3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0, max: 20, step: 0.5 },
+  margin_sides:     { key: 'margin_sides', label: 'Side Margin (mm)', labelAr: 'الهامش الجانبي (ملم)', category: 'formatting', component: 'slider', defaultValue: 3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0, max: 20, step: 0.5 },
+  line_spacing:     { key: 'line_spacing', label: 'Line Spacing', labelAr: 'تباعد الأسطر', category: 'formatting', component: 'slider', defaultValue: 1.3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0.8, max: 3, step: 0.1 },
+  base_font_size:   { key: 'base_font_size', label: 'Base Font Size', labelAr: 'حجم الخط الأساسي', category: 'formatting', component: 'slider', defaultValue: 10, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 20, step: 0.5 },
+  font_family:      { key: 'font_family', label: 'Font Family', labelAr: 'نوع الخط', category: 'formatting', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times New Roman' }, { v: 'arial', l: 'Arial' }] },
+
+  // ── Header / Logo ──
+  show_logo:          { key: 'show_logo', label: 'Show Logo', labelAr: 'إظهار الشعار', category: 'header', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.logo' },
+  logo_source:        { key: 'logo_source', label: 'Logo Source', labelAr: 'مصدر الشعار', category: 'header', component: 'pills', defaultValue: 'company', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo', options: [{ v: 'company', l: 'الشركة' }, { v: 'custom', l: 'مخصص' }, { v: 'default', l: 'افتراضي' }] },
+  logo_size:          { key: 'logo_size', label: 'Logo Size (px)', labelAr: 'حجم الشعار (بكسل)', category: 'header', component: 'slider', defaultValue: 56, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo', min: 20, max: 200, step: 2 },
+  logo_align:         { key: 'logo_align', label: 'Logo Alignment', labelAr: 'محاذاة الشعار', category: 'header', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo', options: ALIGN_OPTS },
+  logo_border_radius: { key: 'logo_border_radius', label: 'Logo Border Radius', labelAr: 'تدوير زوايا الشعار', category: 'header', component: 'slider', defaultValue: 50, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo', min: 0, max: 100, step: 5 },
+  custom_logo_url:    { key: 'custom_logo_url', label: 'Custom Logo URL', labelAr: 'رابط الشعار المخصص', category: 'header', component: 'input', defaultValue: null, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo' },
+
+  // ── Company ──
+  show_company_name:  { key: 'show_company_name', label: 'Show Company Name', labelAr: 'إظهار اسم الشركة', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.name' },
+  company_name_text:  { key: 'company_name_text', label: 'Company Name Text', labelAr: 'نص اسم الشركة', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name' },
+  company_name_size:  { key: 'company_name_size', label: 'Company Name Size', labelAr: 'حجم اسم الشركة', category: 'company', component: 'slider', defaultValue: 15, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name', min: 8, max: 30, step: 1 },
+  company_name_bold:  { key: 'company_name_bold', label: 'Bold Company Name', labelAr: 'تسميك اسم الشركة', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name' },
+  company_name_align: { key: 'company_name_align', label: 'Company Name Alignment', labelAr: 'محاذاة اسم الشركة', category: 'company', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name', options: ALIGN_OPTS },
+  company_name_color: { key: 'company_name_color', label: 'Company Name Color', labelAr: 'لون اسم الشركة', category: 'company', component: 'color', defaultValue: '#111111', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name' },
+
+  // ── Company Info ──
+  show_address:       { key: 'show_address', label: 'Show Address', labelAr: 'إظهار العنوان', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.address' },
+  show_phone:         { key: 'show_phone', label: 'Show Phone', labelAr: 'إظهار الهاتف', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.phone' },
+  show_tax_id:        { key: 'show_tax_id', label: 'Show Tax ID (NIF)', labelAr: 'إظهار رقم الضريبة', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.nif' },
+  show_rc:            { key: 'show_rc', label: 'Show RC', labelAr: 'إظهار السجل التجاري', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.rc' },
+  show_nis:           { key: 'show_nis', label: 'Show NIS', labelAr: 'إظهار رقم NIS', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.nis' },
+  show_ice:           { key: 'show_ice', label: 'Show ICE', labelAr: 'إظهار رقم ICE', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.ice' },
+  show_article:       { key: 'show_article', label: 'Show Article', labelAr: 'إظهار المادة', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.article' },
+  company_info_align: { key: 'company_info_align', label: 'Info Alignment', labelAr: 'محاذاة المعلومات', category: 'company', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  company_info_size:  { key: 'company_info_size', label: 'Info Font Size', labelAr: 'حجم خط المعلومات', category: 'company', component: 'slider', defaultValue: 9, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 16, step: 0.5 },
+  override_address:   { key: 'override_address', label: 'Override Address', labelAr: 'تجاوز العنوان', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_phone:     { key: 'override_phone', label: 'Override Phone', labelAr: 'تجاوز الهاتف', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_nif:       { key: 'override_nif', label: 'Override NIF', labelAr: 'تجاوز رقم الضريبة', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_rc:        { key: 'override_rc', label: 'Override RC', labelAr: 'تجاوز السجل التجاري', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_nis:       { key: 'override_nis', label: 'Override NIS', labelAr: 'تجاوز NIS', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_ice:       { key: 'override_ice', label: 'Override ICE', labelAr: 'تجاوز ICE', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_article:   { key: 'override_article', label: 'Override Article', labelAr: 'تجاوز المادة', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  header_custom_text: { key: 'header_custom_text', label: 'Header Custom Text', labelAr: 'نص مخصص للرأس', category: 'header', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  header_separator:   { key: 'header_separator', label: 'Header Separator', labelAr: 'فاصل الرأس', category: 'header', component: 'pills', defaultValue: 'dashed' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+
+  // ── Document ──
+  title_text:           { key: 'title_text', label: 'Title Text', labelAr: 'نص العنوان', category: 'document', component: 'input', defaultValue: 'فاتورة بيع', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  title_size:           { key: 'title_size', label: 'Title Size', labelAr: 'حجم العنوان', category: 'document', component: 'slider', defaultValue: 13, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 8, max: 30, step: 1 },
+  title_bold:           { key: 'title_bold', label: 'Bold Title', labelAr: 'تسميك العنوان', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  title_align:          { key: 'title_align', label: 'Title Alignment', labelAr: 'محاذاة العنوان', category: 'document', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  title_color:          { key: 'title_color', label: 'Title Color', labelAr: 'لون العنوان', category: 'document', component: 'color', defaultValue: '#111111', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_doc_number:      { key: 'show_doc_number', label: 'Show Document Number', labelAr: 'إظهار رقم المستند', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'document.number' },
+  show_date:            { key: 'show_date', label: 'Show Date', labelAr: 'إظهار التاريخ', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'document.date' },
+  show_time:            { key: 'show_time', label: 'Show Time', labelAr: 'إظهار الوقت', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'document.time' },
+  show_due_date:        { key: 'show_due_date', label: 'Show Due Date', labelAr: 'إظهار تاريخ الاستحقاق', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'document.dueDate' },
+  show_cashier:         { key: 'show_cashier', label: 'Show Cashier', labelAr: 'إظهار الكاشير', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.cashierName' },
+  show_client:          { key: 'show_client', label: 'Show Client', labelAr: 'إظهار العميل', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.name' },
+  show_client_nif:      { key: 'show_client_nif', label: 'Show Client NIF', labelAr: 'إظهار رقم ضريبة العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.nif' },
+  show_client_phone:    { key: 'show_client_phone', label: 'Show Client Phone', labelAr: 'إظهار هاتف العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.phone' },
+  show_client_address:  { key: 'show_client_address', label: 'Show Client Address', labelAr: 'إظهار عنوان العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.address' },
+  show_delivery_address:{ key: 'show_delivery_address', label: 'Show Delivery Address', labelAr: 'إظهار عنوان التسليم', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS, field: 'customer.deliveryAddress' },
+  show_session:         { key: 'show_session', label: 'Show Session', labelAr: 'إظهار الجلسة', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: POS_DOCS, field: 'session.code' },
+  show_payment_term:    { key: 'show_payment_term', label: 'Show Payment Term', labelAr: 'إظهار شرط الدفع', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS, field: 'document.paymentTerm' },
+  show_bank_details:    { key: 'show_bank_details', label: 'Show Bank Details', labelAr: 'إظهار تفاصيل البنك', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: PAGE, supportedDocs: COMMERCIAL_DOCS, field: 'footer.bankDetails' },
+  bank_details_text:    { key: 'bank_details_text', label: 'Bank Details Text', labelAr: 'نص تفاصيل البنك', category: 'document', component: 'textarea', defaultValue: '', supportedPapers: PAGE, supportedDocs: COMMERCIAL_DOCS, dependsOn: 'show_bank_details' },
+  doc_separator:        { key: 'doc_separator', label: 'Document Separator', labelAr: 'فاصل المستند', category: 'document', component: 'pills', defaultValue: 'dashed' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+
+  // ── Items / Columns ──
+  col_order:            { key: 'col_order', label: 'Column Order', labelAr: 'ترتيب الأعمدة', category: 'columns', component: 'column-manager', defaultValue: ['name', 'quantity', 'price', 'total'] as ColumnKey[], supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  col_show:             { key: 'col_show', label: 'Column Visibility', labelAr: 'إظهار الأعمدة', category: 'columns', component: 'column-manager', defaultValue: {} as Partial<Record<ColumnKey, boolean>>, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  col_widths:           { key: 'col_widths', label: 'Column Widths', labelAr: 'عرض الأعمدة', category: 'columns', component: 'column-manager', defaultValue: {} as Partial<Record<ColumnKey, number>>, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  col_headers:          { key: 'col_headers', label: 'Column Headers', labelAr: 'عناوين الأعمدة', category: 'columns', component: 'column-manager', defaultValue: {} as Partial<Record<ColumnKey, string>>, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  col_aligns:           { key: 'col_aligns', label: 'Column Alignments', labelAr: 'محاذاة الأعمدة', category: 'columns', component: 'column-manager', defaultValue: {} as Partial<Record<ColumnKey, AlignOption>>, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // ── Items Table ──
+  items_font_size:      { key: 'items_font_size', label: 'Items Font Size', labelAr: 'حجم خط الجدول', category: 'items', component: 'slider', defaultValue: 10, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 18, step: 0.5 },
+  items_font_family:    { key: 'items_font_family', label: 'Items Font Family', labelAr: 'نوع خط الجدول', category: 'items', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times' }, { v: 'arial', l: 'Arial' }] },
+  show_col_header:      { key: 'show_col_header', label: 'Show Column Headers', labelAr: 'إظهار رؤوس الأعمدة', category: 'items', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  table_header_bold:    { key: 'table_header_bold', label: 'Bold Table Header', labelAr: 'تسميك رأس الجدول', category: 'items', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
+  table_header_bg:      { key: 'table_header_bg', label: 'Table Header Background', labelAr: 'خلفية رأس الجدول', category: 'items', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
+  table_header_color:   { key: 'table_header_color', label: 'Table Header Color', labelAr: 'لون رأس الجدول', category: 'items', component: 'color', defaultValue: '#333333', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
+  table_border_style:   { key: 'table_border_style', label: 'Table Border Style', labelAr: 'نمط حدود الجدول', category: 'items', component: 'pills', defaultValue: 'dashed' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+  alternating_rows:     { key: 'alternating_rows', label: 'Alternating Row Colors', labelAr: 'تلوين الصفوف بالتناوب', category: 'items', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  alternating_color:    { key: 'alternating_color', label: 'Alternating Color', labelAr: 'لون التناوب', category: 'items', component: 'color', defaultValue: '#f5f5f5', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'alternating_rows' },
+  price_display:        { key: 'price_display', label: 'Price Display Mode', labelAr: 'طريقة عرض السعر', category: 'items', component: 'pills', defaultValue: 'ht' as PriceMode, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'ht', l: 'HT' }, { v: 'ttc', l: 'TTC' }] },
+  show_line_total_ttc:  { key: 'show_line_total_ttc', label: 'Show Line Total TTC', labelAr: 'إظهار المجموع لكل سطر', category: 'items', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // ── Totals ──
+  totals_font_size:     { key: 'totals_font_size', label: 'Totals Font Size', labelAr: 'حجم خط الإجماليات', category: 'totals', component: 'slider', defaultValue: 10, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 20, step: 0.5 },
+  totals_bold:          { key: 'totals_bold', label: 'Bold Totals', labelAr: 'تسميك الإجماليات', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  totals_align:         { key: 'totals_align', label: 'Totals Alignment', labelAr: 'محاذاة الإجماليات', category: 'totals', component: 'pills', defaultValue: 'right' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  show_total_ht:        { key: 'show_total_ht', label: 'Show Total HT', labelAr: 'إظهار المجموع HT', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.ht' },
+  show_total_tva:       { key: 'show_total_tva', label: 'Show Total TVA', labelAr: 'إظهار مجموع الضريبة', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.tva' },
+  show_tva_breakdown:   { key: 'show_tva_breakdown', label: 'Show TVA Breakdown', labelAr: 'تفصيل الضريبة حسب النسبة', category: 'totals', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'tvaBreakdown.rate' },
+  show_discount_total:  { key: 'show_discount_total', label: 'Show Discount Total', labelAr: 'إظهار مجموع الخصم', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.discount' },
+  show_fiscal_stamp:    { key: 'show_fiscal_stamp', label: 'Show Fiscal Stamp', labelAr: 'إظهار الطابع الضريبي', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS , field: 'totals.fiscalStamp' },
+  show_total_ttc:       { key: 'show_total_ttc', label: 'Show Total TTC', labelAr: 'إظهار المجموع TTC', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.ttc' },
+  total_ttc_font_size:  { key: 'total_ttc_font_size', label: 'TTC Font Size', labelAr: 'حجم خط TTC', category: 'totals', component: 'slider', defaultValue: 14, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 10, max: 30, step: 1 },
+  total_ttc_bold:       { key: 'total_ttc_bold', label: 'Bold TTC', labelAr: 'تسميك TTC', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  total_ttc_color:      { key: 'total_ttc_color', label: 'TTC Color', labelAr: 'لون TTC', category: 'totals', component: 'color', defaultValue: '#111111', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  total_border_style:   { key: 'total_border_style', label: 'Totals Border Style', labelAr: 'نمط حدود الإجماليات', category: 'totals', component: 'pills', defaultValue: 'double' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+  show_amount_in_words: { key: 'show_amount_in_words', label: 'Show Amount in Words', labelAr: 'إظهار المبلغ كتابةً', category: 'totals', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.amountInWords' },
+  show_paid_amount:     { key: 'show_paid_amount', label: 'Show Paid Amount', labelAr: 'إظهار المبلغ المدفوع', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.paid' },
+  show_change:          { key: 'show_change', label: 'Show Change', labelAr: 'إظهار الباقي', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.change' },
+  show_remaining:       { key: 'show_remaining', label: 'Show Remaining', labelAr: 'إظهار المتبقي', category: 'totals', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.remaining' },
+  show_prev_balance:    { key: 'show_prev_balance', label: 'Show Previous Balance', labelAr: 'إظهار الرصيد السابق', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'balance.previous' },
+  show_new_balance:     { key: 'show_new_balance', label: 'Show New Balance', labelAr: 'إظهار الرصيد الجديد', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'balance.current' },
+
+  // ── Payments ──
+  show_payment_details: { key: 'show_payment_details', label: 'Show Payment Details', labelAr: 'إظهار تفاصيل الدفع', category: 'payments', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'payment.method' },
+  payment_font_size:    { key: 'payment_font_size', label: 'Payment Font Size', labelAr: 'حجم خط الدفع', category: 'payments', component: 'slider', defaultValue: 9, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 16, step: 0.5 },
+
+  // ── Footer ──
+  footer_line1:         { key: 'footer_line1', label: 'Footer Line 1', labelAr: 'سطر التذييل 1', category: 'footer', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  footer_line2:         { key: 'footer_line2', label: 'Footer Line 2', labelAr: 'سطر التذييل 2', category: 'footer', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  footer_line3:         { key: 'footer_line3', label: 'Footer Line 3', labelAr: 'سطر التذييل 3', category: 'footer', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  footer_separator:     { key: 'footer_separator', label: 'Footer Separator', labelAr: 'فاصل التذييل', category: 'footer', component: 'pills', defaultValue: 'solid' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+  show_thank_you:       { key: 'show_thank_you', label: 'Show Thank You', labelAr: 'إظهار الشكر', category: 'footer', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.thankYou' },
+  thank_you_text:       { key: 'thank_you_text', label: 'Thank You Text', labelAr: 'نص الشكر', category: 'footer', component: 'input', defaultValue: 'شكراً لزيارتكم!', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_thank_you' },
+  thank_you_size:       { key: 'thank_you_size', label: 'Thank You Size', labelAr: 'حجم خط الشكر', category: 'footer', component: 'slider', defaultValue: 11, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_thank_you', min: 8, max: 24, step: 1 },
+  thank_you_color:      { key: 'thank_you_color', label: 'Thank You Color', labelAr: 'لون الشكر', category: 'footer', component: 'color', defaultValue: '#111111', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_thank_you' },
+  show_returns_policy:  { key: 'show_returns_policy', label: 'Show Returns Policy', labelAr: 'إظهار سياسة الإرجاع', category: 'footer', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.returnsPolicy' },
+  returns_policy_text:  { key: 'returns_policy_text', label: 'Returns Policy Text', labelAr: 'نص سياسة الإرجاع', category: 'footer', component: 'input', defaultValue: 'كل الاحتجاجات لا تتعدى 48 ساعة', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_returns_policy' },
+  footer_legal_text:    { key: 'footer_legal_text', label: 'Footer Legal Text', labelAr: 'نص قانوني', category: 'footer', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // ── Barcode / QR ──
+  show_barcode:         { key: 'show_barcode', label: 'Show Barcode', labelAr: 'إظهار الباركود', category: 'barcode', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.barcode' },
+  barcode_content:      { key: 'barcode_content', label: 'Barcode Content', labelAr: 'محتوى الباركود', category: 'barcode', component: 'pills', defaultValue: 'doc-number', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_barcode', options: [{ v: 'doc-number', l: 'رقم المستند' }, { v: 'total', l: 'المجموع' }, { v: 'custom', l: 'نص مخصص' }] },
+  barcode_custom_text:  { key: 'barcode_custom_text', label: 'Barcode Custom Text', labelAr: 'نص الباركود المخصص', category: 'barcode', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'barcode_content' },
+  show_qr:              { key: 'show_qr', label: 'Show QR Code', labelAr: 'إظهار رمز QR', category: 'qr', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.qr' },
+  qr_content:           { key: 'qr_content', label: 'QR Content', labelAr: 'محتوى QR', category: 'qr', component: 'pills', defaultValue: 'doc-number', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_qr', options: [{ v: 'doc-number', l: 'رقم المستند' }, { v: 'company-info', l: 'معلومات الشركة' }, { v: 'both', l: 'كلاهما' }] },
+
+  // ── Signatures ──
+  show_cashier_signature: { key: 'show_cashier_signature', label: 'Cashier Signature', labelAr: 'توقيع الكاشير', category: 'signature', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'signature.cashier' },
+  show_client_signature:  { key: 'show_client_signature', label: 'Client Signature', labelAr: 'توقيع العميل', category: 'signature', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'signature.client' },
+  show_stamp:             { key: 'show_stamp', label: 'Show Stamp', labelAr: 'إظهار الختم', category: 'signature', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'signature.stamp' },
+
+  // ── Section Visibility ──
+  show_header_section:    { key: 'show_header_section', label: 'Header Section', labelAr: 'قسم الرأس', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_doc_info_section:  { key: 'show_doc_info_section', label: 'Document Section', labelAr: 'قسم المستند', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_items_section:     { key: 'show_items_section', label: 'Items Section', labelAr: 'قسم الجدول', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_totals_section:    { key: 'show_totals_section', label: 'Totals Section', labelAr: 'قسم الإجماليات', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_payments_section:  { key: 'show_payments_section', label: 'Payments Section', labelAr: 'قسم الدفع', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_footer_section:    { key: 'show_footer_section', label: 'Footer Section', labelAr: 'قسم التذييل', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // ── Rules ──
+  rules:                  { key: 'rules', label: 'Rules', labelAr: 'القواعد', category: 'rules', component: 'rules-editor', defaultValue: [] as any[], supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // ── Report ──
+  show_report_header:        { key: 'show_report_header', label: 'Show Report Header', labelAr: 'إظهار رأس التقرير', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  report_header_text:        { key: 'report_header_text', label: 'Report Header Text', labelAr: 'نص رأس التقرير', category: 'report', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, dependsOn: 'show_report_header' },
+  show_report_footer:        { key: 'show_report_footer', label: 'Show Report Footer', labelAr: 'إظهار تذييل التقرير', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  report_footer_text:        { key: 'report_footer_text', label: 'Report Footer Text', labelAr: 'نص تذييل التقرير', category: 'report', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, dependsOn: 'show_report_footer' },
+  show_charts:               { key: 'show_charts', label: 'Show Charts', labelAr: 'إظهار الرسوم البيانية', category: 'charts', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  chart_type:                { key: 'chart_type', label: 'Chart Type', labelAr: 'نوع الرسم البياني', category: 'charts', component: 'pills', defaultValue: 'bar', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, dependsOn: 'show_charts', options: [{ v: 'bar', l: 'أعمدة' }, { v: 'pie', l: 'دائري' }] },
+  chart_title:               { key: 'chart_title', label: 'Chart Title', labelAr: 'عنوان الرسم البياني', category: 'charts', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, dependsOn: 'show_charts' },
+  group_by:                  { key: 'group_by', label: 'Group By', labelAr: 'تجميع حسب', category: 'report', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  sort_by:                   { key: 'sort_by', label: 'Sort By', labelAr: 'ترتيب حسب', category: 'report', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  sort_direction:            { key: 'sort_direction', label: 'Sort Direction', labelAr: 'اتجاه الترتيب', category: 'report', component: 'pills', defaultValue: 'asc', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, options: [{ v: 'asc', l: 'تصاعدي' }, { v: 'desc', l: 'تنازلي' }] },
+  show_report_period:        { key: 'show_report_period', label: 'Show Report Period', labelAr: 'إظهار فترة التقرير', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'report.periodStart' },
+  show_report_cashier:       { key: 'show_report_cashier', label: 'Show Cashier in Report', labelAr: 'إظهار الكاشير في التقرير', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'report.cashier' },
+  show_report_summary_cards: { key: 'show_report_summary_cards', label: 'Show Summary Cards', labelAr: 'إظهار بطاقات الملخص', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'report.grossSales' },
+  show_report_payment_breakdown: { key: 'show_report_payment_breakdown', label: 'Show Payment Breakdown', labelAr: 'إظهار توزيع الدفع', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'payment.method' },
+  show_report_top_products:  { key: 'show_report_top_products', label: 'Show Top Products', labelAr: 'إظهار أفضل المنتجات', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'item.name' },
+  report_col_widths:         { key: 'report_col_widths', label: 'Report Column Widths', labelAr: 'عرض أعمدة التقرير', category: 'report', component: 'input', defaultValue: {} as any, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  report_col_headers:        { key: 'report_col_headers', label: 'Report Column Headers', labelAr: 'عناوين أعمدة التقرير', category: 'report', component: 'input', defaultValue: {} as any, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+};
+
+export function getSettingMeta(key: string): SettingMeta | undefined {
+  return SETTINGS_REGISTRY[key];
+}
+
+export function getSettingsByCategory(category: SettingMeta['category']): SettingMeta[] {
+  return Object.values(SETTINGS_REGISTRY).filter(s => s.category === category);
+}
+
+export function getSettingsForPaper(paperSize: PaperSize): SettingMeta[] {
+  return Object.values(SETTINGS_REGISTRY).filter(s => s.supportedPapers.includes(paperSize));
+}
+
+export function getSettingsForDoc(docType: DocTypeCode): SettingMeta[] {
+  return Object.values(SETTINGS_REGISTRY).filter(s => s.supportedDocs.includes(docType));
+}
+
+export function getVisibleSettings(docType: DocTypeCode, paperSize: PaperSize): SettingMeta[] {
+  return Object.values(SETTINGS_REGISTRY).filter(s =>
+    s.supportedDocs.includes(docType) &&
+    s.supportedPapers.includes(paperSize)
+  );
+}
+
+// ─── Column-level metadata defaults (single source of truth) ────────────────
+export interface ColumnDefault {
+  header: string;
+  width: number;
+  align: AlignOption;
+}
+
+export const COLUMN_DEFAULTS: Record<ColumnKey, ColumnDefault> = {
+  rowNumber: { header: '#',       width: 8,  align: 'center' },
+  barcode:   { header: 'باركود',   width: 14, align: 'right'  },
+  ref:       { header: 'مرجع',     width: 12, align: 'right'  },
+  name:      { header: 'البيان',    width: 30, align: 'right'  },
+  unit:      { header: 'وحدة',     width: 10, align: 'center' },
+  quantity:  { header: 'الكمية',   width: 12, align: 'center' },
+  price:     { header: 'السعر',    width: 14, align: 'right'  },
+  discount:  { header: 'خصم',      width: 12, align: 'center' },
+  tva:       { header: 'TVA',      width: 10, align: 'center' },
+  total:     { header: 'المجموع',   width: 16, align: 'right'  },
+};
+
+export function isSettingVisible(key: string, docType: DocTypeCode, paperSize: PaperSize, tpl?: Partial<PrintTemplate>): boolean {
+  const meta = SETTINGS_REGISTRY[key];
+  if (!meta) return true;
+  if (!meta.supportedDocs.includes(docType)) return false;
+  if (!meta.supportedPapers.includes(paperSize)) return false;
+  if (tpl && meta.dependsOn) {
+    const parentMeta = SETTINGS_REGISTRY[meta.dependsOn];
+    const parentVal = (tpl as any)[meta.dependsOn];
+    if (parentMeta?.component === 'toggle' && !parentVal) return false;
+  }
+  return true;
+}

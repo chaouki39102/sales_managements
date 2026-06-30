@@ -16,6 +16,7 @@ import { connectSlugToInterceptor }  from '@/lib/api/core/client';
 import { appActions }                from '@/lib/store/appStore';
 import { AuthProvider }              from '@/context/AuthContext';
 import { FiscalYearProvider }        from '@/context/FiscalYearContext';
+import { PrintRuntimeAdapter }       from '@/pages/settings/print-settings/runtime';
 import { AppRoutes }                 from '@/routes/index';
 import NotificationContainer        from '@/components/notifications/NotificationContainer';
 
@@ -37,8 +38,10 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <FiscalYearProvider>
-            <AppRoutes />
-            <NotificationContainer />
+            <PrintRuntimeAdapter>
+              <AppRoutes />
+              <NotificationContainer />
+            </PrintRuntimeAdapter>
           </FiscalYearProvider>
         </AuthProvider>
       </BrowserRouter>

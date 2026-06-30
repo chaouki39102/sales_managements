@@ -1,6 +1,7 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { Separator } from './shared';
+import { printFieldResolver } from '../../services';
 
 function renderThermalPayments(tpl: PrintTemplate, data: UniversalDocumentData) {
   return (
@@ -9,8 +10,8 @@ function renderThermalPayments(tpl: PrintTemplate, data: UniversalDocumentData) 
       <div style={{ fontWeight: 700, marginBottom: 2 }}>وسائل الدفع:</div>
       {data.payments.map((p, i) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-          <span>{p.mode}</span>
-          <span dir="ltr">{Number(p.amount).toFixed(2)}</span>
+          <span>{printFieldResolver.resolveItemField('payment.method', p as any, i)}</span>
+          <span dir="ltr">{Number(printFieldResolver.resolveItemField('payment.amount', p as any, i)).toFixed(2)}</span>
         </div>
       ))}
       <Separator style="dashed" />
@@ -28,8 +29,8 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
           <tbody>
             {data.payments.map((p, i) => (
               <tr key={i}>
-                <td style={{ padding: '4px 12px', textAlign: 'right' }}>{p.mode}</td>
-                <td style={{ padding: '4px 12px', textAlign: 'right' }}>{Number(p.amount).toFixed(2)}</td>
+                <td style={{ padding: '4px 12px', textAlign: 'right' }}>{printFieldResolver.resolveItemField('payment.method', p as any, i)}</td>
+                <td style={{ padding: '4px 12px', textAlign: 'right' }}>{Number(printFieldResolver.resolveItemField('payment.amount', p as any, i)).toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
@@ -43,8 +44,8 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
       <div style={{ fontWeight: 700, marginBottom: 4 }}>وسائل الدفع:</div>
       {data.payments.map((p, i) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', width: 200 }}>
-          <span>{p.mode}</span>
-          <span>{Number(p.amount).toFixed(2)}</span>
+          <span>{printFieldResolver.resolveItemField('payment.method', p as any, i)}</span>
+          <span>{Number(printFieldResolver.resolveItemField('payment.amount', p as any, i)).toFixed(2)}</span>
         </div>
       ))}
     </div>
@@ -52,6 +53,7 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
 }
 
 export function renderPayments(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+  if (!tpl.show_payment_details) return null;
   if (data.payments.length === 0) return null;
   if (isThermal) return renderThermalPayments(tpl, data);
   return renderPagePayments(tpl, data);

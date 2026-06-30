@@ -65,4 +65,3 @@ export interface DocumentPrintConfig {
 
 export type ReceiptTemplate80mm = PrintTemplate;
 export type CompanyPreviewData = CompanyData;
-export type ReceiptLiveData = TemplateLiveData;

@@ -2,7 +2,7 @@ import React, { useMemo, useEffect } from 'react';
 import type { UniversalDocumentData } from '../../types/data';
 import type { PrintTemplate } from '../../types';
 import {
-  mm, fontFamily, getCompany, SectionWrap,
+  mm, fontFamily, SectionWrap,
 } from './shared';
 import { renderHeader } from './HeaderSection';
 import { renderDocInfo } from './DocInfoSection';
@@ -18,19 +18,6 @@ import { calculatedFieldService } from '../../services/CalculatedFieldService';
 export interface UniversalPreviewProps {
   tpl:      PrintTemplate;
   data:     UniversalDocumentData;
-  company?: CompanyData | null;
-}
-
-interface CompanyData {
-  name:    string;
-  address: string;
-  phone:   string;
-  nif:     string;
-  rc:      string;
-  nis:     string;
-  ice:     string;
-  article: string;
-  logoUrl?: string | null;
 }
 
 function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
@@ -56,7 +43,7 @@ function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
   return { data, computed };
 }
 
-function UniversalPreview({ tpl, data, company }: UniversalPreviewProps) {
+function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   useEffect(() => { formulaEngine.clearCache(); }, [data]);
 
   const isThermal   = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
@@ -68,8 +55,6 @@ function UniversalPreview({ tpl, data, company }: UniversalPreviewProps) {
   const portraitH = isA4 ? 1123 : 794;
   const paperWidth   = isThermal ? tpl.paper_width_mm * 3.78 : (isLandscape ? portraitH : portraitW);
   const minHeight    = isThermal ? 'auto' : (isLandscape ? portraitW : portraitH);
-
-  const co = useMemo(() => getCompany(tpl, company), [tpl, company]);
 
   const ruleResult = useMemo(() => {
     if (!tpl.rules || tpl.rules.length === 0) return null;
@@ -111,7 +96,7 @@ function UniversalPreview({ tpl, data, company }: UniversalPreviewProps) {
     }}>
       {tpl.show_header_section && sectionVisible('header') && (
         <SectionWrap highlight={sectionHighlight('header')}>
-          {renderHeader(tpl, co, data, isThermal)}
+          {renderHeader(tpl, data, isThermal)}
         </SectionWrap>
       )}
       {tpl.show_doc_info_section && sectionVisible('doc-info') && (
@@ -130,7 +115,7 @@ function UniversalPreview({ tpl, data, company }: UniversalPreviewProps) {
           {renderTotals(tpl, data, isThermal)}
         </SectionWrap>
       )}
-      {tpl.show_payments_section && tpl.show_payment_details && sectionVisible('payments') && (
+      {tpl.show_payments_section && sectionVisible('payments') && (
         <SectionWrap highlight={sectionHighlight('payments')}>
           {renderPayments(tpl, data, isThermal)}
         </SectionWrap>

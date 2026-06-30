@@ -32,21 +32,10 @@ export function fontFamily(f: FontFamily): string {
   }
 }
 
-const COL_HEADERS: Record<ColumnKey, string> = {
-  rowNumber: '#',
-  barcode:   'باركود',
-  ref:       'مرجع',
-  name:      'البيان',
-  unit:      'وحدة',
-  quantity:  'الكمية',
-  price:     'السعر',
-  discount:  'خصم',
-  tva:       'TVA',
-  total:     'المجموع',
-};
+import { COLUMN_DEFAULTS } from '../../services/SettingsRegistry';
 
 export function colDefaultHeader(col: ColumnKey): string {
-  return COL_HEADERS[col] ?? col;
+  return COLUMN_DEFAULTS[col]?.header ?? col;
 }
 
 export function borderStyle(s: BorderStyle): string {
@@ -84,11 +73,11 @@ export function colWidth(
   col: ColumnKey,
   defaults?: Partial<Record<ColumnKey, number>>,
 ): number {
-  return tpl.col_widths[col] ?? defaults?.[col] ?? 20;
+  return tpl.col_widths[col] ?? defaults?.[col] ?? COLUMN_DEFAULTS[col]?.width ?? 20;
 }
 
 export function colAlign(tpl: PrintTemplate, col: ColumnKey): AlignOption {
-  return tpl.col_aligns[col] ?? 'right';
+  return tpl.col_aligns[col] ?? COLUMN_DEFAULTS[col]?.align ?? 'right';
 }
 
 export interface CompanyData {
@@ -101,31 +90,6 @@ export interface CompanyData {
   ice:     string;
   article: string;
   logoUrl?: string | null;
-}
-
-export function getCompany(
-  tpl: PrintTemplate,
-  api?: CompanyData | null,
-): CompanyData {
-  let logoUrl: string | null = null;
-  if (tpl.logo_source === 'custom') {
-    logoUrl = tpl.custom_logo_url ?? null;
-  } else if (tpl.logo_source === 'company') {
-    logoUrl = api?.logoUrl ?? null;
-  }
-  // 'default' → null → initial letter fallback in renderLogo
-
-  return {
-    name:    tpl.company_name_text || api?.name    || '',
-    address: tpl.override_address  || api?.address  || '',
-    phone:   tpl.override_phone    || api?.phone   || '',
-    nif:     tpl.override_nif      || api?.nif     || '',
-    rc:      tpl.override_rc       || api?.rc      || '',
-    nis:     tpl.override_nis      || api?.nis     || '',
-    ice:     tpl.override_ice      || api?.ice     || '',
-    article: tpl.override_article  || api?.article || '',
-    logoUrl,
-  };
 }
 
 export function buildTvaByRate(

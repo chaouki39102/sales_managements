@@ -4,40 +4,1044 @@
 # ğŸ“˜ print settings
 # =========================================
 
+## FILE: resources/js/pages/settings/print-settings/__tests__/fixtures/expanded-registry.ts
+```
+import type { SettingMeta } from '../../services/SettingsRegistry';
+import { SETTINGS_REGISTRY } from '../../services/SettingsRegistry';
+
+const ALL_DOCS: readonly string[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT'];
+const COMMERCIAL_DOCS: readonly string[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV'];
+const POS_DOCS: readonly string[] = ['POS', 'RPT'];
+const WAREHOUSE_DOCS: readonly string[] = ['DDP', 'BT'];
+const REPORT_DOC: readonly string[] = ['RPT'];
+const NON_REPORT_DOCS: readonly string[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS'];
+
+const THERMAL: readonly string[] = ['80mm', '58mm'];
+const PAGE: readonly string[] = ['A4', 'A5'];
+const ALL_PAPERS: readonly string[] = ['80mm', '58mm', 'A4', 'A5'];
+
+const CONST_EXPANSIONS: Record<string, readonly string[]> = {
+  ALL_DOCS, COMMERCIAL_DOCS, POS_DOCS, WAREHOUSE_DOCS, REPORT_DOC, NON_REPORT_DOCS,
+  THERMAL, PAGE, ALL_PAPERS,
+};
+
+export function expand(value: readonly string[] | string[]): string[] {
+  const result: string[] = [];
+  for (const v of value) {
+    if (CONST_EXPANSIONS[v]) {
+      result.push(...CONST_EXPANSIONS[v]);
+    } else {
+      result.push(v);
+    }
+  }
+  return [...new Set(result)];
+}
+
+export interface ExpandedSetting extends SettingMeta {
+  expandedDocs: string[];
+  expandedPapers: string[];
+}
+
+export function getExpandedRegistry(): ExpandedSetting[] {
+  return Object.entries(SETTINGS_REGISTRY).map(([key, meta]) => ({
+    ...meta,
+    expandedDocs: expand(meta.supportedDocs as unknown as string[]),
+    expandedPapers: expand(meta.supportedPapers as unknown as string[]),
+  }));
+}
+
+export const ALL_DOC_TYPES = [...ALL_DOCS];
+export const ALL_PAPER_SIZES = [...ALL_PAPERS];
+export const SETTING_COUNT = Object.keys(SETTINGS_REGISTRY).length;
+```
+
+## FILE: resources/js/pages/settings/print-settings/__tests__/fixtures/templates.ts
+```
+import type { DocTypeCode, PaperSize, PrintTemplate } from '../../types/domain';
+
+export function createMockTemplate(
+  overrides: Partial<PrintTemplate> = {},
+  docType: DocTypeCode = 'FV' as DocTypeCode,
+  paperSize: PaperSize = '80mm',
+): PrintTemplate {
+  return {
+    id: 1,
+    name: 'Template de test',
+    doc_type_code: docType,
+    paper_size: paperSize,
+    is_default: true,
+    is_active: true,
+
+    paper_width_mm: paperSize === '58mm' ? 58 : 80,
+    page_orientation: 'portrait',
+    margin_top: 3,
+    margin_bottom: 3,
+    margin_sides: 3,
+    line_spacing: 1.3,
+    base_font_size: 10,
+    font_family: 'tajawal',
+
+    show_logo: true,
+    logo_source: 'company',
+    logo_size: 56,
+    logo_align: 'center',
+    logo_border_radius: 50,
+    custom_logo_url: null,
+
+    show_company_name: true,
+    company_name_text: 'Ma SociÃ©tÃ©',
+    company_name_size: 15,
+    company_name_bold: true,
+    company_name_align: 'center',
+    company_name_color: '#111111',
+
+    show_address: true,
+    show_phone: true,
+    show_tax_id: true,
+    show_rc: true,
+    show_nis: false,
+    show_ice: false,
+    show_article: false,
+    company_info_align: 'center',
+    company_info_size: 9,
+    override_address: '',
+    override_phone: '',
+    override_nif: '',
+    override_rc: '',
+    override_nis: '',
+    override_ice: '',
+    override_article: '',
+
+    header_custom_text: '',
+    header_separator: 'dashed',
+
+    title_text: 'FACTURE',
+    title_size: 13,
+    title_bold: true,
+    title_align: 'center',
+    title_color: '#111111',
+    show_doc_number: true,
+    show_date: true,
+    show_time: true,
+    show_due_date: false,
+    show_cashier: true,
+    show_client: true,
+    show_client_nif: false,
+    show_client_phone: false,
+    show_client_address: false,
+    show_delivery_address: false,
+    show_session: docType === 'POS',
+    show_payment_term: false,
+    show_bank_details: false,
+    bank_details_text: '',
+    doc_separator: 'dashed',
+
+    col_order: ['name', 'quantity', 'price', 'total'] as any,
+    col_show: { name: true, quantity: true, price: true, total: true },
+    col_widths: { name: 40, quantity: 15, price: 22, total: 23 },
+    col_headers: { name: 'DÃ©signation', quantity: 'QtÃ©', price: 'Prix', total: 'Total' },
+    col_aligns: { name: 'right', quantity: 'center', price: 'center', total: 'center' },
+
+    items_font_size: 10,
+    items_font_family: 'tajawal',
+    show_col_header: true,
+    table_header_bold: true,
+    table_header_bg: false,
+    table_header_color: '#333333',
+    table_border_style: 'dashed',
+    alternating_rows: false,
+    alternating_color: '#f5f5f5',
+    price_display: 'ht',
+    show_line_total_ttc: false,
+
+    totals_font_size: 10,
+    totals_bold: true,
+    totals_align: 'right',
+    show_total_ht: true,
+    show_total_tva: true,
+    show_tva_breakdown: false,
+    show_discount_total: true,
+    show_fiscal_stamp: true,
+    show_total_ttc: true,
+    total_ttc_font_size: 14,
+    total_ttc_bold: true,
+    total_ttc_color: '#111111',
+    total_border_style: 'double',
+    show_amount_in_words: false,
+    show_paid_amount: true,
+    show_change: true,
+    show_remaining: false,
+    show_prev_balance: true,
+    show_new_balance: true,
+
+    show_payment_details: true,
+    payment_font_size: 9,
+
+    footer_line1: '',
+    footer_line2: '',
+    footer_line3: '',
+    footer_separator: 'solid',
+    show_thank_you: true,
+    thank_you_text: 'Merci de votre visite!',
+    thank_you_size: 11,
+    thank_you_color: '#111111',
+    show_returns_policy: true,
+    returns_policy_text: 'Retours sous 48h',
+    footer_legal_text: '',
+
+    show_barcode: true,
+    barcode_content: 'doc-number',
+    barcode_custom_text: '',
+    show_qr: false,
+    qr_content: 'doc-number',
+
+    show_cashier_signature: false,
+    show_client_signature: false,
+    show_stamp: false,
+
+    show_header_section: true,
+    show_doc_info_section: true,
+    show_items_section: true,
+    show_totals_section: true,
+    show_payments_section: true,
+    show_footer_section: true,
+
+    rules: [],
+
+    show_report_header: true,
+    report_header_text: '',
+    show_report_footer: true,
+    report_footer_text: '',
+    show_charts: true,
+    chart_type: 'bar',
+    chart_title: '',
+    group_by: '',
+    sort_by: '',
+    sort_direction: 'asc',
+    show_report_period: true,
+    show_report_cashier: true,
+    show_report_summary_cards: true,
+    show_report_payment_breakdown: true,
+    show_report_top_products: true,
+
+    report_col_widths: { product: 50, quantity: 20, total: 30 } as any,
+    report_col_headers: { product: 'Produit', quantity: 'QtÃ©', total: 'Total' } as any,
+
+    ...overrides,
+  };
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/__tests__/helpers/test-utils.ts
+```
+import { Page } from '@playwright/test';
+import { SETTINGS_REGISTRY } from '../../services/SettingsRegistry';
+
+export function getRegistryKeys(): string[] {
+  return Object.keys(SETTINGS_REGISTRY).filter(k =>
+    !['id', 'name', 'doc_type_code', 'paper_size', 'template_version', 'created_at', 'updated_at'].includes(k)
+  );
+}
+
+export function getToggleKeys(): string[] {
+  return Object.entries(SETTINGS_REGISTRY)
+    .filter(([, m]) => m.component === 'toggle')
+    .map(([k]) => k);
+}
+
+export function getInputKeys(): string[] {
+  return Object.entries(SETTINGS_REGISTRY)
+    .filter(([, m]) => ['input', 'textarea', 'color'].includes(m.component))
+    .map(([k]) => k);
+}
+
+export async function mockApiResponse(page: Page, templateOverrides: Record<string, any> = {}, status = 200) {
+  await page.route('**/api/v1/print-templates/**', (route) => {
+    if (route.request().method() === 'GET') {
+      route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            id: 1,
+            name: 'Test Template',
+            doc_type_code: templateOverrides.doc_type_code || 'FV',
+            paper_size: templateOverrides.paper_size || '80mm',
+            is_default: true,
+            is_active: true,
+            template_version: 2,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+            config: { ...templateOverrides, ...templateOverrides.config },
+          },
+        }),
+      });
+    } else if (route.request().method() === 'PUT') {
+      route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+    } else {
+      route.fulfill({ status: 404 });
+    }
+  });
+}
+
+export async function mockTemplatesList(page: Page, templates: any[] = []) {
+  await page.route('**/api/v1/print-templates*', (route) => {
+    if (route.request().method() === 'GET') {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: templates }),
+      });
+    } else {
+      route.continue();
+    }
+  });
+}
+
+export async function navigateToPrintSettings(page: Page, docType = 'FV') {
+  await page.goto(`/settings/print-settings?doc_type=${docType}`);
+  await page.waitForLoadState('networkidle');
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/__tests__/lifecycle.pw.spec.ts
+```
+import { test, expect } from '@playwright/test';
+import { createMockTemplate } from './fixtures/templates';
+
+test.describe('Print Settings â€” Lifecycle', () => {
+  test('loads the page without errors', async ({ page }) => {
+    const { mockApiResponse } = await import('./helpers/test-utils');
+    await mockApiResponse(page, { doc_type_code: 'FV', paper_size: '80mm' });
+    await page.goto('/settings/print-settings?doc_type=FV');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('h1').first()).toContainText('Print');
+  });
+
+  test('save button triggers API call', async ({ page }) => {
+    const { mockApiResponse } = await import('./helpers/test-utils');
+    await mockApiResponse(page, { doc_type_code: 'FV', paper_size: '80mm' });
+
+    let putCalled = false;
+    await page.route('**/api/v1/print-templates/**', (route) => {
+      if (route.request().method() === 'PUT') {
+        putCalled = true;
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true }),
+        });
+      } else if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              id: 1, name: 'Test', doc_type_code: 'FV', paper_size: '80mm',
+              is_default: true, is_active: true,
+              config: {},
+            },
+          }),
+        });
+      }
+    });
+
+    await page.goto('/settings/print-settings?doc_type=FV');
+    await page.waitForLoadState('networkidle');
+
+    const saveBtn = page.locator('button:has-text("Ø­ÙØ¸")');
+    if (await saveBtn.isVisible()) {
+      await saveBtn.click();
+      await page.waitForTimeout(2000);
+      expect(putCalled).toBe(true);
+    }
+  });
+
+  test('should show template selector with templates', async ({ page }) => {
+    const { mockTemplatesList } = await import('./helpers/test-utils');
+    await mockTemplatesList(page, [
+      { id: 1, name: 'Template 1', doc_type_code: 'FV', paper_size: '80mm', is_default: true, is_active: true },
+    ]);
+
+    await page.route('**/api/v1/print-templates/*', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            id: 1, name: 'Template 1', doc_type_code: 'FV', paper_size: '80mm',
+            is_default: true, is_active: true,
+            config: { show_logo: true, title_text: 'FACTURE' },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/settings/print-settings?doc_type=FV');
+    await page.waitForLoadState('networkidle');
+  });
+});
+```
+
+## FILE: resources/js/pages/settings/print-settings/__tests__/playwright.config.ts
+```
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: '.',
+  testMatch: '**/*.pw.spec.ts',
+  timeout: 60000,
+  expect: { timeout: 10000 },
+  use: {
+    baseURL: 'http://127.0.0.1:8000',
+    viewport: { width: 1440, height: 900 },
+    actionTimeout: 10000,
+    screenshot: 'only-on-failure',
+  },
+  webServer: {
+    command: 'php artisan serve --port=8000',
+    url: 'http://127.0.0.1:8000',
+    reuseExistingServer: true,
+    timeout: 30000,
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { browserName: 'chromium' },
+    },
+  ],
+});
+```
+
+## FILE: resources/js/pages/settings/print-settings/__tests__/registry-validation.spec.ts
+```
+import { describe, it, expect } from 'vitest';
+import { SETTINGS_REGISTRY, getSettingMeta } from '../services/SettingsRegistry';
+import { getExpandedRegistry, ALL_DOC_TYPES, ALL_PAPER_SIZES, SETTING_COUNT } from './fixtures/expanded-registry';
+
+const VALID_CATEGORIES = [
+  'global', 'paper', 'header', 'company', 'document', 'columns', 'items',
+  'totals', 'payments', 'footer', 'barcode', 'qr', 'signature',
+  'section-visibility', 'rules', 'report', 'charts', 'formatting',
+] as const;
+
+const VALID_COMPONENTS = [
+  'toggle', 'input', 'select', 'pills', 'slider', 'color', 'textarea',
+  'column-manager', 'rules-editor', 'logo-upload',
+] as const;
+
+describe('SettingsRegistry â€” Structural Validation', () => {
+  it('should have exactly 144 entries', () => {
+    expect(SETTING_COUNT).toBe(144);
+  });
+
+  it('every entry should have a matching key in the registry object', () => {
+    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+      expect(meta.key).toBe(key);
+    }
+  });
+
+  it('every entry should have all required fields', () => {
+    const required = ['key', 'label', 'labelAr', 'category', 'component', 'defaultValue', 'supportedPapers', 'supportedDocs'];
+    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+      const missing = required.filter(f => !(f in meta));
+      expect(missing, `${key} is missing fields: ${missing.join(', ')}`).toEqual([]);
+    }
+  });
+
+  it('every entry should have a valid category', () => {
+    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+      expect(VALID_CATEGORIES.includes(meta.category as any)).toBe(true);
+    }
+  });
+
+  it('every entry should have a valid component', () => {
+    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+      expect(VALID_COMPONENTS.includes(meta.component as any)).toBe(true);
+    }
+  });
+});
+
+describe('SettingsRegistry â€” dependsOn Validation', () => {
+  it('every dependsOn target should exist in the registry', () => {
+    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+      if (!meta.dependsOn) continue;
+      const target = getSettingMeta(meta.dependsOn as string);
+      expect(target).toBeDefined(`${key} depends on ${meta.dependsOn} which does not exist`);
+    }
+  });
+
+  it('every dependsOn target should be within supportedDocs of the parent', () => {
+    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+      if (!meta.dependsOn) continue;
+      const parent = getSettingMeta(meta.dependsOn as string);
+      if (!parent) continue;
+      const expanded = getExpandedRegistry();
+      const child = expanded.find(s => s.key === key)!;
+      const parentExp = expanded.find(s => s.key === meta.dependsOn)!;
+      const childOnlyInParent = child.expandedDocs.every(d => parentExp.expandedDocs.includes(d));
+      if (!childOnlyInParent) {
+        const outside = child.expandedDocs.filter(d => !parentExp.expandedDocs.includes(d));
+        console.warn(`WARN: ${key} docs [${outside}] extend beyond parent ${meta.dependsOn}`);
+      }
+    }
+  });
+});
+
+describe('SettingsRegistry â€” Visibility Scope Validation', () => {
+  const expanded = getExpandedRegistry();
+
+  it('every setting should be registered for at least one doc type', () => {
+    for (const setting of expanded) {
+      expect(setting.expandedDocs.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('every setting should be registered for at least one paper size', () => {
+    for (const setting of expanded) {
+      expect(setting.expandedPapers.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('report-only settings should only be visible for RPT', () => {
+    const reportSettings = expanded.filter(s => s.category === 'report' || s.category === 'charts');
+    for (const setting of reportSettings) {
+      for (const doc of ALL_DOC_TYPES) {
+        if (doc === 'RPT') {
+          expect(setting.expandedDocs).toContain(doc);
+        } else {
+          expect(setting.expandedDocs).not.toContain(doc);
+        }
+      }
+    }
+  });
+
+  it('settings with COMMERCIAL_DOCS should exclude POS, DDP, BT, RPT', () => {
+    const commercialSettings = expanded.filter(s =>
+      s.expandedDocs.includes('FV') && s.expandedDocs.includes('BL') &&
+      !s.expandedDocs.includes('RPT') && !s.expandedDocs.includes('POS')
+    );
+    for (const setting of commercialSettings) {
+      expect(setting.expandedDocs).not.toContain('DDP');
+      expect(setting.expandedDocs).not.toContain('BT');
+    }
+  });
+
+  it('paper_width_mm should only be for thermal papers', () => {
+    const meta = getSettingMeta('paper_width_mm')!;
+    const expandedPapers = expanded.find(s => s.key === 'paper_width_mm')!.expandedPapers;
+    expect(expandedPapers).toContain('80mm');
+    expect(expandedPapers).toContain('58mm');
+    expect(expandedPapers).not.toContain('A4');
+    expect(expandedPapers).not.toContain('A5');
+  });
+
+  it('page_orientation should only be for page papers', () => {
+    const expandedPapers = expanded.find(s => s.key === 'page_orientation')!.expandedPapers;
+    expect(expandedPapers).not.toContain('80mm');
+    expect(expandedPapers).not.toContain('58mm');
+    expect(expandedPapers).toContain('A4');
+    expect(expandedPapers).toContain('A5');
+  });
+
+  it('show_bank_details and bank_details_text should be COMMERCIAL_DOCS + PAGE only', () => {
+    for (const key of ['show_bank_details', 'bank_details_text']) {
+      const s = expanded.find(e => e.key === key)!;
+      expect(s.expandedDocs).toEqual(expect.arrayContaining(['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV']));
+      expect(s.expandedDocs).not.toContain('POS');
+      expect(s.expandedDocs).not.toContain('RPT');
+      expect(s.expandedDocs).not.toContain('DDP');
+      expect(s.expandedDocs).not.toContain('BT');
+      expect(s.expandedPapers).toEqual(expect.arrayContaining(['A4', 'A5']));
+      expect(s.expandedPapers).not.toContain('80mm');
+      expect(s.expandedPapers).not.toContain('58mm');
+    }
+  });
+
+  it('show_session should be POS_DOCS only', () => {
+    const s = expanded.find(e => e.key === 'show_session')!;
+    expect(s.expandedDocs).toContain('POS');
+    expect(s.expandedDocs).toContain('RPT');
+    expect(s.expandedDocs).not.toContain('FV');
+    expect(s.expandedDocs).not.toContain('DDP');
+  });
+
+  it('isSettingVisible with dependsOn should hide children when toggle parent is off', async () => {
+    const { isSettingVisible } = await import('../services/SettingsRegistry');
+
+    const toggleDeps = expanded.filter(s =>
+      s.dependsOn && getSettingMeta(s.dependsOn as string)?.component === 'toggle'
+    );
+
+    for (const child of toggleDeps) {
+      const parentKey = child.dependsOn!;
+      const tpl: any = { doc_type_code: 'FV', paper_size: '80mm' };
+      tpl[parentKey] = false;
+      tpl[child.key] = child.defaultValue;
+
+      const visible = isSettingVisible(child.key, 'FV' as any, '80mm' as any, tpl);
+      expect(visible).toBe(false);
+    }
+  });
+
+  it('isSettingVisible with dependsOn should show children when toggle parent is on', async () => {
+    const { isSettingVisible } = await import('../services/SettingsRegistry');
+
+    const toggleDeps = expanded.filter(s =>
+      s.dependsOn && getSettingMeta(s.dependsOn as string)?.component === 'toggle'
+    );
+
+    for (const child of toggleDeps) {
+      if (!child.expandedDocs.includes('FV') || !child.expandedPapers.includes('80mm')) continue;
+
+      const parentKey = child.dependsOn!;
+      const tpl: any = { doc_type_code: 'FV', paper_size: '80mm' };
+      tpl[parentKey] = true;
+      tpl[child.key] = child.defaultValue;
+
+      const visible = isSettingVisible(child.key, 'FV' as any, '80mm' as any, tpl);
+      expect(visible, `${child.key} should be visible when ${parentKey}=true (FV/80mm)`).toBe(true);
+    }
+  });
+});
+```
+
+## FILE: resources/js/pages/settings/print-settings/__tests__/serializer.spec.ts
+```
+import { describe, it, expect } from 'vitest';
+import { normalizeTemplate, toApiPayload, fromApiResponse, TEMPLATE_VERSION } from '../services/SettingsSerializer';
+import { SETTINGS_REGISTRY } from '../services/SettingsRegistry';
+import { createMockTemplate } from './fixtures/templates';
+
+describe('SettingsSerializer â€” normalizeTemplate', () => {
+  it('should fill all missing fields from registry defaults', () => {
+    const minimal: any = { id: null, doc_type_code: 'POS', paper_size: '80mm' };
+    const result = normalizeTemplate(minimal, 'POS', '80mm');
+
+    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+      if (key === 'id' || key === 'name' || key === 'doc_type_code' || key === 'paper_size') continue;
+      expect(result).toHaveProperty(key);
+    }
+  });
+
+  it('should preserve valid user values', () => {
+    const result = normalizeTemplate(
+      { id: null, doc_type_code: 'FV', paper_size: '80mm', show_logo: false, title_text: 'Ma Facture' },
+      'FV', '80mm',
+    );
+    expect(result.show_logo).toBe(false);
+    expect(result.title_text).toBe('Ma Facture');
+  });
+
+  it('should set template_version', () => {
+    const result = normalizeTemplate({ id: null, doc_type_code: 'POS', paper_size: '80mm' }, 'POS', '80mm');
+    expect(result.template_version).toBe(TEMPLATE_VERSION);
+  });
+
+  it('should override old template_version', () => {
+    const result = normalizeTemplate(
+      { id: 1, doc_type_code: 'FV', paper_size: '80mm', template_version: 1 } as any,
+      'FV', '80mm',
+    );
+    expect(result.template_version).toBe(TEMPLATE_VERSION);
+  });
+
+  it('should set paper_width_mm for 80mm thermal', () => {
+    const result = normalizeTemplate({ id: null, doc_type_code: 'POS', paper_size: '80mm' }, 'POS', '80mm');
+    expect(result.paper_width_mm).toBe(80);
+  });
+
+  it('should set paper_width_mm for 58mm thermal', () => {
+    const result = normalizeTemplate({ id: null, doc_type_code: 'POS', paper_size: '58mm' }, 'POS', '58mm');
+    expect(result.paper_width_mm).toBe(58);
+  });
+
+  it('should not override paper_width_mm for page sizes', () => {
+    const result = normalizeTemplate({ id: null, doc_type_code: 'FV', paper_size: 'A4', paper_width_mm: 80 } as any, 'FV', 'A4');
+    expect(result.paper_width_mm).toBe(80);
+  });
+
+  it('should ensure name is not empty', () => {
+    const result = normalizeTemplate({ id: null, doc_type_code: 'POS', paper_size: '80mm', name: '' }, 'POS', '80mm');
+    expect(result.name).toBeTruthy();
+  });
+});
+
+describe('SettingsSerializer â€” toApiPayload', () => {
+  it('should strip top-level fields into config', () => {
+    const tpl = createMockTemplate({}, 'FV', '80mm');
+    const payload = toApiPayload(tpl);
+
+    expect(payload.name).toBe(tpl.name);
+    expect(payload.doc_type_code).toBe('FV');
+    expect(payload.paper_size).toBe('80mm');
+    expect(payload.is_default).toBe(true);
+    expect(payload.is_active).toBe(true);
+    expect(payload.template_version).toBe(TEMPLATE_VERSION);
+
+    expect(payload.config.show_logo).toBe(true);
+    expect(payload.config.title_text).toBe('FACTURE');
+    expect(payload.config.margin_top).toBe(3);
+  });
+
+  it('should not include id, created_at, updated_at in config', () => {
+    const tpl = createMockTemplate({}, 'FV', '80mm');
+    const payload = toApiPayload(tpl);
+
+    expect(payload.config).not.toHaveProperty('id');
+    expect(payload.config).not.toHaveProperty('created_at');
+    expect(payload.config).not.toHaveProperty('updated_at');
+  });
+
+  it('should include template_version in top level', () => {
+    const tpl = createMockTemplate({}, 'FV', '80mm');
+    const payload = toApiPayload(tpl);
+    expect(payload.template_version).toBe(TEMPLATE_VERSION);
+  });
+
+  it('should handle partial templates', () => {
+    const payload = toApiPayload({ name: 'Test', doc_type_code: 'POS', paper_size: '80mm' });
+    expect(payload.name).toBe('Test');
+    expect(payload.doc_type_code).toBe('POS');
+    expect(payload.paper_size).toBe('80mm');
+  });
+});
+
+describe('SettingsSerializer â€” fromApiResponse', () => {
+  it('should reconstruct a full template from API response', () => {
+    const response = {
+      id: 1,
+      name: 'Default Template',
+      doc_type_code: 'FV',
+      paper_size: '80mm',
+      is_default: true,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      config: {
+        show_logo: true,
+        show_company_name: false,
+        title_text: 'FACTURE',
+        margin_top: 5,
+        paper_width_mm: 80,
+      },
+    };
+
+    const result = fromApiResponse(response as any);
+
+    expect(result.id).toBe(1);
+    expect(result.name).toBe('Default Template');
+    expect(result.doc_type_code).toBe('FV');
+    expect(result.paper_size).toBe('80mm');
+    expect(result.show_logo).toBe(true);
+    expect(result.show_company_name).toBe(false);
+    expect(result.title_text).toBe('FACTURE');
+    expect(result.margin_top).toBe(5);
+    expect(result.template_version).toBe(TEMPLATE_VERSION);
+  });
+
+  it('should handle null config', () => {
+    const result = fromApiResponse({
+      id: 1,
+      name: 'Test',
+      doc_type_code: 'POS',
+      paper_size: '80mm',
+      is_default: false,
+      is_active: true,
+      config: null,
+    } as any);
+
+    expect(result.show_logo).toBeDefined();
+    expect(result.title_text).toBeDefined();
+  });
+
+  it('should fill defaults for missing config fields', () => {
+    const result = fromApiResponse({
+      id: 1,
+      name: 'Minimal',
+      doc_type_code: 'POS',
+      paper_size: '80mm',
+      is_default: false,
+      is_active: true,
+      config: {},
+    } as any);
+
+    expect(result.show_logo).toBe(true);
+    expect(result.show_barcode).toBe(true);
+    expect(result.col_order).toBeDefined();
+  });
+});
+
+describe('SettingsSerializer â€” Round-trip Symmetry', () => {
+  it('should round-trip all 144+ settings without data loss', () => {
+    const original = createMockTemplate({
+      show_logo: false,
+      show_company_name: false,
+      title_text: 'TEST INVOICE',
+      margin_top: 12,
+      logo_size: 100,
+      header_separator: 'double',
+      col_order: ['rowNumber', 'barcode', 'name', 'quantity', 'price', 'discount', 'tva', 'total'],
+      footer_legal_text: 'Legal notice test',
+      rules: [{ id: 'r1', condition: 'total > 100', action: 'highlight', target: 'totals' }],
+      show_report_cashier: false,
+    }, 'RPT', 'A4');
+
+    const payload = toApiPayload(original);
+    const restored = fromApiResponse({
+      id: original.id!,
+      name: original.name,
+      doc_type_code: original.doc_type_code,
+      paper_size: original.paper_size,
+      is_default: original.is_default,
+      is_active: original.is_active,
+      config: payload.config as any,
+    } as any);
+
+    const settingKeys = Object.keys(SETTINGS_REGISTRY).filter(k =>
+      !['id', 'name', 'doc_type_code', 'paper_size', 'template_version', 'created_at', 'updated_at'].includes(k)
+    );
+
+    for (const key of settingKeys) {
+      const origVal = JSON.stringify((original as any)[key]);
+      const restVal = JSON.stringify((restored as any)[key]);
+      expect(restVal).toBe(origVal);
+    }
+  });
+
+  it('should preserve unknown/deprecated fields', () => {
+    const response = {
+      id: 1,
+      name: 'Test',
+      doc_type_code: 'POS',
+      paper_size: '80mm',
+      is_default: false,
+      is_active: true,
+      config: {
+        show_logo: true,
+        _deprecated_field: 'should be preserved',
+        _legacy_setting: 42,
+      },
+    };
+
+    const result = fromApiResponse(response as any);
+    expect((result as any)._deprecated_field).toBe('should be preserved');
+    expect((result as any)._legacy_setting).toBe(42);
+  });
+
+  it('should set template_version for old version-1 templates', () => {
+    const result = fromApiResponse({
+      id: 1, name: 'Old', doc_type_code: 'FV', paper_size: '80mm',
+      is_default: false, is_active: true,
+      config: {},
+    } as any);
+    expect(result.template_version).toBe(TEMPLATE_VERSION);
+  });
+});
+```
+
+## FILE: resources/js/pages/settings/print-settings/__tests__/visibility.pw.spec.ts
+```
+import { test, expect } from '@playwright/test';
+import { getRegistryKeys } from './helpers/test-utils';
+
+test.describe('Print Settings â€” Visibility', () => {
+  test.beforeEach(async ({ page }) => {
+    const { mockApiResponse } = await import('./helpers/test-utils');
+    await mockApiResponse(page, { doc_type_code: 'FV', paper_size: '80mm' });
+    await page.goto('/settings/print-settings?doc_type=FV');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('shows thermal-only settings when 80mm selected, hides page-only settings', async ({ page }) => {
+    await expect(page.locator('text=Ø¹Ø±Ø¶ Ø§Ù„Ø¹Ø±Ø¶')).toBeVisible();
+    await expect(page.locator('text=Ø§ØªØ¬Ø§Ù‡ Ø§Ù„ØµÙØ­Ø©')).not.toBeVisible();
+  });
+
+  test('hides thermal-only settings when A4 selected', async ({ page }) => {
+    const { mockApiResponse } = await import('./helpers/test-utils');
+    await mockApiResponse(page, { doc_type_code: 'FV', paper_size: 'A4' });
+    await page.goto('/settings/print-settings?doc_type=FV&paper_size=A4');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('text=Ø¹Ø±Ø¶ Ø§Ù„Ø¹Ø±Ø¶')).not.toBeVisible();
+    await expect(page.locator('text=Ø§ØªØ¬Ø§Ù‡ Ø§Ù„ØµÙØ­Ø©')).toBeVisible();
+  });
+
+  test('shows report-only settings when RPT selected', async ({ page }) => {
+    const { mockApiResponse } = await import('./helpers/test-utils');
+    await mockApiResponse(page, { doc_type_code: 'RPT', paper_size: 'A4' });
+    await page.goto('/settings/print-settings?doc_type=RPT&paper_size=A4');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('text=Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø±Ø³Ù… Ø§Ù„Ø¨ÙŠØ§Ù†ÙŠ')).toBeVisible();
+    await expect(page.locator('text=Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„ÙƒØ§Ø´ÙŠØ± ÙÙŠ Ø§Ù„ØªÙ‚Ø±ÙŠØ±')).toBeVisible();
+  });
+
+  test('hides bank details on 80mm thermal', async ({ page }) => {
+    await expect(page.locator('text=Ø¥Ø¸Ù‡Ø§Ø± ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¨Ù†Ùƒ')).not.toBeVisible();
+  });
+
+  test('does not crash when switching between doc types', async ({ page }) => {
+    for (const doc of ['FV', 'POS', 'RPT', 'DDP']) {
+      const { mockApiResponse } = await import('./helpers/test-utils');
+      await mockApiResponse(page, { doc_type_code: doc, paper_size: '80mm' });
+      await page.goto(`/settings/print-settings?doc_type=${doc}&paper_size=80mm`);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('body')).not.toContainText('Error');
+    }
+  });
+});
+```
+
+## FILE: resources/js/pages/settings/print-settings/__tests__/visibility-engine.spec.ts
+```
+import { describe, it, expect } from 'vitest';
+import { isSettingVisible, SETTINGS_REGISTRY } from '../services/SettingsRegistry';
+import { getExpandedRegistry } from './fixtures/expanded-registry';
+
+type DocType = 'FV' | 'BL' | 'DEV' | 'BCC' | 'AA' | 'FA' | 'BR' | 'AV' | 'DDP' | 'BT' | 'POS' | 'RPT';
+type PaperSize = '80mm' | '58mm' | 'A4' | 'A5';
+
+const ALL_DOCS: DocType[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT'];
+const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5'];
+
+function makeTpl(doc: DocType, paper: PaperSize, overrides: Record<string, any> = {}) {
+  const base = Object.fromEntries(
+    Object.entries(SETTINGS_REGISTRY).map(([k, m]) => [k, m.defaultValue])
+  );
+
+  // Enable all toggle dependsOn parents so children are un-gated for doc/paper tests
+  for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+    if (meta.dependsOn) {
+      const parentMeta = SETTINGS_REGISTRY[meta.dependsOn];
+      if (parentMeta && parentMeta.component === 'toggle') {
+        base[meta.dependsOn] = true;
+      }
+    }
+  }
+
+  return { doc_type_code: doc, paper_size: paper, ...base, ...overrides };
+}
+
+describe('VisibilityEngine â€” isSettingVisible', () => {
+  const expanded = getExpandedRegistry();
+
+  for (const doc of ALL_DOCS) {
+    for (const paper of ALL_PAPERS) {
+      it(`should show only compatible settings for ${doc}/${paper}`, () => {
+        const tpl = makeTpl(doc, paper);
+        for (const setting of expanded) {
+          const visible = isSettingVisible(setting.key, doc, paper, tpl);
+          const shouldBeVisible =
+            setting.expandedDocs.includes(doc) && setting.expandedPapers.includes(paper);
+          if (visible !== shouldBeVisible) {
+            throw new Error(
+              `FAIL: ${setting.key} visibility mismatch for ${doc}/${paper}. ` +
+              `Expected ${shouldBeVisible} but got ${visible}. ` +
+              `Docs: [${setting.expandedDocs}], Papers: [${setting.expandedPapers}]`
+            );
+          }
+        }
+      });
+    }
+  }
+});
+
+describe('VisibilityEngine â€” DependsOn Gating', () => {
+  it('should hide children when toggle parent is OFF', () => {
+    const parents = Object.entries(SETTINGS_REGISTRY).filter(
+      ([, m]) => m.category !== 'global' && Object.values(SETTINGS_REGISTRY).some(
+        s => s.dependsOn === m.key && m.component === 'toggle'
+      )
+    );
+
+    for (const [, parentMeta] of parents) {
+      const children = Object.entries(SETTINGS_REGISTRY).filter(
+        ([, m]) => m.dependsOn === parentMeta.key && m.key !== 'barcode_custom_text'
+      );
+      if (children.length === 0) continue;
+
+      const tpl = makeTpl('FV', '80mm');
+      tpl[parentMeta.key] = false;
+
+      for (const [childKey] of children) {
+        expect(isSettingVisible(childKey, 'FV', '80mm', tpl)).toBe(false);
+      }
+    }
+  });
+
+  it('should show children when toggle parent is ON', () => {
+    const expanded = getExpandedRegistry();
+
+    for (const [parentKey, parentMeta] of Object.entries(SETTINGS_REGISTRY)) {
+      if (parentMeta.component !== 'toggle') continue;
+      const children = Object.entries(SETTINGS_REGISTRY).filter(
+        ([, m]) => m.dependsOn === parentKey
+      );
+      if (children.length === 0) continue;
+
+      const tpl = makeTpl('FV', '80mm');
+      tpl[parentKey] = true;
+
+      for (const [childKey] of children) {
+        const childExpanded = expanded.find(s => s.key === childKey)!;
+        const fitsDocPaper = childExpanded.expandedDocs.includes('FV') && childExpanded.expandedPapers.includes('80mm');
+        if (!fitsDocPaper) continue;
+
+        expect(isSettingVisible(childKey, 'FV', '80mm', tpl)).toBe(true);
+      }
+    }
+  });
+});
+
+describe('VisibilityEngine â€” Edge Cases', () => {
+  it('should handle unknown setting gracefully', () => {
+    const tpl = makeTpl('FV', '80mm');
+    expect(isSettingVisible('nonexistent_setting' as any, 'FV', '80mm', tpl)).toBe(true);
+  });
+
+  it('should handle missing tpl field', () => {
+    const tpl = { doc_type_code: 'FV', paper_size: '80mm' };
+    const result = isSettingVisible('show_logo', 'FV', '80mm', tpl as any);
+    expect(typeof result).toBe('boolean');
+  });
+
+  it('barcode_custom_text should not be auto-gated by dependsOn', () => {
+    const tpl = makeTpl('FV', '80mm');
+    tpl['barcode_content'] = 'doc-number';
+    const visible = isSettingVisible('barcode_custom_text', 'FV', '80mm', tpl);
+    expect(visible).toBe(true);
+  });
+});
+```
+
 ## FILE: resources/js/pages/settings/print-settings/api/printTemplatesApi.ts
 ```
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api/core/client';
-import { useActiveSlug } from '@/lib/store/appStore';
+import type { ApiClient } from '../contracts/ApiClient';
+import type { PrintTemplatesApi } from '../contracts/TemplateRepository';
 import type { PrintTemplate, PrintTemplateApiResponse, DocTypeCode } from '../types';
-import type { LibraryApiResponse } from '@/reporting';
+import type { LibraryApiResponse } from '../template-library/types';
+import { usePrintTemplatesApi, useSlug } from '../providers/PrintSettingsContext';
+import { toApiPayload as serializePayload, normalizeTemplate } from '../services/SettingsSerializer';
 
+// â”€â”€â”€ Query key factory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const printTemplateKeys = {
   all:     (slug: string)              => [slug, 'print-templates']              as const,
   list:    (slug: string, code?: string) => [slug, 'print-templates', 'list', code] as const,
   detail:  (slug: string, id: number)  => [slug, 'print-templates', id]         as const,
 };
 
-function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
-  const {
-    id, name, doc_type_code, paper_size, is_default, is_active,
-    created_at, updated_at,
-    ...config
-  } = tpl as PrintTemplate;
-
-  return {
-    name:          name          ?? 'Ù‚Ø§Ù„Ø¨ Ø¬Ø¯ÙŠØ¯',
-    doc_type_code: doc_type_code ?? 'FV',
-    paper_size:    paper_size    ?? '80mm',
-    is_default:    is_default    ?? false,
-    is_active:     is_active     ?? true,
-    config,
-  };
-}
+// â”€â”€â”€ Pure helpers (no external deps) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function fromApiResponse(r: PrintTemplateApiResponse): PrintTemplate {
-  return {
-    id:            r.id,
+  const raw: Partial<PrintTemplate> = {
+    id:            r.id as any,
     name:          r.name,
     doc_type_code: r.doc_type_code as DocTypeCode,
     paper_size:    r.paper_size as PrintTemplate['paper_size'],
@@ -45,55 +1049,74 @@ function fromApiResponse(r: PrintTemplateApiResponse): PrintTemplate {
     is_active:     r.is_active,
     created_at:    r.created_at,
     updated_at:    r.updated_at,
-    ...(r.config ?? {}),
-  } as PrintTemplate;
+  };
+  const config = r.config ?? {};
+  for (const key of Object.keys(config)) {
+    (raw as any)[key] = (config as any)[key];
+  }
+  return normalizeTemplate(raw, raw.doc_type_code, raw.paper_size);
 }
 
-export const printTemplatesApi = {
-  list: (docTypeCode?: string) =>
-    apiGet<PrintTemplateApiResponse[]>('/print-templates', docTypeCode
-      ? { doc_type_code: docTypeCode } : undefined)
-      .then(r => (Array.isArray(r) ? r : (r as any)?.data ?? []).map(fromApiResponse)),
+function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
+  return serializePayload(tpl) as unknown as Record<string, unknown>;
+}
 
-  show: (id: number) =>
-    apiGet<PrintTemplateApiResponse>(`/print-templates/${id}`)
-      .then(fromApiResponse),
+// â”€â”€â”€ Factory: creates PrintTemplatesApi from an ApiClient â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  create: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) =>
-    apiPost<PrintTemplateApiResponse>('/print-templates', toApiPayload(tpl as any))
-      .then(fromApiResponse),
+export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
+  return {
+    list: (docTypeCode?: string) =>
+      api.get<PrintTemplateApiResponse[]>('/print-templates', docTypeCode
+        ? { doc_type_code: docTypeCode } : undefined)
+        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as PrintTemplateApiResponse[]).map(fromApiResponse)),
 
-  update: (id: number, tpl: Partial<PrintTemplate>) =>
-    apiPut<PrintTemplateApiResponse>(`/print-templates/${id}`, toApiPayload(tpl))
-      .then(fromApiResponse),
+    show: (id: number) =>
+      api.get<PrintTemplateApiResponse>(`/print-templates/${id}`)
+        .then(fromApiResponse),
 
-  delete: (id: number) =>
-    apiDelete(`/print-templates/${id}`),
+    create: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) =>
+      api.post<PrintTemplateApiResponse>('/print-templates', toApiPayload(tpl as unknown as Partial<PrintTemplate>))
+        .then(fromApiResponse),
 
-  setDefault: (id: number) =>
-    apiPost<PrintTemplateApiResponse>(`/print-templates/${id}/set-default`)
-      .then(fromApiResponse),
+    update: (id: number, tpl: Partial<PrintTemplate>) =>
+      api.put<PrintTemplateApiResponse>(`/print-templates/${id}`, toApiPayload(tpl))
+        .then(fromApiResponse),
 
-  duplicate: (id: number, newName: string) =>
-    apiPost<PrintTemplateApiResponse>(`/print-templates/${id}/duplicate`, { name: newName })
-      .then(fromApiResponse),
+    delete: (id: number) =>
+      api.delete(`/print-templates/${id}`),
 
-  library: () =>
-    apiGet<LibraryApiResponse[]>('/print-templates/library')
-      .then(r => (Array.isArray(r) ? r : (r as any)?.data ?? [])),
+    setDefault: (id: number) =>
+      api.post<PrintTemplateApiResponse>(`/print-templates/${id}/set-default`)
+        .then(fromApiResponse),
 
-  installLibrary: (templateId: string) =>
-    apiPost<PrintTemplateApiResponse>('/print-templates/library/install', { template_id: templateId })
-      .then(fromApiResponse),
-} as const;
+    duplicate: (id: number, newName: string) =>
+      api.post<PrintTemplateApiResponse>(`/print-templates/${id}/duplicate`, { name: newName })
+        .then(fromApiResponse),
 
-// â”€â”€â”€ Hooks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    library: () =>
+      api.get<LibraryApiResponse[]>('/print-templates/library')
+        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as LibraryApiResponse[])),
+
+    installLibrary: (templateId: string) =>
+      api.post<PrintTemplateApiResponse>('/print-templates/library/install', { template_id: templateId })
+        .then(fromApiResponse),
+
+    uploadLogo: (file: File, onProgress?: (p: number) => void) => {
+      const fd = new FormData();
+      fd.append('logo', file);
+      return api.upload<{ path: string; url: string }>('/print-templates/upload-logo', fd, onProgress);
+    },
+  };
+}
+
+// â”€â”€â”€ React Query hooks (depend on context for api + slug) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function usePrintTemplates(docTypeCode?: DocTypeCode) {
-  const slug = useActiveSlug();
+  const api = usePrintTemplatesApi();
+  const slug = useSlug();
   return useQuery({
     queryKey:        printTemplateKeys.list(slug ?? '', docTypeCode),
-    queryFn:         () => printTemplatesApi.list(docTypeCode),
+    queryFn:         () => api.list(docTypeCode),
     enabled:         !!slug,
     staleTime:       5 * 60_000,
     placeholderData: keepPreviousData,
@@ -101,17 +1124,19 @@ export function usePrintTemplates(docTypeCode?: DocTypeCode) {
 }
 
 export function usePrintTemplate(id: number | null | undefined) {
-  const slug = useActiveSlug();
+  const api = usePrintTemplatesApi();
+  const slug = useSlug();
   return useQuery({
     queryKey:  printTemplateKeys.detail(slug ?? '', id!),
-    queryFn:   () => printTemplatesApi.show(id!),
+    queryFn:   () => api.show(id!),
     enabled:   !!slug && !!id,
     staleTime: 5 * 60_000,
   });
 }
 
 export function usePrintTemplateMutations() {
-  const slug = useActiveSlug();
+  const api = usePrintTemplatesApi();
+  const slug = useSlug();
   const qc   = useQueryClient();
 
   const invalidateAll = () => {
@@ -127,35 +1152,34 @@ export function usePrintTemplateMutations() {
 
   const create = useMutation({
     mutationFn: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) =>
-      printTemplatesApi.create(tpl),
+      api.create(tpl),
     onSuccess: invalidateAll,
   });
 
   const update = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<PrintTemplate> }) =>
-      printTemplatesApi.update(id, data),
+      api.update(id, data),
     onSuccess: invalidateOne,
   });
 
   const remove = useMutation({
-    mutationFn: printTemplatesApi.delete,
+    mutationFn: api.delete,
     onSuccess:  invalidateAll,
   });
 
   const setDefault = useMutation({
-    mutationFn: printTemplatesApi.setDefault,
+    mutationFn: api.setDefault,
     onSuccess:  invalidateAll,
   });
 
   const duplicate = useMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) =>
-      printTemplatesApi.duplicate(id, name),
+      api.duplicate(id, name),
     onSuccess: invalidateAll,
   });
 
   const installLibrary = useMutation({
-    mutationFn: (payload: Parameters<typeof printTemplatesApi.installLibrary>[0]) =>
-      printTemplatesApi.installLibrary(payload),
+    mutationFn: api.installLibrary,
     onSuccess: invalidateAll,
   });
 
@@ -163,88 +1187,4310 @@ export function usePrintTemplateMutations() {
 }
 ```
 
-## FILE: resources/js/pages/settings/print-settings/components/PreviewSelector.tsx
+## FILE: resources/js/pages/settings/print-settings/ARCHITECTURE.md
+```
+# Print-Settings Module Architecture
+
+## Overview
+
+`print-settings/` is a **fully self-contained feature module** for ERP document template management. It handles creating, editing, previewing, saving, exporting/importing, and installing print templates for all document types (invoices, deliveries, quotes, receipts, etc.).
+
+## Directory Structure
+
+```
+print-settings/
+â”œâ”€â”€ index.ts                          # Public API â€” consumers import ONLY from here
+â”œâ”€â”€ ARCHITECTURE.md                   # This file
+â”œâ”€â”€ AGENTS.md                         # AI agent context cache
+â”‚
+â”œâ”€â”€ page/                             # Page-level orchestrator
+â”‚   â””â”€â”€ index.ts                      #   Re-exports PrintSettingsPage
+â”‚
+â”œâ”€â”€ PrintSettingsPage.tsx             # Main page (orchestrator, ~740 lines of logic)
+â”‚
+â”œâ”€â”€ types.ts                          # Canonical PrintTemplate type + createDefaultTemplate()
+â”œâ”€â”€ types/
+â”‚   â”œâ”€â”€ index.ts                      # Re-exports from root types.ts + data/
+â”‚   â”œâ”€â”€ domain/
+â”‚   â”‚   â””â”€â”€ index.ts                  # Re-exports domain types
+â”‚   â””â”€â”€ data/
+â”‚       â”œâ”€â”€ index.ts                  # Re-exports UniversalDocumentData + DocumentDataBuilder
+â”‚       â”œâ”€â”€ UniversalDocumentData.ts  # Single data contract (no imports)
+â”‚       â””â”€â”€ DocumentDataBuilder.ts    # Builds from API/POS/legacy sources
+â”‚
+â”œâ”€â”€ services/
+â”‚   â”œâ”€â”€ index.ts                      # Barrel exports all services
+â”‚   â”œâ”€â”€ FieldRegistry.ts              # 79 cataloged fields with Arabic labels
+â”‚   â”œâ”€â”€ CalculatedFieldService.ts     # 8 computed fields
+â”‚   â”œâ”€â”€ printStoreService.ts          # DB layer â€” save/fetch templates from backend
+â”‚   â””â”€â”€ engines/
+â”‚       â”œâ”€â”€ index.ts                  # Barrel exports engines
+â”‚       â”œâ”€â”€ FormulaEngine.ts          # Expression evaluator (no eval, custom parser)
+â”‚       â””â”€â”€ RulesEngine.ts            # Declarative show/hide/highlight rules
+â”‚
+â”œâ”€â”€ hooks/
+â”‚   â”œâ”€â”€ index.ts                      # Barrel exports hooks
+â”‚   â”œâ”€â”€ useUndoRedo.ts               # Stack-based undo/redo (60 steps)
+â”‚   â””â”€â”€ useKeyboardShortcuts.ts      # Ctrl+Z/Y/S handlers
+â”‚
+â”œâ”€â”€ components/
+â”‚   â”œâ”€â”€ index.ts                      # Barrel exports all public components
+â”‚   â”œâ”€â”€ ui.tsx                        # UI primitives (Toggle, Slider, Field, Input, etc.)
+â”‚   â”œâ”€â”€ Accordion.tsx                 # Collapsible accordion panel
+â”‚   â”œâ”€â”€ ColumnManager.tsx             # Table column visibility/order/width manager
+â”‚   â”œâ”€â”€ TemplateControls.tsx          # All template control sections
+â”‚   â”œâ”€â”€ QuickNav.tsx                  # Sticky section navigation with IntersectionObserver
+â”‚   â”œâ”€â”€ TinyBtn.tsx                   # Small icon action button
+â”‚   â”œâ”€â”€ PreviewSelector.tsx           # Routes to UniversalPreview or legacy previews
+â”‚   â”œâ”€â”€ FormulaEditor.tsx             # Formula expression editor with field picker
+â”‚   â”œâ”€â”€ RulesSection.tsx              # Condition builder (rules list, visibility, highlights)
+â”‚   â”œâ”€â”€ ChartSection.tsx              # BarChart/PieChart via recharts
+â”‚   â”œâ”€â”€ ImagePreviewModal.tsx         # Logo/image preview modal
+â”‚   â””â”€â”€ preview/
+â”‚       â”œâ”€â”€ UniversalPreview.tsx      # Main preview orchestrator (~280 lines now)
+â”‚       â”œâ”€â”€ shared.tsx                # Shared helpers (mm, align, Separator, DocRow, etc.)
+â”‚       â”œâ”€â”€ ReportSection.tsx         # Report rendering (KPI cards, charts, top products)
+â”‚       â”œâ”€â”€ LogoRenderer.tsx          # Logo image renderer
+â”‚       â”œâ”€â”€ HeaderSection.tsx         # Header renderer (thermal + A4/A5)
+â”‚       â”œâ”€â”€ DocInfoSection.tsx        # Document info renderer
+â”‚       â”œâ”€â”€ ItemsSection.tsx          # Items table renderer
+â”‚       â”œâ”€â”€ TotalsSection.tsx         # Totals renderer
+â”‚       â”œâ”€â”€ PaymentsSection.tsx       # Payments renderer
+â”‚       â””â”€â”€ FooterSection.tsx         # Footer renderer
+â”‚
+â”œâ”€â”€ sections/                         # Template control sections (for PrintSettingsPage)
+â”‚   â”œâ”€â”€ index.ts
+â”‚   â”œâ”€â”€ ToggleSwitch.tsx              # Section accordion toggle primitives
+â”‚   â”œâ”€â”€ HeaderSection.tsx
+â”‚   â”œâ”€â”€ DocumentSection.tsx
+â”‚   â”œâ”€â”€ ItemsSection.tsx
+â”‚   â”œâ”€â”€ TotalsSection.tsx
+â”‚   â”œâ”€â”€ FooterSection.tsx
+â”‚   â””â”€â”€ FormattingSection.tsx
+â”‚
+â”œâ”€â”€ render/                           # Render helpers
+â”‚   â””â”€â”€ index.ts                      # Re-exports
+â”‚
+â”œâ”€â”€ config/                           # Template library config
+â”‚   â””â”€â”€ ...
+â”‚
+â”œâ”€â”€ template-library/                 # Template library (install/search/filter)
+â”‚   â”œâ”€â”€ index.ts
+â”‚   â”œâ”€â”€ types.ts
+â”‚   â”œâ”€â”€ constants.ts
+â”‚   â”œâ”€â”€ categories.ts
+â”‚   â”œâ”€â”€ mockData.ts
+â”‚   â”œâ”€â”€ registry.ts
+â”‚   â”œâ”€â”€ TemplateLibraryModal.tsx
+â”‚   â””â”€â”€ config/
+â”‚       â”œâ”€â”€ index.ts
+â”‚       â”œâ”€â”€ PaperConfig.ts
+â”‚       â”œâ”€â”€ TypographyConfig.ts
+â”‚       â”œâ”€â”€ HeaderConfig.ts
+â”‚       â”œâ”€â”€ TableConfig.ts
+â”‚       â”œâ”€â”€ TotalsConfig.ts
+â”‚       â””â”€â”€ FooterConfig.ts
+â”‚
+â”œâ”€â”€ api/
+â”‚   â””â”€â”€ printTemplatesApi.ts          # React Query hooks for template CRUD
+â”‚
+â”œâ”€â”€ utils/                            # Pure utilities
+â”‚   â”œâ”€â”€ index.ts
+â”‚   â””â”€â”€ numberToArabic.ts             # Number-to-Arabic-words converter
+â”‚
+â””â”€â”€ page/
+    â””â”€â”€ index.ts                      # Re-exports PrintSettingsPage
+```
+
+## Architecture Principles
+
+### 1. Self-Containment
+- All code for print template management lives inside `print-settings/`
+- External imports are limited to 4 shared infrastructure paths:
+  - `@/lib/api/core/client` (HTTP client)
+  - `@/lib/store/appStore` (active company/slug)
+  - `@/components/ui/ErrorBoundary`
+  - `@/lib/api/core/types` (type-only)
+- No imports from `@/reporting`, `@/pos`, or other page modules
+
+### 2. Singleton Sources
+- All service instances are created once and stored in `services/engines/` and `services/`
+- `reporting/index.ts` re-exports from `print-settings/` to avoid duplicate instances
+- Direction: POS â†’ print-settings â†’ reporting (POS re-exports from print-settings)
+
+### 3. Single Responsibility
+- `PrintSettingsPage.tsx` is an orchestrator only â€” it composes components, manages state, and delegates to hooks
+- UI primitives live in `components/ui.tsx`
+- Each major render section has its own component file
+- Services are stateless classes or singleton instances
+
+### 4. Data Flow
+```
+User action â†’ PrintSettingsPage state â†’ tpl object â†’ UniversalPreview â†’ Section components
+                                                          â†•
+                                              rulesEngine.evaluate(tpl.rules, data)
+```
+
+## Key Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| PrintSettingsPage | `PrintSettingsPage.tsx` | 3-column layout: doc type selector, template controls, live preview |
+| UniversalPreview | `components/preview/UniversalPreview.tsx` | Dispatches to paper-specific renderers |
+| PreviewSelector | `components/PreviewSelector.tsx` | Routes to UniversalPreview or legacy A4/A5 previews |
+| FormulaEditor | `components/FormulaEditor.tsx` | Expression editor with field picker + validation |
+| TemplateLibraryModal | `template-library/TemplateLibraryModal.tsx` | Browse/search/install templates |
+| RulesSection | `components/RulesSection.tsx` | Condition builder for show/hide/highlight |
+| ChartSection | `components/ChartSection.tsx` | Chart rendering for report summaries |
+
+## External Dependencies
+
+Only 4 shared infrastructure imports:
+- `@/lib/api/core/client`: `apiGet`, `apiPost`, `apiPut`, `apiDelete`, `apiUpload`, `apiPatch`
+- `@/lib/store/appStore`: `useActiveCompany`, `useActiveSlug`
+- `@/components/ui/ErrorBoundary`
+- `@/lib/api/core/types`: `CommercialDocument` (type only)
+
+## Build
+
+```bash
+npm run build  # 1020 modules, 0 errors (PrintSettingsPage chunk: ~95KB)
+```
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/Accordion.tsx
+```
+import React, { useState, useEffect } from 'react';
+
+export function Accordion({ title, icon, id, children, defaultOpen = false, collapseVersion }: {
+  title: string; icon: string; id?: string;
+  children: React.ReactNode; defaultOpen?: boolean; collapseVersion?: number;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => { setOpen(defaultOpen); }, [collapseVersion, defaultOpen]);
+  return (
+    <div
+      id={id}
+      style={{
+        marginBottom: 4, border: '1px solid var(--b2)',
+        borderRadius: 'var(--r2)', overflow: 'visible',
+      }}
+    >
+      <button
+        onClick={() => setOpen(o => !o)} type="button"
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 7,
+          padding: '8px 11px', background: 'var(--bg3)',
+          border: 'none', cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+          borderBottom: open ? '1px solid var(--b2)' : 'none',
+          position: 'sticky', top: 0, zIndex: 5,
+        }}
+      >
+        <i className={`ti ${icon}`} style={{ color: 'var(--em)', fontSize: 13, flexShrink: 0 }} />
+        <span style={{
+          flex: 1, textAlign: 'right', fontSize: 12.5,
+          fontWeight: 700, color: 'var(--t1)',
+        }}>{title}</span>
+        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`}
+          style={{ fontSize: 11, color: 'var(--t4)', flexShrink: 0 }} />
+      </button>
+      {open && (
+        <div style={{ padding: '8px 11px', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/ChartSection.tsx
 ```
 import React, { useMemo } from 'react';
-import type { PrintTemplate, CompanyData, ReceiptLiveData } from '../types';
-import { UniversalPreview } from '@/reporting';
-import { DocumentDataBuilder, emptyDocumentData } from '@/reporting';
-import type { UniversalDocumentData } from '@/reporting';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
+} from 'recharts';
+import type { UniversalDocumentData } from '../types/data';
+
+interface ChartSectionProps {
+  data: UniversalDocumentData;
+  chartType: 'bar' | 'pie';
+  title?: string;
+  width?: number;
+}
+
+const COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+export default function ChartSection({ data, chartType, title, width = 600 }: ChartSectionProps) {
+  const breakdown = data.report?.paymentBreakdown || [];
+  const hasData = breakdown.length > 0 && breakdown.some(b => b.amount > 0);
+
+  const chartData = useMemo(() => {
+    return breakdown.map(b => ({
+      name: b.mode,
+      value: b.amount,
+    }));
+  }, [breakdown]);
+
+  if (!data.report) return null;
+  if (!hasData) return null;
+
+  const chartWidth = Math.min(width, 560);
+
+  return (
+    <div style={{ margin: '12px 0', textAlign: 'center' }}>
+      {title && (
+        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#111' }}>
+          {title}
+        </div>
+      )}
+
+      {chartType === 'bar' ? (
+        <div style={{ direction: 'ltr', display: 'inline-block' }}>
+          <ResponsiveContainer width={chartWidth} height={200}>
+            <BarChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: '#555' }}
+                axisLine={{ stroke: '#ddd' }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: '#888' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={v => `${v.toLocaleString('ar-DZ')}`}
+              />
+              <Tooltip
+                formatter={(value: number) => [`${value.toFixed(2)} Ø¯Ø¬`, 'Ø§Ù„Ù…Ø¨Ù„Øº']}
+                contentStyle={{
+                  fontSize: 12, borderRadius: 4, border: '1px solid #ddd',
+                }}
+              />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                {chartData.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div style={{ direction: 'ltr', display: 'inline-block' }}>
+          <ResponsiveContainer width={chartWidth} height={220}>
+            <PieChart>
+              <Pie
+                data={chartData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                innerRadius={40}
+                paddingAngle={2}
+              >
+                {chartData.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value: number) => [`${value.toFixed(2)} Ø¯Ø¬`, 'Ø§Ù„Ù…Ø¨Ù„Øº']}
+                contentStyle={{
+                  fontSize: 12, borderRadius: 4, border: '1px solid #ddd',
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
+            {chartData.map((d, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#555' }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: COLORS[i % COLORS.length] }} />
+                <span>{d.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/ColumnManager.tsx
+```
+import React, { useState } from 'react';
+import type { PrintTemplate, ColumnKey } from '../types';
+
+export type Updater = <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
+
+const ALL_COLS: { key: ColumnKey; label: string }[] = [
+  { key: 'rowNumber', label: 'Ø±Ù‚Ù… Ø§Ù„Ø³Ø·Ø±'  },
+  { key: 'barcode',   label: 'Ø¨Ø§Ø±ÙƒÙˆØ¯'      },
+  { key: 'ref',       label: 'Ø§Ù„Ù…Ø±Ø¬Ø¹'       },
+  { key: 'name',      label: 'Ø§Ù„Ù…Ù†ØªØ¬'       },
+  { key: 'unit',      label: 'Ø§Ù„ÙˆØ­Ø¯Ø©'       },
+  { key: 'quantity',  label: 'Ø§Ù„ÙƒÙ…ÙŠØ©'       },
+  { key: 'price',     label: 'Ø§Ù„Ø³Ø¹Ø±'        },
+  { key: 'discount',  label: 'Ø§Ù„Ø®ØµÙ…'        },
+  { key: 'tva',       label: 'TVA'          },
+  { key: 'total',     label: 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ'    },
+];
+
+const miniBtn: React.CSSProperties = {
+  width: 20, height: 20, borderRadius: 4, border: '1px solid var(--b2)',
+  background: 'var(--bg3)', cursor: 'pointer', display: 'flex',
+  alignItems: 'center', justifyContent: 'center', fontSize: 10,
+  color: 'var(--t3)', padding: 0, flexShrink: 0,
+};
+
+export function ColumnManager({ tpl, update }: { tpl: PrintTemplate; update: Updater }) {
+  const [dragKey, setDragKey] = useState<ColumnKey | null>(null);
+
+  const toggleCol = (key: ColumnKey, show: boolean) => {
+    update('col_show', { ...tpl.col_show, [key]: show });
+    if (show && !tpl.col_order.includes(key))
+      update('col_order', [...tpl.col_order, key]);
+  };
+  const moveCol = (key: ColumnKey, dir: -1 | 1) => {
+    const arr = [...tpl.col_order];
+    const idx = arr.indexOf(key);
+    if (idx < 0) return;
+    const t = idx + dir;
+    if (t < 0 || t >= arr.length) return;
+    [arr[idx], arr[t]] = [arr[t], arr[idx]];
+    update('col_order', arr);
+  };
+  const handleDragOver = (e: React.DragEvent, key: ColumnKey) => {
+    e.preventDefault();
+    if (!dragKey || dragKey === key) return;
+    const from = tpl.col_order.indexOf(dragKey);
+    const to = tpl.col_order.indexOf(key);
+    if (from < 0 || to < 0) return;
+    const arr = [...tpl.col_order];
+    arr.splice(from, 1);
+    arr.splice(to, 0, dragKey);
+    update('col_order', arr);
+    setDragKey(key);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {ALL_COLS.map(col => {
+        const visible = tpl.col_show[col.key] !== false;
+        const idx     = tpl.col_order.indexOf(col.key);
+        const isDragging = dragKey === col.key;
+        return (
+          <div
+            key={col.key}
+            draggable
+            onDragStart={() => setDragKey(col.key)}
+            onDragOver={e => handleDragOver(e, col.key)}
+            onDragEnd={() => setDragKey(null)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '4px 6px',
+              borderRadius: 'var(--r1)',
+              background: visible ? 'var(--emb)' : 'var(--bg3)',
+              border: `1px solid ${visible ? 'var(--embo)' : 'var(--b1)'}`,
+              cursor: 'grab', opacity: isDragging ? 0.4 : 1,
+            }}
+          >
+            <div
+              onClick={() => toggleCol(col.key, !visible)}
+              style={{
+                width: 28, height: 15, borderRadius: 8, flexShrink: 0,
+                background: visible ? 'var(--em)' : 'var(--bg5)',
+                border: `1px solid ${visible ? 'var(--em)' : 'var(--b3)'}`,
+                position: 'relative', cursor: 'pointer',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 1.5,
+                left: visible ? 12 : 1.5,
+                width: 10, height: 10, borderRadius: '50%', background: '#fff',
+                transition: 'left .15s',
+              }} />
+            </div>
+
+            <span style={{
+              flex: 1, fontSize: 11.5, fontWeight: 600, color: 'var(--t2)',
+              minWidth: 0, display: 'flex', alignItems: 'center', gap: 3,
+            }}>
+              <i className="ti ti-grip-vertical" style={{ fontSize: 9, opacity: 0.3 }} />
+              {col.label}
+              {visible && idx >= 0 && (
+                <span style={{ fontSize: 10, color: 'var(--t4)', marginRight: 4 }}>#{idx + 1}</span>
+              )}
+            </span>
+
+            <button onClick={() => moveCol(col.key, -1)} disabled={idx <= 0}
+              style={{ ...miniBtn, opacity: idx <= 0 ? .3 : 1 }} type="button">
+              <i className="ti ti-chevron-right" />
+            </button>
+            <button onClick={() => moveCol(col.key, 1)}
+              disabled={idx >= tpl.col_order.length - 1}
+              style={{ ...miniBtn, opacity: idx >= tpl.col_order.length - 1 ? .3 : 1 }} type="button">
+              <i className="ti ti-chevron-left" />
+            </button>
+
+            {visible && (
+              <>
+                <input
+                  type="range" min={5} max={60} step={1}
+                  value={tpl.col_widths[col.key] ?? 20}
+                  onChange={e => update('col_widths', { ...tpl.col_widths, [col.key]: Number(e.target.value) })}
+                  style={{ width: 44, height: 3, accentColor: 'var(--em)', flexShrink: 0 }}
+                />
+                <span style={{ fontSize: 10, color: 'var(--t4)', minWidth: 22 }}>
+                  {tpl.col_widths[col.key] ?? 20}%
+                </span>
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/DeleteConfirmModal.tsx
+```
+import React from 'react';
+
+interface DeleteConfirmModalProps {
+  deleteTarget: number | null;
+  actionLoading: string | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+export default function DeleteConfirmModal({
+  deleteTarget,
+  actionLoading,
+  onConfirm,
+  onCancel,
+}: DeleteConfirmModalProps) {
+  if (deleteTarget === null) return null;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+      zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={onCancel}>
+      <div style={{
+        background: '#fff', borderRadius: 8, padding: 24, width: 380, maxWidth: '90vw',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--red)' }}>
+          <i className="ti ti-alert-triangle" style={{ marginLeft: 8 }} />
+          ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø­Ø°Ù
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 20, lineHeight: 1.6 }}>
+          Ù‡Ù„ ØªØ±ÙŠØ¯ Ø­Ø°Ù Ù‡Ø°Ø§ Ø§Ù„Ù‚Ø§Ù„Ø¨ Ù†Ù‡Ø§Ø¦ÙŠØ§Ù‹ØŸ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù† Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onCancel} style={{
+            padding: '8px 16px', border: '1px solid var(--b2)', borderRadius: 6,
+            background: 'var(--bg2)', color: 'var(--t2)', cursor: 'pointer', fontSize: 13,
+          }} type="button">Ø¥Ù„ØºØ§Ø¡</button>
+          <button onClick={onConfirm} disabled={actionLoading !== null} style={{
+            padding: '8px 16px', border: 'none', borderRadius: 6,
+            background: 'var(--red)', color: '#fff', cursor: actionLoading ? 'not-allowed' : 'pointer',
+            fontSize: 13, fontWeight: 600, opacity: actionLoading ? 0.6 : 1,
+          }} type="button">
+            {actionLoading ? 'Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø­Ø°Ùâ€¦' : 'Ø­Ø°Ù'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/ErrorBoundary.tsx
+```
+import React from 'react';
+
+interface Props { children: React.ReactNode; fallback?: React.ReactNode; }
+interface State { hasError: boolean; error?: Error; }
+
+export class ErrorBoundary extends React.Component<Props, State> {
+  state: State = { hasError: false };
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback ?? (
+        <div style={{
+          padding: 24, textAlign: 'center', color: 'var(--t4)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+        }}>
+          <i className="ti ti-alert-triangle" style={{ fontSize: 28, color: 'var(--red)', opacity: 0.6 }} />
+          <span style={{ fontSize: 13 }}>ØªØ¹Ø°Ø± Ø¹Ø±Ø¶ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©</span>
+          <button onClick={() => this.setState({ hasError: false })} style={{
+            padding: '6px 14px', border: '1px solid var(--b2)', borderRadius: 6,
+            background: 'var(--bg2)', cursor: 'pointer', fontSize: 12, color: 'var(--t2)',
+          }} type="button">Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/FormulaEditor.tsx
+```
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { fieldRegistry } from '../services/FieldRegistry';
+import { formulaEngine } from '../services/engines/FormulaEngine';
+
+interface FormulaEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+  placeholder?: string;
+  showFieldPicker?: boolean;
+  width?: string;
+}
+
+const FUNCTIONS = ['IF', 'SUM', 'AVG', 'ROUND', 'CONCAT', 'FORMAT', 'TODAY', 'MIN', 'MAX', 'COUNT'];
+
+function insertAtCursor(input: HTMLInputElement, text: string) {
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? start;
+  const before = input.value.slice(0, start);
+  const after = input.value.slice(end);
+  const newValue = before + text + after;
+  const cursorPos = start + text.length;
+  return { newValue, cursorPos };
+}
+
+export default function FormulaEditor({
+  value,
+  onChange,
+  label,
+  placeholder,
+  showFieldPicker = true,
+  width,
+}: FormulaEditorProps) {
+  const [validation, setValidation] = useState<{ valid: boolean; error?: string } | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const filteredGroups = useRef(fieldRegistry.getAllGroups());
+
+  const doValidate = useCallback((expr: string) => {
+    if (!expr.trim()) {
+      setValidation(null);
+      return;
+    }
+    const result = formulaEngine.validate(expr);
+    setValidation(result);
+  }, []);
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const v = e.target.value;
+      onChange(v);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => doValidate(v), 300);
+    },
+    [onChange, doValidate],
+  );
+
+  const handleBlur = useCallback(() => {
+    setFocused(false);
+    doValidate(value);
+  }, [value, doValidate]);
+
+  const insertText = useCallback(
+    (text: string) => {
+      if (!inputRef.current) {
+        onChange(value + text);
+        return;
+      }
+      const { newValue, cursorPos } = insertAtCursor(inputRef.current, text);
+      onChange(newValue);
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.setSelectionRange(cursorPos, cursorPos);
+        }
+      });
+    },
+    [onChange, value],
+  );
+
+  const handleFieldPick = useCallback(
+    (path: string) => {
+      insertText(path);
+      setPickerOpen(false);
+      setSearchQuery('');
+    },
+    [insertText],
+  );
+
+  const handleFunctionPick = useCallback(
+    (fn: string) => {
+      insertText(`${fn}()`);
+    },
+    [insertText],
+  );
+
+  // Close picker on click outside
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node) && !(e.target as HTMLElement)?.closest?.('[data-picker-toggle]')) {
+        setPickerOpen(false);
+        setSearchQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [pickerOpen]);
+
+  // Escape closes picker
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPickerOpen(false);
+        setSearchQuery('');
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [pickerOpen]);
+
+  // Ctrl+Space opens picker
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.ctrlKey && e.key === ' ') {
+        e.preventDefault();
+        setPickerOpen(p => !p);
+      }
+    },
+    [],
+  );
+
+  // Update filtered groups on search
+  useEffect(() => {
+    if (!pickerOpen) return;
+    if (!searchQuery.trim()) {
+      filteredGroups.current = fieldRegistry.getAllGroups();
+    } else {
+      const results = fieldRegistry.search(searchQuery);
+      const groupMap = new Map<string, typeof results>();
+      results.forEach(f => {
+        const list = groupMap.get(f.group) ?? [];
+        list.push(f);
+        groupMap.set(f.group, list);
+      });
+      filteredGroups.current = fieldRegistry
+        .getAllGroups()
+        .filter(g => groupMap.has(g.id))
+        .map(g => ({ ...g, fields: groupMap.get(g.id)! }));
+    }
+  }, [searchQuery, pickerOpen]);
+
+  const inputWidth = width || '100%';
+
+  const styles: Record<string, React.CSSProperties> = {
+    wrapper: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      position: 'relative',
+    },
+    input: {
+      width: inputWidth,
+      padding: '5px 8px',
+      borderRadius: 4,
+      border: '1px solid var(--b2, #d0d0d0)',
+      fontSize: 13,
+      fontFamily: 'inherit',
+      outline: 'none',
+      boxSizing: 'border-box',
+      paddingRight: validation ? 24 : 8,
+    },
+    pickerBtn: {
+      width: 28,
+      height: 28,
+      borderRadius: '50%',
+      border: '1px solid var(--b2, #d0d0d0)',
+      background: 'var(--bg, #fff)',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: 16,
+      lineHeight: 1,
+      color: 'var(--t2, #555)',
+      flexShrink: 0,
+    },
+    validationIcon: {
+      position: 'absolute' as const,
+      right: showFieldPicker ? 36 : 6,
+      top: '50%',
+      transform: 'translateY(-50%)',
+      width: 16,
+      height: 16,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      pointerEvents: 'none' as const,
+    },
+    dropdown: {
+      position: 'absolute' as const,
+      top: '100%',
+      left: 0,
+      right: 0,
+      zIndex: 100,
+      background: 'var(--bg, #fff)',
+      border: '1px solid var(--b2, #d0d0d0)',
+      borderRadius: 6,
+      boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+      marginTop: 4,
+      maxHeight: 300,
+      display: 'flex',
+      flexDirection: 'column' as const,
+    },
+    searchInput: {
+      width: '100%',
+      padding: '8px 10px',
+      border: 'none',
+      borderBottom: '1px solid var(--b2, #d0d0d0)',
+      fontSize: 12,
+      outline: 'none',
+      boxSizing: 'border-box' as const,
+    },
+    groupLabel: {
+      padding: '6px 10px',
+      fontSize: 11,
+      fontWeight: 600,
+      color: 'var(--t3, #888)',
+      textTransform: 'uppercase' as const,
+      letterSpacing: '0.5px',
+      background: 'var(--b1, #f8f8f8)',
+      borderBottom: '1px solid var(--b2, #d0d0d0)',
+    },
+    fieldItem: {
+      padding: '6px 10px',
+      cursor: 'pointer',
+      fontSize: 12,
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderBottom: '1px solid var(--b1, #f0f0f0)',
+      transition: 'background 0.15s',
+    },
+    fieldPath: {
+      fontSize: 10,
+      color: 'var(--t3, #999)',
+      fontFamily: 'monospace',
+    },
+    fieldType: {
+      fontSize: 9,
+      color: 'var(--t3, #999)',
+      background: 'var(--b1, #f0f0f0)',
+      padding: '1px 5px',
+      borderRadius: 3,
+      marginLeft: 4,
+    },
+    chipsRow: {
+      display: 'inline-flex',
+      flexWrap: 'wrap' as const,
+      gap: 4,
+      marginTop: 4,
+    },
+    chip: {
+      display: 'inline-flex',
+      padding: '2px 8px',
+      borderRadius: 12,
+      background: 'var(--b1, #e8e8e8)',
+      cursor: 'pointer',
+      fontSize: 11,
+      color: 'var(--t2, #555)',
+      border: 'none',
+      fontFamily: 'monospace',
+      transition: 'background 0.15s',
+    },
+    errorTooltip: {
+      fontSize: 10,
+      color: '#d32f2f',
+      position: 'absolute' as const,
+      top: '100%',
+      left: 0,
+      marginTop: 2,
+      padding: '2px 6px',
+      background: '#fff',
+      border: '1px solid #ffcdd2',
+      borderRadius: 3,
+      whiteSpace: 'nowrap' as const,
+      zIndex: 10,
+    },
+  };
+
+  const groups = filteredGroups.current;
+
+  return (
+    <div>
+      {label && (
+        <label style={{ display: 'block', fontSize: 12, marginBottom: 3, color: 'var(--t2, #555)' }}>
+          {label}
+        </label>
+      )}
+      <div style={styles.wrapper}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <input
+            ref={inputRef}
+            style={styles.input}
+            value={value}
+            onChange={handleChange}
+            onFocus={() => setFocused(true)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder || 'Ø§ÙƒØªØ¨ ØªØ¹Ø¨ÙŠØ±Ø§Ù‹...'}
+          />
+          {validation && (
+            <span style={styles.validationIcon} title={validation.valid ? 'ØµØ­ÙŠØ­' : validation.error}>
+              {validation.valid ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="7" fill="#4caf50" />
+                  <path d="M5 8.5L7 10.5L11 6" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="7" fill="#f44336" />
+                  <path d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              )}
+            </span>
+          )}
+          {validation && !validation.valid && validation.error && (
+            <div style={styles.errorTooltip}>{validation.error}</div>
+          )}
+        </div>
+        {showFieldPicker && (
+          <button
+            data-picker-toggle
+            style={{
+              ...styles.pickerBtn,
+              background: pickerOpen ? 'var(--b1, #eee)' : 'var(--bg, #fff)',
+              borderColor: pickerOpen ? 'var(--a, #1976d2)' : 'var(--b2, #d0d0d0)',
+            }}
+            onClick={() => {
+              setPickerOpen(p => !p);
+              if (!pickerOpen) setSearchQuery('');
+            }}
+            title="Ø§Ø®ØªÙŠØ§Ø± Ø­Ù‚Ù„ (Ctrl+Space)"
+            type="button"
+          >
+            <i className="ti ti-list-search" style={{ fontSize: 16 }} />
+          </button>
+        )}
+        {pickerOpen && showFieldPicker && (
+          <div ref={pickerRef} style={styles.dropdown}>
+            <input
+              style={styles.searchInput}
+              placeholder="Ø§Ø¨Ø­Ø« Ø¹Ù† Ø­Ù‚Ù„..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === 'Escape') {
+                  setPickerOpen(false);
+                  setSearchQuery('');
+                }
+              }}
+            />
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {groups.length === 0 && (
+                <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--t3, #999)' }}>
+                  Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬
+                </div>
+              )}
+              {groups.map(group => (
+                <div key={group.id}>
+                  <div style={styles.groupLabel}>{group.label}</div>
+                  {group.fields.map(field => (
+                    <div
+                      key={field.path}
+                      style={styles.fieldItem}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.background = 'var(--b1, #f0f0f0)';
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.background = 'transparent';
+                      }}
+                      onClick={() => handleFieldPick(field.path)}
+                    >
+                      <span>
+                        <span>{field.label}</span>
+                        <span style={styles.fieldType}>{field.type}</span>
+                      </span>
+                      <span style={styles.fieldPath}>{field.path}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      {focused && (
+        <div style={styles.chipsRow}>
+          {FUNCTIONS.map(fn => (
+            <button
+              key={fn}
+              type="button"
+              style={styles.chip}
+              onClick={() => handleFunctionPick(fn)}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = 'var(--b2, #d0d0d0)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'var(--b1, #e8e8e8)';
+              }}
+            >
+              {fn}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/ImagePreviewModal.tsx
+```
+import React from 'react';
 
 interface Props {
-  tpl:          PrintTemplate;
-  company?:     CompanyData | null;
-  liveData?:    ReceiptLiveData | null;
-  overrideData?: UniversalDocumentData | null;
+  open: boolean;
+  src: string;
+  alt?: string;
+  onClose: () => void;
 }
 
-export default function PreviewSelector({ tpl, company, liveData, overrideData }: Props) {
-  const data: UniversalDocumentData = useMemo(() => {
-    if (overrideData) return overrideData;
-    if (!liveData) return emptyDocumentData();
-    return DocumentDataBuilder.fromLegacy(liveData);
-  }, [liveData, overrideData]);
-
-  return <UniversalPreview tpl={tpl} data={data} company={company ?? null} />;
+export default function ImagePreviewModal({ open, src, alt, onClose }: Props) {
+  if (!open) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,.65)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'zoom-out',
+      }}
+    >
+      <img
+        src={src}
+        alt={alt ?? 'Preview'}
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxWidth: '90vw',
+          maxHeight: '90vh',
+          objectFit: 'contain',
+          borderRadius: 8,
+          boxShadow: '0 8px 40px rgba(0,0,0,.35)',
+        }}
+      />
+    </div>
+  );
 }
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/index.ts
+```
+export { default as PreviewSelector } from './PreviewSelector';
+export { default as RulesSection } from './RulesSection';
+export { default as FormulaEditor } from './FormulaEditor';
+export { default as ChartSection } from './ChartSection';
+export { default as ImagePreviewModal } from './ImagePreviewModal';
+export { Accordion } from './Accordion';
+export { ColumnManager, type Updater } from './ColumnManager';
+export { TemplateControls } from './TemplateControls';
+export { QuickNav } from './QuickNav';
+export { TinyBtn, toolBtnStyle } from './TinyBtn';
+export {
+  Toggle, Slider, Field, Input, Textarea, Select,
+  Pills, ColorField, Divider, SectionTitle,
+  styledInput, ALIGN_OPTS, BORDER_OPTS,
+} from './ui';
+export { renderHeader } from './preview/HeaderSection';
+export { renderDocInfo } from './preview/DocInfoSection';
+export { renderItems } from './preview/ItemsSection';
+export { renderTotals } from './preview/TotalsSection';
+export { renderPayments } from './preview/PaymentsSection';
+export { renderFooter } from './preview/FooterSection';
+export { renderReport } from './preview/ReportSection';
+export { renderLogo } from './preview/LogoRenderer';
+export {
+  mm, align, fontFamily, borderStyle, colWidth, colAlign,
+  colDefaultHeader, Separator, DocRow, TotalRow, InfoRow,
+  getCompany, getVisibleCols, formatDate, SectionWrap,
+} from './preview/shared';
+export type { CompanyData } from './preview/shared';
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/DocInfoSection.tsx
+```
+import type { PrintTemplate } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+import { align, formatDate, DocRow, Separator } from './shared';
+import { printFieldResolver } from '../../services';
+
+function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
+  return printFieldResolver.resolve(fieldId, data, tpl);
+}
+
+function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
+  return (
+    <div style={{ marginBottom: 5 }}>
+      <div style={{
+        textAlign: align(tpl.title_align),
+        fontSize: tpl.title_size,
+        fontWeight: tpl.title_bold ? 900 : 400,
+        color: tpl.title_color,
+        fontFamily: "'Tajawal', sans-serif",
+        marginBottom: 4,
+      }}>
+        {tpl.title_text}
+      </div>
+
+      <div style={{ fontSize: tpl.base_font_size }}>
+        {tpl.show_doc_number && <DocRow label="Ø±Ù‚Ù…:" value={r('document.number', data, tpl) as string} mono />}
+        {tpl.show_date && <DocRow label="Ø§Ù„ØªØ§Ø±ÙŠØ®:" value={`${formatDate(r('document.date', data, tpl) as string)}${tpl.show_time && r('document.time', data, tpl) ? ' ' + r('document.time', data, tpl) : ''}`} />}
+        {tpl.show_due_date && r('document.dueDate', data, tpl) && <DocRow label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªØ­Ù‚Ø§Ù‚:" value={r('document.dueDate', data, tpl) as string} />}
+        {tpl.show_cashier && r('customer.cashierName', data, tpl) && (
+          <DocRow label="Ø§Ù„ÙƒØ§Ø´ÙŠØ±:" value={r('customer.cashierName', data, tpl) as string} />
+        )}
+        {tpl.show_session && r('session.code', data, tpl) && (
+          <DocRow label="Ø§Ù„Ø¬Ù„Ø³Ø©:" value={r('session.code', data, tpl) as string} />
+        )}
+        {tpl.show_client && r('customer.name', data, tpl) && (
+          <>
+            <DocRow label="Ø§Ù„Ø¹Ù…ÙŠÙ„:" value={r('customer.name', data, tpl) as string} />
+            {tpl.show_client_nif     && r('customer.nif', data, tpl)      && <DocRow label="NIF Ø§Ù„Ø¹Ù…ÙŠÙ„:" value={r('customer.nif', data, tpl) as string} />}
+            {tpl.show_client_phone   && r('customer.phone', data, tpl)    && <DocRow label="Ù‡Ø§ØªÙ Ø§Ù„Ø¹Ù…ÙŠÙ„:" value={r('customer.phone', data, tpl) as string} />}
+            {tpl.show_client_address && r('customer.address', data, tpl)  && <DocRow label="Ø§Ù„Ø¹Ù†ÙˆØ§Ù†:" value={r('customer.address', data, tpl) as string} />}
+            {tpl.show_delivery_address && r('customer.deliveryAddress', data, tpl) && <DocRow label="Ø¹Ù†ÙˆØ§Ù† Ø§Ù„ØªØ³Ù„ÙŠÙ…:" value={r('customer.deliveryAddress', data, tpl) as string} />}
+          </>
+        )}
+        {tpl.show_payment_term && r('document.dueDate', data, tpl) && (
+          <DocRow label="Ø´Ø±ÙˆØ· Ø§Ù„Ø¯ÙØ¹:" value={r('document.dueDate', data, tpl) as string} />
+        )}
+      </div>
+
+      <Separator style={tpl.doc_separator} />
+    </div>
+  );
+}
+
+function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const isA4 = tpl.paper_size === 'A4';
+  const clientName = r('customer.name', data, tpl) as string;
+
+  if (!tpl.show_client || !clientName) return null;
+
+  if (isA4) {
+    return (
+      <div style={{ display: 'flex', gap: 30, marginBottom: 24 }}>
+        <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
+          <div style={{ fontWeight: 700, fontSize: tpl.company_info_size + 1, marginBottom: 6, color: '#111' }}>Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„</div>
+          <div style={{ fontSize: tpl.company_info_size, color: '#333' }}>
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>{clientName}</div>
+            {tpl.show_client_nif     && r('customer.nif', data, tpl)     && <div>NIF: {r('customer.nif', data, tpl) as string}</div>}
+            {tpl.show_client_phone   && r('customer.phone', data, tpl)   && <div>â˜ {r('customer.phone', data, tpl) as string}</div>}
+            {tpl.show_client_address && r('customer.address', data, tpl) && <div>{r('customer.address', data, tpl) as string}</div>}
+          </div>
+        </div>
+        {tpl.show_delivery_address && r('customer.deliveryAddress', data, tpl) && (
+          <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontWeight: 700, fontSize: tpl.company_info_size + 1, marginBottom: 6, color: '#111' }}>Ø¹Ù†ÙˆØ§Ù† Ø§Ù„ØªØ³Ù„ÙŠÙ…</div>
+            <div style={{ fontSize: tpl.company_info_size, color: '#333' }}>
+              {r('customer.deliveryAddress', data, tpl) as string}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      fontSize: tpl.company_info_size, marginBottom: 10,
+      padding: 8, background: '#f9fafb', borderRadius: 4,
+    }}>
+      <span style={{ fontWeight: 700 }}>Ø§Ù„Ø¹Ù…ÙŠÙ„: </span>{clientName}
+      {tpl.show_client_nif   && r('customer.nif', data, tpl)   && <span style={{ marginRight: 12 }}>NIF: {r('customer.nif', data, tpl) as string}</span>}
+      {tpl.show_client_phone && r('customer.phone', data, tpl) && <span style={{ marginRight: 12 }}>â˜ {r('customer.phone', data, tpl) as string}</span>}
+    </div>
+  );
+}
+
+export function renderDocInfo(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+  if (isThermal) return renderThermalDocInfo(tpl, data);
+  return renderPageDocInfo(tpl, data);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/FooterSection.tsx
+```
+import type { PrintTemplate } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+import { Separator } from './shared';
+
+function barcodeText(tpl: PrintTemplate, data: UniversalDocumentData): string {
+  if (tpl.barcode_content === 'custom') return tpl.barcode_custom_text;
+  if (tpl.barcode_content === 'total') return `${Number(data.totals.totalTtc).toFixed(2)} Ø¯Ø¬`;
+  return data.doc.number;
+}
+
+function qrDataText(tpl: PrintTemplate, data: UniversalDocumentData): string {
+  const parts: string[] = [];
+  if (tpl.qr_content === 'doc-number' || tpl.qr_content === 'both') {
+    parts.push(data.doc.number);
+  }
+  if (tpl.qr_content === 'company-info' || tpl.qr_content === 'both') {
+    parts.push(data.company.name || '');
+  }
+  return parts.join(' | ');
+}
+
+function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const hasContent =
+    tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
+    tpl.show_thank_you || tpl.show_returns_policy || tpl.footer_legal_text ||
+    tpl.show_barcode || tpl.show_qr ||
+    tpl.show_cashier_signature || tpl.show_client_signature || tpl.show_stamp ||
+    tpl.show_bank_details;
+
+  if (!hasContent) return null;
+
+  return (
+    <div style={{ textAlign: 'center', fontSize: tpl.base_font_size - 0.5 }}>
+      <Separator style={tpl.footer_separator} />
+
+      {tpl.show_bank_details && tpl.bank_details_text && (
+        <div style={{ marginBottom: 6, padding: '4px 0', borderBottom: '1px solid #ddd' }}>
+          <div style={{ fontWeight: 700, fontSize: tpl.base_font_size - 0.5, marginBottom: 2 }}>Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¨Ù†ÙƒÙŠØ©</div>
+          <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', whiteSpace: 'pre-line' }}>
+            {tpl.bank_details_text}
+          </div>
+        </div>
+      )}
+
+      {tpl.footer_line1 && <div style={{ marginBottom: 2 }}>{tpl.footer_line1}</div>}
+      {tpl.footer_line2 && <div style={{ marginBottom: 2 }}>{tpl.footer_line2}</div>}
+      {tpl.footer_line3 && <div style={{ marginBottom: 2 }}>{tpl.footer_line3}</div>}
+
+      {tpl.show_returns_policy && tpl.returns_policy_text && (
+        <div style={{ fontSize: tpl.base_font_size - 1, color: '#666', marginBottom: 3 }}>
+          {tpl.returns_policy_text}
+        </div>
+      )}
+
+      {tpl.show_thank_you && (
+        <div style={{
+          fontSize: tpl.thank_you_size,
+          fontWeight: 700,
+          color: tpl.thank_you_color,
+          fontFamily: "'Tajawal', sans-serif",
+          margin: '4px 0',
+        }}>
+          {tpl.thank_you_text}
+        </div>
+      )}
+
+      {tpl.footer_legal_text && (
+        <div style={{ fontSize: tpl.base_font_size - 2, color: '#999', marginTop: 3 }}>
+          {tpl.footer_legal_text}
+        </div>
+      )}
+
+      {tpl.show_barcode && (
+        <div style={{ margin: '8px 0 4px' }}>
+          <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
+            {Array.from({ length: 48 }, (_, i) => (
+              <div key={i} style={{
+                width: i % 3 === 0 ? 2 : 1,
+                height: i % 5 === 0 ? 28 : 22,
+                background: '#111',
+              }} />
+            ))}
+          </div>
+          <div style={{ fontSize: tpl.base_font_size - 1, letterSpacing: 2, marginTop: 2 }}>
+            {barcodeText(tpl, data)}
+          </div>
+        </div>
+      )}
+
+      {tpl.show_qr && (
+        <div style={{ margin: '4px auto', width: 48, height: 48 }}>
+          <svg viewBox="0 0 10 10" width={48} height={48}>
+            <rect x="0" y="0" width="3" height="3" fill="#111" />
+            <rect x="1" y="1" width="1" height="1" fill="#fff" />
+            <rect x="7" y="0" width="3" height="3" fill="#111" />
+            <rect x="8" y="1" width="1" height="1" fill="#fff" />
+            <rect x="0" y="7" width="3" height="3" fill="#111" />
+            <rect x="1" y="8" width="1" height="1" fill="#fff" />
+            <rect x="4" y="0" width="1" height="1" fill="#111" />
+            <rect x="4" y="2" width="2" height="1" fill="#111" />
+            <rect x="3" y="4" width="4" height="1" fill="#111" />
+            <rect x="5" y="6" width="2" height="3" fill="#111" />
+            <rect x="3" y="7" width="1" height="1" fill="#111" />
+          </svg>
+          <div style={{ fontSize: 7, color: '#666', marginTop: 1 }}>
+            {qrDataText(tpl, data)}
+          </div>
+        </div>
+      )}
+
+      {(tpl.show_cashier_signature || tpl.show_client_signature) && (
+        <div style={{
+          display: 'flex', justifyContent: 'space-around',
+          marginTop: 14, fontSize: tpl.base_font_size - 1,
+        }}>
+          {tpl.show_cashier_signature && (
+            <div>
+              <div style={{ width: 70, borderTop: '1px solid #111', marginBottom: 3 }} />
+              <span>Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„ÙƒØ§Ø´ÙŠØ±</span>
+            </div>
+          )}
+          {tpl.show_client_signature && (
+            <div>
+              <div style={{ width: 70, borderTop: '1px solid #111', marginBottom: 3 }} />
+              <span>Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„Ø¹Ù…ÙŠÙ„</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tpl.show_stamp && (
+        <div style={{
+          width: 44, height: 44, margin: '8px auto',
+          border: '2px solid #111', borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 9, fontWeight: 900, transform: 'rotate(-12deg)',
+        }}>
+          Ø®ØªÙ…
+        </div>
+      )}
+    </div>
+  );
+}
+
+function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const hasContent =
+    tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
+    tpl.show_thank_you || tpl.show_returns_policy || tpl.footer_legal_text ||
+    tpl.show_bank_details;
+
+  if (!hasContent) return null;
+
+  return (
+    <div style={{
+      fontSize: tpl.base_font_size - 0.5,
+      borderTop: tpl.footer_separator === 'none' ? 'none' : '2px solid #111',
+      paddingTop: 16,
+      marginTop: 12,
+    }}>
+      {tpl.show_bank_details && tpl.bank_details_text && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¨Ù†ÙƒÙŠØ©</div>
+          <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', whiteSpace: 'pre-line' }}>
+            {tpl.bank_details_text}
+          </div>
+        </div>
+      )}
+
+      {tpl.footer_line1 && <div style={{ margin: '4px 0' }}>{tpl.footer_line1}</div>}
+      {tpl.footer_line2 && <div style={{ margin: '4px 0' }}>{tpl.footer_line2}</div>}
+      {tpl.footer_line3 && <div style={{ margin: '4px 0' }}>{tpl.footer_line3}</div>}
+
+      {tpl.show_returns_policy && tpl.returns_policy_text && (
+        <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', margin: '6px 0' }}>
+          {tpl.returns_policy_text}
+        </div>
+      )}
+
+      {tpl.show_thank_you && (
+        <div style={{
+          fontWeight: 700, margin: '8px 0',
+          fontSize: tpl.thank_you_size,
+          textAlign: 'center',
+        }}>
+          {tpl.thank_you_text}
+        </div>
+      )}
+
+      {tpl.footer_legal_text && (
+        <div style={{ fontSize: tpl.base_font_size - 1.5, color: '#888', margin: '6px 0', textAlign: 'center' }}>
+          {tpl.footer_legal_text}
+        </div>
+      )}
+
+      {(tpl.show_cashier_signature || tpl.show_client_signature) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, fontSize: tpl.base_font_size }}>
+          {tpl.show_cashier_signature && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: 150, height: 1, borderTop: '1px solid #111', marginBottom: 4 }} />
+              <span>Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„ÙƒØ§Ø´ÙŠØ±</span>
+            </div>
+          )}
+          {tpl.show_client_signature && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: 150, height: 1, borderTop: '1px solid #111', marginBottom: 4 }} />
+              <span>Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„Ø¹Ù…ÙŠÙ„</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tpl.show_stamp && (
+        <div style={{
+          width: 60, height: 60, margin: '16px auto',
+          border: '2px solid #111', borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10, fontWeight: 900,
+          transform: 'rotate(-15deg)',
+        }}>
+          Ø®ØªÙ…
+        </div>
+      )}
+    </div>
+  );
+}
+
+function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const hasContent =
+    tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
+    tpl.show_thank_you || tpl.footer_legal_text ||
+    tpl.show_cashier_signature || tpl.show_client_signature ||
+    tpl.show_bank_details;
+
+  if (!hasContent) return null;
+
+  return (
+    <div style={{
+      textAlign: 'center',
+      fontSize: tpl.base_font_size - 0.5,
+      borderTop: tpl.footer_separator === 'none' ? 'none' : '1.5px solid #111',
+      paddingTop: 10,
+    }}>
+      {tpl.show_bank_details && tpl.bank_details_text && (
+        <div style={{ marginBottom: 6, padding: '4px 0', borderBottom: '1px solid #ddd' }}>
+          <div style={{ fontWeight: 700, fontSize: tpl.base_font_size - 0.5, marginBottom: 2 }}>Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¨Ù†ÙƒÙŠØ©</div>
+          <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', whiteSpace: 'pre-line' }}>
+            {tpl.bank_details_text}
+          </div>
+        </div>
+      )}
+      {tpl.footer_line1 && <div style={{ marginBottom: 1 }}>{tpl.footer_line1}</div>}
+      {tpl.footer_line2 && <div style={{ marginBottom: 1 }}>{tpl.footer_line2}</div>}
+
+      {tpl.show_thank_you && (
+        <div style={{
+          fontWeight: 700, fontSize: tpl.thank_you_size,
+          color: tpl.thank_you_color, margin: '4px 0',
+        }}>
+          {tpl.thank_you_text}
+        </div>
+      )}
+
+      {tpl.footer_legal_text && (
+        <div style={{ fontSize: tpl.base_font_size - 1.5, color: '#888' }}>
+          {tpl.footer_legal_text}
+        </div>
+      )}
+
+      {(tpl.show_cashier_signature || tpl.show_client_signature) && (
+        <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 16 }}>
+          {tpl.show_cashier_signature && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: 80, borderTop: '1px solid #111', marginBottom: 2 }} />
+              <span style={{ fontSize: tpl.base_font_size - 1 }}>Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„ÙƒØ§Ø´ÙŠØ±</span>
+            </div>
+          )}
+          {tpl.show_client_signature && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: 80, borderTop: '1px solid #111', marginBottom: 2 }} />
+              <span style={{ fontSize: tpl.base_font_size - 1 }}>Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„Ø¹Ù…ÙŠÙ„</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function renderFooter(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+  if (isThermal) return renderThermalFooter(tpl, data);
+  if (tpl.paper_size === 'A4') return renderA4Footer(tpl, data);
+  return renderA5Footer(tpl, data);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/HeaderSection.tsx
+```
+import type { PrintTemplate } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+import { renderLogo } from './LogoRenderer';
+import { align, formatDate, Separator, InfoRow } from './shared';
+import { printFieldResolver } from '../../services';
+
+function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
+  return printFieldResolver.resolve(fieldId, data, tpl);
+}
+
+function renderThermalHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
+  return (
+    <div style={{ textAlign: align(tpl.company_info_align), marginBottom: 5 }}>
+      {tpl.show_logo && renderLogo(tpl, data)}
+      {tpl.show_company_name && (
+        <div style={{
+          textAlign: align(tpl.company_name_align),
+          fontSize: tpl.company_name_size,
+          fontWeight: tpl.company_name_bold ? 900 : 400,
+          color: tpl.company_name_color,
+          marginBottom: 3,
+          fontFamily: "'Tajawal', sans-serif",
+        }}>
+          {r('company.name', data, tpl)}
+        </div>
+      )}
+      <div style={{ fontSize: tpl.company_info_size, color: '#444' }}>
+        {tpl.show_address && r('company.address', data, tpl) && <div>{r('company.address', data, tpl)}</div>}
+        {tpl.show_phone   && r('company.phone', data, tpl)   && <div>â˜ {r('company.phone', data, tpl)}</div>}
+        {tpl.show_tax_id  && r('company.nif', data, tpl)     && <div>NIF: {r('company.nif', data, tpl)}</div>}
+        {tpl.show_rc      && r('company.rc', data, tpl)      && <div>RC: {r('company.rc', data, tpl)}</div>}
+        {tpl.show_nis     && r('company.nis', data, tpl)     && <div>NIS: {r('company.nis', data, tpl)}</div>}
+        {tpl.show_ice     && r('company.ice', data, tpl)     && <div>ICE: {r('company.ice', data, tpl)}</div>}
+        {tpl.show_article && r('company.article', data, tpl) && <div>{r('company.article', data, tpl)}</div>}
+      </div>
+      {tpl.header_custom_text && (
+        <div style={{ fontSize: tpl.company_info_size, color: '#555', marginTop: 2 }}>
+          {tpl.header_custom_text}
+        </div>
+      )}
+      <Separator style={tpl.header_separator} />
+    </div>
+  );
+}
+
+function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const isA4 = tpl.paper_size === 'A4';
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      marginBottom: isA4 ? 30 : 16,
+      paddingBottom: isA4 ? 20 : 10,
+      borderBottom: isA4 ? '2px solid #111' : '1.5px solid #111',
+    }}>
+      <div style={{ flex: 1 }}>
+        {tpl.show_logo && renderLogo(tpl, data)}
+        {tpl.show_company_name && (
+          <div style={{
+            fontSize: tpl.company_name_size + (isA4 ? 4 : 2),
+            fontWeight: tpl.company_name_bold ? 900 : 400,
+            fontFamily: "'Tajawal', sans-serif",
+            marginBottom: 4,
+          }}>
+            {r('company.name', data, tpl)}
+          </div>
+        )}
+        <div style={{ fontSize: tpl.company_info_size, color: '#555' }}>
+          {tpl.show_address && <div>{r('company.address', data, tpl)}</div>}
+          {tpl.show_phone   && <div>â˜ {r('company.phone', data, tpl)}</div>}
+          {tpl.show_tax_id  && <div>NIF: {r('company.nif', data, tpl)}</div>}
+          {tpl.show_rc      && <div>RC: {r('company.rc', data, tpl)}</div>}
+          {tpl.show_nis     && <div>NIS: {r('company.nis', data, tpl)}</div>}
+          {tpl.show_ice     && <div>ICE: {r('company.ice', data, tpl)}</div>}
+          {tpl.show_article && <div>{r('company.article', data, tpl)}</div>}
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'left', minWidth: isA4 ? 250 : 180 }}>
+        <div style={{
+          fontSize: tpl.title_size + (isA4 ? 4 : 2),
+          fontWeight: tpl.title_bold ? 900 : 400,
+          color: tpl.title_color,
+          marginBottom: isA4 ? 12 : 8,
+          textAlign: 'left',
+        }}>
+          {tpl.title_text}
+        </div>
+        <table style={{ fontSize: tpl.company_info_size, borderCollapse: 'collapse' }}>
+          <tbody>
+            {tpl.show_doc_number && <InfoRow label={isA4 ? 'Ø±Ù‚Ù… Ø§Ù„ÙØ§ØªÙˆØ±Ø©' : 'Ø±Ù‚Ù…'} value={r('document.number', data, tpl) as string} />}
+            {tpl.show_date && <InfoRow label="Ø§Ù„ØªØ§Ø±ÙŠØ®" value={formatDate(r('document.date', data, tpl) as string) + (tpl.show_time && r('document.time', data, tpl) ? ' ' + r('document.time', data, tpl) : '')} />}
+            {tpl.show_due_date && r('document.dueDate', data, tpl) && <InfoRow label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªØ­Ù‚Ø§Ù‚" value={r('document.dueDate', data, tpl) as string} />}
+            {tpl.show_cashier && (r('customer.cashierName', data, tpl)) && (
+              <InfoRow label="Ø§Ù„ÙƒØ§Ø´ÙŠØ±" value={r('customer.cashierName', data, tpl) as string} />
+            )}
+            {tpl.show_session && r('session.code', data, tpl) && <InfoRow label="Ø§Ù„Ø¬Ù„Ø³Ø©" value={r('session.code', data, tpl) as string} />}
+            {tpl.show_payment_term && r('document.dueDate', data, tpl) && <InfoRow label="Ø´Ø±ÙˆØ· Ø§Ù„Ø¯ÙØ¹" value={r('document.dueDate', data, tpl) as string} />}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export function renderHeader(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+  if (isThermal) return renderThermalHeader(tpl, data);
+  return renderPageHeader(tpl, data);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/ItemsSection.tsx
+```
+import type { PrintTemplate, ColumnKey, AlignOption } from '../../types';
+import type { UniversalDocumentData, DocumentLine } from '../../types/data';
+import { getVisibleCols, colWidth, colAlign, colDefaultHeader, borderStyle, align } from './shared';
+import { COLUMN_DEFAULTS } from '../../services/SettingsRegistry';
+import { printFieldResolver } from '../../services';
+
+const COL_WIDTH_DEFAULTS: Partial<Record<ColumnKey, number>> = Object.fromEntries(
+  (Object.keys(COLUMN_DEFAULTS) as ColumnKey[]).map(k => [k, COLUMN_DEFAULTS[k].width]),
+) as Partial<Record<ColumnKey, number>>;
+
+const FIELD_MAP: Record<string, string> = {
+  rowNumber: 'item.index',
+  name:      'item.name',
+  ref:       'item.code',
+  barcode:   'item.barcode',
+  unit:      'item.unit',
+  quantity:  'item.quantity',
+  price:     'item.price',
+  discount:  'item.discount',
+  tva:       'item.tva',
+  total:     'item.total',
+};
+
+function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: number): string {
+  const fieldId = FIELD_MAP[col];
+  if (!fieldId) return '';
+
+  const val = printFieldResolver.resolveItemField(fieldId, line, idx);
+  if (col === 'discount') {
+    const pct = printFieldResolver.resolveItemField('item.discount', line, idx) as number;
+    return pct > 0 ? `${pct}%` : '';
+  }
+  if (col === 'tva') {
+    const pct = printFieldResolver.resolveItemField('item.tvaPct', line, idx) as number;
+    return `${pct}%`;
+  }
+  if (col === 'price') {
+    const display = _tpl.price_display === 'ttc' ? line.unitPriceTtc : line.unitPriceHt;
+    return Number(display).toFixed(2);
+  }
+  if (col === 'total') {
+    const display = _tpl.show_line_total_ttc ? line.totalTtc : line.totalHt;
+    return Number(display).toFixed(2);
+  }
+  return val !== undefined ? String(val) : '';
+}
+
+function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const visibleCols = getVisibleCols(tpl);
+  if (visibleCols.length === 0 || data.lines.length === 0) return null;
+
+  const ff = tpl.items_font_family === 'monospace'
+    ? "'Courier New', monospace"
+    : "'Tajawal', sans-serif";
+
+  const bs = borderStyle(tpl.table_border_style);
+  const border = tpl.table_border_style === 'none' ? 'none' : `1px ${bs} #999`;
+
+  return (
+    <div style={{ fontSize: tpl.items_font_size, fontFamily: ff, marginBottom: 4 }}>
+      {tpl.show_col_header && (
+        <div style={{
+          display: 'flex', gap: 2,
+          fontWeight: tpl.table_header_bold ? 800 : 400,
+          color: tpl.table_header_color,
+          background: tpl.table_header_bg ? '#f0f0f0' : 'transparent',
+          borderBottom: border,
+          paddingBottom: 3, marginBottom: 2,
+        }}>
+          {visibleCols.map(col => (
+            <div key={col} style={{
+              flex: `0 0 ${colWidth(tpl, col, COL_WIDTH_DEFAULTS)}%`,
+              textAlign: align(colAlign(tpl, col)),
+            }}>
+              {tpl.col_headers[col] ?? colDefaultHeader(col)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.lines.map((line, idx) => (
+        <div key={idx} style={{
+          display: 'flex', gap: 2,
+          background: tpl.alternating_rows && idx % 2 === 1 ? tpl.alternating_color : 'transparent',
+          padding: '1px 0',
+          borderBottom: tpl.table_border_style !== 'none' ? `1px ${bs} #eee` : 'none',
+        }}>
+          {visibleCols.map(col => (
+            <div key={col} style={{
+              flex: `0 0 ${colWidth(tpl, col, COL_WIDTH_DEFAULTS)}%`,
+              textAlign: align(colAlign(tpl, col)),
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: col === 'name' ? 'normal' : 'nowrap',
+            }}>
+              {colValue(col, line, tpl, idx)}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const visibleCols = getVisibleCols(tpl);
+  if (visibleCols.length === 0 || data.lines.length === 0) return null;
+
+  const isA4 = tpl.paper_size === 'A4';
+  const cellPad = isA4 ? '10px' : '5px 6px';
+  const totalPct = visibleCols.reduce((s, c) => s + colWidth(tpl, c, COL_WIDTH_DEFAULTS), 0);
+  const scale = totalPct > 0 ? 100 / totalPct : 1;
+
+  return (
+    <div style={{ marginBottom: isA4 ? 20 : 12 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: tpl.items_font_size }}>
+        <thead>
+          <tr style={{
+            background: tpl.table_header_bg ? (tpl.table_header_color || '#111') : '#f5f5f5',
+            borderBottom: isA4 ? '2px solid #111' : '1.5px solid #111',
+          }}>
+            {visibleCols.map(col => (
+              <th key={col} style={{
+                width: `${colWidth(tpl, col, COL_WIDTH_DEFAULTS) * scale}%`,
+                padding: cellPad,
+                textAlign: align(colAlign(tpl, col)),
+                fontWeight: tpl.table_header_bold ? 700 : 600,
+                color: tpl.table_header_bg ? '#fff' : tpl.table_header_color || '#111',
+                fontSize: tpl.items_font_size,
+              }}>
+                {tpl.col_headers[col] ?? colDefaultHeader(col)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.lines.map((line, i) => (
+            <tr key={i} style={{
+              borderBottom: tpl.table_border_style !== 'none'
+                ? `1px ${borderStyle(tpl.table_border_style)} #ddd`
+                : 'none',
+              background: tpl.alternating_rows && i % 2 === 1 ? (tpl.alternating_color || '#fafafa') : 'transparent',
+            }}>
+              {visibleCols.map(col => (
+                <td key={col} style={{
+                  padding: cellPad,
+                  textAlign: align(colAlign(tpl, col)),
+                  fontWeight: col === 'total' ? 700 : 400,
+                  fontSize: tpl.items_font_size,
+                }}>
+                  {colValue(col, line, tpl, i)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function renderItems(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+  if (isThermal) return renderThermalItems(tpl, data);
+  return renderPageItems(tpl, data);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/LogoRenderer.tsx
+```
+import type { PrintTemplate } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+
+function resolveLogoUrl(tpl: PrintTemplate, data: UniversalDocumentData): string | null {
+  if (tpl.logo_source === 'custom') return tpl.custom_logo_url || null;
+  if (tpl.logo_source === 'default') return null;
+  return data.company?.logoUrl || null;
+}
+
+export function renderLogo(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const logoUrl = resolveLogoUrl(tpl, data);
+  const companyName = data.company?.name || '';
+
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: tpl.logo_align === 'right' ? 'flex-start' : tpl.logo_align === 'left' ? 'flex-end' : 'center',
+      marginBottom: 4,
+    }}>
+      {logoUrl ? (
+        <img src={logoUrl} alt="logo"
+          style={{
+            width: tpl.logo_size, height: tpl.logo_size,
+            objectFit: 'contain',
+            borderRadius: `${tpl.logo_border_radius}%`,
+          }}
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+      ) : (
+        <div style={{
+          width: tpl.logo_size, height: tpl.logo_size,
+          background: '#111',
+          borderRadius: `${tpl.logo_border_radius}%`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: tpl.logo_size * 0.35, fontWeight: 900,
+        }}>
+          {companyName.charAt(0)}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/PaymentsSection.tsx
+```
+import type { PrintTemplate } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+import { Separator } from './shared';
+import { printFieldResolver } from '../../services';
+
+function renderThermalPayments(tpl: PrintTemplate, data: UniversalDocumentData) {
+  return (
+    <div style={{ fontSize: tpl.payment_font_size, marginBottom: 4 }}>
+      <Separator style="dashed" />
+      <div style={{ fontWeight: 700, marginBottom: 2 }}>ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹:</div>
+      {data.payments.map((p, i) => (
+        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+          <span>{printFieldResolver.resolveItemField('payment.method', p as any, i)}</span>
+          <span dir="ltr">{Number(printFieldResolver.resolveItemField('payment.amount', p as any, i)).toFixed(2)}</span>
+        </div>
+      ))}
+      <Separator style="dashed" />
+    </div>
+  );
+}
+
+function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const isA4 = tpl.paper_size === 'A4';
+  if (isA4) {
+    return (
+      <div style={{ fontSize: tpl.payment_font_size, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¯ÙØ¹</div>
+        <table style={{ width: 320, borderCollapse: 'collapse', direction: 'ltr' }}>
+          <tbody>
+            {data.payments.map((p, i) => (
+              <tr key={i}>
+                <td style={{ padding: '4px 12px', textAlign: 'right' }}>{printFieldResolver.resolveItemField('payment.method', p as any, i)}</td>
+                <td style={{ padding: '4px 12px', textAlign: 'right' }}>{Number(printFieldResolver.resolveItemField('payment.amount', p as any, i)).toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ fontSize: tpl.payment_font_size, marginBottom: 10 }}>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹:</div>
+      {data.payments.map((p, i) => (
+        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', width: 200 }}>
+          <span>{printFieldResolver.resolveItemField('payment.method', p as any, i)}</span>
+          <span>{Number(printFieldResolver.resolveItemField('payment.amount', p as any, i)).toFixed(2)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function renderPayments(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+  if (!tpl.show_payment_details) return null;
+  if (data.payments.length === 0) return null;
+  if (isThermal) return renderThermalPayments(tpl, data);
+  return renderPagePayments(tpl, data);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/ReportSection.tsx
+```
+import type { PrintTemplate } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+import ChartSection from '../ChartSection';
+
+export function renderReport(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean, width: number) {
+  const r = data.report!;
+
+  return (
+    <div style={{ marginBottom: isThermal ? 4 : 12 }}>
+      {tpl.show_report_header && (
+        <div style={{ marginBottom: isThermal ? 3 : 8 }}>
+          {tpl.report_header_text && (
+            <div style={{
+              fontSize: tpl.title_size, fontWeight: 900,
+              textAlign: 'center', marginBottom: 4,
+            }}>
+              {tpl.report_header_text}
+            </div>
+          )}
+          <div style={{ fontSize: tpl.base_font_size - 0.5, color: '#555', textAlign: 'center' }}>
+            {tpl.show_report_period && r.periodStart && r.periodEnd && (
+              <span>Ù…Ù† {r.periodStart} Ø¥Ù„Ù‰ {r.periodEnd}</span>
+            )}
+            {tpl.show_report_cashier && r.cashierName && (
+              <span style={{ marginRight: 12 }}>Ø§Ù„ÙƒØ§Ø´ÙŠØ±: {r.cashierName}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tpl.show_report_summary_cards && (
+        <div style={{
+          display: 'grid', gridTemplateColumns: isThermal ? '1fr' : 'repeat(3, 1fr)',
+          gap: isThermal ? 4 : 8, marginBottom: isThermal ? 4 : 12,
+        }}>
+          {[
+            { label: 'Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª', val: r.grossSales, color: '#16a34a' },
+            { label: 'Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª',        val: -r.returnsTotal, color: '#dc2626', hide: r.returnsTotal === 0 },
+            { label: 'ØµØ§ÙÙŠ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª',   val: r.netSales, color: '#2563eb' },
+            { label: 'Ø¹Ø¯Ø¯ Ø§Ù„ÙÙˆØ§ØªÙŠØ±',     val: r.invoicesCount, color: '#8b5cf6', isCount: true },
+            { label: 'Ù…ØªÙˆØ³Ø· Ø§Ù„ÙØ§ØªÙˆØ±Ø©',   val: r.avgInvoice, color: '#d97706' },
+            { label: 'Ø£Ø¹Ù„Ù‰ ÙØ§ØªÙˆØ±Ø©',      val: r.highestInvoice, color: '#06b6d4' },
+          ].map(card => {
+            if (card.hide) return null;
+            return (
+              <div key={card.label} style={{
+                padding: isThermal ? '3px 6px' : '10px 14px',
+                borderRadius: 'var(--r2)', border: `1px solid ${card.color}22`,
+                background: `${card.color}08`, textAlign: 'center',
+              }}>
+                <div style={{ fontSize: isThermal ? 9 : 11, color: '#666', marginBottom: 2 }}>{card.label}</div>
+                <div style={{
+                  fontSize: isThermal ? 13 : 18, fontWeight: 900, color: card.color,
+                }}>
+                  {card.isCount ? card.val : `${Number(card.val).toFixed(2)} Ø¯Ø¬`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tpl.show_charts && tpl.show_report_payment_breakdown && (
+        <ChartSection
+          data={data}
+          chartType={tpl.chart_type}
+          title={tpl.chart_title || 'ØªÙˆØ²ÙŠØ¹ ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹'}
+          width={isThermal ? 288 : width - 80}
+        />
+      )}
+
+      {tpl.show_report_top_products && r.topProducts.length > 0 && (
+        <div style={{ marginTop: isThermal ? 4 : 12 }}>
+          <div style={{ fontWeight: 700, fontSize: isThermal ? 11 : 13, marginBottom: 4 }}>
+            {tpl.group_by ? `ØªÙ‚Ø±ÙŠØ± Ø­Ø³Ø¨ ${tpl.group_by}` : 'Ø£ÙØ¶Ù„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ù…Ø¨ÙŠØ¹Ø§Ù‹'}
+          </div>
+          {(() => {
+            const sorted = [...r.topProducts];
+            if (tpl.sort_by === 'quantity') {
+              sorted.sort((a, b) => tpl.sort_direction === 'asc' ? a.quantity - b.quantity : b.quantity - a.quantity);
+            } else if (tpl.sort_by === 'total') {
+              sorted.sort((a, b) => tpl.sort_direction === 'asc' ? a.totalTtc - b.totalTtc : b.totalTtc - a.totalTtc);
+            } else {
+              sorted.sort((a, b) => {
+                const cmp = a.name.localeCompare(b.name);
+                return tpl.sort_direction === 'asc' ? cmp : -cmp;
+              });
+            }
+            return (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: tpl.items_font_size }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #ddd' }}>
+                    {(['product', 'quantity', 'total'] as const).map(col => (
+                      <th key={col} style={{
+                        width: `${tpl.report_col_widths[col] ?? (col === 'product' ? 50 : col === 'quantity' ? 20 : 30)}%`,
+                        textAlign: col === 'product' ? 'right' : 'center',
+                        padding: '4px 6px', fontWeight: 700,
+                      }}>
+                        {tpl.report_col_headers[col] || (col === 'product' ? 'Ø§Ù„Ù…Ù†ØªØ¬' : col === 'quantity' ? 'Ø§Ù„ÙƒÙ…ÙŠØ©' : 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ')}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((p, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                      {(['product', 'quantity', 'total'] as const).map(col => (
+                        <td key={col} style={{
+                          width: `${tpl.report_col_widths[col] ?? (col === 'product' ? 50 : col === 'quantity' ? 20 : 30)}%`,
+                          textAlign: col === 'product' ? 'right' : 'center',
+                          padding: '3px 6px',
+                        }}>
+                          {col === 'product' ? p.name : col === 'quantity' ? p.quantity : Number(p.totalTtc).toFixed(2)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()}
+        </div>
+      )}
+
+      {tpl.show_report_footer && tpl.report_footer_text && (
+        <div style={{
+          marginTop: isThermal ? 4 : 12,
+          fontSize: tpl.base_font_size - 1,
+          textAlign: 'center',
+          color: '#666',
+          borderTop: '1px solid #ddd',
+          paddingTop: 6,
+        }}>
+          {tpl.report_footer_text}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/shared.tsx
+```
+import React from 'react';
+import type { DocumentLine } from '../../types/data';
+import type {
+  PrintTemplate,
+  ColumnKey,
+  AlignOption,
+  BorderStyle,
+  FontFamily,
+} from '../../types';
+
+export function formatDate(iso: string): string {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
+// â”€â”€â”€ Styling helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function mm(v: number): number {
+  return v * 3.78;
+}
+
+export function align(a: AlignOption): React.CSSProperties['textAlign'] {
+  return a === 'right' ? 'right' : a === 'left' ? 'left' : 'center';
+}
+
+export function fontFamily(f: FontFamily): string {
+  switch (f) {
+    case 'monospace': return "'Courier New', monospace";
+    case 'times':     return "'Times New Roman', serif";
+    case 'arial':     return "Arial, sans-serif";
+    default:          return "'Tajawal', sans-serif";
+  }
+}
+
+import { COLUMN_DEFAULTS } from '../../services/SettingsRegistry';
+
+export function colDefaultHeader(col: ColumnKey): string {
+  return COLUMN_DEFAULTS[col]?.header ?? col;
+}
+
+export function borderStyle(s: BorderStyle): string {
+  switch (s) {
+    case 'solid':  return 'solid';
+    case 'dashed': return 'dashed';
+    case 'double': return 'double';
+    default:       return 'none';
+  }
+}
+
+const BORDER_MAP: Record<BorderStyle, string> = {
+  solid:  'solid',
+  dashed: 'dashed',
+  double: 'double',
+  none:   'none',
+};
+
+export function Separator({ style }: { style: BorderStyle }): JSX.Element {
+  if (style === 'none') return <div />;
+  const thickness = style === 'double' ? 3 : 1;
+  return <div style={{ borderBottom: `${thickness}px ${BORDER_MAP[style]} #999`, margin: '4px 0' }} />;
+}
+
+export const MemoizedSeparator = React.memo(Separator);
+
+// â”€â”€â”€ Data extraction helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function getVisibleCols(tpl: PrintTemplate): ColumnKey[] {
+  return tpl.col_order.filter(k => tpl.col_show[k] !== false);
+}
+
+export function colWidth(
+  tpl: PrintTemplate,
+  col: ColumnKey,
+  defaults?: Partial<Record<ColumnKey, number>>,
+): number {
+  return tpl.col_widths[col] ?? defaults?.[col] ?? COLUMN_DEFAULTS[col]?.width ?? 20;
+}
+
+export function colAlign(tpl: PrintTemplate, col: ColumnKey): AlignOption {
+  return tpl.col_aligns[col] ?? COLUMN_DEFAULTS[col]?.align ?? 'right';
+}
+
+export interface CompanyData {
+  name:    string;
+  address: string;
+  phone:   string;
+  nif:     string;
+  rc:      string;
+  nis:     string;
+  ice:     string;
+  article: string;
+  logoUrl?: string | null;
+}
+
+export function getCompany(
+  tpl: PrintTemplate,
+  api?: CompanyData | null,
+): CompanyData {
+  let logoUrl: string | null = null;
+  if (tpl.logo_source === 'custom') {
+    logoUrl = tpl.custom_logo_url ?? null;
+  } else if (tpl.logo_source === 'company') {
+    logoUrl = api?.logoUrl ?? null;
+  }
+  // 'default' â†’ null â†’ initial letter fallback in renderLogo
+
+  return {
+    name:    tpl.company_name_text || api?.name    || '',
+    address: tpl.override_address  || api?.address  || '',
+    phone:   tpl.override_phone    || api?.phone   || '',
+    nif:     tpl.override_nif      || api?.nif     || '',
+    rc:      tpl.override_rc       || api?.rc      || '',
+    nis:     tpl.override_nis      || api?.nis     || '',
+    ice:     tpl.override_ice      || api?.ice     || '',
+    article: tpl.override_article  || api?.article || '',
+    logoUrl,
+  };
+}
+
+export function buildTvaByRate(
+  lines: DocumentLine[],
+): Array<{ rate: number; base: number; amount: number }> {
+  const map = new Map<number, { base: number; amount: number }>();
+  for (const line of lines) {
+    const pct = line.tvaPct;
+    const prev = map.get(pct) ?? { base: 0, amount: 0 };
+    map.set(pct, {
+      base:   prev.base   + line.totalHt,
+      amount: prev.amount + line.totalTva,
+    });
+  }
+  return Array.from(map.entries()).map(([rate, v]) => ({ rate, ...v }));
+}
+
+// â”€â”€â”€ Simple presentational components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+interface DocRowProps {
+  label: string;
+  value: string;
+  mono?: boolean;
+}
+
+function DocRowFn({ label, value, mono }: DocRowProps): JSX.Element {
+  return (
+    <div style={{ display: 'flex', gap: 4, marginBottom: 2 }}>
+      <span style={{ fontWeight: 700, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontFamily: mono ? "'Courier New', monospace" : undefined }}>{value}</span>
+    </div>
+  );
+}
+
+export const DocRow = React.memo(DocRowFn);
+
+interface TotalRowProps {
+  label: string;
+  val: string;
+  red?: boolean;
+  bold?: boolean;
+}
+
+function TotalRowFn({ label, val, red, bold }: TotalRowProps): JSX.Element {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', marginBottom: 2,
+      fontWeight: bold ? 800 : 'inherit',
+      color: red ? '#c00' : 'inherit',
+    }}>
+      <span>{label}</span>
+      <span dir="ltr">{val}</span>
+    </div>
+  );
+}
+
+export const TotalRow = React.memo(TotalRowFn);
+
+interface InfoRowProps {
+  label: string;
+  value: string;
+}
+
+function InfoRowFn({ label, value }: InfoRowProps): JSX.Element {
+  return (
+    <tr>
+      <td style={{ color: '#555', padding: '2px 0', whiteSpace: 'nowrap', fontWeight: 600 }}>
+        {label}:
+      </td>
+      <td style={{ padding: '2px 0', paddingRight: 12 }}>
+        {value}
+      </td>
+    </tr>
+  );
+}
+
+export const InfoRow = React.memo(InfoRowFn);
+
+// â”€â”€â”€ SectionWrap â€” applies highlight styling from rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function SectionWrap({ highlight, children }: {
+  highlight: Record<string, string> | null;
+  children: React.ReactNode;
+}) {
+  if (!highlight) return <>{children}</>;
+  return <div style={highlight}>{children}</div>;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/TotalsSection.tsx
+```
+import type { PrintTemplate } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+import { TotalRow, borderStyle } from './shared';
+import { printFieldResolver } from '../../services';
+
+function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
+  return printFieldResolver.resolve(fieldId, data, tpl);
+}
+
+function PageTotalRow({ label, val, red, bold }: { label: string; val: number; red?: boolean; bold?: boolean }) {
+  return (
+    <tr>
+      <td style={{
+        padding: '5px 12px',
+        textAlign: 'right',
+        fontWeight: bold ? 800 : 400,
+        color: red ? '#c00' : 'inherit',
+      }}>
+        {label}
+      </td>
+      <td style={{
+        padding: '5px 12px',
+        textAlign: 'right',
+        fontWeight: bold ? 800 : 400,
+        color: red ? '#c00' : 'inherit',
+      }}>
+        {Number(val).toFixed(2)}
+      </td>
+    </tr>
+  );
+}
+
+function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const fs = tpl.totals_font_size;
+  const totalTtc = r('totals.ttc', data, tpl) as number;
+  const totalDiscount = r('totals.discount', data, tpl) as number;
+  const taxBreakdown = data.taxBreakdown;
+
+  return (
+    <div style={{
+      fontSize: fs,
+      fontWeight: tpl.totals_bold ? 700 : 400,
+      textAlign: tpl.totals_align === 'left' ? 'left' : tpl.totals_align === 'center' ? 'center' : 'right',
+      marginBottom: 4,
+    }}>
+      {tpl.show_total_ht      && <TotalRow label="Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ HT"        val={r('totals.ht', data, tpl) as number} />}
+      {tpl.show_discount_total && totalDiscount > 0 && (
+        <TotalRow label="Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø®ØµÙˆÙ…Ø§Øª" val={-totalDiscount} red />
+      )}
+      {tpl.show_total_tva     && <TotalRow label="TVA"               val={r('totals.tva', data, tpl) as number} />}
+      {tpl.show_tva_breakdown && taxBreakdown.map(rr => (
+        <TotalRow key={rr.rate} label={`  TVA ${rr.rate}%`} val={rr.tva} />
+      ))}
+      {tpl.show_fiscal_stamp  && (r('totals.fiscalStamp', data, tpl) as number) > 0 && (
+        <TotalRow label="Ø§Ù„Ø·Ø§Ø¨Ø¹ Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ" val={r('totals.fiscalStamp', data, tpl) as number} />
+      )}
+
+      {tpl.show_total_ttc && (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          border: tpl.total_border_style === 'none'
+            ? 'none'
+            : `2px ${borderStyle(tpl.total_border_style)} #111`,
+          padding: '3px 5px', margin: '5px 0',
+          fontWeight: tpl.total_ttc_bold ? 900 : 700,
+          fontSize: tpl.total_ttc_font_size,
+          color: tpl.total_ttc_color,
+          fontFamily: "'Tajawal', sans-serif",
+        }}>
+          <span>Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ TTC:</span>
+          <span dir="ltr">{Number(totalTtc).toFixed(2)} Ø¯Ø¬</span>
+        </div>
+      )}
+
+      {tpl.show_amount_in_words && r('totals.amountInWords', data, tpl) && (
+        <div style={{ fontSize: fs - 1, textAlign: 'center', color: '#555', marginTop: 2 }}>
+          <em>ÙÙ‚Ø·: {r('totals.amountInWords', data, tpl)} Ø¯ÙŠÙ†Ø§Ø±Ø§Ù‹ Ø¬Ø²Ø§Ø¦Ø±ÙŠØ§Ù‹</em>
+        </div>
+      )}
+
+      {tpl.show_paid_amount   && <TotalRow label="Ø§Ù„Ù…Ø¯ÙÙˆØ¹"        val={r('totals.paid', data, tpl) as number} bold />}
+      {tpl.show_change        && <TotalRow label="Ø§Ù„Ø¨Ø§Ù‚ÙŠ"         val={r('totals.change', data, tpl) as number} />}
+      {tpl.show_remaining     && (r('totals.remaining', data, tpl) as number) > 0 && <TotalRow label="Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ"  val={r('totals.remaining', data, tpl) as number} red />}
+      {tpl.show_prev_balance  && data.balance && <TotalRow label="Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø³Ø§Ø¨Ù‚"  val={r('balance.previous', data, tpl) as number} />}
+      {tpl.show_new_balance   && data.balance && <TotalRow label="Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¬Ø¯ÙŠØ¯"  val={r('balance.current', data, tpl) as number} bold />}
+    </div>
+  );
+}
+
+function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const isA4 = tpl.paper_size === 'A4';
+  const tblW = isA4 ? 320 : 260;
+  const totalTtc = r('totals.ttc', data, tpl) as number;
+  const totalDiscount = r('totals.discount', data, tpl) as number;
+  const taxBreakdown = data.taxBreakdown;
+
+  const borderTop = tpl.total_border_style === 'none'
+    ? 'none'
+    : `${isA4 ? '3px' : '2px'} ${borderStyle(tpl.total_border_style)} #111`;
+
+  const totalsJustify = tpl.totals_align === 'left' ? 'flex-start' : tpl.totals_align === 'center' ? 'center' : 'flex-end';
+
+  return (
+    <div style={{
+      display: 'flex', justifyContent: totalsJustify,
+      fontSize: tpl.totals_font_size,
+      fontWeight: tpl.totals_bold ? 700 : 400,
+      marginBottom: isA4 ? 24 : 12,
+      direction: 'ltr',
+    }}>
+      <table style={{ width: tblW, borderCollapse: 'collapse' }}>
+        <tbody>
+          {tpl.show_total_ht      && <PageTotalRow label="Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ HT"      val={r('totals.ht', data, tpl) as number} />}
+          {tpl.show_discount_total && totalDiscount > 0 && <PageTotalRow label="Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø®ØµÙˆÙ…Ø§Øª" val={-totalDiscount} red />}
+          {tpl.show_total_tva     && <PageTotalRow label="TVA"             val={r('totals.tva', data, tpl) as number} />}
+          {tpl.show_tva_breakdown && taxBreakdown.map(rr => (
+            <PageTotalRow key={rr.rate} label={`  TVA ${rr.rate}%`} val={rr.tva} />
+          ))}
+          {tpl.show_fiscal_stamp  && (r('totals.fiscalStamp', data, tpl) as number) > 0 && <PageTotalRow label="Ø§Ù„Ø·Ø§Ø¨Ø¹ Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ" val={r('totals.fiscalStamp', data, tpl) as number} />}
+
+          {tpl.show_total_ttc && (
+            <tr>
+              <td style={{
+                padding: isA4 ? '10px 12px' : '6px 8px',
+                borderTop: borderTop,
+                fontWeight: tpl.total_ttc_bold ? 900 : 700,
+                fontSize: tpl.total_ttc_font_size,
+                textAlign: 'right',
+                color: tpl.total_ttc_color,
+              }}>
+                Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ TTC:
+              </td>
+              <td style={{
+                padding: isA4 ? '10px 12px' : '6px 8px',
+                borderTop: borderTop,
+                fontWeight: tpl.total_ttc_bold ? 900 : 700,
+                fontSize: tpl.total_ttc_font_size,
+                textAlign: 'right',
+                color: tpl.total_ttc_color,
+              }}>
+                {Number(totalTtc).toFixed(2)}
+              </td>
+            </tr>
+          )}
+
+          {tpl.show_paid_amount  && <PageTotalRow label="Ø§Ù„Ù…Ø¯ÙÙˆØ¹"       val={r('totals.paid', data, tpl) as number} bold />}
+          {tpl.show_change       && <PageTotalRow label="Ø§Ù„Ø¨Ø§Ù‚ÙŠ"        val={r('totals.change', data, tpl) as number} />}
+          {tpl.show_remaining    && (r('totals.remaining', data, tpl) as number) > 0 && <PageTotalRow label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ" val={r('totals.remaining', data, tpl) as number} red />}
+          {tpl.show_prev_balance && data.balance && <PageTotalRow label="Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø³Ø§Ø¨Ù‚" val={r('balance.previous', data, tpl) as number} />}
+          {tpl.show_new_balance  && data.balance && <PageTotalRow label="Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¬Ø¯ÙŠØ¯" val={r('balance.current', data, tpl) as number} bold />}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function renderTotals(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+  if (isThermal) return renderThermalTotals(tpl, data);
+  return renderPageTotals(tpl, data);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/preview/UniversalPreview.tsx
+```
+import React, { useMemo, useEffect } from 'react';
+import type { UniversalDocumentData } from '../../types/data';
+import type { PrintTemplate } from '../../types';
+import {
+  mm, fontFamily, SectionWrap,
+} from './shared';
+import { renderHeader } from './HeaderSection';
+import { renderDocInfo } from './DocInfoSection';
+import { renderItems } from './ItemsSection';
+import { renderTotals } from './TotalsSection';
+import { renderPayments } from './PaymentsSection';
+import { renderFooter } from './FooterSection';
+import { renderReport } from './ReportSection';
+import { rulesEngine } from '../../services/engines/RulesEngine';
+import { formulaEngine, type EvaluationContext, type ExpressionValue } from '../../services/engines/FormulaEngine';
+import { calculatedFieldService } from '../../services/CalculatedFieldService';
+
+export interface UniversalPreviewProps {
+  tpl:      PrintTemplate;
+  data:     UniversalDocumentData;
+}
+
+function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
+  const t = data.totals;
+  const computed: Record<string, ExpressionValue> = {
+    totalHt:      t.totalHt,
+    totalTva:     t.totalTva,
+    totalTtc:     t.totalTtc,
+    totalDiscount: t.totalDiscount,
+    fiscalStamp:  t.fiscalStamp,
+    paid:         t.paid,
+    change:       t.change,
+    remaining:    t.remaining,
+    lineCount:    data.lines.length,
+    itemCount:    data.lines.reduce((s, l) => s + (l.quantity || 0), 0),
+    prevBalance:  data.balance?.previous ?? 0,
+    newBalance:   data.balance?.current ?? 0,
+    docNumber:    data.doc.number,
+    docDate:      data.doc.date,
+  };
+  const calcFields = calculatedFieldService.computeAll(data);
+  Object.assign(computed, calcFields);
+  return { data, computed };
+}
+
+function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
+  useEffect(() => { formulaEngine.clearCache(); }, [data]);
+
+  const isThermal   = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
+  const isA4        = tpl.paper_size === 'A4';
+  const isA5        = tpl.paper_size === 'A5';
+  const isLandscape = !isThermal && tpl.page_orientation === 'landscape';
+
+  const portraitW = isA4 ? 794 : 559;
+  const portraitH = isA4 ? 1123 : 794;
+  const paperWidth   = isThermal ? tpl.paper_width_mm * 3.78 : (isLandscape ? portraitH : portraitW);
+  const minHeight    = isThermal ? 'auto' : (isLandscape ? portraitW : portraitH);
+
+  const ruleResult = useMemo(() => {
+    if (!tpl.rules || tpl.rules.length === 0) return null;
+    try {
+      const ctx = buildEvalContext(data);
+      return rulesEngine.evaluate(tpl.rules, ctx, formulaEngine);
+    } catch {
+      return null;
+    }
+  }, [tpl.rules, data]);
+
+  const sectionVisible = (section: string): boolean => {
+    if (ruleResult && ruleResult.visibility[section] === false) return false;
+    return true;
+  };
+
+  const sectionHighlight = (section: string): Record<string, string> | null => {
+    if (ruleResult && ruleResult.highlights[section]) return ruleResult.highlights[section];
+    return null;
+  };
+
+  const paddingTop   = isThermal ? mm(tpl.margin_top) : (isA4 ? 40 : 20);
+  const paddingSide  = isThermal ? mm(tpl.margin_sides) : (isA4 ? 50 : 24);
+  const paddingBottom = isThermal ? mm(tpl.margin_bottom) : (isA4 ? 40 : 20);
+
+  return (
+    <div style={{
+      width: paperWidth,
+      direction: 'rtl',
+      fontFamily: fontFamily(tpl.font_family),
+      fontSize: tpl.base_font_size,
+      lineHeight: tpl.line_spacing,
+      padding: `${paddingTop}px ${paddingSide}px ${paddingBottom}px`,
+      background: '#fff',
+      color: '#111',
+      margin: '0 auto',
+      minHeight,
+      boxSizing: 'border-box',
+    }}>
+      {tpl.show_header_section && sectionVisible('header') && (
+        <SectionWrap highlight={sectionHighlight('header')}>
+          {renderHeader(tpl, data, isThermal)}
+        </SectionWrap>
+      )}
+      {tpl.show_doc_info_section && sectionVisible('doc-info') && (
+        <SectionWrap highlight={sectionHighlight('doc-info')}>
+          {renderDocInfo(tpl, data, isThermal)}
+        </SectionWrap>
+      )}
+      {tpl.show_items_section && sectionVisible('items') && (
+        <SectionWrap highlight={sectionHighlight('items')}>
+          {renderItems(tpl, data, isThermal)}
+        </SectionWrap>
+      )}
+      {data.report && renderReport(tpl, data, isThermal, paperWidth)}
+      {tpl.show_totals_section && sectionVisible('totals') && (
+        <SectionWrap highlight={sectionHighlight('totals')}>
+          {renderTotals(tpl, data, isThermal)}
+        </SectionWrap>
+      )}
+      {tpl.show_payments_section && sectionVisible('payments') && (
+        <SectionWrap highlight={sectionHighlight('payments')}>
+          {renderPayments(tpl, data, isThermal)}
+        </SectionWrap>
+      )}
+      {tpl.show_footer_section && sectionVisible('footer') && (
+        <SectionWrap highlight={sectionHighlight('footer')}>
+          {renderFooter(tpl, data, isThermal)}
+        </SectionWrap>
+      )}
+    </div>
+  );
+}
+
+export default React.memo(UniversalPreview);
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/PreviewSelector.tsx
+```
+import React, { Suspense } from 'react';
+import type { PrintTemplate, CompanyData } from '../types';
+import type { UniversalDocumentData } from '../types/data';
+
+const UniversalPreview = React.lazy(() => import('./preview/UniversalPreview'));
+
+const FALLBACK = (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    height: 400, color: '#999', fontSize: 14, fontFamily: 'sans-serif',
+    border: '1px dashed #ddd', borderRadius: 8, margin: 16,
+  }}>
+    Loading previewâ€¦
+  </div>
+);
+
+interface Props {
+  tpl:   PrintTemplate;
+  company?: CompanyData | null;
+  data?:    UniversalDocumentData | null;
+}
+
+export default function PreviewSelector({ tpl, company, data }: Props) {
+  return (
+    <Suspense fallback={FALLBACK}>
+      <UniversalPreview tpl={tpl} data={data ?? null} company={company ?? null} />
+    </Suspense>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/QuickNav.tsx
+```
+import React, { useState, useEffect } from 'react';
+
+const NAV_SECTIONS = [
+  { id: 's-header', label: 'Ø§Ù„Ø´Ø¹Ø§Ø±'    },
+  { id: 's-doc',    label: 'Ø§Ù„Ù…Ø³ØªÙ†Ø¯'   },
+  { id: 's-items',  label: 'Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª'  },
+  { id: 's-totals', label: 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ'  },
+  { id: 's-footer', label: 'Ø§Ù„ØªØ°ÙŠÙŠÙ„'   },
+  { id: 's-format', label: 'Ø§Ù„ØªÙ†Ø³ÙŠÙ‚'   },
+  { id: 's-rules',  label: 'Ø§Ù„Ù‚ÙˆØ§Ø¹Ø¯'   },
+  { id: 's-report', label: 'Ø§Ù„ØªÙ‚Ø±ÙŠØ±'   },
+];
+
+export function QuickNav({ controlsRef }: { controlsRef: React.RefObject<HTMLDivElement> }) {
+  const [active, setActive] = useState('s-header');
+
+  useEffect(() => {
+    const container = controlsRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) setActive(entry.target.id);
+        });
+      },
+      { root: container, threshold: 0.3 },
+    );
+
+    NAV_SECTIONS.forEach(s => {
+      const el = container.querySelector(`#${s.id}`);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [controlsRef]);
+
+  return (
+    <div style={{
+      display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8,
+      padding: '6px 8px', background: 'var(--bg3)', borderRadius: 'var(--r2)',
+      border: '1px solid var(--b2)',
+    }}>
+      {NAV_SECTIONS.map(s => (
+        <button
+          key={s.id} type="button"
+          onClick={() => {
+            const el = controlsRef.current?.querySelector(`#${s.id}`);
+            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+          style={{
+            padding: '3px 8px', borderRadius: 5, fontSize: 11,
+            fontFamily: 'Tajawal, sans-serif', fontWeight: 700,
+            border: `1px solid ${active === s.id ? 'var(--em)' : 'var(--b2)'}`,
+            background: active === s.id ? 'var(--emb)' : 'transparent',
+            color: active === s.id ? 'var(--em)' : 'var(--t4)',
+            cursor: 'pointer', transition: 'all .12s',
+          }}
+        >
+          {s.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/RulesSection.tsx
+```
+import React, { useState, useCallback } from 'react';
+import type { PrintTemplate, ReportRule } from '../types';
+import FormulaEditor from './FormulaEditor';
+
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+interface RulesSectionProps {
+  tpl: PrintTemplate;
+  update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
+}
+
+type RuleAction = ReportRule['action'];
+
+const ACTIONS: { value: RuleAction; label: string }[] = [
+  { value: 'show',       label: 'Ø¥Ø¸Ù‡Ø§Ø±'     },
+  { value: 'hide',       label: 'Ø¥Ø®ÙØ§Ø¡'     },
+  { value: 'highlight',  label: 'ØªÙ…ÙŠÙŠØ²'     },
+  { value: 'disable',    label: 'ØªØ¹Ø·ÙŠÙ„'     },
+];
+
+const SECTION_TARGETS: { value: string; label: string }[] = [
+  { value: 'header',    label: 'Ø±Ø£Ø³ Ø§Ù„ÙØ§ØªÙˆØ±Ø©'    },
+  { value: 'doc-info',  label: 'Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ù…Ø³ØªÙ†Ø¯'  },
+  { value: 'items',     label: 'Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª'    },
+  { value: 'totals',    label: 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª'       },
+  { value: 'payments',  label: 'ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹'      },
+  { value: 'footer',    label: 'Ø§Ù„ØªØ°ÙŠÙŠÙ„'          },
+];
+
+const SECTION_KEYS: { key: keyof PrintTemplate; label: string }[] = [
+  { key: 'show_header_section',   label: 'Ø±Ø£Ø³ Ø§Ù„ÙØ§ØªÙˆØ±Ø©'    },
+  { key: 'show_doc_info_section', label: 'Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ù…Ø³ØªÙ†Ø¯'  },
+  { key: 'show_items_section',    label: 'Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª'    },
+  { key: 'show_totals_section',   label: 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª'       },
+  { key: 'show_payments_section', label: 'ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹'      },
+  { key: 'show_footer_section',   label: 'Ø§Ù„ØªØ°ÙŠÙŠÙ„'          },
+];
+
+const LABEL_MAP: Record<string, string> = {
+  header:    'Ø±Ø£Ø³ Ø§Ù„ÙØ§ØªÙˆØ±Ø©',
+  'doc-info':'Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ù…Ø³ØªÙ†Ø¯',
+  items:     'Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª',
+  totals:    'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª',
+  payments:  'ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹',
+  footer:    'Ø§Ù„ØªØ°ÙŠÙŠÙ„',
+};
+
+const STYLES = {
+  row: {
+    display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0',
+  } as React.CSSProperties,
+  badge: {
+    fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
+    background: 'var(--emb)', color: 'var(--em)',
+  } as React.CSSProperties,
+  ruleCard: {
+    border: '1px solid var(--b2)', borderRadius: 'var(--r1)',
+    padding: 8, marginBottom: 6, background: 'var(--bg3)',
+  } as React.CSSProperties,
+  label: {
+    fontSize: 11, fontWeight: 700, color: 'var(--t3)', display: 'block', marginBottom: 2,
+  } as React.CSSProperties,
+  input: {
+    width: '100%', padding: '4px 6px', borderRadius: 'var(--r1)',
+    border: '1px solid var(--b2)', background: 'var(--bg)',
+    fontSize: 12, color: 'var(--t1)', outline: 'none', boxSizing: 'border-box' as const,
+  },
+  select: {
+    width: '100%', padding: '4px 6px', borderRadius: 'var(--r1)',
+    border: '1px solid var(--b2)', background: 'var(--bg)',
+    fontSize: 12, color: 'var(--t1)', outline: 'none',
+  },
+  btn: {
+    padding: '4px 10px', borderRadius: 'var(--r1)', border: 'none',
+    cursor: 'pointer', fontSize: 12, fontWeight: 700,
+  },
+};
+
+function genId(): string {
+  return `rule_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export default function RulesSection({ tpl, update }: RulesSectionProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const handleAddRule = useCallback(() => {
+    const newRule: ReportRule = {
+      id: genId(),
+      condition: '',
+      action: 'hide',
+      target: 'items',
+      priority: 0,
+    };
+    update('rules', [...(tpl.rules || []), newRule]);
+    setEditingId(newRule.id);
+  }, [tpl.rules, update]);
+
+  const handleDeleteRule = useCallback((id: string) => {
+    update('rules', (tpl.rules || []).filter(r => r.id !== id));
+    if (editingId === id) setEditingId(null);
+  }, [tpl.rules, update, editingId]);
+
+  const handleUpdateRule = useCallback((id: string, patch: Partial<ReportRule>) => {
+    update('rules', (tpl.rules || []).map(r => r.id === id ? { ...r, ...patch } : r));
+  }, [tpl.rules, update]);
+
+  const handleToggleSection = useCallback((key: keyof PrintTemplate) => {
+    update(key, !tpl[key] as never);
+  }, [tpl, update]);
+
+  return (
+    <div>
+      {/* â”€â”€ Section visibility toggles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--em)', marginBottom: 6 }}>
+        Ø¥Ø¸Ù‡Ø§Ø±/Ø¥Ø®ÙØ§Ø¡ ÙƒÙ„ Ù‚Ø³Ù… ÙŠØ¯ÙˆÙŠØ§Ù‹
+      </div>
+      {SECTION_KEYS.map(sk => (
+        <label key={sk.key} style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '3px 0', cursor: 'pointer', userSelect: 'none',
+        }}>
+          <div
+            onClick={() => handleToggleSection(sk.key)}
+            style={{
+              width: 32, height: 17, borderRadius: 9, flexShrink: 0,
+              background: tpl[sk.key] ? 'var(--em)' : 'var(--bg5)',
+              border: '1px solid ' + (tpl[sk.key] ? 'var(--embo)' : 'var(--b3)'),
+              position: 'relative', cursor: 'pointer',
+              transition: 'background .16s, border-color .16s',
+            }}
+          >
+            <div style={{
+              position: 'absolute', top: 2, width: 11, height: 11,
+              borderRadius: '50%', background: '#fff',
+              boxShadow: '0 1px 3px rgba(0,0,0,.25)',
+              left: tpl[sk.key] ? 15 : 2, transition: 'left .16s',
+            }} />
+          </div>
+          <span style={{ fontSize: 12.5, color: 'var(--t2)', fontWeight: 500 }}>{sk.label}</span>
+        </label>
+      ))}
+
+      <hr style={{ border: 'none', borderTop: '1px solid var(--b2)', margin: '8px 0' }} />
+
+      {/* â”€â”€ Rules list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--em)', marginBottom: 6 }}>
+        Ù‚ÙˆØ§Ø¹Ø¯ Ø§Ù„Ø´Ø±Ø· (Ø¥Ø°Ø§ ØªØ­Ù‚Ù‚ Ø§Ù„Ø´Ø±Ø· â†’ Ù†ÙÙ‘Ø° Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡)
+      </div>
+
+      {(tpl.rules || []).length === 0 && (
+        <div style={{ fontSize: 11.5, color: 'var(--t4)', padding: '8px 0', textAlign: 'center' }}>
+          Ù„Ø§ ØªÙˆØ¬Ø¯ Ù‚ÙˆØ§Ø¹Ø¯ Ø¨Ø¹Ø¯. Ø£Ø¶Ù Ù‚Ø§Ø¹Ø¯Ø© Ù„Ø¨Ø¯Ø¡ Ø§Ù„ØªØ­ÙƒÙ… Ø§Ù„Ø´Ø±Ø·ÙŠ ÙÙŠ Ø§Ù„Ø£Ù‚Ø³Ø§Ù….
+        </div>
+      )}
+
+      {(tpl.rules || []).map(rule => (
+        <RuleCard
+          key={rule.id}
+          rule={rule}
+          editing={editingId === rule.id}
+          onEdit={() => setEditingId(editingId === rule.id ? null : rule.id)}
+          onDelete={() => handleDeleteRule(rule.id)}
+          onUpdate={patch => handleUpdateRule(rule.id, patch)}
+        />
+      ))}
+
+      <button
+        type="button" onClick={handleAddRule}
+        style={{
+          ...STYLES.btn, background: 'var(--em)', color: '#fff',
+          width: '100%', marginTop: 4,
+        }}
+      >
+        + Ø¥Ø¶Ø§ÙØ© Ù‚Ø§Ø¹Ø¯Ø© Ø¬Ø¯ÙŠØ¯Ø©
+      </button>
+    </div>
+  );
+}
+
+// â”€â”€â”€ RuleCard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function RuleCard({
+  rule, editing, onEdit, onDelete, onUpdate,
+}: {
+  rule: ReportRule;
+  editing: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onUpdate: (patch: Partial<ReportRule>) => void;
+}) {
+  if (editing) {
+    return (
+      <div style={STYLES.ruleCard}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={STYLES.badge}>{LABEL_MAP[rule.target] || rule.target}</span>
+          <button type="button" onClick={onEdit}
+            style={{ ...STYLES.btn, background: 'var(--bg5)', color: 'var(--t2)', fontSize: 11 }}>
+            Ø¥ØºÙ„Ø§Ù‚
+          </button>
+        </div>
+
+        {/* Condition */}
+        <FormulaEditor
+          value={rule.condition}
+          onChange={v => onUpdate({ condition: v })}
+          label="Ø§Ù„Ø´Ø±Ø· (ØµÙŠØºØ©)"
+          placeholder="Ù…Ø«Ø§Ù„: total > 1000"
+          showFieldPicker
+        />
+
+        {/* Action + Target row */}
+        <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+          <div style={{ flex: 1 }}>
+            <span style={STYLES.label}>Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡</span>
+            <select value={rule.action} onChange={e => onUpdate({ action: e.target.value as RuleAction })} style={STYLES.select}>
+              {ACTIONS.map(a => (
+                <option key={a.value} value={a.value}>{a.label}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <span style={STYLES.label}>Ø§Ù„Ù‡Ø¯Ù</span>
+            <select value={rule.target} onChange={e => onUpdate({ target: e.target.value })} style={STYLES.select}>
+              {SECTION_TARGETS.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ width: 60 }}>
+            <span style={STYLES.label}>Ø§Ù„Ø£ÙˆÙ„ÙˆÙŠØ©</span>
+            <input
+              type="number" value={rule.priority ?? 0}
+              onChange={e => onUpdate({ priority: parseInt(e.target.value) || 0 })}
+              style={STYLES.input}
+            />
+          </div>
+        </div>
+
+        {/* Highlight style (only when action = highlight) */}
+        {rule.action === 'highlight' && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+            <div style={{ flex: 1 }}>
+              <span style={STYLES.label}>Ù„ÙˆÙ† Ø§Ù„Ø®Ù„ÙÙŠØ©</span>
+              <input
+                type="color" value={rule.highlightStyle?.background || '#fff3cd'}
+                onChange={e => onUpdate({
+                  highlightStyle: { ...(rule.highlightStyle || {}), background: e.target.value }
+                })}
+                style={{ ...STYLES.input, padding: 2, height: 28 }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <span style={STYLES.label}>Ù„ÙˆÙ† Ø§Ù„Ù†Øµ</span>
+              <input
+                type="color" value={rule.highlightStyle?.color || '#111'}
+                onChange={e => onUpdate({
+                  highlightStyle: { ...(rule.highlightStyle || {}), color: e.target.value }
+                })}
+                style={{ ...STYLES.input, padding: 2, height: 28 }}
+              />
+            </div>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end' }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                cursor: 'pointer', fontSize: 11, color: 'var(--t3)', paddingBottom: 4,
+              }}>
+                <input
+                  type="checkbox"
+                  checked={rule.highlightStyle?.fontWeight === 'bold' || rule.highlightStyle?.fontWeight === '700'}
+                  onChange={e => onUpdate({
+                    highlightStyle: {
+                      ...(rule.highlightStyle || {}),
+                      fontWeight: e.target.checked ? 'bold' : 'normal',
+                    }
+                  })}
+                />
+                Ø¹Ø±ÙŠØ¶
+              </label>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Collapsed view
+  const actionLabels: Record<string, string> = {
+    show: 'Ø¥Ø¸Ù‡Ø§Ø±', hide: 'Ø¥Ø®ÙØ§Ø¡', highlight: 'ØªÙ…ÙŠÙŠØ²', disable: 'ØªØ¹Ø·ÙŠÙ„',
+  };
+  const actionColors: Record<string, string> = {
+    show: '#16a34a', hide: '#dc2626', highlight: '#d97706', disable: '#6b7280',
+  };
+
+  return (
+    <div style={{
+      ...STYLES.ruleCard, cursor: 'pointer',
+      display: 'flex', alignItems: 'center', gap: 6,
+    }} onClick={onEdit}>
+      <span style={STYLES.badge}>{LABEL_MAP[rule.target] || rule.target}</span>
+      <span style={{
+        fontSize: 11, fontWeight: 700,
+        color: actionColors[rule.action] || '#111',
+      }}>
+        {actionLabels[rule.action] || rule.action}
+      </span>
+      <span style={{
+        flex: 1, fontSize: 11, color: 'var(--t4)',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {rule.condition ? `â† ${rule.condition}` : '(Ø¨Ø¯ÙˆÙ† Ø´Ø±Ø·)'}
+      </span>
+      <button
+        type="button" onClick={e => { e.stopPropagation(); onDelete(); }}
+        style={{
+          ...STYLES.btn, background: 'transparent', color: 'var(--t4)',
+          fontSize: 14, padding: '2px 6px',
+        }}
+        title="Ø­Ø°Ù Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø©"
+      >
+        âœ•
+      </button>
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/TemplateControls.tsx
+```
+import React, { useState } from 'react';
+import type { PrintTemplate, FontFamily } from '../types';
+import type { CompanyData } from '../types';
+import { Toggle, Field, Input, Select, Pills, SectionTitle } from './ui';
+import { Accordion } from './Accordion';
+import type { Updater } from './ColumnManager';
+import { Section } from '../sections/ToggleSwitch';
+import HeaderSectionControls from '../sections/HeaderSection';
+import DocumentSectionControls from '../sections/DocumentSection';
+import ItemsSectionControls from '../sections/ItemsSection';
+import TotalsSectionControls from '../sections/TotalsSection';
+import PaymentsSectionControls from '../sections/PaymentsSection';
+import FooterSectionControls from '../sections/FooterSection';
+import FormattingSectionControls from '../sections/FormattingSection';
+import RulesSection from './RulesSection';
+import { isPropertyVisible } from '../services/PropertyVisibilityService';
+
+export function TemplateControls({ tpl, update, companyData }: {
+  tpl: PrintTemplate; update: Updater; companyData: CompanyData | null;
+}) {
+  const [allCollapsed, setAllCollapsed] = useState(false);
+  const [collapseVersion, setCollapseVersion] = useState(0);
+  const docType = tpl.doc_type_code;
+  const paperSize = tpl.paper_size;
+
+  const sec = (k: string) => isPropertyVisible(k, docType, paperSize, tpl);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+
+      <button onClick={() => {
+        setAllCollapsed(c => !c);
+        setCollapseVersion(v => v + 1);
+      }}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+          background: 'var(--bg3)', border: '1px solid var(--b2)', borderRadius: 'var(--r2)',
+          cursor: 'pointer', fontSize: 12, color: 'var(--t2)', marginBottom: 4,
+        }}>
+        <i className="ti ti-arrows-vertical" />
+        {allCollapsed ? 'ÙØªØ­ Ø§Ù„ÙƒÙ„' : 'Ø·ÙŠ Ø§Ù„ÙƒÙ„'}
+      </button>
+
+      {/* â”€â”€ Section visibility toggles â”€â”€ */}
+      <div style={{
+        padding: '6px 10px', background: 'var(--bg3)', borderRadius: 'var(--r2)',
+        border: '1px solid var(--b2)', marginBottom: 4, display: 'flex', flexWrap: 'wrap', gap: 4,
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--t3)', width: '100%', marginBottom: 2 }}>
+          Ø¥Ø¸Ù‡Ø§Ø± / Ø¥Ø®ÙØ§Ø¡ Ø§Ù„Ø£Ù‚Ø³Ø§Ù…
+        </span>
+        <Toggle value={tpl.show_header_section} onChange={v => update('show_header_section', v)} label="Ø§Ù„Ø±Ø£Ø³" />
+        <Toggle value={tpl.show_doc_info_section} onChange={v => update('show_doc_info_section', v)} label="Ø§Ù„Ù…Ø³ØªÙ†Ø¯" />
+        <Toggle value={tpl.show_items_section} onChange={v => update('show_items_section', v)} label="Ø§Ù„Ø¬Ø¯ÙˆÙ„" />
+        <Toggle value={tpl.show_totals_section} onChange={v => update('show_totals_section', v)} label="Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª" />
+        <Toggle value={tpl.show_payments_section} onChange={v => update('show_payments_section', v)} label="Ø§Ù„Ø¯ÙØ¹" />
+        <Toggle value={tpl.show_footer_section} onChange={v => update('show_footer_section', v)} label="Ø§Ù„ØªØ°ÙŠÙŠÙ„" />
+      </div>
+
+      {sec('show_header_section') && (
+        <Section id="s-header" title="Ø±Ø£Ø³ Ø§Ù„ÙØ§ØªÙˆØ±Ø© â€” Ø§Ù„Ø´Ø¹Ø§Ø± ÙˆØ§Ù„Ø´Ø±ÙƒØ©" icon="ti-building-store" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
+          <HeaderSectionControls tpl={tpl} update={update} company={companyData} />
+        </Section>
+      )}
+
+      {sec('show_doc_info_section') && (
+        <Section id="s-doc" title="Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ù…Ø³ØªÙ†Ø¯" icon="ti-file-description" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
+          <DocumentSectionControls tpl={tpl} update={update} />
+        </Section>
+      )}
+
+      {sec('show_items_section') && (
+        <Section id="s-items" title="Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª â€” Ø§Ù„Ø£Ø¹Ù…Ø¯Ø© ÙˆØ§Ù„ØªÙ†Ø³ÙŠÙ‚" icon="ti-table" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
+          <ItemsSectionControls tpl={tpl} update={update} />
+        </Section>
+      )}
+
+      {sec('show_totals_section') && (
+        <Section id="s-totals" title="Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª â€” Ø§Ù„Ø­Ø³Ø§Ø¨Ø§Øª" icon="ti-cash" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
+          <TotalsSectionControls tpl={tpl} update={update} />
+        </Section>
+      )}
+
+      {sec('show_payments_section') && (
+        <Section id="s-payments" title="ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¯ÙØ¹" icon="ti-cash-banknote" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
+          <PaymentsSectionControls tpl={tpl} update={update} />
+        </Section>
+      )}
+
+      {sec('show_footer_section') && (
+        <Section id="s-footer" title="Ø§Ù„ØªØ°ÙŠÙŠÙ„ â€” Ø§Ù„Ù†ØµÙˆØµ ÙˆØ§Ù„ØªÙˆØ§Ù‚ÙŠØ¹" icon="ti-file-text" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
+          <FooterSectionControls tpl={tpl} update={update} />
+        </Section>
+      )}
+
+      <Section id="s-format" title="ØªÙ†Ø³ÙŠÙ‚ Ø§Ù„Ø·Ø¨Ø§Ø¹Ø© â€” Ø§Ù„Ù‡ÙˆØ§Ù…Ø´ ÙˆØ§Ù„Ù…Ø³Ø§ÙØ§Øª" icon="ti-settings" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
+        <FormattingSectionControls tpl={tpl} update={update} />
+      </Section>
+
+      <Accordion id="s-rules" title="Ø§Ù„Ù‚ÙˆØ§Ø¹Ø¯ â€” Ø§Ù„Ø¥Ø¸Ù‡Ø§Ø±/Ø§Ù„Ø¥Ø®ÙØ§Ø¡ Ø§Ù„Ø´Ø±Ø·ÙŠ" icon="ti-adjustments" collapseVersion={collapseVersion} defaultOpen={!allCollapsed}>
+        <RulesSection tpl={tpl} update={update} />
+      </Accordion>
+
+      {sec('show_report_header') && (
+        <Accordion id="s-report" title="Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± â€” Ø§Ù„Ø±Ø³ÙˆÙ… Ø§Ù„Ø¨ÙŠØ§Ù†ÙŠØ© ÙˆØ§Ù„ØªØ¬Ù…ÙŠØ¹" icon="ti-report-analytics" collapseVersion={collapseVersion} defaultOpen={!allCollapsed}>
+          <Field label="Ù†Øµ Ø±Ø£Ø³ Ø§Ù„ØªÙ‚Ø±ÙŠØ±">
+            <Input value={tpl.report_header_text} onChange={v => update('report_header_text', v)} />
+          </Field>
+          <Toggle value={tpl.show_report_header} onChange={v => update('show_report_header', v)} label="Ø¹Ø±Ø¶ Ø±Ø£Ø³ Ø§Ù„ØªÙ‚Ø±ÙŠØ±" />
+          <Toggle value={tpl.show_charts} onChange={v => update('show_charts', v)} label="Ø¹Ø±Ø¶ Ø§Ù„Ø±Ø³Ù… Ø§Ù„Ø¨ÙŠØ§Ù†ÙŠ" />
+          {tpl.show_charts && (
+            <>
+              <div style={{ padding: '2px 0' }}>
+                <Pills
+                  options={[{ v: 'bar' as const, l: 'Ù…Ø®Ø·Ø· Ø£Ø¹Ù…Ø¯Ø©' }, { v: 'pie' as const, l: 'Ù…Ø®Ø·Ø· Ø¯Ø§Ø¦Ø±ÙŠ' }]}
+                  value={tpl.chart_type}
+                  onChange={v => update('chart_type', v)}
+                />
+              </div>
+              <Field label="Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø±Ø³Ù… Ø§Ù„Ø¨ÙŠØ§Ù†ÙŠ">
+                <Input value={tpl.chart_title} onChange={v => update('chart_title', v)} placeholder="ØªÙˆØ²ÙŠØ¹ ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹" />
+              </Field>
+            </>
+          )}
+          <SectionTitle>Ø®ÙŠØ§Ø±Ø§Øª Ø§Ù„ØªÙ‚Ø±ÙŠØ±</SectionTitle>
+          <Toggle value={tpl.show_report_period}  onChange={v => update('show_report_period', v)}  label="Ø¹Ø±Ø¶ Ø§Ù„ÙØªØ±Ø©" />
+          <Toggle value={tpl.show_report_cashier} onChange={v => update('show_report_cashier', v)} label="Ø¹Ø±Ø¶ Ø§Ù„ÙƒØ§Ø´ÙŠØ±" />
+          <Toggle value={tpl.show_report_summary_cards} onChange={v => update('show_report_summary_cards', v)} label="Ø¹Ø±Ø¶ Ø¨Ø·Ø§Ù‚Ø§Øª Ø§Ù„Ù…Ù„Ø®Øµ" />
+          <Toggle value={tpl.show_report_payment_breakdown} onChange={v => update('show_report_payment_breakdown', v)} label="ØªÙˆØ²ÙŠØ¹ ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹" />
+          <Toggle value={tpl.show_report_top_products} onChange={v => update('show_report_top_products', v)} label="Ø£ÙØ¶Ù„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª" />
+          {tpl.show_report_top_products && (
+            <div style={{ padding: '4px 0', borderBottom: '1px solid var(--b1)', marginBottom: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', marginBottom: 4 }}>Ø¹Ø±Ø¶ Ø£Ø¹Ù…Ø¯Ø© Ø§Ù„Ø¬Ø¯ÙˆÙ„</div>
+              {([['product', 'Ø§Ù„Ù…Ù†ØªØ¬'], ['quantity', 'Ø§Ù„ÙƒÙ…ÙŠØ©'], ['total', 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ']] as const).map(([k, label]) => (
+                <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                  <span style={{ fontSize: 11, color: 'var(--t2)', minWidth: 50 }}>{label}</span>
+                  <input type="range" min={10} max={70} step={1}
+                    value={tpl.report_col_widths[k] ?? 30}
+                    onChange={e => update('report_col_widths', { ...tpl.report_col_widths, [k]: Number(e.target.value) })}
+                    style={{ flex: 1, height: 3, accentColor: 'var(--em)' }} />
+                  <span style={{ fontSize: 10, color: 'var(--t4)', minWidth: 28, textAlign: 'left' }}>
+                    {tpl.report_col_widths[k] ?? 30}%
+                  </span>
+                  <input
+                    value={tpl.report_col_headers[k] ?? ''}
+                    onChange={e => update('report_col_headers', { ...tpl.report_col_headers, [k]: e.target.value })}
+                    placeholder={label}
+                    style={{
+                      width: 60, fontSize: 10, padding: '1px 4px',
+                      border: '1px solid var(--b2)', borderRadius: 'var(--r1)',
+                      background: 'var(--bg3)', color: 'var(--t2)',
+                      fontFamily: 'Tajawal, sans-serif',
+                    }} />
+                </div>
+              ))}
+            </div>
+          )}
+          <SectionTitle>ØªØ±ØªÙŠØ¨ ÙˆØªØ¬Ù…ÙŠØ¹</SectionTitle>
+          <Field label="ØªØ¬Ù…ÙŠØ¹ Ø­Ø³Ø¨">
+            <Input value={tpl.group_by} onChange={v => update('group_by', v)} placeholder="Ù…Ø«Ø§Ù„: category" />
+          </Field>
+          <Field label="ØªØ±ØªÙŠØ¨ Ø­Ø³Ø¨">
+            <Input value={tpl.sort_by} onChange={v => update('sort_by', v)} placeholder="Ù…Ø«Ø§Ù„: total" />
+          </Field>
+          <div style={{ padding: '2px 0' }}>
+            <Pills
+              options={[{ v: 'asc' as const, l: 'ØªØµØ§Ø¹Ø¯ÙŠ' }, { v: 'desc' as const, l: 'ØªÙ†Ø§Ø²Ù„ÙŠ' }]}
+              value={tpl.sort_direction}
+              onChange={v => update('sort_direction', v)}
+            />
+          </div>
+          <Toggle value={tpl.show_report_footer} onChange={v => update('show_report_footer', v)} label="Ø¹Ø±Ø¶ ØªØ°ÙŠÙŠÙ„ Ø§Ù„ØªÙ‚Ø±ÙŠØ±" />
+          <Field label="Ù†Øµ ØªØ°ÙŠÙŠÙ„ Ø§Ù„ØªÙ‚Ø±ÙŠØ±">
+            <Input value={tpl.report_footer_text} onChange={v => update('report_footer_text', v)} />
+          </Field>
+        </Accordion>
+      )}
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/TinyBtn.tsx
+```
+export const toolBtnStyle: React.CSSProperties = {
+  padding: '5px 8px', borderRadius: 'var(--r1)', fontSize: 13,
+  border: '1px solid var(--b2)', background: 'var(--bg3)',
+  color: 'var(--t3)', cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+};
+
+export function TinyBtn({ icon, color, title, onClick, loading, disabled }: {
+  icon: string; color: string; title: string; onClick: () => void;
+  loading?: boolean; disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={loading ? undefined : onClick}
+      title={loading ? 'Ø¬Ø§Ø±ÙŠâ€¦' : title}
+      type="button"
+      disabled={disabled || loading}
+      style={{
+        padding: '4px 5px', border: 'none', background: 'transparent',
+        cursor: (disabled || loading) ? 'not-allowed' : 'pointer',
+        color: (disabled || loading) ? 'var(--t4)' : color,
+        fontSize: 11, lineHeight: 1, opacity: loading ? 0.6 : 1,
+      }}
+    >
+      {loading ? <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+        : <i className={`ti ${icon}`} />}
+    </button>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/ui.tsx
+```
+import React from 'react';
+import type { AlignOption, BorderStyle } from '../types';
+
+export const styledInput: React.CSSProperties = {
+  width: '100%', padding: '5px 8px', borderRadius: 'var(--r1)',
+  border: '1px solid var(--b2)', background: 'var(--bg3)',
+  fontSize: 12, color: 'var(--t1)', outline: 'none',
+  fontFamily: 'Tajawal, sans-serif', boxSizing: 'border-box',
+};
+
+// â”€â”€ Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export const Toggle = React.memo(function Toggle({
+  value, onChange, label,
+}: { value: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '4px 0', cursor: 'pointer', userSelect: 'none',
+    }}>
+      <div
+        onClick={() => onChange(!value)}
+        style={{
+          width: 34, height: 18, borderRadius: 9, flexShrink: 0,
+          background: value ? 'var(--em)' : 'var(--bg5)',
+          border: '1px solid ' + (value ? 'var(--embo)' : 'var(--b3)'),
+          position: 'relative', cursor: 'pointer', transition: 'background .16s, border-color .16s',
+        }}
+      >
+        <div style={{
+          position: 'absolute', top: 2, width: 12, height: 12,
+          borderRadius: '50%', background: '#fff',
+          boxShadow: '0 1px 4px rgba(0,0,0,.25)',
+          left: value ? 16 : 2, transition: 'left .16s',
+        }} />
+      </div>
+      <span style={{ fontSize: 12.5, color: 'var(--t2)', fontWeight: 500, lineHeight: 1.4 }}>{label}</span>
+    </label>
+  );
+});
+
+// â”€â”€ Slider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export const Slider = React.memo(function Slider({
+  label, value, min, max, step, unit, onChange,
+}: {
+  label: string; value: number; min: number; max: number; step?: number; unit?: string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div style={{ margin: '2px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--t2)', marginBottom: 2 }}>
+        <span>{label}</span>
+        <span style={{ fontWeight: 700, color: 'var(--t1)' }}>{value}{unit}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step ?? 1}
+        value={value} onChange={e => onChange(Number(e.target.value))}
+        style={{ width: '100%', height: 4, accentColor: 'var(--em)', cursor: 'pointer' }}
+      />
+    </div>
+  );
+});
+
+// â”€â”€ Field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function Field({ label, children, hint }: {
+  label: string; children: React.ReactNode; hint?: string;
+}) {
+  return (
+    <div style={{ margin: '2px 0' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span>{label}</span>
+        {hint && <span style={{ fontSize: 9.5, fontWeight: 400, color: 'var(--t4)' }}>({hint})</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// â”€â”€ Input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function Input({ value, onChange, placeholder, onEnter }: {
+  value: string | null; onChange: (v: string) => void;
+  placeholder?: string; onEnter?: () => void;
+}) {
+  return (
+    <input
+      value={value ?? ''} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder} style={styledInput}
+      onKeyDown={e => { if (e.key === 'Enter') onEnter?.(); }}
+      onFocus={e => { e.currentTarget.style.borderColor = 'var(--em)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--emb)'; }}
+      onBlur={e  => { e.currentTarget.style.borderColor = 'var(--b2)'; e.currentTarget.style.boxShadow = 'none'; }}
+    />
+  );
+}
+
+// â”€â”€ Textarea â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function Textarea({ value, onChange, placeholder, rows = 2 }: {
+  value: string | null | undefined; onChange: (v: string) => void; placeholder?: string; rows?: number;
+}) {
+  return (
+    <textarea
+      value={value ?? ''} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder} rows={rows}
+      style={{ ...styledInput, resize: 'vertical' }}
+    />
+  );
+}
+
+// â”€â”€ Select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function Select({ value, onChange, children }: {
+  value: string; onChange: (v: string) => void; children: React.ReactNode;
+}) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} style={styledInput}>
+      {children}
+    </select>
+  );
+}
+
+// â”€â”€ Pills â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function Pills<T extends string>({ options, value, onChange }: {
+  options: { v: T; l: string }[];
+  value: T; onChange: (v: T) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 3, marginTop: 2 }}>
+      {options.map(o => (
+        <button
+          key={o.v} onClick={() => onChange(o.v)} type="button"
+          style={{
+            flex: 1, padding: '4px 0', fontSize: 11, borderRadius: 'var(--r1)',
+            border: `1px solid ${value === o.v ? 'var(--em)' : 'var(--b2)'}`,
+            background: value === o.v ? 'var(--emb)' : 'var(--bg3)',
+            color: value === o.v ? 'var(--em)' : 'var(--t3)',
+            cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontWeight: 600,
+          }}
+        >{o.l}</button>
+      ))}
+    </div>
+  );
+}
+
+// â”€â”€ ColorField â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function ColorField({ label, value, onChange }: {
+  label: string; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <Field label={label}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input
+          type="color" value={value} onChange={e => onChange(e.target.value)}
+          style={{ width: 30, height: 26, border: '1px solid var(--b2)', borderRadius: 4, cursor: 'pointer', padding: 1 }}
+        />
+        <input
+          type="text" value={value} onChange={e => onChange(e.target.value)}
+          style={{ ...styledInput, flex: 1, fontFamily: 'monospace', fontSize: 11 }}
+        />
+      </div>
+    </Field>
+  );
+}
+
+// â”€â”€ Divider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function Divider() {
+  return <div style={{ height: 1, background: 'var(--b2)', margin: '5px 0' }} />;
+}
+
+// â”€â”€ SectionTitle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--t3)', margin: '4px 0 2px', letterSpacing: '.3px' }}>
+      {children}
+    </div>
+  );
+}
+
+// â”€â”€ Alignment/border option constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export const ALIGN_OPTS: { v: AlignOption; l: string }[] = [
+  { v: 'right', l: 'ÙŠÙ…ÙŠÙ†' }, { v: 'center', l: 'ÙˆØ³Ø·' }, { v: 'left', l: 'ÙŠØ³Ø§Ø±' },
+];
+
+export const BORDER_OPTS: { v: BorderStyle; l: string }[] = [
+  { v: 'solid', l: 'â”€' }, { v: 'dashed', l: '- -' },
+  { v: 'double', l: 'â•' }, { v: 'none', l: 'Ø¨Ù„Ø§' },
+];
+```
+
+## FILE: resources/js/pages/settings/print-settings/contracts/ApiClient.ts
+```
+export interface ApiClient {
+  get<T>(url: string, params?: Record<string, unknown>): Promise<T>;
+  post<T>(url: string, data?: unknown): Promise<T>;
+  put<T>(url: string, data?: unknown): Promise<T>;
+  patch<T>(url: string, data?: unknown): Promise<T>;
+  delete(url: string): Promise<void>;
+  upload<T>(url: string, fd: FormData, onProgress?: (p: number) => void): Promise<T>;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/contracts/HostContext.ts
+```
+import type { ApiClient } from './ApiClient';
+import type { Notifier } from './Notifier';
+import type { PrintTemplatesApi, TemplateRepositoryHooks } from './TemplateRepository';
+import type { CompanyData } from '../types';
+
+export interface HostDependencies {
+  apiClient: ApiClient;
+  notifier: Notifier;
+  printTemplatesApi: PrintTemplatesApi;
+  templateHooks: TemplateRepositoryHooks;
+  company: CompanyData | null;
+  slug: string | null;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/contracts/Notifier.ts
+```
+export interface Notifier {
+  success(message: string): void;
+  error(message: string): void;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/contracts/TemplateRepository.ts
+```
+import type { PrintTemplate, DocTypeCode } from '../types';
+
+export interface PrintTemplatesApi {
+  list(docTypeCode?: string): Promise<PrintTemplate[]>;
+  show(id: number): Promise<PrintTemplate>;
+  create(tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<PrintTemplate>;
+  update(id: number, tpl: Partial<PrintTemplate>): Promise<PrintTemplate>;
+  delete(id: number): Promise<void>;
+  setDefault(id: number): Promise<PrintTemplate>;
+  duplicate(id: number, newName: string): Promise<PrintTemplate>;
+  library(): Promise<{ id: string; name: string; paper_size: string }[]>;
+  installLibrary(templateId: string): Promise<PrintTemplate>;
+  uploadLogo(file: File, onProgress?: (p: number) => void): Promise<{ path: string; url: string }>;
+}
+
+export interface TemplateRepositoryHooks {
+  usePrintTemplates: (docTypeCode?: DocTypeCode) => { data: PrintTemplate[] | undefined; isLoading: boolean };
+  usePrintTemplateMutations: () => {
+    create: { mutateAsync: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) => Promise<PrintTemplate> };
+    update: { mutateAsync: ({ id, data }: { id: number; data: Partial<PrintTemplate> }) => Promise<PrintTemplate> };
+    remove: { mutateAsync: (id: number) => Promise<void> };
+    setDefault: { mutateAsync: (id: number) => Promise<PrintTemplate> };
+    duplicate: { mutateAsync: ({ id, name }: { id: number; name: string }) => Promise<PrintTemplate> };
+    installLibrary: { mutateAsync: (templateId: string) => Promise<PrintTemplate> };
+  };
+}
+
+export const PRINT_TEMPLATE_KEYS = {
+  all:     (slug: string)              => [slug, 'print-templates']              as const,
+  list:    (slug: string, code?: string) => [slug, 'print-templates', 'list', code] as const,
+  detail:  (slug: string, id: number)  => [slug, 'print-templates', id]         as const,
+};
 ```
 
 ## FILE: resources/js/pages/settings/print-settings/index.ts
 ```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// print-settings/index.ts â€” Public API
+//
+// Consumers import ONLY from here:
+//   import { PrintSettingsPage, PreviewSelector } from '@/pages/settings/print-settings';
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+export { default as PrintSettingsPage } from './PrintSettingsPage';
 export { default as PreviewSelector } from './components/PreviewSelector';
+
+// Types â€” consumers need access to these for template data
 export * from './types';
 export type { ReceiptLiveData, CompanyPreviewData } from './types';
+```
+
+## FILE: resources/js/pages/settings/print-settings/PrintSettingsPage.tsx
+```
+import React, {
+  useState, useCallback, useEffect, useMemo, useRef,
+} from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  usePrintTemplates, usePrintTemplateMutations,
+} from './api/printTemplatesApi';
+import PreviewSelector from './components/PreviewSelector';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { TemplateControls } from './components/TemplateControls';
+import { QuickNav } from './components/QuickNav';
+import { TinyBtn, toolBtnStyle } from './components/TinyBtn';
+import { Input } from './components/ui';
+import { type Updater } from './components/ColumnManager';
+import { dbSaveTemplate } from './services/printStoreService';
+import {
+  DOC_TYPE_LIST,
+  type PrintTemplate, type DocTypeCode,
+  type CompanyData, type ReceiptTemplate80mm,
+} from './types';
+import { DocumentDataBuilder } from './types/data/DocumentDataBuilder';
+import type { UniversalDocumentData } from './types/data';
+import { TemplateLibraryModal } from './template-library';
+import DeleteConfirmModal from './components/DeleteConfirmModal';
+import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
+import { normalizeTemplate } from './services/SettingsSerializer';
+
+const PAPER_DIM: Record<string, { w: number; h: number }> = {
+  '80mm': { w: 80,  h: 0   },
+  '58mm': { w: 58,  h: 0   },
+  'A4':   { w: 210, h: 297 },
+  'A5':   { w: 148, h: 210 },
+};
+
+function paperLabel(size: string, mm: number): string {
+  const d = PAPER_DIM[size];
+  if (!d) return `${mm}mm Ã— ØªÙ„Ù‚Ø§Ø¦ÙŠ`;
+  return d.h > 0 ? `${d.w}Ã—${d.h}mm` : `${d.w}mm Ã— ØªÙ„Ù‚Ø§Ø¦ÙŠ`;
+}
+
+const DOC_CATS = [
+  { key: 'pos',      label: 'POS',        icon: 'ti-device-desktop' },
+  { key: 'sales',    label: 'Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª',   icon: 'ti-receipt'        },
+  { key: 'purchase', label: 'Ø§Ù„Ø´Ø±Ø§Ø¡',     icon: 'ti-truck'          },
+  { key: 'warehouse',label: 'Ø§Ù„Ù…Ø®Ø²ÙˆÙ†',    icon: 'ti-box'            },
+] as const;
+
+export default function PrintSettingsPage() {
+  const apiClient  = useApiClient();
+  const notifier   = useNotifier();
+  const companyCtx = useCompany();
+  const slug       = useSlug();
+
+  const companyData: CompanyData | null = useMemo(() => companyCtx
+    ? {
+        name:    companyCtx.name    ?? '',
+        address: companyCtx.address ?? '',
+        phone:   companyCtx.phone   ?? '',
+        nif:     companyCtx.nif     ?? '',
+        rc:      companyCtx.rc      ?? '',
+        nis:     companyCtx.nis     ?? '',
+        ice:     '',
+        article: companyCtx.article ?? '',
+        logoUrl: companyCtx.logoUrl ?? null,
+      }
+    : null,
+  [companyCtx]);
+
+  const [activeCat,     setActiveCat]     = useState<string>('pos');
+  const [activeDoc,     setActiveDoc]     = useState<DocTypeCode>('POS');
+  const [selectedTplId, setSelectedTplId] = useState<number | null>(null);
+  const [localTpl,      setLocalTpl]      = useState<PrintTemplate | null>(null);
+  const [isDirty,       setIsDirty]       = useState(false);
+  const [isSaving,      setIsSaving]      = useState(false);
+  const [canUndo,       setCanUndo]       = useState(false);
+  const [canRedo,       setCanRedo]       = useState(false);
+  const [editingName,   setEditingName]   = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [deleteTarget,  setDeleteTarget]  = useState<number | null>(null);
+  const [useRealData,       setUseRealData]       = useState(true);
+  const [showLibrary,       setShowLibrary]       = useState(false);
+
+  const historyRef    = useRef<PrintTemplate[]>([]);
+  const historyPos    = useRef(-1);
+  const controlsRef   = useRef<HTMLDivElement>(null);
+
+  const { data: templatesRaw, isLoading } = usePrintTemplates(activeDoc);
+  const templates = useMemo(() => templatesRaw ?? [], [templatesRaw]);
+  const mutations = usePrintTemplateMutations();
+
+  const { data: previewDoc, refetch, isFetching } = useQuery({
+    queryKey: [slug, 'preview-latest-doc', activeDoc],
+    queryFn: async () => {
+      const list = await apiClient.get<Record<string, unknown>>('/documents', {
+        'filter[document_type.code]': activeDoc,
+        'page[size]': 1,
+        sort: '-id',
+        'fields[commercial_documents]': 'id',
+      });
+      const docs = (list?.data ?? []) as Array<{ id?: number }>;
+      const first = docs[0];
+      if (!first?.id) return null;
+      const full = await apiClient.get<Record<string, unknown>>(`/documents/${first.id}`, {
+        include: ['party', 'lines', 'lines.product', 'lines.packaging', 'lines.stockLot', 'payments', 'payments.paymentMode'].join(','),
+      });
+      const doc = (full?.data ?? full) as Record<string, unknown>;
+      return doc ?? null;
+    },
+    enabled: !!slug && useRealData,
+    staleTime: 60_000,
+  });
+  const prevUseRealData = useRef(useRealData);
+  useEffect(() => {
+    if (useRealData && !prevUseRealData.current) refetch();
+    prevUseRealData.current = useRealData;
+  }, [useRealData, refetch]);
+  const previewData: UniversalDocumentData | null = useMemo(() => {
+    if (!previewDoc || !companyData) return null;
+    return DocumentDataBuilder.fromApiDocument(previewDoc, companyData);
+  }, [previewDoc, companyData]);
+
+  useEffect(() => {
+    if (templates.length > 0) {
+      const tpl = templates.find(t => t.is_default) ?? templates[0];
+      setSelectedTplId(tpl.id);
+      setLocalTpl(normalizeTemplate(tpl, activeDoc, tpl.paper_size));
+      setIsDirty(false);
+    } else {
+      setSelectedTplId(null);
+      setLocalTpl(normalizeTemplate({ id: null, doc_type_code: activeDoc, name: 'Ù‚Ø§Ù„Ø¨ Ø¬Ø¯ÙŠØ¯' }, activeDoc));
+      setIsDirty(true);
+    }
+    historyRef.current = [];
+    historyPos.current = -1;
+    setCanUndo(false);
+    setCanRedo(false);
+  }, [templates, activeDoc]);
+
+  const pushHistory = useCallback((tpl: PrintTemplate) => {
+    const stack = historyRef.current;
+    stack.length = historyPos.current + 1;
+    stack.push({ ...tpl });
+    if (stack.length > 60) stack.shift();
+    historyPos.current = stack.length - 1;
+    setCanUndo(historyPos.current > 0);
+    setCanRedo(false);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (historyPos.current <= 0) return;
+    const prev = historyRef.current[historyPos.current - 1];
+    setLocalTpl({ ...prev });
+    historyPos.current--;
+    setCanUndo(historyPos.current > 0);
+    setCanRedo(true);
+    setIsDirty(true);
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    if (historyPos.current >= historyRef.current.length - 1) return;
+    const next = historyRef.current[historyPos.current + 1];
+    setLocalTpl({ ...next });
+    historyPos.current++;
+    setCanUndo(true);
+    setCanRedo(historyPos.current < historyRef.current.length - 1);
+    setIsDirty(true);
+  }, []);
+
+  const update: Updater = useCallback(<K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => {
+    setLocalTpl(prev => {
+      if (prev) pushHistory(prev);
+      const next = prev ? { ...prev, [key]: val } : prev;
+      if (key === 'paper_size' && next) {
+        if (val === '80mm') next.paper_width_mm = 80;
+        else if (val === '58mm') next.paper_width_mm = 58;
+      }
+      return next;
+    });
+    setIsDirty(true);
+  }, [pushHistory]);
+
+  const handleSave = useCallback(async () => {
+    if (!localTpl || isSaving) return;
+    setIsSaving(true);
+    try {
+      let savedTpl: PrintTemplate;
+      if (localTpl.id) {
+        try {
+          savedTpl = await mutations.update.mutateAsync({ id: localTpl.id, data: localTpl });
+        } catch (e: any) {
+          if (e?.response?.status === 404) {
+            savedTpl = await mutations.create.mutateAsync({
+              ...localTpl, id: undefined,
+              doc_type_code: activeDoc,
+              is_default: templates.length === 0,
+            });
+            setSelectedTplId(savedTpl.id);
+          } else {
+            throw e;
+          }
+        }
+      } else {
+        savedTpl = await mutations.create.mutateAsync({
+          ...localTpl,
+          doc_type_code: activeDoc,
+          is_default: templates.length === 0,
+        });
+        setSelectedTplId(savedTpl.id);
+      }
+      setLocalTpl({ ...savedTpl });
+      setIsDirty(false);
+      try {
+        await dbSaveTemplate(apiClient, activeDoc, savedTpl.paper_size, savedTpl as ReceiptTemplate80mm);
+      } catch {
+        notifier.error('âŒ ÙØ´Ù„ Ø­ÙØ¸ Ø§Ù„Ù‚Ø§Ù„Ø¨ ÙÙŠ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª â€” POS Ø³ÙŠØ³ØªØ®Ø¯Ù… Ø¨ÙŠØ§Ù†Ø§Øª Ù‚Ø¯ÙŠÙ…Ø©');
+        throw new Error('dbSaveTemplate failed');
+      }
+      notifier.success('âœ… ØªÙ… Ø­ÙØ¸ Ø§Ù„Ù‚Ø§Ù„Ø¨');
+    } catch (e: any) {
+      notifier.error(e?.message ?? 'ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [localTpl, isSaving, apiClient, activeDoc, templates.length, mutations, notifier]);
+
+  const handleSetDefault = useCallback(async (id: number) => {
+    setActionLoading(`default-${id}`);
+    try { await mutations.setDefault.mutateAsync(id); notifier.success('ØªÙ… ØªØ¹ÙŠÙŠÙ† Ø§Ù„Ù‚Ø§Ù„Ø¨ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ'); }
+    catch { notifier.error('ÙØ´Ù„ Ø§Ù„ØªØ¹ÙŠÙŠÙ†'); }
+    finally { setActionLoading(null); }
+  }, [mutations, notifier]);
+
+  const handleDuplicate = useCallback(async (tpl: PrintTemplate) => {
+    if (!tpl.id) return;
+    setActionLoading(`duplicate-${tpl.id}`);
+    try {
+      const copy = await mutations.duplicate.mutateAsync({ id: tpl.id, name: `Ù†Ø³Ø®Ø© Ù…Ù† ${tpl.name}` });
+      setSelectedTplId(copy.id);
+      setLocalTpl({ ...copy });
+      setIsDirty(false);
+      notifier.success('ØªÙ… Ù†Ø³Ø® Ø§Ù„Ù‚Ø§Ù„Ø¨');
+    } catch { notifier.error('ÙØ´Ù„ Ø§Ù„Ù†Ø³Ø®'); }
+    finally { setActionLoading(null); }
+  }, [mutations, notifier]);
+
+  const handleDelete = useCallback(async (id: number) => {
+    setDeleteTarget(id);
+  }, []);
+
+  const handleToggleActive = useCallback(async (tpl: PrintTemplate) => {
+    if (!tpl.id) return;
+    setActionLoading(`toggle-${tpl.id}`);
+    if (localTpl?.id === tpl.id) setLocalTpl(p => p ? { ...p, is_active: !p.is_active } : p);
+    try { await mutations.update.mutateAsync({ id: tpl.id, data: { is_active: !tpl.is_active } }); notifier.success(tpl.is_active ? 'ØªÙ… ØªØ¹Ø·ÙŠÙ„ Ø§Ù„Ù‚Ø§Ù„Ø¨' : 'ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„Ù‚Ø§Ù„Ø¨'); }
+    catch { notifier.error('ÙØ´Ù„ Ø§Ù„ØªØ­Ø¯ÙŠØ«'); }
+    finally { setActionLoading(null); }
+  }, [mutations, localTpl, notifier]);
+
+  const confirmDelete = useCallback(async () => {
+    if (deleteTarget === null) return;
+    const id = deleteTarget;
+    setActionLoading(`delete-${id}`);
+    setDeleteTarget(null);
+    try { await mutations.remove.mutateAsync(id); notifier.success('ØªÙ… Ø§Ù„Ø­Ø°Ù'); }
+    catch { notifier.error('ÙØ´Ù„ Ø§Ù„Ø­Ø°Ù'); }
+    finally { setActionLoading(null); }
+  }, [deleteTarget, mutations, notifier]);
+
+  const handleNewTemplate = useCallback(() => {
+    setShowLibrary(true);
+  }, []);
+
+  const handleInstallLibrary = useCallback(async (_templateId: string, _tpl: PrintTemplate) => {
+    try {
+      const saved = await mutations.installLibrary.mutateAsync(_templateId);
+      setSelectedTplId(saved.id);
+      setLocalTpl({ ...saved });
+      setIsDirty(false);
+      setShowLibrary(false);
+      try {
+        await dbSaveTemplate(apiClient, activeDoc, saved.paper_size, saved as ReceiptTemplate80mm);
+      } catch { /* ignore legacy sync */ }
+      notifier.success(`âœ… ØªÙ… ØªØ«Ø¨ÙŠØª Ø§Ù„Ù‚Ø§Ù„Ø¨ "${saved.name}"`);
+    } catch (e: any) {
+      notifier.error(e?.message ?? 'ÙØ´Ù„ ØªØ«Ø¨ÙŠØª Ø§Ù„Ù‚Ø§Ù„Ø¨');
+    }
+  }, [apiClient, activeDoc, mutations, notifier]);
+
+  const handleExport = useCallback(() => {
+    if (!localTpl) return;
+    const json = JSON.stringify({ version: 2, docCode: activeDoc, template: localTpl, exportedAt: new Date().toISOString() }, null, 2);
+    const a    = Object.assign(document.createElement('a'), {
+      href:     URL.createObjectURL(new Blob([json], { type: 'application/json' })),
+      download: `print-template-${activeDoc}.json`,
+    });
+    a.click();
+    notifier.success('ØªÙ… ØªØµØ¯ÙŠØ± Ø§Ù„Ù‚Ø§Ù„Ø¨');
+  }, [activeDoc, localTpl, notifier]);
+
+  const handleImport = useCallback(() => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.json' });
+    input.onchange = async (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const data     = JSON.parse(await file.text());
+        const imported = data.template ?? data;
+        if (!imported?.col_order || !imported?.paper_size) {
+          notifier.error('Ù…Ù„Ù ØºÙŠØ± ØµØ§Ù„Ø­');
+          return;
+        }
+        imported.id = localTpl?.id ?? null;
+        const merged = normalizeTemplate(imported, imported.doc_type_code ?? activeDoc, imported.paper_size);
+        setLocalTpl(merged);
+        setIsDirty(true);
+        notifier.success('ØªÙ… Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ â€” Ø§Ø­ÙØ¸ Ù„Ù„ØªØ·Ø¨ÙŠÙ‚');
+      } catch { notifier.error('ÙØ´Ù„ Ù‚Ø±Ø§Ø¡Ø© Ø§Ù„Ù…Ù„Ù'); }
+    };
+    input.click();
+  }, [activeDoc, localTpl?.id, notifier]);
+
+  const handleTestPrint = useCallback(async () => {
+    if (!localTpl) return;
+    const mmW = PAPER_DIM[localTpl.paper_size]?.w ?? localTpl.paper_width_mm;
+    const winW = Math.min(Math.round(mmW * 3.78) + 60, 900);
+    const win  = window.open('', '_blank', `width=${winW},height=700`);
+    if (!win) { window.print(); return; }
+    const printCss = `
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #fff; display: flex; justify-content: center; }
+      @media print { body { padding: 0; } @page { margin: 0; } }
+    `;
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head>
+      <meta charset="UTF-8"/>
+      <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+      <style>${printCss}</style>
+    </head><body><div id="r"></div></body></html>`);
+    win.document.close();
+    const { createRoot } = await import('react-dom/client');
+    const root = win.document.getElementById('r');
+    if (!root) return;
+    const reactRoot = createRoot(root);
+    reactRoot.render(
+      React.createElement(PreviewSelector, {
+        tpl: localTpl, company: companyData,
+        data: useRealData ? previewData : null,
+      }),
+    );
+    await win.document.fonts.ready;
+    await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => setTimeout(r, 400));
+    win.focus();
+    win.print();
+    setTimeout(() => win.close(), 500);
+  }, [localTpl, companyData, previewData, useRealData]);
+
+  const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving });
+  useEffect(() => { refs.current = { handleSave, handleUndo, handleRedo, isDirty, isSaving }; });
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (ctrl && e.key === 's') { e.preventDefault(); if (refs.current.isDirty && !refs.current.isSaving) refs.current.handleSave(); }
+      if (ctrl && e.key === 'z' && !e.shiftKey) { e.preventDefault(); refs.current.handleUndo(); }
+      if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); refs.current.handleRedo(); }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+
+  const docsInCat = DOC_TYPE_LIST.filter(d => d.category === activeCat);
+
+  return (
+    <><div style={{ display: 'flex', flexDirection: 'column', height: '100vh', direction: 'rtl', overflow: 'hidden' }}>
+
+      <div style={{
+        padding: '10px 18px', borderBottom: '1px solid var(--b2)',
+        background: 'var(--bg2)', display: 'flex', alignItems: 'center',
+        gap: 10, flexShrink: 0, flexWrap: 'wrap',
+      }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <i className="ti ti-printer" style={{ color: 'var(--em)' }} />
+            Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø·Ø¨Ø§Ø¹Ø©
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--t4)' }}>
+            Ù‚ÙˆØ§Ù„Ø¨ Ø§Ù„Ø·Ø¨Ø§Ø¹Ø© Ù„ÙƒÙ„ Ø£Ù†ÙˆØ§Ø¹ Ø§Ù„Ù…Ø³ØªÙ†Ø¯Ø§Øª â€” Ù…Ø­ÙÙˆØ¸Ø© ÙÙŠ DB
+          </div>
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {localTpl && (
+          <div style={{ display: 'flex', gap: 3 }}>
+            <button
+              onClick={handleUndo} disabled={!canUndo} type="button"
+              title="ØªØ±Ø§Ø¬Ø¹ (Ctrl+Z)"
+              style={{
+                ...toolBtnStyle,
+                opacity: canUndo ? 1 : .35, cursor: canUndo ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <i className="ti ti-arrow-back-up" />
+            </button>
+            <button
+              onClick={handleRedo} disabled={!canRedo} type="button"
+              title="Ø¥Ø¹Ø§Ø¯Ø© (Ctrl+Y)"
+              style={{
+                ...toolBtnStyle,
+                opacity: canRedo ? 1 : .35, cursor: canRedo ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <i className="ti ti-arrow-forward-up" />
+            </button>
+          </div>
+        )}
+
+        {localTpl && (
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <button onClick={handleExport} title="ØªØµØ¯ÙŠØ± JSON" type="button" style={toolBtnStyle}>
+              <i className="ti ti-download" />
+            </button>
+            <button onClick={handleImport} title="Ø§Ø³ØªÙŠØ±Ø§Ø¯ JSON" type="button" style={toolBtnStyle}>
+              <i className="ti ti-upload" />
+            </button>
+
+            <div style={{
+              fontSize: 11, padding: '4px 10px', borderRadius: 'var(--r2)',
+              background: isDirty ? 'var(--goldb)' : 'var(--emb)',
+              border: `1px solid ${isDirty ? 'var(--goldbo)' : 'var(--embo)'}`,
+              color: isDirty ? 'var(--gold)' : 'var(--em)',
+              fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <i className={`ti ${isDirty ? 'ti-point-filled' : 'ti-check'}`} style={{ fontSize: 10 }} />
+              {isDirty ? 'ØªØºÙŠÙŠØ±Ø§Øª ØºÙŠØ± Ù…Ø­ÙÙˆØ¸Ø©' : 'Ù…Ø­ÙÙˆØ¸'}
+            </div>
+
+            <button
+              onClick={handleSave} disabled={!isDirty || isSaving} type="button"
+              style={{
+                padding: '6px 14px', borderRadius: 'var(--r2)', fontSize: 12.5, fontWeight: 800,
+                border: 'none', fontFamily: 'Tajawal, sans-serif',
+                background: isDirty ? 'var(--em)' : 'var(--bg5)',
+                color: isDirty ? '#fff' : 'var(--t4)',
+                cursor: isDirty && !isSaving ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', gap: 5,
+                boxShadow: isDirty ? 'var(--emglow)' : 'none',
+                transition: 'all .15s',
+              }}
+            >
+              {isSaving
+                ? <><i className="ti ti-loader-2 spin" /> Ø¬Ø§Ø±Ù Ø§Ù„Ø­ÙØ¸...</>
+                : <><i className="ti ti-device-floppy" /> Ø­ÙØ¸ (Ctrl+S)</>
+              }
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+
+        <div style={{
+          width: 200, flexShrink: 0, borderLeft: '1px solid var(--b2)',
+          background: 'var(--bg2)', overflowY: 'auto', display: 'flex', flexDirection: 'column',
+        }}>
+          {DOC_CATS.map(cat => (
+            <div key={cat.key}>
+              <button
+                onClick={() => setActiveCat(cat.key)} type="button"
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '8px 12px', border: 'none', cursor: 'pointer',
+                  fontFamily: 'Tajawal, sans-serif', fontSize: 11.5, fontWeight: 800,
+                  textTransform: 'uppercase', letterSpacing: '.8px',
+                  color: activeCat === cat.key ? 'var(--em)' : 'var(--t4)',
+                  background: activeCat === cat.key ? 'var(--emb)' : 'transparent',
+                  borderBottom: '1px solid var(--b1)', textAlign: 'right',
+                }}
+              >
+                <i className={`ti ${cat.icon}`} style={{ fontSize: 13 }} />
+                {cat.label}
+              </button>
+
+              {activeCat === cat.key && docsInCat.map(doc => {
+                const count = templates.filter(t => t.doc_type_code === doc.code).length;
+                return (
+                  <button
+                    key={doc.code}
+                    onClick={() => setActiveDoc(doc.code)} type="button"
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '7px 12px 7px 16px', border: 'none', cursor: 'pointer',
+                      fontFamily: 'Tajawal, sans-serif', fontSize: 12.5,
+                      color: activeDoc === doc.code ? 'var(--em)' : 'var(--t2)',
+                      background: activeDoc === doc.code ? 'rgba(10,138,92,.04)' : 'transparent',
+                      borderRight: `2px solid ${activeDoc === doc.code ? 'var(--em)' : 'transparent'}`,
+                      borderBottom: '1px solid var(--b1)', textAlign: 'right',
+                    }}
+                  >
+                    <span>
+                      <span style={{ fontWeight: 800, marginLeft: 5, fontSize: 11 }}>{doc.code}</span>
+                      {doc.name}
+                    </span>
+                    {count > 0 && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 800, padding: '0 5px', borderRadius: 8,
+                        background: 'var(--emb)', color: 'var(--em)', flexShrink: 0,
+                      }}>{count}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--b2)' }}>
+
+          <div style={{
+            padding: '8px 10px', borderBottom: '1px solid var(--b2)',
+            background: 'var(--bg3)', display: 'flex', flexWrap: 'wrap', gap: 5, flexShrink: 0,
+          }}>
+            {isLoading ? (
+              <span style={{ fontSize: 12, color: 'var(--t4)' }}><i className="ti ti-loader-2 spin" /> ØªØ­Ù…ÙŠÙ„...</span>
+            ) : templates.length === 0 ? (
+              <span style={{ fontSize: 12, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <i className="ti ti-files-off" />
+                Ù„Ø§ ØªÙˆØ¬Ø¯ Ù‚ÙˆØ§Ù„Ø¨ â€” Ø£Ù†Ø´Ø¦ Ø£ÙˆÙ„ Ù‚Ø§Ù„Ø¨ Ø¨Ø§Ù„Ø²Ø± Ø£Ø¹Ù„Ø§Ù‡
+              </span>
+            ) : templates.map(tpl => (
+              <div
+                key={tpl.id!}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  border: `1.5px solid ${selectedTplId === tpl.id ? 'var(--em)' : 'var(--b2)'}`,
+                  borderRadius: 'var(--r2)', overflow: 'hidden',
+                  background: selectedTplId === tpl.id ? 'var(--emb)' : 'var(--bg2)',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setSelectedTplId(tpl.id); setLocalTpl(normalizeTemplate(tpl, activeDoc, tpl.paper_size)); setIsDirty(false);
+                  }}
+                  type="button"
+                  style={{
+                    padding: '4px 9px', border: 'none', background: 'transparent',
+                    cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontSize: 12,
+                    fontWeight: 600, color: selectedTplId === tpl.id ? 'var(--em)' : 'var(--t2)',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  {tpl.is_default && <i className="ti ti-star-filled" style={{ fontSize: 9, color: 'var(--gold)' }} />}
+                  {tpl.name}
+                  <span style={{ fontSize: 9, opacity: .5, fontFamily: 'monospace' }}>{tpl.paper_size}</span>
+                </button>
+                <div style={{ display: 'flex', borderRight: '1px solid var(--b2)' }}>
+                  {!tpl.is_default && (
+                    <TinyBtn icon="ti-star"  color="var(--gold)"  title="Ø§ÙØªØ±Ø§Ø¶ÙŠ" loading={actionLoading === ('default-' + tpl.id)} onClick={() => handleSetDefault(tpl.id!)} />
+                  )}
+                  <TinyBtn icon={tpl.is_active ? 'ti-eye' : 'ti-eye-off'} color="var(--t4)" title={tpl.is_active ? 'ØªØ¹Ø·ÙŠÙ„' : 'ØªÙØ¹ÙŠÙ„'}
+                    loading={actionLoading === ('toggle-' + tpl.id)}
+                    onClick={() => handleToggleActive(tpl)} />
+                  <TinyBtn icon="ti-copy"   color="var(--blue)"  title="Ù†Ø³Ø®"     loading={actionLoading === ('duplicate-' + tpl.id)} onClick={() => handleDuplicate(tpl)} />
+                  <TinyBtn icon="ti-trash"  color="var(--red)"   title="Ø­Ø°Ù"     loading={actionLoading === ('delete-' + tpl.id)} onClick={() => handleDelete(tpl.id!)} />
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={handleNewTemplate} type="button"
+              style={{
+                padding: '4px 9px', borderRadius: 'var(--r2)',
+                border: '1.5px dashed var(--embo)', background: 'var(--emb)',
+                color: 'var(--em)', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <i className="ti ti-plus" /> Ø¬Ø¯ÙŠØ¯
+            </button>
+          </div>
+
+          {localTpl ? (
+            <div ref={controlsRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
+              <div style={{
+                padding: '7px 9px', marginBottom: 8,
+                background: 'var(--bg3)', borderRadius: 'var(--r2)', border: '1px solid var(--b2)',
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--t3)', marginBottom: 3 }}>Ø§Ø³Ù… Ø§Ù„Ù‚Ø§Ù„Ø¨</div>
+                {editingName ? (
+                  <Input
+                    value={localTpl.name}
+                    onChange={v => update('name', v)}
+                    onEnter={() => setEditingName(false)}
+                    placeholder="Ø§Ø³Ù… Ø§Ù„Ù‚Ø§Ù„Ø¨..."
+                  />
+                ) : (
+                  <div
+                    onClick={() => setEditingName(true)}
+                    style={{
+                      fontSize: 13, fontWeight: 700, color: 'var(--t1)',
+                      padding: '3px 6px', borderRadius: 'var(--r1)',
+                      cursor: 'text', border: '1px dashed transparent',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--b3)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}
+                  >
+                    {localTpl.name || 'â€”'}
+                    <i className="ti ti-pencil" style={{ fontSize: 9, opacity: .3, marginRight: 5 }} />
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                  {(['80mm', '58mm', 'A4', 'A5'] as const).map(s => (
+                    <button
+                      key={s} type="button"
+                      onClick={() => update('paper_size', s)}
+                      style={{
+                        flex: 1, padding: '3px 0', fontSize: 11, borderRadius: 'var(--r1)',
+                        border: `1px solid ${localTpl.paper_size === s ? 'var(--em)' : 'var(--b2)'}`,
+                        background: localTpl.paper_size === s ? 'var(--emb)' : 'var(--bg3)',
+                        color: localTpl.paper_size === s ? 'var(--em)' : 'var(--t3)',
+                        cursor: 'pointer', fontWeight: 700,
+                      }}
+                    >{s}</button>
+                  ))}
+                </div>
+              </div>
+
+              <QuickNav controlsRef={controlsRef} />
+              <TemplateControls tpl={localTpl} update={update} companyData={companyData} />
+            </div>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--t4)', fontSize: 13, gap: 8 }}>
+              <i className="ti ti-printer-off" style={{ fontSize: 32, opacity: 0.4 }} />
+              <span>Ø§Ø®ØªØ± Ù‚Ø§Ù„Ø¨Ø§Ù‹ Ù…Ù† Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© Ø£Ùˆ Ø£Ù†Ø´Ø¦ Ù‚Ø§Ù„Ø¨Ø§Ù‹ Ø¬Ø¯ÙŠØ¯Ø§Ù‹</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{
+          flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
+          background: 'var(--bg1)', overflow: 'hidden',
+          position: 'sticky', top: 0, alignSelf: 'flex-start', maxHeight: '100vh',
+        }}>
+          <div style={{
+            padding: '8px 14px', borderBottom: '1px solid var(--b2)',
+            background: 'var(--bg2)', display: 'flex', alignItems: 'center',
+            gap: 8, flexShrink: 0,
+          }}>
+            <i className="ti ti-eye" style={{ color: 'var(--em)', fontSize: 14 }} />
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--t2)' }}>Ù…Ø¹Ø§ÙŠÙ†Ø© Ø­ÙŠØ©</span>
+            {localTpl && (
+              <span style={{
+                fontSize: 11, padding: '2px 7px', borderRadius: 8,
+                background: 'var(--bg3)', border: '1px solid var(--b2)',
+                color: 'var(--t3)', fontWeight: 600, marginRight: 2,
+              }}>
+                {paperLabel(localTpl.paper_size, localTpl.paper_width_mm)}
+              </span>
+            )}
+            {companyData && (
+              <span style={{
+                fontSize: 10.5, padding: '2px 7px', borderRadius: 8,
+                background: 'var(--emb)', border: '1px solid var(--embo)',
+                color: 'var(--em)', fontWeight: 600,
+              }}>
+                <i className="ti ti-building-store" style={{ marginLeft: 4, fontSize: 10 }} />
+                {companyData.name}
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            {localTpl && (
+              <button
+                onClick={() => setUseRealData(v => !v)}
+                type="button"
+                title={useRealData ? 'Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø¨ÙŠØ§Ù†Ø§Øª ÙØ§Ø±ØºØ©' : 'Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø¢Ø®Ø± Ù…Ø³ØªÙ†Ø¯ Ø­Ù‚ÙŠÙ‚ÙŠ'}
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 8px', fontSize: 11,
+                  color: useRealData ? 'var(--em)' : 'var(--t3)',
+                  borderColor: useRealData ? 'var(--em)' : 'var(--b2)',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <i className={`ti ${useRealData ? 'ti-database' : 'ti-database-off'}`} />
+                {useRealData ? 'Ø¨ÙŠØ§Ù†Ø§Øª Ø­Ù‚ÙŠÙ‚ÙŠØ©' : 'Ø¨ÙŠØ§Ù†Ø§Øª ØªØ¬Ø±ÙŠØ¨ÙŠØ©'}
+              </button>
+            )}
+            {localTpl && useRealData && (
+              <button
+                onClick={() => refetch()}
+                disabled={isFetching}
+                type="button"
+                title="ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ù…Ù† Ø§Ù„Ø®Ø§Ø¯Ù…"
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 8px', fontSize: 11,
+                  opacity: isFetching ? 0.5 : 1,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <i className={`ti ${isFetching ? 'ti-loader-2 spin' : 'ti-refresh'}`} />
+                ØªØ­Ø¯ÙŠØ«
+              </button>
+            )}
+            {localTpl && (
+              <button onClick={handleTestPrint} type="button"
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 11px', fontSize: 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}
+              >
+                <i className="ti ti-printer" /> Ø·Ø¨Ø§Ø¹Ø© ØªØ¬Ø±ÙŠØ¨ÙŠØ©
+              </button>
+            )}
+            {localTpl && (
+              <button onClick={handleSave} disabled={!isDirty || isSaving} type="button"
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 11px', fontSize: 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  background: isDirty ? 'var(--em)' : 'var(--bg5)',
+                  color: isDirty ? '#fff' : 'var(--t4)',
+                  border: 'none',
+                  cursor: isDirty && !isSaving ? 'pointer' : 'not-allowed',
+                  fontWeight: 700,
+                }}
+              >
+                {isSaving
+                  ? <><i className="ti ti-loader-2 spin" /> Ø¬Ø§Ø±Ù Ø§Ù„Ø­ÙØ¸...</>
+                  : <><i className="ti ti-device-floppy" /> Ø­ÙØ¸</>
+                }
+              </button>
+            )}
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', justifyContent: 'center' }}>
+            {localTpl ? (
+              <div style={{
+                boxShadow: '0 4px 24px rgba(0,0,0,.14)',
+                border: '1px solid var(--b3)',
+                borderRadius: 2,
+                display: 'inline-block',
+              }}>
+                <ErrorBoundary>
+                  <PreviewSelector tpl={localTpl} company={companyData} data={useRealData ? previewData : null} />
+                </ErrorBoundary>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--t4)', fontSize: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                <i className="ti ti-device-desktop-off" style={{ fontSize: 24, opacity: 0.4 }} />
+                Ø§Ø®ØªØ± Ù‚Ø§Ù„Ø¨Ø§Ù‹ Ù„Ø¹Ø±Ø¶ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+
+      <TemplateLibraryModal
+        open={showLibrary}
+        onClose={() => setShowLibrary(false)}
+        onInstall={handleInstallLibrary}
+        activeDoc={activeDoc}
+      />
+
+      <DeleteConfirmModal
+        deleteTarget={deleteTarget}
+        actionLoading={actionLoading}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/providers/PrintSettingsContext.tsx
+```
+import React, { createContext, useContext } from 'react';
+import type { HostDependencies } from '../contracts/HostContext';
+
+const PrintSettingsContext = createContext<HostDependencies | null>(null);
+
+export function PrintSettingsProvider({ value, children }: { value: HostDependencies; children: React.ReactNode }) {
+  return (
+    <PrintSettingsContext.Provider value={value}>
+      {children}
+    </PrintSettingsContext.Provider>
+  );
+}
+
+export function useHost(): HostDependencies {
+  const ctx = useContext(PrintSettingsContext);
+  if (!ctx) throw new Error('PrintSettingsProvider missing â€” wrap <PrintSettingsPage> in <PrintSettingsProvider>');
+  return ctx;
+}
+
+export function useApiClient() { return useHost().apiClient; }
+export function useNotifier() { return useHost().notifier; }
+export function usePrintTemplatesApi() { return useHost().printTemplatesApi; }
+export function useTemplateHooks() { return useHost().templateHooks; }
+export function useCompany() { return useHost().company; }
+export function useSlug() { return useHost().slug; }
 ```
 
 ## FILE: resources/js/pages/settings/print-settings/sections/DocumentSection.tsx
 ```
 import React from 'react';
-import type { ReceiptTemplate80mm } from '../types';
+import type { BorderStyle } from '../types';
+import type { PrintTemplate } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { AlignButtons, BorderSelect } from './HeaderSection';
+import { Field, ColorField, Textarea, Input } from '../components/ui';
+import { isSettingVisible } from '../services/SettingsRegistry';
 
 interface Props {
-  tpl: ReceiptTemplate80mm;
-  update: <K extends keyof ReceiptTemplate80mm>(key: K, val: ReceiptTemplate80mm[K]) => void;
+  tpl: PrintTemplate;
+  update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
 }
 
 export default function DocumentSectionControls({ tpl, update }: Props) {
+  const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
+
   return (
     <>
-      <div className="ps-field">
-        <label className="ps-field-label">Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù…Ø³ØªÙ†Ø¯</label>
-        <input className="ps-input" value={tpl.title_text ?? ''}
-          onChange={e => update('title_text', e.target.value)} />
-      </div>
-      <SliderField label="Ø­Ø¬Ù… Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù…Ø³ØªÙ†Ø¯" value={tpl.title_size} min={10} max={22} unit="px"
-        onChange={v => update('title_size', v)} />
-      <Toggle value={tpl.title_bold} onChange={v => update('title_bold', v)} label="Ø®Ø· Ø¹Ø±ÙŠØ¶" />
-      <AlignButtons label="Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø¹Ù†ÙˆØ§Ù†" value={tpl.title_align}
-        onChange={v => update('title_align', v)} />
+      {sec('title_text') && <Field label="Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù…Ø³ØªÙ†Ø¯">
+        <Input value={tpl.title_text} onChange={v => update('title_text', v)} />
+      </Field>}
+      {sec('title_size') && <SliderField label="Ø­Ø¬Ù… Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù…Ø³ØªÙ†Ø¯" value={tpl.title_size} min={10} max={22} unit="px"
+        onChange={v => update('title_size', v)} />}
+      {sec('title_bold') && <Toggle value={tpl.title_bold} onChange={v => update('title_bold', v)} label="Ø®Ø· Ø¹Ø±ÙŠØ¶" />}
+      {sec('title_align') && <AlignButtons label="Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø¹Ù†ÙˆØ§Ù†" value={tpl.title_align} onChange={v => update('title_align', v)} />}
+      {sec('title_color') && <ColorField label="Ù„ÙˆÙ† Ø§Ù„Ø¹Ù†ÙˆØ§Ù†" value={tpl.title_color} onChange={v => update('title_color', v)} />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
 
-      <Toggle value={tpl.show_doc_number} onChange={v => update('show_doc_number', v)} label="Ø±Ù‚Ù… Ø§Ù„ÙˆØ«ÙŠÙ‚Ø©" />
-      <Toggle value={tpl.show_date}      onChange={v => update('show_date', v)} label="Ø§Ù„ØªØ§Ø±ÙŠØ®" />
-      <Toggle value={tpl.show_time}      onChange={v => update('show_time', v)} label="Ø§Ù„ÙˆÙ‚Øª" />
-      <Toggle value={tpl.show_due_date}   onChange={v => update('show_due_date', v)} label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªØ­Ù‚Ø§Ù‚" />
-      <Toggle value={tpl.show_cashier}   onChange={v => update('show_cashier', v)} label="Ø§Ø³Ù… Ø§Ù„ÙƒØ§Ø´ÙŠØ±" />
-      <Toggle value={tpl.show_client}    onChange={v => update('show_client', v)} label="Ø§Ø³Ù… Ø§Ù„Ø¹Ù…ÙŠÙ„" />
+      {sec('show_doc_number') && <Toggle value={tpl.show_doc_number} onChange={v => update('show_doc_number', v)} label="Ø±Ù‚Ù… Ø§Ù„ÙˆØ«ÙŠÙ‚Ø©" />}
+      {sec('show_date') && <Toggle value={tpl.show_date} onChange={v => update('show_date', v)} label="Ø§Ù„ØªØ§Ø±ÙŠØ®" />}
+      {sec('show_time') && <Toggle value={tpl.show_time} onChange={v => update('show_time', v)} label="Ø§Ù„ÙˆÙ‚Øª" />}
+      {sec('show_due_date') && <Toggle value={tpl.show_due_date} onChange={v => update('show_due_date', v)} label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªØ­Ù‚Ø§Ù‚" />}
+      {sec('show_cashier') && <Toggle value={tpl.show_cashier} onChange={v => update('show_cashier', v)} label="Ø§Ø³Ù… Ø§Ù„ÙƒØ§Ø´ÙŠØ±" />}
+      {sec('show_client') && <Toggle value={tpl.show_client} onChange={v => update('show_client', v)} label="Ø§Ø³Ù… Ø§Ù„Ø¹Ù…ÙŠÙ„" />}
 
-      {tpl.show_client && (
+      {sec('show_client') && tpl.show_client && (
         <>
           <div className="ps-section-title" style={{ fontSize: 12, marginTop: 4 }}>ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¹Ù…ÙŠÙ„</div>
-          <Toggle value={tpl.show_client_nif}    onChange={v => update('show_client_nif', v)} label="Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠ Ù„Ù„Ø¹Ù…ÙŠÙ„" />
-          <Toggle value={tpl.show_client_phone}    onChange={v => update('show_client_phone', v)} label="Ù‡Ø§ØªÙ Ø§Ù„Ø¹Ù…ÙŠÙ„" />
-          <Toggle value={tpl.show_client_address}  onChange={v => update('show_client_address', v)} label="Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø¹Ù…ÙŠÙ„" />
+          {sec('show_client_nif') && <Toggle value={tpl.show_client_nif} onChange={v => update('show_client_nif', v)} label="Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠ Ù„Ù„Ø¹Ù…ÙŠÙ„" />}
+          {sec('show_client_phone') && <Toggle value={tpl.show_client_phone} onChange={v => update('show_client_phone', v)} label="Ù‡Ø§ØªÙ Ø§Ù„Ø¹Ù…ÙŠÙ„" />}
+          {sec('show_client_address') && <Toggle value={tpl.show_client_address} onChange={v => update('show_client_address', v)} label="Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø¹Ù…ÙŠÙ„" />}
+          {sec('show_delivery_address') && <Toggle value={tpl.show_delivery_address} onChange={v => update('show_delivery_address', v)} label="  â†³ Ø¹Ù†ÙˆØ§Ù† Ø§Ù„ØªØ³Ù„ÙŠÙ…" />}
         </>
       )}
 
-      <Toggle value={tpl.show_session}    onChange={v => update('show_session', v)} label="Ø±Ù‚Ù… Ø§Ù„Ø¬Ù„Ø³Ø©" />
-      <Toggle value={tpl.show_payment_term} onChange={v => update('show_payment_term', v)} label="Ø´Ø±ÙˆØ· Ø§Ù„Ø¯ÙØ¹" />
+      {sec('show_session') && <Toggle value={tpl.show_session} onChange={v => update('show_session', v)} label="Ø±Ù‚Ù… Ø§Ù„Ø¬Ù„Ø³Ø©" />}
+      {sec('show_payment_term') && <Toggle value={tpl.show_payment_term} onChange={v => update('show_payment_term', v)} label="Ø´Ø±ÙˆØ· Ø§Ù„Ø¯ÙØ¹" />}
+      {sec('show_bank_details') && <Toggle value={tpl.show_bank_details} onChange={v => update('show_bank_details', v)} label="Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¨Ù†ÙƒÙŠØ©" />}
+      {sec('show_bank_details') && tpl.show_bank_details && (
+        <Field label="Ù†Øµ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¨Ù†ÙƒÙŠØ©">
+          <Textarea value={tpl.bank_details_text} onChange={v => update('bank_details_text', v)} placeholder="CCP: 001 234 567 â€” Ø¨Ù†Ùƒ Ø§Ù„ÙÙ„Ø§Ø­Ø©" rows={3} />
+        </Field>
+      )}
 
-      <BorderSelect label="ÙØ§ØµÙ„ Ø§Ù„Ù…Ø³ØªÙ†Ø¯" value={tpl.doc_separator}
-        onChange={v => update('doc_separator', v as any)} />
+      {sec('doc_separator') && <BorderSelect label="ÙØ§ØµÙ„ Ø§Ù„Ù…Ø³ØªÙ†Ø¯" value={tpl.doc_separator} onChange={v => update('doc_separator', v as BorderStyle)} />}
     </>
   );
 }
@@ -253,79 +5499,78 @@ export default function DocumentSectionControls({ tpl, update }: Props) {
 ## FILE: resources/js/pages/settings/print-settings/sections/FooterSection.tsx
 ```
 import React from 'react';
-import type { ReceiptTemplate80mm } from '../types';
+import type { BorderStyle } from '../types';
+import type { PrintTemplate } from '../types';
 import { Toggle, SliderField, Section } from './ToggleSwitch';
+import { ColorField, Field, Input, Textarea } from '../components/ui';
 import { BorderSelect } from './HeaderSection';
+import { isSettingVisible } from '../services/SettingsRegistry';
 
 interface Props {
-  tpl: ReceiptTemplate80mm;
-  update: <K extends keyof ReceiptTemplate80mm>(key: K, val: ReceiptTemplate80mm[K]) => void;
+  tpl: PrintTemplate;
+  update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
 }
 
 export default function FooterSectionControls({ tpl, update }: Props) {
+  const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
+
   return (
     <>
       <Section title="Ø§Ù„ØªØ°ÙŠÙŠÙ„ â€” Ø§Ù„Ù†ØµÙˆØµ ÙˆØ§Ù„ØªÙˆØ§Ù‚ÙŠØ¹" icon="ti-file-text">
-        <div className="ps-field">
-          <label className="ps-field-label">Ø³Ø·Ø± Ø§Ù„ØªØ°ÙŠÙŠÙ„ 1</label>
-          <input className="ps-input" value={tpl.footer_line1 ?? ''}
-            onChange={e => update('footer_line1', e.target.value)}
+        {sec('footer_line1') && <Field label="Ø³Ø·Ø± Ø§Ù„ØªØ°ÙŠÙŠÙ„ 1">
+          <Input value={tpl.footer_line1}
+            onChange={v => update('footer_line1', v)}
             placeholder="Ù…Ø«Ø§Ù„: Ù…ÙØªÙˆØ­ Ù…Ù† 08:00 Ø¥Ù„Ù‰ 20:00" />
-        </div>
-        <div className="ps-field">
-          <label className="ps-field-label">Ø³Ø·Ø± Ø§Ù„ØªØ°ÙŠÙŠÙ„ 2</label>
-          <input className="ps-input" value={tpl.footer_line2 ?? ''}
-            onChange={e => update('footer_line2', e.target.value)} />
-        </div>
-        <div className="ps-field">
-          <label className="ps-field-label">Ø³Ø·Ø± Ø§Ù„ØªØ°ÙŠÙŠÙ„ 3</label>
-          <input className="ps-input" value={tpl.footer_line3 ?? ''}
-            onChange={e => update('footer_line3', e.target.value)} />
-        </div>
+        </Field>}
+        {sec('footer_line2') && <Field label="Ø³Ø·Ø± Ø§Ù„ØªØ°ÙŠÙŠÙ„ 2">
+          <Input value={tpl.footer_line2}
+            onChange={v => update('footer_line2', v)} />
+        </Field>}
+        {sec('footer_line3') && <Field label="Ø³Ø·Ø± Ø§Ù„ØªØ°ÙŠÙŠÙ„ 3">
+          <Input value={tpl.footer_line3}
+            onChange={v => update('footer_line3', v)} />
+        </Field>}
 
-        <BorderSelect label="ÙØ§ØµÙ„ Ø§Ù„ØªØ°ÙŠÙŠÙ„" value={tpl.footer_separator}
-          onChange={v => update('footer_separator', v as any)} />
+        {sec('footer_separator') && <BorderSelect label="ÙØ§ØµÙ„ Ø§Ù„ØªØ°ÙŠÙŠÙ„" value={tpl.footer_separator}
+          onChange={v => update('footer_separator', v as BorderStyle)} />}
 
         <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
 
-        <Toggle value={tpl.show_thank_you} onChange={v => update('show_thank_you', v)} label="Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø´ÙƒØ±" />
-        {tpl.show_thank_you && (
+        {sec('show_thank_you') && <Toggle value={tpl.show_thank_you} onChange={v => update('show_thank_you', v)} label="Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø´ÙƒØ±" />}
+        {sec('show_thank_you') && tpl.show_thank_you && (
           <>
-            <div className="ps-field">
-              <label className="ps-field-label">Ù†Øµ Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø´ÙƒØ±</label>
-              <input className="ps-input" value={tpl.thank_you_text ?? ''}
-                onChange={e => update('thank_you_text', e.target.value)} />
-            </div>
-            <SliderField label="Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ø´ÙƒØ±" value={tpl.thank_you_size} min={9} max={18} unit="px"
-              onChange={v => update('thank_you_size', v)} />
+            <Field label="Ù†Øµ Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø´ÙƒØ±">
+              <Input value={tpl.thank_you_text}
+                onChange={v => update('thank_you_text', v)} />
+            </Field>
+            {sec('thank_you_size') && <SliderField label="Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ø´ÙƒØ±" value={tpl.thank_you_size} min={9} max={18} unit="px"
+              onChange={v => update('thank_you_size', v)} />}
+            {sec('thank_you_color') && <ColorField label="Ù„ÙˆÙ† Ø§Ù„Ø´ÙƒØ±" value={tpl.thank_you_color} onChange={v => update('thank_you_color', v)} />}
           </>
         )}
 
-        <Toggle value={tpl.show_returns_policy} onChange={v => update('show_returns_policy', v)} label="Ø³ÙŠØ§Ø³Ø© Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹" />
-        {tpl.show_returns_policy && (
-          <div className="ps-field">
-            <label className="ps-field-label">Ù†Øµ Ø³ÙŠØ§Ø³Ø© Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹</label>
-            <textarea className="ps-input ps-textarea" value={tpl.returns_policy_text ?? ''}
-              onChange={e => update('returns_policy_text', e.target.value)} rows={2} />
-          </div>
+        {sec('show_returns_policy') && <Toggle value={tpl.show_returns_policy} onChange={v => update('show_returns_policy', v)} label="Ø³ÙŠØ§Ø³Ø© Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹" />}
+        {sec('show_returns_policy') && tpl.show_returns_policy && (
+          <Field label="Ù†Øµ Ø³ÙŠØ§Ø³Ø© Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹">
+            <Textarea value={tpl.returns_policy_text}
+              onChange={v => update('returns_policy_text', v)} rows={2} />
+          </Field>
         )}
 
-        <div className="ps-field">
-          <label className="ps-field-label">Ù†Øµ Ù‚Ø§Ù†ÙˆÙ†ÙŠ (ØªØ°ÙŠÙŠÙ„ Ø³ÙÙ„ÙŠ)</label>
-          <textarea className="ps-input ps-textarea" value={tpl.footer_legal_text ?? ''}
-            onChange={e => update('footer_legal_text', e.target.value)}
-            placeholder="Ù…Ø«Ø§Ù„: ÙŠÙØ¹ØªØ¨Ø± Ù‡Ø°Ø§ Ø§Ù„Ù…Ø³ØªÙ†Ø¯ Ù…Ù„Ø²Ù…Ø§Ù‹ Ù‚Ø§Ù†ÙˆÙ†ÙŠØ§Ù‹ ÙˆÙÙ‚ Ø§Ù„ØªØ´Ø±ÙŠØ¹ Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠ"
-            rows={2} />
-        </div>
+        {sec('footer_legal_text') && <Field label="Ù†Øµ Ù‚Ø§Ù†ÙˆÙ†ÙŠ (ØªØ°ÙŠÙŠÙ„ Ø³ÙÙ„ÙŠ)">
+          <Textarea value={tpl.footer_legal_text}
+            onChange={v => update('footer_legal_text', v)}
+            placeholder="Ù…Ø«Ø§Ù„: ÙŠÙØ¹ØªØ¨Ø± Ù‡Ø°Ø§ Ø§Ù„Ù…Ø³ØªÙ†Ø¯ Ù…Ù„Ø²Ù…Ø§Ù‹ Ù‚Ø§Ù†ÙˆÙ†ÙŠØ§Ù‹ ÙˆÙÙ‚ Ø§Ù„ØªØ´Ø±ÙŠØ¹ Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠ" rows={2} />
+        </Field>}
       </Section>
 
       <Section title="Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ Ùˆ QR" icon="ti-barcode">
-        <Toggle value={tpl.show_barcode} onChange={v => update('show_barcode', v)} label="Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯" />
-        {tpl.show_barcode && (
+        {sec('show_barcode') && <Toggle value={tpl.show_barcode} onChange={v => update('show_barcode', v)} label="Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯" />}
+        {sec('show_barcode') && tpl.show_barcode && (
           <div className="ps-field">
             <label className="ps-field-label">Ù…Ø­ØªÙˆÙ‰ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯</label>
             <select className="ps-select" value={tpl.barcode_content}
-              onChange={e => update('barcode_content', e.target.value as any)}>
+              onChange={e => update('barcode_content', e.target.value as 'doc-number' | 'total' | 'custom')}>
               <option value="doc-number">Ø±Ù‚Ù… Ø§Ù„Ù…Ø³ØªÙ†Ø¯</option>
               <option value="total">Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</option>
               <option value="custom">Ù†Øµ Ù…Ø®ØµØµ</option>
@@ -338,12 +5583,12 @@ export default function FooterSectionControls({ tpl, update }: Props) {
           </div>
         )}
 
-        <Toggle value={tpl.show_qr} onChange={v => update('show_qr', v)} label="QR Code" />
-        {tpl.show_qr && (
+        {sec('show_qr') && <Toggle value={tpl.show_qr} onChange={v => update('show_qr', v)} label="QR Code" />}
+        {sec('show_qr') && tpl.show_qr && (
           <div className="ps-field">
             <label className="ps-field-label">Ù…Ø­ØªÙˆÙ‰ QR</label>
             <select className="ps-select" value={tpl.qr_content}
-              onChange={e => update('qr_content', e.target.value as any)}>
+              onChange={e => update('qr_content', e.target.value as 'doc-number' | 'company-info' | 'both')}>
               <option value="doc-number">Ø±Ù‚Ù… Ø§Ù„Ù…Ø³ØªÙ†Ø¯</option>
               <option value="company-info">Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ©</option>
               <option value="both">Ø§Ù„Ø§Ø«Ù†ÙŠÙ† Ù…Ø¹Ø§Ù‹</option>
@@ -353,9 +5598,9 @@ export default function FooterSectionControls({ tpl, update }: Props) {
       </Section>
 
       <Section title="Ø§Ù„ØªÙˆØ§Ù‚ÙŠØ¹ ÙˆØ§Ù„Ø®ØªÙ…" icon="ti-signature">
-        <Toggle value={tpl.show_cashier_signature} onChange={v => update('show_cashier_signature', v)} label="Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„ÙƒØ§Ø´ÙŠØ±" />
-        <Toggle value={tpl.show_client_signature}  onChange={v => update('show_client_signature', v)} label="Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„Ø¹Ù…ÙŠÙ„" />
-        <Toggle value={tpl.show_stamp}            onChange={v => update('show_stamp', v)} label="Ø®ØªÙ… Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" />
+        {sec('show_cashier_signature') && <Toggle value={tpl.show_cashier_signature} onChange={v => update('show_cashier_signature', v)} label="Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„ÙƒØ§Ø´ÙŠØ±" />}
+        {sec('show_client_signature') && <Toggle value={tpl.show_client_signature} onChange={v => update('show_client_signature', v)} label="Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„Ø¹Ù…ÙŠÙ„" />}
+        {sec('show_stamp') && <Toggle value={tpl.show_stamp} onChange={v => update('show_stamp', v)} label="Ø®ØªÙ… Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" />}
       </Section>
     </>
   );
@@ -365,39 +5610,66 @@ export default function FooterSectionControls({ tpl, update }: Props) {
 ## FILE: resources/js/pages/settings/print-settings/sections/FormattingSection.tsx
 ```
 import React from 'react';
-import type { ReceiptTemplate80mm } from '../types';
+import type { FontFamily } from '../types';
+import type { PrintTemplate } from '../types';
 import { SliderField } from './ToggleSwitch';
+import { Field, Select, Pills } from '../components/ui';
+import { isSettingVisible } from '../services/SettingsRegistry';
 
 interface Props {
-  tpl: ReceiptTemplate80mm;
-  update: <K extends keyof ReceiptTemplate80mm>(key: K, val: ReceiptTemplate80mm[K]) => void;
+  tpl: PrintTemplate;
+  update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
 }
 
 export default function FormattingSectionControls({ tpl, update }: Props) {
+  const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
+  const isThermal = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
+
   return (
     <>
-      <div className="ps-field">
-        <label className="ps-field-label">Ø¹Ø±Ø¶ Ø§Ù„ÙˆØ±Ù‚</label>
-        <div className="ps-paper-pills" style={{ marginTop: 2 }}>
-          {([80, 58] as const).map(w => (
-            <button key={w} className={`ps-paper-pill ${tpl.paper_width_mm === w ? 'on' : ''}`}
-              onClick={() => update('paper_width_mm', w)}>
-              {w} mm
-            </button>
-          ))}
+      {sec('paper_width_mm') && isThermal && (
+        <div className="ps-field">
+          <label className="ps-field-label">Ø¹Ø±Ø¶ Ø§Ù„ÙˆØ±Ù‚ (Ø­Ø±Ø§Ø±ÙŠ)</label>
+          <div className="ps-paper-pills" style={{ marginTop: 2 }}>
+            {([80, 58] as const).map(w => (
+              <button key={w} className={`ps-paper-pill ${tpl.paper_width_mm === w ? 'on' : ''}`}
+                onClick={() => update('paper_width_mm', w)}>
+                {w} mm
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <SliderField label="Ø§Ù„Ù‡Ø§Ù…Ø´ Ø§Ù„Ø¹Ù„ÙˆÙŠ" value={tpl.margin_top} min={0} max={10} unit="mm"
-        onChange={v => update('margin_top', v)} />
-      <SliderField label="Ø§Ù„Ù‡Ø§Ù…Ø´ Ø§Ù„Ø³ÙÙ„ÙŠ" value={tpl.margin_bottom} min={0} max={10} unit="mm"
-        onChange={v => update('margin_bottom', v)} />
-      <SliderField label="Ø§Ù„Ù‡Ø§Ù…Ø´ Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠ" value={tpl.margin_sides} min={0} max={10} unit="mm"
-        onChange={v => update('margin_sides', v)} />
-      <SliderField label="ØªØ¨Ø§Ø¹Ø¯ Ø§Ù„Ø£Ø³Ø·Ø±" value={tpl.line_spacing} min={1} max={2.5} step={0.1} unit="Ã—"
-        onChange={v => update('line_spacing', v)} />
-      <SliderField label="Ø­Ø¬Ù… Ø§Ù„Ø®Ø· Ø§Ù„Ø£Ø³Ø§Ø³ÙŠ" value={tpl.base_font_size} min={8} max={14} unit="px"
-        onChange={v => update('base_font_size', v)} />
+      {!isThermal && sec('page_orientation') && (
+        <Field label="Ø§ØªØ¬Ø§Ù‡ Ø§Ù„ØµÙØ­Ø©">
+          <Pills
+            options={[{ v: 'portrait' as const, l: 'Ø¹Ù…ÙˆØ¯ÙŠ' }, { v: 'landscape' as const, l: 'Ø£ÙÙ‚ÙŠ' }]}
+            value={tpl.page_orientation}
+            onChange={v => update('page_orientation', v)}
+          />
+        </Field>
+      )}
+
+      {sec('margin_top') && <SliderField label="Ø§Ù„Ù‡Ø§Ù…Ø´ Ø§Ù„Ø¹Ù„ÙˆÙŠ" value={tpl.margin_top} min={0} max={10} unit="mm"
+        onChange={v => update('margin_top', v)} />}
+      {sec('margin_bottom') && <SliderField label="Ø§Ù„Ù‡Ø§Ù…Ø´ Ø§Ù„Ø³ÙÙ„ÙŠ" value={tpl.margin_bottom} min={0} max={10} unit="mm"
+        onChange={v => update('margin_bottom', v)} />}
+      {sec('margin_sides') && <SliderField label="Ø§Ù„Ù‡Ø§Ù…Ø´ Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠ" value={tpl.margin_sides} min={0} max={10} unit="mm"
+        onChange={v => update('margin_sides', v)} />}
+      {sec('line_spacing') && <SliderField label="ØªØ¨Ø§Ø¹Ø¯ Ø§Ù„Ø£Ø³Ø·Ø±" value={tpl.line_spacing} min={1} max={2.5} step={0.1} unit="Ã—"
+        onChange={v => update('line_spacing', v)} />}
+      {sec('base_font_size') && <SliderField label="Ø­Ø¬Ù… Ø§Ù„Ø®Ø· Ø§Ù„Ø£Ø³Ø§Ø³ÙŠ" value={tpl.base_font_size} min={8} max={14} unit="px"
+        onChange={v => update('base_font_size', v)} />}
+
+      {sec('font_family') && <Field label="Ù†ÙˆØ¹ Ø§Ù„Ø®Ø· Ø§Ù„Ø£Ø³Ø§Ø³ÙŠ">
+        <Select value={tpl.font_family} onChange={v => update('font_family', v as FontFamily)}>
+          <option value="tajawal">Tajawal â€” Ø¹Ø±Ø¨ÙŠ</option>
+          <option value="monospace">Courier â€” Ø£Ø­Ø§Ø¯ÙŠ</option>
+          <option value="arial">Arial â€” Ù„Ø§ØªÙŠÙ†ÙŠ</option>
+          <option value="times">Times New Roman</option>
+        </Select>
+      </Field>}
     </>
   );
 }
@@ -405,22 +5677,100 @@ export default function FormattingSectionControls({ tpl, update }: Props) {
 
 ## FILE: resources/js/pages/settings/print-settings/sections/HeaderSection.tsx
 ```
-import React from 'react';
-import type { ReceiptTemplate80mm, AlignOption, CompanyPreviewData } from '../types';
+import React, { useRef, useState } from 'react';
+import type { AlignOption, BorderStyle } from '../types';
+import type { PrintTemplate } from '../types';
+import type { CompanyData } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
+import { Field, ColorField, Input } from '../components/ui';
+import { usePrintTemplatesApi } from '../providers/PrintSettingsContext';
+import { isSettingVisible } from '../services/SettingsRegistry';
+import ImagePreviewModal from '../components/ImagePreviewModal';
 
 interface Props {
-  tpl: ReceiptTemplate80mm;
-  update: <K extends keyof ReceiptTemplate80mm>(key: K, val: ReceiptTemplate80mm[K]) => void;
-  company?: CompanyPreviewData | null;
+  tpl: PrintTemplate;
+  update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
+  company?: CompanyData | null;
 }
 
 export default function HeaderSectionControls({ tpl, update, company }: Props) {
+  const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
+  const [uploading, setUploading] = useState(false);
+  const [zoomImg, setZoomImg] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const templatesApi = usePrintTemplatesApi();
+
+  const logoPreviewUrl = tpl.logo_source === 'custom' ? tpl.custom_logo_url
+    : tpl.logo_source === 'company' ? (company?.logoUrl ?? null)
+    : null;
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await templatesApi.uploadLogo(file);
+      update('custom_logo_url', res.url);
+      update('logo_source', 'custom');
+    } catch {
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
   return (
     <>
-      <Toggle value={tpl.show_logo} onChange={v => update('show_logo', v)} label="Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø´Ø¹Ø§Ø±" />
-      {tpl.show_logo && (
+      {sec('show_logo') && <Toggle value={tpl.show_logo} onChange={v => update('show_logo', v)} label="Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø´Ø¹Ø§Ø±" />}
+      {sec('show_logo') && tpl.show_logo && (
         <>
+          <div className="ps-field">
+            <label className="ps-field-label">Ù…ØµØ¯Ø± Ø§Ù„Ø´Ø¹Ø§Ø±</label>
+            <div className="ps-paper-pills" style={{ marginTop: 2 }}>
+              {(['default', 'company', 'custom'] as const).map(s => (
+                <button key={s} className={`ps-paper-pill ${tpl.logo_source === s ? 'on' : ''}`}
+                  onClick={() => update('logo_source', s)}>
+                  {s === 'default' ? 'Ø§ÙØªØ±Ø§Ø¶ÙŠ' : s === 'company' ? 'Ø´Ø¹Ø§Ø± Ø§Ù„Ø´Ø±ÙƒØ©' : 'Ø´Ø¹Ø§Ø± Ù…Ø®ØµØµ'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="ps-field">
+            <label className="ps-field-label">Ù…Ø¹Ø§ÙŠÙ†Ø© Ø§Ù„Ø´Ø¹Ø§Ø±</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 36 }}>
+              {logoPreviewUrl ? (
+                <img src={logoPreviewUrl} alt="logo preview"
+                  onClick={() => setZoomImg(logoPreviewUrl)}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 6, cursor: 'zoom-in', border: '1px solid var(--b2)' }} />
+              ) : (
+                <span style={{ fontSize: 11, color: 'var(--t4)' }}>
+                  {tpl.logo_source === 'default' ? 'Ø³ÙŠØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ø­Ø±Ù Ø§Ù„Ø£ÙˆÙ„ Ù…Ù† Ø§Ø³Ù… Ø§Ù„Ù…Ø¤Ø³Ø³Ø©' : 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø´Ø¹Ø§Ø±'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {tpl.logo_source === 'custom' && (
+            <div className="ps-field">
+              <label className="ps-field-label">Ø±ÙØ¹ Ø´Ø¹Ø§Ø± Ù…Ø®ØµØµ</label>
+              <input ref={fileRef} type="file" accept="image/*" hidden
+                onChange={handleLogoUpload} />
+              <button onClick={() => fileRef.current?.click()} type="button"
+                disabled={uploading}
+                style={{
+                  padding: '5px 10px', borderRadius: 'var(--r1)', fontSize: 11,
+                  border: '1px solid var(--b2)', background: 'var(--bg3)',
+                  color: 'var(--t2)', cursor: uploading ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                <i className={`ti ${uploading ? 'ti-loader-2 spin' : 'ti-upload'}`} />
+                {uploading ? 'Ø±ÙØ¹...' : 'Ø§Ø®ØªÙŠØ§Ø± ØµÙˆØ±Ø©'}
+              </button>
+            </div>
+          )}
+
           <SliderField label="Ø­Ø¬Ù… Ø§Ù„Ø´Ø¹Ø§Ø±" value={tpl.logo_size} min={30} max={120} unit="px"
             onChange={v => update('logo_size', v)} />
           <AlignButtons label="Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø´Ø¹Ø§Ø±" value={tpl.logo_align}
@@ -428,37 +5778,39 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
         </>
       )}
 
-      <Toggle value={tpl.show_company_name} onChange={v => update('show_company_name', v)} label="Ø§Ø³Ù… Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" />
-      {tpl.show_company_name && (
+      <ImagePreviewModal open={!!zoomImg} src={zoomImg ?? ''} onClose={() => setZoomImg(null)} />
+
+      {sec('show_company_name') && <Toggle value={tpl.show_company_name} onChange={v => update('show_company_name', v)} label="Ø§Ø³Ù… Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" />}
+      {sec('show_company_name') && tpl.show_company_name && (
         <>
           <SliderField label="Ø­Ø¬Ù… Ø§Ù„Ø®Ø·" value={tpl.company_name_size} min={10} max={28} unit="px"
             onChange={v => update('company_name_size', v)} />
           <Toggle value={tpl.company_name_bold} onChange={v => update('company_name_bold', v)} label="Ø®Ø· Ø¹Ø±ÙŠØ¶" />
           <AlignButtons label="Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø§Ø³Ù…" value={tpl.company_name_align}
             onChange={v => update('company_name_align', v)} />
+          <ColorField label="Ù„ÙˆÙ† Ø§Ù„Ø§Ø³Ù…" value={tpl.company_name_color} onChange={v => update('company_name_color', v)} />
         </>
       )}
 
-      <div className="ps-field">
-        <label className="ps-field-label">Ù†Øµ Ø¥Ø¶Ø§ÙÙŠ ÙÙŠ Ø§Ù„Ø±Ø£Ø³</label>
-        <input className="ps-input" value={tpl.header_custom_text ?? ''}
-          onChange={e => update('header_custom_text', e.target.value)}
+      {sec('header_custom_text') && <Field label="Ù†Øµ Ø¥Ø¶Ø§ÙÙŠ ÙÙŠ Ø§Ù„Ø±Ø£Ø³">
+        <Input value={tpl.header_custom_text}
+          onChange={v => update('header_custom_text', v)}
           placeholder="Ù…Ø«Ø§Ù„: Ø§Ù„Ø³Ø¬Ù„ Ø§Ù„ØªØ¬Ø§Ø±ÙŠ: 13/B.0123456" />
-      </div>
+      </Field>}
 
       <div className="ps-section-title" style={{ marginTop: 8, fontSize: 12 }}>Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ©</div>
-      <Toggle value={tpl.show_address} onChange={v => update('show_address', v)} label="Ø§Ù„Ø¹Ù†ÙˆØ§Ù†" />
-      <Toggle value={tpl.show_phone}   onChange={v => update('show_phone', v)} label="Ø§Ù„Ù‡Ø§ØªÙ" />
-      <Toggle value={tpl.show_tax_id}   onChange={v => update('show_tax_id', v)} label="Ø±Ù‚Ù… NIF" />
-      <Toggle value={tpl.show_rc}      onChange={v => update('show_rc', v)} label="Ø§Ù„Ø³Ø¬Ù„ Ø§Ù„ØªØ¬Ø§Ø±ÙŠ RC" />
-      <Toggle value={tpl.show_nis}     onChange={v => update('show_nis', v)} label="Ø±Ù‚Ù… NIS / STAT" />
-      <Toggle value={tpl.show_ice}     onChange={v => update('show_ice', v)} label="Ø±Ù‚Ù… ICE" />
-      <Toggle value={tpl.show_article} onChange={v => update('show_article', v)} label="Ø§Ù„Ù†Ø´Ø§Ø· (Article)" />
+      {sec('show_address') && <Toggle value={tpl.show_address} onChange={v => update('show_address', v)} label="Ø§Ù„Ø¹Ù†ÙˆØ§Ù†" />}
+      {sec('show_phone') && <Toggle value={tpl.show_phone}   onChange={v => update('show_phone', v)} label="Ø§Ù„Ù‡Ø§ØªÙ" />}
+      {sec('show_tax_id') && <Toggle value={tpl.show_tax_id}   onChange={v => update('show_tax_id', v)} label="Ø±Ù‚Ù… NIF" />}
+      {sec('show_rc') && <Toggle value={tpl.show_rc}      onChange={v => update('show_rc', v)} label="Ø§Ù„Ø³Ø¬Ù„ Ø§Ù„ØªØ¬Ø§Ø±ÙŠ RC" />}
+      {sec('show_nis') && <Toggle value={tpl.show_nis}     onChange={v => update('show_nis', v)} label="Ø±Ù‚Ù… NIS / STAT" />}
+      {sec('show_ice') && <Toggle value={tpl.show_ice}     onChange={v => update('show_ice', v)} label="Ø±Ù‚Ù… ICE" />}
+      {sec('show_article') && <Toggle value={tpl.show_article} onChange={v => update('show_article', v)} label="Ø§Ù„Ù†Ø´Ø§Ø· (Article)" />}
 
-      <SliderField label="Ø­Ø¬Ù… Ø®Ø· Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ©" value={tpl.company_info_size} min={7} max={14} unit="px"
-        onChange={v => update('company_info_size', v)} />
-      <AlignButtons label="Ù…Ø­Ø§Ø°Ø§Ø© Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ©" value={tpl.company_info_align}
-        onChange={v => update('company_info_align', v)} />
+      {sec('company_info_size') && <SliderField label="Ø­Ø¬Ù… Ø®Ø· Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ©" value={tpl.company_info_size} min={7} max={14} unit="px"
+        onChange={v => update('company_info_size', v)} />}
+      {sec('company_info_align') && <AlignButtons label="Ù…Ø­Ø§Ø°Ø§Ø© Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ©" value={tpl.company_info_align}
+        onChange={v => update('company_info_align', v)} />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
       <div className="ps-section-title" style={{ fontSize: 12, marginBottom: 4 }}>
@@ -467,17 +5819,18 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
           (Ø§ØªØ±ÙƒÙ‡Ø§ ÙØ§Ø±ØºØ© Ù„Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ© ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹)
         </span>
       </div>
-      <CompanyField label="Ø§Ù„Ø§Ø³Ù…" value={tpl.company_name_text} onChange={v => update('company_name_text', v)} placeholder="Ø§Ø³Ù… Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" apiValue={company?.name} />
-      <CompanyField label="Ø§Ù„Ø¹Ù†ÙˆØ§Ù†" value={tpl.override_address} onChange={v => update('override_address', v)} placeholder="Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" apiValue={company?.address} />
-      <CompanyField label="Ø§Ù„Ù‡Ø§ØªÙ" value={tpl.override_phone} onChange={v => update('override_phone', v)} placeholder="Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ" apiValue={company?.phone} />
-      <CompanyField label="NIF" value={tpl.override_nif} onChange={v => update('override_nif', v)} placeholder="Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠ" apiValue={company?.nif} />
-      <CompanyField label="RC" value={tpl.override_rc} onChange={v => update('override_rc', v)} placeholder="Ø§Ù„Ø³Ø¬Ù„ Ø§Ù„ØªØ¬Ø§Ø±ÙŠ" apiValue={company?.rc} />
-      <CompanyField label="NIS" value={tpl.override_nis} onChange={v => update('override_nis', v)} placeholder="Ø±Ù‚Ù… NIS" apiValue={company?.nis} />
-      <CompanyField label="ICE" value={tpl.override_ice} onChange={v => update('override_ice', v)} placeholder="Ø±Ù‚Ù… ICE" />
-      <CompanyField label="Ø§Ù„Ù†Ø´Ø§Ø·" value={tpl.override_article} onChange={v => update('override_article', v)} placeholder="Ù†Ø´Ø§Ø· Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" apiValue={company?.article} />
+      {sec('company_name_text') && <CompanyField label="Ø§Ù„Ø§Ø³Ù…" value={tpl.company_name_text} onChange={v => update('company_name_text', v)} placeholder="Ø§Ø³Ù… Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" apiValue={company?.name} />}
+      {sec('override_address') && <CompanyField label="Ø§Ù„Ø¹Ù†ÙˆØ§Ù†" value={tpl.override_address} onChange={v => update('override_address', v)} placeholder="Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" apiValue={company?.address} />}
+      {sec('override_phone') && <CompanyField label="Ø§Ù„Ù‡Ø§ØªÙ" value={tpl.override_phone} onChange={v => update('override_phone', v)} placeholder="Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ" apiValue={company?.phone} />}
+      {sec('override_nif') && <CompanyField label="NIF" value={tpl.override_nif} onChange={v => update('override_nif', v)} placeholder="Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠ" apiValue={company?.nif} />}
+      {sec('override_rc') && <CompanyField label="RC" value={tpl.override_rc} onChange={v => update('override_rc', v)} placeholder="Ø§Ù„Ø³Ø¬Ù„ Ø§Ù„ØªØ¬Ø§Ø±ÙŠ" apiValue={company?.rc} />}
+      {sec('override_nis') && <CompanyField label="NIS" value={tpl.override_nis} onChange={v => update('override_nis', v)} placeholder="Ø±Ù‚Ù… NIS" apiValue={company?.nis} />}
+      {sec('override_ice') && <CompanyField label="ICE" value={tpl.override_ice} onChange={v => update('override_ice', v)} placeholder="Ø±Ù‚Ù… ICE" />}
+      {sec('override_article') && <CompanyField label="Ø§Ù„Ù†Ø´Ø§Ø·" value={tpl.override_article} onChange={v => update('override_article', v)} placeholder="Ù†Ø´Ø§Ø· Ø§Ù„Ù…Ø¤Ø³Ø³Ø©" apiValue={company?.article} />}
 
-      <BorderSelect label="ÙØ§ØµÙ„ Ø§Ù„Ø±Ø£Ø³" value={tpl.header_separator}
-        onChange={v => update('header_separator', v as any)} />
+      {sec('logo_border_radius') && <SliderField label="ØªØ¯ÙˆÙŠØ± Ø§Ù„Ø²ÙˆØ§ÙŠØ§" value={tpl.logo_border_radius} min={0} max={50} unit="%" onChange={v => update('logo_border_radius', v)} />}
+      {sec('header_separator') && <BorderSelect label="ÙØ§ØµÙ„ Ø§Ù„Ø±Ø£Ø³" value={tpl.header_separator}
+        onChange={v => update('header_separator', v as BorderStyle)} />}
     </>
   );
 }
@@ -501,7 +5854,7 @@ export function AlignButtons({ label, value, onChange }: {
 }
 
 export function BorderSelect({ label, value, onChange }: {
-  label: string; value: 'solid' | 'dashed' | 'double' | 'none'; onChange: (v: any) => void;
+  label: string; value: BorderStyle; onChange: (v: BorderStyle) => void;
 }) {
   return (
     <div className="ps-field">
@@ -539,10 +5892,13 @@ export function CompanyField({ label, value, onChange, placeholder, apiValue }: 
 
 ## FILE: resources/js/pages/settings/print-settings/sections/ItemsSection.tsx
 ```
-import React from 'react';
-import type { ReceiptTemplate80mm, ColumnKey } from '../types';
+import React, { useState, useRef } from 'react';
+import type { ColumnKey, FontFamily, BorderStyle } from '../types';
+import type { PrintTemplate } from '../types';
 import { Toggle, SliderField, Section } from './ToggleSwitch';
+import { ColorField } from '../components/ui';
 import { BorderSelect } from './HeaderSection';
+import { isSettingVisible } from '../services/SettingsRegistry';
 
 const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'rowNumber', label: 'Ø±Ù‚Ù… Ø§Ù„Ø³Ø·Ø±' },
@@ -558,11 +5914,16 @@ const COLUMNS: { key: ColumnKey; label: string }[] = [
 ];
 
 interface Props {
-  tpl: ReceiptTemplate80mm;
-  update: <K extends keyof ReceiptTemplate80mm>(key: K, val: ReceiptTemplate80mm[K]) => void;
+  tpl: PrintTemplate;
+  update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
 }
 
 export default function ItemsSectionControls({ tpl, update }: Props) {
+  const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
+  const [dragKey, setDragKey] = useState<ColumnKey | null>(null);
+  const dragOverKey = useRef<ColumnKey | null>(null);
+  const lastDropTarget = useRef<ColumnKey | null>(null);
+
   const toggleCol = (key: ColumnKey, show: boolean) => {
     const newShow = { ...tpl.col_show, [key]: show };
     update('col_show', newShow);
@@ -581,6 +5942,32 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
     update('col_order', newOrder);
   };
 
+  const handleDragStart = (key: ColumnKey) => {
+    setDragKey(key);
+  };
+
+  const handleDragOver = (e: React.DragEvent, key: ColumnKey) => {
+    e.preventDefault();
+    if (!dragKey || dragKey === key) return;
+    if (lastDropTarget.current === key) return;
+    lastDropTarget.current = key;
+    dragOverKey.current = key;
+    const from = tpl.col_order.indexOf(dragKey);
+    const to = tpl.col_order.indexOf(key);
+    if (from < 0 || to < 0) return;
+    const newOrder = [...tpl.col_order];
+    newOrder.splice(from, 1);
+    newOrder.splice(to, 0, dragKey);
+    update('col_order', newOrder);
+    setDragKey(key);
+  };
+
+  const handleDragEnd = () => {
+    setDragKey(null);
+    dragOverKey.current = null;
+    lastDropTarget.current = null;
+  };
+
   const changeColWidth = (key: ColumnKey, width: number) => {
     update('col_widths', { ...tpl.col_widths, [key]: Math.max(5, Math.min(60, width)) });
   };
@@ -593,94 +5980,105 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
     update('col_aligns', { ...tpl.col_aligns, [key]: align });
   };
 
-  const ALIGN_OPTIONS: { key: 'right' | 'left' | 'center'; label: string }[] = [
-    { key: 'right', label: 'ÙŠÙ…ÙŠÙ†' },
-    { key: 'center', label: 'ÙˆØ³Ø·' },
-    { key: 'left', label: 'ÙŠØ³Ø§Ø±' },
-  ];
-
   return (
     <>
-      <Section title="Ø§Ù„Ø£Ø¹Ù…Ø¯Ø© â€” Ø¥Ø¸Ù‡Ø§Ø± / ØªØ±ØªÙŠØ¨ / Ø¹Ø±Ø¶" icon="ti-list-details">
-        <div className="ps-section-sub" style={{ marginBottom: 8 }}>
-          Ø§Ø®ØªØ± Ø§Ù„Ø£Ø¹Ù…Ø¯Ø© Ø§Ù„ØªÙŠ ØªØ¸Ù‡Ø± ÙÙŠ Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§ØªØŒ ÙˆØ±ØªØ¨Ù‡Ø§ Ø­Ø³Ø¨ Ù…Ø§ ØªØ±ÙŠØ¯
-        </div>
+      {sec('col_order') && (
+        <Section title="Ø§Ù„Ø£Ø¹Ù…Ø¯Ø© â€” Ø¥Ø¸Ù‡Ø§Ø± / ØªØ±ØªÙŠØ¨ / Ø¹Ø±Ø¶" icon="ti-list-details">
+          <div className="ps-section-sub" style={{ marginBottom: 8 }}>
+            Ø§Ø®ØªØ± Ø§Ù„Ø£Ø¹Ù…Ø¯Ø© Ø§Ù„ØªÙŠ ØªØ¸Ù‡Ø± ÙÙŠ Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§ØªØŒ ÙˆØ±ØªØ¨Ù‡Ø§ Ø­Ø³Ø¨ Ù…Ø§ ØªØ±ÙŠØ¯ â€” Ø§Ø³Ø­Ø¨ ÙˆØ£ÙÙ„Øª Ù„Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ±ØªÙŠØ¨
+          </div>
 
-        {COLUMNS.map(col => {
-          const visible = tpl.col_show[col.key] !== false;
-          const idx = tpl.col_order.indexOf(col.key);
-          return (
-            <div key={col.key} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 0', borderBottom: '1px solid var(--b1)',
-            }}>
-              <div
-                className={`ps-toggle-track ${visible ? 'on' : ''}`}
-                onClick={() => toggleCol(col.key, !visible)}
-                style={{ flexShrink: 0 }}
-              >
-                <div className="ps-toggle-thumb" />
-              </div>
-
-              <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--t2)' }}>
-                {col.label}
-              </span>
-
-              <button className="ps-btn-xs" onClick={() => moveCol(col.key, -1)}
-                disabled={idx <= 0}
-                style={{ opacity: idx <= 0 ? 0.3 : 1 }}>
-                <i className="ti ti-chevron-right" />
-              </button>
-              <button className="ps-btn-xs" onClick={() => moveCol(col.key, 1)}
-                disabled={idx >= tpl.col_order.length - 1}
-                style={{ opacity: idx >= tpl.col_order.length - 1 ? 0.3 : 1 }}>
-                <i className="ti ti-chevron-left" />
-              </button>
-
-              {visible && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <div className="ps-paper-pills" style={{ gap: 2 }}>
-                    {ALIGN_OPTIONS.map(a => (
-                      <button key={a.key}
-                        className={`ps-paper-pill ${(tpl.col_aligns?.[col.key] ?? 'right') === a.key ? 'on' : ''}`}
-                        onClick={() => changeColAlign(col.key, a.key)}
-                        style={{ fontSize: 9, padding: '1px 4px' }}>
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                  <input type="range" min={5} max={60} step={1}
-                    value={tpl.col_widths[col.key] ?? 20}
-                    onChange={e => changeColWidth(col.key, Number(e.target.value))}
-                    style={{ width: 40, height: 3 }} />
-                  <span style={{ fontSize: 10, color: 'var(--t4)', minWidth: 20 }}>
-                    {tpl.col_widths[col.key] ?? 20}%
-                  </span>
+          {COLUMNS.map(col => {
+            const visible = tpl.col_show[col.key] !== false;
+            const idx = tpl.col_order.indexOf(col.key);
+            const isDragging = dragKey === col.key;
+            return (
+              <div key={col.key} draggable
+                onDragStart={() => handleDragStart(col.key)}
+                onDragOver={e => handleDragOver(e, col.key)}
+                onDragEnd={handleDragEnd}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '5px 0', borderBottom: '1px solid var(--b1)',
+                  cursor: 'grab',
+                  opacity: isDragging ? 0.4 : 1,
+                  background: isDragging ? 'var(--emb)' : 'transparent',
+                  borderTop: dragOverKey.current === col.key && dragKey !== col.key ? '2px solid var(--em)' : 'none',
+                  borderTopStyle: dragOverKey.current === col.key && dragKey !== col.key ? 'dashed' : 'none',
+                }}>
+                <div
+                  className={`ps-toggle-track ${visible ? 'on' : ''}`}
+                  onClick={() => toggleCol(col.key, !visible)}
+                  style={{ flexShrink: 0 }}
+                >
+                  <div className="ps-toggle-thumb" />
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </Section>
+
+                <span style={{
+                  flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--t2)',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <i className="ti ti-grip-vertical" style={{ fontSize: 10, opacity: 0.3 }} />
+                  {col.label}
+                </span>
+
+                <button className="ps-btn-xs" onClick={() => moveCol(col.key, -1)}
+                  disabled={idx <= 0}
+                  style={{ opacity: idx <= 0 ? 0.3 : 1 }}>
+                  <i className="ti ti-chevron-right" />
+                </button>
+                <button className="ps-btn-xs" onClick={() => moveCol(col.key, 1)}
+                  disabled={idx >= tpl.col_order.length - 1}
+                  style={{ opacity: idx >= tpl.col_order.length - 1 ? 0.3 : 1 }}>
+                  <i className="ti ti-chevron-left" />
+                </button>
+
+                {visible && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <div className="ps-paper-pills" style={{ gap: 2 }}>
+                      {(['right', 'center', 'left'] as const).map(a => (
+                        <button key={a}
+                          className={`ps-paper-pill ${(tpl.col_aligns?.[col.key] ?? 'right') === a ? 'on' : ''}`}
+                          onClick={() => changeColAlign(col.key, a)}
+                          style={{ fontSize: 9, padding: '1px 4px' }}>
+                          {a === 'right' ? 'ÙŠÙ…ÙŠÙ†' : a === 'center' ? 'ÙˆØ³Ø·' : 'ÙŠØ³Ø§Ø±'}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="range" min={5} max={60} step={1}
+                      value={tpl.col_widths[col.key] ?? 20}
+                      onChange={e => changeColWidth(col.key, Number(e.target.value))}
+                      style={{ width: 40, height: 3 }} />
+                    <span style={{ fontSize: 10, color: 'var(--t4)', minWidth: 20 }}>
+                      {tpl.col_widths[col.key] ?? 20}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </Section>
+      )}
 
       <Section title="ØªÙ†Ø³ÙŠÙ‚ Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª" icon="ti-table-options">
-        <SliderField label="Ø­Ø¬Ù… Ø§Ù„Ø®Ø·" value={tpl.items_font_size} min={7} max={14} unit="px"
-          onChange={v => update('items_font_size', v)} />
+        {sec('items_font_size') && <SliderField label="Ø­Ø¬Ù… Ø§Ù„Ø®Ø·" value={tpl.items_font_size} min={7} max={14} unit="px"
+          onChange={v => update('items_font_size', v)} />}
 
-        <div className="ps-field">
+        {sec('items_font_family') && <div className="ps-field">
           <label className="ps-field-label">Ù†ÙˆØ¹ Ø§Ù„Ø®Ø·</label>
           <select className="ps-select" value={tpl.items_font_family}
-            onChange={e => update('items_font_family', e.target.value as any)}>
+            onChange={e => update('items_font_family', e.target.value as FontFamily)}>
             <option value="tajawal">Tajawal (ÙˆØ§Ø¶Ø­)</option>
             <option value="monospace">Courier (Ø£Ø­Ø§Ø¯ÙŠ)</option>
           </select>
-        </div>
+        </div>}
 
-        <Toggle value={tpl.show_col_header} onChange={v => update('show_col_header', v)} label="Ø¥Ø¸Ù‡Ø§Ø± Ø±Ø£Ø³ Ø§Ù„Ø¬Ø¯ÙˆÙ„" />
-        {tpl.show_col_header && (
+        {sec('show_col_header') && <Toggle value={tpl.show_col_header} onChange={v => update('show_col_header', v)} label="Ø¥Ø¸Ù‡Ø§Ø± Ø±Ø£Ø³ Ø§Ù„Ø¬Ø¯ÙˆÙ„" />}
+        {sec('show_col_header') && tpl.show_col_header && (
           <>
-            <Toggle value={tpl.table_header_bold} onChange={v => update('table_header_bold', v)} label="Ø®Ø· Ø¹Ø±ÙŠØ¶ Ù„Ù„Ø±Ø£Ø³" />
-            <Toggle value={tpl.table_header_bg} onChange={v => update('table_header_bg', v)} label="Ø®Ù„ÙÙŠØ© Ù„Ù„Ø±Ø£Ø³" />
+            {sec('table_header_bold') && <Toggle value={tpl.table_header_bold} onChange={v => update('table_header_bold', v)} label="Ø®Ø· Ø¹Ø±ÙŠØ¶ Ù„Ù„Ø±Ø£Ø³" />}
+            {sec('table_header_bg') && <Toggle value={tpl.table_header_bg} onChange={v => update('table_header_bg', v)} label="Ø®Ù„ÙÙŠØ© Ù„Ù„Ø±Ø£Ø³" />}
+            {sec('table_header_color') && <ColorField label="Ù„ÙˆÙ† Ù†Øµ Ø§Ù„Ø±Ø£Ø³" value={tpl.table_header_color} onChange={v => update('table_header_color', v)} />}
             {COLUMNS.filter(c => tpl.col_show[c.key] !== false).map(col => (
               <div className="ps-field" key={col.key} style={{ marginTop: 2 }}>
                 <label className="ps-field-label">Ø±Ø£Ø³: {col.label}</label>
@@ -693,13 +6091,16 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
           </>
         )}
 
-        <BorderSelect label="Ø­Ø¯ÙˆØ¯ Ø§Ù„Ø¬Ø¯ÙˆÙ„" value={tpl.table_border_style}
-          onChange={v => update('table_border_style', v as any)} />
-        <Toggle value={tpl.alternating_rows} onChange={v => update('alternating_rows', v)} label="ØªÙ„ÙˆÙŠÙ† Ù…ØªÙ†Ø§ÙˆØ¨ Ù„Ù„Ø£Ø³Ø·Ø±" />
+        {sec('table_border_style') && <BorderSelect label="Ø­Ø¯ÙˆØ¯ Ø§Ù„Ø¬Ø¯ÙˆÙ„" value={tpl.table_border_style}
+          onChange={v => update('table_border_style', v as BorderStyle)} />}
+        {sec('alternating_rows') && <Toggle value={tpl.alternating_rows} onChange={v => update('alternating_rows', v)} label="ØªÙ„ÙˆÙŠÙ† Ù…ØªÙ†Ø§ÙˆØ¨ Ù„Ù„Ø£Ø³Ø·Ø±" />}
+        {sec('alternating_rows') && tpl.alternating_rows && (
+          <ColorField label="Ù„ÙˆÙ† Ø§Ù„Ø£Ø³Ø·Ø± Ø§Ù„Ø²ÙˆØ¬ÙŠØ©" value={tpl.alternating_color} onChange={v => update('alternating_color', v)} />
+        )}
       </Section>
 
       <Section title="Ø®ÙŠØ§Ø±Ø§Øª Ø¹Ø±Ø¶ Ø§Ù„Ø£Ø³Ø¹Ø§Ø±" icon="ti-calculator">
-        <div className="ps-field">
+        {sec('price_display') && <div className="ps-field">
           <label className="ps-field-label">Ø¹Ø±Ø¶ Ø§Ù„Ø£Ø³Ø¹Ø§Ø±</label>
           <div className="ps-paper-pills" style={{ marginTop: 2 }}>
             {(['ht', 'ttc'] as const).map(m => (
@@ -709,8 +6110,36 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
+        {sec('show_line_total_ttc') && <Toggle value={tpl.show_line_total_ttc} onChange={v => update('show_line_total_ttc', v)} label="Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ TTC Ù„ÙƒÙ„ Ø³Ø·Ø±" />}
       </Section>
+    </>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/sections/PaymentsSection.tsx
+```
+import React from 'react';
+import type { PrintTemplate } from '../types';
+import { Toggle, SliderField } from './ToggleSwitch';
+import { isSettingVisible } from '../services/SettingsRegistry';
+
+interface Props {
+  tpl: PrintTemplate;
+  update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
+}
+
+export default function PaymentsSectionControls({ tpl, update }: Props) {
+  const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
+
+  return (
+    <>
+      {sec('show_payment_details') && <Toggle value={tpl.show_payment_details} onChange={v => update('show_payment_details', v)} label="ØªÙØµÙŠÙ„ ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹" />}
+      {sec('show_payment_details') && tpl.show_payment_details && (
+        <SliderField label="Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ø¯ÙØ¹" value={tpl.payment_font_size} min={8} max={14} unit="px"
+          onChange={v => update('payment_font_size', v)} />
+      )}
     </>
   );
 }
@@ -718,19 +6147,10 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
 
 ## FILE: resources/js/pages/settings/print-settings/sections/ToggleSwitch.tsx
 ```
-// resources/js/pages/settings/print-settings/sections/ToggleSwitch.tsx
 import React from 'react';
+import { Toggle as UIToggle } from '../components/ui';
 
-export function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <label className="ps-toggle">
-      <div className={`ps-toggle-track ${value ? 'on' : ''}`} onClick={() => onChange(!value)}>
-        <div className="ps-toggle-thumb" />
-      </div>
-      <span className="ps-toggle-label">{label}</span>
-    </label>
-  );
-}
+export const Toggle = UIToggle;
 
 export function SliderField({
   label, value, min, max, step = 1, unit = '', onChange,
@@ -757,8 +6177,7 @@ export function Section({ title, icon, children, defaultOpen = true, id, collaps
   const bodyRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     setOpen(defaultOpen);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapseVersion]);
+  }, [collapseVersion, defaultOpen]);
   return (
     <div className="ps-section" id={id}>
       <button className="ps-section-head" onClick={() => setOpen(o => !o)}>
@@ -771,2039 +6190,4782 @@ export function Section({ title, icon, children, defaultOpen = true, id, collaps
   );
 }
 
-export function ColorToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
-  return <Toggle value={value} onChange={onChange} label={label} />;
-}
+
 ```
 
 ## FILE: resources/js/pages/settings/print-settings/sections/TotalsSection.tsx
 ```
 import React from 'react';
-import type { ReceiptTemplate80mm } from '../types';
+import type { BorderStyle } from '../types';
+import type { PrintTemplate } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { AlignButtons, BorderSelect } from './HeaderSection';
+import { ColorField } from '../components/ui';
+import { isSettingVisible } from '../services/SettingsRegistry';
 
 interface Props {
-  tpl: ReceiptTemplate80mm;
-  update: <K extends keyof ReceiptTemplate80mm>(key: K, val: ReceiptTemplate80mm[K]) => void;
+  tpl: PrintTemplate;
+  update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
 }
 
 export default function TotalsSectionControls({ tpl, update }: Props) {
+  const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
+
   return (
     <>
-      <SliderField label="Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª" value={tpl.totals_font_size} min={8} max={16} unit="px"
-        onChange={v => update('totals_font_size', v)} />
-      <Toggle value={tpl.totals_bold} onChange={v => update('totals_bold', v)} label="Ø®Ø· Ø¹Ø±ÙŠØ¶" />
-      <AlignButtons label="Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª" value={tpl.totals_align}
-        onChange={v => update('totals_align', v)} />
+      {sec('totals_font_size') && <SliderField label="Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª" value={tpl.totals_font_size} min={8} max={16} unit="px"
+        onChange={v => update('totals_font_size', v)} />}
+      {sec('totals_bold') && <Toggle value={tpl.totals_bold} onChange={v => update('totals_bold', v)} label="Ø®Ø· Ø¹Ø±ÙŠØ¶" />}
+      {sec('totals_align') && <AlignButtons label="Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª" value={tpl.totals_align}
+        onChange={v => update('totals_align', v)} />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
 
-      <Toggle value={tpl.show_total_ht}      onChange={v => update('show_total_ht', v)} label="Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ HT" />
-      <Toggle value={tpl.show_total_tva}     onChange={v => update('show_total_tva', v)} label="Ù…Ø¨Ù„Øº TVA" />
-      <Toggle value={tpl.show_tva_breakdown} onChange={v => update('show_tva_breakdown', v)} label="ØªÙØµÙŠÙ„ TVA Ø­Ø³Ø¨ Ø§Ù„Ù†Ø³Ø¨Ø©" />
-      <Toggle value={tpl.show_discount_total} onChange={v => update('show_discount_total', v)} label="Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø®ØµÙˆÙ…Ø§Øª" />
-      <Toggle value={tpl.show_fiscal_stamp}  onChange={v => update('show_fiscal_stamp', v)} label="Ø§Ù„Ø·Ø§Ø¨Ø¹ Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ" />
+      {sec('show_total_ht') && <Toggle value={tpl.show_total_ht} onChange={v => update('show_total_ht', v)} label="Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ HT" />}
+      {sec('show_total_tva') && <Toggle value={tpl.show_total_tva} onChange={v => update('show_total_tva', v)} label="Ù…Ø¨Ù„Øº TVA" />}
+      {sec('show_tva_breakdown') && <Toggle value={tpl.show_tva_breakdown} onChange={v => update('show_tva_breakdown', v)} label="ØªÙØµÙŠÙ„ TVA Ø­Ø³Ø¨ Ø§Ù„Ù†Ø³Ø¨Ø©" />}
+      {sec('show_discount_total') && <Toggle value={tpl.show_discount_total} onChange={v => update('show_discount_total', v)} label="Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø®ØµÙˆÙ…Ø§Øª" />}
+      {sec('show_fiscal_stamp') && <Toggle value={tpl.show_fiscal_stamp} onChange={v => update('show_fiscal_stamp', v)} label="Ø§Ù„Ø·Ø§Ø¨Ø¹ Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ" />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
-      <Toggle value={tpl.show_total_ttc} onChange={v => update('show_total_ttc', v)} label="Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ TTC (Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ)" />
-      {tpl.show_total_ttc && (
+      {sec('show_total_ttc') && <Toggle value={tpl.show_total_ttc} onChange={v => update('show_total_ttc', v)} label="Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ TTC (Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ)" />}
+      {sec('show_total_ttc') && tpl.show_total_ttc && (
         <>
-          <SliderField label="Ø­Ø¬Ù… Ø®Ø· TTC" value={tpl.total_ttc_font_size} min={12} max={24} unit="px"
-            onChange={v => update('total_ttc_font_size', v)} />
-          <Toggle value={tpl.total_ttc_bold} onChange={v => update('total_ttc_bold', v)} label="Ø®Ø· Ø¹Ø±ÙŠØ¶" />
-          <BorderSelect label="Ø¥Ø·Ø§Ø± TTC" value={tpl.total_border_style}
-            onChange={v => update('total_border_style', v as any)} />
+          {sec('total_ttc_font_size') && <SliderField label="Ø­Ø¬Ù… Ø®Ø· TTC" value={tpl.total_ttc_font_size} min={12} max={24} unit="px"
+            onChange={v => update('total_ttc_font_size', v)} />}
+          {sec('total_ttc_bold') && <Toggle value={tpl.total_ttc_bold} onChange={v => update('total_ttc_bold', v)} label="Ø®Ø· Ø¹Ø±ÙŠØ¶" />}
+          {sec('total_ttc_color') && <ColorField label="Ù„ÙˆÙ† TTC" value={tpl.total_ttc_color} onChange={v => update('total_ttc_color', v)} />}
+          {sec('total_border_style') && <BorderSelect label="Ø¥Ø·Ø§Ø± TTC" value={tpl.total_border_style}
+            onChange={v => update('total_border_style', v as BorderStyle)} />}
         </>
       )}
 
-      <Toggle value={tpl.show_amount_in_words} onChange={v => update('show_amount_in_words', v)} label="Ø§Ù„Ù…Ø¨Ù„Øº Ø¨Ø§Ù„ÙƒØªØ§Ø¨Ø©" />
+      {sec('show_amount_in_words') && <Toggle value={tpl.show_amount_in_words} onChange={v => update('show_amount_in_words', v)} label="Ø§Ù„Ù…Ø¨Ù„Øº Ø¨Ø§Ù„ÙƒØªØ§Ø¨Ø©" />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
       <div className="ps-section-title" style={{ fontSize: 12 }}>Ø§Ù„Ù…Ø¨Ø§Ù„Øº ÙˆØ§Ù„Ø±ØµÙŠØ¯</div>
-      <Toggle value={tpl.show_paid_amount}  onChange={v => update('show_paid_amount', v)} label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹" />
-      <Toggle value={tpl.show_change}      onChange={v => update('show_change', v)} label="Ø§Ù„Ø¨Ø§Ù‚ÙŠ (Ø§Ù„ØµØ±Ù)" />
-      <Toggle value={tpl.show_remaining}   onChange={v => update('show_remaining', v)} label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ" />
-      <Toggle value={tpl.show_prev_balance} onChange={v => update('show_prev_balance', v)} label="Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø³Ø§Ø¨Ù‚" />
-      <Toggle value={tpl.show_new_balance}  onChange={v => update('show_new_balance', v)} label="Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¬Ø¯ÙŠØ¯" />
+      {sec('show_paid_amount') && <Toggle value={tpl.show_paid_amount} onChange={v => update('show_paid_amount', v)} label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹" />}
+      {sec('show_change') && <Toggle value={tpl.show_change} onChange={v => update('show_change', v)} label="Ø§Ù„Ø¨Ø§Ù‚ÙŠ (Ø§Ù„ØµØ±Ù)" />}
+      {sec('show_remaining') && <Toggle value={tpl.show_remaining} onChange={v => update('show_remaining', v)} label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ" />}
+      {sec('show_prev_balance') && <Toggle value={tpl.show_prev_balance} onChange={v => update('show_prev_balance', v)} label="Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø³Ø§Ø¨Ù‚" />}
+      {sec('show_new_balance') && <Toggle value={tpl.show_new_balance} onChange={v => update('show_new_balance', v)} label="Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¬Ø¯ÙŠØ¯" />}
+
+
     </>
   );
 }
 ```
 
-## FILE: resources/js/pages/settings/print-settings/todo/add reports models task.md
+## FILE: resources/js/pages/settings/print-settings/services/CalculatedFieldService.ts
 ```
-# TASK
-Implement a built-in Print Template Library on top of the existing Print Settings system.
-
-IMPORTANT:
-
-DO NOT redesign the current print settings module.
-
-DO NOT replace the existing architecture.
-
-DO NOT create a new print engine.
-
-The current system is already production-ready and contains:
-
-- Print Templates
-- Universal Preview
-- Print Template CRUD
-- Template API
-- Live Preview
-- Print Settings
-- Universal Document Builder
-- Existing database structure
-
-Your task is to EXTEND the existing system without breaking anything.
-
-The implementation must be fully backward compatible.
-
-------------------------------------------------------------
-
-# GOAL
-
-Instead of creating an empty template when the user clicks "New Template",
-
-the system should open a Template Library similar to professional ERP systems.
-
-Examples:
-
-- Odoo
-- ERPNext
-- Microsoft Dynamics
-- SAP Business One
-
-The user should simply choose a ready-made template and install it.
-
-------------------------------------------------------------
-
-# REQUIRED BUILT-IN TEMPLATES
-
-Create the following built-in templates:
-
-1.
-
-Algerian Invoice A4
-
-Reference:
-FV A4 image
-
-2.
-
-Algerian Delivery Note A4
-
-Reference:
-BL A4 image
-
-3.
-
-Algerian Delivery Note A5
-
-Reference:
-BL A5 image
-
-These templates must visually match the provided reference images as closely as possible.
-
-Do NOT create simplified versions.
-
-Do NOT approximate the layouts.
-
-------------------------------------------------------------
-
-# REFERENCE IMAGES
-
-Treat the provided images as visual design specifications.
-
-Analyze every visible element, including:
-
-- Margins
-- Spacing
-- Typography
-- Font sizes
-- Borders
-- Rounded rectangles
-- Header alignment
-- Company information placement
-- Customer information placement
-- Document title
-- Items table
-- Column widths
-- Totals section
-- Footer
-- Signature area
-- QR Code position
-- Barcode position
-- Legal text
-- Page numbering
-- Empty spaces
-- Visual proportions
-
-Rebuild the layouts entirely using React components.
-
-DO NOT use the images themselves.
-
-------------------------------------------------------------
-
-# STRICTLY FORBIDDEN
-
-Do NOT use:
-
-- PNG backgrounds
-- JPG backgrounds
-- Canvas
-- SVG screenshots
-- PDF snapshots
-- Static HTML copied from images
-
-Everything must be rendered dynamically using React.
-
-------------------------------------------------------------
-
-# COMPONENT ARCHITECTURE
-
-Every visual section must be an independent reusable component.
-
-Examples:
-
-Header
-
-CompanyInformation
-
-CustomerInformation
-
-DocumentTitle
-
-ItemsTable
-
-TotalsSection
-
-Footer
-
-SignatureArea
-
-QRCode
-
-Barcode
-
-LegalText
-
-Watermark
-
-Every component must receive its data through props.
-
-Nothing should contain hardcoded business data.
-
-------------------------------------------------------------
-
-# TEMPLATE ARCHITECTURE
-
-Create a new module:
-
-resources/js/reporting/templates/library
-
-Inside it create:
-
-InvoiceA4DZ.ts
-
-DeliveryA4DZ.ts
-
-DeliveryA5DZ.ts
-
-Each file must export:
-
-- template metadata
-- default configuration
-- layout definition
-- default styling
-- supported paper size
-- supported document types
-
-Avoid mixing layout and configuration.
-
-------------------------------------------------------------
-
-# CONFIGURATION
-
-The layout must be entirely configuration-driven.
-
-Dimensions, spacing, typography, borders and visibility must come from configuration objects.
-
-Avoid magic numbers wherever possible.
-
-Future templates should require only configuration changes, not layout rewrites.
-
-------------------------------------------------------------
-
-# BACKEND
-
-Add a new API endpoint:
-
-GET
-
-/print-templates/library
-
-Response example:
-
-[
-    {
-        "id": "...",
-        "name": "...",
-        "description": "...",
-        "document_type": "...",
-        "paper_size": "...",
-        "preview": "...",
-        "category": "...",
-        "read_only": true
-    }
-]
-
-------------------------------------------------------------
-
-Add another endpoint:
-
-POST
-
-/print-templates/library/{id}/install
-
-This endpoint must:
-
-- load the built-in template
-- copy it into print_templates
-- create a normal editable template
-- return the created template
-
-Do NOT duplicate manually.
-
-Implement a real installation process.
-
-------------------------------------------------------------
-
-# BUILT-IN TEMPLATES
-
-Built-in templates are system assets.
-
-They must NOT be stored:
-
-- inside database seeders
-- inside migrations
-- inside JSON files
-- inside print_templates table
-
-They should exist as immutable system templates.
-
-Users never edit them directly.
-
-------------------------------------------------------------
-
-# INSTALLATION FLOW
-
-When the user clicks
-
-"New Template"
-
-open a modal dialog.
-
-Display professional cards.
-
-Each card contains:
-
-- Live Preview
-- Template Name
-- Description
-- Supported document type
-- Paper size
-- Install button
-
-------------------------------------------------------------
-
-# PREVIEW
-
-Do NOT use screenshots.
-
-Do NOT generate preview images.
-
-Use the existing UniversalPreview component.
-
-Render every preview using mock document data.
-
-The preview must be a real rendered template.
-
-------------------------------------------------------------
-
-# AFTER INSTALLATION
-
-Immediately:
-
-1. Install template
-
-2. Refresh templates list
-
-3. Open the newly created template inside the existing editor
-
-No additional user actions should be required.
-
-------------------------------------------------------------
-
-# EDITING
-
-Built-in templates are read-only.
-
-After installation, the created copy becomes fully editable.
-
-Users always edit their own copies.
-
-The original system templates never change.
-
-------------------------------------------------------------
-
-# DESIGN QUALITY
-
-The three templates should reproduce the reference layouts with extremely high visual fidelity.
-
-Pay attention to:
-
-- exact proportions
-- table alignment
-- spacing
-- typography hierarchy
-- visual balance
-- section placement
-- border thickness
-- margins
-- whitespace
-
-Target a visual accuracy as close as possible to the provided references.
-
-------------------------------------------------------------
-
-# IMPORTANT
-
-Before writing any code:
-
-Study the entire existing Print Settings module.
-
-Understand:
-
-- PrintTemplate model
-- UniversalPreview
-- UniversalDocumentData
-- Template API
-- Current CRUD flow
-- Existing configuration system
-- Reporting architecture
-
-Reuse the current architecture.
-
-Do not introduce parallel systems.
-
-Do not break any existing API contracts.
-
-Do not modify existing public interfaces unless absolutely necessary.
-
-------------------------------------------------------------
-
-# FINAL REQUIREMENTS
-
-Your implementation must:
-
-- compile successfully
-- pass TypeScript checks
-- pass Laravel checks
-- produce zero build errors
-- introduce no regressions
-- preserve full backward compatibility
-
-Only implement the new Template Library and integrate it cleanly into the existing system.
-
-Quality expectations should match enterprise ERP software standards.
-```
-
-## FILE: resources/js/pages/settings/print-settings/todo/BL A4.jpg
-```
-ÿØÿà JFIF  ` `  ÿÛ C 		
- $.' ",#(7),01444'9=82<.342ÿÛ C			2!!22222222222222222222222222222222222222222222222222ÿÀ åÏ" ÿÄ           	
-ÿÄ µ   } !1AQa"q2‘¡#B±ÁRÑğ$3br‚	
-%&'()*456789:CDEFGHIJSTUVWXYZcdefghijstuvwxyzƒ„…†‡ˆ‰Š’“”•–—˜™š¢£¤¥¦§¨©ª²³´µ¶·¸¹ºÂÃÄÅÆÇÈÉÊÒÓÔÕÖ×ØÙÚáâãäåæçèéêñòóôõö÷øùúÿÄ        	
-ÿÄ µ  w !1AQaq"2B‘¡±Á	#3RğbrÑ
-$4á%ñ&'()*56789:CDEFGHIJSTUVWXYZcdefghijstuvwxyz‚ƒ„…†‡ˆ‰Š’“”•–—˜™š¢£¤¥¦§¨©ª²³´µ¶·¸¹ºÂÃÄÅÆÇÈÉÊÒÓÔÕÖ×ØÙÚâãäåæçèéêòóôõö÷øùúÿÚ   ? ÷ú(¢€
-(¢€
-(®wÅÖ­yaK¡Üj¤ÉÒˆ?é :ãøHåO?PŠŠâ¤Ó/†±©]K¢Mr­»Ù$‰ê1C9ŞüN2Õ?ì}]Æ„‘éÁe.ldû9Š	<ÍÙuåş¯fæ]£¦);ØSĞh®FşÂY5=6áü=ss3Ü	ä»I!Í§<ºAƒ´*±@r r*½¯‡„Ï®¿Á,W³«l½¶¶&W~vòØï‰ro;Áİê 43¶¢¹]DşÌñ,Íi¤ÇgcªÛùŞ\hfÆİ»v9$7«½›:•›iºˆõ²µ¸iíÚA»Aq1XÈÚò«ìz‘Û4¤ì®	]Øèh¯ì¼¡K£µÆâ­.úf´YäÒll–ægÂ±Ø"ó”ÉµŸ#ÌÀªåˆ®şKí6GğµÇˆšùg†i®µ1<°,!Ha)rü­ş®2§pÆ3TÕ™)İ\Ü°ñõ•àƒ}•ÜfãW—IˆìÈŞ›¾rN>RôÎuµæºWÃ½vv9u=vŞm2ÛS:¤PÃo´¼Í¼·c ·Bòg«Ò©/…_øõ¸ßÄí·üúX(¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (®KÂúÍ¾±âÔ¼Oi¬[¼ÛÃe¦y(øû½@Ï<gÖÑÑ0êWâ};â=Î¯rŞÖô{M9íÕa[ˆ	–9AÉ9ÚÀç¦N@îän®ºÀ^.l5…ïDKç´ ˆËãæÚ8ÏLĞ¶¸=Ë4WŸüV×u=ÇÃÿ Ù÷Ol—ZÅ¼.ƒæ1ä±\öú:d@¡j¯ıtÿ 0}‚Š+:ïÄ-„ÒÃy¬iöòÄTH“\¢İ÷r	ã88õ +€ø­®jz&‘¢6;B·:½¼²ÆIm ™ÚöÈïPü`ñ³áıE›GvMªÃˆ­°Ê¼°Mİƒ û{g"×ï·åşaşWüÿ ÈôZ)–EfR¤Œ•=Gµ- T7s=½œóÇ“¼q³¬1ãt„íã'¥cx7ÄÍâßÅª¾™u¦ÈÎÑ½½Àä2œŒägxâ…¨=ú(¢€
-(¢€
-(¢€
-+€ø³¬jZ>‰£6›u%±¸Ö-à™ã8b„’W=pJŒã¨ã¡5ßĞµWşº˜=õçşAEPEPEyÿ Ãı{SÖ<Wãk}Få¤[DCo0±Æ7ï€}ëĞ(èŸpê×`¢Šó;ÄZÔ¿u]Òéqiñ¼j®ÃÂÄg’K½;PµiÙ¿ë{EpñN­¯x·Æz~¥*ôËÕŠÚ$ˆ(<¸ëÔçh<“í]ÕÌO5¬ÑG3Á#¡U• ,„d‘×‘CÚşW­>„´WšxCÔ´?éö:‡Ä‹íVò9$“M’ß‰aİÃ™°C¼rÇ Efh~2ñ7ÄİJú×DÕì<5mfäI€Ü_2UÀ@§Û%H½ì§¯QXşğøğîö£UÕu6y™õ;£< À< 8èlPÁÆx?Çx‡UÔôûû[{9`Å“Gt’¸A#r`üØ#G ñÁWgGK‡[Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Êø¢U²}_N›QĞü‰HÍ®ÔO¹
-3ÄªÄü¡ğv¦Ec\
-ËYğİå§‡o!³µûKGäès aÆc-[qÁ ÷Æ+éı_ğ‡Epq	&ñ$“Ëc¨GpÒÊ÷ÖT&ÈÃòF$QÉW§p`H“TMuá¿Fºi¹¼¶‹jZêºÄÀ¸*9‘€·HùêO4Ö¶ş¿¯óç¥Ñ\^ƒ¨j2üCÖ-ï´½Vk8¶ÜIm2ä¬oœ¬‰ØU² ­SÄ2è¶ş¡87éñ‡i%¿ğôóœ”üJ ^ô=®;kc£¢¼±¼[/„¯õ];DÑ£Ô´ûx¢¼)ow,ïÌ]¤2°27 «üYèIIã}Yğ¾·¬XYÍ§YÛXÁ{g9¶!Ü•-"8p1Õ8*x9#Ÿau±é)<2M$I*4‘cÌE`Jg‘‘Û5%xí™uª|OƒÄ¶:uè°¹Õ#uškib“r®b b0O ší<Iâ¿ø«IÜnç°½‚x…­½¸”¼ê&07äÜıÑzäMÿ ­/ÿ  7:ê+Î­üuâ5Ó­çÔ´(­&mb&Q,fH¥Çú êº‚GÊv3:z-Òÿ ×Gú‡õı}ÁEPEPEPEPEPEPEP^Añ/Ç7ú?ŒcÒm¼akáëdÓÌæO°‹¶’rØà+psıøÇ¯×šø&f³ø«ã.ò5û\ÒÅ{Û~g„® Ï¢åF=sJ×•½¯×ä;Ú-ú_§ÌĞøSãy¼oáV¸¼Uûuœ¿g¸‘jJ@Èu²#{*ßÄß\ø_À·šÜ·›£Šf¶–`	U?y‚î8ÁéÓŠëëÍ~)JÚv¹à­btYtÛ]WeÂ2†
-Î0Ï÷pH>¸§-Z]ÚtM¾—9ï|P»¹ñúxrïÄqø–Æú<Û_G`m^)’U“hãƒÏ=¹ìw÷ÖÚfŸqy'—mmK+í'j¨É8=*ÅA{g£cqeu’Şâ6ŠT?Ä¬0GåD›åÓpI_]#ñŸ†‡„åÿ …™àÉÚ&\j6¥ØÇyŒ0ÏBsÓ§B0G>½mp—VÜÇ’¢È¹ë‚3^uÁ?ì´·¾ÕüA©iÖº->òûuºğ@ÂªŒc=ˆ¯IUTEDPª£ ÀôJËä'vîş~g“ø›J½ø•ãCF¶ÕäÒí¼7rE,÷w"îWÏPª8#œàúhø{Ä~+Ôşë‡ËŠ_é2\X‰³K:Œ`zcÙ­/|0ÒuïK®&¥¬iWóCäO&—t!ó—½òœğ ürÓøçÂß¼8¾ğ¥¡s¬’ŞÆ[)’W•ÇI½¶NsÀ ‘öêÿ >ÿ ×è_ÚOúµ¶ûÿ ­L¿x—şß…^Öç]ÃkVépÚ‹½\ı	ük­ñn£ãKÅ²x{Â×6ZD6ÖKy%ıÔ[üÒK(A•e gŒğO±~ğâ…PxcÄ¡¥–r×´D+C+±|©é•Î:yã¬|,ğÆŸ¥ı»Äş&ñ-ş§5­ïõ$* Ú>TPİğ6{UKFïŞş[[ğd­R·k~-ş)™:wÅß.¾<?ı™¡x–ùöˆçÑ¯Ì0îÚX©yT«1
-OÊ@à¹Äşğ)ÔtÛ¯xj3¬ø‚Xí ™ÙÁ”p@ÀÜs„Š¿ÿ w‚üià:ßFÿ FÒã•nlî4Æò^9Ù#;¸ÁÜ	Ï¸Ígİ|ğş¤ÒKªë>"Ô®Š*CuyæI ŸíÇ¯PG'<Ó{ê„¶ĞoÆXmì¼¢,H±Çm«Úù1.`nG¶?•Iñ­ø[HòÉó†µmå[æ ~´·_t=LçY×<I«í’¨yIl|ÉòŒ\Pjæ—ğ›GÓõ]>şïW×uvÓ¹³‡S¼Åq‚ª`ŒvàqÀ¤·×½ÿ /òüAí§k~æwµ^ZÉw-¤w0½Ì*­,+ .¾é+ÔƒŒõÅO^@¾2ÓüñSÅ0øœËkkªù6—S:²ªmÛ…õÈàv9ÅW³ş¿¯ĞzÚçA¯üT²ğßŠ¯t+ı.èI¢OfèwÙ…¢œ’qŸfàcsÄ·t\x¶ëÄ:nŸä²ÊÚ(µ‘#ãä2·Ì\ô Npz
-§<6?~"[^éRj–š>nÊu{Sä<“
-¬e—#'8Ï°à¶ƒŞ}Nıfÿ Zñä¦±zfHù€ Èã¡È=Å$•ô¥ûwjúlOâ/êÖšG‡aÑtØ&×õåSoÓŠ <…ùàc ıqƒoáÿ ‹¯|O§ŞÛë6+a®i³›{Ûdû õV^O{œ*·ôïøŸBy5íRŞtÙÊ-äj’ZÌ0YäoÀ!ôã8¯4ğo†mµ¨|IâËŸx«MĞ…†õµ“]$`†y[oÌEã‘Í>ey?Ÿ¦Öş¾bµ”W]½¯ësÚ´OXx‚÷Vµ±–Òî¾Ë3°YÀÉÛ‚NN@äæ[ÄZõ‡Æ˜ôÙô=FÄÉd«$A–Ëc$ğxÎ>e®_Ã¾ø}{©Ékàÿ ë·‘ÚÆnJÔö—ûìvœœBğ§.yé¼!áÏ
-i~2ÔšÛ_¾Ö¼Gm
-Ã3êW|ĞFyÂğ8é¸éÆpZVjş•¿=|„ŞßÖ·üêööÛM°¸¾¼™a¶·¥–FèªI¥´º†öÎ»v/ñ¬‘±R2¤dG½slo5/‡:í¥‚4—/jÅQ:°© õÍXø÷Áş1øwö[Ï&Œò[,7q‹”†xÈr¦ğwÓ*AÇ^ßGåoÔ«j¼ïúŸµİ2+GÒ^ò/·iErĞ†’%0ì9Ï^qĞÖ×Æ~ëHğş’`½»²Óo/ãúşÅ±,PõùèN:LsœWğëÁº±âjÛD†şûÁ³Ù}âëQ‰U¦œ>WÊpªÀg· d}Úî£ø7¦H¬'ñ?ŠîtÔ
-¦ÂmK÷ŠGÈT(ùxílSiò¥çëîüEzşVı_À¥á	¼àû»h4¯ˆjv—ì NšånÛÎvÊ²,c1ò[vF	a’¯SbUªî dZÀĞ¼áym¤hvvÒÇ»dş^ù†zşñ²ıık §'t%¹àòüCñ¤:|^(¼ñ‡t«[‰¥†úŞR@F(IØ†RÁ‡8;}q÷kµğOü_âYíãÔ|.k€./æ¹1.vçrDé¸‚z`œg“Xş„kéâ?¬ú—Š’î{{Xî[jˆã_î‚Q×'I¯DğÍÖ·{ [Mâ-:-?T ‰ ŠPê8Nã'ëJ/Kù'÷şc–îİÙÄ|;Ä_>"ª|Ì/ãm¹ää9¬H¼Oñm1|_q­xkGÒå’XÓLÕQãTÚY@,{?ÊÇ¹ÇœËYø_¥j¾$Ÿ^¶Õu½şæ0“¾•x óqİ¾RsÀéÀ8Ï5›ğ{ÂÖš£êz¾×¯˜‚'Ön>ĞFÜ€¬1ıàqŒRŠÑ'Ñ%÷h7k¿7rÃï‰:ÿ n#Œø^íb!.õÔ U;wXYwínÜ÷ëÁ§X£Ú#UdÉŒèQ™:pŞbãô©­|2Ó5O®Ûëæ‘}qÇ;iwH”/?)ì ãÆy­
-x#Kğ¼šÒkÛËÛ×s{7›4¸è`p2{}sT©ö¿åoÔ—{[ÓüÎKáÂ…ø¡ñ(Àû\óó+§øƒâÿ øC¼<—QíÔékkö—ÛÈÙù¤=•@$ı;u­Âúv‡«k¯š×Z´âk†‘Æ® À'¹äóWõ/OÕí¾Í©XÛ^Ûîå\Â².GC†f¦ŞìWd¿\«ûÍ÷¹ã>	Ì"’Áâ;»­Ú{¸&FÌË@¤…P ã¤àgĞüMğ¿öRËãÿ Ìº~¹§/™pAÄw‘7,ƒ¹ÇçÓĞ­cáW†u+‹K«eĞ/-K¹ĞÊZHCJ¯?Ï¯<š¤~è×wVòëZßˆõÈ`bÉm©ê&X³¸
-ä~¹¦îÒ¶–ÿ 1uo{ÿ ‘Ùéú¤w^µÕ®JZÅ-ª\Èdl,@¨c’zë\Ñø¡àËírZêqêws}ŸËÅÊ“’çËÛå$äãjïõMDğN ºÔ«Œ¶íÁìyr¸	ş^3\¯†¾izïÂ]MÕ-eÓî@KÏ:Ì,3¤½˜¼¶ÜH'ñ‡i7¦š~?ğ®¢—]ø&Fª>ø
-ïT½Ñü,×¯‡˜­Ãª«NB¹™‰ÀçHãšöKy…Å´S"Ó#5ç1|ğ¢j1^Ëq«\ÈnV{ Âñ·ïÌß.[œphã9'Òú
-ká³ø®‚Š(¤EPEPEPEPEPEPEPEPE6GòãgÚÍ´…'è=k|KtQÃxgWIÃ*¥»Ik¾MÁLT`)'qF3@@jößÚĞim½of·kŸ,ŒìE*â8ÎXt'½4khé­kt‡Ëg[‡@"r¸Ü ç9”çyà’ 4W:|i¦5²ÜAÍÄ ÊexÕG“nQ¥`Ì	]Ê~è,{
-½ªk¶ÚL‘¤±M.TÉ+Dˆ"$| ‘Ó'Û àR‘•]C+# Š£iªÃ}y4ĞÎñBJµÎÌD\RNXä¹g Š¿@ıÏ‚<9sd¶_Ù«od³ZYÊöĞHN3¾8Ê«ôxmç|=s,×VsH²¼o%¹¼˜[¹@n„?–@Ú8+)Ú¯‹-´Û8îÖî@ÚŒ6%‚H0Îáwê7(Îr¹ =ê{ßÅeâ­+A6Ò¼š„3J%PJÆ#Û×¾î§§­ºş´¿ä=eÃáİ2nMdA$šƒ©A4ÓÉ/–¤äªb#Ñ@¥ĞõËm~ÖââÚ)ã[{©m\L ñ±V#ñ‘ÅiÑæEĞô‡Õ—U}.Åµ%[Ãn†aÆ8|g§jıPEPEPEPEPEPEPEP\~£á»Æø§£x’Ñ ·[íoŸpÆ3“óĞvúWaEoıv–
-æ>!xzOxUÒ­â]Iûu$È¤2Œ’ ÉÏ½tôRjêÃNÎåm9'‹Lµé·\,(²ŸW gõ«4TsÏµ¼“Ï*EJ^I‚ª($“ĞU'wvLU’H’Š­§ßÛjš}½ı”¾m­ÄbX¤ ÊFAÁæ¬Òz(¨öÖ1p^æ!öeİ>\~ìc9oN9æ«išæ—¬Æ¯§_ÁqºŸb?Î¨ã(Ì½W#¦@ 
-l‘¤±´r"¼n
-²°È õV&³ã?xP‚ÃVÕ­í.§ÚcŠBrC6Ğx÷>„ô·{fÕÃfCkimck­¥¼Vöñ±Å
-D€ ©«?G×t¿Z=Ş“}ä	+BÏd+©Áùû‚àƒZ0
-(¬Äú/…íc¹Öµ¬â•Š¡|Ä)b  €ş8H^À•Íj©¨éZv±l-õ;[è\Â²(aßÏ'Ÿz«§ø—GÕ¯~ÇaÄÿ fK°©’NHV9ÇÔwëZ´4	ö"··‚ÒÚ;khc‚”$qD¡Ut  ©hªwš­Ÿseoup±Í{/“n„d}¥ˆö“Çæ(®¡áj×FëRĞt»Ë‚™nlã‘ÈXW$Ó,%Ó˜övæÀÅäı›Ë^ÌcnŞ˜Çjz^ÚI{-”wPµÔ*H@]ô%z€pqš–¦‰à¿øru¸Ñôk[9Ö›üå3œ<“¤òp2x«px{H¶×®5ÈtøT¹ŒE5È_™”tş™=Nz]ºº·±´–êêhà·…É,µQG$“ØQgwı”–Ïæ[ÏËàÊÃ àò8=èÔ	«Ê|Wáí|ëúƒhßü¨Z¼BhnîáŒÉ$¹ùÃƒ‚Xóƒ¹bx¯V¢•µ¸îTÓ"x4«H¤´‚ÍÒSmnsXuxƒVèª’êvPêvúl—··(òEñ2®7 Èªnì”¬‹tU=;U±Õà’}>å.!W…3‘½Ng¾gøq|F¾:½¿ö³1Am“»pPØÎ0ïÏ#¨4·Æë?õ[?ßx‹ÀŞ#múó/=¤±‡·™ÏRzã«U¹'­=Hø‘%Í§ü$^%Ó!¶¶ûãK¶%çıtijc¸£ œì,uKMîÒÊå'6“›iö€Wê2?•\¡hêÂŠ+¼U¡$76§—ov,d`IÄçŒz·Ì:g¿¡ Š(ªºæ‘¦\GoªØÚO.<¸ç¸HÙòp0	ÉÉâ€/ÑES°Õlu_´ı†æ;m;[Ìc9"€Jç¡##8ïÇPhå!”« A ÷¥¢€8øşø-dj©áËEºVŞ -åŒqvã½yë]…QÒÁÖáEPEPEPEPEPEPEPEPEPEP\æ§á™5=!l§m*åä”Ët÷Úw’1Ê'˜60%° õ®Š,9+oŞXø¯OÕ-5ùÆŸknğ½Œğ,­.à Ÿ8üÃîFyÏÜÀÀ8«7–».£w-¢şìÅ–¶~]ÈR1¶IK0‘z»@Î2~’Š¾àp6_/¾Ç¦±âÔ#RÏ,ÑÙ›iÙ$`íxä #>K)V .Õ#oWğİæ« íx|Ø^Òë„ù3dùşGÇpä½«£¢öò©ËxsÁpx{Vö'µÃ¬ˆE§•#‡}äÎûšÃ…À'®jÆ¥fÚnŸâ=E,­n{vEgnĞ\LV26¼ªÄ»€€¤vÍt4TµxòùXiÙÜğŸxF¼Üh>3ĞÜëorÖ±[	$ŒÄşnİ«:±PÇ¸/‚ÕĞÚøgÅúœúv³mâ".m.®ı»M{irHü²4›“
-(	ò‘ó+Õhª¾·D¥¥ŒoháûkØ–s1»¾ñ›fÜ;q“Ğ`g¾+fŠ)Ì(¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š ¡­êöÚs©İ‰uÉH—s¹$ ª;±$ =Mpzè¶ğ¦ ,4İ$EaâhnŞîg–F“í"Ëò±!r§Ó÷Zî‹iâ-ëI½ó½Âíf‰¶ºA§±>••gà¸b×-5kıgVÕn,£1Û-ì±ùq.4@_Ç'éS(ó&ŠNÚ˜~ñ~…¢|8ğ°Õ5H yìTF¹,H	rBƒ€¡NIà:Õ»ßxÇñ›eÔãµ´Id‰¦6ë6ä2"îÜ¬£€8Ç ÷´<áE9_h î‘aQĞıŞ¼šÁ>‘Q_Âú+,kµ°ˆí'åàd“øš©û÷¿RaîÚİ2;_Ù|A‚ÒX¬õ$Xk6ªÎø\lIÆâKí NâTç®s?Áí>=7Ä7P¤&}N–E$ç{+NkĞn<á»ËËk›­7í×g·šyÚ.Ñ²ŞZàz/¿ZÜÒÚ+©n£·….&
-²Ê¨¸\íz2q™§ö¯ıuı]ÿ ­´·õÓôG–øëÇòÇâH´KFßO[JÉ.Ì’ìšä;«ƒ#…ûÍÎsŒ’zKoÅ‰|G§kI•®™5²CpğÂo•wíÎÒ[×g¦k«¿±µÔl¥´¼´·»·|Ğ\ t|r2#¨«”ğÏ†õx¯¬5ÏxFßK¸D&ßJ…±#½æ+ VÇqŒsÖ”{?ëoòüG.æøw
-xâòµçÒn<È¡Šî(
-Ú²ÿ :ùfCòÙÀëYŠ¡jC¹‹ÃšŠVW¾µº7æBß3@‹sNx<Äc<×¦Ià¿
-ËQÉáÒ%+µ„D $œ·’OÔš–o
-øvæ÷í³è:\·|~ıìãgà`|Äg€1JÚ}ß‡õ_¸}¯ëşŞs6^,Ôlµ/é—ÇªA­[JÏ¨„Hİœ.õ"4b Ã‘ÈÁÄÿ É ÚK¤Y]ÛØßÜXOr·wlª0>FéXœ:óŒ»o&“â»[ÃŞ´Ó<–[‰â·ò®Ãœà&ÕÛ·¦A=ı¹êUÑ‘Ô2°ÁR2¢k™içı]>ë×Èò/[¹oA¦ØÛê·-á»O¶^Ïv"†ÔÎÆIv±¾S´½k¤Ó~(i—‹SÕ!K&›R:lqÃt“$¸.ô“å€–ìëÆw?áğı
-šş¡ÿ âk;VğU„Kn4
-øSL«z/,•CAœ°]ˆ~lŒñÅSw~_æîJV_×EcF›Kğ§<Sk•sVzj^Öök—2ÌÛ•ä`qm£ ıãÑªøƒÃ·Ú‡€õ‰oV[¶=Úˆw;í1¶<±ÚàÇ±ï]&§áíCMµš×ÀúG‡t¦»P³Ş2yLFDqÇ‡ Fæ=©šÂï
-YøzÓJ—K‚g€#5â/“<’/!ÌˆCƒ’{ñœRÖŞ–üÛÿ !»]ùßòKüÌß]Ùê?5BÂE–ÚïE´™%^6>Ø­ÔbñV¿â	Ş^M§ÉfÑ5±²ºx.]iæ\¶1ŒzõÒéz&—¢ÁZuŒâ8R È¿9DÎÕ,yldõ'©õ¨õ/èZÌë>©¢é×Ó"ìY.­RVœàã$ñïCKnšşw{ß®Ÿ•ÅzŒ>µ“À¶Vêöø~ñâİróO" †$„À ~Cj{Ë¡x#Âemì^)KÛëÿ ²ÀˆŸ»Üòç-…Àû§Ğã¶Ó¼7¡iI&™¢éÖO*ì‘­­R2ëèv‘íYWÒmmÇ‡¼?áËMZ"ÚiôÔ*¬ûX}AãŞ†İŸŸüóü§õòÿ #š‡â!ñG„/u(f½ğ¿öpIo.-çÀ 7–Šçv\0ÚÌƒ'¦zU‰uµ¶Ñüy¨xÂäÜ^]&Æ‚"Ë é"d¨
-A*pA’¸ë†tkÙâÔ5MHŸU*-ÁµGmàË»g°ø'Âh®©á}VAµÀ°ˆåädøSÙıß‡ù“ºûÿ ¯—õcÄŸ¬¼=â!¥‹Tºİ#“R™n‘ZÑ¶†òÏÌøà¶1´2õ_Y¾´<$«<,ói÷`bA’¤)Sô;[¸>•ÒxXF‘hâ8Üº(±‹
-Ç màğ9ößøB¼( 0èŞI`æ?°E´°½pO>ô––ÖÖµÓúî`ü(´¶ƒÃzÅª.ëW¼H¯¹eRªÃ¶0 qÇ‡kãùuï‰Ú%­¶¡oo¦ù÷¶Íb²şúFpUÏ œì\vÎyÀõ+k[{+hí­`Šx”,qDU è Uõ-LÖ`H5M:Òú$mëÔ*«cçÑ³]’·èßÌóŸx›Jğõ‡µ)g‰ ¶×f“jÌ¹ve@q’ÀN:úVæ™ñ	µ/ê×Ñéµm1wI¦Av³oRFé"Œ22wØõÅoxen#¸ÒDÑÈ,£ÜF nF À¨O¼"@ÂÚ!Ğ>.?ñÚÖòKîwwó¹ÌéR÷ÄÉ¢>—ËÌÊİi:Œw03Y”¼‚.UFH]ÇñëÇjVÖ–¾ñ6§
-ãäûG™”*²§ÍıĞf‡=+Ôì¼6—:|šoˆ4­êÆŞrl ‚ËÇ03î
-ÜŸ»Ç5ª4m(i_ÙCL³n6ı“È_'Î6cÏ=([ßúİ?ÒÂİYÿ Z5ú˜º‡Š.¬~!èŞû5–£k4‚à6\H˜8À<.3É–<\ÏÄkæêÇie¡K6›aı¡x5hãÿ I·ß%”•ù—vr m™Îk¦±ğĞÑüX—Ná»-$Û’k{*óÌ'8WiNÎyíŠ×Ôü?£kMêšFŸ}$@ˆÚêÙ%)ŸMÃŠOeo?Öß§¨ÓWwòı?¯Soùş´¹…¼Ÿ-É~âB›Õ
-ãœŒó‘Œw®[ÂÚÔºã›¨lş×%¯ˆ§?gó<½¨å>wl¨,[ Úºdğ–£{â‹-g^Ö¡½OV6vV¶fŞ(å<29fÁÀÉÀíZ—¾ğŞ£u%İï‡´››©9y§²GcŒ’2xªûµçù§ú	mgåù?ó8ı7â-§Šu«Ÿ
-İi^p¸Ì+u¥jK-¼«µL›e>SeCŒ„zÕß†R[*xŠÆßN{±j²@ËöÉ.C€s»a±À£šÙ²ğÚ^éieâ}'@½[Y
-Ù¤_ºH°á$İ°ñŒG¶4ı3OÒ-~Í¦ØÛY[î-å[B±¦OS… f¿—ù	ë÷ÿ ™nŠ(¤0¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(½õì:u”×—o“î*'•±ì¨ÀV|Ş'Òà‚)œŞyrÚ›Åd±€ˆäáÓá8oj× ‚2Q\Ü:ı—†56¶šWK{%fhÒ8NDhÄåC9À©“i6¿¯ëOÄj×W$ÿ „ÛEû$w?ñ3òå‘cŒdİnrÀ‘…ò÷@<:Õ¦ñ>”!³”Iq"İ‚cò¬ær áT˜À<øÁÎqŠå"ğ¯‰D²Ó¡[k&†ê)^å5™®eÂ¡V(f‚œc	½y<Ş×Í…•¬0é±ÜY;,œÒÃ2©`|ÆAêñ±ÚÌ2IÏËz]úşÿ 2u·Ëñ7¢ñ†‘4·QÇı ÍjdŸìË §ŞPŞ^½$öÍZ›Äd}ó\3[Ş²%¹'v¿İTúqßËYø{ÄvwÚµÊØéÏ%ëÎÈÍ­\”PøÀòL>ZXõëVO†õˆ<–·2Ôé ’áÕmĞáåUm„¹2n#!F1Ó¥(ê•ü¯úÿ _ğúÛÏş¦<i£3İ*ÿ hŸ²³¬¬4«¢¡“ï |¼1p3Ç=*ÅÇ‰ô«x­%ó.gŠî/:	-,æ¸WN9ÌjÃœŒÉÏÎYh#±Ô5k´±ÓKÉ&tgÖ®J(|`y>VÅ<°ëÖ·4ÍïOÔÅÌm6“DÒObŒ]b¹b¤´Mò·ÌXm?6fÊZÅ7Ûñş¿­n}?‰tÍvI#±7e£İŸ>ÆxU¶°DPHnƒÖµëÂöZ•†q§¤r½Üó¨¶¸iWl’4œ–DÁ±Ó¶{à[[YÆ¾÷F/Üp‚O·J~mÙÇ‘,¾îØÅP=ÙVÓÄÖ·%ºĞ–ÓPæŞ/4Ë5«$.»¶ü~÷>œÄàâkÖ>ÑåÕ5uµ‰‘X¢äå˜(ü2G5ÅŸ	x×Kñ©¬iº¾™¨]_Áå,·Şl_gÄ…•B02€vñ³×“’s¥ğ?u%’SSµ–ÅŒ^–Õ%•C¬É!’(Œ
-©…R¡y$óJ:òßæFÎ÷Nñf©iĞ_-ìvğÜ]=¤iuŒË"»&ÕòIR@êGj’ïÄºeºº=Ä¬—FÎKß»òˆĞ€}Éäœ x¸ğ/â–;K=jÚÂÆ™æŠ{kÉCæK7{B+¿&Öb¼“ÏJ%Ğ~"Ç¬é·²®™{9²m>òàÏ»r¼ŠÌåBE° nÑ!ìAÉjZ´­ıi§ãøK¿ë¯ù~''ˆ¬G‡c×mÒîòÊXÒHşÉlòHêØÁîù<p+?Iñ÷‡µ{½>Ê©"¾¿·[ˆmfÕö”Ş8ÚÜ¼àã5Aü«?Ã}/ÃkKcqoQ\ÍnâUUùÈÁIÇ ƒõÊ¯†¼Sá¿ìİZú}}Ëì9Õ§÷~PÀQFàî“¸p*“—eşOõ°•Ú]ÿ ¯ø'«ßŞG§é÷7²†híâi\ É!A'üStÛøµM2×PdXnaY‘e]¬ŒÇšòİ7_Õ5MCĞ|?­Ùx‚êm>xõy\¬a—ä’I¶Vå
-T3d’Q¹à_ø—A¼¶}[U/o—ÙÚ¿–á&|Œ0FDX‚…À
-	9äé-ZÖÿ ğ?«‰½õÛş	èQE
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-+Èõ]Xxâ'öM®¬—štbÊv‚}¯"+oXäa÷¾P9ùzV·Â»«ÖÂi÷z~’ïmöK{‹vƒTLUn§$´G_ºÿ ˆKGoëdz5óüº?‹´µItûN-e“TûeàÑn#;~ÎCÃ>@¤•ÇjÇŸAÕşÛ|±øoZ6oöQa(ß}™˜"Æå;ó‡ ç­$î¯åÏ@k[yÛúş¶>˜¢¼sâ—®]XhIa¨¬z4êémÎSPòÔ#¶ÀpÙÎ 9çšáeĞ¼dm­Ú6¶ú¡šaâ	D~Õn^-«¼q0À *à1š¤½ë[ÿ OĞW÷oımø§Ó´WŠy¿ü+[H¶Óudˆê­<`™IÓŒàÔÈÜ|¿½·øpk–‹Bñ'ö†¡åèšÊGö•>&Ò@-íylqû€W'çÛòûbˆ«É.ÿ ğ?¯“ì›íıÁù£éJ(Ç=h¤0¢Š¯}$±X\I¯ÚæXØ¥¾à¾kc…Éàg¦M&ì®5«+¾½£Çn÷jÖ+H!iZá«Rs€Ä@ëÈ­
-ğèZ–‘ã¦Ôî¼.-î¥¼e¸µ8X-¡YmæPÊ¬rïÜ8¦®¿â‹vûBñ&¤ø¾¬Ç™)a¾ˆŸi;ŒaÇÌ>^¹^N2 5ÛÏúş¿à1ug¯ÇqÏ*E4nğ¶ÉUX€p}8=ˆ¤æXÄ—G
-T#˜€OrHÜ×“è:5óüQ‡]‡M¼ŠÂâşú_2{ybÂ!PJ¸K8ldp{
-“â·kâ{¯,Iı«³o6BsçN€,&Ñ‚«´·9ÇAâ¥ŞË»·éşcV»í¯ëşGªÁ<70G=¼©,2(t’6¬§AjJòïø“]Ó4Ï	èĞxkPkd‚[ég²6GÀVÛ• *pK7’;oÅpéMª[Ãi%ÕæŸ§A£Ş±£&XÜOå=ˆ }T¬›í¯à(İş‰g^ñ¿‡ÍŠÍi}w%íÀ‚8ì 2°à’äá d‘“í[åšŞ·ªøÂÛOŞÔ­à¶Õl.cXŸ.¦S“´¨‰»WiávëY›ZŠîtm?Q’ÑİË£ 
-Àäÿ İ†ˆ4$ìş§ùƒ×ßşFıQHŠ( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( í_D²×m~Í|n¼AX/%ƒp#7–Ë¸c±È«v–¶ö6ÚZÂÛÂ‚8ãA…E Ošx­ ’yåH¡‰KÉ$ŒQ@É$ ½c_x»A±7ÑO«[C5œiCdíVVe _…c…ÉÀ£k†æåâ«­ë¶-ÓÆ¡¨ëz­¼ò%Å¤2¶¹ˆÛË$F(ÕTdíèá˜9­­7â½“áå—ÄpêkwëÚËçª	dÜrğÀÀ@Ç°n´-A¡Yº—‡tMfd›TÑ´ûéc]¨÷V©+(ë€X
-mÖ¿eg­izT…şÑ©,­nF6‘†9$õÁ5ÈxƒÅš­·Î‘¤LÙû£Êš/=TJ¤"›”¥³·, h½¿®ÃZåİ•­ı¤–—–ĞÜÛH0ğÍtaèTği¶:}–—h–š}½¥²d¬6ñÑrrp Ö¼³Ã_5¦x“]ÔJŞ†ÖÔH-£Rñgndb#Éå²Np[Œú…üOeâ­/í–±Ü[È„$ö·1”– 0¨ ‚8 ŠvÜ›èº(¢ÂŠ( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š+Î5¿jzŞ.lmîáÒ­5¨5f±¼+”ŠÁHyn 1ÁÈ^‡šMØi\ôIeHayd;Q³t­VÒõK=kK·Ô´ù¼ë;„ó"“i]Ëë‚ˆ¯$KëÛé´GA´ñGÛ ¶µ2^G$±j6Ì“8_-]w¿ ç9ë+è^)ñ7´/é·º°éˆ–é!–Âw‘üÙ\0œ#®S²å²{à·O;~ğ?O§kÿ _àzf‰ã_’Ö++§óîüãRDÊÌ"m®OààpGk_ñ~HKéz½ù—8]:Éî
-àómàuÏ=pkÎü!á»ûoÁ·O¥Ïn=N{œÂWÊ¸1‰8áÊ•<ñíW¾+Ûx³S¶šÏLÓ®æÒc‚9É³ò™æ•eUÕ›~Ğ«If#°Å/å¿]şñõ—àzæ±§éòXÇyt=ô¾M²È
-™©m¾Ç õÇ<u T:Wˆ,5›İRÒÎBÒé·f¸óm‘íÉã•5ç~)Öíu}JòÛX¾›NğáÓÄÖ÷Ö/hö÷Ñ¾åh¼ÕW•±ÎÕ¦1Ï4´µñ•¯„µOÃcı›¨ê^}ì‹qÌ–ñÄ¤U¸
- RÛ_+\Ñ}Ö©›ô³moëKÿ ’õùËEqñÉÖ-ô-?Sµ¹TÔ4Ï·	¼µH
-ØÃ¤ä@ğ{U¯x‡ZĞJ]ÖÂê{û“h"º‘”ïe%cª‚2ŞŞA/wúó·æwWş»$Ú…•½í½”×–ñİÜ†0@ò¨yvŒ¶Õ'-×*Íx–¡­øÃV¿µÕ²58 1Ñú„•¸––PA'÷,088ûÕ½©øÏÄ—Ú”Ö6º~¯¤éÈ‰©Ç¡Ï<ÓŒªDP„fmßë Â€yÜ:_×ùô¿×õıjv:ÇŒtmT[Jw†Cg-é,•Çİ9'’páO¶vm®b¼´†êİ÷Ã2,‘¶Ê‘pyèkÅ£‡_ñ^÷Ú¾“|Ú§‡o­ä’m5ày%vÄA®”!2ìwÅz	Õ›Áß,/o-‰’ÒÒÚ)"‘ü°¬v'ÌØ;@'“ÔÒÓ_ëWşH]tş´_æÍñ¬Xpè¢ãş&ßíF­Ä[¶îÎ1×¶sW«Ìµíi´ŸŠïcayªÈš…­ìb2âS.èÕÊƒå†¾fãÓu/ˆ¾&Y¬î,<#ª}ŒÃÜC&•pò´…—ÍHÛ´ª·ÊUˆ`Å%ª_×Wş_ÕÊjÍÿ ]ùŸEy]¾­ñRñÃi¦ØÈG—©é2[YÁ	ÎÂ®û'yp¼€¥2ı@ ×E&©‰®”Ôoõ‹ËÍN[{
-Û´6‘¹SóB[ 2[lİ$
-5ÓÌ]üÊŠó5ñÏƒoõŸ
-izÅÊÚ[C6°ç™DÎÄìPàHAÅt^×5ÍrÊöMoO{GŠ`°3ÙIjdBŠNcvcÅ qÁ¡kª¡ÕQ\G‡|]w›%¯‰´ım5H.%GM"i£•w’¬eJí zğs¦­–¿ã¼®ê§OyyüŸÙ±Ídb–KmË†0åX7aN€¹ vÖÇ_ªë–Z<út7lâMBém`
-¹ËO>ƒ
-j'Äº~³«júe·š·ZTËÂH }åÈeç•<İy•ÇŠ¯¼Oo¡Ï>‘qw£ø‡uãÙiWHY7…`X6r™,0x¨.u_Gyâ»İMoLŠ{¯´XÁ†çšk—¢ÆHö"œrœœciÍ¿ëáÿ 6.¶_Ö÷ü‘êú—ˆlt­_IÓ.L‚ãT•â·Âü ª–;‰éØÔ’8ë‰­5›íNÿ N¶Ÿ}İAsÆYq¹y##Ğšò¿xÆhG…5ëŸOqq`®ã¼¶’Ê¦x¸Û$èC+mÆyÀÈ$gªğ„øëÅÑ²»·´Ômì&¸Œ¦H‰·(õ# gŠioä+éıw;š(¢ÂŠ( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( ısHƒ^Ğït›§‘ »…¢vŒ€Êê2Í`YøÊ{©/üPm|C¨<k
-Éua(Ô’&	ÜI$’}‡£e®ÜÜøÛVÑİŞÊÖŞd”™šBùÏ=>Q;EmÍ<VĞI<ò¤PÄ¥ä’F
-¨ d’O Ş0ò2G„<2,ğî’-iƒìQùeñÛvã8ã5FûÀÚuİ¡Óíîn4íÈ3iš|PAÜå·ÿ › 0ÈââOE§xûÄz4–šŠÃèZ9CÄçvß¼§9ç·j±§ø‰¯¼Q¨hfakKX.D†PKù›¸Ú+Œäæ¡Óúşº—õKÕíã·ÔôÛ;Ø#mÉÌ"©Æ2Åfÿ Â	àÿ ú4?üCÿ ÄÖÖ­k‹q©Áug$Fì&’à,9\ƒº@F	ÁÇ¥p‡ÅøâĞ,¯m4yÚkØ£–‘½¾…~CùI*rƒ´ddZ» Ù\ìçğw…îŒfãÃz<Æ4XĞÉcmAÀQ•àÂ¯éºN›£Ûµ¾—§ÚXÂÍ½£µ…bRØ$(8ŸjÈñOŠ#Ñü5®_i²Z^_épï’ØÊ–Ädo äqÎ8ÏëRè$:Ş§«Ù=ŸÙßN’$$Ê¸xÕó€>\d§¥¨>†õQ@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@pÇÃkMWÇë­¦x}íöƒ9¹´•åvœ¨”DÙüÌ¤‚;ú(Z4ûKAX/àí]VJâ+»››yŒğı¦şy£ŠCŸ™cw(108íŠo‰üA E¶š!Ô!rIMì6Ë,ª20É98Çp|‰|Mâ‹	è§TÔcœÂ)X•IóÉ$(èzO$€EÜ-ĞÛ¢¹û[ëë_Ù“]Üiåˆ‹¢†(v1lm`Fâ/‹tËÚëÚ¬¢ÊÖp™;„áºÑn´(ÿ ø€¶[z}Uujv˜¹k[‹Ó%ºîÛÂÆx\m8ÇMÄtÀÖü)£øÔêĞÜ\Æ»ÑÍÜËm;†è•‚7> ÖOˆ¾!éŞ×'Óo-.\C¦6¤d‡i,¡öíPHç©ä•Ô-í¿öx¾yV+o+Îi$`¡SÉ= ½=?àÿ “¾¿ğ?Í	cmr÷0YÛÅ;¢ÆòÇ«2/İR@É°í\íçÃİâîkû_µXjrËæı¾ŞmÓFw38X³d( çµ.<EgmâM?Bt˜ÜßÁ$ğÈ y{Sç9ät ñ'Š-ü5>Ì,ë©ß%’¸lËA=Iäcñê(¶Şçşa}ş¶ÿ #CGÓ‘¥A`×÷—ŞH+ö‹ÙÌüçæ`Olãµ^¬/Äš¾©«iĞG2O¥Ì°Ïæ PÀ®	8ÁïŠÄ!¶³¸x"’)î’	KÈ­Äjs–ÌŒ>èäÑ{üÿ Pı?Cj¢¹µ·½µ’Úî§·•vÉ¨zx"¥®Sñ}–—¬\ime¨ÜİCd/ŠÚ[™K¡“f¸¶yéŒw£È<ÇOá$ém§é±¾‹Ì³9ÑÈ´g#±(Áø­-+O:V—Û.ï<•ÛçŞIæJüÿ `döÍSÒüIe©ZA<±ÜéÒO$‘Åm©Dmær™$„nHÚ7qÛ®0q£i{i–ÎêˆÁÚ^€p2=ˆüè¹ÑìÎ¶5³}´CänlÙœãËİ³¯|f›­è:gˆ¬VÏT¶óáIVdÄŒŒ§*ÊÊC) ŠÑ¢€2t_ik·ÓmZ9¯$\M,Ï4²°ÉcLã“êkZ±|Câ(¼>4Á%»Ìuø¬“ Bùù˜ú ×Û­‹´ÍsªAy%¨S0?.îG?‡N†ÃbÆ§¤¶¥ua:êz…ŸØæó¼»YB¤ÿ ìÈ
-ËíÇ_\Sõ="ÛVHÒæKÔ’GÙof¶'>¦'\ş9«’¹$¸ª–Ç®+#Â^ >)ğ½´l¥²7I¸Á!$¯$pHƒE¯§õıh½EÓ¼=¥Å¦éV«miJF·$ä’I$’ORjıcx{Ä1ø€jm»Â¶7òYç—)Œ¶;“ÏßÎ•­XkQÜ=„²8·™ ™d…âd H*à„vïFÿ ˜W9âoişğÄÚğ+}kË›y€&@ÈÏİ9Èë‘Š¹¦øËT×5]&˜\iWœÎ V.å+ƒ’1ê_ëúîôQE QE T7WPYYÍws #i$vèªIü…SÑ5¨µÍ7íñZŞZÄX…[ÈLLÊ:8øHÁóÁÈ *+şÍ%õ/L·˜ÜÉ©Ç$¶ó@ÂV?¼wƒƒé“ëŠÔ†î9®n-ÑfËÀè§##kıö“ô=—¯ø‚ËÃzr^ß	ŒO4p(†2ç{¶ÕÏ`2z’â@§kúå§†ô+½^ùgkkTŞâ‹¹úüÎ î@¥}.ÖÆ•­Å¼s !d@à¸#5%6­ '}BŠÉ—Ä6Qx¢ßÃÌ—ö{g¹VòˆŒ"Ìx'' Î;ã#2Å­ZO¯ÜèÈ%û]´	<›£!v¹!pO_ºzgó +&øzãQşÎƒ^Òå¾Şcû2^FÒîWh9ÈÁã«Z€
-)	ÀÏ¥béş*Óµ=uô{t¼[¤µMö‹I mH³ŸlqÖ¶—6è¢Š (¢Š +3ÄZ8×ü;¨i&soö¸/4.í™ï2=»ô­:(ìxç‹~êÚæ§$Òù÷š¤â(£Ô`k;H”cı[¼’¶T– 2Œ×A/Â.[›ë†×u±-ú•¼`ÖçÏÉRwf‘” `+µ½ÕìtûÛ+K©™&½r(˜1¤¨êG\U¹¦ŠŞši8eØ £Ô“B}Bİ>¹ø=¢É mõ-FBäøŞà–,Y‹FJä‘…Ú:`Vï…|¾–{»NïRÔ."Xev$mWvP»‹6ü|ÌÇ
-9§Âq¤\İ-®Œ.u¹·„s¦GæÅA9y‰. è_=8æ¢‡â/†§“S…/[íp¸i d!ÊÃ÷ÊşÃ©ëŒQ{/ë§ü8Zú_Ö…øW±Ç¤É¤Zø“\µÓÙ’Ö#nDY}øVhK€O›Š ÿ ´yà½WV¹	<—Û‡ÄŒÛ– Ìwsó9<WUáïi>)²{½"çÏ6	'ÈWcG<0é‘Zô5fOSÈì¾kóø»VVÔ.F½†D¹¹­Õ¯É½e 3†<vÚØùG¤éÚ—©jwÖşg¨È0b0»"…ã¦|òM^¹¸ÎÒk™‰B#	 “ÀëYñnâÛ&ºÒnAC*:hË p§±8#8$P¶å]ïwÔÜ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(Í~$xWÅ^"¹i4÷†}>¢{{1zĞ7œ²f+·l„ª…]Î¡rO^i|K/‹õëmJĞxFêŞnJ¹ŠæØ\ÛÜŒìÆl ì
-dàyÀôšÂÓüáı+\›Z°ÓRF}şlêï™7[pÎ*#qÔÒK£ÛQß[õ9}ÇÅ¹Öï%Ğ¨úÜ&D†ò4bº«È»È%Nq\Í—‡|i iÚL:mÜ?Ùí0HcÔÖiQ·²î–)VmÊY.İ¿)Éù²¾×E7¯õØKEcÈ¤ğ¯‰õMS[Ëæºm:6¾%Ììå¸)# «€2í“I9'ºÕ­õ+Áii¥[ê“*CÅœ¥vËUeq
-NİØÉÇò®Š¿×›«·ş¶Kô<RÛÁŞ4°¼ïF°kHìSPT7—QÊö©"F#ŒÌÌ¨ÉÆ«{Æºµ’]ÛØK}s¡kNVîâ8åL[62Z’de2˜Æ03× {6¥£éšÌ	©§Z_D½cºeUlc 0<àš’ÇO²ÒíÓO³·´¶L•†Ş!.NN :Ğ¯ızÜ?_ò±ÈxÇX–½®júgösêím2ÀdAX@n:›#•Äx·Yµñ‰{mªê¶úµ–£} †âö+_"¬«”tÊ
-íÆÕİ–á†3^ß\Æ£àÿ íÚëÆú8²ª¬k§Û<‡#÷ÎŒê9 €G^0rJ’æÓ¥­ùGİWë¿õ÷™‹âıàöŸ¬½«­İ½·œ—1±1ıÅweq e±œñ\Ç‰./|SâÛë¿ïÔĞè¿Ùó^Y\"Ç(p7³ ~]ÙØK.î™¯a¢ªOšNOÏñĞQ÷cÊ¿­¿Èñ½ÃúŞ›£ÙØIğâ›xu	%0^Ü[][g#1Û³É’İÉm£¯Z¶øêÎÍ­tOÚh İ<³I¥µš!Àª†Ü­ İ–,˜f½fŠCZ?ëÏüÌí êgÃÚyÖ•WT6éö ¤`I»îñ×ÓJòİCYñO‹ìÜÄ·v¶Ö7óÚÉu¥jQÙÛJwIìÆL '*#`Çò¯XÔt­;X¶ú…­ôƒˆ®aY0ï†g“Ï½DÚúHÒ[J±m4t³6èaçîco^zu¡êîEdpÚ—…¼\4M"{ıZOjVZ¥½ì–éê2c8\Ÿ›9fÇA[Ş‹_ë·ú„7ÖºeĞ„ÚZ^ÜG#Dê¤>Á2ª;äœñ]J"EÇª"€ªª0  êwş¾ïò¿¯Çõ8Ù¥“ÃVš¥Ö™áZo´Ş<—J—),“1R<ØÔÊß)!Fß”€s·ŒWá¯xÖÖ?Û1Öìå´’6ºãQ…-#…0¥¼Lşfå$np@9+Ùh¤´wôü?¯éê¬yÅ¬^*ğÌ>&¶Óü1.£=î§5İ¤ş|’m?:´ªù^~\s£9ªş‡Ä~Ô®~YÙØÜ¿Ùmn³3nıŞwNnÒxìIÀ“éôP´û¬_¾ç–/Ä†…>…ÿ M¶Œ—¤3¤¶On°$$oº@²ni RÕÁÀÇÔèš%åŸüS«K Òı-Ş	ÆŒà€28é]UÓ·õéşAßúëp¢Š) QE—â=xƒÃš†^(şÙE¾X|ÕL½·#$u@®?ƒòE­èú‚k"-:Ş8Ûû$m”*²·>fWpv$r2rA¯R¢•—õıy‡õı}Ç’ÍğZIt='û[KZÃ<K!Ñ²ÄÊT™?×¬@é]N‹àıOCÕ5}BÛV°3j^Aum9‚©v“ÄÜ–9ÏSk±¢ªıA«L>ÜçYâY#ÔäFWÒ‡ÊRo4Ä£~rA-Éã1Rßü7š-¶œºÜ8’é|¹tÿ 2ÌÎt1ùƒË+Ğ·½RŠ›+r‡[.¿ ×Ê/.³a> eó¡>›+Ê[vîPÜyL;`¡«ŸÀùµ¨*x‚ÒÚ;Û“rÈšH|1VV9yY‰;²~RNĞ¹5ìSz«]?Éãğ&òWµ’_[I,.Í4¥×€¸}³Ÿ;çPT =*Õ¿Á)­µï¿fæ â+i4öñîw~Êq´¹Û‚
-úœšõÚ(Âï~x‰´ëØg]6î$µòá	›pÈ¸‰Nå@‹¸–?9ÀUQÑ‹7Fø1}¨èÏ£Ÿ¥\#ÎlÚtrË:ÈïÄsmŒ¡(ã“š÷j(Zãwî.'VşßÓ’¹7jº(0©%	ES1Ú§`È	‘Wì>jÚu”Ö–ş*·D—Nm4ºiŒ®±LƒçğÙb:c»×ªÑGK]€òyşı¢óíPÑàÏ‘òÛhXÊmÙ÷ß)~×>ÕŸğN]6òÊæcKYme·‘dM«“3}á7ñnÃáWÒ½vŠiÙİz‰««QHaEPëÚ¯ˆî†œ“éš¤·úf·%Ë¬v€ğ¬‡g—,hc)ä±;˜äæ¨D|Mq&¹£G6¯©C}=¸¶“VĞ§0ÎÆ\¬Çj"©^ëÊü©Üú÷ö&“ı­ı­ı—eı¤FçÙÓÎÆ1÷ñ»§zUúI+Yÿ [=î¿­ÿ Ìòı#ÀŞ&Ğn´ÛÍ&-ÊâÆÙmnRdj¨æE™ƒç-ƒÇ\rÊâÉ ğÃÇ^&Öïî¯­®Vä}šİe,$Œ±G1°Hä^ÏE7®ÿ ×_Ì/¦Ÿ×OÈä¼9áGÃ–Úğ·¸¶’{¹„–fRÌ‹¶|ÁÁåçñŞ¸¿gÂ¶úÎ¥«é:$:µü7e½ôÅâtØ$UQ3
-¤“©Œ“ì4S»½ı?øaYZÇ•\ë>"Õ|hĞÙjP¥•ÂM™ªÃ-ƒÜ©‰|ÆFfØØ#rwI5ÑøÁ·^Kèî.¢gKdË'şY@±’AÀúñŠì¨¡h´×p¢Š) QE QE QE QE QE QE QE QE QE QE QE QE QEÊxóÄ·ŞÑİ˜Ó¢9Üê3mˆ2®åŒ !ß :`pæ5/Š¦Ûq¦i–,z:ëWisr\IñE'¿ÛäONûY´Õï!òtÍBÆÑ%ûU“\Ïn%@;õ¸ëÏ„Öw~Òü8n­¿²ì£ÚÒKb$¼9bÏ²flFã€™ëK_ëçÿ ú¸ôÓúíÿ ßüGhãÓom-PØ¾&³z²dHÂ-‚ frFH?tâ²mş&ë‹r–“kqye¥ox÷;-­-¤8ıöâ:œ”å€ùz×Aoà¥“Ä‘_y)g©ZÇ§YÇnNmí=ª96âÍGJ©£ü>ÖtmJßSÄV3ß[iñi<Ú[”X“•‚\¿6qÁã+Fÿ ¯?şÖÿ 1-µş¶ÿ ‚oxÄsø¯ÂZ½Ì6ñM(eqo.ô%IÀ8ÎÓÈÎrş#ø—¤k:»Zéö²èú°E©4’0šS60bÇfFwgwAŠİÑ~èv[ÚêvVz¼ÒİKy$—vªÊ%‚ŞZ6í‹ÀôäšÊÖş®«©jí¬¶ºf²öÏ}gö]Ì|“ÿ ,ßx	¸ ÊßÒ´¿®ßğC£%µø¹âÇÑ´‹ÍŞ[¥‚y¯î±5ÁÁÜ@0[œå±œá[ŸÅ(®tûıAâÑ–8®%khõ€÷…b,aòÀ°?‹€Ã­5~ywzÂ®±ı±¯Ù?z²ãîy»ñ³<ãnqÆ{ÕíWáì(¿[¯jV×&Ií­ÖÆÍ­öy«µ™‹I!bAÀõ.üºNßç§â5¾¿Ö¿ägè¿<Cy}ı—q¢YÍ©ŞXE©Ø%µÁHÖ	.ÙY³ó&rJçwe«:Ö‡<Ouw¦XÜ^øzy"•àâ‚à Üve\«À*sÏq§ü8Õ´ö{´ñ<?Ú‘éQé6—K§ ‰NKm2Ò9È[·ğ6«„µ®»d¶÷Vÿ gŒG¦±ƒ»Ìs™K¼»%‹ã#8ëN}y­tü×7—å¯âaŞ|OÖ­ˆ±ÓìÊhqë—¢áİXÈËÅÃ´I¸5ÖÚxóG›û\™­[·Y­hÏ–]€"-ı7óÀïø€pï¾Ë«øwIĞu]GMÎÂƒÎIä¢àa$yG$.NLà[Õüw©,š|âÛhNÖ¥lM¡w·mâ7€›¶vš§no+şş–û¼Å­¾_åÿ ï/k^)¿Òüs h)anöÚ§œ|ó12~î2Åvm s·ÇŒğ:Ó,<O¯Íâ;ÿ Ãö6²Ü[5ÜÂ=LÊöÑ‚ Ş<¤–8 17<SõÏ
-j·Œ´MzVÚİ4Ÿ3Ë·{&¿˜»_.%^İ8àõÏJ» xvM*ÿ UÔ¯oVûQÔfó,>Z¤j0‘ªîlç¿$“It¿ŸüëÈròò7¨¢Š@P¼Öôİ?R°Ó®îÒ+½A™mb æB£stéëJµquohˆ÷3Å
-»¬jdp¡F{“Àê+ˆïÚêİ­®m£·R|øä·gym¬üU¿
-óˆŞ½ñ-4“wQ‹Æ+•f‚Yd˜0R`²FU$mã©¥Õ/ë¸ôÕ¡âÍCOñô:T·úBiÒI~[ZÜ™‘[h3 bV,£jœdè3ÙCuoq$ÑÃ<R<²UGÆØC‚b+Ì¯şO»MÔõıp^¶šÑ®,´©¾×v‘°(’l•ÃÛN|²~^£“[^´¸ŸÄ~$ñöUÎ•c©É‚Úå<¹dhÃ™£ê›‰ã<œdõª[[×ô·õúï¿§üªÕu{ÈŞj7w)fv=UA,Ç° šÉÔ¼YdŞ¹Ö4{Ûi¥m:kë5“ È¨¹İ°á°3ÇÃjßÛ««5…Ö‘â‹VÛQ¹½Òu;É{fGV²<ÙHÀ®Ò¼c#9æDÓ5êúWö©-†4®¯-£Ú­Áš"†8•ÕYÆâX qÖ¢ÎQvş´ÿ ?êå«FZì¿Ïõ_Ö‡u x†ÒçKÑ`¾Õ-?µïlbŸìí*,²’™,ƒ ÇÒ“Tñ8±Ô›L‹MÕd¸1å.VÂG¶V*ÄnqŒ€<nõÇŸ\ü.¶VzNµt÷±^B#i¬tF’$TæšC
-0y`óùßµğˆì-4ÛkÙÚ[éğ´+om¤˜á›r•g•ØgÎ 98äÕT÷®ãı_×b!¥“ ğ5­sQÒ4íZºĞ†¢ÒªüîşqLğv€W€23øWw­^K§hZ…ì
-5½´’Æ²gieR@8ç…¡ø"WÓoa¼wÃH\q2rß8bå³ßhã¼Õ\x¦gÄ1[é–¡kV.·‘Ç¹ÚÊáÕØÉÜYU‰¨ªïË¾¿›·áb¡½ååù+ş&Ç‡¼Ue©é^ßØCªêVQ\‹E˜+¹eÉØ„î#!½zèkÆ›áeµ³iºF·r÷°]Ä°É%†ŠÄ–cigfÆ £`99ï[éğ÷Ävú%‘câûm6ÖÎ'ŒgémHÌ»w¹Yğ[’zc'8ÈT­vÑ+¢7~!k:¦á	µckÔUp`Òª‘Ï9Æ}éÚˆîõ/ø“E¸†‹KÍ	@w,eã’	vñ¬˜ü®KjÖŸ‹¡a-ä7R¤¶eıÙSå£™ˆD%ğ“Éä“šèôï‹kZÙ¹26¦°'•³!‘×?1%‰íıi+/ëÓşÿ ¯Çüª(¢Q@Q@Q@y÷‰5¯è¾=ÑãŠW—HÔ&6ËCÅ¼ÄÅFàÍ)}Ë’pª8<šôÎ]FMMõ5Ò,P÷BÙ­‘ƒ—ÆOu¥`èy^“ãÿ Y~-cÏ’îÇMW–	­‘>Í|ò$e :0*T’ÄwjoxÇÄŞÔZÔê@É¤ØYO:´ÿ §É,Â7İòå@ç6óë^™oáİÒĞZ[hÚt6Âa8†;TTaöÃ¼
-’ïDÒoï`½¼Òì®níÈ0Ï5º<‘`ämb20yâ©=Sşºÿ Ÿà„Ö]?Ëñgšè>Ön<Y¾ä±¼ŸP‰¬#¶Ö¢ÛnÒ»ÈÌyÈ9É<V¼sã}J	­cÑ.§Ó¢:}åù–âÈÆò4*1I”§9' ‘Œô}I´Ô¦Ôm´»(o§Ksº,²d‚w09 u=©u-JÖV5ÕtË+åˆ“º·YBÔÀâ¦Şê]Öí]cñUÓ^Ÿ›û;­V)&Ó-%6«bS·t‹™S·ä 3ÔŠÅ´øÃ©Íáß–Õ´õ½—RTÕf¢mˆÊØU\}Ğ€n~À¯99Ë†ôWº{}M…®Õ’å£µE3+uóÜ€ø3ÂÍl–ÇÃZ9ºÄlbÚ¬@· £'ØzSÿ ıŸp[Yÿ ZW¡xÃÆÚí¶¥Z“ı¯ì«yo–‘<ÉøMŠ°ñúÀÒ}î3Íeéÿ üS«éQjCPû1ûD:{[%¼_1hÌùe'vá>î;w¯eğŒÆ</¢l$1_ìø°HÎ6ûŸÎ§ŸÂº˜Mq iSJ#’Î6m€m’:cŒzR{;_Ößuş¿­õü'ğ‡|UªC<—ˆÌË¥C¨%Íí´?»Ì"icò×h “œàôÈ6­|Uã²i:ı‚Ë%ØE´hâW–Ü6é%º8Ä8ˆ¡Âãïò@¯JOx^;im£ğŞLTËØÄÊçnFÜdã>µxÂQººx[DVSÃOˆïš««ßúßú_Ö’Óµ¿­¿§ık¿L–Xà…æšE8Ô³»œ©'°§Õ]JÆ-SJ¼ÓçÏ•uÂø<íe ÿ :™]'bÕ¯©ç#ø‘ö‹öß¾³#ÛÈLÉm¡0ìfYNø%>[mÂ°P2~b+¶Ñ¼Qa­_Ïcn·<Ğ\Ÿ:-¡ã•IR§¿B¿‘£xE“ÃÖ‹¬øgF±€-ÌÂÆc&0_%H$yÏ^kcFğÜZEõİûßŞ_Şİ"Fóİ˜ò±¦v¢¬hª«’O’yªÑ]îìÌİgÇVv:­†•¦¥¾¥}vä±D¡V@†có89ù?+tïqñÛş¸õšù4«]>õn,Ú"®fŠhÓîwc‘·8ÆîÙ5bïáíİåìšxÔ/-¼<nÍôqÃ{—w™ş­íOËædí2‘ß« ·ğ6œ¶—º}¾ªâY&7œÏ#Hç,Ä•À'€ ;T«èßŸåoÃ_ÃäŞö_×ü>ŸÏ|PÓ¯,näÓ¢êÅÈ½ƒP2B°åïbTf,0IÏ=Áà¯x†ãÇ—n¥~ÓZÉ6¢D;1K¨@%Fæ Qšë4ÿ hë¥ÚÛkZn«\[).$Òáî%T(( ãŒøæ¶ìôm/Nò~Ã¦ÙÚù(ÑÅä@©±Xîe\ SÍR²•ıAê­æ`x§ÄObúšuü>LÚÒY]íÚà®×Ü„ó´‚£¦"¡Ñ~&ø[Õ#ÓbĞİLÀ’[óc#"LÇ¸"ãçÚ@ 3RŸ‡z,ºŒ“İ½Õå“İIx4»§Y-ggW'¹Ã ± 
-–ËÀºD?m·¼Ót{½:K>ÖÏû*KbT+tbp>b3Û¦0–Úÿ [hµôş·-^x—J¸¶–ÛNÕí¤¼šÚi 6î%ÆÔ[Œ€èyë¸z×-ğ^Ö56ò-^öK¶¶ŠÌÄî€İ\‚İXää’OZéÿ áğı
-šş¡ÿ âkfŞÊÒÑ¤kkX`2d1Fy (Î:à >€P´¿˜=lOEPEPEPEPEPEPEPEPEPEPEPEPEPEPE#ÈÊ©#†2=ù¯!µñ6¹mğûÇWÏ®±Ô,5i­­n®ÕIjªWnãÈ .76qÖ•÷òWüRıF•Ï_¢¼‡ÂwÚæ­¦kšaÔ5¥–Æê-Úd¬§QXY>eóäd 3d‡«Æ	M½ñ½ğ¸ˆu-fçQÓŞæÎîgŠ‘:åïœ¸Ê§+–|Œ‚2z]¾šŠ:Øö*+Áõok÷¾°Ö›WÕâÒÓEûM½ı¶Õ}Ai[€€RxÚ~Cü«\xßÅzn±â)µ+›;Í=<Ça)Ê¾oš˜ù·dã?w¶W.¶íşvüÿ  Z«÷ÿ €ÿ ¯™ôç£XÔáø¹5œ—÷3Xï’Í‚…C"Œªp¼nÉ8<× øïQÒdğ×ˆµjæâÏ^†òMBh òs³ÉP>B Áïu<ÒKúûÿ É‡§õ¢©îÔWøCÄúŸŠ|OâËfñM­«ºZKj-åIÖpÆA,T°+>Î:
-§&³â;?İÉg«ßOcw­¥¶f“7·–¬HeŠB	Ëd•vä*“”¶ÓÓñ·ùşaı~=²Šñ«RûTøo{w}â½JŞ;®-şÍïüÜoÉ÷šAÆB˜¶tõİCÅ:o‡¼	&£ªO£w©Ú[j0Ä±ªÉ¹·Ä.Aù@;H$`ƒM+´½?ëòø?êTW‰xÇÅZì:¯‹µ[=ZæÙ¼35¤v–hG“(—O5?9ã=1‘ƒ[º£¬é­tíbÿ T1êv.P]yf©ãbKDŠíä(B0¼ÇÌ22TUíçşWü‚Z_#Ô(¢ªê:¦“a-õôË´#/#@ç¹êhÕVŸOµ¹½µ¼š×…Œd‚›†Öúäz×—|@’ïJñ¨ÇWÖ•5-íí¢Šè-´-C#ËÁ;¿‹x+œä×[mâ+ÃŞ	Ó¥¼¸4:u³ı’<ï¸* TÌBƒÓ=èZ«ÿ ]Èé]?Ìëh®&/éü†‘ê–:Â[ËæÚ\YJ’Ûü§Ì ¢ƒÁw9ä×5ğÆçR‹[Ñln5	çµ
-Á:ÄÎv+y¤8È\.zœSŠ»ş»7úvWş·Kõ=óÂº¡­A¬Şi6—Œ
-9åŒ3.G^2CÔv­z….í¥ºšÖ;ˆâ­,JàºÎÒÃ¨Î3×¸?ˆş$:=ş‘«I%«ÿ h]%…ÒB¢İYQŒ”ù£.–1¹–évzcâ[íoVÒ•'†ãKXŞf6#+©`ÊsÈà‚xäVN³ñFÒ.â·Hç¿ó-ZìMm$+ˆcŸ2YXàƒ…$ãœt¢ö©×Q^_âíwYÔü'¯ÚTlÚ<·pF·2¥øŒ¨ÚÏQ€H`yÇ=N9½àLx³ÄZ}ıü×qÛÚiÍ‘ĞZ¼ªä…Ë.p)¥{ÿ ]ÿ È:_úéşg¡Q\Õ×<?gâÈ|55áòaKÌqÈßr7nŠì2@ïq4øŠ+ãö}ÅÆ®÷BŠ}MÌn%‹*éncÛå†VPÊùœñIjÕºƒÑ6ú¯EpŸ.£ğşå´½IQÅí¼B{wİ±ÅÂ)¨=Aî*İß¿ÄÙ\İM-´dğ#¹*›£mÛW8PHÎ_ëÓüÁÿ _}ÒŠ( Š( Š( Š( Š+ø›m¨]ø*xtøgŸ3Ãöˆ-Ğ»Ë˜<Å
-99\ä£"€;
-+ç‹ı[m3dÚ.«.‹»T:]¢YJÍnä³·–èÿ ‹i`6äôÍtBÂHük¢\ÜXøˆêVñ+j:’YM&÷h„f}»<µù9?wq'ş¿¯ë ›·ãı^g²Ñ^/¡ivş$û'_³Ó®¢$çK¼‘f1¶<é•6¼¯!bJ¯Aİ×ïÂÚ÷ü!:]·Øn¯fKÛk=:[•JJäGpÒ-İ		ÂçQı_×ê5½¡(¯‡Fñ%¯­^îÛP¸Õ Ô-âf–ò<fÉmˆ•|Üc³•ÎYLš­-Ÿˆ4­YÓ´]{‹I,öË¬Ùh²Y_Í#ù
-JwÈ	+—Qò®ìã	è®¿¯ëo]:»?ëúüz¢¾n»ŸÅo…Ş_x±"ÓôÉmVKVR¤Àaœ²Ü~aÂí òEá‹é<©éÏ¥êI~²X0Ñîü©_Ê@|¸€T‚MÊ•ÁÉ,FjšŞİ?ÎßğEÛÏğ>‘¢¾xÓtMõ;{ŸøoU½º‚KÉõ…[YY/H(mÓ*6Ì»€ÂüÀ I Kàí[H×4—·Ğîš}°İÍ•¡‰à3$ˆVÜ¢¨Vf?2 8ëBWkÏúş¾]Á¶“}¡ª7æ•Yså¡`ñ×¾+3]×cĞ×N2F¬/oc´äØ¨_<“ƒé€;’kÇtñ6i¡Òu/²Ø^]<‰ŒÒH¢h#òË${€,U¹àÿ x/¥;¿¿ğ·ùß×õè{ÍGÄ3<©Ñ»ÂÛ%U`J6Áô8 àö"¼Ãş'Œ§ºóìüxmc‰Z[Iín"“îe˜JSB„XÙ›xª^Ñõ)~%ÛkßÙWVö·7·³;I¨¨­o
-çªW.Ê¥±œU%wo g°Q\íÇ´k5Ôä»’xaÓ®–ÒY<’ûä(©¹ˆ¹8ašó«/k6ú¯ˆõ½C»õ#’Ğ>‡sS2HÁpÈ§~èÈmï·’£ *Z°z#Ùé²H‘FÒHê‘ ,ÌÇ Ô“\?‰¼kªØ_\èÚNòêéÁº.Dv!øŒ|¤ÀŞÈ§9Ü ç’Õ¼Aâ={Ãs[j6>!âîÚêm,ôY ·•æ…Û{’ „”¨ÆwéŞÎÃI6“=•%d•Ñ€ee9„uy·íî<áÿ İj–“Å¤‹6%¥	kâ¥¾ğÊqy®gÄZ÷ˆ¼[¢yWû=õ´Í4-.5Üo#mDg¶‘w†Øà+cåp+'eåøŠ7jïCÚç[y..%HaK¼’0UUI'€*N£"¼ÃÅ^ ›]ğÎ¿á[õu“e—½»ÎÒ  –Œ‹|ä}Üôé½àı2ïOñ/Ššky#·šâÛÉ‘Ã~÷mº+OŞÏ®h¶­
-ú&v4QE!…Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@ÊNpÃƒù•ÌÃğ÷Ã0iÚ†,f{]BO6æ9¯g“|™~YÉ>aƒÀçŠéè vhvëqä%üR\H²OpšÊÍ)UÚ¡¥oe¢“éO>ÑŸŒQŞ[ÛG¿ä¶Ô.!óœ±r„ú¶MoÑ@ø/Ã÷1ÙÃ5k[5U‚ÓÏ[.Üí&Ş[¥I¦ê>ğæ­«6§{§.œÄÒby%1œ¡xÕ‚>;nÒº(¾·#ş=ş_øH¼«ŸíM_öÙ±³û›7íÛvãç¨t¯øwDÔ—PÓôóÂ	,Ï#¤"FÜâ4f*™?İº(Zl]ÎZo‡~¸ŸQš[kÖ}Hm¼?Úw@N;L t”ÂºğÁ\=•ÃÈ'Y¤¿¸i£1çfÉïLn8
-GZêh §,~ødÅ-Òy½Ê<z…Â9™¾ôŒÂ@Ìı·N8Î)Óü>ğİÍ••œ–—>E”¦{uKû„+)bÆBC‚Ï’NâIë]=Îj>ğŞ«¨µıîò\?•æs*¬¾YÊ0W#Õ«Z…´7Q„QÜÍx±˜ÒkËÙ®Yõ
-evÛøÆkfŠ +ÅÚñ†/4Ïµµ›8Y#¸Uİå:0ulwQÅmÒ3*#;°UQ’ÄàIì5¹ã~Ò£ñç‰eÔõÛK«F-4z~ŸsÜ‹IpØ `Q3Éç¯Kiğÿ I·ñÅ¼>¼¶²[5-J-zà4£ä²‡ÜÇ$`tŞÅ,sÄ’Äë$n¡‘Ğä0==Å>Ÿ¯s‰Ò¾i-¤ZC©èö¶P@ö»t{ëˆÑ¢c’¬ÊQŸ8İœrs]-¶…¦Yê	oh±Ü¥ªÙ£‚p°©È@3€3íZ57Ü+4G*«²1F)Ãà‚íŠwş¿¯_Ä-ı^‡”xÓSºğOˆµId¸³k”?ö‰³¸´(¢6pÁ”^Tn'ZÚOÂûëqâÙfÖ/ÌÍ4ı¥s"Z! ªDìû°0î	ïÒ½ŠKDSÎ´­;Ä6³j"ÛÁ60ÉwÉ.µOKtePYU1»cíÈn¹Î,hŸ
-ô;oYiºÔO¨Ígxk©¼”vÉc{¶ÇŒ
-€~™®öŠœœ¿¼-=Ë\ÜY]Ï;§—$“j724©v9iôÊ•²8é[öÚE¥{¨Ánîô ¸“q;Â(Á8 xëWj8'†êŞ;‹ycš2IV¡pE y…ŸÃíZñgˆ­u»{™$†ğ]#Çpñ˜&Õ_aÙ |t#hí]UÏ„mlçµÔtë'ÔuWİêºÍÓÇF.ÿ 4Çû?ˆ®¦Š‰%Ğ­·Ôá<3ğêÚÍn.õ¸£kÙõÔ>Ëgs2ÙÂÙ *®FĞw2g?A]u¶“ci©ŞêP@òû`¸—q%Â(Á8 zc­Yšxm¢2Ï*E v
-2N'Ô*J:Y[…Q@Q@Q@Q@TW70YÛIsu4pA—’Y\*¢¤“À-›'ˆtHlmï¥Ö4ô³¹m\5ÊånxVÎğzzTÇVÓWT],êƒPdŞ-Ëæ•õÙœãƒÎ(—(¬èµıx/&‡V°’+"EÓ¥ÊƒÎòËŒ¸éM—Äz6÷Ók:tvw'lt‚9O¢±8cÁé@tUCªéË©¦˜×ö£PtóÔÌ¾k/?0LçqÚ£Ÿ\Ò-mîn.5[¡µ“Ê¸’K„U…øù\“…<¨ ôU­é-yšê–FêX¼øà	½ãÆw…ÎJàzTÅ6QŞwL6’ËäÇ?Û#Øòp6p[Û­tkQU!ÕtëB}>ûYomÀi­’ei#, äu}jªxŸÃòÉqëšc½Ä†(Unã&Gª3ÉŒê(Æ¯¥ÛkZTú}Ú«C2àîŠ90zƒ¶Ee$yUMÃv:&ˆúU¸Ì.ÉVå·px…AÇ :ÕİGR³Ò,^öşá ·B¡¤n€±
-âHnàd[xcH´ŸMšgé´ÓÈÆ8ÈÁ^Xî®zAZôÉ§ŠÚ	'TŠ”¼’HÁU’Ià ;Ö{xFMQ4×ÔíRòDHâi 2,i<1;[“Å°µ‘Ïkßmu¿Cªï¶ŠİÚ3jb”‹à„íY6Ê¨Àd¹åFI-oë>Òõı>;B	Ö3•ä€
-ã÷l¹$c¥jÕeÔ,›Pm=níÍêF%ka(ó	Àb¹Î3Ş–½Êš?‡t½	î¤°Ä×LyæIå”…Üò31 tÀçÖµ(¤$*–b $Ô7Üî êÚ[y”<R¡GSÜ‚*“¥gxvÓH–æIÅ½²Û™(ìíÎAÈ8îhÒµí'\ˆI¥ê6÷C`“¸,’+Ôƒ‚G8©µSOÒ-¾Ó©_[Y[îæÜÌ±®OA– f€ Ò47BŠdÓàd3ÈešI%yd•ıYÜ–cõ5¥T.õ­6ÇE}fâöÓR/8Ü«nB„dFs1Œç<Tö÷Ö—rMµÔ3I*G c# 0	{ ±EPEPEPEPEPEPEPEPEPEPEPEPEPEP2‡FSœ0ÁÁ şc¥xÖc¯ê~ñÍ–…{rÚ’kóGKvşkÆXòÄ¬r	EÚ	?zöVUtdu¬0TŒ‚+/xfiíáğî“ 	¢K(ÂÈÈÜààò3GOÕ?ĞwĞğ¤º»{_KÑÒîËGŸY´²ÓôÉgß’á¾Ñ‘ä±V ñÇ&ºH¹ñ/Ã]FÁVY.4ë»ËY4ÛûÂ–Ö§*«"¹D6ì¨ÎO\zìºq¥¦—6•c&Ÿ6Z=º—0„`céU¥ğ‡†f¶‚Ú_é[Ûîòb{(ÊÇ¸å¶¸<œu¡êšşº—üâÑ§ıuÿ ?ë§”ëP]kÿ ´ßÅöÉZÖÁ$-}¨4rÛ´N	š-±üò¶Ò±ÆrAÎñ¯öè¹ß“¨=æ¥ö3á«”º%£26`rÃ;ˆRFqÛÛ.|3 ŞİCuw¢i³ÜBª±K-¤lèî…$dÛ*dÑt¨õWÕSL³]EÆÖ»(™†1‚øÉà×µ;û×]ïızÿ W%/vŞ_×õ×ÈğË[í@ë6ÚóO?ü$OâöÒ¦kÇ¯xvçŞéÁæº¼¾ÒµŸŠÒXÜ]¼Öv05±’w•¢ÌR9ÚX’ ,ÄÀí^ 4jßÚÃH°‘9û`¶O;¦ß¿İ8ëÒ›ká½
-ÆöKÛMN·»”0’xmQ÷rÙ`2sßÖ“øy|­ø/ò¿Ì¤ìÿ ®íÿ À<kÃÚ½Ï…õ¨WC‚úşCÃ¶÷×Æ²ÜæòF
-gu\°$¶H3Š±àÉôÛx¥¼C¨ê²Û[ë“Mr!ûvUQbq´Xÿ Ë Aû Œ_Óü?¢é	2išE…’Î ˜[[$b@3€Û@ÏS×ÔÕøA¼#´¯ü"Ú&ÒA#û>,?à>æ›woÏüïø	h¾ïÊß‰ã×vZœ^ğ×…Úí=@Ïu$Ú—™!TŞË n1°ªœŒ· ­É¿ˆ¾hm§ªê> º…bÓÅÕÁì²Å!ó.~Sòìäy„“€ rÄ\oøe¬’É¼;¤›Ts"Àl£Ø®FÛ€HšKøbìÆn|9¤LbŒE™clAÑFW€;
-]Ëúşµó©ÿ _×ü1ç^<³›OƒEñ\7rjP[ÜÚ7Ûà¿>~Ò<²–è¨Skä3|ÇvHÆ "Ö•eqáŸŒ–òÇ;GªØJ¢d½yá£mŞmÈ( 6jã…û ‘€;äğ¯‡c½KÔĞtµ»@N¶q‡PÑ†ÆFN*]3ÃÚ.‹$’iZ>Ÿ`ò®Ö¶ÉaèJšië_Å	­-éø1úÖ±k é3j7›Ì1c\³` Ü’@¯#øeã=P¨‚mCTĞîÖVæÂRµLa‚„eüÀ’yÅz·‰4;Oø~ïJ½3,(%à8‘
-ÊÊ}A ×àÍ÷WÕŞïÅ/­ÜÏe/ ¿Ó-ìâ‘Êù{”Ìe`£ ±ÆÀ=j-Ìíëø«Ÿ.¿Ö÷4ìüwc§i:.‰§ÛÉªk’é–òAg rq¹Ï
-¸RKsäEş,]eKq†Õ§·»šÚáßR;4òÀä\°
-KP«€s»¦+°>	ğ™‰b>ÑLjK*°	ÆHzœÈRÁà¿
-ÚÜGqoá¢`ñÉ„JÈÀäBä{Õ·y7ßüÈŠåIvÿ #½Ö/<Kccã=GÖì¤Ñ‰”Cx1lày¨ˆç€¬¤Œ3Û–ğD(<Qá-FŞi¤¶¿½Öe€ËŸõD»A €qyÉ5è>7ğ®£â]CGò2é¶ò¾³šúXRä¥”#£®FHeÏ 9®¢-3O€Ûlm£6±˜­ÊB£ÉCŒª`|£ÀôFÉózÿ _×˜=UŸõÛúôûVËûdivo¿Ú| ¤â=ÛwŒxÁ9<úâ>/ê1[xjÖÂ[{)>ÙqòÉ¨\É¼f52|Í+n;p£#-JOˆºÆ¨¯‰ü?æ\ŞMkıŸ=‡Ø%¹IS%Ã~è†B>`BX´ïü5ğı•­Æ¥y¦Ù]Í¨¢ÚXmã‰÷2Ÿï$±ëS«]šüï§áb›Iúÿ —ùßğ5ôI{®éšEÎ˜ö­{¤.¢’´Á¾l€Ñ•ë‘¸rO5GZø™ceem{¥Eõ‹Ü=½ÅôÓ4Ö¬¹ví’FƒÉeáŸi:ÕËè–Òl%fPğiRyå
-Úèçvy `c9â÷‡ü¥iBK½FŞËTÖ'¸’æmF[4YÏEÎJ¨ŸçM»ëıoşBJÊßÖßæ`ÿ ÂKy¬K¦Ëu­ÛiPj¶²É-—˜óÄˆÛœM¸Vp,Šx/Pp>Y½‰¼6’2Ïá çÌûÙû@`:tğ=«Ò¿áğŒÆ</¢l$1_ìø°HÎ6ûŸÎµ£°³Šä\ÇiN"	V0FBg®Ğ{t§'ëf¿Q=U¿­×ùŠ~&i^×­ô©mî.¤Ùç^¼#‹H¾GñA*9–ìäÚòßHøÃivšºÇª]¶Ô"ŠV71Ë2	„†3†^c(0aÔšéîüc¨|@¾mWH‹PÓ/mâ»W=ëÌGaì
-|½ÃÁæ¶„´İ<­Ï‡4­KÔà\-[
-z‘óş÷áJ:ZOúş¿-}µ¼WõıÀõæ~ ê:O‹>].›|'A©ÛÚ3Àpé(¨ÈÎîr8ç‚2*ç…ãh~)øİeY,$ëŸ)'şù­øMÒ¦›PÔ¡³Õ5¹îŞîMFK4WW'wU  7ç½t±Z[Cq=ÄVñG=ÁS4ˆ€4˜SÀÍ8è¿¯/ò­ÿ ®¤ÔQE 
-(¢€
-(¢€
-(¢€
-å>"hÚ†¹á6µÓ"óîæ	şÏ½SÎT‘Y—-Ğw#¥utP„İøÅ~UÍÚè¯:Şÿ jªX}¦m>Ñ-_gl¤â·WÂÚœ!ÑƒxRy­ôõW¸½òk»ƒ‰œ“&ğŠƒå\ÇÚ>³EE`zëëøQ¤xrú+­fkŸİÚC<1Ak¼¶Rc…‡•µÊ4œ—,ı g©Å›áÏˆÓÂö–Ö–·?ÚL×¶ê'’†+[‡çÏÃ‚$ ïÌA‡ËŒ÷(Ó¯õÿ Ô‡ZxÄ6>*µ…mš{Hu[KÁª´ÑäÅoå²İ¿$ğ `òjºxCÄ0_Ë<™,âñj)f³[(–ˆ À`2pp0İsÓÚè¡ë¿õ·ù!%eeıoşlù©>øãşi4S¦F.¥ºKµ¼ûd{#A©„œîİ’€WßÖı×€µíBÇ^ßá»Û[B(aµòd±>YHU[ÌfbUÀ?»ùˆN{
-÷j(ïæ>Ş_ğç„øŸá÷Šµ+Å›FÓ®mmZŞú&’Ò¸Vt. òÉ'yÄÌyÒ« xÎMl]0dK6Ñ	!u(·kªåƒ
-“Ğôÿ E4ìÓì&“M×´›ÍoÁw¶6	î™¢xâÜ«»dªÄÄáOR+š×µO‰7ó\Ç¤è7Ze²#=¬±½œ³Jûp©(yJ¢îÉ%w09¯J¢Ï/ŠoÜ>¡u¯Çic¡ˆe7V÷Ö±İ'•ØE]Ğwor>o•N+Cğö³¬izŞ›f[I±¿¶‹Nº¸DIœM9fÚ~` ² ÏÌÁA"½²hb¹‚H'‰%†U)$r(eu#x ÕŸe¥Ú%¦Ÿgoil™+¼B4\œœ( u¦š}¿¯ëæf»ÿ Z:—m´½kTÓî-œı‚Á/~GdÊÌÀìCµvŒ±`yÀæ¸eÖ¼I¬kgÅÚn™ªE¥Ëi5½¤ÓMdQ‚"6•p|Õ$±c¸0{â¯é¾/ûöƒ2}•÷¡KxTà™crTd.22Em_iÖZ›Yêv÷v­ĞÜD²!ÁÈÊ‘µ6Òı¯ëşwÔà.üSâeµÒtkD‚óZ¿ÑMÃËdb•á˜laVtË;ìĞ0sáƒÇÏ¦·¤júŒÉx»^ßS†İß0ÍšÄŒ¨tsÉ=ı#LĞt}ÍşÊÒll<ÜyŸe·H·ã8ÎĞ3ŒŸÎ´*›¿õ½ÿ àm-ımcÍ¾x?Tğ­Ìò_Z¤1¾™n„#!İ(y]ÇÊO#xô9àšÉ‡Wø…â­.âEÓîaÓ¯ÊOm>œğ«Û…q˜²n#vÙF¸1^¿Tt­&ÛF´’Ö×’óË>Ö í29v™cIêîÊ¹æ—'¾ğãxòÌjZÆˆ¾l©:4–ò+›‚ÍŒ(~RÌJ±ùº×iá}
-óHñ‰.&‰cµ»šÜÛmÛó…QNF0}+wOÒ4İ%e]7N´³6ù´öõ;@É÷5rúõçrmøQHaEPEPEPEPEPEPEPEPEPEPEPEPEPEPEP>µâÃ¯
-jÚŒV­1Cp	¹°ÔÉsaA gšûÆ^Óu{}*óW¶†ö|l›‘‘¹º&{n#wl×1ñ>Ê-KI¼³³U¬¶à"YéfXîˆmÑÇ,¦&P8Ş£æ9à×!âOkz”×Z^%7zğ³:¼o§IökG‰T´‘Ü¨G@CNÄuz÷ş¾î¿Óş¿¯ëô=a|] 7ˆ¿°«nu@î2z«»îïÇ;3»ã5§‰4Kû‹è-5KIŞÁC]˜å°ƒ»ï0à‘²3‘q^7káİm/m´&Óu¶Cã©5é¶%­¶çÌó±·$qŒç<WS¢˜‡¼yq©húŒºmìvşX—J’ácB® )†äŒâí‘M[–ş_åşoîõøµùjv65ğÖ¥o}qk¬Ú˜¬?ãå¼±À!¾le#>SØšd9ğÍÆƒ.·¯Ø".G`Êêÿ Ü1‘¿qì¸Éã æ¼—_Óõ/é^"Ô¡Ğu«_G­£éòD[A*âÎ£Ì•‡ÎB.NMKFÖo¼isâË}'RşÇMsO•­ŞÊU™Ö8Ê¼¢»ÈRÃ¢óÏ¡¢*ûéÿ ¿Ïğ{ƒÑ;ZlzÜŞ8ğÔ¾²ú¼Æãˆ];H{¨@–Æ20rX›Å~·ÁäÖ,±¨2-˜Yƒ‚Ìl–#$p;â¼Sû[i¢¼û­¦Ás­ê¶÷ğØK,ö¨ÉµU PHY]ËĞvÍk\[jpxáõ¤ş½·¸²Õ ¹ŞÎÆi|¨›.áCbb¤îÉ<u ŠN×î¿şà{éçøm÷§âíLÖ-ô›İRŞéØ"FÄà1PÍÑ v†#v8Í‹tWV›K±Õ òZ4'»£ã¡ÚNÃxŞ[mGTM.?ê§O†tÔod´Ò&-2ãd*Á6öˆÀ ×ô}fÏÆÏ¥^,
-·¦{[»)c‹HŞù_Mß(à·ñ2p£«×Ïúüÿ =.®KE§—üÓòÖÇ¹QE QE QE QTuI4mÿ T•‰gnó²)Á`ªN?V5ßô}G°¾Öå{3uj·L°Ã-ÂÄ§h9tB Üàq’x£úş¾àş¿¯¼éè¯8¸ñŸˆug±M/CÕôé×W$†ãN­Í‘êæF@‘psÛ\VÇ‹¼isáËèlltGÔ'{I¯]¤¹ñ$Q·ÎAËtÇpI•Õ¯ımpJîËúètğ_Ùİ\\[ÛİÁ4ÖÌxã3DHÈ*qëXšWtbê[k§3Ü\[ÅÄÀ³B~~Ø#8$Çjó¨|A­r×_Óô½BÁoïP^XCá™ú('/4â=ï!#a tç“V|?áËØuÿ 	jJ¸€6§ªŞMºÜ¡9Cyf^>V#` óÛ·®¿ÓĞWVÓúÜõúÃºñ†‡eâ´+‹ÇMFVEHşÏ!R\£x]€œdö®KâWµ
-ò;AXã[ËÛ§…¦Å¸…¬Ë†a÷Aã’1Ïë:¿‹uİOGÕ4{MrÒâU·m2k{Ëtµ‘dË±m¢Q”wàà.;ŠQ÷ší{^ê}ìz¯ˆ|Aaá!õMMİ-RD™8,ÁGá“Ö¥³ÖtûıJÿ N¶¸ó.¬
-˜ö0Ù½w/$`äz^y¯ø€øßC¾ğòèW«¨E«Åk$Fİ§€*LŒ]¦U1¨ÙÉRr:sÁ=‡´Ë‹_‰>0½ki£µ¹Éb‘ª9XØ0CÜ:w¢:«ÿ ]?ÌŸ/ó±ÙQE QE QE QE QE QEâŸÚxJÉnï,µˆ -#ÚÁ¹aA€YØ£’8ÎãØQ—â6‡¸4Ò.LhKV½¾BLÈ]c'vì•vííš›Æ“ÅúoösM§GlÊÊÍs§ı¢T$c|Mæ(€Ï85“qğ¾ÂûÄÖúÜñ›[xÕVŞYáÕ6£ÎûÊÈÊ`„Só`’
-Wı_×ê\Óş%hzµôé¡ZÚıµCÛîk‹}ÅD‘ª’Jå{àŒ‚@·ÿ ô›
-ÃW6Z”ğ^Z}·d«4|¹y>` €À$úƒYZ7Ã"Òî?íØæ™ô¯ì›Wk"(w3ê$ùÛæÆAQÇCV.<¬Ïá'ÃƒÄ6BÎÅQ%¥³¥O¸®<ï»À$™ZoËúßşã`^ÖßğÆ¥ñKÃzUü°]=ÈµˆªK|±HÑ™3ÎíÅFx\rsU_âî‰³éšÈÕ<Û«an…íá*¬%rnÒz1=xàÖ^·ğqµæ»ŠëÄL-o'îáRÉDp°˜÷İ´)'q]¾Àµ#|-ÕÙ.•¼OhâöHê6Ò‰e…F…|ï»Æâ3ó™]¯ëü¼ÅÛúş¿ÏÈÒ<9-ü––Ñ_İ6öŠİ ‰\]H¥D·™—
-:œãš|_,®,ZöÛÃúì¶èë²yP IšC‹ç”n}Ã›±‘Ï5•kğ»]±Õ'Õ-|d©¨Ì³,·‡M>d¾f1¿…m˜ù P01[/€î´÷Ò#¿Õàº°Òæ·´†ÇÉqÄÈÅ±—nrK9$ô«iëúş­Ô×_ëúş¾]¿oJ(¢ÂŠ( ŠÀñŞ¯a¡½‰å†â'+hÕæx0F¬-·<uëq\ÿ Š|Y¬Ü½Í¢ÜÚè0^âŞ{=æi®~íĞH³€íQ»å ’·ş½?ÌÇ­Ö>«â}2ÃV¸û5Ü­¦[5Ä‰öwEp¶FñÎÒqŞ¸-%µ(¼-¤øoÃòkö·/~Æêæ}HVí#³á§«Á~gnœg8†ãá&¹ªÄ·§ŠmßSl‡»k'–eŒÆÑù!üÕ]›\ç®ãÉ¡§­‡¯¯õı‘ŞøWÅv,²âÖŞæ¬r$êæhÕøïŒ8êÒ¤ñ‰-ü3iÍÕ»Éåï6ğªœdf‘Ï<O²m¼/qáoøŒè×FKÛ´imw 6X4Ã¦sı+ŒÓş\ê¾[ƒâ_´é×‘}¶5ÊæI¢y#!Ü2\gpçrà©9ùqU&¯u²·õø1Eh¹¼ÿ ¯Èôßë‹áÏßëMl÷+i	—ÉF ·¶{~MÄ6ºÕæ£koÄrX<i)•†.ÆŞsŒ0ê5ÄZhZï‰,õ­2;û«OÜG¬Ú¶/ö‡
-$h”²”íoS–,qëÚhşHÖ5A'2JHŸfÜyb8ÂœóĞœñÖ.Åweø›TQE!…Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Ü[Ãwm-µÄK,2¡I#qÊF#ĞŠóáµÅ®¹4z¬Q\ør'§Ø¾¯u:Ûc³÷NŒd1lÁÁÅz]-Áê¬Î=ü f•|Yâ´bæD©±’Tğ¥H#‚0ÀŒ1é-'Â–Úf¯q«Ï}}©ês ‹í7Î„Ç"**ª)#'Éë[ÔP´Ø¡EP%ş‡,ş,Ò5Ëy6µk{•9Ì‘8ÇPê§·zĞÔ4è5;o³Ü=Ê&àÙ¶º’İ²?Ú•±íš·E,f~¢iŞ°û™oäÁæ4Œ³³;³31,ÄäšĞ¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢¼æëâ£Â;KS¦GªE¤°`Âf–HË‰ghPp1´“ÉÏj:ÛúíúƒÚç£Q^O?ÄıoN›[±¿°³öíl¶{mç‰?}!,$ÃHªqó¨Pİ±‘Q\|TÖÄSYÁg§JÄß5Ü²FşL«m#PÙRÙIÛ‡4®­ëMşïø`ëoë]¾ÿ øs×h¯)_‹7’êq\¥„+£¨,Ş"¬n7Ë—xlíÀàmÛ“×=ªµ§ÄïßEòZhĞ¬Úoö²ÜÍæím÷8Ù"îÌJ¨J˜œqMéıy_òÔ¾ßÖ¶üô=~ŠóOøX%K›xdğìfy|>Ú˜³Œ»Nó£f1òŒ“òüÍøñ\¬ÿ u¨Ä°ÛÃ¤İ€“í±Fş[ƒq‹ÌÜ„6U¤,UxÈuş»µú
-ú_úÚçºÑ^uyãnf»›Kµ¬a»‚ĞÜGe5ï–LfI¤"&Ñrª1OZ·¡xÖïVñn›¦Å.Ÿy¦]é-|—ÖñÉJÁÂıÆ'Ë‘´–<u(Z»[_òõş·±İQE(¢Š x!º·’Şâæ†U)$r(eu=A‚*?LÓô‹_³i¶6ÖVû‹yVĞ¬i“Ôá@«tPE6I(ÚIR4™˜à :’kÏ¼Kñ;LÓìôİKLÖlåÓçšH¥e´óó°Ø&hö@A Š:ØC¨à‚hRx’(aR5
-ª=€éU,5­7T–ö;+¸æ{)|›€¹ıÛíƒøÈ÷A®Rø’·ºÕ†€ñµ¨»²[‹ÃÎä™ÈØŒ) X‚Cp?ˆRïoÄ>Ë—cÑè®3ÄŞ.–ßÀº¶£`ÉcªAÆne†GÎ#wRW=2pq‘Ú®øgÄš¾³®Ø]¥ºÿ gIÇåÉD®wÔä€qBÔ‡MEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPXx/Ã÷ñÖä°'P2	L‚y™°6İáI±‘ØÖıÎ?<;5µäs\‹µEšK«É¦”„mÈåÔÈÚG5ÿ <)qe¤šc˜â3Âîe‘Œ¿ë7¸}Ï»¾âs]UÏÂá¿í”Õ†–‚é]@‘Ä[•6+y[¶d)À;r+?şgƒÄeLT… .¡p»B±eQ‰8PÇpQÀ<ã"»(‘ÌEğûÃ–÷QİAôWBĞ$±êw*Á’Ã"Nä’O\ó×šdßü)<+é²pe-"ŞN²ËæãÌó$ºMØÜOÕWŸ´çñè¿Øú²Ü­ãY+	V˜!}£“‚R022G4_[_Ö£Ù\Ø·ğ^…g¢Ç£Ù[ÜÙØG#H±Z_O	%³œ²8fô$Š-| Xê–š•¥œ°\ÙÀ- òî¥TH‡ğl´ç#“ÉçšÆ¶ø£¤^éÒ]YéúŒóC|¶h!A+6ÄÜv³p1‘Æí¿ŠôÛŸÜøi£P··[†Ü£c)8!Ny##<wúáë¿õ·ù1_ù›tQE!…Q@Q@¾/ÒåÖ¼!«iĞ`Í=³¬`Œ†ldìH ûçí>è7Émgyeq¨[!š)ïîÙl ,±yË¼(ùv’8â»ª(Z\CÃŞ›I¹Ôï¯o"»¾Ô%G•á·ò#UD
-Š©¹ KsíTäøuáycXŞÊàÅùÅöû€>íÛ¢]øˆçºGCŠêk„ñ/Äy<3â‹M"ëÃ÷/ÓªÅt—À¼k»Ë¶r9%@IõHÓ@?´dÖaé»ô¿"Q/›«^4…İÃØ\£#Ky8ÈãÂÓK²±»¼º¶€G=ë¬—¸ìªu<` 8ÅqúGÄvñ–6ºF‰4—×ÑİÊ—7	pÄÄÛ^Lc"0€H®î©P¢Š) QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE W™…7'ÅRëÒk–Ëq& /÷Á§æ)Q™æ“åœË›FkÓ(£­Ã¥:†Ë3ëP¦©ct%ûT6L‰q—ÎËšwbNA1é×.µøqªZëÚ~¸¾$GÔ­ç¸’yÖVIÒS“ŒÎV09û£œ)=9ô:(Zl]X(¢Š (¢Š (¢Š (¢Š +Î/şÁ{ãhüEı¹rÙ¸Ïğ£³êÊ« ÚUFÅ ØµèôQmn,yí¿oô«mËy£‚]­"²²]ÈYv™^}˜ù²F¢¬|5ğ½ß†mõe–«k[›…{{k¹b’e
-K¹ˆlÜØ	<d’I®êŠ`õ
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-É¾ñ&—§Ü}šIÌ·_óïn†Y?%Î?­ª\ÜêZ§ö%„í T^Ü!ù£CÑÑ›×°æ².|C§èáïh²jº² ÓAlÁôiænŸ|·µ lÈÑu’=~ÈGó4¿ğ’ÿ ÔYÿ À_ş½d¯ü,™¾rŞ´gÊd¸œ¯±`Ê?Jw“ñ#ş¼)ÿ €wüv€5?á%ÿ ¨&³ÿ €¿ız?á%ÿ ¨&³ÿ €¿ızËò~$Ï÷…?ğãÿ ÑäüHÿ Ÿï
-àÇÿ  OøIê	¬ÿ à/ÿ ^øIê	¬ÿ à/ÿ ^²üŸ‰óıáOü¸ÿ ã´y??çûÂŸøqÿ ÇhSş_ú‚k?øÿ ×£ş_ú‚k?øÿ ×¬¿'âGüÿ xSÿ  î?øíOÄùşğ§şÜñÚ Ôÿ „—ş šÏşÿ õèÿ „—ş šÏşÿ õë/Éø‘ÿ ?Şÿ À;ş;G“ñ#ş¼)ÿ €wüv€5?á%ÿ ¨&³ÿ €¿ız?á%ÿ ¨&³ÿ €¿ızËò~$Ï÷…?ğãÿ ÑäüHÿ Ÿï
-àÇÿ  OøIê	¬ÿ à/ÿ ^øIê	¬ÿ à/ÿ ^²üŸ‰óıáOü¸ÿ ã´y??çûÂŸøqÿ ÇhSş_ú‚k?øÿ ×£ş_ú‚k?øÿ ×¬¿'âGüÿ xSÿ  î?øíOÄùşğ§şÜñÚ Ôÿ „—ş šÏşÿ õèÿ „—ş šÏşÿ õë/Éø‘ÿ ?Şÿ À;ş;G“ñ#ş¼)ÿ €wüv€5?á%ÿ ¨&³ÿ €¿ız?á%ÿ ¨&³ÿ €¿ızËò~$Ï÷…?ğãÿ ÑäüHÿ Ÿï
-àÇÿ  OøIê	¬ÿ à/ÿ ^øIê	¬ÿ à/ÿ ^²üŸ‰óıáOü¸ÿ ã´y??çûÂŸøqÿ ÇhSş_ú‚k?øÿ ×£ş_ú‚k?øÿ ×¬¿'âGüÿ xSÿ  î?øíOÄùşğ§şÜñÚ Ôÿ „—ş šÏşÿ õèÿ „—ş šÏşÿ õë/Éø‘ÿ ?Şÿ À;ş;G“ñ#ş¼)ÿ €wüv€5?á%ÿ ¨&³ÿ €¿ız?á%ÿ ¨&³ÿ €¿ızËò~$Ï÷…?ğãÿ ÑäüHÿ Ÿï
-àÇÿ  OøIê	¬ÿ à/ÿ ^øIê	¬ÿ à/ÿ ^²üŸ‰óıáOü¸ÿ ã´y??çûÂŸøqÿ ÇhSş_ú‚k?øÿ ×£ş_ú‚k?øÿ ×¬¿'âGüÿ xSÿ  î?øíOÄùşğ§şÜñÚ Ôÿ „—ş šÏşÿ õèÿ „—ş šÏşÿ õë/Éø‘ÿ ?Şÿ À;ş;G“ñ#ş¼)ÿ €wüv€5?á%ÿ ¨&³ÿ €¿ız?á%ÿ ¨&³ÿ €¿ızËò~$Ï÷…?ğãÿ ÑäüHÿ Ÿï
-àÇÿ  OøIê	¬ÿ à/ÿ ^øIê	¬ÿ à/ÿ ^²üŸ‰óıáOü¸ÿ ã´y??çûÂŸøqÿ ÇhSş_ú‚k?øÿ ×£ş_ú‚k?øÿ ×¬¿'âGüÿ xSÿ  î?øíOÄùşğ§şÜñÚ Ôÿ „—ş šÏşÿ õèÿ „—ş šÏşÿ õë/Éø‘ÿ ?Şÿ À;ş;G“ñ#ş¼)ÿ €wüv€5?á%ÿ ¨&³ÿ €¿ız?á%ÿ ¨&³ÿ €¿ızËò~$Ï÷…?ğãÿ ÑäüHÿ Ÿï
-àÇÿ  3âtQ—Ñµ•^çìdãò&®iÚî›ª³%¥Ò´©÷¢`Q×ê§¹×“âE§ïLÔQy0Âg¶vöÅÆ~´Û=_Hñ…Óéš•ÎâeŞ-çÂOşüN8tÏpHõÚÑXº¡ròÜiz‘P³ÆdxÏİp?B;Ú Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( ?¼Ö§Ñ¼ªë6H²jš•ûAf§ø¥y<˜‡¸\gÆºoør×Âú$V$Äù—7ËÜLyyõ$Ÿğ®ûŸxİo®GÑ®~ W©PEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEP\¿<=&³£ı³N>N¹¦“s§\(ù–AÉOuqò‘ĞçÚºŠ(²ÖaÖdğŸˆí€EÔah¤PznMÛOû®¤~uÙW–ø$“àßîê·j=€–p?Jõ* (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š òÛïù øşÆqüîkÔ«Ëo¿äà_ûÇó¹¯R Š( Š( Š( Šãõˆv:dÚ¢Á¤júœ:Rƒ}qa
-4p·R¹gRÌh<ãš?ˆ:>1ÈºXŒ±˜“p;|½¹ÆíÜuÇ¾9¥}.;;Øêh®:Ïâ6Ÿ6±¤é—Ú^©¥Ë«ÅæØ½êD^ÛòHÅ[‘Ãùâ—Wø‡c¦Mª,F¯©Ã¥(7×£Gu+–u,À`°PvƒÎ9¦ôÜK]ÂŠÆğÿ ‰ô¿xnzÆb¶2£9i°†=¹œ`çœ{â²l¼vuéAğÖ…ªÙ-ÊÃ&¡º8-öçÈ]ƒ¾Şz.	Í×”:\ëè®sÆ*>³±hl¾İyyµ·›åîf=Kml 9éMÕ¼gm¦ê²ivÚ^§«^Áoö›ˆ´è‘ü„í¸³(ÜØ8Q–8éÒ‹éë¸ìt´W5á_é0Ğ'Ö4ß´$VîÉ4S Y#*3‚#¦şy¬=3â¼¿ÙZËÁŞ/’–QÀÓWÊ œnß¿}úS³½…Òç Ñ\f¹ñÓE×çÑbĞ<Aªİ[Æ’Lt»!:Æ;AùJ4?‰Zfµı¬Òéz¾•“’òMNİaäd.7–ÉãÌe'upò;:+ˆÿ …›a¯£iÚ–‰­i¬,ä»Š ŒN0lŒÊr@Á»zvêER ¢™+2Dî‘™TŠ@,}xüë…Ğ|_ã-OÄ–öš—€çÓ4Ù©%Ë]¬… m=÷³•$BÕØŠç{EPEPE`øÓ]ŸÃ>Õ5›hyí!Ş‰&v“qÎsøu££^¾£¡é÷Ò\ÛG3û¹eãÛš·òş¿@z[ÏúıK´QY÷‰ô_Áo6µ¨EgÄ¢š@Næ?@p=Iàw4\z+'Ãş&Ñ¼U§µö‰åº¹FeJ°ìU€#ñÖµ W/â_I¡ø“ÃZ<V«!Ö.^7‘¢®N®Höë]EUpz;Q@Q@Q@Q@Q@[àŸù¼#ÿ akÏıq^¥^[àŸù¼#ÿ akÏıq^¥@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@[}ÿ  ÿ ØÎ?Íz•ym÷ü€|ÿ c8şw5êT QE QE QEÈx×TFĞäÒ4«4›XÕüÈlìáK»ä¼­è£%™ãÖ¼Ãâg…dğgÀİ#EŠV›Ê¿G»‘F™ƒ“ÿ Ü@ôëĞu…vÚ—ˆnuÆñ_Š-ï®Æ{[Ôˆ,yÈvÇÂOÄääÕË?†º¿…µ-æKíBJc=ÍÅìÁçy0ÛÀ ?:VÒıtüÅ'ïykø­Î'âŞ$Ö>ıˆº7Ê`ÛÏË˜½;t®ãÆº¤z6‡&‘¥Y¤ÚÆ¯æCgg
-]ß%åoE,Ì´İ7áÖe«éz•Ö§ªj’é0,öHÊ@0@D]ÍŒ±?˜§¨ü+¶Ô¼Cs®7ŠüQo}p63ÚŞ¤AcÎDk¶>z~''&œ’k—£oúÿ 2bÚ³ì—ëşgñGŸáïÀ›ÚÜoiî–+É”cymÎÀ{e@ú
-½}©x›á}Ç„âÔ:¦ƒzÉhÖ†Ê8|œ•å
-òx<n'§9Ïµ·Ã-/êÛŞê0j›‹‹‹Ù·ÎÒ`a·€9üsœšu·Ã9n´‰uSSÕcÑ×0^´E"  ìK´`±4Ó÷®û§ò¶«ü„×º’ìÿ áÿ ÌÊÔ3âúeš’Ö¾²{¹½<ù~TSï·]Oˆõ«
-i—¶]ÜÈ©¼
-<ÛÉÈ
-Š å ç z
-ƒÃ>:§®êW¢ò÷W»óŞA—± ÂFã£<ûô¬ï|6¶ñ'ˆcÖ§ñˆm.¡B–âÊé"XŒ0L&F{œ’~€?e/¿ç¯ü—È®­ÿ _×RŸ‚|w¡øT°»¹Xu}kÍšæD]ënò. #vß¯'=«•ñ$/øE£h76¾"]_H†D²–ÂkãÏ¬¿7AÆI9%Åw:WÃ‹-*×WHõÍ~{½Q9u	ïw\Æ;vHŒ÷ÍO-MÖ›6««êºÒé§}¤ZŒ‘²¤œ!ØŠ]À-Œ“×š¥nm<¾åÓîM|ş÷×ï-x›^°ğ†¯õù-Ñde#UÚ÷àd“…ç {T~ĞæÑ<7¾;õKçkËù;´ÒrGÑF»RkŞ±ñ¯¤ßê7m™/ŸšºˆNÌãnI¹şg:š¶œ5}*âÁ®îíË·Ï³˜Å,|ç*Ã¡¤ÿ Vş¿$Rş¿¯ó<‹âi×|-â]ÅúŒöİ¤_g‚Ãì·-Îôıãn…#-À8!}= îhÎÓµˆà‘Ğı+—·ğ%§Ú´éõ]WTÖ¿³~kHõ#eøC±»Œp\¶:õæº–]ÈË’21pEC—Ô7•Ìoéºæ™i4zïˆ?¶¦y7G/Ø’ÛË\}Ü)9çœš­ãOi~Ğ›RÔ˜³1Ùo}ùŸÚ=©<È|+áX|'c=¥¾§©ß¤Ó4Åµ++7-´à`’}I&¸ÿ ‰pB¾4ğuÖ§
-O£Ï-Æ›p2§Mª}¾¾Æ”®ì—_ëş Õ•ÛèhxâÎ¿}&‹â94­pD.`…_tw07*Èrr@Æy=	õäÚ´ú¯†õ•ñ5ş•âh<Ekª3^_´E¬fµgÀŒ>pn  c’=1èÿ 	¸µŞ1ÕåµÓ•—KáaĞwÌ[ c Çlt­9>hÖ¡­ë^(× ²a:Zßİ½ÒF‹¹ˆôêrRk™K·ùÿ ‘:ÙÇúØÑñ×Œ¯|!.‡s³é7Wbû’y[…À©99 —H®Î¼£ÆÅÿ ¯í¼ ézŒvmqš¦£we$	jCíQ"ƒ¸ğy¶2	#Õ°vàpi/†şoô[y™å¾$ø¼Ö~#ŸMğæ•ı±–­>¯"¾ÓJv°Œgæe$yõ#¼·ñ6‘uáøI!¼FÒ„pg8E¶G\ŒG\ŒWø/ÁÒëšSÅi«K¢x§ÃºÅ¬·±B$ó‘œ¿Î„êI8ÉìzÕÛß†Şğ~™ecâë0YŞJ¾e›^yV·R&5SµI'w6qI|:ï§ãızÛ›M—éúÿ Zõ5Ïƒ:®§r$za¸e 0R.pHÏNõ½á7Xü¢;°U]>Xœ <±^áï†şñ&ƒé~,ñ¥áıø¨oò¶v4{/<ãƒĞûÖ’|ÓÅtöñGŠäÓ@
-lRC&s°¨Aòı*œÖëoÂÿ æJÖŞWı?Èéí¼uá»ÆÓÖD¹Ô|Ókş(ó?¾Ü¯
-?¼pbiÖWºW¼(/#Óá¼±¸Şa‡P‰Y$(Ä+ù°	ñØ+<;²u¿–†3
-9½\ˆHÁ‹î`'-ÀÇŞ5rƒú}‚´:_Š|[¦Y—gKK=SdQäç
-6“ù’}M&“V¹cá>·q¬xfò;ûk-FËPšŞî;hV42gq8^3óc=ñõØÜj–VºŸ4Ø»¼ßäD˜°A–' 98ÔÕ/xcNğ‘ı§y¬­#K,Ó¾ùf‘º»·v<W+ãåñâ}Åš6—.¯oe¶×v0­)!_™ @Îéé’z¯ë§ù‰-Ä•Æä, ¾Ş}Àÿ 
-êüAâí'Ã7Ztœ¦3|ò*?Ê»»FÛ'‘Åyíş›­|\Ö¬†¡¢j^ğş›+ËÄÌ"½š\»Tƒ³à89é«yğK@Õ#“û_Yñ©9P°Ü^êd–ã9;>\sß û`óR®•¼ïø/òWò·çşd7¾.øƒ}¢Şx“BÑô[MšhcÕš_´ÏŒù€)
- ˆ<uÁ©­xöâÏá–â[{{x.õ·XÅÛ&—g#‹ÉÍB~é7RD5ÄÚİ¬m¼YêZ‘’Ø  F}kOÅ'ğ·‡ô{›MvÂy4ø#U0*Y-ß¡DSÊ'8 À>˜¡ÚÖôÿ ƒ÷ù]¿ëúĞÈøkã-OXÔµ_ëZ™©ŞX*K¡¦È­Ämë·€Ààpõ>^ağ¿A¹mkXñdúZ½ò­½š–â%<³¨– GéŠôú§²¾ä­ß`¢Š)(¢Š (¢Š òßÿ Èáû^èëŠõ*òßÿ Èáû^èëŠõ* (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š òÛïù øşÆqüîkÔ«Ìõ{Kƒğù§´ˆËyáİXŞˆGWò¦.ËøÆÍõâ½O¿¶Õ4ë{û9V[kˆÖXz2‘‘@h¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š +šñï†ÅŞºÒà’8®÷$¶ÒÉ©"° œqÔtï]- Ô±¨vÜÀ O©§QE ´
-(¢€9/ÂÒi~=×5è¥ŒZj–ğ„gwœ›cÆ1·ú“[š•§kâßS°µ½X8æ‘C‡Ï'Ÿz·E·*iú^Ÿ¤Âğé¶¶q;™-¡XÕ˜õb>ÕnŠ( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢ŠÈñ>½†|7}«\r-ã%©’CÂ ¥ˆ p	ÿ ‘;Â?ö¼ÿ Ñ×êUÀhZ<Ú.“àà“y{‹ö_c3ş¤Åwô QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QEÍŞ?ü#ºäš‹ƒı—´\2 ”?ì‘€}À¬eĞõÏÏ%×„KD¸s3èòÊ#13–·“î€sÇ¡®ñÑdFGPÊÃHÈ"°á{'-¢êSéêÇ&¢XnŸ˜¿B|·^ñTó*é2ç¾2ÀÓ¿áaÚÿ Ğ¹â¿üOş¦-<L?µ´óæÍ²ñú_²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñt—ÿ ×ş…Ïÿ à’ğ£ş¯ı+ÿ Á$ÿ áZŸeñ7ı4ïüoş.²ø›ş‚šwş·ÿ @ğ°íè\ñ_ş	'ÿ 
-?áaÚÿ Ğ¹â¿üOş©ö_ĞSNÿ À6ÿ âèû/‰¿è)§àñtş>šoİéŞñ5Ìç…Y¬~Ì™÷y {Õx´mBşúxææÖŞó¬ô¸tïÚIÿ ¬g·ZŞ6~%n¯`ƒûËdIı^–F÷İj·sjwœ§UŒp×4‡Ú£>¿sD²'“eŒ2Åœ–#±cÏĞ
-è(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¨-.á¾¶[‹vß`ŒàzûŠ Š*Ş©ecwkks:Ç5Ñq
-·ñí]Íùš°(¨,¯-õ{ÛID¶×¬±H¬2>Æ•î îW	¦VhÓ¸Éü7Î‡¦Œ	¨¢Š (¢³¤×4è®f·kßC<PHI*òcf}zô (¢€
-(¨nî ±³òæA¼´²¹*¨É? ¹5ØİedC¹Sê:€
-(¤.ªT3 XáA=N3Çà -S|Äó6o]ä·<àc?Ì~t ê(¢€
-(¦,Ñ<¯È$xŞ+™³@¢«ßŞÛéº}ÅõÓì··¥‘±œ(&›.£i¶qÉ:«Ş9Kq×Ì`¥ğ1şÊ“øPª(¢€
-(ªöWÖÚ¹Òa,BGˆ°ï#aø2‘øPŠ+2oiV÷sÚÍx‰<r!*Ó±øã=*Î¡}›d÷RÅs*! ­´3ò@á=sÀéG˜y¨ªvz”7zZj'¶…»-Ü-Æ]ÊÀŒw¤:Æ?³ñw. ÛmrËòùHàüªO½ ]¢ªêZ¦“§Í}0†ÖºI¢ŒãŸÎ“PÔ­4«½½—Ê¶Ÿild8ç“Ørx tU{+Ø58îí™šT²2B
-°ö#4[ŞÁw-Ìp±f¶—Ê”#´69ëÃG­ X¢Š§wªYXİÚÚÜÎ±Ít\B­ü{Ws~@f†ìÊ*;Û{û/­dÛOËŠÌ¤duéTônef0ÚêşQ ‹Û)m÷dgåŞ£w§ŸL–ÖÀiÑE QE QE QE QUï/`±‰$¸bªò¤JB“–v
-£r9« QUoµ+M5`kÉ–%t·Œ·F‘~&e}m¨Û™í&Ä$x‹ ~ò1Vƒ)… X¢³ã×tyuVÒ£Õl_QLî´[„3œ¦sÓ”–¾ Ñon®-m5{‹‹`LñErŒñ pw r¸<ĞCLÖôi$}+T²¿XÈÖ·	(Rzgi8«P][ÜùŸg)|§1Éå¸m:©ÇB=(Z(¢€
-*­Æ¥giyiiqswlËo
-Ä ©æ• ‚I¤İ²5,ÛT±Àô“ô_¨¢¢¶¹ŠòÖ˜´3 ‘	R¤‚28<¡¨aÕ4û›û‹/­¥¼· Ïn“+IznPr3ïG[™nŠÎ²ñ‹©_Kec«Ø]]Ä	’.QäL¨9<V8ô£Ì¢«ØŞ&¡eÔqOÈ2â‰ÇÕX*vu@0\N2Oj Z(¨å©½k!s	»XÄ¦0y	Æí½q3@ÑU Ô­.f½Š){)sî¡ÿ “
-’ÊòßP±·½´”KmqË€pÊÃ óìhz+:Ó_Ñ¯îç´³Õì..móçCÊ;Çƒƒ¹AÈÁãše¯‰tëK›»MoM¸¶µ]×Ct‘¹bpzúP¥­İµõ¬wV—\[Ê7G,.z‚8"¦ ŠÌiqëk£µÖ/Û‹cwÃ'
-İûV QLšhíá’icŠ5,îÇ@ä’}(nÀ>ŠÏÒuÍ+^¶{'P·½…c<°8ï‚+B€
-(¢€
-(¢€
-(¢€
-ã5ÿ XXä†İtämòË‰n 2À¿ÄÉ¹ISó6NÑòóÙÖM®˜"Õ¯Ì°¤–ÒËÜ%Ô’í*Øô?*œÿ ´ikpèeÿ ÂÆğ§Ûã·å’Ñ7fp!‘ˆüÃòïÁ'nr éYz/ü;a¤ZÛÜ_*Ü=ÌÊ`UâS#²S‚»—nĞF[p
-	8®©lõíÆ¹mZ¦çå²x`6ã™7sóR9àJ} áeøámkK™$Ö$°F†9c)?•<Œ~m‘mûì
-Bù²¤v.Òum'Z¹ĞaÒ¯ÅóÛ¤²ÜÇ$æi­Ô¡e'Á™WóC]ÅšºhÏxbQağÿ G’dqåiĞå1ƒƒqÏÖ›âJÃH×4[İJò+KqçÄe™¶ , Ìx_»{:‘[—¶VÚŒöW‘,Ö×˜åº2‘‚+3FğÅ†‰3ÜC-õÕË‚}õä—¨[vÅ.NÕ:íÉª“æmœ½ßÄ{k”u±Õ´İ2häòÍ½ı´³ÜÌÌØEKed“Tçïp«º—ˆu«[FûLmko*À·-ƒÍ²ÊÁ|õ$DPFõ³Œİ­aÿ Â4&Õá¿¿Õõõ‚F–ŞÒsÃˆÑKå±×¯4•®&hİ_%­İ•»mÍÔ–lr›SòôôÉí\¦³$0føÈ†ŞßR±’yWD£ŞX›TsĞ{WS«húv»§I§ê–pİÚÈ0ÑÊ¹QèGb9ªK>ËK³KM>ÒKdÎØ`Œ".NN ã­oØ`|CÒ—Rc4ğ&ŒÍäÅ©yŸ'š $?*ÊUşéçœİƒmñ
-ùµÑæ«¢Ã¤—Q~-Z<`d*]™¶4¸8ÆÎªŞƒ>Š4ëÔ›RVâù£òÈ‰|Ò™ÎİØÎ3Û5fëúş¿ÌJñ§„´‹]EÇˆ.n<·ù"»»yå¸P8hU¾fSœ¹nsÔÕÓâí;Ä¶ºŸ§6%²˜Ï1a„ùiã†VŞØ`p|³ŒGeYÚîq«h—vº„Ú|Ó¦ÅºƒïÇÏ%yãµ2W‹O°âí$ÇA0²Ğ¡šelEn¥”uÈQÇ=şµ•âGá©ìâ¸Kx£¼WH®®®V’QŒ+“Ğm,ÙÎ~\ I¨úZÜh-¥İÏ,«$L’«s‘Œ‚I úIõ$óU´İ¬o¾Ùu¬j:œë•¼1““µcD8$Àç®nNòl˜«E#“°ø¦ÄÚª^ëú>¨Ö<ìÈ7™Îw*ÆZBàaNô$`›M&·âËmSU·¼Ğu›¸Î²´ŠÍ¯fgèOš’¶2®çÎOJíõkmNêŞ4Òõ(ì%—‘í¼ì¦ Ã$yéĞÕ»u™-¢K‰VY• ’EM¡Û2q“Û&–ûc7ûRöÇA›RÖ4ô‚HÉ$S5Îu9(„2H ôã5¥jÔ|qÏ‡ÓB¼ií%’îîÉ#k„mÉ·{¯ HÁ9${lëz6¥¬Ì–ÿ ÚÉk¤0ÅÍ¼6ß¾œ`å<ÒØU9Ânàá†km@U
-   ¨ëpéb­à‚ïv™$“£OÀí*‚!×O#ƒ×Ğ×;qã­3NMBÆiPkRcÓÌ†Iî8UAv¤Bœs†´õÍ
-çS–­?Y»Ò¯aĞ*H¯e,¬
-“òğz‚{ŒƒsJÓJ´hEÍÍÔ’HÒËqrá¤‘Ïs€ à     ’ş¿¯OÄz½ŸÄ],i5Î£ay¨ÂH=™ş×ÜncÁ€ÜP†ÏLÖ1ñö…¹o¨Ûk59R9c
-ËÄË:¾Ô*BºöÚkÓè§ÖâécËî|Qáh<-âX5ë«©d‰â‚«§k“
-Ğ«|Ì„œn\©¸¦·Æ­½/†î ³¸·òµ"9‚ ÚJCŒÊT†R$sëÅv5ZÇN±Òí¾Í§ÙÛÚ@·•oÆ¹=N &švÜ?àş%[ÍnÚÏYµÓ$Mq³« m<³|Ã€:N8ÎŠµIš;hæ­¥XÏlÓµı…‘¸*ÃWeW¨$àg0ÁÏ`ÊJ°HÁ½pv^•uñcs·.l\ÛÅ>¥Zÿ (ò×:‚°\ß_ëúÓî4[½Öí“Å¶±Yë¤ê+4vw:;ÂT#q•cd 6íÿ tƒÛ2x¦o
-ÚÛÆßÙÖö²êWòÎú„ÍøÅÌ™XNİ¦O˜0F@ã<•ôŠÂÔômSU»ò§ÕãG.KX-JÍ*ã”yK‘°¡QIg®EÑGıw9ûë›]dêúd°ŞÙµö˜‰qŞ®ëp…ö°à€
-ä‡#¨5ÑxŸR¹ÓìaÂéÄ¾SÜÛYIvÖë´Â4“Æ €H$0vè£¥¿®€AñT[øwI³Ô ¼¼,ĞjÓ7úZòÎœ!”gpp:E°µÓ|Amáí=¢=6w¼ŞÜ‚ÖÑ´Rf7îüî»sŒ†ã;I®’ûMÕ.õ4tÕ M,¨Yìd²Y<ÑóËp7L
-öÜQ¥.¥5Ÿ‡¢°ÒÈmÈ¢Ï0©'œÆŒ™Ï±y‡S‡‹ÇxƒÃ÷úuİöŒuiÈv¶WM#>öù‘‚¸u#
-Œc'§gâKÕÓ´)¥k‘g)Üö·V`¥ı°rxO Ó´]&}?í÷í¨\°2ÏåˆĞ(ÎÔDÉÚƒ'‚IÉ$’MjĞö½ÎFÇ_½_‹øníuhá½X>ÚÁsõVuÇÊ\dŒ¯ÊÅN1œ
-ş%´ğö£âHfÖ4İ:öK¸§„_e³‚%.‘V“”q…9ÈüGuáÅ¿Õá½½Ôï®-à”MÆ1n1µˆTØ#pÜÄÏa’	R ‘Ôv¢ı®Ÿåıt‡œÉâë£–^&’-:Î`ÏkÍastiÄVìƒn!v—Ã¤¿¤êÚNµs Ã¥_‹ç·Ie¹IÌÓ[©B6ÊO!ƒ2®æ8>†»(&¶³Š‹¹.åA†EUg÷!@\ı ©èjêÂ9­âm3á®›p–’Ï5¾—­º)Şì#( g?AšæáñzivZÿ Ú5ÅşØ|Og©jöfRP °Àà9]ÊT¸ç©&½&³µ‹MNòŞ4ÒõDÓ¥KÈÖÂmÊTŒ HÁ‚<¨È# ¹;¶û•ÔMSZ·Ñt´Ô5x­÷"Ìàd@ÍŠ	=ºôÉ¬›?Z]ê´Ö×¶—Ú=•¬Rı¢ÉüİŒKïV+N 8×¨Í‰ô=WPÔm›RÖb“M·+'Øí­<£4‹´ƒ#—bT0$*…ê2N9¹§Yjö÷÷ßkİÚ¾ï&´˜¾bGÌîÀ;zr÷ÉdOCœ‡Çš%¶¥ªHu?>Î`²Y2–e¹‘WkÅnOË!ÈO•3–sß5¥á/¿ˆòI$2InëŸ.	!1ç?»‘$ù•Ô©ÎqT€3Šéh feéK¤’{as-ÆœìÉS´K,3±¿…Ü9 ûŠãï¼{§ê×ZLzN·p!¹‰å˜iÇws€¥VXvHêœ°$.C 	­ëï]ÜêsÏiâ]RÂÎëqº´·òÎæ*ª
-;)hø;OS‘´ä†c¶·WlQ D\ç Bş¿_ø ÈtÛ©/tÛ{™mæä@Æ9Ğ#ªäíõÆr3ƒÍg]k§êZ”wÈ‰cmf—i4g.,pöÀ Ùô­k˜{i"âKwu*³D²Q¸È÷{V~ Å¤Iu;]İ_^İ03]İ²™º£jªªŒœ*€9'©4=Xt8Ó©Ä|;¨-¾¹ı±¥i×¶S&¢_Ì)™EiGË&Å\–á°ÜŒ+ÿ ˆº9ºk+_Kƒz‡Q¼—ı¿¿±²«)\¨Ú¯Ôœ‘{Z(éoëúĞ.yŞ™âû/ZÙÚÅ«éz º¢ljÑï‰-!‰™™ †Xà0~a]G…#1é7
-P¯üLoHcƒs&+rŠiÙ[úéşAı~æpwºÇ‡5zÖÆÏXÓ’m6y<˜!•L²]:2aQNp»Ø±Æ3ßåjÄÑ/tÃiàûy.¬Çö6Ÿ2ë	$Š~ÌjŒ²ƒ÷s 63·=«Õè¤¶·õıjœ†³a«ŞjšÆ‡y¡}uo~EŒñ´Û¡lKY	‘ˆWûZ›ğ¿X²Ô¢×â±€Åz“È£íËÃ˜ä~~SÉàç‚yÇEG+~7W_?ÒÆ^¯©Íi§j/em-ÅÕ¬!Ö4Ì,Nq„#Û‘€æ²tmJ=?AÔõ5-[UL’‹Ë#Ä#j–QÄ;@ù€Ğñš‡Æ:%ìò¥şŒº²ßK[LtÛØ­÷GµŠïóCà2Ë¸‘éRÉáK‰-aÓíu±Ñäùïmü³-İËw+Ü4ÁÈ…-€Àtõ)ô25oˆ:4š­¿Ø<WvÑˆYºÇ,r
-Ï)D¯2OŞÆ*æ§ãßŞÛßØÚkút#_*ækï³Åq’w¬s`ô“qRŞ¢»UT*€  v¬Ë=bFâkİZ›G-å[¥Ÿ–c²¹}Çq ğ3Çœ^¢¿S7À—·¾/4‚hÖâD·˜\I8’,ä,ˆ­ *Bƒ–êi6©¥ËñFçO:•¨¹}$Ba[…ŞÌF3Á~o§5ÙÑCWiÿ [X‰¯ë{iá›k«{ÃÖv:•«£è6²£jV€!*#H‰T°'ô…È¿¹œÉ4¶1H"•­ÙÄ½vg€qßœ£§½\®oÅšD·‘Úê©NÑÂÄÚmÌqHcfÃy¹× ¬*1Š$ï¸-61>Ë¨Å³¦ê
-Ê¶÷BKmÑ]Gº7ÜÎdåƒg’7nÇ›~0¹Õšú;K-:ÃR(x,f±óÙİrw™TH À˜Ÿ»¸üµ­á=i:<M2^ÿ hLŠn¤¾»ûTÅ‡c'B£'@“€I¨5³â/T}SEÓ Õáš†k6¹J¥Xá‘˜#ÙRGAƒÚ‰nh™nâûZƒÃ7—³XØÃ¨ÃH-ÓKÚ3‚å‚yíêk–ÔüEc£xòÖöæ{+k›hÌíy¨IÈ„dˆ¤	ÎâIqÀîÏ£]xŸçÕŸP°ÓÉ\é^|%fQ×ÎØ„€OVVR ÏR*ÃhºŞ«Ú–¯š}¼l6VÖ¦ÌPÊåÛ~Ş (Qœ8·ş¿¦?¯ëCÃ*ÓoüI¬ZÙE=ÄW€Ç|L.|…à|Ûˆ>\˜m»Ó†5±áxfôˆStSfD«‘‚­åŒV»iÖ/¨¦¢ÖVí|‘ùKrb_5S®ĞØÈÙ«4=bãéø\iÙ'yëÑ4}d“UÓ´K¨oà‰ƒKy!7•-&03Œö®ËLÕô»ßI¬iú›éš*Çur“/—y›•Y³€UC	ãw½wTPİß7õÕ~¢¶–şº?Ğå>_Z_xO6—P\ƒG'• }¸§8÷‰¼k&ƒ©"­E”$ı¦k™ÄfWÂŸ&.ŞfÖ}ìm’W±¬„Ò€×od–å³ºXgÚè[ˆÎ7sß,Å(ê;VñLş&ÒfĞõ»¶y¡m"ÔäŒ±óUíQ7É“ºB»
-öÁÏkgs.»©i÷ÄŠX&7a¿Úí‚=êåÜ\ÚIWsZHÃxBOq½Y0j‹¢C¢Ã8[››»›‰L³İ]0iecÓ;@ €@ ”-¬]VşæÂ}4ÅOo=Ğ‚}Ç¡
-W×æÛŸlÖ~¹ã-#Ašê×P¼‚Êå-Œğ}­Äi?„$€Ä‚½yµ$’MPêrj÷wW1	”WjojíÆà‘ª p18$2MK£h×V777Ú¢uBã
-Ò,^TqÆ	*‘¦NĞ7’I'©à ­t=™Ëé~?Ó¡Óïƒk’j·ªËökIm„WÅ*°"‡(	È;3ŒòÀfº?	kßğiR\‹{–†cŞ'‰$à7ÜrYİ‚¤’5½E2lpŞ´Öõé:ÇŒ5…šòÊ‰8,Â†t@Í¹8Éõ­?ì=[ş‡-oşüÙò=Gà–Tøyá×v
-«¥[IÀÊZo‡|o¡x¦òò×K¹g’Ôÿ m&qæF‰7¹Ç¸Èµ™7ö­ÿ C–·ÿ ~l¿ùì=[ş‡-oşüÙò=>ãÅµš(¥Ö,üÉfòRPø›†Ævÿ «q“•#­p<æo¥ş•ªÉcÃ7ÓÇ%´¼8ùHd`p9*wîŠMÛñü›Wvş·±Üaêßô9k÷æËÿ ‘èşÃÕ¿èrÖÿ ïÍ—ÿ #ÔZôzo€ôÍ[P3Ìïio•KÉ4®*Vf rzMWĞ>"h>!ÔŸJ¶7±j‘3¬ÖrÚ¹hJ’öPÑ‘×v9ø«q´š%;ÅH¿ı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_ü\V«ã=6÷ÅŞÔÖâæŞÆÂMM/#™
-”xc%:ç‘ßĞŠĞğ·àšşM3Y¹ÔÆ§w9–ÊÖçFxd6
-ÿ «.¥#y ğsÒ¥+èt¿Øz·ıZßıù²ÿ äz?°õoúµ¿ûóeÿ Èõ_Æ~!MJH£–ê;ë×[=´)##ãæ@ebH®FçÄrk–^9îëÑZÜÈèŠ·,#mÌ<·t+Ÿî± ƒéBÕÙw_ù\Šş¿‡ü1Ûaêßô9k÷æËÿ ‘èşÃÕ¿èrÖÿ ïÍ—ÿ #ÖGÄk›{ÿ ‡ZüV·Ñæ0 á”$ï]ÊØ<`AìyàÕ[İZY<_àCa«­åÒİÅq-¬ÃÉ¸e‹ áI­ëhZ°ÿ ƒø ´ÖåñEş˜Ş0Ö<›{+k„aâÒ<êÀÿ £ã‰qÇsøiÿ aêßô9k÷æËÿ ‘é–ŸòP5ûØÿ èÛºáu}"êÃâ'…4y5ınhu/¶ÉxWS¸Œ9
-Y€ÿ  \àØsš®ß×pèÙŞÿ aêßô9k÷æËÿ ‘èşÃÕ¿èrÖÿ ïÍ—ÿ #×«²ü9ñV—y¬kWzÍ”Öò5æ£4›nK?678Ê€ Á¬vã]Ğ¼gag©ëÛ÷PVàù—o!aÈ-±~`¥Øwi]Zÿ ×õe@³½¿¯êúŸı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_üV¼?¬CâØjÖÿ êîàY@şé#‘õ#ğ®7^ñüv)U‚{óe§°ŠòŞ;h
-Ü»îUd‘df§ıZ¶J‘ÏjjÒåbNñæGQı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_üX^Ôc´ñ‡'¿½X­!¸µo2áö,Jaeºÿ :ß—Åš,:äz3İ°½yJ¢	
-o+¼'˜`b¼àœâ—o1™SÚkqx¢ÃL_kMÅ•ÍÃ±‚ÏphŞP?ÑñŒJÙã°ütÿ °õoúµ¿ûóeÿ ÈôË¿ù(?ı‚ï¿ôm¥qÿ -/´Ïj¾!µÖõH'Ú+x­¯%…!ÀcµX-»©`cÖ©wW;?ì=[ş‡-oşüÙò=Øz·ıZßıù²ÿ äzã<iáëø}µı3Wñ¿c¹ŠêâÕõk‡V·F>|üY9<qÅjøbæ[WÖ¼\5Ó£«yvˆ×’˜
-¢şöQí¸-8ãfG&5ò'Wku7¿°õoúµ¿ûóeÿ Èõ™ªZkvZ‹oŒ5‚—×­o)h,ò[Í&Gú?\Æ½sÁ?Zæ¼âíB÷Ç:…¦§5ã[êöë¨iÉq‘,*81&ğ3…*r¹S‚sÍv¾ ÿ ß…ì(ÿ úGsGDÇÕ¡ÿ Øz·ıZßıù²ÿ äz?°õoúµ¿ûóeÿ ÈôİgÅiâŞQÔ.®M¤ñÎª<Å˜;ó°*Œ	é€sY—mt‰l-u6îÖúxcšê(JL–Jî#Ü‘¸ã*¾8¡jCWûVÿ ¡Ë[ÿ ¿6_üGö­ÿ C–·ÿ ~l¿ù£×¼A>®è¾TFËQH&•‰İË¦;rTç5‘mñWÃÓ\CğjÖ«vĞ%—O‘–ødŒÅ°1= 0ãš ô6ÿ °õoúµ¿ûóeÿ Èôaêßô9k÷æËÿ ‘ëšñŸ‹tmSÂ%Òì5ûtZ}ÃmIàŸ+ír l”àù§xãR*ñ…ıü×QÛÚiív;AhNò«’%sDu¸=?¯Oó:?ì=[ş‡-oşüÙò=Øz·ıZßıù²ÿ äz<E¬Üh?gÔ&’Â"~ß5ÃÈ$Là'–H<sOÔüW¢è÷¶ö—×†9§Sl.ê¶Å,Ê¤ -À,@4-@gö­ÿ C–·ÿ ~l¿ùì=[ş‡-oşüÙò=yßŠbñ<z'ˆm/uË6}m,oxeÏ}ÈÚ<´Â+€Iå:ñ×xrîù¾#x¾Êææimá[7ÉTİnÚ¹Â‚GABÕ_úéş`ô¿õÔ‡-5½cÂúN§qãaf¼²†âE0¡3nN2}kOûVÿ ¡Ë[ÿ ¿6_üLğ7ü“ÿ ÿ Ø.×ÿ E-oĞö­ÿ C–·ÿ ~l¿ùì=[ş‡-oşüÙò=qº¡¤j?MÎ™§N!ÆyWQ–æR.dD}ˆd+åğ:¨ÉQ 5Øê^2ğş•eåÎ¤o/˜RKdk€D|şì6÷'Ş²Ÿp¶­ı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_ü\eèüöL÷úN¬Èú!32Úeyò¤ˆŒÙ ‚á·qô¬}JMOLñµü–ZŒñZŸé–æŞ7*¢6‡x<©Ê½>QDuiwÿ 4¿P}mÓü®z_ö­ÿ C–·ÿ ~l¿ù³5ëMoKÓ¢¸ƒÆÃ;ŞÚ[ğY‘¶[ˆãcÅ¸çqï½+¯¬ÈßşÂšwş–C@şÃÕ¿èrÖÿ ïÍ—ÿ #Ñı‡«Ğå­ÿ ß›/şG­Êæ<{:Áá¾R7\G´uÉ·–âRß,~`ûª{ÀMØh·ı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_üX^%–Ïá]Ş©§¥İÅî—©,Z¬›æYc?:ÈÃˆçu©ï¾&èztån ÔZÖ(â{«ømZK{c"îEvä‚½0¦÷ÔØşÃÕ¿èrÖÿ ïÍ—ÿ #Ñı‡«Ğå­ÿ ß›/şGª¿ğ°<4ûé£ûXFˆÉg:®ÛQ›)ò+lÚ¸{WOÓ-æ‹S¹e“Ç#/îšFRŒs–RyÁõ¦•åoët¿Péëfÿ CÒ°õoúµ¿ûóeÿ Èõ™â;MoGğ¾­©ÛøÃXi¬ì¦¸d‚Ì©dBÀ[ƒŒZëëÇ?òOüIÿ `»¯ıÔ€ö­ÿ C–·ÿ ~l¿ùì=[ş‡-oşüÙò=nQ@Øz·ıZßıù²ÿ äz?°õoúµ¿ûóeÿ Èõ¹E aÿ aêßô9k÷æËÿ ‘èşÃÕ¿èrÖÿ ïÍ—ÿ #Öå‡ı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_ü[”Pö­ÿ C–·ÿ ~l¿ùì=[ş‡-oşüÙò=nQ@Øz·ıZßıù²ÿ äz?°õoúµ¿ûóeÿ Èõ¹E aÿ aêßô9k÷æËÿ ‘èşÃÕ¿èrÖÿ ïÍ—ÿ #Öå‡ı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_ü[•Ëë>)ÿ „cU–m~ëMµÑeˆ‹6!¸yUK8a·hs%€	»+—?°õoúµ¿ûóeÿ Èôaêßô9k÷æËÿ ‘ëçâ‰ İ¥üñ-´W/"*É ‘LÈÈŒ7$¼V¯üCáÍRÖæëHµòç´0ı‚æF¹‡}ÀØe•q•#ƒTúüµg{
-èî?°õoúµ¿ûóeÿ Èôaêßô9k÷æËÿ ‘ë'áıİõÇü$Ñ_\ÍpÖÚåÄQ4®X¬xR É8ğJì©tO½¿êÑ‡ı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_ü[”Pö­ÿ C–·ÿ ~l¿ùì=[ş‡-oşüÙò=nQ@Øz·ıZßıù²ÿ äz?°õoúµ¿ûóeÿ Èõ¹E aÿ aêßô9k÷æËÿ ‘èşÃÕ¿èrÖÿ ïÍ—ÿ #Öå‡ı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_ü[”Pö­ÿ C–·ÿ ~l¿ùì=[ş‡-oşüÙò=nQ@Øz·ıZßıù²ÿ äzÌ‚Ó[—ÅúcxÃXòmì­®„{‹Hó«şŒb%ÇÏá×Ö§ü”cşÁv?ú6î€ı‡«Ğå­ÿ ß›/şG£ûVÿ ¡Ë[ÿ ¿6_üRøÄºo…´¦¿Ô¤}¥„qCî–w=ø˜ÿ úğ+Íµÿ i‘x»JÕíïõGÓîRŞhÊjO0Æê°ye\®Tº–ÓV’ô¢m‰ı‡«Ğå­ÿ ß›/şG®gâŞ!ğŸµnÃÅÚ¤—6ŞVÄŞÌ¡İ"!ÈÑzëtïYjZÎ©¥B³%ÖšÈ³,±íÜr}W¨Ï¨=°k—øÓÿ $“\ÿ ¶ú>: ½¢iÇXø=¦i«#Dnôa½Wt ZÅğ‡€¼;¨é6Zä¶—Ö÷³DCÅüĞ¬r³Ãhf#§Òµ<aâ‡ğ7‡ÚßZÑã…´ÛcI¤Êì«å.ap8ïŸA[ÙŞ.ÿ  î‰ÿ ‚iù*‹oı[ƒès—_ôİ1a>ğîq"DÑí-JãËN/îÊÈ${õÆ8ëW<3ğóKÑ<:¶H÷W2Ù;©Lòdl–HÁoİ®IáqØõ­ìïĞwDÿ Á4¿ü•Göw‹¿è;¢àš_şJ£úş¾ğ)xËIº›áö¡¥h4[ N2ŠFPÄ¨ ç´-Vÿ O´kmÆtá‘l´«İæÊ-? î2DêùlN:“¸W]ıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉTumõ‰v1´Ÿ [ı‡ÍñŸjÕå¼{ùnlå’ÛÊ™Ô)XÙX(P“Î2kEğî‘áØ$‡J±ÜJÅå|–’V$œ»±,Ç$õ'­CıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉTî'!š{İ]é÷š‡‡ÅÃBÚÒ6”³`yFHÔxÃd3È¥G§øOÁÚÄ~M¾›«Ç«‰aäßÛ$»phD…BGü³Æ:t5¿ıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉT–€õ9­7áö‘}aªZj>¹Ó"švRkMÈÚ13.í»óıàNW9=kkCğ.‹ ‹W†9'¸¶šYâšR«È¡Xí@©÷@w×¹9·ıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉT-êEiÿ %Xÿ °]ş»©5	hú®·m¬]År×ö¿ê%KÙ£òıvª¸=øç¾kÖÃÅÇ:²®µ£‰†›d]Î“)R¦[­ /Ú2!²rs‘ÀÇ;ÙŞ.ÿ  î‰ÿ ‚iù*0,ë:—âX­u[4º‚)–tG$ ëĞğG¿z¯ÿ ®“ı­yªyw_l¼„ÛÍ'Ûfæ3ü oÂã'@ÆN1IıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉTYÉté~°6:<Ak»p‰®$•T÷Û½ßÃÂ>_kRx»FÖfÔô=•õµ­ÌÊ–ã˜–	 \Çw A$œç·mıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉTk{‡KÆ±àmmkí;ÃwZµÅÚ©’ÖëS¸·kÉS#dºäãxÈã‘6l¾xbÊşF1Öò)ÂI.¥‘ŒœáŸsän8-œgŠ½ıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉTu¸=w"»ÿ ’£ÿ Ø.ûÿ FÚUÃzWŠ,E–¯³Ú†Üb[‰"V#¦íŒ7c¯9¬«é*ÚÖf:méGL¡B‰mw¿hÉ$•ÁÈÆ<mÿ gx»şƒº'ş	¥ÿ äª ¿ı™jt¦Ó$GšÑ¢0ºÏ+ÈÌ„`‚ÌKRsTÂz+xe<8-=%SËñ\IW¸,¬ƒ“œ{æìïĞwDÿ Á4¿ü•Göw‹¿è;¢àš_şJ¡ë¸lA?‚t›½6ê[{£q¦F#³_N%ú‡ç=	9$pr)Ş ÿ ß…ì(ÿ úGsRÿ gx»şƒº'ş	¥ÿ äªÄ×l<PºÇ†DšÖÎÚ“ˆŠé2¨Vû%ÁÉh;†rAÏ ®¹¤Ş[x_,úEÎŸ©\K{ÛôK‹¹íRwö©ˆ€Ç9b1»:ëŞü<»Õ!Ñôk‹]&-KØ‚ñ˜Ü_MUA1¨ˆ6>lôıwöw‹¿è;¢àš_şJ£û;ÅßôÑ?ğM/ÿ %P´KËôÛî	kë}şò…×Ã¯
-ŞŞIu>šæg”ÎnæQ…•‹ lJ®JàœUí;Ã^‚×—zN¨ÜÏ=Ìï$’¶¦}îå uÅ/öw‹¿è;¢àš_şJ£û;ÅßôÑ?ğM/ÿ %P´VAêrü5ŠŸRÕôë=<¤öVZÄ¢y¤e,ÎE
-BŒª¯Ì~öx®òÛI±´Ô¯5 	wzO&âw„Q‚p ğ1Ö©gx»şƒº'ş	¥ÿ äª?³¼]ÿ Aİÿ Òÿ òU+ ës•½ğ—‰Ú×ÄšM¡Ñ^Ã[»yZîáäó¢@-SÊÊwƒ5¦ßü)=¼q]Y\Ü:Â!id¿¸Şéò“¿;>PBıÑØ
-×şÎñwıtOüKÿ ÉTgx»şƒº'ş	¥ÿ äªŠßÖ€Ş·şµ(ÁğóÃ÷Âõ,g7ÒFi/§1å†r©é»8ãÒ·-ô«+MJ÷Q‚·w»>Ñ&âKìQ‚p ôÇZ£ıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉT\¼ÿ $ÿ Ãöµÿ ÑK[õÅx2ÃÅàoµ¾µ£Çi¶Æ4“I•ÙWÊ\Âàqß>‚¶ÿ ³¼]ÿ Aİÿ Òÿ òU fêş	Ğ–Şkí;Ã°ÿ h¤n,.Á§İŒ«É\ƒâÍehŸ4KÍ8®«áWÒ¥†gÃ­4ÊªÀäÆÊÀ¢¶ö@\ãx®Ÿû;ÅßôÑ?ğM/ÿ %QıâïúèŸø&—ÿ ’¨@ÙE>øUlä´}1§àÁnn¦›ËŒ…Œ»“ÈåÇ z
-·ƒô( !fî©x·Á¦¸–GiÔa]™˜–À ’8Sÿ ³¼]ÿ Aİÿ Òÿ òUÙŞ.ÿ  î‰ÿ ‚iù*‹°6«Æò·ÿ °¦ÿ ¥Ô¿ÙŞ.ÿ  î‰ÿ ‚iù*±<Waâ…ÑíÌúÖéı¥` M&U;Ü!NMÁà;€FFr ;Z¡¬hº~½d-5°¬‹*í‘£du9VVRH=ÁªŸÙŞ.ÿ  î‰ÿ ‚iù*ìïĞwDÿ Á4¿ü•@áÇ„ä(ßJÊÆ
-‘ö‰zù„Kó~ôoççİÍIcàé÷6sÅ§4¯d»mÕÌ·n2îÖF`‡*9 *ßöw‹¿è;¢àš_şJ£û;ÅßôÑ?ğM/ÿ %P¶˜ñ‚µjQ–°Óm:E&¡¡?ÖÁÃ•òÕI$73ÔsÈêcğ®‹Ÿe`¶Y¶²¹p+JìDÀ–ŞÄœ±ËóÍ7û;ÅßôÑ?ğM/ÿ %QıâïúèŸø&—ÿ ’¨Z+ÕÜÚ¬ÿ É?ñ'ı‚î¿ôST¿ÙŞ.ÿ  î‰ÿ ‚iù*±<gaâ„ğ7ˆãZÑä…tÛ“"G¤ÊŒËå6@cp@8ïƒC@­‹ıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉTµEbÿ gx»şƒº'ş	¥ÿ äª?³¼]ÿ Aİÿ Òÿ òU mQX¿ÙŞ.ÿ  î‰ÿ ‚iù*ìïĞwDÿ Á4¿ü•@TV/öw‹¿è;¢àš_şJ£û;ÅßôÑ?ğM/ÿ %PÕ‹ıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉTµEbÿ gx»şƒº'ş	¥ÿ äª?³¼]ÿ Aİÿ Òÿ òU mQX¿ÙŞ.ÿ  î‰ÿ ‚iù*ìïĞwDÿ Á4¿ü•@Uå·~ñ]•e¤Åo§jZ6Ÿ~—Q$-¶òp&2‰€['$¶ ã&»ìïĞwDÿ Á4¿ü•Göw‹¿è;¢àš_şJ¢ÚÜEø İèÖO¨xrçN¹„~îÖMRY™»÷.²™ ¦ÓëéZpü>ğÌ‡Û–Êv¹2$®òßO'šèr g!È=gwû;ÅßôÑ?ğM/ÿ %QıâïúèŸø&—ÿ ’©ß[¡[MKÚ~•e¥›£e”nîæs¸±ynIôtâ®V/öw‹¿è;¢àš_şJ£û;ÅßôÑ?ğM/ÿ %RµEbÿ gx»şƒº'ş	¥ÿ äª?³¼]ÿ Aİÿ Òÿ òU mQX¿ÙŞ.ÿ  î‰ÿ ‚iù*ìïĞwDÿ Á4¿ü•@TV/öw‹¿è;¢àš_şJ£û;ÅßôÑ?ğM/ÿ %PÕ‹ıâïúèŸø&—ÿ ’¨şÎñwıtOüKÿ ÉTµEbÿ gx»şƒº'ş	¥ÿ äª?³¼]ÿ Aİÿ Òÿ òU mQX¿ÙŞ.ÿ  î‰ÿ ‚iù*ìïĞwDÿ Á4¿ü•@Uiÿ %Xÿ °]ş»©³¼]ÿ Aİÿ Òÿ òUbZØx øçVUÖ´q0Ól‹¹Òe*TËu´ûFA6NNr8ä?ˆZ-¾§áé¯byì>Ölî#V*PL0’9®©Èõ54t=3OU±±šòh¥+ö©p!špGï$\²î=s°óÚ¶³¼]ÿ Aİÿ Òÿ òUÙŞ.ÿ  î‰ÿ ‚iù*…§õı^€õÜ§á­SµÕµ=s]Õõ+ğ‘mò †=Û3 ÌNâI sĞqYä’kŸöÃÿ GÇ]öw‹¿è;¢àš_şJ®#âõ—ˆ¢ø]¬½ş­¥Ïl<ñÁ¦I·ï£ÆÎÀsá?‡Z îü	ÿ $óÃ?ö
-µÿ ÑK]sşÿ ’yáŸûZÿ è¥®‚€
-(¢€
-@A"©ë`şÆ¼şÓû7Ø|¦óşÓ·ÊÛwnãZãtwğö¡ğ·ÃÏ}m§ê±Gk0[ÈU{ r7g#§ôÁ£¿Ëñ¸Îê{˜-Q^âxáFuZG
-1Â¨ÏrH w&¥®_´ğ§‡ü?wı…essÀ.|¸aBàù’$ 9í×…Ï¦ö ö‹à–…®.¬ÆœÊ~òDòğlu#œş4›²o·õıÀÕ¥ı_×Sj«{ˆšXgŠHÑ™ÑÁ
-ÊH`Hî úb£:…Ó¿´Må¸±òüß´ù£ËÙŒîİœmÇ9é^Ump§I¿Sq¦ê6Vóé¿jÔtÖÙíÑÀeuª²—ä„`Uõ¾´MQ5f¹µÿ „`øæ[¯1~Î?ÑqænÎİ¾~î¿ïWmÿ ®ßçø
-ú^åılzUÅÌ–Ò\ÜÏ6ñ©w–G
-ª£©$ğ][Ã$1Ë<Hó±HUœ# [
-;œxìy¥¡egaáÓywi—©qqûÉURf3‹W œ,díOÛÕ‡ÑA¥kğİ¼÷¶E|:¬ÀWí˜– z|–{ygÒ•¿¯ë¨ÿ ¯ÇCÓ,ÿ ä¡ë?ö
-°ÿ Ñ·uĞW9§=Õ„‡.4?q÷ónó]!'tQE
-Š{˜-Q^âxáFuZG
-1Â¨ÏrH w&¥®3ÅWZ}—‰¬¦×d¶‹J}6ê%’í”Eæ±Œù¸ÜÉ¸ÔŞô›W;"B©f  2IíUÎ¡d4ïíyn,|¿7í>hòöc;·gqÎzWwq$_´k]Jdk›tÓæÔá•ÆôƒÌMí <…àî'Œ+g¡ª+}hš¢jÍskÿ ÁñÌ·^bıœ¢ãÌİ»|ıÜÿ Ş¯—V»Àÿ ?À›éë¯ù}Îç_wÏÄ-ú_ÿ èÛJè+Ï<$¬5½Œ}™¬µv´Û÷~ÎníŒ[ÙÙ·Ø¯C¤Õ†!!T³ $ö¦A<7VñÜ[ËĞJ¡ã’6®§A}kŸñÁÛáäy 6‰{l÷{¾è€L¥ËvÚ-0i–;™µë»)b—LŸQ/i$,7ZyŒ¤pA“~Hïº…­ÿ ®ßçøÓúõÿ #§®Ä?òğŸı…_ÿ H®« ®Ä?òğŸı…_ÿ H®©ĞQE QE Rd§­-qŞ,¹Ò-<[á¯'±†÷í²,o3¢É± ”`ÎÒÅ¦J÷ÅW`èÙÖ˜é-ZxÅÃ¡‘b.7²‚`:	>ãÖ…¹îd¶YãkˆÕ]â*¶v’:€vœzàúW«]øZoÙÙı¿L‡R¶¼K™É™~Òòm*‘¨ÎâNîG@¼cæã7H'Ö4‹Hå„kvÚ½ôºŒA‡œ7›ó8ê¿q‚x?&:
-#ªş¿¯ëÌŸ×¯ùV=[˜!–¥8äŠDàÄ(îp	ã°4-Ìs%²Ï\FªïpYU³´‘Ô´ã×Ò¼ßÅZ…„×Zñk«Y%¿Ò ]üÕo´IºB?3	<£òÿ °})4ƒêz%—›ü$Ú­ìš”JÀÌ±7›–qÔ#~ãğ~LtÒ¿õı|Áéıy_ñèuŞÿ ’yáŸûZÿ è¥®‚¹ÿ É<ğÏı‚­ôR×AHÈOZF‘ wU.v¨'3ï€*ä<Ys¤Zx·Â3^OcïÛdXŞgE“cA(À'¥ŠL•ïŠÇñF¾Ö~=ğòj6SÂ©¨2Z–»¶T•¸S(lîqÕF Àå°Í+ØoOºÿ ŸùdA"Æ]C°%THÉñ2Şæ¸¼Ûiãš0Ì›ãpÃr’¬2;‚>„Wø³]»ÜÚÉ§İÁªÍ¤^ÁîÜ„ÆWb,Å²UıİÄòöŞ¹±¾ñ>«u¢Ok6m-cßhÊÑ—x#+ÆàP>ƒhô¡+Æâz^Ÿ×¡××?ã/ùÛØWMÿ ÒØk ®Æ_ò¶ÿ °®›ÿ ¥°Ò ¢Š(½õı¦™e%åõÄVÖÑÉ,¬Tg“Ò’×P³¾°Kûkˆåµu.²«|¸,Ê©x‡S¸Òôå–Ú^I$ù‰i-È‡ æ8†öc‘Èë\Õ‡43 Ûiº†¯ßµ›G;LÛL )‰Áåf$Ÿİıî-Ù6†–©3¹GY]2°È#¸§WZøÒİ¦Òì¬5#$vöÉ$v­zæA…h¦HÃ<@`à|Ç¯ÊU½¼jÅY	 •n£ØÖ[bSºÔusş;ÿ ’yâoû]è¦®‚¹ÿ ÿ É<ñ7ı‚®¿ôSTŒè(¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š *$¸†W™#•¡m²€Ù(pĞàƒô"£¹¼Ki­c|fæ_)I8çk7şË\7ŒcÑÇ…|q=à³+'çÙƒ2À ÏñƒŒwÉâ‚¢®ìwÓÏ´<ò¤pÆ»Üà(õ&—Î‹Ïò<Äó¶ïò÷ÛsŒãÓ5‹­Mÿ ‚/§µ‘. –ÉŞ7„ùŠãnr¸Î
-å¤ñÆ„ş<·¹%ÑVÅ!{|´jC‚ªå…Şv‚jùYÏ;ˆé‡ÖÄ&Ú¹è]ÛCq¼·$óçÊœ“'hêp98§4ñ$ÑÂò*É&v!<¶:à{Wj~;ŠïZÒ‹~&7’öMn.yO™3a\°d ÉR:u:õı–•©é7úÔ–ªÒÆn'pˆ¥— <í=}*z\}loTsO´FYäXãË9Àäà~µÉ^x¾ğ¢Í5äVú¥ÌÖqÀşÔÊÄ/0L°Ú	ÃĞƒT¯u­#T“U¹Òæ´¼‰ìbšêkyŒŠL…‘v± åoJ`u§]Ó?µ?³í%¾	 €,Œƒ P|°GBØZÑ®GÂ7lz…íƒªC©i-›•hfóÅ¬¬ß4~`$ÙÜÃæìWz—‰ôİW[M^úŞÂ`A5Óyi#!×{¹aÛ×’yçDY·Li£I6u&v)<¶:â¹×øƒá$¸Š1â5ÒLætº¢Œó…'œrpqĞÖdş7ğÕæ£¥ŞVÚ$·še—ÏGå¬ª_'ä@*[ëC`wÏÙÿ ÉCÖìaÿ £nëDñoˆµ‹èÒÓLÒõ4—–÷RG¨#îo(ËpÃ‘º#ŒŒNÕŸü”=gşÁVú6î€è)23Œòik¼¹Ò-ş,iˆg±‹Q›L¸ÆôY¤ùá(§¹à9Ù±Ş’Õ¥ılÆ¼ÿ ãoü’wşİÿ ô|uèçÿ äë¿öïÿ £ã ƒÀŸòO<3ÿ `«_ıµĞW?àOù'ÿ °U¯şŠZè( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(Ÿ³ÿ ’‡¬ÿ Ø*Ãÿ Fİ×A\ıŸü”=gşÁVú6îº
- (¢Š (¢Š (¢Š çï?ä¡èßö
-¿ÿ Ñ¶•ĞW?yÿ %Fÿ °Uÿ ş´®‚€
-(¢€
-çüCÿ !Ï	ÿ ØUÿ ôŠêº
-çüCÿ !Ï	ÿ ØUÿ ôŠê€:
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€9ÿ É<ğÏı‚­ôR×A\ÿ ?äxgşÁV¿ú)k  Š( Š( ¹ÿ ÈÛşÂºoş–Ã]sş2ÿ ·ı…tßı-†€:
-(¢€
-€Ã7ÛÖqtâCo±v–È!³ÙÆF3zTôPEP\ÿ ÿ äx›şÁW_ú)« ®ÇòO<Mÿ `«¯ıÔĞQE QE QE QE QE QE QE QE QE QEZûO²Õ-ÓP³·»¶rCqÈƒ‘• ´¶6ze¢ZXZAimvCb4\œœ(àrI«PQÎ$$r´R2²(¡ÇÁÇ½IE
-šuµÕ­ Šòıï¥É&gPóÛ
- ÀíßsÖ¤¼Šiìæ†Şå­ft*“¢«Ï¨8÷==@¯eÖö«ÅÛİJ	ÌÎŠ¥²sÑ@téÚ¬QE ÉUŞXäòä*B¾3´ö8ïO¢€+ÅÈÓ’®·İ‚½ÂF/Œ
-r<ãšLµ»´´ò¯u¿—93<IéÓ
- Æsşç­\¢· ®~ÏşJ³ÿ `«ıw]söòPõŸûXèÛº è(¢Š +Ïş6ÿ É!×íßÿ GÇ^^ñ·şI»ÿ nÿ ú>: è<	ÿ $óÃ?ö
-µÿ ÑK]sşÿ ’yáŸûZÿ è¥®‚€
-(¢€"¹º·²µ’æîx ·‰wI,®z’x«M¬iĞi±ê/w´”)†HÎÿ 7pÊ„’äö’{f¦¾m¬.&u••#$¬Q4xìªì®RY~øR7·Õ­ĞÂ&)MÍ›ÇXJlŸåYpÄò9£¿Èv;+¯è6ö÷šŞ›mÈ&é#×ib3õv;û9¬üWp=›Gæ‹…Êc;·tÆ;×/¢B/iöofñ_İI$hKWl[ÙŒÎ|·eù¶±ÎöÆ8 t×mog¦Èò[¼–ğ¦|¨¡2±Ğ*($8 Pô¸–¬­kâ-òÆâöF··b“9m¾Y÷‘?Ä# ƒKı¿¥ÿ eGí@Û–Ø Fóÿ Ï?/üÌälÆìŒc5ÆÎÏªX^j–ö‘¹7öw—QK§Í	E"şíĞ4Œª¥ĞrI¨Õé5uñ!³¿:ckMqå}_9c6H“ÉÛæ}ğF6çwJi_}?¥şoîê/ëó;‰µ:55wÚÈ•$_¼ósĞ \—'°PIíQIâ-?²–ÔmÊİ Ğº¾å*xXpœ(' ± r@®.Õnl!Ñ.§³Ô+}Jêúh–Êgx¡ŸÏª¤–×(>eİ’ ‘©ÚiŞ#·šÂıŸÄ®4à¶’7–^iÊ¤„.!À•çÛÇºš-ı~ƒş¿ÎúÏşJ³ÿ `«ıw]sšr”ñî¬ŒÛ™t<ëûÛºèé	lQE
-¥¨êöLh÷÷)
-¹Âç$ñÔà³tQ’H5v¹OI&âk=R[[»‹/ìû‹Sö[Y.$f€*ŠN)ç Ú2yŸõıyì4t“Ş[ZÚ5Ü÷Çn«¸ÊÌã±ÍTşßÒÿ ²Æ£ö mËl #y…ÿ çŸ—şfr6cvF1šå¦³½³ğ&‹¦<^i‚Ââê4…ßrG"—
-Àì»IÚ¤·Fj,wI«¯‰ùÓZk+ìrùË´òDNß3ï‚1·8;ºUÙ]ëıiùİıÄôş¼ÿ ¯™Ğ½Ì:Ğ®mfh$Ò/™$ƒ+6ÓGZékğÕ´öŞ#ÑÄrFg´ÕîR9«"Iwlè
-TíaywÔƒ"¹º‚ÊÚK›©’cy$løÔv7öº•ªÜÚJ$Œ’YXpU”à«ÁR‚døÂ‰thd·…æû5íµÌ±F…Ù£IU›j€K8'Ó<,’Éq­ê&+ˆ­ïï¼Ût¸…â}«hIG—,ÔŒô-oıvÿ ?Àõøsş!ÿ ç„ÿ ì*ÿ úEu]sş!ÿ ç„ÿ ì*ÿ úEuH‚Š( Š( ªÍ©XÛß[ØÍ{oåÈ&w”	% dí^§®*Õrş'¸òµÿ ³^Ê#¾i$x,å•cSˆ2)ó:O|ôĞ·ŒÙ“ZÓbÕcÒŞò%½|±ßÛˆÉ
-y 1 €p±k:tú”štWqµÒ˜Ç|}àBW#p•Ü¹Æá{Yó¯<M`šlš‡Ÿiu’ÛI§•³eèòyÍ.6ÉÔµ™¥Û^}¿HÓ^Öî;7U¼¼¹˜ÛH±4Oçm+&Ğ[ÍO•I#œ8ê¯ızƒÓúõ;KİgNÓ®a·»»)f#j·lœÇ¢‚p œÄ¤E¬éÓêRiÑ]Æ×Hcñ÷€=	\ÀWrç†xŸ}¢æmxCc(×4¨mìl¥ùdh+'Ëû¬²ûG'ĞÒh¶WËu¢i2Ûİ­Ş™©İİ]\5¼‹ÆŞvÖYHÅ¼Ô;A$s†„¿¯ë°=?¯/Ôé|	ÿ $óÃ?ö
-µÿ ÑK]sşÿ ’yáŸûZÿ è¥®‚fÔ¬mï­ìf½·òä»Ê’€2v¯S×ùï-­¦¶†i•$¹Ç
-“Ë°RÄÁIü+ñ=Ç•¯ød}šöQóI#Ág,«˜d@Y‘H_™Ôr{ç &°üG&¹tK‡Ñâº†;âa¸€ÜHb„Äèw„•2Ï“ós…Î Ü­YÙé÷™İÍ¨YÛİ-´×1Ç3Dó„fÇîÓ›ØËÏ½3NÕluhK…™cm®  ©ê28#„FA¼·ÄöŞ&ºñÕ±Ña’æëL»·ûM»\<l®PÆ…ÌáÚ_f$‚@nÛ@wÔ|O©êñAwœ––ÖÊ·VÒ[³H†Fc²@ uÆ8éBÖ7Óúô:Šçüeÿ  ;oû
-é¿ú[tÏøËş@vßöÓô¶@tQE W¾¼K).¤ŠyR1’–ğ´®yìª	?€¦ÛßÅ>š/ÌsÁÂì“ÄÈè\©?Â©ø†]N-9F—os4¯ Y©‡Í0rÉç0Bsóg®pqŠæôßIg¢Zh÷&¸Z;F·–W°•öÌ¸U!HlŒŸ0œ}îj[vvÜj×W;xfKˆ#š3˜äPê}AúóÈuMR{­:]+ÄGgb€ÇÛÊpyœÇÊG +60Çu‡ ¡c—P®@ÜÈëŞ´itØ”İµ\ÿ ÿ äx›şÁW_ú)« ®ÇòO<Mÿ `«¯ıÕ#:
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(ª÷÷i§\ÜÆ†GŠ&u@	,@'h¨Éõ;;[è,§cxä–5nTÛ¸ç§‡ùc¨Yê–iw§İÁwlùÙ4FÁÁÃ ŠÃ´×t}s_¶ŸJÔ-uki)™í$ˆ·ÚÜáÓ×ƒIàiŒºÂµ½ä/îŸmÕ¤1WİH($`xúu§`Ò×:j+‹Ö<Y¨éş"‰"µ3i¢O³ùpZË<³ÉÁ|2±”^@lï¹f9’ËBÖfŒ*‘4šuÄc’AùZ<ğväppÙ €H›étluuBkO¹¸ò"Ÿt¾|–ûvœïA–8ÀçßµajšíÌWZz'W{›I–[±mjíŒÆU˜7I /÷³ü¿wŠ[YnnôÛå¶8ÛQ¸¸Hš6XÚ7PYX¤’88<ò:Ó¶¿×—üé	½¿­ÿ àQ IÀj;[˜om!º·}ğÌ‚HÛnR2>Õ]õ+t¼º¶–Xãû<<ŒîÔbÃ'= Øyÿ 
-âô¿jĞéº¥†—}öx£ŠŞâiôÙHã ª°e*0	ìhÎGÌ([Ûúê>‡O'Š4àm…ÍíÃok;ä3/ÍÆ#•€g*§h5ôQ4œ<2İ¶Èâa’ib¤®F@Sßu®.Ş¡ÖmÚÛNÔa×¡¼–)&[RÚ¼ìä<ÅDl»Ná†Ü’ÊzOÊm[L¾hn%†Öï|¢Ş™Â˜¤@B ,yaĞ^‚—¶6ª¥Ş§ecËÜ\"ıš>d,‘óómãå?‘®v]^éü74W¶z¬Òß}¢;w¶±‘©b#½b;X|Ï´|¤’µNk»ÍvˆàÓ.â¸m&x.ã¸ÓÚ&»BÌÀ+Œ‡!`rqŠõı[ŒèÇˆ-¦¿VP]ŞÈd²A	ò¢ÁÃ•°„©à¢±qıŞ5«‘ğóZŸÜM£Xj–wQ´÷ésa%´fãå
-ê$U%È»h àAûÚz–¶ÚF®©ug¨Kc4 Ç5¥›Ü„1Ü¬±«8$Á#‡©²WæİC-Ô0ÜÁnï‰gİå®:àdş•€ş4µô­rKc‘,ÿ ÙKå|£asg•rFFsåñ7Ú¯4û¹t=jk4¾r6g(…YQ¾T;·|¤„İ·?61Cµ®~ÏşJ³ÿ `«ıwXº%Ïoï£‘.ak0k‰5=1¡|ã•·@êûfe89pxÚ³ÿ ’‡¬ÿ Ø*Ãÿ FİÓµ€è+:MwJ‡WJ’ú¾“îÂ[œã;sĞ1…<	 €q£\–§isâ+]9¬5!¥ÒÜf-2sÓ…ıîÍW;‹ê<®©Ù³­¯?øÛÿ $‡]ÿ ·ızyÿ Æßù$:ïı»ÿ èøè ğ'ü“Ïÿ Ø*×ÿ E-tÏøşIç†ìkÿ ¢–º
- (¢Š (¢Š (¢Š (¢Š (¢Š çìÿ ä¡ë?ö
-°ÿ Ñ·uĞW?gÿ %Yÿ °U‡ş»®‚€
-(¢€
-(¢€
-(¢€9ûÏù(z7ı‚¯ÿ ôm¥tÏŞÉCÑ¿ìÿ £m+  Š( ¹ÿ ÿ ÈsÂöı"º®‚¹ÿ ÿ ÈsÂöı"º ‚Š( Š( Š( Š( Š( ÀŸòO<3ÿ `«_ıµĞW?àOù'ÿ °U¯şŠZè( ¢Š( ¢Š( ®Æ_ò¶ÿ °®›ÿ ¥°×A\ÿ Œ¿ämÿ a]7ÿ Ka ‚Š(  6ªoÖïÍ›pŒÇåù‡Ë s·¦î:õ©è Š( ¹ÿ ÿ É<ñ7ı‚®¿ôSWA\ÿ ÿ äx›şÁW_ú)¨ ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(¥½™·Ôo.‡—s±Šz8IüT ÿ €Õº( Š( ıCBÑõi¡›RÒ¬oe‡ıSÜÛ¤”°8éÚ´(¢€
-x„ğI	gA"•-a‘ÔÈ>õ%n]>Á4ëE·Iîg ’^æf•É=~fş]l
-µE S%Í…ãŞé½JîC†î­>Š ¯¯—§%›ÜO.Ø„Fg|HÜcqeÇÍß#Ôzfœºe§ÙÒæîàg;î§i_8çæ<ûã ÏUÊ(ëp
-çìÿ ä¡ë?ö
-°ÿ Ñ·uĞW?gÿ %Yÿ °U‡ş» ‚Š( ¼ÿ ãoü’wşİÿ ô|uèçÿ äë¿öïÿ £ã ƒÀŸòO<3ÿ `«_ıµĞW?àOù'ÿ °U¯şŠZè( ¢Š(+›«{+Y.nçŠx—t’ÊáQ©'€*?í¦ÿ iÈ•ç}¤È{1ÛºmÇ9éK}:ÛX\Lë+*FIX¢iñÙT'Ø^vmï.<	àábÊŞÄÅöáobÆâ6HŠ©ò^6,›»0éwù~#èvòø›C·ÓáÔ.µk;[9Ø¬3ÜÌ"IqT¶7Œ‚8#‘sZPÍÄ1Í‰,R(dt`ÊÀò#¨®Ï¨É£XÉ¨ëÖÚ‘{…µÓJÉ,Eÿ vf_!’"T! „ïœs½RvçáíÄ]“NØæİ‚şø¦aèsÂ‡¢lé	â"T¼’=Fİâ³;n%WÌq6H(_îîr¹ÈÈÈädşßÒÿ ²Æ£ö mËl #y…ÿ çŸ—şfr6cvF1šá-UôÆÕµkíÂ[	£Kí;ìó.\Ê‰Ä…Â FS’0	<	Ö;¤Õ×Ä†Îüé­5Ç•ö9|åŒÚy"O'o™÷ÁÛœİ*¬¿¯—çw÷u'§õçıÁ;‰µ:55wÚÈ•$_¼ósĞ \—'°PIíQIâ-?²–ÔmÊİ Ğº¾å*xXpœ(' ± r@®.Õnl!Ñ.§³Ô+}Jêúh–Êgx¡ŸÏª¤–×(>eİ’ ‘©ÚiŞ#·šÂıŸÄ®4à¶’7–^iÊ¤„.!À•çÛÇºšVş¿Aÿ _ç}gÿ %Yÿ °U‡ş»®‚¹Í9Jx÷VFmÌºF	õıíİtt„¶
-(¢…RÔu{&4{û”…\ás’xêp?„Yº(É$š»\§ˆ$“Nñ5©-­İÅ—ö}Å©û-¬—’3FÀE'óĞm<ŠOúş¼ö:Iï-­mî{ˆã·UÜefqØæªoéÙcQûP6å¶ ¼Âÿ óÏËÆÿ 391»#ÍrÓYŞÙøEÓ‰¯4ÁaquBï¹#‘K…`v]¤íR[Ç#5;¤Õ×Ä†Îüé­5Ç•ö9|åŒÚy"O'o™÷ÁÛœİ*ì®õş´üîşâz^×Ìè^æÏhW6³G4iÌ’FÁ•‡›iÈ#­tµÀøjÚ{oèÆâ9#3Új÷)ŠU‘$»¶tO*v°È<†»êOA‘\İAem%ÍÔÉ1Œ¼’6 üj;û]JÕnm%FI‚¬¬8*ÊpUà© ƒÁ²|aÄº42[Âó}šöÚæX£BìÑ¤ªÍµ@%ˆ œ“ŒiId¸ÖõÄV÷÷Şmº\Bñ>ÕŠ4$£€Ë–FêÆz·ş»ŸàúüNŠ¹ÿ ÿ ÈsÂöı"º®‚¹ÿ ÿ ÈsÂöı"º¤AEPEPUfÔ¬mï­ìf½·òä»Ê’€2v¯S×j¹ÜyZÿ †GÙ¯eß4’<rÊ±©†D™…ùG'¾zh[‡FoJÄêgM¶æüGæ›a(ógŠõÆ{Ô	¯hÒj­¥&­`Ú’ç6‹r†a“òg=9éY·~#ékökÖE°¸‰¦K9Z%gxŠƒ ]ƒ!©ãõ¯f÷¿ğ”(Ó/õi,Vâf¾µ½Ó¼˜QHbRQœù˜èÎ0Oµ§Ïó¡Ñ^ë:vs½İÜqK1U»dà=…à u -gNŸR“NŠî6º@sï¼èJän ’»—8Ü3Äø‹í3kÂùF¹¥Co`ëe/Ë óAY>_İ`È­—Ú9>†“E²¾[­I–ŞínôÍNîêêá­äX6ó¶²Ê@F-æ¡Ú	#œô4Òş¿®Àôş¼¿S¥ğ'ü“Ïÿ Ø*×ÿ E-tÏøşIç†ìkÿ ¢–º
-@U›R±·¾·±šöŞ;ËLï(J ÉÚ½N\Sç¼¶¶šÚ¦T’æC*O.ÁK?'ğ®{Ä÷V¿á‘ökÙDwÍ$œ²¬ja‘fE!~gQÉï€šÃñšä9Ñ.GŠêï‰†âq!Š¡ŞTË>OÍÎ8rµgd7§İşgw6¡got¶Ó\ÇÍÎ›»Lo`7/>ôÍ;U±Õ¢y,ne¶¸ ‚§¨È<àŒzAòßÛxšëÄ7VÇE†K›­2îßí6ípñ²¹C0S„#i|e˜’	»mßQñ>§«ÅÜrZ[[*İ[InÍ"É 8Ôg<ã¥XÜOOëĞê+Ÿñ—ü€í¿ì+¦ÿ él5ĞW?ã/ùÛØWMÿ ÒØiĞQE^úñ,,¤º’)åHÆJ[ÂÒ¹ç²¨$ş›oúh¿1Ï[²O# r¤dtÿ 
-§âu8´å]½ÌÒ¼d6¦64ÁË'œÁ	ÎÍ¹ÁÆ+›Ó|A%‰i£ÜhšáhíŞY^ÂWÛ2áV<…!²2|Àvq÷¹©mÙÛq«]\íá™. hÎc‘C©õdSëÏ!Õ5Iî´è-t¯IŠo*uÀmæss) ¬ØÃ}Ö‚…Œj]B¹p ¯zÑ¥ÓbSvÔusş;ÿ ’yâoû]è¦®‚¹ÿ ÿ É<ñ7ı‚®¿ôSTŒè(¢Š (¢Š (¢Š (¢Š (¢Š (¢Š *–«ªÚhšdÚûH–°Ò<p¼¥G®Ôàw8ã©«µÏxè¹ğ>³p\O,ö’Cvğ<ÎÎÊ@PÔõÆz›³-Úx“L»·¹¸ó.-¡µA$Ï}i- E9ù¿z«Ç‘ÇzÊößQ´K«I<Ûy2R@3Ëªz‚8#5Áën¡&£İgÄ6"í'Q`Ÿj„*6ÏÜˆ9B§2AÁí‘Õø^]Jm7ÕW˜Ë/—$ñåx·Ÿ- P¬Si#À<S¶ä§¢6k2×ÄZ=êéæJØ¶¡™iHæP2J©äàuãõ_SñF“¢j-o«ê6–˜XšæQšrÁ‚äüÄaxüÃÖ°gsfˆÙ_&`òy6SH"So"åT…ùAİ¤ôĞµ+¹ÜÑX~'Ôïtı8.˜ˆ×³²4›»ˆ×™ˆ1“šÊ³ñØ—G†áôZ{–#ıF—såÈ…±æ©Øp¤|ÛyaÓ­/ëúş¿QÇİëRêZDãQÓu«i$«ÙA9¹†A“»©b¹UÃ Pç#5§öíR	A}%µÄ×±¤rKq,ˆoÂvr™;G98Ğ­õí¾c=íÜ]¼d‘ö–ÂO“ô::ÈŠèÁ•†A®3Ä^.‚]
-â;_yîÿ ¡h—+8R@o,É@ØÏ$ş¸¨­¼a5…cZWˆogD	4·:]Â¼CV“äC»¼°İÎ1Gpgk5Ä6Èy£‰*v
-1G=É Üšd÷[Om¯‰.d1Ä0Næ
-Xı8S^|5ëù—U²“ûbı8ŞÆ[ÏÌˆ.r«û°·NW',İG[¯LÖÃJ¿{{™"¶ºß2ÛÀó:ƒ‰ˆ7ÌÃ >½(nª]êvV1Ü½ÅÂ/Ù¡óæ@rÉ?6ÑÎ>SùçeÕîŸÃsE{gªÍ-÷Ú#·{kÊ–"0ËÖ#µ‡ÌûGÊI+Tæ»¼×`¸2î+†Òg‚î;=¢a1´,Ì¸Èqò ç¡_×õ¸ÎŒx‚ÚkñeeİìöK$Ÿ*,1i[J
-+İàãZ¹5©ñÄÚ5†¡iguO~—6[Fn>P®¢ER\€Û¶‚$½§©km¤jê—Vz„¶3@sZY½ÈIÊË³‚A\1Áèz›%qnmÔ2İCÌîø–}ŞZã®OéXãKQqJ×$¶9Ïı‘t¾QÇÊ6÷6pyP@Ç$dg>_}ªóO»—CÖ 6³Kç)ÓfrˆU•åC»wÊHMÛsóc0;Zçìÿ ä¡ë?ö
-°ÿ Ñ·u‹¢\øÖşú9æ¦³¸“SÓÎ9[t¯°FfPÃƒ—«?ù(zÏı‚¬?ômİ;X‚¨I­i±j±éoyŞÈ>X‰ïŒíÏ@Äd…<€@8¿\†³ç^xšÁ4Ù5>Òê9%¶“O+fËÑäóš.\#m“¨i-Ò³g_^ñ·şI»ÿ nÿ ú>:ô
-óÿ ¿òHußûwÿ ÑñĞAàOù'ÿ °U¯şŠZè+Ÿğ'ü“Ïÿ Ø*×ÿ E-t QE QE QE QE QEÏÙÿ ÉCÖìaÿ £në ®~ÏşJ³ÿ `«ıw] QE QE QE s÷ŸòPôoû_ÿ èÛJè+Ÿ¼ÿ ’‡£Ø*ÿ ÿ FÚWA@Q@sş!ÿ ç„ÿ ì*ÿ úEu]sş!ÿ ç„ÿ ì*ÿ úEu@Q@Q@Q@Q@Q@ÿ ?äxgşÁV¿ú)k ®ÀŸòO<3ÿ `«_ıµĞPEPEP\ÿ Œ¿ämÿ a]7ÿ Ka®‚¹ÿ ÈÛşÂºoş–Ã@Q@@mTß­ß›6áËó–A çoMÜuëSÑ@Q@sş;ÿ ’yâoû]è¦®‚¹ÿ ÿ É<ñ7ı‚®¿ôSPAEPEPEPEPEPEPEPEPEPKû3wöfV	%¼é27Ó†Š–[¢Š (¢Š (¢Š *9âÁ$%ŠT´lU†GPG ûÔ”Q¸tûÓ­İ'¹œI{™šW$õù›ùt°*ÕPL–?6{¦õ+¹g¸>´ú(¼V¾^œ–oq<»bñ#qÅ—7|ŒsQéšré–ŸgK›»œïº¥|ãŸ˜óïƒ<`qW(£­À+Ÿ³ÿ ’‡¬ÿ Ø*Ãÿ Fİ×A\ıŸü”=gşÁVú6î€:
-(¢€
-óÿ ¿òHußûwÿ Ññ× WŸümÿ ’C®ÿ Û¿ş€:É<ğÏı‚­ôR×A\ÿ ?äxgşÁV¿ú)k  Š( ©jÚµ¦‰¦Í¨_4«mİ#GÊTz€œzœ`w«µ…ã(//<ªÙØYKyuslğGnŠrÊFIvQyÏ± qI½KÚ±g¥%³İ´ª·3$²@î7¹C($–Àç­^fŒÇ8Q“€Iü‡ZåüL5+ßØMökµÚÏ%²É x–9RFZ@¤áHXóÜ×M½¼­ş[nÛ™Ï§\gñÅ¯ù	l®fGâ].]ë+4¢È9/o"¾ğş^ß,¨}Ûş\c9¨ÿ á&µûÎ–×’\¤†±Ó‰@¡ íèGÍ»o#æÁÎA¦ê·^¿Ó®t)ã’[ùd’Öi /,\Â²±°	a††¦ÓWÄ.ƒuV§pg¼cm³Û½Í´$™¤!»oÎÇw¸_ë·õıj=ÿ ¯3£_iÏ¡Å¬G$òÙÊÃ´’HI8Ç–ª_9ê1‘ƒ•TxÃI0ù5CûÃ—ı‘uæd OÉåîÆsŒr9¤²šïMĞ-à³ğíâ´p°Šİî!,¥H
-$møÜÙÜHİĞäç ÓÖ4©•«Xk×;\µŞöM’9™È™	RyÀ€:tz\cN•gñæ­*
-úFÀ:`·}T€Aö#5Ñ×)áë{«OŞ[ŞÜı¦î-MI§ÇúÇ]†oÄó]]6’z	leëí®‹ùáº›½ÖÚ¤cï;c 'Ôà…ñWã¹ŠkDº‰üÈ]ˆÈ	Ü¤d'ŠÅñD×íl¶º=ıí½Ğd¹’ÒX‘1‚£Ì‘9n™O\Vµ£:éĞ³ZD?Ñ•””ãîdq‘Ó®=êz1õE;i×Z8Õ iŞÜ»D«öi¬êÅJùewç Œc±íNÓõëCJ—PÜöÑÛ–[”¹]në÷•ûdz‚Aê	ÃĞ¥Ö´¿
-ŞáËß·Ë‰bµi­òâYÔäK· 0È,AÆzÔ-a­Éáâl-$±¸Šw¸’Şş®$½sónÄsª/Ìr2øG D´½‡¥íçşğ‰5ûĞ-µ¡öƒiqKİä‘ƒ€W ,O= ªx×K[igßU“É?¾û6txÔ YÊº)ÚÏ©Á
-	â©x]õí#Ám•æ‹<º½§•å£C©@Uœİzî8S…©µˆõ+m"..ÿ RK•a}qi$ß6KæH˜,IÆ>èéÈRÑ»	y’Ë<W>;Ğg…ÃÅ.|èã£)–Ìƒ]%s»şOï¶û+c^şãp>_ïlş\8éÇÓĞ÷ĞJöÔ£u«ÙÙjVZ|í*Ü^³,…Ê1U,Ap6©Â“‚A8âªÏâm:ßRû†l,Ëm%ÀŒùQÌøÙoï6áì8‚ÊO¥ûë~’ÓJ¹»†Úñ¦X¤‰Djb’>Cº“ËƒÀ<ß åj^»Ô¼LVÔê:c^Cy|HOÒk†1(²Par&…k«ÿ _ÒüFü»Ÿü¸®Ä?òğŸı…_ÿ H®« ®Ä?òğŸı…_ÿ H®©ĞQE QE QEGû^Ìkk£–”^4áTÂá øÚH,¹ ädU[i×šY!˜y²<0NÑ‘Ò&|ÄFîWië€yÚNÖÅKÄ¿>>ÓncÒ®d±ŠÊx$»Y"­#FÃ‚áğ<³œ/q×œeYxbìø¦•şĞ´Ñì.fºŠÊâHd™ÃÑlÕ÷l;H@¡[Kùşäúş½N«TÕìôx`’ò]}ÄvÑ(.îÁTøäú MÚ½Ş©y¦ÄÒıªÍQ¦W…Ğ ùÚT°ÚÜ©#Šã|e§ø§PÖ÷K¶n–İÅŒ¶Ñ´¶Ş\‹#æåä¨ÈÎ Èê6´ÔÔ¿á8Ônn4›˜­f±·…n™áØÏHÍò‰Œùƒ±-Y­Föş»“xşIç†ìkÿ ¢–º
-çü	ÿ $óÃ?ö
-µÿ ÑK]!^ŞC§ÙÉup\EÉÙ;p U±$à 	5šŞ'Ó–Å/-LFòÕ?²®|Ò@Î|¿/~?ÚÆ=êÆ¹—Hš3cyz¯îl§Êy*åÓn:çp<V6—g¬éº%Ìp­ëÉwu›h¯n„òXÆÊ —vvß´†ln 9p4Ï‰´Á¦G~ZìE,†(ã63	 Ï0ãœ/@OAZpHÓ[Ç#Âğ³¨c˜Ü„ö8$d{+ñ/‡e}WJ»†ÇS¾µ³´–ÙbÓõm<lÅ}Şl{Aù³œp{tº½õ¦§Ûês‰ï¢·DPs½À9ïÏ~ôú\
-çüeÿ  ;oû
-é¿ú[tÏøËş@vßöÓô¶@tQE W¾k[)&·³–òTX"dV~zä/æECm¨teÔ'¶h?teh¼Å€9á”•9ìsßµWñ¶§w§,:`¤r=ÓÛ JŠÌ‡8äã<µÏéÓø“NÒítŸøE¦6ğ[5«IÜ'.0“.•Œä§ÉÖ¥ŞÎÛZêçckp·vÜ¦BKÈ¹ô#5-yòXøîúÀŸ€¶6i›ûô…"™HH^5‰aw"ü£ù™O~›üµó
-—ÀÜT`íZ;n‰W¶£«Ÿñßü“ÏØ*ëÿ E5tÏøïşIç‰¿ìuÿ ¢š¤gAEPEPEPEPEPEP]FôéöOuöy'	ËÆ¤òÙvU O=zSÕaÒãˆÉ³M;ùp[Â¹yŸí 9b îEdøÓO}WL´±‰l¤k´òã¿€MnøÌ$C÷†ĞÄƒ¸/#­TÔ<?so¡XAÛ.oí'ßk.˜–ö¢Ó*W
-’|¢ 	]¤HØ?Ä@ ¾cHx¿Gx ’&½œN	Qm§ÜLST‡„¡¬0ØäC[µç?ğ‰ê6šT:tK¬¾°èò>³m~!·IF—dMà3<¢8ã'¶¶òC ßH—Olé7Ÿ©dÀä¨<gÓ<f‡¢¾Döz…¡çı’â9¾Ï3A.Ã’/ŞSî)oom´Û)¯/&Xm¡]ÒHİz×1¡è%±º’æçÄS=ö}&@³ˆ˜ƒ%Ë¯› Ï=ˆé’8qİxŸV†ãI{}rYmçYÖöÎßk”cËnURC±– ¨e Oëúş¾`zP!”2Aw¬[Ïÿ fŞ^hXKk§ZÀ÷~òÆU‘B’B+8Éåì:æáİ7XÓ­¤şÙ×fÕ'ä†(ÖÏÊ6"–<à±ëŒ€½+Zø‡Oñ#ê×:CjQ²M û Ê3«'î¦òãB®ÖbIÏZö±­oâ9¥†Ù´É-ôéŞ( ‘§ä‘¤pªÛP²ùgp;·çıŸ]Édò¡y6;ìRÛPe;ë\µ–‘tt3nº{ØÃı£Åµ”“+h–HÙ—å%Te\…RÀ ô÷‡‰f¼Õ´GÓõù&Ub«ukp£HÃ‰ÖTĞ’¥Æ7b‡µ–ÿ ğ.ìì\…_OV¶ºS}Êâ*ÉµCpySÎ9î1éW,.Òÿ O¶¼YRâ%•Uº€À¿5ÉøbÇPÚmÆ…w¤Á§Á**Ü]Gp£w2»3*2ÁxKM`\XCuaweoecöiD³DÑM ØÆ™¿…¹`§8ë‡¥ßõßş µ·õäuWâ}^]nâ{/M£¢\GlnYDÑ‚á6À¶älÉ,ÊNáœr½.kÚv>$ĞcPûIvH‚½ãE,€ç;B‰åÊ6I;v1×-mçı_ğ×oKÉÜß_Újú¶¢èPÉ4Š“«ycVGR3>îw|£UÉr ÅT¾3}K8´}@]Yonn¬ãÆ9ÛòO7<“a%”äÀíë>×]Òoµ;2×RµšúØfkxåãç£š¦ÃZ>–6—Vü©¤XÚR¬ÖhòªÌÜ®IíTu[]Ô4Ë‹;OkVWSFR+—¸´U…ÏF%fc€y8RqØÓë`İU@÷qÇ{©IŒ’«2²Âå ÎçjxŒóŠæo¯u)ïµx4{é.¥‚±@co&ã½c.
-o)Î×èvç¬;ñˆf±Ôö˜¡·+Î¡{¸óBÑ5¹—,ëÃ|¡p0¤«E¨t;û[ä»òGVµ˜Bå‡Ş;ò=°â²lÿ ä¡ë?ö
-°ÿ Ñ·uNên-BêÚÚÊèıªòŞè_ÛËB¡V0èáŸ~–Ã
-­ÃzâåŸü”=gşÁVú6î€tFóW³±Ô,,g—7ò4pFIÚ…É>€ëêG­^®^ÒüR¾/ÒïlÖ+Û4¾ó–Ñ[Çå¼{K5Êîÿ XÇåNäó¬-ì;Úóÿ ¿òHußûwÿ Ññ× WŸümÿ ’C®ÿ Û¿ş€:É<ğÏı‚­ôR×A\ÿ ?äxgşÁV¿ú)k  Š( Š( Š( Š( Š( ~ÏşJ³ÿ `«ıw]söòPõŸûXèÛºè( ¢Š( ¢Š( ¢Š(Ÿ¼ÿ ’‡£Ø*ÿ ÿ FÚWA\ıçü”=şÁWÿ ú6Òº
- (¢Š +Ÿñü‡<'ÿ aWÿ Ò+ªè+Ÿñü‡<'ÿ aWÿ Ò+ª è(¢Š (¢Š (¢Š (¢Š (¢Š çü	ÿ $óÃ?ö
-µÿ ÑK]sşÿ ’yáŸûZÿ è¥®‚€
-(¢€
-(¢€
-çüeÿ  ;oû
-é¿ú[tÏøËş@vßöÓô¶ è(¢Š *eloÖøÂŸjXÌB\|Á	®}2©è Š( ¹ÿ ÿ É<ñ7ı‚®¿ôSWA\ÿ ÿ äx›şÁW_ú)¨ ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(–©¥Yë6d¾‰ ë"”‘£te9VWRH=Á™¢Zi/#[K~æ@}«Päz	]±øb´h ¢º¶†öÒk[˜ÄLˆz2‘‚?*–Šö9¡àığGi{®êZœ¤n±¿ŠÖxäPrËC½ºKnã®krÃN±Ò­ÓN³·³¶RJÃoÆ€N€*Í QEğCuo%½Ä1ÍªRHäPÊêz‚Um7GÒôh^/M³±‰Ûs¥¬±é’š»E Ø­¾Ş/¼”ûP‹ÉóqólÎvçÓ<ÔôP%ï‡ZãS’şËYÔ´É¦P³C$¸à1Ycp2 1œàaú†4«n´¶¸¸»V[Ë©maY.ƒO™±6r{VÅSNÒ´í"ØÛi–¶P,b¶…c\§
- ÏnŠ( ¦KsÄñKÉ©WGPGqO¢€2$ğ§‡&±†Æ]J’ÒZÎ3dõ*¸ÀÏ|V¤QGIH±ÆŠĞØSè 
-:†§j²[ÉgÃ[¶èŒƒ;È¨µfÙÿ ÉCÖìaÿ £në ®~ÏşJ³ÿ `«ıw@Q@yÿ Æßù$:ïı»ÿ èøëĞ+Ïş6ÿ É!×íßÿ GÇ@?äxgşÁV¿ú)k ®ÀŸòO<3ÿ `«_ıµĞPEPTµ=N=2ÜHĞ\\JÙÛÛG¾IÀÔFH«µ•¯^j6–û3M¹½FØ~ÎÑ÷Şº‚Ga¸Ï˜!‡ÅOöm† &™­o¥H`‘m¤?;6Ğò|Ü|Øçµ®Ìp£' “ùµÆj–·ãÁúmŸáÛíĞŞ[¿Ù|ø‘ÇÊä»–`§£7'“Ô×c½¼­ş[nÛ™Ï§\gñÅSÙÿ ]t(ÙëºuöÚ´S”²Báä6„¦Æ*Û•À+‚¤rJ®Ş%µ	wö[ğ&›Èµ†Kf[—ÚN½—
->R~îòßØš®¥àk>çH¼¶•uV¼kV¹â#rfÚ„+`Ë/Ì:Í6]V›Jhî4İRãOmIn#±’ıd¾‚5Œ Vv›
-|Ñ»‰2àJÒïıvş¾Cë÷ş¶;íı;ûj¾s}”¶Áû¶Ş_~Í›qÛ¾\c­S>.ÓÄKû›¶ºÄ¶ié¡Ù·Ì,Æ2œ©;²6nÜ¹Ä:^º¾Ól^ÒââîÖå.À/cS‡X¤!‚™Jq‘òî-MH4­nÇÄ×)]îc¨	¢m9f€M+
-£12Áò[;X‘¹zó‡ßçÿ ïÕ	_¯ùşC¥ÜCwã­RæŞE’t}=ãu<2™nÈ#ğ®’¸Ïi¢ë³i’º¼–š™²ô,²]ƒl×gD’M¤%±KWÕ¬ô=&çS¿—Ë¶·Bîz“ìrzS\ŞAgc-íÌ‚+xc2ÈíÑT’
-å>!iö©¢Ü.ŒÑNZÚH>ÆÖá™™ÆİáÚhÕp	;¸'ƒÒ´u-?RÖüsa(X5+›"„2„U¯BÜ¸fúš].WT¿®…ˆ|Kc,ñ]Ã4C[<çùØU$†#0C`«ñn–ºúÌâê{fd¹­¥·uûÊê€;‘•Ç9Ç5—Ö£¾Õ|B¾¼[™m`´‚ÁæƒÌb…Ø¹"Ms ş,ü§•í£?ÃífÆßA¿·i2¦šßÍšIİ#!E\·MÙ `‚Ÿ_ëúş½EZ¿õı?ëc«¿Ô­´Û/µÜ»÷*¨T,ÌÌ@U
-9$’+"Oé±ÚI1‚ù¥·b·VÑÛ—–×hüÀ¹ (9È'pû›¸Êk‰.§ Ãº.ªÒ2¬Ê-e·Y­¥FR¼´›7ÏV_”ƒœàáE¥kº^—uoqe©êóë75üÖòÚ«ÅÀ‹KDU•xËØÒïı] [&ÍÉgŠçÇzğ¸x¥Ñïte2Ùk¤®awÂiáıößeoìkßÜnËıíŸË‘Ç8âºzo}¯mJ7Z½–¥e§ÎÒ­Åë2Áˆ\£RÄjœ)8$*¬ş&Ó­õ/±ÈfÂÌ¶Ò\Ï•Ï‘–şónÃ€H, Ôñ_¾·áé-4«›¸m¯iåŠH”F¦)#ä;©<¸<À=ğV¥á{½KÄÅmN¡c¦5ä7—Áä€Átñí Æ¸iˆ% hVº¿õı/ÄoË·ùÿ À;ŠçüCÿ !Ï	ÿ ØUÿ ôŠêº
-çüCÿ !Ï	ÿ ØUÿ ôŠêQ@Q@Q@µìÆ¶º9iEã@nL.	¤‚ËFE«Ù®¹ææöKw¹¨¬«“é’Ã¸>••x—çÇÚmÌzUÌ–1YO—k$A¤hØp\>–s…î:óŒHt¿ÙüB³º•b¼ÓÄS¬×qZ$ëSºä± F£pL  ÁÎTVÒş­¿A¾§O©ø—NÒ'hn–ı™S{m:âáTsÕ£F§BsIiâ]>óP[H¼ñæ3ÇÏXå‘3æ"“ÎåÇ9<ã;[k¤kİFæÆ6±Ö×âàÊñ“¸–,+s†$q…ÆNN9Í7DÕSPÒì.,eK}3R¹¾ûy’3êşnÅP¾ïßîP>S‚xË^bfÏ?äxgşÁV¿ú)k ®ÀŸòO<3ÿ `«_ıµĞRÖ¯ge©Yió´«qzÌ°b(ÅT±ÀÚ§
-N	ãŠ/5{;BÂÆyqs#G`d¨\“è ^¾¤zÖWˆÒıõ¿Ii¥\İÃmxÓO,RD¢51I!İIåÁàï€quí/Å+âı.öÍb½³Kï9Ùm5¼~[Ç´³\®ïõŒ~TîO8ÚÍ[A¿ÓüÎ¦÷Ä:f¨5•ÕÊÇ2ZI{&zG7§Şã×ÒŸ¦k6ú£MG<Ãƒ$ìp­’F#ÓpÀç¾ ğÇŒ/u¹ ŒÁsmqeu^­¢Æ¡¥(U[7%<µ]Á8Nr½~…m}qâC[½Ó§Ó¼ëh-RŞwœì.Å¿vÌ¸&@9ùOŠ±¸Ÿ×§ü¤®Æ_ò¶ÿ °®›ÿ ¥°×A\ÿ Œ¿ämÿ a]7ÿ Ka¤AEP{éæµ²’k{9o%A•‚&Egç .BşdT6Ú—F]B{fƒ÷FV‹ÌYISÇ=ûUÛjwzrÃ¦ÙÚAç#İ=±xğr¨¬Ès@Î3Èë\ş?‰4í.×Iÿ „Zco³Z´‘İÂrã2àùXÎIú|j]ìí¸Õ®®v6·wiÊd$±¬‹ŸB3R×Ÿ%ˆîï¬	ğècf‘)¿¿HR)”€d…áóX–r/Ê1Ÿ™”÷é¿Ë_0©|ÅF>Õ£¶è•{j:¹ÿ ÿ É<ñ7ı‚®¿ôSWA\ÿ ÿ äx›şÁW_ú)ªFtQE QE QE QE QE QE QE QE QE UÔoNŸd÷_g’p˜Ü±¼j@Ï-—eP äóĞw¨õ=V.8Œ‘Ë4Ó¿—¼+—™ğNÑ’ à– äVO4÷ÕtËK–ÊIæ»O.;øÖï€ÌÂD?xm@;‚ò:ÕMCÃ÷6ú„}²æşÒ}ö²é‰oj-2¥p©'Ê" •ÚDƒüDè4‡‹ôwŠ	"kÙÄà•Ú}ÄÅ0ÅHpˆJÊÃAô5»^sÿ £i¥C§DºËë#ë6×ât™äi	xÖDŞ1ãÊ ƒ2qÛk?oL§F'¼Œ¤‰“Ëóv°%7vÜñÏ<Sa×A,õí#PÔntû=JÖâò×>|JãÁÁÜNF*İİİ½…œ×—s$6ğ!’YáQ@É&¹½KU×u6{;/k67S.È®¤Ğ$-Ù›lÌÛAäáI#<T:ö«­é>%±h­ïnìç+vÖÏjfÚÅÁ²H`0*Åvƒ94»vtö«h·v1\Û³2¬±6å$?Pj=CPûÙ©å7Éüw{?Z‡AKÔÒPja;I#…Õ¤Tg%UŠårÁ#¦¹­_TÖõ)æ²³ÑnæwøûvŸ-»P¹àM"~ğnÁÈ*÷°V‡½¿«hÜQ^s^$XuKt¯CmtPÛËq¨ZÌñ6>|¿Ÿæ*Œ…bÀn*T‘‹0¯‹¬t›:×J¼;Ë‹ƒ©¤±ªvÃ,æIÏAæF«×î€	 ïk>×]Òoµ;2×RµšúØfkxåãç£š¦ÃZ>–6—Vü©¤XÚR¬ÖhòªÌÜ®IíTu[]Ô4Ë‹;OkVWSFR+—¸´U…ÏF%fc€y8RqØÑÖÁº:ªîãö+R“%Vee…Ê 1ÎÕ<ğ	çÌß^êSßjğh÷Ò]K0	b€ÆŞMÇzÆ\ŞS¯ĞíÎXvâ/Íc¨í1CnV+Bö+qæ,„	¢ks.Y×†ùBàaIV ‹Pèwö·Éw=ä(­k0…Ë¼v+ä{aÅdÙÿ ÉCÖìaÿ £nêÔ:ÜZ…Õµµ•ÑûUå½Ğ¿·–$…B¬aÑÃ>ü-†[†õÅË?ù(zÏı‚¬?ômİ è+2mzÊUtÒ·¯pJ©1XÏ$jO@Ò*^0y# ŒÖrZ–™wyâT–Æ×Y±•."’Kï·²KíÜ¾@”ä²‚¼Æ9ç<‹tƒ£:Úóÿ ¿òHußûwÿ Ññ× WŸümÿ ’C®ÿ Û¿ş€:É<ğÏı‚­ôR×A\ÿ ?äxgşÁV¿ú)k  Š( Š( Š( Š( Š( ~ÏşJ³ÿ `«ıw]söòPõŸûXèÛºè( ¢Š( ¢Š( ¢Š(Ÿ¼ÿ ’‡£Ø*ÿ ÿ FÚWA\ıçü”=şÁWÿ ú6Òº
- (¢Š +Ÿñü‡<'ÿ aWÿ Ò+ªè+Ÿñü‡<'ÿ aWÿ Ò+ª è(¢Š (¢Š (¢Š (¢Š (¢Š çü	ÿ $óÃ?ö
-µÿ ÑK]sşÿ ’yáŸûZÿ è¥®‚€
-(¢€
-(¢€
-çüeÿ  ;oû
-é¿ú[tÏøËş@vßöÓô¶ è(¢Š *eloÖøÂŸjXÌB\|Á	®}2©è Š( ¹ÿ ÿ É<ñ7ı‚®¿ôSWA\ÿ ÿ äx›şÁW_ú)¨ ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(–©¥Yë6d¾‰ ë"”‘£te9VWRH=Á™¢Zi/#[K~æ@}«Päz	]±øb´h Š( ³­¼?¢Ùj2j6šE„Òîó.b¶E‘÷œ°9=y­(ÛMJÒKKëX.­¤ÆøgŒ:6FTğy Ñgei§ZGick­´c	„EïÂOE QE Ébx)cY#u*èã!êî)ôPDğäÖ0ØË iRZ@KCYÆcŒ¥WïŠÔŠ(à‰"‰8ÑB¢ ÀP: ;
-}GPÑ´íVKy/ìâ¸kvİgaã‘ùõ ö¬Û?ù(zÏı‚¬?ômİtÏÙÿ ÉCÖìaÿ £nè ¢Š( ¯?øÛÿ $‡]ÿ ·ızyÿ Æßù$:ïı»ÿ èøè ğ'ü“Ïÿ Ø*×ÿ E-tÏøşIç†ìkÿ ¢–º
- (¢Š (¢Š £u«ÙÙjVZ|í*Ü^³,…Ê1U,Ap6©Â“‚A8â¤Ô5m.Éï.Ü¤(TªX’Ä*€I$ µâ4¿}oÃÒZiW7pÛ^4ÓË‘(LRGÈwRypx€{à,²ŸQğåÅ¤‚ìJÈ%€$[†ğ…ˆöç‘ƒƒ‘Ö‡°ô¹,~"°:l×³mÅ¼LğÉ2Ç/»Ú¹ÜÇpÀ]Û²1œÔw~&¶±Óú{=AcuibØ™%<ÈËÕ@_›Ûnï–¸÷ğÆ­.h÷z¤övº£İEaöõøFÑ™$™]˜ŒÉ’X+E´İIü+•¨iºİëM,Î¤Kd,ŞZM/œ¬øV à¸ù{à=¯ımı˜–úÿ [ÿ _¡Õ_ë6zu¬7}¦D˜â1kk-Ã7ÎØÕ›ïŒV[xßGXÌ£í¾Lk¾æG³’?³&YwÈC¹HèORFĞXM¿[µÒ-ì	nµQI¨Å¼Œ<›Kn;q»yÈ¾0¼Ká;Fsa¤FÉ.­Òòíd€Á$ U•ÃHd
-[Bçw-Å=9­ĞÚ›V|üBÖHÿ  U‡ş»®‚¹Ûøÿ WEû«¤éàßÛºè©ÛP¨/.â²¶iå\|±¡vbx (äš©ê²<zlŞ]•İáeØa´•c”ƒÁ*ÌèŒç;ôæ“RÄÚ{i¨º]¢ù¦€Z¼³$ªHdÙbH ò¹j[¿éö>—\¹i¡²Š3#yğ<RqÛc€Ù'€ç"¹È4{›O4f¹w—¦{kK}H%Õ¢èóÔ·Í¼ğí÷ÀçC_ğßŠŸÁ-giuöéşÏ<"Öâ14§Ì,÷Ï2ÈŒ±İÜàæŸüÆ×ş»ıÍÔv¶r]J%1Æ›ØGHØöU“ì¬«ŸéĞiVÚ”iwuoq
-Ü¯ÙíÙa #| œN )ö÷z—ö0Z]Ëİ­ vXÄ(CQA™€aí·‘ók¶İ·´}OêŒßd[[Ñö»ÑUB¤ÌÍØƒx8¡õ·õ¿üGdÙ¯,ñ\øïAº=ó£Œ¦[2t•Ì.ïøM<?¾Ûì­ı{ûÀù½³ùr8ã§WOMï •í©FëW³²Ô¬´ùÚU¸½fX1”bªX‚àmS…'‚qÅUŸÄÚu¾¥ö9ØY–ÚKò£™ñ²2ßŞmÃØp	”#K÷Öü=%¦•swµãM<±IˆÔÅ$|‡u'—€x¾ÊÔ¼/w©x˜­©Ô,tÆ¼†òø<.=¤× bQd ÂäM
-×Wş¿¥øùvÿ ?øq\ÿ ˆä9á?û
-¿ş‘]WA\ÿ ˆä9á?û
-¿ş‘]R ¢Š( ¢Š( ¢Š(ö½˜Ö×G-(¼hÂ©…Â2!ñ´YrÈÈª¶ş&Ó®54²C0ódx`£")¤LùˆÜ®Ó× ó´­Š—‰~|}¦ÜÇ¥\Éc”ğIv²DZF‡Ãàyg8^ã¯8Ê²ğÅÙñL7+ı¡i£Ø\Íu•Ä2É3†¢ØªîØw6B¶—óüÿ ÈõızV©«ÙèğÁ%ä»<ûˆí¢P2]İ‚¨ñÉô š-µ{;½RóM‰¥ûUš£L¯ ó´©`µ¹RGÆøËOñN¡­î—l$İ-»‹m£im¼¹F%ÍÊ!ÉQ3œ‘Ômi©©Âq¨ÜÜi71ZÍco
-İ3Ã±6‘›åó2;bZ³Zíıw&ğ'ü“Ïÿ Ø*×ÿ E-tÏøşIç†ìkÿ ¢–º
-B
-ÇŸÄÚu¾¥ö9ØY–ÚKò£™ñ²2ßŞmÃØp	”Šáõ/İê^&+ju1¯!¼¾$§i5ÃH”@Ù(0¹ “Bø•öş¿@ètãY¶“V:l	q<éş¹ã‰ŒPñŸšCòîû¿ %¾`qŒ‘£^}¡øsVÓuèBC¨Ã²şâæòñõö—QHd!V0í|ºg÷k­Éã>ƒGDp®Æ_ò¶ÿ °®›ÿ ¥°×A\ÿ Œ¿ämÿ a]7ÿ Ka ‚Š( 
-÷ÓÍke$ÖörŞJƒ+LŠÏÏ@\…üÈ¨mµ.Œº„öÍîŒ­˜²<2’§={öªş!¶Ôîôå‡L³´ƒÎGº{bñàä	QYçœg‘Ö¹ı:iÚ]®“ÿ ´ÆŞfµi#»„åÆ2eÁò±œ’ôù:Ô»ÙÛq«]\ìmnîÒ”ÈIcY>„f¥¯>KİßXáĞÆÍ"S~¤S) ÉÃæ±,2ä_”c?3)ïÓ–¾aRøŠŒ}«GmÑ*öÔusş;ÿ ’yâoû]è¦®‚¹ÿ ÿ É<ñ7ı‚®¿ôSTŒè(¢Š (¢Š (¢Š (¢Š «yzlÍ¾mä•f™b.¯ˆóÀ-¹†Fp0¹9#Š­ªk–ºT‘Å$wÍ"´‚+x‹°q½Èô\sÑCÆñ†úíş“izd²)–WT³0y`(, —ÉŒÁlÆ-BÔÚ¦Ï©>±2@ºœmm*¶	+)2#$mê2IZÛúş·µ6"ñF•qso³İÜ}¡Qã–ŞÆy"Ã€T™
-.A’0Í^Ôn§³²ií¬e½‘YG“¢1€N\ÀÉëÚ¸ëoOcs¦Øi°kV­`mÕõ¿Öâ8Â‡”ä²‚¼Æ9ç<ô'±Õ5­ôå†Dg?hŠKÉ-|ÄÚp<ÄF`3‚@ÆqŒã ¹lùD·ÔÑ‚ôÉ¤Ç}-»ÄL"V„2¹^3€T~ àÓ#Õm]4òÅ‘¯×t*Pœü»°Hàg©çW=`ºäé¥XI¦_X¥œ&©¥‚qåùB;9;¶‘¹WŒçŠÈ›Oñ5Àµ’=7TƒìPÅEı¢±‚Wh-Å0Is†â}£•ì
-íÌûÃÿ À¶_×oø'`ş ¶òâÙáœ4QZ–Ú6–‘ARz|ÀùíÓ:’H‘FÒHê‘ ,ÌÇ Ô“\ÊX_j1Ëu5„¶6£m:Áq$eÑ")’Å—'iÀöúÆzV³¬Yı—MŠŞ[w†E‘%¿’Øï l?$m¼~R@9ç=’Û^ÿ ¢ÿ ‚=ßËüËrxŒÜj×Z^göë«FUºwbŠÜ<¾Jœ¨À	ãOO¿‹R²[¨Cª32áÀb§8÷°m¾İ¨øŠÎÿ şëİ.H‘’æâæx?}#ÄR9b†±·æÁäƒ—ªK­ønÆÆKhî~Î·23Clöß¼y.2¨şq†VÀòØ0cĞÑÙ­ÎÖÚáçó·ÚÍ—!Eóvşğâ]¤ğ}ğ}«.óÄ?Ù·—ŸÚÚéÖ°=Ã_¼±•dP¤ŠÆN2Aù{¹¬_èÚ–›©ê“ÜY;9È1¤ĞÁò>æbÒ]‘Èÿ •ñ€H-|C§ø‘õk!µ(Ù&€}‹PåÕ“÷SyqÆ¡Wk1$Œç­½ÕšÖş#šXa½›L’ßNâŠ	xŞIG
-­µ/–w»~ÙõÜ–O*“c¾Å-µXã°µËYiGC6ë§½Œ?Ú0Ü[YI2±¶‰d™~RUFUÈU,  Aq¨x–kÍ[D}?P¿’eV*·V±G
-4Œ8‘eHİ*\`ãv({Yoÿ îÎÁµÈUôõkk¥7Ğ¼¨"¬›T1W•<ãã•rÂí/ôûkÈÕ•."YU[¨ ûó\Ÿ†,um¦ÙÜhWzL|¢­ÅÔw
-7p±£+³2¨ã,€8ô¹áäÖÅ„7VvVöV?f”K4MÒ€<a›ø[–
-pÃ¸z]ÿ ]ÿ à[^GQEp ·ÕåÖî'²ñTÚ:%ÄvÆå”M.lnFÌ’ÁŒ¤îÇ+Òæ±ı§câM8õ´—dˆ+Ş4RÈ>s´(\£a“·apRÖŞ×õÿ vô¹ÙÑ\Íõı¦¯«iÚ.…“H©0º·–8Õdu#3îçwÊ0U\‘· UA{ã7Ñ¤³‹GÔĞ%–öæêÎ9c¿ tósÀù6‚YN@IÜŞ³íuİ&ûS¸Ó-u+Y¯­†f·P^>qÈê9ªl5£á8ÙciuhÑÊšE¥*Àíf*¬À`íÊäÕGQÕµİCL¸³´ğÆµeu4e"¹{‹EX\ôbVf8“…'>¶ÑÕTww±Z”˜É*³+,.PŒîp6©ç€HÏ8®fú÷RûWƒG¾’êX!€K0Öòn;Ö2à¦òœí~‡npÃ°x†k@hÿ iŠr±\ê±[1d M[™rÎ¼7Ê
-J±Z‡C¿µ¾K¹ï!DukY„.X}ã±_#Û+&ÏşJ³ÿ `«ıwTî¡ÖâÔ.­­¬®Ú¯-î…ı¼±$*c÷àùl0ªÜ0ç®.Yÿ ÉCÖìaÿ £nèèAY×:Íµ¾£©qqy&—Lâ5'ï;}ÔÄÚBäñZ5ç×>Õ£ñMõÍ¤:ŠÜ]ê\¦¡ VÙ!Qhå‡Ì›j:İ°;—‘ÎñX:ƒ^ñ·şI»ÿ nÿ ú>:ô
-óÿ ¿òHußûwÿ ÑñĞAàOù'ÿ °U¯şŠZè+Ÿğ'ü“Ïÿ Ø*×ÿ E-t QE QE QE QE QEÏÙÿ ÉCÖìaÿ £në ®~ÏşJ³ÿ `«ıw] QE QE QE s÷ŸòPôoû_ÿ èÛJè+Ÿ¼ÿ ’‡£Ø*ÿ ÿ FÚWA@Q@sş!ÿ ç„ÿ ì*ÿ úEu]sş!ÿ ç„ÿ ì*ÿ úEu@Q@Q@Q@Q@Q@ÿ ?äxgşÁV¿ú)k ®ÀŸòO<3ÿ `«_ıµĞPEPEP\ÿ Œ¿ämÿ a]7ÿ Ka®‚¹ÿ ÈÛşÂºoş–Ã@Q@@l­úßSíKˆK˜! •Ï¦@5= QE W?ã¿ù'&ÿ °U×şŠjè+Ÿñßü“ÏØ*ëÿ E5 tQE QE QE QE gjº†´°Ô›}»—†X.$‚D$pñ²°ÎI¦éVúT/¼—®Û‰º¼šá³ìdf {*í QE–VÓ^Aw$×HGÌ¾ğß?AéSÑE QE œŞÑ[V³iR"ğÛ'œcïãwN:ô­( ¢Š(9à†êŞK{ˆcšT¤‘È¡•ÔõªÚn¥èĞ¼:^›gc¶çKX%cÓ$(5vŠ *±[}¼_y)ö¡“æãæÙœíÏ¦y©è KßµÆ§%ı–³©i“L¡f†&IqÀb²Æà0e@$c9ÀÃôÿ iVÜimqqv¬·—RÚÂ²]$Ÿ3b(läö­Š(¦¥iÚE±¶Ó,-l ,XÅm
-Æ¹=N*İPL–(ç‰â–5’7R®2 âŸE dIáOMcŒº•%¤´05œf8ÉêUqø­H¢’(‘c*" °§Ñ@uNÕd·’şÎ+†·mÑv9?PjÍ³ÿ ’‡¬ÿ Ø*Ãÿ Fİ×A\ıŸü”=gşÁVú6î€:
-(¢€
-óÿ ¿òHußûwÿ Ññ× WŸümÿ ’C®ÿ Û¿ş€:É<ğÏı‚­ôR×A\ÿ ?äxgşÁV¿ú)k  Š( Š( [YŸL šeÅÌ"$Ò£³{mTòä	arrH
-nßŞ}‚ÊKŸ"[‚¸;w» q$‘ÔïX>*Ğ.<FñÚ6™¦4
-¿»Ô¥˜››G=Z$òˆÈÂàï§:úÍ³İé3[&Ÿe¨ïMµü›"dgqØÿ _ºyô¥Ğ:•ÛWÔ[NóbğõòŞ3ÖâXW ûÌèîª½»·û&¨7Œà{2kk)šmB9e	"*±s '$8 árÂ­¯‡õmC¸¶Ñ,ôØ$½ºó¥µK·†T*¡’X‰çnsµybqQjŞÔµ=3O¶›IÑ§·‚":k]É0r$‚"Å•A í\n$C¿OëOëş -õş¿¯êæõŞ¼"±Óåµµ’kH…µ‚Så|Åüç`
-§<è	â²Ïí^	n ±á³ÍÔw2«Z¨wB1’ƒFÄ€qµIªÅÎ‡®$:C-µíŞªŞuÕËÆnØÆÑÈÅx`Á¾bHÁ­c'µ{k]NŞ±u×adÔYçuû34’34Caó8˜€§Ü¹Å´®ìe/ø'IdÁ¾ ë¤t›ïûÛºèk°Aõt_ººNıı»®Š¤JöÔ*¶¡¨[iv2Ş]É²ÀÉÆI$à $’@ u$UšÄñ^†|A¡›5KyY&ŠqĞÌSlpÛƒò¶1œuÁé@ÇgQK¸ê$’mKH¥€Ê«¼äÈ#^sÀvãòVñL­²Á¢Ş}²xåŸì³I°Š6›r³)'pÚ3ó2Te…M#Ãz†•¥ßAgŸ§û æÚÎCäÙÇ±QŒD"åÎÒßuF[Û›Z¶¨E©Ùê:Vo$rY{©šÅ
-°eG9R˜ÛİF9—õ§ùé÷ìÔVëE‡T°†[¸î"I!HğÃcH¯9<VSø¢ñtczšÔ“BdûLBT‚6!Ê;c~pÅ8ãvÌñ%¾•{¥xjÖÆÃP‚ŞÎ;p/.5Ÿ®ÜÇ=ó’0:Ö<~Ö4ı-´ı?MÒ>Ãw;Ouaö×‚T¨Le`9BAfÈ\î#4Kwo-•ÍCsçü?uï.möEÜ0pd³##µtµÍ7Ÿÿ 	Æƒö¡Ücßy‚"Jólò<‘ùWKMî%{jfßka«i¶Z\8¿‘¢K„Ùå£*3á²Û¹
-q…#ÔŠÏ¹ñd6ú„‘›9ZÆ¸ìg»>IäÙ´mêWç ·$`¸«õûZïWĞî, ²’¦c=ËÆÄŞ<(°<9<‘Óò3õÿ kx¥/¦‰-m#+‰½ìÙ½xÀ)æB6Æ6°_˜ï$(P­uq¿.ßçÿ  ëëŸñü‡<'ÿ aWÿ Ò+ªè+Ÿñü‡<'ÿ aWÿ Ò+ª@tQE QE QE f¶°©â8ôf´¸W–Ùîc¸;<¶
-Ê¬£»#zõP=é­®Ûÿ ÂM†ˆí3[Ipòò¦Òƒn{±óÇaŒõRêÃV“ÆÖ”PY>ImİåÄ¹‘‘²Ë ãËïîíqâğ®»eã{=JVK2(æYæx„„ÊÊÄ[nW*:¾zr !š¶—óımúÛS{V×n4ÉYcĞ5;èÕC4ÖÍ POğşòT$ôèQŞ«Ùøª;«ø"k9aµºšKkk‡uùævõ*:‘¶œœínŸ.ëo¨ŞİXµävĞÛB¾tÑÅ3HZa÷W•\ ûÙà’pôïj6ú¼æĞézuõÅí¼É3¤2y˜FM€(_5¹s´p2p/13GÀŸòO<3ÿ `«_ıµĞW?àOù'ÿ °U¯şŠZè)^öåímŒ‘ZÍs&@X¢ÆXŸr@ÜŸğ¬İ;Ä1İh÷·vÒZIi+Aq|ÌH¸!|FÜ NG ğ.êÇSl¿ÙÛ=éí2´h=É
-ÇLW:şÖn4%‰eM.òŞG’ì®Ä©+09id–Üä–f$ˆò	Ï4ìì>Å´ñgÚtí.{-:Yî5?·1T¤ !l±à·Î 	êTe†ŞŸ}o©éÖ×ö¯¾Şæ%–6ÇUa‘\N‘áèÚf"=…Ş¥ea&Ÿ,sİ•ˆÆJeu€—f6•èÜ±#'°Ñ4ÅÑt+-$2-¥ºBŒnÚ ÏãVÒÖßÖÿ ¥‰ş¿/ø%úçüeÿ  ;oû
-é¿ú[tÏøËş@vßöÓô¶‘Q@ïšñ,¥m>8%º÷iq!	÷`¬GÆªØê3OáØµŞIßÎfvhÜc#i`ÇQß½Gâ*ãYÓ–Ö‹h‡˜Dº¶3Å2à‚Ó#qœqÈ#Šç­ ñM‡Ù´XäğûG«Ä!ûS¤’&@<²TX$e¾ÿ ¥ŞÍ-ÿ ¯ëş Õ®®uPjvÒ[XI4ÑC%ê)†7pØ®âªRO•v¸X¼9âyo!y_D¶Hl’Ì´‹%à—cVTÄF#‘“‡n‹ıĞk¸@V5Vrì ˆ>üVÛ¢Uí¨êçüwÿ $óÄßö
-ºÿ ÑM]sş;ÿ ’yâoû]è¦©ĞQE QE QE QE QE QE QE QE V;ø†Ò¦‡5ŞòÁæÃ»ÿ HsG—·Ç îÉÁã šØ®Pi‡Sñ^¨W[½¶·ˆÂ.4ûiB_h"BøŞªFT,äœ‘BÜ:n|Y¾¡$fÎV±‚î;îÃ’y6mz•ùÀ-Æ	n+{KÕçÔålè×ö–ûwGspĞì”gŒ‘˜dsó(÷Áâ±5/WÄë}$1ÛZÇ4wä_M›×Œe± #`¿1ŞHP8©<?á°ë«¶‘¥hò˜ƒKºO¹•·È|¸òÃiƒ÷<âˆùÿ Z˜?ëúô:º+™½ñ~¤ßjvš†©§Z]ÄU­`¿º[e‘
-)1+»p$Œt®vãHÕ¼qZ¼º^Åe·ûD­x²¨nbHTC»€Ùe[jCÒ+>ÖúyµBÎH‘b·Ü7-¸ä{şq\¤ÚÇˆÁÔ!Qğ½©ŠB¯©´­`A#ÌrÑƒ!$†Ø_âÉ¨ïü;âjòæ]SFĞ'tHÒ)µ¦†,o0ùæ·$Œ²ã€¥I,O@õ;úÏÔo§³»Ó"Š‘n®Œ2l_-Û#ß*?ÓVk?è6ÿ ÚZŒ0ÛÚÄ‘=ÕÌ¢5$  ’ÇŒŸRz÷®NSâ/Â$³M2÷JòW·»]B[9' )HŸ
-2ïVË Æy:èk³¾¢¼æ/ë‚ÏQÓ¡Yé—³,‹¾¥+GÚ>SA²LŸ˜§Ê€ÎI³†|Kk£É¤Y®kl%i·ÛO=¸›œˆÖ8Be?ŞWñÈ}Ìhş¿¯ëP;ÚÏµÖ »Ôî,Şı$€e¤šÎXânqòÈÊ¿j´Úv¥'…b³K˜´âŠ2²Ï™PÊ„0Üx,	\Áç<ËÕ‡Š5îÎóOĞì­æ…’[¡«ÌÆ#—È\íëËÓ¨ëGPZ£­ªW:”vº•œ©·í{Är´±¨Ş£;–ÄŒŸ”ºsŠâ5-K¹şÑº³ñ´³Å+uw¨5µ½Ô‘±.°ÊòğÏ@$u Šn‹¥x—XŠ×Ri4Ë{w³òckÃ5ûK“|M†XY%‹ØR@#næÊù®îµZ-ŸdœBìïÌhùöûøÇµfYÿ ÉCÖìaÿ £në3X·¹´Ô½Åæ—íä+ss|aœI–0±„Û&J/ñ¯ßÆ=tìÿ ä¡ë?ö
-°ÿ Ñ·tt ¬[­zæÛQËáíRhŒ«º­ÄdœrJÎ~^Ç­mVÙn¦ÖşÓqåXÈ¬Ko¼ì0  |£à·®Ô:çÿ äë¿öïÿ £ã¯@¯?øÛÿ $‡]ÿ ·ı tÿ ’yáŸûZÿ è¥®‚¹ÿ É<ğÏı‚­ôR×A@Q@Q@Q@Q@Q@ıŸü”=gşÁVú6îº
-çìÿ ä¡ë?ö
-°ÿ Ñ·uĞPEPEPEP?yÿ %Fÿ °Uÿ ş´®‚¹ûÏù(z7ı‚¯ÿ ôm¥t QE W?âùxOşÂ¯ÿ ¤WUĞW?âùxOşÂ¯ÿ ¤WTĞQE QE QE QE QEÏøşIç†ìkÿ ¢–º
-çü	ÿ $óÃ?ö
-µÿ ÑK] QE QE ÏøËş@vßöÓô¶è+Ÿñ—ü€í¿ì+¦ÿ él4ĞQE S|´ó›xqéšu QE W?ã¿ù'&ÿ °U×şŠjè+Ÿñßü“ÏØ*ëÿ E5 tQE QE QE QE QE QE QE QE ™©xoBÖgYõMN¾™bÉuj’°\ç °''zÓ¢€"¶µ·²¶ÚÖ ·‰BÇHP€À-PV­¢jÜØÏı¡uhÖry©ä$'qéÉ’6#Œ”Œ†#½jÑE Aö;]Ò7Ù¡İ&wŸ,e² 9õàÈTôQ@Q@Q@Q@Q@ÉoÌ,1»!%(%r1Ç§‡gÿ %Yÿ °U‡ş»®‚¹û?ù(zÏı‚¬?ômİ tQE çÿ äë¿öïÿ £ã¯@¯?øÛÿ $‡]ÿ ·ı tÿ ’yáŸûZÿ è¥®‚¹ÿ É<ğÏı‚­ôR×A@Q@İÎÖ¶’Î–òÜ4jXCPïÃqŸ©J×\µ¹ğå¾¹¶Xí§·K…F\¾9n@ÀÏ=*åïÚ>Å0´).
-K!D'İ‚±ß¹X<5¬ÿ Â¥éí{ö-OM€G³¸VŠb©°i`l9á23Ş“Ùü¿_øVĞº,ûN¥Ïe§K=Æ¡göáoæ*”„-–<ùÀ¡=JŒ°Ú²Ô Ôt¸5Be‚â4Xà°##¯­qZG…üK£iš<ˆöz••„š|±ÏvV#(U•Ö ~]˜ÚW£rÄŒ»FÓ?±<?c¦BŞoØí’fùw•\dõÆqïW+koëÒÂëıyÁ(ÚK¯MisQJĞ¼üÅu”ÄA!Š¸uİ€9Í>?Üµ“:èw×7qNmæ·µxÈV Êò2+'#ƒì dÚè:÷ü"šeÌZr\K{$şTwNñO“^'c*b„…n9Ç8©´êº^‡ueoö[1utYmá¹wÂ 8…ŠNC0UT¿g«ş»_Ö£·Oéjiÿ ÂGhğßÜX^A,òù0Y9ˆÍ3äáWk”9Á9İŒ’MSºñl–"Ss¥HŸdn¯À™I¶…‹<pÏ…%” Çhh¼Oá©µƒ§G™¥]ÙéÎ$ÒúCåM”d*ÃË`»A­†É`u¬+jÖ¡ÓÅ¶³‚ê?9•lTÉ!Ä GûÀ] Ÿp3€ÕŸõı_ˆtöLâ°ÊAI° ÿ ½»­›Û—µ¶2Ek5Ì™b‹b}É rÂ±lGãı]î®“§ÿ nëWV:˜ÓeşÈÙïHÄi•£AîHV<zb“~¦]¿Šâm%®n¬§†ñnM‘²FWy.ğFÙêíÉm¸8Ù²šâ{D–ê×ì²¶I„È Ïˆãv1	 äG'½ğö¥¥ééw¤è³=ÛNº|÷4Õƒ4’4Yß¹ËçË<ır7<= ¾“á£¦JÑÇæ4ÍåÛŸİÛ‰˜Gå]Ø§AĞö}Ã¯õæIc¯6¤&¹´Óç“NDfïrÿ ¤‘ÓÊPI#†ù›hèFàroâ	ŞÊú["ê+‹I„_gÑÌ¥¶”Ä…ÎAÉ 6FH=á¿Şxzæ›m3E¶–ÎÅíTÙÈcşÑc³kÎD_&6gşZ¹çmYxVK+Q“@ĞÇÛÄjú:Ë‹/”œ¹o'–`Fwü*=é»tşµS¤¶ÔËi³_jW\p†iñâ%P–&7eÇ^ıªµ¶ºÓXÏ¨\i÷v(¡¡iˆ2ÎB#RH+€HrIFpÇƒfO	êz5´6iªÈí,È|‹0Ñ…ÄC`Ş2 ‘„Îæ<t9ğxQK«û!iáû)-?G–1m,Š÷’4–ÇïÇH©ã	ìíı_×¿¯ëúÿ ={-IuxcSHš%»Ğ¯'XØä¨i,Îç]mp^ÒõWğ¶™ªL’İZè·Ñ@ëµe³ËN1ØŒú–ë]íT­}63oµ…°Õ´Û	-._ÈÑ%ÂlòÑ•ğÙmÜ…8Â‘êEgÜø²}BHÍœ­cÜv3İ†$òlÚ6õ+ó€[Œ0ÜUúı†­w«èwYIÓO1åãboØHéùúƒÿ µ¼R—ÓD–¶‘ÏÄ†ŞölŞ¼`ó!cX/Ìw’)+]\oË·ùÿ À:úçüCÿ !Ï	ÿ ØUÿ ôŠêº
-çüCÿ !Ï	ÿ ØUÿ ôŠêQ@Q@bk~ —F"_ì»›‹8Ù~ÓpŒª#p6©9r	\3‚HÚvë×mõë½B³±Òî4ø±..o¤‰Œ åIU‰
-F@Ü2pxÀ£ªsâÈmõ	#6rµŒqØÏv|“É³hÛÔ¯În0HÀ#qYãñ§^‡NŸK¹‚¥²Ü;/ï
-rÛ  ‚¤õç!xİ—àóªø;ëˆ£¶µh®$6×³fõã ¯™ËÃóä…Š¹kmâñŞ^ØéBº8¦KÙHâë´!‰@,ÁKİ‡\
-ËúşµşŸQ’êş'Jº¸ŒZI<VP-ÍôªÀy11`ïŸ”’8Â‚rN¬ZëÚ“[éö=¬.É=ñ‘DJÃª/%™À<7Í‘¶°ukZŒº‰,5«ìïƒ\¹û6İà¼»ıæVCÁÙÊSŠº7€_J×-&ËK†;K¹®´¡'íwJáÿ u Ø8g'{g`àg†­Ô—õ§ù›Şÿ ’yáŸûZÿ è¥®‚¹ÿ É<ğÏı‚­ôR×AHÉ"CË#³3 S\âøÆt[køm$ó.ï¤°¶Šfò³"» .OÜa=	ä 	âµu6MWO6ñ^ÜZ8u‘d€¦ISôuÆqŸ”×aáÅáÏìıLéú˜şĞ–æK;›¬Ãq—m¬Ën¸!Ø660%„` z[úìÿ àx«Ì‚ÓìzmÄ÷WË1·fT+LÎOä€££9Q–:}õ¾§§[_Ú¾û{˜–XÛU†Er×4ˆ4ë‹´º»·¶¸´h.®äÇdØÌŞ^Ğƒ nü¸Åu:&˜º.…a¥¤†E´·HC‘Û@üiÙ[úóı,OõùÁ/×?ã/ùÛØWMÿ ÒØk ®Æ_ò¶ÿ °®›ÿ ¥°ÒĞQE^ù¯ÊVÓã‚[ ?v—ĞŸv
-Äqìj­£4ş‹Q‘mä‘­üáögfÆ26– àŒuûÔ~!Ò®59m`¸¶ˆy¤K«c<S.(è29Ç‚8®zÒØ}›EO´pÚ¼Bµ:I"dq³Ë%@éå‚F[ïğ*]ìÒßúş¿àZêçU§m%µ„“M2^¢˜cwŠî* õ dñéWk…‹Ã'–ò•ôKd†É,ËH²^	v0eeLDb98vè¿İ»„cUg.À X“ïÅhíº%^Ú®ÇòO<Mÿ `«¯ıÕĞW?ã¿ù'&ÿ °U×şŠj‘Q@Q@Q@Q@Q@Q@Q@eOy©EâkQ€°™IÓ¿H¶&Ü—’İÏµj×¨xgXşÜ—Vµ—M»vgË%´â6B»>Ò¥ÈUÉ ,csœ’€èµ»Ù´İúúŞ4’kxTI	
-Äà‘ĞT··3[é“ÜÃo4qXå˜F¤œ3à…ø5ÁAàİ{Kµ¿ƒN²ĞOö…¿“#G)µ1NCm¼÷ àHøéƒ-¹éá}zQï!Ğ´Tóíd·¼#]¹ón·†y<JÀdd*~C;=VVÑãÔídFİÍÀ¹C‚G£æ<t¯RËÄM6§se§M§´p}ª7–D`Ğç¶Òv0 ñÏ9ÎBÃá=TÑt«•Ô¯İäóG™7™´TU2Ó	b€óÎq“A4Oê-tu/²ióLUÍÖŸzf‘¶6cÁµPdç†É$ã“CÑè%±¿¡këºgÛ¡†Hc3KYF÷r2dÙÛœFiÚ†³g§\Ai,ËöÛ”‘í $æ]‹¹¹íÇsYÑµI¸µÖ®cWº–t1Ì$ ;—<ˆcÁËğyé…nt?¶£ ·`‡ÌÃy-ÌäÄ’Í›Pm ÜÊx8?PTï´F­{Õí`Ğ¡Õuˆ,íÚ’I&"&à:±àrqU_Åš7”¯mwöÖhRáb²FF‰Ûhp¨	+œä˜æ°­.¼Oiuo£Åwá¹'·¶ò>Îo\JØ‰Êyd1û¾Ÿ7ßéW|o²5ÛD¸A†X¾İ,~kqûİâ·8? g;äÕß/õı]m1½•÷ş¿àÿ V¿Kip·vÜ¬rÆ² p“FQ×#£)äjƒIÔ?´ì~ÒbòˆšXŠnİ÷$dëûsø×0Éâm
-ÓMÕìuí9#‚éb„Êö«a!3++wİ(á‹8à‘Üi–RiöBJiæ”mè7ÈÎáº›µ®ƒ[Ø±w{iaÉyu¼në´ÒÌpÜ‚œ×­ÌvÍ*‰äFtŒYT€Ä}7/æ+Ï[Äqëzí­¥‘3êö±$7Úmî,†-Äo>nR8²3ó|Á‚ ğA}mâ©uH®íáÑŠY»ˆ‘ç•ZåŒ1|¢ &â?†ú=æ÷bïL}SNÖ5˜î5-Nö;k¹ÌòHrU’fò•XYNÂX(W]âhÖ_ÍÇÌÆŒ»Š#’ê6¹ì$á‡u$QÒáÖÅíZõ´İ"òùbóM´/(vİÛA8Ïn•l€}«†Ñ|­¶µjº–²òKÚ¬W:YC¹3şHØ –+· ÷.¿şÙ³Ô¬u­{TÒ4»(cxÆ§4qÇëËmbÃpÚÈ¥x!94º¦Ôuxtëı>ÖYìbkÉ
-(¸»;`Ë5 ù’£uü?ù(zÏı‚¬?ômİso§øÅ¶Ö·	so±‘Õ5{·ŒÜ[8&Ù¢d9P
-°pz0eÉÒYÿ ÉCÖìaÿ £nèèN‚°&ñDQë²i©i$‹ÑA<ŠÃr< Âu)Œå¸Ç`pÅwë‹Ô|+©^ø¥u¶`¥ÔSC©‡[˜!P7@#	†Fùó—÷„HÄ¿¯ëúôcÙ¥yÿ Æßù$:ïı»ÿ èøëĞ+Ïş6ÿ É!×íßÿ GÇ@?äxgşÁV¿ú)k ®ÀŸòO<3ÿ `«_ıµĞPEPEPEPEPEP?gÿ %Yÿ °U‡ş»®‚¹û?ù(zÏı‚¬?ômİt QE QE QEÏŞÉCÑ¿ìÿ £m+ ®~óşJÿ `«ÿ ıi] QE Ïø‡şCÿ °«ÿ éÕtÏø‡şCÿ °«ÿ éÕ tQE QE QE QE QE sşÿ ’yáŸûZÿ è¥®‚¹ÿ É<ğÏı‚­ôR×A@Q@Q@sş2ÿ ·ı…tßı-†º
-çüeÿ  ;oû
-é¿ú[ tQE ß-<Á&ÅŞcœzfE QE ÏøïşIç‰¿ìuÿ ¢šº
-çüwÿ $óÄßö
-ºÿ ÑM@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@}<ÏäÇçfM£qÆqÏâ3RÑE QE Q‡J‚J[õšñ¥”Qï%h†qÒ2ÛAĞzúš½E T7V¶÷Ö’ÚİCöó!I"‘w+©à‚;ŠšŠ7Nğ¶›¥ÜC5¬º¦aD—Uº–01Œly
-=GµE\¹û?ù(zÏı‚¬?ômİtÏÙÿ ÉCÖìaÿ £nè ¢Š( ¯?øÛÿ $‡]ÿ ·ızyÿ Æßù$:ïı»ÿ èøè ğ'ü“Ïÿ Ø*×ÿ E-tÏøşIç†ìkÿ ¢–º
- (¢Š ++Äš­Æ‰áÛíRÚÖ+§´‰¦h¤˜Ä
-¨ÉÃnp8çÔV­ex“J¸×<={¥Û]Åj×q4-,B«(eçƒŸÀĞ8Úúø›^:‡.µàûEÄp<±Ãœn*¥‰'²çğ+VY&[F’DÓmÊF[hcî{~~†¹Ÿø1üK¢}}@Á©cl×P™ãˆ«}ïÜ¤Ê}˜zç¥mÛXŞÚhØÃ{Û#„F·2Fò.ì}â­!cô.O½f%Óúìa7Šµ}F=BÎĞİZŞAj’C+ÌWhbFT¨uÏ¯cvMã¬tûÑzºdW¶7«e$·WŸe¶rcŞUŠ§îáˆ<dıê³máı^=îÂëQÒnŒë·÷šSŸ'ç2¡˜™¼£ØÓ´ßÉáİXør{9vy&°Ş’3uÂFñ…ì< =hş¿/ø?x_×á÷¹ñ#ÛøbÛUÙc,—2ÅfÚìËo™$­æì^AÎßjÆºø‰—4š^ úd:ÄWoºêóì¶ÒDs&öP"á0Ç' ­“áÙí´3¥XM§‹y¦t½±3¤¯#ïo”H£i,ÿ /=G<s›eàĞ¼™¼;sicvU¥±ÂB¬ß»Fi.  õ£«ş¿¯ø>AÓúş¿á·.é4¾6Ô¤i¡ŸFÓ˜ËÂ>d»ù”dğzOÔ×M\—†ôÈt_Şé–ìï¦‰§BŒç,BÉv2k­¦í}Ş"Ô5=;OšëO·´d·‰§šK¹J®Õä¨Ú	É Ç…È8n•x]\Ë¤-ÔŸé/‘-¦}˜b3µ›ğNĞÕ{LÕu&·[BÆŞÛ|±]Y4âR>îvÊœÎ9ä
-Ò;¤°XŞå$»àÌbÂ—ÇŞØLöÏãŞ§£ş¿¯ëÌ:£*ÓR×¥M@\iZds[(òÄ:“È®øÎÖ&+ÁSïU+ŸÚXøCIÖï>Ím.¦‘y\\ˆâ:nÃJGÊ –Çn$±qi¢5½Ôldb×3BYZVåœ aÁ$œ™¬k	ßÛh:ªj¶ÿ Ú:6µÑ³o)—a™“ò¡Ç8=8§ÿ şt5m5ËÍËC§ß\OÊ5µÆmÀ$ô“°QÆ@ùˆè¹Àç®üc¨XønkûµÒ-¦µ¸–ŞI®.¼¸n3÷bÏ ¾rNÂßÛÎ”~ÕìtSc¥ë¶óLóMq<¶M&d‘÷±D«°[ –íÎA%bÑ¼A‚Y®¯¤¬8(èšS…à óø?{%·d‘Ç÷vş¿¯øpõi<ßhR`úEó`q™lûtuËEc™ãX[îò-´KÈcŞÛÕ’Ìçºšn×ĞJöÔÈÔõk›gG³[X¤¶Ô&xZc1ŞA„Û†!Ü1èk*ïÅ—úÓ-´agŸ:—>vù|¼H@ ÈŞ¬	 ¸mkGÔ5-SHº´¿¶¶O¸3´rÚ4¦BQ€ÂEÛò»v<àöÁ­}á][ÄöúÆ¥„ßcu’Ô%’¬Á”o˜’YA%€P¸=sBİ_Öƒ~]¿ÏşÒW?âùxOşÂ¯ÿ ¤WUĞW?âùxOşÂ¯ÿ ¤WT€è(¢Š (¢Š (¢Š È}Zæ?A¤=¬_gÒK„¸ùFE*Sn ıàÁÜzeYx²âãQ³/m °¾½Â®|Ø¤‹Ì9~Øo,ü£p9mß.Î¨MâÛ=b;ûdµ··’ÜÛ5£3°r¥™æ Qqòır1VßÂÃÅOâ;Èôù/Óx·’ŞÄBÊc26æi(ÛœŒü¢…ÒşŸùò#ñŠ¦Ñõ«}:(`ß,>tK3•kÆİ´Ãmã*Üç‚0K)¦øÆÓZñ,ºe…î–#¶–H¤G»êWL†è ÿ ';OË‚¢Ö¼!}­ùËs©Ù˜ï-c¶¼W°fû¬Çt—÷M–ÎNüSÚ¤±ğ|¶w–hÚŠI¥Ø]IyiÙÈ™dpù.òG˜ülîäœ¸ùùƒòş¿¯ÀµàOù'ÿ °U¯şŠZè+Ÿğ'ü“Ïÿ Ø*×ÿ E-t€«%ìVŒÚ}¬779cšsuä–
-Äqè¦²aÔ<Ey§ÍåéÚd^kD’ÇÁcû´bCdm gæVÅôW3ØÍÊÛ\:á&h÷ì÷Û‘“éÏ_^•›ªh×“hĞiºMíµ”HíÍ8’0>ï!ç¹Ï#>´µ2j•¦˜,lmâ½»³’õÒyKFFÕ wî[»OA¤jQk:5–§²Åw
-Lªİ@aœÅ¹ğæ­#YŞA«ÙÅªA¶Ï/Ø	…¢r§jÄ%J”\Íß çÍ/OƒIÒ­4ëmŞE¬+
-n<£>üUioëÏô°¿¯Ëş	n¹ÿ ÈÛşÂºoş–Ã]sş2ÿ ·ı…tßı-†Î‚Š( 
-ZÄÏo¤ÜÍı¶Ñ¦ïµ]&è¢©a¹xÇûBªé—Ó\xV@N·RÉkç$¾O”#+”Üpzdg×¥M«é_ÚÖğÆ/nlä†a2Kn#,:H¬§¯q×r+›‡EÖí/ ÒâñBlÙÒ8ŸKbÀng3 <Iòù©wi¥¸Õ“W7â×ìã·Ó~Ù:Çq{:¨R@È’d€`@ê@­jã­ü«¸å›ÄÍ
-Çh¶€ØY$o,j~_7Í2£–åQ>ñíÅuè¡#TˆP ,rOÔ÷­¨•t¬ÇW?ã¿ù'&ÿ °U×şŠjè+Ÿñßü“ÏØ*ëÿ E5HÎ‚Š( Š( Š( Š( Š( Š( Š( Š( Š( ¯jriZK\ÂÌ&Ş"YIvÎz•XĞ†$€yÎSÀªºÿ ˆÆ•¢[j…†™R#s{Çª¸8’U 0 à`íä€JõøØX"Ôj—YØı²3-ìRÚÛ®ÖS-µvyE+{mVµ··ğ†¹¥¬n>ÔûdªìÊÊZ`²v9's6r3Í/óÿ !í¨Çñ­é³¸¼K-:ÑooU¥,d‹å8ùSÌ‡ ªàd²öhâDWS•a‘\4?šÎÎ{;=Nm¯àò5şÆJºw" $%uß·Ó'«Õ¾×–[N·iæ‰ãaHCÊ¤*2@=	ÍS°ºÿ _×qb¾’M~îÀˆü¸m¡™q÷‰vû|ƒ7Y¿—Nµ‚X•½Ü¶ğOÊò*{à×¬Ë®Ï¬G¨}ºO$ŞT1ÛO`oe›Êbä¹‚B¨‡~İÈRI"´¬¼4T¿¹ŸPûBI$72<Zz¬ò˜ÜHKùC÷¬H °pw´l[Ş)Õïtm6+‹;pÈÒ„éÓÌK8Îs+ e, ã8a€K­:á´h¿kÙïóJ*¨Ïd
->èí’ÇXõ®rİõícP¿ºÒu³ÓdØ«­¥H\8\1‰Y£e_»÷Õ²Ûˆã®ïö<?ğc	¦X~Ëöa*•nÜ1ŸÃİ©ta£h¥á}Bkøo¼İbÓTò.<Ÿ:ÖßÊ@B© |ï»¯<õÜ>–×Tjš]¼0ZÙÇk°P†,X z×5©é:…§İìñTñZŞ2¬“6™ç]+•<³Å^@ıÙ9ï’1+øw\Ô£ûY×t¹MÈ†Fót‡(gtl‹ç‚'$1n@àt£Ğ:-Î¢WIúu»jjÊ¯[KóP‘ó+3#=y¥†ê[Í.¾KIeƒx.Ë*ÄHÎIS†¯‘é\µŸ€‡¨K Üi°Ş\Ç²î{í-eyNz¯”ñ*gŒ€0p\“½ÿ ô_ğ‹Ã¡™¢Š(Ò5–@Ë°‚0¬¥qÀ ŒqÍ`[ğÆ ú‹ö¹5;}DdU¹‚)+àolŒƒƒF>¦ö«iÚÄ>™¨ZŞÂ±¤¶™dPİpJ“Ï#zæo¼5®C£ßÙEâ[sc(’YîÈ	˜·ÌÁåFT
-NAÄY
-N9æ—Iñ6¾‰†£qªHÀÓéQK~Êàd)t–
-Ê7:Œõ=èop¶¥«ÍCTºñCè‹9Ò-Ìaá¹òVG»ã-å3¨Êz«#9ëSÙÿ ÉBÖ{ÿ ÄªÃÿ FİÔN‘â	¢Ó$×5[iRÔ,¾Lv[&2Çï%óN2rQW'Ğdìÿ ä¡ë?ö
-°ÿ Ñ·tíea^úrw~,¸·Ôn™m k;øtùÔ¹ó·Ëåâ@:@6õ`ImÃu•ÍßxB×Vñ=¾±©Ga7Øİdµ	d«0eæ$–PI`.\Ò_¾Ãèt•çÿ äë¿öïÿ £ã¯@¯?øÛÿ $‡]ÿ ·ı tÿ ’yáŸûZÿ è¥®‚¹¸<¢ÚÛÅoo.³ Hã[½UE  %À v©?áÒÿ çë\ÿ Áõïÿ  ‚Šçÿ áÒÿ çë\ÿ Áõïÿ £şİ/ş~µÏü^ÿ ñê è(®şİ/ş~µÏü^ÿ ñê?áÒÿ çë\ÿ Áõïÿ  ‚Šçÿ áÒÿ çë\ÿ Áõïÿ £şİ/ş~µÏü^ÿ ñê è(®şİ/ş~µÏü^ÿ ñê?áÒÿ çë\ÿ Áõïÿ  ‚Šçÿ áÒÿ çë\ÿ Áõïÿ £şİ/ş~µÏü^ÿ ñê ,ÿ ä¡ë?ö
-°ÿ Ñ·uĞW6<¢­ÃÜ,ºÈDTy·{¹•I*	ór@,Ø·Z“şİ/ş~µÏü^ÿ ñê è(®şİ/ş~µÏü^ÿ ñê?áÒÿ çë\ÿ Áõïÿ  ‚Šçÿ áÒÿ çë\ÿ Áõïÿ £şİ/ş~µÏü^ÿ ñê è(®şİ/ş~µÏü^ÿ ñê?áÒÿ çë\ÿ Áõïÿ  óşJÿ `«ÿ ıi]sgÀÚ+\%ÃK¬™ãFDëw»•X‚À7 «‘ßhô©?áÒÿ çë\ÿ Áõïÿ  ‚Šçÿ áÒÿ çë\ÿ Áõïÿ £şİ/ş~µÏü^ÿ ñê è+Ÿñü‡<'ÿ aWÿ Ò+ª?áÒÿ çë\ÿ Áõïÿ ¨äğ6‹3ÂòË¬»ÂûâfÖïIFÚW+ûŞÖa‘Ø‘Ş€:J+Ÿÿ „7Kÿ Ÿ­sÿ ×¿üzøCt¿ùú×?ğ}{ÿ Ç¨ ¢¹ÿ øCt¿ùú×?ğ}{ÿ Ç¨ÿ „7Kÿ Ÿ­sÿ ×¿üz€:
-+Ÿÿ „7Kÿ Ÿ­sÿ ×¿üzøCt¿ùú×?ğ}{ÿ Ç¨ ¢¹ÿ øCt¿ùú×?ğ}{ÿ Ç¨ÿ „7Kÿ Ÿ­sÿ ×¿üz€:
-+Ÿÿ „7Kÿ Ÿ­sÿ ×¿üzøCt¿ùú×?ğ}{ÿ Ç¨ ğ'ü“Ïÿ Ø*×ÿ E-tÍÁàmÖŞ+{yu˜`‰Gzİêª( . µIÿ n—ÿ ?Zçş¯øõ tW?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PAEsÿ ğ†éóõ®àú÷ÿ Qÿ n—ÿ ?Zçş¯øõ tÏøËş@vßöÓô¶?áÒÿ çë\ÿ Áõïÿ ¨æğ6‹r'—Y•«…}nõ€e`Êy—¨`=ˆ€:J+Ÿÿ „7Kÿ Ÿ­sÿ ×¿üzøCt¿ùú×?ğ}{ÿ Ç¨ ¢¹ÿ øCt¿ùú×?ğ}{ÿ Ç¨ÿ „7Kÿ Ÿ­sÿ ×¿üz€:
-+Ÿÿ „7Kÿ Ÿ­sÿ ×¿üzøCt¿ùú×?ğ}{ÿ Ç¨ ®ÇòO<Mÿ `«¯ıÔÂ¥ÿ ÏÖ¹ÿ ƒëßş=QÏàmêŞ[{‰u™ •
-Išİë+© ƒ.#µ t”W?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PAEsÿ ğ†éóõ®àú÷ÿ Qÿ n—ÿ ?Zçş¯øõ tW?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PAEsÿ ğ†éóõ®àú÷ÿ Qÿ n—ÿ ?Zçş¯øõ tW?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PAEsÿ ğ†éóõ®àú÷ÿ Qÿ n—ÿ ?Zçş¯øõ tW?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PAEsÿ ğ†éóõ®àú÷ÿ Qÿ n—ÿ ?Zçş¯øõ tW?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PAEsÿ ğ†éóõ®àú÷ÿ Qÿ n—ÿ ?Zçş¯øõ tW?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PAEsÿ ğ†éóõ®àú÷ÿ Qÿ n—ÿ ?Zçş¯øõ tW?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PAEsÿ ğ†éóõ®àú÷ÿ Qÿ n—ÿ ?Zçş¯øõ tW?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PAEsÿ ğ†éóõ®àú÷ÿ Qÿ n—ÿ ?Zçş¯øõ tÏÙÿ ÉCÖìaÿ £nèÿ „7Kÿ Ÿ­sÿ ×¿üz£ÑVáî]dO"*<ƒ[½ÜÊ¤•ù¹ lÛ­ t”W?ÿ n—ÿ ?Zçş¯øõğ†éóõ®àú÷ÿ PA^ñ·şI»ÿ nÿ ú>:è?áÒÿ çë\ÿ Áõïÿ ª÷ß¼?©ÙÉg~5[»Y1¾õ›É°AS.ğ :†§y5øÒtÇTº1‰'¸eÜ-£$€qüNÄ6ÑÓ‚O@øCôYşmJÔjÓ½&¤~Ñ“ì­ò¯Ñ@Ôß
-~şÓPÔ™o5–cşÌrSÿ Zß /øB<%ÿ B®‡ÿ ‚èøš?áğ—ı
-ºş¡ÿ âkvŠ Âÿ „#Â_ô*èø.‡ÿ ‰£ş	Ğ«¡ÿ àºş&·h /øB<%ÿ B®‡ÿ ‚èøš?áğ—ı
-ºş¡ÿ âkvŠ Âÿ „#Â_ô*èø.‡ÿ ‰£ş	Ğ«¡ÿ àºş&¹ÏéË?‰lôË=SYşÒÕ.y<­Nh£³µŒ/˜U‚ØÚ2	ÜäçŠdQ´_¤¶[‹£h I.@ŒfU%C!W¦:f…¯ãø+ÿ À_×ÎÇMÿ G„¿èUĞÿ ğ]ÿ Gü!ÿ ¡WCÿ Át?üMsšœ’xŞHlu=fâÇE‡ÉºšçTQstØ8e-³ä^H ¸ãŠæ¾,Éyuâ6·±2İ}ƒH’òks)ŒZø[˜ÎàUù°=‚	¤İ­æ	jÿ ¯ëúG¤Âá/út?üCÿ ÄÑÿ G„¿èUĞÿ ğ]ÿ ^y­AeªŞéúÅûj-õÔo.ÙÖA v8Â®ş…Nw’rH^)[x{ï6µ®Ø.£d<Dºe„ùÇØrşÏ·c·$ï'vzcªŞ÷/õÑ~nßy7Òÿ ×Wú~G¨Âá/út?üCÿ ÄÑÿ G„¿èUĞÿ ğ]ÿ \çÄàñÜøNXç¸Búí¬.‰;ˆİwnÃ ;[•21\G/.›[ñ–¨×	ªèw+¤í•‡’²`0@8;Á9äQ¿ü¿Ì¦­ızÿ ‘ë_ğ„xKş…]ÿ Ğÿ ñ4Âá/út?üCÿ ÄÖÔEÌH\aÊÃĞÖUş¡woâM&Ê+­*;k•”ÍÄÅndÚ¹_%z0ÅÔ­­‰OK‘Âá/út?üCÿ ÄÑÿ G„¿èUĞÿ ğ]ÿ XŞ,ø—¦xOX†Âæ‘@Wº—xA
-1 m~ñ¹ÉPs·'œb“Rø±á>f‚Au”)	bé!rAÂ©,:y w¡k°ö6¿áğ—ı
-ºş¡ÿ âhÿ „#Â_ô*èø.‡ÿ ‰®7ÇzÆŸâ+«›‹]JÇX‰Úû¹YLæDÉ@	Ëc±õëxgU}àŞ‘©ycŸ’O-Bğ3`á@9'ĞÒMr¹>Õ%×üÍÏøB<%ÿ B®‡ÿ ‚èøš?áğ—ı
-ºş¡ÿ âkêrxcQÖO…nÊZDÓFâpÜ  åLª’ô$äÅƒ´à+ƒO¥¬Zµ½Ü–×†¶÷ql½Î¨R)#DR»o' ÁÁì_[?ëUı|ƒusÕ¿áğ—ı
-ºş¡ÿ âhÿ „#Â_ô*èø.‡ÿ ‰©tíbö÷@mB}êÂábŞ-¯$K¹ûÊÇhÏ`îxİ×µ¼â­:úA	º‹íšºÌåÙÿ ÕB¾RnŒ$,¸#“Î£hŸs×ÿ áğì5“o§È:K§¯Ù\À£ÚjKkÛİ&ú;Q¹k˜.	K[ÇP¸ùr`» À pA ãwŸøËÇ>×ü+sc¯rÛ_Y†0Ì†I@’6g€Åö‚{uSÁ¥Õïmõ¯kZ¦›pòÄ0;+&É¡Ù2¬R:`´Ò×ïü®+éOÎÇ±QL†A4Ê£Ô0üE>ÂŠ( Š( Šæuoì¯ê—Z–1İßiqÅ}ÚÔ¤¬[ËÎâr§<cßÆ?ÆI´íG½Ô´xD×VòKpMÉsŞS¬ «on­´°8îsJÿ ×õèÂÇ¬Ñ^G§üX¼ŸÄVö÷—:2İ:HåÀ‚8„jÙiGo@QS®s†;–¾5Öî¾j>$ŠÎÂKû9'ÀVqo4q¹ËÆz°(89Á>)ô¸[[_Ö†ß†¼Oy¯jšÅ¥Îö°œÄ’ÈäiH£xÉ 09 ×K^}à9EÏ<iyo7/e*†rĞFiÏãmjÛâTŞ–°é—7oo(wÄBA*Ëş­”ÊW†ZvÕG­„Ó}şŠã¼uâ}SÃ­¦.±[©¼¹$’&¸“ÙbZFç'€ZÅÒ¾/iøzÊï\¿±{û©\-µƒ©‘#*ÒFdo-°9MÌr@<	M4ØÚ=.Šò/xïÁŞ3ğ†¥ºHVæÊ´ZÛê7¦Ùn£lªˆ¥'€q’G½wö÷·6¾†úËMK¨ôå–Œ…Äy’ß19ãoDÛèV’êoV#ø¿Ãñø‘<<ú¤Vr@µçvB†çŒFO=ºVG€<Y¨ø–-RVİ!¼°#m–ÒÛä: Ç&YXdƒÉàŠå5oêøşÊnI´O™/lYn ’¤^G–Aä¹bªò ç4;ŞßÖÀÕÏJ‡Äz5ÍÅ”Ú­Ä—¾gÙ„	›>ş
-ä`w÷ã­$~#Ñ¥¿Ô¬—Q€\iZñ]¶ù!†àI<cÇNõã>Ô´íÄšíÔÑA¥Ú^jv«©5Ì’Ãqû´*âG$e°x\)`Ø¥hxf}Å^%Öu{ûK+;v¹[Óp%¬Ÿ(;Kå•%9]‹°¯ŒÑÛÒÿ åı|ÅßÔõM_Äú6‚XjwñÛ•·{¢$ˆ€Í€v ¤3ZPOÕ¼wH²C*‡GSÊFAÒ¼ÊïHYé:¥o.ƒ¦ZÜiöš¸¾0Ã>SB4l0È o¯êŸ¥Y~én–BÔlp!I$táØ†F,Põ'‚(_ÿ ®¿¥†ôvş¿­Î¾¸oxÇZ¿×µh5İ6ËE²Ó-Õîİ¤­1Ê–•[hC
-‚8äæ¡ğOu­sÄ—ºF·¦-”Émö¨ãû4±<CÌdØÅø“¢ë€yã°äüY¬Å¡ø“ÆÖ“IiÚ£éèŸj€Oû’»$™a?ë¶` œÒ½µï·åı}ãµî»—¯x²ÏH²ck²ÿ P’Ñîílã“ánHlæ'¶OcW<;ªÍ­è6šÅšÚI:n1%Ê\(ô+"¬PEy‡îm|UsáùŒ–wréÚúÏö0#H"8·F˜Y7˜ã';?k0xsà¾ª_¬¦{ÉUsdá@Ü@ç# sUmÿ ®²_¡7Õ/ëeşg}EyõŞ¥ÿ 7‰¡Àt»û­E’Ø1¸’ê0·‘‚¤Ôçõ§¥ükĞ.,ä“R6ö×x¢Š[µŸÍY0pX&ä†Ç$Imıw·æ7§õó=6Šóû/Œ>¿µº–'9¢·Y¢·ŸbÉtÍœGK¾F	®@æµ‹vZÿ …µ"º5´òlaq¨³Eöi.ãhWaÊĞƒÒ‡~ƒK]Oe¢¸Ÿ‡š†¿q¤Ái}á¸´İ:Ö!7òRÓíàŠTó8ãÌ`pGZ¯ñÆšß„&·šÇLI´ä„Ísq%¼²+è¾Pdâ&*X†|‚@Ú´¬%ª;]CP´Ò´ùïï§H-`BòÊı
-¯¢ëÚ_ˆìö‘{İ°‘¢2GœnS‚9ÿ $G¨ø¯ZÔ4ı¯JÓå½»’Da’QcÌˆ²¨ä…=8ë^i¥|CÕ4ÏÚZ6£ksªÿ iÏçÛUä»D2›l÷¬¬NàvçåUÆJzÛúéşaÑ5ıoşGµW9ãİøcOµ¹´ÒWPi®,í-’0AùšGùG  	$µÊhŸ.õY<1I¤\Ë©]Iİ½¬»®"‹kä1+7•ÓæÍ·yâÄ½júöÇÄÚİœ@Z5…ÕŒ–fty‚Ş¹N ì«{Éy…ô~Ÿ×âzÔl^5fBŒ@%[_c?*uax³TÔôµŞ“b×w~li´BóyjÌ9gÚ	8^j¿‚¼Kqâ_Ã«][ªİ–9cX+4nÊJ‡Ã vç‘œWİöÓÌšßÆşºÔ/l!ÖìÍÍŠ<—*Ï´D¨ÅX³ç8=­}gM»¿ûµì3\ys²6İû¦8VÈã·­xéñæ»«êpø²øèV×ºZËiix$³HeI‹*˜Ï»¤@?)£ğ×Š¬ü7w±yj,şÑá«qijò¸:Êãj<…›o*rIÚ‡=¥ÿ ¯‹üîíımşgºQ^YyñpO¥Â4õ²´Õã»û6¡ew'-»DQ+#\r6À=ğ*Î…ñsK’ÆÃûvòÎ+›Ë—‰ZTXgk\)vò	ÁK1ı@ zUç‡ã…w{Ú„óİ,íeUy—’NĞwc íàk ñ£s§êVm­XDËî4‰Ìh÷ì#3e‘’@<g4_Kô¶:	¦Ş&™Ö8£RÎìpI'Ò¡³Ô-oôÈ5iƒÙÏš9H*
-yäqë^% øª(ÛY‚ëû*Í5k®®ÈI`ûDí¹ìŞdÏçî*Ü¢(<rOĞøWâ/†,|!áıãQnJÃÈXypº&nÙáÏ8P	üÆS~ë~Ÿ­ÿ !«]/ë¥¿3Ñ-uı&öÎÆîBÜÁ~qhÎû<óÏ
-´kÀ<7«é·ZGÃıÂÒöÒóNÕayRxÈów¤¾d‘œœ®å|ôÆí×:Õ­®¹c¤8ÜŞE,ÈTª‘íÜX“êÀqš¶’¿«ü‘)¿Ãõd³j–Pj–Úd·
-··(òC$²®7`2:ÕÊò]KÇ¾ºø§¢İÛj½½Õ¬÷”·Iœ+"HÛÈ¹Š·ğûÆzî½}·¯=å½ãL’¤V`±tc—÷rÆ@ÇŞfİŒpN&:ÿ ^cz6z}Aiyk¨Z¥Õ•Ì76ï’ÂáÑ°ppGš«ı±lúüšYåmÓ¶ÅBÅ@<ç$ƒÛ·Ò¼‡Â4ß
-øIÒEs~%İ0†(Îa•Ï	¸e¹ì¬Fx]Ú]®{}g^kÚNŸ|,¯5{{ƒn÷Ee} D„rO §×Ğ×iñ+S·Ò5­Bî;U´°–Ş(¯ôå–Wg;dÛ~V3ÉuÜ#€MsZ¶·cãénõxá‰e°ğæ£ÊEp&H$İ±~a€Á€r8äã¥OÇò¿ùUôôüì{Tú•­€¾¸½¶†Ì…"âIUc!±´î'äc×5šŞ™·‹%ì+©O	+rß3 8$~¼{C\Œ¡‘ÿ gõ·,Ë§Ùù·×9ââOˆ]ŸŠ|>¶úãG¥ì¶úµ¶ÖQPG
-“x;²3-«K—ÎÄ§x)yÁ=2Šñ;‹ÚŠxÆäµÅ…î’Ò˜ÅŒd$Ñ¨—ËG…Ïü|~# şâ¯Â1w¢Érc‡K»º0]İJ„¬C³$ÀÜrê%lŸqõk±»wg§Æ’^İÁl’H"Fš@œôQ¤ö^]wGƒTM.]VÆ=FLl´{„¶za3“ùW˜|TñÖ…>™ck§ëÚ»¤yZàÃ atBPş`¥Ë¼2k3Ä,šohº—>‰¨M:Ù†¶±’ÒâQrçWL¸Úä+Fß.G9¢:»yÛúş¿0“²oÊç¹Q^wâ‰~ŸâÉ|1ªÚÅoc#%´×s_,±±*í#ipà©ôã3ü0{/'ÄéĞÄ,âÔİa¸·ºšâ+„Ú¥X<ŒÙlpÛN2(Zÿ _×p–Ÿ×õØÔğoü‹iÿ _W_úQ%oÖƒä[Oúúºÿ Ò‰+~€
-(¢€
-(¢€
-(¢€+&Ÿeü—ñÙÛ­ä¨K…‰D£ -Œ‘íU¿áÑ?µ?µ?±ôÿ íÛ¾×ödósŒg~3œqÖ´« x§Cm|hcQ„ê$6!ç®7(lm.¦w sŒP·²…ë->ËM…¡°³·µ‰œ¹H"TRÇ©ÀO­WÔ|?¢ëG&©¤X_IÚul’•€°8¦ÂE¤qtD¾]H†f¶‡24` I“h>Xä`¶3‘ŒÓõ-FÑ4Õ5k‚êå",\n#4v`Aqá/İİµÕÏ‡ô©®X‚ÓIe9#¡$Œö©ÿ áÑµ?µ?²,?´	É»û2y½1÷ñœuéU.<eáËMFÒÂmbÔ\]íò@mÊw®X|«¸}Ü‘»¶iëâÍµñ¡®©ÔˆlC“‚ËÈî—¦w sŒQä'„|34A/‡t—†ŞTmeTÉÉÀÛÆO'bè·WĞß\i]ÀC<–ÈÒG´åv±=1Ò«ë^+Ğ¼;5¼:¶§¬“°®I8'›Ú¹à±Âæ¤Õ<K£hÑ@÷úŒ1›œxÔ—’|–‹–~X}ĞzĞ¼€Õ¢¢Š ÄF–M¬ÂÑ‹{«%‚á	;Œˆä£Œ•œ{
-Ö¸‰æ¶’(ç’İİHYb
-Y¨ÜÏÔRÔpÏÌfH%TÈY0Ü¤†w}Å,nfh~¶ĞŞöu¹¹¼¼½—Í¹»ºe2H@Â•UBÀ  *_hñëúî•$Ï
-ÜÆPJœ”=AÇ|8ïWnn­ì­Şâîx >ô’¸U^Ü“À©hz«Ñœ¿ÃŸ6îáµ{Ë{»k¶2^Al·vÂáğ>gQtc=FÎk»UTPª¡UF  
-Z(5½-5½
-ÿ K’W‰/ x‰ÕC2?:ÌĞ¬üUgp Õ/ôi´èc„ÛYIÒ€¸ËfB¨sØzWEE@z™Ğèñ¬z„7—3ê6÷²3´¡4R0cQ´|˜ìsúš©â+h,ü«ÛZÁE§N±ÅT6àÀ¹Y*ÿ ‘?[ÿ ¯	ÿ ô[PÍ‡üƒ­¿ë’ÿ !V*½‡üƒ­¿ë’ÿ !V( ¢Š( ¢Š(ŸÖ<áızıï¯ìåk©-Í¬’Au,H‰ÉFòÙw/±ÍT¾ğ¥ıœzkjÚ”:*2cJ·ò#ƒbã÷dˆüÂ§‚üæºº(Zã]XÄËb¤+c;OcŠägğ=Î±g§‰<M©ê–é)y-Ñ"¶ŠuÉ*²Ğ3 ÈÜÚvP<°"òã>Xµvòúcµsúƒí­|Aı¹{©j:®¢‘yPI|ñí·S÷¼´T·8ÉÇ×=u¸t±ËxƒDÖ$ñN“âØÍ-¤2ÛMk|í´o‚YUŠ¾T„ŸÇkL—V•$:­••«6[·œ0ï’Ñ¦?Z¿EE`{Ü*–§c>¡l!ƒS»Ó›vL¶¢"Äc§ïÆ>ƒ<u«´PG‡<7aá4ÙØùÒ$2Ïqq'™5Ä‡«»wcZôQ@S³Òtİ:âæâËO´¶šé·ÜI*+rrÄ±äõõ5rŠ *Ûyn­$†ÉìälbxN{V_nAëSÑ@z…¬ô‹Û´¸»¾Ô/\5Åíìåp3µxUFN@¹E UMOL³ÖtË;P·[‹K„),Mœ0?NGÔr*İ5pNÇ/oà='N•®t™otûæaûjÏö™–%é› Uö t•@ğİ¾€×Ò­İåíİôŞuÍÕã«HçåU@à  ³E ¢Š( ®oTğu¾¹©Cqªêš•İœ	£Ó]ã[mÃw@Î €Ìk¤¢·–
-(¢€1õ}3V¿»µ{O¦[Ç‘<PÛE#L8ÃH§ià¹<Gáÿ YxzKËˆçº¼¾¾“Ìº½¼<Òãî‚@ *ƒ€  nQBĞ}{B›]¶6ë®jšl,…$[‰ƒşÓ#2Ÿ÷H«šV•e¢ivúnn¶övé²(×'êy'Üõ«”PLš®`’	âIa•JIŠ]HÁ#µ>Š ‚ÒÎ×O´ÖÊÚkhÆ#†Š=€àU[û-JãR°¸³Õ¥´MÍ·ÙÖAr¤tÜyB#ß9í£En,•â]ø‡Ã:–.¹¼·hD gnG§qëZ´RjêÃNÎç9£?‹`‚ÊÛRÓ40±ª¤ÓZj Á)ƒ†ïÆ´¥²Ô›_‚ò=X¦œ‘2K§›u"FìşgŞR=9õ­Š;«yn&·xhqæÆ®G‘‘¸u3TİİÉJÊÄ6zV§Íq5•…­´·/¾w†F•¹åˆ1äò}k7\ğ¼Ö£§êK}§ßØoÜY²nÚàV¬¬äuŸªx–+S·±“MÕîl~úÒÂI¢ŒGÌê9«Z.®šŞœ·‰gg–e0ß[4ŒêİPúô–º¡½4_Ç£Ïyt÷÷º…åÛ)–æñÔ¶ÕÎÔPªªª2Ç Xš×¢¼úÜYøßX³›]mb;C;iº~–âÌ»U7$ŒÍ Èm'Ñ{»ZÊÿ Ö§K¬xCD×¯VöşÚct°5·›Ô°3DÇ%ÆË¹sØæµ­-mìm!´µ…!·…qÆƒ
-Š «é¢kr^Gk{j™|«Ûv†AƒU¹Áê>µz´õ3µM6çQXÅ¾µ¦…7Ù¿>¾doŒ{c­7Ãú§†ôhtË7šHã,Í-Ãï’Wf,Îíİ‰$šËVÓu)n"°Ô-.¤¶}“¤+˜›òÒŸi¥ØÍ}}q½¬+ºIdl*Š6A¾…š+/N×ìu­]KJ‘®"ŒÈ˜h¤·¦AR¥w‘»Ÿc\6‹ñY»Õ<?k¨Ø[BºŒ·‘Î#MÒ'•uVF*Ã%YXnÈû«Ò…«°t¹é´V:ø«B:TzœÚœ–o+B$½&Û÷ŠH(D›H`TğFx­£"€
-*	n t¶3Ä·2#<Q3€Î u dg¢¸ÿ øÊêûÂÚæ§k{uuªË*4¶VlñA‡`•"ôPOÔô&…¨má¹Ö,uK\Õu°ÊÓ[ÛNaXUÈÀb±Æ¥ˆÏ'ÒUGÔ­¼HæYç³]ÓÛÀCÊ™€(9Éz«áÿ i¾'Ò—PÒçó"ÜRDe*ñ8ûÈêyVŸˆÈ Ğ¶²ÜËğoü‹iÿ _W_úQ%oÖƒä[Oúúºÿ Ò‰+~€
-(¢€
-(¢€
-(¢€
-òıvÆêëÆš=Ï†¡¾i­o%3Au¦,àVR$•]¢]ÎÌ3IÇ×¨QI«ú5ğòiÚ.œ#ÕBK-ÜºìwÖA"GÏÊé6Àd,pxvÏ°®£Ç1Ëüšs®CâìZE³ÓLğÉ¹²İ¡d\°ù× W{E7­„´<ŸÄ-óiúV¥ ê€Ã¨jòéÚL®/®•F"F´Œ]˜ ë‹7S[ê6ÓqáıZßMÒ.‹ÛE“*‹‰fb¡4É$ç,ryÏ§ÑG[üÿ ¯ë·Q[K|$ñÅ„ú½üú—‡#ÔåÔu=9´Ém.tyÖ'Œ±ùŒ’•ù$ç9çt?xORÔşÀú¬º¼V–6zdX‰í§‰B««;#€!‰Ë'©Í{ÍGİş¿¯?¼o_ëúìˆó'Ù²øY6s´ ã°ïY¾k·ğı³__Íqóo¹šÅ¬İşcŒÄÀÀã§8ÏzÖ¢€èrš·Šm$Ômô±†şÑK˜µ(d†•â<:~ñ[wQÁ ã5ƒğ³Uxôj»khbÓfòÚCÆÄÆÀò?vÅNFG8Ûœïõ2ÃV¶û6¥cmyàŞUÌK"ät8`FjK{;kKD´¶¶†d]©HzKTŸv‡½9ñçŠìõŸ-c}y{ªAÄ6ñÁ¸ÆŒw©f@ÄFÀ(bÄŒ jÖ‘¯ø›Rñ•Ë-®º4r¢$o§$1™ÎZc»ÃîÎĞãÈ5Ñé~	ğöyÕŸåÉÿ  <òHo9)ŠÇû@ô­ú­/qt±XŞÄº‚ÙlŸÎhüÀÂŞC3Œ1°ösŸjå4ïßêÖõK™,¬ï,Zîsç·Ìy
-ã –^H<v®ªÿ M±ÕmM®£emynHcÄK"dt8`E1´}5´wÒŒ	§<M[F#ØÙÈ cOJ—{1¦“Gá{XxRêşúÖæqös=­µíĞ¸º.rpÆ8—Ü.¹Ç-dÛ|LñÍ¤‡'¹{k‰ ÔŞÆä«”p»b]»‘Š’ß?M»N	ÕÁàˆáwñˆe±˜Åjoü° ç
-dŒ,¬xç ô­Í'I°ĞôÈtí6Ùmí!HÔ“ä’y$I<š­/uız“ÒÇ6ñp¼šuğì·r\4l­¦ÜÛºF\ˆÜ¹ä;FX,#ëIªø«\Ô_]±“B¹ƒE}2ìÃq-œÑ°ÛUÙ˜‰p†ĞOZî¢Ñl ×.5˜áqqÃ,kÈ½Üíç3Éõ¨<Uÿ "~·ÿ ^ÿ è¶¤´ş¿¯ëä7«6l?ämÿ \—ù
-±Uì?ämÿ \—ù
-±@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@\ùße›ìû|ı‡ËİÓv8Ïã^'àÏ	ë‘§-¼K®a’Kö¸²{‰¤”|³G(W]ê¯eÇÍ–#°Ï¸Õk->×NHí!$³<Î<»Ìyõ$šV³¿õı÷Vg™øjËWñ´sèÿ &¼ÆôÜ7Ú4¹PÉæ(`’‘KGµP¡WøÖ	ñwÙÑ¼3B.^á¤û	ÛwğopªN@ ™q]ıİ…ı_yÍøOÂÒørÊù.µ95Ëé¼éî6òB*f áA''“Û¥aiÿ .|?¨Gw xX™lÈ‹û8ç!÷îS—ó,rûókĞh£­ÿ ®À´V<õüâç°µ²?'[G",©hâig#ùß1\àqlàƒDÒ¢ğo†¥Šæââğ™å¸H-¤vg•Ë‘¦÷Æ[§'¹5ÑQ@ağßÃRiş'Ôµ+[}R×EKaehšœKÒâFrÛv«ÂïË ßIuÛûKJñ-õ…åÕ­Ö™s¢ªKöwˆ«¬‡dcxİ’0Ùç§£YÇ…ô/Ok>¯¥ZŞÉjI„Ïm¹ê0zc‘Go/ó¿ßpîûÿ Ã~GŸ­ïŒïáğõˆŸU‹^‹Q‘¯%’ÅÅ¢Aó|³0Hã˜…ÀY AèkB/Ãá­^Ó_¾Ô'ÓQ¸¼’;I••¥š Ÿ*F]‘@’s’zşŒ U
-   ©hÛUımşA¿õëşgŒë®‰&±­M|öĞŞÎ,áºÑš÷Q²HŒv.à?Š&*½8â½Â~Ğ|%¦ˆtK •U¥•Ôù²œuryÿ €ğN ®‚ŠŠÈ®ìà/<Ï|DĞîtı"ştƒ+İjWV¯l]D(C>[“Æ:óIkà/éºe™¦ø½-ltû£qn‹`Ûœ,#™„ÃÌL0ç‚zW QBÑÔòİŞÛÄZÏˆßNñ`^¼‚yl´©mR1„oÄŒL„Pı8®ÇÃ~¸ÑµcQ½¿îóT™%—È·0D›P(Ú…˜äã$–çJèh¡hîrŞÿ ‘m?ëêëÿ J$­úÀğ·ú4Z–˜üKi;cş™Êí2í‰6ıTúVı QE QE QE s¿Œ¿±æ¸x{YšgÜ\DªK#í
-#*³òÀdg>†§³ñCjÍ®‡©É­ÏÙ§ºÌ>=e@Ü9
-}³L¿Ñ/õ_é÷—n4}5LĞB®Åå¹#Ü` Æ	äæ°µoÜk$²¿:v“£}–ôİ>£§ÌZîã €­û¥9å›Ó´.—ş¶ÿ ƒøòş¿­?j×Æ–w¾>ŸÂ¶Ğ´oh×\îÂ†«°r~nNx#s†ø³Åóxe<Øô[«è"½Ä¨ÁUÜ XÉ¼“';8êF@<î‰àoCøoªÃ¨‰´˜-˜ó®Ü:ŞKnËr~mÄò\ò+kÇ>¼ñU„ºji:4ñ¼%"¾¼™¼ÛVn"› ?}sÔ?…5¿õÿ  z]ßbÇ‰<ogáÛÍÉ­äïUºŠ‹;LJííÁÆ;äBFbüN´mn8?³.“%ùÒÓRó›°~é¨Oöó×¶9¬_|1Öå“L}#[–âK{›{™¤Ô.NèWjìÅ»‘ÜüÄ¨$§&¯7Ã‡¿ñt¥Õ½¥œ_n’[Ù¥ûmÀádt*‘ÆF;T““Ï4Õ¯¯ÃOø?;ïo—ùÿ À5üQãÄğö¦ÖúTúŒÖö¦ş÷Ë‘SÈ¶‚Ã?yıŒàò*FñÌ÷PØørÆM^öKx®˜,«6ñÈFÓ+œH$íUfã¥`øƒÁ¾&Õu{ıZÕ4˜gÔ´‰4Ë˜$¼‘’<¶VEa[ŒåH_©¬;Ÿƒ‘Ç}edÚ\ñ]Çh±ê7[…Õ™ˆ(ss¸/MË×¨Kÿ Z¿ÒÌoËúÛş	ìİ¹¢›”‰±r ÍÔûšu [VF¹¥®¦Úqm6Ò÷ì×i87ˆŒüê[sğ§ÜP½fO­Áoâ]ã>uÌm"?ŸÈØ\HzuT#½k™ñôWš¦£¢èz]ıÕ¡ròL³Gy$ˆ£Ú\0BBr PGRr1XŸ<Cı«£ŞÜİÆ.,åînæÕòI„eÏíÕ—;Ùp$qB×ëşÚ÷ˆ¼Ii húçÉsqamö‡´I “iÈRGP	œv=qM°ñ,Wş(¿ĞÖÚT{KXn§•3<qÓNNOf¸­sÁş4Öå¾¹‘|=÷úaÓ®DsÌá·, ˜Ï<°Úzâ=ºŸèš­¶¿¨ë°³ŠK›k{d‚Òf•@vX³"’İ1Æ:šŸõ¿ü ~_ÖßğKÚçˆSD½Ò ’8Y/®<–’[È¡òÆ8!]äµyçèü;¯Gâ+›˜íŞ‚òk]®À’cr¹ã×+Ë|_mªø‡L¸´¾Ó5u›{›˜be°¹ÃÄÒ)‰c’-±mÂ¡-)lÎÓ]5¦‰ã­7E½´Ò‘m5Íä—±ÏspÎÉæ6ã ˆ®FHÜ·JIéë§üêÀ÷²ş·ÿ ı\ï/nVÊÆâíÕ`‰¤*¸É
-3Ÿ¥qxŞÏÄ~Ô-RÖâŞêãÃ¯¨íp6eeÚG] ‚:ÕkxŞÂîiK[ˆf°6ÏŞ½s0iIæošíµBµ^ïÂšŸ»íPÊO‡cĞ ;ä¸w 61£p=s€sŒf©o¯õñÀ¶ŸÖ«ş	ê6ò¶ÿ ®Kü…X¦EÅFŸu(Ï §Ò ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(RÒ.ší5=5âKøÓËe“!.#Îv9ŒJ·;I<H5?á(¶¶ù5[Kı:a÷„¶®ñş d#ñÔ
-é¨ gşÿ ĞDß™?øš?á1ğÿ ıGıù“ÿ ‰®šŠ æá1ğÿ ıGıù“ÿ ‰£şÿ ĞDß™?øšé¨ gşÿ ĞDß™?øš?á1ğÿ ıGıù“ÿ ‰®šŠ æá1ğÿ ıGıù“ÿ ‰£şÿ ĞDß™?øšé¨ gşÿ ĞDß™?øš?á1ğÿ ıGıù“ÿ ‰®šŠ æá1ğÿ ıGıù“ÿ ‰£şÿ ĞDß™?øšé¨ gşÿ ĞDß™?øš?á1ğÿ ıGıù“ÿ ‰®šŠ æá1ğÿ ıGıù“ÿ ‰£şÿ ĞDß™?øšé¨ gşÿ ĞDß™?øš?á1ğÿ ıGıù“ÿ ‰®šŠ áu«ÿ øŠbÕ%Iü‰°¸hä‰u”ğ:RiZ¿„´dlïæÌòy²¼íq;»m’ÒnnŠ3Ú»j(ZÌÿ Âcáÿ úûó'ÿ Gü&>ÿ  ˆÿ ¿2ñ5ÓQ@÷~
-¹×á×%¼˜ê #IrpûƒåèÇ·z×ÿ „ÇÃÿ ô÷æOş&ºj(™ÿ „³M—å±KëùOİÖÎS“îåB/ü	…Og¦__^Å©êÉO~Ëf¸@HÁvn!p 3’Nı QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE•¯.ªöjšeå­ˆ,MÍäë¹¡Œ–E?)lãïp9$•æ:¼[­işÒRòıT]Iı¨-Ai!„|’›åB9íF2+Ò¼MáØüQ¥6}BöÒİØE©Œ@çkoFÊúıGqğêÒê[K©uİiµId’ß2/25tÑªù~Z¦ à Áç¹¥®¿×õÿ ¸ÎJ_x«SøooâÛ[«<ÆRÚ8Ï}r%(bÃ}Ô`8
-Käõ ssWøruË­&[ßìM:8?´u°’ì¬Òm&$`qŒ»ä$ğ8Ín§Ã;ht˜lu­^Î*&KXâ00Vlï”ï‰¿xr~nÙ8ÆMGsğ¯GºûR>¥«ùÉßÂgF†mi¾ã’¬¹«Óšı/ı^šouı_×!|kñMĞü9}.ªiwº¼,‘%°¹W(Ìá	tSœóÒ¹{‰šÏ†gÕ¼;|Ë¬k6×vöÖ7"Ø¯›ç)|É|˜< Ëp:œ×¥ø‡Ãš‰|;q¡ß£9Ğ/îÖLT©ÁÁÓÏ?Âí"_:â}CS—T’ò+Ñ©³Æ'I"P.&Ğ20Tõ>ØJ××úÛşõ°ö$ğÿ ŒôTÓ%—Uñ”ó›©cf»‰tÿ )—‰b“‚>ñcÏ'°¡}¬ø®ÃÇZ- »°ºRyÃiÆvAnœ¬æ\nİĞ§8#'©ğç†l¼3ow¬“Ï5åËİ\Ü\2M#u'h
-=0 –<£ZºÕG‰5Á=Ô©$¡^!ÊÇ¸DF?º'9ÉÊê¿¯ëúë¨tfv‘«ø¢/ˆË¢ê7¶wĞK§ıªò+x6¦ûˆEGêÁ¿Ûäà‘´q]õrº7ÓFÔ¾Ú Ö®K\=Ì±Í$!g‘—nd)³€:)8
-ê¨èƒ«
-(¢€
-Bp3éKHyÎ=è†‘«&­¦ï²^Ù)g+è2(RFJ€ã#ØŠáõÿ [i4h…ÕÛÚÜC[c¼`NÌEˆ¡ipUrÊÃh#¨-ÆçFçÃWÚLº¥ÍÌ·PKºc»ÔÄj£ŒúW’Ãm«øªş×Â³ÿ fX]i+^m¶¾²Ä¼€³¥”x%Î:KÂ€:®?ù}ÚÜ%¤şºX÷(¢Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@A•¥¬³KokRLA•ãŒ)›ˆëÔõ©è Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š+˜__}ƒ]–{8-î,®–ÚÖ"å÷3ÇŒ9ÄZP^@ORÇOEcXj··$ÔtÛ›Xá†ÚŞbpùy7´ŠIf>IÁÉÁ84g`¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¬¦Ğ-ZêiÚI‰šö;×L¥Ñtéò)õÈë(¢€ò-G§Å­>¤üéàRFĞ¨ÎÃg9çŸJ·E QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QEÿÙ```
-
-## FILE: resources/js/pages/settings/print-settings/todo/bl a5.png
-```
-‰PNG
-
-   IHDR  Š  œ   ^—   sRGB ®Îé   gAMA  ±üa   	pHYs  t  tŞfx  ÿ¥IDATx^ì`ÅÛ‡ŸôŞiĞKè]Š€DAATDÿ~ö®¨ˆ]Pì¤K—Ş{	5”@		IHïåÒ.—Ë};—„˜@P°Î£Ãåfwgv÷îvûÎ¼ïk”””¤£,--qtt$==­V{µÎÁÁ¬¬,Y'ëşQu&&&˜››SVV†NWù•ë‰ïxffæuÛÊ:Y'ëd¬“uÿÕºš­[·N'j4,,,022Ò/ğğğ }ûöìŞ½›’’}]ƒ$88˜ÒÒRY'ëş1uâ»-ÄcAAú:ñïĞ¡û÷ï¿º¬“u²NÖÉ:Y÷_®«©	Š‹‹uiii„††r÷İwëÕ¥@X`LMMÉÏÏ¿zcufff¨Õê«VY'ëş	u*•Š””Z·n­·,
-şŒ~e¬“u²NÖÉºR]MMh¤,Ğ%''Â!C°²²Ò¯(	…Yµ±DòO%//„„:uêtU(J$‰ä¿CNN/½ô’şõÒ¥K¦OŸnx+V¬Ğ—[åwŞ¡k×®zöá‡jÿ85÷ïV¨©	õBQÇ	kK@@€^YV!…¢äß‚Š‰DòßFè! ÄëeøğálÚ´ÉğfÌ˜Áûï¿oxWD¢­Í›73bÄCí§æşİ
-55¡^(
-1(n¤nnnz3dR(Jş-H¡(‘H$ÿmªÅfÍšÑ¼ysÃ’ú#,mÂÉ·¦«²(
-ÍT5?¾ªêu1^XUÅêBQ¼ëÜ
-5ûø#BQ´Q]Ê¡gÉM¨@§-£(;Ÿmåú:cŒ-°u¶ÇÒÔ“Jÿ§ßAš’BJŠÔ”TXáàbƒ¹Ò˜±aéíD
-E‰D"ùoS](
-ëß{ï½gXR„˜¢®.!V[Õëµm[](Šeb[¡>}Ô—ššğNÜ“%ÿ*
-‘x€E#‡1¶wozëËp†˜ÁÊ¤««ı.r‰ŞùsË°‘‹8]¤ô&‘H$‰äï‚ŠÊ².³ù=˜4‡zèZ™8…‡‚s*IEqÜ!ö-xíÚ²×°èPù†6®‘IÒ©õŸÄÄ÷6³ïRÅ†%×QGRìI~=œM±ºÒ³¼’2Ôêt¾HV–ÊPjÙ‡¿æƒW7ìÃãLzâk6Ç¨È*3¬tÛ±ÆÒ¡=C>ü„Çğ¦y—æx?ğ4Ÿ}<‰ş¾68]›Òú;Å
-²2HÏ(¤T[¡ÔH$‰D"ù» Švvv´lÙRç¿Š‘¹5Ö.hã¢âRº†,SOšµoC›¦.˜ŸYLøÅ8Êœqqq¡‰m.‡.ë0²³ÇÕÙŠëµR&—ƒ#8»3Z5¥QÙQvìaßù´b±˜´‡9µo+ÇSK)ÓVïç_æè¯ŸğéìïùñD"	}½@«¬“‘Z„£W#Z¶oOûöm	lã‹»µ)æ¿{ø÷f˜cjáA“şéØÖ³ò³ÒˆP™aa¦×¦´J$‰äVÑäS’|Œu³>å‹UÁˆÍ3,üˆĞi³gÏÖ;£ÔU~7³àÀúíçÍ›ÇÔ©SõCÑ¢Œ7Î°Æ‰şÍ¾Ô,¢ÛMMM(YªSV ¡?ğĞ*;wéÅ«ãšc“ÁÖ—"¼ûWôpCcI=±œŞ¿ø2ı…AŒìÒÃæzÊb8ıë%._± íópÚû.OhFÛxíÁVW×U%âÌ¶…ìÌ%¡çÌ¾Ïgk2ÃVspã<~Ú›ÉéÎğË“wqoge-êâm=ŒO÷Nx5ôÂº²©›£-A£RÄİé²ÔÖ85öÃ7À×úNÕ«(‡‚xÖÿ6k÷çh®eŞCøôã§¤iw«ß«ó¹°îs–ı°‘¥ñğMğ3ôñ´Gí­!ì$Š$ÛÈkß šÖ889GQ"‘ü)Ë>Oü¯xö©U„ôy›§ã½A~†¥·Eˆæ¦&r1,F?jãÜèÚĞN¼«¤¶õl<póñ£}37,”·wÌñ'Q}_]ók£ú|¿[™£X…——'OÔ¿ÖEms«×ÕÅ­Ìƒ¬/55¡Ş¢˜Í±cÇôéÍ$UèĞjJ(ÉÏEcåJq™µºÒ›è†¨œh6ü.ú¿Ş—f:Öqò÷ÃÍİ¡R$
-Ñ]VHì¡ƒÄ¥dSèÑX¿YníÆpßcóÉ£­q°©n«T+R1‹Ìr[49…¥¦’™K¡ò‘İTÇ«³PEoæëg&1mÊû|½*„‹×F´¯¡Bmi>éi¤¦f‘[P‚~D\SŒöÂJ–í± Ã¢'ı:Ùbr~!wÆ›Qª\P´”«ÉOM#-5ŸBµÒNe‹7ÁE¸ºŞÖŠ"U9äf¦*ûT­dPP¢¡B§¥B¹Àå¥cãŒ×ø|Æ÷,<œ@^‰R/}°$ÉßœÂŒ.XF¨º¸–iLåÚ­Jåè¯ßòÚxâÉ©<öè~íŞYw–´Ü4Ê…RWµŞºïxmì$šúO>6qÿ{Ÿ×~:@dºŠb­NNúˆL'ÂSZˆ8QnGÇ;IMM(ç(ÖI!é{ØùÅ[Ä\À¸‘÷1¸™aÙprÂÆÆ'u:	û™±Æ•áíZ3¦‹GårMD,"Ò«?¶mÓó†"©:jåÛ–I'˜ÿÜT½cÉØ§_gQ]®áp’«”@höÄƒÜ=¸]œôK®§ ì³9l½{?Îßìä¤²V™i	¨KíhØõ>†Ox©­4Äœ'.+"Òˆ?²”Y½1¨÷,–‰WjnBnfrrÁ¼1¶Ê‘ÆPŸÃ7;£ÉçùÂZfŒx•¹GÎ³óÈj6ü0ƒ{2)(­Ÿ\•H$’¿
-Kkg4ì„±ÉéˆİLĞìÏ™<ó01®Ó˜¹ı ?½Û›al!øÛw<}'ù¥¨«ÖûîqC>dŞ`6}÷$ãı/2ïSÆÏ¬ÂÛ/dÿ#dee1tèP½ÅOôûŸ„Šµ·­ßşÈwK.PÒïÊ}ÂÖmÇ9™T‹¢±1Æ¥	Ä†…òÓÊ"úuÊäÀò,\q„ğ|å©LË¯§ÒØÉƒŞ–XÖ{ÔÖ3³´hÕ†¡¯¾Â+Ÿ¾È¸v.„ø5âoâÌbãŠ]‡á<ÿæbfLÎ ÖNXÔøäõ:«¾dÚì-˜4nFƒŠ+„¯ØÈÒï÷cjmÓv4³‹åÒÆ¹Ìùx1ë#ÊÉ?‘@V®ò$Zœ*#‰ÈÔx’SeOÈÎÇÕtß¹BØêïùé•øúp6ªëœw®GìË©}ŠğÜ}™ÓË^aé¶+ä6Í~Ã—ŸÍàÙ>¥Ø_‰#->‡ôü,RÂCN¤Ï‹oñì“ıho|…C‡Ï“R¦AÚÈ%Éß##cLLDN]CÅmA\_³9{p;aÇ“eiÃî¢‡o#úİ3šÍÚât†„}ß²-,[ë•QÑ´9Í}¼iÛ¹+í|<ñQ]$%i5Ç#JÈ©m$JrSşiÅšHg–Ú°rÃİ·©òCéAÇ÷qws5‘‡ÎräT™†Unˆ±ÖÎŞ4lG~-ñ,%;ş4g#Îsjå,Û´U‹¾gñŠM¬Şzœˆ­?óÕŞh.e•¨sLÌÜñkßÎĞØ(îîŞŒ€ŠDe”Rp#kn…™{cÚw¼‡.M|ğ¶¯áª\Ç…Ã{Ù°|'{ÂÒÉö¼‹!÷µÅÏ>;Öóó–rÜÅ}“GóğCıéŞ¬^6:L‘XV¦EcìŒ{“~¬Íl2(ÈÊ%'¿†™33š³§ÂØu&…"Exê®»(æQ®=C|²†"å¨ÒÎ±+~úšïî"Å­;†=ÂØ]éÓÄœÔ|#ŠŒÍ017ÅÜÔ[;ìŒsÈ¼Ãå„L’“É<KZY9õö‰DòçPœ‰êÂf¾‚í¡I¤Ş©T…rı-ˆâô‰hbbr±q²Á¿C nÊ5Ó¥q[|=üğUP’zõ'“ˆI£L«lSJÅÅ425èìq°¶ÃA?3QÚzLsú3ÉåÀ†ùÌ˜ñŸÎZÇ±äjŞvş
-„C1w°_¿~Wë^~ùå«Î,b®|•3ŠpXù»QSê…¢˜Üïèèˆ±±40êñèL—0nü`Ú»ûÑã¾–”©ò’U‡é½Œòòå™C¡˜4héwÓö<0ª" ZÓŞÅ–Æ–ZÊK”/ò•ìírHJŠ"üb—¯d›¨üœG~ie8ëº061ÁÎÛ++,-]phàM›æè½o8Ë¸¬µ"¾öíÙÅ¶mG8™|½2ça¡—8¥|_›5õQx
-P®X:ç‘·es×°ş@<^øu¤µ"}LiÜ¹	œl±ÇÛº£&¤…E­N6e‰±Äg•’líCÓ†v˜šTÿ®å¢.9ÊÁÍ;Ø®ˆèa—8Gñö…¬=VD¡•EWˆÜ»­×°,±İ:Ñ¡nvŠ¨oÛ‘ƒ`W˜JZBYÊÁér((¯
-.‘H$!êL’"NrhÃÖ-ı‘?úŠähd&E&¦XYÛê-‹·á€˜.Fv
-ˆÏQ.çV–´ññÀL8«Ú¸àìl‡‡ƒr]VôO…§aäè„»“r)Î äø^6D¤r16Š¬¼tÊ¼iÒõAÚ7´ÂAÜkş&¨¯cÏšáõ~ô?¯ZÏÑèt2kE÷çQ%
-…ƒIu¡(Ä£¨¥cÇWEcTT”~¿55¡ş_éÌ¢<)i5hŠrIÏ)¤´¨€âü,ÒSSINI#RÆM\qóQš"3rõNù"şŸŞ¹BA	GXµ!Š+qéäfVs¼H$3½ÎÖİ¹k@†ÏXÃâåkX±8ˆoßy”©ãĞiÜë|ú@ m=lĞª)*È";_y²+Ì%7OUé´q£‰h÷
-©Æä?H‡¦V(¿ûº)N#ÿì*Şyó{îs‚Ö¼Ş™¥0¬+Œıº3ñ‘ÁøÅ¬"hŞj¶ŸNV.j¬cWñÍ[¯ğÊsÏ)Û¿Áßnà`™C_K–>¸	wM%ªÔ:Œ”/—I‡UA%Åy”kÔ¨J(WÖÓç*Âº”’
-[,•Yø²÷øüíç˜¹/™sNCíé‰ŸR÷/fşL¥ï·?ç½_ã°¬ü_Ëä>q0wÅ®Épÿy1ó~ù–O¤Ÿ	FÖ˜İ™,/‰DR/ôÎ‹*râ°áë÷yqÊë¼0ÿ(šÓìün5›6œ&ÙÜ
-woå¦\×<$oV¹ßd¦’šFŠro(U‚oˆV™©ÄªKIUŞZYXàãæb¸.;bçi‹K€XOi'9'¿^x¶ì«£
-uÑ>[°5KsìüiŠ[¶aô»/3Øß·?M(*÷”²b
-³SHKM!3¿˜ÍõÇ\X\‚©¹î&˜k²è•	|ûË^Äœ0ë‰ğêéò„Gr]ÅÙùÖcqlmmõÛïáÌÌÌ[z¶´´üÍ¾Ô,¢Ûtf©uzÖ¾ÁˆW—pdİ7¬ù8#z÷¦ß½cypcsî¹cüâ9²p&#_[¦wúøô©ÑÑ;WÜÇcfåçCnì¯|óÆXƒÓÅ½JÙAÎğtÒC_‚ËÛ^ç›¯fòÆ§ËÙóÙcÜ÷]0GâH;¹€5ß<ÅÔYÈYö¯Ï\Xé´q£‰hû	Ş˜ŠÙ3“iccƒ½¡İZ±÷Ã¥ß+lØ²‹ààù|úÜàëYœÜñ¶-ÄÇ²ŒÒ¶/ñë¦e|ùX'¦=1…7ëóGÖ,»¶là•~.øé;."=ö$Û~üc……Xº8ád½ã“‹¶vÅÄÄóÍ{¸\TJ¤r,ØÉ¾âÇxo]0»ÚÿñGV}ô¯ˆ~ªõ©/»¶üJ?zUv|¹'×±sÿÖ9a:²3m¬Ìo|^$‰äN¢)„ğù¼ôÊ§¼»ü2Ú®òÎòÅ¼3È™¦N©æ’uSÍKÔö¯˜5±]ú¤Ë§{	¾|›İJ†3õå×X4},Šó1_û:?üÎ–p¬-[àÓàÏ™[HZÄ&–MëÂİ=»0qÖ&¶G)ç²Nİ¦òâìõìYı%ŸÒ‚±ÿ‡ V¯ØÎ	á¼YO\]]Ù¾}»>|M]åË/¿4¬}kˆØ‰bûÅ‹3iÒ¤[vf÷úšûR³ˆ>î42×³mIª´(NÇä¢®şäbl¦|#›ØÜã²“â	ÿíÔÔ\QşmzáUq…tå	(.½HÔ*Å‹æığr·åÚ™­Œ£—˜A’øB›š+«µ¡³Ÿ3v¥	¤\¹DT•Û°ƒàfŒ.GªçS(-ªŠ8tõÂ?°)”§¼ßŸoY¡ìÛ?ù¥›”§·i_³j¼7F)(0rÂ¼AS|~c­TQœÁ¶×ƒ8«"%yi¤ÅÇøŸ?÷(vÀõúæè†Ù,üe%k/ûÓ©•råÉåŠUšzŠ ÜÚqä‡shıv¶lUÎ£¡JMl©7vîçå—ÆpŸŸÖ¦•ÏB2¢D"ùsQ£ÎåÄSx}™-6=îåÑç†r—Ÿ1_ŞÅ¢â'è0è&w.Gsì[º<õ)}Şâı«qÅ„»XöÌü‘5ë·°ûòeâŠ”k—w ãşï}¦ìG¿€:"q¨àô×Œxe1›ÅĞc8“±õ|'°·ÈàÌ/Ÿ°è«9|á=ßaşMqQâ×ÿt„CqŒ{Öm8ÆÅ‹*å>ÓŠvıÆòü‡SéãWO«bşY¬ÙÂÆM!ÊTÑşã†òÀ¸øjê&™è]+	ÿ
-AÊ=Ò¸ÿÛ¼ğìD^¼¿ùÕXÄU”©ÒI»°ƒõ?¾ÄÜZrÆ1ò‰§øhr{„=¤º5LXóªbŠa_1|«Ü,bmTï·&µÅL¬ª»jöñGâ(ÖÔ„&ÊÉz_,&N¡¬«Ü”—ÿ7fy›Ybéäƒ@š6mz­4	 ©ö–f˜YØcïÖèúå†àßw[S¬ì\póò3Ô+Û6uÇÙÆ¼Fö°°÷¢ACÃöş4U„¤¹	fÖ.8{^k·i#7Üì-”ÏÅS[wû‹6Å2?y»`§hQã?"&¦&œåòÅ‹KócĞxûøáîì¢\Të\GZ5ÉT(ë8zxÓĞ¯9-»ŞM¯!0¬}C:Ô8bqîìlğöj€§rÜ~Ş^ø5ëH»>ƒèß»İ}lní8*ŠQå•Pª5ÃÖÃ¥øø·¦m·éß›{;xb­4XÕ¤xàÉÏÏ×›êk~Ç%‰ä!²«¤…²9h§óñfëDËBŠSN²âË%Ä¹SDÒƒ<<´f¦XÚXàÑá^:¶j‚¿E.ªøæm	GåÛ›~Û*Ğ‘
-Û0òWæ}wˆ(£Æ´>„!­m(8q’„,OúÒ²­;µJE"2‹¢9°ãq	Y{øãÛsıüÌ°4Í$öÀAí8EX™"<Ûµ¥erçwìãx†%MÇ¾Ê³“;ÓØU¹çäe’KljYM»Ó±¡#Şv5ïf¿%ãôÏ¬]¾a¥8thŒQø&BBÈuğÂ£e+Z;W>¬Å`ßÎM¬?Eºecüœ”û¬ŞZ ÜcJ‹)/ÈVÄj2hÛ‚İéÅ_uL,l±uóÃÇ=ÔS—‰‰2¦Ü>€¾Ã[é“7T¿Ú‹,,"KŠxó«æŞ
-"K‹p@iŞ¼y½3¬Tï·&¢Ñ–h³*LUİ­P³[Ù¿Ú¨®	õB±Êb(Æºk:´üW„âLK/‘‘xıÁjZì«=+ìêÔSf˜š»Ò¨[ºôéCŸªÒ«}šºâb]û…ÄÒÉ—†­ª­/Jûæ´ö¨G|Êš˜9áĞšÕÛ¥‹"}~“E@
-E‰Dr§Ğ&’~z%ï½¢ˆB÷N4jÑ„vÊøQ–ıp¿Ö¸50Ç,3…ø$5‡ØØ{åI¿$óšPtïB¯NmèÕÌQï!³v6?Ì¥¤Ãpîb"O÷v'ûØÂÎ™`Ğ”V½šáU[°#-(‚ğÂÆ£\M%ËÉ«Öı¹¿µ#6º8Â·dÿ¶sÄ[šÓp@{,‘EaëÜ÷ò;m@6ÎXf&6”èòRbİ{3¼Íİn”Lh	5‘[f³e_Ù>÷3íÓ'èmMzL$W4.˜xr·Ò¶¸
-§şš…óbQp:&Ğ¯±VfâÊm‰ƒ=ŞÍ¬ˆß³Ÿ¸dG<ÚÒ®W *
-H?DhfeÆV¸Ø˜alj‚ƒ¯?ê#Ä_( È¡İFuÁGéÄ´Ú º˜òôôÔ.	v+ES‹[M!&–=z”+W®àíí­÷®ª‹¥¸¸ıvÂQD´!¨M(6iÒ„ÂÂÂ«}Ö§DDD°uëVJJ*£§ü¡XSêU¡tf‘¸5l¿rq3+ßÅ¹(ET]?D"‘H$uP–ŸCjÄYÂ4ÍñòoDÃÊÃ¯‘	ÆfÖ8:Ùpe×|ùÂ8FŒÏØ	3YrôçSòÉŠFFÊª•ùú““Èˆ#:%Aç8|èÙYg8qş¿Š'×¤9]û˜âê–L*›¬ºæâ	Ço:;àjiªôSÊ¹Ä4JËµèr³ÈVŒ)V¦öŒTö×ÊÆ
-a‡¡\«¬#ÚpğÅ»±;Í)‡¢ì£…¦5I¿ELÛÊ%?»Œb•Æ:[¬Ì-i>a*}|°Š‹çlÈ)"RRHRÊ¥Ø2³R13Öá`¤Ö;kŠ¡S}É.&wš43ÆÎ9’²"}Tµ*šC³åù/«K1šÂÒÒphiSó"4º<ò”s£»S‹eb¨÷V‹’­ªö&O|ÕY¥ªNÌIóÅP°(ï¼ó~y]Ìœ9óº>ëSª÷ûG‘Î,’Úñh¨\àZ0Rù³úÔB‰D"‘ü,<phö 3g=B›@oCe.…9;˜3i ÃŸ˜ÅWÛ£Èµ´Æ¼AC:+âÎéâ*–¿ûƒºÜEï“xgG—„ßBğÓ³ßPŸ›ExòEòT‰dÔ©Ä¨N ½Çv£M(*E›J†"Õ9$ªò¸ˆ7æ–cè:ØŸV–úaÚ¢ÒRR3ô¢!‡üDÁÚÜŒQ]ñQ„çvBw\=-±w'<øïÒ“]çƒ`å}Ò!Bæ=Ë}]ºĞ])Ì–pHfîã]è×³ÒÙ£²T;îíğiÙ˜¦ÕÇ÷ÿ@PPÏÌÛ@Ä²i¾»ge{9ş8¶oGwå,ÈÁ£Û‚tf‘(¡0CyÊO€6½”‚¶ÿ"ŸéÌ"‘HîyÑ»84…IA-7ç#&?ØÊÏ0ÿ2!’HÏÂ"–À‰ ™¬»—ÏNåÕ—ºâ—KÄŠÙ<÷ã_¬ôd4³q¤ÅØéLêå‹·ê(Çölä›-×€aL~ö^~|(mnMÍÑõ_°pùjVÇ4¡kìJ“‰¹\Æ¹;ãŞx…'G8£=²š•ßıÂò±ä7iOE8š›¨ÈŒºŒÚØ“Àiòô½õ‚Ò®—OUânv-ùE7QµËµ0l"mMS(?··õ,•r7gıU§-¦Åé¤m˜ÎäÏ·±çŠ®îÎ´4I"DQÔêF÷2bü~d ıš¹Õ:IDÏ¯R§k×®†wèƒg—1·Ox+‹W#QW¯ˆ,-U–É*Ç•êu·ƒšûw+ÔÔ„z¡XPP 7õ`fvm~™Š’R(J$’;EAÌ>N,|Š	ßÿÓ3y~âÆµJ±:¥ä'…¶åg‚‚–³Çx2?ıo=Ş	w­RN°b×Y¢õ¡0„“†ûc@+w\‹#‰<{œM!"*¢‚gWºuoOï@ÏÚYª‘{€s§²ï¢¡Br×È~4·UDiI,áÁ!?­»X'Ÿf´4n^`Qo]©áÁœ=~‚T1ş[Hì„„k(víÈ ñğTjví¯q6	aÊzúk ôH;úëJ[EøéÏh-çê*·p^n7UBñVù=ÎwšššP/…7R²úD)%ÿ¤P”H$w
-uæyb÷~É”gWs®ÙƒÜ?t$ÿÜ…V]}p@MvôYâ“â9zŒ#‹`ÕEo>ı.¯LÆãbŒô_LEy1ù—7±ìóOùå¸;–=ŸfnĞˆxß7÷Ÿ¾½ÔfQ¬níÖ¿Ú2¥T·Î	K›°şÕ´Ø‰ùˆ¢Ü¬AuëáôéÓõCíÕíŠöo…šış‹¢h£º&”CÏ’ÿR(J$’;G.ª´#Ìø,s/%UÖÎ÷Œgú¢Ñ’ÁñÙ/²p]0{’-°°õÆÁò!ŞZ<…‘÷4£¡¡…"»J)ù)Qıq(3VåpŞï1FN}‘ã[(Ëµ¨Uy•¡3·ÁÑÎ¢2”M…š•ZÏØÌÖu^!:+{¬­-±2ûcnÂJV3¡ˆ„!W‹×º¬‚Õc
-Ç‘ÅQ¼Y‚ê1kã÷Xkö[×şÕ‡ššP:³H$‰Dò‡pÀÖ±ö0õ+UİéÙå>Â¡$pjÚ•!®aOğk<ÖÛŸJÙğo¥2»ÊêW†òüá€Ó‚>mº1¶·>w R28ô/?ÿ2ÏPŞUÖ’{‚í_}ÅÀê½Ëxuàİ<_KfÉŸ‡´(JşH‹¢D"¹£üÆqå·XØ»áÖ¤=­=,0ÿCé´şndr-.e¿ò®rğSCIn*)‘azÏíÎf1ù±±<ĞÓ
-=ø-o¼¡…h}ûÓoìã|8Õ•ØÏç°lù!‚s58Ø‘~‰
-ïVtõLÏ¸ö7ó¼®›šÃ³ßpıúõú×*ç“šT·ÎU=‹x‰;wîÔ×	DÌBQª÷Q5}#‹bÕĞ³X.Ââª,Š¢¯?üP_'¨êC„Á!wÄkUİ·(ÚÙÙÑ²eK}€H‰D"‘H$·ˆ±rÿtjF×^ıõ7i}¹wÃaShâ†™ogzõíNoáQüo‰s,=h¤<ˆ·WŠx ïÔ©;w|€1ÿ÷>o¿û>Ï?9œ|*S ›aæÜ’=»ÑÒ+ «r;¼»`ej‡[«´jïN?3ğêÃÈ!Í±õõUÚwÂS¤"ûˆ9‚÷ÜsÏµÏG)bî vB¼Õ&k"æı‰í5j¤ß¦ªTm[½ôúfq'Ö¯5‚´¶>„İ½{÷uu·“ššP/……ED
-¯™•E"‘H$É- J$úì‘Ê›û¦l^Äœğã¯	ÎÔ[Ûş}ct¸5ëÍ}ï½Ç[J9”k–±½›`p76³Â¾Íƒ<:é1¦Nz‚‡xˆ§l§•?]ÆMâáÿ{œ§&çÑg_çõgeüÔÿ1úŞşÔ™ÛZr[©©	õÿÊÌ,’¿h5Åçf Rk)¯+º~…Mq¹…¨µ:}N ‰D"ù+©¸¼Ÿµ?¾Ã¸q1rôdùdçw/bÛÒ¥|¾(„­a.|2î…Çø|ú@„{K¥´ı`ìs3yõ?üîy•™ã1î6x‡‹@âÂJ'†gkË»,,ibx¸ªTy)WG÷ŠíkfAí‰úê¥¶>¢İª>ÄwmíÕ—ª~333õ^ÊUí:;‹ê¿™™Eò ˆôˆ­lœ>’¹G³‰/0T×¤(šˆ­k˜>rG³‹¨k5‰D"ù³ÈÍr§cû6ŒÛ[‡~¼ğÙ«lŠOÒeòÎ†š©ÿ²²²:t¨~˜Wdu©ÉÔ©Sõs«Š–®‰˜(¶¯Õí‰úê¥¶>¢İª>ÄüÈÚÚ«/UıNš4‰Å‹_mW¤¼]üC…b&I§Ö4~ßÛÌ¾KY–k”¢‡	_õŸ}ø¬
-WŞUÖVr£m«SLÖ¥}ì5•e§sIªıÁ@¡r½ÍNbÒ‡·£½zÛ³oóö§û³ÊõËş=Ç$tß:¾?”ÆéË¨Šk³tçwr/ûÖ-åPZ—34Çìcõ÷oórn\Mnñ¿íÌH$’¿;¶ètßÓ¼øâ'¬Z1“G‡MàÍ9?0İ÷|õîhº;¹4Ñü%T·(şÖ‹ZZkÇä}CĞ ±ã®®®×Ü”—ÿÍn¶Åqœ?Î‰CIhÜ¬ ô2Ñ¹¦TXÚáãnBEa<Ççîå²".Êì¬0R•t"›Ö°.O$ªÎmm1Ó±Bâ­eÏÖƒŸS$¦›;îM:ÓĞÉëßDÍärğiÎî¹@†“ÖÖFä…ç¡®0ÅÎ×	›[mïVÍÑsE?œ5›¹éŸ¼ô:4”¤ŸeëüUìØ«|i,qÖŸƒ[G›q§° 8—nÒ¯¹+Ş5®‚Œs»8}d+{R*(nÚN¶	\:¸›uûãˆóéÅ£=°3¤“óóóõ? šßq‰D"¹]˜ÚØ`íà†»»Mš(7l;G<ùÑ¸ycü|\°7ã›/Ë?!ªæÍ›§í×¯Ÿ¾ÔVW¶mÛêëÄkâoOOOÎŸ?o¨A¿ÎäÉ“õ<¢^ÛV¯;sæÔ—ÔÔÔß´WÕwUqqqÁÈÈH¯ËªêUmT‹úúôq«T×„úçš’3KYN
-É1yä›4§Ï+ÿÇs*H=Îñ‰ä”åQœ|ŠåKBÉóÌàQJñÎ#tÉrN%“‘~ƒmÑ¢Õä‘rv;gN%ät,)%îø¾Mlq½5èªKœ9|šıáÆ4õ/Œj„qø~N>Ã%Õ­·wÃcÓRšÁ¯ç6OfD7KR–î *»”Â¿z(COiÂIö®[Ä·sæ±j§8†e·ˆ¥¥r¡µ½A•tŠÄË§9á'vìfÇ‰8’òŒ”²¶åÊS¢òD•SH‰©5NÖx”kÑ–PªÓÉ¹@‰D"ù]ˆ°3ÂG¼VQ[@6Q/†…e²zİ“O>©"v9QDÈœ*ªÚ«^š5k¦_&^«×Äö³gÏÖ[A}ú¸UşñÎ,ªb7ÚŒèÃØ7úÓÂÌŒ-;Ó<ß‡¬BåÄåRs]­:`İÈO7OœYÓ¡Õ.ÎÇ‘˜êZç¶…Š°È¾Àö93‰rêOßŞãÕgî¡µ³:ş*â£¸hlBT«Ö´q3ÃÌ­­[Eab|‘¨ËE·ÜŞ­P£¡"¿˜<KG*P£U+ÈÖ—ÎEëPß~ôÎ"d§¦‘–šMA±òşÚşõ”›`Vî@ó‘½ğm›K™&…”š¹;ëë|¢|9ÅÔF”»ı6-ùˆ¯¿ŸË{“eü[kØ™A!¦Êz.X[¶ãÑ»[ãëá œ{cLJÔT$g­Õ*[K$‰Dr=BhÕ²TW/Õ‡…«†ÅqÕ0oõmkk¯>ÃÂbÔ«ª?ñwmØÚÚê·éùjŒ‰÷¢şF}Ô—¼3‹“¿?8Şëiæ†­·#Ö%ÅÊ’„ÖÇ'k+l”ÿ¬¬póÑ’¤|Pæ^ŞunëTJaÄ!¾×<Yö!ö|=–á“_`ÆL
-Jk·Kåf§QhZ…‡n˜(ÿ¹áâaA¹i!iqn¹½›“E¬}{1êÁlıf&_¿1‡C)yd=ôwûÚÓ@Ä¦ºİèEæğ\ïşôïıs¶F]{Y°o€M×QL~òV­ÚÌoNá^Ã²*êë|b«¯“;Ğ`F8‘‡òØ>7C{Ã¡òÅ=”KqY˜zãä^ùä¥ÇÉ'[;<o%‰D"©Úœ@U(ÕKuG“*gá„Rå8R}ÛÚÚ«£‰ˆåXÕŸø»6ªœm¶oß®®x/êoÔÇïå'MM¯™—«5Dï?…w7?ZvÀQ5jf*,RFÊ:Æ	ë”iå$V#e»º¶µ..$39’<íbµt2‰gzQñí+|³ó2—²~k›ª¨Ğê­bF&Æ•9*•õT+(),¸åöntlNF&˜Y9Ğ¡{ošt÷!;!šó¶°íĞyrÊ5hïÄœ•MQ>¸Ü;”vM½hXsno~8‡}ÆkcfÌ#“xlÊTyæY¦)‚ñ£Y×;ÛdF#4ø{ö$şÊšƒI$Wƒ²,T1›ùú‰I<şÚGel‚9¦@ï>äísøş»˜ññ2–/~“Gûàg#Îwµ¹‹â³6ªú,$‰D"©¢E±ÊÙæN[kòÏsf1 )H&'rG³=hÔ¾-|İ°)V>Øã¬Éä¾¶>4uµ¢$ëÉç¶î8†îîz§ˆÚ¶µ.L"5ê «š1 [†ölO'Åçv³Ê¸+İì“I=À/¿n%øØI‚ãÑYp–È"kT6ÍÓ®2ÆSfØ¢‹(µjDÓ²S·Ôƒ‹=öèjÙ?MEI§YëˆOËö´ğÂ‰BŠ¯œ¡Ô§#ŞN687nB[Úbß¤)]ú£GÜ¬¯ï£8f›÷†sğŠ9mº6¥‘m1GB8s2Š˜Ôd2²/+â0µƒd’Êá“ñ\ñ@¿îø9Y@Q‘;øğËUG%alkŠ™NKÜñ‹p×£ëß‘nMÑæ]bçñxÜ»¦™§=Ö¹ç¹Âîˆ\ZE["òBNpæt:I{0fp3Ü­ÌôN>Ò™E"‘H$bş]Ï=õsûDéÛ·¯ş½…Eå°\ãÆ¯.«^js>©é,"¶­Şp*9pà€~™ÆÃ¹UÎ&UEÜ“j:®G±¬¦CŠhKX&…ÓŠp^ë
-j¶YÛ¶·JuM¨ŠU¹œÅøwM‡–¿¥P,É";ñ<'#.RÒz}-°Õª)ÈÌA[ËÎ¸FÜèƒŸ»9%i—‰?y‚Œ¦cèÒØ•&¹µo›&'’•™½xd@k:û»cR–Gyñq6©{0À=W¡çØw<‚4¥Ÿ4|iî–Cf©j|ÒÙå¯¤ã»H®ğÂÚ3€æºK·Ô^ë–^x[SPËşå%^&?j3ÿ‹dLŸn<8°#¾n%‡Î#ÄQI>.xÚİf$D¢G m[u§­—öµÑâ´Óœº¨!×´÷?ØO‹bÒ”õt™Ê/#šÃ¡¹hÊlğ	lEÓ¦.Š ÏçÂ¶0Î5éÏ°õb²"Êr’8—@Ò•hLíì15u 7ü¹Gpwë¸ås`İ÷¼óÓn¬ºL µ·–Y!Dœ>ÂKæt}ğ!½¡xB
-E‰D"‘ü!Şª‹DQª‹D??¿ë–U•úˆÄªm«·'›wU"Qü]³4HŸêOˆÅªşÄ°±ÛUwš"QØöDÚ¾¹sçêSÿ‰>D]Ívkn{+ÔÔ„zUøOrf)/Î%/z?§Ï†òKá :ÙçcRxğˆ.&[àÕª=Ò)JK&.5ä´"ÒzÒ£•fŠ¨kÛ8#Ü<šà’u…´Ô+Ê¶©$¦¤p%3n¾.¸¶Ê˜ÿ}Äš5kX³|1kfçÁıébçŒoÆ"S“INäJ†/Îv­èÒÚç–Ûëãm¢h«Ú÷ïTx.ùª<l59¨²Ó•§…|òKL°jäB‹FnØY›ÎĞmD¨êÂ\¥¯4¥ÔîÌâØ›.¶xí_ÂìéOğô{+8è9ˆã†òèì:ç•Oc`K[,Ë‹)Ôšãld£•f&†‡;œ:?BĞ#éÜ¬"¨©¹…òäWÎ…¸â‰ˆãbt(fZŠó2ÈLO%>>†”ô2lï§KKœm*¨ĞU SÚµ°4ÇTyB“Q($‰D"©?ÿxg–ËÛ^ç“^â©×¾dÏŒ¹ï~ôîı!v^†Ö-°ñéÍ3½O³æ‹ÇÒ{±†Ó½Ÿ¡·E{o°m§8´ÅÌ&Ù2c´²moî{c)_X~Ì›Ğº6o§.ôjkF#Õ\ì­<	ô~¹ªF˜µíE_¿[nïFÇfÙ«3şwOà¹ôOùùÿîÓGví}b6“Ú8àgohäv’v’#KßVúê¯”ºœYüiØF‹g`1	™úİV~}w"o>8O/röÌ`ê}÷0PÙßŞ½bâë«ØkÕ…)÷u ‰g;m×ï¶]58«ïğúÄûxèË¬JkF‹ül¶½3’‰÷õæ¡—°*Åƒ.ÿ»¶VØçf“[¨¢ÔÕ‘N½ÚámaF-ŸšD"‘H$’zb¤SHNN&$$„!C†`eu-ÀŸ0?Š!»*3äßS/.1ƒ¤\C…4öÃ7ÀêôÂ/g‘UP†¹½+®şzaVšzú†Û:«)ˆ?BdR)¹"Šµ–>-é¥¨0ÓÚ5µ˜ï˜Ox|¾ş½ƒ_ ~>ğ¶7£¢üÖÚ»ñ±yàd¤"=â4—³”v…Ğ¯Çşı!J²ÈH¹Â©¨å~Íñiàˆrh×Ègç¼oX¹-šÌ¾ïññÓ½hêb‰UYÕ¶i†«0ÇÌÂ•&Zãag†•~XEqvÛ~‹ÙGKi0æ)&ON÷òSœO21ûÁÆsSSìòó§§Ê°Yıó5Óf“›@J¶³ª:½säåå‘ Ÿ×!æ¨H$‰ä¿…pD^ËÕS~/Â;yúôé†w×¨Ş‡¸ßtìØÑ°äÂ+yæÌ™ú¿»víªwB©Ğc"ƒŒ¨Ë«¨jOÌÆ"ñ:cÆıĞ³p^CÖUN,5·½jjB½P,((Ğ{Ú`fvMü…¢äoFæ>V|1—•‡Šq~ù'fßçs‡—ßP¡Ñ‡Ê9´ùçãÒáWBYáBl#£Åx†=ñ(“Gu¦±µaıÛ€ŠÉ_DF(á`X’¡B¡EúvnK¿ GCE]d{à(‘(»k$C›Ûbe¦<çÅ}î+ÆAÃ¾ŒĞŠ–>ü6áÚõd„®àè™b²­[Òw˜#W‚¶İêš·oI çÍ¶6Pœ‰*ş4A[riuOoÚ·ô¡¾›V"Â£¥ºbgŠ]°îØ›sBÙ—³>=¬õ¼ä‘}ûSŞU†ÍõÁ§YGi…WÊ	Vï:K±K {ö£C¥oåïC«Vvï+ôí5£I£˜_ØÉAú2¸_ıÎ³ /6–¼ôXŠ5lÙ†oÑtnÛŒ:?rq_(ŒâÀ†Ã$™ùáÓµ·r~On¯º:G<ñúGó7mÚdxwê}W(»:›7ofÄˆ†wõ§¶öª„¢˜/¨xı£ÔÔ„ÿLgÉß‡ò.?Ãùğ\
-t¥O×ú´yW¥¢N¹(ªÓ¸t&Œóaç¹pé—¢•r6‚e»ˆØ8Ò²ÉÌ)ÇÜ·1GOdHß´w¯n¶üãHg‰ä/"+‚cÇ²vıNÿz˜˜²2²šÑÔ·!m=¯Å™ÑÄGåèéËDG—*÷£(‚W/aÑ²£œöéÏ°VØ˜£I<EØÁõ|µá(‡YĞ²k ş¾NˆgËŠòRòbös&,™ôbÌì±1÷85‘ëßaş¼mì8_ˆgó~}a»tÍqñoJ'Ÿú=™–eF·k6Ófì¦¢yü›úRÏM+Ñ•)»r–õï|Î¼cÙ$4hÈˆÑ,xr:?GÙbÑÈŸîmÜkL›) '6‚¿l`Gğrö]Ì$!İGZwo€ÕÙ¼ûùÏËvÂ+PŠ×¨n	]Y‘²{xGioÛ•"òŠrÉZü9_D7¦]ç šÖG(ª3¹°sû×®$8ö_~¹˜Ëfmñôõ§¹¢ªM«]‡¶’vğõÌoØrI‡QÓnõŠåeÊgNº¤ØtRâsÑºº`£\ê«§K¬®Od='Â‘äVŠ¸éÿ®ÍYD£ÑC£Fô÷Ñ—p>©^„ ;tèa‹J„°ÿş×õQ‘6P:®\¹‚··7¦¦¦zïf1—°I“&X[[§ïC´!Öù=ÔÔ„zUøOrf‘üÍppÃÕÙûÌ,BnâH\±Y”h*‡‡•§Smê^–~ú¯>õ?{î9{ám›‘„Óƒ¯ğpæ©V>ŸÒŸ>·Ó”(‘HşZ|2î…×˜;ãEñéÃÄ7¿çëgîg´!¤Xu²#Ö±éËq<4â!î1‹K·³;1‰½¥jÎ¥f¢qrJÔ–4ğmÅ/O S|Úü
-õK*Ğ¥¶l*o<ùïÿ¸‹#Âş&®F¹äg—Q¬Š$7qGV†±£XÃÑ¬<R*·®…ùé\ŠØI¹æYyùÜÂ¦•T(û’›M¶r¿Õ'aS^µÊût¥¾ôØEÒ.$r¹†Ó ¸Ó°ëC<©ˆæOôcÄÄ)<=ó%¦¿ÖŸfZ
-³Ó•fj½w«ˆøÀ¹†ö"“¢Ù¯ˆšÔ‹:´EZ´:ê5¾XI|Ì16í<Á’%aŠàp&!:˜øDÃçTJ¿äfr¥LMªr.4Úßœ„ÚÑi)+Èàô‚Ø²i_ò5Ÿ¼±€Í—K(*¯{Ç¯·Şj¹Ùp®ú]´h‘~]°Ö,UÃÎÕíŞ¬‘–Ol/r;WŸ±*¶ÃÎbÈ»ª?üP¿ü÷ğwf‘üİğ§Õ]è9ÊF¹Ïç‘ƒ¹ïñ9|³3Z?—P«Q“~„s£üå}Äùàà]Jy…‰½üd‰ä?^M¸{b>?ıßt~ÙAT-ŠÁ«u_ºÜ5–NcÎZ~ØwŠ°°Z–WaÛ¼-»än’8O¹şZSI>eÚ‹„$â^”Áåó'X«Ô‹Qw\=-±wa«ƒí•r]&¬z`iíLƒ†06ùSXÄˆ†»'––èg“)¯&Ê{_¥Ş†TExæ’uİ<õk˜YÙ8ü‚W±=(ˆ ¹úwO_¥™Û3L{]{B‹¨•¨ˆ¸ğDEœWŠÛ›áÔ¡/Îf©"2«2…œ\ú
-/m^÷ù61…>´°´†<3ê9PFIüfV¯9Ì¬·æ²|Ër6_:À—ßî$¶°T¿û’?†Š’?ˆ)-rïÿ}ÄÒŸßbR³R¬¢V±âóyì¡‡;a2O~¾—\µ>Î”0{zz(Å[S™EE"ùOMvR$‡W‡‘y%ƒÂ’2Êj1eÇ‡u%ô¾/óé²E,xıaFµóÖÇB­±™¥%yÄŸİ@±&†,aQÔÔÙ`eÛ‘Ï¿Ë[KñıGOóbïªá·ÊÌYFÆ-ñhp7CzêcÃŞè¤Jáè#˜0FXi>fÎŠPDö'ŒşHì-EŒ™(ç¢ÎÌ#[IâflÔ£;;4'Ğ¶rµš”«K¸|ôWÂ®œç²J…JäüÇHiÎT°9_9	¹••¿ŸkíµlÑŒ»{tÁSÑÄ&eåTTÜ GuŒ-°r(§4é§ı/Lû-gÓÉª0»±èPú5'VoQ¬´ß3glüñôÊç½xËW.gåÂÏønjÛ˜ÿæ»Sa™º*K\m¥6`Mª¬}ÕËòåËKëF8Ä‹ààÁƒ¯n'IÕ­Œ¢TuWßgÑïFÿ™‰´0-[¶ÔwK$·Š™½7>­zsßğÑŒú5^œ6ñ÷õ¥[ûötèÔ•î÷NfâİíéÖ°«ŸD"ù÷"œY6,å‡_¶Zl‡FW·Â2wnoóvôñ#.2”3Ü©ÍÿÁÄÔ{GŒ/™“O^b,ÑÁëùè“¹¬Ø´…-Ç¼g#Û|ÉÇŸÏfë%¦XY`mßÿÖŞx˜‰T¡ucbéˆ£WkÚ¹uv+‹İÆ†£Iàè¢Ü=«$f)ùI¡[ü!Ÿ~¸˜í¡I¤êG5hJ’9¿ns¿bÅpbkN;SkĞ–h)3µÇÉÏó OÜqûM\/áÌÌ¶OgñÍ¡tÒrµµ†şRk4”¨ÕŠĞÒ@Áy,™Ë7ß¬`ÉX}n}!ò„CÏ†ù3ôNWËª`ÄæéÛPN(88ãifN€“#>ù-äc5„CÏ…­Ìşüãë·­F^ìQNîü‰›7±qór|÷›öT!	]1Ÿùó7°"TDÖ¨jëUß_¥¬
-Fß­‰æt4„ö>…h3Î—˜‚¥«7VBëÛ©1}÷îİz“ºŠ°ˆŞ1/°æv¢îfÇá#æ4Vm'<bŞ¢XVUÄüEAõ}®O·JMM¨Šbr¤££øÁİPëK$7À3+/Z|'^x›·ß¾¾<>¨m<nÉ5P"‘ü£²$—Äƒ›øuÙNÖ…çáŞÍcój‰2¥©çØ½s;§.¥£ñìG»ïçÑ&‘ìşö~ŞÈ,-†Õ«cíà†oë^¸›¦ŸœF|äy¢‚Wñí·ğÁß²xı6Ö¯]Ââ¾äóE;ËPÔ›µ§~èE+"ÓÕØè†±V­İšÑêŞé¼öÜS<r¯=ÅI‡Ù²>˜D+åºÊûeIf$+BhñÌığ+æ/:ÈÑÈL²U©$‡ıÊŠU¿°dŞ÷,Y²™íG•3b¬œ+,‘ª-6S4§Î¡XÇèqqæ9ÎíYÎÂ9›9gˆ½…så°µ@xkXÙà`bªtB –—&½m›W,aAĞæÿ²mÑÙ”–gµ}1~YÂòG9}ò8§w¯àÇ%Ë	Z¾V»Ø±ç,±¶8›_ë£&Ú"J3ÂØ±ès¾üqÛO%_?$­Îäò±s„ÉÂbØ îèLîÑ-ìÛÌ©T!dË”¯F(ÛÿÈìÙY°õ,É%J³5'^]o9¿,ÙÈ£§9yü»W|Ê’å¿°|­"¬vdWh2yeZ
-Ssdİüøãb–„æRT›Ùú#BÖÜsÏ=za'fêKMQ(Juñ(JTT”aíßR½_Q„ ı½ÔÔ„ú¥3‹D"‘Hn+:"ÃØ²x;'âğê=œûš«±4U£ÕŠ,JÊ*WÈ<ô“'<ÄÇ¿† Kv™F[¢¢/‘”¤·+)k+J¢Uvù%¨M,0sr§¹r3;î'£²1µv¢__OÜì[2hò3L|xƒ:¶Ä½ïÿÚÎwÆ™ßÔÒ¤U«(ÌÏ$­ĞM³1¼óÜ8&¶.$ûÔfvœ.§´L¨š
-ÒNoáĞŞ_ÙìØ“Î.ÉŸ»’ëròÒi.˜ÎOê~ø·3F{n+¡wºDG™Î§FæØº‰D;ZÊÕ:Ä ´IUÆª«hH	ÙEğ–í²À£÷ÒĞËu•Ã‡°l:»ÑÈÜ}syeeáK?‘hïO€·İ±•¼´à©‰/ÃÈu¼ù#Ëç}MĞë£éZ°Ÿµ>Çè1Ïğ¿W°;¦€tµ©r®Ì05UöIhûê&E;l‡0­‡QÑ¿uÀÉ?Ë…Ó¦d—?Ë'k×°vÉë<Ò^GEZ‘qù"œ
-Ä^&Ú¸œ¤„‹dì?È>å³W+ŸŠ~HŞĞLåz—8Wæ„ëˆgxóÇ¥Ìûús^íEÁşOøğ¹‡óÌû¼:ÿ$ñEexu{€Î­{âX˜ÏöÓç¡¨©ŸóÍm¤º3‹p˜©/5‡™E©>}³aæêıŠR[ŒÇú"Y$‰DrçÑ(7™ğöçå¾… ˜4ç(9…GÉÈÉ!_¥ƒ’"2RáXm>š…>¸««®êTı|¬TQ/Â§dì"è™øê+E|¦S–È)á¥»ÿ*µ'ÏdÎgóx¯g¾{‰??Ì™ò~¼ôƒ	°µTÔET¶…X¶h w¤»‘XL9ÄÂÇ3xúN"òKQ;»ÓĞÎ‘†EEú˜¬•ûœKA®#Î¶£yïYÌù~
-mc¸’º“#cÙhN™{W†OzšÑw9b›¶ƒÕ;S))M!ãb)yúĞ’jÊËÒI:UA#3g:Ø‰ÊjÄr%,•û“ÉÏYÄë“>fuÈ%V9|h1•ÄÅÒbôÍ)ç»X9ï¿*ç_Ûj8#ÍCwÙRºf;ã›ĞôşnØs`ß|–ıß î~ú¦.	¼—ÀŞÿÇ×ÛŞgŒ[y4¢Ğ®%¾ğôUÎÕu'Ké>t¸«+®ê:pr”ãL%5Û­K5ç™->Î—oMaê0gŠK/’”iB¹kÍõ¬”õ†3¶[Æ{Ø7ÿ7hOŸêƒKCoïFïÿû€3ÓÚÁRùê4¥qKÚ5,E›J†òIg–?Î3³ˆx@—.]Ò¿J$ÿdÄwXp["ù“¨PLşeB.$‘#&¦©(Î9Çæ—~à‚{,¼àìXA©i1›RØ¨J›µmY)içhñp7Œ.] %V‡ùÿf³´í^zs-GS4¸7j—QEÜ$³ruEø7wÆ¦L£lkC¡F\Œ»ÂÉ0MÚ7GÌ|)JÁ¼ıxúŒÄß£Ìô6‘Ã?â‘)1µ»kå~(XÅ†•™²0“®m<°Ó)‚µÈ;GW†·Jâ£¹¹<ôÙÇuO"çğj~×áQÇéÈDÊl]hÜ¦~}I:‰ƒ£Š¬´d’³´˜5	¤G)¶y‘ŠĞ3'İØ›6¾Ö¤»ğÀ÷¯2fTW::TwÁP‘KBTb¥`VHØó!N¥r¾ÈŸ®>Š84'û‚"ÀÍ-1öö •]^-íMp¥,3‹òìd.¤˜Ñ´k\”}L.,'«Øæ¦Ît|öuîo¦ë5»Ù°=‹Î8æÅqÊa$ãÇáå^äíœÁÀ·bplêw;}¼J¶ŒÒ´ó¨ZLcÔØ1LÜìÚÜJu‡~şUK·rÜ®©rîóH>é@ûñãÿæCªZñÜBfÌş™¥Ñ.Lšµç;å6{ßl½@°8¶FB4—’u–ürŠí[cêÜ•g_E³¸¹¬Ù}í1VÊzUé`Õä'aêÚ†¯Nçÿz{àjymbmÁ°«×Õ…ÊV:°ì‰aàêu1o²fàëªº!ÚmÕ†èGôw#ªãvrK™YÄ“æ(ƒnKşˆ‰¹ÂëZÜ–Hş
-ŠQ«â+3–T†´±¶ÆÄİ†‰‰zëÈtZ‰ø6¤kÿÆ+"'3Mƒu÷¡µ`Ãşp¢õyN”›X†ƒcÇ.’t5÷©¸‡µ£3²³	«FÁ§]_:vé@.°}ÅAŠ[&°¶Ì,UÙ_ö]4T(85ÃÇ×›îWØrÚîGÇò.gÓÑ8H=Áò]g)qiGïÆ2ôvpğ ©juµc«D¹QZ
-¹úİ6ìó¸®´mæV«óNu*3ÌDSyh•çÊ“ERëÏ«……	}û6T=ƒôôš=Wa…M }Ç¥•M
-	ÇC8~"úª½š=ÇSƒ*>„ -a–üÖhäÙuİsşŠHæìñ„\kv};Ó³_ îUÙiæ|ÎW‹ÏæÒ‹×~Î^P^ıØj`İ ›€»7´96)G8Î‰èªÏ½
-'4ä®‘ıhn«œÙjã¦wR(8p@ù¨êƒTO:UïRUw#„'³˜Ë(œRª†–k««â¤í×¯Ÿ¾ÔDl_[@ğúPSê…¢ğ )ÎÜÜÜäMT"‘H$Âz¨"-"„"E\9¹
-‹¢aÑ?	á”“vàõ?òÎŠh\{?ÊÿÆ½¾†å74ùä¦&r1"™Ÿ@:û¹ĞÀîFZ´%Ê!gRŒK;\VÆSİ2*ŒO1ìùp§R›Óèágyïó(µu…³Ñä'‘šx™ˆd5>½ñs±äVvYp'…â¥ºõğFVFÁ­îó­RSJg‰D"‘üÉT )É'?3øKGÙ8sA«÷r$®õŸï¨zëˆgŠ8ÌÉÊĞß¬S.!rçLœ±‹–}éĞã.ºı]E¢BEA¶Ç+gÔ¬İÇæ¢¹…ó^QœBöÙU|4ñVï"®*×I&róbæN›Æ´iÏ*e¿&à:ª7#§ÔU¯K$ŠïKAÔn¶÷,ŸÄ¬İÉÄæjëÑçÍBHx‹¡âºŠp¹Âº'¾"´Íusno‚˜ƒ+¶¯5‚Mÿı2ÑG]Ô<úìs]Hg‰D"‘üÅäµı+fM¼‹Ş'ñÎ‚>
-bõŠíœ¨9’øwDSáóyéñ‘zËN—cúú6²òïå™©£ôC£·šñåÏ¤09Øè0N—P¶v'Î%Õš)§.òS.qjóÇ/YÄGAkY±=ªr*Á	 ÛÔ÷ø¼z¶¥Ìo*Ã…)ñ†ä’ItØEŠKJY»f'ç’ÒêNx¸ºº²}ûöëö©féñn†
-ß…¡C‡’••e¨½9"íØN¼ÖDd2Ó¿EôQ5£>û\_¤P”H$ÉŸŒ­>wñØ·~â§ ,^µeK>àÅq]iùOˆËoj¥èE¾ö!sçÎenĞÏÌ[¼˜õ^fÊ€æ4¶ºI’¿+ß^ô{ì3Öl\ÃÆo1©¯?¯ù±Ş¯t¼”ù«–³äƒ	ŒëÚPùDo†v8W³Ô‰âêh‡uİ¦D¶øöšÄcŸ­eãšå¬xk0}ı¹…]®“ÛeQ,,,¼ãEÑG]ÜN‹bMnèÌ"‘H$‰Dòo@èa™¯u9Ü‘–O8™ÔœXåá,œXªœYê¢º£‰pV©™]åVœYªâPXÅëE:³H$‰D"ùÏQ](şQêŠõá÷:šÜ¨Û)¥3‹D"‘H$’ÿõf®o©9´+ÂâÔ¶^må÷ß¨q\·ËĞWSê-ŠuÜ–H$‰D"ù7 æ
-G“[™CX"·ruÁ'†oä•\šÛÖ—õ!D¢ph¹b±Ö€ÛR(J$‰D"‘HjjBıĞ³˜tÙ²eK}æ
-‰D"‘H$É“ššP/Eî[GGGŒe´‰D"‘H$’ÿ*55¡tf‘H$‰D"‘è‘™Y$‰D"‘H$õB
-E‰D"‘H$I­ü¡Ì,Â,)\ÍEôğ¤¤$ıß"ÅÌíp=—H$ÿlÄµÄŞŞ^ß«Q£FúLb’´tš“H$’¿/·-3‹…±±±DEE§Ïo(Ú())‘BQ"‘è¡+â…yxxàïï¯÷¤óõõÕH‰D"‘üı¨©	o)¢²ª^Š€‡fÇ¤¥¥Ñ³gO:uêDÓ¦Mõ-,,[H$’ÿ*ÅÅÅú§ÒÈÈHN:ÅÑ£GéÑ£ƒ"00P/"e¤‰D"ù{ñ‡n‹¡æ+W®ğå—_êÿîÓ§wß}·ŞZ¸S‚¸ğ¶H$ÿUª,5jµšœœ~ıõW½pÃĞ"q¾“““‹‰Dò7¢Ö€ÛõAÃ³gÏòõ×_Ó¢E&L˜ÀÀõ9Å¼#aEÔ›(¥H”H$
-âZ Å…F<LŠyŠ£FâÁÔ‹ÃÏ>ûŒÄÄD½”H$Éß“÷Ä"÷àò
-+€:ÃÎÃ‡×¹¸¸Hk€D"©âZ!æ+Šy/ÂÚ(œàÄ¤i1ÑÁÁÁ°–D"‘HêO)ùIç8¿s9‘fm±³²À¦.ŸdM>%içÙI‰«V.6XÕ¤º&ÔEqÑÔ5g(??ŸèWFŒA»vín8D-‘H$uQea¯»wïÖEwww9·Y"‘HªS¦¢4#šıGÏp!RyFfØ(âîº+eq1Ç70ÿë9œó~˜–Şö4°©Í€§¡$ë"Q»ññôs˜µ°¥¨<“ø˜
-Ì\q±Q¡qåˆpMM¨oíF™YÄááázÏfaA¼ë®»ä]"ù7¡«@[’K¶ª•úÏ‰X ®%Â±E¼†……é­‹U'‰D"‘(¥’f¯¿ü4ùŒï—çba>Ù))¤*E8fD$üÄqæ­ :9‹’Òº2ì••Îeó8U|èµüøş+L|şfÊR®ı†õn13‹¸p‹ùC«W¯Ö›ÇgX"‘Hş-hKóÉØ9gæm èDŠ¡öÎccc£wh¹té’ş¢$BkI$‰Ä€ƒ?®^fûïx··~©Ç8¸pÓºt¡§Rº(åÿ}FĞ¾TÃ7Â+'<}Ë=wZy@äòåÃ²sC¡X^^®Ÿ›(Ä¢š+ŠDò—R¡Vw±búó¼ÿáÏ¬8›oX ©šâ.®šÌkS?fÎŠPPQZÆÎï÷tˆØ³‰J]hŠQ6fækSymÎ
-ö\·b¡+æğÃóÓ•§ÓìëNëB<|6lØ}Ì®‹/–H$‰cSŒŒÌ1>N˜*ƒK–>4êq/Ó¾xšŞMÇğÈİ­pmbM\‰–@eõ§K1ÆÒÚ	†01mM@—NtjæM€aéĞEáµ,áÖÌ˜ Ì'OÔO@ô[ÉÚ"ùSKø¬™¿‚C‰p[G3µH;ÇC»Ù~2‚¨LE8Jê‰mYqGw²û)ÎFgR€NCQqåI‡HºÉÅÃê5©(‡œhNŞÇÊ}'ØU}ÅŒ‹œ9±»±î\%š›èÂ+Z„ÕjÜ¸±>ŒNLLŒa‰D"‘üKÉ‹%:x3>ü˜‹·²ê—o˜¿~+B{á-ÎŒ&rûÇ|5wÁqaKâBºm†=Àè»í”k²Vö~¶j„‹²şUËßÕ>>Uú8FhR>¥Jµ‰‰V6îÊµ×gO8ÙaZ¦!.'mÅµ‡ûššPß®¸X‹Éå5Y„%Q<å¡(&›K$õA·—}«¾æ›o°88™lE)Ş>­¨S`Ô+_êå_òG…¢øqä’r„³ŠğŒ¾Â³8“ôKáìØJl^ÊCß_L…^–)WŒk×3ŒMpnlŒ¹W)Z3ELÖc81&™ğÓQÊ™«<ƒäåS¤"FùLâ•‹Nyµ‹ÎÍEH*‘H$ÿjÊ
-ÈK‹åô™Óœ?Æö_~`Éš­l»˜gX¡
-…©QœÛ²Œƒ9^x72F“ÍÁ=1dÙããp‚cgbÉÈ4¥©—›a›JŠ“O¾ëG¾ıa.|µ€a‰¤Ö ¨–kvMM¨ÿ·.g1GQän–DéÀ"©/ÉGIÈIä²ò½;uô$ê2å+›067O,,¡ Øìš?®[DW¦£Ólñ½ó§ê]ıİ*´¨UÙädd™­ª¶mš¤ã/ı‚±|Ä’S$i+EÕ_†…rú\pó1ÆÂJ‹N¹0\§ç†Ñ¬]W:ûŞ×‰–WòÑ]L!VyW.ª]ñ´µ¯×0FM„C‹@¤•H$’5îèúĞ[lZ³”M¯ µÂ*Û++„»vï)¢´¤•ª;¾¯¾ÿÉPo4ÉYd—gsmáyÒS¢ˆ¼TıÚ©%-1†üìDzvo‹Sô2N…Ær1­úÅŞTïá,t ‰Ù15ÅHù¯Š[rf©Pî"¹¹¹úx:ÖÖÖ†Z‰äÆÿ’÷æŸää®åìœ9˜Ö–×»óÿĞ––±s5;ÒÙvè0¯ag”ÖËú'VÊàDĞ3¼üÀŒ&¨Ú¶¹D…áÄ¾uÊÃÖaæ|·™˜4
-Å¢¿©ŠÎÎ%K˜o™ô?š§Ş^y1‰D"ù"fµ»'Š¾*<t«‚	Wª¯7ªäRXz9›~dáWÛ8Ÿg„ãİŠĞthÆ°™³×&P¾\
-rı±rÈ£3b¢ƒ&Ù¹äTİ}Äp².Î6ØÛ“µ%}(b±öÚ‚
-E˜;$æÉŒ+=¡„ìZÁ£³­R£NØÃŠ9¯1bêkL^u‘œbfÖÎ”%äÈ‚·yùÅMœÌ+ù	¤ë16·Á©ËÓ¼õå"V®şšÏŞ¸Ÿ.N`~õ—‘AbÈ~1†1#~dMH¢RS…xBK#ùl
-ñaa$¦œår”ëÜliØc"“>^É†5‹øåõAônìÌo¢V¿÷èl6D«¸~ô[\6.²gæk|U—ó:Uôf?:‰/ñóXÄZjÙ‡f3ıù‰<õ›mµÊƒ R´æ›ºâî-¬Œ‘œ\ñ9ï¡—ZY^äÃŸp}·fXÚXcçh¹òNeppÂÑÆ9AE"‘Hn€¸‡®ù˜£eÄ»—0îŞ‰¦½4œİÿ9/(×Ü¯^{Çñø+søùD©«V±+ê2áû8õÓË<4r,Oú„ŸÏ*wˆf}é5°íıóˆZú
-¯<şÏ1›Ù«Ö0ëÅoÙšWÈ‘søâù±Œ~üŞ\u‰†cûÓ!Àå>g£U¯˜Ö˜zXffá*¶lÙB@@€¾ˆ1kÉš’4"7±nËn¶nÛÆÖ]gÙuÚ†£Úâa–Í¥#;Ù·ã§’ıto3œ­s‰İ¦¤ŸV°&,»î½iæj‹‹eİO,T(‚HÉUëØ´a+;†rZS[Œ’EÈÙKS~0[â¸FŠ…/n{2®ƒÁ¿(–ØätÎË çøR‹O²qóÂ’49ûáiS¹ZuŒŒM0µ÷ÄÇ/ _{ªøÃ¬Ş¸ŸS_\í­°·¬ (å1»W´?ûÎİğ÷o„×ÕpöZÊÕv¸µhKû>İéØ¶­ÒòÌflŠ¥½;î¾şø7´Eº†½{£¸¬2ÃÚ³Î¦†ã]º½!‘D$ç“x,Œ¸&İißĞo;ƒN^BÙøÕBÎ8aÛ©=
-yV]9e…„­ŸÍ&åœU¸ùÓº¹Vqøúûíì;µóqñd[àÑ¸%vÉ;Ùje“Ntíİ_“,b÷,bß…L.+A]â„ÿ€V4ÑÅqèÈ9Î©m±ôoI¥ß¢hì8C¹“/Mºv£•"ªõ˜f|‚°ğl’Ûbjw/ì,®w«‹ŒŒ}tñP:`À C­D"‘üÑST\J¶Ú/ÿÎôëÕ¿æ¾ø4ô&ÀËo¥ˆÔÈ^^>4R®»­»ô¡O»tîÕ‹îİ;Ò¥ece™·RhÙ¥/½+÷„NÍiâí«?¾Îå¨’ãHÏ©À®õ ZÛ†qåŠrqò§i·tîØ{îB&.¸Ø¹àÙ,];àçh¤Ü·û¨PïÌ,R(JDÎÒ¼v¼ó"ß¬ØÊ¶SŠK,CWhFÇÑıiìí‹*–ÂÈ‹œ8kG—	½hd_Hat±¡±$dÄÔp0w5sÇ×©Jà“[‰!gˆKQQ`n‡£©òÔtt?ÌİÉş£Ç	?­ûÒirw™Ç…ËÑ
-Mäø¬/Y\dŠQ\2jç¦•B±‹Ò\!Á›8x.Ğ3¹$ız„2Ó|ÿÓ*Ne8àÖª]¼ª	M>¹É1œ;F7VBÔdŸæôÎ_˜õÙjBm{Ñ¡…]±2ÑbkÃÎıÁ˜4¿‡fMšÒÌEˆ^ñ[qÀ³mG:öëG·mid[FyZ8§B3É*3ÆÆÅãâTbÖ~Â¬G	×¸áØÖöjÔ1kùæ«µÄ™Ğ¢k;<“v°-«%½:ù*»Ê!]òWÄÙ¡__äc³N´kí Ê¿jã7±ÄØÌç’]É@íÔÿÆ8F­bú.wÚt°À1ïñŠL÷¿›N%{Ø{,:(B±)>—8:o5‡ã­1õìCÿ±Êé›ó€G:{Ÿ&LíŒ›"*lã œ·+œŞ¼›Ä5&æ”gÇ]jƒ£uéÇB8%…¢D"‘Ô¥3.¾mè×ç.úµoˆ§§MZt¤Ÿr¹õÒ‰¶M¼ñtñ¤aû~ÜÕG©ëê…ef¹éZìzMâ·cD(×vï>˜ôÒË<y_OÚ7´ÇŞÎ•MÚÒZ¹où*—öê"±¦&Ô/ºQfÉZ…©¶•ZÓ¸qÛ»aÉKàÒ¥"tV®¸xaf[@a~/Æã‘we ró¿”šUÃ;Y?Úóìœù&_²˜_ÏgPZp‰]Aó8bÔš.“çÅ)M1UoâøÑ³Ø–è„´¦æ8[áhï¤|ÉÍ0×‹ØLR®Ä’ü3ï¼ÿ-‹Wo%)%#çJ¨Ğ9bláˆZ[¡<Á]?ø]QÅ…?ñîãÏ±ìT)E`Ğ––ûrŸ©š˜£Ç&6%…ìbåwÑ %Í¬œ1)-¥T]å,~Leçd‘%"äge“WGò®yïõyü¸.‚dEÒYX5¤ÏÈiè]Br|!§¢Iº’DÄáÓÄjJ‰5vA­´İ£«ó#$¦çsuj²pŞqñÆÏÕ™œc¡l™÷+ÁJ_WQù«JfV.öŞwaî¬C]‘G^n…eE´yp(cš1zà¡ìß¦C‡»puaåEyd§'”MôY…w3`Ê(x¼ö©©J›*J5å¸™án¤VúI%%=U™†sÁ™ûæ#Lš<‘ßâx|.Ú
-ºZ&FK$‰äOÂ¡	Íid›Á¡¯¿à@º'ùj´P¢ÜçêCMMh¤(G]rr2!!!2äºÎbå§zŠAƒé‹ŸŸŸa‰ä¿C:M…«ùğ¹¶îHóŞVäüø"A1®Ê—Ïcm	6~h?åkæŒoŠ§"âLŒâ¹°yßŸÍ/üÄòÿëÇğV•Ş­h‹!c3İBNË»øü zäoäÕŞc[ƒGxø½f¥£?`›ƒ³òeU¡SS…Qì,:0uùg´8ı,›6³ş‚ÎVŠ˜Ò‘S ˆCcSLM,¨(Ñb­<%úgÊ´Gy}bü,®=2„¯bÃ–]¼}¦+¿|;l±3Ö’qn{fæ¹Í¶hM¬°4WO§UÚ5#¿ñ|1s<£{ĞÀL´%~Dá¬š<“å»O‘Ùù.†=û:ŞK`_£7é;l{¸a¦SD²æ?>øKö'ÂÆ;s´¥™ö¬‰"‚#Ø´1scù­ŞbîcİÃ—ÊQ]!F5ÇÌ¯—óå¦Ø;[ë­×I1]Eå9èõ</<6wúZS|a%/Lú™3ª|2‹‹)*)§Lyšu 	ş¥±Y”’ig¡ß¿¢¬|Jnak•™rÌ†ö”sZn,bo)ûl¡ô¨-E•WHIÛhßÙŸ©Ú¹¼ñ_>å„zÏ6î)Àæ•Ìåƒ‹õ¦TãÜ¹s¬[·µZÍÇl¨•H$É­S¦DEr¨r/z’ÛÀíO™öÈC<ÒİëzxÖÔ„R(Jn‚uÁeN|û,/t¥ÑÃ3ñÿ:áu9ŒK9Š–Ğ;n€…½nMÚÓÚÃs#2Bç³eÑ,¾XšG“÷ğŞˆ¦tö2=kTp~Ÿ[En‹ÑLxéYF5ˆ#bç/|=÷1ªt®n•µæ±©İğQÄLå–Š¨±p£i×ÖØå%%9Ä›e rhŒ¿CšøT×V‘|ğV.ú•OOeñ®'ééa‡#E$Ÿ^Ï¦§ñvÒX&éEfnè§6*Bç¦´ká…§“•ÁÓW|>‰!¸’ƒÚÙGçrö<4‰µ]Ş`ôä‡yµ¯·²Z	äîâ³ñ°'ß·ûb\{!š}hÑÂ„¢¢\ÅÔÚ‡U"Ñ±WˆºÙ{¶ ¹¯7Íœ(S¥r‰Lu'Vl`ûşd¢<Á—Ã»ĞØº”rå³­çæõœƒ‘ìM¤µm..“7óê}ğ.K'=K‹yµïA}BQ"‘Hn/eªt²ãCO«†íğoè‰C=T¢B­B±  @?|%æ!VÏ¾"…â—ŒĞ=­w)+Î jûr²¿Î°ÇÆ3qdÀ5ïV‘…%8•¨èd¬.¦è@¢‹bp>6–³N£ønæ{hîˆ[U„%M!D/æ©g¾ç„iú?õ*ïn„ma‡–-fÙ’Íl=gLy»ÿ±lı$º¹ÛboØôv‘wz>k.à¹åûà5Ì§89šCûs)äyÃ~aúänôij:)’KÇö‘ßn*>v×ã7SœuõßÏçYmhrï#<Ú[9W±;8ÅÎµÙ¸Şó½:‰1µxÖÜvDœBWüÂ¯A{8ªòÂïı™=À«Ò
-û{ÉåÀÑ3KÂÌÊ–vÃ¦ÒÕïFçåÆH¡(‘H$jjBéÌ"©•¬ˆ9ÅÑsédd U>{ÿæíñ´ÑR¨ªèèËJ)E•¾•m+v°lÅa.jB¹t)Ÿ´”4òK-0óïG»‘OòLÏ¸V†4R¾o¦²ÃÃ1©ˆĞ¬B,
-¹’‡F—KjV…n´i×•>C[àaevÛã0ZšQ^VDLÜ	vŸV/a'{†°ë¼š†í{ğÀ„Çèà„‹6‰˜ã˜7ëª:ĞÀÛw'+jwàYÖXZÄ’y”è+i„E^"nÛÏ¬qÄÎç?ĞŸ}ñûIZ´e¤†"ôÜÎ%«1ÇÕÅ±KF¨ÈŒ$òèIN+¯ÑÑ‡X÷ù"^±ÁeĞÃ<ıH/Û£şïÇÆ?ÃäëŞ½zÒÌÍ›ú=¨ÖŠtf‘H$’¿55¡z–ÔƒëçâÒ×	óÑh†=Hff§âZáÚç,9˜BHé×¹1"Æß·×1oW¼¡Æ€ß îzğ1æ¼ÜGo¹ü¶¯“MúÑ…}ıWÒs‹kï7ñ»7,aò§{•7™2û-ÆŞÛ671q^\5™Ÿ–ïfµr²Ìí]éüÂbŞÖ‚Şõ937¢”’Ü‹ìœ>‰ïeqÁ®æ>_äĞìŸXòåj¶Wn §ó˜—ÿÔËŒma¨øñ_³(jŠs(*7¦ÂÔçúL’H$’?9GQò;08TäP\Z¦—•®ÖXZª©¨(§¬Üc[\,15®ŸÏ«­**¡¨TŸî¦–XXÙàhgqçD¢@ÙomYYyÅzİZûÕª)-NÂkÛG;¬-ÍÑû²Ü ½(.E8L)Odæ¶.ØY™Ö{Ş^İèĞ)û]šŸM¡ºqÍ}Ö VQ¤*Ö'¯ÂÜZÙo¥üuÉM(ê"¢Èmö‹şÊ]"‘ü§©©	or»“HBÜ˜cíìŠëÕ` JqÀÙÙWWå½‡Â£"Q`lQAVø&¶|1iÓ®•9Ëwšs‡E¢ÀØKxˆcQÁİ—šâÔÄK[gÃñºà`}s‘(ÙiÅyQÚõôğÀÅÖì6ˆDr~Í°ròÀÍ£¶}6ÃÂÎç«ŸSeqW¯şRª2åü¸òkOäê³ı»ÇW™Uèµ×æ0sOBeµD"ùG¡¿åÙÙÙÑ²eKLMë W"¹=˜*âÓ‡†-;Ñ©ÓµÒÜÏ—ßäº“HşÉ£.ŠæØÂ59–LâïÊ±ıOB9^•˜ñ=Ë~YÉÊ]Ç9z.…e‰!P‚D"ù›RSê…¢¹¹¹ŞQ¥º#‹Drç±Á3pC§¾Ç{ï]+ìG™4Xò¯¢Mi<¡»bÈK/µm‰Z?= rÚø¿E(FsğËG'’X¤~¡^(ş;W"ù÷PSêÿsef‰D"¹S)ÿ›`j.¦(oÑ¤ÎÈÕgà¹S¶
-M	Åù™•uR²ÉÏÏ'''Kö"%5”üRJËïTï5W"ùÇ£<âhKPe«P©Ôú‰ÿ(*D¨»"rÓU”ju7¼îÔÔ„ò',‘H$wKE45À§³1Ö•)wî8…QÛÙ4k"]ºôTÊ4fÍú˜—_~\ù»]ú¤Ë§{	¾œoXûvóç¯DrGÑ–BÆN‚™Ç‚ Äªÿ1F±i¯Ïá¬Bnå—/…¢D"‘Üq„#“	¦FÂĞö'Ojl8ç'%åŠRö³lÙ*¶o®´(Æ_"eÅûl9|ĞÃ&·•?ûx%’?HşYüü!/N}É«.Öp6S£.ŠçĞ‚oÙ}z/gbrxMo™À¨’¨2¬w+›^6gWLgşüŸYq¶štÙ¯æ¼ÆÄç§3ûP6*õµüç{b'»Ö,dj$±åG×¿½P”Î,‰Dr'1ÅØÄG#Ì™,ï,¦Ø7î@›}äW¥i6¥îíè5dOŒè†ŸÈ‰îæ«£öÊşH$sÔ™$EœÔgçÚScZ†1º
-#Š2.­åRR(!rlûN¶†§’®úÓö´jH<Æ–mÛ¡¸s¾€Ê´¸‰DŸ=Â®ƒÇM.¡LûGgöšRV˜E~^išsœ‰Ê&?år}Hg‰D"ùÓ1ÃÈØWcÌnwš¡ZbğÈ³<=~8#Ggì”gù¿—_æÕg§0şş‘Œ˜ò<ƒ»pGn+Çk…µ&Òş ù«)Î$ıÒ)6oİÁæc±\I¿B¼…›w±cW(±ye”˜Z`af¦O%ñ[Ì01qÄÃ×K-¥Ú2ÔZcl•%¿[5‰Ø½EEè<;âêêCm9ÃœeK¬•'JıŠ5)£¼4•èİ;Ù·y3ûNF)âüŞåĞÙ¥ÛòÕhL,êìC:³H$ÉÜšİÃÈ6±bí&¾šzıÚ¶¥Ù=Sùhõ2Ö>İ“®íëŞn,06qÁÍÇêJò"’äE³gÉÇŒ›ø0÷¿º–!Ù»æ[>˜<)>déÑ+Ä)²ÏÚÊ7‘¾®\‹0°U·ã›˜áæ¨h¸4lÖ‰]šâ­¬`R^®ˆ¯kÎ!:–2U:Y)dää×=¤k¦HÒc™şy›6|ÇoŞKë²4rT¥”Ú:ãikOc¥]µ²/×SDIş¶½ş2ïL›ÆôÖ°ñ\¥ù)¤¥¦TN-%-“´Ü4Š Çacç‰“KGÌÍÚÓ¥•N¼êìC:³H$‰D"ùO»ù%fLböF5\‹õ…DrhK¯_æƒ/Ç1(gA“^ç—ç‰*T6(*E›J†VËÍìt(ë ¬›[T‚ØT )Ì"|şPÙ…^şŠ õšªw4™Å´>é)œÌâòôÕ¹Å¥œJJ§ì:!ç€­ë ß¾‡'O²~ö‹Œu;ÏŞO»0°O—Jg5QgğôDä—Şğ8jïãz¤P”H$’jË×®^Á¿2‰HÕdı÷èl6D«¸éˆÕí"µ ul™ÊŸuØWêAµL/#F0¢FyêÃµ°g&s^«¹íÇÌYŠÌó/£Bùrgâàö(r¬š0ä…·xå•Õ¬Y6•»ĞÈ¡)m‡ŒâéÏ0¨"”‡røb
-è²)JßÆ‚Iã™bøL}m&«.Bql³zS"°ª[M­¸÷3^ûp.3Ÿyˆá-Å õõ¨3£‰Şñ).9Yé£Ê&3ù2ûã¹²â8Q‰¹3mq
-Ùg1kâX&ê÷å)Ÿ¾Šà<ÌİòA:‡­Ÿ~ÄÂÛxE—âÛ1àñg™ôpg:j£H:pˆ³)jònğ;×*û^V^®Juûéõè…¢tf‘H$ÿ]4hJR8¿îk–ı²œ¹?±pñÖ/ D?³üö`llŠƒ³fæ6†š?—Œó[8´ëVm^Ï–mkÙN¦êOŠWT†6¿”åÏßsF5ùI$[Ê¬O¿â;‘éeóf6×(¿ş2Ÿ_–-¯õsÓªU$šÍòe¿°xeÍm•ºíûXgÜ¿%*E¤†ï`ûšùÌŞUÂYÎÄåÁ…SûÙº³Ç@Rv®fçŠCœ.lDÛûFpÏ]Åe^ârrùE9”^<Â¶¤Q’™HÄÎƒ,?Dq™PŠXYÚ`+&3š(ÊÅk3,õı+¿sSKœšİC¯şÃéß¥5ÍÜjNJÎ#;ş~ZÃ–İ¸œ]H©î[0 }–©Y¨ŠÕ‹Uó3)9µ—uÛÒ(0Ò(ûxÓ{w³ï|&™¡ÛÙ¶çÁñe˜5iÏÀÑ£éeUDIL4—ãË1vjËĞïÂßÁ««&AŒ\p´7ÁÌÒÕÆÜ?gL«ù¨Hg‰D"¹J1ªôhÂÖ¯fÙ7ß²öÈeöì;ÀÖE_òıò­_Ê#·¤î!™[ÁØØDŠ+…¢^8•è…SİÏñ·—’Œ+¤åeªÜLÕ¥ÑÛF\ZAåéï‚&ŸÜ+qœŞMzi9b†”‰	gv°êç9|ôáB6¦›bÖ¡ƒ†ç¾!Ê¹¹rcVnÚ9QÇ9²y?í‰'«TËÕOM[‚:û"Á‹¿`ÕtRÍ:Ğ}Ğ½Ü;¸7½-°·ˆäì©Clİz–äRaa1l'ù’CÂñ-Êïw‹OåR¤uÂ§Û]4jhIÑ¹-¬›û‹×³iÅ,[ò#AËw°sïERì4¸8Yag¡ˆ:\¬mAe»Ÿ/Şî.è2’9²k-ûÎ$¡qñ£¡¯^ÊÏØXŠ.¾8[[]Šå¥äFïæÈ¾:M4™d]¹Ìñ=…4±·RD¦)ZÇ üÚtcR_åı5f£ìK#k[JŒÜ•}iˆ—{%igØ·v-ë¯g_b>Ô&hÍ-hß®1^edŸÙËÑ#Ñœ+tÀÓßŒŒÓ{8´c3;‚C‰Ì6¢A›¸˜ak°:XYÒÆÇ3¥¯*¤3‹D"‘*Ô”ä_âÜ_øvÂË|{0Ôr¬--)ãÈ÷Ï1cÕqÎ\Q¡¾©VÔ¢Ve““‘Af¶
-¡-o¨7ôC±Ùú¡Ø5­Ï®R”¯¿!†ˆ„=NS’O~vµ‰êEìæeıfòzM|[ö£Qã@lÌ”{UQ)çì 46´Ûg4½#å?SSsŒê›šE|éaœ\·’¦®åtn1…Ê±e„ocÓ/ßğÊ¢hÌqï:‰ï|ÏòM›X·z)s¦µ¤{SK¬Í!?+Ÿ³GÂH*Ó\›—¥Î $a?ë·”’”×†»z“Ï–¯å×_3}dcÚ¸šcNšò€°+Ex´¶“üQQ”QLy²)Í]ÑµÇÛÂYdıæ~4–¡¡¬øàéL•ïÒ)Î}g_z‹9û-ñÌ =éÜµ+C{šGŠ¹òëJ¶ì?FhÖeT;äóu—±êÙwµ"ÀÒWo/ú5õÂÍ¦J&B¹òûŒİö:Ÿ¿Séh²9²jö¢’"JUX¶åûºÒÜÓeµˆÛhÛB)¶˜š)¢ÕÁ™–Ê¾<òÜT†Dsbõ:¶î#"é"§~ùˆ%SFâ©•Ì}ıU^zwû'óÀ´ÑŒê:ó ËßÆóÏLcÚ´i¼üùJvf˜Óÿƒigk‰ğzVúğòñ¤¥·¦Â:jà7šP§””¤[·n®¸¸X¼½JVV–nÔ¨QºŸ~úIg¨•H$’ÛGxx¸îı÷ß×½ùæ›†š?‰¬ƒºµïMÔp¶×Ù(—B#¥2E7zĞ ][ñŞØXgaïª›øÕNİÁ+†mj¥\))ºƒ³Æè&÷ì©8f–n}ŠNW,ª«Q^”¥K\>A7 »¢ãzêz_ ;¢Ô—V.®•üsku+æ½­ëğÕI]ZZ©ÉÒ[ûî	uÿ[¯Í)Ö•D®ÔÍza„Î«mµºÊÍ¯§ìŠîèüÿé¦´:ÒR)÷è^XxBšoX~›Ç¿d´® KıW|Ó'èúôĞ5½Dw,«HW¤Ûÿ»Gçhc¦³qj {4èŒî@T.¯¸L§g]EE¹N]¦şúİ˜ÎÊq7Ñ¹ú}¬œÿ|]ve«:]ö]Êúgu~®¶:ã¡ÓuomŠÒ•j+tÚB]qÎİ·ƒ;ë:cªóè0T7å×]vÍNò"UwrÑsºg;6Óy·˜¥Û”Z ËÕWöë¶Ï§³wrÑ?ºL·òx¤.33Y—œ|­d«TºüÜ\]^F†şï¼ÔT]zò^İŠ—Çè†úvÖ5xu£îÌÅ8]F^‘®¸¬L§)©\'[U¦S—Wè{T}'3Ó“uéÙyº‚RñM­†6Vw~ÃGº©Æ®:/××t_í<ªÛ¦ü¦ßèªsõôÔOZ¦[zEW—­S<uyÊ¾d+ı¤†¯Ğ}ûä İİ­zëøş”î|Ì•ëö?9%U—œ¥Ò©
-ru¹Ùé×/3”ÔŒ,]òıV¾şÊ~”êŠE™Ù:qi©¸v¿Ñ„õ|Ô“H$’§ˆ9Y»t§r
-(ÂRQCiÛk4O¼ùÏ=7Œ6Td±û§E¬]€:ı$*”ö²Ã9{"°05…VØ9ñr_sÚxÿóYµ¿‚ûº`iaJÂ9¬[»”-—Ôx4ñÇÅÔ”âŒxÒcI)( ÓÆ{c#Ó®ÇÌVí»Ó«_å°œ!#;ü[H*¡Ÿ„¿á}÷>A»£‰-2,¨SŒê™š%?æ,á—.pZUL™©ãìC¬øq%[7Â²aF¿·”g·¤£ŸVfúá0Ñ¶¹]Úuè‡Ÿ_Kå³Ğ¡++¿>´‰N©Ó–S¦TT„®!âD0Á‰"µVN=i×Ç¿–åä«8™FÙË-¹ó8Ñ´Ç î¾¯ñóøäÑ1ŒN ½É{[Ó01ÏÜE¿Vş¸ºzáåu­8ÛÚbïèˆƒ››ò·ÂYd5;7Ç“çİ•'èãF¸9Xcef†©¥­²‡²®æ&"Q%UßIWw/Ü°«6”¬ÇØƒFİ‡0eÁ4î©ØÎ¦é¯ğî‡KÙ§ògğ«YşÜİôh ·(:)ûâ`m†³Y4û—nbûŞ2´^ƒ}kûù\·ÿ^x¹Øbkçˆ£³ûõËÅÃÍ'+”K„²X‰>\±3û]¹{µ¡?éÌ"‘Hş+hÕE$ú‰{D®ãtCÎS!2)ÒÙãÚ¢/C&Là™'ÑÆÆÕÅìÜ¹‹‡c)0¬Y
-MQÇ9›”MBQ9jô#6W•J%ZòsâĞ”İX]]İ¿m+ùõ|.émi‹eñNl;ÄÁàËdUØĞ¢y#ìÌŠH¾EFJ*˜š`dk…¥rÅ¯]š)7?ÿ–4o×‘ÎÊQ˜“MI™u½ıYJQeF¾{-ÛÎg’UZq½Óó¡Ñ(¢T9º:tXNRéY	ä¥Qx~=?õ#·#×¥C})ŞC{oKıMíbœ8‘˜Ó©¤Æ*:ÁÓÎşø˜›r5|£™9¦öÎøc“v‘3[á»Ïf0cÆL¥|ÃŠ8Ä¦ê¢R2¡˜§Õê¥ºäŸˆòoÔ…®LâÿŞÇ½½ºÓ£S':õÂ½#'ğÖ”y°½7®ÿ]%/ö Á«Äwã¥Ìâ»_BIr¤×#1¶µÖ¦·Ã¶f]ƒ´pSŞz„‘÷bØıòğ“/0uô`F¶óTöOSé”dØ—¿!hm*¥z2dÊ}ôV~ÕÄéíF:³H$’ÿ0e”%ºd%Çâ(óoK»®íhåR†™ñ)Î#ü’)í0şÅÇÕ­ö9D…îcÃ²lÙMªÁÉBßš*Ôs[Ø²y?gÒ²É!ƒìÔ0‚·†rYd{ĞÏwÓP’{…Ë'¶³ûÄE2r…PÌ%7ı'«9mT:rœçÈ†¬ZÂøDİ°övÃ³âáÛ—³m_"‘‰ÂÙÒsã
-r/mçà±3\ŒÏQ´X.¥±'Ù™^GJ1™Ù¤'à&R
-â‹£Á{³>hrÈM‰!äde^şx¸ÛâtmjÖMç%‚ÃÛ¢I«vşU“ÿ>Ë¥dqéßÄ¼¹›8’m÷À±<4~}*2À L…ƒË•ó‡Ø¼y“RV²hÅNÍÁŞÇ¶tÂßªZ†¬uäÁ¾ÊçìjOÎÙlüñ}Ş¿²ü¸1š³Ê9¥Lƒ.;m5£ HşAXzâŞ¤#ƒìH—®éØQ”ŞôëÚ›‡»6ÄÚ¼î§›²‚TÒbOsút˜R2¨hŞ“¾O`Âø~´±W9n›D²ÆÂ®}^~çŞ{÷”òÜãÕ¿ãåç$‘©ìKè9N_*Ã®õ=Ÿ:šñã: ¬VÇÃàíá7š°¶ñè*äE‰Dr§ùSç(Vdêò®¬Ô½ëå¢ó§‹näKsuKv,Ñ}?ÌFçde¤ƒ¡º1/¯ĞÈÌÖåæféâ®Î±öA_SƒWuAg.êÎæüœ?°Hô(:'½ıĞP\tö®èŞİz^+Ö‹Ô…l™­{·':{‹êëÕh/r§nËì)ºÊ2‹ªuüéz?3K·{ë»ºû]íu.†z—V½uÃ>Ûª[ü¬«®³oU{J±qÒñhnÑó×ÍMª,†ùVÊzFÆv:û—t³¶_ÔİpúeurNê=£ëiá¨³¸{–nşñ]®aQm\?'SìßoÏŸ(qÏè6¾Úàúã¨*m§èüv§.¼Úú¢DîüV7{JÛjëšé,m:èz®}~¨®\¹·¥¬×Í3P×ÓËKçU­x¸Øél,Mu4h¯k0i•îTvQís<%ÿr¢vé¶¼á¥kİ¤ês®{î°ä·ÔÔ„Fâå‡GHHC†ÁÊêZ¾%áùòÔSO1hĞ }ñóó3,‘H$’ÛÃ¹sçP.J¨Õj>şøcCí¢4‘œˆµ¼tßv¤÷ağ»Óx~š'»¿¢÷‹kIÍÑbmgCë»‡1ú…Oèt¨'ïşr…£1b¼Ôc+\m”§~cıpŒ°†©‹rÈ/Vş’E²ÌØ[g¬ÌŒ11ª@[VJ‰*Â²êëÕh¯BCY©ğ`.Ò[Üô«™Zbai‰½e…9…¨Å¼I¥ÚØÌk;¬´9–V ï&#­p¶±Àò7ÃdÔª"ŠTÅŠbu§Ó«øäÑNô
-°«ŸuâÊ^¶®˜Ë¨÷öPÖó~şä!ìÖˆºREk‹³Iİø<“?ÛÍŞ0£ğ·çO «Ğ¢)Ê¢ D{í8ª0³ÁÆÖ;ÃœÄ*„7xiq!yEUƒÄmôä3L}y÷6±ÃR9 ëæ”³©-UÎm!%jÍuÃìC³ùvá:æÅxàõÈç©+>5¶—ü“¿Ë2åw™wõwiŠ™…¶µ}7$5©©	k^I$‰äßKi	eéIœÑjÉ#‡¢’B
-MhĞk
-oŞoCRŠUÙDïàç7'ñö²4"SÓ­[†ëB…VEnzi†|ªi9ä–ÙPÑf
-ÏÍšÏ×ŒcbEÌU”P•Fº>÷ªòš•G‘=CŞ`ú÷?0ç¥(¿¾½´L²òì°°€×ßx€-<@ÑÂ<2óµ”´Ì„	ĞÍSJ"´O9…4ò/Íùšï§Od¨®Ë¢\r2Ò®å|½Z2ÉVD¢c‹®Œ™±”Æ·§­—uı‡°A'æYª5Ztá©äæ—r£Ù–Z™©á¨K«¼€j¯¡¤¦¥“¥Òc›–}Ï¢7†âlo©h[EØæf^·¾(i™¹ŠHtÁŞyo,ZÉ²MßñáóÃèã§ˆçZ…€R£ˆT;7Ü¯NîwSJ‰ÇbHËÔÇ“kÛĞCØ&RHüÃA¯-¼ğğ¬ú¬İqs©ë»!¹z‹bAAşÇ€YU¸niQ”H$wš?Õ¢XCÆ‰…<0á;Â2mè1í¦½ö#½T¤œâ—…A¬Şk˜³fÀ³ÛSLÛŞ-Œ”§ì‹†Új˜X@Ã¾ŒĞ
-Ou(—Nd_-«afí†1®«;v©§8{ü!©†eWqRà[(¢»HR’!O¬¡ş3ÈNN ,úZşXÏ®#èŞŞOÕ%BVì#L©»‘3†“O3ÚG7¯ksşêEÚaö­ş™ÇŸ_AôıàMßŸ‘¿µ)gFDPPCl±nŞƒ®½	¸ARšÊãhI ƒ
-U|A[Â(,¹á‘`eÛaS»ággqmNb½ÙxR‰Ú>›o?\ÏöĞ"ÌzÜÏ£³æğb'[ìkzªJ$ÿ!jjB½P,--%//777LªEç–BQ"‘ÜişT¡¨N&7zoz›-i¹8Œ~G{‡·zÛé‹\Àëw¼Nèû?îĞ“~7R9ÿŠ¢Û¶”OşˆÍŠN-î6‘q£ÇğÜ°n´oæ†HTV¦Ä˜ø$ÂNàÜ–™ü°_¹éXäáå…ï§›CeS5eª+¤œû•yïÎdÅ©<âŒ»Ò}Ä>›ıİœ-u¢ä?LMM¨ÿ9ÈÌ,‰ä?…5¦®ŞØš`c
-‘ñ)=éêœ@ßÓyáóMlÚt­|5õ)6¸ú7§O,,ŒàØRV|û-¯ı´—ˆ”’”½÷'¾~çq&üo&Ÿn7¢ Ôûö	 ÉßB$Šyšy$ÙÏîŸ^æÇãŠHÌ·Äº}'ü‡ö¥‹‰IMM(‰ä?„æÖtm†³·ò6ü
-yû/®ü)cçİ[<|Ú2ø¡QXZz“2ïYîëÒ…îJôì<–Jª\¦Å3SG1nhsœ*+ÿbb94ƒÆ¼ÄëkÑ;!Áİë6˜ÿĞ¯!‘H®G
-E‰DòÂS¼±²u€²lJò“IÎm ë¤(–èİ«øøÑÙlV‘©N tÅ>ú“W]$GänıW¡œ;§ ¼û=ÃâwGÓµÊÙF•MzŠÁÉ$[EQi9ÛÑ÷•Y¶æE¦hNã^Ëw’
-µJïÉ<ıù‰ŒY9®+Óx=h-Û…R‘º¶{ncÆô¤­u­ùl$’ÿ<&ï‹ˆ£
-–––¸ºº^7G±¤¤„={öàããCãÆqvv6,‘H$’ÛCFF‘‘‘hµZ`¨½ƒè´˜—'qâà%®$e»+:İM×fX˜Ö×'2ƒØ}[ØüÃn;FŒ*•ÈÓûØ·a;öŸäDfÅ¾ø¹Úábó/ &˜Úºàãmƒ¦´íØ~ıúı¦|/CGŒdx¯†4°·¬=¥àB§«@[œEf‰9FE©dÅ†°yßi¢££•’@Rv…6°i1”É“Ç1î‘toé‰‹LLöïF“OIÚy6ER¢ü.­\l¸>^|©áû8¼q=k÷§câë‡½ò€#ÂéÜ|ÛÕ5áYrssyã7hİº5¤U«V†%‰Dr{8sæ›7o¦¢¢‚3fjï jåâv‚Ÿ^~›åŞ›nÓ¾ãçÇ[âegVÏp1Ñüâ‚>ú™åµå€¶VªœÃ¯¯fD ûŸ*”$×(Š=ÀÑ½ùvK¬¡Æ€CcÛâ©İğµ³Ğ;âHşˆüäÂÁêò•xT	aÍ4cÌ’)Ü;¼×¹çªc8ô³ò›ÚÅ«	|·àUz;¤“—RmoFE9ä_&äBé9† R¦æàHW?—:S
-ÖDd$JÍÉ#JãMo‡Zb¥ÖˆDœ K®½)¿„ÊÈk¿&4s»şpKÎ,FFFú4.b#a]”H$’ÛM~~¥Ò×š?cå¢èÒ‡¾Ò¶­9ùY¹œ=rš„’2JõÁyëƒ.ŞøuvÆÉÆc#ìİiàá†«£V:+œ‹
-Qk5È+ç_‡M@?î™úÕuÎIú²ôk–¼Ü‡fR$şë)ŒÜÌšïŞ`ÊÏ1ååÊ+2äw¿Š¬(b£’¸PâÓƒ#éÛĞ
-ËØúm{SÊ•«@ì6~øü›0	M`Ò³/óÔ²3„§Ş8÷û54ä]ØÅ–¥_òè‚£Äf•P¦­ï«‚´ÓËX5s
-ı‰ı	Gùå½—ùèƒ Ÿ¾j«Š[rfùşÚ¶mKVV©©¿	ø%‘H$˜„„ı«¯¯¯şõÏ" Õİx6
-„Ü,4!‡	MR“«6,¼)N4ú"O~ğ%Ÿ²ÆÁzÏ|¹šûaÑô—àğ_Í|€¾­=°5l!‘Hş|œºMåÅŸ(¿Ë±tRŞ×e»Ë½FdÒeTÎŒîˆµ¹Y½·½)fÊU ğq¾œÿßM}š©]ŸäÃ5{~m€Ş2X?b‰8x‚ÃÊu&ÿ—W˜¾>šˆ´ú^°r)È-$;5™²¢„Ì?ÈÚ¸¶å©¸˜‘cX§nn(E ÅN:‘““Cbb"åå5ó+I$É#""Bÿ*¦¸ü™˜5mC/?zTäR^|’„´2ŠKoŠ1fVxµÂ°WÖ°bÍ+LÒ‘¶İè9z"ï/™Âà WÜÌÃ6‰ä/ÁØÂG'\mnh=ÎN$7×FY·'=Ú™cnfTïmoŠ‘‘¢2ípvíH÷MhÜ$••Ÿ,ãl¦•¶¾WoZ?ø4/-]ÁšŸ¿æÕAñs®ï¤[lì¬°w)§\WÄeU)å8TT ÑjëÔ~íììhÙ²%¦¦×Ïæï5j¤/b¾âùóçK$‰ä!†5D>Qñ Ú°aC½ÓÜŸŠ]sš4ó¦cK5êòF$Y/¥Ş˜Û5À³íPmKÓvX›9àÔ¨1îiFKÓßoH$B(%šJz™èà¤ü¶ë¥ßD¨„b,aÅ7ß0wÉÎ€¦Î
-%å¥’xáç‚C‰Ï/£¤ŞÑŒ)/M#3õ§Îœe×Å2ëkQ´ÀÌÜK+'LÍºÒ²ƒÍ©+:lMM¨?bˆYÌ26¾şÌˆ9Š666ôéÓG?¡ñğáÃúùDbÒ¹D"‘ü^„8SZ6nÜ¨rîØ±£şZóçâNÃ–ş´èîA¹òT—M‘Z&HşST(¿ùÜPN‡ç‘b®<øuhLC¥º~NmB¥±q!K>ı”ïnäxºò\S"	g–ÜhBlaç¾Ó„]¬ş@ª"3ú,§6oÖ;õU•#g£ITVQP%åèá-¬\»’-K?áã¹Û8E~(\ªÄÎ¹¾­S—ÒÉÓZcnÕs‹ntíÑo«:­¤55¡şß›eféÕ«—şi?&&†ĞĞP}ª-®Ş³¾%‰ä*âÚ!8Å…Hß×¡CÚ´icXúçâîÓšÆÍïÂVyîèÓ G«{Ğ‰DR¦Œ²°cÍË§ÈÉ‰–.†%õA(Â|Jrí172ÂŞ>—Â|¥ö:¡X®,ÕÑ¼÷Æ†ÄSÔ²ZpwÍ%B–Îa¦ppyrOM›Æãá­ÙAüz2…”ÔTR²ó9·ùGv&UÙë)Ş½×·ƒÛ	J%¶@MYi¹ÅJÒ[ÿ³ßšÀ£Sdê”G;r$ï/?JD¡;N.J¿ÆŠvqÇİÂ‚ºfGş®Ì,ÂüØ·o_Ú·oÏ7ß|Ã•+WĞhd‰Drësúôi‚‚‚˜4iR­Ó^ş4ìpvv§›"›yºcc%}`%’ÿš²bÂC~%/ÇŸ–´kz+9„ÄÁ@†9Ÿù'O²aş—<¶×MÌ§0ïó__IœËıÜ5rµ3,Ä\ ,UG’ppÙz’àã'Yùno]	âƒ‡»Ğ¥gºLû”ŸöøÒ®Ù`Şš6”ÎÃŸ§»•úÈÖ©'ˆ8²†××FpøûÁ|¼ ˜+¦òîâÍìYüCœm	»Cø•ßï\/¡(† İİ•‹i·núaè¯¾úŠ•+WrùòeÃ‰DrsÂÂÂ˜7o;vì`Ø°aôèÑ'å)ş/Ã¶)-?Í‡Ëñt7Ù×7à¶D"ùç£¢¬$’“òÉµj…Oó š»ÖK×s¬]qõòÂİÕQø®\E•CÉ…¬ÎÈ%ñÄ¯ìZ³ù»Î Õ†“š¥¡Ôµ=ÚØq·w™Ñ!,}õe¾>bCº¹-›ÛSÚû>öÃ;¥»ûSŞyìY›¹‰ãZãÚÈãl1lı%[f=ÇÛ¢0êñ*MœÊè6¸PD:ìl±,Ï%·<“¶¸š™ÜÒüéff©¨sˆD Æ¢¢"ÒÓÓõa-Ä<#1mkkû›9‰D"®bÚÊşıûõÁµÅÔ¼_dğğôôüë¬‰K¬Üñn€»)õ›˜$‘Hş!ˆ ëûvmfÙ†Ãœ‰J&-¤¢1±ÆJÑ=6I{øòÇƒä¤ÿ ^ôoîtUDİp[g?<m„#L2¡+~eÛºÍMEíÖ[¸[«lSnD‰kº´oE»6Ş¸ZQq>‚¤5W.…yö8—b.r>.““5øö»—>­íq­ÈäÄ#–%¶‡àaœ8}™ØÄlT¦f˜–$}2ŒÓÁÑdGD•£ÅØÁ]~*	gösààöF¤èÈK’/]fFƒ1¶e.çÖï'ÎÄß^w3¼ÕoÖë™¥6Äü"|{çÎúùŠbÛßß_oq27mC"‘üû+U×‡566V£]ºtÑ_ˆ$‰äN’vk¶`SÈõC¯-ú£_·¦ø†½ÏÀ·ÂhóÌ—<;ñ^îo~Í©îFÛz`}Å¼XöÌ\À®“ÉkÑ…SşŸ½ó ¬¢Èÿø'½÷^I¤÷"Ò;ˆŠå°œİSOïìıo==;zØATé„Ş{B Hï½çåõ÷òş³/H0@€Ğd?w{Gf÷íÌşvæ7ß™òÓ¢àô[‡—S·ƒ5ïıÂ6ñW‹¹ìDÜ]gğïû‡ÑÛ&…Ã­í*ô'‚ğÀ™p‘câ¯3
-”Ò÷ÀKLóeå×KIsèI—ïà®>-G+ª	ÍB±¨¨È¼LÅ¤I“prr²\zvrssÙ±C<ğš5ÄÇÇhV ’X”‘‘¹¶‘Æ"‹Ölc#C†áæ›o6ÿ¿Ï¹—‘‘‘¹8Ô¤obï¼GyùL÷5fLéKwËÉk˜S5á	E©Ç@úŒ$©O©gQRÒçgiL£ŒŒÌµ$¥Cú
-!5%ß"S‘‡¨ÈÈÈ\	4„vQÖP«²ÇÉÃgG{ìd÷Ô¾BQFFFFFFFFæ¯Ã©šĞ¬O·3‹ŒŒŒŒŒŒŒŒÌµÃ9íÌ"########síp^;³ÈÈÈÈÈÈÈÈÈüõ9¯Yddddddddd®=d¡(########Ó*æYÏÒ®	+W®$**
-;»Ó®)s‘6lÉÉÉæodddddddd.Ç5ÈñMêëëÍkà×„f¡˜˜˜ÈW_}E=d¡x‰Q(ÔÕÕñÊ+¯°{÷nó"æ×2ùùùæéøÒŠğ×*²Úl«‹CEE…y®ğğpKˆŒŒÌÅâr–·æÄÃ£i‡–VwfÙ¿?Ÿş9³fÍÂÛÛÛ|¡Ì¥!%%…ßÿİü’¤½´¥Š¯e¾ÿş{ÂÂÂÌë7]«È6h;²­.ë×¯§  €üã–™‹Åå,oÍ5Èq¡Øê:Š2222222222§"E™V1Ei\¢———¼G³Ì_“^‹"yé	›Y¼x%sì Yúsù²¯Ê&iãb~x÷3>ù|9û‹ÕÔé¡6{'	;°\ÜP}N7”‘‘‘‘‘¹²iugi°¢´i¿,eZCÚ8½&c)9IJéŠÇˆA[MîÖ_X½x_~ù3¿_Ê)5¨gvº†2J“cØ´!†˜¿ñË‚ßùiñVâäRª4 7)(>¸?ÏãûMéfÇ³w×&öÎ @Q™«™Vwf‘f¸”––^ó)d&“¤–¨®,§²VJ+½²Œ¤ŸæË%B ¥”ÑP_IiYu!È®È,£Ç`¨ 'ë›7ì"#õ åUÇX¶/•Ö`¹¦õÔfïaóç·sßığĞ‹ß²8Ï›ğ‡_æËyÏ2­³¾öù+çàÚ:·í%yûg¼úüC¼úåolÍ·ÜGFFFFFæ*EŞ™EæÌè•ü#/=v½7—˜¬:têd,×³]ñ~äçÏ`ì¤›ød[%9u–ß]Q8àè~ãß‰áç_gñÖŒ;™<ßØ7§3,ÿ¤L£ 9?b\Quı7¯}¿œK>â‹G!-¾bÓtU5*8R
-¾¡àèb	”‘‘‘‘‘ùk!Åk]%ŠŒ|şà6ÇPn	nF£U…®t­§²æëw&PiÒ¡VšĞ¦”¢­PÒ`mE‰¹G±ñ
-íQ´ÂÊÚ'O[Šãw’z4•RÜíÏ<¼Â1Œ¨>£xô±¸–¬eoj)…ø¸94‰¸¹Òq”}îE7WÜä!22222QÌBQÌò×F]•KÆïXºn.ßn<ÈşìZË™SÑcĞW’~dZ;”™”l_Ëºcàá}ÃˆŒÁÏÑÉrıŠ¾uq,Ë?ŸÅêMÉ)ÓSo9Õ}]ÅûæóO>àİw—°j_ºÈÜpûİ<~=”íû%«·°#[eù…„vÎ¶¸‡:ãÛ=_Âíì‘W•‘‘‘‘ù+ Of¹1@k„¨1N”gíå`l"é•:i–
-Ôd¿w11ÛØ›F‘V‡Ö¹×àêÔƒ!6ÔÔ;áfEøÈÎDv$ÔŞqß+µ;Ú¨*§*u?ÌÛFF½F7/)£¾–â„ÍìJÊ$£²ŠúÂ#\ğ¿oXÇÂ¯°jõ~(İqÇM ª|?û—üÄÂûÈ¨v<µ÷TèëîM ŠR222222W;òd–k
-ZE8w¡Ï#K˜ÿË×¼t˜š}+ù9®ƒ®uÂ|>|ûî½÷^ùÏ"6×v`àS?òñ¯ñşûïñä;¯òÔp_Ü,²ĞÅOº‹^©›=jëk)ÉH#3úF"û†d@¯­¡<{?k>¸Ÿ6Ÿ¶îäèáıl_UÌ€{d\Ç
-”©»Ø¸5²êZt3(¤3AéÛ‰_2“÷–]PBII•µz´N¸8Ú`ÕhDo2	KËÈÈÈÈÈ\ıÈ“Y®)²ˆ›;¹OıÀ¦R=šÒD$Õ²kWIG’)Pç³~ÉR<†NãÎ;ûĞÇí _®IF¡Ö“óïıçeú!
-q'cÓ¯
-4¸P7ó-«d“SDfü¯¼ßÃ¼¿¥šÌß1÷é'yò¿¿q4*Š?Şz‹_“’X·{1?>=…¡CGŠãQöô¸©¯<Ì4ï=|ÿèPÆ*Â§ğÀ;©ì«›Àc½qª+&]£¢È·ŒŒŒŒŒÌ_‰«r¯çòÄÅìÚ°ƒU£yüã©ôğvÆÍrîù[Y¼r;ŠİıÀkLgÛ|¯dlêéÿæ‘A^'{Ê.u¯çü|õé¯¬HváÆÏæòpTÇş—/—`K‘="\©M©§ÒÕ;}1&’R·ëé¾äÙUBt9‡‰ë<Äu.Lzÿ9né£¢rÃO<ññN¦|½ÇGqôºh½{uêêÊr©®,¢¸Ñ•Rªæã›º×¥±555­Ú=°Ë üìëÑU¤“Vj	4ã…W@×õÂ£.‡CGÑ¹„Ö±3aÊˆçÎU¿q£jâøíËbl®ëÂà}¸X[İ_z[Iù¤†Ã[³P×¥PTUÉªı§÷CgÃ òeVïÏßF|DôÁô'§3ˆ8–}ñíw:ä½ed.Œü­ï³r“‚b·Áüíñ ¾ôECîcĞ˜¡Œìèl¹ª‰s-oZ•p±1d9;‘²7‰‚-nç©iÚ²×³ÍÛ‚²²2RSS=z´9ğò#õ_Q·Œõñù¤‰Š¹Gàñ%HTÄ.eóïkùã@(#@¨›-Í.(ÜÉò«øyo	õ‘£˜ÔÙçšxÖ/YÂÜÍd„dz/\ì[,zrÉ©¨¨0¿¨n¸Á,\„n·œ¹pTG7²nG	Ê †L›Fo7\ë’x¤œÌ*_úO¼¾}ÇĞ¯{zõêN¯~ƒ¸¾{$a!ÁtèÒŸ>}û3 G'ÂC£ˆî;‘qzàŒ½Náİ¹şú!Dû	Û·ã7èC‡™3k§N,!ç=.şøw"2$œèÈ „×gT`tM&#Ë÷ğ^3€.¡¡tîÜ™èèè?ÁŞ®"->xŸz.Œ°`œ¬¬±rò!8LØ,ĞK.ö°AKÊÉŞ¹…Í?ÿÎ²;Ù)´v®¸¶ó=zU	GWÎbîOG)¢Ñ`[ÈÚåÉ±é€¯›#îíWæÚßVgÁ(Dpñ.æÍ[NÌÆõì‹gÇ"Ü#Ú×ï6=[³÷±c;7¯â·+ì}:1r@"#í©X7‹ù?_|ûÌÌLêëëéß¿¿%DFF¦mHÉ®ÅòåÛ‰ËUàãgä/æ³×¹a;1(ÌµéRçVŞÔhë3Ø5ó–ï=Àú-»ˆ+ WÙ‘Á#;àéd{N>½¹qtt´„bş·¯¯¯y‹Yz^q“Yu¢ÑÈ†_fóùç?1íŠ5ÂG›5”£Áˆ^øë¶PSQËí‰”kuèêª©V*ÈÒéÉ«©ÃØØ~¢ìJD/D¿»½u
-òÄ°q}›â2D5Õ‘>æÙ7^åõ7îã7Çg8^Ç†uöÅÓ³#‡İÁËÏ?Ã”®nø^á ›h :'‘mß|Ïë~å—¯çŠÜA2®™T4Ô—ä‘@ÂñãX…Õ*QšÚ‚ìı›Èª'=s'[ıÌŸ|Æ/û‹)ª¿ÊGsšD% Tar2 ²µC§µÂ³±‚ª!¼õgó'Òy•é;Øºp¾_ÅÖ#),w%zÄí<òô?xôïÃéê   î/j?™+“QËbÒcwŸÚ4Ñ³­X&„¦—šz˜œ”xËÄG­ğ…†Bê*’°+‡­¬z%Õ*!f.ƒ¢*T&
-;|C;sİ€¾D™ThÅ™öğWÇd!ÉÉ&ÃÁººJHI"¾tæäyàêáŒ—¿ätÅ¥§ï„ÊºF‹óÁlruF”>º¸i9ûWÇ£÷†öŠ¤kÅ.~{óIû÷“¼6gyŞ!Ü0}]Ä5M“ßÿêhD¡-¢¦*—›èã¯&TWDq±åô_púÌx’~[À/?|Ë7ó²ğÃ‡xhdGQšNbPUS[YI¥’«<¿f”=6¶>upÂÑ¹ˆ’Ò\rrkE¨´ºå_ [gèr¯}ğKæı—w™A/‡ÉÜ4<„@_é)Ï„äÀj9ºr›÷SÑëA^úñW~ıc)K_¾}üÅù¿¸ıdd®4ŒŒ%›øùÍ§ù¿·fóÓ²6ú?&Ë„Ğù1køê«Yø¿·™¿¿Jµî~öB«Ø£³q¢ÁÉ†ë¬­ZøÛóÇg¯!ÜñÍ×¼7ç;¾şúkq¼ÅGÿO/7GœÏÏq·àê˜Ìbç=âãÙKDb—ğó0ŞZ~qQblÌ¥¤Ü€æ´½‹!t0‘çæ>ÄPo—vzIWQzøu>/\zéÇ%=mËpíDä°ûxqË¶¼ø".YÂ¿^Ø<nõÚAIYÊ¾0‰	ÿÛÆV¶Ô1O`zì1{)†dñ÷ùö6ÚØØÚWÁDöÎÈÑ½è'Â¯ÔYòçKIÊ.îùƒCâßm³•äÀü4z]ú@RÊï¼òÖ&2ê54wa×Šıdd®Œz‰{Hª­$vw*şØÓFÿ§E£ÎgÓ’¥ìúü~û-†ÿ-MaÑ+o±*£Rs¡îIXğdn¿1çö2Òlµ¡C›&YN˜úSë)kã×Ösá
-Š**Ó·°òÍÛ¸÷ŞûxäÑÇyòÉÇyì÷sÏwsÛ­³Yzbg¡æM!ÏÒ£èà„‡¯+BÍ[{xááâŠÔn¿6°ÅÁÍ¯  ‚šşŞî—}Ï¥Å[GW<	ôğÀËßwOÑ*»6ºSÍ¨²ã8´e)_oÊ${á»¼ùéoü¸#›ærÑÅÉƒNIQi.…UÂŠ²UwX\÷ÁÜzë­Ì¸÷AŞX™Ñ†O3VØØJ»à8`kç€£“øwc#©%•Ô¾Uw• }ØIcëû¯òéë?	*Ï±÷Õ‡.S™~Ë$ş1XEÎÆ/yî—ƒ.h>â¯l?™+k{<ÿ“×>Ë¢…ïğöÓÃˆlÔb[µ‹ßŞşŠy|Á?|dö-<ğä{ìõşùŞ\~ùåWæÿ2‡ïf>À¸g:vÄÕ=áWİÃ‚	³±á¼FjIŞÒ–ğş«Â¿ú%ïoÍ~ZEZüRòÃğ·ûxâÁAtÎßÎÜõGÈ*“|I9âüì»ïçîÙûˆoá_Î³Z¸rvfQ V•‘ŸYÊ±›Øv°œJ¥kU¶l%YkƒQˆwgo\Ü-¿”'²sÕ|¾š¿˜]…M‹K‹ğvÔà­/¥ºÌ_Õíq°µ;¿—%#sÕRNîıŞW†Í‡xj˜uÉkÙ¼û )ÍösôèNX€&Š«F_ÄŞU«Ù_Dµ•h`©Yóó|öÑy÷İwy÷³ÏøàçŸùùƒøLúûİ¯™³`ÉÂ'éÍÃDNÒØh¢J¥F'+¹jÑ£W—¼|KcsÈ·ò&8¬™2ORYÅfÉèÑÖ$³cÁ¾6Ûæ3>ù|9û‹ÕÔ9†ÑuèÜqã(¦ùàĞß²tG2I¥§»ô×°ŸŒÌ•‡•=Á}<|<Ã®3`ÊZâ½÷ùïG_3÷·ŸY±n»v$9y6$SníŠ•±’ò£	ìÈ÷"lğ8F÷ÁÍXANE5N]ûâf‡Ğ ¶öÎÒ'¬púêœû&Ô•(máßmçĞ‘Dï]ÃÂE¿1kO	&{/lõu”çf“‘•C‰®Œ”Ä,Jk”hj)HÚÅO«cXıÓjö¥•q÷ò'®ğY¬pòé@Ôˆ{¸mhWBB"ğ
-!¼sN×å–‡FĞ'Â[©¥}Rîé
-ö³eél¾×\(ºáå¨Å±ü0±ëbX·6†˜ƒédT*›~$#s­ + '5¬|'ºßü/üëVF8P›¼—{’ˆßœ@n­+w?<\Q×ç²?¥ ]Ñ>¶ì"Ñ¹;£oœÂ+Ê¶ÍcÙªµ¬ÙG|ÜN¶oXÈ·/dùªeüşëOü<o[s5¢J}lN¢ê€ƒ½p4ÖVø8;ao{ñgì^4Œ*´UGÙúÃoì,Õ¢ò÷'ØOZ© µÆ„ºìûW/á·Ÿ×q TMyò,ı~&ßÏŸÏÂ%Ëùõ“ïù9¶Âz=¹nğxîâŒKÊ2V/]Â²É§ôÖşÅì'#sE¡¦¡,“£›¶pT¨¨QôtõÙdî_Â/~Â+‘^–A^E•ÆPn¼õú†øÕ)Šğ°¢:ö¢÷ÔûŞÉ×Ê?k­¦ƒwÇóëœ"°6']¿Íç“_°éÇĞ°F¬,àóß6Qp3}»†ák¨"/«˜ÊÆFŒ•u(u¢‘ª³ÆŞÉÏşX'm&5«”üË}ÛÀ>™ÅŸàŒ¿óFü÷xÂ²yÕü¼£çÑpwOÜôUädSP©QM}e)YÙTWÖb¥× ¨*¡´¤„’²jj•
-2°ø½‡ù÷ƒ·sç{óøå@:!ˆ„8–G‡Ë\(T¨Zjm´¨j)õ¡‹7U™$®ËgÿxŸß÷g’’ZD¸6Ã¤áHÚQ
-¦‘Úà…Ñlë³ GWÜõ"¯ÌZÈâ™¯óá0*ì‡3æï·3m´NU‡Ù½ïE•*íCğññÃßìDyëê§ÓÉå®:ôJUyd•ù`_–À±ûØ°7kC™iE¤nØÈ®ÔRâ…³Sç»zÉùxÜ0„q7¤Ÿú‹VïâPJ&%ÂGÕÔ™°vë‡W`(u{ç²lÑ\~ØšN‰ğÅe5ê¿ıdd®$…xŠ[ÊÜûŸ`A\…BHù÷Ç	0ÍÛ	§qS¸>4/ìQ÷áöûãîŞ•d/ŸÅ¼‡8¬îÆô‰°«¯&/_hÚ–$3+•:g=İ‚0ÍÃSlm¬±µˆ¯³ÒÅ±ıùxæ6¡U’1†\O¿~ı¸) åº/˜_Ò—I½Á×_ÿ‡×ŸÎkGüÜpIkÿ>7s_‹—[&UuuÔŸCÙ?™E[–Bê’—˜úÜ|öxOcê=Sy<*‰Êïå¦ñÒC¹õ“|WâGCõ&¾|x¾´›İ»Á5©ÙSæÅ»Ií‰Ç=ïóş=ôÌÚARRGœé€½$edşêx¢÷Ğ.¢5Ï¦·ngÒèÇy7Öƒgğ·¿w§OÄ&fÿsÓŞCZ}·_¯£rş³Üô¬(ƒI[Ù½xÿ{5[}ÿÁ«61ë¹™ÔÅO_Búôc€ıZ~{ÿÌå-63-ïßÇ}ïo¡¾OwïFG‘ÉAFùãâØN‹M^pïv7ïÄld­41lã|¾m<…šmöC?²xw,™ñ?òŞİ·ñÔax»zAb¿~÷ËÕu¨—¿ÆKwO2û±QÓßâ¹ßúóÂÂµ|ıÚ0úÔ6ítÃèIÜòÖ¦¿ıdd®$”õ(kŒÚô%0À!Ax‡D1ğ&ÑÅ?ÄOvÿãKÌ˜ô/ŞÙ4’qwŞÃÔ©^ærşÖ-C}ÃP¦|#4HNKò÷÷÷oİ…	×÷Â«¼„‚F#!şŞ„x¶\Cñ´ˆF}Mµ®3xìßÃ(Úü_>üp.ßí u]%Ë_»‰»'IYnåî—~c“ëPyr*;p|ÕéöâÊÚ™E•ÍÑ­Ëøşƒ¹Ä÷y‚éÓÆ2¦ƒUaË1œ¥• Tr8£ÇU‹Áù”&şP,Ÿn® 'Iø{ÁıCúâÕ›îB,^ŞnÅ‹º3ËEBQOÚ¯Ùæ÷7÷ï@ôY—i;ç³ÓÆ‰UêÅÿo9PG…ÖŸéÿ¾ib÷ñ9;æ4oıŒmŒDëÈu#{·ãÒ?±¤5|J¼çÃÅØmD]™AQ^óf	&ÈÏ@Ã±#dÖHã
-	°ÁÉ©ÜÜSgE;cïJÏa‘x;Úš—kÁ¨F§(!%>“Êr!B—­eGÒÉB»ô!2ĞY”ßR2•âÒsáŞ¸¶_v¹¼»ØHŸ†J9v$a>óâ7'‘2€
-´z5ŞHpÒ¦v‰”Q(İÈ‚GD¯‹n¿Ó!ïÌ"ó—§x'›~ÿ™Ç?<È°åù‰è` øĞ
-Vüo)_ãµáôq Á\~¥ñz!tébƒRYCa‹Â*4ˆ^hUKâMX‡Phò“ú ë	$Ä£å­–·¼ÍÄ,^ÀıŸ§ñğÌwèíi…‡ét	í±sğ¥Ó€î¹ÙãdSNÁŞu,{a&ï'Eñğ÷¯ó÷›ûÓ­•oàmÙ™Å,<hv¸ï¼óyRËe£l/Ûşøçş›Èğ¯æñøÈpºùœ}QUöv—ZSãÜÅ²™…Úl2RòÛÖcæ?»¹“şİ;ÓÑÓüçÁÕ'kÉß»œåoıºÅ‹ãÀQYB¾Ú—Şãf0(Hˆ¤è¨=÷Š_®¾ƒ_<ÏÒ´*6$*©síÉÄ×ßå£±¢uh^’À’æWŸbh24¤…3î‘»¸çµ›ò§-}ÎNmöNR²³9à0‡ÅÛ-ãç™KÙšæÍ¨Ïf2½q=[âr0 Ï4Ï’má²ŠŸs¥Q/ZæiìX´€E“m×ƒi³ŞäÁ..¸Ú]üW„­¤İZJâØQçƒ®8Gu=•o6÷º:]\d¡(ó—§6•ø¿òî{ß’9ƒë£ı	q7R_”OöÁL˜ñ_º½ƒ#<¸Ø>Z-oµ‡Ø»üg^}y)¼²ŒnïÁõá§í¨F«È#nn‡*Ñp­£2#™ÄU‡aê,}i£zûÒšôiM(J»ÄeìlöbWÌd
-•RM®h¬¥p,'N‡$ªjÈÙº”%?ÎeöŠ$kĞ5má–]Dï0rÇ°+K$^"e’›Şl·›s¡eM™ûôdí<JnÒV-ÿ¾åD¢KŠÈ%V.4E«®;]=…UJŒ'Î’æı:²ö$»&G<»’†óœ×¤+;Â‘ùôçU$©©ÉÍ%¯ê±Ê|ÒKP¦oà·¿`Şª®°üè/…º¢TRvÇ³š˜åøáû}$U‡=v2z¸áx•
-¤ó¡Q'sâ–.[ÀìÙß0÷Ûo™³$ôjjy’²ŒÌ•‰g}ÆğĞÍ£èíXFyV		©Í®5†3A",7a7[bbØ¶÷ø+–ß^
-<C	ŒèÂ˜`©©”Õ)Î°¶££¾†Òä#¤šwßÊ¦ Á™›§r÷¿ÆÑ¿cë"ñt\Ù“Yl°wÔco}ˆ_Öœôİâ¨¬§^­·|æ‘Ö4Ë!uÕ›·S»‚ùñµ¨š¶p¹†‘’Uu%•’ÍÊ*(«U£o¢ÊIÜ¯øñÍŸÙTbDsÎ™5V"óØÚ˜p(¬ÃŞÁ[×Ë¹”¹=nşì|ğşó<6~Ãı{óÀØ.¸8_Œ )Í6öˆÆ%èğëM'¿`ì·}ÌÏª¨±öÅÙÕê#ñ¹ù¸y
-»ü•a’¶˜³ŸäÉ?Ç“oşÆ®Š®}ä>şıÚ˜khÇŸ&F9Ù‰m^H|ü1¶ÕP³Š¸R5ç»j¹ŒŒÌEÆßè±Üüî2~Y¼ŒeËš_¾~ç'f²çÛWxëYáã|’·g~Çº¡•Úc¼6ãWpGLº¨¤€J…
-Åi¥ÎŞC¹ã‡ŸøÆòÒ±ğ§xl¨7an–ËÚÈ•=™%h=‡Oåı‰uxl89è»ÅñÀgÌZŸfÔ´WA¦~<›Ùâ¡ÖşüïŒ÷»$›æ_ÙHµS21/=&2‰°Ù”û˜úÖ&R¥ ²’Tº¥µIìI¬@§?W¥èŠ³—7‘#øÜôïLó•ä.Ò3T·ôW¶ìŞEzS`3šÒÚO´EÚc{K>}cŠ­)ÉUK£RzÒ3ò&Ş°'.íÉ•Œ]&=Ísó›ïøó!¯?<ˆkj³v.¾ôxh³—·ÅZ6Æ¼ÃİİÜ	çÈÈ\UxDcô‹ûX¿å¤[2ûcê—Úµ{x‡Ğ£÷ìR‘‘]IÑeZİïÊŠ6xwÁ”gÿà—¹sùáÿî`DWJLîhG=Å»ŸÌâëWîà¶AaB?KHİCöBIûâD€ŸN6X_ÓËŞèĞ*rÙõù»ü¾ß€.´}oğ£ÂÅw+kì‚;ĞÑÛ›p•‚ƒY9èR~kZñı”Uç_øa;²UÒ,ª÷Íæ‘ûïá/ğÁ»8¬÷q°ÂŞÃ_B]İÍ33/ºJ«ùüÁ³dG)¯Vºç-½ Ò$€æy£Ù³}´4DËâÓZU»>çíçø“]Ì×UIù´/#g<ÆØ-_p8¥œ²["Ğ1ùÑÑÁ‘ ¦ÛıïßÉwßæ;şxáéæpMõ$ÇÊÊ{× |ıÛ"€À OQ©Xs™çÊÉÈÈœ#Ö¶8z=xÒ¿ùûz›'‘]êÑyÖ>¸÷ìÏÄÆ$¨¬¡æÂ6X9oÌBñÊÙ™EÈ>áp{LeüÄ©L½í^yâY^ñ9^~øoÜrÓL½¡;İB<šf]ÊœÄ¼;ÍJæ,Ø O	Ë^ä€GïIÜ:}<t*`ÁšÃ$Õ»ââC„›†òì|ò³ö°kG.…":¸ª¨Ø°ôädb–üÄ¢Õ1¬ÚwÃ›~'Uë€²pñw±.¥Ì©@"g¡ÀÜ-^jôŠrÊSw²ü˜5F‘‡½ü¤Ù)ôêbR–Îœ˜=ìÌ®mº¸µTfcÛwÛIN\ËŠ…¿³nG’66ê¥Å’W°;¥„J£®ÖJnHæhòqİ,Û°“TU!İoæ¾¡Nd¤$±?¥•´8²VÎ.¸ÛØródddddddš°÷Ä9lîa&Œ ôU*WøÎ,§àß‡7=Àÿz€g†‡âv!Óiÿâ4íN³’;@n£#QıwÓbT¨i¨6¥Šå·¹‹øí÷¤TÖcpÕ£NÚÉÊIUÙàNdTgBº0ú–Ûèdµª”œÒ*Jq'ÈGAYæ>¶lI"½NdÚ@\¬õ¨:ê-é¸ÔhUBğ—c	ÄÚß	+'õ•iÜ°„…ß|ÈÌïæòÃokØº'“Ì†(zíI_¹qìX»?Ö8²+†Ôíl_ü¿­ˆaíº¬‹M§\ëŒX8Qºà2œÉ·N¦³[5U)[Øµi+›w¤SìIjê²ê”Xuî,¸	[’z£VWD‘‘‘‘‘‘iN8¸ueø3Ï3îNÆ½Âwf‘9_õU¨Ulm‚ñíÏß~|›{Fª©\ù_{æÙTN÷Â6ÍúŒ?¶æQi€kAb
-¨×&qlç
-Î;Â±¨˜òüÿñÕüù|óê¿yl\?ºìKíÖ_Ùp —¤}I”ìËdkıL¼>Œ`'#¶ö4Xºæ/õX½zçnõŞÌ‘2%Ç4F´±,ÿäs–g;¡MÚÊÎ9ŸğÖ¬]ìÑßÏó?Ë£|ĞÄogİÛIêÄ€ï O¸å»~å»×äéßà‹íÔç&¿f9ó6e š|3÷¿òsæÿÄ?ÛRµèI|úEüb;EõVôš8€¦¢K£ŠõÔº¹£÷tÃùZü+####sÕrêd–+kÁíköZG±ñÈ¼7ëWæ¦x0åµ¯y¼ßåÓ9KXRÎÿÅ£<qu´ÆÊÆÆÜRĞëOÍ'…;ãáëb^ˆ\}&£ƒ¦–jE;>{ŸœP÷}ˆÏŸHgq“I²A…Ú`³»·y°ï…tLŸëºxFzRdh5j“-Fiıckt¤gsÂÃÛm½­Î€±&›Š¸ÅÜûé*
-Ü¦rÏ½·ğØôøX~qk[¬\ñvwÄÖÚ„Aİ€Z©DÙÌ|6Â.®¸Ù‹‡×+©®WÑhë„³ë¹‹Å«jÅËŒl«‹ƒ¼¢ŒÌ¥ãr–·¶,¸}©;€d.Ö‘ã¹éÆqÜÕ¥‚õï?Ì½wŞÅ??]ÉaÇ!L~ğ%^EXx0ÒÀ\|}}OÔ=yøàŠ£Y$J»|ÉÇwÜÉŒ{ãŸOü_®Õã5†wŒ¤«¸ÎYºÎÖ7OßË7Ø×ÆÜ¼ñ÷ÏäïŠ¢š#?®bËºçy÷İŸùcgzó³Iëû	!,íŸ+=o§ŞDOz”Ï>ŸÍ/Ÿ<Á?oDts{è²ó/xòåxe^<¹Jza™?Oä6õvÇMÚE2€½•¾ÂÆr¢ŒŒŒŒÌUY(^I“YdÎ·0ºÇä©SäE@ı6j<»ÒuÄÜ7õú;ãv…¸u cß¾ôíÛOC™0ã~şvëÆw÷5¯TeæuE‡9ğÇB~9RDÊ¶µdH$Í2£¹BĞ9ö`ìø‰­O’rô&¨CúöêJ¯/\l­¯Ğg–‘‘‘‘‘i®®É,2ç„£‡?¾á×Ñ!<’N¶ø…ö¤sTºŸ×T):¸‰;,»Ú40cBO:^ÑÓy­°wsÀïº|®»›)£»Ó¿ƒ6ËésáødªçåÙé=v²3¯Ü)#####óWEÌòW¦*ŸÒCkùcåfïs%qİ%¤pô2­½tyğ'lÀm<¶p!{Œ—¿ù†ûÿ=ƒ1á–Ó2222222§åÊŞ™EæÂÄ°û><±šü¾}óùèéIò²œ—‘‘‘‘‘‘‘9d¡øWÂÆGW¯f“,|ñvwBšc!#######s®˜—Ç9xğ _}õÕ‰©Ğ2—òòr²²²ÌSÓ;FYY³]O®A:„»»;:u²„\{È6h;²­.™™™Ô××Ó¯_?KˆŒŒÌÅâr–·æäøò8RZŠ‹‹‰ŠŠ2Ov6ÅÃ‡óİwß™g¹H2—¥R‰B¡à¹çcïŞ½äææZÎ\›Hë79::âãó§Õ¯$H“Ëä5MÏNIIÉ5—_¤ñCÒ¸òKHûs)â‘‘iâr–·æä¸P”ÒR[[‹ŸŸŸy²³Y(ÆÇÇ3{öl>şøcó292—ôôtÖ¬Yc^hSš’~­³hÑ"ógóQ£FYB®=$Hk]>Ü"s:–,Ybv®×R~Ù¾}»Y ßu×]–öçRÄ!##ÓÄå,o­iyÁm™6!E™V1Ei<”ô-úøâŠ222222222×§İ™E.ïÌ"######Ón˜LÒì´F#zKĞÅÇ(¢ÕˆhMˆheÎ‘VwfQ©Tƒ¶“E5õ”•ÖÓ ÿ¶ÿ	)‰8¥óâ_g “Q‹¢LúL÷;£V‹V<›´¶ø™ïß
-">MC=¥"NÑ$RpÎtô|:Õ•õÔ*´—°4£QØN­Ú¬-ékë»l^…¢¶Êêó´}{"]Úq¨Õ÷g2Ò¨WRSZB¥CêEgzó±Ë5€Iä©vó#W"'ÊL9ÅÅ•WF—‘¹bõAâX>
-–ĞœÉ?_ ªÚ£diQ
-±(=:Ššµğó¦¿Vyö;m\šYê²©Ü2‹Éãf1oW6Å–à?!„œ±¼œrQ±h-A­SGCå>æNş–Mgºß)ÇÆrpõjˆŸ³H+e×¼YŒ›<—-•"§áL×éE±82—çÅ;sbÉ²_RĞÖÔP.şù§ŒÔ–ôµõ]6'k5sŞ™ÅÃÏ§íÛñìÂ5–?[ -¥.åwŞ˜ø"sW¥vª;Ósœ]®´¢LWTTüuÅâ‰2s>|eäq™+QwWÅ2÷ş¥ÄÇó§İdÏäŸ/€ºì8ö~{Ÿí>JfPi¤ìZÉkol £Ns½q•q¦:¾hg¡XGÖö˜óõçü;9œGÆg²ç‡—øø‹Øœg¹DP—¸ˆŞ{Œ›n{’{ŸÙ@j­å\ò6³è/qÓMÏòÈÓIx¾<è^A´iÅ4ñÛ÷3wKË¿2k;›æ<+îyÓÉã±÷xcQ"Uâ¼Ô²ÉÛü.ÿ[µ‘•vÑ¼û²'O?ÂïKâHŞD3Ît¢@dÔ_á¼3š^ÙğÒ»,>ª‹\«4jTíœÉOßËM3ŞæÿşK©ŞtZ ¤"}+>x„»¶zİµıáÿñÎ)é+OXÄ’ß?çéŒh^~7»•Ÿ³ê”wy-ZE:;gŞÇÓ+Š(s5Ò×v	¯Şó ßï­¦@xˆ¶Ø¾=ĞV¤“¾âÿ¸ï®Û¸éî/™³"Í|ÿæ˜ŸíûwøçRşæMøæÍeÓ¢X”X‡^UÍ±ÅğÒ†"zEsçÀ"vŠçøÅòçf—‹GİáßX·y¿>m3æ¼1ç¡]ŸóóæìÈVYB-äoeñ—_ğÀ/ğÆïgÆûˆ—#\UÙá8Ö>¿‘Ã¢LŸËãå‰‰¤lİJšø·¡)è
-ÃRfŞºŸ»^ÊÃÖÓ°°,v­ÿ E—‘‘iÔÛU‡¢r)ÛbSIÎR¶É?_(vv8Ùû°wo*YUµ(uM=ŠµjmêQ”j£*òòÊ)ÏI¢ 3–Å;«PiÏ£–ÒV ÈİÄÌO6—^!<É…sö:¾}1ÅöšÌ¢ÌJ¦¼^¼Ğ0”›ï¹‘ùäeÄ²ñØI•eëDh¨¶j2v Ğ6}~>Qèı‚,Ú–É‘zºöïGÿ½4¥án8[.k•F¡rê“Ù¾{û÷åR'Y¯ŠÑ‚©Ôàß¿?½ÅÑ_:ºGÑ9È;Ëoc×’_ìE§Áƒ™2±7ı‚”ìO8Æ¾c%M/ùl×%"ëè16-QâÑ›aã3¢·6ÊBlH¦T£¿¸=Ö¶ØyGÒ9Ü»ÚZò—¡ÁÇ3‘¦$—Ê‚ÊûÓ­ç &OŸÈ]¬0äï`áÁ!ÅÛPfql_6	ûm	ê7˜‰S3¸“-ÅùÙ¬Í¢^Ü§y¦Ô×UQ“z÷.wÈ˜‰c?¢åëùı@ùÕª3ÛŞrŸöÀÚŞ¿HzEÚ¡È,§8§æ”d9‡2HÛUCTOº‘öTä±)6‰ŠÒ#¬[PÒ&‚Ş#3nXNå,Ùt„£Y‡H<»\¤òQ¸‹½ù:Jônó¡W“¼üsæ|ö.ï¾û.ŸÍYÀòdjË÷ôÚììYÒtN:–ìÉ »Ô•[û.3?j
-Ÿ¿j'‰RQyÈŞ+ÏúÃ”æ§4…ÇÑ› \w]ş½èì…‡“4èÙ„AUHMŞJæ©©‘2]›PQWH^r¹gá¢Ûï<Ğ”¤²s=óÖä£êr=ãn{„û§u¡Ÿ÷av®]Ï|aO)ËÈÈ4ÇN¸/¼#üqqk}üó…ccã€«›=İ±µ³Eïè„öøäT£06µşmÔ«E¿š%?}ÁûÏä£O¾ç§¹«‰+QSw•·^+|aA:yñ?—–K®ğ»ÌYêøå¢Nf1(Ô¸Få†éóÂØhBÜÁÄ!¡„y*)©>i—¨QLºåv¹y0âï¦¤G‡A](ZóYbƒû€;ù¿·â¥çGĞÍÍáÌ"QÈM£AAQŠ¨ĞKâYd9sÑßÈ<ùÖ[¼)·¤ã©»¸oTî¢Õa]¶Ÿ}9póÀ”¾8¸tbÄ}c0”ä‘™”A‰”£Åuœéº½›9$
-ÀÎâ1Ì¸¾~D@t¿2×n&³Vƒê"~™³¶sÂ½Ç­Üwï­LÒåO60ªtØ¹†Óõö—xib7ú™Â½©%§¬ƒ(HT§p,Ï–ÃõÜ7"‡úN¹O7£÷ñäjÄ}š5ËuÂöjkB¦<ËCS†3é†t0Š[û)«©B©ÕÙöâíÕ½mçJÈ»yá‰›ÀŸ÷7©¥¡ÚˆºÖ“°œl<	ïØ	?_Ê©/N`]ÖPúE÷``T~=¸~Æ`Šwî"óĞ6öf¶İ.ƒF–šÄ]dÛFQŞ‚4Ôåìfë.Ñ8Š‹'!a/{wìbÃ)”¨è¤¤Ä²fçN‰óûbX¿ò ‡âr,ûlİÊƒIˆİÈÖu»Ù¹«€:‘‡\zLgd”	§ªl©4÷ú›Í¿#nšÆSßÎ´Á7qß°N„zI[:bïáˆW7•H£hµ·¹kP/Ê­pŞí][´#F•
-}£h¤ö½‹ŸÄØ‰w0Y”™±]…ß3E¹iÊã222ÍBÑÆïÈAt».»6øçÇÚÆVˆ®ë¯«vB(Ú‹ÿxç
-¡(ùËu§¥Q\S]E]UÙEÕä‹ŠßÃTE­®ñßs¢ÑÊ	+Ç†ôµõ…	Ë°¿âluü…rQ'³xôGÏ}écŞFªRtè5ö„ºùĞ]TÈm¢±ee,ó>X…‡­=‘>N(‹‹).)¥¸NƒF¼äÓa2ªPÕ°s=C÷`ğÀ0Ë™ã4ÒèdK£½â¥Ò}ÅQ^]‡BêR60–âL}ÒO¬mÀ/ˆ¨‚¬2óÉ‘¾òå:ÓÁ$VÔ“Ò+;Ñ’¸¸áaeÍu‡ãI/ÑQwë—¨¾t<â•8˜s€ƒŞw/†tÄÁÖšÆêrŠ\)ˆòÅO\a¾ÌÓ— ú:üR’R)~ÕìU8ø…2j£„MüÌ,„£PL&­;ƒ#ñq±;³í/)>øDit?Ì‚oWr(+—¤Â
-‚;3iP\ªŠIéî‡•=.ÒåÂ¹ùĞ+%ŠƒÇ8hj»]ÚáÀôz’ÙĞ³ƒ'İ;:£«Ì£8v%»®{G?^Ä²eßñîİc	˜¿‘´zµÙ›Ø^îEöà/XöÇo,ûñ:&g’öë\Ögğ‹ßÇ|>÷w–ıô¦¸Ù‘»`©ÂHÎÔ£÷¸jíĞï‰£D„ô«*©İ»ˆ%**çg§#`L7üÛ¼Ñ®ÂÖ~R99LäJBjÜômıü<·D»‰<.•!Â5¶¢¼¸3T”GËÕ222MX‰ÿÚ t>¢œ»˜=êEÇACOÿPJll„<å·)øŒè…’ÆXK~ÏÚÁŸÏóî¬_Xµj•8~iVö›®ÿÒ„š…FiÒ›7?ÂŞÌİ/şÈİ£ûÓã*ØmôÒLf1#™û©Ûúâ¥ÆØÁmÜ°®Õ‘8şĞëXğÍsüëæ(ãøáveŸ~<–¶T›0Wp ®–ğ“ÔPŸÃÚ¯şÅTqÏ!Ò}Å1ıùÏ™[cÊå%yhÔgEp¶ëjk«)//±üu5Eşa?êNâoıqr´¡¦²„†újËùó¡˜êBÉ1wpóğBÕg´ı¥Å‹.“ïâ¶ÛÇ3zıëüsÜpnZjG¶So&„*Íïöt&é½Jï÷òQ‡Îp”¹ t>‘Çu#	EeÔ¨öUalÌ¥¤Ü@Iq	Ö¢ıDÛİFyÑ 	r²üLJrkè€½p¨xùàíjÀS[BI…ğ{fx‹†P%vÚ#$Š0iTB%g&±æË\ÔŠöUX¦E¼W:R™)ş-D”—;¸c¢”ÇOWƒÈÈ\«8`cãOP/F<o²V¯æ`ìL:•&ÌÜÈsP×pJŸ¥QøåòÄ&—’vÎ|¼hBQ¯ªçØâw©Ò‘ 1CèÚÔuuV´*%•åe4t»‡Şü„¯¾ÿï¾x—Oş5†ÎëÖs4¥ˆ¬ÖôYy9Ù‰üªFÿ0Oœm¤¶Ì)¸9ìî}gß'î+I‡êBv.å&´Fƒy‰3#-rúë¤éşWÓ¬Ï¼Í?RìV‹ëÓèï$Z`ÂpFQ[KÏq¾”'l$'o¦§¢¿¿;^6ng±}SÓâÒ`MÍ±ıTÔæüÖfşçÆTîfóìŸøïï	”¤ånZ·Ò{½»\0¢Åj¨-!Ëß{GG³P´w÷"°cºlœIÌúXvìÏ¤4?&J‘Ôª²Ôõ%ØI"!mğ²Å`W(Dd&ö¶–²b-Da°~‘Í{ö¼p÷pÀÛO‡îx˜y2Ë>ı)÷[±e­	gÑ’÷À?P/*‡4¶¼ÿ*¯Şz+·Şú ÷>ø9+3'{ÿD£h…ŸŒ7ëûlÚ´˜­ùMg¯4¤2³5n#‘ÜüêCòø…İ‘‘¹šÑVTPºs'©Zm³‰l'{/ld›e¢ì³7qÓmwqÓÿ­`Ó9MqÅÉÃ‹ Âııi@¼äÏ«(wòÅÖŞ‡¦ÀsGQEÅá$¶ş~€Ãj]‹É|zMÇ6|Í¼ßÿ`CRVËÕQ®Ìê­½wfÑ×R•Ãõ@"†÷§GO?ÚúªQ0µF‹É§+½oÇ¤iÓ˜vÓd¦LìOï²½””SÒÊìÂÚ‚CŞñ3,ûƒù3ÿËÇŸıÂòı›‰K[É‚g²>UA…ÊĞîô!î)İWÓoK_/OìrÊ¨µ¶ÁÕÓ»JšjÕ)™Ğ'Ñ$r­"+qû®óññ'ØÃ™ÆœjêZœµ…ÅOwìZÌ¼,4Ø]FRµöİ†0hd˜M™ÂÅÕGµú’zs¦>)\°·óÏ ®;MÁ—f7g)©
-Áè[¢	t²O~fÛK}t—L~‰FÅŞÄR¶Wwfè]73åöûyô¦îtÒ“±=™£—xwu4(uÍfãKbÈ‡à`|„Ç;»´BI™´\±Oòy6Î"M×Mæ‘;ÆÓÇ!øË˜·9•¢ÈhB¼lñpv¦^g¢T!åTI†éEC®«FâyÕõÌâ×€AkD×bN†=vv8HCÍILS 6úÒ§o'®»Î[Ûã,‰èê«RÙü¹ô©Ú›€¾}éÛ5ˆ.¹,:Gn•ZšYCe^"»
-EåbiO9:‹²ånÄaÆÑÑŠâò:’ÓNYjà2s¼Ì,Y²™#Qô¾ïQy<ÔœÇed®U4(Ôõ¤¿ï`4™½åI$ßRiö§ê“õÜ(~¹^G¥·Ğİ:â_²€ôœãCThÕÙì\–Hna]ë+¨`‹Ğ9.¾Rım	:äÕBè*h¨Ó˜'…œMÉÒmbYrı‰	ƒ¸„âïÂŸc”4hŞ©hmkKÇa×ç¡+É$¿í
-÷²pñwfQUP]˜Blz!½¢_×hÂ­*¨+- H¼Á³ô·¶wÄÅËßêJ4
-mÓR-B˜YÙÛ#êìDŠ[Ó³:kglÄuº&%pğp9åE”×å’!T~a­¥Rj­“+~áAtˆÀG4{<"»V¯Æ¶¼–*­ÈBF!…ñ	À!(€`!¥²îg¸Î«WOú…ù–“OeƒñêU(êÄï:xÛâÚÓ|Ï]¹xO‡Pt#{¢—›ea:…JÖ‰ªÏ«°ŒRË{ÓÖáëàŒ>,‚Hó6Ë½Óh€štR	{Û^G`¿»lÀTšNiâO³ÅšÛ^ĞÜÊk½8”%r¸È–ƒºÁô	·ÃŞ«£n›ÀÈè jµ:^PŒ¦F…B¤Ù¨ù°®šŠ°h"ûõ¤—ó9Ú¥=eÕÊÁW¥F˜Û²Ó¨NÁC˜şì‹Üq½6å9-2ĞsòHºû9‰ŞäLQYS#&M)eÎ8{t"Ä?˜Ü‚R”¢AcÔUQÓ`¢Vë·£xfw 3O
-3hp²×aU›È†ØŠU
-‚üjÉOÍC¡0"’"h@­*§ «üDkÂ'ßÉİo¼ÁÏßÇ·x‘QX#î¯E_y”¢ôı-„¢pH¶v'¥–÷±x¹…`*.89‰ær#ÊŒ¦(µ‹¾au¦näÎé“è¥‹eÇ¦X’ókÎyF¤ŒÌ_Q¿¤+=4Y2éT*½ôÂIœ÷‡¶²tŠş4~‚—^y†çGÔaPÔRT¡Å²ˆÂ„ß™ÿÍv²«Í‹zë´ê«•øz:àh6‡,9:'*I‹ßÇ¦¸³¬¾ ­ ÿÀ6,[Ê²¤z¡Q,ŞÉ3Š°®QÜÖ/š¡7šMÎ³qp#lÄ¿¹©‹#ÁTs9G/µ‹:™EZÛ§.c;ñ‡ò“b<ê°Q“¿‡C»·±_X_š1d¾®¶†ÊZ¡şEæª.+¡¶AÚâ<}	î6„QeG)=–ErV1Åy…§WRîy+£C	ó·DØÿ¾wqÇk«XµrËÿÄ¼ÿ=ËCc§3º×ı<=ó#şÖÏƒ {i§Jó$ŠãGÎÑtÔ¼¾m0]EEe×u cCL„ˆtg¦S˜_HÊîƒdõÂ¡W Aª:ª«D…ÑŸA§¹nÂõÜĞ9’énÅ¢B,&/OØ ùÇDÜ¥Hg'û6÷°BÕ5T‰tÖ*ëQjj©.-£^(Vi.Ô+¢*N"k÷"¾­…§£‘Î£G8¼a)»KTT_GŸOQDZŠxÂbÒãE+ÊÓÍØëè*
-¿Q¢ª‚ÚZ!05BPÔRºg.‹óEQ°£›°K^)ëgßÑ’KÎ`{‘ìöÒÎ&£H‹²šÒŠZ¢rW(ª©®¬ÿç¤2mç,D	}eÇÓSV/\™7û=ªwŠÌZ"Ò(ò_^z)‡SÈ½¹7ş7\Ï„3Ú¥ı£Uì°õ$ª\YQn’73ïSGYY)*ÿÁôx3ÿ6–'N¸‹ôµ _i²Uq©EE¥¦QEğ°!Üáƒ[qÅEä‹ç,qrÇĞ·7=}šeæq½
-T!„z±ÉË&#a	sæ¼Ã³o½ÏÇ«÷“$„c~	%%9Âç]Õ“	ÿKtˆ-Æ^VAU­ŠN&ôu5ä—”	{—b¬*¡L:/"V"Âj„/(•ÂTxÙ8å Bê48­Ó¾D/3i›fóÌ·û©‰¸™¡CÑY±—½¿¼Æ=÷}À¼íYäµyI ™¿*áj(/PÑ 3è’|±A­ Æ‰§‡â¿g÷Ï­!|v^f&ûvl!½º×Óil0R“EÆáx¶/øšI‡I,È'KøóŒìR¦Ö1¤«·Y,Š;c²é²uÀŞÊê”N	é/ü#²IÙñß¿ó»Ä=ò×§é{Ø½-­Ûò0Ö”	vò\yM1Ö%Ô×‹F|‹FcS‘×9áêcƒ¨2/Œ³ÔñÊ©“Y¤qv¦˜yäSuuµôçyS¹ãSÓ[÷ö7ùz{˜œ¼LAÁ¦àà`SàÀ»LÓß[gÊ2˜Lúã×İ7Ğäë)®³q3yšüb£iG¾8Ùh0JLÕkŞ0İ:n€É/PÜ#¨›)úºM¬Ë3¥×èMâ6§Å ª6/Òô·1Ñ&/w“‹£§©C÷¾¦—×”šÒöüfúô™›Ìi:~ŒqéçıÅ&a`ñëFqhMÊ=³Mo?8Şäc;Êàõ˜é­¥	¦”òÓ¡E¯›î÷{sM¾)qõi®ÓhLúâSú™ºD‹pa‡@¿ñ¦q·Ï6­©×šÔR<M¤¥¥™fÎœiª¯¯·„\8g´xÅuIKM‹^k
-ôq39yú›|‚Ì¶ê6ÊÔí¡ŸM{Ê•¦†FI“²Æ´ô­¿™¼Ä9é=úüÍôàÛkL{”:)“ˆÄôéßÆ™zæSÓ¼Í‡L	ßŞfêÕÑ×äæåcòòl²q‡.¦€©Ÿ˜æÍÿÈôêSg²}.4mÛ¶Íò×ù¡.´¤¥s€ÉÍÁÍäææcxÓı¦Ï˜LÂü&“NiJYó¶é­¿ù˜§'p”iÆ3?™V¥)Lu…©^ä¿Û-ù/(`€)ºË¦Ò+LÅzÍ™íÒH6Ø¼y³I«Õ¶r¨Mõù¦MÿwŸé×Í{Lñ•"¬4Ù”¿âESŸnLAAcMw=?×´êX¥©V¥5i¤ß(kL‡W¼azı6o‘Åóxšn{çÓÊÃU¦œ¸Å¦Ùxš:w4x›Æ>ü–é›=õ&Õ‰øMëVo0}ÿí~“Bäk¢ÊTRT`ÊÍÍG‚)ùÀÓë]»šˆ<äoòóõ6¹9yšüD™’ÂÄàg
-0ç5?“¯ iğ]·›î}æ_¦Ç}ƒL-×Lq»é®§şeò÷iúx6­Él–?,¸àüÒ—™ /“µ•ÉÎÅÓœÇƒ|M¾~ş&ëşkúnw©òdV¾hHÏ+å‘‹É¥ˆCæ¯Dµ)7viößÿaú5¹ÚT¨n
-•|ñ¡Ÿ1u}u™iMJ™¹î>«n>[ÔW^&Oo?“(ƒ'˜¢ÿŞôÃ?CM£ûú›}zàÀI¦nÿÙdÊ®V›æê6Ï”š¼Íôß7·™*j5¦ÖŠ©N™fÚ9ûIÓã=M¾â’oo^_8ÿnzô™ÿ˜¾œõOÓX¡s:Xtttu³é‘ŸLy5:“¾•HÊ6~/|û:ÓºK€…s-og«ãÏ…Ö4Haa¡iÙ²e&•JÔó+éâãã™={6ü1^^mœÜ
-ÒŠë™¹…d—òŞ%¿ĞúDû™—ŠÑµr]P×At	ÀOê³–>aÖe—ZHYµtv~tÔ`7{œZ€hÔZÑ–¦˜YAE}Sß¯­½#¡½†a_A‰hq¤œì÷õˆìMÇ° B=šõ)
-HÏ:~ô>”®ƒ"ñnD[R@ÆÑ\ÄıÂ[Ü¯ÙuÒ¢àÒgªª\v)D£“f…zãN·AaH«oÑ¤§§³fÍşñ˜Ç´g´#êB‘îl›×úi†ƒ;~Ô=7{lT”åwìøî Âºt J¼G7“Q¼ğRÒ3Q9áì‡§âqÕh›¯c-ìêİ™Ş!FÕdŸÅö‹-BFe	9w¤––¢¸eZ\¼í6ˆÂø¶Âø*‘‹òÒ8ñhâ­vìHD§PüìNÍ.Ø;†ÒkxG|m±?“],!‚d†n	iI£®ºC?2/«;ºôä¦^ÎhªsÙ“T$òš‘‘â9Bğm6hNZX»(/4Ëô]˜Ë›»±ŒêÜxÄO‘²©Wh4a;fyºÃ+8TíÒ 7v?õét4ÕäìI¢P££­ËM;àáä„}n."ZóN,^"ÌA„•Š°&<Z}SY²d	!!!”_Ú‚4îºÕ2#q<w&ÈËéâö(¶oßnî…½ë®»,!íÏ¥ˆCæ¯„uşaÒVÎæ¹Ø46šëi£ÚQğ|ï	îéBgQ·Å?·Æ	Ÿ]$ê´šX6gãëDŸaØv¤G„¦ĞÑä²½qíÆpqCGóU(j‘§­é(Âl[DK]a&ÙÙMËàáï;zâí¦¡èpN‹ñõî~øuêC÷@ì›OnklJóüÿÛª{=:ÍI8×òv¶:^˜¹Í´¦AŠŠŠˆ‹‹cÒ¤I8	¿lŠIIIæÊéå—_ÆÃÃ¼¢Ì%âbÅ«™öŠW;gŠÒz](ÓØ±ë˜Z!„tíÍÈg^Šş\‘>µ*ÓÖ³-İ€Upwº÷êFûE¡A/*ÆiYµÖÆKÃa¤ñ1ÒØé3q©„â•„,e®HDZ‘Çœ5‡iPÿîê…“kn|t0gİ0£èëP—%³nÎ:
-ºİLÿÁ=¹!òÊ^¿Tjd–'¯gQÌf²*Æ0hêX¦ŞEót—³¼µ¦AêëëÍŸÒ£¢¢°³³kêØj×É,222©Ë­#{xâm¢DšqÓŞ4ĞÕäRë»D;ˆDiğ‘†ÊôXâ·­ikÖ&]«Cİbh´Ô6¯!gßÅ&“~úõtddd®$œıpë6•ç_z­i×-óÑÖ]ÕZCúbQBú¦l]½šÕÒ±j)+—ıÎÂ-:]ñ´Ê'#u+ë’’HZ·ƒÉù^ÒeM~­"}?©‰{ˆ'nÃFRJjÉIŞÏ­«Yµt9K]Êò%¾cûĞçú–"ñJä¢Nf‘‘‘¹„„aäë¹³wû0ïL0üYî7°z+%XËÑ˜/˜ıö‹<ûìû|ğÉ|¶¨¨iá×¥Ñ9¤.ú?¬#æè…ú–‘‘¹:Q¢®;ÄÚ—ŸçõÇçqéxê^ıv;V÷İÍ şá¸ç.gõ¯/ò¯`Ş¿Ÿä«Ÿ·³'«áN~“bª$eÙüòõøpæ|ñÌs,8Å¦EŸñÍóÔßóí(îûàg¿e}¯t•(¸„;³ÈÈÈÈGXìÇ G¾à£%û„ZËÆ˜w¸»›;ÍÆê4ÍïÁÔgóæGOóÈ ó3-##s5ã«ïX^·™pÀrìİ¶ïîéN÷@5nİG2¸ß¼¤ìÍ˜Õ¿pûğ(¢P˜—·¹”t;ƒ½ÿÎğAğü/?1¦›7“Ÿúœ™Ë¥4odÛ†w¹§»WëæM²P”‘‘¹DØààæƒ·AAxâbgMËM¤?ìqööÅÓÛ·6îè$##óWÃ+GÜñ&Ørâãj‡½®İèqÃX¦?7!Q}2¤;ÑQ¾­lß{±ü“/¾]Ç0zÚ8nŞ.İ»Ñ?$ ß@áë¤4è…ëŸ|İÕƒÙ·÷Î,22222222ììÜñğ'¬o(¾ö.øøyâîál^]åÒ )?GÑ $¸C8;9á-­ê íŸ•rñwf‘‘‘‘‘‘‘‘‘¹*‘'³ÈÈÈÈÈÈÈÈÈ´Š<™EFFFFFFFF¦MœØ™åÿûcÇ=ë·2í‹R©¤¬¬Œğğğã®e¤á¥<èããc	¹öl ööö¶„Èœi‘Úk-¿H­}Fc^hübq)â‘‘iâr–7IƒHl·ig–ùóç3~üxY(^b¤"­ŒŞ¿ó¸€käädsfíĞ¡ƒ%äÚC²‹‹‹¹ñ sfRSSqww¿¦òK^^
-…‚=zXBÚŸK‡ŒŒL—³¼IDŠÿL;³˜…¢älÿøãyæ³Ó•¹tÈ[øµDŞÂ¯[øÉœ@ŞÂïâ oá'#sé¸Ò¶ğ“z7kkkÍ«áH“åÉ,222222222f¤^Fy2‹ŒŒŒŒŒŒŒŒÌY‘…¢ŒŒŒŒŒŒŒŒL«˜…¢¼3‹ŒŒŒŒŒŒL»ÓØ(Í@©×£±]|ô"Úzm#"Z™sD«(ïÌ"sí¡S )IeÓ†T2Ê¨,Á-PUP–‘Ê†Mé”h4Î°Ğh€štâö¤’˜^Â,Óiœ³4Úd2YBddd®]t4å¤¯M"¿¤KèÅö§:E	eGcØ—YKµÊ(tc5eùJ(¢^gDqf.ÍÎ,"5õ”•ŠŒ!*ÜÓŞUªLDœÒùV«½
-Em=•Õ*s¥}NUhÅ4J‡åÏ‹†Q‹¦¡R!>4FSËø¤ç¥º²Z…V´q.1g³ßåNß%A´(ÕuÔ$‘¶c/>·ˆeÛ“Èª®C¡=ù¶ôªjjsö²}Ù"{q);Òr(iĞ ™³Ñ ASCiÂR>ûï"æ,ÚËÑÊjÂ¨—S5j(UÊÏÑn˜1ªk©WiPëO¹¿AÊWµ”•URU]FI½°AºÆˆZQOAZjƒñœÊQ«E'üĞ9—óKÍ‰2SNqqåùù&™kÑ(¯M`ñóK‰‹+ Z/ê{Š†ò&úé›?òÅOÛ9ÔÎş´¡0‰„E/óÍî£dÖhhTf‘·‰gî$WÔuR™=;FôRzõZz
-µñüÒg¾PÔÅ55*4B¤¶«·¾t.Íd–ºl*·Ìbò¸YÌÛ•M±%øOˆÊÁX^N¹‹ZKP²V3çY<üÜjˆ?ÏIÈÔÔĞĞĞ@åÏ‹Fq,»æÍbÜä¹l©l ÎlF/ÚOGæòÜÃ³xgN,Y–àKÆÙìw¹ÓwI¨!mİç|úÑ{ÜŸ3ŒŸVÃgù{Ì~şsæÄÌY«Ÿã%Xî3Œ?E’sÿ-ÌŸ·‹X‘yë²w±å›[·-’é¯c"ˆyø9æ
-£6\Fu]÷KW/å‡¸öÏåRC¯bÓ[|½zëÓ”–PY1Ì}ï?L™ò O¾0‰QÿÛÆ)ç—P¿›å¯á@µºeY8%qqŠ‰!YüûŠn°œ(3·0pàÃçç›dd®)ÔâXÊÖØ$§•Pš²Š__¾…Ñ›"5^‡[ÚG¼ØÎşÔÑÙoÿ^$ìK!«RhKxÛ‘º¯ÊÉÊ>-ı ÙGw0wC9šóèLÓ–R—±’7^[É®”ÒóHË¸tØ¼-V<xğ yÁmiîó§¬íøcé2¾®êÎ­Ù½c‰E&ìƒzÒÑÓrUâ"üğoÏ\CÌV=ac»àïlOÓRßZ´Šlö~õ,Ÿ¥º ±Ò®ÚÎ¼ÅkQ ÈÓ	ó…B[‘Nö¦Ïxöo˜· —J{oÂ{‡pbÏ†ºD¶/øYoÊ7‹™×«;~lKÈD6’ J²¤ïÓïO^§@éèIT„·%·ù]æïMgŸm7gKöçŸ‘nê€_®Õq\ş*¯¤÷dÈĞ@BKö‘ºvy–8ìlšîÑ|Ámi¬è…Ó6û)
-š¥/¸†ÜclÜ_wïŠ´µeÖvvü1ËlÏvØEjƒ;½{šípb°‚¶Eö&¾zö¾÷3ó_o9rl£°®Ï¢íÌ÷K±,¸Ñtß%o;Ëö•°OÛ‹ÇïÈõC¶*&!¥CyöôGõ^V|‡Ò­/cfŒah°AVÙ,ÍwÖ¬Æ¹2—U?šüäŒïEg§*U
-æubô @ÜmiÏ=u/¸}ÚE¤*ÈXÁyŞ˜üz1¦[>Î–%Ê`ö…ìÙ´Ã®Ã‰eÎN4Ë³ş§7yı³Å,^,"?;xâg“EÊoÿ2‡ÿòëbËEë1¨½¬±óÏ~€µ2»DŠ|kÆÁŸğPzõï!ŞÛ$&îMŸ0\íÔ§s`!E=§ÓÁË¯6eé:
-âQ£ÀiX‚DÈñ§9ÇÜn·ürZ”T¤ï`ÓçÿÇ;óEEPVŸGBü^RöŸÕ7µ'¹¹¹æFpÏ=-!íÏ¥ˆCæZ ƒFKîJ\F$Ü¥»Ú*ÊºßÁ´aƒÙ¯VyÔÔd³•!ÜŞÃû¶–şÓc¨/F‘O™ÛDö‹ Ôß€*S¿E¥„ßÓ?W‡õxk4j¨Ş;›™_ÍçûKYµ6ñ5^ßw\ÎÁákj)K?Äá]ó¨ì‹»_!.–“Î­¼¿FjÖ4ˆ´ø·´;K§NÌn›{Ûk2‹2+™òzºĞ0”›ï¹‘ùäeÄ²ñ˜¨,ØºêC€­šŒİ(´'Çèëª¨I=H{‚»dÌÄ1ŒÑÀòõü~ ƒüêVG—™±¶wÆÅ/’^‘v(D¦(Î©iÙSY]ÖÎû®ıÍFi:B	ÁÉ.ˆ ñòl„	ª³J1X9zâq\F¨·s“ hº½>™Øµ…ä{Ñiğ`¦LìM¿ %û±/ñYG±i‰§ˆŞ7˜½½°Q²`C2¥ıESşm²Ÿ¦DdÊ*
-­úÓíºAŒŸ6ˆ>U˜2·“T*îayŠÑ«Ôà/¿÷q;tB)È»¦KN¢Ucª-®°ntèuÜn×‰Œï‹½}$¾NÂ¸Uçp¿vBYœF^µ…[nˆöÁÁÖ‡°=uSz95zŒ%IÒ`å×™a>Ø:=¦?n…9TìİE|~5ûìú3,:€ 7ü:w&,ÜãÖm¤UhQ\âî$£Î@á¡ğ
-§c—DûÜÑG•BÊÁÍìL'£F8LówÕ*kñ¿¡ôíÛ·éè*ò³u)Ù©ü”ëOd×^ôíâ‰.-›¸•‰ÙØcÜ—İƒqª«&;6Û<È|;·0:÷îÇ˜!=èîæHh Rì°uõÁ­k4a¶8µÙ™Úac+„é%Yç‹¦DØuçzæ­ÉGÕåzÆİö÷OëB?ïÃì\»ù{Îì›dd®Ml°²vÅÅ7‚È?C‚ñ‰èËÀa™Ò=ˆğÈ"<”®&¬Ï£·î4Ø
-gâéã[ŸMö8
-±c+ÒâR¥DÓh:¡7N‹µvŞ×Ñ_ÔíÃÇLdÔØ	Ü1ù:QoØa2ÉÚŞ÷°L½cı:á}°]ˆFj+u2‹A¡Æ5r(7L˜ÆF2à&	%ÌSIIu­å*p‰Å¤[nç‘›#õ4¯O¥¦jkB¦<ËCS†3é†t0Š[û)«©B©=ıè;PB†ÜÍOÜÌÈÈ ş´S®µFÜÄ]ÿ÷o½Õt¼òÄC<öècÜvÇŒ¢Y4ftô¼a:ÏX®1NfR¯ ÌF‘†²ıìËé€›ç ¦ôÀÁ¥#îƒ¡$Ì½›9$„êÎâ1Ì¸¾¢5p ÑıBÈ\»™ÌZÒøÚ‹A›ìgT‰
-=H´^â…qİˆîId·v÷ÇW<ÿñr 1zã9‚'Åó¿yÜOİÅ}£¢öïiQ^„°vğèÊè¿ÄÓo4]ûúKÏóÂÃwñ÷'_bêàN„¸ÃıÚ	ƒµªrì+r(ÂÉ()w¼MøJœk¨Šó)ô²E%æ÷+5˜<¼	ª(E4”òò#½q­³ u×YY–AQµ•A
-¼Tˆ†˜Hwb’#>îDIİ¿æÁá¤¤‘S­ÄàÜÜD5j§.õy’×_|‘_×™Èè ªKŠ9ğOşùìÿñÆ+q½›Õ›÷“¡¶3sÇ>¸ëiL>H®3cBU*âZ¿#êÛ@ˆlû€qôwD4lÛˆ3N.V8¹ªQ‹8.ç¸ÏÓaT©Ğ7ºáÜ÷.|vc'ŞÁä½ÛUØÉh$§ìÌ¾IFæÚÄZEGœEùöôpÁ+²»7}é!¾ô¥CÃ¨¬qÀ^Éè8ÿÔvØÙÛãâáKµğå’¾8SïáqTU4M¬±¶sÂ½Ç­Ü÷ø‹ğ"¯¼p+CCœğ8]¯†TŸT‘^ƒ®©…nÆÎÙ¿Îƒ5í^úv£Y»ş¼¸ÔV.êd>ãèÙ³/}ÌŸ¨$o¯C¯±'ÔÍ‡î!mÛ´ßÁ/ŒQ3âŒŸ¹‡AEÔN&­;ƒ#ñqiË+?úÕ"}åk¤qûø7
-Œ4º;ŠzW‹¶¸Ø¼ß¡tTÔ©Nê70–)ÒXä†ù‹º$øUƒé`+êIÂÒCd|óc¸¸á!ÄÅu‡ãI/ÑQw‘ê”6ÙÏ%
-¿°^ï¬AW]Jyz<¹tÂØí^¦tÄÒ$ÄøG£½âùK-v(¯n9	än~8tÁˆ@‡ñªÊ•í©!p°Î~vçv¿vÂ£Sz9×ãtËw““/â•z­R‡ÁJ´v1PY^„V#£ù3õõuTVì¿ì˜êÑëÒ8T€•Æ‰¦—1	'Õ´’íêP}»p½Ÿù„¥p–"Ïªtge‘%ì^XYOqiú†Jºùb'u¥{øàånÂËTNy•xƒæ×â‡u-Æ£¤Š0s0OfÉ!=)…ËJÑœhõˆJAäq“øªêJ*KJ())£´¬¥øñI¡y*uht'ã5¨ª…_R\b~z¤ÆíøGßfÑÏÏsK´›Èãzz:-¶îíx¾IFæ*Ç$MLU«Ñ‰–ŞIî ªF_üB­qh¥á¨W%‘Ÿî‰ºl2·ŒğÁÉ¡I˜üË¤Ä
-á¿KJ)®j@uNC$Ájƒi­÷‡ÉŞ¶ä#IYBÎ™†ÚÂç¦J©o‘6“QØ%»å\ØòÜ¹rQ5’…K¸3‹ô=î©Ûúâ¥ÆX!Îbª5$ÇÜÁÍÃ#B¤}hJß®r[jêÜ‰2‡I^9•‡bö«gÂÀ´÷~ºŠuiMÃP%A]^’‡F}Ê µµÕ”——XşºÜœÎ~BXTnaîäqÜ2á_üëñÇùqö{Í×PŸÃÚ¯şÅTñüC,v˜~Ê$Ó#
-´ªõ…At6ØàqÁ÷;O¼3ù®¿1e¸-ß=<Q×‹xÅó¾¹0™\Ç ‚ü¥uËµWZ†š2rÃ°¡i¨KJ]:?èÃØN™ÔÅÕz’(BÈ¤<óCF¿ı6oÍô>ã?‹·Q‘n¹FÂÏWü¢-šñÂİÛ_iààqÌ“Y–òæœ<Bş­Ûño.8:{ª•C21/=ÆcC‡2tè&L}‹…©õ”µ:kíÏdÅ¼ÄÊ•s‰¹bgXe‘¸Dø·œïà‰íé›dd®>´¥¥nØ@¢F#<RÛÈZı5%~x<9^âïÓA²LJ¼WøïëG3ğñ_YuNCÜpöö&l€ğ÷êÑ³ÔûşQ¸z„[´Ày ¨£úğ1öÿG¼h”7·^İÀ‘Õÿcö‚ÄNkçI¶K#ä¢	E½ªc‹ß¥jHG‚Æ¡ëi[
-g¦<a#9yÛ0=ıııİñ²iŸµõ*µHß
-L¾¸DZ2¨”F/zİş
-O8—9ß}Ç7³>á¿wwF½7‘}»ÓÈ3_gbÑÀéÖŠ“–å¹RöÍ>½ı\pòèÇ”fòŞœy|õÆıLîÒÈo+vR Ö¢Å•Èa÷pï;óø^Øá;q|ôøH:T²si,ÇÄÎ44¯<!‰â#‰xê££4öÂîwŞX;à9Œ‘_ü†9³ÿËã£C9>‚Ó†ĞËÎVˆÅ
-•4”(89@BÂŸààtösÃx¤„J}óÙùNX[‡àïk‹ã~J8'¤<glÄ`+õŞY™s¬¢à(	?¿Âo¿½Ë+/<Ì³ïÿÎÌŸãYşş#ür š…-n‡1ê–§™õüS<?ë	&6ÚXaM•£?)%•èÍİ‡õ¢ñ ¦¶À“kóç©Ã¤î½4¶u#¤×^ù×z¹Ûbw¢HjĞió)HßËü÷¢ïÿ7îıúk¾şğ_¼6ÃE{ÒÉ*SˆÌ‘HAÊV–¤q¢ÇĞÅİÃ<¦è8Áİ†`°ò!÷h¾%äÊ"oólÛHFD$7¿úÃÚÏ7ÉÈ\}(©5*IU»f²²4`#Õ……ÔÔ©i°ô­HK{UíœI¢ıd|úÏ`BOg$7zÚ”K•s'|îù¯>yƒg‚PV˜Išùc•â0‹gn!9½B¤¤5¬Ì=Š¶§ÕPFÓs¨(*?ı*-Í&zÆmšÏÌU'¿ˆùö"ºß E]ƒU³F±­“;QÓŞbš—ÿš,2ÏeIˆ³p±4RsÌê­½wfÑ×R•Ãõ@"†÷§GO?Ë'²sCzEJªF0ú–hlÍ™é‚Ñ×¡©NeCš'>â¹;Ğ%Ø¿è!3iÓ¤ãFn>š(µcY¨JÅU"Ã¹{ú`W)­¯§:%cŠ{Š
-/ØÃ™ÆœjêD|R Ù‹ÊİOw„>¹èœÙ~öØ:=~"cÄsŞ2ázx’½-‰"­^"<B»ÓcÄq;Lcú-céëå‰]NÕâ§í>Wfq¬P!
-C Cº{a/Dô	â¼ïw¡8ûĞy S&Œ¢G.¯ë„hÉ”±‘xÛÙáİ‹î<««©/³Ñ` >?ü8éÇàˆ`úUäQUkD-^¦¦¦‚rm=…{ån‡ë¥ì‘´¢ÛÅßêzâ=‰ˆÉÖßqL¿mÃ‡¦{§ "BÜ	ˆê!ò¡y(4ƒ9¬ó &ÌÉ¢ááO¤_0^ÎşTæ—
-'o§*jLÔ{„î.¢2ûj¥Z¥'Î:¬‹±iûÖn[ÍÎ}1,Ûx¢riÜ¤t­B\« ´Ø—ÀëºÓkÜXFMÊÔñCÓ×£Ş„Á`e&ò¼äf“m„›67èOÇp‹B «uÅ''Ñ\4êÕÔ'/cÉ’ÍiŒ¢÷}ò€([¡íå›dd®J4èêÉ®vÂ­Ñê”²ĞT¯ÚÙÚ4}½QU ÎİÍê|WÂn GgQ75VPud'Gª´ÔµÖcP_Ffy#ùİ„O™ÄŒñ°Õ™¨©ÒˆÛe‘¶ş+~Y´ŸÄÂ:³¿P5è(Í¯¦c°+nÎg«l¥ô¹ãj<HÂ¶.J@j+Ÿ¶«GÔo)»6²fÉVŠÔè§õŒw ;}B“©¨Ô£n&­mñŠÂÈnø:*(”*¼vàbi¤‹¿3‹ÈÕ…)Ä¦ÒØë)úu&Üª‚ºÒŠZ†?–UÛS%Qh{ıîbx°Si:¥uŠÖ3R›/°º€üø=dŒ$È/ 3|Ò·²™ŞÕƒÎ¡„x5Mº°±Å=²+aõjlËkyS£QT€BğøàÕ«'ıÂüËÉ§²A„‹§W5 •aø]o[\OßÇ~áœ‡ıl„ qqtÆ×Ù;‘ZË	¶N®ø…ÑÁ2QèÏÍ
-éåj¨H‰%·Îuèàfƒ–ÿÌÙï×h+(L9ÀÎÕ«Y³Í»)÷A·Ã¹!J´{mÄ‹ëÏ„~.x)RÙ¼|5«W¯gÙòT=;2f(»væ¶u$nŞÈºU«Y±*ƒÅFîîOg!4-Q]ì\°u£«6¥FA¾GŸH¢Æ½Îó/½È?gL`Lï "C<„PìIˆŠV"/¤Æo#&&FÅQ„¶K‘#†Ğ+ ˆnuÛØ²y-kVl%Uo‹ÃÀ~D‹–Yß	_opFİN„¦²ÅÍII]]6IYYähÄûŞ¶…½k¥{¯eÓ¶xçè±éª¥0=–=Rœ›v°õ@v‰$îŞÂ–#™¤T ÙÃ–uÒïbØ—šÉÑâ
-¶Ä°^º×¶<jê­ñwjãâ¸— iwŸ¢Ö.ú†Õ™n¸x;§O¢—.–›bIÎ¯¹@ß$#sµb¤QU‹*/—BQç©-*Ë¨®¡¾(‰xc¢ë®-$ÿğFV.ù…ùd9Hê®Õ¬Z³Õ›ãÉRè„¯iúmÜÃ„-¤xÿBVn­Ò—ô„b7®`ÅÚm¬Øy•æ ñqÂ¿	_¿bû!Ö¸38Ê?7©²5`´5¡vñÅËÚú1%9:w‚{º ¯Hd×¼ùü&î±J«[;–oeïáb
-+„?8´™Mk×œ8·íP2ù.¡x
-QìĞ¢mŠ#@´Àİ¼,ëà¢j¤?Of1¯£˜——ÇÖ­[7nÜ­£(u'×§ofb2ó“ø{w[œ•”ÙOFz~½é(jU½¸®2‹c	ìßİ@Ç[:ãïæŠ‹`6&†º"*öÎaNAWì}:1"HG]U9¹›'Å.k?ZéB6Åo••Ta[L)?/BûãcëdÒne%ˆ-%ëà6-:Hç»gĞ=Ü÷ãé³¾êi6¬h™(D:k*)_ÍÑ¨‘tĞşnzêÄ9] Ú-É¢âv ±CB çnûe½‰İ›	î&·F=¨È4z”Çö—›Ïö^“xvH“4½ZĞŞë(šmp6û¹ºãa¬§¼²ÆüŒÒQ™„­Pò#şÆ]İ<ğ‚O¡¨£ªºöÄ5eG6“áìãõc¹©ƒ6FqMM-j]#6öØZiÑÔeóÏ[Q8ÓcÂõBHY&­ Æû9›×Î“Öl×uë²yŞ÷üï?³øuÏ!”cfñÜ]ã™ÚKÄk¾@ŠÕ—aÄ%¬çËYsˆY¿‹­Iƒ¹ûÑ‰LÖ07BC2yïÃ¯„“XÎÆ=&¬}ÇñÆë£·­dó}Ú3¯£(òˆÁ	Û¼ßÈ÷éŠg8ánN8;7Šü]ÍÁŸßeñŠİ¬<¤ üh,Ö=oÅ·pk~Ç{_.díÚâğdè?Æ0ìÆat´i $ë}>ùv+Ö„ˆŒ¼õø6µ³µ¢œ–	mÉ˜^Aâ¹»3|ÜTfÌ˜!ÉLLö;ïğëÊ¥,÷Ş›@^u2»7o`ÃÚµ".qlŞÍæƒyT§î&vûRDîÒZyà8û}¾Y¿V8úµT8xPçèÁÊÏßgÃ:éwù"-=tË(ºŠ<tº&ì¥ZGQêIT&mÓlîı`6CÿÉ-“F1Äú	¼Ç½¯ÅaŠîID§àV}S{"¯£(s%¢)Ì¥rûr÷ÂÑJ•ZAUÖ!’7Íå?ã˜Ô³Q5{Øºb/|GuÊ.öm[Çš5kXw¨˜#îypr4¡®ÒR6§àÙ?Mª¸/ùÏ¬u¢ñ)Da¬¨Swod«h˜æôyš7{üÎÑşõ×5lÊTÓÿ1^º!ó³UT4(9ZÎøÁ¸YêßæxvìU!Õ‡ğíkX+Ò%¥íOÇf'B¯ïÏğQÎ›9“_ÖÇ°Òrî@±“ÿÇ×ûàÒ$²š†‰FuR¦ğs¸uŠ2k¡ãœKykSÔ­i²²2bcc‰ŒŒ4¯£heÄÇÇ3{öl>şøc¼¼ÎwÒ‰ˆpçL¾üa_Çd¢49âáhƒµğğ!#zó}|úÊ$ÂÅû©“®›»˜¯W¥£T4âäëÂÍÿ÷3Ü2AÖ	[ı_îÿd95&lmíp’º¤ìÜ0öx„ß¸ƒi;àÓüXZûæß~¶›œ|•$‹é:úFî~c>÷7û*’—ÍbášX–…½Èºgn ÜÓ‘Ÿôu
-ó®¼û;›â›F#Ú»yÓ÷ñ/xzj_yçslÓf½C‡Vr«i+–ıÁ—ëRDëÁIäƒq<şÃãümêuDW%gíwLûx3µ
-5V†îôy;Ïüø cEAp´ôŞJ/HÊ`ÿøÇ?ÌéB9aƒ3Ù/(C+…½?\gùt}SÿşOŞôŞÒ3söB>û=Şrt¿çmî½íFné#2º­Ê70ó™¯ÉÄõ=ÉMGÙğÆ}|Öx'ã§İÁK£914õØYîg¹PZ„;((ˆQ£F™ÿ¾`µ¨J”RKRZçOê?u‡$d•âPIıWÒ9gó$'GÑx­7£NIe­
-c£Ôkj½£tŞÙ<¶õ”;]0’üıı>|¸%¤%&ƒ}Î|º#N»ó·‘¡–3F´ŠZ”jyëA+ñ¼N¾8™ThÔj”R 9µN¢UÛôlV:euja*ñhvN®8»ºqükMÕ®…$ĞŠ†ÒÄ°Sİw£Ùi)+ëPIãr-¡gÃF8#;[[¬•Jó’EíD˜Óˆ°&ìpbÙÅÕédj…%K–Ò~ùå4HŸ›¥Äg¾İOe
-k'\q´6 o´¦ºËÓ|óáİÜ>4¢UßÔlß¾’’îºë.KHûs)âù+!ÊY
-ù›¾fò{¢Î«W›ëU“Qˆ2ÏÉ¼´ú)¦Dz`Ò¢Q5P«<¥ËËÚkW|<±¢¡5ŸjÔ6m©W
-¯!êÅI	
-`D_¬]ñ¤–M#:iÜ³­=6NîøŠºÖÆ\×1¨ÕV¸Š°Ö¿JI
-TBPš¼–HËıˆ:ÀÎˆºVÙbë<k;\=OhŸ›ÒüÉ?“1ÄÄ—'Ğ»™Ÿ8—òÖ¦:ş4©5ZÓ ÒbÛqqqLš4ÉÜyØ®BQÚ%3·ìÒS†“ºâAŸh?óR1ºV®ê:ˆ!x[Õ (>F\F5ÚãËÑHˆŒ„wgzw&ÈË©ÕÙQR7÷©¿uñ ´Û ón(¶ÖZê
-3)(«¥Ä­ÃE cÓ÷µ&¤îÜºlâR)«nJ›ôâ½;¢k°^¶Ô”q´—^Ã	·¯ ¤ Ÿ´iÀT‰†ÒuP!¢¢•>SUå²ëH!sÎõÆ; œnƒÂâ9k{ÅÖl`¦¹ı¨.Ê#îØÉ™Ù.	èDtÓ|{PuüÙšğˆìMÇ° B¥…¤LBhKIOÌDå„OTÁ
-JSâÈ´‰b/DÜ«Y“él÷³ĞîBñ*älB±Éöe¤Çí$¾Şë°ÜÙûøòNíƒôu@Ú"pY‘>QıÑ»Ã¯ÿu:…ÂCø‘5[qhuuuæ–¬³s³<Ô
-—J(Jã®K
-²9lŞªğÚà›ÚY(Ê\‘ü©Î“pêPzïˆh˜^°‘v ËİÇœ×7`ºù~nÓ—!Á»Ä]’.ÊÛı#ïı´ë¨1å–‰LŞrŞÆ¹”·6Õñçà‡Ú,“’’Ì•ÓË/¿Œ‡GûV82g¦½…âÕ,Û SHRµ=ÕöŒlş£>µ*ÓÖ§ïP8=/ì}ŞHMIö•H>Fj¹&ëLzxİš/b+õK–°÷Ç•Ø†xÃØ3>Û¥ŠW²P”¹6P¡Uä;g‰ê¦%eôuèêI.ÂŒ§n¥¯_.•EGØ¥¢÷áÃ¨úN¦KŸëèu¦‰íŠä×ÈÚ¾‚Ì=:Wlò
-ğºñ.<s·“™CJnõ¹9†
-7ı~Æö&Ê²ñq.gykMƒÔ××›×9ŠŠ:¹…_»Nf‘‘‘¹4ø÷¡g×ní.%¤	ÜzL7;µ‰ÇÑ¡(É$;%•¤¤,rrs©PĞÿncFúC‰¦´²¢
-J.õşˆ222WFŒúZJ’“|ğ ¥ãH&Ç*éqßèîƒ»*´C[Y½b/ãöpàP&¹%-·î½¨HşªÊ´]Ø¹ƒÍ[rdÿ~WR”{Œ¬ñwf®#¸ï_¯0ıú?‹Ä+‘S'³´ë§g™sGîQl‰Ü£x=Š2râEBîQ”¹ò©¢¾¾”ÜØR­¬%èİ¾Ø$ÕááíK`0Ú¶Ü…"})§êØöl¤RÈèq~”‰ĞÎ¾¾x9¶­‘}¥õ(úé¹•ÑA22222222W2^¸ºFsİğaÜøîy„Óp¢»‹3—
-iö´?^Q#;}4wÜÑƒĞ  úˆÃ£V1¹R…¢ŒŒŒŒŒŒÌU†´k”v8{I«#Øâà ş¶³¹ÄÂFÄgçˆ“³#..væ¡|öâ°şå3Û³½wf‘‘‘‘‘‘‘‘‘¹ú>A_ÜYddddddddd®JN;™å»ï¾ã­·Ş2Ÿ”¹tdgg³yófî¹çón×:+V¬   €¡C‡ZB®=$øúú2xğ`KˆÌéa^Sùeß¾}æn¹åKHûs)â‘‘iâr–7IƒlÙ²åìë(JBñ³Ï>£W¯^f%)séV‹×h4f‘(÷è‚Z­6·bÚc;Ã«•ã6ËâÙ‘ÊÎµ–_´Z-´İêÙ¸qÈÈÈ4q9Ë›¤A¤OÌmŠß|óO<ñ„yßT™K‡ôB8ÀÄ‰e§,Ø¹s§y‰¦kyYÉÒÂ÷İ»w·„Èœİ»wãããsMåiƒ„ššFŒa	i.E222M\Îò&i„„„³Eyg–Ë‡¼bKäuåuÏyÅ‹ƒ¼¢ŒÌ¥ãJ[GQŞ™EFFFFFFFF¦UNÌbş_•JEAAF£´Ê¸ŒŒŒŒŒŒŒŒÌµHUU•y‚N§3ÿİ$edddddddddNAŠ222222222­bŠòÎ,222í^¯G¡P˜—z‘‘‘Î@šRø%èâ£ÑÖ‹h…O²É´iRËÅß™E§@S’Ê¦©d”)PY‚[ ª ,#•›Ò)Ñhú~:t4å¤o:FñéîwœFÔ¤·'•Äô
-–àÕèjsIØOF~ugÈHƒ¸]:U¢ò;ççhKZ.'mI_[ŞåU‡‚Šô<²â
-¨µIÒ\ïRW™NnA.é•g.=çƒÉ¨CSœÀÑ‚2ŠN- Š2'²iÓnöØÄºÔRÊ¤4¨©/-"y]
-g-Ó-QWVRUpïã
-@U‘NFüÖ6ú0™kKİ½6‰ü’z,¡¢„²£1ìË¬¥Zeº±š²|%Q¯3ò—™!|qzb*{Î¥.k}2‹Q« ¡$‰´yñ_óY¸UŒ:5ÚO`D«¨¢:k/Û—-â¹—²#-‡‚:jı)©W¡¨­¤¸8›œ´X–¾¸’¸#%TYN·¤£NECy¥	Kùì¿‹˜³h/)UÔ¨4šš®2§¯"ì„µ|÷ü—,İOrYŠ“	<‰ºš2öşøs(·G¯ª¦6§ås”4hĞ
-364hª[¦åhe5
-Q›˜,i¹h˜„-Ô5TU”š§¸›ñïªT¢4‹­Ìïr/>·ˆeÛ“È©b±5am¿Ó7PSZJéñ8›ÕÂ.jU]EËsåÕB„k/~ÁïÒ¨©£¬´DÄ›ÄŞE[XûÍ^²0aEUåÍÓe9*kEŞåã¸­>}óG¾øi;‡.Õ»l)R]Å‡–³aÇvbÖ‹W®G][FEY	åÕõ­ægIüé•Uf””ÔP«yUäeU	¥%RØÉß6ŠğÚøù,Û¶Õ¨„N>Añ~b~ù‰—_~Ÿ™_¿ÄÓKH.QŠ•T$`Óëk8P©¦®Í^«‘ÒC‡HÚ´•4ñWó¨®X„oÊİ;ß|”{XÌŞjá«,§ddd#ê‹Ú?¿”8!fªEoöCU”š}±Å×–VPZ£F/*Ÿöp©…I$,z™ov%³FC£2‹ô¸M|<s'¹¢¾i[£Îˆ^/D¥^‹A¯A!êÆóò÷æºQEM
-¹ş½pLâ:E•G7°è›_øÏGkÙS*|º°¯±xÑ'³ÇÎaŞü÷¸?m?½kÏ‘ùs˜ùù:b%¹k–åÄÎy‚çgo`¹Ï0VüIÎı·ğÑ§«X—vJ{#k5sŞy˜à–ûS‰üé^ïH°åtK(MYÅ¯/ßÂèM‘L}ÙÀ’»ŸàåÔiš¤ˆ9}Ÿ=Ç¿¹rç’Ó¹ô[Öığ9sšØ’ºljcçòòoáB·¿  àIDAT)´„5#kõs¼³¤åsÌŸ·‹Øbé§»ØòÍ-ŒÛv2-1?ÇÜ#"¥¹+\DåŞà‰»'Ûl:®ÍÀÇeUJ©°Ô9ØJz—9ÃøiÅ0|–¿Ç’wæ°:Ë|º%ÚRêR~å‰£™p<ÎfÇKÂ.[¶­cÕ§÷¶<7ıy˜káU,ŠwY¹åC&!â-6ˆ¡ŸM£—Qƒ]ùæ<q7Ó›§Ër<üÎç|¿â¤­F×á–ö/^¢wÙ*z!Ê’di]\ºLâ‘AÎhêSÙôÖTî›2”;^ÅqÎÏÚ²R>ÉÔ	£:ôŞ›»…½)kXøäP&ŒjŞïøomİñÿwÅ®t1ÍßyÔT~ıY–/ÿœ·_ZÏ¶§F3,RZÕg/ş=–s(MMu]Óåg§†új%•%–?¯„oZ³!–o¶Yş–‘‘9jq,ekl‡E¯-M!å×Ç™8úú“¾vÂİL|c)u¢ñÚô£ÂÑÙoÿ^$ìK!«²æ<z2›´JV–³éÉ>ºƒ¹¢nl°Ôç„T7f¬ä×V²Ë\ÿ^8ú†JÌÌÃ1UĞ;œz%óôÄ7ø=¥Òö0à)Ø¼-ıÁƒ?~ü…íR—HAïñÜtCOúuóA™´ƒ³Î†ÑÓ]d˜ŒU|¶C´"‡ñ÷iÃèìCU6+vP9yÓe@B}“±Œw×TRíİ‡¿ß7[§fp¿P|m±³D×‚ò#$:ÌgI‘<ğÀÍŒïIG§ªEKeá:¦uÁÇ¥„Œ•ñ=`O§îçÆŞa„óˆË‡#õŞŒŠ£¸•ù¼ÔIÚÉ·ã(;àBÿ[ûÑ¹‹æ°Å›¨ŞËÒ¯óPºõeÌŒ1µ<ÇÒ|7‘Ñ«q®ÌeÕ&?y'ã{EÑY¤¥R¥`şQ'F
-Ä]<‡ôõ_RîÒ‚—ıû÷o·mÈŒÙ[bq6•1·Ï`Æ7rãÔ)Ü8FÈNşx)røl¶2¤r`Ù1§1ú‰éŒéBˆU1ñ•&Öº1|@àI[I4Ôb(Ê'¯ë4&Ü<ÛnqŞ8Rä©ëğöÌÔ±ƒ	ÑT¢¯6ê¾Çø»HÓMRº„°;°3‘>.æ÷šœœlÑtßö <¸ıûxc»3·şıvî¸e<ãGu£s¨'ÎF=VÙÉ¦Ûø›¹óV)İ“ÄMhè8zyyĞÉÇˆ¦ßL6˜‘ıº`•'Z‡Ùle·÷ğÀÅŞÆQû Ù@ÚÒ±C‡––Ô26ìÆĞ¥Ñ]:ĞÁÅkk'<Bºá®9ˆÖÕ»°aŒìxrïğòÄÅìß³†¶ÓùÛ…íG2¼—-†ÊR6
-â¦'âÖ[úùì…u¥EYp²sÄÕSKaš†òt=ı-ïÜÚGg´
-4éûÉñêŒ§³=Î6:êkÔ»ĞsâñNDXSügÆ–†¼ÔB ;Ò SÓ‰³’ššjŞMª]óË™°”ıE3`ñªXÒªpvëÃ´G‡á&×rÙÅ$77—†††‹ºÍ¥ˆCæZ ƒFKîJ\Fäº¡ø(ÌÄwÆ#Üzó-Ü&ÕSÆ3Yh†î!8ÙX_p–¡¾En<enØ/‚P¡/2…ğ[TJø=}ñsu0û²ÓÑ¨õáŞÙÌüj>ß/XÊªµñˆ¯!ğú¾ø»;àÒ4t¯MhEİX–~ˆÃ»æQØw¿BNºf3çTŞ´èªIT O¿áŒé¯mÊÃ«Ğ÷»›®®øœéáN¡5"3—vgéÔ©ÓÉ·Ûm2‹­>á}è×ã£½pt´Â§×ºuëIW¡°E¥\Ÿ“@ºRTĞ¾‘ôóÁÖ!€è1ı	PŠÍ+¤X©B«Lcçì_È®‚¡ßx¦OÃÄñÑ	quºİo5U…”—’e×ƒ!ıñsóÁ¯³ Ñş8%'W¥§A/}tÕ ÔÔRPT‹Úh£›ÁÁ~„ú6 JJrË)ÈQà×)[›–ñŠç 4‰CÚ ¬ü:3 Ùs¸æP±wñùÕì³ëÏ°è ,i	÷Ä¸uiZ±'ªÑÊµC8}‡Œdê´iL“©“˜64Šp/'Œm±UY™6ºõ`L´¶>„èŸ•EìAÒêE«¦yº½a7MÒ›šâœ4b4#:ö`Ô]7Ó§[nx„õfŠ8wãñt	ñ:$Ú¯¥èlW„sØ»•¸uñ¨ÃF1iâTnš6€>"NóôBôàÛ“£Ç1õ–¦4M4™‘‘=9uCÆ£O¯¾6‘)İƒá‘¡t4aÕxQû@Oƒ¡˜CÇÜñqp%ØCÊµ6ØØ{Üw}º ôoKTÙ¤¥•’TàCTÿLÏ7ujzwõÁU§ÄPPÆ¯?}…èìÑ%— ßùİŞ·FÑÀ+8DºB8àï\ImA6‡ï#·Z'Ê’%ØÖ÷ëõ¶EhÇ6bƒkÛ:êDWî<=zu	É«çWR‹
-W³¨•‘‘96¢aéŠ‹o„ğ›~øy;b´vÆäÍ˜	¢A~¼˜0’	}CğîöhvÛÚ9àéã[¢bÇVÜÙ¥J‰¦Ñtö¯W¢^°ó¾şƒ3|ÌDFÀ“…_s·Ãşe’µ¨İEİ8õiôë„w›ıâi°¶ÇÖ%˜¨~İ³3Ñ8ú‡>ìV;áu¡÷\ÜÉ,.QzàoÊ iõjÖ-[ÎÎêmğµtTê­mp«ËC_YF¹4¨G§ŞÙ©pÒ(i¨­EYËÏ¿í¥®0“ªŒx¶Š{­^·ÕI%”IÃZÁ(îcchÀ³<•"!tTÒeÎ¸¸:ÒÁT…¢ŞˆŞ âé€_ÇzÏÿ‰•+W²,YcP¦BÚåZ2ˆ¶"‡‚5jÇL-lÓ²ù`2Ñ”æSèe‹Ê[Ä!ŠRôGÓI)¯!?ÒÑ:2P)-VÖ„egPT-ÒwÑbIã(”¨õ%¤Åîd»d;qÄ¬ßÈ¾¬ZóÄ¶ØJY&Ş­–Š w¤ŠæŒââ·J‰G~yB(¶áì]xzxÙaÖ.¢­¯®ãØ!¡]ÜpõhÂ²š²¢Tˆô¬µ¤këÒ…p¾h(Òˆß·Ÿ­[ñĞåp`ózÖKqïI$®@d@‘Ø°Dùzˆ†ˆô]5)û5¸z9Ò¯;Á]úÒCd;³(k°WGŠBˆƒ]ûö&£Bˆ•l’ÔX7:5‰İ³ +9Hr¡’Ãe^øä‰<±q119\Ğˆ½…ıCŠIXÃ†…kÉ¨Wb×­£ù¾æÇÅK8ZhA/Ş¹AzçæÉ,‡Ù¶ó…'2‚6¶ö897
-_RCAü^öÆÄˆ¸6±qsÙµÍåŸP
-\K­ˆC#«(ˆ'??é])ÕÕTgïå·ÙØtíÊu=…¿³œ“‘‘ik!qv±ÂÓÃ'GQoÔS×ËáëÙd©6îØOB‘]{°ØÙÛãâáKµ¨ë¤Ú»-lŠ‚ª*š&*ZÛ9áŞãVî{üEŞzë-q¼È+/ÜÊĞ'KıÖ
-Ò„™ª"Òk„/;ÙÚµu£_çAŒšv/};†á{¡BÎNÔµ^İèŞ@}òö¬XÅÆİÉ1vÅ×ÅSäÊyq	vf©¢äÈz>ñ4OıßB~ÿî-şˆYÁêcZLBåK=Œƒu‰¨w²é€4µ„â²:BDZ)jP¦$°ÎÚ‰mëæğÍ›óøcÿàÑ>ÎŒÏ6³'«¦eO–— (:û00{!våœ!­¤²V…VjKØX‰ÊËƒˆ¡ã?a07¤üÊ—Ï>Ê3k¤iCèë­XdR‚’C‡¨ªÀ}p|Ä½O•*Ë‹Ğj¤±¦¾¾ÊªS§¾\*ô˜%(2W3ÿ£7xşñÇyì‰ãa^Zp˜¤b•Æg·U}M9Ê†62ûFm!Åuùì©!²Q4h@[yˆ„µßñ"MOˆãÑïáé÷æ0oO¹ypqû¸ˆ–4f§‘ZQÉÚ¢,6ÿïqû—ÈO>Èıÿ÷ï¯>f.Íãm4ÔP_—È¶ZœtÎø[Â£W%‘Ÿî‰ºl2·ŒğÁÉ¡© ]2t"ŸÖVQ(ŞŸ½SÛ>uÖd!§"Ø´µüòä“<÷ä?yäşùö×4ê£†2æÍ‡¸nïü°”ÕÛÓĞ×«š½!òñ2B
-Ñ¡ÊÜÁ²vòóúÂ­Ûã%Ä{g¼}„˜®<Â¶ÿ}ÄÇ"¾'ÿùÏ=û%“k(Q‹ÂkÔ
-1®Bš(}|p¸ä¤ëqŠ÷Ìbó–¥lÊ¼B¦¶ˆ4+òS9³”ßì ïõƒ-5-edd$¤£ZNê“U´Ö6¾ø…Zã`î,R£oH§8~!=/4‚T<|?O¼ø&ÿ]“O•pÈ­Phä:ê*D]Õbbf[‘«ôå¡,A-0’½m;ÉG’(²„œ3;´…ÿÎ;L•Rß"m&i¥•ü5ì:$êÛÂ–çÎÉ/f±÷›ùøùyï£Ùl_ø
-ßí*%«æÂ'Ì\‚Y‚é8üA^9p€âØøÕ?èá¡dı–XÊm1úOäÑçî"„Xşsç@ÎÀ©¯ó}œ‚:W/\””‹Dûü‹7æ¯f›¸Çİ«Ùüí£LÚ¶Œ¤BNóbÆµİGŞÆk¯`ó·ñ·qâŞ£ÿÎï®!Ñ¦>ş6¢R—&h¬!3ï¾ßïbİŠ÷ø‡rë>šÙ4¡Bß€ñÈ\–Ô†PáÚÁ^–{_U8àèÑ‰ïn`áFa;a¿İ«çóı#İÉùa$QØ[9Ã‡Ö(=,œÁAB§õÂÖIj‚yÑeò³¼ğKSš¤CÊ7POìâ]W\Œ¯ñ5•%4xô`Ğ?¾"FÄ¹_Š{ãWü§‡ë·°Aèùæã“ë²I]¸‚À1p–úR[’µúkJü*ğxr½Äß§k\^ITW¤ãáÁ­O|Î×ûv³}ß
-f=¤$¢h.ß¿ò·?˜Cä¼?øaí,nus í»’Åïşü>¤db†ĞsÂm|ÿÉTúˆ“6P¢Qe’¸YSwcwó«¼#œÍ¾õ_³ğÍ`~Ûu”ÌbÑø(‰#çP?ŠH„?5ãêé·ßÉş¹¨a·ãàÚ‰’£­ÍœºÇ·n5ÿşÁ‘{˜È N¸ZNÉÈÈHs6J)Ü°D†Ów1¸Øı&îùî Ûö6ÕÛü‡õsgÿÿVß >ÍokH[÷9ŸŞ+êª3ÛŠÎŞŞ„À,["U åTúG‰Fq8QMç¢êÃÇØÿGñ*]‹çĞ«8²úÌ^°€˜Ãiæ¥l.ÉëöbÚgs™+l(Õñß>Úƒmë·‘TØ>fšs„¢¶®x$èNQx*ÅkN)¢+mœpëu3÷>ó.?Ïı‚YŸ¼Àİ]M¾½?½†t%ÒÊ„Ñ(ô°ƒ¾Š{wè@h—p:ëâ©-¯¢ªµÏQÖvØûu!rÊs|ûõWü0ç#^º{(¸Ñı¡IôqwÂ=3“Ä4Ldâˆ:ô¾™Ç»“[¢±MäP‰š¤ØßÙıó›|òÜ}Ü1ãaîyá¶×şÁWï=ÉÌÿ-bsÔûa‹¯…JJÔZ’Ğ„?ÁÁèìç&Dg	•zc³Y\Nâ·!øûÚâØãZÇÊ<ÙÀÉ+¿@a;a¿ÑÑô|=İµœ¤éşm°U¸·?.
-+´Y•Tˆ»l¡xàèà/A²ƒ%èTêIª†£ôgL¸=6RÎ;'<üšÒ$ÑÑ#0„PeÓr£GÑØ(ZWÖöØ»ù`‰78º"SzÔ¤]ÚlÜ2‹¢ª"Ö©F1$Ôç“Ø¨UPµs&‰ö“ñé?ƒ	=Íãø.Î¸Ê3`ï€§¡ÅUèÔÚ6­kÙO¼¶HJuÖø€·k$6FÖ¢|ãút'2º?]:9êKa•d;é×u4ÔÙ¡®ïÜ]‡MF<ÛÖ}Ç?Ï¿^y•×~Ü@Z9“+P«ŒT×ä¦ÿÜÎˆ=ˆ–âğ!ØÛ/œíìPÕ•SU–kîQ<nzuƒ‚úÚ“_Ùô ÜÕ“ú
-órX'óßå¡¼ ‘ô#ËÈ/ÜÁïo?Â¿Ãç«bE›¾Eõ¯|øÀ¾ZGÂåú #sYQRkT’ªv#ÌdÕ4ë’+¤¦NMƒÒZ5g\}‚	jòÇQ=zÑ£Kw¢ëU˜›÷F6#/–*çNøÜó_}òÏ/ ¬0“4syS RfñÌ-$§Wˆ”´†T/
-mrÚù¢¢HÏ¡¢¨œbKÈ™Pfm'nÓ|fî¬:¹™o/¢ûâ©áYÔ5P5QeëäNÔ´·˜æ¥Ã¿&‹ÌóÿXgAªyì…øõÅWØ°C‡0º„‡£‹Ï£¼Jiş|Ş˜kÂ‹¹3‹A¯Å#È‹!ô„¶hŠĞ-Œè>Ã+„ag§\ÊüF3lÊP®ïˆ·³Ş!‘t,ÈAQŞ@´”»¨ìMºF4¦<=]p=eÆĞ	ìİpêÉø‰“ªÁŞÃÇã¹{FwBœmùöÎ0Ê"ïÃOú¦÷@è½ƒTÁ‚‚bGÅrçyg;Ëùyê½wÏŞQQiÒj*		é!½·MÛİlv÷›Ù$0@Pª¾ÏİHvŞ6ïÌ¼3¿iÿ±m,¦¤ŞŠÂö0‚=¬°r	;H_\›Ä3ìq´ËæÌæò‹Æ1rø`†èƒ‡µ!ƒõÇÓ^$‘¨ìT‘CdÔâVW‡H¤aîÆ¢lŠB|±7‚±¡Œ¨.¤¶Á€FÚújªt”ŒB„‹Ngqj›Q¯§½]ƒçÌ¡û¹u¬Ü>I\9õ‰ LÄGXMr>¢øZ*‹(w²¡iP‘*Ñ¦ù•J’L#y»öSİ`Ä9jâ<³NìvÑÊR…zâ7&’`ñû4L­ø~ÁêZTÔ1ÇN±]ŞàŠ¥?¾"SZ™3eåééN/B5b2AÎvØw¥Qk5š‚]¬-rÂ.xÑı"ñ3
-“Cj­î„ÛO;VÎBp‡2Ø>FmU[H›—%±¯³nW6;¶Å‘¸e«Ò„pÓ‹tè7‡Á^&\Rßâ©§î¶iÃq;‡I"!3`Ù+ÏóÂ±©TDÒhÂ…
-îHzÔÖNhì#èç`ƒµSSgLföì	Œš0Š‘“¢Ğ¯x—e/>%îû*oğ-[Ä±=i5_~ğ/?%ü_yW¿¥|ëg|õîKüoK2{rëiúì)^V^÷ßíNfi=«ŞxŠ~/üDR¡¯~G/$;GØúaèœ[ø¿İÎÕ3Æ3iD?Â|ÜpÀk› Â‡£ø¶\Î‡À*(œušDÃ¯‘ü:{œÇ|³²Pac-êÜê=ƒNƒ¥¨}f'DeCvW+É­2Rd7ióç²xV_¬ÛLÔ×jEñœGÖÆ·ùò›}(Q›ER«h…VÕà„³¨ÏNŒŸN†D’·¯ãëo’)>Çˆ×’GzìÏüôı6’K5¿Ì«tğÆÃÏ…aAiT×èíø#XZ«pœÇÔvx©DY]×yà4a´Q„8T”KîNÇõSçØÅ,fó8]Ë£¥µße¢EZ	ÏHcO|Šù~Ò.¯@8èqc˜èkƒ¥®œì„dR’’šÄ¡ÌäyßÄ‚9¢Ò	uE%2’µ%š=I”X´S!„Jun&Ù‹ÈkÃ¸…#Ô×õ×!'’–ær f?©â¹iÉÛÉÔã>dKf„à,ç(jkÉ+.¡¢¢K‘©‹Åy9‡r((14šI—D**À±Ó˜8¼/}ı¬hk®ãĞ.ú_<†á£Bñj«§0%•ÿprri•u^³u~&É[âÉè;–aÓ‡2ÅU¼Ç¡TÒm-Q—å“ŸÌÁÊ6šfÌå¦h/\;Aœvó8r'•ªl¶‹ø;”!âMÜ;7?Ò†,&^Â”¾Ú¶œ<®m°(-£­´€T}­B§íŒïãÇ”	,
-s>’–Å5mèİp²PSºÕrĞ{õeÜÔaøua÷”7
-iôíGˆÌâD©×N·y[•%úÂróHïÑ"Ş#/%ìbl#Æ3sA^–:ê²cØ¾í ™µÎL½ò"Bœ,±å‡^]BiÚ66ÿ´‚ó‚ñBØX“Ç¡ƒé<˜Ck„xG';œN£Ê=±y‘.ÑP©ßJ†EÖŞ„¸Ù`lk¡2yûŠhÔ9àæì Dø(†Øcçê{[!%{ù9AÿŠ:\Æ\ÆÄ™áj eÇN’ª*(©¨Å*tƒ¦Íá¢>*³Ào«I'¯Ş­[?&DzŠ=„èac˜:uªpc=$€æM[H/.$·¢Æ–6ìÜ4ÖTQ%¯KWÓHÖ7S#-õUè}BqõÂ÷@,‰•ò¹¨C±÷	¢hlçuVøDaÄÔáˆ ·çöl™ÇQy„=©“'0.Ò'›&Ê²ÈÏjFë4”Ù7MeDÔ úÈBúÏGPÌã(œ¨©))!-¶ÿ‘ıq´·1/ş“?4§ñóAşÃ£	åMsA†¨ŸÔù‡ScíŒëÔ9Ìsei_»¨»“Ó2H9˜ŠÁĞLC]=	‡D=VQJUñAvï%O4>"$õäeä‘\ÔÊ°iéå€£u3u•Udl%bÖ0|ìmE¯ù<;Œ-»HÖ=»‹hqk§Z„-·3ŒG¹B»$"§L”g:[Tšbçå˜ådS©Uãq)‘Ş¸yHÇ3,j¨²ñFë>ˆÁrD'§ô½õTÇ‹ëåüo÷I—2SÖñ§`¿§'bêœ<îääÔÑ(<Lñññ¦Ûn»ÍTWW'şv2¾5½|ïe¦€€€#nÎcß˜VTwoo5™ÊV™^¾z¦i‚86xæÕ¦¿­*3Õµ¶wïB×(õšiÉeã;ï3Ø4`ÈßLï%×™J4ç‹ú )é›ÇL‹Äù¡Ç>·E;_6½¹ô—ğÌ1İüÄJÓÎšÎ:Q\iúæ±9İÎ0]vóÍ¦‡{Ì´dĞpÓã?U˜²vwß¾Â=bzóç,S‘¼A]–©â§GLÃIyü2ÓeK¾5Å‹C:y¼“¬¬,Ó+¯¼bjlï|:øÕs{ˆç^Æ•ˆ,ÓÏo.=rŸ€€¥¦{_ŞiÊÇº¥å?î}Ùôm†ÆÔZ—lZõ·!¦™½izy§9~ády£“¯¿şÚ´}ûöÎ_§‰_½G÷4—qRfÚùòÕ¦›ÿq¯iÉ·æ·;BOùÀìÏ4ùÛ*Sr]«éxYò·"ã`Ë–-&N×³km0é
-¿7=ÿ¿LŸş”nªiÔô|ŞïqZ‘•¦Ì?2mØü³iKYçüf§1iåı[{:Öá4Ùõt¬»ûê«¯N~9í­u"ÛÿÍtõÌÁ¿ÊKßüÙtl¶?È÷•yäLr6¡ğGBm*IXoúòæL¯m=dŠË+5•––šòâ6˜6¼t­)ò©M¦YB_üª,0M¸ù	Q_S÷À/u·¿)À×İäæámòôö3Œ¿Ì4è¿?™~úï Óeã;ï+ü†¿oªhìªm‹D]»Ûôšğk<âw,5¦ƒ+Ÿ0=6ç—°õìD=øÄÛ¦eİêĞ®cÇÕ4&£¹Î<üÃ‡¦7™¶óº§ô½õ¦?zÒ %%%¦~øA”Ñ¢XÈÿ$$$ğşûïóâ‹/âîş;VpÈ-÷Z„3Û[éÀFö49¨°7Û*Õ ¥©¡NÑÆ;'7\UVXvoDH5«-€FÚ6¹ºÇR¨Z;œ<]±·¶ìy(Ó¨§M+·ük1Ïw³>ê¹¿ ‡è4-M4ÙÜ•£Îöt_ÀjÔ‹g·Š–K×l{­J…••h%i±róÂÑB‡FÓõ¾2P¸xH ÖXÉ-ãÚZÌ+‰æ=ñlÅõò¸ƒyj×+H%ÿÓO?qûí·›{Ò~7¿z®ˆ½cã¹—q%Wzj5-"º"K…ƒ³£ˆ+;ñ¿¤¥ÁJ…­ˆC{«v´êZš-P©ìq¶ë6ÎpÒ¼ÑÁ7ß|ƒ¿¿?Ó¦Mëô9üê=Ms¹­d-^[G<~éê)˜±´ÁÒÎ	OWÖ"R{Ê’¿>>>L<¹ÓçX:ã>ekK\©tŸÈ}“»5OOMÕ›Ÿàã†™ôÏ‚a^G}¿Ñ"Ö¶ÑĞà‰·7=GÉV®4Ñp²oâûï¿'00ğôæ—!·ÇÔªihÖ¡;Æü‚ÊÅG{İ³ı™`Çæí¯½öÚNŸÓÏÙx†Â	ñ]T¦S´ù.~z¢î–õ´É€³ÛÅ<´öÌóÀßBLY,ê•¨3E}qâæHİİ¢ªM,?@(SDÙd©rÂšµFÌ’ÁÚ+{¼œlD8dél ½½]Ô×8	¿MÊ•ÕM´6·Yd×3ÒÜ¨Ïmh:ëĞš¶‡º¶i‹V„ù¥¿¦a;†9Ïfh·×=¥ï­7uü)Ğ“‘Æ¶ãââ˜;w®y–Ó+N™Ó./pÎˆP¼À8¹Pì¤©˜ÒkZ¬=‰üİÆ¹FîÇ*·ü;,
-z!€k<¬·HQUOÊ·o±>&‘}¥ÎØ:ŒæúÿŞÆ¤çn¶Å:Ì>lxòYõ'ğ²Å\3ô×«Ï»8ëBñ<@Š
-ç%rH´¶€ØÔ’Î‰#¶ª †LÇófô]5M{ùà±M˜._Â¤‹†3.àÏõøèª³)Üõ	O¾Ëˆ»™·`OîÜğ¡“sù½õF(š5í™\Ì¢  p†p&ĞÏÿ´‹D‰…•-ª€áDû‘Ø…-Îş}	4†Q£F1fL(~ÖÇ,Š’?ñLßÈPüÏïJ@AA¡“n$Í»­˜İÉwU;>­èšóÊ‹¼ùŸÿğézçßùŠCA>¸Öï&öç7yVööY¾ßLjù/½•gÎœ;¾`Óªùjùr¾yñe6*eßú/øæÍÿğÔsïòö—4÷™Á„KÆ0rğÑ"ñ|D
-Æ3·3‹‚‚‚BÈ¢Æ™ğ©7°øoÿæßÿ¾Ÿï»‚qÇît Çmƒ¶øf._<›©ágc÷d…ó}åSHKL$QºÔ\2«UDßt	£yâÒšEVÒ6Ö®ŞCbÜnâ“r)(oîf’îL#‡~©ÉŠ%>f'[¶&’ºo)e5”d’—.~çÖRí4…›î~„+&Dqì«ç!gag…ßƒ4’=ÅŸ-ãƒäÇN·ò›/xfA$‘Şm8÷ŸÄ˜‘ç>»Lÿô-LîK„­æ´œ>1Vôºˆa£®eÚ„kùË›¯3}€'İú8½/Ãü%ß|ñ "ñ>†MÎrøŞ™EAAAAAAAáLâ“S$Q“'rÉSóãÚ‡‘c£‰ì œ-äˆîS™qÅt®º*š †	çz:Ìİ'(BQAAAAAAáCZC±ÁF¥ÂÁ]Z°°ÆÎNü¶±:ËÂF<ÏF…½ƒ
-GGóT>[á,ÿ@SùÌñ©,fQPPPPPPPPP³(((((((((ôÈ±‹YØQ|ï½÷xâ‰'ÌÎùùùlÙ²…ë¯¿Ş¼mÛŸÕ«WãëëkŞNòÏŠŒ///ÆÛé£p<¤ı/??¿?U~‘“Ì+++Y°`A§Ïéçl<CAA¡ƒsù½I²uëÖŞÜ~õÕW2dˆYI*œ=¤µx­Vk‰J.h4s+æ´ì{}ÒÊ·xrä·ógË/:£Ñh.ÀÏgã
-
-
-œËïMj9Ä|R¡˜››ËÚµk™0a‚yZAAáÂG6<¤€R 
-
-
-
-
-ÇC
-Å>}ú™“Ø£P¬¯¯7w?†‡‡›{1”ŠEáTÙÈÜ"’È%[dzH§ôT+((((œ
-”••M‡Plnn¦¢¢Â</ª«BV2
-
-½¡+¿È.l‰\¥ˆ“sƒŒwé¤h—ôŠ2äp­êPì+œ+äWOS+ôzı#¿
-
-
-gÙ¹Ó}A³¬#ÌÖpÌõ¹ŠrW–]»v1cÆó,+¥Qè-]Â°K(*œ;äĞüè{Š]"1''Ç<qZş­ p¶‘ù0::š€€€_Muª««3WP2+(œd~ì“eåŸ-ïÉ÷—ïxâ¡gE(*ü¡xşp"¡ØÒÒBFFO>ù¤9­”Å2
-gY·ÈC9ÍiáÂ…Ìœ9³óHR(Ê-eİİÏŞŞ
-ndYYSScş×ÉÉÉìşLÈÑ¥¦¦¦ß&e¤I  p"¤‘Â¤»PT†Ï2şO$åô’íÛ·›®]|ñÅôíÛ×ì¯ p¶yRVÊß}÷Ó§O7¯´ìŠrÕ¿§§g§‚Â™EæÉêêjó¿Rÿ¸¸¸tùs G–ÔjõÉ…b÷Å,r(@
-Eéº.ºğ‘½£å¤,ßBrN	%fúO_ÌÈAı—æ#zhÎbçÚ½¤®¤Ş|†ìuÌôÅ£ÔÏ³•IƒNÜ.å[RÉ)é8ëú3dÊHÆM	Ç§Óç„èÕhª2Øôİ.ò[´´
-/÷ ~™¹ˆ1şåd®èf™Œ¾ä"†ÄÏê××‚*Çp&]=‡({\mÌİ¨"?f‰1©duú€‘cÆ2jâ`Â{Š«cÛm´HŠ)DºÅ.±¢pU)ÄdµPlôãÒ©áÈvkÏ±ÔBÅÁİ•Ö£‹^,òØ¤Í&¿WÿR¤O(Êá†HLLä¯ı+Ã†3û+(œ-d”“ä~øaÆŒÃ½÷ŞÛy¤E(*œm¡øk¡xìb«'2‚d%#+•îâğQÙ0èëEÅ»‚¯Ÿı’õ{2Éjª¡&/ŸW¬å°¶Ÿf¡„÷±ÆJSNşú¯øàã-Ä¦eQX’NÒÆÕ¬İ\ƒ®O¾ÁŞø»¨°Ò· ;ğ9O¾ºŸóPë©¯¨0÷ØTT8âLD´_‡¨<šš
-Ó6³cËŞÿ`'9ÕUT5ˆgYØâÑ7§â|ÿü;¬Ş™FZMu™»X¾ê uáøöqÃS—KúŠ/xåùõ¤Ö×PY™Å¡ıûXµ1‹6õqÇÓÕ–­('é¨ÉŞÄÆ?dÙ—Ù×h %7ë6$“Õâˆ³h(ğÑQm«ã=×ŸO•Y:J¤ éŠòoIWã™ÀdĞ£«8Hâ4RÒ2Ìóízr²á#{.233ÍÃ­=#İáÂb´8ØYckTÓP–Ç]ñ¤‰cYİÏÍ/ §Æ{'*ñát†§wtÆıŞ/ùdE2›ò™:;Òœ?zúÂt5)ìZõk6'R¼€±AV¨¬E|jj¨*Ì`G|:9ZÜìp´ı%$2ş»â¾«±×İŠüø¥)¬òòrFm6T­ p6‘yRsÉMdÅ4nÜ¸Î#H‘(ë"‡N…3‹Ì“rºƒüW.æı³Ùğ•ß›~–¹KóÉ¸Èaxs"<zz–îÑ£ØJkm*«î¾š×b¼ésÍ½Üy÷4F×¬ä¾…Ï±­js»{Jpñ6^šölì{óÿ6…}³÷©¿óÄvwğ·{—ğà#ğn­£|í}Üş†+Á—-àŞG.b`çÓz‹Q×Dæ¦çùö‹·y+>—ñ÷ğÒ#ó™;, S-ÕXqÏ5¼Ó„û¥²tÉ¦×~ÀŒ;?£Ào!·Ş9‘9®‡Yuó[¬²¹‘G¿ûWG—“ñİG\ûèz4\Áÿ-¿k/‰&Â¬%Ú…f.bı“åıïö’x)·<ówğù¿OY[Ê¸E×ñâ_CHüç5¼Ûósoûû-üó†qwf™Éº„¢ü[r&{­µ”¬º›;ßN ş°#í-u¨5`åàŠ£½6FíÍ:ŒAvA©h1ÿ<ñ)pÙ±üu‚}ÚÙµf/?±’Ñ 0ZŠ÷gÛu´µPx·»š+Çõ¡ÇTÆvm-Ôˆ‡ÖØ‰†—£“Ü¬¾£—vËS·ó¿o4ÔFİÊs+ob¤ğíi–`íögyáİoX–ëÏä»ŞáµëÂğuqZ´"}¯~n'úëßbÅ_§2?ª£çE~¯2ş•E…ó¥G±7Å÷+¾g½	+££hìYŠïú´Meƒ¹I/Ê‰?BWĞïåìö(ÊrÙ$ª
-Ñ¨—õ…J…µ(ŸO)¤ˆ“å»,ëÅÏßÛ%Ó›¡ç?A>ÑbĞWRšd@SŸMCS)Õu‡º£®Gs0Umó¹ä¶+X<g$QAƒ™µğ
-Tö]MSiG]Úßç@7<:
-õq³|Å&¾+Å¬G¿dÃË‹¹d¯y8]m%)ìIĞSS?•`ÿÁéıàQ\!
- ììşø]Şüh»‰VhFâîf³0„DÔ`Ï*2óJ).7?N|zóĞçÁÔ
-Jãî:•Q#m±9Š©®î.İEyÌG¬Z—ÂÖ½ÇnFü.öävŞó`ïQYš„.x&W?ş)Ë–½ÈÓW€«H¢ÈEÿâñO?gÙ‹w2_¯'3)‰zïŸw™Ñ@eE%1ïğÆã÷R(˜õŞİ°m{ö°G¸òÚù\3K©oĞĞÔ–_¡. fûK\~ñ&L¸…‡ßØDÜ±3z»§N.îÔç–÷ö:’š4¨åg7ÜÜ½!şüÕŒ…?-¢â® %¡˜Òõ›8TY)š™§‘úzóÂ¶ßP4)ünê)/¯àĞLJ·l!EŠ´Î#½Fš6Â¶Z[ÙÕq6øE'¬íú1pº5.>z2e³iÃvJà€®»ˆ)Ó‡â€ÛÈkyó³¿pÃôş„ÙÛ	Õß.>¨zLrHuD(Ş~‹;…X©©H§Í@ÒÊWyváBßx+¯É!»æ$I'{±jcY·|+1;m16»áYö<ñÏ›¹ñ_ŸòÙÎ|ªÔµ”ÜC|sõFVV6ØØÚc-Âm…£C9Ù¤¤fĞ*Z&¦œššu´Z¹âèéMø Ö6­”V×R«néx¬^GmÚRkj)n·ÁÊR…­­¶DØãé¥¥4+ïŞû]u¢9Îs«ëÄõÕ§œµOÖönô»ò]yänş~ùúy»ãî(2²hVÙ8
-!å5³oæŞ+øì›oøşµŸ÷·ÏşÇÃãJÉŞË¶-õ8yãÆ;.exx!şşø×wÄlæİ»Œ/>[Ê!Ê½;Ãò+ıpv5Ï¼ğ(·OÖàcÌ§ÜÜ²Ÿ™îŞv8l>‚ÀÒÒZ„ÓŸpfŞq	QNö˜w—-OÑŠ´„EI5jNT)
-
-çjµY„œ»â@U9eûVñÍ÷ñŞ¡d6î)£8¿czoiom"ëû×Ùµî}_µ™ç¶I_á²Øöö6vı˜E]S	M©Ëy}{	95ŠíÊ³BQ>iÛ?àË/ğaF.1;ª¨?¥¸o¥¦²ˆ]›ÓhÕêÍ“šÎf¡(Ç¡###Í“ÿxØbëÌ°ëïç†…“ég•ÇŞµËøàû$Š4~„ŒìOß/œmPùG1cV}}œ°GKsC9Ù©™´ë=iCàŒ½¡”Œ"{ò²±ÕeßÚJùÚ5¬úğU^{á~Œb¯óé¿BöìU¦³?³˜ÌÊ*šZršİqªÛNÊÖÏùìİOùğãŸÙ›_Ey»_²u–â™XÙ‚]P"ÍF
-ái+„ç¦ÍûÙ}P|øBÜ¶5wôNktmèÚÄóRìjêª¨k‚Òì#‘Öö¨\­°qY°±‘ÃTI£·'~®¼ŸF´hÎU)Ëùñ³§yúÏx#V¼îh3M–Ö*ÜûÎ`ÂˆAtíaèÖ'Ÿ¾DÏŸÏáæO:ñy¦O¦¿>…´ÜÃ"=ñôˆdü˜ \…ˆîê±uòÁ?z³æDwæã`ÎCÑ"]Ê5KoaşE£èï*ÈxVaç â¹§±æãààîLØˆ¾xÙZw„_eoÎö‰kÙ¬1‡w¤®‚Â¹F~§Å$ÇØêZ«Ñäïà‡Õ”¨•\zJØºàæßÑ£Ç3xà@"Üqs8•>) š0¬È«2bÑĞ‚¿¡‰ákÀˆº*†üÂ4
-J›Ğ×æp ¤‰zÍÑå¬ÂBåI`Ø FÍ şıõ¶ÇŞöTEıÛPGÉ\êõíg¬ü—CğQQQG†¢Í¹O
-DWW×#s™şXˆÀÒ€¥ó sQ¨—%VúzçÍfO]^>%Å¥Û¨WQ”ÀÖ¤*|¢/a¡Š£Bdwh•Y±¾Œ©‘c™É%\|Ëõ\=²†Ø¯XöÖ{|»)‘œãŒOšŒ´Å”êZ©wĞc€çĞ¿qû³™îu˜ÂÍ_òá+X{ ¾cqHO¸÷Êèù×rãìÉLŠLçÀÖøî«•lÜ™ÈBKôí¸;;áìp¡ˆÙ6ÒRœ²Ÿ}Ê—Ÿo%¦¢áÌ¶™L†v‹s(nm¦Gñ-¸áê"{õ:OèMÔä¤¸nëÖm.–Œf7êEá¿…Ÿ· ¿A|à¿·,V©D£Ç	/ñç)OAá´ òp}	?“PĞpŒ¸eU™;7s .’ÊjZ¥PL©¦Tİ1wY¡—¸ù8l‹¯¼¹A¡Œìï†wwS'Å$õVøŸ‰›»C=àL‹húšğÁ;\‹Ê£…Ö6k,T8YXYœ¨p†ñ	gğ¤«Y8óføy3xˆÎ.§RGÛ`e°@¥«§Éd<cBQ.‚tss;²ÖÀü_i'>>ş¹u’±mM
-ë¿…¿½4ûÉ\õ÷xl‘+nl~ï–}½…¸Ún¢¬½•ª´b7obMCó~€KÆEnÿsÆÁyWİû ÿüôSşñ÷¿sÓeÓ¸î¥[ïêˆITTçq¸Ø|§_a4¨¯« M§¿Q²˜WnËØ›^çºéC(WN`Ó¦t´ÚîÙ@&“v‘D"`e)DïØÅÜúõ'<uû &8%÷å{¼ôÚ×l²°Eë0†¡‘á„ù›mÆÊJ¿jÈUá&ykóB¹Úğès}®Úâ¼ÓŒÿzZí£ğZÀ5C.ãÑ«àâp†‹0ñ®V¶B€‰÷²a0™ÚId–­½Æx˜Ô5òúÍ7sã¢«Xtí-Ü|óÜpıb®ºævn¿÷c6B´§ÏKäµ¦†Zªjêh–qÜíÁæ*§…ß‹¨€4jÔÕe”••§¦Y+¾4ÔìaûÿäÛ(¨ë^>ÉªÄŸÈLÚTy–[`!Êùõş»Î,¢¼Õ6SWXDâ†í®¬9Å)&rñ‹7n}üêN¦ŠıM^„‰4²ÂwïÉôëÛŸ¾ıTXyùá+ÊU÷‚GáÒ®©²Ìl~ŞI¹V×1ÏĞ ulë¯ê€_ã€½Şâ‹ë¬†º&šëËÍÖ,Ì®¦‘FŞ\£AÔ3:9šØË6[mm-{÷î=¢	ÿøê
-š’Öóvœ–\ïEL¼h.·^=‹ñw|È}“<èëMAYsºMíÍ]Çwß­â½&İ÷!wŒ÷ Ô<„xìTXûøje‰#‘¸9â}œ.R¬ùø…¢²ÿEÀ	_á|ğ­F—ãnHĞ}Q¸»8áçé£ƒoYÃûßíaåë·rçTqª½\±±ƒƒèßid¾ççÊJª³t4”BPPW\q…y•Ó/ôüÜÓOGŒ™ÿ7şñş¿¹ÿÅù>gº?ÔÊÆŸ¡âæE ª­êU"fºw–œŒúZÜ&ObØwr…ö#îæÎÛç1oR î}û2ş»˜á„oO"¯}òô\}çC|zZºÕ½--"0f±¨ pÖ¨'kÃk¼|ãhF"Üó|›OâÛtW¿´‰—®Ä ¿îfD:¾_/ÿ¹4”ƒ°ò"D”;İK…ŞPNÁî/x÷’+ù"QEiëq'»ƒ¶‘ê-Oòu¥»×W£~oiÂÿØ¨vƒ‘Â’JZEY£p6È#î“gxÿî'YY$„[§Ú+£ iŸŠDê^ô†ò¸Oøâ_™8±ÓİòonÊ_q7òÖ—Çº¼Îß§È_(Û1é44êD+¹HK{ƒh;Úcçì…«ÊkK=*\å¶=Bu“ù=Ï½ı%Ÿäºâ7ëVş5§e«xé±»øÛsŸğmJÓ´…ê6Ô×Qa4¢;…ˆQÑŒ<–’f|ƒ·³Ç¯¢„Fiç¯V„ÍØ€º®Ö&Ñ.ï?„+ÿõ<wsu?åUYäåˆ°WWP¨5ĞjK_ıÃ¤Í<+l|±)ßIÜş$Ö¦øáìx	ÿ\2ÁánÔ\ÎÊïâæ¿®%Î"“‡ù2Ú/uã>2Ğ&m?¶h¨o€GÈ.ºíncÒç¬°spÁÅÓWó¼¼3Şa%ZÕ³˜:Í—è¥T&ñÉ–LZ´¿4½t5Ùä¬yœ[o\Ì‹+H9vªÓ`"¢¦qåÂ™,¹w
-XûÓ>
-íÆrñÒyd~|Õ4VëhQ«Ñêª¨®…¹hòfm'/c7UµõæÖ¤lªë«hiQÓPÊö——²äº«XøÏødçae‘€Âï£*™¸Ÿ¿á¦WbÈnêìÍ Š¦¦BDQ„Ş\I9<æ*?úï½÷¦p×1wˆ?öy1lûìÿ¸éoñÊæÃˆòêh¬°´²ÇÖF.‚³yÙ’Šòj´Ú37§ù‡šü˜,rÙ0èÅgX<Õƒ@·ÎR°­†¦Üy}éMÜºğAÿ4†£ª#uUÕU©ÛĞ›šHÓŒeJô\î¸v0ãç8PÚYæ…yÔ¢ÃÂ™DF|-)ËSQ‹úbÌÃaá0kd%W´ï’Jxsoq¯³·¢	óú–Ö|r¶~Ì¯áš…OğñÖ~µ¦I\»ek5;k¯äïo¿Ékoÿ‡ÛC5¸Öæ“/ó†Ô4YBÓÄÙº7ÛÔåìù@È¡SÂlp»ËP¯——×Ïà¶…&!7Új²()®£¶¡„²Âƒ$Æìb×Ş¨Cæ0qÎÌà„){ş-_lH$§Ö€ÊÊˆmY2»·şÄ·k³hrdğ°p"÷òŞ«Ø²m;111ÄìÜAÌ®vÖôaÔµ‹¸â¢!ö>ŞœñÑÛÚa×TIyY	‡
-©®.$cßvvnÛG‘u$ıçÜÌ×]Â8r!$ò)*«¡¨ğ0YñûØ™ÜNğœë˜7 ¡ÆClùè[6ˆ0lİ¸Š–hB/áîk®`á¼(úX–rpİr–úë6â4uc<[±¬.&;»¢ÊZ
-v°3®ëÈi\tÃb.›Ñ—Hk!˜2óÜ…Ó˜8ĞıH/Áé3¸-¯m"ç
-6¯û‘Uñù$ë¼äçˆuOùPî^²ƒİk¿eåt•ËÖ14kDyjåLh¨»¹7Òâ¤çybcíŒ³‹5ÖÆJj+2H8T…æp2û÷ì2§ïÎ­?³eûV~¨bÜøIŒŒğÃ½{òZ;@ıaJÓ¶óCü!â‰`„wvV–ÔÔ·ĞVÏî]ÛÙ~¨€¢b5íuU”T‘¹OT¼iIdeU¡«ÒPİTGá‘Ÿ2qèP1õ4øõ%Z»™Ä½œñq¨"i}
-Ú©×pé¤~Dz;eü¼+î»l¡*·BßJ‹ÎDƒ…'#ú{ãÔV@ú¶=lZ¹”Âš<ãîè€‡§>ÁôõwÆ1$_Q&”ŠòªÄˆ£³3^¥¤ìİÉ¶­ÛØ™šG¢Î›Á~N4LAãâ‚CˆNâ›øñ€=££|	ùT"ó¤bpû´æ’ğã&6­ßK¦‰²ƒeØˆŸ¯7u‡8¼û¶UöÃ#Ğ•“–nDw”ÆUIq”k´ûøâaÔpx"ö¡Ş´iL´j¬p
-'P“ºÃù˜Üİq÷wÅ¾±ˆøò@FŠ¼àçñç24İ…Ì“gÜà¶y×·46¾ÿ»&·UCÍá:œGG¡ß»Œ”2+Zİ£¸Ø#‡Í@‚İíq¨/¡¢°ˆKG¼4èÜ"ğpóÀ«½jÙª3ÑÔk7ÊğÚâR^Ha¹%îD"8È'}9™?¼Ê6ıH=Tôwl$UÓh?l­:êù½kp["wé“šPN5ûãïÌbã€[ƒ}Úh±hG«i¤©¢ŠªšŒn¡½ü.!&0Ò­–š¬XV&6áäH¤Ÿ+¢UVQYME«-~#˜2c:S†yâT•È²õû9,
-Nón,UõÔhp›p-·/Ï„¾=¬²íÄÂ
-ì|PaTYPßÒŒ±¾’ªÊztvŞ„O¹š¹—_Å¥Qnø‡ˆ¼ÁƒVCS‹xF‹-n¡¹ü®…Ìé‚uA
-;ÖÆ’&ÂP­³Ã1z6s_ÃC×ÁÛÎÈdÙ•×Xáé†O¿‹Døûàcïˆ¾Q'
-*ªŒØyeÊÕ—qùÂ	p´Ç/øÏĞ— n/wú„¢lÑ¶P´oq‰)$UYĞèÅ—ö6=åCU™û9t ÌöHÂ""	å¥Qˆ?kFEû™W'[ôò<'¿hü=lñ²¬¥±º•ºêÊÎv*¨b¯Å>„ĞKşÂÍSû3Èç˜‚DWCş®UüøÃ|YàËˆ«îâïàgİJÑáBqy/‘¾A	
-"Â^Om½¸oeM^èã+Ÿ“(¬D:
-¿Z— Tvø‹Ê2ßk3’©mNßıj¦Å—.bJ”7¾İæp*BQá¤¨<ğôeB”.6M”ØË–5iÄ'àà—Cy?®^¸ºØcÙXMmFN¡¸é2)mvÅ8•[æG`±ñu¾ÜÏ¶¤BÊ¬1„eV?wšò²i"Ä%Ğ'u!1>ŒèK€gGËJŠ'¡µœÒ‚Ãä–RZYEC«øÅç«©)§$?Eøgb>“È¾&tµe”ÓÒRlŞ=êPâAJªª¨i¨ş9doÿ–du»ãJÉM¯ÂŞY¤wnÕíö¸ö!Ğ]€æòµQuÃÓ¹sôOÆYŠ¦vQ½••‘OAy…(ƒEPUC£ò¬<l­m	ö²DÓZKn0Q¢!àª©FİĞD“ ¡.eÊVSUR†®®ˆz‘ÎYZ-5•­XXÖcÙr˜ôuIMÏ¡)8{Q—eJzF)®¸Û5R§5QeÀè0{ìl/e\HşD;³(œId&ëŠòo‰Ì7ˆFF/1–­çË—>åû½ú<úÏÌòÁİşwº%±l]³ŒÛ^Şdş½ä–.šË‚èwß«Œeg…bĞ¡ÕµÑ 3àé”Ê×¯¤’«V>!„)á–lú÷ûh.¿…Ác‡\“Ot\=Úb5¢ÁäJ°ñ +–<ÅáK¯Ä/bcİ>¦c'•‚ä4T„ôwÁ¦8†wÇ³`R QÁBQÙ™å0h z¯?økvgĞ5‚‘‹—2aÏc,O¬§Õ)Ä\‘§§§›O4{655Ô&%ÑáÓ3³ÿù!×_6ƒÉ^ehªÙR9“‘}í	8SÏ/ ÎîÎ,hËµşEn;	ß+şËßl,|Â»ñ¾,xz57ó¥¯u:6¬àÅG>#É ¥Aom^kĞ/"„I“&±zõj³À•ô1ƒ÷½ÄüŠ'ùï'»ÙQköwpï¸ßøâÇØñóVâ™ÁÂG?ä–h!;;|z³3‹"~ŠP„Ú/ğÊ»™ìÕã±onc¢Ê
-Õ©v¨‹¬Ğ5­Ô7uL2·q”ÛªÓ»ªE…^"ÄÛæØşëÇç×SP3»²8Ê“>ã±/³Ñªûc²/ÅÆ¶Ÿ`!ğ„˜cãF2Z©1‰|eŠ·ïåüûóEŒõA»÷]6,{“×¶uäË™÷½ÏMWÎaº¹¨w³²ø¦D;âÕ‘¡x*˜D„iiR· Ñé1ÙØbkïˆm›M›Q¤EÇ·®ï˜XŠJ…¥øîmm'4›¢rvÇA”%rkQ“±­A…­µV"û(Î…P4ô´k©kÒcåà‚ÊRÔúšÛ,±wõ2ïáo-RQ¯ÕĞXWƒ¾z3ßÃ/ „iCÜÍ½ò;‘å¾ÄÊÖ{'7ì4¶èĞušÖ³ùCŞÏÖ F§ÕÑ†Î8Úˆcu”"Î8ŠP]â{<ûæZ¾=ìÏ5Ï¼ÀıcÜqµ;ÉûËzêãøö­UÄ,¤5d0C¯ø;KÅµÎ'»¶ä÷ªE…“ÒZMeM=)•ŒñÚÏOÙCñs²#Òµ‚”ÃÒø«4× ÿÕ™»»z{CI	j‘·:–¤¡¢
-bÈäp<UÖ´WgSZ˜EfçsşÆè‹·F´uê¨Ğúáád…}gï…"O?ò[—&îœëhhp¿}útT8)çB(ö¹€©0Ÿ<ˆÛuó39’§dwñäôF(şñ³(œQdŞéŠòo‰Ì7]âäÏ€µu=…’ÉØ“$*L5•ZTA¸x: Ò‹ÖÅ!Ö}œÆË{é'/’-ACµ5ZL*g<C#ëE¤·-6“ŒO•®ïXÆ}WcO™£¨p68¹záï„ÊZKÎÁ&ì]<‰5Œèş‘ôï,\„pı‰#È×— ~ıˆ¿¥_ÿşaôğÄÙZÚä“·óÄ3 ëX<Ì½XÚˆÿ»àbo)ò³ùÉfdTæ(Nôè[+Hûñ6ˆ8]·¹œ‚J{BÆø™*5øÉ‘yòŒÏQì5²m&?¦sQçÆd!Ø1bÄÔHÂœ;êÓˆüŞN¶˜ÅìÛÓÎ,2ÒdÅ£8ÅÈÉ|r,º¼ãÕ—¡#§rÙˆëò8”ZLY}+ZyÌ £­¹Šü”ª»ü¤Õ¬Ñi “¯]Ê_}”{—^Ëe°•ê¯îß'ã¼§´PPè!äpéO©Km%åŠ›ñİµjÉÍ¬$?¿’ú¦Z¤n¥4¸Pi£©<—üôd’–SÀ´¿Map?/äŞpgƒcwf9îĞ³¬|zCW/V×Ğ³äÏÔ£x>¡=+œ
-µ;¾ Í"¶ş3˜u:˜•¡g…óózèù,Ğ›¡ç{¦ee#/Pœâzãd~éNOç(îì¸îC
-
-'Ã½ŸN.®B¡uz((((ÃqkÙ¡8ÅõÆõDOç)îÌ;…SÁÒ«/.N®¸”=zÆ<ô,WLåçç~Ôäw…ŞÒ}ºB×P´Â¹C¦‡tÊĞ³Â‰i¡¡AO[›>>]û-9z3ô,»½ß¼‚Â™C–“---æåB©şLÈ)cÒÄR÷¡g¹ğQ~§æ5,¿ZÌÒUáwŸ ¯8ÅÏuÏ+]{âÎ“•p÷ïVAáä8š'­Ÿ‘Ø[dŞí*W§¸3íd¹ÙEOÇÿîXz½˜Eº.u© p<dkD60¤ëZÌ¢Ì•;ûÈïUÆ¿²˜Eá|¦7=ŠmmmŠé&…³†,7åâù¯»»;Ò–èŸÙ›ZSSsê‹Y¡¨        Ğ#f¡(7ŒŒ4ÏUTPøÓ¢­ ô@+Şˆ%§I‡¦Óûœ!wu)MbõkÛHÎ©¡¡Ó[AAAAAáL!§ FEEŠ6ÏQlnn¦¢¢Â¼]‹\õsNæ(êj(Í+àğáJ~1ÔàGPdáı¼pîô¡©„œü"²Kê;=ºpÇİ·Q£‚p¿zì*íñİ°¶…ÀhF‡zâãd ¹ª”‚ø,JÅ¡.SÒî¾E"T<ÄZ>DTæ%d¦˜+òi±½MÔääS˜]BE§âlß°0B#ñ:f!¹»GmA<i"0£		ôÁËVƒ¾©œô„\jtúÎ½Xí°±ó¢ï¨Aø;Û`´‰Ã^Ä_€…š²„Š*ëé8KŞÄĞ!òsÃµ[{âBš£(7b×U¦S`pÿªioĞPïÁ¨A¾8Û´Óœ½™íßláí¸}ÕU8µ6c²rÇ·O8£‚äÀ³„MeÙ?Á¿Ö3ç;™7Ã×ªBâóêºåÓzÊE…e¢ÂùÆ¹Ÿ£¨C¯—e¶Ğ_^g‘æ(J#Üx{{›ë”ó`1‹\©§5g=_¿ù%Ÿ|³‡bG+ôu´èfqÙ}KùÛ#sëlg–+ÆÔOxú¯yyeÎîöü²}$#f,æÑ®b°øÕã÷ª-|ıâÿxûı-d8ºâ¢•ª¨CMzy7€&KOœn}‹¯nÇô JRü–÷ny‹Í.-õ´µ´âÙ
-Wüûkî™îˆ§Ê€¾t?»W~ÍÓO¬¤ÀÅMK#m4§ßÀc_ŞÌTâ!G‹1 kÚÏ¦çßá³·Öëì†£4SÑÎ¤%wrû×sIhÇûJŒ"|å©?²ñİ%<¶
-¦<¼’ÛÏeš[¥{—óĞí“b4Ğjm ]cO»İ(îşğE®H„›õ‘ûHNWó¯æÓ¯q'_ßø4Ëwåé ÂÎØNz 7¼ô$KM`œoçryÁ…#…j©¦hÅ=¼££jk:š”rö»¯^»¾Zò¿/ß\Æ9Ã¸ûş~üôı&9OdÎ­÷²ò¦èÎûœ-)‰_Íª'îæ™İ#¸ü…§¹e´††íŸrõs;Ñ_ÿ+ş:•ùQ;X(BQáB@Šg}kk,ìì±;ÿÚéç-ç\(ê‹©¬·E£÷&4°·	×©›êi·´ÃÚÑ‡ß8 |,fÑwuÏ}Äªİàrëó|»áCŸåA_÷¬ß´‚7>£Jœ%{ëêk+hn$zâ£¼¿g;„Ûcvïóş‹óÍ"ñdñåŞw³ş³šÛbÍ×núôqşµh,Nª1Ü=o}ıŒdmZÎª¾"qK?ÜÀª•¯óøÕ“pJ+à»ÿû”8ujr‰ûî;–½—BÁ¬ÇywÃ·<ë(&$-}9ÿzr39ÚÎ¾.ä[T÷ñ¬Ø´¼è‰ÜşÖÏüüÖíLŒnf×îm|µò—÷•4gm"vÕGf‘¨>2ZNAÂF>"qWİ,®~q+E_¼sÍu»xûöØ˜P Î:šÇßL!sØñä¿XónåÑ·–±æéùx¹f²â‡ŸÙ¸;«³—ñBC´ÚÚJHÙ“Àş÷>ä`ˆoK´qo³>©‰
-µ;.îNxú×ÓÜÏÛ»s°¬i!°óê³*GwüBõXZ'±B„{WI+nîŞŒG•I"
-
-
-İÉ[ûÛ·n`ÿ…Y@ÿyÉ‹%6~?ßçœJÂIİ”ÊÚû—òÆ>`m^‡ï™âÜÅö6ÈLd{q®cçqëms:”Ë¯œ€šü
-jRÊ©§Jk?²EjôuÇ)*œşşş
-çovxy8˜{Èî½ë†º
-ç˜&.æK(®k£© ˆ¼,#ªy˜ßÏ‡êò«(N-£…|á<qqõÀÍÑ‹¶vZê›ÑIûC…Y¤¶¦Äo÷?z9£úcîì™DE‡ÓVSKí®Ã”ëÚÑv>ŞŒQ$pm)ñ%då‡àà9•	Sƒ	:©.„Ä’¿w[2A+;èÔ)ÄoÙÂª©Ô·ŠË;ÍãµN#-n;+Ô­4D…LXt´xv³Œâù+HË)¡X*Înœ0şõ˜JSØSEIÍpBG1rj?BÆåb±Îi+IÛK\açÍÎgÚEde~ÏsŞ%Äîr¶Ú`ëÎØ¿şçŞüŒ×ßxƒ^{™¯Ş•G¸áïh‰…¥%–VÎØÛäŠ‹Fêã†•hèªê©·<şîçjòw~ÂGÿ¼…o}59MÔİ:8!-ù;ÙúÑSÇ\+–[b%Zxôcjt‡z‹ğYa+ÒĞ¢¤Z4tæÍÿş¬èĞ5eóÊM¼ğ¿­¬KjE÷‹Y@…ó£®‰Ú˜Wøì›wyò¡Oyÿ©-ˆ*Ş,÷ĞëĞêDY®?•„“=L¸ë!æ.ºˆAgvg%³P<§‹Y,Ä3¢˜zı"®¹v:Ó"}±·tÀÙÍ	k[+ğpÂÖß/qªlKS…^ÔVíáç§ŸæEá>Út€ƒGÉ±qíÏ¨‹æsıU3 ÂÖÊBTÒq$¤’ÕÌœË&æa‡½•+N¸©ÓU›Jzz:‡jĞy1fá$Âííp°eğÌ‹¹öÎ,ˆ»£ˆKGììÅ;9ª°õÁËÚŠîÓŒú6³ö“ZRGQ«v¶~xzZcåN¿>ØUÒPË‚zôíE¤¬\É¾´r½#)®ï*ÖÑÛPSN¡É„¡¹öv#íöBÌú2,Ä€u!EeÕTÕ/'Š?}s-5™qÄU¶Q×æ'ŞÏWOGl¼Âf…›¾€Ò’BrÊ<Ñˆ‚-ƒØ7^áñìÏ~Œ!å1Û{¨ÉIfÛk«I*Õ 6uE¤±`{wnbóşƒ¤•k±²q&`Ø \j«)Øµ‹;RH;d‹•“V"bUB@;÷ÁÚÆ—¨!vuÆQ×†A2Ù‘{\Ö-ETäg°o×~ÖnXÉ‡;s(¨ë¶F6ÓØ¹,†Ø˜|soqwš*ÒÈÜ÷ïQ$Ş£SdÚØ:âê&¬­øøy`çèˆ—HsËfmí†‚FAAáOŠhÜZ;à*ú8·—Dá\"Jl4Ö8­ğöµÆ%ÄC£8 {œ\p´w0¯gè=R¹ãá©ÇÊAºıôN<v1‹Y(vß™å¬c%dTĞdß<“Ë¦„ãƒC{9YBÔXâIÔäH‚DŒZQOYeÚ²lÚsw°cız–¿ø"ï½ÿ_}¿‹=	%æaÑãöüøeÊä	\?5q–¥8ûğ¶]$éÑœÀMã‚p”âT„"høh&\1Ñaö¤mû×ldWV5í!L»a2BPÊû]6“›á3‰ği)/. ¾º—€¢/N¨Ê–î›Q™í4çPÜÚÜmW&ƒÎ~6mF[›ªÚJj³W³vG&®aŒ½x’Y(vIyÙÃéåOH»È(…H<Kfií"am„şIÙĞÒB‹¦K(ÊX9qüÅÄd’'Â–×ŞNkÇEQ¹àb‰ĞÁæû©›‡P44¡«;À®/>å/Ö°.1ŸÚã-/6¶‹ ç’°gëÖí v6eâuŠM¯>LÎÕ|ôò‡|WBIc[Ç‰ˆ ½£>VÖ´76STS/n§·[ÃÚ¿áûÏ¾æûï¿äÅW¾bc¶È*ù.~"9Dz¸¸â*¾‹^íW!Dº£ß "'Ícúä@Z³Ö“–{˜ÒNåj~î¡üğáÇ|»V4én´´µÏ6âfB¼¢™VmGËÒÆÖ÷œÎBÀN4nœ4šşìØ`cïOô•w0{t8ıÿ\¶¢Ïst¨ÕTW7aac}ÿK™2z:Wİ8‰‹£ñÓµcU—M±ÆÑ·Î«$ºêlÒã·ñóÎ}$—jiëªô:1ÚĞ–&s0}'{bSIK¨ëYû˜ëĞlâvocí¶xöeW›G8ÛéÑÉ±;³˜ÿ+÷z7O">×˜-h²Ù¿;…Ö¶P¦ÇcBÄ9›/„B_\ë|˜äïÏˆÇãš°@L[?äŸàágÖ“*^A²X˜dOQ»J%OëKÈ¬ÉLöu±9FŒ¸G^ÌÔÿäÁKƒñ¬Ù$„Êö¥°ÆW¿tãÁbÆÔ.îw˜ô)¯t``ßIüeæ œT¿Aé‹Äm«-gïgï6‘ĞX<´{6‡°h¢ÇÎä*?W·°â›X¾&†CÅä§[Ğ®·ÅVˆFóÒlÉÉãï¡§×“,rQ[oâï·¢oÇ²µ§	ñ¹ê&ÍœÉE2yA®PÖ«K©Üû)O?v×]ûwxô3~Êl¦±İdş 4Åyägìd£6™6 ¿²ñÈ‡bigçäùLóÀ½¹‰üªZ´­¤ó2›«½	¾øjn]Ò«¶lÙSAEmWßœ¼ƒv¡ÕL½×¡½øfzùE¾ığ°û˜ı11lÎh0Çz»®•ü}«È¨ıíy	Ä$=Å'rCF_Â ‘§ŠË«hÑv’2"¯Šc½‚‚‚‚Â¹ÅXCNn‰ŠÍ‚ËÓÓS”õ‘øø„ácçŠ§K+¦ìålLç”ÈšB"
-yƒ†ªäøòÇxà?/òŞö\ò‹JÍ‹ÀÊj¨kÕcĞ5Ró?~nt&'¡ıªí¤‰:Ë\‹å*j=ZmúÆ2*üÀ«Ï<Ê¼ÂßÅQ$4Ò1ºóWÔÖÖ²wïŞ#šğ¼ë˜ĞUæ‘·î]ŞØÛLàÕ·±hñÆ¸Ë#²/m0ó—ŞÏ¿¿û§ßŸ¿MÏß>¿9£úÈAêÕ;I8(ªÕ^ŒÇ´"16¯dS…#nQ£Y4¡oçI=Y›ŞàİİÁ]Ÿºä]Y:ŠyƒKÉMXÅË·>É™Tv«ÏÚfq¿wù*&—†¡sX|ÏRfù€ªû’ãŞR“‹zë§<öí,&›Â¼1şºãOèÄ%Üóó^»İ‹èæ|÷ßG¹û¡÷Y%âJÃ†ô'4À©óü“Ç_MÍNvï–=šWœì|qì»ˆ[şû<ß=t·öøn2¤“şıC\òÀgT{F0v°;–	›Ä»~ÊŞ:¹œúeğØé\ÑnÄ¾ ‚ú-Í—dÄûâİß7‡F´¥”·WQZ`@3j şs&0%b ‹,­ˆòóÁQÕ5A ^ˆ²dJ+ÛĞİñ×Ô´i’°ª}oì!~W¹Â×ÆŞ™ÁóïfŒ¿ÈcMdU×uœŞ…zp÷$À` µ´’†#½À™™“¨®o—*((((\Ôç nn¤Š»yå¸‘œ†T’B]~¾ÙO	á¹‰Xíd&Şñk_ı+×Ô<ÎUOfôèÑŒ^úî_›&j…&’YÈUcñŸÆ2k©åâf¢
-ÏİOVv;w‹:tíSÌ‰éÏ}Æöçf²44…µ© é…FêÎù%«RHÙö=ÿú2—KşÃ¢y˜ÖµÔ_‹ÛâàìŠ›î^^¸88à2 /}œğ‰akí‡‹x©“½•®†–Â­|ön,™¦@üD0È§[Ï_a{÷%²<Ç	mäÜrÙp.]ú0‹.Ë¬ÀrjÊcˆI)¥¦k2YS	‰Ëxğí­T„/fö‚«¸t°³Ù†á±ƒùr1‚—wvªîÒ²«Fd–6š*„Ü¨·!'Íácw³{ÙÃÜİİÜóÜ×lgI	±ÿëçøïïòÒZ<Ã0áÖOxù/xù³™Ó¯‰VqoÓœËL¤KWdœ<ş\]#<8›îêV‡A_CEº­PgnNx»ŸÚlŠ£°°ÂBÎåtwÇÇÕg»”tK>I[øä»8\RO®å ÏÁ5}(=ü5O¿²‰}Ù5hlÜqöö#|	kÆ†dv|ò/?úß§iiM‹aÓ¡jSâ¨Lú™m9n8zZb—õ=+^|–‡_Še¿ÍrÄİÅÂ<³¡¶ëéìg‡K—ÆîÏu{ùş¶›¹ëÅ•,7O´tÄÎ¡?¯†«ÇRí#6E-^ÙÛà‚œp3io(¢nï'Üvó³|´5›ƒéYdŒc«ˆë")£œüóÚFj*r1'äŸwÇ“Îsœœ0¤–PÿSÒ/Wºaiã€{Ôb&7ãçXÜ9w]ÔÓg‚ÃúŞWhu‰_'á6m&Óş“‡.â®	aXp:¤¨!•­9jÒ²¬à6¢ºWç hÿJv§b%‹xüòqLŸ»Şn¢ï…F:«'Òæšì•·»ÛN<«¶ğ„HŒÙ¸’6$³Ûz<ğlß*²÷ÿÌÊ˜t*íB	q·ÁÆª›ô2µiœÇ•;IÖà>í2–Î„¯x±cZ74Õ‡ÈŞú:o}“†İøk˜=G¨÷p§_l
-–ìeÃ¶½ü˜Ô£Çtnºu‘}<1¥St`/Éj+ú^´„‰}=ğk/$'n=o}±Šê\¶ğ:uÍ„|øİÏ¶ìƒ—³½Ùf£DÎ´¶kçpJ"å¥å=}‰š2…Hc1_oc¦VáÓ™wë•\5Ï?· ¼İ\p4iiH/ ZÜÃÈdÏèapÅŞ#c9‡ö›XEeÛx.èfêƒkõ^·üÄ÷[t¸òÃÉÎÚÜ·hæ˜øóœ1ŸÛ.	§9%†jµVdâŠãÖ~°…ƒêPúN¿˜ÙóFÑ9yOæ.;Šòo‰Ì7Çï*w©8Àº¿eıÖmd5ˆ8qJçqI]i{÷ğŞÊ
-†L‰ ¦Åˆ¡¾”æúbRós)/«£¥2‹Ì	ìÛGzq9.SogşhKšvoaÛò-ì®¨áğ¾ä«‚Ñ·¶a8œM~u#¥YâüÌ2
-òJ(,k¤QÚ ²,";a»¶o%¥ì†/áÖY&ò7ÄRlLŸ©3¸t˜¯yQÒ‘·ÒTÒ˜µ•çŸÛF}ÿñÉ oGqÜW‡2÷ +¿”ââ"ŠÒö³g?{c«°ê;šñÓ£f<Àû¯®&«¢ˆŒ”L
-Kš°êƒåtj›ËÉÎ<@âîíìIÊ¤©ÿ\uùH†ù¶P—È¶õ)h§^Ã¥“úéí`^ÿ&éúeÜwÙB•sMºÒ¢±±‘Ü\ååæÖ©b«Nál#ódSS[¶l1Ûm7n\ç‘¤=[i™A.°Tèzôš
-2Ö~À?Å°'G­Ç€Áø‰(<2óHá¸ÈrSæIù¯´(İiAj©òb*rö±<a7I;w+ÜÎ.Ëîıih]„ğÓRh?{vïş{Ù—”FJÒa
-JLxÊØË¯ Úº]éRÙ¹=†½Û×‰ôÎg÷îtRSÒ)-MeŸ¸oF}ÅsÈç©q¨L%%n7+Úi÷ÊÈ}ÒHr˜ºµµ—£4ŸJ¥2kBi›×,å‡)MJã¼g[(šwË¨8(ÄÌw|ğõO,OnÄaàd.	Ô¡N[ÇWËÖğÃşG\Äç2Ò¦‘œšNNN9ÙYäØÍæ„z´ƒ¦0eÑÅ\=ÀíÄ"±&‡Ì}?ğÃ÷ß°©.‚Ù×ßÂ¼	ƒí.T4µ¢‚/b¢œš2#á–¨‹Åuq{9TPGkŸ)\yåB©Ê¨H^Çòï¾çåUi´õ›ÎE¡v8–ïeÓê•¼úÅ>,‡ÏcD¨;¾Nñ*ãÔÅ—Æ,jK2È¯j@cíEÁn¶ïÌ£Îaã®º{şo6cúMd\T8ş>Ö4W–Qºë Eâ!.cúØÁvn¡89™4¶~ÉŠ½EĞŒäâI¢Õqçxú;µ’¿å¾y÷CŞû©¿¡nTÊy}=Çßµ¸fT0¾êäægSİfNgD›»ŸÛK°ì¿€éDËf¼ß‘‰·§,Û›ÑÖd°}åvRŠi"Ñ?"š°îS0Õ‡É=xˆŸöµrÉ‹ñ4ÖP—•Day£¯“lek=5BÖ·€}ğ`.¹f	ãû»àĞØBKmÕÚjálsåbF†‡ã©mB£«C§¢48Ò¼Ê?22˜°[ÚëªÅ½*hĞÙá9é‹0Ó»•ª²fœŒdÔ”ñŒôSÕ;l¨/¢2~Ïmªg¤øˆ§$ĞA
-ÉvìÚŠÙ¹)‰¢ªô"¹[ë+©¨hÅä9˜ñsg1oê |TmhÊ«iÕ6 ÖºàÙw,Wß8ßæZçÔÖTPÓØ&ÑL¼îfñ#Ğª•ÆÚz*Zìxé"¦DyãëğË÷ªE…óE(nDå¯­!wë¤©-¨o3¢²µÇ;z*ıdS6
-GsÆ„"xx´¡·(fÃÆx*E¹+ËŞcÏÄkéïn‹ªp7;UR^×Bc½¨ÛªíqÇåÿwS‚ƒq©İJÚ¡ì9XNeu-¶nr:#6–z,í´Ô‰{Ug5/'ÜjÊi6ÔQSUa~Şg a#§3#Du”FêI(ÊïT"¿Cs"<ÎéÎ,MU›ŸäÁ÷v±;CZ«;–¢&.à/ÏÜÆ¬ÊOùû+ÙštŒ!¿è%ÜºTˆ£ÑtìSq|Jbß`Í²×yy»Œ¸›ÏÜaˆ_GÑ˜¶š+>æáÏÓ:}:ğŒšÈ¤¿¼Ä“³|0$¼Å»_¬æ“-=ôzpwø$ó…xPuzwQËêw¿àãO¶ğË¢™yëRnºkya™Ìïyã£å¼¾2±Ó£ƒ‘#	j¿mÓ&’Äoó´Â‘™±ø6>ºj€üuÔ3²…`1b„Y Ê‰ªGÑ=şdÎ«ÚÌë¾Çêİt¼™ìkÁ’fÑÜaDw‹,ÙÀèŠòo‰Ì7¿«‘Ñ˜Büê/yá‘•ø¾ºƒ¿Î
-l÷{Ä'Ò|ÙGÜ2Xdà#İ¿çmi"‡Ö<ÉâÿÆ}ÛÛ,¹ærfFØ`İ\„:î3n}fº!×³ôŞ‡¸¶39Î$ò{•ñ¯ìÌ¢p>#ó¤²3‹Âù„,7Ïí~ç–ŞìÌrî·ğ3‰
-MÛHC³¶ö®5«İ±ÂZ´œÜœPZ¨olEw¬aJGQ!ŠsìÙZîxtMhZ›iÒ‰ÊÓÆW*Ñì:ö:¹mVÓ‚ºåè™–Ö¶Ø9¹u%·5ÑÜ¢¡¥G§B…[Úáìá‚ÊÚò×½œFšæ‘HºnslÌvòºmÁÔŞJS³†fÍÑ+L¬„ğ³‚À¤Õš¯7ëOvöNxtõ2u{F»Ò’üºzşpTüÉUWZššÑ´µwî#oƒ£«ö*ó<ˆ.äıN»P4æĞºoyç–·ùñæ÷ùèñ\l#*vLö8ÚtáŸKL-Tø–{®y•8­5ox˜KgD¼o)ÿ÷]ù“¹âÛùÇÿ]Ìğ³ñ)BQá@Š
-ç²ÜT„âù..hÎˆPDCyâ~zæ<÷7ãFN“66%ò¹l{î¶$d‘eö“ù´?ßu‹$¼WÆ'úú|Ò¿}û?ÜLF‹3~Ş®Ø·f‘q'Ì™É‚±´×¦²æİæpvÄNúšÉMÿº¹Îşt}aŠPT¸P„¢Âù†"{¹×ó9İ™EAáWØãæİ‡a“bS±¬Ã”4t2÷n:áIäğá?âúìéˆÃÙš“ce{_†-¸‰;ï{¿İ¼˜…óç2ïúGxèöë¹náX†èƒŸg0ı
-§w¸§xƒncÎİ™ÅÜ£ØÜÜLEE…y…‹Ò£¨ĞkÎL¢ )Ÿª„/¹ú¦w»ûS®_<Ÿ™¡Ç~…Ò£¨p! ô(*œo(=Š¿îQÔjµ444àííİQ§HÏóig3Îî8ÃÂÀ "TØ)m…3Îy¿3‹‚B®8zMç–5øÛ’‰g…3Èq³È¡«®!+…ã!óŠêì>ôÜ5­pv‘ßl×°¿2ô¬p>Ò›¡g9ì%§A)(œd¬¬¬4ÿëêêj¶'øgB~orTù¤«åIùùù„‡‡›­qËÊ_Fš‚BosºE…s‡"Îgz#¥ÑmOÏ“YÄUP8=È<Y]]mşWv”ı…¢Z­>J(ÊÍäwa^älz–H%İU¡Èee£8ÅõÆuå›.”üsîÜ±i¡     p*È½ÜÜÜÌuŠ¤ÇÅ,²²‘½DŠS\oÜ±â¤§swvœD((((((üNº˜E*Nq¿ÅuÑÓ1Å}§     ğ{ù•P”½]=DÇöV(NqÇ:IWtÇ£¸³ãºuıVPPPP8ßQSUUMNb•»v‘¡ÓÑÔyä”ho…¬ïyîÑWxşÓRÔÂÏh”İƒ¨ÛÚG3VO
-äÄwYÁÈ•fİwg‘•ŠSÜñœ']Ë|Ô•oºæË)îì8I—PìšW"Ë¹&]ÇååÜÜ\ÊËË=z´bÔXá¬#ódSS[¶l1O7n\ç‘äBÙîààĞé£pR:(ÛËw?üÄª=kì	qGÖäÊŒå“#ódkk«ù_¹áˆtg•ª\’ã¶°mÿòk5”Z…à¢ÂÕ®7ı*òc¶±õËïùao1Õ–˜,İèJX¨Ú"ö¾“L£¯;*›jÔ%yl+w&Äİ«Ü!¿7§rOWİ!‘›¥&4×çÒãØÅ,
-
-
-
-
-
-
-ç9rÏùÆ"H'1é É	q$¤¤W¦¥Í ÌU¾ Ğ0jkÑXÔPkï€®¡SÛÉÒN×R““ENb")ÉÉ$§e‘lÌÜk.çêYƒ	wĞÑ¦)!iÍjÒ²Ê¨­È§47‘Õéhô'¾¯³(((((((œçèªi,ÙÅ‹»C¸ôgùöß³¹6¢„oö6ĞÚÖ1Â£pÓg(S=Â£w½Ì}S'0†?Ş^¶‡LÛ2×¢É{ó>ûšï–}ÆÊ;Æ1*È¹ãTXÛ¸4t/Õ­5TÕwŒ6õf“3eg…?Zú‚|’Vî'±´Ü¦zt­„øycm©ÌS¾P——“²n¥ÚN¿ã#ÓÖ›ÑÓTä•gñÆÇñTŸ£­_Ûaiİ¿+>8à~n8xø"œê¸ŠPTPPPPP¸q
-ÄmØ¼ó+~ÿÿøà ?jÇpí@+~Yn p^SDÊwoóÕÿ½Ìš\WšÛ-ÍË'Ç
-»ş3˜3Ô…¡¦]<ø}êÖîÖ.,Äÿ¬±²vÄÖÆ
-kK´míT–×`0œZo³Y(:99yÔB…ó#&[M¡0˜aí´U&³.­^Ù]íüFŠµ&òcÒ)«1`?0’G¬å"“Ö*ÔTÉ¥ÊF½8-˜eòîÓïòá²Ò›@//wbÀQLëïˆkÆ‡ü˜RNi£8ÿ8´·hnÕ˜îœ¹CMTTÔ‘ZÌBQYÌ¢ p>Ğ9A9{?y¹9”ü&	
-
-
-BPÔçÇ²ª,œ‰—ßÆƒ—F2Ô˜Ê—s¨Ó¶3©p^a©£- iõ.R[i	ÄN_…Fk¤A”ÿeeTÍgl×Ph»ccØ¹'„iÄª§­½£WPå7˜¨~Ã¸Ê6™”C{Ø›Wñ‹X”šÎÁ;!ød7 µµNö'ÕzÇ.f1›Ç‘bïÛ·£–†w_*}Æ1êĞ45¢®k@İÜL³ÙÉŒn‰µõ¯ÇÈE$ËT×Ô¡nj¢Iœ¯Ñé1YÛc#N>¹æ•²AKS½xº‘Fq}Kk+q½µxoKíÚVšªkiÇäı››5hÛŒXŠ8²–Ïè1Ìİ\K+Í‘@âdkËãè¸ï¡ÂÆĞB½_ƒßÑ÷îŠK,:ZdÅµòäñ£ß£ó9]´‹wjl¤®^}Ì=ÛÅÚ^ÆµM]=êÎ÷jN‡ÉÊKi£¯Û=¥I™é¤ë2#óÒèø˜DºjóÙúÖƒlÎh¤Úo2Ã}»Å£HkmkÕu"?ô¯ºÌ\É¸—-Féó8
-ç2O*æqNmu”§l`oÛ úùØáíl‰NçJ]£¦…ábosÊóÑşlÈ<yNÌãÛ .‰ŸWÿÄº›Ø°e{35øAËîšÛ´X¸bQSÆÁõÏQ;ø6¦]3‹ñ$mª&¬-mmBcˆ:ºUmÂØì‹C,»KìhÑÚâk§§±©™ªF^áaxÙµ ¦ÂĞ±ı°“BIĞ“y©	÷ïßOXX˜¹#ÑBD©¸¸˜]»v1cÆs—£Œ0éººÏ
-µ±¬~÷>şdi^0‡…÷^Ïm÷Lf@§Ï´e4d®ãÉÛßfWM#µÂ+dÄ>ú·§“-2h j3¯?ø«wgP(¼Ü}¹â™5Ü<Î—¾î%än]Ãg·½Ì*q¬ÃXeQğ——îe–Ø7ôæn8¸#nÈG7cF_ñwOï=şù:·ğ)÷¾¼’­I2tİéŠ—h‚*÷ñéåÿÇÊÊzó;H~NÏ.2¿ç–óúÊÄN.F2bÆbıèrs5·=Ëò­Itœ%#sK^x˜Es‡İmÏt™Éº„¢ü["óÍYmdüA0hêE–|œ¼ô‡ƒ®âÊ;æÑéG%±l]³ŒÛŞûU¾’ß«Œÿ.–R4ÊMîEùoØ°ÄÄDşú×¿2lØ0³¿‚ÂÙBæÉ²²2~øaÆŒÃ½÷ŞÛy¤ƒºº:³Xôôì–ï‹ÉPECñVŞºü9654QnHÄ¨yÜøÔ}\¡ÂÉFÎSS82OVWW›ÿ•úG
-¦³Cgg•ºÅÜ9T“³¸¯îæù.Âo*¡Võ¸Ø¥qØÉ…è[ïcTş
-2¤’ÚäJPP$ÙÙièõ«’="Ç1ş–§xt¦+E?İÇ—«v±>Õ7æÿ{97O¢¿ÍAJÊjØU7£¬pèÔÃZ­µZmn¸ui¾ÒÒRâââ˜;w.öööçƒP”â"—mO¾Âç;ë(fñ|wr>zSíi²Ë—ŞÄ£×EV‰R~T¥,'vıç|¶³‘ôÆ¡\}õFöóÂ[¤ ¨Q„º
-±rÒT’@Úº§yS‰Õı>as§„ãi«"0z"¡:ªö~ÅÀ§ª‰¸óEæ8'³gÇ^6z2âÆ‡xıocÓÆ²òÅÿñùOÅÜÍmcİ…@µ¤5?†½Ûwòù~O½ı:ÿ˜Â Ï_+×½‡h®qqÛóµúá²«‡Ò§ó:ğ#(ÒgÓ!’?z—?i#â¦ÅŒb…!u;ß|´‡æèGyèå+¹xBBÓAû2Ï¿›Èúâ –üë""„_G*»ãîëKxÿv²>~„w>ŞGUĞlFN›Àğ¦<ô~*.ı•¿Üq%·ÌGD±E(>L:5ºİ/rÍßS4‹ŞÉÓ¯^L_qÌœF5qìZù÷<º†ìëßâÛ¿Ne~TG…ªE…E(nÚh×ÖQ°[ˆ !6ZqÀÙSˆÅ¡ığB ûèBÏœ;¡x4mÍUÔ$p°ô_‘’m¢Ü¯§ÙÚ·~ƒñjÊ§¡®†v[óº’†††#£x¶ÎxEeHtmy"‡‹«(©éocGà`¡i<D£Á¢QÒ6êõ^øŠ
-Üª³ŠîP4ŸzN³„".IfË~M>£™¿ô:®œ97^6‘ _%i¤ÄæS)O®%';6üÀ×ÛSîu×Şv=×\µ€KçÏgš|²ƒåD"Q[qƒ;¾ç½å±`8“®¸Šn¸ŠËÅõsfÍ Ú_D¨¾ˆ¼„dvÇTQa?I—_ÌÅ‹ç2}©¤¬ÿ‚]¹-ÔÕ4QïŒõ¨K¹ñ†\rÉ|æÏ-ËûváÆÎeÑ0‚\~-Oún¢â×5cğ	#bÌ4æ
-ÿùGÜH†ö³ÃT–OêšDrEA¡ŠÆÈñ“˜0$×6=%I¹TÔ7ıjÛNƒŞÉï¡“Ì÷œwä˜0Ô‡Ê4bWÅ‰Ìê‹Ç éÌ],ŞıòÉL°oF½qûH¯ê¼Ù £^CcÚj–}ø*O?ı4O¿óoÄ–Ğ¤;û³{¤ SÙ;	±g‡¯Áa8IÿÃ"cÛ`k§ÂS1×¨ié|r3
-
-
-
-\l±VùÑwÆ,¦Í›Ç¼yÓ˜<¶*E$^hØ:ùà3p.ã&LfÖ,†Mˆ"rÔ<æÎÅ¸0‘ÆC&0jÚ<fÎœi²!EÜ<sš¿Éc&]î¶â4Š!ã;üÍšÆOh)Al„&qò"@h¤.‘x<Î¿Å,rş~³5ÎÃg3ıÊ‹¹rj<l<è7(
-'Wi8Ò“%–&Ú2mùŸÖe“TÓ—¡û2Ü«–ÒÃ%ä—ªÑ™oxt5%lfó[Y“AøÈAÖ£¯-!-»Æ\éÊàèÊ3ÉÍ/&½Âk«‘„ÙàJx€/Cm*ÑåmfOF5-NxÊèK.c~´HKñ!$ã3I-uaÈ³æ£Âµ»ş6O`=ù{˜LF4­u¼Zi¬ÉäĞºulüyûòE‹B#EŒ¥ˆ/´‹ø)$'·Ü¼2jëPÛÚ4¢/~îÎ¢Ur4mZ5íMh-J9,îù³p»Ò‹)Uë1ˆç©óÙ—×F]«H· üC]°íÅd¼êâ)ÈN'µø¤1}~Ò÷ÙûcÙ±n±{R)(Ëfïw°låz~Ú°?~ÃË_®!¹TCó9´?4$œáÓ‡$ş>bÍFT
-¶v8	¡h!„b‹NŠ
-
-
-
-Ú(ˆ[OÌæïY½z'Ûv•P/tô=Î¿Y¬…”pÿzö&ş¾x(!BªÚu”ç¡Ô†jp(~B<0ê°®ÜÎÚö±?Ş[­
-ËÌ‡yøîÅ\ûÀ›¼µ&‰ÃµMH%Å^Ô'²û.~\ß„¥a(î•¯ñÁsK¸áïOòèG;È¨l Io¤îp&yÅäw^Ö+Î~x†É®j#%Õµhü&±øª+xòš¡xŠ§ZÒFÕîBh5R2–¿Ì€“ê˜á{ñœô=ÔB¤´RZœM{ãRW½É‹7ßÌ-7ÜÌ¿¾ÚËC•44¹âÉèE¾øûÙs`ï>6­[Ïîôtòœ]™ığÕŒĞ}ØYÆJÕUE4×ÆS¸Œwo»Û¯ºŠŞ\Éš¸Ê
-Ê(ÊH Eß†ÜO¼;¬l¼ğd‰Êš[¨®ÿåè…9îcYşôıüã¦ûyôéÙ™¸™ÿ}œˆÅÀøÇ#òŸËBpûbòI-iîìY4a2êÑ4TR]YNyUµMºn+
-è5BĞ‹c”×¶Ğª7`×è[©-/§B8¹ˆ¤ÃUQYÙŒÖ`:µÀÑ{W·£Å£‚‚‚‚Â =íÚb
-Ö¾Â«O¼Áÿû%+6ìå°8Òİ:âÙàØ™E‡¾­„”=	4Ôx3)j4‹&ô•êLTò¥dé4”rjÙfÿ4ÿw…+ÑÍ+øî¿qï=³¹
-¹ubÏÔUSÚÔ@¶¸ZÃ6Vñ\25šyî»Høä?ÜxÉ“,Oo¤ò7u˜ÉåèÙ³"ŒOüæL7/xQ[£÷ê=^e]Y&»ò£ñI®fğĞ¡Œ¼óNæ7×‘ùöíÜqÅxú“8jB'2õïøüáYŒ2naı·ßòşŠj¬¬Fèkƒ½ªó™f:Â—Yá‹é -†¨§Ÿf‘«+Í+ã¿·<ÀıDJç™Hd¾sB ğš‰LYt1ÓD*d«ÿ1L\ò?~q/^¯ßÄCÏÎ'qåâ€mc:›Ÿ¼„%rˆşê‡¹çã8ä|GV«'kÓ¼z‹86uîşšŸÒ+inÎ"ı§W¹{Â¦
-7áˆ»š‹/ÿ”í5-İ¹‚‚‚‚ÂŸ;T.™ùäZ>ÿi7»w¿Ïû/Ì'Z9×®Ï;¡¨«) pëg¼¿§Ÿy×sÅ³˜ècÑĞNmE!-šVÚı†2hÊU<³d.sşò7N` *ƒÜÃñÄ¦Õ¢3[¢ü5êÚ
-ÔMõè]ƒq}=_;ƒ«ïø7‹æÍd†O!e%1ìL)¥F}êJÑ(„_mìl.´B1œK&öÇ^ˆÄcó{÷‡H(bî_á¡÷?âŸ÷ßÏí×]ÂÒgod¨…}Õ&2òö²gÇn¶¼õ0Ï|™@[ÔB\1K£ëhU'±ìÿ^âÇ]Ùä·t>Ø¼"œÉ‹şÂ?^—GŸ{¥sgò××ngr„;ªš½ääí@èsÚş¨JÑÚúMfñ__å?û+KæÅsğ®fGû®wyó‘Û¸~É=Üÿ¯/ø® ÃGbT”gGÜò5ïnÄ»o(Av©$m]Îg±µ´èŒ¨SÖ±eË!öU†2û¢~4&|ÂÊ-IìØ“Fnz&	­}¹èçyòÕ·yûñÛ¹yº=¹™òÔ­×qÓÂòÜ';I9F1ª[Z¨ºP{nN,,m°wóÅË×O<=Ì6GÎõtS³P<ovfiÈ'/nï|³‹ªÈk™yél¦ÄK.ã¶°ÀÆV…¥œ…éàƒg`?&Eùã5áıñn¥®¥’ø¼JÚÚ{îR´¶±5/ÀÖ;ßALìïMXÔ¢¢0¨O›¸®Šøü
-t¨PÙ;v^ÕEšz-"Ò,-ñruÁÎ¦sXY¯FS‘ÄºÏ¶¬óÁgÀ Æ†umÌ}½zz’‹¡Oô0FÌœÉĞ¡C‰êJÔÅãdok^à`ª+âpÂ6>\ËæÚz1×ßz‹®œÍT¿Rï_ÅÎäòª»f±É¤v'(rC§McÄ„	Dùû5oı<ñGmDü¸ºz‰ vo?è1¶7R_hD/D§£½
-W§cãæAî}ê@ä ÉŒ8È /ìı‡±hîX\´ÅH/àP£7ÆÏeÑ?oåš‹¢äeN]AéÁ-¤UøĞgâ¥ÌãG°>“Méåhõõ%ï"í`
-…&'N`¦{>›÷’e‰Ë„Ë¸óÁÛX2Ş6!8“ÓµÔk]<¤ˆ´"#v>yà,²’\ÁÖ¨®A¯×Q‘¾›MŸ>ÏÓÏ¿ÌÓ_îã@©Z™¨    pÆ9ÿ³tÑTBNü&¾ß°oÊB˜yİİ\<ÀCá¶Äî'µB½w0*Z›i«¯§NkÑd+„—%VRãÊğ›'_öü~x8»ãÚ¦ÃX[%™‘6ƒµ¸ÖJ®ÀÔy½c@$!A„º¶ŠÊ»ÚzmÍu4T5QUá€u(ıCİqvìÖm%”%}Ëò™èú!AŸãh)i°ÚÅ¯Ï©¿‡øm!©~V~ÃñsQá¨ÎeK±-ZûñìÃ°	S<şf†´cgUHMƒšÊ‚Lrw°yk.åÚvš…*Ÿck‹­¸·{Şƒ§3cú0†Øâb[A«¦uƒCsÅFZ[ığñğ'ÄÿŠÆv¨Ï%aÏÖ™³dPZß*ı‡Ğoò/½‡‡{ˆÇ»˜‰ı¼p—YX[aíh‡§e15uíèÛlpÔU“½#?o\ÍÚCõÔ··àlQ$ÄaŞ*#ê»ˆOÊ%¯İUˆ|+jwÃç+~dy\mıY<7¯>ôéï‰½¾ˆŒëX·i3«–ÒÚÔ†®ºŒ´}ëYÿå‹¼øöVö®£Y¯§]äİVÑÈğğqÇI%òLÇ›)(üa&i²CqŠ;N›–æÅ$ÒÄXOçü‘]OkSÎ¿YLFZ5õÉßñÖG_órlîóîáÙ9x¯åİ·ŞäÙoh›Î”p-{S)>TE«¥~Ãâe, }ãOÄgÔa4†ë®[Ê˜ Kl{œí_GeZ6Eqy”Õè	7/ëÊv/DC¡e×İrSG÷Å__ Dê.’+Špˆ¼˜à¶\!âÙ“a…eÈuÜrÏúy‘¥k¢"cÛ¾}†eÙ*&^7—MEÿãšb2
-åQGALÊñß#`‹^M¨]#ºÖ&³åõæšRª²ãøaı!j.º†‹§÷e„e	?ïÍC[æÍ ÉaøzCk~é±ÛHnödôìEª·²ë£çyìı6úÎÄŞ¨CßÔyOµñlØ”BvàH^=÷ÌÇûğ&²J2irÄİ#ïZñÜ5I”ÛÌbì¥s˜;7¯®·‘+p…à”®Ë¦“Ì7ç´Ñq<ô­õ=¿ø?Şùxyå¨<Êùèÿ¾&wÈM,ıË<*âH®ïz;•n®NÆldßÄìÏ"ûp--¹	ìŞ¹‡ä>³‰÷a¤.ƒ˜İÉi´Å`£¦¦0‰İë…ØÛ¸™õq4º…»î½…§®D¨¡•ë7’°c3›å9ÂmØ¶“XSMè¼Æâ6ÿö§dÔÜaDúéhÉNgwJ%ÁWßÎüaAô‘]‘ÈøïŠû.[¨ÊÎ,
-ç2OhgYiËÊKş«8Å'…’,#eÙ)ËĞÎù#».û»²±Ków;³4Tm~’ßş™Mñ%4	qkåàŒ—£-–4Şô³€üï	ê1&~Æóï|Ã›?ÂÑÕ••¶&5Ş¯cş-÷óè¼~È¾uŠÜr/s?~ı)·¼º'ä¢d£¶û>ÃqÛ+¼xÕ ]­0UïcÏŠÏyòÁ¯Ètõq!W°Š°›Ïm¯<ÊUƒqµ± ,öV}şÏ®kG=àn^}êbë¸ËREËEZcß‚÷¸üR–zîáÚ'WQİĞi	QnõgiKcèşóØbÂ±d{¿}ŠÛßÎD'ÒÊŞN<T¯RÔ†~w~È¿g´S±vüo-,Ü˜>k…ùyÔ×Êı_Ì7íKĞB®½õ:şqİúÚhĞæ.çé¼Ë	%T;Úc'îØX×kı77\5‘±vG¶…º n‹<-ÇÏë[ÍÛ¶W¢xçÛÜôL3³|Œ%Ç3®§„3o³¨qĞ„Î˜ÁÎ×?bÙW‡Hœø>|rıı½p³hÇº]¹ÍïT9›÷Ùt¶1ahk¡F-ÒÊØÑ’5#3­ø(mÒ¾áµÏVóÖ)¸;«ˆXúÿ½~ãCU"¯jhjÔ€³Î"óJ»Yù½*·ÎwNfp[æÛ®§‚‚ÂÙAÖ²îèâ¼Û™ÅdĞ£«L'%¯†šÆ‘8ââ@ÄĞÈKóÍ%ää‘-ÍwÃÑ7Œ€Ğ"ÍO€¦†ªÒBâ³*:=:°sñ:bÙÜ\ùêÕ4T”™Z@ƒ8Ş1ëñ˜°ˆÓ459”f“U-Ô©[_†ğÇÏÍşäC‚r¨ıxïàK‹rv§•¢më¶0^Kw{†¥ÙMå™$ä6áóË¼Liİ­ï(x
-áRZÌáÃ•4‹L »’eO¢lE…k¨h9èŠ´5¨«$;Eöº6Ò±Ff 7B‡ ÈÏí(»”P<CÕA
-7¿ÁEîdêCÿcéU3™ØyğWÈÊ«”oŸå‹×°»!’¡|Ä—ùâë`ubs5íBìç®ã¹/
-¡ïhæ-œÊĞ®­mz¢[Ş8’–şÎ¸ÉÕQÇAŠ
-'Š
-
-
-ç…¢´£˜ŸŸOxx8*•ê¬
-E…›Y(¢)¢6mw.|šAs	Ÿ³9ÓÇ±xh§õÉ–|îN`\6f¡ØLşÎµäµyã;õfş~Ç­ŒñŒªD=zÑ¸Éúôîığ0Ua—pÕ_ná‹ÃÍ‹’NW,)BQáB@Š
-
-ç?rš’üN#""ÌCÏæ9Šòã••Œ¬Tº‹Ã¢²W8§HAÒ%»†Œd¾é'ç56"ÛÛ`›_HÖ¾vf•ÓdÄ·½ŠœœrR¶²ö«õ¬ù1‘bKuõ´Ùy>åjæ^¾ù‘ªnÙA;íºzò¨·tÀÊ3oßFEûa/ÎX’ñß÷]=e¢Âù„Ì“'š£xa#§‘è¨ÎNàPJ2IiÙä.¤ÖÂ'QÎÈ»šz‹—Ê¡Œ,JÛÑÛºâé([›'¾–¶&´UÙlß“$®Í$»´‘z½-^æÊ]u6Y‡RØŸ”ö;ïwêï–]£AmáH kO£|]÷+¡Q£GºÎ:a˜{DîhÒByjZ•övØ˜ı…_ÉqğP6…¢ün´ñ2Çµ•å¯cëäÏ=~˜OŠ¬hyƒp=8¶µaT×Ó`ª¥®Å“ÑÕI‡&ƒ´Ä¢i¢ªÅGÈ^÷„ÈïT"-â˜ëáqN‡.l.èE3rÅ×A¾¿íY–oM"±Ã³#1c1~tƒÅ¯_ïÚ}~ ¿W¥GQá|çİ£hÒcĞæğã³ì§xö–‰¶¨ƒ}oü€Ç¯Åøp{4ùûHøæîZ–‰ºYGğä¸ô†¿ñÏ¹ØèsX{‚kMÉÛø^Ü‚ºIã{é¼ô¯„Aa}”½AKÁ/ğÖ²ŸøRÜĞÁÉè[Şæ‘«F26ôï×›w+ØOâ÷Ïs÷§iÔ‹wkt1SİÆ'7OÀIÜ¯³1Éõ5Ùl|qíC½d¶(_Oæ0sÛşh´kë¨ÉË`Õ¿·ğà5?C#M	|ıè],‹W“_oÀ%|4#n|‰®ë‡¿³M·½°{óÜã…¹w˜tZôq»H„›/}{½ÒKKz<	.å7L!*(Œ‘}m~Û¨SCÅUl¯œÊÂI*œU¢î<Ôz¾Pjs…3„l²fş‹ïóş=ìù•ş/Î7¿µq§  ğÇÇ m¦jÓ[|n1›ş¯!~×ZÖ¿uŞ_~Æş¸\²Ê³ÈKãËe£xlùÏl‰ÿ™çfá÷=ë‹š)ZâkÓwnãÅ[¸åµ¬İÏš‡û³À~9kSAvp…>"0|ÿ¹nıæÛø]l[ı6Wd-#/çÔï×«wËÉcYÖ¼½z»Ä»}µÈ™Ñ™ïğ±¸_óQ÷SÁµƒ/¾ç?Œcgq§÷ÉÂÜÜyŞQ”‘û¯Ï\Â3ëÈ®ëğÕUä’·õK^õ}Œ¿¾¿…øí_ñêâh_}‹MyÍTtŸ¦ß«ç'Ì½D/Dfjùwìİ‘JQÏ/"PGBÓ^v¿•GæÛ))ÊêØ1ì7RSRÁÎï6Q¬Ñò›6›ë†"şäÈv–-^xúKkøÇ:O¼Îëø
-
-
-ç/–¶¸¾ƒG®½œ%ÓIpôXÆFhqPéi(Í£F[îêùŒ¥_@$Q‘®xzÖ³+Sœ3léq¯mS×Ò¦²F{ÕMÌFtH ƒ§-aÎÂû¸4ìü3êuÔ¦ÆP?"¿I£BpP$£‡j(¬©!/»è”îw²wk3´¡×·Aè€§ş¾x9âjéƒ“«œÔy#Z¨Î>ÌøØMŒ
-#¬sæIÃ\~˜â¸X¾ºy9Iu­4	i•·#“Ü4-QÏßÆT{G¼:ÌÛxˆûN½›·o™ÅŒaıˆˆ¦ïÀŒiÂ€ƒ©äo6±ê©-’œğ¹UÇso±áéNbMiµM¾GãèÈ QW³è®ÑL>0ß`ó<öß„£3®ÁAµõïîä0'ßy³3‹‚‚‚‚‚Âˆ…•-ªÀáŒ‹ìC¤·ƒT>˜Úµ¨=ûáéîŒ“±	Z,ãnc%Ÿvxx»bëaGÜá:,}‡÷Z‡¶:Úõ58÷1÷Ák¼ıôxé›D¶{âçŞ]ˆu`2ĞÔUatÅŞ×g¬°²q$´¿ÍdçÒıNönî®ş†G0l»ß}…×ÿ³ŒåxN¾œq¾¢)~ä~â½<ğÆÈ‹Çåëxœ™“…¹°Z‡ÊÍƒ€Áş¸ˆø³ÂZ4ğè3|£f¤ŸJ4ø;ïeeï[ÈHfGùâë,šùzK+Z¼ûìfƒƒµ=.ş^øöõÄA<WwÂç¶7Ì½£½±‚ƒƒa_‡c{ÉU‡ºakëŒ§[[bÑ:š08Ú¡-IfïçOóüÓŸ³!¹„òŞnÏ%´œ‹~"¬V–âNówg…?z5õ…ù$mÉ§%jÁAŞøô°òÁ¼U¬­#ujÚ;öt­‹©uM%¹:Lrb"±;6°uÇÏì/ÕÒfèX|p",-,qqõ¢F«§¬¶æ·ß¯§wstÀÑÎ`«Lå@bÕFv¸öËb
-®A¡»r
-áövG„İñèæúVŞ‘ƒ¸è)ôu–×:â/ç
-NN°8÷¸bHWMIj­˜FN§¿—Î6>DLÉ„k{¾öèçrJaş5m´é«HH­Æ£xêÂö;ÜJSeéëÖ¿+üz5Í­u¨K3HJM"))•¤ŒRÊë:í*›wË&nw"ñé%İm´kËÈŞ¼‰mk×²ví6vîËF$/2yåâôømlÛGv="ÿu^&8vgó¥yœøøø·rQPPPPPPè%rc‡ÊC¤ü¼Ïÿ§gÖ“éİ£À0[Š0°µ¶Æ¼Üà×V©-…ˆóãú?ç“äÓ»0Ífïo-§^ˆ¾šª2óB¡ªš:óÆW»aÂ`hÇÚÂÂ<ú›îwœğ96ç»‡×^ƒo|Â{?>Àe.Õä¼ñ515B”t!§Æ/a¶²:¦›ó¤ˆ 44Ä±uyqñ\)Df™'_­ü{Û‰¾Õl³¸U¯ÂÚèLxË|úİ
-¾Ø”B•‚Ga(£8á¾zğ¿¤9]C(5Bºãpã'¼¿ü^F¹6¡+,÷3aÒ7£I[Í[Ï¾ËËvs Fo^ĞØ¦ÑĞnƒëâô4Ç°ê¡ûyô/á/w<Â^ZAL¥I¤GU‰+ùòµGø×³o²2­Í|ß.jkkÙ»wïMøc@AAAAAAáWÔïgÃûY¿Ã‘ë6,e¬—Ç³¯ßÜX­Œ
-òbÑê„×º{¹3fÒp‚ìlÌB' ÏP<BÇ±/ó 	ïÏaé‚Ñf³W–ŞßÃ¡E„€¨*/$ÌEE›óo»ßñÂ×¤¦Î¾ÔEcà`+ü<pvÆ'Jüíts°«s§o/é\¤òÁc©”;õçÊW/eˆğîÍ»ßõÜ.òÖ²?q?kóìP¹bÎS›xû©Û¹nJPç	İ(+Oœ^ZËÒ(-ªVÔâ±5yùl[ò1	µÍ4¤¼Ëşİ?‰ûéĞØT>’‡½“;æG@Nz­–ÔM›8\Q\.Óš£¡r™–‘Ë×òY|<ñÛŸãÕ‡B¥HHC*±U#™xõ¼÷ìß	*OÅÚpL†éÆq…b—¹Å)îDNæ“c‘YOç*îÌ9ç=¥…‚‚ÂYÂ¨ƒÚ¾yá Æ ¦üs6£|q²²0W´~}ÌJÿÉ2[´4!í·–“·Óš‰ƒİ°Uï:áµîV^X~CN«Î,j«òh¬8ÄÀ>aô¿ô%zú=Ş{ï=~è..éoKĞĞQØÆäQ—#Ô„¶%ƒMjğ±t#zÄÀSºß¼Pöêã¿8ë¬ˆØ™A‘NO´TµR/ôOo±´±ÅkĞñÃp
-K;tÕ4ånã•d`7y“®ÃÀã,J<­Ïí†ºÊ•µ-´kEjÿü[
-j9”×N[ÆaäFº]­-öáXXXÒ'ÿQîO±%áí—øêŞû¸ïÕÿ±5ûS»ér½œ30!Ğkì	7lãówãß>Àãÿú‹¯½–OV¯æ¡{îañe·q×/ğMÑW<ûĞ?¸Wö(Ş÷_ü×Ó¼|ÿu\uå&*jRÙŸ°œ‡zŸÏö•RØf8îêh³Áí.C½^^rOãÉ‹ÒOV<ŠSÜ‰œÄlÓâƒÛ’ÎUÜ™u’®´èòSn+œOÈ<ùG5¸mĞ6Róï}º¤Ê
-êÛIß¹‹˜‡Ñ¸záâã…S[-©[Ø’›Jü®Í$çš°ÏÜéâ^äÃÏ­›©‹Ã	¬?G\l;2Ë©qêÏÓf0rà@Âû ÿş„õ	ÄËÁ;GW4™ÉdçÆ±%qI»÷‘Ö<‚qsÇ2b ÿ)İÏÍ¢‘òØã¿›“§;Nâı;Øj~·íBÉeàTÆO5ÏÏüÅn¡D..çÀ7Å|	¯JÖÇó°~VhóóØÿY&†Á~¨ìºVójĞ5•±ÿÃb</LPol«‘µù^úğ •ªzQæâÀÎxö%TbŠ‹}=¥±™dî­Äbp nâ¹Úã>×g³,ê!ÌÒû8ÊÒØ_ÓFN»ã|íĞ©KĞ-É.·£ŞèÁTq}×î\FK6B{¹Y·Òì;…aNÖøùûà5ˆQ“†Ğ¯Ï ÆÎœÁĞ¨0EV-Ôë-Ğ6Y`oãBØ¨Á:Oww|½í×Ÿ!“‹kƒ  (Œ>¡}é$¾½aLš€»»vöş6ŒQ|p2/ê@îÒ'5¡´ÍÛãÎ,]‹üWqŠ;™ëšğÚ%»ü=OqgŞ)BQá|æ-õ*Ó6‘«5Ò¨×Ò(¾³òò*á,ğ<ˆàĞPİ­ñqÏcÛ®J
-PEcäe3-ÀDMú‰¯õ±'$°šõ?ÇS\PL½ÇpÂÇ/ä/ã|±9Z…ÉeÊ`çƒ¯[9e¹Ä'¦®Åš°ë–2{d¡n¸¸÷ş~¿åİ<†‘¸ğRóªçcƒ'r‚pZjs¸ô$p°®'³k+uy%¤­+ÇeV?Üí;†Ì¥€3HÓ:BtLÄ?Ğ«†RÊ²bÉµ´G×ª¦Ş^5uj¡ã‡èÚDu|¥¹Z\§‰{‰çú÷¹]¶‚zsÇ±5–‘TPFbÚa,ë+¨ĞybïØbë‰Kp“…ØíÚKê.7¼#&11"˜è±£1mÓÌnŠpÃèçï"«\ôR@ÎÎ8Ò¬°s	 0hˆ“ÓX¸d6ŞN‘\4}
-³gÏè¼¶'7Y¸HBB"0`Ó&bB”+É;ß©ä„;³tU,
-
-½Ef,ÙØtol(œdzÈ ²3‹Âù„Ì“Ê^Ï
-Ó~`ıòxà“ƒæ¼o9ÿQXrL‘k­Ådo^Í§7?Ï
-ñ«•ÁÌ¾ın¹{Ã­ÒùßÿÚ˜wÅP¢¢¼¿
-¼»3Ë¯„¢ÙS©äN)Lº£ä¡s‹L™ŠPT8ŸP„¢ÂŸ	£^ƒ¶µ™ÚF-UUU¸û÷ÁÛÓg»ß*ãä–…Zê…Hå<6¨p´õoE!{wÀrÚ$ÂB‚Íf~+'İÂOGwU,æ±iÅ)îN"óK×ß’cÏQÜÙqRÊa‚®ß
-
-
-
-
-çË¶2JâVñÑ=÷ğı×_³.¥†\õï)›­°V9á€¿œwà‡«=v*;lüú0tÆdùxáÙyöéÂ,»ïÌ"+ı.'+Å)îD®{~éBÉ;gßuO‡®ß
-
-
-
-
-ç+¼‚é7bÑC†æëŒ‹\z}º±²ÂÒÑ÷  <ííƒQğ£QvfQPPPPPPP8Ó¨ü	~17<ö7,YÂ%#‚ˆ8Ñ
-˜óeg…óº¦Zš››híX¤     pÖPvfQP8o‘vºªˆûø¾úôÖåvø*(((((œ+¡xARHÊò·xqáBqÿä¹Ov’rÌ’¿æd×Ên¬L¶=÷(9¾X¸Çùhk6ù-ò…ÑÕĞ”³†×o½‘[d¼=úÏm+ì<xrŒºjc?cùÖ$V¨ °ú˜Ä¬J!aå‹,¼şf~°—„’¦Î
-
-
-
-VtètÄÄ¢ºúô—‰rµraaïËñ3JKÕÅˆÉo}ü÷N;Çİ™EÒ5>­p¾ Z7‘¿ókÖ|±ŒÉ•£&3Ìş0»÷§‘Vgµo(Ãû¹›-Ö=ã´7×¤%oİ»|õñ$ªq
-íK9¬ş9™R›@¼ıéèdŞ
-I"óN×"Š.ƒÛÚÅ&=Æ6µ5mØzzãÖŸ¾áaDû9vpbLí9ùtS:I‡pucÔä`äÕæ/±)Ÿìø-|òá&’ı&sñ`"½™¶ÜõË¸—+ ¥Sn+œOÈ<ùG5¸İ3r” ”äÅÔ5pôu>Rv¶äí`Û¦YöÃFvîÜÙá*­ÀŞC9;ŞæÓ;Ù²­ó˜t{âØÙèN€»#V»‰ßü9Ÿ­ìv<¯r‘NeìyûSÖlŞÂÆÔrŠ4„…ºŠz¡”ß¬`ıkYŸIB¥ŠPwì[nE§)fÏÚBLÎö¨\THE`Ğ5QºçmV¬ÙÌÚİ']g˜C=TòDñº{øfÅ~XÛù^»ö±ó°®^.XTï#Y†yu—Ÿ–º¤X¶¾œãitŒ»£ÇnÈ\•ÌÍëù|ùÚnÏ®¤AîQb]LæOŸñA¶;Âüôø½K9$õeŞåü—MšÎ“q};÷ab-õ@©9­x‡zôP×şvºâyw¹=+w|;¶„ù…Ö
-sóø)ÖÈ€Á"İìºÒíôÓ}gsı£,f¹@0‰BG[@âšŸØ¾¿uØdŞû0ß»ÉaP²ƒ­·q¨Ú;4Û/ôæÚu?‘œÁ¦–s¸Çq—sÃ½ÿàÛf0È©’ôm?»/…Ãà,ƒ¦†ü}lùy#ëÖ­cİ”Ş÷ÜÙí3€1Ó‡1zÜp†G†á)mïMÇ3âÄ3âH/n@İÙ2”"ÏÅÕK|v¢@ĞÓŞ¤5ïÁzÄB¥ÊGBDekÕ¬¡­İÀYlT*((œ*Æv¨/æÀ®Òr(ï¶™n{Sé1ëXõå×ü¸+¸„Í¬úv7ûJ©×ÖQ›»Ÿ|Àªõ[Ø¶/Ñlÿ4>a?›·|Ï®C‡É/ÉçpâzV}ğ!«¶ïe—Z‰é¹däçR‘¿íÛØ·WøÈ"³ µq­¥±$îÙÇ®XáŸœFJF)µzƒyÉŒhèêÊrÙ¹ñgR‹ª¨ë,`Œ†6ZÊãØõÃ—¬Z¹†{:Â#İö?“œLv…š¶Æ’“RIHH:r<!!]Û7ğSr.ò²D˜fõÇß³1­Ä¼JaV*ûÅı¤¤¨AVjë.ÌõV)Ù‰ÉìİÇÎ{šİâ]Ë(®© "}ñ•:êOë2=M{HÍÈ$±¬ÓKÒŞD]u-¥åM§½ü5ô"R\UC]k÷ˆèÄÆ}»‰†ÂRO†#{EŸ½^Ü½œåØÅ,æÅÊÊJöíÛGHHvv›âH”ÅóƒCÉ6–º“İéx¾”ëş>”`h\·‹’”ıTˆ$s¼ˆQ~–ØuoŒôâÚ²–rtÎ$¯ŞËáÆI¿x6ó…áeß†zÙFòŠRiõÇ»ÿd†ûv4*.èEQˆË\umMMz¢PÒV$“üõãÜñì2Vÿ°‚•iµä[sé`lDÜèµL†fš+’Xõø]¼øşÇü/¡–BÛĞ_]«-?@úŠsÃ?·Ñ:˜>AøK=)[ãåñ|·5‡³Xtûfˆô9ò¶UQ–u˜u(vÁô)‘Dº"Úñf”E…ó?W¢øÛ„ğI® §6†RŒàÚÑ¤ò@Õ` g8Sy“G®	ÇmSN®ø\<‚¨~cqJ+bÄ]Opóırÿ-×²hŞ†gŞÇºêplúNgú€x•µ0öÙ¹ïX:aÑa•µü‘rÓ·q÷%£™Öß¥mÌG
-¾Š1×ıŞ0‡«¢İÀİ{QnXÙa¨o¥)µˆ¬–Ÿ©òÆÕ-€`GK¬DãÕ+zM˜²€=Çc·]Ëµ×^Ë¸†È(®&¾Ù›á–ûy<6Š[oYÂƒÿ¸Õ||ñå³˜m¹’wXc8šËFLÂ¿LÅåO^NDc5¦ ‘D.½O„g£ƒíqıE‚ÈVµ¨·~äí5x¿œÇŸ¹—¥âò¾×Î"4DÄ¡½Ñ\I=`Et=¶¢Œme¡-ÖíÍÔ×«©oP£Ñé1Z«°µÔ£©¯G]/ìMZZXÛÛŠ*²fÓzQn5T×hñp¢Ñè¥Î…I‘¶T×©ilsÄ3¸à&*ÙSêÑÓ‹øáh
-Söâ	K+œ‚&áç¯´£ceÇQ§Ù¶Òfi#e£¹Š{ôN£éËó)oÑRkí€ç¯ûk¤&Ü¿?aaaæÄŞ=Eá¼À o£*E´pjDQĞ…Lt_!Şìp„–‚Š*ÚEk£;½¹¶Dˆˆåo¿Íîfñquœ P‰BÂ—ÀVØ»‹Æqc3µ¿½ QP³ı%.¿x&ü‹§ßøŠMñ?óÑçô[ò.¼ô ·Sğãû|zPÄíIšºÊ<òÖ}Ê{g8$ˆÁ¬ïñZ­¦ÊÒıû©6VN†“î„Š?PPP8ïĞ¡5T²©ÜÈè0?tM:–Çæu;}³†Ô¿Ãî†áD];–ˆNÿc±±u`È˜E”·ÛS¬>¦à¨ßOVy)™¶C2v6O,äƒdƒ(ğíÜİñWÙã?çjT+_cÃ+¯ñÁV>>øXYuî™,ÊvM»k­¹~d(ñ‡ÊÙ™Ş½+­g"NÇàÆ¬,*îÅè+Ä§CWóUÔ2BdúŸÄ0­nõu‹¾ñÂÜ¿·‘õ.ŒuKOÈ=œ«’w¡ëãSX GæA€ Ò³µV>ÌıWÏà+¸î®ØTÒŒö€xÆR!@EÃxÁÒûù8UO³>•µ÷/e©ğ=z3/ş˜­5Í$®½Ÿÿ¼ñîÿr35[Ÿçâ™SxèãXö—ˆ”¬H#}Ù_˜3}‚ù^£¯x€»>ØO•xtı~Ç'o-¬ZÅık{Ê"¿¨ÓÙôï9\7{4Kÿó=öÈ‹}šW>y…§ã¡x!!Zã†6-mFã/Cf¬ÄÇhaŞ^¶Ø‰fzq­A/Z:èÄ9¿ti[ˆÿ[a-7"·Ä1¹×Fÿÿí|TEâÇ¿é»›Ş+¤$¡„Ş¤I“b{Ç~g9OOOOïì]TÁ‚ˆH't½¥Ò{¯»›Í¶lòŸ·I p€àYğïëg$;oŞ›ò¦ü¦>*4xyU7³ñ=üpª*å€V¤«·èÁÎä¾Çå¯“)~á.îù¼s‰Úìm¬ùÇõÜ>ûz®ê3>ß•O•®ÊÒÃ4†‡0hö®í;„`Qq¯<zŠfÓ™TwñéF¯Q7ÑWôF›ëêiĞ^â![ñ¬=™+c#Æ¢dvú2Ï¾ö%ßÌİJÅÎLN‰Kgú¤,cşß`§W<y?ì#ãÇıd\`S¢¨pbÑRİˆ¦^ƒZü§Sïäó¿ÜÊ½¯.`Éşñlo<ÇqÓïskl©_.ä™W·“cãH«r |Û§ø¢Øû	·Şû=ë›­K\ĞUP{|=kŞ{‰û_^É;(N-á§¶q88Q¨1 -¯¦J´1é«P]§^Äßv
-ski.m¤NÄY£ù7şµ”ä¤ê…ÿ†(‘Ö•E‡1´h±±ïX+×‰­ƒuıœu€ÌÉF?ÀÃ/¾Ë»Ocæ -Y•ö¤ë#¸ıÁ§…İMÌâIƒZCæ·/Sş5Ÿ¿|;ŸÁ¶C•à7€Ğ€<m}qí=§g„ÒÍÇ	£EN{%†;xıí3ş³<8®1Bø_nK¨vîÍØşıy¸…æ´å,Ok¦ä´Ş7ĞÒª&¿q3ç<Å¤½QVŸ/õ54×ïaù]·rÿôéLæş§_f¹ÈXÍÌù(wß0‹;û8pêTfs{/­“MZğ³n½‹OöÕw	ËÙXÓ½ë—YddşW°uöÅ3n2÷=ğŞ1–ƒzÒ=(„¸ ;>gñâ¯Y¾v/Gqü„g/%
-{•'ÉØ»“¥kjh6dsdÏ
-ÖlİËÑs÷ñ	Ä¶ù‡v¥qì¤¨5ÍfÒĞÒrºqptóÆ·×z:8RSÓ@å¹#Á@c“¼Å\FæJ³Vˆœb½Ç`À”YLNp¤¿Ó~–¡xZa8¡r"<.‘øAc	S¥ÓÔJ^}Çås°XL”!ÔWE˜¿è4ÚcgïEHÏââFÑ¿‡'®æ"ön¨ÃsÄXúLO=¶iäÖY(L-CÙ£½G¤o7W\ëöQÔh¢ITNÕ:&GÌœÌ€I·r]t)Şf!l¥a³‹P]‰‹½¾½zâ‰m~:Qw:®Ó*D‰ZD(" ç_<Dœíº9úFætÄ®êßìÌòG8m¿ã4¶öøÄÀ±ÁˆQÔ•g×ˆÕ466R]%ş”F2B0èª‰LCŸî¢ÕµĞÒP@nf*)™…U7Ój6QŸssp1ã¦1}òP®ìDe­;·îøxøãîè‚“_Fô	ÀÇÍ	JÊ©9¸ŸİYGi‹Åq£ÂÏY¸cïNlx8ƒlh©Ë&»®‘M:pÄQ@âø8œ›Ô‰„¯¨)§Áh¤x÷n
-kjh®LUZêwaŠ%bÀ ô¢›·µ"‰¥¤>ƒYüÖQŞŠ"`}#‚èn.fãæ,jfqµšÂ
-%µnôî‚º´c“ôéÿü2‹u¢4BÔ"2gggy×ó•L‹èqïeMrù•„Äôcüì8‚¨!kí:§QëEï±72.R‰Ò¡K¯îî­hUDSSmm1ÄÀQÁxèJ8ñíJ7c5\T>W1,´}já¼FÑN¡Â%8šØŞÃ‰ôÆÓC%Šª×’}ü°yûÓJ(©GL@ütx`(=¼UèOndÏ!%rßÓ1´ä¢T«Â6¸3zû‘_\†¾¡Rô„+¨Ò‰^¼o3ÛSxªŒm+vJ¦Êc$}»‡ã­ÁGGÒ?&ÑgÅ˜¿ƒÛÓÉW‹²½-¢—ŸSkƒÒEJ¡•\GVî'-d$Çö¢§¼FQæÄÿÆE£ht³Hß·‡mŠèqç\3å*â)hŠ¶³³<oooìë“±O˜rG<‡!Hß@­1ºEãç€ª|3›Ö¤ØN…V]GM9Ù–çâßo½|[1ÜÃÎäj\FM%^ªÃZš¨nR÷ Ô\Keƒ"5Jw<£âàğJREı”S%:¢B¡ØS‹OâTé¤îÙGv£‚şsäÆ«‡Ô°LøUÎ)M0^.ØUlg÷æ½œ¬5Ğ —¦H„';[Ôw§P„$8dq~öTË§±¹ŠâÒ
-Äõìœ\²+êiDt	Ç¼cìŞ×BÀäÛ¹v‚æÚRöËÁdV£³ñÆUépzí­-î>¾Ôæ4PW]JqM1EÒ3­&Ÿ*-£]ÖVV°¡G´3-iœH-!£5’¸ºø÷g+ùfã	
-•xÄîU@]'ÚÊZjK))1£KdP°†œbòR
-0™Ê9ydÇËL. !/}p:­‚F!ŒÓgQÒ`Á«_!ÎvØÛ^Z{×¦.$¯FC¡Ú„¯}i95hÊr(Ê“âS@^^9FÃQÖ,Ú!ÒÙŸAñÄ‡)¨Úº‘äòJNæ½#…ıßå¡¼e8İ	ë&Ú§Ğh|ı#‰ğbTa•05ÑÒXD®Ög¥ŠÖzªr9°+…jK%ù…ä—š09zæNN‘˜H?|¼±åTBD”Úy3Ë›¶Tú"6îÍ ¿Ìßˆ>Œ¾.²9°`×`‰ˆgìõ·1PôXìŒõB4Ó$ºv
-\Ä½›.r¯}x4Ó®Lñ©tQø‰ÖŸÃıñP§“ôæ×¶á?äjFGœO{˜şÈB±Íb¦Eß(zbšÍ,¶(lÍ8kXv¸§Ş7sÏãáµïæ–é½é&*0©tÔçm'õ@2‡K"ûèdºÑWªµ¥Æ+©Ã‡3vüÕL™K€4­œ©EÛs 7ìãµ®bw¾Í»¾bÁÉzêrÔ¸¸‹Ê1"áoaÊ:6'çrêdY·°iİj¾Lñ¢Gßp"ƒZÑf§q`ÕAr"Æ2il,=ƒÜ:ÖÉBQæÊçC(ªÉİº˜ÕŞaÉár”	7Ñ# SŞöoŞÉºmÉ”ŒÁ9c.ömåûCE¤m_Ç¦õëØë=‹ABôMwÏâØò§˜·¿c‡ö“¼eëÖ­cÇşxÍşŠiƒzà]øÛ×|ÌÂCõdîMbÇFÉMåÕ6›Áû¯Áê•kØQá='sçU¾¸¯äƒO¾á³Å+HJ­&7ø:î™êCÅ÷¯°bÙ2¶W:â7x_!$’·³]t˜÷d–Såï¡§X–œÍ¶CéÙÚÉØû£ÆÎ`L„3NÎó:ÂÇ>ç“_·»Ù±Ÿu^³¹\<½ÕëD˜?äÓƒ•I²%t²hOb¸ü–çßÿb¿1Äuó"Ğ­cÀÊFü«
-%Î=›}Û¾ãå7œöwİ:œºUAÚ§óØrĞˆWT›zélÛTÄÉw¢·]Ö†¡Õ£-õù›Cëwß±}É$år°` sAïî6è¶oáĞ¢OùpSÛÓêÉÊ,¤VS†[¿xFŞöáÛşÂÒ¯·°ñp
-Uö­‚¯bd¸ê’7•¨~Áâ}y$5ugzbõ_=ÆÂ¥ß±xEGœÖobİö4Ššk3«&Me w-¶­µ¼ûïÅ,^ø=ûN¤Rl_ÈÑm›I’îI‡FÏDîœŠ›‰!ik¨¢9ıÉ.=ğsuÀ]å…‹­ïê¥<ıö—üğC+¾>ÜİOğü?—‘FoGèFã9›YlDÁm+))aïŞ½Œ@rìldº.Ê\¡ˆ¹€5ÿz„…+P<»ßXÈış˜ûĞ[,Ûî€Çä;yeùıq€‚ïïã³åxÌæ¹…×'îİx±{¯¾¿ÍM¤àéÛX´W‹÷´ç¸÷Á[˜ØºŠ¿Î|•¤êÁŒ{öAşü÷ÉôëÈÒHt§P”ş–òÍ¡“a(?Á©õo2gŞ1QŒáú{ú’]Ê_FÒØ¿3÷qLï„‹ˆ]cc©9Àş•KùÇ_Vç£À¨Ó`°N.x*;ËLÆ&oBûNå÷d¶j#o?ò?ŠŞiµÒOçnùÛ@N-\IZV15.JÑIsÀÒ+’ãéÔ…ŒÂ{@8÷6Ïçùõ·ó—Å2k˜ªÕ_òêSËÑ?ù-/ŞÔ—!a¢÷'|“Ê«”şÖ3¯DÚK¢Qš)f	:…¢TÎ7nÜh=Zâ¡‡¢oß¾V{™ß
-)O–——óÌ3Ï0hĞ üñ+ÿŸhÅ¬×ÒÜ¤£Ùb‡ÊÃgGÑy3vÚÙâèâ²MƒÉh¤¹ë‘.
-7\•8Û™1éêilO;}>–ĞM¶Ï³ÃÆ¬E¯ÓJË»àhmØ•ÊššL¢7Û+pR:ãá"ƒšÆ&#Fiš­¨×Dåí.êšf½‘[J7!(,˜šÑ	;““€n([êh2´Òe¹µ…pï¬~H#Y¢’6ªÔkô:J‹ÛUx9‹°Yta–ê$n^B\Š¸š››Pë-Ötqu¨£İ9Òna0g'*é¬G'Q÷iÕ4™QºŠq‹£Á‚ÅQ‰‹]z£xÖ ØŠºÑ	o%mš&ŒFÒ˜ª­ágf­¶ùÌ´yöN(\Ü°××¡“gM>‘..¸+D{‰ã"­"hÍ¢ˆtöTH¯C¤iÇóÎÅQåŠÊÙUk#–£Ÿğiíh¼üÃÕ­ÃA'ï×Õé¬Ø†’LÊö®fÿ€GÄ=ntW‚¾¸²İÛ89|‘N«ìE{İ‚FšÿvtÏé)òVEY‡bÒ¤I"/)e¡øÇBª1ŒÔ^ÊÒ¹_òMR¦ı	sª¤ ½ !×2ó¡Û¸iŒè96bÑ3gÉúj¢§rÓ«oğä %æÔ¯/rïÍÜ8\aïÇ¼ñÒr’+pí†?µd±eĞ½3ûñŒïëƒk{€şĞBQ:ÏP[qŠ#¹¢âôÅ³-•¬Ã›yí3-ãç}À££Béíİy<nÌ¢²­,åTj.ˆŞáëKØVê†ã¨É<:;Áº3¯=öÎ¸ù)Ò°Š¼Ô<Êk5èpÂÁÑ“¨>Ş4”Pß Ù	¤Eà¢âÉø‘¯·¥°úD)1Nµ˜†ÎãŒâª{ŒÂßìÌ
-ˆJ$&Ğe{Õ E™?ÿBQFæ¿¥ˆãËV±qÙvØ9Aà@fŞv#cû†v‰ç‰[ôåÔçlaé¿6rB¯G-š
-—€bÇÜÁ3b	T9œ>üı\ÊÎ'ÈÏÏ'""Âz·,¯ptù¤%áà¡l*;¬ €˜AƒIG„RtYš²Øµv?éUE/$bè4&öpAi*¼¬{ÛÂ‘òA0¯KBÏ`Îœ|ğ‡Šçb8µ†µ_/ááÅõ<¼ä;îèG¤[ÇÅÿ@ô‚õdmşùo¬!İ}ï{’nŒÀE\ı¯b_ÂîÇÙZ*:‹Î˜ÅØX?‚EÏÿBÈBQæ€,ed.…jòvîãÈ®NIB±Ûh¦ëElÈ™5é?M3Fm!¬ãD“ŞÚ–«„ˆ1“É’¸Èt¹´LI*§‘‘‘g¦¥Í•••ÖÏµHke¡(s©üŠTïgçÊÅ<öuD>ğÇalŸ`¢}”B‰YÀXEvJç¨ 	SS?{íêPbg<Æ·İÊØĞgıÆÈBQæ€,ed®|Ò©øúú¶·)’¥4¢xøğaL¦_ôû722,üºÇ5ª6¾?O¾ÿŸmO·nş¨(+¢âäZ>{îi¿k>ú$OşíC–çªğŸò×Î˜ö»‰D™_Šºº:öïßZş‡}dd~-	>“‡×¼Âm>î„ìú”Ï¿aÃ†1läX†Í|‘Ï“pÏ,İ·}fñ“×X§õedddddş¿!E™ÓØa¯ğÇ¿çîş|)Ÿ~ı_,ü„yóæ	óó>YÄ’oåÉûÆ’H`‡ñq»ôãddddddşHX[7ùË,228
-±HÔ¸	\5u*SÿÃ !úÌ®o™ÿOœûe«P”¢»»ûéEï222222222ÿ{Hjğğğ8½)ÕúÿmféÜı,Ù\È\ˆó¹•Í¯gdddddd~	.y3‹t¼†tÜ†lds1#å“s9Ÿ;ÙüúFŒ22222¿4çŠÒp£47-Ÿ#Ù\ÌœïÌÄó¹“Í¯o¤w!/‘‘‘¹’‘¾ø1}úôÓfÙ²eWÚyùå—OÛÕ××s×]wYï‘ì$÷ÒoÉ^¢ÓîbÏ“8÷^Éé·ôoW?$º†¯Óß®îºúq©áëê¯d'¹ïj×é_§9Ÿ¿’]'v’ÛÎçu½_²û%±¶ğ]7³H#D’9wjK6²¹éÌ3œÏl~#½éPã®ïCFFFæJ¡ªªŠµk×6ÙÙÙWÚ‘–ÁuÚI?'%%Yï‘ì$÷ÒoÉ^¢ÓîbÏ“8÷^Éé·ôoW?$º†¯Óß®îºúq©áëê¯d'¹ïj×é_§9Ÿ¿’]'v’ÛÎçu½_²ûoøÉÍ,lds9¦«0‘óĞïod¡(####ós¸¬Í,’p”l.f.ÄùÜÊæ×5tı[FFFFFærøÉÍ,k;×)ÊF63R>é\×É¹ndóÛI vı-#####óßòB±+]G+d#›ó™q>·²ùõLWÎı-#####ós±
-EùË,222222222çnf±i455QYY‰NNN§wPş¦ÓWÆZÊò
-)(¨Bİa„Ä„q¾O¦Yô˜µdÉ¥ÖhÆ(¬œ=ı	‰M$Ìì/:V*h³?«ÈNÉ£¼VƒNXÙ;*î3œ0o.zšªË(<œE™¸Öb½É7Ÿ "bğw;ÓùÂÜ{GÄæŸ‹øû|\(=úF!'²J©jB×•ÎtqCi¨£09RƒÉ‰³ãÑaÙ‰¶”œüb²K:,:ñÄÓ¿;±‰A¸‹Ø”É¤¸ªvWvÂxß“ Ü»ô'¤óû:Gµ¤¿%¤|sî‘9¿;Öt®é¬Ç;>?”—®X.#ÌRy•Ò¿sÙHç†"ggçÓ#ŒåååÖr[¶laÖ¬YôìÙÓj/#ó[!åËêêj>şøcFÅ#<ÒqEæé(—W^y¥ãÜ|óÍVÓ‰t$LTT”ÕN:æÉ'Ÿäá‡&//Ïzì‹——ï½÷õ_é÷¹GÁœû<‰Nw÷~ôÑGÖ}´æÁN?tVøşy«¿¹¹¹§İIaêôãRÃ×Õ_)n‘‘‘Ö2Ğ5,]9Ÿ¿á“èô·3,Òó.–¦—‹´«º±±___k›bŠ%%%ìİ»—qãÆY•äo+¥C‚Í4çlà›ÉçËöQâl‡YSÎ8éOÜË#›È`W'«\‘°µèë²)NİÀK/!İd¢ÙÁ°şã¸ş¹Ï¸;ÿH]hm1`Ò”£.Jâİg¿dë‰Bê”¸ví«k¸kˆ/¡ŠS¤şøŸÜı>›İ}ÀÖˆ¡Ù—Äé<üïç™¥ÀµaËŞú„yŸn%ÓÙ7…h¤E›ÜfÖ£×ëÑÚzãrÏ\¾ºoWG{vø~†‹Æã/ïq‡ñCî~évœ¬ÂÅÅ‰3oc"×?~w?‰wÎfæNş'j„xÅ¨ÇbëÊÔW¶ğÈ”âíO§›Dkêç¼òá7¼³2WO%g’i ıÇÍâÙS‰Öìâ›Û_aùŞN©8µ¶P«îÉmo¿Ä7cˆ¿Ãé5¡(D“&ŸŠÃkxê®jÆşûF†ŒÇ·¥[•>ÎØuˆ©+‡sÂüñL˜I ±™†&(İñtvDÑÑ#º¡(mZ“*Á¹sçfíÊÈü–HùT§ÓY&¦M›ÆìÙ³;®ÈÈÈ\)”••YÛŠI“&¡T*/¾Fñ·Á,Lë_ÿŒUÉàvÏ|»q!ÿ˜àE”ç.6lş¢Z¸²XİCÅ¡ÏYòÏk™,ÄURØ<¸`›÷íã»Oß²ŠDÑî_ua2;ŞËä[^äsMÃÿ±˜uâşm×ğ×1>„¹7µy9«>ûÔ*'¾²†¯ç>Ç=S<…ÂßÍ‡'‘×d°şIxF%2áŸ«Ù¸}ûÄs6/şÏŞ0Å ÒŸ¨ ÷—gs±xÜÑ»]m!}"Sîù€¥Â^zv»yçï‰Å%c?¾ôO¾ÕD2ôÙ,^¹˜ÏŞ@OµõÏÁîôB*:üê¤¡®’&M0}†?Ç§âY;O?óS>}k¼‰9ì|éY–g¤#<æ¹¹_³æ•©ø¸Ÿâû¶°)9«c”ñDUy‡YÿñìoÊ ÷à
->xæ†Íz€‹Ó¨ÕIyğJãœ07èĞä"yÉ³7™aoï ¹ğ¼ãØD:kÈ!ÖƒZCCC;led~;¤N‹Ôy™3gW_}u‡­ŒŒÌ•Ìï?¢ØÒ¹ßğğŸÑ5™O\ÃÔ?ş“9ïnf{^ÃgÜÇ»‹gÑ[8oNù–¯–.âÛ£jÃŸà¾«2,!˜ %—²ÂR—¿‹İ?.â%›1}–ÙWæêD»#ÈYQbíÜ¹|<w'“ø×Æ×¹Æÿ${ßûˆys·r*<‘¿ü{	³]v°r]
-[kByò¹;áï„Â®˜#?aÉ×GXÓã>V½8^ş*”]‡õêŸˆ‡¥¹ŠµO0ç‡PzL¸†§îDHû­”‘³u‹î|ELym	÷^íâĞ—<ÿàr+Ï­|ˆÙSc	ë¸C¢zëË¼µºTÅx>zçÂ…İé·l¬¢1w¯Şş7VåÆ0èOòÈ“#èUµg'ÿƒMwúŞıxh“;tÆcDÑLuÚ:’Ş¿•¿®öÄmpîõUhµîèo} Ğí"CĞ¿ç„ùÖñ—©şÄmà±çÖ}ë\¾}h4Sc½­®¥òúS#Š’}mm-Òr³ùJÈ2ÿXÛš+«‘‘‘8wDÑ*¥)©üü|"""P(¿­P´¥¡5–o5¢ş¡‘¦/sÛË«ÙR•À˜Y±ğ•«lÊbË‡o0Eé¶ÁŒ»5†`“vşƒ48áq8w<ö¼èò9¼r1K®ãëS¾L~Xˆ('Tî½	ï“È´Ñ¸gú´/˜ÿábæ~Uƒ9ğvæî{„Ñud}ô.Ÿ¿ı+L~m3ÏĞ¢V›(i8soş
-¾|ï~8¦ ôï/óæ¸@¼]Tb«hœE<6şD<›ªÉùj>Š³¢;cCœĞ+œ	1‹±±~»ë(Ş·Šïÿúo¦Aàõos×X‚Êäå7’ñœòO>=–«|ğèğZ¢`Õ#¼»­Œıš^Ü£²®­ôxƒzÒÓ!Ÿ¢qïŸ¿%­n<×=?‡ÇŸDXõa¾šu'óSkq˜ò·?ú,ÒÒÿ•P¬Na÷ã¤Õ+‰?›Aàt >}-ÚÂÃ|¾! !×2 w4]#wê2×³ë“Ùüéë`"¦Á»¼ÊÜ*g¾Àæ®ÏQ\°£aV—Q¹‹ïöB¯ñ£Iè)½¢ãâ¯ÈYa~ğeştaY?òüË88ù5>{f2Ó‚r©BQæÿ	f5úê“l\¶ÇÁ×Cä%–™‹¡Ñh¬kÚ¥µÒ&gkkŞõË,¿9vN2’Ùwgº‰~X°´h)ÌÉB§µÅ¿O±#ci5aWu˜m{N’’mÆb‚†ò½ìZùÍÿ”_m`ÇÁlÊB{JËÏGƒ¸÷X
-Û7ĞÖê®!£[ğÅgsùpÑ¬ßz‚üF3uå%T4ÔPÙq[;Î(=¸tŒÊ¨5={3jä0n"ÑV‘˜lßËÑb3†^Ã¸cHÎç(~2ëêÉ)Ö`_™Bmú’VúúÌ[¼‚«’#DA÷8†Ü6«úQ{2™Í?şÈ¦ƒ9T:1ì¶Ñôí*¥/u4P^Õˆ¡<›–ÜìÜ°åo½ÅüO—òÕŠ½ìŞ}Š¼’ò„àhn¿I 2‰½¡¶8m¨ÓP7»¹æH›1ó9±u[×ïåÈÉ2j;çëÆ’ıl[¹@¤ı26e0´H/NKmN.9çy—m5ÇVğş»oğå¶tNÕ\úˆ˜½J•6¶áLˆ'."¥ÉDk­xŸí÷üëÈÛöoŞ{ëß¬9X@qSÇ…_™³ÂFt¨/öN¸ˆğÚˆpëŒ"Ÿu¸ıµ‘D§´ÀY¤?é>é~é9¿Fëª±KşûI¤¸Š0E˜¯¤±W³º”â¬ÃlØ{”ãG’9t8‹‚2õé¥0¿?#Medº`¬õ|E)%Ú‹NDG¨¡ª˜cÇËĞ˜„&è°–Ú“¦˜ãÇŠ©jí‹h©´U9¤­]ËÆÏ×%ŸÈÏ3Ñb¨ ;i3Û­öÉ$*±.›’¿YõÓ\Ö—Y~Ú,:ôÙLN¡ÙÆè„!\;(Tj©°T•’oÔSi_Hƒ²…l¿çyêÆp´mcëGoòâ?¾$©\4hh‹Zë«)×6’o[‡I‘ÎQ×§˜6aSƒN’·ê}»ûM¾Ïh Êğ3Ã6“ÈÃÇH^—JÁŸĞ	#éNç¬]R<>aSY1™šÁDÖÚ[×•Ÿs/3•m”~ùÏ=ğ|s
-¯^ô™ö&»9‘>©Ù¹µÛk°!M´´š1Ÿ.’Êâ+
-÷z?FÒÿùç¹)<˜¶mùè¯/òô+8.”‡éçiÿÄX‹6ëGŞğvî¿ëE>øö ™]DVS³‹±Y¤›üŠ*Z,­´³8øÕR½°”õ%&ñ.ÏÆÜb"µ¥JUuõÔ©07k¨«¨ R˜ŠÓ¦šªª&ë½ÑwR¸áĞ[d|ğğÄİÙYtJ.s‹¨Œ4ù8´¥R[ß@£öR«šV,æftu"|•]ÂWUCU£¨äZÛ¬[¹.ÄYa–P‰ÎŠ»‡u	ÂÅ^yZ14ë(/.Ç$òïåg6Ñù3Q_Œ¶±­AÖxñ4477"„HÇïN¤`Mõå¢q©¤¼®IÔ–K«øÍÕ4ª©¾Œ¶m"®¦âbêDX~£¾Áha1ˆ±’jÑË/JIbóúuükw 3ß{…¾¢WSrIa´agéú‹ÈõÖZêEy(+ïJÛ@s‹Èï¿Tİ!óÿš¶6Q¶´Uìü”-;E»WØqÁJ+æútRv¬æ•wwS 5Ò®LDşÒ•Rº’WßÜÌìt­•YÅG·ŞÃŸî€|·–±XÜ€¶bË‚¿İÿ ÷ßûOşõÎ&ê…¿rıI~òË,¿7Æª<òÖÌ‡û›u7ÌÈ OI_µP])mîĞAğ'ŞÇ’GF3ú‘%Ü71‘ÁeÔ6¦²/¥“ùüÕ`ûFÑRxFá5â	Ş?”›yƒY×Îâ†˜qß’SJÅs.œÆ"¿ê¤•l®tÆ#v 7‹ê¸r6—"NDsËs/óÊúõ¼ İ#7Mâş…2ÂËOvQR±Ÿ]?®cùS“¹ıµ$4	2çáY<0ºA4¤;™7ç9¾IÊ ëtë!‰8¦Şû$/|÷¯|ú)ŒÊ#K`bbÁ¤Q[»‹äd!©ş‚”ŒõÂ$@Ìœë;i¸õ]vâ9hC{$¯7r¬¬
-³h˜í`ÖUbŞú4´ú3RÁÉ?Dğë¹^!dpÔ@%cİ{<:l£…vÚÌbòŒÅì¨ÕÿØ¢ËÄ= ŠşSeÂC]šK•MTe¬ã›G‡1qt—ğM½“k^J"CsfCÔ•MåY{œ2ñ>.?ÌBğ5q|îjlšÏç;¶±ààÅ[ŞÚµ=x¼ß”\Àâ§2pØ>ø5?fˆ2İqí¢äí!#+ƒ=R~¼DÌz=©"ùBœ;àñÛ¢¦©v‹&gæÀÜ± “Ê>²ñï£ğ=ÑİpéİCÔ?MyVé"]»nüÙ4ä°çàa>ûr5‡¼Àº|5•òè¢Ì%`nª%uÑdzc!ßì*é°í¤¬=ëÙøırˆ_gš£&*s¥ı°·IÔIV+:Uº±vç>ë€×¢ïçj!(îÄòÏ•¼·õ0;¾º»FòİæjôI’¹ W–P¬N!eû
-ı2·kşÉSD£®´ÊÙÚÙáé€£“Â:]í¨tÁÇM…Â­'İº»âíİBCsG‹«0‰íùpqóB©r³ÇVá«ÎnaøùÜŠÉ¢ç˜¸¿ÕÉg—sü¨ÑVê¨+ŞÛÙâëÒ©c„±]Ñ6¾øx§Ú‚	ìIo¿ó¯ï¼´x4s¼T“«;şşÖ!`7O<zDeo3A¨ÔµTgîáãMùÍbâ„‘Ì¾ã®¹ùAnÕbQKS½¹TtNKË
-Q‰gzøùáéãƒ›J…[Ï(º»ºàîî‘ÄÅ…ààĞu¼ÊˆÅ\KeF+¡º<\œñõ<ÿ.îÿÀÅ×Óyâï_ò¯»§3±·×Y#¬¶Nøvó$Ğ_¡¨’š±ıèİ-”^¢hÌ)³Úu¶=6v*œÜºg‡Sså'Op4ãGš£ûØ¼ôŞ<æıcwQ’{j!/ßsw\ÿ¯¾‹VÅ(‰Îê5h/qö\ÂVå‚ª[$‘vöTÔÔS¦²A[JışÜw×­¼µò¢b¥Õ¨¥nÏ,•ÓŠUß²ı»,I‰b„èHáûÇœQŒñ,¡boÆ–©ãjJ¬dé]÷±t=¥g©’Ÿæ_–VZEÇÔl¢¥íâ£ g¡V[BQ‹;ÚlÅınÍâ]:a§w@i¼xeí¬TZ§?ÎQôÆ¤ç3ŞûÌr<ÃÂD™î¸v.Ò´VÉ¶wù&EKI½QtM´{+Õu"xF>é÷ù‘¦ËM¢,¶ˆÌ¥!Ÿ‹º#~÷V×”Q²c=ßÇ’pïßùócw2{P7½œñs÷ÀÉÅ}I2Û<Áôé³„ù„‡J¬bğlŠ°Ô¤ôT›O‰~Ü¹‰{¹XÌ(ŒF-mE½ o³•Ge.-mö˜"^å¶i×0.áì¹õ‰µ¤j”wÃ8ñ»s“©.ï ¹¹Ç9ÔãFØ+Ûg„´j³°ãÇ·xâñGyğíu¬>!r¾_AÃáæ«"Iˆ"2<ˆè° <]=±µ¹âÆÇ®x¬)vE|™EÚØ°i%oHá„÷dn›5“‘ŞUœLú‚÷~ÍšLmŞÁ;©ğl¨¥¹¤”bM-­&Ì&iŠO4.
-GÂü|°Bî|8yùãçêA€®	KaÅõ-4›[Ä½ñ°·µµŞ/wÓ;&Œ¢‘8Ja©]mõZªÔ8Ø'Ò'Æw×vA¥¯/$wïlH)Á£WâúDxzõÙØØÚ¡èvùñhm¥MÒ MãõL÷Ğ BZ«É¬µÅ¬	ÀÇÃÿÈh‚#â‰õnq©£­µ†¼d’W|Ä»î!SkDßñ8+Ò,“	“x¶9¤~£¦0yÂ0¦Æ8á¯Ê¢¾±”Š2–ÆJŠk-4›zàNd·Dî\•8ˆÛ·ÿÕŠ–â\GÙ‰Í,÷C¶dj©-,¦°ªš´JQi¤®å`&çHBÃ‰ö±Ğ¦ÕqšÎ¯²æÇİ¤j1g³¯±…ºì½”–7cˆšÎ½;‡zbª-äx†ƒqñÅ¤·âäDpˆ­ÍhÊD2†àé®B´kFÚ`Uº‡å_¬ä»-idUk¨ÏË ³ÅLiJ
-ù'óÉ(-&oÿ¶l\ËÑÜ*j:uZÌzª2V“ôí\>[ø•ÈMxO~„Y3§3sPŞ*;*t"ß¸ˆN‚M{é\œ¶‡Ï×làóy[9’_K£°6›.#Ì¿*
-Uxx‰
-ãêXiz¸d÷»,Zõ9¯MfïñzÑAî¢lù¹á®tüÉÃÎ„P´Bñ\T®®(…`¯?rŒ”-§(ªi:}ĞüÙĞÖdq|Ë
-–&gSl²G¥P¡T—R¶ÿkŞyã;>_¹—c…¸_Š«-î^^"î?cG¼´iM“ÎŞoÖ³mky?C+V§ï%;+ƒR³îÁƒ¸á¦hlÂ{¡ğ
-&Æ×	iM¹BélİÀd§òÂ§[ıúE‚³¢Ë©(ñ‰$¢Oa*ÍM¢Ü_D,Jë¥EíÒšl‰Æ¼ìÙ²ˆww— •·³‹È„x‰ğ‰¿/¾Æ½‘šì=¬å^[²Ÿ=»×°zóf–îÌC#®J>H¢XZÇ*Ñ*Ê‘&ı–®ÙÍ¦Té™1ëËHÿáæ¿½€e›RVšÊ\	Ø‰²íM·~W3´_şªvëÎ2s°ÛPâã×°¹èòÈÈ('½Ì“~ã†¥p²n\5jê1šxõLBÿôtÌ£¢(ƒıå¸vëGñ¯c5Å¢<Õ12F”ysßOqî—Yì^HÌ¥“ÒÉ®;‹£Ú„22VJ›J¾cÁ7ëX~\ƒª×H®	6¢N_ÏW_¯á‡ƒµ8¸šaáv˜ò)Ë¯ \İŒ›ƒèIŸàğÖíœ¬Wá›0‘;¯›N/iÍÎù‚nkB_QN}n!™…µ8ù»¡¯Î$sÿNœªG:š{n¹…Á½»áoSC[U:©9¹¢·P8¤:É©z_BGßÉ-·ô"LøßZ›Ã©?ğÃŠel®äê[ïfÊ°Ş„]¨Q·âÌÎŒ6'ïÂñˆÎM#{R“›Bnv999äd¦‘yì0SLxL›Å´±±Ä)ÔädåR]Á¶˜t¦%åh*eŞC?a^ÛÙ±d!ó×iHğ ¦(üÌÌögJÏ>‘LÒ‘½G1êæ™Ü”(â®>An~65¢q5[1ädãRl{ÌdÌÌñŒpz“ŒÔˆH„d:)ßXS†êlv8Næ©J4:Iídù‹qÔ±;†œíÏ+ãD¥	û‚hœÃ°aTšu˜"­	›ØÉ\ß·ŠoÄöCÅäëšÑg&ñc¥³¨²iuÂ#| ƒÂ,èS~`ŞÚ#-r'$0ˆ«Vs ²#†Gîa¦æä~ØIÃ]\{m.'É:©Æ˜8™Ù£ÃğVØŸ9&È"ätÑŞ}{5»O–Ó «£\ä‘£6
-ªjDY1Ñ¨«"wÏ²óšqbØ±U‡¦<‡¬œSÎM&uó~RRáB¯‘£	6Pqd5ßï/â¹'¦OàšAİñvşjª)/ÌfGfÇö×`çe¦Y<¿ğD—0ÏÊÀ‘o2O°wíQªûNcÊèôğw9-¤ôïL{i4L2Ò¨ÜÅpiÑw5¹;öQ¨w¤Ut`¤ƒãÏÆ^¼J=ÚÚÜc{â*:”ëRZL:ª~ÉÖ2z_]ƒèÕİ›úâb<#hjó¦­Å›¸È+_]~>Z•
-ÛÀ@ü;ì¬4
-Á~ ‰y‹SQeÆ­O½ñ¶HÎ2RSR‹¾±ˆâÂ4¾ÛœCcÄÆD˜P8úal²Á­~7+¶	é!ê»àÜmÕ‰øËÎæ”0ÙeÌx»;Ñ&ÂÜ³»ûY§t"­á‘Ä”ôE«³Ò¹­ED"—£Iù¨Í
-\ÃP‰çI],´B4‰zçhé¼½qÂs«¬Ú£«ÈÖÚ¢	ï¾gÃ¢Õ+×`´¨òõÃ]Ô#Td‘¯ìk`ı{D2¸7M}Hó½sß£³™Aøù+ğ3dS¶®¸w}šâ4vj¤ÕU‰ÒÉ€ZÔ•GSjğ	ñc;šŠö“‘#rc&D{¢tÖPÛèD«Æ–HçJêætÖ—›Úuyi.ÙÉÉìÛ~”ı¦ Â]J(­7RjôfPœŸ°äìÊEİlAèc‹A$ß66d‰tqó%6H<´*ƒİ[×³?­‘{¼‚ƒˆôºÄN«Ì„ƒ¨§ÜqwmVÉNŠL^˜¼ãéëİŒ1w%ó¿/§B£ÇÍ¦¬”*<÷ÅK½‡ÛO²=­™¨@-i»QöŠÆÃÅ"ò¡'Ãïã‰['1RuœŒÇ›»1©‡ô=·FJ¥’’nD§
-gôğ \DA“¥âÅéÜ´("ZÛañ»£hÑ7Rô¿—äÌºÛ®„;|&¾ı8üDŸ8g~¶œVí¸ŞNèø{˜yÇÃ<.í ¹¥{Ø¶ækî{gs‡E;ŞBœxğm^xH‡ŠÍ‰Mßóæ3K8&®·¯“8',ÂYéYóõ¼³Ãú?*ÜOeRß Ä¯‹sê"ñ˜6›Ö1ãï«¨j8³ÿÇ³ıp,?Á©õo2gŞ1j5gVr8ºùgyfp…k¾cÑç[É‚¡ÿşV(-T=‹>wrÏ½7ğğÌ>xK"©:‰ş:ŸÕÉ™*¤Hî|ón˜Ô—>]"wÑãqr©:ğEG<"û=lÉ{æV	wRÌ\==DCœÿÎ;]ÒY¤ƒõ+;sw\~åÛ!¥”ÊÓ“k_}•½Ÿ}FÑ1é.L|ŠÇoÁc}]ü=“~ç¦Ëªız<»¾óNş#¼qóÀ£¯c•xg™Ç2…#o‘*Ñ"U‘#B}:E…¸J”‰¢<ÕYÃ|®gÜìûøìÆ³?Ÿ§/9DúÊ¸şõcè„œP*…µÙé0OíI_—\k|ÿÕõ ìì‚ÚÏé‘Êëå#:ˆ†2ª²¶²èæw(˜òãgOçÚ¾ş¨ìÛ°BŒ;Z—K4
-ÁtR4ôÁ3f(â¨½iJVo¶¼{á¿hÔÛlE´+…ViÓ„”„°lmnæèš5¢Bw£²6˜–º &H…¨İ¥k›³pÚ.—ª“6Qæåƒm¿D¤Î•Ù€ÑV„¥<™´SY|ZÙ—'z‰ü¯KHp8‰Ò}Ò¼rI‹bßV@¹¢•·öE°äå‰D7o'½Ü‡ZÇLéÑù<›2ò·®dá¯ğU­ˆ‡cïéL¸ù~Ş(‹sÕğáøuïN˜4…ŞjÁ Öcã$ÂkgOM†‚ì|†`‹Ò»Ò_z–Ü“T56’?Œ¡"iLÇØöŞg,ıò)#æğék3ˆ÷Vá,‚uÖ½'—²¥:2ÏqÜĞ.œú†í5”{\Åm1D¢’ä9ïÀîôoË¦òÄ*ÆïçíY™+ÒOºG<ót|mípPwÇ…»½xóæÁLêå¡ø©?Ìåùİ¸ãÛ¹nh‡S™¿Â‡ßAŒ—
-•ôZ,˜ô-8¸(°³Içø1uÙ†g³&xÃUt—†‹E:µ‰•ÁN£mÇ—î"+»™ĞİAHu5¢;Hu†ÈC6*{!RùîÖ½èããè÷×qtFWÚÔÔ*åiÑq2ÜËwãc¡1»ˆÚª6FL†‹HÓfq™+©íß¥¢)ú6îˆj zó<şÑnö¬¦ÅdÆbçÍÈ—óÇömÙÀÂ-ù¢|˜Ñ©-$şiÍÏŒXF;Wk>h9ş	¯n#U1’·tC]wœÕ§c70A…üÑÒKã¼ç(ş®n·‰ÊÇ ¡±Éxµ…Ò0µW¤ij“&ıa$açä,z.¸şÇ6ãs°1è›iĞ½aÅÖŞ'ÓŸá“†ÁÍÑp¨¥IL««sÂ"l¬ŸáknBk¿\qwS pÏ°º¿‹‡RÊFO­hZ[Û}¶"Õ†]ü°±ˆÆZ¤]½ÖL«Ôt`cc+œyáæ(„€ˆ«Ng¤EÜ+--ÄDçÈßiœ… ñâÄVŠ©´Ã²±	½©¥cÁ»SœİİP*„€é¹‹
-ÅVq¿I×{œœ8‰,Õ¢i&ÜI!v”¦…û­¶K:‹tppBåæ‰³ƒ}ƒ½Ñl‘6â¹JwwŒMMH;8ÏB!*•W!rNû{átÑÛ°íúÎOsnˆ•hd]İinj¦Å,ÅSØ!5pâ÷§STzG"NÒÚ­VÑıv"ÿ8)]ğcWÚ…â¿„P43ùÙÇ¸ar?« ?f…ğË¦Åš'µ¢·°s•ììÚ.•×ËŠ%d'ıÀ·}JÓSË¸ÊşGš<bi‹¹Bõ¢ÒŞLåÀø£:W(ŠTvak3Â™ÆZ
-zG“[ìƒÎ‹Ù³Û«ãºİ»©ôòÂ®OÂ/*ë()Ñ‹|ª¤gÏö^uÒR2…»>ãç*â›º™İîñòñ¡{ÃanšÇŸšèÛç~îš0Œq}¥ŞK¡àGÔè>8íñvW Şı:«Š}©	¾çF
-1ßù<¥ŠP›BNU§±|ò
-²ûÇ2äîk¸~Ò`Âí,T‹0—ŸŠ‘‹ÙüÂZ\‡5SAnuÊlzh€¨;Û…¢4}*$áççg}%ÛßâhF
-ÙC¿æ¡xÑ:ğ©zWÔÎ¡$è293ƒ¡B`…ÍÖ½5IlÉt¢¬5»Çut€Í%"Mhš=è#YW¡èÖ‚ASÏ¶µ;è>j¡¡İÚ;¬¦.éçLá®¾šm‰ê†Dõy¤¸‚ı»H^ËÉœ‚EúE8×“¿ûºY3ˆuVá…†²ìBlÈ§ß½	rÍåä…„bCúœÃlöŸÈ@ÿN½³”ãvYy7ıD¾Tˆ<Zºg%8ÎE¼Töm%ÍÖOˆ†D:£{jùrêñJÃ/}½§–«Ş{ÃJbı5÷Š4uı«d~º
-Å»ûHZ@mÕFs9Ç³Y»XÇõÜB¬—¨EÙĞjĞ6¤³è…
-Füy*±n)Ô–q0ø/Ö|Pöİ,¾¯E}O…ä…;óéûÜtFNéE„(Ÿí]X™ŸâÊŠ2h.*+„è&w=¯/-‚¨L¹~4	—¸ßæŠ :…ƒ[–óÜ¿WrÄöF^~õNnMàeÔj—,Í"­òÖòò.%mlb÷I5díÄ.¤ÅùÍä§—ÑêaK¸‡ÙBëM&B„8
-å@f&mB Û™ÕhuzÊ5ÒÖªrtn}…¶àéT‹ÉÔ>äâæFƒS…‰>*wú]ÿ4×&”S^íL>†›;…¢ú é¥ÎÔ·F3*®]lU'½Éç²æd¾*‘—… ¯h#Ú–´•ÅªÃcï<Ê×$ĞÛ:ß)u
-ŒÔìùo7ïa]jÅé…ğ!ƒ'ªª ¥ä0„’é|V‡ÖÎ€Ye‡[Ğt"4Û©×5PÒâ.:)„ÇÆb)*¢N­F-„¨Å$bz9öƒÃğéê¯èIÔ¬yl‚;nJ)Ïëh¬¬%/¥ !T½DÇÊR³‡´­?òíGYy@ÀĞ«s¨Çœsc¥ûä7Ü1Ğ—qM_™IÎÏx{Mj¯„{ÕâÖ|’”ÜÓ1!nü4&^;–QÁ"¾êd–½±š©ETˆ$°¥ÀÑs¸wZ?â»»[ÆV£ŸG“©
-‹ÃÃ×i·E¯§ )‰–ÄD|ƒ<hÍŞË®¥o²2Ó@Q¹#
-\ºG¡ê7“×ç§»«´æ±uA:ÇVlbîáLŒÆO™Ä¸¡^tËMbOüF†¸Z…¢±¬˜ÚÃÉœ=ƒ76y§ÈHÚCò®£óO_ÓM¤u[7ï`ŞÎë´¾­ï`FÏ˜ÌŒ‰ı‰r’º^â=ìÙÁ7â]n<~…¶šôC"/%eÄäÁŒ0>½!ÊzÇ'Ïeş`œ%ã:,­rò`ßÍÕ0ëÃ„{‹Î©Õ¾Mİq>|¬ŒQCïµ”îØÈ’wZËV½ÂÁ“¦su‚»¤§xø­f{„àã/ÊEx}¯œû{şô€Òÿ8ç
-EëE©Q‘Ñ[ï*ÓÆ^æ‰”w:…bçH¥”oÎ'?‰£6—ıó—²nëv¶ìŞÍîİG8t´
-Ûî¡¸*¬#¸çÇ,´O™+ßå“ows°Ê{ÿ0úE{ZÉË	Å¥QMşîmlır«¬á”L6•”şx^ÊÈ†ôUÊ¬_ô-¶mgÛ¶MlŞ–ÊÎ¬¦şù6fˆ´~)ær»iåXJûÎÎŞ®QïÈ¨¦Üà†¿Ê„—’ú€ÑôU5Ğbï‹BåI`7>!!Ä$$àãéI¯/‘‘ôŠÇQ<?ĞßŸ pÂ"bˆ‹#,6˜ˆxúö¦GéÓlAİ§ÖiÆîİé;b1>N¨œÜqõşxu$–¥„ì=¦ñè…KÙ>–§7Rav§gp AÁ!õJ —´CŞïîD02q,'ö&*ØÕúušö·m³Ò‚Ş"Ä²­‹5Ö°$§_¸7an¶º</Èïna„‡ödàôIU‰8{£ò”6A‰4B*DT”^"AÁ·=ÄİwñÁáˆ‰¡÷ˆ„zØtˆ•zª*+9rØHd| Îö(œ¥ÃÆ[)N1àÓ;”èÁ#éèI€³6½HLL”·Sû7ê-F!Ä›©1:ã>€„(o¢U´9¶Ç#((šØ„^ÄöÆËIÄWéHK­[¥.âzp·îô:š¸nxvš6‹	KÅÖ
-(êf.äÔæo8hÓ[¼—`\]phµˆw+¸­‚µÈşBL ¢ÿ F‡z êPbmÚ:ô%ii¦{pƒõ¤w¬H/;G”ş¡ø+E|…·mºš+ÒØa'ÔÕnâ9ÚTQ™¼$×1\ëG¤¢†êÚ*ö×úÓ?*ˆî½é×'šŞ’[«è·`¯É"³ÊD™%„q±OltoúÎ€Áı‰}’³gdşh8x…áëëOà,YVâì&Êl/?TvgÎµqÀŞÁ“ĞØ ¼ü<q²UâÔlÄ.Xä¡¾1x ı»	Y):Êª¨x¢"Ãe#$LÔ«=zÓÃ×ñôLŒÌ…‘¾Ò'iBiğÁ:¢(}÷µRTn’¥´Î¦³‘‘Ge~Š_fDQKs}:ëŸş”Zª¬vn¨Ü¸áÙ{Şİ¡/.€QˆÌb-zU)jŠT‰ÄœÂŸnJ°+÷ËwuŠHYş#›¿ÛÉÁ'qê´KÉ”"/NfÑëß“¢n¶îú\=ÇğÀ[S…€Q!-Ã¾¤òzI#Š]Ñ¥SP\É¶œÜ<ÁÚ¬TZ]]q•ª¢¶ƒ²™›Ü”®øvlLüu(âø²c¤%W¡¸Ú…¡ˆ-†x†Çõáæ~~´Šx©óói¢S)Â÷«å¿¦šÂì,6Ÿ‹O/ì¬ë4¤µVîØ¸ôåêÁ(ëÑŒÎQä$[q.uÔå¤jĞóÌîçŒª±œüüJë1FÒnñ2M7âc|ˆ‹q¥BëJ„gùiy”Öh¬G5©ñŸx;\ğ½P¹Ô– ÉÙÎÜBT¶Xû¦Jô5GÙÓ—Á½}…½®4õœÅÕ.•(m,H;aŒ†&ê¢TÜÒÒ˜‡Ú·^±£™Òñ}y™_i	Lcc£ğ¾g„¢<õ,ósùe„¢ÌËÏŠ”•YÈÚÕp÷#ƒğts²
-k}Ie;×“ë]E†âFúEÄ26ì‚Cº¿ÒzÉÕ,~øS¾¿áM>¾{b$©ß†IÛÈ‰O>A7åZBcc‰øµƒò_b(;Î©u¯qçG:6™%’8á^øb6ñâ×ï¶œ®n7?ÌİÁŞLF}ğ&Jò%»Å,X¸…4«¿¿}q736Ó”WÂªÌhšÁ¢çæ³jïI
-CñŸõïÇÿ'J;©«7?ÇŸçîeOF->½{‘8k¡|@’FCQØÕŒ¸îNŞ|¨/¥+×Òd4BœÚš"=ğß‹g4ÇİÃœûgó§ëúğÛedd~!ä5Š2¿(²P¼2øyBÑ‚¶¨˜¢İ‡iºşz¨TÖQX}m&¹‡¾åƒ£ëÁ˜Äp¢Âºµßò«!íÀÖ£kh¢Yå§³#
-ët§‹±ŒÒı{Iµ½Šná¡ôıµƒò_"Mõ¶èµÔ5™Ä{FéqT¨póRıJË!.‘V#z­c‹Nò¬v:štÌÖIátFi(¦4¯ˆÙJF\‹›ÉD›ÑL‹½#vJ7|\°»`¾ê ÍŒÅCn¡
-µÖ€³kİºa×Ô„QäÏ{NJª¶L´›UÎ8zôfT@$Cú8ZOEh“6Ú¹¨¬ËOäEFæ·AŠ2¿(²P¼2øyBQÈ³êb4)Éìê5ƒ>*‚„I‹®±ŒÜz/|ÜìğñP¢’ıù]°ĞÖjÀ¨n ±ÕÛZi¹_ÙsÏÿ?07£oÖ±k‹g€»•¶—ÿ}q³òVğÂ'{(jp'nøxß0…Á¢7rfö]ˆé–FÔùõ”98akçŠ¯´Ôá‚sÚ222¿6çŠÒqùùùDDDX0JNçÂx™‹Ñ™Oº
-ÅÎß2¿-’0ìé—*iVc®-!Ëµİ\ÎsX²ŒÌÏDúÂQùA–m9AÎ™ĞØşDîGÎÿA™+é#åååDFFZÕ;ïf	©¡‘‘¹:;BQ&²Pü}°.<iÉBQFFFFF¦—´™EI”¹\$a"O=_9ÈBQFFFFæçpöÔ³’ÿL9Îäû²?    IEND®B`‚```
-
-## FILE: resources/js/pages/settings/print-settings/todo/FV A4.jpg
-```
-ÿØÿà JFIF  ` `  ÿÛ C 		
- $.' ",#(7),01444'9=82<.342ÿÛ C			2!!22222222222222222222222222222222222222222222222222ÿÀ üĞ" ÿÄ           	
-ÿÄ µ   } !1AQa"q2‘¡#B±ÁRÑğ$3br‚	
-%&'()*456789:CDEFGHIJSTUVWXYZcdefghijstuvwxyzƒ„…†‡ˆ‰Š’“”•–—˜™š¢£¤¥¦§¨©ª²³´µ¶·¸¹ºÂÃÄÅÆÇÈÉÊÒÓÔÕÖ×ØÙÚáâãäåæçèéêñòóôõö÷øùúÿÄ        	
-ÿÄ µ  w !1AQaq"2B‘¡±Á	#3RğbrÑ
-$4á%ñ&'()*56789:CDEFGHIJSTUVWXYZcdefghijstuvwxyz‚ƒ„…†‡ˆ‰Š’“”•–—˜™š¢£¤¥¦§¨©ª²³´µ¶·¸¹ºÂÃÄÅÆÇÈÉÊÒÓÔÕÖ×ØÙÚâãäåæçèéêòóôõö÷øùúÿÚ   ? ÷ú(¢€
-(¢€
-(®wÅÖ­yaK¡Üj¤ÉÒˆ?é :ãøHåO?PŠŠâ¤Ó/†±©]K¢Mr­»Ù$‰ê1C9ŞüN2Õ?ì}]Æ„‘éÁe.ldû9Š	<ÍÙuåş¯fæ]£¦);ØSĞh®FşÂY5=6áü=ss3Ü	ä»I!Í§<ºAƒ´*±@r r+(hºÓhş%[İ.kËË¸Š+€<Ï¹¶ˆÛú‘Ûd*GÍƒ´4;‡Erú^Ÿqÿ 	ÖªúS[‰mÄo=Ä6ÛÏ…G™È!ƒñ»zÏ©Y¶›§øQK+[†İ¤YÛ´Œ¯*±.Ç  )³JNÑ¸Es4†ŠùŞËÁ:º;\hş*Òï¦kEM&ÆÉnf|+‚/9L›Yò<ÀÌ
-®XŠïä°¾ÓaÑ4\x‰¯–xfšëSËÂ†—!OÊßêã*wœc5MYÙ’ÕÍËY^7Ù]Æn5yt˜Ìé»ç$ãå!OLàñØ×[^k¥|;×a×c—S×mæÓ-µ3ªE6ûKÌÛËqÖ0t/&qÚ½*’øU÷ÿ €¿[üNÛÁ¥‚Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š+…½’+‹VCşymåšÓdÌS/ 9[<÷cƒü<ntlî¨¢¸iş*¸¼Œé9²Ğl.#ò#‚hQZKàUüÙnGË‚ “@Ò¹ßÑU´ø®àÓ­¢¿¹[«´ViÒ?,HÀrÛrqŸJáş"jº–âoCgy4×Z¨æ8Ûh”q€ØäO={QÕ.îÄßFü®zQ@ÂŠä®ş'ø.ÃT“Mºñ´wqN-äB­…sØ¶1İ³€x$Vv³ªßÃñ£Ã:r^Lº|öÖèøGp,;ãÎ;PµkÏü®Dü¿ÎÇ}EyÎ¿ªkVÿ |3§ÚŞ§\YJfµw*ŒFíÍÆrÀÆxàò2kÑ¨Z«ÿ Z;ÑØ(¢¹Ëİg_·ñµ†™‡}xXÍ¨¬Ê<§>\ôy;¸û¤­ƒ¥ÎŠ( Š( Š( Šà|}©ê6>-ğ<—“Áou©˜î#°²Œõ:~Cµíı™h÷w÷pZ[&7Í<‚4\œ±àsBÕ_Îß—ù‡[]È±E2)c$–'Y#u‡!èAî)ô QEy÷ÄMWRÓ¼Màˆlï&‚ÚëUÜÇm0‘Éã§¯j:¥İÛï³}A¢Š( ¢¼ç_Õ5«¾ÓíoÓ®,¥3Z»•F#væã9`ã<py5'5½KRñï¬µ©&Êî$·ŒıÈ£!À
-;ŸZ#¯ãø;ÓğüUÏB¢ªjvM¨é—6KwsfÓÆSíÌXóİIŞ¼ËÃv/á¿xŒZxƒ^ñ·¦é‘››K¦\òÌs–Î ñ¸òI +÷»±Exçƒ%¾ø«kqw­x·P·6Ò…¸Ñ4ÈşÄ°AW|—‘Ü`îéÛÖ4Í6ÏFÓ-ôí>İmí-GKœ(ç’}Ï&ªİÉ¿bİÃ|Gñ¼ş·Ó¾Ã6“ö«‰¾xu	YD¿|©=Iö‰ºZ°ñ‘o©é·Q\ÚÎ¹Y#'î9 ‚bö¤µØoCBŠ( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Šå|QªÙ>¯§M¨è~D‹$	f×j'Ü…âUb~Pø;HÓ"±®…e¬ønòÓÃ·ÙÚı¥£òt9‰€0ã±–-¸à€{ã•ôş¿¯ø ÏC¢¸8„“x’Iå±Ô#¸ie{‹k*daù#(ä‡+„S¸0$É¬‰’æ]Ã!4ıJI-àÚ°Üió1óU}â› “®&—ºçrµ­¼ÿ ¯ëÌOgı_å©êtWá8®#ñ>ªïip¢C!’i­İæªîT-ÇË÷]@SŸ¼tõOË¢Økú„àÜC§Æ8E¤–ÿ ÃÓÎrR@Oñ({ÑÒãëc£¢¼±¼[/„¯õ];DÑ£Ô´ûx¢¼)ow,ïÌ]¤2°27 «üYèIIã}Yğ¾·¬XYÍ§YÛXÁ{g9¶!Ü•-"8p1Õ8*x9#Ÿ`ëcÒRxdšH’Ti"Ç˜ŠÀ”Ï##¶jJñÛ=2ëTøŸ‰ltëÑasªFë4ÖÒÄ6&å\Ä Ä`5Úx“Ä~ñV“¸İÏa{ñ[{q)yÔL`oÉ¹û£õÈ›ÿ Z_ş nuÔW[øëÄk§[Ï©hQZLÚÄ6M¢XÌ‘KõAÔt'”ìftôZ-¥ÿ ®õëúû‚Š( Š( Š( Š( Š( Š( Š( Š( ıwU¶Ğô+íRîSĞ´ŒÀdğ8ÀîIÀÖ¾ğåŸü?­h:İ¯†u˜¤¿‘S‘îÂ_†oõ’ÇËBÀ1å¸ÜçÛ|{¢7ˆ¼	¬éqŒË5³‡«¯Ì¿ªŠgÃÍoş hÚ‰$ÈÖâ9r1ûÄùõSD>'.ÖıB_
-]ïú+ºÆŒîÁUFK€|×¨ÿ Â]©ßŞøÛÃú&µ4¿ÚÖ:¬W™mr6Bmyf#ªà`œƒŠúBêİ.í&¶“ı\Ñ´mô#¸ƒ—Ãá+¯İgíZôÖO‘ÔÜ¤{`ş”’÷›ì¿]O½ü6îÿ Gÿ î´éç¹Ó-.. 6÷Â,'şY± •üåş3Õ>øÏJÕ¢Ôµ+m+XÒ&’n'uê)#9€Î„ö}Æ=f².ü+áÛûæ¾¼Ğt»‹Æ ™æ³ä$t;ˆÏ•9.f|¨¡ğ÷T½Ö|¢ê‰-w5¸2;u|~ ø×	ãQáï|I¹Ğ¼eª.ËMYl£–ä@’Jä†”1à²Œ zÍ{fêÑµ¢©èú}ü‘)›»t“n{Àà}(Ÿ½+úŠ:+U¥Ïâ][àeôš^½1¸Óî%ûø$º¶…²98+çÓ½Oã=n;Íá¿‰õ¶ğ¶¡m=Äœì‹rdşò­è6ñ&Ÿoá«k]BĞä@—rÚ]<Íå•ò“oã c#¡îBÓB‡D{('Ób‰!óÆ$B«Œd@iß¯švÿ ~‚²Û×ñÛî<ÇÆŞ&Ó5?Ûøáˆ-å“DÕí-q¼ 
- geÚz Gœq\îãèÚš[jû¼-!†ÃRñdÌ[r0vğû88õ}KÂÚ6‘¦Üjƒtiµ{t/h‘ÚC2»ó`c£¥YÒU¼Yá;)<SáØ!UKawÊªÃ£`çàò3ƒIi·O×úùëı_ğN3\øàØ<e¢X¬½kç¨ê›RD‹ËÊùÁ 6ş…˜ìPj—ˆ|gá—øËá;¨õí>K[{[…šâ9Õ¢Œ¸Â†qòŒã×ıkÑ“ÁŞÚ[dğŞ¶ò²´‘‚¹\í$mÁ#'™4/ƒ¼.¶¯j¾ÑÅ»¸‘â1lf €HÛ‚@'ŸsBÑ§ık =U¿­*ãSÓ|Gñ¯Ãsh—Öº‚XØ\½Ô¶²	0ß*‚Ë‘œ™Íz&­©ÛhºEæ§xÅm­!i¤*9ÂŒñïLÓ4=#EYJÒì¬¤­ºE¿3´õªş)ÑOˆ¼-©èâ_)¯-Ş%“²’8'Û8Í)6¡hô¿êÇœîúÛüŠzş­©¿ÃëÍ_B€Å¨5Ú-ã¹rewrFà3’2 <W™XøÖ?ˆ6Qİë>3Âšm´@5½¡—3…ùÜòJÆB¨·SÚµ`¸ø²Ş‡ÃƒÃ0]şÊÚÌ—ñ´b<mßå¶qyçø{W[¢ü5ğ¦•¢ÙØO é7³A£ÜÏa<¬,Iò}êšÕµ·Oëúü	MÙ'¿_Àå~ëZ·…üYªE¨ëÚE¤’K¤\_ï3\*¡$e†HÈ§PÜ•‘áo‰—öÚî‹&¹ã-#SÒµˆÊ¡#·m6`3µ‡oğ†n¿©õkV“B²Y ĞõJ$RY4äš01‘Kg°PzW˜i^ÿ „ïÇqëwŞ
-·Ğü?dÎÂËãP™¿ŠUÆJŒçœŒ÷98²Óú·ùşczGúş´üŠçâß‡ÓÇ–Z:¾˜t÷¶yn/Ìá£ü1‡h8’Iì:šÊÕõë{ÏŒ¾»ğÿ ˆ Ô¢)­.¬índ<n.vç8<ÿ pSN§`šÊè|™tßí:é±¼*fP©Ï9 ü Nq]%›éú“GÓ¼l­î-ò5›+$X‰äìrƒå/sœãåÆ(ïıVÓşJökúşºÿ À:½Nş+J¼Ôn3äÚÂó>=•SÓµØçğµ¦¹ªtÈæ·IåN6Br î=*_é#]ğæ¥¤™<¿¶[Iügie#8öÍyMˆ|O¤øu<#âO†×zäÖ‹½»Å–ÒåAYÜ«*à sÏ=BÒî½-øßô¶~¿¥¿R§¾!é:Ö½á}WJK«HÔÑïu?³ºÂŒØà	 d;¹¦|Eño†¿á>Ğu=F};Ä>†­-n£œÃ9$ùo˜`(ù¸ëßë|à[‹{ıcX×´m#O]R%·-œJaŠ%'ıf>Wcßg§ø_ÃúMĞºÓt-2Îà¢[kHã|£*Å4­o[şŸ×ü^÷ô·ês?µ-*e½µĞ4~ÃI‘ÍÜ2_@#µÃã‹|¶í­Ëà™“âqÔÖ×M•u{'ÃÑÈï«ŞYÜ®#@¿&Ã‚N[Œ.IÈ®ö¼ÛãÉÓ¬ü7©ÜÂÓi6zÄ2ß RÀ'8b;€{z‘Dµ·ªüÆ®¯óüoÂßğ³§¼{Ïr|:É¾ÜøÂ@òÌN2v<À;¨ÎÜs“šÛø™,špğ.¥­Mn®±»¸…"L©$€I qÜ•Ñéqox¦?èŞ3’ïF0yi”xwã=G(Ü‚A»g-u¶6š•¤–—Ö°][IğÏtlŒ©àò¦î­åg÷2lû?ÕOãoišŸˆm‹ü@‹NğÄŒòÉ¢j‰ö–¸Ş P3²í= #‚N8®wNñ¿ŒtmNÍ-µ}Ş¿Ãa©x²‡æ-¹;øıœ{5¿ƒ|/gsÍ¯†ôx'‰ƒG,V1+!!rhj^Ÿ«Û}›R±¶½·ÜÊ¹…d\‡Í%§õı|†õş¿¯™çêV"øÑá™tBÓRûp÷“Y¸tMÃhäIé’Fj)ÿ …©ñ°v™íFqşÃWy¦hzFŠ².•¥ÙX	H2[t‹~:ghëV-ì­-$KkXa’áüÉš8Â™ÜÄu8M4í÷?ÅÜM^ÿ /ÁgÅMoUÑ|3	Ó"¿X§œG{{c™%¥¾	w±ÀÀc€:äWğßTğÏ†~ x‰MÄºFuko%œšÓ˜è†—2Í–3ƒíYÚŸ‡ô]iã}WH°¿hÁµÕ²JP¸Ü*Vÿ ÖÃz«[Üòßêÿ …á­[ÁúµÆ¹{t¶×ğXH%K‹c÷ÚBŸ(*y98µİø¿ÇV{y¬¯õûòËmga™#í'té“ÏNµ4¶ú‚á[­?ÃP¹•a—û#LÜàrw:Æ»Š{½9®Uï5oxûIò4í;CÑ&k©/u+V†K‰0Ê«¶ÓÔ÷é8­RŠïø_ˆ=/'ØÈÔ¾,h7~Ôn<Qá«%Ö4»±z-ì©,ŒÇu-Ëd€qq[Ÿ5ïíKÄpØ[iğh²Â,O‰R/™K?@	nW9è{
-í'ğæ…u%ıÆ‹§My"”{‰-Q¤e+´‚Äd‚¼cÓŠµa§XéV‹i§YÛÙÛ)%a·‰c@O'@. õµ‹4QE QE QE QE QE QE QE QE QE QE Q\uçŠµ;}íMooÇÛ¦¶v7¹H–2üìòF6ä±TÑp;+š²×ç¸ñV³\C¼ñ†°ÌDÇ`bRëw”ßÅòœ.jÅİÖº5“iköĞ¹ˆ¼NÍaä!€e9  ÚxûİvA'svŠáî¼]}¥,v××V³M)yMô:mÀ‚…Üè­!å³†gEÆ[<aµõıvëM™–Õa+mj×·jó#S‚ˆAXòwœäÚİG±ĞÒ2«£#¨ea‚¤d\ö‹¯]j‚$É¶»ŠYíB!Wcp„9$î'p<Ç#©Ö:¥¢}´ÊÒÂ–Kºyf…ãŒ.7€V u*N;Ñ¥®}»ŸxræÉl¿³VŞÈ1f´³•í œg|q•Wè>ğ4ÛÏøzşæY®¬æ‘exŞKsy0·r€İ,´pWW+qñB-JÎì‹ˆvÔm@
-“6ÒI‚ol(<¯Ë¸ps]ïˆ.t=2Â{itûˆnşÕµ"H¶3È$‚8ï˜¦“ßúÑ_úóªè0+.ékrk"	$ÔJ	¦I|µ'%P3>ŠRğ»s¯Yjİ¤-®¥qf*@ÛáIÉ<ã®†—gıj×õ¡A´=!õeÕ_K±mIFğÛ¡˜qéÇZ¿E QE QE QE QE QE QE QE QE VW‡¼?gá,éöS$ß½`H.Åˆà8Õ«E •¦x~ËIÕµmJØËçê’¤³†`T]£hÇsÎy5«\Ãø‹SÏY[Í.6òŞ9¤Ó’[´›íh‹ûT‚ ;r;dsIÉE7ä4®Ò:z+Áš•Æ³à­R»“Í¹¹³Y\(]ÌTdàp9«ºÕíæŸ£ÜİØiÿ oº‰7Gmç¬;ùç.Ü(''Òœ½ÖïĞQ÷­bıÂjY»Ó¦Ób·óôí*o9dYˆ@]	S†`Ä}Âxç<ƒTşøÛ[ñ5Ì–ZÅ´˜tÛK¤•>ü¦@rÍƒ´g ŒÑÖß×_òaÒÿ ×OóG£Q\Wõ[ıPÒÛé±]ÜÅm‘ÓÖâK‡2 NLŠBà€p28äŠì#¹‚if†)ãya!eE`Ld€@aØàƒÏcBÕ\ö%¢¹ïj7ZœSê±ë–7rÃ!ŠÈÚ”a†a˜ƒ€@œIÉ,>-]3Ãöú—Š,&ÑfšaÙ—7d9$(ÙÏ‡'™?¯¼,t”Vv™¯iZÍÕ…ôRÅx%¾NÖ‘TáˆVÃpHÏgšÉñİõŞ—áÉuÁ¢ElåšK5¸2¤UgQ»$×$Ó ©>]Æ•ÎŠâ<;®k74ûÍäW:shV×ŠÂ]˜ÉXãë¶<ã>ÕM[úó±)ßúò¸´W=¡xƒSÕ5[Ë-CÃòiŸgEug½‚f9frFÄ®@gƒóÜÓñv»ªiZÿ …,´äš† Ñ\¯Ê	Œ!'ºcïqÉÛ×•ÛÌ}ü¶Šæl|C{qñVğü°À¶–¶PÜÃ"ƒ½‹’îqŒ8­[]M´º–ÚÎçT×oia±æ@Ã •,?Äö•ô¿õØ:ØÕ¢¹­GÄW¶ş
-¼ÔÍ4ıf=>kµ°¹‘$d(¼ıÆù—8äc¨Î¡á›éu?
-éóÉæMsg®û@ÜÌ€“Ó“Umü¿àÿ vóÿ şf­p~%øU¥ø§ZºÔïu­v'¹HÑ¡·»T‰B`¨
-Pô#w$òI®«[×´ïY-æ§3ÅÊ±)H^R]º ¨	çéYñøÛEßG¹µ{««]Zc´ğZÈÈgïñ”äÈõ=!-^ĞÜ´ƒì¶p[ùÒÍåF©æÌÛğ1–=Éîjj+˜Ôu«ëˆš& ±»³¹šQ´gB˜ç°¿Z/wız‹dtõğCuo%½Ä1ÍªRHäPÊêz‚W/ğÿ ]Õµı'P¸ÕáD’JâŞLxÑğ8ê0AòqõZóU¿´ø“§imâ‹sç™*i)§©eS«Ëæn^A íää`Àµ·Ÿù\{_È†ãàÏÃû›™.$ğìaäbì#¹š5ú*¸P=€»?M°Òm¦›eogn¤‘¼KzœŒÖƒu½CYŸÄ‹~SıXšÒElJ©·êy''×ğ®¢‹Îßˆ=İÂŠ+Ê§ñÇ‰aÓu»‰–×Ä±éĞÍ°örê¬õİß'9ßÇN¶ş·Kõ¢¿õ³¡ê´TFæºKV1pèdX‹ì €X¤FO¸õ®WÅÚö³£jºd6W¾¶·½qcSóƒË.rUY>Us‚‹4v¯¢Šå|®ßkƒ_û{ÆÏe¬OgÆ›B"mÚ=Ï9''“øjíıtÿ 0éëúĞê¨¨/fšŞÆy­­^îtBÑÛ£ª™²‚ÄŸRk7ÃšÍæµms%î’ÚlÎbòÍÔSçrcb ©äQÖÀlÑE QE QE QE QE QE QE QE QE QE QE Vü!Ú7ÙšÜ-ğS;\n]Jà8vvÌÜÉÊƒƒé[ÔPm¦ƒ§ØŞ}ª˜8Pˆs#Ç»˜¢qÇÊB|3¦¶¥q¨}ö›…+!À\G	¿j	Á c9­Š(*÷Ãš]ù¶3Û¸û2yqˆ§’ cãä`Œ§åljK¿é—íºŠy%ŠæêQ¸3(øo2ÈÙ^ Æ+ZŠ.3¬t-;M½îÖY§'vùÕrÛ˜"±!< q•£§\®«>“q,z•Ô!y§w96…U‰TÆv¤Õ¢“WVvw<ÓCğ>“u0jÖôùc–êáµ`#–tä;y7gİ’¦sÏ=·Â&êÒÔêvïoumtóF-u	®#Ú_w~v³pY”È8ašôJ*¯­ÉKK4ı2ÏJ†X¬¡$³<î7ºGmÌy=É«tQHaEPEPEPEPEPEPEPEPEPEP?ãƒªjgF[†¾ò†Ájq6İÃ—şŞİØ÷År¬'Æ0ğóiÚ^±Øí§[½BúÆKuX¤‰“ËıàRï¸ƒ€äœõÇ§ÑJÉî;¾‡šiúÄ­+Ãº>§]xzÙ4øŒO/›$†q´…$4_() rHûÊ8©mt?ˆeÕ`ÖdÑuxõ+U£{ùàXHVFÀXˆ;²à!É# èÔSzŞıD´µºMwáOÂ£xFÓJ‘¯¬”×e»!·p	&0HëÉk"äuâºo	x&ok×7?i[C¦ÚXÃŒï&!™†03‘ŒŞ»:)ß[üÿ ~¢¶–ş»qâ‡ºÎ§¬^ë~­c$ÒÜÚÏ¶Î<±F%V;Pœ±Iüj®¥êój¾(Õ´=gA‹VÔÒe´µ¾k¸•W’db™bäª0:z×¨J°‚zÍÓ|;¡èÒ¼ºV§ØÈëµŞÖÕ",=	P2)GOëÓüŞ§›_ü>ñf§ˆã¿‡Ã÷k»fxRòâµXØ‡Ì b\°éÊèß¼UáÈµˆôÉty¨DGªÄ­jöñ…qí-œÛ'ç¯[¢••­ı]= óh4=fëÆ¾¸×.´kkı*ÖPÂÛQ–Yï¦ÒDn‹…Ï$åNkWÆ¾½ñMÚÏo«An‰e5ªÛÜÚ4ƒE!×kíùsƒÁ<WQ&•§M©Ã©K§ÚÉ
-ìŠé¡S,kÏ
-øÈ‡¹«”Ş«_?Äºôòü"_‡&¹Õa¿ÖtÏêF×N†ÊÖÚKù…¸hÔ2HÌÌ9c€H Ôò#´ğßŒ¼/áÛ}*-KÃzW›ª‹˜ñ¨L‰33†±‚€ªœ1=1É¯aª—ÚVªF¡akv!q$_h…dØÃø— àûŠww¿õ½Åek[Xà.t‹­SñO‹µÛû;í9mƒZ^<ÄHB]ç(UQÏ×®$Öÿ üMák)okÍ™ƒo"ıª]êÉæ™Djv¶J’s
-×ªßh:>©uÖ¡¤Ø]ÜC*[‹d‘Ó?) ‘Ï<V…JZ^æ7¿õä¿CŠğ®Ã¯¿ˆuç·wZUµ´ÑFrÂT,\œ£¨û¤Œç¶2á¢ø—Gñ­ªhë¥ŞéÚ Imï.$‚XæU	ò²Æà©P8#¯¦9ìèª¾·şµÔ<Õ<¯x›Ä©jcKÓ"].âÀ-”ò\I/š¤|ìÈƒjç `óŸ^0õ	khz
-ëÉá-ô{Qd÷z•ÓÏn‚®ñÆŠ$ùW¾9#¸Ç¯ÔsÁÌñ$°È6¼r(eaèAëSÒß×_óc¾¿×—ù#Ì4Oø·ÃšUî›¡êö—V·$vZ…Ö¡qºÙ
-å-ÀhóÅJ²ã#$+J}3â<Únl“è°I§´Oq ¿¸c|Sk,R7Ëäã¶k¾Š(à‰"‰8ÑB¢ ÀP: ;
-}SzßúĞ”´·õ©å~#ğg¼E®Ç¬3è–×û‚­íÁ6EX1pv¾YYJàõ­;İÆ·Ş,Ñ¼DöÚI¦Å$&Ô^ÌD¾bá›Ìò~\¸]§¿=+Ğh¤´Øo]ÎÁºÏ‡´³^Ë—³ÜMwr`Ï–$‘Ë¹çhÎ}+“O‡ş!Ò¼Ec­Xê:f¥-½åÍÄ‰w–ÒJ&\Ò©“qPWä ^™En€ó|#ã›{?ÙÃ>‡×.¾Ó%Ê\NÛz€èªnà`6å=ğ3›àXøcUğãZè‡J¿_’ŞNâ?²³¼#4,J3ÛOL‘“^­EEo—Ünxæ‰à›ÿ í8µıTğü·	2Å¨iº5Ô¶6Cbœ.èKpÄ½yõİ¼ğ¯wàÍN×íëwÚ¨ÕHæİ\:™Æâ6 Àçµz6–ÖÒLğ[ÅÌÛåhĞ)‘½[O¹©¨ş¿'ù ·õø~LóõÒµCâ“ªêRhövV2ƒii©<ó\FÇ ”hĞ“	Î}ÇÕuíJææÒÛD½·¸Ó——ª³¯ÙŸ~ï16«uÏİ9U9â»FÒ´æÕSkS¨"ykta_5WŸ”>3OïVé4šK×ñ¿ù6›~Ÿ…¿Èò‡»Óu_ø*ÇÃúŸö¶¡£Äßn½¶›|Kmåìmì	]ÌÁxäúö«7~ñYxŸL‚&ëOÕµ¨Ç$÷ÒÂÈÄ«‘,2˜#pÊç‘=:Šmßñü]ÿ A-6òü?áÏ ğçƒ5}RxUĞ¯£šBotı.ò[+uD
-ÉŞ©ëóè+²ğ/…ï|6šÔ—¦Ú7Ôµ¼[{YXá ûî3dœéŠéíìí­<Ï³[ÃšæI<´½ÏV8êN55;ÿ _× ¬QE!…Q@Q@Q@Q@Q@Q@Q@Q@Q@¯å»†Æi,mã¹¹UÌpÉ)\ún
-ØüaÂI¨Ë¤G©Zi¶rÃıöÉCŞº2>ÒDxòGn8#å®š²?á¶M'PÓ­î.mã¾y]İ3Fd9`›Á rp1“S+ÙÛëúùZêÿ ×õúœıŸ5GI·½±±ĞîŒ÷)î5–xã,…ğÎ á†WúÕ¹<a2Ã£7Ø­!}E™Òï(Ë
-'òÈ‘›ï ;7/#¾	üîŸoa¨ëz•ı¥¼±ºÃu«!Ëäà¯<ç5,¾ŠM?û7ûkTi$3ä4~Q ˆ²Ñ
-¼€AûÜ./K¿_ÂßæN¶ù~%;/^Şêº¦–z?Ú,LÃÈ]Yšc³£4~NU@Ï8ÏCWßÅlún›=­’Éuwp-ä‚Iöv²MÌçk:sì9¦Gàùa[ÄÄÚÊÅvòI$ampø$~ç?@I4¶fó"Ô/ ®¢»šXÌDÊè¡FC!P2BÉ=)Ge+ş£}mçÿ  Ëµñ¦£y©êš|+İX´£ìÿ Ûç˜ù™<Ÿ•NG<òGÖ´bñ£¨Çi:]´’aÒêËÃ–Ò®>Fçïœò¸#p#-‹ÂCöÅÄúÒÇw$’¼ampú|œı$Vœ¼:”Z;Ş­·Ù¤˜<ñÁê )aƒ‚ Ææ%ğ«ïoÇúş·@÷Ğ©áÍcVÕÄÒ_iv–¤²Â¯ëNKÇ!$À%Ig¸«—zµ¼Vº‘iÚÏìQ–’ææİÖ$ùs¸3 ®}¤ú)4=ûÎ[a¨]Ş‰'’}÷"=Á‹0Fyı0*Y4{ÅâÜÂ×1^cÏ‚æFš" ÆnJ¨õ
-zšrÕY¯Ïğ9_x°Éá{íSÄÔ7——[}ùH@ÿ VI#èyäÍ`x×âMÜvö×½… kkï?Ï·d’9bDa•u»8 g#µu|/ğ|îı”ñ,sı¢(íï'†8dãæÂ¡à}Ğ:J?‡Œİ±su‘Íö›éæÜ$ 9ÜáˆUË4zöül%£ùş?ğ°4h5æÓoµ:Ö(áùî'âığ
-Z0Yd€êHû½ëüm¬[[ê÷-ö9c·ñ$Zt[”°9Œ˜Ë|ù'¯N1[iğ×Âˆ]¿³çyƒ‰d¾¸yƒÜ\²6UI*A8ªöß|1m¯>¯äİK;²É¶{—“÷ŠÈáË“æ1ÌjpÌW® ÉËVæMÿ Z§ú[æ/³eıioø#<wâ+Í#RĞí4í^;k‹«¸c’×ì^{ILŠYŸ F¼‘’9-‚2+h?%óu†ñ<ÖvÖ³Á¬Ã2ù«)!ç2±0Àá³Àz}gÂš¿"Ë©évó\&ß.ä“Çµ·²®pyàŠåµO‡Öq/ü#Zl4²£İG¨ë7«+•V`ç‚>aÇ¥(èµş¶ÿ ƒ÷ë±­ão
-ÂÒêNŞÚ8u8!¿f
-û"nYXu©±Á{ìè¾ Ó<AÒé³¼‚	<©VH^'FÀlppAéŞ¹h>Å¬jº†­âˆ£SE$vºmäñÅŒYJ$çïÀºÍ'DÓô;ya°…K!–W’W–Iõfw%˜ğ$ğÑ;ÿ [Á¾ŸÖæ…Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@As{ifaWPÀgE–@¾cŠ¹êO ¬ë—ğö¯mI%¶Æ!Ñœ.¡˜… œ)'¨é^q®O¦^xò»¯ìoÃ©ÜZ&—µûı®ÍAP€©rÛ—8 “Ò…«H‰³Ô¯uËH,uYme†òçM…¤šÖ”º°RÁ[®ÒqÆi<7¬økNÖ¶Û¬ŞQ}Û23Œàgë^u7‡|G©ø‚ßR‡IÔ7‘j7°\D±_#+,jX³v6_v÷ã¯<|0÷M{öh#²³‚ÎÖò*Wl,Ğ¼d‚òu*à0;d…]Ÿ[~¿ğ?­Éi·KşŸğ­»-+âmÍçˆ¢Ò®tGgÖ.tÔœ>DKÜœ“œŒ>ÇÄ7µ¦–Óèë¦™£;åmBW5ŒXåœ×§x?]şÕĞµ‹1	:íæ§uNöT‘U$1é÷sÉükÇÖüGö+{°Í¦ªÊn¬î®™È"J£î
-rÛHÁ zpù<ÿ à/ÖèjÜŞ_ğ_écBßÄ7ƒáúx…ía¿ºûÚ¼=›dÿ .FÍê9Á9#œäñê^k^†ÂÑå°×àšo8©ßÅ;œÍrúF—âK¿İ^é•„”–×ì²GqªP(Å	i±
-zc¡Æišo…õ}[Ä×·š4wÚ‡7Ùæú*Hîg]£;Ö,®ñ¸)¥ÊÜÎÛkø_óĞ”½Õëşõ=~ŠòÏƒÂæ¯Ø«Bú}´Ğª½­Ô—írP™Ìo ÉÚHçNi&×ŸÄz~³¤O«hº|šf®«sipÖËqfá]-‡,9Tôvò¿åşcş¿¯ësÑ“^Ñä‚ÖtÕ¬Z¹<«iá
-Ìù#jüÇ ğ9â¨]x”ÛxâÃÃfÉˆ¼³’ä]y˜
-P·n9ë×5æöö_ğx?ÉÓşÁ>‰yÌ°EÒ+Cr_$O1B‘ºŒ¨şî8®…<5â•Õ|;xÒE%õ†…=´×á—íL.Aå¹'M­Ÿê¿ ò_Ö«ôıNÛ]Ô›Gğş£©¤"f³¶’qm»¶©lg·Jæ´Mª_xrÂçJxeÕ´¶¾yI(×”! ç ç¡s\G‡5?<Má{;VÕ¯š[›ûi>É4ªá“xıÙÀ` ey{ÊÇÂš‡Š¼'6¶šV%œ÷Ç2b00:œí'8íM-uş´—ëa7¦›ÿ Áés_ÆZ¦µ£hï¨iGGty.¦Ôä•V5‚jKsÔqÓ“‘¹g,³XÛË:Ä²¼jÎ"rÈ	í$G¡ }+€ø‘áx¥¦Íln´á§¼pÚÜ\¼E.Iÿ [€Œ®B€q$:Ğ,|Iªø«Â7¿Øú•—‹zg»·hYZ0
-ªÆìÌI“Œc§¢»ÿ [ZmılwÓ_Z[İ[ÚÍuw;¼ˆ^@]£-´[“•mâ	çñíÿ ‡Íº,Ö],¹;™˜é—ù×â$ñÖ¥ªé“§…¢y4mIîc¸Šú(Öæ”ŠÌHfFÉ-´|§Ô
-°©âUøƒ{âğ®¢,.´Õ±Xâ¼µûB2¶àåL» ;˜1?/=qBèı/óÕz~äzEÊ|8Ò5]Á6z~±æ-Ôo)Ë(•ãBäª³€z+&ßQ¿ºø­¯Yhú´—VÉ¤©–9|Wa¶¢Œt$d°ëÁôÀßÖ×ª¿õ½³ÄºÆá}WS´9.--$4¥•IÇ8â©xkÅ®ùpÍ¥j6“‹HnYm˜[¹uV99Fyş¸8òí"ÿ ÆFÏÅ>¸Óõm[RŸO"\_ÛJ-f”2·ï7€##©Œ¯L`î:Ú'„|Jº®ˆ¾³flMuª_êëûøÁù­ÒÚ'tp¸ätç'«Š×]¿[Š[i¾¿¥ÓKñ‚\\x¡µ1•‰uåû±bíõÉÀó¨¼SãQ£é.¥¥Bš•¾§¨Al¯	/û·É,~ñÀ8¿•e[Úx“@ñ‹d´ğóêê³Ç=ÂÜÂ±òÂ‘(g #²¶Gj¯Šu­'ÂºV¥ Ma6yÅåçŸl!Ä9 F±6~n6¨ö¥—şïüË¯ÏşÖxÄ§\ÕuëdÖí¤Ş}›q“wš
-†ŒuéÍo×+ámûMñŠï.áÃ¨_¤¶Çx%ĞD«œœäsÏİÅÓ^éúİãÚ=ÓXê’ØÇgcfÂ°Q»sc';‰;@zf…²ô_§êÃ¿­¿?Ñeå—Úî­ã‡²½ğş‰®µ´óZÜDúœv3äí$3!€¤œ9ë<áısBÒ¡‹\ñ-Ö­r#Ã#ªĞ“¯˜är2ÍÈì(Z«ƒ:z(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¯7ñO/ô_İéğêTQÅ³	:ÚïEnwßÄİû¢ş#’éWÿ ÂÑÕ?è+¡ÿ ß6_ü´£ş©ÿ A]şù²ÿ å¥ {ãÿ ğ´uOú
-è÷Í—ÿ -+Õ4›¦¾Ñ¬nİãwŞ9Y£Û´–Pr6³ŒsÙ˜z1ë@(¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š k ’6F
-U0È?Q\‡„<sá}FêæKÍ&X§‰cÙh±YAÎK!%³èxôÇ~ÆŠáº°W;eàoéú¬œ6.÷vêÉnóÜË0€’#Wb©ÿ º*(ëpé`¢Š(Ÿ—Á:Ş$OÉi1Õ_5fû\ÀÚ!7íûªã9­=KGÓ5˜SN´¾‰zÇuÊªØÆ@`yÁ5vŠ:X:Ü¯cag¦Z%¥…¤–Ñçd0F#EÉÉÂ$šå<Yà{kj×zE³E)7zW’¬[‡r°:rG=;:(ëpé`íÍQÕ4‹=fÙ ½YJÇ •ä…Ñ†@!Ğ†OCŞ¯Q@z‡tŸY=¦‘f¶Ñ<†I>fv‘ÏVfbY¹&µ(¢€
-çî< İxŠ=~kI›RA*J.æ
-¬h;íè1Ó‘Öº
-(ëpò
-x#¹·–	A1Ê…*H#‘Èü*J(jú0ØÊ°ğÖ¦ø}t{ÛJU*-g&dÚNH;ÉÈÉèj&ğ–ƒıœtû}2+c0Ÿm†mHt`Ñ ûƒ[TPõwa¶†^‡áÍ'Ãv²[é6kn’Èe•‹³¼y,ÎÄ³©5©E QE WšøÃá·ößˆÎ¡e¡èÇ*Æ×MwsuÎÊüåb!ËÑ˜1ÏPEzUuO°th‚ÎÎ×O´ÖÎÚkxÆP" ô p*z( Š( Šo­êkUº€Ü@¡åˆH7Æ§8,:€ppO¥G§êz~¯kö6úÚößq_6Úe‘2:Œ©#4nŠ§¯¦Íqa¡h÷–Ëº{u™L‘V\åG#¯­U(ğñ²ôkºa´–_&9şÙÇ“û³‚ŞİhZŠ©ªéÚTqÉ¨ßÚÙ¤®#®&XÃ±è£q>ÕëÚ<sİÀúµŠÍdeÔfå@w8ÎTr98 
-*¢jºtš_öš_Ú¶Éö¡2˜¶­¿8ÀÇ\ÔâÍ]cOc}Ÿ²båÚ0p|¾~n}3G_©¥EPEŒÁT³’{PÑ\µ¿ÄŞ0K=vŞêf”B°[«I+± ü±¨,Ã– ƒ“Á®‘î xày£Y¥Ç0øëßæ€%¢³m¼A¤^j3iğj6Ïy­A¼Şª¬À÷°sŒã<Ôº®±§è–bïSºÚÜÈ‘	$é¹ üÏáÔñG˜yhªöÖÚŸog(–Öæ5–) #r°È8<=jÅ[FE`xŸÄSø|i‚ßM7Ï{x–Ä„c<î~q€¹·è ¯7ñMÏ†ãñÚßé_çº7É«jqÅrß"ãz˜1˜ñƒÇJôŠğˆ—0Çã½I_JÒ§aåfIõ='oİ'U¸¥ğ&>£€5şÙàÿ ú|*ÿ ÁÌ?ü‹GÛ<ÿ @/…_ø9‡ÿ ‘k€ûe¿ı ´?üøÿ ‘hûe¿ı ´?üøÿ ‘h¿ûgƒÿ èğ«ÿ 0ÿ ò-z¦’amÅ­ã´o,Ü<
-»Fl 1Ğàdc_6}²ßş€Zş|?ÿ Èµô_†ˆo
-é#0l¡!#xİWäŒ#İ SØŠ Ô¢Š¡­^]iú%íå¡»º†x­Æs#Âğ	çé@è®ÃZäú—Š'·¾ñ$ÿ lûEÑ]";xR(¢‰‚bTÈ[æWpÈ=0+¼£¢}Ã«AEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEP#ñVÕt­*ÄiÅİâÛïÜŠÜ«‚èê9PI ü ãæ"¹«{ßkÖzF§a8¿e1¼WÚckbC”+ˆf“.¸¨Š;ú&¯£iúöÖ:•¸İ™_nâ¥X†VR
-{‚7LÑmt“!¶–ıüÌnûUü÷8Ç§ší·¯lQØK];Ô¼)­]ë>>[-KHu«ŠÖäI
-¤²¢°mÁ\°Ş[©¹Åm|<Ğµ]2ó[¾Ô´ó§Gxm–V•.Fc°•=9Ïâ»º(»÷X%«¿õıhx]×Ã¿]Éyj–fÕX_5Äx»ûF<µàîï¸ 1Tn<âùu½KU?g¼ÓÆ;/µA¾)ºGæ‘¿fÒÃ¶N•ô’I[ÊßŸùúßÎÿ ×ÜyGŒ|â	í4u´±:«A¡Üi³"Íì™ãU~ğ®FG$sÇJâ[á—OÒlÎ’’K¥\Íqqp.ãÛ|­$l2Û‰ùIùÂ:æ¾¢ªş÷7õ½É·»ËımcÈÂş%›Áš®šº-ÄS\kUŠ¸ƒa‹Ïä$ >oîò>läW8Ÿ¼`Ú†»!Ñ|¸õ›”’Ø›¨s`¢ëÌ;ğÜ|¹oİîëë_AQJ>ëMtÿ €¿D7ªk¿üú€éEPP^}«ì3ı„Bnü¶òDä„ß—qã=qSÑI« GxsÃ¾0ğÿ ŠnuF9…Ä×/&§zo!kK«a ÀÛ•ee‘~S±p‚HêİR_xÉt/Yx.t½·U¸²º·Ö#(¶¶Ò¬Ñõä0Áqr=WRÑt­j8ãÕtË;ôŒîEºe
-}@`qWUUQ*¨À `M7§•¬ó<ÇFğ±ÿ M¦(%¼¼T‘â2"<1"ØÌ	,®x'ñšO¾­âˆnü2ú5ÃMı¯ÙœÙHmÍ²…v‘æ ÆŒcƒĞ`õ¯P¢‹h—Eúö»ş¿­O2Ğ—Çºe¯…ôèt_³ØYEµòK$d wÈ `®ĞI î c;^,ñÜ>¸ÔlL–6×Pé†òÖKùö$òe€W«—œò9ÍvtS“mß×ñI~–k“ø¯[Ómîõ.ËIÓí5+Å’k˜Ñ£Q)gfbøS`<)İ¸ F+«ğVµw®E¬O5Ô7¶qêRÇcw{RX@^ŸŞ
-Å—w}¹®¢Š—ş»oızÿ ˜W›ø¦ÖşOİ¼?ô­z3³”÷v¨ó|‹Ô:û¼Ÿáô¯H¯ø‰á?ê~;Ô¯/ü?ñîêO+|ÚM”r[6"@618 î 5şÃªÑĞÿ ğ:Ëÿ ˆ£ì:§ı]ÿ ¬¿øŠà?áğı
-Ÿğ]ÿ Gü ÿ ¡Sâ¯ş¡ÿ âh¿û©ÿ DCÿ Àë/ş"½2ï…bÚÎ-.÷ìAcµVVKY6p€´…<p1ÇJùÓşOÿ Ğ©ñWÿ Ğÿ ñ5ïöv)ğöÖÅÍÍ–ºRBÆ÷lsC”ï;+÷»'°ã¹ÉxnşÒÿ U’]T¹7J`Qaqâ½v@ÿ ¿r‚y.Ò0x`W€3ƒéµçQëÎsãQÔfº³ÓŒj@I~P©æ±,w°,İ?w}©íıyÔóøsÃ:ÏÄË[ÓRdÔ-®7˜DÒJ^ÆvR®à.ğ8Èè3]—†¼¡xB	àĞ¬šÒ)Ø<‰çÉ ,3ó±Çá\oÄugø…á{'HŸUÊŞâåm¢»Ôd4jK;©0ØÚ0yÎz×eá­S]Õ-§}wÃ‡D™ãûlw"EÇ\§N{Qø>ÿ Ìsøµò7(¢Š (¢Š (¢Š (¬H|KŞ#}izÂ²îÿ K{[b@L`ç'¾Sí”Õü[¥h÷av¸»ÔŒFe±±·{‰ŠŒ•@vH ¹QïÖŞ`nQXÖ^#¶»ÖSG’Úæ×Q6l{y‚oØ*Ì¤“èO½lĞEb'‰bû+X¶5‹‹S…ş·§9 {©™Û£¥À(¢Š (¢Š (¬«ohºÓí5Í6{ĞYM´Wq´™^£h9ã56™­iÚÉ¼uÒÜ}á­g(U •Éã#¦E _¢Š( ¢±5ÿ èò¶õ8lŒà˜„€’à ûÃüƒUfñç‡­µ[Í>{ÆkI-ãrbb¬Óÿ «€s9è29£p:Z+/\ñ™áËX®uI¤Š9d'—’’Ç ÚŠOéVôûûmSN¶¿²—Íµ¹eŠL¹XdG´fŠÍĞõÛ/Ø=ívg’Î»w21R@ôÈïZTt¸•®x‡OğôvO¨;¢Ş]ÇgUÈóñŸAÁæ¦Ò5›vÈŞi³ùöâGˆ¾Æ_™«0‚×õ÷ ş¿¯¸¿EPEPEfkúí—†ô‰5=@È FDÄk¹™™‚¨Ü‘Ö´è ¢¹/øƒX×F¬5ì°öwfÜ%‰—tL:¤›ÆQˆ9=1]m.lUgOµÖlô™®6ß^$’[Å±õL9H«ô QE QE QE QYº®¹e£Ï§CvÎ$Ô.–Ö «œ¹óè0¦¡Ò|K§ë:¶¯¦[y«u¥L°Ü$ŠŞ\†^ySÈíĞĞµş½?ÍÓúş»VV¥â+WÒtË“ ¸Õ%x­ğ¿(*¥âzv u$:âkMfÂûS¿Ó­§ßw`P\Ç±‡–\n^HÁÈô&€/ÑE QE QE QE QE QE QE QE QE QE QE QE[P¿µÒôû‹ûÙ„6¶ñ™%‚v¨'“ôÌkÿ |9áë›Ë=Nê{[ˆm–xÔÅ†œ2±=Ü6‘ÎHx®›SÓ­u}2çN¾‹Íµ¹ŒÅ*n+•=yÂ³ô/ÚèO4ëu{}y:ªIw}7™#"çjôTdğ ë““Í-ÆxªjÖ^ °Õ~Ù£ucw$c\›Q&+•’Úf'‘œ¬,†U!rÀ].ñ'QÒ<×“hsê1ÚŞI×÷2N‹ErşfùòrÅy}¼rËÒ½~±õoéZåÂK©Gs:¡CäÉ„U·.èƒn}TçÓZz	ëb¶·âûRÒ!¿1ÛÙj>`7ÓÊ#Š&UªIËsŒ‘Ğõé^{âˆ“xìÃ¤øšÖÚßìRÁö˜u4d2m#ì È1ç;‰sĞ
-ö:(ìxFƒñmNñ«¨êvßÚ·±ÙËjš›ít_{dc,£¹E?İÏ¡àoGã=¯E°·¸†O&â4•eŒ>Ğß$ŠHa†àä•ÓÑNûŠÛxÿ ¿äo¾ÿ ’Uÿ ,ÿ ä=ÿ Ÿê×ıgôÿ gm{xÿ §ÕSÅ÷Ëmâ
-ÙB<½¶÷ş#¾µ™?v¹İS*.O# dO$Òÿ †:ü1Ô}§\ÿ ¡×ÀßøWjü‘GÚuÏú|ÿ …v§ÿ É á¯eµi“Á5´:|ó9LqYÚ»y|,C¼dğ¿ìâ¼kí:çı¾ÿ Â»Sÿ äŠö­.K¥ğ”‘›kÛ±c)†åß`û²¶æ*OGl’NM'°Öç'‰lo5t{OG¸´¶ŞÓDŒ÷rQ‹«y™Qä©F?»l‘ÛĞk“:§‹ç³´ŸûO¶Y ó<»ùdš4iîÚİy
-NrF99âºÊ§±(óÏ¥ÓüWğkÚ@$ò"¹–à±BCò+0,rH,2œzŒ×ygyo¨YCyi2Ío:	"‘O¤d^iñ_U‹@ÕtMT\è±Ü¢KCY³¸š1’‡|m
-¶ÙÜv85§ğŸÄRkŞ?E’X Lwˆ»x'Psî3ïÍ(kv¿çÿ øZJıÎşŠ( Š( Š( %µŸÅ_mõÿ ézªÛ›k«eKKe¹Š%Ş¦5A÷ä.K8œQŞßk:¶±aâMÃ®âˆH/-.`t‚âÕI!d•”&ã´©$ƒ2=ZşĞ_ØOhg22ÛÈREÏuaÈ>õOBÑ…i%²êZ•ò¼›Ãê&wN ÀcÎ8Îy&’è»mı~`ÿ ?ëş±çw"½_IâK_ëî$Ğ¾Ë/¦J¤Ü‰7ùmòğ>aóıŞ	Åu~×|A­%ø×´Ö´0<b6R[oÊüëµÙ³µ²7+ ŒW[E?ëñ¿êWëk~‡‘¼¾-¶øƒo®ëzn£+å´g¶PB§o•…ƒ|§vÜ³0  U¯Oã8­~Ù{a¬Ü<öó½Êê“¢ÆÓ«6Ã
-œI·M…@ÁÏ7©Ukûu+F¶î6 “os$Çûq²°üéZÊËúş®=İşg•ØüLñ\ö×Öo M&­Ù¤""àyH™¾&|³) ®7äĞán¼[ã^×O[-KN¾’haĞä+4¡¸b×Q *:ï8¯GÑ|9¥ø|]fÛº=Ü¾mÄ²Ï$ÒJøÆYäfcÇ¿¯­M«höZåšÚ_¬Í
-È²òBÁ”åNä`x ½@§×úş¿ÌKúş¿¯/>ßÆ¾-ƒ@¾MCCš¬í½­r-øb¾a™›c¡7ŞOOzé<­júÎqs­X=¬ÑÜ:G›I-Ì±€
-·”å™O$“È8$WKĞbŠcÈ>Çâh.!Ò|}ª6ŒbKÑ¬X5 ‹{îıÔŸgYÏŒÇö«ß ¾ÓàñÎ‹6›núŒ—6ë$3 (À Ì‰PƒŞª¼gÔh¢>ïõóÔòO|Jñ¼3K–çG³¸6oÍ4—³ ¥ÕJƒ±•X²ƒ÷‚¶OLo_üF¼‡Pòtÿ k÷–ÃËÌíc<9ÜNì+EÈQã$úÃ¡Ó´9tïë:”r§Øõ(às9 efôÁ_/ñZÜ¡|)îÏñŸ‰üI­èzön•â:àC,·Vú}”ÂHç)‘£Q$y'pL’=…E«h÷úÚëš¬:UãÍs}¥G½ŒÉ)ˆ§šÛCê@)ô¯g¢…£¿ÄõVò±È|B“SşÉ²¶±}N{›ÅöëK…¤¹‚¹‚Ãæ
-	 àÅp—zŠotM>âëL×àñE„M>îI
-^”©Šâ5#Ê$lÛˆÁ9ã>ÕEAÜñ+ÏèºyÓ¬ì5hdŠşò[‹{;^mÍ#«%Ä±<;>èÇŞ98ä zh|­éÚ-„RøsYÖu/³3İJšeÅ²	Dæ.[H |¤’½&ŠŠÂêy–£ª]xÛûÊêV“C­Ç;%Õ”¾P·ŒóF@€‘ÆÜ’	Ån|=³¸Ò|9¨‹Ëy Î©y2,¨UŒfV*Ø<àG­v4„0FAê(Ù;[nÕÿ ­ÿ Ìåm|}¥ÿ Â'§kú˜’Î+èšd(ä¹*ƒ$“å¡ $Œ™®SMÖ¾!kZÓÜh·Ía3îPÒŞ8¡<£DìRyhùJå b¬ÅğÎhüQ4F¿á”Ÿø–^è"p„ œ¾ì©b¸# cŸKDH£XãUDPUF  …mÄï±‹£øŠ;ígPĞ¦Q©i©\?”)wƒ‡ŒbÁáG½pw’x¢‰Zf»­iZ Ó-g»‚%´·Kˆã…“°XKÊYŠå‹ Ts^£oeifó½­¬04òf1FÈç«6:&§¡nŸQù)â{Æ)Ñõ+	ü-y¶ÑuCO•%EIâd]åŠÈÍ$¨
-Á•†8ç§Õ¾"k ŞE¢ø;X˜¢”¶¸¹°äØÄ›Ù¸*ç#©'h ŸD¢–·8Y_Ùj-¹ÔlŞ×í:§š»…qå&â¾«œò:â¤Ô<|±xgHñŸ§Muc}r"0ñö†¹Wb‚AbáxÏ?‡g\ÖŸğÿ ÂúV§¡g¥,wHòDÒ4p»ãs$lÅœT”v^Ÿ€wùş'œO«xïWñ&Ÿ¯Iá9¡—L‚ğ[@Ğ2æO!AwÀÉ¤¸*Vñ×ŒõÅ’ÆÌ]Ùİ[]yR½†ƒ+Jå‘a’İÄvß¾@~PWƒšõ½KLƒU·Xn$»DVÜ­Ü¶íŸv”‘ÏLâ¡Ñ43Ã¶rZévŞDRÊÓÈZF‘¤‘¾ó31,Äú“BóŸ…ŠÀËâ£¥%Ã€Rœy~»™œ‚}€ÀÇSšÈ:Kêw^¼Ÿ]¿:ä×Òñ^‰ôˆŒùxÀ7u'=Mvµ•¬øoJ×ŞÒMFŞFšÍÌ–óC<Éƒµãea‘Ôf‡«¡ÅÙxÒûK±×tHt;»­OI¹6š|°\\G"S™1È‹0àq[ş×5ÍrÊöMoO{GŠ`°3ÙIjdBŠNcvcÅ qÁ­@Òü9`l´›E¶¤i\nggv<³3Ì}É= íZTıCĞâ<;âë¸4Ù-|M§ëiªAq,r:iM«¼•dhc*Wi×ƒœõ5lµÿ Eà½wT}:{ËÈ¯äşÍk#²[n\1‡*Ä»
-pÌ õÍuú’Ú•Õ„ë©êc›Îòíe
-“ÿ ³ *w/·}qOÔô‹mY#K™/PFIe½šØœú˜søæ§§õä>¿×‡”ÜxªûÄöúóé÷z?ˆw^=–•pD…“xVƒa×)’ÃŠ‚çUñ4w+½ÑäÖôÈ§ºûEŒøny¦¹q!,db!ÙÇ!¹ÉÆ6Ÿ]Ñ´];ÃÚ\Zn•j¶Ö‘d¤a‹rNI$’I$õ&¯Óé§õ·ù­ÿ ®¿æxç‹<c4#ÂšõÏ‡§¸¸°×qŞ[IeS<\m’t!•¶ã<àd3ÕxB‰üuâhÙ]ÛÚj6ö\FS$DÛ”z‘3ƒÅw4SOq[KQHaEPEPEPEPEPEPEPEPEPEPQ\\Ágm%ÍÌÑÁJ^Ie`ªŠ:’O TµGYÒmõİïK»2,Q˜İ£8eÏp{ÔPæÇ‹â²ñş©¦jº®Ÿi§¥¥«Ú	æXË»™7`Ÿ½œ3Ø`rkrçÅ¢ßùÚÅm>3%Ük2³Â£» Ë¦9$
-á¼Cğ¶mbîPgûSİ„Iõ‹ÛÖ1ÄqÃi\÷›$p+y¾øAİİ¬.·8;ÈÔ®Fü•$œIÉ%T“Ü€O4_¸«âOˆ:yğn¯yáİZÑµ[XY„³BUÂ±x\\gºúu­3^¼ºñ©¢ÜÇn±ZÙ[\FcÜX™7†xàUK†~Ò{aeqsÅåMä_NpË02 ø‘²Ìrá<æ¯xcÁš?„¡tÓb6E	,Ò7.;µ@E ÈÜ*Ïµ×æm?­¿à“Ëâü/6·cv­kå±Š³¼€°%F#gù¸ÀÆ{kÍu_‹:ÌZ†ÆÎ»ÈÑŒ¦VY#e”G2˜>R­•ÆòygÜŸ<7-´Ö¿g¾KIíbÔî£„–mÇ¬@Ï8ü4ğ¢Û-³X\É+,qK¨\H±î!‰@Ò„WŞ…½Ø=¬ˆ¼Wã(-ü9âuĞïâ:Æo¾ExÉò‰èyn‡¦@#Ò®xgÄš¾³®Ø]¥ºÿ gIÇåÉD®wÔä€q\Å‡Â–‹ÅwwZ†¡5æ$r*À÷×&ICI¼$¹|2©-Ü†İÊç$ú¦—ecwyum {×Y.q;ÙT(êxÀ qŠ#µßoÄö]uá.|Iõ%°Ò¾ Oj<­’i:œ‘[7î“;@ÀsœüÇœ:W»×øÚçËñ}òÂı§/ı/şï·yŸ»_ùmö„ßŸtcç í0ÿ  Å_üÍÿ È´}³Æôø«ÿ ƒ™¿ùº¶ÿ Õ4ÿ Ì}ÿ İt}·ş©§şcïşë í0ÿ  Å_üÍÿ Èµô’/æğ-ŠÄn-õÓcö÷/,r˜†<Ö*70o¼JòsÇjñÏ¶ÿ Õ4ÿ Ì}ÿ İuìö0É{àÛX"VÓdŸODU[ Û ·,¯÷wcã4¥³Üæì´İF+Û!i¥x–Öá&O:îÿ [åıæPÎû·û°A ü½»{™Y%Ú[—EÊÃPî}â?Ry‹‰u¬ØÚéxÒî•ÍÖ“©	.İS–5'pl¹À';»úSØ§›Ş|PÔt]vÂÃ_ğ¤º|7·"u½ÊŠÇ»ª)@ämó|­€p3éæ_¾İµ¥ëz&“sv±KcÕµŠİI©—ØÅpB¬€6@œğk±ğãx‰ã¸%´nŞQ‰-Ï
-|¤ó~<ÍøÉ?–)GXİî7ñXÜ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(–­«Yèšl·÷Ò‚<•K31 *ªK@ u&¹Ûßgéê×~Öm¬ÃCzÓÂ¢KEòÔ 'tyş%'ŒŸcÊxï~‹â+Ó}g¥êZn¶Öò*İk‹¦Ëm$ƒ—;Xl9<sÎ½Ã‰îô’u_êŸkº¶’ÚàÚ\‰ch$rÂ0ó«¹»òŠJïQ»-	ü3ãHD!>!×,¡‚b[{).d1lFUSÆìëÉ9®Tñ'‰´ïêşN¥›ñj‘•DR ódaTåyç>´ßü:H­.í<=¡ëRİ¿™å\­åª[âXÖ6F1bUOÜİ•á³ÍušÃ»}"KËÛË«wo}=Ã:†–XUU…A´p9÷ëUÓíoÒÿ “ûÄÛ·­ÿ [¼qg§øqŞëU¾ÓÙD'O#íH9 (ÙÎ9ã¦sÆk
-ËÄ2·Ãí×LÕ|AªØùºoö‘óŞV@‘Ü*‚qòî g¯&º½kÃZWˆM³j0ÊïjXÃ$72Bé¹v¶6SÈàŠàæĞHÖt}Çşk„Ó$C§Ü\ÙE=…³2°Œ~\¬î±#9©]cÜo¿oëî$Ò|s5ç‹´îï×C‹@óïmäÜµÂÊVAŒrÀ‚¤uéµŞèºî›â¼Òî<èVF‰ó##©Ã++ ÊG¡¸é<“e¬Ü\éW~)ÔµÅÛ~b0Z£`| é±sAfÏ95«ğ÷ÃwÑ.£òŞ_İ½Ü°‹‡œA¸XüÇ$¹
-£,O\öÅRÕkı6ïızôzJÆ¥Æ¹-–½öKÛ$¶ÓÑj2İÆ¢Iy&1;²Ï±ôÍA‰üækÑbÿ ğı€^¦¯æ®ÆÜG—÷ÆœãÔ`wà<G¥xmûYğóê¶vúŸÚ¿µÚoµ9„Î¬@H[c2ÀP©¤°ğ½•‹kâ1üw°Æö0Ø!ûDP»ä§—,{BÈlçç€ëkÿ _?Ÿå÷Óµÿ ¯Ãåùü*ÑäÓm'¶Ö4Ô›Q‡~œ·sˆ¼òÃåÂœ1 yõ®kÀÓ_êº¥Ùñ.¡¨¯ˆ´ç+6'òícF$£Æ‘…!åÈÛÔåuË®hºe®ƒáÏéØyÚ„ö¨‚”>ù™Ü²°,6ªx8À¯OÑ¼1“©Şj’êÚ¡v‰Ü^:ec^ˆªŠª£$I$š«+ß×ş:µoOø?×ùœ¿Ä­bÒÂãNˆkšÍµñ–5û&™2Æ<·™Í”˜ß  Î7r½Ív°kZuÆ³u£ÅtP´$¤Wû§8ÁÎ;t¬}À:ˆ§¸ºº[¸/'XÃOmu"İÈJgc=7)¬-#MMSÄ:²]¯Œc¾Í­U»HmÕcGÏîZ 1,\=ˆ¥­êÆ÷¿§ü^ûÄó]YøÆÊÒ6´¾Ñ a¬Á·‡z8ãœñÏO|Sü9âKHü1á4Õ/q«YÄ!ß¹ŒÒyA›'}ÉçëUá½²İŞİkÍ6¡“|Í4Gí)ÙXyx\@)´€O9æª7…mô{ÿ i³]x›T²³œ5¢ˆàh-Y„2ºF²`qÉ>ä{>¶ü/¼×íÒÇ_a¯èÚ¥Ì¶Ú~­ayq2Åor’2s˜)$sÇ5æ~+øâ?Tñ%ö5ºiŞ–Ú),ßmóq»sõM¹ùv÷ëšõÚãuŸ†º>µªß_Mu
-j-_ZÂè"¹0œ¦ì¡aèv°ÍuıZ\zYœwƒ¾%k§Št[kÛû;‘¬›„¸ÓRš[Ä]Ä0ïôã+Õµ}cOĞt¹õ-Rê;[82Jı°’O@&³tß	ZØë­\Ş^jZ™‹Èâğ¦aº¢Æªª	êq“ë\çÄÍu‹ÿ Åw4ÑéïxĞ3Ã÷¡×0Ê3‘Ã.ŞGñĞŞ‰%ı_ğıD·mÿ _×õØ©®xÔYxÖÈÃâ[“¥ÉµÃÁ¥´y29MÆFq)¶üÈ^3Ö»ë-gNÔo¯¬¬îÒk›	wQ®sáéî:ƒ\øK¦Xé6‰sqªë+c7Úc³Tµ@ÒÂ2È¦4-ÎÁ Zİğ®—«?ˆõ¯k1éÒß¬PCd²‰#‹vFRT³nè3€ É¦­·¯ü;ŞşŸ×õèuôQE!…Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@xGÄOM¦xïR³OiV‹•ˆg½Ö#uÌHy[såç?/¯<æ½Ş¼Æßÿ áñ}öƒÿ çÛ>Ëåşÿ íŞ^íÑ«ıß,ã±×µ pğÜĞ×¡ÿ àÇÄüUğÜĞ×¡ÿ àÇÄüUtğÓ_õ(ÿ åKÿ µQÿ 5ÿ RşT¿ûU sÿ ğÜĞ×¡ÿ àÇÄüU}¤Æš×lbq"^é±«ÍÈCŒe”Ë—9ÎA|·¯9¯ÿ †šÿ ©Gÿ *_ıª½¿BÔÿ ¶ü=¦jŞO“öëH®|­Û¶o@ÛsœgÀ¡«è	ÛS$èÕÉ´·¿Õ´é4ûi£•b·ÓRŸ,‚ƒy•”rpƒŒ·<tÔQEÂÇškvRø3Åvú½¤>,Ôt«‰&M7JÌÑÇpØå“ „9vÆHİéÒºÿ ø•|Km<ÃFÖ4³„1ê–C?W“‘Ú£ñ/…WÄ¿g?Ûºæ”Ğç.ôÁ¼ïqÛŒÔ¾ğßü#vÓÃıµ¬jk‡ßª]yìœc
-p0(Öa-]Íº(¢€
-FeDgv
-ª2Xœ )k™ñF²¶©¢YEÚ™Ò¦ºU¹Qöp¿t	|¼œğx!Np)7d4®ÎŠ	áº·âŞXæ‚U‘°eu<‚àƒëRWxWâ	Ñ<xïokr–Z¨°·dh-á	&ZG€4Hâ.FqœkĞü?â›]wÁĞxË0Âğ´²ÆHP¦C€GŞÁS‚:ÕJÉ7Ñ•ÉWv]ÿ á[}FÆîâ[{kËy¦ˆfHã•Y“’9 är¬> úT³Ï­¼—¤0Æ¥ŞI*ª¤“Àä¾ñVuâ_jëc¢ézlz|WJÖ©	’4,å¼çEyÂ’™;NZÀøƒ%¤²k—±\Oqo®hË{g2áchÒH¾FVLÊ£q$®ªÿ Öÿ äÊZ¿»ñ·ùó5Ä6ñy³ÍQäîÁFIÀäú’ãRW‘øŞå5^Ò$ñWî—º—kmkåÉf$•¨“$HHôÈ9ì@m|b<'‰ñf—Mqâ+¾}Ğ·ŒÈs!R609'¨£MoımşbWi]ÿ ÈöR@' u5^ÏP²ÔÚÊòŞåc!\Ã*¸R@ 8 ı¬{ßé±ø¼O<2K§=¹1lÌŒ í#§9Ç<WğûÄú>¤x£W¾DÒ¬m¯¦$m!
-¦èy¤3œIŠ6“O§ù…ôMu=ZŠòÆñSün·ö6nâ1§4†êQtPÄgó[¶y=Jçw~•Ói^>Ó®<-6»¬Òc·¼{+„’O0G"É°Ê9Ï¦zàf…·õıv¿õıw:”&’$•H±æ"°%3ÈÈíš’¼;ÄÖkÿ 	G‰5%b«¯høÁ7arG{æ¯jòÖÚX"æ¤¸}¤ÈØÎ§ œJªÿ ÖÉş ÷·õ×ü‡Ïq­¼—Ç1)y$‘‚ª(êI<NGI#Y#ud`YNA¸5ä)‡PÑ¼a¦ŞkZ¥ê5ÿ ÙMİµ´Pm‹äeSÌX>şÜ†oCSÛø¾kmMğÌ¾k[ı6HmR[à×J‹nHgƒ–T%X¸ão8àT¹{®^Wüÿ ÈvÖŞm~_æz´İ[Çqo4sC"†I#`ÊÀô ¤·¹‚îŞ;‹i£	rIV ¯0ğ®ª‰áİO“ÄVTŞ4–¶ù¾TÃJfÎ¦Ò1Áô&¹ïêºEäìôÍMî®´û†Šé&IInÌWFPr“Z5i5æ—ŞÚı	¿»ëdÏu¨­®­ïm£¹µ)àe%‰Ã+PG²µe ¸:=¼b]NæÊyàI÷X@ïe%”~uÇ|Ö¤½±Õ´§û!Oš3Z¥º®$MÌ?ÑÉˆáƒr99ç¥kë­†ô±è_Ú6?n?l·ûYÎ óWÌ8 Ÿ—9à2ŸÄzÕšò=?Äº^·ñ–Ñ,´½& î'1Â×’Ë¨Şß.ø×†UËe€$€0+±¼øá»iD1]½äætƒË¶Œ·- ‹p'
-T9Á ‡"…ª^`ôoÈéŞxcš8^TYeÏ–…€gÇ\ø©+É¡ñe®­ñBÕï :a´¶Ôí®ã@|¦ˆ¦AaÁù~n?\WOmñ7ÃÓøQÕ¥k‹Oìì}¢ÎéV;…İŸ)laò6œàç¨æ…µÿ ­Ã­¾G[5­½ËÄóÁ­ïˆº(Ş£=¸¨âÔlg¼{8¯mäºE,ğ¤ª]@;I+œ>µ™áÏÙx–ÆêêÚˆ>Ë1†XæØXªÀ‚ŒÊÊUšò6şËÇ^(Öíôk"Â;Í!¦‰­á…îY¼ü1˜¨RÆ31\¸•¤ôvò¿ápÑ«ü¿åEyoƒ|g¦¥ÛÃ8º„iOo¥,FKòbm›¨È>V Cò$ZÒ¾'Í¬êAşÆ–ÓX¸Ş°Íkså´D’Ï½2Éœ´`nÀ÷MYÙ©è’ORE’Æ’LÅcV`	 ç Ÿ ¢	á¹…f‚T–&û¯Sô"¼~æCâ-gÂ²¿ˆáÖÚ;ëõ6vfÚ©Ü˜Ën]ÀÃ‚sĞÖ¿ÃÏ-‡‡ü¡=®äÔ¬%1İ	FH¹)·¯LóÛ\%¯õäßè'£şº;›Ey7Ä«:ßÅp^¾e¨M¤Y¥õä×-« ˜la€.KŸ/ñâ¶Ç†ÏÄ–·j7Ô¥’Ú9˜e±%;Õ÷pÉò·'Ó«úş¼½Fôş¿¯SĞh¯:ºøƒq§x“Åq¢kÊÚŞêÊÖÑ—pB„É¹†N‚pÃ äR_Şk:<úŒÖŸáûK•¯ãµnÀÂFXDÙRyÂÓ]¿¯ë`znz…ÈZüDÒ.<P<<‚i®ãìu—äùâ2åq¼ºô`	\eHÉÁ®câuÆ‰-§}ÇQ¹Òì´.¤ººh]-ÖQ~óxÎHÆ?‹víı?Ë_AÙêz©!T³ $ö¦Ã4WÇ4$±H¡‘Ñƒ+È ¢¸Oø/¬üAáæÓçÍğô·ÖÓ±JÊt*Jõ99<t'9|'†<5áÈ¢Ñ^òÔé¶Ï-ÉºHe@Ù oõÒà1Ø==hïëòkyşŸæz}æ>%ñ!×ş?‹lÄzu­©'É¶º‚ŞI“z†by¤8<ŒîïäÕšÒÉô_±JÍ,fv½f\ÃüEv¾GNƒùQ`.=å¬w‘Y½Ì+u2³Ç8ê¸ÜBõ dg´ù§†İU§–8•QK°PXœ 3Ü“€+Î¼_~«ñÂ÷ºnúÅÜV×¢í®*¸(¥¤|áP|À’<`šÍÕ|T<Wc ^Ii³Xø®gxn–âÂ¶$ pì0xëN:Ûúë`z_Óô¿èzİG4Ü*¬ñG*««¨uF{‚2yÿ 5Ûq«iöÖ,·Ònl.RK”xn$/µ¼·Uaµ	*Ùàƒ•ÈÎÆ©â(|3¨Zx–ÚÊËP¸EHä±işñò¢ä†×$pvçĞ¨ë¯¿ÈŸqÔ$ğÉ,±G*<‘$E`J22;qÍI^!âû 4¿ŠWÊù7V\òE‰}îyü+Ûcæ5>Â…ğ§ıl˜=ßø¢Š( ¢Š( ¨-o-o¢2Ú\ÃqvBñ8pNÈîVo‹moo¼!«Zi¢c{5¬‘Â!dV,F Ëü zŸLãœWéZgÄûE°±Ó®-ôQo¾0ı
-ÈQƒ dÛ0ÀıÕèÇ$«ÿ _ùÙ±%Õ¼WÛÉ<I4Ùò£gŸ'hêp:â¥¯o|@ËD½ÏW“Ä:}¥Ôfò[‹{•òÔ³±İ7g9a+¹Ğ?á!±×µëÛıåáº6Ínbk#˜“s+‚ÁIãq'ŒôªKúù‰»œ÷ZÂf¸š8bRy*ŒœO¹–{ˆmmä¸¸–8a‰KÉ$ŒQGRIà
-ñ­_Iøâ]VÏVÒ®&…. ¸Ó™e²Ìe'Ë2r
-Ÿ,ğwC“Î*èÿ uï.•yi%ÚOÏ˜ªlÄÅ¼ÀmüíØA…ä˜¹ÈÔ]òÜ¯µcØU•Ñ]2°È äK^+_ÖÕeg¿ŠEmÓàƒNò„a‡Ê'iÛÜÆÜúÕ­NOŒ
-5Ó »—uÉkiôøöÆU°»~n±’[,1÷9Í»-Wõ·ùşbW=m®­Òê;W%¸•Y£ˆ¸áq’RF~¢çEç˜<Äó‚ï1î¶çÇ¦{×…Í¥|UŸÄV şÇš=OË{k¹ì?u‘X~o™¶ƒş³ qŠ¹c¦|NƒÄòêòi÷Ae‡ÉXd°[‹…Y$1n1’”66ğ8<r»sÚè¯g¹ñµŸÛ5»ñ5Å¬y§ºyM¬l‹—ÂKˆ˜³T•Îâ ]Úš6¿ñÄZ3İhú¡{qÏËÓLPÉ„0¯˜T	–+ì0¡jOv¨¾ÑÚ¾ËçGö‚g•¸oÛœnÇ\gŒ×ÜÉñ…¦Ám¨›Qr|Ï¦‰L§Ş©lÆ6Œ‘’zTã­k›û
-yZ¤š9³I"6QEç‰Y•Ê$€ciQÂõ1ÍÖÌ?¯ÄöÊ+Éçÿ …£öÏôOíoû,\ÿ fß¾ó6öÛ÷vóëQiïñb+Ë).âÕ%e·7¿önÆ]Íçò¤7İÛ·9İÔÒ»z\õÚ(¢ÂŠ( 
-óßÙÚÜ[ÛÜ]Á×,Vä+J@É
-,@ô«ã~#ñÚNúL·ÚÁ¨iºä‚êİdDš8RB ÜåƒFC—Ê ÛœğS>5Õ5%×ô	õ}]šy­â³ŠÚí”H$vÜ‘´J®B®ÂOÌœ¹èm«¯ëoó£³şµäzÎ£âJ¾ŠÂïPíó#³ˆglçF€¾8<ãibñ>‡4w©lÂÈJn ~PGÃœu!O+Î</áÏø:k´_Ï+Å¬Ù=ôE.ä:Ü™	2Ä‡(
-€:ôÍÔôeğG¥É‹õ‹ëÉ­m<•%í¦Ü­Ò‚c (İÃ’G~Oóô›òûµ¿ùzÇ§jº~­ŸN½‚ê1€Æ)m$ ã¡Ájåpşğö¥á;¢XÄå§Y@‘¬Û`zs):â±u_ÅúLZ¬íúl7wĞÜ[\j¶¯´*Ëî›åS´‘°7ÆñN×²ò%^×g§Í4vğÉ4Î±Å–wc€ rI>•OJÖôÍrÔ\i—Ğ]FUXùm’¡”2î^ªH à€y®ãÅÚæ·â+ËM_AT–ö˜Ì“–‰NA‘•XFÇQ¿åª Õï†Ô¼'£ü1Ä²­¨AR’Yö²9Æqô–·¿ß‘ß×­ü:Òµíb}Jæm³M·pşÎ±—¢…4¶îçİ¶vÇë~ñ•ö±=Î“ã¿ì»ÛåÙÿ dC?—… üìrrA<ôÎ;Pü*=ş~?ò‘¦ò-ğ¨ô?ùøÿ ÊF™ÿ È´Â%ñşŠşP-ÿ ÆøD¾!ÿ ÑOÿ Ê¿øĞÿ 
-Cÿ Ÿü¤iŸü‹]Å…¢iúuµ”G1ÛÄ±)Ø© ò 
-:tP ì ®ş/ˆôSÿ òoş5ÜXCqo§[Cyuö»¨âTšãËù® ûG““Ó4bŠ( Š( Š( ¼ÿ â>‰vâ=kG›SQ1ÒÆÂ+Ñ5»J¼R²© ÷Ïñxô
-)XiØàl¼®G¦ÜKe¯Ëa¨j‰j7WvQÉu¹@PËE
- +c=IÅuÚ&iáıÓI°V[kXÂ&ó–>¤äœ“õ­
-*®JV9ÿ ø}uhc¸´Òô+R&Qú­§œ±®rq›>˜#šÃŞ±±ÒZ;íÃö÷·´7ƒM³T†d$àFH#S‘œõ®’ŠKA½LkøjÒâ‹oi0ÏÌ2Ge´|“ò¹’xõ¬ı{ÂÚ†­Í­m¤éwºñ-, ¹›#ûÒûAaü[	ã­u4PVpiö6öV±ˆííãX¢AÑUF ü…s)ğ¿öœ‰w¦hş›Qc¶kZÃÎ&=¤`ÁïN1Çzê¨¡ë«¢²9ğF˜ŞX×ÂŞ]\C­§«[,ÄÄ¡¶ä{Yïàÿ ê—Ã÷ú†¦ér0F·Ò4ÇRĞäU-.Ô-óòœg5ßÑGP3m|=¢ÙYGgk¤XCm¢tŠ;tUağ7zñY.ğş¡«:ÿ G»‚ÛVÒçií~Ò…¡²•d|r¨äWKEPZw¥ü9mC\şİñŸ‡n/62ıÃN_!™2Hòò6 Æp8ëšì´ßhš4’I¥hú}‹È6»ZÛ$E‡¡ÚkJŠ:X1à¿
-¸ğÎŒ6¾õÿ @‹†ã‘òõàsíI¥ø3Ãº5á¼±ÒáKŒå$rÒ¾÷î'Ë_¾TÀù»E¹Ä|CÑîe´‡\Ò§ÔàÕ¬ÑáC§ÚGtÒDøŞ­„+—=G=3Ò­ø'Ã‡KµmNù¯dÕîâ)Úñ!Œ¢F0ˆ±ÂLq¯R $üÜœôë(¡hR–¥£izÌI©¦ÙßF¹ê”)éÄ¾ğUŒpF|9a¡i±³4wGHIZ"WM­Ó“‘Æ5ÔQ@Ö•à}ËF†ÂşÚZE™îd¸¿…%gÎ^NF“éĞN°ğ„ôÓA Y<‘²´s\GçÊ›@
-É¹€   8ãÑÑ@4í+NÒ-¶™akebÆ+hV5Éêp ñPêš­ÛTÒl/š DfîÙ%Ù¸Ü:Ê´h¡ê<º†­csâ4«û:İá³Ó`ÒÄ6ñ–ÆX«;ç@€+FËÂGN:~³e£j6qNòYÀ4´;dc¡Ia‘ıà{×IE fXøsCÓ/óOÑ´ëK§R­5½ªFä °Çò¬ë.™â¸ït­Ãö¶Bës4V]ÙrsÃ¨ÁRqyã95ÒQG[Ÿ}¡hú¥Ì7:†•cw<ê¥¸·I>sò’	óÅD¾ĞúkåĞôÕ»›p–qi’Mß{sc'99Ï\Ö­„Ş
-ğ£Â·†tcd”CaÕ' mã8•I/„|5=Ä—xwI’iF$‘ì£,ã§$®MlÑ@V¾Ğ,n-î-4=6Ş{u+ÚF9ÈR@;›§©õ§jú›¬’ïMÓ®nâR-æ¼´Yü¦ìppqœ3¢´è gFğµÍ¶½w®kZ¯ö£<_fˆ%¿‘¼¢&æ<·%‹pnRoé¶—6w~Ó´M&î	ƒ¼ë¤ÆÌÑà†@T©\ƒÔéè£°‡Á¾7_j>ÑÍÁ3Íû[÷g;³·9Ï9­İ6ÃSHÒşÊÚí"KÏÈÇFëY×‹­t­bßE·³ºÔu‹˜šh¬í¶)òÆ~viTŒuÏ±¬½GÇçÃ÷–Vzö—ö{›‹›ÆKK<(„nØ	TÜÅwÀc©ÎB¿õızÚÿ _×SROøJmBæşoés\ÜÒ¼Ö¨û<á œòG^ù­)4M&m)t©t»'Ó” ¶n†Èù1=*M3P‡VÒ¬õpÂ¨RhÃc;X3‚Fyõ«tÚ¶ŒIßS
-?øR"~ÑP‚°ˆ`‡îÒxLÂú(0Àiñ|Ã9çåç+z¡¶»¶¼¤µ¸ŠtWhÙ¢pÀ2œ2’;‚#µ T‡@Ñ­ôÖÓ`Òl"±fŞÖ©l‹lƒ’ c9 ç…hÖ‹üOoàÿ Ë¬İA$ĞÅ$hÊ„8\şÍM¦øËT×5]&˜\iWœÎ V.å+ƒ’1ê†Æ½Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@Q@?²-¿µ¿´üÛß´Ÿn›Ééõ[ü¿üw¯=jıPTî46îúŞúçOµšòßıEÄ«Iû¬FWğ«”PTu-JÖV5ÕtË+åˆ“º·YBÔÀâ¯Q@eÓl'¾·½–ÊÚK»`D¼Jdˆ‚±•ÈëŠµE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE ÉeYdXãE,îç@êIì+ÍuOxóÇV¾¾´Õtû·êÎx%Ê<>k •ËóÈÙ;úTĞÅsOKªRHäPÊêF ğA«Ô~ø_SŠÖ)ô±6 ˆ"´šKhÓ,…‰”}à8ê3Bø“ğ´r:ÎŸãG ¸ğçöFµkæéÚ´W1´ƒ‚CáÙİˆÊ²ÚNqV/4¯x’é®uMìs[h—–Næ7K©¥Ú•†Ê©	œ¾Ün¶k¹Ñ´3ÃğO—j-âc<Š˜ ~bqœ•¥I«ÆßÖªÌi»ßúŞç&‰®CğšßE°“ìúÔl0©IŠbDUÊ‡SÆpFAïÖ£Õµ_j^»³‹ÂZå–¥=«"Éõ JWªÉçnÀ?Å·>ÕÚÖlZˆ'×c…Æ£<"	%óœ†@rÌíã×äúšr|Í·ÔQ÷R·CÎ<[«øëÂvZ$ít&†;khgòLí7~b‡FaØ2ç>A‘E]JÃÅOi4iáù|9b.ŞliÖÖ)"8P²O:»0dù‰8àéßğŒxûOûOûLşĞßæ}«ì‘ù»ÿ ½¿Ï¾jíí…§hö—ö]Û>7Ã<bDlŒ©àóEúúş?Ö¶ß×CÌ‹ãÛÍ6ãB×Ö¦ò_[4z€6©m(èìÛWl¥¸aÈ9À<W[¢h—–~?ñN­,;Kô´Xx&C0c€r Èã¥tñE$Q"Ç(TD
-@aO§ëîÿ  ş¿P¢Š) QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QE QEÜ²Ág<Ğ[µÌÉ4p«20.O=2kË×âÕÍ¦â;›«}*ÿ û1 òŸN»ÌgÍÀØääü„d€ñ^£r³µ´‹k$qNTˆŞXËª·bT${d}k‘	¼›VÔµ«íCNºÕ/,ÖÄÓ›ì¢Ù`Ğ™‰r}K§ªê>†Tµ]+Å0êÖ–m«è1Fáí½Ñ”f-¡áÉPFN{qTµ_‰ÚÖ‘-ü²éÖ3Zh"Ù5ŒË$²L|’!=İ2:ÕËo…qiÖö–¶’Û4sê‘ßêÒ„"e,‘G‚ªğv“Ç<œÔÚ÷Âÿ íSY’-cìÚv¶öÏ¨Z›mîÆÿ ,ßx	¸c9Vş”üÿ ®Ÿæşä/ëúóÓñ ğÇÄ­CWÖta§[A¦øfm0ÄìfˆÄND½à2
-ãz×o­\jğÛÅg÷3>Ã-Ä›b·'{ w?8W“ s\n…ğ®=2óJ[ıN=GLÒ#¹ÊÒKM§“‘+!ÀRF6¨­ÍcÁë&6‘á©,<?Ëæå­¬ï¸0Hà·\tÁæœ­m?­zü·¾¿×§ü#BñÎ½¬x^]t+	şÙu6¢a·_(€Y1±Vùˆã¤xÍüL½Ñ~[kŸÙÇªŞD³Åfe2¤QP$á>eã®XR4æğN£y E¡ŞkvßÙ¢á[k]8B†İvâİ?xJ©*I$±9Ç£ñÏÃk_ÛÍö{ÆÓ®®8ç›3H¯ªùbTN	=Aê{óG_»şõëä8ï¯õı—˜ÿ øíô[CÒì­’ââşúŞ—pJ[Ç#c±;a¶öI=³‰ÿ Nõu±,š}¢èGX:+5¾ÕÙâVwaùz÷Ïj“XøDº‚X5®²ö—Ü%İÌ¬÷s‰ ¹Êp1K Vœÿ m5OÃ­ëOa;[äÅ¥€±€ÓH]ŞB r #8¤´ûÿ Ëş
-ùÜ]?¯?øåb¶‹ñ:ÓÄÓ][ßhÖš-¯œYg¹ß{r¨aò×;Nâ@(Írzö¿ÿ 	§‡­ªé
-©¥ø•l¢µyd‘bïr˜7a€±Åt6ßáÛ£Úê:¿ÚôİÎÖÇA(gmÊd•$Ëm chBHëÚ;á$Öšuı•Çˆéy¨Å¨1K•dpÅpó89Æ7»Ô· 4•Õü¿5ú½·×ògG«øûJñÏ‡ü>–P5¦§ç´™¤\eŠíÀ¿6ãßÖ³¼=ãCSñÕÆy– Z›.ÚídšÑÕÊ˜¥Á!Û¡;q·¡Ït5ï	ê:·Œ4]zßVµ¶H“Ê‚K“˜»_s	W·L\ô§Cá;Û¯Øxƒ[Ôí®n4ødÖ;;6·QæpÅ÷Jå¸è8Ş…Òşwümú¶ÓËş	ÕQE€(¢Š *†«­éº$vÒjWin·7	m	`NùáWçĞw«õVö;ù1asm‰ÏnÒ†Nà ëƒïÏĞĞz®¯a¢YÍFàAàƒå,ÎÇ¢ª¨%˜ö Y:—‹,›Á÷:Æ{m4­§M}f²d;¶6Æxã"¸m[ûuuf°ºÒ<QqªÛj77ºN¡§y/lÈêÁG›) •ÚWŒdg<Èšf£ã]_CŠşÂõ%°Ó¦ƒUÕå´{U¸3DPÇº«8ÜK´:ÔÙÊ.ßÖŸçı\¥hË]—ùş«úĞî´Ú\éz,Ú¥§ö½íŒSı¥E–RS%‚pqÃtàúRj':“i‘iº¬—<¥ÊØHöÊÅXÒ1çÃ¸óëŸ…ÖÂêÏIÖ®ö+ÈDm5ˆÃ2DŠ‘¼Ó³HcF O,sß;ö¾ñ…¦›mcâ»;K}>…mí´“3nR¬ò ›ùÃÀ'šªõÜ¯ëúìD4²dñÆµ®j:F«C 7ZÔZU_ßÎ)Ğ
-á°F
-îõ«ÉtíP½Q¦·¶’XÖLí,ªHã"°´?A¡êúmì7ñØiK&N[ç\¶{íc×š£«Ã¬ø†+}"ãS²Ô-bŠÅÖò8â·;Y\:»9;‹*±#µ]âùw×óvü,T7¼¼¿%ÄØğ÷Š¬µ=#CkÛûu]JÊ+‘h³w,¹;Äd7¯C]xÓ|,¶¶m7HÖî^ö¸–$°ÑX’Ñ¢¬m,ìÒÔ´lç'=ë}>øßD±Ò,|_m¦ÚÙÄñìı- i—n÷+>rOLdç Š•®Ú%tFïÄ-gTĞ<!6¡£¬mz“ÀŠ®UR9àg8Ï½;CñŞ¥ã?h·Â‘ibÙ¡(â%Œ±ÜrA À~5“€õÉmZÃSñaÔ,%¼†êT–ÑÌ¿»*|´s1„ şy<’s]áñaâk[7&FÔÖò¶`D"R:çæ$±=¿­%eızÁõøÿ ‘µER ¢Š( ¢Š( ¢Š( ¯>ñ&µâ}Çº<qJòé„ÆÙahbX·˜˜¨Ü¥/¹rN@Ç“^ƒYË hÉ©¾¦ºE‚êè[ •²0røÉã´¬+Ò|âk3¯Å¬yò]ØéªòÁ5²'Ù¯B‘ÄŒ FJ’X‘ÎãÍMâoø›Ãú‹ZH4›)çV‚?ôù%˜Fû¾\¨ãfŞ}kÓ-ü;¡ÚZKmN†ØL'ÇjŠ‚AŒ>Ğ1¸`s×R]èšMıì·š]•Íİ¹æ·G’,¬FF<U'ª×_óüšÑ¯ë§ù~,ó]ÇÚÍÇ‹ 7Ó¼–7“ê5„vÁÚÔ[mÚWb™99'€*×|o©A5¬z%ÔútGO¼¿2ÜYŞF…F#)2‚ç$à1ƒ^o¢i6š”Ú¶—eôà‰nc·E–LNæ'$§µ.¥¢iZÊÆº®™e|±cVë(Bz‘¸TÛİK²İ³Ë¬~!êºkÁsâSguªÅ$Úe¤¦ÕlJavî‘s*cvâ\€z‘X¶Ÿu9¼;á²Ú¶·²êJš¬ÒM±[
-«ºÏØç'#Ù`ğŞƒj÷Oo¢i°µÚ²\´v¨¦en¡ğ>`{ƒPxY­’ØøkG0#—XŒ[Uˆ 6àdûJğ?¯óîk?ëCÊô/xÛ]¶Ô£‹Rµı•o-ã‚ÒÒ'™ ßI±V#ÿ XO½Æy¬½?âŸŠu}*-Hjf?h‡Okd·‹æ-9Ÿ,¤îÜ2İÇnõì£Á˜Ç…ôM„†+ıŸ	ÁÆßsùÔóøSÃ—S	®4*iDb òYÆÍ°¡rGLqJOgoëúÛñò¿×õ¾¿äşñ¯ŠµHgƒRñÙ™t¨u¹½¶‡÷qù„M,~Zí €²sœ™Õ¯Š¼cöM"âç_°Yd»¶JòÛ†İ$·G‡8\}áHéIàïÇm-´~ÑÒ	Š™b[‚¹\íÈÛƒŒœgÖ£OøJ7WOhŠÊriñıóUu{ÿ [ÿ KúÒZv·õ·ôÿ ­wé’Ë¼ÓH±Ç–ws€ u$öú«©XÅªiWš|ùò®¡x_¬¤çS+¤ìZµõ<ãÄ#¾Ñ~Ûá—Öd{y	™- T&ŒË)ß§Ëm¸V
-OÌEvÚ7Š,5«ùìmÖág‚Ú“çE´<r©*T÷èA÷â²4oè²xzÑuŸèÃV0¹˜XÀìdÆä©“Ï9ëÍlhŞ‹H¾»¿{ûËûÛ¤HŞ{³V4ÎÔUUrIàrO5Z+¢]İ™›¬øêÎÇU°Ò´Ô·Ô¯®Ü€‚ö(”*ÈğÌ~g? çånğ.> ÛÂW ³_&•k§Ş­Å›DUÌÑM}Îìr6çİÛ&¬]ü=»¼½“O…å·‡Ù¾8obb²îó?Õ½©ù|Ì¦R;ãµtşĞ#Ó–Ò÷O·Õ\K$ÆãS‚9äiå˜’¸ñĞ€j•}óü­økø|›ŞËúÿ ‡ÓñùãŠuåÜšt@]X¹°jHV¼ ıìQÊŒÅ†©9ç¸"±¼â/ÜxòãMÔ¯ÚkY&ÔH‡``†)cUÈ¨ÜÀ`ê3]fŸàmt»[mkMÑõk‹e1¥Äš\1â=Äª… … qßÖİ¥éŞOØtÛ;_%8¼ˆ6+Ì«À$@êyªVR¿¨=U¼Ìø‰ì_B“N¿‡É›ZK+½»\ÚûvTtÁT:/Äßëz¤zlBú©€xKbŞlddI˜÷\`üûHjSğïE—Q’{·º¼²{©/—të%¢Lãá
-ä÷8bT$RÙxH‡í¶÷šnw§IqçÚÙÿ eB‰lJ…nƒNÌF{tÆÛ_ëmV¾ŸÖå«ÏéWÒÛiÚ½´—“[M$İÄ¸Ú‹q0=wZå¾ëÚÆ±¦ŞE«ŞÉvÖÑY˜ĞÛ«[«œ’Ië]?ü ÿ ¡SCÿ Át?üMlÛÙZZ4mkR†(Âï Ç\ Ğ
-—ó­‰è¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¤`YC$`0ÆG¿5äV:Ï‹æğ?ŒåÓo.õZËZ–Ú((…<°v P»¶äà(É$ã&ÿ ×T¿QØõê+À‹µØlõ½'LÕµK‹85+;[Sx¬—ò‰CyÖêî»„€ôfP:ô§7‹u«¯éVQjÚÔ­¨]Ás§ÚîSXc]È¬äd² AmÁry¡è¯ıtÿ ?ëª[Ûúëş_Ö¶÷º+Åõ=_Ä—¿´ï[kš…ÜZ¬²O¦¤p¤2Ç&dyƒ²´ .WË´I‚)x»Å¾$µ¸¹Öá¿ÕbŒ-œšÙíØÙŞ, y‹(
-AsÉ
-Ç#ø}İ½î_;Õ\÷Z+Ã­¼]¯¾§oâ&Ô®·Kâs¢>˜XyoØlÇÎş½ºVãø—YÒu_‰NÚÅïö=œY,ê˜ˆ´nÿ uUGq’dœRÚ<ŞWüŸê†•ÿ ¯;~‡ªÑ^7áİKÄgX]zşïûS@‹X3Hi"™˜î!T0áTªH>µAüQ­Ùø{WÑ“RÔ£ÔíõØ­’ÆæU{Óm1%bp_s‘’Ÿ”Ï Ói§oë{~b¾—ş¶¹îtW‘hZö£/.u‹¿ê6Ğés\C-ªÚÆ×›·(†TlÈÉq–àæ‡|e¬è^MO"xZÅs3:E2ïqû¨‚Éë’
-¹<°£ª^ŸˆÒ»=²Šó½s^/ø1­uÇ}ş+™¥7Cˆá$6å˜|ÙÁb8+#Ã>=>!øºk6ÿ Ù7S›+8î7ù£×?ëJ‚Ûzªœc­	]¥ëø_ü…ÒşŸ‰ëtQX×úìšUıÃ_Ø›}a+jm2•ócËòÇÏĞƒœcµ 6h¯%ø%Ş•â-Q¯­*jZ-ÛÛEĞ[hZ(†G—‚wğW9É®¶ÛÅW‡¼§Kyphtëgû$yßpT@¨9;˜…¦{ĞµWşºÿ =_×Oó:Ú+‰‹ÇúF¿¡¤@º¥°–òù¶—R¤¶ÿ )Ã3(( ğAİÎG95Í|1¹Ô¢Öô[Byí_Â°N±3ŠŞi …Î2§â®ÿ ®Íş€İ•ÿ ­ÒıOD¼ğ®ƒ¨kPk7šM¥Æ£…ycËƒ‘×ŒƒĞõ«^¡K»in¦µâ'¸„+K¸.³´°ê3ƒŒõÁ®â?‰¤GêÒIjÿ ÚIat¨·VTc e>hËåŒg®F%ºAİ…EcØø–Æû[Õ´¥Iá¸ÒÖ7™§MˆÊêX2œò8 9“¬üEÑ´‹¸­Ò9ïüËV»[I
-Â"çÌ–DV8 áI8ç(½juÔW—ø»]Öu?	ëãv•›6-Ü­Ì©~#*6³ÄT`qÏSoxçS,ñŸ5ÜvöšsDdc´„ï*¹!rËœ
-i^ÿ ×ò—şº™èTW5uãÏÙø²MxEü˜RÁsr7ÜÛ¢»;ãÜg>"‡JøÅıŸqq«ƒ=Ğ…"ŸSs‰bÊº[˜öùa•”2¾Cg<`RZµn ôM¾‡«Ñ\'ÄË¨ü?¹m/RTq{oİ÷lqpŠAÁêP{ŠŸÃwwïñ#Æ6W7SKmÙ<îJ¦èÛvÕÎ3B×úôÿ 0×ßc´¢Š( ¢Š( ¢Š( ¢Š( ¢Šãş&Ûj~
->çÌğı¢t.òÁæ1BNW9¨È ÂŠùâÿ DÖÛLÙ6‹ªË¢îÕ—h–R³[¹#ìíåº?âÚX¹=3]°’?è—7>":•¼JÚ¤–SI½Ú!…nÏ-~gcÎOİÜIÀ¿¯ëúè&íøÿ _×™ì´W‹èZ]‚?‰#şÉ×ìôë¨£‰#¹Òï$YŒm:eM¯+ÈX’«ÆĞwuÀÃ»ğ¶½ÿ N—mö«Ù£’öÚÏN–ÆeR’¹Ü´‹wBAB0¹Á_×õúocèJ+Ã¡Ñ¼Ikã«W»¶Ô.5H5_ø™¥¼²[b%_7Álås–cÓ&«Kgâ+AÖtíCâÒK=²ë6Z,–WóHÅ¾B’òJåÔ|«»8Âz+¯ëúÛ×@®Ïúş¿#Ş¨¯›®çñ[Ááw—Ã^,H´ı2[U‚ÒÕ”©0Cç¬…÷˜p»H<‘xbúOêzséz’_£¬–4{¿*Wò.  “r€eprKš¦··Oó·üvóü¤h¯4İS}NŞçÄşÕon ’ò}aVÖVKÒ
-tÊ³.à0¿0 @ Òßø;VÒ5Í%íô;¦Ÿl7sEehD"g¸É¢·(ª™Ì€:Ğ•Úóş¿¯—pm¤ßcèjç†9£…åE–\ùhX|uÀïŠÌ×uØô5ÓŒ‘«ÛØíy6*Ï$àú`äšñİ Å£üMšhtKì¶—O"Ac4’(šü²Éànx?ŞÀ©Nïïü-şc·õızóQÇqÏ*E4nğ¶ÉUX€p}8=ˆ¯0ÿ …‰ã)î¼û?ŞXâV–Ò{[ˆ¤û™f”ÁÃ¡6fÃ*—†ô}J_‰vÚ÷öUÕ½­ÍíìÎÒE**+[Â¹Ãª•Ë† ²©lgI]ÛÈìW;qãmÍu9.ätë¥´–O$¾ù
-Â*nb nNCØf¼êËÅÍ¾«â=oGĞîç}Fä´¡ÜÇÌ’0\2)ßº2{íä¨È
-–¬ˆözl’$Q´’:¤h31À u$×âoê¶×:6“¤<ººCğn†K„‘ˆ~#)p7²)Îw 9äµox^ğÜÖÚˆc¸»¶º†[K=D€ ­åyávŞä¨!%*1Ãºw³°ÒM¤ÏeGIcY#et`YNA¡^mà{{øÄ÷Z¥¤ñAi"Í‚	iBZÇ¸©o¼2¤œdk™ñ½â/èUÇ…~Ï}m3MK£MwÆÈÛQí¤]á¶8
-Øù\ÅJÉÙy~"Ú»Ğö¹ç†ÖŞK‹‰RcRï$ŒUGRIà
-“¨È¯0ñWˆ&×|3¯øVãF½]dÙCåÅonó£´ˆ%£bÃ†9w=:ox?L»ÓüKâ¦šŞHíæ¸¶òdpß½ÛnŠÄ÷†F3ëš-«B¾‰QHaEPEPEPEPEPEPEPEW³¾·Ô i­dó#Yd„¤aãvÇ>Œ¬=ñÇb€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€”:2œá†	ó+ŸÓü¡éV×°X¥ü	{'›pSS¹Üïœ–İæd1Ç$OCšèh y¼áÃ¤Á¦.š#¶‚qsŠi#•fÿ j°}ÿ ínÉ¨GÃß,pˆì%ŠHe’e¸Šòtœ¼Ÿ|´ªáÛwË‚ºz(›>ğé°‡O[[˜ì!ŒD¶‘ßÎ2äŸ0á_$œ–·|Õ¹<+£M«A©Íjó\[mÖYäx   qØ‡ rªlÑEõ¸òøÃ©®l®EçÚßúù<¿8®Ó'•»füÜ÷ëN¶ğ^…i¨êñÚÎ×Šï<ëÉ¥YÔŒa‘Ü© [ôQÒÁ}nsVğî—Écmw–(à2¦¡p$XĞåQdó7"E ôçğ'‡$³û3ØÈßé"ïÏ7S8ó·ù™½ÓŠèè z/øv-¡K1Ûİ›åq+oœœù’Ù‘½ß8«šÿ ‡4¿iÿ `Õá–{]ÁŒIq$Aˆé»cÃ¾yæµh :ÜççğV‰s¨éú„ñßIw§®ÛY[R¸Ìc¿ü´ä‘Á';‡5/ü"z?ü$¿ğ‘yW?Ú›<¿;í³cg÷6oÛ·<íÆ3Î3[tP\×‹|'ˆô»ÔûuİÌ‘¨I„ò4qpêŞNí„åG8Î;×KHÌ¨ŒîÁUFK€&5¹ã~Ò£ñç‰eÔõÛK«F-4z~ŸsÜ‹IpØ `Q3Éç¯Kiğÿ I·ñÅ¼>¼¶²[5-J-zà4£ä²‡ÜÇ$`tŞÅ,sÄ’Äë$n¡‘Ğä0==Å>Ÿ¯s‰Ò¾i-¤ZC©èö¶P@ö»t{ëˆÑ¢c’¬ÊQŸ8İœrs]-¶…¦Yê	oh±Ü¥ªÙ£‚p°©È@3€3íZ57Ü+4G*«²1F)Ãà‚íŠwş¿¯_Ä-ı^‡”xÓSºğOˆµId¸³k”?ö‰³¸´(¢6pÁ”^Tn'ZÚOÂûëqâÙfÖ/ÌÍ4ı¥s"Z! ªDìû°0î	ïÒ½ŠKDSÎ´­;Ä6³j"ÛÁ60ÉwÉ.µOKtePYU1»cíÈn¹Î,hŸ
-ô;oYiºÔO¨Ígxk©¼”vÉc{¶ÇŒ
-€~™®öŠœœ¿¼-=Ë\ÜY]Ï;§—$“j724©v9iôÊ•²8é[öÚE¥{¨Ánîô ¸“q;Â(Á8 xëWj8'†êŞ;‹ycš2IV¡pE y…ŸÃíZñgˆ­u»{™$†ğ]#Çpñ˜&Õ_aÙ |t#hí]UÏ„mlçµÔtë'ÔuWİêºÍÓÇF.ÿ 4Çû?ˆ®¦Š‰%Ğ­·Ôá<3ğêÚÍn.õ¸£kÙõÔ>Ëgs2ÙÂÙ *®FĞw2g?A]u¶“ci©ŞêP@òû`¸—q%Â(Á8 zc­Yšxm¢2Ï*E v
-2N'Ô*J:Y[…Q@Q@Q@Q@TW70YÛIsu4pA—’Y\*¢¤“À-›'ˆtHlmï¥Ö4ô³¹m\5ÊånxVÎğzzTÇVÓWT],êƒPdŞ-Ëæ•õÙœãƒÎ(—(¬èµıx/&‡V°’+"EÓ¥ÊƒÎòËŒ¸éM—Äz6÷Ók:tvw'lt‚9O¢±8cÁé@tUCªéË©¦˜×ö£PtóÔÌ¾k/?0LçqÚ£Ÿ\Ò-mîn.5[¡µ“Ê¸’K„U…øù\“…<¨ ôU­é-yšê–FêX¼øà	½ãÆw…ÎJàzTÅ6QŞwL6’ËäÇ?Û#Øòp6p[Û­tkQU!ÕtëB}>ûYomÀi­’ei#, äu}jªxŸÃòÉqëšc½Ä†(Unã&Gª3ÉŒê(Æ¯¥ÛkZTú}Ú«C2àîŠ90zƒ¶Ee$yUMÃv:&ˆúU¸Ì.ÉVå·px…AÇ :Óäñ.‰à³mVĞİ}¡-Œ)(gYXªÊ2T§®:V­=C©‘má"Ò}6hmœK¦BĞZ;O#ã#yc¸`¹è=kÔW7Vöpî§ŠA É+…PI ŸR@úš¥¿¤\jÓiQê6çP…ö=±p;Cœ÷°¬	#8Í…¬sº÷ÃÛ]oÄĞê»í¢·vŒßÚ˜¥"ø!;VM²ª0nF9Q’GË[úÏ‡4½OÃP‚FµŒåc†y ‚¸ıÛ.F	éZµZBÊêæâÚŞîŞiíˆYâPÍ<€À©#Ö–½Êš?‡t½	î¤°Ä×LyæIå”…Üò31 tÀçÖµ(¨//-ôû)ïnæXm C$²9ÀU$šêÁ!×Gum-¼Ê)P£©îÁOIÒ¿³¼;i¤Ks$âŞÙmÌÀ”vvç äw56ŸªXj°™l/ ¹E 1‰Ãm$‡c‚<Ó5-oJÑ–6Õu;+”‘º¸Xƒ‘ÔÄf‹tî	ßTG¤h:n…É§ÀÈgË4’JòÉ+ú³¹,ÇêkJªjZ–‘¦Ï¨ßÜ$p&ù%nŠ?OĞu§ÛßZ]É4v×PÍ$,©ŒdŒ€Àt$yìhÅQ@Q@Q@Q@Q@bë~"´Ò¤û
-Ê[TšÚY­ ¼€ìyöŒ*ä– sÖ¶«;RĞtZXç¾Òôû»˜F!–êÕ%1÷ã##x"¦Iµ Õ¯©Ë\øâèx#L½²:TŞ"¼³·»û×i *à`ÁÛÀq×šè,|U¥_Xh·K9A¬ôD(IfØ\©  õãŠÊÓ>i‰-İÆ¹k¦j“\yJ±ÿ g$vğG•E2[Ü–'œp ¹ éz†ºlÚm„–±(C=ªID)F8†8â®M]µıyº'ı_‘™ã=}ôvÓîí×PŠKbÑ¬ëÎ¨NßBÖ…¼omw<º^¥{4š‰Õ.­"o°È±åSÌå–ŒõÎ<ÕÍ7á÷†í´Ûx/ôòî8ÂËrºL1y¬:¶Ğ\ú+NÃÂŞÒ®ÖëNĞt»;•	­ìãÀ=yP
-Éê6îŠŞÿ Ïı…u/ı-šº
-çüÿ  ;Ÿû
-ê_ú[5t€(¢Š (¢Š (¢Š (¢Š (¢Š FPèÊs†8$Ìt¯ÑìuıOÀş9²Ğ¯n[RM~hâinßÍxÓËX•A(»A'ñï^ÊÊ®Œ¡•†
-‘EcÅáÁm=¼>Òc‚à4IeY 9€\Fhïéú§úú—Woc«éz:]Ùhóë6–Z~™,ûá’\7Ú 2#"<–*Ä8äÓ’êëSÑt¯[Çuw{§}Æu6Û}‘®á”6
-Ç”Ù2s€ ¯|—BÑî4´ÒæÒ¬dÓãÆËG·Cã¦Œ}*	<+áÙ¬!°—AÒŞÎ-»YÆcŒ¥WûPõNÿ Ößåÿ n%£¿õ×üşÿ ¸òBÖãZø5§ø‚»Ë÷±³Üóß^´[É¹i!
-­ºS†PìÜ :å©ã_íÑr5¿'P{ÍKìgÃW)tKFel&"Àå†w¤Œã·´ËáOM-¼²èT’["¤öq“¯İ
-qòØ•e4]*=UõTÓ,×Qqµ®Ä
-&aŒ`¾2x uíUzşwş½«ŠÚ[úş¿?#Ã-oµ¬ÛkÍ<ÿ ğ‘?‹ÛJ˜y­ÿ ½áÛœl{§šèòûJÖ~+IcqvóYØÀÖÆIŞV‹1HçibH ³µz€Ğ4a«k"ÀjDçí‚Ù<î›~ş7tã¯Jm¯†ô+Ù/m4]:ŞîPÂIáµDwİËe€ÉÏZ—ğòù[ğ_å™IÙÿ ]Ûÿ €y„ì¥“^MI¼¼[=OÃPjW/—E†]ŸQ¤èÌqÓ‘Y²Íwc£k‰^Úğx¡°‚áŞÊT›.mƒáJG·%‡¯o›í1xGÃPÚOi‡´˜í®
-™¡K(ÂI´åw.Ü™éRÿ Â7 ÿ eÿ eÿ bi¿Ùû÷ı“ì©ånõÙŒgßäÓwş·¿üz[úÚßğO'Ğn­ ğİİõŞ¸—Z]õÅ„ZD„ ¸v_*h˜3ªüªì Xã¥Wø•6«£|;ÿ „v[]ÌĞË{,SÌ·r»ŒÆ& …QÉ °şäW±Eáíí#‡GÓãÍÌ–Ê–Èy,ƒ)>¢¥Ô´m/Y‰"Õ4Û;èÑ·"]@²…=2ƒEöù~ğB“³¿õıÁ<ÿ Ä7cşW/!’ÿ È¸ŠîW·s*ƒ²´ù¯†a÷CóY>×®õ/¢çQMF¹ÑœEg=ŒÑı”
-AAÙrÏ÷KÒ½-¼'áÇšŞfğş”ÒÛª¬l£İ_ºãå¶:T¿ğèÚ¿Ú¿ØÚöíßkû*yÙÆ3¿Î8ëBviö¿ãóÙ·’ü
-wÚÍî„š®£­%¨Òbh…´,Ó¾ì)’Äciï^gñ=ËÆz¡QÚ†©¡İ¬¬/Í„¤#j˜ÃÊ	ù$ò1ŠôÍwÂ:.³¥ê–ÒÙ¥»ê
-¦âæÒ5Iİåp$1œ×àÍ÷WÕŞïÅ/­ÜÏe/ ¿Ó-ìâ‘Êù{”Ìe`£ ±ÆÀ=j-Í§—éb“å×úŞæŸìtí'EÑ4ûy5Mr]2ŞH,à`îN79áW
-Inp1Ü€h¿Å‹¯ì©n#ğÚ´ö÷s[\;êQÇfX‹–IbÊpwtÅvÁ>1,GÂú)IeCa8ÉoSù
-X<á[[ˆî-ü3£C4L9#°‰Y‚\‚z¶ï&ûÿ ™\©.ßärºÅç‰ll|g£èúİ”š12ˆoÆ/íœ5œğ”‘‚@Æ{rŞ…Š<%¨ÛÍ4–×÷ºÌ°sş¨‘·h 3Ï9&½ÆşÔ|K¨hşA†]6ŞB÷Ös_K
-\€T¢²„tuÈÉ¹à G5ÔE¦iğc´fÖ3¹HTy(q•L”p8‚ˆÙ>o_ëúóª³ş»^‚jÙl#ÎÍñ·ûO”œG»nâqÏ''ŸC\GÅıF+oZØKoe'Û.>Y5™ ·ŒÆ¦O™£emÇnde±éIñ×XÑõñ?‡üË›É­³ç°û·)*d¸oİÈGÌèK‘Öàß†¾²µ¸Ô¯4Û+¹µB"›K-¼ap#>æSıâÄ–=juk³_ôü,Si?_òÿ ;ş¾‘ã	/uİ3H¹ÓÕ¯t…ÔRV˜7Í2½r7Iæ¨ë_,l¬­¯t¨¡¾±{‡·¸¾šf‚ÚÕ—#Á²HÀÂãr,¼3â'Z¹}ÓÁºM„¬Ê*O< Á@Û]îÏ g<^ğÿ €t­(Iw¨ÛÙjšÄ÷\Í¨ËfË9è¹ÉU€3üé·}­ÿ ÈIY[úÛüÌøIo5‰tÙnµ»m*VÖY#Ñ¥²óx‘s‰·ªÀî‘OåêÃ7±ñ7†Á’FYü$ùŸ{?hN€>µzWü!˜Ç…ôM„†+ıŸ	ÁÆßsùÖ´vq\‹˜í IÄB*ÆÁÈLõÚn”ãdïıl×ê'ª·õºÿ #‘ñOÄÍ+ÂÚõ¾•-½ÅÔ›<ë×„qi÷Èş#È%G!rİ€<›^[ém.Ó@·XõK –Ú„QJÆæ9aæA0ÆpËÌe:“]=ßƒ¬uˆÍªéjeí¼WjóÇ½b¹ˆì#=ƒ!O—¡Øx<ÖÑğ–›§•¹ğæ•¡iz‚œ“¥«aOQò2Şü)GKIÿ _×å¯£–·Šş¿¯ø¼ÏÄGIñgÃË¥Óo„è5;{Fx%¢•İÎGğFE\ğ¼mÅ?¡l«%„ƒ=så0$ÿ ß5¡áÿ éºTÓj”6z¦·=ÛİÉ¨ÉfŠêäğ#ÎâŠ  ãÜ÷®–+Khn'¸ŠŞ(ç¸*f‘“qêp8§õåş@õ¿õÔšŠ(¤EPEPEP\§ÄMP×<&Öºd^}Â\Á?Ù÷ªyÊ’+2å°:ät®®Š ğ›¿x¯Ê¹»]ç[ßíUK´Â§Ú1å±Ëìí“´œVêø[SƒÄ:0o
-O5¾ª÷±ŞB­wpb3’dŞP|«¸ã;@çÖh¡h¬]}Ê4_Eu¬Ísà›»Hg†(-a·–ÊCp°ò¶£¹F“’åŸ¡ õ8³|9ñx^ÒÚÒÖçûIšöİDò@ĞÅkpüùøpD€ùˆ0ùqƒ^ãEuş¿áú‚ĞñËO x†ÇÅV°­³Oi«ix5Vš0<˜­ü¶B»·ä  ŒMWOx†ùgƒÃ%œ^"mE,ÖkeÂÑLSÎ®z{]=wş¶ÿ $$¬¬¿­ÿ ÍŸ5'ÂÂ-&ŠtÈÅÔ·Iv·Ÿldh u0“Û²Bğ
-ûãšßºğ½¨XëÛü7{ks¨E6¾L–'Ë)
-«yŒÌJ£8÷1	Ïa^íEüÇÛËşğŸü>ñV¥x³hÚuÍ¢-«[ßDÒZB·
-Î…ÄY$ï!˜™ àúVF±áOi/u®İèª–¶Â6B©‡‚9”¢İÇò")<pNÑ´Œ¡Ñ”ç0pH?˜éBm4×AY5g±á·M{âsê°MVÖÚæÒõä±¸‚PU¡¿xYB;nFXœœ`(éoõ?‰×W­5¾…=Œ0L¦x^ÎAs˜yÌòåO—òíOâ$îÆ+Ğtİ*ßJ…â·’ñÕÛq7W“\6}ŒŒÄaÅ]¡h’]õwg“¿ü%ShZ„¿ÖßÃÒ"‹¨.,ÅÌÁ‹r!û1ùnP¬ûØÉ ğ_…µ¹¼W¤ø²òÈF³ÚIäXÖg„ÛÅ%Ô†m¬ÅFväôÍzÅí¦¥i%¥õ¬VÒc|3Æ#*x<€iÖöğZ[GmmpA„(”*¢€ÀâìÛª±É_üD±ÒÆ¼÷–’•ÑîcÒÈÊè¬$!Šª&I –ä9 WuBúÎ¿oc{buKhşÉq}qdQ
-»º|­"ùiåó–$2}WğV™­x—N×nY–êÁ•£U·€†+œnfŒ¾>cÀ`Á#5¯©húf³AªiÖ—Ñ#oXî YU[È8&’Ó^¿×ç¸ßdqZÿ ˆ¼Ow¬ê>ğìH×Cm/ÚíLOän-½%óX' ‚B§Šçïtïêš!µÕ4^îöh.¢–oí8bC+WËŠtL£îšõm7IÓt{v·ÒôûKY·´v°¬J[ d… g síW(ivw<÷ÃUÿ €¼9â{«‹4u„ı¢ÚˆUÚ5$c8FxÎ+»?<C ´2ÛŞÃ!´Û^i’ÁÊœ\£RÊU²I nCĞû¢ËFê`{ƒT´í"×MĞíôtS5œuY°Û`ñƒÇ(m»·åı~B¢’^×æyş¯©ë¾%Ò¼Gá¥.¡t–ĞÀo,åÉŠGŒn—e;ƒ†8@ØR¼g¯Má}
-óHñ‰.&‰cµ»šÜÛmÛó…QNF0}+~ÃM°Ò­E®emgn	a¼Kzœ(­S¾·Z%ØÇ¾ğŸ†õ;É//ü?¥]İIóOeØ ±8 Â«ÿ Â	àÿ ú4?üCÿ Ä×AE!œÿ ü ÿ ¡SCÿ Át?üMğ‚x?ş…Mÿ Ğÿ ñ5ĞQ@ÿ ü ÿ ¡SCÿ Át?üMğ‚x?ş…Mÿ Ğÿ ñ5ĞQ@ÿ ü ÿ ¡SCÿ Át?üMğ‚x?ş…Mÿ Ğÿ ñ5ĞQ@ÿ ü ÿ ¡SCÿ Át?üMğ‚x?ş…Mÿ Ğÿ ñ5ĞQ@ÿ ü ÿ ¡SCÿ Át?üMğ‚x?ş…Mÿ Ğÿ ñ5ĞQ@ÿ ü ÿ ¡SCÿ Át?üMğ‚x?ş…Mÿ Ğÿ ñ5ĞV2ÚN<b÷›µo Ùö™ãûíùâ<ïóÚÆ1Æhêv£áoéßjğõµ¬Xó&–Â«’ ÉÛêE3Hğç€5í*OKğîsg8&9WMˆ‚Aà®G Œänµ¿xŠûU].Îài-ÆŸş†ğ,¶Å	Q /$oæn+»pÁ4Û=wÄ•a¤ÜkP¶¾úê¨Ó$‘nnÑÛî?ï$hÀR_qvÀ næˆëó·ãÿ pz_Êÿ ‡õcÕll,ôË8ìì- ´µ;!‚1.I'
-8$ŸÆ¬QE QE QE QE QE QE QE QE cë^)Ğü:ğ¦­¨ÅjÓ0' »› íL76y¨ï¼eáİ7W·Ò¯5{hogÆÈÙ¸›¢g¶â7vÍsì¢Ô´›Ë;8õQªËn%–eè†İrÊbeê>cr$ğv·©Mu¥éâSw¯3«ÆútŸf´x•KIÁ*„t1àôìGW¯ëîëı1¿ëúş¿CÕÇ‹ü>|Btí[í0	0äõWwİŞ;3»ãAã/İN ·ñ&4Ç8;è™O» Oá^CoáÍh]Ûè/¦_›¸¼`u¼6Ïä½¶Ü™¸ÙÈãns+©Ô4Kÿ Øx’k=:Kk]:]+D´’ÜÁ»*’`6†!Qx/½'¤oılŸæì	kgıj×ä®v:ü3ªZß\ÚkV¯‰ÿ Iwm‚1Ù¾lefSØšl9ğÍÆƒ.·¯Ø".G`Êêÿ Ü1‘¿qì¸Éã æ¼KZğßˆ<A`.´íR†;ÙÚÜ[Oi$-<‰*³FŠÊà)<ĞÔV¥£k7Ş4¹ñe¾“©c¦¹§ÊÖïe*Ìëe^Q	]ä)aÑyçĞÕòëkÿ Wµş{“wkÿ [^Ç­ÍãA¡[ë/«Àln8…Ğ3´‡º„ ¹aÜc# `Õ‰üYáË[kk‹K‚¤ó ’[¸ĞJ¾ªIä}+Å?°5¶š+Ï°êÚl:Ş¡{o„²ÏjŒ›UZ…õÜ½lÖÍ–¥§x3Kº¶¶Ö´[iOkkic¥´Ğ°i	_1'Tf!Y²êFyÅOKú~_ÿ áŠ{ÙZÿ ‘é·>4ğİ¦¥i§Í¬Ú­ÅŞß$Ü§pÜ¹qò®á÷w»¶j÷öÖı¼4Oµ)Ô¹ºû8‘`»‰Æ'¹Íy‰Şêú;-*÷Ã÷ÆH<CU’ÇI™—P¼E‰Sn2ç' ×ü/eâ;ã¼Ôô‡intö‚öş$¹hZRáòÀ€Bçh äŒ•åo_ËOÇôîKz_Óşáıh{=QHaEPEPEs)¾·Ñî¡Ö'»ÖØ-n&–±9¶œ$ùÌ¨#.æôÍ~;Ñô}Âû[•ìÍÕªİ2Ã· åÑs€	ÆIâ…¯õëşAı_yÓÑ^qqã?êÏbš^‡«éÓ®¯IÆ![›#ÕÌŒ"àç·¸­xÒçÃ—ĞØØè¨Nö“^»Ir-âH¢oœƒ–è1à’+«_úÚà•İ—õĞéà¿³º¸¸··»‚i­˜,ñÇ fˆ‘TãÖ±4¯è:ÅÔ¶×N.g¸¸·Š'‰f„üı°0FpH#ÕçPøƒ[å®¿§éz…‚ßŞ ¼°‡Ã2ôPN^iÄ{ŞBFÂ@éÏ&¬øÃ—°ëşÔ•q mOU¼›u¹Cr†òÌ¼|¬FÀç·n*+]§ ®­§õ¹ëõ‡uãËÄhWšŒ¬Š‘ıB¤¸%Fğ»88Éí\—Ä¯k:ävƒ,±Æ·—·OL!‹q
-
-/;Y—ÃîƒÇ$cŸÖuëºªhöšå¥Ä«oÚdÖ÷–ék"É—bÛD2£) ïÁÀ\w£ï5Úö½ÔûØõ_ø‚ÃÃCêš›ºZ¤‰2.pY‚Ã'­Kg¬é÷ú•şmqæ]X1ìa³zî^HÁÈô&¼ó_ññ¾‡}áåĞ¯WP‹WŠÖH»O T™»LªcQ³’¤ätç‚zi—¿|azÖÓGks’Å#!Tr±°`‡¸tïDuWşº˜=>_çc²¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(Å>-´ğ•’İŞYj ZGµƒrÂƒ ³±!G$qÇ°88£/Äm-pi¤\˜şĞ–­z|„™ºÆNíÙ*:íÛÛ57<)'‹ôßìæ›NÙ••šçOûD¨HÆø›ÌQpk&ãá}…÷‰­õ;¹ã6¶ñª­¼0²=ÃªmG÷•‘”Á§æÁ$®úş¿¯Ô¹§üJĞõkéÒB4µµûj‡·Ü×ûŠ‰#U$•Ê÷Á€)oş#é6†®lµ)à¼´ûnÈ!Vh ùrò|À 7€Iô²´o†:E¥ÜÛ±Í3é_Ù6®ÖD,Pîf%ÔIó·ÍŒ‚£†¬\xYŸÂ:O‡ˆl…Š¢JKfJŸq\yßw€Hş"=2´ß—õ¿üÆÀ¼ÿ ­¿àşKâ—†ô«ù`º{‘kT–ùb‘£2,gÛŠŒğ¸äæª¿Åİ8'gÓ5‘=ªy·VÂİÛÂUXJä>İ¤:ôbzñÁ¬½oàãkÍw×ˆ˜ZŞOİÂ¥’‰áa1î»hRNâ»}jFø[«²]+xÑÅì=Ôm¥Ë
-
-ùßwÄgæ82ºÿ _×ùy‹·õıŸ‘¤>.xr[ù--¢¿ºmí»A¸º‘Jˆ7n2/.u9Ç4ø¾(Y\Xµí·‡õÙmÑÖdò¡@“4†1Ï(Üû‡!7c#k*×áv»cªOªZøÉSQ™fYoš|É|Ìc~%
-Û1ò  /`b¶4_İiï¤G«Áua¥;Íoi’<â0‰‘‹c.Üä–rIèVÒÿ ×õı[©®¿×õı|»~Ş”QE!…Q@ã½^ÃBz<ËÄO<VÑ«Ìğ`X[nxë×â¸;ÿ ø³Y¹{›E¹µĞ`½Å¼öz-ÌÓ\2ıÛ ‘g 1Ú£wÊ2%oız˜=[¬}WÄ6úe†­qök¹[L¶k‰ìîŠà)l$Œ1ã¤ã½pZKjQx[Iğß‡ä×ín^ıÕÌú<­ÚGgÃNW‚6üÎİ8ÎqÇÂMsU‰n5OÛ¾¦ÙvÖO,Ë£òCùª»6¹Î#]Ç“CO[-__ëúÿ #½ğ¯Ší<Ye=Å­½ÌXäIÔ/ÌÑ«ñßqÔ¥Iâ?[øfÒ›«w’ËŞ.máU8ÈÍ"xdÛx^ãÂŞñÑ®Œ—·hÒÚî@l°,h;†9LçúW§ü8¹Õ|&·Ä¿iÓ¯"ûlk=•Ì“DòFC¸d¸ÎáÎåÁRsòâªM^ëeoëğbŠÑsyÿ _‘é¾%×Ã¿ÖšÙîVÒ/’Œolöüş4š?ˆmu«ÍFÖŞˆä°xÒS*]¼çaÔkˆ´ĞµßYëZdw÷V¸Xÿ µl_íHÑ)d1)ÚŞ§,Xã×´Ñü;‘¬k:‚Nd:”‘>Í¸òÄq„9ç¡9ã­]ŠîËñ6¨¢ŠC
-(¤bU‚– d(ÆO·4 ´W0|M¨Ãö«{*Ùo’x`#¼fŠF“8!Œm`XlÎi²x£Q(ÔbÑ¢o&W†ò&» «¤†2°â2e$”™Êô' ZÔÑ\òø®ÖoaÛÍ§ù‘±I–kĞ“–Ù»÷Pà— u$®9ÆpiŞ ñÆ#%¥‚^-^òä4æ2°©ç`
-Ûœó…;GxQÛÌ-­ú+œ‹ÅÖ—^']Ú}<²’²¬×¡''fÿ İC‚\ y$®9ÆpjŞ§«_iú¤i§G-”ó$/Ú”3wHÂÀI,¸ œQÛÌ.lQX~×›[ûVó¦åÙßı¡Ó9âUØ¾[qÓüñ[lÁFIô=7h¬‹Oh—¾_A¨Áı”À‘u+yIÃmä¾1óqÎ*ÅVz§‡­µk¹-lRy<úS~í¡DˆÅX“ĞØ£­ƒÌ¿§éúeŞ£qnÒ§Ü}¢Db6«ìU;F8ÎĞO^sWë•ñG‹—D½Òà´k{–›QK[È“2K¼nã§!ÑŒõ­?ÄöºÛnëKÏÕ kVg?t øÎsÆ>hZ¯Oø ô×™³EPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPwğİÛKmqË¨RHÜd2‘‚ô"¼ãBømqk®M«W>‰Ãéö/«İN¶ÅìıÓ€„c[ppq^—EGpz«3 ™¥_x­¹‘êgld•<)RàŒ0#F:cKIğ¥¶™«Üjóß_jzœÈ"ûMó¡1ÇÇÈŠŠªŠHÉÂòzÖõ-6¨QE‰¡Ë?‹4rŞD­cšŞåNs$N qÔ:©íŞ´5:NÛì÷r‰¸6m®¤·lö£el{f­ÑGK™Ÿ£hšw‡ì>Ã¦[ù0y#ììÎÇ,ÌÌK1'¹&´(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¯9ºø‡¨ÃãG°ÒÔé‘ê‘i,0™¥’2â@ÙÚm$òsÚ¶ş»~ ö¹èÔW“Ïñ?[Ó¦Öìoì,Åı»[-ÛyâOßHcË	0Ò*œ|ê7ldTW5±ÖpYéãR±7Íw,‘¿“*ÛcˆÔ6T¶GRvã¡Í+«_úÓ»ş:Ûú×o¿şõÚ+ÊWâÍäºœW)a
-èÆê7ˆ«òÀeŞ;p8väõÏj­iñ;Ä÷Ñ|–š4+6›ı¬·3y‚;[}Î6H»³#’ªR£æ'Sz^Wüµï·õ­¿=_¢¼Óş‰RæŞ<;_¶¦,ã.Ó¼À¨ÙŒ|£$ü¿3~<W+?Æİj1,6ğé7F $ûlQ¿–àÂFbó7!•i^2®í~‚¾—ş¶¹î´W^xç[™®æÒí`knà´7ÙM{å“’i‰t\ªŒc“Ö­è^5»Õ¼[¦é±K§Şi—zK_%õ¼rFÒ°p¿q‰òÇ$m%GJ®ßÖ×ü‚ı­ìwTT7wpXYÍwu*Åom$²7EP2OåX+â‡Ô´;Û:İ¬oUdû*k1´(UæàeŒx`xìpi6’o±Imæt”Wšø?â]Æ±~öšŒ6×ä¶Š.70æH·’Şa àmÈÁÏ šßoˆº‚ê+jÌ_,möxîsœß0S}¾j–R2™iÉò¦û
-:Øéç‚«y-î!heR’G"†WSÔx" ÓôÍ?Hµû6›cmeo¸·•m
-Æ™=Nšã~ø»Uñ=µÔZ°·3ZÛYÈ$‰H2y°‡%»g=€ Wmypm,æ¸X$œÄ…¼¸ÙU›rª?9.W¨“æ'¢¼óJø‘a·¬Á­ê^TBxÎ!™äDñDròE¹B—“‰ÆOGMx½4ßêM¡jz|š½›Â$ƒÍWxÃJˆw($¯ŞêGz-·˜ÎÊ£‚m¡HmâH¢A…HÔ*¨ö¥sñp¼ğ¤šÆ´ööÆ;Ùm\Â·+1 ’OËùö¬3âEÆ©­Éu®txì.&åˆ<¾\â3)’Bˆ/<6Ñ“óÀKV¿®——ù~6=*Šæ<i¯Í¥ø7X»Ó.`S¶²ûJ#•v@xW'Ğàò2;ÒøgÄš¾³®Ø]¥ºÿ gIÇåÉD®wÔä€qGp}<ÎšŠ( ›"—•]° :ã+î2üÅ:Š ç#ğt¶—æ©rÍ2ÏòùH$VÜvÄ9şğoNœP|$VHíµİRØ[»ÊÆ%·&y\’Ò>èˆÜK»€3ÀÑÑ@cÂö¿Ú¿l7W-œn>ÄÛ>q]¦O»¿$gØÉÎ3P]ø#Hš(á²C¥@#’	!ÓãŠ4š' º2”#•Ãuæº:(Zmı_–€aÚWíh¸û8˜ÜGä	Jí/÷wçãvŞsŠ…|!ok{ÚeıÎ—k!lla·œ8ò‹p2AÍtTPn—£ÿ gK5Ä×÷Z…ÜÊ¨×K}‹’«ˆÑ ³™ù=1¢A*@$:Ô´Põ‘ñ›¨ ][ÚÏ{©_BÑÌ³ApvÊ®JU]à´É9ïÄjz•<ò·‡ôêw‰º‚{aj“yn­ûÛ›¸¼ÀIçäbI^İkÙh¡hî=O ]jş!¾×u†ƒK»’[imF“ ‘£xC~ñŞH€v;Èå:ÖCÀme¤®Ÿoy®êº}ÍúÍsd%³AóIæ<…Ú%lnç
-ÀóÆ;z-6ş¿«×p¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¬	¼áûxërX¨¦A<L
-Ønğ¤€ØÈìk~Š çÀšÚò‹9®EÚ¢Í%ÕäÓJB6äGrêäm#š‚‡¸²ŠÒM1Ìqˆaw2ÈÆ_õ›Ü>çİßq9®ªŠ ç¿áğßöÊjÃKAtŒ® Hâ-Ê›¼­Û2à¹Ÿÿ 
-³Áâ2‹¦NªB€P¸]¡X²¨Äœ(c¸(àq‘]
-Èæ"ø}áË{¨î ‚ú+ˆ¡hXõ;•`ŒIa‘'rI'®yëÍ2o†ş‰ôÙ82–‘o'Yeóqæy’İ&ìî'Šê¨ f¿‚ô+==ÊŞæÎÂ9EŠÒúxI-œå‘Ã0ç¡$Qkà­ÇT´Ô­,å‚æÎm—u*¢D?ƒ`m¤w9O<ÖıyÉøÛCºÔE…ıŒ?i¹³2FmÚ;ˆçUÚêÉ$±Àçxî0rkšĞşê{í*ÊÂÖyïlçx.7Ê1å(ˆoÏ(’>HÎãšõ(ZÔóëÿ ‡0ËqŸ¦ØÙiúGÚa¹¸º[¹íÌC
-©‘û²zœã'5>›ğ×I¶¹¼}:­U×ì3Z_İ-ÈfÂ’I¿vÜtPvàôî{ª(èE·†´½>Úö-:ÜY›ÈV&9#òÓ<mP Åy®‘áo[Ô-<;ªÜ]Úi5°¶Ÿì‚îÚJ0Yv€V5®7Î0ô}Ä¶úååı¬VïÖ.d{›y$‘‚"•ÊıÓÃ?®6¨ëwıvüÃedrP|6ğ½£;CarÛÚ7x¥Ôn^9Z<lŞŒåX.7ŒVM‡Ã”¼ñeÆ½®Z[[«s•üòÆÒF’BÁË(;íÏ''ì—_Ñä[.­`Ó™šÜD.Sq•ydÆs¸wEgGâûKßøŞÒå ³[‚Ğ8U‘Œ%ƒ¤•=é^Ş÷oëúùıÕÔ¸|3£
-}Ù)Óçwy!.Ü³9rÁ³¸Ç ƒÁÆ1Y<-|í%İäòºŞYu;–‘Ğãäg2neùA
-I ç“W¼/âË_Ø\\ÚZÜÂÖì©$s(RY£Y>^zaÇ'Jåî~+=„Sÿ İÁ$7S[<ks»LvŞqÉLŒöÇ@9'‚)¿uê÷¶4Sáî&·}%İ¬²ØMH¬ÚÍì’Í´’RegÚÈ3À$÷Èæº»M.ÊÆîòêÚ÷®²\6âw²¨QÔñ€ ãÍè8jBÓJÒ$) ŒßMu:Ä!ÆÔæGÎx%UNºúm5£iìQE!…Q@Q@Q@Q@Q@Q@Q@Q@Q@Vÿ Q´ÒíMÍäÂ(
-8,YEU,Ç° “Y?Ú¾!¼ùôÿ Å'£êw¾C‘ê4şTû
- è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ‡üøèø7ÿ £Îñ‡üøèø7ÿ  ‚ŠçüïÏ‡ÿ “ñª<ïÏ‡ÿ “ñª è(®Îñ€çû?ClvûtÃ?”qùQı¿¨Xs®h¯mñ]YMö¨Sıï•\}˜È ‚ŠdRÇ<)42,‘º†GCÀô ÷ú (¢Š (¢Š (¢Š (¢Š (¢Š +Î|m£j¾"ñ®›¦Á®K¥Ä¶mufé:ùèà;®™`­İÄŒùy¯F¨Şdš9$ibÏ–åAdÏ\Ù¥mSş¿®£¾M©|<Ôì­õxm-æÔnµ[O!e²sk»™L†Gó.¾ñ-¶5ÛÔcšë¼ku¨iZ=”Âì®¥ Ô. ‚FGŒ¢²<Ä !ÊŸ¼2q×¡ëè¡««	hîy&…àOZğœ–Ñê}‘pçìÉö('œÆ»DS­ÙLœÜ #9 Ö]¯‚5ßíû­#F×µc¦Ü›³%öŸq¼bPëµ¤Tå²
-¯Q»v>Zöú)½X-69Á±h–ZÍ¬÷
-º‹‚²ÄIˆR!´œ‚Ãnwc©éÅs6¿á´Š[Ö´²óKMh¢e’K ’êB°œl¤óŸM¢‡­üÕ{»E—„ïô›ë]^êæ=J}?N6Ã¦Ù‹ifC·ÚIÊ¶6ä¨“Løká{¿ÛêË,7VÖ·7
-öö×rÅ$Ê—sÙ¹°:xÉ$“]Õîïë{ŠÊÖş¶°QE†QE QE QE QE QE QE QE QE „…’ ’ikÆ.ñx#_’&Û"i·­èDmƒ@è{ulx–óeV6
-ı ·=ÙpÄö/c]júğó4¹£ÓôÖû—rEæM8şôj~U_Flçû¸Á-ñHÖúFÛo}r¶ò¨ÿ ÆÒ2ıFû9® À ş«ÃËx«\fîw[Œş ?!Gü#7_ô4kŸ÷Üüjº
-(Ÿÿ „fëş†sşûƒÿ Qÿ Í×ıçı÷ÿ ®‚Š çÿ áºÿ ¡£\ÿ ¾àÿ ãTÂ3uÿ CF¹ÿ }Áÿ Æ« ¢€9ÿ øFn¿èh×?ï¸?øÕğŒİĞÑ®ßpñªè( ş›¯ú5Ïûîş5Gü#7_ô4kŸ÷Üüjº
-(Ÿÿ „fëş†sşûƒÿ Qÿ Í×ıçı÷ÿ ®‚Š çÿ áºÿ ¡£\ÿ ¾àÿ ãTÂ3uÿ CF¹ÿ }Áÿ Æ« ¢€9ÿ øFn¿èh×?ï¸?øÕğŒİĞÑ®ßpñªè( ş›¯ú5Ïûîş5Gü#7_ô4kŸ÷Üüjº
-(Ÿÿ „fëş†sşûƒÿ Qÿ Í×ıçı÷ÿ ®‚Š çÿ áºÿ ¡£\ÿ ¾àÿ ãTÂ3uÿ CF¹ÿ }Áÿ Æ« ¢€9ÿ øFn¿èh×?ï¸?øÕğŒİĞÑ®ßpñªè( ş›¯ú5Ïûîş5Gü#7_ô4kŸ÷Üüjº
-(Ÿÿ „fëş†sşûƒÿ Qÿ Í×ıçı÷ÿ ®‚Š çÿ áºÿ ¡£\ÿ ¾àÿ ãTÂ3uÿ CF¹ÿ }Áÿ Æ« ¢€9ÿ øFn¿èh×?ï¸?øÕğŒİĞÑ®ßpñªè( ş›¯ú5Ïûîş5Gü#7_ô4kŸ÷Üüjº
-(Ÿÿ „fëş†sşûƒÿ Qÿ Í×ıçı÷ÿ ®‚Š çÿ áºÿ ¡£\ÿ ¾àÿ ãTÂ3uÿ CF¹ÿ }Áÿ Æ« ¢€9ÿ øFn¿èh×?ï¸?øÕğŒİĞÑ®ßpñªè( ş›¯ú5Ïûîş5Gü#7_ô4kŸ÷Üüjº
-(Ÿÿ „fëş†sşûƒÿ Qÿ Í×ıçı÷ÿ ®‚Š çÿ á¾^bñ^¶®:û;Ä©ñ_êZLÑÃ­´ÛHÁ#Ô CNÊ„¹8 ^3»Q][C{i5­Ìk$!DnŒ¤`Š ÃÀğş»o@&—©ÈÈ#vœGep#¦à;¹®†¸Àóİx'O[Çg¸µÕ­­šVûÎa¾X·ÿ À‚dÿ ¼k³ Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( °ügÿ "/ˆìsÿ ¢š·+Æò"ø‡şÁ—?ú)¨=gşF¯×[ıÕĞW?¬ÿ ÈÕá¯úëqÿ ¢Zº
- (¢Š (¢Š (¢Š (¢Š (¢¹mOÄú¨Ö®´½Ãÿ ÚrYÃæ]M5×Ù¢W#rD­±·9ö#'š.4®u4W	á‰ö÷ƒµO^ÙK§e;¥å³?˜T¨ÏÊp39õš~+ŞYhš½¬xv+=VœD³G¨e„íwO(3Ãt÷â¶ôüvKúş›ErÚ—‰õ_í«3@Ğ?µÎ2æi®şÍ¹’%m¹È9ìFO5€ü{oã]îşK6Óf²™¡º‚YÈÎì1ê?Z£¯¢¸KOjş,§ÁzU¬Öpjš¤ï2H!#Dfu’¿¥jøëÄÓøSÂ¼QM~Y!¶…Á*ò¹ $u=ºQÒáÖÇMEr÷¾"Õ­o4íÓIRÖe·Ş0”ÛÛ[¯MÅ°äe
- p}*—‚<~ş+Ôõ&ûG}'TÒ¤5¹œL9 î=1‚'<>¶AÒÿ Ö§kEqKã«oZ¼Ò¼#¦E©-Éu¨]\mb“²ªÍ!Îr ¼Õßx‹Xğ¿ƒ?µ§Ñ£Ôï­á^Gip"…02ìşm½p±éõ©º·7AÛ[E…àïÿ ÂYáKsì¿eûZ³y>fı¸b¿{==+”´ø…âí\ÜÍ¢ü>ûuŒW2Û¥ÏöÌQy›©;Yr:{ıMSV—+Ü”î®H¢™HĞFÓF±ÊTEmÁN9 àgëO¤0¢ŠFÎÓ´ØàŠ Z+Í4ÍwÇçÇvšn³?„á·&A%µÑûCÇ€VUV%C~lÁ—GK‡[W{7Å6ñ(¶¾]+µÇïÌšwĞ‚p8Æáš:Ø:\ïè¢Š (®gÅş9Òü¶oª[ß¼wncG¶·2*° Ğ§è	®kÆîá,¾)ğØ¸´•¦H‡Û-°ñüû[å9R}şaøô£¶¶=.Šæ<ey¬Aá/µhº•¥İïT“d1¡<ó´Œ“…äw=ñ[zMÌ·š=ÌòÚK,°«¼–r…‰”cÕ}¥ßÈ›èŸråQ@ÂŠ( Š( Š( Š( ?şeoû˜?÷']…qÿ ó+ÜÁÿ ¹:ì( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¬?ÿ È‹âû\ÿ è¦­ÊÃñŸüˆ¾!ÿ °eÏşŠj Yÿ ‘«Ã_õÖãÿ DµtÏë?ò5xkşºÜè–®‚€
-(¢€
-(¢€
-(¢€
-(¢€
-ç¼WâC¡ÚGmcÛ5»Òc°²SÌİ›Ñ«1àr+¡®K]øeáj©k:\—wn¡K½äà : €°©=é5}p>!ğ¥¿†ş
-ø‹C¶¾‚÷[Â_ê‚9ıÅÕ‰ÛÔ(
-q‘Î	¬¿Íßìóá( I§{XaU—ÀïEz÷‡¼á¯
-ÛŞ[èÚTvñ^ .¤yD€ ;Éã“Ç½V²øqáM>âÎk}1ÿ Ğei­b’îi"Ï%’6rŠsÏƒƒÚ–İ4p&×ãø‹®ø‚_è–66ñ}»ÄQ¬6vjy–@çoD^¬ÇëÈ¯?×tHüğ_ÄzM–¥Îºê·:¡…ÁpeuvõTÛ295Şk¿¼#âmQõ-gK’îíÔ)w¼œ @ p ö u'½[Ğ<	áŸZŞÚéLpÁzÜ£»Ê% ƒ¼0ÇœÒ’æNû¿êßæ÷Z¶Èñ{Ûkïü"ğß‹|=âmZ9×Êó-$¹ßlûÁÜ¢/º0ÀöõÎO5Şx’fñWÄhe6¥¬Ûw±äü›F#÷ŞGã]%¯Ã
-Ù‹d‹N”Ák7Ÿ´·“Érsó™ÊÉşõ~ÃÃv(Õ<B³\Í}¨$q¿šÊV$AÂ  S’yw÷¯çÃOÇ_‘²²íoÇü‰<GâOéfîà4²»­­c’æS÷cAÜ“ù“À®OÑ§ğÏ‡üU©Ş^[ë6sß=´2‚ğª«mX×«'–gè+®ñ'€<3âë¸®uİ>KÉ!M‘æêdTğªà{œdàzS|7ğ÷ÂŞ½–óCÒ…­Ä±ùO!I	\ƒ9§¥gk§~·_×ëı^ïf¼ğæ=ŸÀ¹¼S¤x—W±Ôm&yšnÊÀYdÆÖŒpI<ä;q^Ÿ¨ê·ZçÀ+½Rù@º¹ÑIp0ÎN;g¯ã[á¯„¶Ïén–×	æ´òd·‘Á&â3Ğq·VÆ±áí7]ÓF}ÆÏnÓ2@¬¸ÆÖòÙw.;*§ï&»Ûòt’}¯ùœÏÁáŸ„úÎ3œúèÕÈxßÁ²|>ğ$š¿‡<Uâi´ùÖa·Û¢˜¼ƒ Æ ^§=9ç çMÑ¼!¢h\Úfm4v!F¶’îYc
-sªìBçqÎÜg½R°øsám5-c·Óæ6ö’ùĞ[M{<ĞFüüÂ'r›¹'8È'=iÍóMÉh({±Iêkø~êòûÃšmŞ£‘{5´rO1µÊ‚F;sÚ©hZ:n¯ªİÇâWRyåÄ¶×w‚Xí[ïíD lá‡˜­úÄÑ¼!¡xSÔ5-.À[İê¾êA+·˜r[8b@ä€PİåpJÑ±GÇ5¶ğFƒöé-äºº””µ¶Œs#…,IôPI®SÀßµ†Ô,tÏ5¦íf!w¤ßÛC(nL‡\ãÄ’A6ş)³i:Ÿ„üNøk=:üÁv¬>Që±˜ı ıiÑüğwÚdi×Pº±fw‹N–í…¼äÑ…Ãò÷sÅ(uoúş®şC•´Kúş¬yŸ4MsÃ	«^x~Ûí‘kú×ÄK©F®à°+”~fÀÚ1Œ2O«üGñˆ<;áí7^ÒbCioqš”,¹v„àmry<ÇlÓ­~øB›ûNÃÂëqunÅå,İ°²¾ÌúŒâ²|[‹<yw†aĞnôm	¤MJöêh·ºO–‚7`sÈ'œg©Šî¿OòfÜŸŸõşG§#‰#W_ºÀ^ªC¨x–_xú×Ä‡L¿Ğ.¤´±€2¬kG•—=L‡±ã·<cÜÑh¨£
-£¸wáŸƒ®ï®5Ùü*uAä¼PNPÊÙíi3ês×œäSŞëşÌqÚÌÊ×<eâK?Á!Š“I¿hSUW,eqHPI=AÎëWüaâïZø¢øZÛJ“R6Ozÿ ÚR0($ã
-A.pO'ºÖf­eâø“NÒ¤ĞgĞ¼-¦\¤÷<±ù—,YV6#nN2	uvÕ‰&ğ«XêZ%æ¯¯'Vesm;³d(ÜUa=9ì	§'}º·ënŸˆ¢­¿e÷ÿ Ã®…â¯|=şÓÓÙtıFâŞHÆõÜ-ç\©àõ†y¯2Õu‹ïşÌÓİjnÒİÛÈÉ6íŞg—:¨b{ñŒç&¶¼ğ?ÃIá‹Fñ6Œ%Õ¤IÂİJ¢<œ„_(ÀÏ?S^—‡ôˆ¼>4ÓàP‹Éû.ß“o§×¾zç´ä¬İ¼¾ô{vıÇš§¯AáCMÑí|E§Zî’}6K¥‰gß	 fùHúõ¨©ğ:âtÒuí&K³ÛØjL „\­ÂÂ®7ybUá¶¤w5«ÿ 
-Káçıßù;qÿ Ç+°Ñ´=3ÃÚlz~‘cªt%ÆN1’z±àrrM	Ù¿?ó´Šíÿ üÍ
-(¢ÂŠ( Š( Š( Š( ?şeoû˜?÷']…qÿ ó+ÜÁÿ ¹:ì( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¬?ÿ È‹âû\ÿ è¦­ÊÂñ©Ç€üDyãL¹éÿ \š€¬ÿ ÈÕá¯úëqÿ ¢Zº
-çü@D:¿‡/‰ıÊ_4.İ€–'U?‹ìğ*è( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(Å^ƒÅ>¿Ñn$òÒî-‚M»¼¶ê­ŒŒà€zÖ•¬&ÚÎ†Cj…Û«`c&¦¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€8ÿ ù•¿î`ÿ ÜvÅ[Ëçx*ŞçÆ¶“Ä½šd?Š²ŸÆ»Z (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š *ËX¯¬n,ît3ÆÑH¾ªÃô5=Îi1.³á™4]W-uj>Éw´ímë²¯¦àE=²;Šp×ŸEßÄA¢	ÂêKò%®G7¨l/¡=İKI{›…¾±¹û&£ìY¶oI9Ù"än\’G Œœ“˜!Õu¨ßÉ½ğìîãş[Y\ÂñŞ20úm?S@#ñ‡2o‹YÓOñ-Òüéÿ ÛÚ?ılğ!?Æí¯ú_ßpñÊ?´n¿è}ÿ }Áÿ Ç( şŞÑÿ è+cÿ 	ş4ohÿ ô±ÿ À„ÿ ?´n¿è}ÿ }Áÿ Ç(şÑºÿ  5÷ı÷ÿ  û{Gÿ  ­ş'øÑı½£ÿ ĞVÇÿ ühşÑºÿ  5÷ı÷ÿ £ûFëş€×ß÷Üür€ííş‚¶?øŸãGööÿ A[üOñ£ûFëş€×ß÷Üürí¯ú_ßpñÊ ?·´ú
-Øÿ àBÛÚ?ılğ!?Æí¯ú_ßpñÊ?´n¿è}ÿ }Áÿ Ç( şŞÑÿ è+cÿ 	ş4ohÿ ô±ÿ À„ÿ ?´n¿è}ÿ }Áÿ Ç(şÑºÿ  5÷ı÷ÿ  û{Gÿ  ­ş'øÑı½£ÿ ĞVÇÿ ühşÑºÿ  5÷ı÷ÿ £ûFëş€×ß÷Üür€ííş‚¶?øŸãGööÿ A[üOñ£ûFëş€×ß÷Üürí¯ú_ßpñÊ ?·´ú
-Øÿ àBÛÚ?ılğ!?Æí¯ú_ßpñÊ?´n¿è}ÿ }Áÿ Ç( şŞÑÿ è+cÿ 	ş4ohÿ ô±ÿ À„ÿ ?´n¿è}ÿ }Áÿ Ç(şÑºÿ  5÷ı÷ÿ  û{Gÿ  ­ş'øÑı½£ÿ ĞVÇÿ ühşÑºÿ  5÷ı÷ÿ £ûFëş€×ß÷Üür€ííş‚¶?øŸãGööÿ A[üOñ£ûFëş€×ß÷Üürí¯ú_ßpñÊ ?·´ú
-Øÿ àBÛÚ?ılğ!?Æí¯ú_ßpñÊ?´n¿è}ÿ }Áÿ Ç( şŞÑÿ è+cÿ 	ş4ohÿ ô±ÿ À„ÿ ?´n¿è}ÿ }Áÿ Ç(şÑºÿ  5÷ı÷ÿ  û{Gÿ  ­ş'øÑı½£ÿ ĞVÇÿ ühşÑºÿ  5÷ı÷ÿ £ûFëş€×ß÷Üür€ííş‚¶?øŸãGööÿ A[üOñ£ûFëş€×ß÷Üürí¯ú_ßpñÊ ?·´ú
-Øÿ àBÛÚ?ılğ!?Æí¯ú_ßpñÊ?´n¿è}ÿ }Áÿ Ç( şŞÑÿ è+cÿ 	ş4ohÿ ô±ÿ À„ÿ ?´n¿è}ÿ }Áÿ Ç(şÑºÿ  5÷ı÷ÿ  û{Gÿ  ­ş'øÑı½£ÿ ĞVÇÿ ühşÑºÿ  5÷ı÷ÿ £ûFëş€×ß÷Üür€ííş‚¶?øŸãGööÿ A[üOñ£ûFëş€×ß÷Üürí¯ú_ßpñÊ ?·´ú
-Øÿ àBÛÚ?ılğ!?Æí¯ú_ßpñÊ?´n¿è}ÿ }Áÿ Ç( şŞÑÿ è+cÿ 	ş4ohÿ ô±ÿ À„ÿ ?´n¿è}ÿ }Áÿ Ç(şÑºÿ  5÷ı÷ÿ  §ñ>j›çÖôØ—ÕîZ£5ì¾(…¬´ä¸‡M”m¸¿th‹¡ê°ƒ†$7ğ 9šM©]$h—äĞ<ÿ äJ¤÷¾ ¿s”4Äè×7ò$Œ?Ü&`ßğ&_¡ µH£½Ôô­Õmí¤öåPac"IìLŠ¤HÚº:¥¦éé:FòK,¯æO<§2Løs       v€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€0î¼MwR[Xiš†©$-¶Sh±„¿º^GE'ÔHïŠ‡şmGş„ísşşÙòEAà®|¥È~ü°ù®¼îK1üI&·èşmGş„ísşşÙòEğ“j?ô'kŸ÷öËÿ ’+b°<Câ«ê:5¥Ä8ÔîİdR1
-Hã¹'ñÎxå7`'ÿ „›Qÿ ¡;\ÿ ¿¶_ü‘Gü$Úı	Úçıı²ÿ äŠ—ÃÚí¯‰tMbÉ%K{¥,‹0Æ	 3‘ëZuMYÙ‚wÔÇÿ „›Qÿ ¡;\ÿ ¿¶_ü‘Gü$Úı	Úçıı²ÿ äŠ5ÿ G ÿ f·y›P¾ŠÉ6œ/Ÿ˜Ÿ@úŸNµ=»¦j­ş™kx’ŞØ0€ApÈë×ğÍ%¯õıw§õıv ÿ „›Qÿ ¡;\ÿ ¿¶_ü‘Gü$Úı	Úçıı²ÿ äŠÕ–T†–CµK1Ç@:×9¨xãK¶ğŠø’Ìµí“Ì¦Ğc;šAÈa‘‚NxÏÑ\½ÿ 	6£ÿ Bv¹ÿ l¿ù"øIµúµÏûûeÿ ÉQ½];L»¾xÚE¶…æ(˜ËàgŒñ\ı¿´ù<;áí^XeTÖæŠŞ5ˆ†K <1;x?
-¿‡ã°_qfûÆw:nŸswá-r;khšiŸÌ³;QA,p.2péV?á&ÔèN×?ïí—ÿ $T9ÿ ’âOûİè¦«æ¾š#ÚF4ûÛé®™Ö8­yT³1.ê  uÏRzMÛpÜOøIµúµÏûûeÿ ÉÂM¨ÿ Ğ®ßÛ/şH¬ßøæ­¬Öz.¯ÔrIÜñGå´‚QØ©Ï@@Î+ªªi­Âæ?ü$Úı	Úçıı²ÿ äŠ¯cã;KO¶¿´ğ–¹%µÌK4/æYÈÀ87u®‚°<ÿ $ÿ Ãöµÿ ÑKH	ÿ á&ÔèN×?ïí—ÿ $Qÿ 	6£ÿ Bv¹ÿ l¿ù"±õŸˆVº&µy¥Í¢jóÍif×Ò<¦ p\fPx=±Ÿj’ãâ‹m{ BérmõÕÊğ*ˆ‰8ù[,O+ü8ù‡¾®Àô5?á&ÔèN×?ïí—ÿ $Qÿ 	6£ÿ Bv¹ÿ l¿ù"²õÏˆZ>ƒâ$Ñ'Šêk¯³5ÔÍ¡X"PK3î`x œ('È«Z‹à×îa…tÍFÏík{n÷KÙ¢$©GnydzĞµÛúş¬şàzoıW_xëÏÜØ@³\øK\6–8Aó,Î^GTAÅÇve<UøIµúµÏûûeÿ ÉŒ?ä	oÿ aM;ÿ K!­ú Çÿ „›Qÿ ¡;\ÿ ¿¶_ü‘Gü$Úı	Úçıı²ÿ äŠØ¢€1ÿ á&ÔèN×?ïí—ÿ $Qÿ 	6£ÿ Bv¹ÿ l¿ù"µ>ÑÚ~ÍçGö‚g•¸nÛœnÇ\gŒÔ”ÿ 	6£ÿ Bv¹ÿ l¿ù"øIµúµÏûûeÿ É‹|M„´OíK˜^XDñDÁX¡Ø)cì'ßõ©´/ÚxoÚÑ&O°ŞIg(” K¦2F	ã‘ŒàûPµÛúÛüĞ=ÿ ÂM¨ÿ Ğ®ßÛ/şH£şmGş„ísşşÙòEiı¦µ}—Ïí<Ï'xß³8İ¸Ï©	À$ö£ÌøIµúµÏûûeÿ ÉÂM¨ÿ Ğ®ßÛ/şH¬Fø•£µ¦‘uoÃÃ¨ê)§Ÿ1m²îRÀó‚
-‘`s[Úˆ-5õ¿6±ÌŸa¼’ÊQ( ïLdŒÇ<gÚ‹?ëåşhŸ×¯ù2£øÎæ=Bğ–¸.fŠI£O2Ï”B~Ñ‰ùû±ÿ 	6£ÿ Bv¹ÿ l¿ù" »ÿ ’£ÿ Ø.ûÿ FÚVı cÿ ÂM¨ÿ Ğ®ßÛ/şH£şmGş„ísşşÙòEEârû@Ó¾Ùg¤h*äÊZò+dˆÁg‚p8­¨]¤†96™A(Ä¤ö8$~DĞWü$Úı	Úçıı²ÿ äŠ?á&ÔèN×?ïí—ÿ $Rkş&±ğïØã¸Içº¾˜Aikn ¼ÏÇ ±
-1œå˜
-É½ñÖ‹˜úæ‹ö/í-AláDº¼a·a¤ÂàÂ–ıî(_şmGş„ísşşÙòEğ“j?ô'kŸ÷öËÿ ’*Okö'Ğ­µ{•-î7mY€6±S	AïZ”5m çì|gs©iö×ö×$¶¹‰f…üË1¹§ã# µcşmGş„ísşşÙòEAàoù'şÿ °]¯şŠZß øIµúµÏûûeÿ ÉÂM¨ÿ Ğ®ßÛ/şH¦[ø§ñé'CÖ"UgQ}%¸ÎTÃ'< $ÚµÖâ¸’İ&¦ˆ$ad8$uÁÇÒ—/şmGş„ísşşÙòEğ“j?ô'kŸ÷öËÿ ’+b°¼Gâ{Ï£ÇsºêWÉd®¤08'×‘Š:Ø	á&ÔèN×?ïí—ÿ $Qÿ 	6£ÿ Bv¹ÿ l¿ù"Ÿ¡ø‚Ó_[ókÉöÉ,¥€ôÆHÁ<sÆp}«V€9÷ñÌz„6á-p\Í“FeŸ(…ı£óö5cşmGş„ísşşÙòEAwÿ %Gÿ °]÷ş´­ú Çÿ „›Qÿ ¡;\ÿ ¿¶_ü‘Gü$Úı	Úçıı²ÿ äŠØ¢€1ÿ á&ÔèN×?ïí—ÿ $Qÿ 	6£ÿ Bv¹ÿ l¿ù"¶( øIµúµÏûûeÿ ÉÂM¨ÿ Ğ®ßÛ/şH­Š(şmGş„ísşşÙòEğ“j?ô'kŸ÷öËÿ ’+bŠ Çÿ „›Qÿ ¡;\ÿ ¿¶_ü‘Gü$Úı	Úçıı²ÿ äŠØ¢€1ÿ á&ÔèN×?ïí—ÿ $Qÿ 	6£ÿ Bv¹ÿ l¿ù"¶( øIµúµÏûûeÿ ÉÂM¨ÿ Ğ®ßÛ/şH­Š(şmGş„ísşşÙòEğ“j?ô'kŸ÷öËÿ ’+JkËki`Š{˜b’wÙ
-;…263…©À'Ò¦ øIµúµÏûûeÿ ÉÂM¨ÿ Ğ®ßÛ/şH«·:•¬ŞD·P‹’»–"‰†#
-NNB?ıò}s~ø‡¦x¶[K{k{ˆn.,Mî×ÁUQ!Œ®s’CLc½]?¯ë@znkÿ ÂM¨ÿ Ğ®ßÛ/şH£şmGş„ísşşÙòElQ@ÿ ğ“j?ô'kŸ÷öËÿ ’(ÿ „›Qÿ ¡;\ÿ ¿¶_ü‘[P?ü$Úı	Úçıı²ÿ äŠ?á&ÔèN×?ïí—ÿ $VÅÿ 	6£ÿ Bv¹ÿ l¿ù"øIµúµÏûûeÿ É±E cÿ ÂM¨ÿ Ğ®ßÛ/şH£şmGş„ísşşÙòElQ@ÿ ğ“j?ô'kŸ÷öËÿ ’(ÿ „›Qÿ ¡;\ÿ ¿¶_ü‘[P?ü$Úı	Úçıı²ÿ äŠ?á&ÔèN×?ïí—ÿ $VÅÿ 	6£ÿ Bv¹ÿ l¿ù"«§ŒîdÔ&°_	k†æ£šDó,øG.çíäÆÿ —¸®‚°-?ä kö±ÿ Ñ·t?ü$Úı	Úçıı²ÿ äŠ?á&ÔèN×?ïí—ÿ $VÅbhş#m^ş{VĞõ‹)K,×¶á#+òÇ3ƒƒŒ”u°t¸ÿ øIµúµÏûûeÿ É©â¯-×ûODÕ4ÈIí"IşñŠGÚ=ÛŞ³µXé~!Ôt‹‹iËØégSgL"C*QäVÄVºï‡£ºD-i}j$	 (ëœdt4-Uÿ ®¿äÃúş¾ó?Ám·ÀºC`œZ!À+Ï|5â/Şx5£¦]ê:Uúî6°¼K0Œ°».&WŞOŞëÆ;¯j6ZF‘‹¨]Ák{`-ò.€².z«qÁTšhºpC­Y<3İËrˆfAåo;ŠznÜ÷µŒSâMüí®™“ÒKaãåÿ xA<Üí\‚T›mÿ Zñ¾§¤İÜé±G‘¨İù·¶ò©·œ*´j#·’wrHå<óØê3ø_W`ÔåÑïaVŞ±Ü´R(n™Ãdg“RÚj>°µÖÎóL¶·Œa"†XÑ{ p(éfúüN{ÃÚn£áŸ„Ÿdº™tëû[9ÜË…—È9v® ø®wÀÍ«İk±Á/Œî­’XcÔD”‹ÉŒªk‰Ç’‹ĞÎkÑ§Õ´;›y-æÔ¬)P£©¸L2‘‚:×'‡4+}$héã;‡ÒAùl®e³¸W9	ûØ™Š0	8À§wÌÛş¿­íoëúÜÀ¾¿ˆ|E«>‹u&µc¥ë6W‘(‘0¬„±FÌB ©ÆG|œ’jÿ ‡ü5ã§ÔZ{êÚe¹oôŸµËÔ·'9Ìqaã¶_™†·İw®âÊûÃºm¢ZX]iv¶Ñçd0I"ääáG’MXşÜÒ?è+cÿ 	ş4-?¯$¿Oó¸=¯ë¹ƒñ{¸|+ö{ÛÈ/î¥[{ah›4¬Ô‘°de˜…ŒW}áïM kZdºeíÌ÷7Én§SZÆ‘0•ç”Ë½°AÊªçÍw!‹Ã%Ó–ÒïX†ŠUš‹k´Ia‘z278={w§iÓÚY\'ñ¤—é·o•s- P}wœş8æ”twşº~ õI7šŸ‹µõ‹)ü#:Y][yVL·VûÑ™Y[Î>i glÇ©â¹½.ßÅ¾$Ğ4[OEX$Ñõk@ F¿>VO¼WÜ™VÜ1Ğ×{d<-§ê—Ú¥İ„W—û~Ó »ÌÛœc#' ­íÍ#ş‚¶?øŸãBÑßÓğw¯ãø«ş9ÿ ’âOûİè¦­]E¥M6äÃm%Ì¾YEC9=bó"¹ßë:\¾ñqêVnï¦\ªªÎ¤’bl 3[¿ÛšGılğ!?Æ“WVvw8ÿ  xbâ/†1ø_ÄÚCBPI±ÌÑH’v`Ëµ›¦G\GµÃÿ Â²×"°†âëÃ–•ı´éc ,˜KHÕ‡³ÌD‘Ø‘Ã“Œ:×´niô±ÿ À„ÿ ?·4ú
-Øÿ àB9{Í·×úş½D´Vş¿¯ò9ÿ †Zv­£øÇKÖm%¶¼´/Y$÷.âT‚ŒF0@çƒÇBt<ÿ $ÿ Ãöµÿ ÑKZÛšGılğ!?Æ°¼¬éqxÃ±É©Y£¦™l¬­:‚‰rÍ9;»‰+|!âOxÎş}>ÖöÒÒ] Ø¥ÒO¤¯¿~×ËˆÛîœ ÙíŒåÚŞƒ®ø¦ÏO²¹ğÆ™ö}1àáÛË¶¹İ# YryDp3ƒŒW¥ÿ niô±ÿ À„ÿ ?·4ú
-Øÿ àB%¢·õ×üÊmŞÿ ×Oò<ïÃ~3µÖtÍf=u=Oìw~Ï$'™ª`È	ETû3šé< k'ˆ®ŞÂ÷JğËZ.İ:öí'òîKdù;]ö¦2NHÉn§öæ‘ÿ A[üOñ£ûsHÿ  ­ş'øÓNß×¯ùèMŒÿ ÈßşÂšwş–C[ÌHR@Éë\§‹u.MİSR³b5==ˆYÔğ/!$õì5»ı¹¤ĞVÇÿ üi1E¯x¦ÛÄš6Ÿ}©É¤j(–òÇwá³}%½Ãİ3ìP±ª»³@Î0Ná£_U—\Ó¾&hqZje¡º’˜—’n‚Ùca'™Ò¤g‘!;²1ÏnŠ/Oââ;Ê¡|•†ÑXñ‚mc/İº‘ÅiéËàı"Y%ÓC²’Q‰ØCqîW¡igı_¦-n¿¯ëõÔä5H¼g{âˆ5»_Ma2ióiòËİ¼Î’É"+:‡T*©;úpjÏ…<7ã;y¼ûÍQ²±p°¼¸ŠúyXq—”¡òÔáNÄ-Ôá®ßûsHÿ  ­ş'øÕ{Ëÿ ê6i}w¥İ[IğÏ$nƒ‘x<BÑYÕêyu­Ï<CªMámYâxe²º¹½¶Ë2³olÈ%YPVÆyã“èÑ®ôy<D÷py+{¬OwŞ´làœd‚q×éVôÙ<)£Fñéo£XÇ!Üëjbˆ1õ!q“W¿·4ú
-Øÿ àBE§õ·ù×úõÿ 3ÏuGsá½3Æ:]®›®÷éj"+—	J4
-ì «wÛŸ­Z¿¾øƒ/ˆEÌZËè­")Óšk3¾de²$Îmr¤`s]$Vş
-ƒRşÒ†;òÅşÔ‹—qêwrrrsŞµ?·4ú
-Øÿ àB`{¦è:½Æ³§«x2ÃAµ¶Õ~ÙçYù
-­
-ÄÁÂ1-&ç àm¯OàİïG—ÄOu’·ºÄ÷Pá‹FÁ@n	ÆH'~•³ı¹¤ĞVÇÿ ühşÜÒ?è+cÿ 	ş4Ó·õéşH¿×¯ù™÷òP4ûßèÛJß®NëYÒÏ4™¥fQtËÕ-ç®2Úàg>Çò5»ı¹¤ĞVÇÿ üiÆ|Lğ¿‰<Qk-¶›$iâÑ±h×o=Æì«)  fQ““ĞbÔúÏo&ËÂ³Y˜ã’ææ"\ñ‡}²‘å›˜ã ïÔÿ niô±ÿ À„ÿ ÃLğT^!:üriéª–g7+w†bWiÏÍ‚1ØñI.Ÿ×õÿ  mõş¿­F[ë¿Ò<EáÛÛÉœÇ.Ÿz÷Vqµ¤Û@,Z6l°eBÄ­xtÿ êZ†·b®ÚMÿ Ÿ.­ÑùW1¬lìİ½\– ¸È'88®ÏûsHÿ  ­ş'øÑı¹¤ĞVÇÿ üiÿ _wõşbéoëSáîw x*ËN¾„AqÌÆ-á¶†•ÙFA#8#¹®¨niô±ÿ À„ÿ ?·4ú
-Øÿ àB6îîngøşIÿ †ÿ ìkÿ ¢–·ë“ğV³¥Åà?Ç&¥fše²²´ê"%È#5»ı¹¤ĞVÇÿ üiçÒè>*ÇóëVÖr/ı)¯Ñm¦±|òXıöpIlš†úÏÆwzş©©ZøzûKMNÆ+YÖîÖKˆŞ2	a™@!İ,6îÀàW£ÿ niô±ÿ À„ÿ ?·4ú
-Øÿ àB$¬’ì;ëë{ÿ ^ZVƒáÿ Yé·Wk÷7’íe¥\Ëã$…r×-f‰àt |ÄV'†î¼Qâ~ŞÇTi—EÕ#¸¸»•í’ÂÜ†‡÷'w·ù°x¯EÔ.¼3«[}›RŸH¼ƒpo*åã‘r:6Fitû¯é6ßfÓgÒ,í÷ò­8×'©Âàf©=n'µŠÑnôy|D÷Py+{¬Ou Ş´làœd‚q×é]EPşÜÒ?è+cÿ 	ş4niô±ÿ À„ÿ ]íúÕ¶gİÿ É@Ñÿ ì}ÿ £m+~¹;­gK><Òd•™EÓ/T·¸ËkœûÈÖïöæ‘ÿ A[üOñ ôUíÍ#ş‚¶?øŸãGöæ‘ÿ A[üOñ ôUíÍ#ş‚¶?øŸãGöæ‘ÿ A[üOñ ôUíÍ#ş‚¶?øŸãGöæ‘ÿ A[üOñ ôUíÍ#ş‚¶?øŸãGöæ‘ÿ A[üOñ ôUíÍ#ş‚¶?øŸãGöæ‘ÿ A[üOñ ôUíÍ#ş‚¶?øŸãGöæ‘ÿ A[üOñ ôUíÍ#ş‚¶?øŸãGöæ‘ÿ A[üOñ GÅŞ›=Æ·gvÚ^›©hğÇ6Ÿ¨j9
-¼‹è®8Ã(^3“Û <Å¤?5­>Úy’òU¸;èÌ7‚ÒXÔ˜œ¬¢hÄ6ƒ“Éè×çÂz¤ĞÏ~ú=ÌĞ©–V.ùF<©È •SA±ğ‡†MÁÒomáûFÏ3~¤ÒçhÂı÷8ÀÀã°°¡u¸?ëúş·97ÄVË¤ÍyàeÔ¯booo^Õî•ˆ&5‚C)b¨Ø¤bØı4ü!áSEñ‹suˆí|=ö)¤<ã(}€g'<ãÚÿ niô±ÿ À„ÿ ?·4ú
-Øÿ àB4ìïıl×ê-ıt¡~Š¡ı¹¤ĞVÇÿ ühşÜÒ?è+cÿ 	ş4€¿EPşÜÒ?è+cÿ 	ş4niô±ÿ À„ÿ  ¿EPşÜÒ?è+cÿ 	ş4niô±ÿ À„ÿ  ¿EPşÜÒ?è+cÿ 	ş4niô±ÿ À„ÿ  ¿EPşÜÒ?è+cÿ 	ş4niô±ÿ À„ÿ  ¿EPşÜÒ?è+cÿ 	ş4niô±ÿ À„ÿ  ¿EPşÜÒ?è+cÿ 	ş4niô±ÿ À„ÿ  ¿XŸòP5ûØÿ èÛºĞşÜÒ?è+cÿ 	ş5…k¬écÇš´‡R³Úe’†ó×‰n²3ŸqùŠ ã/uÿ Şøæ[íÎâïO³»{°ˆ¢ÆÁdó‹‘µ™v²?AÀÁÜsZˆ|9â=_Å6–‹ag­İË6­ä«HòÂ7h$s"†m¤}Ü× Ø6‹§ëš®¥µe·Q1;Ãç¦Ñv–Î{½¿†Ÿ¨Çàíbd›SM
-öT]¨÷"
-¸³I]$–öüÖ õnû_ò9‹+]_ÅPkôú<¶cRğüv[I,e¦vWbFå_œ»iç+¯ğå„ú_ƒt­>éBÜ[XEª@e@Ï~EYşÜÒ ÀÕ,ğ!?Æ«j$Òà´qå½ÕÓ©X-`•^IŸ*€^€rpj¯½¶ÿ ‡ÿ 1k¥ÿ ­¿Èƒäsÿ a]Kÿ Kf®‚¹ÿ ÿ ÈçşÂº—ş–Í]!…Q@Q@Zöíl­üÍ†Iì5ë#€SØO ÕjÓëÓõYb9î­Ä¦4'j“Øf€±±Es¶/âdÕRëí&åYc·±’„ğƒy™ø$7ğôSÒ©[øÆKO	êÆ²	-o¦³	*®Ë1Xñ“Œ±ÀïGõú¿¯Äëè¬-Z7úmİíÅı•À…Û|v°º|”}ä³0ë»jdB€kÿ „î÷OÒ Öu8í¥±¿ÓeÔ-"·‰‘âØªÂ7bÌ•qó\<sÀ]ÿ ÿ É<ñ7ı‚®¿ôSWA^â-OSÿ „[ÅºF®ö“\.5ÜsZBÑ!VE(UA^¹ä7AŠô
-áEP\ÿ ?äxgşÁV¿ú)k ®ÀŸòO<3ÿ `«_ı´ĞQE QEÏøËş@vßöÓô¶è+Ÿñ—ü€í¿ì+¦ÿ él5ĞPEPEPE…â½Zÿ EÒc¼±ÙñsRùûåD8?7sÇ¿J İ¢¹k÷z µš+ıÚ7‘`¿}¯tK ÊŒ]BayÜCõè1Í»­Zúéº_—mö»iåİó7Gåı ?¾}¨vŠÀÖu[ñ­ÚhšL¶°ŞÏo-ÛKuJ¢íÚ®‡$¸ç< x9¬ñ¾£ªXËw¥ÅkØ4ØõÈ.#gioıÒ0e
-G”ß19ph¾—ş¿­fnÙÿ ÉCÖìaÿ £në ®kJ.¼q©ÜG’èÚs®zàÉvEt´Ú³³%;« ¢Šçü_«İhš;^ÛêU‚ $Ë©UÛ,`L9ù·q‡9İ·)+Æj8Š	-l¢»°³º–Ò;¹îgÌğ[£œ)ÂŞ	ónUP7ĞÆ2LjK+YF÷ìJwEP3Ÿğ'ü“Ïÿ Ø*×ÿ E-tÏøşIç†ìkÿ ¢–º
- (¢¹ı.ø\xŸRµMj[Ñ‚Öâ(ÄPHÛ½Fâà©È'€FFy'[K—q¨5¶¾–òÈ±Ú}ŠIİ˜ ªUXôá¿O¦êÖš´M%©˜l8dŞH\z®¡°{`ö¡j¯ıo`ëoë¹vŠ( ~óşJÿ `«ÿ ıi]s÷ŸòPôoû_ÿ èÛJè( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢ŠËÖ®¯-ÀÙùY’ö(¥-‰ƒƒÏ§¿èêt¹©Eax¯V¿Ñt˜ï,c¶|\Á¾~ã…yQ ÆOÍÜñïÒ·h ¢ªÙÜO3Ü­ÄPFÑLQDSù™L¥¾Qµˆ?wœzš©©ë‰§y;ëÓ:æ6´·ir ÜÊÑÎsè|«Erş¸½×Tjwz¥ÌrC#Ã6–G
-ÂàıÙ]÷`ƒ‘ VH\tô»ËË[¶½ò÷Ç}qe3Ìk#ÈÀÁÆ=}sÍ—5hªİÏm©bèÙÅ§È©24ÄJó’FÍ¤cc9Îx©TÓÓSM5ï­–şDóÔÌ¢V^~`™ÉqÚ€-ÑUô+©¦w	Ş™~_”ª>¹aùÔÑMêÍ‰ V(J08`pGÔ(ôS±´­‘Lˆ2Êƒœ=ğ#O ŠÎÕŸöéÑßÍïÊócó"eI—ø¶1áŠädFE^2Æ²¬M"‰ªO,\lÎ€Edx‡W‹F²Šæ[ømÍÌ–Ï9t –P‚>PNîB€I¥5Ìö¯s<ÑÅoy]Â¢¨$“ÀïGK-—³ì–3i×ZmÖrÎŸhKÀK8…Œ(!ÏÊÙ†0O85¢eeXŒŠ$pYPHÉĞd~b€E¬İÍe«Âqæ^Cü¹ù]ÂŸ§^´uHŠæsöòPõŸûXèÛºÓ‡YÒî59´È5+9oá¥µIÕ¥ŒqË 9‘Ôw™gÿ %Yÿ °U‡ş» ‚Š+]Õ¯ôİSC†Ş;ck}{öišMÅÆcv@Às©ÏÓ½lísş;ÿ ’yâoû]è¦®‚¹ÿ ÿ É<ñ7ı‚®¿ôSPàßùÜÿ ØWRÿ ÒÙ« ®Á¿ò¹ÿ °®¥ÿ ¥³WA@Q@Q@ºŞšÅƒCæÉà&d–Xö7©òPf©ø?Ã²x[ÃvúD—¦ğÁ&ÃŒÜ;¾>€èoQBĞ
-}„öq\´·+=İÄ#Ëå•QÙ@]Ç  3Ï'½s°x.ûûïO¼Õí¥MCûJŞxlŒb)¼ß7æS#n]Øã*q‘œó]-?¯ë°yõ÷7•´·7³)½òí
-G,J…*™¡äÙn1Ó6? ¤ö)§jwës§ÛXÉaeP8œ*åØ»op¨ ¿<vtP4ìp#Ñ.í<âÍKS¿†òöM{eh-Ì±¬r7İ.ÿ 1,rs÷uÏøïşIç‰¿ìuÿ ¢šº
-QE ÏøşIç†ìkÿ ¢–º
-çü	ÿ $óÃ?ö
-µÿ ÑK@Q@Q@ÿ Œ¿ämÿ a]7ÿ Ka®‚¹ÿ ÈÛşÂºoş–Ã] QE QE ‡â­÷_ÒVÆÎşŞÏ÷ÑÊï5±›;\ ¦>eëÆ~µ¹E ajú>©¬[=„Ú’i·y7q­“ù¯C”7	xÊ¶=M2ïA¿›Å^©¡m¥„/¶{Fwu}»¿yæ‘qòœsœöè( ró@Ôæ¿‡S·Õ-#ÔáB’ËdÎŸg‘ƒyeŠK)UÃnìxæ³ÛÀ_fµ6šV¤-¡¸°M>ù¦€Ë$Ñ®ì20u	'ï’r8ãÎŠ:Xww¹Îi±%¿5Xb]±Ç£éè£Ğ	nÀ®¹û?ù(zÏı‚¬?ômİt7q%m³µ;}^àÆºmı•´x"aqfÓ3ºD¨¿PÕ£E¸qğ+Ù‡EÔcµ¶›ON¹êØÜ3Æ›‚•`ëµğíÉ:qÇ=]­´vvpZÅ»Ë†5wœ“Ş¦¢‹‡õı}ÁEP?àOù'ÿ °U¯şŠZè+Ÿğ'ü“Ïÿ Ø*×ÿ E-t „d’3ÜW#…õ=?3Nñ4‚(íü—şĞ±b‘¯#g•å|Ã-ËoÎzzõôR°y4Ö5M:„ñ5¥å´Ö&Ö?´élD¶ò I“«–G_ÇA¡hw:Liö½wQÕ$XV nŠ\u "Œ“Ë–o~Nvhª¿az…QHg?yÿ %Fÿ °Uÿ ş´®‚¹ûÏù(z7ı‚¯ÿ ôm¥t QE QE QE QE QE W1e§øÍ¡––6’7\HòÍ³î~ìÆ¡	8'æn„sœŠ:Ü:XÃñV‹{¯é+cgogûèåwšØÍ® Ó2Œõã?ZÔ–sg`gº-!‰3!·Ü±¨»˜ıOÖ¬Q@ıæ—>Ÿ¯êZ“ÇQE·]J†á£ó´2uaB0Ê0E/‡´_É¢Cö}RÏJµK†šÖÕ4w‹¼à<m1+ƒk¯#k¾¢ õ9Xü/ªÁy.­¹
-ë3°Éö#öY#
-† n:†2É<í;Fî—e%…ŠÃ4Ë<ìí$²¬{;1c…ÉÀÉàdœc“Ö®Ñ@~5»û[móA¸]Ú¼ÚŒ×QŠÇ&ñ" Í!cµp¥Tõ s†Õüim.šºÌpE(š÷í6†l¢²)O60ìç ~í‚í=ƒvÔPºyÙ£—ø„ŞÅz¾$ƒÎ¶VİNÌf6ëæ03¿ó+ ù~ï5kÂ°Gä«yÔóŞK%ÄÛxüĞB¨I |£’Nã“kzŠ€õ<÷Kğ¾¦ú’kzf¡ggs)s{,ÖÍ<ÒN¿»hÙ·®èr¤…à©i àj
-ë“İù—ş'k‹w›Ì–Ù-J#)•¼;pPmÇ@[prÅ«©Š ó<¤æ9vÇv=MIBÑÖæèÚ”úÌ3Üê°É§Û\5Ä-¦&T®¥È*77ã œg652öòk[­3QK+ËbÀ4°yÑHÊÈOP¤À‚=2+VŠÌãõOø¿SòˆñfŸfÑ†­tvË«mó°Ç ¤ŸÂšü÷°ŞI¯iÎÑª¯ÙdÒ˜Ú‡1²§¸:’Ç%Èû¤ Tìh£`8ı?ÂZ¼w(Ú³aw¿7íäif	NÀ7šÀ€Ë’$’IÙÖ4»ë»«Kİ3QK+»méûè<è¥ñ¹Y)êªAÇpH­z(éoë°u¹ÇÇ¿â%š×ÅúY‚9²²Xid’6ÁWß3år m?íôl Ô¼A%ÂZxÆŞ*â;™ ÒYUeFÂª–“ıVèùQ–Èoœf»ê(@qãÀpêrÆŞ&×U†	š{{(¬–hİYÊ–wbIl‚åN~ï ÕëH¼«Çª"é:zª¨À Kw€tUÏÙÿ ÉCÖìaÿ £nè ¬èš¯y¥Mg¨ÚÚ¥…ÏÚvMhÓ+.2$\;v<ãèw¨£­ÃÈ+Ÿñßü“ÏØ*ëÿ E5tÏøïşIç‰¿ìuÿ ¢š€ÿ ÈçşÂº—ş–Í]sşÿ Ïı…u/ı-šº
- (¢Š (¢¨k/<zEÃ[I<rà$y’&H•H9 dƒÓ¡ ôW&±v<â	ìuDêšjJe:•¬"kwX÷Û,dc6İOnÆÊG›O·•Î]âVcêHwù~ ô·Ïğ,Q^á]Üêò.¥¨Ëi$÷Ó¤{ƒ€¦ÕãQæÇÙ;œŠuÇŠµxÆµØ‚Q©ÙØZ…E-n³¬Y'¨ga=Æ@ê:‹[[¯ùØvÕ®Ç}Esš6£wo.¹c}s-éÒİY.dTY$FŒ>"ªäÃ€8Ç|×-/Œu]@³×®.õ5=&kõ¶’8Õ-¤TWUMª¦ƒ¸±àsÖOëú°$ÙÖxïşIç‰¿ìuÿ ¢šº
-ó¯\êñn{¨Í¨©ğì×‘Ï:F¤¤ŠÉˆÕFŞ3ÉÉ<W¢Ğ+…Q@sşÿ ’yáŸûZÿ è¥®‚¹ÿ É<ğÏı‚­ôRĞAEPEP?ã/ùÛØWMÿ ÒØk ®Æ_ò¶ÿ °®›ÿ ¥°×A@Q@Q@W;ã;İCNĞÒïO»ì—vèÿ º]^dB¼ğ8cÛ>˜ ŠŠæüYı³›^iZ“A<Eµ¢Ä·R$…”¶ÓÓä*@É$öÈ¾ñ§öcS‚öHíô}F&±	—:°ˆ»3.÷§`>Qy¡kız˜3»¢¹­jòòëÄ¶:üúy–ÎkÇ¹‚8İÎÆD	ûÅeÁ.Iã<ÍsVş+Ö5Í:êæŞñ¬gÒô˜¯¤(ãhîeo3*ÛÕˆOİÖù<
-WÒïoøòì¿¯êçUgÿ %Yÿ °U‡ş»®‚¹à^xÓQº´M¢éÒmôÌ—gÓÕ4Ó³%;« ¢ªYˆ ’{W1e¬êZ‡‹/ìU’A¦Çqh<¶Yä]ì3’ÀBäq×8]l>—ş»EÇh÷ú„úÎ˜ºİä’Dñ˜¥¾°ò.bÁLHŒ	VÚv‘œç=+SÂòêRYŞ.¡t×‰Ü‘Úİº*<ña˜(Û” !AÇ4 z´QE sşÿ ’yáŸûZÿ è¥®‚¹ÿ É<ğÏı‚­ôR×A@W5¢İZ\øŸQ6’jR§–ÍáÌ¹ˆ"$n0
-çx;ˆ€u°t¹ÒÑX—Ú°×D·”°NšâCŸ•v2e°:ğM]Ó5	5YåÓ¯,]Oú« ™ ô £2Ÿ¦r;BÚÿ Öö¿×k—¨¢Š çï?ä¡èßö
-¿ÿ Ñ¶•ĞW?yÿ %Fÿ °Uÿ ş´®‚€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¢€
-(¦»¤Q´’2¢(,ÌÇ Ô“@¢±õ¼ Ò–ŞèGÇp$FMË!Â•î:sé‘Ş«ø>úúûK¼:…ÏÚgƒQº·yj™T••xÃëîhZ»KÏÅ}4	â'¸šä¬7[aò”; 0Å€‹‚	ÜÜ'šµ¥êJşK¹ÍàxQÖaw,Û“!·ùsò“òğz(éFÖÆµÊxÄQëú$§Îy'·ÒB÷\¶	,„¼?'İ#£9ênÚêFÊo]jW,¶vw!ÕŸ‘BŞ&lÎ2Xş4ì]ê*•î¢¶‹g ŒËÌéô#	»;[Ü´À«ZÔn¢–æÒ-Jp—V2$DRHàyÕs!Ãaú”–®ß :z+“µ†âãÅSÛë’ßy‰!ŸN]¶’0FFÔ–.å—ªœN×-ÔvÅ"3ªàòª@'=?ˆ~tRZ)b Î2Meë“Ë½£@ì	¾·G
-ØÊ´€}¹£ª@ôMšµÏÙÿ ÉCÖìaÿ £négñ¯‡m/ÚóSK=¬Ê&»G†e8eYœİê‰àúeƒ¤¾?Õä•Ñ´=•”äe»Á€:*(®oÅŸÛ0Yµæ•©4ÄP[Z,Hëu!aòHYKm=>B¤’O`’¹ÿ ÿ É<ñ7ı‚®¿ôSW@3z×?ã¿ù'&ÿ °U×şŠj <ÿ  ;Ÿû
-ê_ú[5tÏø7ş@w?öÔ¿ô¶jè( ¢Š( ª×ÖÒİÚ40_\YHÄb{uŒºóØH¬¼ôäUš(çÂÑ]h7Ú[êW¡õ EİêˆDÓ¡w°|€/
-8sÍjYXı“LŠÆK‰®„qùfY¶‡qï°(éÇ Uº(Ó¼gbğ	ï.ïàµ„Áiox"d·ŒàPá@Ë–<zäÖuÃ=N—S’ØÉ¿dqåÛÛÇöfF†-‘m*¤HÉ’OgEn,bYøq,òÿ Ú7ÒÏ-ÏÚ.§“ËİtBl T´./İ®sVßÁdq´3\ŞÚ-´–vö×6[@øÜ‰µT‘…Q–,@Qƒ×=-ìâ<I &—à_İK}w¨^K£O	¸»ò÷ˆÖ)
- ØŠ01Î2sÉ8íëŸñßü“ÏØ*ëÿ E5t\AEP\ÿ ?äxgşÁV¿ú)k ®ÀŸòO<3ÿ `«_ı´ĞQE QEÏøËş@vßöÓô¶è+Ÿñ—ü€í¿ì+¦ÿ él5ĞPEPEPY"ĞWÄZzÙI¨^YÆ%IXÚˆòÅ2çz7€<c§§¯E `j¸¾½‚é|G«Û<0ùJ°­±\Ÿ¼øh[}F1ÈÓfğ…œ×¦cwx-ä’)®,÷!ŠâXöì‘ÉRû¾DÎ´dsĞÑ@W^ûL‘Ü.±¨Á{Ë²î?$È±ÈAh¾hÊìÈ\ddmÕiü¦½¼vÖ³İØÛ}‘lg†Ü¦.`\á²³r¥[æ<ôÇME»9ëXü«¢(U]&À :æİ×C\ıŸü”=gşÁVú6îº
-#(e*À#Á®N‡ºM—‰.µİ>W±»‹k[UXsœ²~ë;²I$“œàä [En,sÏáA%¥Ú>³©ë´X¥ÔT@·Z’BF™º.yëÒ´4)ô¸^95+ËâØ
-×"5Ø `*¬hŠáŸ~•£E`¢Š(Ÿğ'ü“Ïÿ Ø*×ÿ E-tÏøşIç†ìkÿ ¢–º
- B2=ë—oZØFdÒõ=rÅRGáŸÌAÑOælÇ8Ù´ó×¦:š)X6ËÁ«qam:k ·İkäGÏÍ0²<L§ °fùq¸ŒçgCğÆ›áôAgö©aXD—WRNUeŞÄ 8
- àqÀÆÍW‚Š(¤3Ÿ¼ÿ ’‡£Ø*ÿ ÿ FÚWA\ıçü”=şÁWÿ ú6Òº
- (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š *µı©¾Ó®­­	&ŒH€e2ÈÏqVh K/WûbÜêúµ­ËE$ÒÄÁ´¶2çt’dñÆ099Œ?Ãú ğü0®¥{z·½Ã¡UÜ–b<´^¤çœûb¶( wTğŠjW7R.³ªÙÃvÈ÷öÏGu È]yF_ºÁæ±eĞN¿°°MgÅó´mæAt‹‰o¸•bìcÃŸ›Ÿ3{`îòŠ ÆĞ<5gáö¾–	$êşo:êæUZVÆ"5U‚Œä“’sY¾%ÒÌâöİ}Rô¬SÙéqÅ'švíw£ÈKP8'&ºº)5q§c˜›ÂÖÚ¼1Ì5bÖÒDX¬’Q†EUøÛ¿ríS±‰\Œ•&¦ÿ „M%ŠëíÚÆ§{q<k\ÊbG€+oR\j¹İƒ’p3ÇĞÑM‰lcXhk~··šÆ£©Í•‡íF%X³Ô…Š4™`H9—WÑU–Öâ;ëËËRŞUÍ£&à¬0ÊC«+)À8*yPF­J(‡Ãòë¶k-Ç‰|LV9IgWI¸}«
-dÜ¤àñŠz‡†¯-ÎıOÅ–Ûf[†k±bYÔ²/Éü;äÀB¤îŠõı];õı_™cá;K{Áy}y{ªÜ£ù‘5ó©H[ûÉ*Æ­œáwryæ’ÏşJ³ÿ `«ıw]söòPõŸûXèÛº è+Tğìú–¥ìzş©bcŒ¢El-Ê.z°ó"c¸ôÎztÆMnQ@Š1If`Š.Ù'§¹¬/ÿ É<ñ7ı‚®¿ôSWA\ÿ ÿ äx›şÁW_ú)¨ ğoü€îì+©élÕĞW?àßùÜÿ ØWRÿ ÒÙ«  Š( Š+#Å·Zw‡/.¬±ö„·.ŠpX´¿Ë¿íÁlI»++»ôW __kz5ê¦¿sp]²©­ãò$TRVHÚ0ˆÛ‰êŸsdî~ŸQ¸ğå¤º«»!³&Í†EB9^ŠÌ»XÀ$Õ5oë¸z+Ë`ñÎ¥gkª_\İÉ4öúl÷Oep‘ˆÄŠÀ!¶tQæÃ÷²K1($ŠÑÔµİ[Ã÷o¤K©Ï{%ÚÚy“Exi¼§Â¢*r9ÎE%­­×aµkùÀÿ 3Ğh®sFÔníå×,o®e½:[«%ÌŠ‹$ˆÑ‡ÃU\ƒ¸pïšå¥ñ«£èzõÅÓŞ¦§¤Í~¶ÒG¥´ŠŠê©µCÃw<zÑéıV›:Ïÿ É<ñ7ı‚®¿ôSWA^uâ+BÓÃş-Ñ¯uµ>šò9çHÑÔ”‘Y1¨ÛÂ‘Æy9'ŠôZp¢Š( ®ÀŸòO<3ÿ `«_ıµĞW?àOù'ÿ °U¯şŠZ è(¢Š (¢Š çüeÿ  ;oû
-é¿ú[tÏøËş@vßöÓô¶è( ¢Š( ¢Š( ¢Šç|g{¨iÚ]é÷bİ’îİ÷AË«ÌˆW{gÓÑQ\ïˆïu-_ÃÂÚìGmu¨yâò2)ŠFûÇ Ê˜>ıª¦±©Ëcâ(^ïSÖ,¬ÑB¾E¬MlYˆÚ$vœobW*@*H$Zıöş¾ñµoÌëh®kZ¼¼ºñ-g>e³šñî`7s±‘~ñYpK’xÏs\Õ¿ŠõsNº¹·¼kô½&+é#Š8Ú;™[ÌÊ¶õb÷_Ãµ¾cÏ•ô»Ûşü‚Îö_×õsª³ÿ ’‡¬ÿ Ø*Ãÿ Fİ×A\Æp/<i¨İÚ&Ñté6úfK³ŠéêšiÙ’ÕĞQHÙ(ÁNæ­,5˜53ø–úôÅnL«u¸ˆHÜ/Ä­Æcw÷}sHgMEpwz¶µ£&¥lÚ”×°½í•¥ôĞÄ$ŠIœ$ƒªŒA+ÔsŠİğõİçÛõ}*öêKÆ°™w2ª+Èq¸"ªäG qù£Ïúéş`oÑEÏøşIç†ìkÿ ¢–º
-çü	ÿ $óÃ?ö
-µÿ ÑK] Q\Ö‹uisâ}DÚI©JX6{‡06æ ˆ‘¸À+à`î ÖÁÒçKEb_jBÃ]ÜNRÂ=:k‰~UØÉ–ÀëÁ5wLÔ$Ô!g—N¼±u?ê®‚dƒĞ‚ŒÊ~™Èîkÿ [Ø:ÿ ]®^¢Š(Ÿ¼ÿ ’‡£Ø*ÿ ÿ FÚWA\ıçü”=şÁWÿ ú6Òº
- (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (®Åší—‹tËeÖõ‹;+«IâÓ¬é·£&<‰ç·§x5ÏÅ§Eu©ˆmì"¼¾Ô ²GÉÚví(¤bß!8û«İN—ş¿­c¿¢£ÖKxäI<Äd_˜×Z§«ÊÍ¢êbÖ}—ÛÈ#|Ñ¾Ì¡äR|©·Ğ"¹š4(®U5R?x~ÖKô’ÖóOšIcH‡‘_>NHûç€G¾z×Iuuoci-ÕÔÑÁo
-’Yj¢I'°¦ôÜKTŸrj*½•õ®¥cí”ñÏm:XÎU”÷³Üyi2Â¢k”ŒÈ°+€Í×zdŒdñCÓpZìOEgèúªjö^wÙæ¶š71Om8áuSPA‚#ƒVá¸ŠãÌò˜·–æ6à˜uúş-ˆš +’ÌHÆñùjÍU•FòªØŞ\©Ïuà€r©5Ohú9òì—{˜¡yDI’7ÈP‹FæÀàóÁ z+:ÂğË}i%õ½ÄĞH¬#ŠE¨bXî<˜`{qT­5E°^»Õ.ŠZÚ^ŸŞHr#ËŒöí’hZıßåş`Íê*•î ,ç±CH—Sù%ÔŒGò3}‰P¿ğ!XÚ–£r—RZ&¥Ï¡hZb1´PI \–;³†äcÓ-Z@İ•şgMErzlWø–âv[ß¶Âí=Š­Ñ[iaÈT@¡Š’2²*H!ˆ ×N×-ÔvÅ"3ªàòª@'=?ˆ~t-“¤´R
-2ÄœdšË×'–{FØ}n±•i  ûsGTè›5kŸ³ÿ ’‡¬ÿ Ø*Ãÿ FİÒÏã_Ú^5µæ¦–{Y”MvÊpÊ³8»Ô+Áô4ËI|«É+£i:{+)È Ëw‚ tTQ\ŸuÍ&Ş+è5[»4”ì‹O3Â@`\ÎÁªmî
-Ï'°Y\ÿ ÿ äx›şÁW_ú)«}X2†R# õã¿ù'&ÿ °U×şŠj <ÿ  ;Ÿû
-ê_ú[5tÏø7ş@w?öÔ¿ô¶jè( ¢Š( ª:¾•±`mf–hq"K°7F¬28 Aî^¢€9©¼&´š#®ê«qq2Íst¢ßÌŸhU‡•³h pg¾y­‹=­,ZÚâúêıœ±y®JïlöÂ*¨ã Ïš»E,1oà{m¯//58íÒŞÚèÇ¶˜*¥Y¾P\±ã®riãÁ¶È¼¿¾½º™bE¼ŸÊóa1xömE\«’Ù*I=r8®’Š<ÃÈÄ³ğâYåÿ ´o¥[Ÿ´]O'—ºè„Ø@¨h\(_º\æ­¿‚4Èãh.f¹½´[i,íí®6l¶ñ¹j©#
-£,X€£®zZ(ÙÄx“@M/À¾+º–úïP¼—Fqwåï¬RA±`cœdç’p1Û×?ã¿ù'&ÿ °U×şŠjè(¸‚Š( ¹ÿ É<ğÏı‚­ôR×A\ÿ ?äxgşÁV¿ú)h ¢Š( ¢Š(Ÿñ—ü€í¿ì+¦ÿ él5ĞW?ã/ùÛØWMÿ ÒØk  Š( Š( ²<E ¯ˆ´õ²“P¼³ŒJ’±µåŠ0eÎôn xÇON+^Š ÃÕ¼6uytÉ$Ö5OL†ƒ÷’+¹·FyÃ0ÀÀç§LKs¡5æ¡çİj·³Yù‹ Óİ!òC)ND~grı}¸­z(
-ëÃ?i’;…Ö5/cyv]Çä™9-Í]™ŒŒ£š­?ô×·ÚÖ{»o²-ŒğÛ”ÅÌœ#–VoânT«|Ç˜é¨ wg=b‹õtE
-«¤Ø @<ÛºèkŸ³ÿ ’‡¬ÿ Ø*Ãÿ Fİ×A@‚³aÒ¾ŸumõÒMrï$—ƒg¹»Œ®Ş  |¸ 
-Ò¢‹ÍCàØ×M{­gT½‹jy&s0:°u‘vF ¾àçÈ÷9ÔÒ4xô•¸o´Ïwsu'›qsq³|¬(ÈEUU  ORMhÑNàQE 9ÿ É<ğÏı‚­ôR×A\ÿ ?äxgşÁV¿ú)k  # ƒŞ¹vğe­„fM/S×,U!1´pŞüÄDşfÌs›O=zc©¢•€ãl¼·Ó¦¹â}Ö¾DpÜùĞÀÀ#ÄÊz Ko—ˆÎvt?i¾Dj‘Ö„Iuu$åPv]ìB lÑUqX(¢ŠC9ûÏù(z7ı‚¯ÿ ôm¥tÏŞÉCÑ¿ìÿ £m+  Š( Š( Š( Š( Š( Š( k¿ı¯Ä–zßöô2ZÄÑ-¼b/)•ˆ,ä-ÎÕèÃ§ç1ê‡RÔ%½MBúÊKˆµÒÛöÜD	![z1Üü©SózcvŠ:X.G[[Ço
-Š$ˆ:*€+ûEÖf»½zÕ¼7¤b’ÄÉ*|¡Ë0(È_âFÁ$ò8®‚Š7w`´ØÃ¸ğÒÏâ?V]NúcE¬b/+kmÜc-ÎÕş.1Æ9¤ñUœW¶6‘İ*½ŸÚ\)áEaèUÙÛsÚ·iE*êOPFE røSgsmsâbDºv’ácF’1'h‹10®A,§s~ÏÂ6Ö6·‘C¨ê>mË/"4±ÅşRWŞY°À˜ŒmÀŸ¤é+¥E6ëË«Éç“Ìšâå”»œ*ª¨ …P;õ$š7‘µ›»{UÓ~ÒÁå†ÛÈxËÀKí$c8 gÉ­ê(À’Ã©Ë¨Çâÿ ™s¿ç·1œ€2#òv+aGÌO<ÓOÃèÓOŸO´ñ.¿ic;nhb–=¸ó&Œ 0XñÇN+±¢€2´i“Ü\Ë¨]êSª#Ot#3µ@@˜ôÏ=zV'‰´‘n.®ëÄR[ê‹›28¤Y—ƒ’èYUÊºòAã–®ÂŠhsw^‹S—íWÖ …ŠÍ´R¬Io ÍÄŒgc–\“•§ÿ Â&’Cuö­cSº»ŸÊÛxíI–ÅÓ`HÕ8bO*sœ+¡¢€24í	¬ïíŞ­¨jw3mvbQ““µbD\œH'Œgı_DMV[[ˆï¯,/-KyW6Œ›‚°Ã)¬¬§ à©åA"µ( BË®Ù¬·%ñ1Xå&58m]$Fáö¬(XqrsƒÆ)éş¼·;õ?[m™n®ÄQ‰gRBÈ¿'ğì_“
-vr{º(_×õıtì×õı~f„í-ïåõåî«ræD×Î¥!oï$H«¶rw…İÉçšK?ù(zÏı‚¬?ômİtÏÙÿ ÉCÖìaÿ £nè ¬WB:¼Œ—¥êØI—=‚,>TÊsÄÆdä8ü+^Š EUDTE
-ª0  Vÿ äx›şÁW_ú)« ®ÇòO<Mÿ `«¯ıÔ x7ş@w?öÔ¿ô¶jè+Ÿğoü€îì+©élÕĞPEPE[Q>o&âKwÛŸ68¼×QÜªàå±œpyÇ¡h¯;_j?ğ‹³.£{<±ê†ÚY~Æ°ßÇ	—ÉV—NTœÕÔøKQ—TğÕ½Ü·‹vÌÒ0 3(v¼ É´À†ÈÀéGKÿ ]ÀÛ¢¸{]jòÚêş9õ-HêFÊk›[MNŞ-[oR®±« …;Û8;°AYÖ(ÕDÖ¥‡P¹¸Şvj	P³’nceÛ-åfÏ,)_Kß×õêzMÍx7TŸTÓ¯™ï¥¼ò.š(šî!Â€ªvÌŠŠ·ÇÊ>]§œæ™i>©§xæ;İQï´å³óî¢‹iw|©Å«.ï•‹0Ú¼œóV×úíqt¿õØ±ã¿ù'&ÿ °U×şŠjè+ÏuWPÔ|'ñõXÖÒÊT†cV´†#9l·<ãÒ½
-ÍC©§5Kœ\[&›Í½¸Sk—‘q»©'häœ{
-Äğ¿Šn/uı6Îm]®î/lå–ûN–(ÒM6dÙòíU«–eıábp¤É"×úõÿ !µoëúîzsşÿ ’yáŸûZÿ è¥®‚¹ÿ É<ğÏı‚­ôRĞ# ¢Š( ¢Š(Ÿñ—ü€í¿ì+¦ÿ él5ĞW?ã/ùÛØWMÿ ÒØk  Š( Š( Š( ŠæüYı³›^iZ“A<Eµ¢Ä·R$…”¶ÓÓä*@É$öÆÕüE¨ZxÅlÍü–±›h¡@‘µ¤ªø.&}¥ã—¶ÊäÆ~j­.úŞÑXúíµÔ‘‹˜µ»İ:#bëg.Ò·ÿ [ı É5•}>·¥?…a—TiMÅè·¼ß{¦ÌR7, Q÷Uz~ ş¾âíŸü”=gşÁVú6îº
-çìÿ ä¡ë?ö
-°ÿ Ñ·uĞPEbøºæöËÂ:µær-®­­%™%1‡ÁT'€xÏÁÕGÄWWéáho-õûY¼Ù°°ûL!_—+±ğ™Îp¾œ…_!Ûo?Óşê(®7YñEÚx^Æ÷Kš	e—ì5Ê!òÂK"'Êœ¶ã€zÏ8ÍÍs\¼·Öôk[-«m6 ¶×R2çvb‘ö/Óh$û€9ÎZÛÎÂZ«ÿ ]ÎšŠ( ÀŸòO<3ÿ `«_ıµĞW?àOù'ÿ °U¯şŠZè( ¢¹~ö+wO–]WW‚WÎ†Ò(šİ$œ”,ªÄíÈ#¦x
-XlI­iñÁy7Ú<Å³“ÉbF‘ÖL)	µA%åÀ “‘GK‡[è¬øõÍ6M>Şÿ í!-î$XciU£&Fm
-°6î0@ õ®Ä:íæ•áØofÕ/¢˜j·P…ŠîÖÜIñ¹çR¿*/
-¤Ó¦Hm/ıuÿ #Òh¨­®"»µ†æßÈ$FõR2åRĞÕ´%;«£Ÿ¼ÿ ’‡£Ø*ÿ ÿ FÚWA\ıçü”=şÁWÿ ú6Òº
-QE QE QE QE QE QE QE QE QE QE QE VF«}©Ãwk›—*¼gû]ÛDë’Uq*©^i4i.ßQ×âàËw¡`R¸òÔÃc9äd“Ğu¡kız˜3bŠçoou<y¤Ù‹±ö«K—kqûÈcÃëüg¦Öâ™ï ‚k>«
-Ï#i–ÑK) ?xŒ cqé“·$€Uô¸ìtU*úÖïC´¾‚ù®­dd[©@C"ã;Ø  ÔŒz
-îso¯iê÷kÂÉÄ¨†ànËn€ØÁÇ=©µgat4èªªG§ui4f(à¶[Ÿ=ÊÊK†ğ Ÿ÷…QÒ¼a£k2Ãœ—Ÿ¿„ÏÏa<1ÉÆY^DU#æz İ¢©iºµ†±“X\,É†7 U†CÏ ‚B# ƒYºş±o&…¯Ûéš”ªYYJÍ3)–ØJ–ÊóÓ4*îÆısöòPõŸûXèÛºĞ¼Öl4Áj·×IÜ0H÷rI'YFã–Qœ‘œû?ù(zÏı‚¬?ômİ§us ¢Šæ|a®^ivû7h™g·HË‘I2& şñqè'¶A5sş;ÿ ’yâoû]è¦®‚¹ÿ ÿ É<ñ7ı‚®¿ôSPàßùÜÿ ØWRÿ ÒÙ« ®Â~4ğ­¶p“ø—F‰Î§~á^ş%%ZîfSËt*A¸ Öçü'~ÿ ¡¯Cÿ ÁŒ?üU tW?ÿ 	ßƒÿ èkĞÿ ğcÿ Gü'~ÿ ¡¯Cÿ ÁŒ?üU tZúÚ[»F†ë‹)ŒOn±—^{	—œŠÈÿ „ïÁÿ ô5èø1‡ÿ Š£ş¿ÿ Ğ×¡ÿ àÆş*€ü!lÑ#¥ıìzŠÜ}¤êIåyÏ&Ï/,
-ygäùq³¨ óZZ^•“bÖñM,#´²Ï&İòHÇ,ç .sØ =«;ş¿ÿ Ğ×¡ÿ àÆş*øNüÿ C^‡ÿ ƒøª „áº‚â=[R¾ÕĞ=°’äDoáQ¦3µy9?(÷¨ŸÁ°\$­{«j7wŒ#ŞIä¬ùo½6„Pá¹ù•³ĞäqRÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @ÚøsìŒÒ_Q{©'OrŞPyğ…X,av€z€sQi¾627Úu½ORË³ÛŞ
-;7Vm‘)o@8ãƒş¿ÿ Ğ×¡ÿ àÆş*øNüÿ C^‡ÿ ƒøª æui>ğ—µ;*÷ºUÎèÅ¼¤`DØTòãR‚O©ç&½¸?øÓÂ·^ñ½¿‰ti§—L¹Hãş&gc  ’Ií[Ÿğø?ş†½ÿ 0ÿ ñT4^òüQ>»ı«~ÒÍ€Û0‡Ê	*#İÁf9İßœ*m7CÂî[Ù¯.¯ï¤A¹º)¸FB(EUQ“ÆIÀÅ?øNüÿ C^‡ÿ ƒøª?á;ğızşaÿ â¨ZÔè+Ÿğ'ü“Ïÿ Ø*×ÿ E-ğø?ş†½ÿ 0ÿ ñU‡àÏxV×À¾·¸ñ.ñi–É$r_Ä¬Œ"PA²=¨¼¢¹ÿ øNüÿ C^‡ÿ ƒøª?á;ğızşaÿ â¨ ¢¹ÿ øNüÿ C^‡ÿ ƒøª?á;ğızşaÿ â¨ ñ—ü€í¿ì+¦ÿ él5ĞWâÏxVçG·H<K£JãS°r©«w1áº“Øksş¿ÿ Ğ×¡ÿ àÆş*€:
-+Ÿÿ „ïÁÿ ô5èø1‡ÿ Š£ş¿ÿ Ğ×¡ÿ àÆş*€:
-+Ÿÿ „ïÁÿ ô5èø1‡ÿ Š£ş¿ÿ Ğ×¡ÿ àÆş*€:
-+Ÿÿ „ïÁÿ ô5èø1‡ÿ Š£ş¿ÿ Ğ×¡ÿ àÆş*€$Õ<;>¥©G{¿ªX˜ã(‘[r‹¬<È˜î=31“PKàëineoí@ZO*MsdZ6y(ÌÈdäLíp:rrÿ øNüÿ C^‡ÿ ƒøª?á;ğızşaÿ â¨ZÔ¸tQ!‡í÷—Åt×"9JmbI*§
-Ô<¨Ïa’qQk~şÛºÓç:¥õŸØfóãKaÖ|ËoFa€@ç×ü'~ÿ ¡¯Cÿ ÁŒ?üUğø?ş†½ÿ 0ÿ ñT Yÿ ÉCÖìaÿ £në ®×Æ_j×â]A&™d‰!¿‹k2ËtX»€Ë‘Ûpõ­ÏøNüÿ C^‡ÿ ƒøª Ğ×4•×4k­1îî-b¹ŒÅ$–û7”#>uaÈ$tÏ¦*«èWFÆÎÖ?ê­ºlvD¶İ8í¿108ùvş|Ô?ğø?ş†½ÿ 0ÿ ñTÂwàÿ úô?üÃÿ ÅP={á×‡õí*ÓO{dµÓbÅ$ğ¼MÒÆÿ /8ëŒ‚AMcáÖ…¬İé·RÄË`T«Cim™vŒ å¢'Ÿ”`sœd]ÿ „ïÁÿ ô5èø1‡ÿ Š£ş¿ÿ Ğ×¡ÿ àÆş*·ù‡KÏÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @?äxgşÁV¿ú)k ®Á4ğ­¯|=oqâ]âÓ-’Hä¿‰YD ‚d{Vçü'~ÿ ¡¯Cÿ ÁŒ?üU .¿¤<ì×ğË«9±Ícc,J.6BŸ7q¹²UH$ğ+&æ-Jm7Pšÿ Â·7rêRnv—PÆĞÂùfIL‹‡$gt{¶à NĞN¯ü'~ÿ ¡¯Cÿ ÁŒ?üUğø?ş†½ÿ 0ÿ ñTúÜÈµÓu¨´»_¶–î0šïQ¸¹Ä ¿šËçi];C87g€†£à¸õ¯m_YÔ£Ó¯k –ï,rØó"g9<7ñŠŸş¿ÿ Ğ×¡ÿ àÆş*øNüÿ C^‡ÿ ƒøª»ˆÚ´µ†ÆÎKdÁkh	;TÏ°©«Ÿÿ „ïÁÿ ô5èø1‡ÿ Š£ş¿ÿ Ğ×¡ÿ àÆş*†ï«­¢Ïù(z7ı‚¯ÿ ôm¥tÁİxÓÂ­ã­&á|K£#Ó/QäñmVimJ‚w`°;í>•¹ÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @Ïÿ Âwàÿ úô?üÃÿ ÅQÿ 	ßƒÿ èkĞÿ ğcÿ @2Vd‰İ#22©!€XúñùÖü'~ÿ ¡¯Cÿ ÁŒ?üUğø?ş†½ÿ 0ÿ ñTE<>Ş!¿»Õµ=-t‹¦D†ÒT15ìAvö‘w(ÉÆç;GC¦iãM¶hÍÌ÷RÈæIn.
-ï‘NĞª8 ` 0+3ş¿ÿ Ğ×¡ÿ àÆş*øNüÿ C^‡ÿ ƒøª=}Iï<=öÏYkGT¾‰ìÑ£Ú1”U±¼Æ[«ü\cŒsK>‰y /êÖãÌy"Û¶àÇ;rñ1
-½0qÔ*¿ü'~ÿ ¡¯Cÿ ÁŒ?üUğø?ş†½ÿ 0ÿ ñTvëL1øuôİ(Enc€Gl‹´| ÷Ç=ëŒÓ&Õ|câE–ÿ L¶ÓK—æ0kßj,¤º0Ç…°êZNF#›ş¿ÿ Ğ×¡ÿ àÆş* ƒÅ¾µv{ør¼ÑŞÀ¥»óƒFîì:h	àçe¹Ok¢õWË&XXù\|YŒÇŒ€wlŞOVÇl`3›}WV„Ş)[â“'úX,Ìs”>^K¹ıÏ—÷|b÷ü'~ÿ ¡¯Cÿ ÁŒ?üUğø?ş†½ÿ 0ÿ ñTsEĞãÑuKÛÛ¯5²îQ#"‰»`2ybÍêNWƒÂº|2je¾_|ØîO(	X,@„^ÿ 0]Ü’I$Ôğø?ş†½ÿ 0ÿ ñTÂwàÿ úô?üÃÿ ÅPõ¦ÅY<å^ëÄ:íÄÊPw¸A‹Ù09å™Kt!†Z³ÿ ’…¬ÿ Ø*Ãÿ FİÑÿ 	ßƒÿ èkĞÿ ğcÿ Xv¾4ğªøëV¸oèÂ	4Ë$Iü[Y–[¢ÀØ$\Û‡­ w•Íx¯ÀúGŒ /ãÉ†[Àò;wIár@ÆqƒÆEKÿ 	ßƒÿ èkĞÿ ğcÿ Gü'~ÿ ¡¯Cÿ ÁŒ?üUrŞ¶¶ŠÀ	\(^ Àà à ¬?ÿ É<ñ7ı‚®¿ôSQÿ 	ßƒÿ èkĞÿ ğcÿ Xş,ñg†õOëšvâ*òúëO{k{Øä’i6UDU$³@ rI¡êC¸¢Š( ¢¢’êŞ'Ù$ñ#z3€iŸo³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ o³ÿ Ÿ¸?ïà U·Ùÿ ÏÜ÷ğQöû?ùûƒşş
- ±EWû}ŸüıÁÿ >;˜&b±M„® KEPv©ª&x~ÓrH···v:³v ÈË`õ H‡ü#¨~ó_»›Qõ]¢¶Oa8aîåÓ¥ÿ ‰…Æ¡®ÉË\Îööÿ ìÁ².?Ş`ïÿ ƒ bÇàïD›#ğæ‹è¶1ÿ  Ó¿áğßıúWşGş±E cÿ Â'á¿úô¯üü(ÿ „OÃô/é_øøVÅÿ Ÿ†ÿ è_Ò¿ğ
-?ğ£ş?ÿ Ğ¿¥àá[P?ü"~ÿ ¡Jÿ À(ÿ Â²mâøw5üVö¾”éèñ’Š@ï¼ØÚØÙÈÇ8®º¼ÓÃÈ’üDñÔ—úUûi×ñÛˆÍÆ™7•:Ç,€nL7' lÑßĞ}/èk%×Ã	Ù'ğƒ×s•{c´dŸA’ãW4Ë?kO"iVŞ¿h€2Xà” =3·8¬Í&ÓXñn»£Ü;NÊ,ôæ³gšxXù@E‚C—Ëôà‘Ó¯à­>ößI—RÕ£Ù«jÓË¤#˜² H¿à~¹¦„Ê+'Ã¦ñöµĞN§Ïî~ÉŞSvİ»ÿ ØÎìsŒUÏìßoû'G:‘·7_g(Hˆ0]ÄíÀä÷9¯;»ğn©qâ¸tÍ®$ÒáÖÛZš[í>H¼£øf#ÍÙûªp9=ëéö>2Ó¾'İ\Å¤ÀÚ­Î˜öòê2-Ñ´k†pÛ·ıŸ  î€ oÏ£ªWóü¿ÏOø}V¿õ×üµ=2×MğUî­}¥Ûi:<·¶ÌKbŸºŞ	\¸É ñŸ­TVøxŞ ÙèGR!±ØÓ—6İ¥ÆA)ÀãÆ|>û†¼gâ‰uş;„€›ˆínç2È€†e?gBÌÄ“…ëdéâÔüe§oêXiì¡M"hRæê^³;
-‘!9$Ìrpp2uB}N»û7Á_ÛÃDşÉÑÎ¤mÍ×ÙÅŠ"q;p9=Îjÿ ü"~ÿ ¡Jÿ À(ÿ Â¼ÇÃ> Ó~2ı«RÒYä¸°h/uRå yK‡Ê¹€/ *…ÎĞ äŒf§öSş·»F?ü"~ÿ ¡Jÿ À(ÿ ÂøDü7ÿ Bş•ÿ €Qÿ …lWxçVñl"‡Gğl¨/-¬Zöâ)J²åÕc\ºœçkŒFXqS~ƒ±Õÿ Â'á¿úô¯üü(ÿ „OÃô/é_øøWâ¯ø—ÃWÖ6Œ‰`ĞÛ=ËigÌ Y#Y#8FPAİÛœû¯ˆ> º¸kmÁºš—¸A=õ¤È¬¡ã™v€«HÀ–ÀØ3ÉÚÕÙs­ÿ „OÃô/é_øøUUÑ¼ú“é«¦h&ı#óZÔAš©ıâ˜Î9ã½Vğ&³¨jº^¦5;ˆ®æ±Ô®-EÔ&E9Ó¶÷û½OZæõ›Ïè'Ñd±³¾¾Ô¡·–Øl–[¨üİ†Äàc®9¡j×¿†ôOÊÿ ‡ü1Ûÿ Â'á¿úô¯üü(ÿ „OÃô/é_øøW‰¼Y¦üJ—NÔášâÆxîæ‚Îİ oÜÆÆÑÂMÍÊ‘&'jg^Ô“ÄŞ%Ôlt¯ÙÃ©éÑ­¥ÄºDÒùwQ¡ãÊÁ |ê2@RU¹8ÉWÒşWüÿ ÈvÕ¯ë§ùƒÿ Ÿ†ÿ è_Ò¿ğ
-?ğ£ş?ÿ Ğ¿¥àá\ÿ ˆoµeø;=åıÄšn°tä2²‚N@ùFÃY¾^ª/
-i¾"ğç…/Jé6v¡-Œ–Z<ws\ºË³;ZY¨³ò ÀÏŞ'9oİnıµJİN—ş?ÿ Ğ¿¥àáGü"~ÿ ¡Jÿ À(ÿ Â¼îÏâgŠn­níCšMNŞâ5ãÑîBÛÃ")%á/¸º±Æù`—+ñŞ²šaÓlõ6óÊÛ5§ö$›$¸’d’pªQ¯¿çèHµ°t¹Øø‚ÃÂĞo5‹ÿ iÆÚÕ7¸ŠÂ6cÈ R:àz‘N–ÃÁ0ê:~Ÿ&‘¤‹­EíPX#	@f;‚àpGSÏjã5Ïëz§Ã]^Ï^Ò.ŸY%´´Ñ®R±¾Oï_r2¥·dpq‚zÍ¥êsxË_ğF±k£=¤}Åô‹w[Æ‚ªVEJŸ”œäcŠQÕÛúş®o¼Úğ·†´´›–—DÓ]†§¨ -i!Vî`N€ °­¿øE|;ÿ @/ÿ  ãÿ 
-‡Â?òºÿ °®£ÿ ¥³Ví dÂ+áßú iøøQÿ ¯‡è¥ÿ àáZõãºïƒ´ŠÓ†™m<bşK£<JÆáŠ–Ëñó`“NÔ-Z_Ö×ö=/ş_ÿ ĞKÿ À8ÿ ÂøE|;ÿ @/ÿ  ãÿ 
-óiz/Âïé!°Ñá].KYtéáH÷&ÒÑNIfÁRÄœµ™®ør{/
-[xSE°jÆÔêú‹iëb`Ù[s/È¾ ÉZWV¿õı[QÙŞß×õ}[ÿ „WÃ¿ô Òÿ ğ?ğ£ş_ÿ ĞKÿ À8ÿ Â™á-z?xSMÖ#Æna"ƒ®8eüáí¼ks7Ä
-Y_,óH,ÿ ²åÔ2Å…´<­‰…9ÉÈê0)«K”ïc·‹Ã~Ÿ•¢èòlr²Ö#µ‡PxàûTŸğŠøwş€_şÇşÇø_Òtm3SKİB8ÅÇ‰n­mÁ%‹Hï£õÎzsÍni?t}kÄ'G³IÙ‹L‘Üæ37µËó7(ÈäqIkoKş	ş£Ú÷ïoÅ¯ĞÔÿ „WÃ¿ô Òÿ ğ?ğ£ş_ÿ ĞKÿ À8ÿ Âµè 3]ğÖƒ±á•MMU“Su-¢ ãì—F@?P+sş_ÿ ĞKÿ À8ÿ Â«øƒşC~ÿ °£ÿ éÍoĞGü"¾ÿ  —ÿ €qÿ …ğŠøwş€_şÇşˆü;¦kĞÃ&§l—)d$–8ePÑ–(W,¤s€N=ùô¯6øqàø“áVŸq{¥ZµüĞ\Ãö¿,o¤`Ğ°ÀÁ9#blßoø?ä>Şg¦ÿ Â+áßú iøøQÿ ¯‡è¥ÿ àá^aà‹K_ŞhúV¥¤Z†ğ”RÃxÚ×Ê"9VsÛq“Äş »‡Çv.†££iÿ ÙsL?#Ë`VûÛ÷8û»~AÎiõIuü¶Oæÿ 2u³¿OÏª=Cş_ÿ ĞKÿ À8ÿ ÂøE|;ÿ @/ÿ  ãÿ 
-Ö2‚ Œ‚;ÒÒÆxSÃZÚ=ÃK¢i²0ÔïÔ´Bp·s :t  =…nÂ+áßú iøøUÿ ÈãşÂšş–MSk(Òô].çQ:ŞÖe‚äÛbCŞùq¸ƒğ¢à;ş_ÿ ĞKÿ À8ÿ ÂøE|;ÿ @/ÿ  ãÿ 
-ã<5âÉ4İb×L¹·ÔŸNÕŞ{«;İOPI'XÕe¢Ú8nIÇ|g;Ç~4Óoÿ á¼Ò¡³Ô"GmBŞ[›‰ óLrÌp…*ZRXà6Fàæ…º]ÿ ¯óç¢Â+áßú iøøS&ğß†-à’yô]"(cRï#ÚÄªª9$’8¸-Kâö'noµi,–#l¶©y	ÎÖÿ \Ö­µ‘	İ‰w`€=E;ÆºÕÆ—âKÏ[Ú<·Ø¯b¢X€tË#)`Àp3ßB~í×˜ÒÖŞ‡z<-áÆPFƒ¥FAqóúRÿ Â+áßú iøøW#àGÓümâ{F’GT´ÓyåÉ•%¸üµOÄŞ4¸²ñÕ¼QÙŞ¤Ö¬±ÛY6 Ğÿ iy…“+‰Ã Tá™“ jI)(¢UùnvÉá¿É,‘&‹£´‘cÌAk)FF8ÍIÿ ¯‡è¥ÿ àá\~‘¯izŠü}©ß%½¬W6!c¸©h@Æ$œŒq•·­üBÑt-atÙ–yå	“42 Y"³pÄd‚vƒ€A=E.Şåq÷ ñŸ†´<â¡Ñ4ØåL¹dt´@ÊDLAnÂ+áßú iøøUÿ É?ñ'ı‚î¿ôSVı dÂ+áßú iøøQÿ ¯‡è¥ÿ àáZ2İÛ[ËS\E“±HQÜ# I
-S€O•ç:×Œ…Æ¶÷Ú,´óè^zßÚËx¶Vj ¥Õƒ3”·'h¥t;¯ü"¾ÿ  —ÿ €qÿ …ğŠøwş€_şÇş‡qñHItŞù´sª?‘'•ì'¯\rpv^"¹´øpúU†8¯!¤jæTEÙ'Ës>ı¥™Âm=NîGJ{6ŸOó°–©>ÿ åsÖ?áğïı 4¿üü*4ğß…ä–H£Ñtv’"Š¶±„ŒŒŒqÇ5ÇÉãÓ®xV}NÇSºğÕµƒˆ®ou+§i—V4“9Ë+gnã"¹NÅÓÅ×Z€¹ó$ÿ „§KIØ™¼‘¸ªó‚KôÉãÒ¼­éø´¿Pé_Àõ¯øE|;ÿ @/ÿ  ãÿ 
-Ã×|5 Ç¬xeSDÓUdÔİdh€8û%ÁÁã‘Ô
-ìëÄòğ¯ı…ÿ Hîicş_ÿ ĞKÿ À8ÿ ÂøE|;ÿ @/ÿ  ãÿ 
-×¢€2?áğïı 4¿üü(ÿ „WÃ¿ô Òÿ ğ?ğ­zä|cãûÜYÚIïï®Nÿ ³[à2Ä2Yùã8VÂõb0=hÿ ğŠøwş€_şÇş
-øpJ ÓœáU®¼oá»=2ÏQŸUˆZŞDÓ@Ê¬åÑFY° C‘×©³›Æş×m5M).ŒW^EÒy®ÒëQÜF3œsœÇ”›Š~Wü;yšĞøoÂ÷0G<.,2(t’;X™YO ‚"¤ÿ „WÃ¿ô Òÿ ğ?ğ¯8økfÖ(Ñã-!2xNo3ïÌN>ƒ8Ø®_øÚˆÆ˜4»Ôó[m¤u!òËîŠßxÀÀ/¸ç®*ä¬íëø6‰‹oğüRgIÿ ¯‡è¥ÿ àáQÃáÏÜÇæA¢èò¦â»’Ö&d ‚?
-£¨x½¬¬´[›úŞßTº[YÁE{mà„.ª[©ÀÆxÏ8<0ÒüO6à_ÄjQ[YH×ÛßEj%"gJ‰óÛ‰ˆxäŠŸøaô¹ì?ğŠøwş€_şÇşÂ+áßú iøøTš®úŞœ·¯¥jj±ùb¿RB=v«1Cƒí\·nfø!K+åiŸö\ºƒX°¯öƒ•±0§92yFö¹C§1ÛÅá¿Ï¿ÊÑty69GÙkÚÃ¨<p}©Ã¾{™-—FÑšxÕ]â±Ulà‘Œ€pqô5Êx_Òt}3SKİB8ÅÇ‰n­mÁ%‹Hï•QŒúç=9æ’ËVÑ4ïŒ> ¶»ÔŒ7Ú„vĞCoÏ—!“Éû H'<‘K¢ó_¥ÿ Pïåşv;øE|;ÿ @/ÿ  ãÿ 
-dğÌÊÒ[#6Qğ}GÃøH>i±¹£yÓiœJíªš³°u±ÿ üÚgïtÉ`Ç&ÎâV–İı†âLTàu*Õ¥¦jI©@çËxn!.{y1º'ô8ê ‚8 ƒWkVÿ ‰oˆ4ÍR>æAav;2¶LL}Ãü£ÚV¤Ÿÿ È‘£·v¶V>äòOæk ®Àßò#h¿õèŸÊº
- (¢Š (¢Š (¢Š (¢Š (¢Š (¢¡»»‚ÂÎk»©V+x#i%‘º*’*¶¬¤ÔW7á¯i>(¹šÚÍ.à¸HÖtîšû³'ª7n‡Ô
-~!è-â?ìm÷ ùæĞ^OÙÈäÁ¿ûøç¦;g<Qmmı_®Òÿ ×õ×Ğêè®WEø…¡kÚÀÓlÚåZPíi<°•Šğ!Ä†&ï´ğr¶G5ÕPl Í?ŒôzÚTìĞMmt§9–7ÁP8ìêoÑG˜7>Ñou(¯ï"»¹š´Ä—óÉrá–&rƒãÇj¿«höšİ‘³¾ûA¾òÁu,† ˜ÙI=~Š:X.ïr¦™¥Øèºlv›k­œ¶8£
-?©'’O$œš¤<'áä»’ò-ÂÉ7î»··X§Ë‚‰ryjm_ÒüEm5Æ•t."‚f·ìeÛ"ã#î(Õu…Ò¦±¬5¯µÎ!İileXsür÷Sßÿ ¯CÕİõıCb#ÂÚ>…yu{cjâòë{™ç’yœ  äflp8Î8«Ú•ˆÔ´éìÚææØL»L¶²˜ä_uaÈ5 ×´³âĞEâj,äÛàçËÎ3œc¯læªx‡Å:©ŞïŠêâÂİç{HæQ!ÚQÔ™rqÆG^);[]†·Ğ–ÿ Ã–š§…ŸÃ÷ó\ÜÛ¼Ï$™™Šã[ 6q×µgÎñ[Ûİx³Äw6Ğ‘û£q%ğ0Ii!ÿ ¾ùïšŸÃ¾0Ó¼Muymb“µŠŞWi 
-Ë4{Ğ¯9<z["òÔŞµ¹„İ¬bS˜<À„ãvŞ¸Ïªi§©)«hSÑ|=¥øz	âÓ-Ú!q3O3¼¯+Ë!êÌîKõ5&©£Ùë0ÃêÌËË<~UÄ‘ëĞåCÅ_¢ÂŠ( cÂ?òºÿ °®£ÿ ¥³VíqŞ“Ä‹cz,4½*{_í]Gd“êRDçı2låD9ş#øt­o;ÆôĞÿ ğq7ÿ "Ğİf]øsC¿¾[ëİN¹¼\bâkTy:|ÄgŠ¯çxÃş€šş&ÿ äZ<ïĞCÿ ÁÄßü‹@—VV·Ñ¬wvĞÜ":È«4aÀ`rÜ†ªÂ=¢Ë‹Ã£éÿ j¹FIæû*o•[†ØËÜµ[Îñ‡ı4?üMÿ È´yŞ0ÿ  &‡ÿ ƒ‰¿ù€.éÚ6™£Ã$ZVg`’Ì¶Ğ,a©
-k„Ñ4Yôı´{ÀgW’;©fk´6“%Ó±?¾"iƒpr8®8wãúhø8›ÿ ‘hó¼aÿ @Mÿ ò-C¥ŒíWÁö2VÒü7áœ4ˆ·‚öÁIhß•J¼ ã9(ü6í4Oº[«-"ÂÚácò–Xm‘'÷A8öª¾wŒ?è	¡ÿ àâoşE£Îñ‡ı4?üMÿ È´·EbyŞ0ÿ  &‡ÿ ƒ‰¿ù;ÆôĞÿ ğq7ÿ "Ğ~ ÿ ß…ì(ÿ úGs[õÄë’ø«ûcÃ>n‘£+Iü º¬¬¾ÉqÃ³£nã‘@ç#oÎñ‡ı4?üMÿ È´«uim}k%­İ¼Wò¯Èzx5›£éz4o—¦ÙØÇ!ÜëkÄú dÕ;ÆôĞÿ ğq7ÿ "ÑçxÃş€šş&ÿ äZ ÒO²‹í>]º}©‹\m‰GœHÁ/ÇÌqÇ5@xOÃ‚Å¬G‡ô¡hÒ	LÎ?,¸·Î8Í3Îñ‡ı4?üMÿ È´yŞ0ÿ  &‡ÿ ƒ‰¿ù€5mmmìmc¶´·ŠŞŞ!¶8¢@ˆƒĞÀ5byŞ0ÿ  &‡ÿ ƒ‰¿ù;ÆôĞÿ ğq7ÿ "Ğ~ÿ %Çı…5ı,š°¯¾^]ÿ jXGâ‡BÕ/~×uf-Jwrè²–áXó÷I=s7…%ñPÑî<#FtşÒ¿É}VU;¾×6ánxpÀÎßãúhø8›ÿ ‘hëp(ê^ĞF›?öO…ü6/ÂşàİiècİşÖÕÎ>”ÍÁ–Îq¯xsÃw$¬KÙiêDÎT°pHoQ“õ­;ÆôĞÿ ğq7ÿ "ÑçxÃş€šş&ÿ äZ šÛÃ:•µÍµ®‡¦ÁÒ…¸Š+HÕe8 ÃO_Z…<áxÌe<7£©·¡[†Öã‘òğxû
-<ïĞCÿ ÁÄßü‹Gãúhø8›ÿ ‘hóV;Khn'¸ŠŞ(æœƒ4Š€4˜SÀÍpvÚEİ¥âuvßP½ûJ]ÆÖÎ%OàGI¤R<¾ƒHÇ~ŸÎñ‡ı4?üMÿ È´yŞ0ÿ  &‡ÿ ƒ‰¿ù¿×õĞ:XËÔ|%e>ˆ’hŞğí¶£åí-JÆ6HÔä²+>§î’9={êÃá/CA<;¤Gå¸•DvQ€’qó—ƒÀç¯wŒ?è	¡ÿ àâoşE£Îñ‡ı4?üMÿ È´äŸø“şÁw_ú)«~¸ŸKâ£ào#F¦Üù«+²¯”Ù!M¸ã¶F}EmùŞ0ÿ  &‡ÿ ƒ‰¿ù€#ñ‡n5‹½*şÃRûş›3I«.ÖVMÊH#¸#Ÿ¤ü<ÑàK™õÛ[wT»˜ÏqywcI8 *v¨ q“Şµ<ïĞCÿ ÁÄßü‹Gãúhø8›ÿ ‘hZÔÂÁ+ı¼_ø5´#tì\ +ÁÎ
-XŒ;ñ[Éàÿ Gt·IáÍ!nüÅ•lc9ÜÜç<æ“Îñ‡ı4?üMÿ È´yŞ0ÿ  &‡ÿ ƒ‰¿ù€%¹ğ·‡¯o$¼ºĞt¹î¥’ilãg~1Ë“ÇJšßAÑí-â·¶Òla‚|ø£ŠİROï¨½Ç5SÎñ‡ı4?üMÿ È´yŞ0ÿ  &‡ÿ ƒ‰¿ù€6ëÄòğ¯ı…ÿ HîjO;ÆôĞÿ ğq7ÿ "Ö&¹/Š¿¶<3æé2¸ÔŸÊªÊÁ›ì—1û8Ú6î9är ;j+Îñ‡ı4?üMÿ È´yŞ0ÿ  &‡ÿ ƒ‰¿ù€6ëŠñ…muoYË}¦-ş›}hÖ÷K"–X3¾'Ïğıé#qŞ¶¼ïĞCÿ ÁÄßü‹Gãúhø8›ÿ ‘hëpéa«à¯
-ÆwGá4ø»ÿ Àk/‡ĞİjvSëÙ7–É¦›m¥-ãg ³•gpOÃ½myŞ0ÿ  &‡ÿ ƒ‰¿ù;ÆôĞÿ ğq7ÿ "Ğ¢YZÇrnc¶…'1ˆŒ«°r=p2x®^Ğ5ÁâíRêŞÛSšÇR†]épCulÑË?Ş
-198>¹ë]Wãúhø8›ÿ ‘hó¼aÿ @Mÿ ò-n,dG¡jŞ$Õm/õÛ‹‹m>ÆãÎ·Ò¼q³È§)$²$ÒÆOh$ßzh6ºö¾‰¦Ã}¹Ÿí1Ú"Ë¹³¸î999çœÔwŒ?è	¡ÿ àâoşE£Îñ‡ı4?üMÿ È´z´sƒƒƒÚ¼ßDÑgÓôFÒ5ï^Hî¥™®ĞÚL—NÄşø‰¤VAÁÈà¸àuŞwŒ?è	¡ÿ àâoşE£Îñ‡ı4?üMÿ È´u†v«àû«i~ğÎD[Á{`¤´oÊ¥GŞ qœ”~WÁ>ŠúÚò"ŞŞKbkm˜£È$‚Ñ¡
-Ä$näTwŒ?è	¡ÿ àâoşE£Îñ‡ı4?üMÿ È´«kimcl–Ö–ñ[ÁÂEUïÀ
-š±<ïĞCÿ ÁÄßü‹Gãúhø8›ÿ ‘hn°<aÿ  kcÜjš~?ÈGò5'ãúhø8›ÿ ‘kÅrø¨èöş~‘£"iX`¦«+ßk‡hÁ·À'°$àã ğ7üˆÚ/ız'ò®‚¹ÿ È¢ÿ ×¢*è( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¬oi3kŞÕ´›yMwk$Q³ÅN3íšÙ¢“WVvw<«Âúˆ¬¼Ek¯êº‹û;@ƒL[Xç·i.%2~óhPñ0'=+%¼âK§¶‘ñ+êÿ Ú^|[D%s¡÷ù™8û¸Ï|s^×ESwwÖ·üÄ´V_Ö–üğ‡‚¼Gkªx>ßRÓ~Ëoáµ¼ó.¼èÙ.L„„Ø‹t9;‚ô¯a¢Š›ÜV
-(¢Â¼çÄ_¥ÂŞ ¼Ó¦¶²Ô4HYÇÎ${’¬¿.Òàc' ‘íèÕ›'‡´IµUÕeÑô÷ÔT†mj†P@À;ñœïJÚç›ÙAãÛOéº³i¾!º%%mJµU·‘™0‰qTU`>lîëIª)Ò|}âÈ´×Ô<3(¸³GÈµÔ"Š8®<Õ)qïIr#m}¼±Åzö§¦Yë:eÆ¨B'´¸M’ÆXÃÓ ƒPhš—áË'²Ò-ÖÙ¥i|¥f*ºàvaMoè.‡™]hÿ f½Ôu=.ïW³¸ºG{wlRd'ˆc·Hã*~ô¸$“Ç'ÖtMwQ]JŞ×À0!¾ÓÛûR±%é¸|+I+FøØTœí’:â½rŠ-¥ƒÌä<5áûÍ+Æ#Ô&ˆ-­Ü6QC&ğ|ÓeXà@äqık—Ğ|7u¬xëÄ½å•µœ»(ºk¥¿2*–5‘ÁÇ“Á8`ŸW®zoèrêwz’E{muxÁ®ÏQ¸¶0,r('ñNï››ËüƒìÛúÚÇ#âŸxÃ@ñõ”qF÷ZeåÔqYÙ@Ößé	å·˜ò$WVÚwgfÎ;®™yñ6	/áÕ4ËÉÄöî‘\[½“‹i÷6×KÆ^2¥N$ù^§&»M'ÂĞä]7D±·¸J­ÂÂÄ¹üìOrI&¶©%¥†Ş·<ƒDÓü}§İ[ÜÃ}«Üé«rc½Ó›P´»»Tüååc„&%sä†»×Ä;¯ÛÜ65–ˆ÷@5¼“Z¸[p¬É·.$-µ†ÆaƒƒŒdööz^Ÿ§Ëq-•µ´—/æNğÂ¨eoï1æ<M[§}S'£9ÿ ÿ ÈçşÂº—ş–Í]sşÿ Ïı…u/ı-šº
-C
-(¢€
-(¢€
-(¢€
-(¯*×lbœxÃSÖu»=JÙ4éÚ0e…vÀb·UÙ¸–ÏSG_ëËüÃ¡ê´WâÕƒT¿ğİœâ2]M¢½…€xİ–
-£AùÀà÷¹mJµ½ñ‚iö³xzõ/°ÚK
-´!ÖHGF>]ÒÇ68¡jíëøXŠÿ ×_ò;Ÿÿ ÈsÂöı"º®‚¼ëBi[Cğ›œJeˆ“Ÿİ[±ş9¶½€
-(¨®L¢Òc<Ğ³?ŞÇ­&ì®4®ìKEy…,-­'ğ=í¬)c3js¢$ÿ »RæR9b%+ÉÉÉ÷5êMYØ”îQE!œÿ ƒäsÿ a]Kÿ Kf®‚¹ÿ ÿ ÈçşÂº—ş–Í] QE QE QE QE sş;ÿ ’yâoû]è¦®‚¹ÿ ÿ É<ñ7ı‚®¿ôSWA@Q@Q@Q@sş!ÿ ç„ÿ ì*ÿ úEu]sş!ÿ ç„ÿ ì*ÿ úEu@Q@Q@Q@Q@Í´–²Û]CğJ¥$ŠT®§¨ ğEqŞÒ­µ/†z]”–7h#ıİ½âf†8%pAÀäu‘Ô+ÛQ^Og£lĞ¬®µ'L¹ÑôO·AwctàÂÌ$ÏÚ!Ş»@\$mV 7ö>µ¸_‡Úe¾§BÏnw@äƒlNÔìFØñO¥Ğu³:z+Îôß‹}_ÄZ,ZV•b—ÖKş‹mBîeòŞ,(f8l·mfOöÛÂÖš~§	õt·¸»Ó­µ¼ê`iB²+nòª²îù‡€nöşµ°zÿ Z\õ`À’©ÁÁéK\—…nŒ:=ş˜¶:vŸwgs=¼1ÙF"†à¨æ$y$}á‘“‚&¼öòÑôïhz‡C¬^hwr_ÜÂf˜ù »;Y„˜ää‚}Í.¼¿ëä4®ì{}sş2ÿ ·ı…tßı-†²t-6ÃHñÈ·Ğìí­l%Ñ’YÖÚ5Dwóˆ‘¿§Âµ¼eÿ  ;oû
-é¿ú[?ëñ±)ßúò¸xşDmş½ùWA\ÿ ¿äFÑëÑ?•t†QE QE QE QE RÕ®oíl]3O[û­è«Î!\ ±r <N8•áŸjİŞ«Şim…ÇÙ¼ëkÖd \Ñ§İÈúäv­F»:â¤´ºt+ïš#'¾ÜŒşuWÃºĞ-4«w2,	‡•‡Í+“–sîÌIüh]oı_¨3–“Ç:„,ü?4`†éæìÂíMÜA d•¹Û‡ˆñ»9ê xãRÔüou ÜÁ¥dZ½àym\©ŠR	İ	Ø>N„	ÑÕ<'¯kuÖ­ªZ=®›wöËX-¬'Ş2{™[pä\ã·JÂw÷^(²ñ±ªZÜ]éğË¢ZY<¦A†gÌ®_ƒ"ˆì¯çùiøÿ VĞ%ÖŞ_ŸùğO‰ï<O²÷¶pZÉa©Ib#†C ùrw3–'øGâ«İø«_²Ö,,gğıŒk}u$0îÕ›å&KLÊ"*hó–QÔÒxkÂ:×†­µ•‡[°š}Jõ¯ƒ¾šáb‘ÈŞ6‰òËÀÈ#¹=+BÛÃŞ#Ô5­Rõo%¸¶–ñ¤&%¶‡’À|Í’Ç:
-KvümşcÓ_SÂÿ SÆ:àM2ëHƒMG•DS\ï¾ºŒ2Â1å¦wÄ€8\æ»Êóİá‹é†„óë"êËA7Âµòäıéé$›È|E\ş•èTİ¬¬-nJ÷YÒôÛ›{kíJÎÖ{–ÛSÎ¨Òœ…åHéê*Ìâf·‘mä9Š‘È…Õ[±*${d}kÌ5ÿ CâÏ¶‰â{™¿y¢)µ–À›uvƒ/¶y¬X½y¥Õ/ëfÇÒÿ Öé§\·<A}ájV·:E´hûe—S2•P«–c»€ş·÷‹¦¬uÔQ\"ª¤×p´ãÜ¡Ğ’G}Ãšó©t]nÖÛUÓ¯<)u¬”ÔåÔ4ëË-I-7´™ûíæ¬ˆT1^}3J]—õ°G£g£é—bÿ K´¼A “}»î²3•$CŠ¥â­BãIğ–±¨Ú2­Í­œ³D]w Ê¤Œõ‰¥h¿‡>I£ZÊ«Ãe8„ÀÇjÊÛ™Us€H ŸNk—ÕîµÏhš&‰a&»cÜQÛjvóè²«ì#÷¦K©¾UAÆĞÌ[sÃšæmGú½ÿ  †–rş­oÌìWÆºF“£h¯j‘Au}k™e<–—m£»˜|Ç
-3Öº£"¼ê†š‰½²÷ÄùÚqÓ]­4õG¹ƒ²Ëæ´±°ôAœ×hš}Í…†™xh#Xã¸¾F¸ÈåÀd,H÷ÒªM;²"šI2ã][¥ÒZ´ñ‰ºB\oeÔ‘“î+[ñm†‡¨ÚiòÛêwW•cf÷yÁ‘ÂBƒÆO<\ãùŞ%ø¡ßÙi7ÖğèñÊnµ+«I-DÂD*"Eq»,xÀÇ^k?ÇpèW_ôx|Mttİ8é³„¹İnÙ˜‚IA@¼íÈÉn½Œõ^wı¯éßúş¿«õ=@ÊÏ#<ŒR×ŒxößÃ¾#Ğá³ğ«µ÷ö\RA–™¥½å«4ª ıâb8İN~ürpu“á¿6©e®Ïâ‹uÖ"»Húo˜Q‘
-Vƒ±”á'',6“Á¸º‹i«i·÷W6¶z…¥ÍÅ«m¸Š•Ş’0À©È=}*åxÚ|)°¿Ôd°–E[İ1â–ÒC ”±ÙÍY‹\dç;å8ŞqŞº>^Â]kâ+İz	®b¹YÙbÓV"¡Am¼²G´Œ©-’3Á&…Ğ[ƒäsÿ a]Kÿ Kf®‚¹ÿ ÿ ÈçşÂº—ş–Í] QE QE QE F}J¹Ô¡Ô§Ó,å¿„b+© V–1Ïİr2:‡½^¢€(I¢i3YOe.—dö—f­Ğ¤NK2ãä“LŸÃÚ%Ö›q£éóXÀAŠÚKdh£#8Ú¤`u=zÒ¢€9İy-cÂ1Æªˆº£ªªŒ •Ö ÑW?âùxOşÂ¯ÿ ¤WUĞPEPMJÓîî.ì´Ë;k›“™æ†G”ç?3–çjõPEP?àßùÜÿ ØWRÿ ÒÙ« ®Á¿ò¹ÿ °®¥ÿ ¥³WA@Q@Q@Q@Q@ÿ ÿ äx›şÁW_ú)« ®ÇòO<Mÿ `«¯ıÕĞPEPEPEP\ÿ ˆä9á?û
-¿ş‘]WA\ÿ ˆä9á?û
-¿ş‘]PAEPEPEPEPW6Ğ^[ImusÁ*”’)P2º ƒÁ—ÿ †¾Â,áÒ~Æ$ó…¿Ø£ò÷ã¶íÆìq¸­š(„š&“3Ù¼ºe”c²·BmñŒlãåè:c «W6Ğ^[ImusÁ*”’)P2º ƒÁ-–¾ĞSK}-4M5tù{ÚD3qÉL`8íR`èÿ Ù?Ù?Ù6?Ù¿óçödòzîû˜Û×kBŠ ¥¥Úı—ìúmœ?dV[o._%[ïÀùAï´–š.•awqug¦Y[ÜÜ’gšuG—''q-Ï<Õê(–›£iz4rG¥é¶v)#nuµb}HP2k3Æ_ò¶ÿ °®›ÿ ¥°×A\ÿ Œ¿ämÿ a]7ÿ Ka Àßò#h¿õèŸÊº
-çüòxRÖÔğöo-£CŒŸû/ë] QE QE QE Q\—â]zoxÚÂy,§şÇ‚³EÉBÌÿ 9f'û œòçšMÙ7ÛQ¥s½¢¼gÂÿ <IªiºÔĞ<:Ü|wq[5¡YcÛ4‰é!?$î1Ïÿ „|Du¹5%Õmo.lİXbÓ'±’A8t™Ù{†ªÄÜéè¯>¿ÕüY§øóE²7v7	©I:¾™D­½ºr³™xmİÈÚs€22[?‹<E¢êrG¬]è×iúkê¢YYJ p‘£´¤c»QÂçÔİZÿ ×õınUìzÀxÅ×>$ÔƒêZ˜‚ò{!qˆº|ˆ£.q!–A™
-Œ¡×ƒÖ¹É>$ë–ú‡öì“@Ú!×_EşÎ…'ó>öüŸw³ÍSVvÖ¶üÄµÛúÒÿ ‘ìTW’øOÇºıöµá¹õ9àšÇÄëpbµ¿b0“·kç.uİz`q^µCMn+…T›M³ŸS¶Ôe„5İª<pÉ“ò+ãpÇNvµnŠC
-(¢€
-(¢€
-+‰Ô~'èú~¥ugö-Bqk2[É,B Fb¡QE’C¹X|ŠÜ©ÆqY~ñ”7¾?Õtyb½æáæqÍü’˜|¦o’È¢ ÊÁÆÒÀôÎF µ`ôZ•Eyg‹<G}©x\¶”%´Ú_ˆ-m”BÇ÷™"d-ä7#§»àÄ¸3ñÃItÒCı¡H˜°ùI˜*1ÛoäG]®ŸæGoë¯ùµçµQ ”Òm?´¤±ÔvÎÈ.Ymf3"îçƒ ¤‚zU?xªÚóYñOˆoî½¤–út Jå„AáÎÅÿ 1ÀIõ4-oızÓúó±êWŸ´­CRM‚ÛRXoZX,õ3ÛiäEË|î=ğØ í8'ÆøBçU³‡á|/©\MÜW«:ï*®6@ËŸ˜®0	ô¦•ÿ ¯_òz'ƒäsÿ a]Kÿ Kf®‚¹ÿ ÿ ÈçşÂº—ş–Í] 
-(¢€
-(¢€1ï|Yá½6ñí/¼A¥ZÜ¦7Ã=ìhë‘‘•'#ƒW¯µ+.Ğİê¶Ö–Ê@3\J± '§ÌHŸs=½æ°4h
-3 W¡O*¹ù½Øÿ Â‡Ö¥×µ+2Åd½Õ¬t²ï²›ÆPªØ9Û¸»nì"8*ú\}l,ş%Ğm´ø5oMŠÊàâ™.‘cÿ ²Äàô==*wÖ4¸§³†MJÍ%½µ§PÓ¹AŸ›¨éµÃØ]ÚØø9tíC^Òôyg’æ;[Ç£]Â\şõÛœ•b@ ç€2ÿ U¶Òü7à˜õ©,4‹…»šÙ¤¬hˆÀ¬rezôÈš}~kñÿ !tù?ÃüÏ@½¿³Ó-îşîKdÆù§F‹“–<j­‡ˆtMV9äÓµ>ñ-ÆéšŞå$yb¤àpzúmÆ¹£Fšƒ\^ÀLÚ÷e›ˆr»”ŸÃ‘\‡‹DÍ¦è×7Ó>Ê÷QIu¥U+oŒJû¾Pˆùl®üpPÍGR±Õµ/	]i×]Û^EA t$Y]g8?…uUçº~¡}¨\xuîîã¿†?O¥új„Y\ís´'$®T vä
-ô*¦JaU¯µ-.Ñ®õË{Kd 4×¬h¹8b@ëVkÆ7vÖ^Ö&»¸ŠŞ3i*•ÂÌ¤“Ü’ õ—,[.*í"åş¹¤iVÑ\ê:¥•¼ÇKqp‘«ññVà«xî-åh%PñÉWSÈ >µÀM¨XÃiáßXkÚy=9í¡³gó~ÜMÉC»Ì€|ªÇ¶+¤ğN{¥x7M´ÔT-âÆ^dˆÙ˜¶ÑÉéœu=+F¬ÚìfÒ7è¢Š’Á¿ò¹ÿ °®¥ÿ ¥³WA\ÿ ƒäsÿ a]Kÿ Kf®‚€
-(¢€
-(¢€
-(¢€
-(¢€9ÿ ÿ É<ñ7ı‚®¿ôSWA\ÿ ÿ äx›şÁW_ú)«  Š( Š( Š( ¹ÿ ÿ ÈsÂöı"º®‚¹ÿ ÿ ÈsÂöı"º ‚Š( Š( Š( Š( ©jZÎ—£D’êš•ŒnÛQî§Xƒ¸ˆÉ«µÏx®ÿ N·³w^ °Ñ®.£tk†Ìe#99+Øı3‚m-­Ô½}â=LKw¿Ö´ëD¹]ğ5ÅÒF%^9\Ÿ˜r:zŠ½qsoik%ÕÌñCo—’Y*"¤“ÀõãÚ¤×0ÚY,÷v^¾M	a’Êå¶[ê1à[Æ¥·£.Ì¤°ó  ×¥ßÜÚ	Ç6£t48(·<Ò"}œœaIo— ñÍ7³·õ¿õıjº¤ÿ ­¿¯éÚXüSáétéuõí-ìa`’Ü­äf4cŒlà‘Áõ¥“ÄÚ:l:”ºæ™„ìR+¦»ŒE#ä+gğzÆ¸WR¸ºÒöËâ5kõHÿ ³|M˜„pŸ-˜´›@ŠE˜ø Ø8eªFıÍ¶•3k6z%ÔwW²G¯4ŠÖ7™uÜ»`ù›² o—Ëm¤Kúü¿¯ÊáÛúïı~v=r+«yíîâ’ÙĞH³#‚Œ„d0n„cœÕ]3[Òu¤‘ô­RÊıc ;ZÜ$¡Ié¤â¹ÿ ëzBxNÎÓRû-‹A§‹‰í¥“r$ •ó77Tb2	çf¨Øk6½æ©¬hwj×VñGäXÏIºÁ$°U™€åqïµ©»]Ûúş¿ÌIİÄV÷>gÙçŠ_)ÌryncªqĞJÄñ—ü€í¿ì+¦ÿ él5ğ¿X²Ô¢×â±€Åz“È£íËÃ˜ä~~SÉàç‚yÆÿ ‹{i¥Ù¯2\ê¶›¯•*ÎßøìL
-:'ä¿ OV$ÄxsX¸½s·I¿`×ÚÚp1æD`ÑJ‚~ñ#¡‘È4Œ¡”« TŒGZÁ>¹°9Ğ5W°µ¤ñ}¢ÙİL«(öWí@Íú+285À¿¼ÔtöoU°p?/8Óücş¬ğ	ÿ øí hQYşN±ÿ ?Ö?øÿ üv'Xÿ Ÿëüş;@V“¬Ïõş?ÿ £ÉÖ?çúÇÿ  Ÿÿ Ğ…rğöÀßë×W¥r5Ø|›Ød1e
-UvíŒ0*	Ÿ®kÉÖ?çúÇÿ  Ÿÿ Ñäëóıcÿ €Oÿ Çh°îsÚÃÛm6è^Á®jÆş;4°‚éşÎ^çb+aÏ,¬}­ÃVš÷×i=ÅİıüŠ÷W—%<ÉvŒ(ùT 8 V|cş¬ğ	ÿ øíN±ÿ ?Ö?øÿ üvØ¬a§U5Û[ş-lÍs4rÌ‚HT:¡ÊÇ¹b#İÉÎI9·màİ2+fÒéî/ÿ ¶]šö[–]ò»B‚¡@U £äëóıcÿ €Oÿ Çhòuùş±ÿ À'ÿ ãµ6ÒÁÖç=¦ü;´ÒîîoW{è¬’ÂÚîS=¼
-ÙÚ£ÊÚsĞ–V8î)‘ü2ÑSW¦êıàÔÍƒ4~A¹+´È@MŞøİŒöÇÒy:Çüÿ Xÿ àÿ ñÚ<cş¬ğ	ÿ øíUİïıwüõõ–ş»~G=¡|6ÑôNÊîŞêşhôñ0±µĞÅkæ¶_f1î>fnv5Ÿäëóıcÿ €Oÿ Çhòuùş±ÿ À'ÿ ã´]‡[šV“¬Ïõş?ÿ £ÉÖ?çúÇÿ  Ÿÿ ÒBŠÏòuùş±ÿ À'ÿ ã´y:Çüÿ Xÿ àÿ ñÚ Ğ¢³ücş¬ğ	ÿ øíN±ÿ ?Ö?øÿ üv€<î:]wY“Åú.·&ª—åí/í­n¥n2bKn¹Œ?0d“œöê“À¾ÔmÚâ{+Ë£u¦ûû»™&DÈpšåã9 ñ´äs[^N±ÿ ?Ö?øÿ üv'Xÿ Ÿëüş;BÑ[úìWsŸo…Şa6í*Fóù˜›ÙÉ•·3ŸæpXáXv=+ Ò4K
-ŞX4øiLÒ´“<¯#œÌîK1À“Ú'Xÿ Ÿëüş;G“¬Ïõş?ÿ  ,ñ6›yaâøGã¹Ò/4íNõµ$¶Ô4»»© ‘òjÄnÌÀ9ÎN0uv_
-</‘í´×Ì¶Ëo4’\H‚p¹Û¹‚»Ş2¼`ğ+¨òuùş±ÿ À'ÿ ã´y:Çüÿ Xÿ àÿ ñÚŠß×—àWëÏñ0[áŸ…[iZÛPi-c1[¹Õ®É…ÁT>oÊãµmGáÍ&)4§ÉTé1´v 3b*àgåÉÉëëRy:Çüÿ Xÿ àÿ ñÚ<cş¬ğ	ÿ øí;°±ŸàßùÜÿ ØWRÿ ÒÙ« ¬'GÕt›9-£Ô¬äsqrKY0Á–g”õ½‹‘øUï'Xÿ Ÿëüş;H
-+?ÉÖ?çúÇÿ  Ÿÿ Ñäëóıcÿ €Oÿ ÇhBŠÏòuùş±ÿ À'ÿ ã´y:Çüÿ Xÿ àÿ ñÚ Ğ¢³ücş¬ğ	ÿ øíN±ÿ ?Ö?øÿ üv€4(¬ÿ 'Xÿ Ÿëüş;G“¬Ïõş?ÿ  
-+?ÉÖ?çúÇÿ  Ÿÿ Ñäëóıcÿ €Oÿ Çh?Ä?òğŸı…_ÿ H®« ¬ıU¾¼Ó.[R³Sar×*“|äÃ$X?½ô”ŸÂ¯y:Çüÿ Xÿ àÿ ñÚ Ğ¢³ücş¬ğ	ÿ øíN±ÿ ?Ö?øÿ üv€4(¬ÿ 'Xÿ Ÿëüş;G“¬Ïõş?ÿ  
-+?ÉÖ?çúÇÿ  Ÿÿ Ñäëóıcÿ €Oÿ Çh?Á¿ò¹ÿ °®¥ÿ ¥³WAX:Nªé6r[G©YÈæâä–²aƒ,Ï)ë{#ğ«ŞN±ÿ ?Ö?øÿ üv€4(¬ÿ 'Xÿ Ÿëüş;G“¬Ïõş?ÿ  
-+?ÉÖ?çúÇÿ  Ÿÿ Ñäëóıcÿ €Oÿ ÇhBŠÏòuùş±ÿ À'ÿ ã´y:Çüÿ Xÿ àÿ ñÚ Ğ¢³ücş¬ğ	ÿ øíN±ÿ ?Ö?øÿ üv€3üwÿ $óÄßö
-ºÿ ÑM]`ëZ>«­hZ†•&¥g^ÛIlÎ¶LJ‡R¤ŞöÍ^òuùş±ÿ À'ÿ ã´¡Egù:Çüÿ Xÿ àÿ ñÚ<cş¬ğ	ÿ øí hQYşN±ÿ ?Ö?øÿ üv'Xÿ Ÿëüş;@V“¬Ïõş?ÿ £ÉÖ?çúÇÿ  Ÿÿ Ğ…sş!ÿ ç„ÿ ì*ÿ úEuZN±ÿ ?Ö?øÿ üv¨ßèú­õæ™rÚ•š›–¹P,›ç&"Áıï¤¤ş½Egù:Çüÿ Xÿ àÿ ñÚ<cş¬ğ	ÿ øí hQYşN±ÿ ?Ö?øÿ üv'Xÿ Ÿëüş;@V“¬Ïõş?ÿ £ÉÖ?çúÇÿ  Ÿÿ Ğ…Ÿäëóıcÿ €Oÿ Çhòuùş±ÿ À'ÿ ã´¡Egù:Çüÿ Xÿ àÿ ñÚ<cş¬ğ	ÿ øí hQYşN±ÿ ?Ö?øÿ üv'Xÿ Ÿëüş;@V“¬Ïõş?ÿ £ÉÖ?çúÇÿ  Ÿÿ Ğ…Ÿäëóıcÿ €Oÿ Çj9 ×™1¥¦£z¾ì?!0 )$HbyeuHÑK31ÀP:’{
-ÂÓÕµ½a5§V[thì†…¾üØô _mÇ£RÇáÉ.¥IµÍF]M‘ƒ,VÊÃ¿–3»şÍØ­ê (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¢Š (¨gºŠß!ÉÜ#i6’UqŸæ+ŸÑ¼Uoy¦^ê÷z¶Šúl[X=”ş`·ªÊÙÁ?tçÔŒq’ÓQ\F³naÔµ(Ì’·öWi¸¦Ï–áGoÈÂıæ+ópn\k2Ú¶¥m¡ynÑ˜í 7‰dá|Ö$ü¹ÅÀP~RG%ô¸í­º+™ğÏ‹ÛÄ’:&wq¯Í|’Ã5œéªùuä(Æ0ÁO³¨}†k(ÚŞGêo%¥R6ÄJ’¥¹Ï$ã¹=\r)k•ğÍÈ‚ÓA²MBÜ#i@¥‡•™¦À\>î È\ÔõâŸqâ;·Ñ-õkD¶_&!qe3eÖ>Cpq¹J¶2m¸ùsš~€tôU[Å†êe$³'ÚQ€0»#ã¹¸+Ôs‘×Ö²¤ñ"Ú[Ì­§]Isá²Ú)¤”„Ş¤e1üØ'=G&noÑ\•ßŒä‡V±µ‚Â‚ñíÌ÷-× àŸ&1ÚÎæLrNæ;²kšdKzÏ{.±Üs“°WİåÀ’@ë@u±¡EgØk6ZÌĞÙÈeòFZ@§fw¼dÜ†ü=k:ÏÅV÷^,¸Ğql$‰€.A˜Ûñ`R`H#=8ÉÖÀt4VUÕÂê7Wš47òY]Çr‰-Ù<åROÌÕ†2¸É¿J}”öÚ|¶šº”×wÿ giTÜe’5 bªVQĞgß€4¨¬˜üK¥Ou½½ÈY()<uİ›wFÃ#Òªx‡ÅVş½±·œ[rØ&{‘¹Tùa†$a¸¹2pµØ6:LŒ½*“ ·‘İMÆcS`İ	8#•àxüë™¹¸yukÔÛ\XŞ=½¼×.fß›G*ç[¾A9;O<Ğ[ErW×÷ú-Ãø»NšŞg¸F‚?bŞ•Îv“#2lÚyƒùV®…â{/É8²G0ÇÌsù‘<s®H%
-;crkŒŠ Ú¬-'ÄRjÚÍõˆÑõ8¬Ë!òŒJC`øÚÈy9İ:rF<Uü&ğ°¶W …ÍÈ–	¿>Iòöç	äÔÁª]Ç§jšåÓ¸ÓmóçKå ùævşÉnÃ&—K×ÓĞé.&[{y&ef¥¶ Ë6psUt}Mu*õ³½³óA&ŞöÈAÆOOå\Æ„>Ógá'Z™ Y£ScpÒÂÈ¨Sr3Ì‡Œ“Ôu85­áy#µğŸ˜í±F	“ûÂª8êzSz6‰Næı„ú”×V³¥ÇÙa´{ás5Á¾ù‹–?(\¦2q†ÀÀZ®ú·ÚåÓnŞÛQµ?j{9íd–5–BA)e|˜ÚÇÏQI½.¿®ŸƒÛúùşGDÒÆ‰½İUIq8'ó'úóíRöÉ~èzlÓF%»‚Ü"<â5!6]¶I„ ‡†qÔvVï6 F÷‚Yf·¶`¯æ»2¯8m«¸œuÚ3è*•ü‚Îö/ÓxV‰eF‘~òQXŞñ>$°xÚÍš	ŒNlîÅÌGå
-¸³‚#ÜãxcVÒuojSéÖú:æ{V®Iİ†3mBp>RIÂŒàğÚ³ésµ¢² ñ>‹s4PÃ¼ÅD`+|û·íÁÇ9¹ g¦ ñ›k¯¥ªHÅD÷
-ñ˜ÒR»ÄDnŞ¯#+ƒÓ9â€ØØ¢¸m?Å÷#Ä—M£j×2]::ÃÄ%ÙÇœ¤£[’v¶à„’H®“ÄÊhZS^¿ÙÇÌ5ÔşL*OBò`ì³ƒÉ½&ì®;kcV™ÑN›á•$^™F~•’|AbşôÊ¿b’ØLÊ]`…³·ã9Ûß8æ¹/±\ø6æöÁ4ëkk-CÏa¡˜Z, ^UŠlm£œ”'åã?´×õ½‰oKsƒÓ­-r‹¯Yx~ÚğËûÉ§Õd†dš$ydl6ÕóW89Á#<c9·EİÅæ›kw¦ÇóÌNEÃÄD‚İù‚ç¦zš©?OÄ}ZõüÔ€ƒĞæ¸ØüIpŞ>m;ìŠ®TFmšıŒ¾PÉù2sŸ›Ì‚°•££jvv“‰¯#Q.­=¼y|î•¥c°c¿^(Zÿ ^v§õäßèt!$	SƒƒÒ–¸İGN6~.Ó!¼C~e–$¹ <ã¶GÊJ\‘Ï=ãÊ‘¼hÍ†íQ§ÿ !GDû‡V»,  OZZçµ-OO>+ÑìEÜñ%pĞ‡ÓtLFáü9 ã=pqÒ Ò|Yş½q§MuaÂY"K0‹¸¶nt<²°ù  1Ëg Z»Ós¨¢¹-q¢ƒÅ6·é¤ØÜ›EŒ\ÜË6Ùâ9Hü¡ŒùÉ1’H«·>+ÕfWÓod¸Šåà6ñË•UßæÎl[œ©¾HN)IÀÉé\Eßî¯æŠmFúê3uasº’?-VKƒ€UH ü¿19i‡P[İoÅp8Ó…¹±häİ³\Fc¹š3ò `Ä©¹9ã	éı5«·§âwTW9 Àmõ»„!‡üK,¸bIG9ç<RÛø†àë¥ÔVqéNeK{•¹@ĞœIæ)QpA8ÇÍ‚qU%gbbï³¡eH88àÒ×3­a¥Üø–(F­dâîX¡)ã´§±,¬KØô§x[ÄwZÄ"=BÎn
-³Åqi0šÖé ¼O×#† óÆG4–£z%…0ÿ „–Òh¬õ›½:K[™ ˜Ø¼eÁ\­½nAÀsS_ëvpXê‚9âšm>1ö…y6,e—#{òŒrHè9Å&ì®4µ±¯Ey•äÍÿ &‰¨K§i·KbÌÅ¬2êÑ¢g˜u“a*¿7Ï´€p@Ü;+ÏAe‹µÌ¦ê/=–-™‚!·s°fªïÚûU[[
-æİ…¦,Ö¾&Ômf¾Ô.¡KˆÅÃÄcPÎùTUPÃn1–' x­Ú]­‚Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( wÅú~¥s¦­Ö‹{{iªAòÅ%¤0ÌJ±]Á’R‡ õcŒô5!ğşµq¦„}bD7±Ôõ¢=Ë…Q¢EÊHV9Ëëh »OéZU¤Ğé^aæa±¢ª_ºÌ«Ø<õÏ¸¬åğŒ•Ä—~(‡JÖ®Êˆá/§8Uvs’I$îçŠéh <ˆ,£¸†Î(îå†YÕpïF$?E,ØãÜÖsiW÷:Ò]Şêjö6ï¾ŞÎ60®Y‹ã' ä‚@ÆÅu¸t±Ïj~Ñnlî¾Ïáı	îæs6nìÑåçæ|“Éç¯&­'‡ì.a±}WLÒ®¯,€Ê¶j,<°ÛŠtÆ+^Š ÌÕôoíI-¦‹P¼Óî­™ŒsÚİµ†Huee<GUVF¡á;©ô“¥Ág5´Ä½Óêöm’i	ûüÈ¨ÀÀØT`` 1]U¬%—ƒü9c¥>›‡§}–UA4fÒ<NW¡qŒ1Ï<÷¨ ğf…æËöŸh
-f;Qœ€Ç¡È9Ë<`|İ:“ÑQNáäTµÓ¬ôø¥M:ÒÚÓÌ;›Ê„(-€!q ATtİ'PP}CWÔã½¹c…-íÌÂ‡°¥Ü–$’Ç€ œìÑ@yÚ£kMjºE…ùˆº¶Ivg®7Œà~USşÏ}›ìßğhŞFÿ 3Êû[wcÆÜgf·( ëMF°œOg¤X[L$6ÈŒcqÈçhÏ®¥U½Ò5-KR_µj‘%$YœÅ$®J\î\ŒáUsÀ$Œƒ·E gjú@Õ£ƒmíİ”öòù±\Z²‡S‚Ã++	GâA†tÿ ìÙlµ:ºO'›;êJ“[±+´(T•±E cIáKçyÒ_Î ËºÊ3¼…¾^qïZiöV·3İ[ÙÛÃqpM,q*´›Fq'•fŠ Ä²Ò5ª-ş±ªExğ©[x-­ŒG]ÙŸd¶ Î É&åş‰¤ê³A6£¥Ù^KnsÜ[¤àü¥ÇAÓÒ¯Ñ@Ú‡ô]&â[7H°³Q‰$¶¶HÙÆsÉP	æŸ¨éVú•&œZKxÜ¯lÛ&2²Äãµ^¢€9ááëûxç–ß[’îş`Ï«@³¢Çİ(ŒJ3Ô§¾p0Ïø/Iğÿ úJéúYÔ™İšîÛOßnî6 \•P01“¤’Mt”P$¾ğô’<«¤ZÁ,’ùÒKjCÈÜç{&¹²	 äç9­B;ù-Jé·6Ö×’âİ¦LwùUĞşµjŠ ÎÑôÆÒí&»’òîgón.dP¦G p    ©É.Ô´M'ZH×UÓ,¯–"Lbêİ%OR7Š¿E cŸ	xm•Õ¼=¤•pCƒeçr@?P$ğÌ±ÇÒ]"ÊZÊ22NĞ6ğ2IÇ©­š(µ†c¥Z-¦gogl¤•†Ş%<œ UM^ÏW½	«C§ÂÜLÿ dófÆGú¶.N22ÈısŠÔ¢€Ø‚ÎÒ+(m C
-@I' c’y'Şª\x{D¼Ô“RºÑôùïã*Rê[TiT¯İ!ÈÈÇnx­*(ëpéb„Ú‘s=ÄóévRÍs“<’[£4±ÿ u‰eàpx©¤Óì¦¶ŠÚ[;w·„£ED
-¡^TŒ`c1Vh 0ÛHÖÍ¥k}V%¹iëöY`™‰8—l²†ƒÈÛÇ 1Zw~ÑdxÍ¾ƒ¡a¶EqçièÅàP0ƒÆ0¸Î@Ú:ĞQBÑX/©•má½ÊàÍk§ÅcyQåaÚ:~ì|™Ç±œqœSµ>òô[K§ßGgwm&ôy`ó£`T©VPÊHÁÏ9ètè _Nğ]’6¡&¯k¤^½ùS<péi/‚X3).ÎÙ9Ë1í€9Îı†c¥Z-¦gogl¤•†Ş%<œ Uš(/UÑ¡¾xï ¶ÓF«oÿ ×—–Bs<ã¬;ôaXWşÔ/ôÖÓî5[¸nÍ»’ÿ K¼½Ç—¦AFÆ9İÎ{(°\Ë´ğŞ‡a¦Ë¦ÚhöÙL14	l%ã:ãÇ­@<áp`#Ãz80©"Æ/İó»åùxä“Çs[tQÖáÒÃDh$i(v 3É¦Oâ:¦š.•åÍâi–kut».&X<ËèíŒ°úÕê( øSÃ†+X¥í	ktûx„“’PcåÉçõ>Ÿ¡húL³K¦éV6RMşµí­Ò3'˜¨êzÖ…‘á_ê·mu¨è:]åË k‹8ärNXQŸx]¼œøoG>@Ä9±‹÷c%°¿/’xîMmÑFÁ¹‡ÿ g…¾ÓöŸøF´o?™æı‚-Û³œçnssU¼Gá‰üM*[ŞÍ¥I¥««y3étÃûÛdi6©##!2ãk¥¢€(éº6•¢ÄñéZeŒrÎ¶°,A©
-M^¢Š (¢Š (¢Š (¢Š (¤pYC$`0ÆG¿5â:¤Øº¦»«xsS¹Hít©íg»ïtšò«7 ıö‰wTq£ vş¿¯OV†•ÿ ¯ëú¹íôW…øf+{}n;ÕïlôKÏÁ«j“GtÊLÛyÎJ1$w^êš‚tİëû:-[D²²’ä£ØYÉ¸©ş&€ÊA#ƒ·œô§;[ÛúòL›éëkÿ _#Şè¯;ğWˆ=;RµÓ<}æÚjsÛŞ}’ò9÷Ì0ZFšw¤-§'ÜWŸÿ j_G©¯‰Qî›Äğ–¾šñ™X±´?gÛœ}3Í.¿×[˜ìÿ ?Âÿ ä}	Exƒ<Ousªè:Î½¥[RÖÚñ¬f†ıœÚìÄ–î8².àÙ<î<šë¼n-u»ë:f­²´²Ñ¥,^\8;d©¶±À4Jé_úôõş¼Æ¬İ¿¯øcĞ¨¯$¾µ×4ß
-Øk¡Ö¬´*D¾X5ùíK…l±ß;Êí)ó0ç9æ½3Dº[İOºHg…f¶AÃ‘PpÄòHîO4í¿—üÎÄßoë±~¢–êŞ	¡†iâYØ¬(îH@$…Î<vRÌêÿ Úz‡Û’ÅtğSìFs)ùüÀ@ ç¦ŞİkË~#x±äÒ´OéqÙ‹HLÓ[½ì6æW‘$P‰ˆmŒªÇ1|ÿ tÒºÒåY½b¢£·”OmÃ"ˆÍIM«;ÕÂŠ(¤0¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š( ¢Š(UÑ‘Ô2°ÁR2¬‹/	øoM¹6>Ò­n%‚Ê4`Á<ŠØ¢€1£ğ‡†bµšÖ?é	o9S4+eI
-ıİÃn2q™¥Â~†Ê{(¼?¥%¬åLĞ-”a$+Ê–\`ã¶zVÅZÇO²ÒíÓO³·´¶L•†Ş!.NN :Õq hÃVşÖE€Ô‰ÏÛ²yİ6ıünéÇ^•£E`gZxE°¿–şËH°¶¼—w™q²$““–''“F§áıZxßUÒ,/Ú0Dmul’”®7ŠÑ¢€1Oƒü2^>Ò7[€°Ÿ°Ç˜À$€¿/’xîkjŠ(¬e…­åÅİ½´7WX3ÍJ¯.:n`2Ø÷¯,ÿ „7Q_Iá¸/<@<3åÈ€.Ÿj(¥Á’4ºvóî8*«œvİ^»EBîÄ6–°ØÙÁil‚8 c'j€9ö5Pİõ`•´AEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEPEP\ˆÖuhì|@·3@/"¾ÒÏÈ+K[?{'$ã8' p:ê¢t‹pó˜?y%Âİ1ŞØ2ªŒã…QÇN3×šúÿ Z¯ĞwĞ¡§ŞjMâ½NÆòXZÚ+[ymÒ4åw<ªK7r|°x œã'v [;t¿–ùcÅÌ±$Nù<¢–*1Ó‚íùÔôØúZQHŠ( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( Š( ÿÙ```
-
-## FILE: resources/js/pages/settings/print-settings/types.ts
-```
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// print-settings/types.ts
-// Ø§Ù„Ù†Ø¸Ø§Ù… Ø§Ù„ÙƒØ§Ù…Ù„ Ù„Ø¥Ø¯Ø§Ø±Ø© Ù‚ÙˆØ§Ù„Ø¨ Ø§Ù„Ø·Ø¨Ø§Ø¹Ø©:
-//   - ÙƒÙ„ Ù…Ø³ØªÙ†Ø¯ ÙŠØ¯Ø¹Ù… Ø£ÙƒØ«Ø± Ù…Ù† Ù†Ù…ÙˆØ°Ø¬
-//   - ÙƒÙ„ Ù†Ù…ÙˆØ°Ø¬ Ù…Ø­ÙÙˆØ¸ ÙÙŠ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª
-//   - Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ÙŠØªØ­ÙƒÙ… ÙÙŠ ÙƒÙ„ Ø´ÙŠØ¡
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-// â”€â”€â”€ Enums & unions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-export type PaperSize       = '80mm' | '58mm' | 'A4' | 'A5' | 'none';
-export type AlignOption     = 'right' | 'center' | 'left';
-export type BorderStyle     = 'solid' | 'dashed' | 'double' | 'none';
-export type PriceMode       = 'ht' | 'ttc';
-export type PageOrientation = 'portrait' | 'landscape';
-export type FontFamily      = 'tajawal' | 'monospace' | 'times' | 'arial';
-
-export type ColumnKey =
-  | 'rowNumber' | 'barcode' | 'ref' | 'name'
-  | 'unit' | 'quantity' | 'price' | 'discount' | 'tva' | 'total';
-
-// â”€â”€â”€ Document types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-export const DOC_TYPE_LIST = [
-  { code: 'FV',  name: 'ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª',   category: 'sales'     },
-  { code: 'BL',  name: 'ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ…',       category: 'sales'     },
-  { code: 'DEV', name: 'Ø¹Ø±Ø¶ Ø§Ù„Ø³Ø¹Ø±',         category: 'sales'     },
-  { code: 'BCC', name: 'Ø·Ù„Ø¨ Ø§Ù„Ø¹Ù…ÙŠÙ„',        category: 'sales'     },
-  { code: 'AA',  name: 'Ù…Ø±ØªØ¬Ø¹ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª',   category: 'sales'     },
-  { code: 'FA',  name: 'ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ø´Ø±Ø§Ø¡',    category: 'purchase'  },
-  { code: 'BR',  name: 'ÙˆØµÙ„ Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…',     category: 'purchase'  },
-  { code: 'AV',  name: 'Ø£Ù…Ø± Ø§Ù„Ø´Ø±Ø§Ø¡',       category: 'purchase'  },
-  { code: 'DDP', name: 'Ø¥Ø°Ù† Ø§Ù„ØªØ³Ù„ÙŠÙ…',      category: 'warehouse' },
-  { code: 'BT',  name: 'ØªØ­ÙˆÙŠÙ„ Ø§Ù„Ù…Ø®Ø²ÙˆÙ†',   category: 'warehouse' },
-  { code: 'POS', name: 'Ø¥ÙŠØµØ§Ù„ POS',        category: 'pos'       },
-  { code: 'RPT', name: 'ØªÙ‚Ø±ÙŠØ± Ø§Ù„Ø¬Ù„Ø³Ø©',    category: 'pos'       },
-] as const;
-
-export type DocTypeCode = typeof DOC_TYPE_LIST[number]['code'];
-
-// â”€â”€â”€ PrintTemplate â€” Ø§Ù„Ù‚Ø§Ù„Ø¨ Ø§Ù„ÙƒØ§Ù…Ù„ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-export interface PrintTemplate {
-  id:           number | null;
-  name:         string;
-  doc_type_code: DocTypeCode;
-  paper_size:   PaperSize;
-  is_default:   boolean;
-  is_active:    boolean;
-  created_at?:  string;
-  updated_at?:  string;
-
-  paper_width_mm:   58 | 80;
-  page_orientation: PageOrientation;
-  margin_top:       number;
-  margin_bottom:    number;
-  margin_sides:     number;
-  line_spacing:     number;
-  base_font_size:   number;
-  font_family:      FontFamily;
-
-  show_logo:         boolean;
-  logo_size:         number;
-  logo_align:        AlignOption;
-  logo_border_radius: number;
-
-  show_company_name:   boolean;
-  company_name_text:   string;
-  company_name_size:   number;
-  company_name_bold:   boolean;
-  company_name_align:  AlignOption;
-  company_name_color:  string;
-
-  show_address:        boolean;
-  show_phone:          boolean;
-  show_tax_id:         boolean;
-  show_rc:             boolean;
-  show_nis:            boolean;
-  show_ice:            boolean;
-  show_article:        boolean;
-  company_info_align:  AlignOption;
-  company_info_size:   number;
-  override_address:    string;
-  override_phone:      string;
-  override_nif:        string;
-  override_rc:         string;
-  override_nis:        string;
-  override_ice:        string;
-  override_article:    string;
-
-  header_custom_text:  string;
-  header_separator:    BorderStyle;
-
-  title_text:       string;
-  title_size:       number;
-  title_bold:       boolean;
-  title_align:      AlignOption;
-  title_color:      string;
-  show_doc_number:  boolean;
-  show_date:        boolean;
-  show_time:        boolean;
-  show_due_date:    boolean;
-  show_cashier:     boolean;
-  show_client:      boolean;
-  show_client_nif:  boolean;
-  show_client_phone:boolean;
-  show_client_address: boolean;
-  show_delivery_address: boolean;
-  show_session:     boolean;
-  show_payment_term:boolean;
-  show_bank_details:boolean;
-  bank_details_text:string;
-  doc_separator:    BorderStyle;
-
-  col_order:   ColumnKey[];
-  col_show:    Partial<Record<ColumnKey, boolean>>;
-  col_widths:  Partial<Record<ColumnKey, number>>;
-  col_headers: Partial<Record<ColumnKey, string>>;
-  col_aligns:  Partial<Record<ColumnKey, AlignOption>>;
-
-  items_font_size:    number;
-  items_font_family:  FontFamily;
-  show_col_header:    boolean;
-  table_header_bold:  boolean;
-  table_header_bg:    boolean;
-  table_header_color: string;
-  table_border_style: BorderStyle;
-  alternating_rows:   boolean;
-  alternating_color:  string;
-  price_display:      PriceMode;
-  show_line_total_ttc:boolean;
-
-  totals_font_size:    number;
-  totals_bold:         boolean;
-  totals_align:        AlignOption;
-  show_total_ht:       boolean;
-  show_total_tva:      boolean;
-  show_tva_breakdown:  boolean;
-  show_discount_total: boolean;
-  show_fiscal_stamp:   boolean;
-  show_total_ttc:      boolean;
-  total_ttc_font_size: number;
-  total_ttc_bold:      boolean;
-  total_ttc_color:     string;
-  total_border_style:  BorderStyle;
-  show_amount_in_words:boolean;
-  show_paid_amount:    boolean;
-  show_change:         boolean;
-  show_remaining:      boolean;
-  show_prev_balance:   boolean;
-  show_new_balance:    boolean;
-
-  show_payment_details:boolean;
-  payment_font_size:   number;
-
-  footer_line1:        string;
-  footer_line2:        string;
-  footer_line3:        string;
-  footer_separator:    BorderStyle;
-  show_thank_you:      boolean;
-  thank_you_text:      string;
-  thank_you_size:      number;
-  thank_you_color:     string;
-  show_returns_policy: boolean;
-  returns_policy_text: string;
-  footer_legal_text:   string;
-
-  show_barcode:         boolean;
-  barcode_content:      'doc-number' | 'total' | 'custom';
-  barcode_custom_text:  string;
-  show_qr:              boolean;
-  qr_content:           'doc-number' | 'company-info' | 'both';
-
-  show_cashier_signature: boolean;
-  show_client_signature:  boolean;
-  show_stamp:             boolean;
-
-  show_header_section:    boolean;
-  show_doc_info_section:  boolean;
-  show_items_section:     boolean;
-  show_totals_section:    boolean;
-  show_payments_section:  boolean;
-  show_footer_section:    boolean;
-
-  rules: ReportRule[];
-
-  show_report_header:        boolean;
-  report_header_text:        string;
-  show_report_footer:        boolean;
-  report_footer_text:        string;
-  show_charts:               boolean;
-  chart_type:                'bar' | 'pie';
-  chart_title:               string;
-  group_by:                  string;
-  sort_by:                   string;
-  sort_direction:            'asc' | 'desc';
-  show_report_period:        boolean;
-  show_report_cashier:       boolean;
-  show_report_summary_cards: boolean;
-  show_report_payment_breakdown: boolean;
-  show_report_top_products:  boolean;
+ï»¿// Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯
+// reporting/data/CalculatedFieldService.ts
+//
+// Layer 2 Ã¢â‚¬â€ depends on UniversalDocumentData types. Pure TypeScript.
+// Computes derived field values that are not directly in the API response:
+// balance movements, profit/margin, running totals, amount in words, etc.
+//
+// Design notes:
+//   - profit uses a simplified calculation: for each line, totalHt - totalTva.
+//     This is the gross margin assuming cost Ã¢â€°Ë† Tva (i.e. cost = unitPriceHt Ø£â€”
+//     tvaRate Ø£â€” qty). Real profit requires cost price from inventory, which
+//     is not yet present in UniversalDocumentData.
+//   - amountInWords is a stub returning a description string. A full Arabic
+//     number-to-words converter can be plugged in later.
+// Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯
+
+import type { ExpressionValue } from './engines/FormulaEngine';
+import type { UniversalDocumentData } from '../types/data/UniversalDocumentData';
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export interface CalculatedField {
+  /** Unique identifier for this field (used as key in data.computed) */
+  id: string;
+  /** Human-readable label in Arabic */
+  label: string;
+  /** Compute function Ã¢â‚¬â€ returns a single ExpressionValue */
+  compute: (data: UniversalDocumentData) => ExpressionValue;
+  /**
+   * List of field paths this computed field depends on.
+   * Used for cache invalidation in the formula engine.
+   */
+  dependencies: string[];
 }
 
-export type SectionTarget = 'header' | 'doc-info' | 'items' | 'totals' | 'payments' | 'footer';
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Service Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export class CalculatedFieldService {
+  private readonly fields = new Map<string, CalculatedField>();
+
+  constructor() {
+    this.registerDefaults();
+  }
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Public API Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+  register(field: CalculatedField): void {
+    this.fields.set(field.id, field);
+  }
+
+  registerMany(fields: CalculatedField[]): void {
+    for (const field of fields) {
+      this.register(field);
+    }
+  }
+
+  computeAll(data: UniversalDocumentData): Record<string, ExpressionValue> {
+    const results: Record<string, ExpressionValue> = {};
+    for (const [id, field] of this.fields) {
+      try {
+        results[id] = field.compute(data);
+      } catch {
+        results[id] = null;
+      }
+    }
+    return results;
+  }
+
+  computeOne(id: string, data: UniversalDocumentData): ExpressionValue | null {
+    const field = this.fields.get(id);
+    if (!field) return null;
+    try {
+      return field.compute(data);
+    } catch {
+      return null;
+    }
+  }
+
+  list(): CalculatedField[] {
+    return Array.from(this.fields.values());
+  }
+
+  get(id: string): CalculatedField | undefined {
+    return this.fields.get(id);
+  }
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Default field registrations Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+  private registerDefaults(): void {
+    // 1. Movement Ã¢â‚¬â€ balance movement = current - previous
+    this.register({
+      id: 'movement',
+      label: 'Ø·Â­Ø·Â±Ø¸Æ’Ø·Â© Ø·Â§Ø¸â€Ø·Â±Ø·ÂµØ¸Ù¹Ø·Â¯',
+      compute: (data) => {
+        if (!data.balance) return null;
+        return data.balance.current - data.balance.previous;
+      },
+      dependencies: ['balance.current', 'balance.previous'],
+    });
+
+    // 2. Amount in words (stub)
+    this.register({
+      id: 'amountInWords',
+      label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› Ø¸Æ’Ø·Ú¾Ø·Â§Ø·Â¨Ø·Â©',
+      compute: (data) => {
+        const total = data.totals.totalTtc;
+        return `Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› ${total} Ø·Â¯Ø¸Ù¹Ø¸â€ Ø·Â§Ø·Â± Ø·Â¬Ø·Â²Ø·Â§Ø·Â¦Ø·Â±Ø¸Ù¹ Ø¸Ù¾Ø¸â€šØ·Â·`;
+      },
+      dependencies: ['totals.totalTtc'],
+    });
+
+    // 3. Profit Ã¢â‚¬â€ simplified: per line totalHt - totalTva
+    this.register({
+      id: 'profit',
+      label: 'Ø·Â§Ø¸â€Ø·Â±Ø·Â¨Ø·Â­ Ø·Â§Ø¸â€Ø¸â€¦Ø¸â€šØ·Â¯Ø·Â±',
+      compute: (data) => {
+        return data.lines.reduce((sum, line) => {
+          return sum + (line.totalHt - line.totalTva);
+        }, 0);
+      },
+      dependencies: ['lines.*.totalHt', 'lines.*.totalTva'],
+    });
+
+    // 4. Profit margin Ã¢â‚¬â€ profit / totalHt * 100
+    this.register({
+      id: 'profitMargin',
+      label: 'Ø¸â€¡Ø·Â§Ø¸â€¦Ø·Â´ Ø·Â§Ø¸â€Ø·Â±Ø·Â¨Ø·Â­',
+      compute: (data) => {
+        const totalHt = data.totals.totalHt;
+        if (totalHt === 0) return null;
+        const profit = data.lines.reduce((sum, line) => {
+          return sum + (line.totalHt - line.totalTva);
+        }, 0);
+        return (profit / totalHt) * 100;
+      },
+      dependencies: ['profit', 'totals.totalHt'],
+    });
+
+    // 5. Running total Ã¢â‚¬â€ cumulative sum of totalTtc across lines
+    this.register({
+      id: 'runningTotal',
+      label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø·Ú¾Ø·Â±Ø·Â§Ø¸Æ’Ø¸â€¦Ø¸Ù¹',
+      compute: (data) => {
+        return data.lines.reduce((sum, line) => sum + line.totalTtc, 0);
+      },
+      dependencies: ['lines.*.totalTtc'],
+    });
+
+    // 6. Line count
+    this.register({
+      id: 'lineCount',
+      label: 'Ø·Â¹Ø·Â¯Ø·Â¯ Ø·Â§Ø¸â€Ø·Â£Ø·Â³Ø·Â·Ø·Â±',
+      compute: (data) => data.lines.length,
+      dependencies: ['lines'],
+    });
+
+    // 7. Item count Ã¢â‚¬â€ sum of quantities
+    this.register({
+      id: 'itemCount',
+      label: 'Ø·Â¹Ø·Â¯Ø·Â¯ Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â§Ø·Â¯',
+      compute: (data) => {
+        return data.lines.reduce((sum, line) => sum + line.quantity, 0);
+      },
+      dependencies: ['lines.*.quantity'],
+    });
+
+    // 8. Average line total Ã¢â‚¬â€ average of line TTC totals
+    this.register({
+      id: 'averageLineTotal',
+      label: 'Ø¸â€¦Ø·Ú¾Ø¸Ë†Ø·Â³Ø·Â· Ø·Â§Ø¸â€Ø·Â³Ø·Â·Ø·Â±',
+      compute: (data) => {
+        const lines = data.lines;
+        if (lines.length === 0) return 0;
+        const total = lines.reduce((sum, line) => sum + line.totalTtc, 0);
+        return total / lines.length;
+      },
+      dependencies: ['lines.*.totalTtc', 'lines'],
+    });
+  }
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Singleton Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export const calculatedFieldService = new CalculatedFieldService();
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/engines/FormulaEngine.ts
+```
+ï»¿// Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯
+// reporting/core/engines/FormulaEngine.ts
+//
+// Layer 1 Ã¢â‚¬â€ zero dependencies. Pure TypeScript.
+//
+// Custom expression evaluator for report formulas.
+// No eval(), no Math.js, no external DSL.
+//
+// Built-in functions: IF, SUM, AVG, ROUND, CONCAT, FORMAT, TODAY,
+//                     MIN, MAX, COUNT, ABS, LEN, UPPER, LOWER
+//
+// Expressions:
+//   "Hello " + name
+//   IF(total > 1000, "high", "low")
+//   ROUND(SUM(lines.*.totalHt), 2)
+//   FORMAT(doc.date, "YYYY-MM-DD")
+//   COUNT(lines.*.totalHt > 0)
+// Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯
+
+import type { UniversalDocumentData } from '../../types/data/UniversalDocumentData';
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export type ExpressionValue = number | string | boolean | null;
+
+export interface EvaluationContext {
+  data: UniversalDocumentData;
+  computed: Record<string, ExpressionValue>;
+  /** Current line index when evaluating within a line context */
+  currentLineIndex?: number;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  error?: string;
+  /** Expected return type */
+  returnType?: 'number' | 'string' | 'boolean' | 'any';
+}
+
+export type ExpressionFunction = (
+  args: ExpressionValue[],
+  context: EvaluationContext,
+) => ExpressionValue;
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Tokenizer Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+type TokenType =
+  | 'number' | 'string' | 'identifier'
+  | 'lparen' | 'rparen' | 'comma' | 'dot' | 'star'
+  | 'plus' | 'minus' | 'asterisk' | 'slash'
+  | 'eq' | 'neq' | 'lt' | 'lte' | 'gt' | 'gte'
+  | 'and' | 'or' | 'not'
+  | 'eof';
+
+interface Token {
+  type: TokenType;
+  value: string;
+  pos: number;
+}
+
+function tokenize(input: string): Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+
+  const peek = () => input[i] ?? '';
+  const advance = () => input[i++];
+  const pos = () => i;
+
+  while (i < input.length) {
+    const start = pos();
+    const ch = peek();
+
+    // Skip whitespace
+    if (/\s/.test(ch)) { advance(); continue; }
+
+    // String literal
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      advance();
+      let str = '';
+      while (i < input.length && peek() !== quote) {
+        if (peek() === '\\') { advance(); str += advance(); }
+        else { str += advance(); }
+      }
+      if (peek() === quote) advance();
+      tokens.push({ type: 'string', value: str, pos: start });
+      continue;
+    }
+
+    // Number
+    if (/[\d.]/.test(ch) && !(ch === '.' && /[\d.]/.test(input[i + 1] ?? ''))) {
+      let num = '';
+      while (i < input.length && /[\d.]/.test(peek())) num += advance();
+      tokens.push({ type: 'number', value: num, pos: start });
+      continue;
+    }
+
+    // Identifiers and keywords
+    if (/[a-zA-Z_\u0600-\u06FF]/.test(ch)) {
+      let id = '';
+      while (i < input.length && /[a-zA-Z0-9_\u0600-\u06FF]/.test(peek())) id += advance();
+      tokens.push({ type: 'identifier', value: id, pos: start });
+      continue;
+    }
+
+    // Multi-char operators
+    const next2 = input.slice(i, i + 2);
+    if (next2 === '==') { tokens.push({ type: 'eq', value: '==', pos: start }); i += 2; continue; }
+    if (next2 === '!=') { tokens.push({ type: 'neq', value: '!=', pos: start }); i += 2; continue; }
+    if (next2 === '<=') { tokens.push({ type: 'lte', value: '<=', pos: start }); i += 2; continue; }
+    if (next2 === '>=') { tokens.push({ type: 'gte', value: '>=', pos: start }); i += 2; continue; }
+    if (next2 === '&&') { tokens.push({ type: 'and', value: '&&', pos: start }); i += 2; continue; }
+    if (next2 === '||') { tokens.push({ type: 'or', value: '||', pos: start }); i += 2; continue; }
+
+    // Single-char operators
+    const singleOps: Record<string, TokenType> = {
+      '(': 'lparen', ')': 'rparen', ',': 'comma', '.': 'dot', '*': 'star',
+      '+': 'plus', '-': 'minus', '/': 'slash', '<': 'lt', '>': 'gt', '!': 'not',
+    };
+    if (singleOps[ch]) { tokens.push({ type: singleOps[ch], value: ch, pos: start }); advance(); continue; }
+
+    // Unknown character Ã¢â‚¬â€ skip
+    advance();
+  }
+
+  tokens.push({ type: 'eof', value: '', pos: i });
+  return tokens;
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ AST Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+type ASTNode =
+  | { kind: 'number'; value: number }
+  | { kind: 'string'; value: string }
+  | { kind: 'identifier'; name: string }
+  | { kind: 'binary'; op: string; left: ASTNode; right: ASTNode }
+  | { kind: 'unary'; op: string; operand: ASTNode }
+  | { kind: 'call'; name: string; args: ASTNode[] }
+  | { kind: 'member'; object: ASTNode; property: string }
+  | { kind: 'wildcard'; prefix: string; field: string };
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Parser Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+class ParseError extends Error {
+  constructor(message: string, public pos: number) {
+    super(`Parse error at position ${pos}: ${message}`);
+  }
+}
+
+class Parser {
+  private tokens: Token[];
+  private pos = 0;
+
+  constructor(input: string) {
+    this.tokens = tokenize(input);
+  }
+
+  private peek(): Token { return this.tokens[this.pos] ?? { type: 'eof', value: '', pos: -1 }; }
+  private advance(): Token { return this.tokens[this.pos++] ?? { type: 'eof', value: '', pos: -1 }; }
+  private expect(type: TokenType): Token {
+    const token = this.peek();
+    if (token.type !== type) throw new ParseError(`Expected ${type}, got ${token.type} (${token.value})`, token.pos);
+    return this.advance();
+  }
+
+  parse(): ASTNode {
+    return this.parseOr();
+  }
+
+  private parseOr(): ASTNode {
+    let left = this.parseAnd();
+    while (this.peek().type === 'or') {
+      this.advance();
+      left = { kind: 'binary', op: '||', left, right: this.parseAnd() };
+    }
+    return left;
+  }
+
+  private parseAnd(): ASTNode {
+    let left = this.parseComparison();
+    while (this.peek().type === 'and') {
+      this.advance();
+      left = { kind: 'binary', op: '&&', left, right: this.parseComparison() };
+    }
+    return left;
+  }
+
+  private parseComparison(): ASTNode {
+    let left = this.parseAdditive();
+    const cmpOps: Record<string, string> = { eq: '==', neq: '!=', lt: '<', lte: '<=', gt: '>', gte: '>=' };
+    const t = this.peek();
+    if (cmpOps[t.type]) {
+      this.advance();
+      left = { kind: 'binary', op: cmpOps[t.type], left, right: this.parseAdditive() };
+    }
+    return left;
+  }
+
+  private parseAdditive(): ASTNode {
+    let left = this.parseMultiplicative();
+    while (this.peek().type === 'plus' || this.peek().type === 'minus') {
+      const op = this.advance().value;
+      left = { kind: 'binary', op, left, right: this.parseMultiplicative() };
+    }
+    return left;
+  }
+
+  private parseMultiplicative(): ASTNode {
+    let left = this.parseUnary();
+    while (this.peek().type === 'asterisk' || this.peek().type === 'slash') {
+      const op = this.advance().value;
+      left = { kind: 'binary', op, left, right: this.parseUnary() };
+    }
+    return left;
+  }
+
+  private parseUnary(): ASTNode {
+    if (this.peek().type === 'minus') {
+      this.advance();
+      return { kind: 'unary', op: '-', operand: this.parsePrimary() };
+    }
+    if (this.peek().type === 'not') {
+      this.advance();
+      return { kind: 'unary', op: '!', operand: this.parsePrimary() };
+    }
+    return this.parsePrimary();
+  }
+
+  private parsePrimary(): ASTNode {
+    const t = this.peek();
+
+    // Parenthesized expression
+    if (t.type === 'lparen') {
+      this.advance();
+      const expr = this.parseOr();
+      this.expect('rparen');
+      return expr;
+    }
+
+    // Number literal
+    if (t.type === 'number') {
+      this.advance();
+      return { kind: 'number', value: parseFloat(t.value) };
+    }
+
+    // String literal
+    if (t.type === 'string') {
+      this.advance();
+      return { kind: 'string', value: t.value };
+    }
+
+    // Identifier Ã¢â‚¬â€ could be a function call, member access, or wildcard
+    if (t.type === 'identifier') {
+      this.advance();
+      let node: ASTNode = { kind: 'identifier', name: t.value };
+
+      // Function call: IDENTIFIER(...)
+      if (this.peek().type === 'lparen') {
+        this.advance();
+        const args: ASTNode[] = [];
+        while (this.peek().type !== 'rparen') {
+          args.push(this.parseOr());
+          if (this.peek().type === 'comma') this.advance();
+        }
+        this.expect('rparen');
+        node = { kind: 'call', name: t.value, args };
+      }
+
+      // Member access: expr.property
+      while (this.peek().type === 'dot') {
+        this.advance();
+        const prop = this.expect('identifier');
+        node = { kind: 'member', object: node, property: prop.value };
+      }
+
+      // Wildcard: prefix.*.field (for array aggregation)
+      if (this.peek().type === 'star') {
+        this.advance();
+        this.expect('dot');
+        const field = this.expect('identifier');
+        node = { kind: 'wildcard', prefix: t.value, field: field.value };
+      }
+
+      return node;
+    }
+
+    throw new ParseError(`Unexpected token: ${t.value}`, t.pos);
+  }
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Evaluator Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+function isTruthy(val: ExpressionValue): boolean {
+  if (val === null) return false;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  return val !== '';
+}
+
+function compareValues(a: ExpressionValue, b: ExpressionValue): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return -1;
+  if (b == null) return 1;
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b));
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Cache Entry Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+interface CacheEntry {
+  value: ExpressionValue;
+  timestamp: number;
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ FormulaEngine Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export class FormulaEngine {
+  private readonly functions = new Map<string, ExpressionFunction>();
+  private readonly cache = new Map<string, CacheEntry>();
+  private readonly cacheOrder: string[] = [];
+  private cacheHits = 0;
+  private cacheMisses = 0;
+  private static readonly CACHE_TTL = 60_000; // 60 seconds
+  private static readonly CACHE_MAX = 500; // max entries
+  private _dataVersion = 0;
+
+  constructor() {
+    this.registerBuiltins();
+  }
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Public API Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+  registerFunction(name: string, fn: ExpressionFunction): void {
+    this.functions.set(name.toUpperCase(), fn);
+  }
+
+  /** Increment data version to invalidate all cached evaluations */
+  bumpDataVersion(): void {
+    this._dataVersion++;
+  }
+
+  evaluate(expression: string, context: EvaluationContext): ExpressionValue {
+    // Context-aware cache key: expression + data version + computed keys hash
+    const ctxHash = this._hashContext(context);
+    const cacheKey = `${expression}::v${this._dataVersion}::${ctxHash}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached !== undefined) {
+      if (Date.now() - cached.timestamp < FormulaEngine.CACHE_TTL) {
+        this.cacheHits++;
+        return cached.value;
+      }
+      this.cache.delete(cacheKey);
+      const idx = this.cacheOrder.indexOf(cacheKey);
+      if (idx >= 0) this.cacheOrder.splice(idx, 1);
+    }
+    this.cacheMisses++;
+
+    try {
+      const parser = new Parser(expression);
+      const ast = parser.parse();
+      const result = this.evaluateNode(ast, context);
+      this._setCache(cacheKey, result);
+      return result;
+    } catch (e) {
+      if (e instanceof ParseError) return null;
+      throw e;
+    }
+  }
+
+  validate(expression: string): ValidationResult {
+    try {
+      const parser = new Parser(expression);
+      parser.parse();
+      return { valid: true, returnType: 'any' };
+    } catch (e) {
+      return { valid: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  clearCache(): void {
+    this.cache.clear();
+    this.cacheOrder.length = 0;
+    this.cacheHits = 0;
+    this.cacheMisses = 0;
+    this._dataVersion++;
+  }
+
+  get stats() {
+    return { size: this.cache.size, hits: this.cacheHits, misses: this.cacheMisses, dataVersion: this._dataVersion };
+  }
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Private Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+  private _setCache(key: string, value: ExpressionValue): void {
+    if (this.cache.size >= FormulaEngine.CACHE_MAX) {
+      const oldest = this.cacheOrder.shift();
+      if (oldest) this.cache.delete(oldest);
+    }
+    this.cache.set(key, { value, timestamp: Date.now() });
+    this.cacheOrder.push(key);
+  }
+
+  private _hashContext(ctx: EvaluationContext): string {
+    const d = ctx.data;
+    const parts: string[] = [
+      String(d.doc.number),
+      d.doc.date,
+      String(d.totals.totalHt),
+      String(d.totals.totalTtc),
+      String(d.totals.paid),
+      String(d.lines.length),
+    ];
+    if (d.balance) {
+      parts.push(String(d.balance.previous));
+      parts.push(String(d.balance.current));
+    }
+    if (ctx.currentLineIndex !== undefined) {
+      parts.push(`i${ctx.currentLineIndex}`);
+    }
+    return parts.join('|');
+  }
+
+  private evaluateNode(node: ASTNode, context: EvaluationContext): ExpressionValue {
+    switch (node.kind) {
+      case 'number':
+        return node.value;
+
+      case 'string':
+        return node.value;
+
+      case 'identifier':
+        return this.resolveIdentifier(node.name, context);
+
+      case 'binary':
+        return this.evaluateBinary(node, context);
+
+      case 'unary':
+        return this.evaluateUnary(node, context);
+
+      case 'call':
+        return this.evaluateCall(node, context);
+
+      case 'member':
+        return this.evaluateMember(node, context);
+
+      case 'wildcard':
+        return this.evaluateWildcard(node, context);
+    }
+  }
+
+  private resolveIdentifier(name: string, ctx: EvaluationContext): ExpressionValue {
+    const d = ctx.data;
+
+    // Top-level fields
+    if (name === 'docNumber') return d.doc.number;
+    if (name === 'docDate') return d.doc.date;
+    if (name === 'dueDate') return d.doc.dueDate ?? null;
+    if (name === 'totalHt') return d.totals.totalHt;
+    if (name === 'totalTva') return d.totals.totalTva;
+    if (name === 'totalTtc') return d.totals.totalTtc;
+    if (name === 'paid') return d.totals.paid;
+    if (name === 'change') return d.totals.change;
+    if (name === 'remaining') return d.totals.remaining;
+    if (name === 'fiscalStamp') return d.totals.fiscalStamp;
+    if (name === 'totalDiscount') return d.totals.totalDiscount;
+    if (name === 'prevBalance') return d.balance?.previous ?? null;
+    if (name === 'newBalance') return d.balance?.current ?? null;
+
+    // Computed values
+    if (name in ctx.computed) return ctx.computed[name];
+
+    // Current line field (within line iteration)
+    if (ctx.currentLineIndex !== undefined) {
+      const line = d.lines[ctx.currentLineIndex];
+      if (!line) return null;
+      if (name === 'rowNumber') return line.rowNumber;
+      if (name === 'lineRef') return line.ref ?? null;
+      if (name === 'lineName') return line.name;
+      if (name === 'quantity') return line.quantity;
+      if (name === 'unitPriceHt') return line.unitPriceHt;
+      if (name === 'lineTotalHt') return line.totalHt;
+      if (name === 'lineTotalTva') return line.totalTva;
+      if (name === 'lineTotalTtc') return line.totalTtc;
+      if (name === 'tvaRate') return line.tvaPct;
+    }
+
+    return null;
+  }
+
+  private evaluateBinary(node: { kind: 'binary'; op: string; left: ASTNode; right: ASTNode }, ctx: EvaluationContext): ExpressionValue {
+    const left = this.evaluateNode(node.left, ctx);
+    const right = this.evaluateNode(node.right, ctx);
+
+    switch (node.op) {
+      case '+': {
+        if (typeof left === 'string' || typeof right === 'string') return String(left ?? '') + String(right ?? '');
+        return (left as number ?? 0) + (right as number ?? 0);
+      }
+      case '-': return (left as number ?? 0) - (right as number ?? 0);
+      case '*': return (left as number ?? 0) * (right as number ?? 0);
+      case '/': {
+        const r = right as number ?? 0;
+        if (r === 0) return null;
+        return (left as number ?? 0) / r;
+      }
+      case '==': return left === right;
+      case '!=': return left !== right;
+      case '<': return compareValues(left, right) < 0;
+      case '<=': return compareValues(left, right) <= 0;
+      case '>': return compareValues(left, right) > 0;
+      case '>=': return compareValues(left, right) >= 0;
+      case '&&': return isTruthy(left) && isTruthy(right);
+      case '||': return isTruthy(left) || isTruthy(right);
+      default: return null;
+    }
+  }
+
+  private evaluateUnary(node: { kind: 'unary'; op: string; operand: ASTNode }, ctx: EvaluationContext): ExpressionValue {
+    const operand = this.evaluateNode(node.operand, ctx);
+    switch (node.op) {
+      case '-': return -(operand as number ?? 0);
+      case '!': return !isTruthy(operand);
+      default: return null;
+    }
+  }
+
+  private evaluateCall(node: { kind: 'call'; name: string; args: ASTNode[] }, ctx: EvaluationContext): ExpressionValue {
+    const fn = this.functions.get(node.name.toUpperCase());
+    if (!fn) return null;
+    const argValues = node.args.map(a => this.evaluateNode(a, ctx));
+    return fn(argValues, ctx);
+  }
+
+  private evaluateMember(node: { kind: 'member'; object: ASTNode; property: string }, ctx: EvaluationContext): ExpressionValue {
+    const obj = this.evaluateNode(node.object, ctx);
+    if (obj == null || typeof obj !== 'object') return null;
+    return (obj as Record<string, unknown>)[node.property] as ExpressionValue ?? null;
+  }
+
+  private evaluateWildcard(node: { kind: 'wildcard'; prefix: string; field: string }, ctx: EvaluationContext): ExpressionValue {
+    // Currently only supports lines.*.field
+    if (node.prefix !== 'lines') return null;
+    return ctx.data.lines.map(line => {
+      const val = (line as Record<string, unknown>)[node.field];
+      return typeof val === 'number' ? val : 0;
+    });
+  }
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Built-in functions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+  private registerBuiltins(): void {
+    this.functions.set('IF', ([cond, t, f]: ExpressionValue[]) =>
+      isTruthy(cond) ? t : f,
+    );
+
+    this.functions.set('SUM', (args: ExpressionValue[]) =>
+      args.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0),
+    );
+
+    this.functions.set('AVG', (args: ExpressionValue[]) => {
+      const nums = args.filter((v): v is number => typeof v === 'number');
+      return nums.length > 0 ? nums.reduce((s, v) => s + v, 0) / nums.length : 0;
+    });
+
+    this.functions.set('ROUND', ([val, decimals]: ExpressionValue[]) => {
+      const n = val as number ?? 0;
+      const d = Math.pow(10, Math.floor(decimals as number ?? 0));
+      return Math.round(n * d) / d;
+    });
+
+    this.functions.set('CONCAT', (args: ExpressionValue[]) =>
+      args.map(v => v ?? '').join(''),
+    );
+
+    this.functions.set('FORMAT', ([val, fmt]: ExpressionValue[]) => {
+      if (val == null) return '';
+      if (fmt === 'NUMBER' || fmt === 'number') {
+        const n = val as number;
+        return n.toLocaleString('ar-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      if (fmt === 'DATE' || fmt === 'date' || fmt === 'YYYY-MM-DD') {
+        const d = String(val);
+        if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
+        return d;
+      }
+      return String(val);
+    });
+
+    this.functions.set('TODAY', () =>
+      new Date().toISOString().slice(0, 10),
+    );
+
+    this.functions.set('MIN', (args: ExpressionValue[]) => {
+      const nums = args.filter((v): v is number => typeof v === 'number');
+      return nums.length > 0 ? Math.min(...nums) : null;
+    });
+
+    this.functions.set('MAX', (args: ExpressionValue[]) => {
+      const nums = args.filter((v): v is number => typeof v === 'number');
+      return nums.length > 0 ? Math.max(...nums) : null;
+    });
+
+    this.functions.set('COUNT', (args: ExpressionValue[]) => args.length);
+
+    this.functions.set('ABS', ([val]: ExpressionValue[]) =>
+      Math.abs(val as number ?? 0),
+    );
+
+    this.functions.set('LEN', ([val]: ExpressionValue[]) =>
+      String(val ?? '').length,
+    );
+
+    this.functions.set('UPPER', ([val]: ExpressionValue[]) =>
+      String(val ?? '').toUpperCase(),
+    );
+
+    this.functions.set('LOWER', ([val]: ExpressionValue[]) =>
+      String(val ?? '').toLowerCase(),
+    );
+  }
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Singleton Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export const formulaEngine = new FormulaEngine();
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/engines/index.ts
+```
+export type { ExpressionValue, EvaluationContext, ValidationResult, ExpressionFunction } from './FormulaEngine';
+export { FormulaEngine, formulaEngine } from './FormulaEngine';
+export type { RuleAction, RuleEvaluationResult } from './RulesEngine';
+export { RulesEngine, rulesEngine } from './RulesEngine';
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/engines/RulesEngine.ts
+```
+ï»¿// Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯
+// reporting/core/engines/RulesEngine.ts
+//
+// Layer 1 Ã¢â‚¬â€ zero dependencies. Pure TypeScript.
+//
+// Evaluates declarative conditions to determine show/hide, highlight,
+// and disable rules for report elements.
+// Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯
+
+import type { FormulaEngine, EvaluationContext } from './FormulaEngine';
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export type RuleAction = 'show' | 'hide' | 'highlight' | 'disable';
 
 export interface ReportRule {
   id: string;
+  /** Formula expression string evaluated by FormulaEngine */
   condition: string;
-  action: 'show' | 'hide' | 'highlight' | 'disable';
+  action: RuleAction;
+  /** Section or element ID this rule applies to */
   target: string;
+  /** Rule ordering Ã¢â‚¬â€ higher priority runs later (default 0) */
   priority?: number;
+  /** For highlight action: CSS properties to apply */
   highlightStyle?: Record<string, string>;
 }
 
-// â”€â”€â”€ Default template factory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface RuleEvaluationResult {
+  /** Per-element visibility: true = visible, false = hidden */
+  visibility: Record<string, boolean>;
+  /** Per-element highlight styles */
+  highlights: Record<string, Record<string, string>>;
+  /** Per-element disabled state: true = disabled */
+  disabled: Record<string, boolean>;
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ RulesEngine Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export class RulesEngine {
+  /**
+   * Evaluate a set of rules against the given context.
+   * Rules are sorted by priority before evaluation.
+   * Later rules override earlier ones for the same target.
+   * Failed condition evaluations are skipped gracefully.
+   */
+  evaluate(
+    rules: ReportRule[],
+    context: EvaluationContext,
+    formulaEngine: FormulaEngine,
+  ): RuleEvaluationResult {
+    const result = this.emptyResult();
+
+    const sorted = [...rules].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+
+    for (const rule of sorted) {
+      try {
+        const raw = formulaEngine.evaluate(rule.condition, context);
+        const truthy = raw !== null && raw !== 0 && raw !== '' && raw !== false;
+
+        if (!truthy) continue;
+
+        this.applyAction(result, rule);
+      } catch {
+        // Failed condition evaluation Ã¢â‚¬â€ skip rule gracefully
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Merge multiple results. Later results override earlier ones.
+   */
+  merge(base: RuleEvaluationResult, overrides: RuleEvaluationResult): RuleEvaluationResult {
+    return {
+      visibility: { ...base.visibility, ...overrides.visibility },
+      highlights: this.mergeHighlights(base.highlights, overrides.highlights),
+      disabled: { ...base.disabled, ...overrides.disabled },
+    };
+  }
+
+  /**
+   * Default result: everything visible, nothing highlighted, nothing disabled.
+   */
+  emptyResult(): RuleEvaluationResult {
+    return {
+      visibility: {},
+      highlights: {},
+      disabled: {},
+    };
+  }
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Public (used by RulesEngineAdvanced) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+  applyAction(result: RuleEvaluationResult, rule: ReportRule): void {
+    switch (rule.action) {
+      case 'show':
+        result.visibility[rule.target] = true;
+        break;
+
+      case 'hide':
+        result.visibility[rule.target] = false;
+        break;
+
+      case 'highlight':
+        if (rule.highlightStyle) {
+          const existing = result.highlights[rule.target];
+          if (existing) {
+            Object.assign(existing, rule.highlightStyle);
+          } else {
+            result.highlights[rule.target] = { ...rule.highlightStyle };
+          }
+        }
+        break;
+
+      case 'disable':
+        result.disabled[rule.target] = true;
+        break;
+    }
+  }
+
+  private mergeHighlights(
+    base: Record<string, Record<string, string>>,
+    overrides: Record<string, Record<string, string>>,
+  ): Record<string, Record<string, string>> {
+    const merged: Record<string, Record<string, string>> = {};
+
+    for (const [key, styles] of Object.entries(base)) {
+      merged[key] = { ...styles };
+    }
+
+    for (const [key, styles] of Object.entries(overrides)) {
+      if (merged[key]) {
+        Object.assign(merged[key], styles);
+      } else {
+        merged[key] = { ...styles };
+      }
+    }
+
+    return merged;
+  }
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Singleton Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export const rulesEngine = new RulesEngine();
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/FieldRegistry.ts
+```
+ï»¿// Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯
+// reporting/data/FieldRegistry.ts
+//
+// Layer 2 Ã¢â‚¬â€ depends on UniversalDocumentData types only.
+// Catalogs every entity field available for use in report formulas, rules, and
+// template properties. The singleton `fieldRegistry` is the single source of
+// truth for field discovery in the reporting framework.
+// Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯Ã¢â€¢Ú¯
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export interface FieldDefinition {
+  path: string;
+  label: string;
+  group: string;
+  type: 'string' | 'number' | 'boolean';
+  /**
+   * Primary aggregation hint for array-numeric fields:
+   * - `'sum'` Ã¢â‚¬â€ supports SUM, AVG, COUNT
+   * - `'count'` Ã¢â‚¬â€ supports COUNT only (string/boolean array fields)
+   * - `null` Ã¢â‚¬â€ no aggregation
+   */
+  aggregate?: 'sum' | 'avg' | 'count' | null;
+  description?: string;
+}
+
+export interface FieldGroup {
+  id: string;
+  label: string;
+  fields: FieldDefinition[];
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Registry implementation Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+class FieldRegistry {
+  private byPath = new Map<string, FieldDefinition>();
+  private groups = new Map<string, FieldGroup>();
+
+  constructor(fields: FieldDefinition[]) {
+    const grouped = new Map<string, FieldDefinition[]>();
+
+    fields.forEach(f => {
+      this.byPath.set(f.path, f);
+      const list = grouped.get(f.group) ?? [];
+      list.push(f);
+      grouped.set(f.group, list);
+    });
+
+    const groupLabels: Record<string, string> = {
+      doc:      'Ø¸â€¦Ø·Â¹Ø¸â€Ø¸Ë†Ø¸â€¦Ø·Â§Ø·Ú¾ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯',
+      company:  'Ø·Â§Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©',
+      party:    'Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€/Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯',
+      lines:    'Ø·Â§Ø¸â€Ø·Â£Ø·Â³Ø·Â·Ø·Â±',
+      totals:   'Ø·Â§Ø¸â€Ø·Â¥Ø·Â¬Ø¸â€¦Ø·Â§Ø¸â€Ø¸Ù¹Ø·Â§Ø·Ú¾',
+      balance:  'Ø·Â§Ø¸â€Ø·Â±Ø·ÂµØ¸Ù¹Ø·Â¯',
+      payments: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¯Ø¸Ù¾Ø¸Ë†Ø·Â¹Ø·Â§Ø·Ú¾',
+      computed: 'Ø¸â€¦Ø·Â­Ø·Â³Ø¸Ë†Ø·Â¨',
+    };
+
+    grouped.forEach((fields, id) => {
+      this.groups.set(id, {
+        id,
+        label: groupLabels[id] ?? id,
+        fields,
+      });
+    });
+  }
+
+  getGroup(groupId: string): FieldGroup {
+    const g = this.groups.get(groupId);
+    if (!g) throw new Error(`FieldRegistry: unknown group "${groupId}"`);
+    return g;
+  }
+
+  getAllGroups(): FieldGroup[] {
+    const order = ['doc', 'company', 'party', 'lines', 'totals', 'balance', 'payments', 'computed'];
+    return order.reduce<FieldGroup[]>((acc, id) => {
+      const g = this.groups.get(id);
+      if (g) acc.push(g);
+      return acc;
+    }, []);
+  }
+
+  getByPath(path: string): FieldDefinition | undefined {
+    return this.byPath.get(path);
+  }
+
+  search(query: string): FieldDefinition[] {
+    const q = query.toLowerCase();
+    const results: FieldDefinition[] = [];
+    this.byPath.forEach(f => {
+      if (f.path.toLowerCase().includes(q) || f.label.includes(q)) {
+        results.push(f);
+      }
+    });
+    return results;
+  }
+
+  register(field: FieldDefinition): void {
+    if (this.byPath.has(field.path)) {
+      throw new Error(`FieldRegistry: field "${field.path}" already registered`);
+    }
+    this.byPath.set(field.path, field);
+    let group = this.groups.get(field.group);
+    if (!group) {
+      group = { id: field.group, label: field.group, fields: [] };
+      this.groups.set(field.group, group);
+    }
+    group.fields.push(field);
+  }
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ All fields from UniversalDocumentData Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+const ALL_FIELDS: FieldDefinition[] = [
+  // Ã¢â€â‚¬Ã¢â€â‚¬ doc (Ø¸â€¦Ø·Â¹Ø¸â€Ø¸Ë†Ø¸â€¦Ø·Â§Ø·Ú¾ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'doc.number',     label: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø¸Ù¾Ø·Â§Ø·Ú¾Ø¸Ë†Ø·Â±Ø·Â©',       group: 'doc', type: 'string', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯ Ø·Â§Ø¸â€Ø¸Ù¾Ø·Â±Ø¸Ù¹Ø·Â¯' },
+  { path: 'doc.date',       label: 'Ø·Ú¾Ø·Â§Ø·Â±Ø¸Ù¹Ø·Â® Ø·Â§Ø¸â€Ø¸Ù¾Ø·Â§Ø·Ú¾Ø¸Ë†Ø·Â±Ø·Â©',     group: 'doc', type: 'string', description: 'Ø·Ú¾Ø·Â§Ø·Â±Ø¸Ù¹Ø·Â® Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯ Ø·Â¨Ø·ÂµØ¸Ù¹Ø·Ø›Ø·Â© ISO' },
+  { path: 'doc.dueDate',    label: 'Ø·Ú¾Ø·Â§Ø·Â±Ø¸Ù¹Ø·Â® Ø·Â§Ø¸â€Ø·Â§Ø·Â³Ø·Ú¾Ø·Â­Ø¸â€šØ·Â§Ø¸â€š',    group: 'doc', type: 'string', description: 'Ø·Ú¾Ø·Â§Ø·Â±Ø¸Ù¹Ø·Â® Ø·Â§Ø·Â³Ø·Ú¾Ø·Â­Ø¸â€šØ·Â§Ø¸â€š Ø·Â§Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹' },
+  { path: 'doc.time',       label: 'Ø·Â§Ø¸â€Ø¸Ë†Ø¸â€šØ·Ú¾',              group: 'doc', type: 'string', description: 'Ø¸Ë†Ø¸â€šØ·Ú¾ Ø·Â¥Ø·ÂµØ·Â¯Ø·Â§Ø·Â± Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯' },
+  { path: 'doc.typeCode',   label: 'Ø·Â±Ø¸â€¦Ø·Â² Ø·Â§Ø¸â€Ø¸â€ Ø¸Ë†Ø·Â¹',          group: 'doc', type: 'string', description: 'Ø·Â±Ø¸â€¦Ø·Â² Ø¸â€ Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯ (FV, BL, FA, POS)' },
+  { path: 'doc.typeName',   label: 'Ø¸â€ Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯',        group: 'doc', type: 'string', description: 'Ø·Â§Ø¸â€Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â­Ø¸â€Ø¸Ù¹ Ø¸â€Ø¸â€ Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯' },
+  { path: 'doc.status',     label: 'Ø·Â§Ø¸â€Ø·Â­Ø·Â§Ø¸â€Ø·Â©',             group: 'doc', type: 'string', description: 'Ø·Â­Ø·Â§Ø¸â€Ø·Â© Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯ (Ø¸â€¦Ø·Â³Ø¸Ë†Ø·Â¯Ø·Â©, Ø¸â€¦Ø·Â¤Ø¸Æ’Ø·Â¯Ø·Â©, Ø¸â€¦Ø¸â€Ø·Ø›Ø¸Ù¹Ø·Â©)' },
+  { path: 'doc.notes',      label: 'Ø¸â€¦Ø¸â€Ø·Â§Ø·Â­Ø·Â¸Ø·Â§Ø·Ú¾',            group: 'doc', type: 'string', description: 'Ø¸â€¦Ø¸â€Ø·Â§Ø·Â­Ø·Â¸Ø·Â§Ø·Ú¾ Ø·Â¹Ø¸â€Ø¸â€° Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯' },
+  { path: 'doc.reference',  label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â±Ø·Â¬Ø·Â¹',             group: 'doc', type: 'string', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø¸â€¦Ø·Â±Ø·Â¬Ø·Â¹Ø¸Ù¹ Ø·Â®Ø·Â§Ø·Â±Ø·Â¬Ø¸Ù¹' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ warehouse Ø·Ú¾Ø·Â­Ø·Ú¾ doc Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'warehouse.id',      label: 'Ø¸â€¦Ø·Â¹Ø·Â±Ø¸Ù¾ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸Ë†Ø·Â¯Ø·Â¹',     group: 'doc', type: 'number', description: 'Ø¸â€¦Ø·Â¹Ø·Â±Ø¸Ù¾ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸Ë†Ø·Â¯Ø·Â¹ Ø·Â§Ø¸â€Ø·Â±Ø¸â€šØ¸â€¦Ø¸Ù¹' },
+  { path: 'warehouse.name',    label: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸Ë†Ø·Â¯Ø·Â¹',      group: 'doc', type: 'string', description: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸Ë†Ø·Â¯Ø·Â¹ Ø·Â£Ø¸Ë† Ø·Â§Ø¸â€Ø¸Ù¾Ø·Â±Ø·Â¹' },
+  { path: 'warehouse.address', label: 'Ø·Â¹Ø¸â€ Ø¸Ë†Ø·Â§Ø¸â€  Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸Ë†Ø·Â¯Ø·Â¹',    group: 'doc', type: 'string', description: 'Ø·Â¹Ø¸â€ Ø¸Ë†Ø·Â§Ø¸â€  Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸Ë†Ø·Â¯Ø·Â¹' },
+  { path: 'warehouse.code',    label: 'Ø·Â±Ø¸â€¦Ø·Â² Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸Ë†Ø·Â¯Ø·Â¹',      group: 'doc', type: 'string', description: 'Ø·Â±Ø¸â€¦Ø·Â² Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸Ë†Ø·Â¯Ø·Â¹' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ session Ø·Ú¾Ø·Â­Ø·Ú¾ doc Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'session.id',         label: 'Ø¸â€¦Ø·Â¹Ø·Â±Ø¸Ù¾ Ø·Â§Ø¸â€Ø·Â¬Ø¸â€Ø·Â³Ø·Â©',      group: 'doc', type: 'number', description: 'Ø¸â€¦Ø·Â¹Ø·Â±Ø¸Ù¾ Ø·Â¬Ø¸â€Ø·Â³Ø·Â© Ø·Â§Ø¸â€Ø·Â¨Ø¸Ù¹Ø·Â¹' },
+  { path: 'session.code',       label: 'Ø·Â±Ø¸â€¦Ø·Â² Ø·Â§Ø¸â€Ø·Â¬Ø¸â€Ø·Â³Ø·Â©',       group: 'doc', type: 'string', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¬Ø¸â€Ø·Â³Ø·Â©' },
+  { path: 'session.openedAt',   label: 'Ø¸Ë†Ø¸â€šØ·Ú¾ Ø·Â§Ø¸â€Ø¸Ù¾Ø·Ú¾Ø·Â­',        group: 'doc', type: 'string', description: 'Ø¸Ë†Ø¸â€šØ·Ú¾ Ø¸Ù¾Ø·Ú¾Ø·Â­ Ø·Â§Ø¸â€Ø·Â¬Ø¸â€Ø·Â³Ø·Â©' },
+  { path: 'session.closedAt',   label: 'Ø¸Ë†Ø¸â€šØ·Ú¾ Ø·Â§Ø¸â€Ø·Â¥Ø·Ø›Ø¸â€Ø·Â§Ø¸â€š',      group: 'doc', type: 'string', description: 'Ø¸Ë†Ø¸â€šØ·Ú¾ Ø·Â¥Ø·Ø›Ø¸â€Ø·Â§Ø¸â€š Ø·Â§Ø¸â€Ø·Â¬Ø¸â€Ø·Â³Ø·Â©' },
+  { path: 'session.cashierName', label: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø¸Æ’Ø·Â§Ø·Â´Ø¸Ù¹Ø·Â±',     group: 'doc', type: 'string', description: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â£Ø¸â€¦Ø¸Ù¹Ø¸â€  Ø·Â§Ø¸â€Ø·ÂµØ¸â€ Ø·Â¯Ø¸Ë†Ø¸â€š' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ currency Ø·Ú¾Ø·Â­Ø·Ú¾ doc Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'currency.code',   label: 'Ø·Â±Ø¸â€¦Ø·Â² Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸â€Ø·Â©',         group: 'doc', type: 'string', description: 'Ø·Â±Ø¸â€¦Ø·Â² Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸â€Ø·Â© (DZD, EUR, USD)' },
+  { path: 'currency.symbol', label: 'Ø·Â±Ø¸â€¦Ø·Â² Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸â€Ø·Â©',         group: 'doc', type: 'string', description: 'Ø·Â±Ø¸â€¦Ø·Â² Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸â€Ø·Â© Ø·Â§Ø¸â€Ø¸â€¦Ø·Â­Ø¸â€Ø¸Ù¹ (Ø·Â¯Ø·Â¬)' },
+  { path: 'currency.rate',   label: 'Ø·Â³Ø·Â¹Ø·Â± Ø·Â§Ø¸â€Ø·ÂµØ·Â±Ø¸Ù¾',          group: 'doc', type: 'number', description: 'Ø·Â³Ø·Â¹Ø·Â± Ø·Â§Ø¸â€Ø·ÂµØ·Â±Ø¸Ù¾ Ø¸â€¦Ø¸â€šØ·Â§Ø·Â¨Ø¸â€ Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸â€Ø·Â© Ø·Â§Ø¸â€Ø·Â£Ø·Â³Ø·Â§Ø·Â³Ø¸Ù¹Ø·Â©' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ company (Ø·Â§Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'company.name',    label: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©',         group: 'company', type: 'string', description: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â© Ø·Â§Ø¸â€Ø¸â€¦Ø·Â·Ø·Â¨Ø¸Ë†Ø·Â¹Ø·Â© Ø·Â¹Ø¸â€Ø¸â€° Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø¸â€ Ø·Â¯' },
+  { path: 'company.address', label: 'Ø·Â¹Ø¸â€ Ø¸Ë†Ø·Â§Ø¸â€  Ø·Â§Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©',       group: 'company', type: 'string', description: 'Ø·Â¹Ø¸â€ Ø¸Ë†Ø·Â§Ø¸â€  Ø·Â§Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©' },
+  { path: 'company.phone',   label: 'Ø¸â€¡Ø·Â§Ø·Ú¾Ø¸Ù¾ Ø·Â§Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©',        group: 'company', type: 'string', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø¸â€¡Ø·Â§Ø·Ú¾Ø¸Ù¾ Ø·Â§Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©' },
+  { path: 'company.nif',     label: 'Ø·Â§Ø¸â€Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¬Ø·Â¨Ø·Â§Ø·Â¦Ø¸Ù¹',      group: 'company', type: 'string', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Ú¾Ø·Â¹Ø·Â±Ø¸Ù¹Ø¸Ù¾ Ø·Â§Ø¸â€Ø·Â¬Ø·Â¨Ø·Â§Ø·Â¦Ø¸Ù¹' },
+  { path: 'company.rc',      label: 'Ø·Â§Ø¸â€Ø·Â³Ø·Â¬Ø¸â€ Ø·Â§Ø¸â€Ø·Ú¾Ø·Â¬Ø·Â§Ø·Â±Ø¸Ù¹',      group: 'company', type: 'string', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â³Ø·Â¬Ø¸â€ Ø·Â§Ø¸â€Ø·Ú¾Ø·Â¬Ø·Â§Ø·Â±Ø¸Ù¹' },
+  { path: 'company.nis',     label: 'Ø·Â§Ø¸â€Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¥Ø·Â­Ø·ÂµØ·Â§Ø·Â¦Ø¸Ù¹',     group: 'company', type: 'string', description: 'Ø·Â§Ø¸â€Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¥Ø·Â­Ø·ÂµØ·Â§Ø·Â¦Ø¸Ù¹' },
+  { path: 'company.ice',     label: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â­Ø·Â³Ø·Â§Ø·Â¨ ICE',     group: 'company', type: 'string', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â­Ø·Â³Ø·Â§Ø·Â¨ Ø·Â§Ø¸â€Ø·Â¬Ø·Â§Ø·Â±Ø¸Ù¹ ICE' },
+  { path: 'company.article', label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â§Ø·Â¯Ø·Â©',             group: 'company', type: 'string', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â§Ø·Â¯Ø·Â©' },
+  { path: 'company.logoUrl', label: 'Ø·Â±Ø·Â§Ø·Â¨Ø·Â· Ø·Â§Ø¸â€Ø·Â´Ø·Â¹Ø·Â§Ø·Â±',        group: 'company', type: 'string', description: 'Ø·Â±Ø·Â§Ø·Â¨Ø·Â· Ø·ÂµØ¸Ë†Ø·Â±Ø·Â© Ø·Â´Ø·Â¹Ø·Â§Ø·Â± Ø·Â§Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©' },
+  { path: 'company.email',   label: 'Ø·Â§Ø¸â€Ø·Â¨Ø·Â±Ø¸Ù¹Ø·Â¯ Ø·Â§Ø¸â€Ø·Â¥Ø¸â€Ø¸Æ’Ø·Ú¾Ø·Â±Ø¸Ë†Ø¸â€ Ø¸Ù¹',  group: 'company', type: 'string', description: 'Ø·Â§Ø¸â€Ø·Â¨Ø·Â±Ø¸Ù¹Ø·Â¯ Ø·Â§Ø¸â€Ø·Â¥Ø¸â€Ø¸Æ’Ø·Ú¾Ø·Â±Ø¸Ë†Ø¸â€ Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©' },
+  { path: 'company.website', label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø¸â€šØ·Â¹ Ø·Â§Ø¸â€Ø·Â¥Ø¸â€Ø¸Æ’Ø·Ú¾Ø·Â±Ø¸Ë†Ø¸â€ Ø¸Ù¹',  group: 'company', type: 'string', description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø¸â€šØ·Â¹ Ø·Â§Ø¸â€Ø·Â¥Ø¸â€Ø¸Æ’Ø·Ú¾Ø·Â±Ø¸Ë†Ø¸â€ Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â´Ø·Â±Ø¸Æ’Ø·Â©' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ party (Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€/Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'party.id',              label: 'Ø¸â€¦Ø·Â¹Ø·Â±Ø¸Ù¾ Ø·Â§Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¾',           group: 'party', type: 'number', description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¹Ø·Â±Ø¸Ù¾ Ø·Â§Ø¸â€Ø·Â±Ø¸â€šØ¸â€¦Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€/Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯' },
+  { path: 'party.name',            label: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€',           group: 'party', type: 'string', description: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€ Ø·Â£Ø¸Ë† Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯' },
+  { path: 'party.type',            label: 'Ø¸â€ Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¾',            group: 'party', type: 'string', description: 'Ø¸â€ Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¾: Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€ Ø·Â£Ø¸Ë† Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯' },
+  { path: 'party.nif',             label: 'Ø·Â§Ø¸â€Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¬Ø·Â¨Ø·Â§Ø·Â¦Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¾',  group: 'party', type: 'string', description: 'Ø·Â§Ø¸â€Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¬Ø·Â¨Ø·Â§Ø·Â¦Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€/Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯' },
+  { path: 'party.rc',              label: 'Ø·Â§Ø¸â€Ø·Â³Ø·Â¬Ø¸â€ Ø·Â§Ø¸â€Ø·Ú¾Ø·Â¬Ø·Â§Ø·Â±Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¾',  group: 'party', type: 'string', description: 'Ø·Â§Ø¸â€Ø·Â³Ø·Â¬Ø¸â€ Ø·Â§Ø¸â€Ø·Ú¾Ø·Â¬Ø·Â§Ø·Â±Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€/Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯' },
+  { path: 'party.nis',             label: 'Ø·Â§Ø¸â€Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¥Ø·Â­Ø·ÂµØ·Â§Ø·Â¦Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¾', group: 'party', type: 'string', description: 'Ø·Â§Ø¸â€Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¥Ø·Â­Ø·ÂµØ·Â§Ø·Â¦Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€/Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯' },
+  { path: 'party.phone',           label: 'Ø¸â€¡Ø·Â§Ø·Ú¾Ø¸Ù¾ Ø·Â§Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¾',           group: 'party', type: 'string', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø¸â€¡Ø·Â§Ø·Ú¾Ø¸Ù¾ Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€/Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯' },
+  { path: 'party.email',           label: 'Ø·Â¨Ø·Â±Ø¸Ù¹Ø·Â¯ Ø·Â§Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¾',           group: 'party', type: 'string', description: 'Ø·Â§Ø¸â€Ø·Â¨Ø·Â±Ø¸Ù¹Ø·Â¯ Ø·Â§Ø¸â€Ø·Â¥Ø¸â€Ø¸Æ’Ø·Ú¾Ø·Â±Ø¸Ë†Ø¸â€ Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€/Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯' },
+  { path: 'party.address',         label: 'Ø·Â¹Ø¸â€ Ø¸Ë†Ø·Â§Ø¸â€  Ø·Â§Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¾',          group: 'party', type: 'string', description: 'Ø·Â¹Ø¸â€ Ø¸Ë†Ø·Â§Ø¸â€  Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€/Ø·Â§Ø¸â€Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯' },
+  { path: 'party.deliveryAddress', label: 'Ø·Â¹Ø¸â€ Ø¸Ë†Ø·Â§Ø¸â€  Ø·Â§Ø¸â€Ø·Ú¾Ø¸Ë†Ø·ÂµØ¸Ù¹Ø¸â€',        group: 'party', type: 'string', description: 'Ø·Â¹Ø¸â€ Ø¸Ë†Ø·Â§Ø¸â€  Ø·Â§Ø¸â€Ø·Ú¾Ø¸Ë†Ø·ÂµØ¸Ù¹Ø¸â€ Ø¸â€Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€' },
+  { path: 'party.cashierName',     label: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø¸Æ’Ø·Â§Ø·Â´Ø¸Ù¹Ø·Â±',          group: 'party', type: 'string', description: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â£Ø¸â€¦Ø¸Ù¹Ø¸â€  Ø·Â§Ø¸â€Ø·ÂµØ¸â€ Ø·Â¯Ø¸Ë†Ø¸â€š (Ø¸â€Ø¸â€Ø¸â€¦Ø·Â¨Ø¸Ù¹Ø·Â¹Ø·Â§Ø·Ú¾ Ø·Â§Ø¸â€Ø¸â€ Ø¸â€šØ·Â¯Ø¸Ù¹Ø·Â©)' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ lines.* (Ø·Â§Ø¸â€Ø·Â£Ø·Â³Ø·Â·Ø·Â±) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // Wildcard paths Ã¢â‚¬â€ individual line fields accessible via lines.*.<field>
+  { path: 'lines.*.rowNumber',   label: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â³Ø·Â·Ø·Â±',     group: 'lines', type: 'number', aggregate: 'sum',  description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â³Ø·Â·Ø·Â± (1-based)' },
+  { path: 'lines.*.ref',         label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â±Ø·Â¬Ø·Â¹',        group: 'lines', type: 'string', aggregate: 'count', description: 'Ø¸â€¦Ø·Â±Ø·Â¬Ø·Â¹ Ø·Â§Ø¸â€Ø¸â€¦Ø¸â€ Ø·Ú¾Ø·Â¬ / SKU' },
+  { path: 'lines.*.barcode',     label: 'Ø·Â§Ø¸â€Ø·Â¨Ø·Â§Ø·Â±Ø¸Æ’Ø¸Ë†Ø·Â¯',      group: 'lines', type: 'string', aggregate: 'count', description: 'Ø·Â§Ø¸â€Ø·Â¨Ø·Â§Ø·Â±Ø¸Æ’Ø¸Ë†Ø·Â¯' },
+  { path: 'lines.*.name',        label: 'Ø·Â§Ø¸â€Ø·Â¨Ø¸Ù¹Ø·Â§Ø¸â€ ',        group: 'lines', type: 'string', aggregate: 'count', description: 'Ø·Â§Ø·Â³Ø¸â€¦ Ø·Â§Ø¸â€Ø¸â€¦Ø¸â€ Ø·Ú¾Ø·Â¬ Ø·Â£Ø¸Ë† Ø·Â§Ø¸â€Ø·Â®Ø·Â¯Ø¸â€¦Ø·Â©' },
+  { path: 'lines.*.unit',        label: 'Ø·Â§Ø¸â€Ø¸Ë†Ø·Â­Ø·Â¯Ø·Â©',        group: 'lines', type: 'string', aggregate: 'count', description: 'Ø¸Ë†Ø·Â­Ø·Â¯Ø·Â© Ø·Â§Ø¸â€Ø¸â€šØ¸Ù¹Ø·Â§Ø·Â³' },
+  { path: 'lines.*.quantity',    label: 'Ø·Â§Ø¸â€Ø¸Æ’Ø¸â€¦Ø¸Ù¹Ø·Â©',        group: 'lines', type: 'number', aggregate: 'sum',  description: 'Ø·Â§Ø¸â€Ø¸Æ’Ø¸â€¦Ø¸Ù¹Ø·Â© Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø·Â§Ø·Â¹Ø·Â©' },
+  { path: 'lines.*.unitPriceHt', label: 'Ø·Â³Ø·Â¹Ø·Â± Ø·Â§Ø¸â€Ø¸Ë†Ø·Â­Ø·Â¯Ø·Â©',    group: 'lines', type: 'number', aggregate: 'sum',  description: 'Ø·Â³Ø·Â¹Ø·Â± Ø·Â§Ø¸â€Ø¸Ë†Ø·Â­Ø·Â¯Ø·Â© Ø·Â¨Ø·Â¯Ø¸Ë†Ø¸â€  Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©' },
+  { path: 'lines.*.unitPriceTtc', label: 'Ø·Â³Ø·Â¹Ø·Â± Ø·Â§Ø¸â€Ø¸Ë†Ø·Â­Ø·Â¯Ø·Â© Ø·Â´Ø·Â§Ø¸â€¦Ø¸â€ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©', group: 'lines', type: 'number', aggregate: 'sum', description: 'Ø·Â³Ø·Â¹Ø·Â± Ø·Â§Ø¸â€Ø¸Ë†Ø·Â­Ø·Â¯Ø·Â© Ø·Â´Ø·Â§Ø¸â€¦Ø¸â€ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©' },
+  { path: 'lines.*.tvaRate',     label: 'Ø¸â€ Ø·Â³Ø·Â¨Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©',  group: 'lines', type: 'number', aggregate: 'sum',  description: 'Ø¸â€ Ø·Â³Ø·Â¨Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â© (0.19)' },
+  { path: 'lines.*.tvaPct',      label: 'Ø¸â€ Ø·Â³Ø·Â¨Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â© %', group: 'lines', type: 'number', aggregate: 'sum', description: 'Ø¸â€ Ø·Â³Ø·Â¨Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â© Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¦Ø¸Ë†Ø¸Ù¹Ø·Â© (19)' },
+  { path: 'lines.*.discountPct', label: 'Ø¸â€ Ø·Â³Ø·Â¨Ø·Â© Ø·Â§Ø¸â€Ø·Â®Ø·ÂµØ¸â€¦',    group: 'lines', type: 'number', aggregate: 'sum',  description: 'Ø¸â€ Ø·Â³Ø·Â¨Ø·Â© Ø·Â§Ø¸â€Ø·Â®Ø·ÂµØ¸â€¦ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¦Ø¸Ë†Ø¸Ù¹Ø·Â©' },
+  { path: 'lines.*.discountAmt', label: 'Ø¸â€šØ¸Ù¹Ø¸â€¦Ø·Â© Ø·Â§Ø¸â€Ø·Â®Ø·ÂµØ¸â€¦',    group: 'lines', type: 'number', aggregate: 'sum',  description: 'Ø¸â€šØ¸Ù¹Ø¸â€¦Ø·Â© Ø·Â§Ø¸â€Ø·Â®Ø·ÂµØ¸â€¦ Ø·Â¨Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸â€Ø·Â©' },
+  { path: 'lines.*.totalHt',     label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø·Â®Ø·Â§Ø¸â€¦', group: 'lines', type: 'number', aggregate: 'sum',  description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â¨Ø·Â¯Ø¸Ë†Ø¸â€  Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â© Ø·Â¨Ø·Â¹Ø·Â¯ Ø·Â§Ø¸â€Ø·Â®Ø·ÂµØ¸â€¦' },
+  { path: 'lines.*.totalTva',    label: 'Ø¸â€šØ¸Ù¹Ø¸â€¦Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©',  group: 'lines', type: 'number', aggregate: 'sum',  description: 'Ø¸â€šØ¸Ù¹Ø¸â€¦Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â© Ø·Â¹Ø¸â€Ø¸â€° Ø·Â§Ø¸â€Ø·Â³Ø·Â·Ø·Â±' },
+  { path: 'lines.*.totalTtc',    label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â´Ø·Â§Ø¸â€¦Ø¸â€ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©', group: 'lines', type: 'number', aggregate: 'sum', description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â´Ø·Â§Ø¸â€¦Ø¸â€ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©' },
+  { path: 'lines.*.lot',         label: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹Ø·Â©',    group: 'lines', type: 'string', aggregate: 'count', description: 'Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹Ø·Â© / Ø·Â§Ø¸â€Ø·Ú¾Ø·Â³Ø¸â€Ø·Â³Ø¸â€' },
+  { path: 'lines.*.notes',       label: 'Ø¸â€¦Ø¸â€Ø·Â§Ø·Â­Ø·Â¸Ø·Â§Ø·Ú¾',       group: 'lines', type: 'string', aggregate: 'count', description: 'Ø¸â€¦Ø¸â€Ø·Â§Ø·Â­Ø·Â¸Ø·Â§Ø·Ú¾ Ø·Â¹Ø¸â€Ø¸â€° Ø·Â§Ø¸â€Ø·Â³Ø·Â·Ø·Â±' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ totals (Ø·Â§Ø¸â€Ø·Â¥Ø·Â¬Ø¸â€¦Ø·Â§Ø¸â€Ø¸Ù¹Ø·Â§Ø·Ú¾) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'totals.totalHt',       label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø·Â®Ø·Â§Ø¸â€¦',             group: 'totals', type: 'number', description: 'Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø¸Æ’Ø¸â€ Ø·Â§Ø¸â€Ø·Â£Ø·Â³Ø·Â·Ø·Â± Ø·Â¨Ø·Â¯Ø¸Ë†Ø¸â€  Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©' },
+  { path: 'totals.totalTva',      label: 'Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©',            group: 'totals', type: 'number', description: 'Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â© Ø·Â¹Ø¸â€Ø¸â€° Ø·Â§Ø¸â€Ø¸â€šØ¸Ù¹Ø¸â€¦Ø·Â© Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¶Ø·Â§Ø¸Ù¾Ø·Â©' },
+  { path: 'totals.totalTtc',      label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â´Ø·Â§Ø¸â€¦Ø¸â€ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©',     group: 'totals', type: 'number', description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø¸â€ Ø¸â€¡Ø·Â§Ø·Â¦Ø¸Ù¹ Ø·Â´Ø·Â§Ø¸â€¦Ø¸â€ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©' },
+  { path: 'totals.fiscalStamp',   label: 'Ø·Â§Ø¸â€Ø·Â·Ø·Â§Ø·Â¨Ø·Â¹ Ø·Â§Ø¸â€Ø·Â¬Ø·Â¨Ø·Â§Ø·Â¦Ø¸Ù¹',           group: 'totals', type: 'number', description: 'Ø·Â§Ø¸â€Ø·Â·Ø·Â§Ø·Â¨Ø·Â¹ Ø·Â§Ø¸â€Ø·Â¬Ø·Â¨Ø·Â§Ø·Â¦Ø¸Ù¹ (1% Ø·Â¨Ø¸â€šØ¸Ù¹Ø¸â€¦Ø·Â© 2500 Ø·Â¯Ø·Â¬ Ø¸Æ’Ø·Â­Ø·Â¯ Ø·Â£Ø¸â€šØ·ÂµØ¸â€°)' },
+  { path: 'totals.totalDiscount', label: 'Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø·Â®Ø·ÂµØ¸â€¦',              group: 'totals', type: 'number', description: 'Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â§Ø¸â€Ø·Â®Ø·ÂµØ¸â€¦ Ø·Â¹Ø¸â€Ø¸â€° Ø¸Æ’Ø¸â€ Ø·Â§Ø¸â€Ø·Â£Ø·Â³Ø·Â·Ø·Â±' },
+  { path: 'totals.paid',          label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¯Ø¸Ù¾Ø¸Ë†Ø·Â¹',                  group: 'totals', type: 'number', description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¯Ø¸Ù¾Ø¸Ë†Ø·Â¹ Ø¸Ù¾Ø·Â¹Ø¸â€Ø·Â§Ø¸â€¹' },
+  { path: 'totals.change',        label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› Ø·Â§Ø¸â€Ø¸â€¦Ø·Â±Ø·Ú¾Ø·Â¬Ø·Â¹',           group: 'totals', type: 'number', description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› Ø·Â§Ø¸â€Ø¸â€¦Ø·Â±Ø·Ú¾Ø·Â¬Ø·Â¹ Ø¸â€Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€' },
+  { path: 'totals.remaining',     label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› Ø·Â§Ø¸â€Ø¸â€¦Ø·Ú¾Ø·Â¨Ø¸â€šØ¸Ù¹',           group: 'totals', type: 'number', description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› Ø·Â§Ø¸â€Ø¸â€¦Ø·Ú¾Ø·Â¨Ø¸â€šØ¸Ù¹ Ø¸â€Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ taxBreakdown.* Ø·Ú¾Ø·Â­Ø·Ú¾ totals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'taxBreakdown.*.rate',   label: 'Ø¸â€ Ø·Â³Ø·Â¨Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©',        group: 'totals', type: 'number', aggregate: 'sum', description: 'Ø¸â€ Ø·Â³Ø·Â¨Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©' },
+  { path: 'taxBreakdown.*.baseHt', label: 'Ø·Â§Ø¸â€Ø·Â£Ø·Â³Ø·Â§Ø·Â³ Ø·Â§Ø¸â€Ø·Â®Ø·Â§Ø·Â¶Ø·Â¹',       group: 'totals', type: 'number', aggregate: 'sum', description: 'Ø·Â§Ø¸â€Ø·Â£Ø·Â³Ø·Â§Ø·Â³ Ø·Â§Ø¸â€Ø·Â®Ø·Â§Ø·Â¶Ø·Â¹ Ø¸â€Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©' },
+  { path: 'taxBreakdown.*.tva',    label: 'Ø¸â€šØ¸Ù¹Ø¸â€¦Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©',        group: 'totals', type: 'number', aggregate: 'sum', description: 'Ø¸â€šØ¸Ù¹Ø¸â€¦Ø·Â© Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â© Ø¸â€Ø¸â€Ø·Â´Ø·Â±Ø¸Ù¹Ø·Â­Ø·Â©' },
+  { path: 'taxBreakdown.*.ttc',    label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â´Ø·Â§Ø¸â€¦Ø¸â€ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â©', group: 'totals', type: 'number', aggregate: 'sum', description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¬Ø¸â€¦Ø¸Ë†Ø·Â¹ Ø·Â´Ø·Â§Ø¸â€¦Ø¸â€ Ø·Â§Ø¸â€Ø·Â¶Ø·Â±Ø¸Ù¹Ø·Â¨Ø·Â© Ø¸â€Ø¸â€Ø·Â´Ø·Â±Ø¸Ù¹Ø·Â­Ø·Â©' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ payments (Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¯Ø¸Ù¾Ø¸Ë†Ø·Â¹Ø·Â§Ø·Ú¾) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'payments.*.mode',      label: 'Ø·Â·Ø·Â±Ø¸Ù¹Ø¸â€šØ·Â© Ø·Â§Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹',     group: 'payments', type: 'string', aggregate: 'count', description: 'Ø·Â·Ø·Â±Ø¸Ù¹Ø¸â€šØ·Â© Ø·Â§Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹ (Ø¸â€ Ø¸â€šØ·Â¯Ø·Â§Ø¸â€¹, Ø·Ú¾Ø·Â­Ø¸Ë†Ø¸Ù¹Ø¸â€ Ø·Â¨Ø¸â€ Ø¸Æ’Ø¸Ù¹)' },
+  { path: 'payments.*.amount',    label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø›',          group: 'payments', type: 'number', aggregate: 'sum',  description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¯Ø¸Ù¾Ø¸Ë†Ø·Â¹ Ø·Â¹Ø·Â¨Ø·Â± Ø¸â€¡Ø·Â°Ø¸â€¡ Ø·Â§Ø¸â€Ø·Â·Ø·Â±Ø¸Ù¹Ø¸â€šØ·Â©' },
+  { path: 'payments.*.reference', label: 'Ø¸â€¦Ø·Â±Ø·Â¬Ø·Â¹ Ø·Â§Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹',     group: 'payments', type: 'string', aggregate: 'count', description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â±Ø·Â¬Ø·Â¹ Ø·Â§Ø¸â€Ø¸â€¦Ø·ÂµØ·Â±Ø¸Ù¾Ø¸Ù¹ Ø¸â€Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹' },
+  { path: 'payments.*.date',      label: 'Ø·Ú¾Ø·Â§Ø·Â±Ø¸Ù¹Ø·Â® Ø·Â§Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹',     group: 'payments', type: 'string', aggregate: 'count', description: 'Ø·Ú¾Ø·Â§Ø·Â±Ø¸Ù¹Ø·Â® Ø·Â§Ø¸â€Ø·Â¯Ø¸Ù¾Ø·Â¹' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ balance (Ø·Â§Ø¸â€Ø·Â±Ø·ÂµØ¸Ù¹Ø·Â¯) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'balance.previous', label: 'Ø·Â§Ø¸â€Ø·Â±Ø·ÂµØ¸Ù¹Ø·Â¯ Ø·Â§Ø¸â€Ø·Â³Ø·Â§Ø·Â¨Ø¸â€š',   group: 'balance', type: 'number', description: 'Ø·Â±Ø·ÂµØ¸Ù¹Ø·Â¯ Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€ Ø¸â€šØ·Â¨Ø¸â€ Ø¸â€¡Ø·Â°Ø¸â€¡ Ø·Â§Ø¸â€Ø¸Ù¾Ø·Â§Ø·Ú¾Ø¸Ë†Ø·Â±Ø·Â©' },
+  { path: 'balance.movement', label: 'Ø·Â§Ø¸â€Ø·Â­Ø·Â±Ø¸Æ’Ø·Â©',          group: 'balance', type: 'number', description: 'Ø·ÂµØ·Â§Ø¸Ù¾Ø¸Ù¹ Ø·Â§Ø¸â€Ø·Â­Ø·Â±Ø¸Æ’Ø·Â© Ø¸â€¦Ø¸â€  Ø¸â€¡Ø·Â°Ø¸â€¡ Ø·Â§Ø¸â€Ø¸Ù¾Ø·Â§Ø·Ú¾Ø¸Ë†Ø·Â±Ø·Â©' },
+  { path: 'balance.current',  label: 'Ø·Â§Ø¸â€Ø·Â±Ø·ÂµØ¸Ù¹Ø·Â¯ Ø·Â§Ø¸â€Ø·Â­Ø·Â§Ø¸â€Ø¸Ù¹',    group: 'balance', type: 'number', description: 'Ø·Â±Ø·ÂµØ¸Ù¹Ø·Â¯ Ø·Â§Ø¸â€Ø·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€ Ø·Â¨Ø·Â¹Ø·Â¯ Ø¸â€¡Ø·Â°Ø¸â€¡ Ø·Â§Ø¸â€Ø¸Ù¾Ø·Â§Ø·Ú¾Ø¸Ë†Ø·Â±Ø·Â©' },
+  { path: 'balance.due',      label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø·Â­Ø¸â€š',          group: 'balance', type: 'number', description: 'Ø·Â§Ø¸â€Ø·Â±Ø·ÂµØ¸Ù¹Ø·Â¯ Ø·Â§Ø¸â€Ø¸â€¦Ø·Â³Ø·Ú¾Ø·Â­Ø¸â€š Ø¸Ù¾Ø¸Ù¹ Ø·Ú¾Ø·Â§Ø·Â±Ø¸Ù¹Ø·Â® Ø·Â§Ø¸â€Ø·Â§Ø·Â³Ø·Ú¾Ø·Â­Ø¸â€šØ·Â§Ø¸â€š' },
+
+  // Ã¢â€â‚¬Ã¢â€â‚¬ computed (Ø¸â€¦Ø·Â­Ø·Â³Ø¸Ë†Ø·Â¨) Ã¢â‚¬â€ future / formula-engine fields Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  { path: 'computed.amountInWords', label: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› Ø¸Æ’Ø·Ú¾Ø·Â§Ø·Â¨Ø·Â©',     group: 'computed', type: 'string',  description: 'Ø·Â§Ø¸â€Ø¸â€¦Ø·Â¨Ø¸â€Ø·Ø› Ø·Â§Ø¸â€Ø·Â¥Ø·Â¬Ø¸â€¦Ø·Â§Ø¸â€Ø¸Ù¹ Ø¸Æ’Ø·Ú¾Ø·Â§Ø·Â¨Ø·Â© Ø·Â¨Ø·Â§Ø¸â€Ø·Â¹Ø·Â±Ø·Â¨Ø¸Ù¹' },
+  { path: 'computed.profit',        label: 'Ø·Â§Ø¸â€Ø·Â±Ø·Â¨Ø·Â­',            group: 'computed', type: 'number',  description: 'Ø·Â§Ø¸â€Ø·Â±Ø·Â¨Ø·Â­ Ø¸Ù¾Ø¸Ù¹ Ø·Â§Ø¸â€Ø¸Ù¾Ø·Â§Ø·Ú¾Ø¸Ë†Ø·Â±Ø·Â© (Ø¸â€¦Ø·Â­Ø·Â³Ø¸Ë†Ø·Â¨)' },
+];
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Legacy / convenience aliases (identical to real paths for field lookup) Ã¢â€â‚¬Ã¢â€â‚¬
+// These are NOT registered Ã¢â‚¬â€ they exist conceptually but resolve to existing paths.
+// The labels here are for documentation only:
+//   prevBalance Ã¢â€ â€™ balance.previous
+//   newBalance  Ã¢â€ â€™ balance.current
+//   amountInWords Ã¢â€ â€™ computed.amountInWords
+//   profit Ã¢â€ â€™ computed.profit
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Singleton Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+export const fieldRegistry = new FieldRegistry(ALL_FIELDS);
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/index.ts
+```
+export type { FieldDefinition, FieldGroup } from './FieldRegistry';
+export { fieldRegistry } from './FieldRegistry';
+export type { CalculatedField } from './CalculatedFieldService';
+export { CalculatedFieldService, calculatedFieldService } from './CalculatedFieldService';
+export {
+  dbFetchTemplates, dbFetchTemplate, dbSaveTemplate,
+  dbCopyTemplate, dbSaveDocConfigs, dbFetchDocConfigs,
+  DB_KEY_TEMPLATES, DB_KEY_DOC_CONFIGS, tplKey,
+} from './printStoreService';
+export type { ExpressionValue, EvaluationContext, ValidationResult, ExpressionFunction } from './engines/FormulaEngine';
+export { FormulaEngine, formulaEngine } from './engines/FormulaEngine';
+export type { RuleAction, RuleEvaluationResult } from './engines/RulesEngine';
+export { RulesEngine, rulesEngine } from './engines/RulesEngine';
+export type { PrintFieldDefinition, PrintFieldGroup } from './PrintFieldRegistry';
+export { PRINT_FIELDS, printFieldRegistry } from './PrintFieldRegistry';
+export type { ColumnDefinition } from './PrintFieldResolver';
+export { printFieldResolver } from './PrintFieldResolver';
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/PrintFieldRegistry.ts
+```
+/**
+ * Canonical identifier for every printable field in the system.
+ * Every renderer (UniversalPreview, ESC/POS, future PDF) reads fields
+ * by ID from this registry â€” never by raw property access.
+ *
+ * Design rule:
+ *   One field ID â†’ one data source â†’ one visibility rule â†’ one render path.
+ */
+
+export interface PrintFieldDefinition {
+  id: string;
+  label: string;
+  group: PrintFieldGroup;
+  type: 'string' | 'number' | 'currency' | 'date' | 'boolean' | 'image';
+  /** Dot-path inside UniversalDocumentData (e.g. "party.name") */
+  sourcePath: string;
+  /** Related setting key in SettingsRegistry (e.g. "show_client") */
+  settingKey?: string;
+  /** Template override path â€” if non-empty in template, wins over sourcePath */
+  overrideTemplatePath?: string;
+  align: 'left' | 'center' | 'right';
+  visibleByDefault: boolean;
+  /** True if this field appears in a repeating table (items, payments, etc.) */
+  isRepeating?: boolean;
+  /** Path relative to repeating context (e.g. "name" for DocumentLine) */
+  relativePath?: string;
+  description?: string;
+}
+
+export type PrintFieldGroup =
+  | 'customer' | 'document' | 'company' | 'session' | 'warehouse'
+  | 'item' | 'totals' | 'balance' | 'payment'
+  | 'tvaBreakdown' | 'footer' | 'barcode' | 'qr'
+  | 'signature' | 'report';
+
+export const PRINT_FIELDS: PrintFieldDefinition[] = [
+  // â”€â”€ Customer / Party â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'customer.name',           label: 'Ø§Ø³Ù… Ø§Ù„Ø¹Ù…ÙŠÙ„',          group: 'customer', type: 'string',   sourcePath: 'party.name',           settingKey: 'show_client',          align: 'right',   visibleByDefault: true },
+  { id: 'customer.nif',            label: 'Ø±Ù‚Ù… Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„',    group: 'customer', type: 'string',   sourcePath: 'party.nif',            settingKey: 'show_client_nif',      align: 'right',   visibleByDefault: true },
+  { id: 'customer.phone',          label: 'Ù‡Ø§ØªÙ Ø§Ù„Ø¹Ù…ÙŠÙ„',          group: 'customer', type: 'string',   sourcePath: 'party.phone',          settingKey: 'show_client_phone',    align: 'right',   visibleByDefault: true },
+  { id: 'customer.address',        label: 'Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø¹Ù…ÙŠÙ„',         group: 'customer', type: 'string',   sourcePath: 'party.address',        settingKey: 'show_client_address',  align: 'right',   visibleByDefault: true },
+  { id: 'customer.deliveryAddress', label: 'Ø¹Ù†ÙˆØ§Ù† Ø§Ù„ØªØ³Ù„ÙŠÙ…',       group: 'customer', type: 'string',   sourcePath: 'party.deliveryAddress', settingKey: 'show_delivery_address', align: 'right',   visibleByDefault: false },
+  { id: 'customer.cashierName',    label: 'Ø§Ù„ÙƒØ§Ø´ÙŠØ±',              group: 'customer', type: 'string',   sourcePath: 'party.cashierName',    settingKey: 'show_cashier',         align: 'right',   visibleByDefault: true },
+
+  // â”€â”€ Document â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'document.number',         label: 'Ø±Ù‚Ù… Ø§Ù„Ù…Ø³ØªÙ†Ø¯',          group: 'document', type: 'string',   sourcePath: 'doc.number',           settingKey: 'show_doc_number',      align: 'right',   visibleByDefault: true },
+  { id: 'document.date',           label: 'Ø§Ù„ØªØ§Ø±ÙŠØ®',              group: 'document', type: 'date',     sourcePath: 'doc.date',             settingKey: 'show_date',            align: 'right',   visibleByDefault: true },
+  { id: 'document.time',           label: 'Ø§Ù„ÙˆÙ‚Øª',                group: 'document', type: 'string',   sourcePath: 'doc.time',             settingKey: 'show_time',            align: 'right',   visibleByDefault: true },
+  { id: 'document.dueDate',        label: 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªØ­Ù‚Ø§Ù‚',       group: 'document', type: 'date',     sourcePath: 'doc.dueDate',          settingKey: 'show_due_date',        align: 'right',   visibleByDefault: true },
+  { id: 'document.paymentTerm',    label: 'Ø´Ø±ÙˆØ· Ø§Ù„Ø¯ÙØ¹',           group: 'document', type: 'string',   sourcePath: 'doc.dueDate',          settingKey: 'show_payment_term',    align: 'right',   visibleByDefault: false },
+  { id: 'document.typeCode',       label: 'Ø±Ù…Ø² Ø§Ù„Ù†ÙˆØ¹',            group: 'document', type: 'string',   sourcePath: 'doc.typeCode',                                         align: 'right',   visibleByDefault: false },
+  { id: 'document.typeName',       label: 'Ù†ÙˆØ¹ Ø§Ù„Ù…Ø³ØªÙ†Ø¯',          group: 'document', type: 'string',   sourcePath: 'doc.typeName',                                        align: 'right',   visibleByDefault: false },
+  { id: 'document.status',         label: 'Ø§Ù„Ø­Ø§Ù„Ø©',               group: 'document', type: 'string',   sourcePath: 'doc.status',                                          align: 'right',   visibleByDefault: false },
+  { id: 'document.notes',          label: 'Ù…Ù„Ø§Ø­Ø¸Ø§Øª',              group: 'document', type: 'string',   sourcePath: 'doc.notes',                                           align: 'right',   visibleByDefault: false },
+  { id: 'document.reference',      label: 'Ø§Ù„Ù…Ø±Ø¬Ø¹',               group: 'document', type: 'string',   sourcePath: 'doc.reference',                                       align: 'right',   visibleByDefault: false },
+
+  // â”€â”€ Session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'session.code',            label: 'Ø±Ù‚Ù… Ø§Ù„Ø¬Ù„Ø³Ø©',           group: 'session',  type: 'string',   sourcePath: 'session.code',          settingKey: 'show_session',         align: 'right',   visibleByDefault: true },
+  { id: 'session.cashierName',     label: 'ÙƒØ§Ø´ÙŠØ± Ø§Ù„Ø¬Ù„Ø³Ø©',         group: 'session',  type: 'string',   sourcePath: 'session.cashierName',                                  align: 'right',   visibleByDefault: false },
+
+  // â”€â”€ Warehouse â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'warehouse.name',          label: 'Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹',          group: 'warehouse', type: 'string',  sourcePath: 'warehouse.name',                                       align: 'right',   visibleByDefault: false },
+
+  // â”€â”€ Company â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'company.name',            label: 'Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©',           group: 'company',  type: 'string',   sourcePath: 'company.name',          settingKey: 'show_company_name',     align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'company_name_text' },
+  { id: 'company.address',         label: 'Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø´Ø±ÙƒØ©',         group: 'company',  type: 'string',   sourcePath: 'company.address',       settingKey: 'show_address',         align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_address' },
+  { id: 'company.phone',           label: 'Ù‡Ø§ØªÙ Ø§Ù„Ø´Ø±ÙƒØ©',          group: 'company',  type: 'string',   sourcePath: 'company.phone',         settingKey: 'show_phone',           align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_phone' },
+  { id: 'company.nif',             label: 'Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨Ø©',          group: 'company',  type: 'string',   sourcePath: 'company.nif',           settingKey: 'show_tax_id',          align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_nif' },
+  { id: 'company.rc',              label: 'Ø§Ù„Ø³Ø¬Ù„ Ø§Ù„ØªØ¬Ø§Ø±ÙŠ',        group: 'company',  type: 'string',   sourcePath: 'company.rc',            settingKey: 'show_rc',              align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_rc' },
+  { id: 'company.nis',             label: 'Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ø¥Ø­ØµØ§Ø¦ÙŠ',       group: 'company',  type: 'string',   sourcePath: 'company.nis',           settingKey: 'show_nis',             align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_nis' },
+  { id: 'company.ice',             label: 'Ø±Ù‚Ù… ICE',              group: 'company',  type: 'string',   sourcePath: 'company.ice',           settingKey: 'show_ice',             align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_ice' },
+  { id: 'company.article',         label: 'Ø§Ù„Ù…Ø§Ø¯Ø©',               group: 'company',  type: 'string',   sourcePath: 'company.article',       settingKey: 'show_article',         align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_article' },
+  { id: 'company.logo',            label: 'Ø§Ù„Ø´Ø¹Ø§Ø±',               group: 'company',  type: 'image',    sourcePath: 'company.logoUrl',       settingKey: 'show_logo',            align: 'center',  visibleByDefault: true },
+
+  // â”€â”€ Items (table) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'item.index',              label: 'Ø§Ù„Ø±Ù‚Ù…',                group: 'item',     type: 'number',   sourcePath: '',                      align: 'center',  visibleByDefault: true,  isRepeating: true, relativePath: '_index' },
+  { id: 'item.name',               label: 'Ø§Ù„Ù…Ù†ØªØ¬',               group: 'item',     type: 'string',   sourcePath: '',                      align: 'right',   visibleByDefault: true,  isRepeating: true, relativePath: 'name' },
+  { id: 'item.code',               label: 'Ø§Ù„Ø±Ù…Ø²',                group: 'item',     type: 'string',   sourcePath: '',                      align: 'right',   visibleByDefault: true,  isRepeating: true, relativePath: 'ref' },
+  { id: 'item.barcode',            label: 'Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯',             group: 'item',     type: 'string',   sourcePath: '',                      align: 'right',   visibleByDefault: false, isRepeating: true, relativePath: 'barcode' },
+  { id: 'item.unit',               label: 'Ø§Ù„ÙˆØ­Ø¯Ø©',               group: 'item',     type: 'string',   sourcePath: '',                      align: 'center',  visibleByDefault: true,  isRepeating: true, relativePath: 'unit' },
+  { id: 'item.quantity',           label: 'Ø§Ù„ÙƒÙ…ÙŠØ©',               group: 'item',     type: 'number',   sourcePath: '',                      align: 'center',  visibleByDefault: true,  isRepeating: true, relativePath: 'quantity' },
+  { id: 'item.price',              label: 'Ø§Ù„Ø«Ù…Ù†',                group: 'item',     type: 'currency',  sourcePath: '',                     align: 'right',   visibleByDefault: true,  isRepeating: true, relativePath: 'unitPriceHt' },
+  { id: 'item.discount',           label: 'Ø§Ù„Ø®ØµÙ…',                group: 'item',     type: 'currency',  sourcePath: '',                     align: 'right',   visibleByDefault: true,  isRepeating: true, relativePath: 'discountPct' },
+  { id: 'item.tva',                label: 'TVA',                  group: 'item',     type: 'number',   sourcePath: '',                      align: 'center',  visibleByDefault: true,  isRepeating: true, relativePath: 'tvaRate' },
+  { id: 'item.total',              label: 'Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹',              group: 'item',     type: 'currency',  sourcePath: '',                     align: 'right',   visibleByDefault: true,  isRepeating: true, relativePath: 'totalHt' },
+  { id: 'item.lot',                label: 'Ø±Ù‚Ù… Ø§Ù„Ø¯ÙØ¹Ø©',           group: 'item',     type: 'string',   sourcePath: '',                      align: 'right',   visibleByDefault: false, isRepeating: true, relativePath: 'lot' },
+  { id: 'item.notes',              label: 'Ù…Ù„Ø§Ø­Ø¸Ø§Øª',              group: 'item',     type: 'string',   sourcePath: '',                      align: 'right',   visibleByDefault: false, isRepeating: true, relativePath: 'notes' },
+
+  // â”€â”€ Totals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'totals.ht',               label: 'Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ HT',            group: 'totals',   type: 'currency', sourcePath: 'totals.totalHt',        settingKey: 'show_total_ht',        align: 'right',   visibleByDefault: true },
+  { id: 'totals.tva',              label: 'Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„Ø¶Ø±ÙŠØ¨Ø©',         group: 'totals',   type: 'currency', sourcePath: 'totals.totalTva',       settingKey: 'show_total_tva',        align: 'right',   visibleByDefault: true },
+  { id: 'totals.discount',         label: 'Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„Ø®ØµÙ…',           group: 'totals',   type: 'currency', sourcePath: 'totals.totalDiscount',  settingKey: 'show_discount_total',   align: 'right',   visibleByDefault: true },
+  { id: 'totals.fiscalStamp',      label: 'Ø§Ù„Ø·Ø§Ø¨Ø¹ Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠ',        group: 'totals',   type: 'currency', sourcePath: 'totals.fiscalStamp',    settingKey: 'show_fiscal_stamp',     align: 'right',   visibleByDefault: true },
+  { id: 'totals.ttc',              label: 'Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ TTC',           group: 'totals',   type: 'currency', sourcePath: 'totals.totalTtc',       settingKey: 'show_total_ttc',        align: 'right',   visibleByDefault: true },
+  { id: 'totals.paid',             label: 'Ø§Ù„Ù…Ø¯ÙÙˆØ¹',               group: 'totals',   type: 'currency', sourcePath: 'totals.paid',           settingKey: 'show_paid_amount',      align: 'right',   visibleByDefault: true },
+  { id: 'totals.change',           label: 'Ø§Ù„Ø¨Ø§Ù‚ÙŠ',                group: 'totals',   type: 'currency', sourcePath: 'totals.change',         settingKey: 'show_change',           align: 'right',   visibleByDefault: true },
+  { id: 'totals.remaining',        label: 'Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ',               group: 'totals',   type: 'currency', sourcePath: 'totals.remaining',      settingKey: 'show_remaining',        align: 'right',   visibleByDefault: true },
+  { id: 'totals.amountInWords',    label: 'Ø§Ù„Ù…Ø¨Ù„Øº ÙƒØªØ§Ø¨Ø©',          group: 'totals',   type: 'string',   sourcePath: 'computed.amountInWords', settingKey: 'show_amount_in_words', align: 'right',   visibleByDefault: true },
+
+  // â”€â”€ Balance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'balance.previous',        label: 'Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø³Ø§Ø¨Ù‚',         group: 'balance',  type: 'currency', sourcePath: 'balance.previous',      settingKey: 'show_prev_balance',     align: 'right',   visibleByDefault: true },
+  { id: 'balance.current',         label: 'Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¬Ø¯ÙŠØ¯',         group: 'balance',  type: 'currency', sourcePath: 'balance.current',       settingKey: 'show_new_balance',      align: 'right',   visibleByDefault: true },
+
+  // â”€â”€ Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'payment.method',          label: 'Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹',           group: 'payment',  type: 'string',   sourcePath: 'payments[*].mode',      settingKey: 'show_payment_details',  align: 'right',   visibleByDefault: true,  isRepeating: true, relativePath: 'mode' },
+  { id: 'payment.amount',          label: 'Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹',        group: 'payment',  type: 'currency', sourcePath: 'payments[*].amount',    settingKey: 'show_payment_details',  align: 'right',   visibleByDefault: true,  isRepeating: true, relativePath: 'amount' },
+
+  // â”€â”€ TVA Breakdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'tvaBreakdown.rate',       label: 'Ù†Ø³Ø¨Ø© Ø§Ù„Ø¶Ø±ÙŠØ¨Ø©',          group: 'tvaBreakdown', type: 'number',  sourcePath: 'taxBreakdown[*].rate', settingKey: 'show_tva_breakdown', align: 'center', visibleByDefault: true,  isRepeating: true, relativePath: 'rate' },
+  { id: 'tvaBreakdown.base',       label: 'Ø§Ù„Ø£Ø³Ø§Ø³',                group: 'tvaBreakdown', type: 'currency', sourcePath: 'taxBreakdown[*].baseHt', settingKey: 'show_tva_breakdown', align: 'right',  visibleByDefault: true,  isRepeating: true, relativePath: 'baseHt' },
+  { id: 'tvaBreakdown.tva',        label: 'Ø§Ù„Ø¶Ø±ÙŠØ¨Ø©',               group: 'tvaBreakdown', type: 'currency', sourcePath: 'taxBreakdown[*].tva',   settingKey: 'show_tva_breakdown', align: 'right',  visibleByDefault: true,  isRepeating: true, relativePath: 'tva' },
+  { id: 'tvaBreakdown.ttc',        label: 'Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹',               group: 'tvaBreakdown', type: 'currency', sourcePath: 'taxBreakdown[*].ttc',   settingKey: 'show_tva_breakdown', align: 'right',  visibleByDefault: true,  isRepeating: true, relativePath: 'ttc' },
+
+  // â”€â”€ Footer / Barcode / QR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'footer.barcode',          label: 'Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯',              group: 'barcode',  type: 'string',   sourcePath: 'doc.number',            settingKey: 'show_barcode',          align: 'center', visibleByDefault: true },
+  { id: 'footer.qr',               label: 'Ø±Ù…Ø² QR',               group: 'qr',       type: 'string',   sourcePath: 'doc.number',            settingKey: 'show_qr',               align: 'center', visibleByDefault: true },
+  { id: 'footer.thankYou',         label: 'Ø§Ù„Ø´ÙƒØ±',                 group: 'footer',   type: 'string',   sourcePath: '',                      settingKey: 'show_thank_you',        align: 'center', visibleByDefault: true },
+  { id: 'footer.returnsPolicy',    label: 'Ø³ÙŠØ§Ø³Ø© Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹',         group: 'footer',   type: 'string',   sourcePath: '',                      settingKey: 'show_returns_policy',   align: 'center', visibleByDefault: false },
+  { id: 'footer.bankDetails',      label: 'Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¨Ù†ÙƒÙŠØ©',       group: 'footer',   type: 'string',   sourcePath: '',                      settingKey: 'show_bank_details',     align: 'center', visibleByDefault: false },
+
+  // â”€â”€ Cashier / Client Signature â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'signature.cashier',       label: 'ØªÙˆÙ‚ÙŠØ¹ Ø§Ù„ÙƒØ§Ø´ÙŠØ±',         group: 'signature', type: 'boolean', sourcePath: '',                      settingKey: 'show_cashier_signature', align: 'center', visibleByDefault: true },
+  { id: 'signature.client',        label: 'ØªÙˆÙ‚ÙŠØ¹ Ø§Ù„Ø¹Ù…ÙŠÙ„',          group: 'signature', type: 'boolean', sourcePath: '',                      settingKey: 'show_client_signature',  align: 'center', visibleByDefault: true },
+  { id: 'signature.stamp',         label: 'Ø§Ù„Ø®ØªÙ…',                 group: 'signature', type: 'boolean', sourcePath: '',                      settingKey: 'show_stamp',             align: 'center', visibleByDefault: true },
+
+  // â”€â”€ Report (session/aggregated) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  { id: 'report.periodStart',      label: 'Ø¨Ø¯Ø§ÙŠØ© Ø§Ù„ÙØªØ±Ø©',          group: 'report',   type: 'date',     sourcePath: 'report.periodStart',     settingKey: 'show_report_period',     align: 'right',   visibleByDefault: true },
+  { id: 'report.periodEnd',        label: 'Ù†Ù‡Ø§ÙŠØ© Ø§Ù„ÙØªØ±Ø©',          group: 'report',   type: 'date',     sourcePath: 'report.periodEnd',       settingKey: 'show_report_period',     align: 'right',   visibleByDefault: true },
+  { id: 'report.cashier',          label: 'ÙƒØ§Ø´ÙŠØ± Ø§Ù„ØªÙ‚Ø±ÙŠØ±',          group: 'report',   type: 'string',   sourcePath: 'report.cashierName',     settingKey: 'show_report_cashier',    align: 'right',   visibleByDefault: true },
+  { id: 'report.grossSales',       label: 'Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª',       group: 'report',   type: 'currency', sourcePath: 'report.grossSales',      settingKey: 'show_report_summary_cards', align: 'right', visibleByDefault: true },
+  { id: 'report.returnsTotal',     label: 'Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª',             group: 'report',   type: 'currency', sourcePath: 'report.returnsTotal',    settingKey: 'show_report_summary_cards', align: 'right', visibleByDefault: true },
+  { id: 'report.netSales',         label: 'ØµØ§ÙÙŠ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª',         group: 'report',   type: 'currency', sourcePath: 'report.netSales',        settingKey: 'show_report_summary_cards', align: 'right', visibleByDefault: true },
+  { id: 'report.invoicesCount',    label: 'Ø¹Ø¯Ø¯ Ø§Ù„ÙÙˆØ§ØªÙŠØ±',          group: 'report',   type: 'number',   sourcePath: 'report.invoicesCount',   settingKey: 'show_report_summary_cards', align: 'center', visibleByDefault: true },
+  { id: 'report.returnsCount',     label: 'Ø¹Ø¯Ø¯ Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª',         group: 'report',   type: 'number',   sourcePath: 'report.returnsCount',    settingKey: 'show_report_summary_cards', align: 'center', visibleByDefault: true },
+  { id: 'report.highestInvoice',   label: 'Ø£Ø¹Ù„Ù‰ ÙØ§ØªÙˆØ±Ø©',           group: 'report',   type: 'currency', sourcePath: 'report.highestInvoice',   settingKey: 'show_report_summary_cards', align: 'right', visibleByDefault: true },
+  { id: 'report.avgInvoice',       label: 'Ù…ØªÙˆØ³Ø· Ø§Ù„ÙØ§ØªÙˆØ±Ø©',        group: 'report',   type: 'currency', sourcePath: 'report.avgInvoice',       settingKey: 'show_report_summary_cards', align: 'right', visibleByDefault: true },
+];
+
+// â”€â”€â”€ Singleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class PrintFieldRegistry {
+  private byId = new Map<string, PrintFieldDefinition>();
+  private bySettingKey = new Map<string, PrintFieldDefinition>();
+  private byGroup = new Map<PrintFieldGroup, PrintFieldDefinition[]>();
+
+  constructor(fields: PrintFieldDefinition[]) {
+    for (const f of fields) {
+      this.byId.set(f.id, f);
+      if (f.settingKey) {
+        this.bySettingKey.set(f.settingKey, f);
+      }
+      const list = this.byGroup.get(f.group) ?? [];
+      list.push(f);
+      this.byGroup.set(f.group, list);
+    }
+  }
+
+  get(id: string): PrintFieldDefinition | undefined {
+    return this.byId.get(id);
+  }
+
+  getBySettingKey(key: string): PrintFieldDefinition | undefined {
+    return this.bySettingKey.get(key);
+  }
+
+  getByGroup(group: PrintFieldGroup): PrintFieldDefinition[] {
+    return this.byGroup.get(group) ?? [];
+  }
+
+  getAllFields(): PrintFieldDefinition[] {
+    return Array.from(this.byId.values());
+  }
+
+  /** Return only fields that appear in a repeating table */
+  getRepeatingFields(group?: PrintFieldGroup): PrintFieldDefinition[] {
+    const all = group ? this.getByGroup(group) : this.getAllFields();
+    return all.filter(f => f.isRepeating);
+  }
+}
+
+export const printFieldRegistry = new PrintFieldRegistry(PRINT_FIELDS);
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/PrintFieldResolver.ts
+```
+/**
+ * The ONLY layer that resolves a canonical field ID to a value.
+ *
+ * Every renderer (UniversalPreview, ESC/POS, future PDF) calls
+ * `printFieldResolver.resolve("customer.name", data, template)` instead of
+ * accessing `data.party?.name` directly.
+ *
+ * This guarantees that:
+ *   - The same field ID produces the same value everywhere
+ *   - Template overrides (e.g. company_name_text) are automatically applied
+ *   - Computed fields (item.tvaPct, item.index) are derived consistently
+ */
+
+import type { UniversalDocumentData, DocumentLine } from '../types/data';
+import type { PrintTemplate } from '../types';
+import { printFieldRegistry, type PrintFieldDefinition } from './PrintFieldRegistry';
+import { numberToArabicWords } from '../utils';
+
+type ResolveContext = UniversalDocumentData | DocumentLine | Record<string, any>;
+
+function getByPath(obj: any, path: string): any {
+  if (!obj || !path) return undefined;
+  return path.split('.').reduce((acc: any, key: string) => {
+    if (acc === null || acc === undefined) return undefined;
+    return acc[key];
+  }, obj);
+}
+
+class PrintFieldResolver {
+  getField(id: string): PrintFieldDefinition | undefined {
+    return printFieldRegistry.get(id);
+  }
+
+  getFieldBySettingKey(key: string): PrintFieldDefinition | undefined {
+    return printFieldRegistry.getBySettingKey(key);
+  }
+
+  /**
+   * Resolve a document-level field against UniversalDocumentData.
+   * Automatically applies template overrides and computed fields.
+   */
+  resolve(
+    fieldId: string,
+    data: UniversalDocumentData,
+    template?: PrintTemplate | null,
+  ): any {
+    const def = this.getField(fieldId);
+    if (!def) return undefined;
+
+    // 1) Template override (e.g. company_name_text overrides company.name)
+    if (template && def.overrideTemplatePath) {
+      const override = getByPath(template, def.overrideTemplatePath);
+      if (override !== undefined && override !== null && override !== '') {
+        return override;
+      }
+    }
+
+    // 2) Footer/static fields â€” values come from template, not data
+    if (fieldId === 'footer.thankYou') {
+      return template?.thank_you_text ?? '';
+    }
+    if (fieldId === 'footer.returnsPolicy') {
+      return template?.returns_policy_text ?? '';
+    }
+    if (fieldId === 'footer.bankDetails') {
+      return template?.bank_details_text ?? '';
+    }
+    if (fieldId === 'signature.cashier' || fieldId === 'signature.client' || fieldId === 'signature.stamp') {
+      return true; // boolean â€” visibility is controlled by the setting, not value
+    }
+
+    // 3) Computed fields
+    if (fieldId === 'totals.amountInWords') {
+      const total = data.totals?.totalTtc ?? 0;
+      return numberToArabicWords(total);
+    }
+
+    // 4) Simple data path
+    return getByPath(data, def.sourcePath);
+  }
+
+  /**
+   * Resolve an item-level field against a single DocumentLine.
+   * Handles computed item fields like item.index, item.tvaPct.
+   */
+  resolveItemField(
+    fieldId: string,
+    line: DocumentLine,
+    lineIndex: number,
+  ): any {
+    const def = this.getField(fieldId);
+    if (!def) return undefined;
+
+    // Computed item fields
+    if (fieldId === 'item.index') return lineIndex + 1;
+    if (fieldId === 'item.tvaPct') return Math.round((line.tvaRate ?? 0) * 100);
+    if (fieldId === 'item.discountAmt') return (line.totalHt ?? 0) * ((line.discountPct ?? 0) / 100);
+
+    // Relative path for repeating fields
+    if (def.relativePath && def.relativePath !== '_index') {
+      return getByPath(line, def.relativePath);
+    }
+
+    // Fallback for absolute paths
+    return getByPath(line, def.sourcePath);
+  }
+
+  /**
+   * Check if a field should be visible.
+   * Uses the template's show_* setting (if mapped) and also checks the
+   * data contains a value for the field.
+   */
+  isVisible(fieldId: string, template: Record<string, any>): boolean {
+    const def = this.getField(fieldId);
+    if (!def) return false;
+
+    if (def.settingKey) {
+      const setting = template[def.settingKey];
+      if (setting === false) return false;
+    }
+
+    return true;
+  }
+
+  getItemColumns(template: Record<string, any>): ColumnDefinition[] {
+    const order: string[] = template.col_order ?? ['name', 'quantity', 'price', 'total'];
+    const headers: Record<string, string> = template.col_headers ?? {};
+    const widths: Record<string, number> = template.col_widths ?? {};
+    const aligns: Record<string, string> = template.col_aligns ?? {};
+    const show: Record<string, boolean> = template.col_show ?? {};
+
+    const FIELD_MAP: Record<string, string> = {
+      rowNumber: 'item.index',
+      name:      'item.name',
+      ref:       'item.code',
+      barcode:   'item.barcode',
+      unit:      'item.unit',
+      quantity:  'item.quantity',
+      price:     'item.price',
+      discount:  'item.discount',
+      tva:       'item.tva',
+      total:     'item.total',
+    };
+
+    return order
+      .filter(col => show[col] !== false)
+      .map(col => {
+        const fieldId = FIELD_MAP[col] ?? col;
+        const def = this.getField(fieldId);
+        return {
+          id: fieldId,
+          label: headers[col] ?? def?.label ?? col,
+          width: widths[col] ?? 10,
+          align: (aligns[col] as 'left' | 'center' | 'right') ?? def?.align ?? 'right',
+          visible: show[col] !== false,
+        };
+      });
+  }
+}
+
+export interface ColumnDefinition {
+  id: string;
+  label: string;
+  width: number;
+  align: 'left' | 'center' | 'right';
+  visible: boolean;
+}
+
+export const printFieldResolver = new PrintFieldResolver();
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/printStoreService.ts
+```
+import type { ApiClient } from '../contracts/ApiClient';
+import type { ReceiptTemplate80mm, PaperSize } from '../types';
+import { defaultTemplate } from '../types';
+
+export const DB_KEY_TEMPLATES   = 'print:templates';
+export const DB_KEY_DOC_CONFIGS = 'print:doc_configs';
+
+export const tplKey = (docCode: string, size: PaperSize) => `${docCode}_${size}`;
+
+/** Fetch all templates from DB as dictionary */
+export async function dbFetchTemplates(api: ApiClient): Promise<Record<string, ReceiptTemplate80mm>> {
+  try {
+    const res = await api.get<{ value: string | object }>(`/settings/${DB_KEY_TEMPLATES}`);
+    const raw = (res as Record<string, unknown>)?.value ?? (res as Record<string, unknown>)?.data?.value ?? null;
+    if (!raw) return {};
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return parsed as Record<string, ReceiptTemplate80mm>;
+  } catch {
+    return {};
+  }
+}
+
+/** Fetch single document template */
+export async function dbFetchTemplate(
+  api: ApiClient, docCode: string, size: PaperSize,
+): Promise<ReceiptTemplate80mm> {
+  const all = await dbFetchTemplates(api);
+  const key = tplKey(docCode, size);
+  return all[key] ? { ...defaultTemplate(), ...all[key] } : defaultTemplate();
+}
+
+/** Save one template into DB â€” merges with existing templates */
+export async function dbSaveTemplate(
+  api: ApiClient, docCode: string, size: PaperSize, template: ReceiptTemplate80mm,
+): Promise<void> {
+  const all = await dbFetchTemplates(api);
+  const key = tplKey(docCode, size);
+  all[key]  = template;
+  await api.patch('/settings', { [DB_KEY_TEMPLATES]: JSON.stringify(all) });
+}
+
+/** Copy template from one doc type to another (same paper size) */
+export async function dbCopyTemplate(
+  api: ApiClient, sourceCode: string, targetCode: string, size: PaperSize,
+): Promise<void> {
+  const all       = await dbFetchTemplates(api);
+  const sourceKey = tplKey(sourceCode, size);
+  const targetKey = tplKey(targetCode, size);
+  if (!all[sourceKey]) throw new Error(`Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù‚Ø§Ù„Ø¨ Ù„Ù€ ${sourceCode}`);
+  all[targetKey] = { ...all[sourceKey] };
+  await api.patch('/settings', { [DB_KEY_TEMPLATES]: JSON.stringify(all) });
+}
+
+/** Save document configs */
+export async function dbSaveDocConfigs(api: ApiClient, configs: Record<string, unknown>[]): Promise<void> {
+  await api.patch('/settings', { [DB_KEY_DOC_CONFIGS]: JSON.stringify(configs) });
+}
+
+/** Fetch document configs */
+export async function dbFetchDocConfigs(api: ApiClient): Promise<Record<string, unknown>[]> {
+  try {
+    const res = await api.get<{ value: string | object }>(`/settings/${DB_KEY_DOC_CONFIGS}`);
+    const raw = (res as Record<string, unknown>)?.value ?? (res as Record<string, unknown>)?.data?.value ?? null;
+    if (!raw) return [];
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return [];
+  }
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/PropertyVisibilityService.ts
+```
+import type { DocTypeCode, PaperSize, PrintTemplate, SettingMeta } from '../types';
+import { isSettingVisible, getVisibleSettings } from './SettingsRegistry';
+
+export type { SettingMeta, PropertyCategory } from './SettingsRegistry';
+
+const THERMAL_SIZES: PaperSize[] = ['80mm', '58mm'];
+const PAGE_SIZES: PaperSize[] = ['A4', 'A5'];
+
+export function isReportDoc(code: DocTypeCode): boolean {
+  return code === 'RPT';
+}
+
+export function isInvoiceDoc(code: DocTypeCode): boolean {
+  return ['FV', 'BL', 'DEV', 'BCC', 'FA', 'BR', 'AV', 'AA'].includes(code);
+}
+
+export function isThermalPaper(size: PaperSize): boolean {
+  return THERMAL_SIZES.includes(size);
+}
+
+export function isPagePaper(size: PaperSize): boolean {
+  return PAGE_SIZES.includes(size);
+}
+
+export function isPropertyVisible(
+  key: string,
+  docType: DocTypeCode,
+  paperSize: PaperSize,
+  tpl?: Partial<PrintTemplate>,
+): boolean {
+  return isSettingVisible(key, docType, paperSize, tpl);
+}
+
+export function getSectionProperties(tpl: PrintTemplate): Record<string, boolean> {
+  return {
+    show_header_section: tpl.show_header_section,
+    show_doc_info_section: tpl.show_doc_info_section,
+    show_items_section: tpl.show_items_section,
+    show_totals_section: tpl.show_totals_section,
+    show_payments_section: tpl.show_payments_section,
+    show_footer_section: tpl.show_footer_section,
+  };
+}
+
+export function getFilteredMeta(docType: DocTypeCode, paperSize: PaperSize): SettingMeta[] {
+  return getVisibleSettings(docType, paperSize);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/SettingsRegistry.ts
+```
+import type { DocTypeCode, PaperSize, PrintTemplate, ColumnKey, AlignOption, BorderStyle, PriceMode, PageOrientation, FontFamily } from '../types/domain';
+
+export type SettingComponent = 'toggle' | 'input' | 'select' | 'pills' | 'slider' | 'color' | 'textarea' | 'column-manager' | 'rules-editor' | 'logo-upload';
+
+export interface SettingMeta {
+  key: keyof PrintTemplate;
+  label: string;
+  labelAr: string;
+  category: 'global' | 'paper' | 'header' | 'company' | 'document' | 'columns' | 'items' | 'totals' | 'payments' | 'footer' | 'barcode' | 'qr' | 'signature' | 'section-visibility' | 'rules' | 'report' | 'charts' | 'formatting';
+  component: SettingComponent;
+  defaultValue: unknown;
+  supportedPapers: PaperSize[];
+  supportedDocs: DocTypeCode[];
+  description?: string;
+  groupKey?: string;
+  dependsOn?: keyof PrintTemplate;
+  options?: readonly { v: string; l: string }[];
+  min?: number;
+  max?: number;
+  step?: number;
+  /** Canonical field ID from PrintFieldRegistry (show_* settings only) */
+  field?: string;
+}
+
+const ALL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT'];
+const COMMERCIAL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV'];
+const POS_DOCS: DocTypeCode[] = ['POS', 'RPT'];
+const WAREHOUSE_DOCS: DocTypeCode[] = ['DDP', 'BT'];
+const REPORT_DOC: DocTypeCode[] = ['RPT'];
+const NON_REPORT_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS'];
+const THERMAL: PaperSize[] = ['80mm', '58mm'];
+const PAGE: PaperSize[] = ['A4', 'A5'];
+const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5'];
+
+const ALIGN_OPTS = [
+  { v: 'right' as const, l: 'ÙŠÙ…ÙŠÙ†' },
+  { v: 'center' as const, l: 'ÙˆØ³Ø·' },
+  { v: 'left' as const, l: 'ÙŠØ³Ø§Ø±' },
+];
+
+const BORDER_OPTS = [
+  { v: 'solid' as const, l: 'ØµÙ„Ø¨Ø©' },
+  { v: 'dashed' as const, l: 'Ù…ØªÙ‚Ø·Ø¹Ø©' },
+  { v: 'double' as const, l: 'Ù…Ø²Ø¯ÙˆØ¬Ø©' },
+  { v: 'none' as const, l: 'Ø¨Ø¯ÙˆÙ†' },
+];
+
+export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
+  // â”€â”€ Global â”€â”€
+  id:             { key: 'id', label: 'ID', labelAr: 'Ø§Ù„Ù…Ø¹Ø±Ù', category: 'global', component: 'input', defaultValue: null, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  name:           { key: 'name', label: 'Name', labelAr: 'Ø§Ù„Ø§Ø³Ù…', category: 'global', component: 'input', defaultValue: 'Ù‚Ø§Ù„Ø¨ Ø¬Ø¯ÙŠØ¯', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  doc_type_code:  { key: 'doc_type_code', label: 'Document Type', labelAr: 'Ù†ÙˆØ¹ Ø§Ù„Ù…Ø³ØªÙ†Ø¯', category: 'global', component: 'select', defaultValue: 'FV', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  paper_size:     { key: 'paper_size', label: 'Paper Size', labelAr: 'Ø­Ø¬Ù… Ø§Ù„ÙˆØ±Ù‚', category: 'paper', component: 'pills', defaultValue: '80mm' as PaperSize, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  is_default:     { key: 'is_default', label: 'Default', labelAr: 'Ø§ÙØªØ±Ø§Ø¶ÙŠ', category: 'global', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  is_active:      { key: 'is_active', label: 'Active', labelAr: 'Ù…ÙØ¹Ù„', category: 'global', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // â”€â”€ Paper / Formatting â”€â”€
+  paper_width_mm:   { key: 'paper_width_mm', label: 'Paper Width (mm)', labelAr: 'Ø¹Ø±Ø¶ Ø§Ù„ÙˆØ±Ù‚ (Ù…Ù„Ù…)', category: 'paper', component: 'select', defaultValue: 80, supportedPapers: THERMAL, supportedDocs: ALL_DOCS, options: [{ v: '58', l: '58mm' }, { v: '80', l: '80mm' }] },
+  page_orientation: { key: 'page_orientation', label: 'Page Orientation', labelAr: 'Ø§ØªØ¬Ø§Ù‡ Ø§Ù„ØµÙØ­Ø©', category: 'paper', component: 'pills', defaultValue: 'portrait' as PageOrientation, supportedPapers: PAGE, supportedDocs: ALL_DOCS, options: [{ v: 'portrait', l: 'Ø¹Ù…ÙˆØ¯ÙŠ' }, { v: 'landscape', l: 'Ø£ÙÙ‚ÙŠ' }] },
+  margin_top:       { key: 'margin_top', label: 'Top Margin (mm)', labelAr: 'Ø§Ù„Ù‡Ø§Ù…Ø´ Ø§Ù„Ø¹Ù„ÙˆÙŠ (Ù…Ù„Ù…)', category: 'formatting', component: 'slider', defaultValue: 3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0, max: 20, step: 0.5 },
+  margin_bottom:    { key: 'margin_bottom', label: 'Bottom Margin (mm)', labelAr: 'Ø§Ù„Ù‡Ø§Ù…Ø´ Ø§Ù„Ø³ÙÙ„ÙŠ (Ù…Ù„Ù…)', category: 'formatting', component: 'slider', defaultValue: 3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0, max: 20, step: 0.5 },
+  margin_sides:     { key: 'margin_sides', label: 'Side Margin (mm)', labelAr: 'Ø§Ù„Ù‡Ø§Ù…Ø´ Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠ (Ù…Ù„Ù…)', category: 'formatting', component: 'slider', defaultValue: 3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0, max: 20, step: 0.5 },
+  line_spacing:     { key: 'line_spacing', label: 'Line Spacing', labelAr: 'ØªØ¨Ø§Ø¹Ø¯ Ø§Ù„Ø£Ø³Ø·Ø±', category: 'formatting', component: 'slider', defaultValue: 1.3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0.8, max: 3, step: 0.1 },
+  base_font_size:   { key: 'base_font_size', label: 'Base Font Size', labelAr: 'Ø­Ø¬Ù… Ø§Ù„Ø®Ø· Ø§Ù„Ø£Ø³Ø§Ø³ÙŠ', category: 'formatting', component: 'slider', defaultValue: 10, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 20, step: 0.5 },
+  font_family:      { key: 'font_family', label: 'Font Family', labelAr: 'Ù†ÙˆØ¹ Ø§Ù„Ø®Ø·', category: 'formatting', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times New Roman' }, { v: 'arial', l: 'Arial' }] },
+
+  // â”€â”€ Header / Logo â”€â”€
+  show_logo:          { key: 'show_logo', label: 'Show Logo', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø´Ø¹Ø§Ø±', category: 'header', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.logo' },
+  logo_source:        { key: 'logo_source', label: 'Logo Source', labelAr: 'Ù…ØµØ¯Ø± Ø§Ù„Ø´Ø¹Ø§Ø±', category: 'header', component: 'pills', defaultValue: 'company', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo', options: [{ v: 'company', l: 'Ø§Ù„Ø´Ø±ÙƒØ©' }, { v: 'custom', l: 'Ù…Ø®ØµØµ' }, { v: 'default', l: 'Ø§ÙØªØ±Ø§Ø¶ÙŠ' }] },
+  logo_size:          { key: 'logo_size', label: 'Logo Size (px)', labelAr: 'Ø­Ø¬Ù… Ø§Ù„Ø´Ø¹Ø§Ø± (Ø¨ÙƒØ³Ù„)', category: 'header', component: 'slider', defaultValue: 56, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo', min: 20, max: 200, step: 2 },
+  logo_align:         { key: 'logo_align', label: 'Logo Alignment', labelAr: 'Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø´Ø¹Ø§Ø±', category: 'header', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo', options: ALIGN_OPTS },
+  logo_border_radius: { key: 'logo_border_radius', label: 'Logo Border Radius', labelAr: 'ØªØ¯ÙˆÙŠØ± Ø²ÙˆØ§ÙŠØ§ Ø§Ù„Ø´Ø¹Ø§Ø±', category: 'header', component: 'slider', defaultValue: 50, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo', min: 0, max: 100, step: 5 },
+  custom_logo_url:    { key: 'custom_logo_url', label: 'Custom Logo URL', labelAr: 'Ø±Ø§Ø¨Ø· Ø§Ù„Ø´Ø¹Ø§Ø± Ø§Ù„Ù…Ø®ØµØµ', category: 'header', component: 'input', defaultValue: null, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo' },
+
+  // â”€â”€ Company â”€â”€
+  show_company_name:  { key: 'show_company_name', label: 'Show Company Name', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.name' },
+  company_name_text:  { key: 'company_name_text', label: 'Company Name Text', labelAr: 'Ù†Øµ Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name' },
+  company_name_size:  { key: 'company_name_size', label: 'Company Name Size', labelAr: 'Ø­Ø¬Ù… Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©', category: 'company', component: 'slider', defaultValue: 15, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name', min: 8, max: 30, step: 1 },
+  company_name_bold:  { key: 'company_name_bold', label: 'Bold Company Name', labelAr: 'ØªØ³Ù…ÙŠÙƒ Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name' },
+  company_name_align: { key: 'company_name_align', label: 'Company Name Alignment', labelAr: 'Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©', category: 'company', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name', options: ALIGN_OPTS },
+  company_name_color: { key: 'company_name_color', label: 'Company Name Color', labelAr: 'Ù„ÙˆÙ† Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©', category: 'company', component: 'color', defaultValue: '#111111', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_company_name' },
+
+  // â”€â”€ Company Info â”€â”€
+  show_address:       { key: 'show_address', label: 'Show Address', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.address' },
+  show_phone:         { key: 'show_phone', label: 'Show Phone', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù‡Ø§ØªÙ', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.phone' },
+  show_tax_id:        { key: 'show_tax_id', label: 'Show Tax ID (NIF)', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨Ø©', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.nif' },
+  show_rc:            { key: 'show_rc', label: 'Show RC', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø³Ø¬Ù„ Ø§Ù„ØªØ¬Ø§Ø±ÙŠ', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.rc' },
+  show_nis:           { key: 'show_nis', label: 'Show NIS', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø±Ù‚Ù… NIS', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.nis' },
+  show_ice:           { key: 'show_ice', label: 'Show ICE', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø±Ù‚Ù… ICE', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.ice' },
+  show_article:       { key: 'show_article', label: 'Show Article', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…Ø§Ø¯Ø©', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.article' },
+  company_info_align: { key: 'company_info_align', label: 'Info Alignment', labelAr: 'Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø§Øª', category: 'company', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  company_info_size:  { key: 'company_info_size', label: 'Info Font Size', labelAr: 'Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø§Øª', category: 'company', component: 'slider', defaultValue: 9, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 16, step: 0.5 },
+  override_address:   { key: 'override_address', label: 'Override Address', labelAr: 'ØªØ¬Ø§ÙˆØ² Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_phone:     { key: 'override_phone', label: 'Override Phone', labelAr: 'ØªØ¬Ø§ÙˆØ² Ø§Ù„Ù‡Ø§ØªÙ', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_nif:       { key: 'override_nif', label: 'Override NIF', labelAr: 'ØªØ¬Ø§ÙˆØ² Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨Ø©', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_rc:        { key: 'override_rc', label: 'Override RC', labelAr: 'ØªØ¬Ø§ÙˆØ² Ø§Ù„Ø³Ø¬Ù„ Ø§Ù„ØªØ¬Ø§Ø±ÙŠ', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_nis:       { key: 'override_nis', label: 'Override NIS', labelAr: 'ØªØ¬Ø§ÙˆØ² NIS', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_ice:       { key: 'override_ice', label: 'Override ICE', labelAr: 'ØªØ¬Ø§ÙˆØ² ICE', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_article:   { key: 'override_article', label: 'Override Article', labelAr: 'ØªØ¬Ø§ÙˆØ² Ø§Ù„Ù…Ø§Ø¯Ø©', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  header_custom_text: { key: 'header_custom_text', label: 'Header Custom Text', labelAr: 'Ù†Øµ Ù…Ø®ØµØµ Ù„Ù„Ø±Ø£Ø³', category: 'header', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  header_separator:   { key: 'header_separator', label: 'Header Separator', labelAr: 'ÙØ§ØµÙ„ Ø§Ù„Ø±Ø£Ø³', category: 'header', component: 'pills', defaultValue: 'dashed' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+
+  // â”€â”€ Document â”€â”€
+  title_text:           { key: 'title_text', label: 'Title Text', labelAr: 'Ù†Øµ Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', category: 'document', component: 'input', defaultValue: 'ÙØ§ØªÙˆØ±Ø© Ø¨ÙŠØ¹', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  title_size:           { key: 'title_size', label: 'Title Size', labelAr: 'Ø­Ø¬Ù… Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', category: 'document', component: 'slider', defaultValue: 13, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 8, max: 30, step: 1 },
+  title_bold:           { key: 'title_bold', label: 'Bold Title', labelAr: 'ØªØ³Ù…ÙŠÙƒ Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  title_align:          { key: 'title_align', label: 'Title Alignment', labelAr: 'Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', category: 'document', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  title_color:          { key: 'title_color', label: 'Title Color', labelAr: 'Ù„ÙˆÙ† Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', category: 'document', component: 'color', defaultValue: '#111111', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_doc_number:      { key: 'show_doc_number', label: 'Show Document Number', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø±Ù‚Ù… Ø§Ù„Ù…Ø³ØªÙ†Ø¯', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'document.number' },
+  show_date:            { key: 'show_date', label: 'Show Date', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„ØªØ§Ø±ÙŠØ®', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'document.date' },
+  show_time:            { key: 'show_time', label: 'Show Time', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„ÙˆÙ‚Øª', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'document.time' },
+  show_due_date:        { key: 'show_due_date', label: 'Show Due Date', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªØ­Ù‚Ø§Ù‚', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'document.dueDate' },
+  show_cashier:         { key: 'show_cashier', label: 'Show Cashier', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„ÙƒØ§Ø´ÙŠØ±', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.cashierName' },
+  show_client:          { key: 'show_client', label: 'Show Client', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø¹Ù…ÙŠÙ„', category: 'document', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.name' },
+  show_client_nif:      { key: 'show_client_nif', label: 'Show Client NIF', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø±Ù‚Ù… Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.nif' },
+  show_client_phone:    { key: 'show_client_phone', label: 'Show Client Phone', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ù‡Ø§ØªÙ Ø§Ù„Ø¹Ù…ÙŠÙ„', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.phone' },
+  show_client_address:  { key: 'show_client_address', label: 'Show Client Address', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø¹Ù…ÙŠÙ„', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.address' },
+  show_delivery_address:{ key: 'show_delivery_address', label: 'Show Delivery Address', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø¹Ù†ÙˆØ§Ù† Ø§Ù„ØªØ³Ù„ÙŠÙ…', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS, field: 'customer.deliveryAddress' },
+  show_session:         { key: 'show_session', label: 'Show Session', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø¬Ù„Ø³Ø©', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: POS_DOCS, field: 'session.code' },
+  show_payment_term:    { key: 'show_payment_term', label: 'Show Payment Term', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø´Ø±Ø· Ø§Ù„Ø¯ÙØ¹', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS, field: 'document.paymentTerm' },
+  show_bank_details:    { key: 'show_bank_details', label: 'Show Bank Details', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¨Ù†Ùƒ', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: PAGE, supportedDocs: COMMERCIAL_DOCS, field: 'footer.bankDetails' },
+  bank_details_text:    { key: 'bank_details_text', label: 'Bank Details Text', labelAr: 'Ù†Øµ ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¨Ù†Ùƒ', category: 'document', component: 'textarea', defaultValue: '', supportedPapers: PAGE, supportedDocs: COMMERCIAL_DOCS, dependsOn: 'show_bank_details' },
+  doc_separator:        { key: 'doc_separator', label: 'Document Separator', labelAr: 'ÙØ§ØµÙ„ Ø§Ù„Ù…Ø³ØªÙ†Ø¯', category: 'document', component: 'pills', defaultValue: 'dashed' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+
+  // â”€â”€ Items / Columns â”€â”€
+  col_order:            { key: 'col_order', label: 'Column Order', labelAr: 'ØªØ±ØªÙŠØ¨ Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©', category: 'columns', component: 'column-manager', defaultValue: ['name', 'quantity', 'price', 'total'] as ColumnKey[], supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  col_show:             { key: 'col_show', label: 'Column Visibility', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©', category: 'columns', component: 'column-manager', defaultValue: {} as Partial<Record<ColumnKey, boolean>>, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  col_widths:           { key: 'col_widths', label: 'Column Widths', labelAr: 'Ø¹Ø±Ø¶ Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©', category: 'columns', component: 'column-manager', defaultValue: {} as Partial<Record<ColumnKey, number>>, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  col_headers:          { key: 'col_headers', label: 'Column Headers', labelAr: 'Ø¹Ù†Ø§ÙˆÙŠÙ† Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©', category: 'columns', component: 'column-manager', defaultValue: {} as Partial<Record<ColumnKey, string>>, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  col_aligns:           { key: 'col_aligns', label: 'Column Alignments', labelAr: 'Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©', category: 'columns', component: 'column-manager', defaultValue: {} as Partial<Record<ColumnKey, AlignOption>>, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // â”€â”€ Items Table â”€â”€
+  items_font_size:      { key: 'items_font_size', label: 'Items Font Size', labelAr: 'Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ø¬Ø¯ÙˆÙ„', category: 'items', component: 'slider', defaultValue: 10, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 18, step: 0.5 },
+  items_font_family:    { key: 'items_font_family', label: 'Items Font Family', labelAr: 'Ù†ÙˆØ¹ Ø®Ø· Ø§Ù„Ø¬Ø¯ÙˆÙ„', category: 'items', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times' }, { v: 'arial', l: 'Arial' }] },
+  show_col_header:      { key: 'show_col_header', label: 'Show Column Headers', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø±Ø¤ÙˆØ³ Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©', category: 'items', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  table_header_bold:    { key: 'table_header_bold', label: 'Bold Table Header', labelAr: 'ØªØ³Ù…ÙŠÙƒ Ø±Ø£Ø³ Ø§Ù„Ø¬Ø¯ÙˆÙ„', category: 'items', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
+  table_header_bg:      { key: 'table_header_bg', label: 'Table Header Background', labelAr: 'Ø®Ù„ÙÙŠØ© Ø±Ø£Ø³ Ø§Ù„Ø¬Ø¯ÙˆÙ„', category: 'items', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
+  table_header_color:   { key: 'table_header_color', label: 'Table Header Color', labelAr: 'Ù„ÙˆÙ† Ø±Ø£Ø³ Ø§Ù„Ø¬Ø¯ÙˆÙ„', category: 'items', component: 'color', defaultValue: '#333333', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
+  table_border_style:   { key: 'table_border_style', label: 'Table Border Style', labelAr: 'Ù†Ù…Ø· Ø­Ø¯ÙˆØ¯ Ø§Ù„Ø¬Ø¯ÙˆÙ„', category: 'items', component: 'pills', defaultValue: 'dashed' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+  alternating_rows:     { key: 'alternating_rows', label: 'Alternating Row Colors', labelAr: 'ØªÙ„ÙˆÙŠÙ† Ø§Ù„ØµÙÙˆÙ Ø¨Ø§Ù„ØªÙ†Ø§ÙˆØ¨', category: 'items', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  alternating_color:    { key: 'alternating_color', label: 'Alternating Color', labelAr: 'Ù„ÙˆÙ† Ø§Ù„ØªÙ†Ø§ÙˆØ¨', category: 'items', component: 'color', defaultValue: '#f5f5f5', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'alternating_rows' },
+  price_display:        { key: 'price_display', label: 'Price Display Mode', labelAr: 'Ø·Ø±ÙŠÙ‚Ø© Ø¹Ø±Ø¶ Ø§Ù„Ø³Ø¹Ø±', category: 'items', component: 'pills', defaultValue: 'ht' as PriceMode, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'ht', l: 'HT' }, { v: 'ttc', l: 'TTC' }] },
+  show_line_total_ttc:  { key: 'show_line_total_ttc', label: 'Show Line Total TTC', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ Ù„ÙƒÙ„ Ø³Ø·Ø±', category: 'items', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // â”€â”€ Totals â”€â”€
+  totals_font_size:     { key: 'totals_font_size', label: 'Totals Font Size', labelAr: 'Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª', category: 'totals', component: 'slider', defaultValue: 10, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 20, step: 0.5 },
+  totals_bold:          { key: 'totals_bold', label: 'Bold Totals', labelAr: 'ØªØ³Ù…ÙŠÙƒ Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  totals_align:         { key: 'totals_align', label: 'Totals Alignment', labelAr: 'Ù…Ø­Ø§Ø°Ø§Ø© Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª', category: 'totals', component: 'pills', defaultValue: 'right' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  show_total_ht:        { key: 'show_total_ht', label: 'Show Total HT', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ HT', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.ht' },
+  show_total_tva:       { key: 'show_total_tva', label: 'Show Total TVA', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„Ø¶Ø±ÙŠØ¨Ø©', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.tva' },
+  show_tva_breakdown:   { key: 'show_tva_breakdown', label: 'Show TVA Breakdown', labelAr: 'ØªÙØµÙŠÙ„ Ø§Ù„Ø¶Ø±ÙŠØ¨Ø© Ø­Ø³Ø¨ Ø§Ù„Ù†Ø³Ø¨Ø©', category: 'totals', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'tvaBreakdown.rate' },
+  show_discount_total:  { key: 'show_discount_total', label: 'Show Discount Total', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„Ø®ØµÙ…', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.discount' },
+  show_fiscal_stamp:    { key: 'show_fiscal_stamp', label: 'Show Fiscal Stamp', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø·Ø§Ø¨Ø¹ Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠ', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS , field: 'totals.fiscalStamp' },
+  show_total_ttc:       { key: 'show_total_ttc', label: 'Show Total TTC', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ TTC', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.ttc' },
+  total_ttc_font_size:  { key: 'total_ttc_font_size', label: 'TTC Font Size', labelAr: 'Ø­Ø¬Ù… Ø®Ø· TTC', category: 'totals', component: 'slider', defaultValue: 14, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 10, max: 30, step: 1 },
+  total_ttc_bold:       { key: 'total_ttc_bold', label: 'Bold TTC', labelAr: 'ØªØ³Ù…ÙŠÙƒ TTC', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  total_ttc_color:      { key: 'total_ttc_color', label: 'TTC Color', labelAr: 'Ù„ÙˆÙ† TTC', category: 'totals', component: 'color', defaultValue: '#111111', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  total_border_style:   { key: 'total_border_style', label: 'Totals Border Style', labelAr: 'Ù†Ù…Ø· Ø­Ø¯ÙˆØ¯ Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª', category: 'totals', component: 'pills', defaultValue: 'double' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+  show_amount_in_words: { key: 'show_amount_in_words', label: 'Show Amount in Words', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…Ø¨Ù„Øº ÙƒØªØ§Ø¨Ø©Ù‹', category: 'totals', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.amountInWords' },
+  show_paid_amount:     { key: 'show_paid_amount', label: 'Show Paid Amount', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.paid' },
+  show_change:          { key: 'show_change', label: 'Show Change', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø¨Ø§Ù‚ÙŠ', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.change' },
+  show_remaining:       { key: 'show_remaining', label: 'Show Remaining', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ', category: 'totals', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'totals.remaining' },
+  show_prev_balance:    { key: 'show_prev_balance', label: 'Show Previous Balance', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø³Ø§Ø¨Ù‚', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'balance.previous' },
+  show_new_balance:     { key: 'show_new_balance', label: 'Show New Balance', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¬Ø¯ÙŠØ¯', category: 'totals', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'balance.current' },
+
+  // â”€â”€ Payments â”€â”€
+  show_payment_details: { key: 'show_payment_details', label: 'Show Payment Details', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¯ÙØ¹', category: 'payments', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'payment.method' },
+  payment_font_size:    { key: 'payment_font_size', label: 'Payment Font Size', labelAr: 'Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ø¯ÙØ¹', category: 'payments', component: 'slider', defaultValue: 9, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 16, step: 0.5 },
+
+  // â”€â”€ Footer â”€â”€
+  footer_line1:         { key: 'footer_line1', label: 'Footer Line 1', labelAr: 'Ø³Ø·Ø± Ø§Ù„ØªØ°ÙŠÙŠÙ„ 1', category: 'footer', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  footer_line2:         { key: 'footer_line2', label: 'Footer Line 2', labelAr: 'Ø³Ø·Ø± Ø§Ù„ØªØ°ÙŠÙŠÙ„ 2', category: 'footer', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  footer_line3:         { key: 'footer_line3', label: 'Footer Line 3', labelAr: 'Ø³Ø·Ø± Ø§Ù„ØªØ°ÙŠÙŠÙ„ 3', category: 'footer', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  footer_separator:     { key: 'footer_separator', label: 'Footer Separator', labelAr: 'ÙØ§ØµÙ„ Ø§Ù„ØªØ°ÙŠÙŠÙ„', category: 'footer', component: 'pills', defaultValue: 'solid' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
+  show_thank_you:       { key: 'show_thank_you', label: 'Show Thank You', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø´ÙƒØ±', category: 'footer', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.thankYou' },
+  thank_you_text:       { key: 'thank_you_text', label: 'Thank You Text', labelAr: 'Ù†Øµ Ø§Ù„Ø´ÙƒØ±', category: 'footer', component: 'input', defaultValue: 'Ø´ÙƒØ±Ø§Ù‹ Ù„Ø²ÙŠØ§Ø±ØªÙƒÙ…!', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_thank_you' },
+  thank_you_size:       { key: 'thank_you_size', label: 'Thank You Size', labelAr: 'Ø­Ø¬Ù… Ø®Ø· Ø§Ù„Ø´ÙƒØ±', category: 'footer', component: 'slider', defaultValue: 11, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_thank_you', min: 8, max: 24, step: 1 },
+  thank_you_color:      { key: 'thank_you_color', label: 'Thank You Color', labelAr: 'Ù„ÙˆÙ† Ø§Ù„Ø´ÙƒØ±', category: 'footer', component: 'color', defaultValue: '#111111', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_thank_you' },
+  show_returns_policy:  { key: 'show_returns_policy', label: 'Show Returns Policy', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø³ÙŠØ§Ø³Ø© Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹', category: 'footer', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.returnsPolicy' },
+  returns_policy_text:  { key: 'returns_policy_text', label: 'Returns Policy Text', labelAr: 'Ù†Øµ Ø³ÙŠØ§Ø³Ø© Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹', category: 'footer', component: 'input', defaultValue: 'ÙƒÙ„ Ø§Ù„Ø§Ø­ØªØ¬Ø§Ø¬Ø§Øª Ù„Ø§ ØªØªØ¹Ø¯Ù‰ 48 Ø³Ø§Ø¹Ø©', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_returns_policy' },
+  footer_legal_text:    { key: 'footer_legal_text', label: 'Footer Legal Text', labelAr: 'Ù†Øµ Ù‚Ø§Ù†ÙˆÙ†ÙŠ', category: 'footer', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // â”€â”€ Barcode / QR â”€â”€
+  show_barcode:         { key: 'show_barcode', label: 'Show Barcode', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯', category: 'barcode', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.barcode' },
+  barcode_content:      { key: 'barcode_content', label: 'Barcode Content', labelAr: 'Ù…Ø­ØªÙˆÙ‰ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯', category: 'barcode', component: 'pills', defaultValue: 'doc-number', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_barcode', options: [{ v: 'doc-number', l: 'Ø±Ù‚Ù… Ø§Ù„Ù…Ø³ØªÙ†Ø¯' }, { v: 'total', l: 'Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹' }, { v: 'custom', l: 'Ù†Øµ Ù…Ø®ØµØµ' }] },
+  barcode_custom_text:  { key: 'barcode_custom_text', label: 'Barcode Custom Text', labelAr: 'Ù†Øµ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ Ø§Ù„Ù…Ø®ØµØµ', category: 'barcode', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'barcode_content' },
+  show_qr:              { key: 'show_qr', label: 'Show QR Code', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø±Ù…Ø² QR', category: 'qr', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.qr' },
+  qr_content:           { key: 'qr_content', label: 'QR Content', labelAr: 'Ù…Ø­ØªÙˆÙ‰ QR', category: 'qr', component: 'pills', defaultValue: 'doc-number', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_qr', options: [{ v: 'doc-number', l: 'Ø±Ù‚Ù… Ø§Ù„Ù…Ø³ØªÙ†Ø¯' }, { v: 'company-info', l: 'Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ©' }, { v: 'both', l: 'ÙƒÙ„Ø§Ù‡Ù…Ø§' }] },
+
+  // â”€â”€ Signatures â”€â”€
+  show_cashier_signature: { key: 'show_cashier_signature', label: 'Cashier Signature', labelAr: 'ØªÙˆÙ‚ÙŠØ¹ Ø§Ù„ÙƒØ§Ø´ÙŠØ±', category: 'signature', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'signature.cashier' },
+  show_client_signature:  { key: 'show_client_signature', label: 'Client Signature', labelAr: 'ØªÙˆÙ‚ÙŠØ¹ Ø§Ù„Ø¹Ù…ÙŠÙ„', category: 'signature', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'signature.client' },
+  show_stamp:             { key: 'show_stamp', label: 'Show Stamp', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø®ØªÙ…', category: 'signature', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'signature.stamp' },
+
+  // â”€â”€ Section Visibility â”€â”€
+  show_header_section:    { key: 'show_header_section', label: 'Header Section', labelAr: 'Ù‚Ø³Ù… Ø§Ù„Ø±Ø£Ø³', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_doc_info_section:  { key: 'show_doc_info_section', label: 'Document Section', labelAr: 'Ù‚Ø³Ù… Ø§Ù„Ù…Ø³ØªÙ†Ø¯', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_items_section:     { key: 'show_items_section', label: 'Items Section', labelAr: 'Ù‚Ø³Ù… Ø§Ù„Ø¬Ø¯ÙˆÙ„', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_totals_section:    { key: 'show_totals_section', label: 'Totals Section', labelAr: 'Ù‚Ø³Ù… Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_payments_section:  { key: 'show_payments_section', label: 'Payments Section', labelAr: 'Ù‚Ø³Ù… Ø§Ù„Ø¯ÙØ¹', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  show_footer_section:    { key: 'show_footer_section', label: 'Footer Section', labelAr: 'Ù‚Ø³Ù… Ø§Ù„ØªØ°ÙŠÙŠÙ„', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // â”€â”€ Rules â”€â”€
+  rules:                  { key: 'rules', label: 'Rules', labelAr: 'Ø§Ù„Ù‚ÙˆØ§Ø¹Ø¯', category: 'rules', component: 'rules-editor', defaultValue: [] as any[], supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // â”€â”€ Report â”€â”€
+  show_report_header:        { key: 'show_report_header', label: 'Show Report Header', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø±Ø£Ø³ Ø§Ù„ØªÙ‚Ø±ÙŠØ±', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  report_header_text:        { key: 'report_header_text', label: 'Report Header Text', labelAr: 'Ù†Øµ Ø±Ø£Ø³ Ø§Ù„ØªÙ‚Ø±ÙŠØ±', category: 'report', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, dependsOn: 'show_report_header' },
+  show_report_footer:        { key: 'show_report_footer', label: 'Show Report Footer', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± ØªØ°ÙŠÙŠÙ„ Ø§Ù„ØªÙ‚Ø±ÙŠØ±', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  report_footer_text:        { key: 'report_footer_text', label: 'Report Footer Text', labelAr: 'Ù†Øµ ØªØ°ÙŠÙŠÙ„ Ø§Ù„ØªÙ‚Ø±ÙŠØ±', category: 'report', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, dependsOn: 'show_report_footer' },
+  show_charts:               { key: 'show_charts', label: 'Show Charts', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø±Ø³ÙˆÙ… Ø§Ù„Ø¨ÙŠØ§Ù†ÙŠØ©', category: 'charts', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  chart_type:                { key: 'chart_type', label: 'Chart Type', labelAr: 'Ù†ÙˆØ¹ Ø§Ù„Ø±Ø³Ù… Ø§Ù„Ø¨ÙŠØ§Ù†ÙŠ', category: 'charts', component: 'pills', defaultValue: 'bar', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, dependsOn: 'show_charts', options: [{ v: 'bar', l: 'Ø£Ø¹Ù…Ø¯Ø©' }, { v: 'pie', l: 'Ø¯Ø§Ø¦Ø±ÙŠ' }] },
+  chart_title:               { key: 'chart_title', label: 'Chart Title', labelAr: 'Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø±Ø³Ù… Ø§Ù„Ø¨ÙŠØ§Ù†ÙŠ', category: 'charts', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, dependsOn: 'show_charts' },
+  group_by:                  { key: 'group_by', label: 'Group By', labelAr: 'ØªØ¬Ù…ÙŠØ¹ Ø­Ø³Ø¨', category: 'report', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  sort_by:                   { key: 'sort_by', label: 'Sort By', labelAr: 'ØªØ±ØªÙŠØ¨ Ø­Ø³Ø¨', category: 'report', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  sort_direction:            { key: 'sort_direction', label: 'Sort Direction', labelAr: 'Ø§ØªØ¬Ø§Ù‡ Ø§Ù„ØªØ±ØªÙŠØ¨', category: 'report', component: 'pills', defaultValue: 'asc', supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC, options: [{ v: 'asc', l: 'ØªØµØ§Ø¹Ø¯ÙŠ' }, { v: 'desc', l: 'ØªÙ†Ø§Ø²Ù„ÙŠ' }] },
+  show_report_period:        { key: 'show_report_period', label: 'Show Report Period', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± ÙØªØ±Ø© Ø§Ù„ØªÙ‚Ø±ÙŠØ±', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'report.periodStart' },
+  show_report_cashier:       { key: 'show_report_cashier', label: 'Show Cashier in Report', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„ÙƒØ§Ø´ÙŠØ± ÙÙŠ Ø§Ù„ØªÙ‚Ø±ÙŠØ±', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'report.cashier' },
+  show_report_summary_cards: { key: 'show_report_summary_cards', label: 'Show Summary Cards', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø¨Ø·Ø§Ù‚Ø§Øª Ø§Ù„Ù…Ù„Ø®Øµ', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'report.grossSales' },
+  show_report_payment_breakdown: { key: 'show_report_payment_breakdown', label: 'Show Payment Breakdown', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± ØªÙˆØ²ÙŠØ¹ Ø§Ù„Ø¯ÙØ¹', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'payment.method' },
+  show_report_top_products:  { key: 'show_report_top_products', label: 'Show Top Products', labelAr: 'Ø¥Ø¸Ù‡Ø§Ø± Ø£ÙØ¶Ù„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª', category: 'report', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC , field: 'item.name' },
+  report_col_widths:         { key: 'report_col_widths', label: 'Report Column Widths', labelAr: 'Ø¹Ø±Ø¶ Ø£Ø¹Ù…Ø¯Ø© Ø§Ù„ØªÙ‚Ø±ÙŠØ±', category: 'report', component: 'input', defaultValue: {} as any, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+  report_col_headers:        { key: 'report_col_headers', label: 'Report Column Headers', labelAr: 'Ø¹Ù†Ø§ÙˆÙŠÙ† Ø£Ø¹Ù…Ø¯Ø© Ø§Ù„ØªÙ‚Ø±ÙŠØ±', category: 'report', component: 'input', defaultValue: {} as any, supportedPapers: ALL_PAPERS, supportedDocs: REPORT_DOC },
+};
+
+export function getSettingMeta(key: string): SettingMeta | undefined {
+  return SETTINGS_REGISTRY[key];
+}
+
+export function getSettingsByCategory(category: SettingMeta['category']): SettingMeta[] {
+  return Object.values(SETTINGS_REGISTRY).filter(s => s.category === category);
+}
+
+export function getSettingsForPaper(paperSize: PaperSize): SettingMeta[] {
+  return Object.values(SETTINGS_REGISTRY).filter(s => s.supportedPapers.includes(paperSize));
+}
+
+export function getSettingsForDoc(docType: DocTypeCode): SettingMeta[] {
+  return Object.values(SETTINGS_REGISTRY).filter(s => s.supportedDocs.includes(docType));
+}
+
+export function getVisibleSettings(docType: DocTypeCode, paperSize: PaperSize): SettingMeta[] {
+  return Object.values(SETTINGS_REGISTRY).filter(s =>
+    s.supportedDocs.includes(docType) &&
+    s.supportedPapers.includes(paperSize)
+  );
+}
+
+// â”€â”€â”€ Column-level metadata defaults (single source of truth) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface ColumnDefault {
+  header: string;
+  width: number;
+  align: AlignOption;
+}
+
+export const COLUMN_DEFAULTS: Record<ColumnKey, ColumnDefault> = {
+  rowNumber: { header: '#',       width: 8,  align: 'center' },
+  barcode:   { header: 'Ø¨Ø§Ø±ÙƒÙˆØ¯',   width: 14, align: 'right'  },
+  ref:       { header: 'Ù…Ø±Ø¬Ø¹',     width: 12, align: 'right'  },
+  name:      { header: 'Ø§Ù„Ø¨ÙŠØ§Ù†',    width: 30, align: 'right'  },
+  unit:      { header: 'ÙˆØ­Ø¯Ø©',     width: 10, align: 'center' },
+  quantity:  { header: 'Ø§Ù„ÙƒÙ…ÙŠØ©',   width: 12, align: 'center' },
+  price:     { header: 'Ø§Ù„Ø³Ø¹Ø±',    width: 14, align: 'right'  },
+  discount:  { header: 'Ø®ØµÙ…',      width: 12, align: 'center' },
+  tva:       { header: 'TVA',      width: 10, align: 'center' },
+  total:     { header: 'Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹',   width: 16, align: 'right'  },
+};
+
+export function isSettingVisible(key: string, docType: DocTypeCode, paperSize: PaperSize, tpl?: Partial<PrintTemplate>): boolean {
+  const meta = SETTINGS_REGISTRY[key];
+  if (!meta) return true;
+  if (!meta.supportedDocs.includes(docType)) return false;
+  if (!meta.supportedPapers.includes(paperSize)) return false;
+  if (tpl && meta.dependsOn) {
+    const parentMeta = SETTINGS_REGISTRY[meta.dependsOn];
+    const parentVal = (tpl as any)[meta.dependsOn];
+    if (parentMeta?.component === 'toggle' && !parentVal) return false;
+  }
+  return true;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/services/SettingsSerializer.ts
+```
+import type { DocTypeCode, PaperSize, PrintTemplate } from '../types/domain';
+import { SETTINGS_REGISTRY } from './SettingsRegistry';
+
+export const TEMPLATE_VERSION = 2;
+
+const SETTING_CONFIG_KEYS = new Set(Object.keys(SETTINGS_REGISTRY));
+
+const TOP_LEVEL_KEYS = new Set([
+  'id', 'name', 'doc_type_code', 'paper_size', 'is_default', 'is_active',
+  'template_version', 'created_at', 'updated_at',
+]);
+
+export interface TemplatePayload {
+  name: string;
+  doc_type_code: string;
+  paper_size: string;
+  is_default: boolean;
+  is_active: boolean;
+  template_version?: number;
+  config: Record<string, unknown>;
+}
+
+export interface ApiResponse {
+  id: number;
+  name: string;
+  doc_type_code: string;
+  paper_size: string;
+  is_default: boolean;
+  is_active: boolean;
+  template_version?: number;
+  created_at?: string;
+  updated_at?: string;
+  config?: Record<string, unknown> | null;
+}
+
+/**
+ * Normalize a partial template: fill missing fields from registry defaults,
+ * preserve valid values, add template_version, keep unknown fields.
+ */
+export function normalizeTemplate(
+  partial: Partial<PrintTemplate>,
+  docType?: DocTypeCode,
+  paperSize?: PaperSize,
+): PrintTemplate {
+  const doc   = docType   ?? partial.doc_type_code ?? 'FV' as DocTypeCode;
+  const paper = paperSize ?? partial.paper_size    ?? '80mm' as PaperSize;
+
+  const result: Record<string, unknown> = {
+    ...partial,
+    template_version: TEMPLATE_VERSION,
+  };
+
+  for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+    if (key === 'id' || key === 'name' || key === 'doc_type_code' || key === 'paper_size') continue;
+    const metaKey = meta.key as string;
+    if (result[metaKey] !== undefined && result[metaKey] !== null) continue;
+    if (meta.defaultValue !== null) {
+      result[metaKey] = meta.defaultValue;
+    } else {
+      const t = typeof meta.defaultValue;
+      if (t === 'string') result[metaKey] = '';
+      else if (t === 'number') result[metaKey] = 0;
+      else if (t === 'boolean') result[metaKey] = false;
+      else if (Array.isArray(meta.defaultValue)) result[metaKey] = [];
+      else result[metaKey] = null;
+    }
+  }
+
+  if (typeof result.name !== 'string' || !result.name) result.name = 'Ù‚Ø§Ù„Ø¨ Ø¬Ø¯ÙŠØ¯';
+  if (!result.doc_type_code) result.doc_type_code = doc;
+  if (!result.paper_size) result.paper_size = paper;
+
+  if (result.paper_size === '80mm') { (result as any).paper_width_mm = 80; }
+  else if (result.paper_size === '58mm') { (result as any).paper_width_mm = 58; }
+
+  return result as unknown as PrintTemplate;
+}
+
+/**
+ * Build the API payload from a template â€” strips top-level fields into config.
+ */
+export function toApiPayload(tpl: Partial<PrintTemplate>): TemplatePayload {
+  const t = tpl as Record<string, unknown>;
+  const config: Record<string, unknown> = {};
+  for (const key of Object.keys(t)) {
+    if (!TOP_LEVEL_KEYS.has(key) && SETTING_CONFIG_KEYS.has(key)) {
+      config[key] = t[key];
+    }
+  }
+  return {
+    name:             String(t.name ?? 'Ù‚Ø§Ù„Ø¨ Ø¬Ø¯ÙŠØ¯'),
+    doc_type_code:    String(t.doc_type_code ?? 'FV'),
+    paper_size:       String(t.paper_size ?? '80mm'),
+    is_default:       Boolean(t.is_default),
+    is_active:        Boolean(t.is_active),
+    template_version: TEMPLATE_VERSION,
+    config,
+  };
+}
+
+/**
+ * Reconstruct PrintTemplate from API response â€” top-level fields + config merge.
+ */
+export function fromApiResponse(r: ApiResponse): PrintTemplate {
+  const base: Partial<PrintTemplate> = {
+    id:              r.id,
+    name:            r.name,
+    doc_type_code:   r.doc_type_code as DocTypeCode,
+    paper_size:      r.paper_size as PaperSize,
+    is_default:      r.is_default,
+    is_active:       r.is_active,
+    created_at:      r.created_at,
+    updated_at:      r.updated_at,
+    template_version: r.template_version ?? TEMPLATE_VERSION,
+  };
+  const config = r.config ?? {};
+  for (const key of Object.keys(config)) {
+    (base as any)[key] = (config as any)[key];
+  }
+  return normalizeTemplate(base, base.doc_type_code, base.paper_size);
+}
+
+
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/categories.ts
+```
+import type { TemplateCategory } from './types';
+
+export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
+  { id: 'invoices',        name: 'Invoices',                nameAr: 'Ø§Ù„ÙÙˆØ§ØªÙŠØ±',               icon: 'ti-file-invoice' },
+  { id: 'delivery-notes',  name: 'Delivery Notes',          nameAr: 'ÙˆØµÙ„ ØªØ³Ù„ÙŠÙ…',              icon: 'ti-truck-delivery' },
+  { id: 'receipts',        name: 'Receipts',                nameAr: 'Ø¥ÙŠØµØ§Ù„Ø§Øª',                icon: 'ti-receipt' },
+  { id: 'quotes',          name: 'Quotations',              nameAr: 'Ø¹Ø±ÙˆØ¶ Ø§Ù„Ø£Ø³Ø¹Ø§Ø±',           icon: 'ti-file-description' },
+  { id: 'purchase',        name: 'Purchase Orders',         nameAr: 'Ø£ÙˆØ§Ù…Ø± Ø§Ù„Ø´Ø±Ø§Ø¡',           icon: 'ti-shopping-cart' },
+  { id: 'pos',             name: 'POS Receipts',            nameAr: 'Ø¥ÙŠØµØ§Ù„Ø§Øª Ù†Ù‚Ø§Ø· Ø§Ù„Ø¨ÙŠØ¹',     icon: 'ti-device-analytics' },
+  { id: 'warehouse',       name: 'Warehouse',               nameAr: 'Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª',             icon: 'ti-building-warehouse' },
+  { id: 'inventory',       name: 'Inventory',               nameAr: 'Ø§Ù„Ø¬Ø±Ø¯',                  icon: 'ti-packages' },
+  { id: 'thermal',         name: 'Thermal Printers',        nameAr: 'Ø·Ø§Ø¨Ø¹Ø§Øª Ø­Ø±Ø§Ø±ÙŠØ©',          icon: 'ti-printer' },
+];
+
+export const ALL_TAGS = [
+  'algeria', 'arabic', 'fiscal', 'official', 'tva',
+  'qrcode', 'barcode', 'signature', 'stamp',
+  'a4', 'a5', '80mm', '58mm',
+  'invoice', 'delivery', 'receipt',
+] as const;
+
+export type TagSlug = typeof ALL_TAGS[number];
+
+export function categoryFromDocType(docType: string): string {
+  const map: Record<string, string> = {
+    FV:   'invoices',
+    BL:   'delivery-notes',
+    DEV:  'quotes',
+    BCC:  'quotes',
+    AA:   'receipts',
+    FA:   'purchase',
+    BR:   'purchase',
+    AV:   'purchase',
+    DDP:  'warehouse',
+    BT:   'warehouse',
+    POS:  'pos',
+    RPT:  'pos',
+  };
+  return map[docType] ?? 'invoices';
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/config/FooterConfig.ts
+```
+import type { BorderStyle } from '../../../types';
+
+export interface FooterConfig {
+  footerLine1: string;
+  footerLine2: string;
+  footerLine3: string;
+  footerSeparator: BorderStyle;
+  showThankYou: boolean;
+  thankYouText: string;
+  thankYouSize: number;
+  showReturnsPolicy: boolean;
+  returnsPolicyText: string;
+  showBarcode: boolean;
+  showQr: boolean;
+  showCashierSignature: boolean;
+  showClientSignature: boolean;
+  showStamp: boolean;
+}
+
+export const INVOICE_FOOTER: FooterConfig = {
+  footerLine1: 'Ø§Ù„Ø¨Ø¶Ø§Ø¹Ø© Ø§Ù„Ù…Ø¨Ø§Ø¹Ø© Ù„Ø§ ØªØ±Ø¯ ÙˆÙ„Ø§ ØªØ³ØªØ¨Ø¯Ù„',
+  footerLine2: 'Ù„Ù„Ø§Ø³ØªÙØ³Ø§Ø± Ø§ØªØµÙ„ Ø¹Ù„Ù‰: 0550 00 00 00',
+  footerLine3: '',
+  footerSeparator: 'solid',
+  showThankYou: true,
+  thankYouText: 'Ø´ÙƒØ±Ø§Ù‹ Ù„ØªØ¹Ø§Ù…Ù„ÙƒÙ…',
+  thankYouSize: 11,
+  showReturnsPolicy: true,
+  returnsPolicyText: 'Ø§Ù„Ø¨Ø¶Ø§Ø¹Ø© Ø§Ù„Ù…Ø¨Ø§Ø¹Ø© Ù„Ø§ ØªØ±Ø¯ ÙˆÙ„Ø§ ØªØ³ØªØ¨Ø¯Ù„',
+  showBarcode: true,
+  showQr: true,
+  showCashierSignature: true,
+  showClientSignature: true,
+  showStamp: true,
+};
+
+export const DELIVERY_FOOTER: FooterConfig = {
+  ...INVOICE_FOOTER,
+  footerLine1: 'Ø§Ù„Ø¨Ø¶Ø§Ø¹Ø© Ø§Ù„Ù…Ø³Ù„Ù…Ø© Ù„Ø§ ØªØ±Ø¯ ÙˆÙ„Ø§ ØªØ³ØªØ¨Ø¯Ù„',
+  footerLine2: 'Ø§Ù„ØªÙˆÙ‚ÙŠØ¹: Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„Ù…Ø®Ø²Ù† / Ø¥Ù…Ø¶Ø§Ø¡ Ø§Ù„Ø²Ø¨ÙˆÙ†',
+  showReturnsPolicy: true,
+  returnsPolicyText: 'Ø§Ù„Ø¨Ø¶Ø§Ø¹Ø© Ø§Ù„Ù…Ø³Ù„Ù…Ø© Ù„Ø§ ØªØ±Ø¯ ÙˆÙ„Ø§ ØªØ³ØªØ¨Ø¯Ù„',
+};
+
+export const DELIVERY_A5_FOOTER: FooterConfig = {
+  ...DELIVERY_FOOTER,
+  footerLine1: 'Ø§Ù„Ø¨Ø¶Ø§Ø¹Ø© Ø§Ù„Ù…Ø³Ù„Ù…Ø© Ù„Ø§ ØªØ±Ø¯ ÙˆÙ„Ø§ ØªØ³ØªØ¨Ø¯Ù„',
+  footerLine2: '',
+  thankYouSize: 10,
+};
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/config/HeaderConfig.ts
+```
+import type { AlignOption, BorderStyle, PaperSize } from '../../../types';
+import { LOGO_SIZE_A4, LOGO_SIZE_A5, COLOR_PRIMARY } from '../constants';
+
+export interface HeaderConfig {
+  showLogo: boolean;
+  logoSize: number;
+  logoAlign: AlignOption;
+  logoBorderRadius: number;
+  showCompanyName: boolean;
+  companyNameSize: number;
+  companyNameBold: boolean;
+  companyNameAlign: AlignOption;
+  companyNameColor: string;
+  showAddress: boolean;
+  showPhone: boolean;
+  showTaxId: boolean;
+  showRc: boolean;
+  showNis: boolean;
+  showIce: boolean;
+  showArticle: boolean;
+  companyInfoAlign: AlignOption;
+  companyInfoSize: number;
+  headerSeparator: BorderStyle;
+}
+
+export function headerConfig(size: PaperSize): HeaderConfig {
+  const isA4 = size === 'A4';
+  return {
+    showLogo: true,
+    logoSize: isA4 ? LOGO_SIZE_A4 : LOGO_SIZE_A5,
+    logoAlign: 'left',
+    logoBorderRadius: 0,
+    showCompanyName: true,
+    companyNameSize: isA4 ? 16 : 13,
+    companyNameBold: true,
+    companyNameAlign: 'right',
+    companyNameColor: COLOR_PRIMARY,
+    showAddress: true,
+    showPhone: true,
+    showTaxId: true,
+    showRc: true,
+    showNis: true,
+    showIce: true,
+    showArticle: true,
+    companyInfoAlign: 'right',
+    companyInfoSize: isA4 ? 8.5 : 7.5,
+    headerSeparator: 'solid',
+  };
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/config/index.ts
+```
+export type { PaperConfig } from './PaperConfig';
+export { paperConfig } from './PaperConfig';
+export type { TypographyConfig } from './TypographyConfig';
+export { typographyConfig } from './TypographyConfig';
+export type { HeaderConfig } from './HeaderConfig';
+export { headerConfig } from './HeaderConfig';
+export type { TableConfig } from './TableConfig';
+export { INVOICE_COLUMNS, DELIVERY_COLUMNS, DELIVERY_A5_COLUMNS } from './TableConfig';
+export type { TotalsConfig } from './TotalsConfig';
+export { INVOICE_TOTALS, DELIVERY_TOTALS, DELIVERY_A5_TOTALS } from './TotalsConfig';
+export type { FooterConfig } from './FooterConfig';
+export { INVOICE_FOOTER, DELIVERY_FOOTER, DELIVERY_A5_FOOTER } from './FooterConfig';
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/config/PaperConfig.ts
+```
+import type { PaperSize, PageOrientation } from '../../../types';
+import {
+  A4_MARGIN_TOP, A4_MARGIN_BOTTOM, A4_MARGIN_SIDES,
+  A5_MARGIN_TOP, A5_MARGIN_BOTTOM, A5_MARGIN_SIDES,
+  THERMAL_MARGIN,
+} from '../constants';
+
+export interface PaperConfig {
+  paperSize: PaperSize;
+  pageOrientation: PageOrientation;
+  marginTop: number;
+  marginBottom: number;
+  marginSides: number;
+  paperWidthMm: 58 | 80;
+}
+
+export function paperConfig(size: PaperSize): PaperConfig {
+  switch (size) {
+    case 'A4':
+      return {
+        paperSize: 'A4',
+        pageOrientation: 'portrait',
+        marginTop: A4_MARGIN_TOP,
+        marginBottom: A4_MARGIN_BOTTOM,
+        marginSides: A4_MARGIN_SIDES,
+        paperWidthMm: 80,
+      };
+    case 'A5':
+      return {
+        paperSize: 'A5',
+        pageOrientation: 'portrait',
+        marginTop: A5_MARGIN_TOP,
+        marginBottom: A5_MARGIN_BOTTOM,
+        marginSides: A5_MARGIN_SIDES,
+        paperWidthMm: 80,
+      };
+    default:
+      return {
+        paperSize: size,
+        pageOrientation: 'portrait',
+        marginTop: THERMAL_MARGIN,
+        marginBottom: THERMAL_MARGIN,
+        marginSides: THERMAL_MARGIN,
+        paperWidthMm: size === '58mm' ? 58 : 80,
+      };
+  }
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/config/TableConfig.ts
+```
+import type { ColumnKey, AlignOption, BorderStyle, FontFamily } from '../../../types';
+import {
+  TABLE_HEADER_BG, TABLE_HEADER_COLOR, TABLE_ROW_ALT,
+  COLUMN_REF_WIDTH, COLUMN_NAME_WIDTH, COLUMN_QTY_WIDTH,
+  COLUMN_PRICE_WIDTH, COLUMN_TVA_WIDTH, COLUMN_TOTAL_WIDTH,
+  COLOR_PRIMARY,
+} from '../constants';
+
+export interface TableConfig {
+  columnOrder: ColumnKey[];
+  columnShow: Partial<Record<ColumnKey, boolean>>;
+  columnWidths: Partial<Record<ColumnKey, number>>;
+  columnHeaders: Partial<Record<ColumnKey, string>>;
+  columnAligns: Partial<Record<ColumnKey, AlignOption>>;
+  itemsFontSize: number;
+  itemsFontFamily: FontFamily;
+  showColHeader: boolean;
+  tableHeaderBold: boolean;
+  tableHeaderBg: boolean;
+  tableHeaderColor: string;
+  tableBorderStyle: BorderStyle;
+  alternatingRows: boolean;
+  alternatingColor: string;
+  priceDisplay: 'ht' | 'ttc';
+}
+
+export const INVOICE_COLUMNS: TableConfig = {
+  columnOrder: ['ref', 'name', 'quantity', 'price', 'tva', 'total'],
+  columnShow: { ref: true, name: true, quantity: true, price: true, tva: true, total: true },
+  columnWidths: { ref: COLUMN_REF_WIDTH, name: COLUMN_NAME_WIDTH, quantity: COLUMN_QTY_WIDTH, price: COLUMN_PRICE_WIDTH, tva: COLUMN_TVA_WIDTH, total: COLUMN_TOTAL_WIDTH },
+  columnHeaders: { ref: 'Ù…', name: 'Ø§Ù„Ø¨ÙŠØ§Ù†', quantity: 'Ø§Ù„ÙƒÙ…ÙŠØ©', price: 'Ø³.Ùˆ.Ø­', tva: '%TVA', total: 'Ø§Ù„Ù…Ø¨Ù„Øº' },
+  columnAligns: { ref: 'center', name: 'right', quantity: 'center', price: 'center', tva: 'center', total: 'center' },
+  itemsFontSize: 9,
+  itemsFontFamily: 'tajawal',
+  showColHeader: true,
+  tableHeaderBold: true,
+  tableHeaderBg: true,
+  tableHeaderColor: COLOR_PRIMARY,
+  tableBorderStyle: 'solid',
+  alternatingRows: true,
+  alternatingColor: TABLE_ROW_ALT,
+  priceDisplay: 'ht',
+};
+
+export const DELIVERY_COLUMNS: TableConfig = {
+  ...INVOICE_COLUMNS,
+  columnOrder: ['ref', 'name', 'quantity', 'price', 'tva', 'total'],
+  columnHeaders: { ref: 'Ù…', name: 'Ø§Ù„Ø¨ÙŠØ§Ù†', quantity: 'Ø§Ù„ÙƒÙ…ÙŠØ©', price: 'Ø³.Ùˆ.Ø­', tva: '%TVA', total: 'Ø§Ù„Ù…Ø¨Ù„Øº' },
+};
+
+export const DELIVERY_A5_COLUMNS: TableConfig = {
+  ...INVOICE_COLUMNS,
+  columnOrder: ['ref', 'name', 'quantity', 'price', 'total'],
+  columnShow: { ref: true, name: true, quantity: true, price: true, total: true },
+  columnWidths: { ref: 8, name: 32, quantity: 14, price: 20, total: 22 },
+  columnHeaders: { ref: 'Ù…', name: 'Ø§Ù„Ø¨ÙŠØ§Ù†', quantity: 'Ø§Ù„ÙƒÙ…ÙŠØ©', price: 'Ø³.Ùˆ.Ø­', total: 'Ø§Ù„Ù…Ø¨Ù„Øº' },
+  columnAligns: { ref: 'center', name: 'right', quantity: 'center', price: 'center', total: 'center' },
+  itemsFontSize: 8,
+};
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/config/TotalsConfig.ts
+```
+import type { AlignOption, BorderStyle } from '../../../types';
+import { COLOR_PRIMARY, TOTAL_TTC_FONT_SIZE } from '../constants';
+
+export interface TotalsConfig {
+  totalsFontSize: number;
+  totalsBold: boolean;
+  totalsAlign: AlignOption;
+  showTotalHt: boolean;
+  showTotalTva: boolean;
+  showTvaBreakdown: boolean;
+  showDiscountTotal: boolean;
+  showFiscalStamp: boolean;
+  showTotalTtc: boolean;
+  totalTtcFontSize: number;
+  totalTtcBold: boolean;
+  totalTtcColor: string;
+  totalBorderStyle: BorderStyle;
+  showAmountInWords: boolean;
+  showPaidAmount: boolean;
+  showChange: boolean;
+  showRemaining: boolean;
+  showPrevBalance: boolean;
+  showNewBalance: boolean;
+}
+
+export const INVOICE_TOTALS: TotalsConfig = {
+  totalsFontSize: 10,
+  totalsBold: true,
+  totalsAlign: 'left',
+  showTotalHt: true,
+  showTotalTva: true,
+  showTvaBreakdown: true,
+  showDiscountTotal: true,
+  showFiscalStamp: true,
+  showTotalTtc: true,
+  totalTtcFontSize: TOTAL_TTC_FONT_SIZE,
+  totalTtcBold: true,
+  totalTtcColor: COLOR_PRIMARY,
+  totalBorderStyle: 'double',
+  showAmountInWords: true,
+  showPaidAmount: false,
+  showChange: false,
+  showRemaining: false,
+  showPrevBalance: false,
+  showNewBalance: false,
+};
+
+export const DELIVERY_TOTALS: TotalsConfig = {
+  ...INVOICE_TOTALS,
+};
+
+export const DELIVERY_A5_TOTALS: TotalsConfig = {
+  ...INVOICE_TOTALS,
+  totalsFontSize: 9,
+  totalTtcFontSize: 14,
+  showTvaBreakdown: false,
+  showFiscalStamp: false,
+  showAmountInWords: false,
+};
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/config/TypographyConfig.ts
+```
+import type { FontFamily, AlignOption, PaperSize } from '../../../types';
+import {
+  TITLE_SIZE_A4, TITLE_SIZE_A5,
+  COMPANY_NAME_SIZE_A4, COMPANY_NAME_SIZE_A5,
+  COMPANY_INFO_SIZE_A4, COMPANY_INFO_SIZE_A5,
+  BASE_FONT_SIZE_A4, BASE_FONT_SIZE_A5,
+  ITEMS_FONT_SIZE_A4, ITEMS_FONT_SIZE_A5,
+  TOTALS_FONT_SIZE, TOTALS_FONT_SIZE_A5,
+  TOTAL_TTC_FONT_SIZE, TOTAL_TTC_FONT_SIZE_A5,
+  THANK_YOU_SIZE, THANK_YOU_SIZE_A5,
+} from '../constants';
+
+export interface TypographyConfig {
+  fontFamily: FontFamily;
+  baseFontSize: number;
+  titleSize: number;
+  titleBold: boolean;
+  titleAlign: AlignOption;
+  companyNameSize: number;
+  companyNameBold: boolean;
+  companyInfoSize: number;
+  itemsFontSize: number;
+  totalsFontSize: number;
+  totalTtcFontSize: number;
+  thankYouSize: number;
+}
+
+export function typographyConfig(size: PaperSize): TypographyConfig {
+  const isA4 = size === 'A4';
+  const isA5 = size === 'A5';
+  return {
+    fontFamily: 'tajawal',
+    baseFontSize: isA4 ? BASE_FONT_SIZE_A4 : isA5 ? BASE_FONT_SIZE_A5 : 9,
+    titleSize: isA4 ? TITLE_SIZE_A4 : isA5 ? TITLE_SIZE_A5 : 13,
+    titleBold: true,
+    titleAlign: 'center',
+    companyNameSize: isA4 ? COMPANY_NAME_SIZE_A4 : isA5 ? COMPANY_NAME_SIZE_A5 : 14,
+    companyNameBold: true,
+    companyInfoSize: isA4 ? COMPANY_INFO_SIZE_A4 : isA5 ? COMPANY_INFO_SIZE_A5 : 8,
+    itemsFontSize: isA4 ? ITEMS_FONT_SIZE_A4 : isA5 ? ITEMS_FONT_SIZE_A5 : 9,
+    totalsFontSize: isA5 ? TOTALS_FONT_SIZE_A5 : TOTALS_FONT_SIZE,
+    totalTtcFontSize: isA5 ? TOTAL_TTC_FONT_SIZE_A5 : TOTAL_TTC_FONT_SIZE,
+    thankYouSize: isA5 ? THANK_YOU_SIZE_A5 : THANK_YOU_SIZE,
+  };
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/constants.ts
+```
+// â”€â”€â”€ Layout constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const A4_PAGE_WIDTH_MM     = 210;
+export const A5_PAGE_WIDTH_MM     = 148;
+export const A4_CONTENT_WIDTH     = 174; // 210 - (18*2)
+export const A5_CONTENT_WIDTH     = 126; // 148 - (12*2)
+export const A4_MARGIN_TOP        = 20;
+export const A4_MARGIN_BOTTOM     = 20;
+export const A4_MARGIN_SIDES      = 18;
+export const A5_MARGIN_TOP        = 12;
+export const A5_MARGIN_BOTTOM     = 12;
+export const A5_MARGIN_SIDES      = 11;
+export const THERMAL_MARGIN       = 3;
+
+// â”€â”€â”€ Logo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const LOGO_SIZE_A4         = 75;
+export const LOGO_SIZE_A5         = 55;
+export const LOGO_SIZE_THERMAL    = 56;
+
+// â”€â”€â”€ Typography â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const TITLE_SIZE_A4        = 20;
+export const TITLE_SIZE_A5        = 16;
+export const TITLE_SIZE_THERMAL   = 13;
+export const COMPANY_NAME_SIZE_A4 = 16;
+export const COMPANY_NAME_SIZE_A5 = 13;
+export const COMPANY_INFO_SIZE_A4 = 8.5;
+export const COMPANY_INFO_SIZE_A5 = 7.5;
+export const BASE_FONT_SIZE_A4    = 9.5;
+export const BASE_FONT_SIZE_A5    = 8.5;
+export const ITEMS_FONT_SIZE_A4   = 9;
+export const ITEMS_FONT_SIZE_A5   = 8;
+export const TOTALS_FONT_SIZE     = 10;
+export const TOTALS_FONT_SIZE_A5  = 9;
+export const TOTAL_TTC_FONT_SIZE  = 17;
+export const TOTAL_TTC_FONT_SIZE_A5 = 14;
+
+// â”€â”€â”€ Colors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const COLOR_PRIMARY        = '#1a1a2e';
+export const COLOR_TEXT           = '#000000';
+export const COLOR_MUTED          = '#333333';
+export const COLOR_BORDER         = '#d1d5db';
+export const COLOR_TABLE_HOVER    = '#f8f9fa';
+export const COLOR_BG_LIGHT       = '#f9fafb';
+
+// â”€â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const TABLE_HEADER_BG      = '#1a1a2e';
+export const TABLE_HEADER_COLOR   = '#ffffff';
+export const TABLE_ROW_ALT        = '#f8f9fa';
+export const TABLE_BORDER_COLOR   = '#e5e7eb';
+export const COLUMN_REF_WIDTH     = 8;
+export const COLUMN_NAME_WIDTH    = 28;
+export const COLUMN_QTY_WIDTH     = 10;
+export const COLUMN_PRICE_WIDTH   = 18;
+export const COLUMN_TVA_WIDTH     = 12;
+export const COLUMN_TOTAL_WIDTH   = 18;
+
+// â”€â”€â”€ Footer / Legal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const THANK_YOU_SIZE       = 11;
+export const THANK_YOU_SIZE_A5    = 10;
+export const LEGAL_TEXT_SIZE      = 6;
+export const SIG_LINE_WIDTH       = 40;
+export const QR_SIZE              = 20;
+export const STAMP_SIZE           = 28;
+
+// â”€â”€â”€ Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const MODAL_MAX_WIDTH      = 1100;
+export const CARD_MIN_WIDTH       = 280;
+export const CARD_PREVIEW_HEIGHT  = 340;
+export const CARD_PREVIEW_SCALE   = 0.38;
+export const GRID_GAP             = 16;
+export const MODAL_BORDER_RADIUS  = 12;
+export const CARD_BORDER_RADIUS   = 10;
+
+// â”€â”€â”€ Registry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const TEMPLATE_AUTHOR      = 'erp-system';
+export const LAYOUT_ENGINE_VERSION = '1.0.0';
+export const TEMPLATE_COUNTRY_DZ  = 'DZ';
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/index.ts
+```
+// â”€â”€â”€ Registry (single source of truth) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export { templateRegistry, registerBuiltinTemplates, buildTemplate, createMeta } from './registry';
+// â”€â”€â”€ Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export { default as TemplateLibraryModal } from './TemplateLibraryModal';
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export type {
+  LibraryTemplateEntry, LibraryTemplateMeta, LibraryApiResponse,
+  TemplateVersion, TemplateTags, TemplateCategory,
+  LibraryFilterState, FavoriteEntry, InstallHistoryEntry,
+} from './types';
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export * from './constants';
+// â”€â”€â”€ Config layers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export {
+  paperConfig, typographyConfig, headerConfig,
+  INVOICE_COLUMNS, DELIVERY_COLUMNS, DELIVERY_A5_COLUMNS,
+  INVOICE_TOTALS, DELIVERY_TOTALS, DELIVERY_A5_TOTALS,
+  INVOICE_FOOTER, DELIVERY_FOOTER, DELIVERY_A5_FOOTER,
+} from './config';
+export type {
+  PaperConfig, TypographyConfig, HeaderConfig,
+  TableConfig, TotalsConfig, FooterConfig,
+} from './config';
+// â”€â”€â”€ Categories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export { TEMPLATE_CATEGORIES, ALL_TAGS, categoryFromDocType } from './categories';
+export type { TagSlug } from './categories';
+// â”€â”€â”€ Mock data (for preview only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export { getMockDocumentData } from './mockData';
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/mockData.ts
+```
+import type { UniversalDocumentData } from '../types/data';
+
+let _mockCache: UniversalDocumentData | null = null;
+
+export function getMockDocumentData(): UniversalDocumentData {
+  if (_mockCache) return _mockCache;
+  const data: UniversalDocumentData = {
+    doc: {
+      number:   'FV-2025-0001',
+      date:     '28/06/2025',
+      dueDate:  '28/07/2025',
+      time:     '10:30',
+      typeCode: 'FV',
+      typeName: 'ÙØ§ØªÙˆØ±Ø© Ø¨ÙŠØ¹',
+      status:   'confirmed',
+      notes:    '',
+      reference: '',
+    },
+    company: {
+      name:    'Ø§Ù„Ù…Ø¤Ø³Ø³Ø© Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠØ©',
+      address: '15 Ø´Ø§Ø±Ø¹ ÙÙ„Ø³Ø·ÙŠÙ†ØŒ Ø§Ù„Ø¬Ø²Ø§Ø¦Ø± Ø§Ù„Ø¹Ø§ØµÙ…Ø©',
+      phone:   '0550 00 00 00',
+      nif:     '09991234567890',
+      rc:      '99B1234567',
+      nis:     '09991234567890',
+      ice:     '09991234567890',
+      article: '1604123456',
+      logoUrl: null,
+      email:   'contact@entreprise.dz',
+      website: '',
+    },
+    party: {
+      id:              1,
+      name:            'Ø´Ø±ÙƒØ© Ù†Ù…ÙˆØ°Ø¬ÙŠØ©',
+      type:            'client',
+      nif:             '09991234567895',
+      rc:              '',
+      nis:             '',
+      phone:           '0550 00 00 01',
+      email:           '',
+      address:         'Ø´Ø§Ø±Ø¹ Ø§Ù„Ø§Ø³ØªÙ‚Ù„Ø§Ù„ØŒ Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±',
+      deliveryAddress: '',
+      cashierName:     '',
+    },
+    lines: [
+      {
+        rowNumber:  1,
+        ref:        'REF001',
+        barcode:    '',
+        name:       'Ù…Ù†ØªØ¬ Ù†Ù…ÙˆØ°Ø¬ÙŠ 1',
+        unit:       'Ù‚Ø·Ø¹Ø©',
+        quantity:   2,
+        unitPriceHt: 5000,
+        unitPriceTtc: 5950,
+        tvaRate:    19,
+        tvaPct:     19,
+        discountPct: 0,
+        discountAmt: 0,
+        totalHt:    10000,
+        totalTva:   1900,
+        totalTtc:   11900,
+        lot:        '',
+        notes:      '',
+      },
+      {
+        rowNumber:  2,
+        ref:        'REF002',
+        barcode:    '',
+        name:       'Ù…Ù†ØªØ¬ Ù†Ù…ÙˆØ°Ø¬ÙŠ 2',
+        unit:       'Ù‚Ø·Ø¹Ø©',
+        quantity:   1,
+        unitPriceHt: 3500,
+        unitPriceTtc: 3815,
+        tvaRate:    9,
+        tvaPct:     9,
+        discountPct: 0,
+        discountAmt: 0,
+        totalHt:    3500,
+        totalTva:   315,
+        totalTtc:   3815,
+        lot:        '',
+        notes:      '',
+      },
+      {
+        rowNumber:  3,
+        ref:        'REF003',
+        barcode:    '',
+        name:       'Ù…Ù†ØªØ¬ Ù†Ù…ÙˆØ°Ø¬ÙŠ 3',
+        unit:       'Ù‚Ø·Ø¹Ø©',
+        quantity:   5,
+        unitPriceHt: 1200,
+        unitPriceTtc: 1428,
+        tvaRate:    19,
+        tvaPct:     19,
+        discountPct: 0,
+        discountAmt: 0,
+        totalHt:    6000,
+        totalTva:   1140,
+        totalTtc:   7140,
+        lot:        '',
+        notes:      '',
+      },
+    ],
+    totals: {
+      totalHt:      19500,
+      totalTva:     3355,
+      totalTtc:     23055,
+      fiscalStamp:  200,
+      totalDiscount: 0,
+      paid:         0,
+      change:       0,
+      remaining:    23055,
+    },
+    taxBreakdown: [
+      { rate: 19, baseHt: 16000, tva: 3040, ttc: 19040 },
+      { rate: 9,  baseHt: 3500,  tva: 315,  ttc: 3815 },
+    ],
+    payments: [
+      { mode: 'cash', amount: 23055, reference: '', date: '28/06/2025' },
+    ],
+  };
+  _mockCache = data;
+  return data;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/registry.ts
+```
+import type { PrintTemplate, PaperSize, DocTypeCode, CompanyData } from '../types';
+import type { UniversalDocumentData } from '../types/data';
+import type { LibraryTemplateEntry, LibraryTemplateMeta } from './types';
+import {
+  TEMPLATE_AUTHOR, LAYOUT_ENGINE_VERSION, TEMPLATE_COUNTRY_DZ,
+} from './constants';
+import {
+  INVOICE_COLUMNS, INVOICE_TOTALS, INVOICE_FOOTER,
+  DELIVERY_COLUMNS, DELIVERY_TOTALS, DELIVERY_FOOTER,
+  DELIVERY_A5_COLUMNS, DELIVERY_A5_TOTALS, DELIVERY_A5_FOOTER,
+} from './config';
+import { headerConfig, paperConfig, typographyConfig } from './config';
+import { categoryFromDocType } from './categories';
+import { getMockDocumentData } from './mockData';
+
+// â”€â”€â”€ TemplateRegistry â€” single source of truth for built-in templates â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class TemplateRegistryClass {
+  private entries = new Map<string, LibraryTemplateEntry>();
+
+  register(entry: LibraryTemplateEntry): void {
+    if (this.entries.has(entry.meta.id)) {
+      console.warn(`[TemplateRegistry] Overwriting template: ${entry.meta.id}`);
+    }
+    this.entries.set(entry.meta.id, entry);
+  }
+
+  get(id: string): LibraryTemplateEntry | undefined {
+    return this.entries.get(id);
+  }
+
+  getAll(): LibraryTemplateEntry[] {
+    return Array.from(this.entries.values());
+  }
+
+  getByDocType(docType: DocTypeCode): LibraryTemplateEntry[] {
+    return this.getAll().filter(e => e.meta.documentType === docType);
+  }
+
+  getByPaperSize(size: PaperSize): LibraryTemplateEntry[] {
+    return this.getAll().filter(e => e.meta.paperSize === size);
+  }
+
+  getByCategory(category: string): LibraryTemplateEntry[] {
+    return this.getAll().filter(e => e.meta.category === category);
+  }
+
+  getByTag(tag: string): LibraryTemplateEntry[] {
+    return this.getAll().filter(e => e.meta.tags.includes(tag));
+  }
+
+  search(query: string): LibraryTemplateEntry[] {
+    const q = query.toLowerCase();
+    return this.getAll().filter(e =>
+      e.meta.name.toLowerCase().includes(q) ||
+      e.meta.nameAr.includes(q) ||
+      e.meta.description.toLowerCase().includes(q) ||
+      e.meta.descriptionAr.includes(q) ||
+      e.meta.category.includes(q) ||
+      e.meta.tags.some(t => t.includes(q)) ||
+      e.meta.documentType.toLowerCase().includes(q)
+    );
+  }
+
+  getCategories(): string[] {
+    return [...new Set(this.getAll().map(e => e.meta.category))];
+  }
+
+  getTags(): string[] {
+    return [...new Set(this.getAll().flatMap(e => e.meta.tags))];
+  }
+
+  getPaperSizes(): PaperSize[] {
+    return [...new Set(this.getAll().map(e => e.meta.paperSize))];
+  }
+
+  getDocTypes(): DocTypeCode[] {
+    return [...new Set(this.getAll().map(e => e.meta.documentType))];
+  }
+
+  buildPreview(templateId: string, companyOverride?: CompanyData | null): { tpl: PrintTemplate; data: UniversalDocumentData } | null {
+    const entry = this.get(templateId);
+    if (!entry) return null;
+    const tpl = { ...entry.createConfig(), id: -1, is_default: false, is_active: true };
+    if (companyOverride) {
+      tpl.override_address = companyOverride.address || '';
+      tpl.override_phone = companyOverride.phone || '';
+      tpl.override_nif = companyOverride.nif || '';
+      tpl.override_rc = companyOverride.rc || '';
+      tpl.override_nis = companyOverride.nis || '';
+      tpl.override_ice = companyOverride.ice || '';
+      tpl.override_article = companyOverride.article || '';
+    }
+    return { tpl, data: this.getMockData() };
+  }
+
+  private mockData: UniversalDocumentData | null = null;
+
+  private getMockData(): UniversalDocumentData {
+    if (this.mockData) return this.mockData;
+    this.mockData = getMockDocumentData();
+    return this.mockData!;
+  }
+}
+
+export const templateRegistry = new TemplateRegistryClass();
+
+// â”€â”€â”€ Helper to build a LibraryTemplateMeta from factory configs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function createMeta(overrides: {
+  id: string; name: string; nameAr: string;
+  description: string; descriptionAr: string;
+  documentType: DocTypeCode; paperSize: PaperSize;
+  version?: string; tags?: string[]; subcategory?: string;
+  revision?: number;
+}): LibraryTemplateMeta {
+  return {
+    id: overrides.id,
+    version: overrides.version ?? '1.0.0',
+    revision: overrides.revision ?? 1,
+    createdAt: '2025-06-28',
+    updatedAt: '2025-06-28',
+    author: TEMPLATE_AUTHOR,
+    country: TEMPLATE_COUNTRY_DZ,
+    layoutEngineVersion: LAYOUT_ENGINE_VERSION,
+    name: overrides.name,
+    nameAr: overrides.nameAr,
+    description: overrides.description,
+    descriptionAr: overrides.descriptionAr,
+    documentType: overrides.documentType,
+    paperSize: overrides.paperSize,
+    category: categoryFromDocType(overrides.documentType),
+    subcategory: overrides.subcategory,
+    tags: overrides.tags ?? [],
+    readOnly: true as const,
+  };
+}
+
+// â”€â”€â”€ Factory function for building PrintTemplate from layer configs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function buildTemplate(
+  name: string,
+  docTypeCode: DocTypeCode,
+  paperSize: PaperSize,
+  overrides?: Partial<PrintTemplate>,
+): PrintTemplate {
+  const paper = paperConfig(paperSize);
+  const typo = typographyConfig(paperSize);
+  const header = headerConfig(paperSize);
+
+  const isInvoice = docTypeCode === 'FV';
+  const isA5 = paperSize === 'A5';
+
+  const table = isInvoice
+    ? INVOICE_COLUMNS
+    : isA5
+      ? DELIVERY_A5_COLUMNS
+      : DELIVERY_COLUMNS;
+
+  const totals = isInvoice
+    ? INVOICE_TOTALS
+    : isA5
+      ? DELIVERY_A5_TOTALS
+      : DELIVERY_TOTALS;
+
+  const footer = isInvoice
+    ? INVOICE_FOOTER
+    : isA5
+      ? DELIVERY_A5_FOOTER
+      : DELIVERY_FOOTER;
+
+  const base: PrintTemplate = {
+    id: null,
+    name,
+    doc_type_code: docTypeCode,
+    paper_size: paperSize,
+    paper_width_mm: paper.paperWidthMm,
+    page_orientation: paper.pageOrientation,
+    is_default: false,
+    is_active: true,
+
+    margin_top: paper.marginTop,
+    margin_bottom: paper.marginBottom,
+    margin_sides: paper.marginSides,
+    line_spacing: 1.2,
+    base_font_size: typo.baseFontSize,
+    font_family: typo.fontFamily,
+
+    show_logo: header.showLogo,
+    logo_size: header.logoSize,
+    logo_align: header.logoAlign,
+    logo_border_radius: header.logoBorderRadius,
+
+    show_company_name: header.showCompanyName,
+    company_name_text: '',
+    company_name_size: header.companyNameSize,
+    company_name_bold: header.companyNameBold,
+    company_name_align: header.companyNameAlign,
+    company_name_color: header.companyNameColor,
+
+    show_address: header.showAddress,
+    show_phone: header.showPhone,
+    show_tax_id: header.showTaxId,
+    show_rc: header.showRc,
+    show_nis: header.showNis,
+    show_ice: header.showIce,
+    show_article: header.showArticle,
+    company_info_align: header.companyInfoAlign,
+    company_info_size: header.companyInfoSize,
+
+    override_address: '',
+    override_phone: '',
+    override_nif: '',
+    override_rc: '',
+    override_nis: '',
+    override_ice: '',
+    override_article: '',
+    header_custom_text: '',
+    header_separator: header.headerSeparator,
+
+    title_text: isInvoice ? 'ÙØ§ØªÙˆØ±Ø© Ø¨ÙŠØ¹' : 'ÙˆØµÙ„ ØªØ³Ù„ÙŠÙ…',
+    title_size: typo.titleSize,
+    title_bold: typo.titleBold,
+    title_align: typo.titleAlign,
+    title_color: header.companyNameColor,
+    show_doc_number: true,
+    show_date: true,
+    show_time: false,
+    show_due_date: isInvoice,
+    show_cashier: isInvoice,
+    show_client: true,
+    show_client_nif: true,
+    show_client_phone: true,
+    show_client_address: true,
+    show_delivery_address: !isInvoice,
+    show_session: false,
+    show_payment_term: false,
+    show_bank_details: isInvoice,
+    bank_details_text: isInvoice ? 'RIB: 007 99999 000012345678 90' : '',
+    doc_separator: 'solid',
+
+    col_order: table.columnOrder,
+    col_show: table.columnShow,
+    col_widths: table.columnWidths,
+    col_headers: table.columnHeaders,
+    col_aligns: table.columnAligns,
+
+    items_font_size: table.itemsFontSize,
+    items_font_family: table.itemsFontFamily,
+    show_col_header: table.showColHeader,
+    table_header_bold: table.tableHeaderBold,
+    table_header_bg: table.tableHeaderBg,
+    table_header_color: table.tableHeaderColor,
+    table_border_style: table.tableBorderStyle,
+    alternating_rows: table.alternatingRows,
+    alternating_color: table.alternatingColor,
+    price_display: table.priceDisplay,
+    show_line_total_ttc: false,
+
+    totals_font_size: totals.totalsFontSize,
+    totals_bold: totals.totalsBold,
+    totals_align: totals.totalsAlign,
+    show_total_ht: totals.showTotalHt,
+    show_total_tva: totals.showTotalTva,
+    show_tva_breakdown: totals.showTvaBreakdown,
+    show_discount_total: totals.showDiscountTotal,
+    show_fiscal_stamp: totals.showFiscalStamp,
+    show_total_ttc: totals.showTotalTtc,
+    total_ttc_font_size: totals.totalTtcFontSize,
+    total_ttc_bold: totals.totalTtcBold,
+    total_ttc_color: totals.totalTtcColor,
+    total_border_style: totals.totalBorderStyle,
+    show_amount_in_words: totals.showAmountInWords,
+    show_paid_amount: totals.showPaidAmount,
+    show_change: totals.showChange,
+    show_remaining: totals.showRemaining,
+    show_prev_balance: totals.showPrevBalance,
+    show_new_balance: totals.showNewBalance,
+
+    show_payment_details: false,
+    payment_font_size: 9,
+
+    footer_line1: footer.footerLine1,
+    footer_line2: footer.footerLine2,
+    footer_line3: footer.footerLine3,
+    footer_separator: footer.footerSeparator,
+    show_thank_you: footer.showThankYou,
+    thank_you_text: footer.thankYouText,
+    thank_you_size: footer.thankYouSize,
+    thank_you_color: '#333333',
+    show_returns_policy: footer.showReturnsPolicy,
+    returns_policy_text: footer.returnsPolicyText,
+    footer_legal_text: '',
+
+    show_barcode: footer.showBarcode,
+    barcode_content: 'doc-number',
+    barcode_custom_text: '',
+    show_qr: footer.showQr,
+    qr_content: 'both',
+
+    show_cashier_signature: footer.showCashierSignature,
+    show_client_signature: footer.showClientSignature,
+    show_stamp: footer.showStamp,
+
+    show_header_section: true,
+    show_doc_info_section: true,
+    show_items_section: true,
+    show_totals_section: true,
+    show_payments_section: false,
+    show_footer_section: true,
+
+    rules: [],
+
+    show_report_header: false,
+    report_header_text: '',
+    show_report_footer: false,
+    report_footer_text: '',
+    show_charts: false,
+    chart_type: 'bar',
+    chart_title: '',
+    group_by: '',
+    sort_by: '',
+    sort_direction: 'asc',
+    show_report_period: false,
+    show_report_cashier: false,
+    show_report_summary_cards: false,
+    show_report_payment_breakdown: false,
+    show_report_top_products: false,
+  };
+
+  return overrides ? { ...base, ...overrides } : base;
+}
+
+// â”€â”€â”€ Register all built-in templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function registerBuiltinTemplates(): void {
+  templateRegistry.register({
+    meta: createMeta({
+      id: 'dz-invoice-a4',
+      name: 'Algerian Invoice A4',
+      nameAr: 'Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠØ© A4',
+      description: 'Standard Algerian fiscal invoice in A4 format with full TVA breakdown, fiscal stamp, amount in words, signature and QR code.',
+      descriptionAr: 'ÙØ§ØªÙˆØ±Ø© Ø¨ÙŠØ¹ Ø¬Ø²Ø§Ø¦Ø±ÙŠØ© Ø±Ø³Ù…ÙŠØ© Ø¨ØµÙŠØºØ© A4 Ù…Ø¹ ØªÙØµÙŠÙ„ TVA ÙˆØ§Ù„Ø·Ø§Ø¨Ø¹ Ø§Ù„Ø¬Ø¨Ø§Ø¦ÙŠ ÙˆØ§Ù„Ù…Ø¨Ù„Øº ÙƒØªØ§Ø¨Ø© ÙˆØ§Ù„ØªÙˆÙ‚ÙŠØ¹ ÙˆØ±Ù…Ø² QR',
+      documentType: 'FV',
+      paperSize: 'A4',
+      tags: ['algeria', 'arabic', 'fiscal', 'official', 'tva', 'qrcode', 'barcode', 'signature', 'invoice', 'a4'],
+    }),
+    createConfig: () => buildTemplate('Ù‚Ø§Ù„Ø¨ Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠ A4', 'FV', 'A4'),
+  });
+
+  templateRegistry.register({
+    meta: createMeta({
+      id: 'dz-delivery-a4',
+      name: 'Algerian Delivery Note A4',
+      nameAr: 'ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ… Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠ A4',
+      description: 'Standard Algerian delivery note in A4 format with detailed items table, TVA breakdown and signature block.',
+      descriptionAr: 'ÙˆØµÙ„ ØªØ³Ù„ÙŠÙ… Ø¬Ø²Ø§Ø¦Ø±ÙŠ Ø±Ø³Ù…ÙŠ Ø¨ØµÙŠØºØ© A4 Ù…Ø¹ Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ù…ÙˆØ§Ø¯ ÙˆØªÙØµÙŠÙ„ TVA ÙˆØ§Ù„ØªÙˆÙ‚ÙŠØ¹',
+      documentType: 'BL',
+      paperSize: 'A4',
+      tags: ['algeria', 'arabic', 'fiscal', 'official', 'tva', 'qrcode', 'barcode', 'signature', 'delivery', 'a4'],
+    }),
+    createConfig: () => buildTemplate('Ù‚Ø§Ù„Ø¨ ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ… Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠ A4', 'BL', 'A4'),
+  });
+
+  templateRegistry.register({
+    meta: createMeta({
+      id: 'dz-delivery-a5',
+      name: 'Algerian Delivery Note A5',
+      nameAr: 'ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ… Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠ A5',
+      description: 'Compact Algerian delivery note in A5 half-page format with items table, TVA and signature block.',
+      descriptionAr: 'ÙˆØµÙ„ ØªØ³Ù„ÙŠÙ… Ø¬Ø²Ø§Ø¦Ø±ÙŠ Ø¨ØµÙŠØºØ© A5 Ø¨Ù†ØµÙ ØµÙØ­Ø© Ù…Ø¹ Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ù…ÙˆØ§Ø¯ Ùˆ TVA ÙˆØ§Ù„ØªÙˆÙ‚ÙŠØ¹',
+      documentType: 'BL',
+      paperSize: 'A5',
+      tags: ['algeria', 'arabic', 'fiscal', 'official', 'delivery', 'a5'],
+    }),
+    createConfig: () => buildTemplate('Ù‚Ø§Ù„Ø¨ ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ… Ø§Ù„Ø¬Ø²Ø§Ø¦Ø±ÙŠ A5', 'BL', 'A5'),
+  });
+}
+
+// â”€â”€â”€ Eagerly register on module load (runs once per page load) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+registerBuiltinTemplates();
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/TemplateLibraryModal.tsx
+```
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense, useRef } from 'react';
+import { templateRegistry } from './registry';
+import { TEMPLATE_CATEGORIES, ALL_TAGS } from './categories';
+import type { LibraryTemplateEntry, LibraryFilterState, FavoriteEntry, InstallHistoryEntry } from './types';
+import type { PrintTemplate, PaperSize, DocTypeCode } from '../types';
+import type { UniversalDocumentData } from '../types/data';
+import {
+  MODAL_MAX_WIDTH, CARD_MIN_WIDTH, CARD_PREVIEW_HEIGHT,
+  CARD_PREVIEW_SCALE, MODAL_BORDER_RADIUS, CARD_BORDER_RADIUS,
+  GRID_GAP,
+} from './constants';
+import { getMockDocumentData } from './mockData';
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  Lazy-loaded UniversalPreview (code-split)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+const UniversalPreview = lazy(() => import('../components/preview/UniversalPreview'));
+
+function PreviewFallback() {
+  return (
+    <div style={{
+      height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 11, color: '#bbb', background: '#f9fafb',
+    }}>
+      <i className="ti ti-loader-2 spin" style={{ fontSize: 20 }} />
+    </div>
+  );
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  Props
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onInstall: (templateId: string, tpl: PrintTemplate) => Promise<void>;
+  activeDoc: string;
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  Local storage helpers â€” favorites, install history, recently used
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+const FAV_KEY = 'template_library_favorites';
+const RECENT_KEY = 'template_library_recent';
+const HISTORY_KEY = 'template_library_history';
+const MAX_RECENT = 5;
+
+function loadFavorites(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAV_KEY);
+    if (!raw) return new Set();
+    const parsed: FavoriteEntry[] = JSON.parse(raw);
+    return new Set(parsed.map(e => e.templateId));
+  } catch { return new Set(); }
+}
+
+function saveFavorites(ids: Set<string>): void {
+  const entries: FavoriteEntry[] = Array.from(ids).map(templateId => ({
+    templateId, addedAt: new Date().toISOString(),
+  }));
+  localStorage.setItem(FAV_KEY, JSON.stringify(entries));
+}
+
+function loadRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function addRecent(templateId: string): void {
+  const list = loadRecent().filter(id => id !== templateId);
+  list.unshift(templateId);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, MAX_RECENT)));
+}
+
+function addHistory(entry: InstallHistoryEntry): void {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const list: InstallHistoryEntry[] = raw ? JSON.parse(raw) : [];
+    list.unshift(entry);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 20)));
+  } catch { /* ignore */ }
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  Component
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+const STYLES = {
+  overlay: {
+    position: 'fixed', inset: 0, zIndex: 9999,
+    background: 'rgba(0,0,0,.5)', display: 'flex',
+    alignItems: 'center', justifyContent: 'center',
+    padding: 20, direction: 'rtl' as const,
+  },
+  modal: {
+    background: '#fff', borderRadius: MODAL_BORDER_RADIUS,
+    width: '100%', maxWidth: MODAL_MAX_WIDTH, maxHeight: '90vh',
+    display: 'flex' as const, flexDirection: 'column' as const,
+    boxShadow: '0 25px 60px rgba(0,0,0,.25)',
+    overflow: 'hidden',
+  },
+  header: {
+    padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
+    display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const,
+    flexShrink: 0,
+  },
+  headerTitle: {
+    fontSize: 17, fontWeight: 800, color: '#111',
+    display: 'flex' as const, alignItems: 'center' as const, gap: 8,
+  },
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 8, border: 'none',
+    background: '#f3f4f6', cursor: 'pointer', fontSize: 16,
+    display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
+    color: '#666',
+  },
+  body: {
+    padding: 0, overflow: 'hidden', flex: 1,
+    display: 'flex' as const, flexDirection: 'column' as const,
+  },
+  toolbar: {
+    padding: '12px 20px', borderBottom: '1px solid #e5e7eb',
+    display: 'flex' as const, flexWrap: 'wrap' as const, gap: 8,
+    alignItems: 'center' as const, background: '#fafafa',
+  },
+  searchInput: {
+    flex: 1, minWidth: 180, padding: '7px 12px', borderRadius: 8,
+    border: '1px solid #d1d5db', fontSize: 13, outline: 'none',
+    fontFamily: 'Tajawal, sans-serif',
+  },
+  filterSelect: {
+    padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
+    fontSize: 12, fontFamily: 'Tajawal, sans-serif', background: '#fff',
+  },
+  grid: {
+    display: 'grid' as const, gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_WIDTH}px, 1fr))`,
+    gap: GRID_GAP, padding: 20, overflowY: 'auto' as const, flex: 1,
+  },
+  card: {
+    borderRadius: CARD_BORDER_RADIUS, border: '1px solid #e5e7eb',
+    overflow: 'hidden', display: 'flex' as const, flexDirection: 'column' as const,
+    transition: 'box-shadow .2s', background: '#fff',
+  },
+  cardPreviewWrapper: {
+    height: CARD_PREVIEW_HEIGHT, overflow: 'hidden', position: 'relative' as const,
+    background: '#f9fafb', cursor: 'pointer',
+  },
+  cardPreviewContent: {
+    transform: `scale(${CARD_PREVIEW_SCALE})`,
+    transformOrigin: 'top right',
+    width: `${100 / CARD_PREVIEW_SCALE}%`,
+  },
+  cardBody: {
+    padding: '12px 14px', flex: 1, display: 'flex' as const,
+    flexDirection: 'column' as const, gap: 6,
+  },
+  cardName: {
+    fontSize: 14, fontWeight: 700, color: '#111',
+    display: 'flex' as const, alignItems: 'center' as const, gap: 6,
+  },
+  cardDesc: {
+    fontSize: 11, color: '#666', lineHeight: 1.5, flex: 1,
+    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
+    overflow: 'hidden',
+  },
+  tagRow: {
+    display: 'flex' as const, gap: 4, flexWrap: 'wrap' as const,
+  },
+  tagDoc: {
+    fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
+    background: '#eef2ff', color: '#4338ca',
+    display: 'flex' as const, alignItems: 'center' as const, gap: 3,
+  },
+  tagSize: {
+    fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
+    background: '#f0fdf4', color: '#15803d',
+    display: 'flex' as const, alignItems: 'center' as const, gap: 3,
+  },
+  tagCategory: {
+    fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
+    background: '#fef3c7', color: '#92400e',
+    display: 'flex' as const, alignItems: 'center' as const, gap: 3,
+  },
+  installBtn: {
+    padding: '8px 16px', border: 'none', borderRadius: 6,
+    background: '#1a1a2e', color: '#fff', cursor: 'pointer',
+    fontSize: 12, fontWeight: 700, fontFamily: 'Tajawal, sans-serif',
+    display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
+    gap: 6, marginTop: 8, transition: 'opacity .2s',
+  },
+  favBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 14, padding: 0, lineHeight: 1,
+  },
+  emptyState: {
+    textAlign: 'center' as const, padding: 60, color: '#999', fontSize: 13,
+    display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, gap: 8,
+  },
+  recentRow: {
+    padding: '10px 20px', borderBottom: '1px solid #e5e7eb',
+    display: 'flex' as const, gap: 12, alignItems: 'center' as const,
+    background: '#f7f7ff', fontSize: 12, color: '#555',
+  },
+  zoomControls: {
+    display: 'flex' as const, gap: 4,
+  },
+  zoomBtn: {
+    width: 28, height: 28, borderRadius: 6, border: '1px solid #d1d5db',
+    background: '#fff', cursor: 'pointer', fontSize: 12,
+    display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
+    color: '#555',
+  },
+};
+
+export default function TemplateLibraryModal({ open, onClose, onInstall, activeDoc }: Props) {
+  // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [search, setSearch] = useState('');
+  const [filterDocType, setFilterDocType] = useState<string | null>(null);
+  const [filterPaperSize, setFilterPaperSize] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [installing, setInstalling] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
+  const [recentIds, setRecentIds] = useState<string[]>(loadRecent);
+  const [previewZoom, setPreviewZoom] = useState<'fit' | '100' | 'page'>('fit');
+
+  // â”€â”€ Cached mock data (never recreate) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const mockDataRef = useRef<UniversalDocumentData | null>(null);
+  if (!mockDataRef.current) {
+    mockDataRef.current = getMockDocumentData();
+  }
+
+  // â”€â”€ Filtered list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const allTemplates = useMemo(() => templateRegistry.getAll(), []);
+  const recentTemplates = useMemo(
+    () => recentIds.map(id => templateRegistry.get(id)).filter(Boolean) as LibraryTemplateEntry[],
+    [recentIds],
+  );
+
+  const filtered = useMemo(() => {
+    let list = allTemplates;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(e =>
+        e.meta.name.toLowerCase().includes(q) ||
+        e.meta.nameAr.includes(q) ||
+        e.meta.description.toLowerCase().includes(q) ||
+        e.meta.descriptionAr.includes(q) ||
+        e.meta.tags.some(t => t.includes(q)) ||
+        e.meta.documentType.toLowerCase().includes(q)
+      );
+    }
+    if (filterDocType) list = list.filter(e => e.meta.documentType === filterDocType);
+    if (filterPaperSize) list = list.filter(e => e.meta.paperSize === filterPaperSize);
+    if (filterCategory) list = list.filter(e => e.meta.category === filterCategory);
+    if (favoritesOnly) list = list.filter(e => favorites.has(e.meta.id));
+    return list;
+  }, [allTemplates, search, filterDocType, filterPaperSize, filterCategory, favoritesOnly, favorites]);
+
+  // â”€â”€ Derived filter options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const docTypeOptions = useMemo(() => templateRegistry.getDocTypes(), [allTemplates]);
+  const paperSizeOptions = useMemo(() => templateRegistry.getPaperSizes(), [allTemplates]);
+  const categoryOptions = useMemo(() => templateRegistry.getCategories(), [allTemplates]);
+
+  // â”€â”€ Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const toggleFavorite = useCallback((id: string) => {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveFavorites(next);
+      return next;
+    });
+  }, []);
+
+  const handleInstall = useCallback(async (entry: LibraryTemplateEntry) => {
+    setInstalling(entry.meta.id);
+    try {
+      const config = entry.createConfig();
+      await onInstall(entry.meta.id, config);
+      addRecent(entry.meta.id);
+      setRecentIds(loadRecent());
+      addHistory({
+        templateId: entry.meta.id,
+        templateNameAr: entry.meta.nameAr,
+        installedAt: new Date().toISOString(),
+        version: entry.meta.version,
+        createdTplId: null,
+      });
+    } finally {
+      setInstalling(null);
+    }
+  }, [onInstall]);
+
+  const resetFilters = useCallback(() => {
+    setSearch('');
+    setFilterDocType(null);
+    setFilterPaperSize(null);
+    setFilterCategory(null);
+    setFavoritesOnly(false);
+  }, []);
+
+  // â”€â”€ Keyboard handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (open) {
+      window.addEventListener('keydown', handler);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handler);
+      document.body.style.overflow = '';
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  // â”€â”€ Filter tag pills display â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const hasActiveFilters = search || filterDocType || filterPaperSize || filterCategory || favoritesOnly;
+
+  return (
+    <div style={STYLES.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={STYLES.modal}>
+        {/* Header */}
+        <div style={STYLES.header}>
+          <div style={STYLES.headerTitle}>
+            <i className="ti ti-library" />
+            Ù…ÙƒØªØ¨Ø© Ø§Ù„Ù‚ÙˆØ§Ù„Ø¨ Ø§Ù„Ø¬Ø§Ù‡Ø²Ø©
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={resetFilters}
+              style={{
+                ...STYLES.closeBtn, fontSize: 11, width: 'auto', padding: '0 10px',
+                color: hasActiveFilters ? 'var(--em)' : '#999',
+                fontWeight: hasActiveFilters ? 700 : 400,
+              }}
+              title="Ø¥Ø¹Ø§Ø¯Ø© Ø¶Ø¨Ø· Ø§Ù„ÙÙ„Ø§ØªØ±"
+            >
+              <i className="ti ti-filter-off" style={{ marginLeft: 4 }} />
+              {hasActiveFilters ? 'Ù…Ø³Ø­ Ø§Ù„ÙƒÙ„' : 'ÙÙ„Ø§ØªØ±'}
+            </button>
+            <button type="button" style={STYLES.closeBtn} onClick={onClose}>âœ•</button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={STYLES.body}>
+          {/* Search + Filters toolbar */}
+          <div style={STYLES.toolbar}>
+            <input
+              type="text"
+              placeholder="ğŸ” Ø¨Ø­Ø« ÙÙŠ Ø§Ù„Ù‚ÙˆØ§Ù„Ø¨..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={STYLES.searchInput}
+            />
+            <select
+              value={filterDocType ?? ''}
+              onChange={e => setFilterDocType(e.target.value || null)}
+              style={STYLES.filterSelect}
+            >
+              <option value="">ÙƒÙ„ Ø§Ù„Ù…Ø³ØªÙ†Ø¯Ø§Øª</option>
+              {docTypeOptions.map(dt => (
+                <option key={dt} value={dt}>{dt}</option>
+              ))}
+            </select>
+            <select
+              value={filterPaperSize ?? ''}
+              onChange={e => setFilterPaperSize(e.target.value || null)}
+              style={STYLES.filterSelect}
+            >
+              <option value="">ÙƒÙ„ Ø§Ù„Ø£Ø­Ø¬Ø§Ù…</option>
+              {paperSizeOptions.map(ps => (
+                <option key={ps} value={ps}>{ps}</option>
+              ))}
+            </select>
+            <select
+              value={filterCategory ?? ''}
+              onChange={e => setFilterCategory(e.target.value || null)}
+              style={STYLES.filterSelect}
+            >
+              <option value="">ÙƒÙ„ Ø§Ù„ØªØµÙ†ÙŠÙØ§Øª</option>
+              {categoryOptions.map(cat => {
+                const label = TEMPLATE_CATEGORIES.find(c => c.id === cat);
+                return (
+                  <option key={cat} value={cat}>{label?.nameAr ?? cat}</option>
+                );
+              })}
+            </select>
+            <button
+              type="button"
+              onClick={() => setFavoritesOnly(f => !f)}
+              style={{
+                ...STYLES.filterSelect, cursor: 'pointer',
+                background: favoritesOnly ? '#fef3c7' : '#fff',
+                fontWeight: favoritesOnly ? 700 : 400,
+              }}
+            >
+              <i className="ti ti-star" style={{ marginLeft: 4 }} />
+              Ø§Ù„Ù…ÙØ¶Ù„Ø©
+            </button>
+          </div>
+
+          {/* Recently installed */}
+          {recentTemplates.length > 0 && !search && !favoritesOnly && (
+            <div style={STYLES.recentRow}>
+              <i className="ti ti-history" style={{ fontSize: 14, color: '#6366f1' }} />
+              <span style={{ fontWeight: 700, color: '#444' }}>Ø§Ù„Ù…Ø«Ø¨ØªØ© Ù…Ø¤Ø®Ø±Ø§Ù‹:</span>
+              {recentTemplates.slice(0, 3).map(t => (
+                <button
+                  key={t.meta.id}
+                  type="button"
+                  style={{
+                    background: '#eef2ff', border: 'none', borderRadius: 4,
+                    padding: '2px 8px', fontSize: 11, color: '#4338ca', cursor: 'pointer',
+                  }}
+                  onClick={() => {
+                    setSearch('');
+                    setFilterDocType(t.meta.documentType);
+                  }}
+                >
+                  {t.meta.nameAr}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Grid */}
+          <div style={STYLES.grid}>
+            {filtered.length === 0 ? (
+              <div style={{ ...STYLES.emptyState, gridColumn: '1 / -1' }}>
+                <i className="ti ti-files-off" style={{ fontSize: 32 }} />
+                {hasActiveFilters ? 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬ Ù„Ù„Ø¨Ø­Ø«' : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù‚ÙˆØ§Ù„Ø¨ Ø¬Ø§Ù‡Ø²Ø©'}
+              </div>
+            ) : filtered.map(entry => {
+              const { meta } = entry;
+              const isBusy = installing === meta.id;
+              const isFav = favorites.has(meta.id);
+              const categoryObj = TEMPLATE_CATEGORIES.find(c => c.id === meta.category);
+
+              return (
+                <div key={meta.id} style={STYLES.card}>
+                  {/* Preview */}
+                  <div style={STYLES.cardPreviewWrapper}>
+                    <div style={STYLES.cardPreviewContent}>
+                      <Suspense fallback={<PreviewFallback />}>
+                        <UniversalPreview
+                          tpl={entry.createConfig()}
+                          data={mockDataRef.current!}
+                          company={null}
+                        />
+                      </Suspense>
+                    </div>
+                    {/* Favorite toggle */}
+                    <button
+                      type="button"
+                      onClick={() => toggleFavorite(meta.id)}
+                      style={{
+                        ...STYLES.favBtn, position: 'absolute', top: 6, left: 6,
+                      }}
+                      title={isFav ? 'Ø¥Ø²Ø§Ù„Ø© Ù…Ù† Ø§Ù„Ù…ÙØ¶Ù„Ø©' : 'Ø¥Ø¶Ø§ÙØ© Ù„Ù„Ù…ÙØ¶Ù„Ø©'}
+                    >
+                      {isFav ? 'â­' : 'â˜†'}
+                    </button>
+                  </div>
+
+                  {/* Info */}
+                  <div style={STYLES.cardBody}>
+                    <div style={STYLES.cardName}>
+                      {meta.nameAr}
+                    </div>
+                    <div style={STYLES.cardDesc}>{meta.descriptionAr}</div>
+                    <div style={STYLES.tagRow}>
+                      <span style={STYLES.tagDoc}>
+                        <i className="ti ti-file-text" style={{ fontSize: 8 }} />
+                        {meta.documentType}
+                      </span>
+                      <span style={STYLES.tagSize}>
+                        <i className="ti ti-dimensions" style={{ fontSize: 8 }} />
+                        {meta.paperSize}
+                      </span>
+                      {categoryObj && (
+                        <span style={STYLES.tagCategory}>
+                          <i className="ti ti-folder" style={{ fontSize: 8 }} />
+                          {categoryObj.nameAr}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Install */}
+                    <button
+                      type="button"
+                      style={{
+                        ...STYLES.installBtn,
+                        opacity: isBusy ? 0.6 : 1,
+                        cursor: isBusy ? 'wait' : 'pointer',
+                      }}
+                      onClick={() => handleInstall(entry)}
+                      disabled={isBusy}
+                    >
+                      {isBusy ? (
+                        <><i className="ti ti-loader-2 spin" /> Ø¬Ø§Ø±Ù Ø§Ù„ØªØ«Ø¨ÙŠØª...</>
+                      ) : (
+                        <><i className="ti ti-download" /> ØªØ«Ø¨ÙŠØª Ø§Ù„Ù‚Ø§Ù„Ø¨</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/template-library/types.ts
+```
+import type { PrintTemplate, DocTypeCode, PaperSize } from '../types';
+
+// â”€â”€â”€ Versioning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface TemplateVersion {
+  id:        string;
+  version:   string;
+  revision:  number;
+  createdAt: string;
+  updatedAt: string;
+  author:    string;
+  country:   string;
+  layoutEngineVersion: string;
+}
+
+// â”€â”€â”€ Tags & Categories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface TemplateTags {
+  tags: string[];
+  category: string;
+  subcategory?: string;
+}
+
+// â”€â”€â”€ Metadata (frontend registry entry) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface LibraryTemplateMeta extends TemplateVersion {
+  name:             string;
+  nameAr:           string;
+  description:      string;
+  descriptionAr:    string;
+  documentType:     DocTypeCode;
+  paperSize:        PaperSize;
+  category:         string;
+  subcategory?:     string;
+  tags:             string[];
+  readOnly:         true;
+}
+
+// â”€â”€â”€ Full entry in the frontend registry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface LibraryTemplateEntry {
+  meta:         LibraryTemplateMeta;
+  createConfig: () => PrintTemplate;
+}
+
+// â”€â”€â”€ API response shape (from backend GET /print-templates/library) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface LibraryApiResponse {
+  id:             string;
+  name:           string;
+  name_ar:        string;
+  description:    string;
+  description_ar: string;
+  document_type:  string;
+  paper_size:     string;
+  category:       string;
+  subcategory?:   string;
+  tags:           string[];
+  version:        string;
+  revision:       number;
+  country:        string;
+  author:         string;
+  read_only:      boolean;
+}
+
+// â”€â”€â”€ Category descriptor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface TemplateCategory {
+  id:      string;
+  name:    string;
+  nameAr:  string;
+  icon?:   string;
+}
+
+// â”€â”€â”€ Filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface LibraryFilterState {
+  search:       string;
+  docType:      string | null;
+  paperSize:    string | null;
+  category:     string | null;
+  country:      string | null;
+  tags:         string[];
+  favoritesOnly: boolean;
+}
+
+// â”€â”€â”€ Favorites (stored in localStorage) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface FavoriteEntry {
+  templateId: string;
+  addedAt:    string;
+}
+
+// â”€â”€â”€ Install history entry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface InstallHistoryEntry {
+  templateId:      string;
+  templateNameAr:  string;
+  installedAt:     string;
+  version:         string;
+  createdTplId:    number | null;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/types.ts
+```
+export type {
+  PaperSize, AlignOption, BorderStyle, PriceMode, PageOrientation, FontFamily,
+  ColumnKey, DocTypeCode, PrintTemplate, SectionTarget, ReportRule,
+} from './types/domain';
+
+export {
+  DOC_TYPE_LIST,
+} from './types/domain';
+
+export {
+  createDefaultTemplate,
+  defaultTemplate,
+} from './types/defaults';
+
+export type {
+  PrintTemplateApiResponse,
+} from './types/api';
+
+export type {
+  CompanyData,
+  DetectedPrinter,
+  DocumentPrintConfig,
+  ReceiptTemplate80mm,
+  CompanyPreviewData,
+} from './types/live-data';
+```
+
+## FILE: resources/js/pages/settings/print-settings/types/api.ts
+```
+import type { PrintTemplate } from './domain';
+
+export interface PrintTemplateApiResponse {
+  id:            number;
+  name:          string;
+  doc_type_code: string;
+  paper_size:    string;
+  is_default:    boolean;
+  is_active:     boolean;
+  config:        Omit<PrintTemplate, 'id' | 'name' | 'doc_type_code' | 'paper_size' | 'is_default' | 'is_active' | 'created_at' | 'updated_at'>;
+  created_at:    string;
+  updated_at:    string;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/types/data/DocumentDataBuilder.ts
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// reporting/data/DocumentDataBuilder.ts
+//
+// Builds UniversalDocumentData from various source shapes:
+//   - CommercialDocument (from /api/v1/{company}/documents/{id})
+//   - POSSaleSnapshot (from POSPage.handleCompleteSale)
+//
+// Principles:
+//   - No component builds its own data shape. Call a builder method instead.
+//   - All field access is null-safe. Missing API fields â†’ sensible defaults.
+//   - No side effects. Pure functions, easily testable.
+//   - CompanyInfo is passed in (from the company context, not hardcoded).
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+import type {
+  UniversalDocumentData,
+  DocumentInfo,
+  CompanyInfo,
+  PartyInfo,
+  WarehouseInfo,
+  SessionInfo,
+  DocumentLine,
+  TaxRate,
+  DocumentTotals,
+  Payment,
+  BalanceInfo,
+  CurrencyInfo,
+} from './UniversalDocumentData';
+
+import { emptyDocumentData } from './UniversalDocumentData';
+
+// â”€â”€â”€ Source type: CommercialDocument from API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//
+// We define a minimal interface here so this file has no circular dependency
+// on lib/api/core/types. The real CommercialDocument type is a superset.
+
+interface ApiDocumentLine {
+  id?:                  number;
+  product_id?:          number;
+  description?:         string | null;
+  quantity:             number;
+  unit_price_ht:        number;
+  unit_price_ttc?:      number;
+  tva_rate:             number;
+  discount_percentage?: number;
+  discount_amount?:     number;
+  total_ht:             number;
+  total_tva?:           number;
+  total_ttc?:           number;
+  product?: {
+    name?:       string;
+    reference?:  string | null;
+    barcode?:    string | null;
+    unit?: { name?: string } | null;
+  } | null;
+  packaging?: { name?: string } | null;
+  stock_lot?: { lot_number?: string } | null;
+  notes?:     string | null;
+}
+
+interface ApiPayment {
+  amount:       number;
+  reference?:   string | null;
+  payment_date?: string | null;
+  payment_mode?: { name?: string } | null;
+}
+
+interface ApiDocument {
+  id?:           number;
+  document_number?: string;
+  document_date?:   string;
+  due_date?:        string | null;
+  notes?:           string | null;
+  document_type?: {
+    code?: string;
+    name?: string;
+  } | null;
+  document_status?: {
+    name?: string;
+    code?: string;
+  } | null;
+  party?: {
+    id?:      number;
+    name?:    string;
+    type?:    string;
+    nif?:     string | null;
+    rc?:      string | null;
+    nis?:     string | null;
+    /** Actual API returns flat strings, not arrays */
+    phone?:   string | null;
+    mobile?:  string | null;
+    email?:   string | null;
+    address?: string | null;
+  } | null;
+  warehouse?: {
+    id?:     number;
+    name?:   string;
+    code?:   string | null;
+    address?: string | null;
+  } | null;
+  currency?: {
+    code?:          string;
+    symbol?:        string;
+    exchange_rate?: number;
+  } | null;
+  lines?:    ApiDocumentLine[];
+  payments?: ApiPayment[];
+  /** Totals computed by backend */
+  totals?: {
+    total_ht?:       number;
+    total_tva?:      number;
+    total_ttc?:      number;
+    fiscal_stamp?:   number;
+    total_discount?: number;
+    paid?:           number;
+    change?:         number;
+    remaining?:      number;
+  } | null;
+}
+
+// â”€â”€â”€ Source type: POS sale snapshot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export interface POSSaleSnapshot {
+  docNumber:    string;
+  docDate:      string;
+  cashierName?: string;
+  client?: {
+    name?:    string;
+    nif?:     string | null;
+    phone?:   string | null;
+    address?: string | null;
+  } | null;
+  items: Array<{
+    name:               string;
+    ref?:               string | null;
+    qty:                number;
+    unit_price_ht:      number;
+    unit?:              string | null;
+    tva_rate:           number;
+    discount_percentage?: number;
+    total_ht:           number;
+  }>;
+  totals: {
+    total_ht:       number;
+    total_tva:      number;
+    total_ttc:      number;
+    fiscal_stamp:   number;
+    total_discount: number;
+    paid:           number;
+    change:         number;
+    remaining:      number;
+  };
+  payments:    Array<{ mode: string; amount: number }>;
+  prevBalance?: number | null;
+  newBalance?:  number | null;
+  dueDate?:    string | null;
+}
+
+// â”€â”€â”€ DocumentDataBuilder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export const DocumentDataBuilder = {
+
+  /**
+   * Build from a full CommercialDocument API response.
+   * Used by CommercialDocumentModal and any document-list print action.
+   */
+  fromApiDocument(
+    doc:     ApiDocument,
+    company: CompanyInfo,
+    options?: {
+      prevBalance?: number;
+      newBalance?:  number;
+    },
+  ): UniversalDocumentData {
+    const lines  = buildLinesFromApi(doc.lines ?? []);
+    const totals = buildTotalsFromApi(doc, lines);
+
+    // Auto-compute balance from document when no explicit options provided:
+    // remaining > 0 indicates the party still owes this amount after this doc.
+    const balance = options?.prevBalance != null && options?.newBalance != null
+      ? buildBalance(options.prevBalance, options.newBalance)
+      : buildBalance(0, totals.remaining);
+
+    return {
+      doc:         buildDocInfo(doc),
+      company,
+      party:       buildPartyFromApi(doc.party),
+      warehouse:   buildWarehouseFromApi(doc.warehouse),
+      session:     null,
+      lines,
+      totals,
+      taxBreakdown: buildTaxBreakdown(lines),
+      payments:     buildPaymentsFromApi(doc.payments ?? []),
+      balance,
+      currency:     buildCurrencyFromApi(doc.currency),
+      computed:     {},
+    };
+  },
+
+  /**
+   * Build from a POS sale snapshot.
+   * Used by POSPage after a completed sale.
+   */
+  fromPOSSnapshot(
+    snapshot: POSSaleSnapshot,
+    company:  CompanyInfo,
+    sessionInfo?: SessionInfo | null,
+  ): UniversalDocumentData {
+    const lines  = buildLinesFromSnapshot(snapshot.items);
+    const totals: DocumentTotals = {
+      totalHt:       snapshot.totals.total_ht,
+      totalTva:      snapshot.totals.total_tva,
+      totalTtc:      snapshot.totals.total_ttc,
+      fiscalStamp:   snapshot.totals.fiscal_stamp,
+      totalDiscount: snapshot.totals.total_discount,
+      paid:          snapshot.totals.paid,
+      change:        snapshot.totals.change,
+      remaining:     snapshot.totals.remaining,
+    };
+
+    return {
+      doc: {
+        number:   snapshot.docNumber,
+        date:     snapshot.docDate,
+        dueDate:  snapshot.dueDate ?? null,
+        time:     new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
+        typeCode: 'POS',
+        typeName: 'Ø¥ÙŠØµØ§Ù„ POS',
+        status:   'validated',
+      },
+      company,
+      party: snapshot.client
+        ? {
+            name:         snapshot.client.name    ?? '',
+            nif:          snapshot.client.nif     ?? null,
+            phone:        snapshot.client.phone   ?? null,
+            address:      snapshot.client.address ?? null,
+            cashierName:  snapshot.cashierName    ?? null,
+          }
+        : snapshot.cashierName
+          ? { name: '', cashierName: snapshot.cashierName }
+          : null,
+      session:      sessionInfo ?? null,
+      warehouse:    null,
+      lines,
+      totals,
+      taxBreakdown: buildTaxBreakdown(lines),
+      payments:     snapshot.payments.map(p => ({ mode: p.mode, amount: p.amount })),
+      balance:      buildBalance(snapshot.prevBalance, snapshot.newBalance),
+      currency:     { code: 'DZD', symbol: 'Ø¯Ø¬', rate: 1 },
+      computed:     {},
+    };
+  },
+
+  /**
+   * Returns an empty document for preview placeholders.
+   * Replaces MOCK / MOCK_COMPANY in preview components.
+   */
+  empty(): UniversalDocumentData {
+    return emptyDocumentData();
+  },
+
+  /**
+   * Builds a UniversalDocumentData from a POS session report.
+   * Converts aggregated session data into the ReportSummary structure
+   * for template-based session report printing.
+   */
+  fromSessionReport(
+    session: Record<string, unknown>,
+    company: CompanyInfo,
+  ): UniversalDocumentData {
+    const sessionPayments = (session.payments as Array<Record<string, unknown>> | undefined) ?? [];
+    const topProducts     = (session.top_products as Array<Record<string, unknown>> | undefined) ?? [];
+    const grossSales      = Number(session.gross_sales ?? 0);
+    const returnsTotal    = Number(session.returns_total ?? 0);
+
+    return {
+      doc: {
+        number:   session.document_number as string ?? 'â€”',
+        date:     session.closed_at ? String(session.closed_at).slice(0, 10) : new Date().toISOString().slice(0, 10),
+        typeCode: 'RPT',
+        typeName: 'ØªÙ‚Ø±ÙŠØ± Ø§Ù„Ø¬Ù„Ø³Ø©',
+        status:   String(session.status ?? ''),
+      },
+      company,
+      party: null,
+      session: {
+        id:          session.id as number ?? undefined,
+        code:        session.code as string ?? null,
+        openedAt:    session.opened_at as string ?? null,
+        closedAt:    session.closed_at as string ?? null,
+        cashierName: (session.user as Record<string, unknown> | undefined)?.name as string ?? null,
+      },
+      warehouse: session.warehouse ? {
+        id:   (session.warehouse as Record<string, unknown>).id as number ?? undefined,
+        name: String((session.warehouse as Record<string, unknown>).name ?? ''),
+      } : null,
+      lines: [],
+      totals: {
+        totalHt:       0,
+        totalTva:      Number(session.total_tva ?? 0),
+        totalTtc:      grossSales,
+        fiscalStamp:   Number(session.total_fiscal_stamp ?? 0),
+        totalDiscount: Number(session.total_discount ?? 0),
+        paid:          grossSales,
+        change:        0,
+        remaining:     0,
+      },
+      taxBreakdown: [],
+      payments: sessionPayments.map(p => ({
+        mode:   String((p.payment_mode as Record<string, unknown> | undefined)?.name ?? 'â€”'),
+        amount: Number(p.amount ?? 0),
+      })),
+      balance: null,
+      currency: { code: 'DZD', symbol: 'Ø¯Ø¬', rate: 1 },
+      report: {
+        title:              'ØªÙ‚Ø±ÙŠØ± Ø¬Ù„Ø³Ø©',
+        periodStart:        session.opened_at as string ?? null,
+        periodEnd:          session.closed_at as string ?? null,
+        cashierName:        (session.user as Record<string, unknown> | undefined)?.name as string ?? null,
+        grossSales,
+        returnsTotal,
+        netSales:           Number(session.net_sales ?? 0),
+        invoicesCount:      Number(session.invoices_count ?? 0),
+        returnsCount:       Number(session.returns_count ?? 0),
+        highestInvoice:     Number(session.highest_invoice ?? 0),
+        avgInvoice:         Number(session.avg_invoice ?? 0),
+        totalTva:           Number(session.total_tva ?? 0),
+        totalFiscalStamp:   Number(session.total_fiscal_stamp ?? 0),
+        totalDiscount:      Number(session.total_discount ?? 0),
+        openingCash:        Number(session.opening_cash ?? 0),
+        closingCashExpected: Number(session.closing_cash_expected ?? 0),
+        closingCashCounted: Number(session.closing_cash_counted ?? 0),
+        cashDifference:     Number(session.cash_difference ?? 0),
+        paymentBreakdown: sessionPayments.map(p => ({
+          mode:   String((p.payment_mode as Record<string, unknown> | undefined)?.name ?? 'â€”'),
+          count:  Number(p.count ?? 0),
+          amount: Number(p.amount ?? 0),
+        })),
+        topProducts: topProducts.slice(0, 10).map(p => ({
+          name:     String(p.product_name ?? ''),
+          ref:      null,
+          quantity: Number(p.quantity_sold ?? 0),
+          totalHt:  Number(p.total_ht ?? 0),
+          totalTtc: Number(p.total_ttc ?? 0),
+        })),
+      },
+      computed: {},
+    };
+  },
+} as const;
+
+// â”€â”€â”€ Internal builders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function buildDocInfo(doc: ApiDocument): DocumentInfo {
+  return {
+    number:   doc.document_number ?? 'â€”',
+    date:     doc.document_date   ?? new Date().toLocaleDateString('ar-DZ'),
+    dueDate:  doc.due_date        ?? null,
+    time:     new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
+    typeCode: doc.document_type?.code ?? undefined,
+    typeName: doc.document_type?.name ?? undefined,
+    status:   doc.document_status?.code ?? doc.document_status?.name ?? undefined,
+    notes:    doc.notes ?? null,
+  };
+}
+
+function buildPartyFromApi(
+  party: ApiDocument['party'],
+  deliveryAddress?: string | null,
+): PartyInfo | null {
+  if (!party) return null;
+  return {
+    id:      party.id,
+    name:    party.name ?? '',
+    type:    (party.type as 'customer' | 'supplier') ?? undefined,
+    nif:     party.nif ?? null,
+    rc:      party.rc  ?? null,
+    nis:     party.nis ?? null,
+    phone:   party.phone ?? null,
+    email:   party.email ?? null,
+    address: party.address ?? null,
+    deliveryAddress: deliveryAddress ?? null,
+  };
+}
+
+function buildWarehouseFromApi(
+  warehouse: ApiDocument['warehouse'],
+): WarehouseInfo | null {
+  if (!warehouse) return null;
+  return {
+    id:      warehouse.id,
+    name:    warehouse.name    ?? '',
+    code:    warehouse.code    ?? null,
+    address: warehouse.address ?? null,
+  };
+}
+
+function buildCurrencyFromApi(
+  currency: ApiDocument['currency'],
+): CurrencyInfo {
+  if (!currency) return { code: 'DZD', symbol: 'Ø¯Ø¬', rate: 1 };
+  return {
+    code:   currency.code   ?? 'DZD',
+    symbol: currency.symbol ?? 'Ø¯Ø¬',
+    rate:   currency.exchange_rate ?? 1,
+  };
+}
+
+function buildLineFromApi(line: ApiDocumentLine, index: number): DocumentLine {
+  const tvaRate   = line.tva_rate ?? 0;
+  const tvaPct    = Math.round(tvaRate * 100);
+  const discPct   = line.discount_percentage ?? 0;
+  const discAmt   = line.discount_amount     ?? 0;
+  const totalHt   = line.total_ht ?? 0;
+  const totalTva  = line.total_tva  ?? totalHt * tvaRate;
+  const totalTtc  = line.total_ttc  ?? totalHt + totalTva;
+  const uPriceHt  = line.unit_price_ht  ?? 0;
+  const uPriceTtc = line.unit_price_ttc ?? uPriceHt * (1 + tvaRate);
+
+  return {
+    rowNumber:    index + 1,
+    ref:          line.product?.reference  ?? null,
+    barcode:      line.product?.barcode    ?? null,
+    name:         line.product?.name ?? line.description ?? '',
+    unit:         line.product?.unit?.name ?? line.packaging?.name ?? null,
+    quantity:     line.quantity,
+    unitPriceHt:  uPriceHt,
+    unitPriceTtc: uPriceTtc,
+    tvaRate,
+    tvaPct,
+    discountPct:  discPct,
+    discountAmt:  discAmt,
+    totalHt,
+    totalTva,
+    totalTtc,
+    lot:   line.stock_lot?.lot_number ?? null,
+    notes: line.notes ?? null,
+  };
+}
+
+function buildLinesFromApi(apiLines: ApiDocumentLine[]): DocumentLine[] {
+  return apiLines.map((line, i) => buildLineFromApi(line, i));
+}
+
+function buildLinesFromSnapshot(
+  items: POSSaleSnapshot['items'],
+): DocumentLine[] {
+  return items.map((item, i) => {
+    const tvaRate  = item.tva_rate ?? 0;
+    const tvaPct   = Math.round(tvaRate * 100);
+    const totalHt  = item.total_ht ?? 0;
+    const totalTva = totalHt * tvaRate;
+    return {
+      rowNumber:    i + 1,
+      ref:          item.ref  ?? null,
+      barcode:      null,
+      name:         item.name,
+      unit:         item.unit ?? null,
+      quantity:     item.qty,
+      unitPriceHt:  item.unit_price_ht,
+      unitPriceTtc: item.unit_price_ht * (1 + tvaRate),
+      tvaRate,
+      tvaPct,
+      discountPct:  item.discount_percentage ?? 0,
+      discountAmt:  item.total_ht * ((item.discount_percentage ?? 0) / 100),
+      totalHt,
+      totalTva,
+      totalTtc:     totalHt + totalTva,
+      lot:          null,
+      notes:        null,
+    };
+  });
+}
+
+function buildTaxBreakdown(lines: DocumentLine[]): TaxRate[] {
+  const map = new Map<number, TaxRate>();
+  for (const line of lines) {
+    const existing = map.get(line.tvaPct) ?? {
+      rate: line.tvaPct, baseHt: 0, tva: 0, ttc: 0,
+    };
+    map.set(line.tvaPct, {
+      rate:   line.tvaPct,
+      baseHt: existing.baseHt + line.totalHt,
+      tva:    existing.tva    + line.totalTva,
+      ttc:    existing.ttc    + line.totalTtc,
+    });
+  }
+  return Array.from(map.values()).sort((a, b) => a.rate - b.rate);
+}
+
+function buildTotalsFromApi(
+  doc:   ApiDocument,
+  lines: DocumentLine[],
+): DocumentTotals {
+  // Prefer backend-computed totals; fall back to summing lines
+  const t = doc.totals;
+  return {
+    totalHt:       t?.total_ht       ?? lines.reduce((s, l) => s + l.totalHt,  0),
+    totalTva:      t?.total_tva      ?? lines.reduce((s, l) => s + l.totalTva, 0),
+    totalTtc:      t?.total_ttc      ?? lines.reduce((s, l) => s + l.totalTtc, 0),
+    fiscalStamp:   t?.fiscal_stamp   ?? 0,
+    totalDiscount: t?.total_discount ?? lines.reduce((s, l) => s + l.discountAmt, 0),
+    paid:          t?.paid           ?? 0,
+    change:        t?.change         ?? 0,
+    remaining:     t?.remaining      ?? 0,
+  };
+}
+
+function buildPaymentsFromApi(apiPayments: ApiPayment[]): Payment[] {
+  return apiPayments.map(p => ({
+    mode:      p.payment_mode?.name ?? 'â€”',
+    amount:    p.amount,
+    reference: p.reference    ?? null,
+    date:      p.payment_date ?? null,
+  }));
+}
+
+function buildBalance(
+  prev?: number | null,
+  next?: number | null,
+): BalanceInfo | null {
+  // Both prev and next must be present for a meaningful balance snapshot.
+  // Partial data (one null) â†’ null (caller should provide both or neither).
+  if (prev == null || next == null) return null;
+  return {
+    previous: prev,
+    movement: next - prev,
+    current:  next,
+  };
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/types/data/index.ts
+```
+export type {
+  UniversalDocumentData,
+  DocumentInfo,
+  CompanyInfo,
+  PartyInfo,
+  WarehouseInfo,
+  SessionInfo,
+  DocumentLine,
+  TaxRate,
+  DocumentTotals,
+  Payment,
+  BalanceInfo,
+  CurrencyInfo,
+} from './UniversalDocumentData';
+
+export {
+  emptyDocumentData,
+} from './UniversalDocumentData';
+
+export { DocumentDataBuilder } from './DocumentDataBuilder';
+export type { POSSaleSnapshot } from './DocumentDataBuilder';
+```
+
+## FILE: resources/js/pages/settings/print-settings/types/data/UniversalDocumentData.ts
+```
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// reporting/data/UniversalDocumentData.ts
+//
+// THE single data contract for the ERP Report Designer Framework.
+//
+// Design rules:
+//   1. Every preview component (Thermal, A4, A5, future) consumes THIS type.
+//   2. No component builds its own data shape from raw API responses.
+//   3. ReceiptLiveData / TemplateLiveData (in types.ts) become aliases for
+//      UniversalDocumentData. Migration happens in Phase 1 â€” in Phase 0 the
+//      old types keep their existing shape and live alongside this contract.
+//   4. No MOCK or demo data lives in this file or in any component file.
+//      Test fixtures live in __tests__/ or Storybook stories only.
+//   5. All fields are optional at the top level so the contract is usable
+//      for partial documents (e.g. draft with no party yet assigned).
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// â”€â”€â”€ Sub-types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export interface DocumentInfo {
+  /** e.g. "FV-2025-001770" */
+  number:       string;
+  /** ISO date string "2026-06-26" */
+  date:         string;
+  /** ISO date string or null */
+  dueDate?:     string | null;
+  /** localised time string e.g. "14:35" â€” computed by DocumentDataBuilder */
+  time?:        string;
+  /** DocTypeCode: "FV", "BL", "FA", "POS", â€¦ */
+  typeCode?:    string;
+  /** Localised document type name e.g. "ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª" */
+  typeName?:    string;
+  /** "draft" | "pending" | "validated" | "paid" | "cancelled" | â€¦ */
+  status?:      string;
+  notes?:       string | null;
+  reference?:   string | null;
+}
+
+export interface CompanyInfo {
+  name:     string;
+  address?: string | null;
+  phone?:   string | null;
+  nif?:     string | null;
+  rc?:      string | null;
+  nis?:     string | null;
+  ice?:     string | null;
+  article?: string | null;
+  logoUrl?: string | null;
+  email?:   string | null;
+  website?: string | null;
+}
+
+export interface PartyInfo {
+  id?:          number;
+  name:         string;
+  type?:        'customer' | 'supplier';
+  nif?:         string | null;
+  rc?:          string | null;
+  nis?:         string | null;
+  phone?:       string | null;
+  email?:       string | null;
+  address?:     string | null;
+  deliveryAddress?: string | null;
+  /** Cashier name for POS context */
+  cashierName?: string | null;
+}
+
+export interface WarehouseInfo {
+  id?:     number;
+  name:    string;
+  address?: string | null;
+  code?:   string | null;
+}
+
+export interface SessionInfo {
+  id?:         number;
+  /** Session code / number */
+  code?:       string | null;
+  openedAt?:   string | null;
+  closedAt?:   string | null;
+  cashierName?: string | null;
+}
+
+export interface DocumentLine {
+  /** Line index (1-based, for display) */
+  rowNumber:    number;
+  /** Product reference / SKU */
+  ref?:         string | null;
+  /** Product barcode */
+  barcode?:     string | null;
+  /** Product or service description */
+  name:         string;
+  /** Unit of measure label e.g. "Ù‚Ø·Ø¹Ø©" */
+  unit?:        string | null;
+  quantity:     number;
+  /** Unit price excluding tax */
+  unitPriceHt:  number;
+  /** Unit price including tax */
+  unitPriceTtc: number;
+  /** TVA rate as decimal e.g. 0.19 for 19% */
+  tvaRate:      number;
+  /** TVA percentage as integer e.g. 19 */
+  tvaPct:       number;
+  /** Discount percentage e.g. 10 for 10% */
+  discountPct:  number;
+  /** Discount amount in DZD */
+  discountAmt:  number;
+  /** Line total HT after discount */
+  totalHt:      number;
+  /** Line TVA amount */
+  totalTva:     number;
+  /** Line total TTC after discount */
+  totalTtc:     number;
+  /** Lot/serial number if applicable */
+  lot?:         string | null;
+  notes?:       string | null;
+}
+
+export interface TaxRate {
+  /** Integer percentage e.g. 9, 19 */
+  rate:   number;
+  /** Taxable base HT */
+  baseHt: number;
+  /** TVA amount for this rate */
+  tva:    number;
+  /** Total TTC for this rate */
+  ttc:    number;
+}
+
+export interface DocumentTotals {
+  totalHt:       number;
+  totalTva:      number;
+  totalTtc:      number;
+  /** Fiscal stamp (timbre fiscal) â€” flat 1% capped at 2500 DZD in Algeria */
+  fiscalStamp:   number;
+  totalDiscount: number;
+  /** Amount effectively paid */
+  paid:          number;
+  /** Change returned to customer */
+  change:        number;
+  /** Amount still owed */
+  remaining:     number;
+}
+
+export interface Payment {
+  /** Payment mode name e.g. "Ù†Ù‚Ø¯Ø§Ù‹", "ØªØ­ÙˆÙŠÙ„ Ø¨Ù†ÙƒÙŠ" */
+  mode:      string;
+  amount:    number;
+  reference?: string | null;
+  date?:     string | null;
+}
+
+export interface BalanceInfo {
+  /** Party balance before this document */
+  previous: number;
+  /** Net movement from this document */
+  movement: number;
+  /** Party balance after this document */
+  current:  number;
+  /** Payment due date balance (for credit terms) */
+  due?:     number | null;
+}
+
+export interface CurrencyInfo {
+  code?:   string;
+  /** DZD by default */
+  symbol?: string;
+  /** Exchange rate to base currency */
+  rate?:   number;
+}
+
+// â”€â”€â”€ Report summary (for session reports, aggregated reports) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export interface ReportPaymentBreakdown {
+  mode:   string;
+  count:  number;
+  amount: number;
+}
+
+export interface ReportProductSummary {
+  name:        string;
+  ref?:        string | null;
+  quantity:    number;
+  totalHt:     number;
+  totalTtc:    number;
+}
+
+export interface ReportSummary {
+  /** Report title */
+  title?:           string;
+  /** Period start (ISO date) */
+  periodStart?:     string | null;
+  /** Period end (ISO date) */
+  periodEnd?:       string | null;
+  /** Cashier / user who generated the report */
+  cashierName?:     string | null;
+  /** Gross sales before returns */
+  grossSales:       number;
+  /** Total returns */
+  returnsTotal:     number;
+  /** Net sales (gross - returns) */
+  netSales:         number;
+  /** Number of invoices in period */
+  invoicesCount:    number;
+  /** Number of returns in period */
+  returnsCount:     number;
+  /** Highest single invoice amount */
+  highestInvoice:   number;
+  /** Average invoice amount */
+  avgInvoice:       number;
+  /** Total TVA collected */
+  totalTva:         number;
+  /** Total fiscal stamp */
+  totalFiscalStamp: number;
+  /** Total discounts given */
+  totalDiscount:    number;
+  /** Opening cash amount */
+  openingCash:      number;
+  /** Expected cash in drawer */
+  closingCashExpected: number;
+  /** Counted cash in drawer */
+  closingCashCounted:  number;
+  /** Difference (counted - expected) */
+  cashDifference:   number;
+  /** Per payment mode breakdown */
+  paymentBreakdown: ReportPaymentBreakdown[];
+  /** Top products sold */
+  topProducts:      ReportProductSummary[];
+  /** Group label (for grouped reports) */
+  groupLabel?:      string;
+}
+
+// â”€â”€â”€ Primary contract â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export interface UniversalDocumentData {
+  /** Document identity: number, date, type, status */
+  doc:          DocumentInfo;
+  /** Printing company info (may be overridden by template override_* fields) */
+  company:      CompanyInfo;
+  /** Customer or supplier. Null for anonymous POS sales. */
+  party?:       PartyInfo | null;
+  /** Warehouse / branch */
+  warehouse?:   WarehouseInfo | null;
+  /** POS session â€” null for commercial documents */
+  session?:     SessionInfo | null;
+  /** Document lines */
+  lines:        DocumentLine[];
+  /** Aggregated totals */
+  totals:       DocumentTotals;
+  /** Per-rate tax breakdown */
+  taxBreakdown: TaxRate[];
+  /** Payment methods used */
+  payments:     Payment[];
+  /** Party balance snapshot â€” null if party has no balance tracking */
+  balance?:     BalanceInfo | null;
+  /** Currency info */
+  currency?:    CurrencyInfo;
+  /** Aggregated report summary â€” for session reports and aggregated reports */
+  report?:      ReportSummary | null;
+  /**
+   * Computed / formula results.
+   * FormulaEngine writes results here keyed by expression ID.
+   * Preview components read from here after evaluation.
+   */
+  computed:     Record<string, unknown>;
+}
+
+// â”€â”€â”€ Empty document factory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+/**
+ * Returns a structurally valid but visually empty UniversalDocumentData.
+ * Use this in preview components instead of MOCK data when liveData is null.
+ * All string fields are 'â€”', all numbers are 0, all arrays empty, no timestamps.
+ * Deterministic â€” always returns the same shape regardless of when called.
+ */
+export function emptyDocumentData(): UniversalDocumentData {
+  return {
+    doc: {
+      number:   'â€”',
+      date:     'â€”',
+      dueDate:  null,
+      time:     null,
+      typeCode: 'FV',
+      typeName: 'Ù…Ø¹Ø§ÙŠÙ†Ø©',
+      status:   'draft',
+    },
+    company: {
+      name:    '',
+      address: null,
+      phone:   null,
+      nif:     null,
+      rc:      null,
+      nis:     null,
+      ice:     null,
+      article: null,
+      logoUrl: null,
+    },
+    party:       null,
+    session:     null,
+    warehouse:   null,
+    lines:       [],
+    totals: {
+      totalHt:       0,
+      totalTva:      0,
+      totalTtc:      0,
+      fiscalStamp:   0,
+      totalDiscount: 0,
+      paid:          0,
+      change:        0,
+      remaining:     0,
+    },
+    taxBreakdown: [],
+    payments:     [],
+    report:       null,
+    balance:      null,
+    currency:     { code: 'DZD', symbol: 'Ø¯Ø¬', rate: 1 },
+    computed:     {},
+  };
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/types/defaults.ts
+```
+import type { DocTypeCode, PaperSize, PrintTemplate } from './domain';
 
 export function createDefaultTemplate(
-  docTypeCode: DocTypeCode = 'POS',
+  docTypeCode: DocTypeCode = 'POS' as DocTypeCode,
   paperSize: PaperSize = '80mm',
   name = 'Ø§Ù„Ù‚Ø§Ù„Ø¨ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ',
 ): PrintTemplate {
-  const is80mm = paperSize === '80mm' || paperSize === '58mm';
   return {
     id:             null,
     name,
@@ -2822,9 +10984,11 @@ export function createDefaultTemplate(
     font_family:      'tajawal',
 
     show_logo:          true,
+    logo_source:        'company',
     logo_size:          56,
     logo_align:         'center',
     logo_border_radius: 50,
+    custom_logo_url:    null,
 
     show_company_name:  true,
     company_name_text:  '',
@@ -2961,24 +11125,229 @@ export function createDefaultTemplate(
     show_report_summary_cards: true,
     show_report_payment_breakdown: true,
     show_report_top_products:  true,
+
+    report_col_widths:  { product: 50, quantity: 20, total: 30 },
+    report_col_headers: { product: 'Ø§Ù„Ù…Ù†ØªØ¬', quantity: 'Ø§Ù„ÙƒÙ…ÙŠØ©', total: 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ' },
   };
 }
 
-// â”€â”€â”€ API types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export function defaultTemplate(): PrintTemplate {
+  return createDefaultTemplate('FV' as DocTypeCode, '80mm');
+}
+```
 
-export interface PrintTemplateApiResponse {
-  id:            number;
-  name:          string;
-  doc_type_code: string;
-  paper_size:    string;
-  is_default:    boolean;
-  is_active:     boolean;
-  config:        Omit<PrintTemplate, 'id' | 'name' | 'doc_type_code' | 'paper_size' | 'is_default' | 'is_active' | 'created_at' | 'updated_at'>;
-  created_at:    string;
-  updated_at:    string;
+## FILE: resources/js/pages/settings/print-settings/types/domain.ts
+```
+export type PaperSize       = '80mm' | '58mm' | 'A4' | 'A5' | 'none';
+export type AlignOption     = 'right' | 'center' | 'left';
+export type BorderStyle     = 'solid' | 'dashed' | 'double' | 'none';
+export type PriceMode       = 'ht' | 'ttc';
+export type PageOrientation = 'portrait' | 'landscape';
+export type FontFamily      = 'tajawal' | 'monospace' | 'times' | 'arial';
+
+export type ColumnKey =
+  | 'rowNumber' | 'barcode' | 'ref' | 'name'
+  | 'unit' | 'quantity' | 'price' | 'discount' | 'tva' | 'total';
+
+export const DOC_TYPE_LIST = [
+  { code: 'FV',  name: 'ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª',   category: 'sales'     },
+  { code: 'BL',  name: 'ÙˆØµÙ„ Ø§Ù„ØªØ³Ù„ÙŠÙ…',       category: 'sales'     },
+  { code: 'DEV', name: 'Ø¹Ø±Ø¶ Ø§Ù„Ø³Ø¹Ø±',         category: 'sales'     },
+  { code: 'BCC', name: 'Ø·Ù„Ø¨ Ø§Ù„Ø¹Ù…ÙŠÙ„',        category: 'sales'     },
+  { code: 'AA',  name: 'Ù…Ø±ØªØ¬Ø¹ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª',   category: 'sales'     },
+  { code: 'FA',  name: 'ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ø´Ø±Ø§Ø¡',    category: 'purchase'  },
+  { code: 'BR',  name: 'ÙˆØµÙ„ Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…',     category: 'purchase'  },
+  { code: 'AV',  name: 'Ø£Ù…Ø± Ø§Ù„Ø´Ø±Ø§Ø¡',       category: 'purchase'  },
+  { code: 'DDP', name: 'Ø¥Ø°Ù† Ø§Ù„ØªØ³Ù„ÙŠÙ…',      category: 'warehouse' },
+  { code: 'BT',  name: 'ØªØ­ÙˆÙŠÙ„ Ø§Ù„Ù…Ø®Ø²ÙˆÙ†',   category: 'warehouse' },
+  { code: 'POS', name: 'Ø¥ÙŠØµØ§Ù„ POS',        category: 'pos'       },
+  { code: 'RPT', name: 'ØªÙ‚Ø±ÙŠØ± Ø§Ù„Ø¬Ù„Ø³Ø©',    category: 'pos'       },
+] as const;
+
+export type DocTypeCode = typeof DOC_TYPE_LIST[number]['code'];
+
+export interface PrintTemplate {
+  id:           number | null;
+  name:         string;
+  doc_type_code: DocTypeCode;
+  paper_size:   PaperSize;
+  is_default:   boolean;
+  is_active:    boolean;
+  template_version?: number;
+  created_at?:  string;
+  updated_at?:  string;
+
+  paper_width_mm:   58 | 80;
+  page_orientation: PageOrientation;
+  margin_top:       number;
+  margin_bottom:    number;
+  margin_sides:     number;
+  line_spacing:     number;
+  base_font_size:   number;
+  font_family:      FontFamily;
+
+  show_logo:         boolean;
+  logo_source:       'default' | 'company' | 'custom';
+  logo_size:         number;
+  logo_align:        AlignOption;
+  logo_border_radius: number;
+  custom_logo_url:   string | null;
+
+  show_company_name:   boolean;
+  company_name_text:   string;
+  company_name_size:   number;
+  company_name_bold:   boolean;
+  company_name_align:  AlignOption;
+  company_name_color:  string;
+
+  show_address:        boolean;
+  show_phone:          boolean;
+  show_tax_id:         boolean;
+  show_rc:             boolean;
+  show_nis:            boolean;
+  show_ice:            boolean;
+  show_article:        boolean;
+  company_info_align:  AlignOption;
+  company_info_size:   number;
+  override_address:    string;
+  override_phone:      string;
+  override_nif:        string;
+  override_rc:         string;
+  override_nis:        string;
+  override_ice:        string;
+  override_article:    string;
+
+  header_custom_text:  string;
+  header_separator:    BorderStyle;
+
+  title_text:       string;
+  title_size:       number;
+  title_bold:       boolean;
+  title_align:      AlignOption;
+  title_color:      string;
+  show_doc_number:  boolean;
+  show_date:        boolean;
+  show_time:        boolean;
+  show_due_date:    boolean;
+  show_cashier:     boolean;
+  show_client:      boolean;
+  show_client_nif:  boolean;
+  show_client_phone:boolean;
+  show_client_address: boolean;
+  show_delivery_address: boolean;
+  show_session:     boolean;
+  show_payment_term:boolean;
+  show_bank_details:boolean;
+  bank_details_text:string;
+  doc_separator:    BorderStyle;
+
+  col_order:   ColumnKey[];
+  col_show:    Partial<Record<ColumnKey, boolean>>;
+  col_widths:  Partial<Record<ColumnKey, number>>;
+  col_headers: Partial<Record<ColumnKey, string>>;
+  col_aligns:  Partial<Record<ColumnKey, AlignOption>>;
+
+  items_font_size:    number;
+  items_font_family:  FontFamily;
+  show_col_header:    boolean;
+  table_header_bold:  boolean;
+  table_header_bg:    boolean;
+  table_header_color: string;
+  table_border_style: BorderStyle;
+  alternating_rows:   boolean;
+  alternating_color:  string;
+  price_display:      PriceMode;
+  show_line_total_ttc:boolean;
+
+  totals_font_size:    number;
+  totals_bold:         boolean;
+  totals_align:        AlignOption;
+  show_total_ht:       boolean;
+  show_total_tva:      boolean;
+  show_tva_breakdown:  boolean;
+  show_discount_total: boolean;
+  show_fiscal_stamp:   boolean;
+  show_total_ttc:      boolean;
+  total_ttc_font_size: number;
+  total_ttc_bold:      boolean;
+  total_ttc_color:     string;
+  total_border_style:  BorderStyle;
+  show_amount_in_words:boolean;
+  show_paid_amount:    boolean;
+  show_change:         boolean;
+  show_remaining:      boolean;
+  show_prev_balance:   boolean;
+  show_new_balance:    boolean;
+
+  show_payment_details:boolean;
+  payment_font_size:   number;
+
+  footer_line1:        string;
+  footer_line2:        string;
+  footer_line3:        string;
+  footer_separator:    BorderStyle;
+  show_thank_you:      boolean;
+  thank_you_text:      string;
+  thank_you_size:      number;
+  thank_you_color:     string;
+  show_returns_policy: boolean;
+  returns_policy_text: string;
+  footer_legal_text:   string;
+
+  show_barcode:         boolean;
+  barcode_content:      'doc-number' | 'total' | 'custom';
+  barcode_custom_text:  string;
+  show_qr:              boolean;
+  qr_content:           'doc-number' | 'company-info' | 'both';
+
+  show_cashier_signature: boolean;
+  show_client_signature:  boolean;
+  show_stamp:             boolean;
+
+  show_header_section:    boolean;
+  show_doc_info_section:  boolean;
+  show_items_section:     boolean;
+  show_totals_section:    boolean;
+  show_payments_section:  boolean;
+  show_footer_section:    boolean;
+
+  rules: ReportRule[];
+
+  show_report_header:        boolean;
+  report_header_text:        string;
+  show_report_footer:        boolean;
+  report_footer_text:        string;
+  show_charts:               boolean;
+  chart_type:                'bar' | 'pie';
+  chart_title:               string;
+  group_by:                  string;
+  sort_by:                   string;
+  sort_direction:            'asc' | 'desc';
+  show_report_period:        boolean;
+  show_report_cashier:       boolean;
+  show_report_summary_cards: boolean;
+  show_report_payment_breakdown: boolean;
+  show_report_top_products:  boolean;
+
+  report_col_widths:  Partial<Record<'product' | 'quantity' | 'total', number>>;
+  report_col_headers: Partial<Record<'product' | 'quantity' | 'total', string>>;
 }
 
-// â”€â”€â”€ Live data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export type SectionTarget = 'header' | 'doc-info' | 'items' | 'totals' | 'payments' | 'footer';
+
+export interface ReportRule {
+  id: string;
+  condition: string;
+  action: 'show' | 'hide' | 'highlight' | 'disable';
+  target: string;
+  priority?: number;
+  highlightStyle?: Record<string, string>;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/types/live-data.ts
+```
+import type { PaperSize, PrintTemplate } from './domain';
 
 export interface TemplateLiveData {
   docNumber?:   string;
@@ -3023,8 +11392,6 @@ export interface CompanyData {
   logoUrl?: string | null;
 }
 
-// â”€â”€â”€ Detected printer & doc config (Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø·Ø§Ø¨Ø¹Ø§Øª) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 export interface DetectedPrinter {
   id:        string;
   name:      string;
@@ -3045,15 +11412,63 @@ export interface DocumentPrintConfig {
   templates:     PaperSize[];
 }
 
-// â”€â”€â”€ Backward-compat aliases â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ØªÙØ³ØªØ®Ø¯Ù… ÙÙŠ POS ÙˆØ§Ù„Ù…ÙƒÙˆÙ†Ø§Øª Ø§Ù„Ù‚Ø¯ÙŠÙ…Ø©
-
 export type ReceiptTemplate80mm = PrintTemplate;
 export type CompanyPreviewData = CompanyData;
-export type ReceiptLiveData = TemplateLiveData;
+```
 
-export function defaultTemplate(): PrintTemplate {
-  return createDefaultTemplate('FV', '80mm');
+## FILE: resources/js/pages/settings/print-settings/utils/index.ts
+```
+export { numberToArabicWords } from './numberToArabic';
+```
+
+## FILE: resources/js/pages/settings/print-settings/utils/numberToArabic.ts
+```
+export function numberToArabicWords(n: number): string {
+  if (n === 0) return 'ØµÙØ±';
+  const units = ['', 'ÙˆØ§Ø­Ø¯', 'Ø§Ø«Ù†Ø§Ù†', 'Ø«Ù„Ø§Ø«Ø©', 'Ø£Ø±Ø¨Ø¹Ø©', 'Ø®Ù…Ø³Ø©', 'Ø³ØªØ©', 'Ø³Ø¨Ø¹Ø©', 'Ø«Ù…Ø§Ù†ÙŠØ©', 'ØªØ³Ø¹Ø©'];
+  const teens = ['Ø¹Ø´Ø±Ø©', 'Ø£Ø­Ø¯ Ø¹Ø´Ø±', 'Ø§Ø«Ù†Ø§ Ø¹Ø´Ø±', 'Ø«Ù„Ø§Ø«Ø© Ø¹Ø´Ø±', 'Ø£Ø±Ø¨Ø¹Ø© Ø¹Ø´Ø±', 'Ø®Ù…Ø³Ø© Ø¹Ø´Ø±', 'Ø³ØªØ© Ø¹Ø´Ø±', 'Ø³Ø¨Ø¹Ø© Ø¹Ø´Ø±', 'Ø«Ù…Ø§Ù†ÙŠØ© Ø¹Ø´Ø±', 'ØªØ³Ø¹Ø© Ø¹Ø´Ø±'];
+  const tens  = ['', '', 'Ø¹Ø´Ø±ÙˆÙ†', 'Ø«Ù„Ø§Ø«ÙˆÙ†', 'Ø£Ø±Ø¨Ø¹ÙˆÙ†', 'Ø®Ù…Ø³ÙˆÙ†', 'Ø³ØªÙˆÙ†', 'Ø³Ø¨Ø¹ÙˆÙ†', 'Ø«Ù…Ø§Ù†ÙˆÙ†', 'ØªØ³Ø¹ÙˆÙ†'];
+  const hundreds = ['', 'Ù…Ø¦Ø©', 'Ù…Ø¦ØªØ§Ù†', 'Ø«Ù„Ø§Ø« Ù…Ø¦Ø©', 'Ø£Ø±Ø¨Ø¹ Ù…Ø¦Ø©', 'Ø®Ù…Ø³ Ù…Ø¦Ø©', 'Ø³Øª Ù…Ø¦Ø©', 'Ø³Ø¨Ø¹ Ù…Ø¦Ø©', 'Ø«Ù…Ø§Ù† Ù…Ø¦Ø©', 'ØªØ³Ø¹ Ù…Ø¦Ø©'];
+
+  const intPart = Math.floor(n);
+  if (intPart === 0) return 'ØµÙØ±';
+
+  let result = '';
+
+  const thousands = Math.floor(intPart / 1000);
+  const remainder = intPart % 1000;
+
+  if (thousands > 0) {
+    if (thousands === 1) result += 'Ø£Ù„Ù';
+    else if (thousands === 2) result += 'Ø£Ù„ÙØ§Ù†';
+    else result += units[thousands] + ' Ø¢Ù„Ø§Ù';
+  }
+
+  if (remainder > 0) {
+    if (result) result += ' Ùˆ';
+    const h = Math.floor(remainder / 100);
+    const t = remainder % 100;
+
+    if (h > 0) {
+      result += hundreds[h];
+    }
+
+    if (t > 0) {
+      if (h > 0) result += ' Ùˆ';
+      if (t < 10) {
+        result += units[t];
+      } else if (t < 20) {
+        result += teens[t - 10];
+      } else {
+        const u = t % 10;
+        const tIdx = Math.floor(t / 10);
+        if (u > 0) result += units[u] + ' Ùˆ';
+        result += tens[tIdx];
+      }
+    }
+  }
+
+  return result;
 }
 ```
 

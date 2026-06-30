@@ -7,8 +7,12 @@ import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type { DocumentType } from '@/lib/api/core/types';
-import { TemplatePrintModal, DocumentDataBuilder, usePrintTemplates } from '@/reporting';
-import type { CompanyInfo, PrintTemplate } from '@/reporting';
+import TemplatePrintModal from '@/pages/settings/print-settings/components/shared/TemplatePrintModal';
+import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
+import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
+import { resolveTemplateById } from '@/pages/settings/print-settings/runtime/TemplateResolver';
+import type { CompanyInfo } from '@/pages/settings/print-settings/types/data';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 
 import { useDocumentLookups }  from '../hooks/useDocumentLookups';
 import { useDocumentForm }     from '../hooks/useDocumentForm';
@@ -364,10 +368,10 @@ export default function CommercialDocumentModal({
     logoUrl: (activeCompany as any).avatar ?? null,
   } : null, [activeCompany]);
 
-  const { data: printTemplates = [] } = usePrintTemplates(docCode);
+  const { data: printTemplates = [] } = usePrintTemplatesList(docCode);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const selectedTemplate = useMemo(() => {
-    if (selectedTemplateId) return printTemplates.find(t => t.id === selectedTemplateId);
+    if (selectedTemplateId) return resolveTemplateById(printTemplates, selectedTemplateId);
     return printTemplates[0] || null;
   }, [selectedTemplateId, printTemplates]);
 

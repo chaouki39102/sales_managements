@@ -1,8 +1,12 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
-import { usePrintTemplates, DocumentDataBuilder } from '@/reporting';
-import type { CompanyInfo, PrintTemplate } from '@/reporting';
+import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
+import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
+import { resolveTemplateById, resolveTemplate } from '@/pages/settings/print-settings/runtime/TemplateResolver';
+import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
+import type { CompanyInfo } from '@/pages/settings/print-settings/types/data';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import type { CommercialDocument } from '@/lib/api/core/types';
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
@@ -132,7 +136,7 @@ export default function BatchPrintModal({ open, onClose, documents: docs }: Prop
     return Array.from(codes);
   }, [docs]);
 
-  const { data: allTemplates = [] } = usePrintTemplates();
+  const { data: allTemplates = [] } = usePrintTemplatesList();
 
   const templates = useMemo(() => {
     if (allTemplates.length === 0) return [];
@@ -157,14 +161,10 @@ export default function BatchPrintModal({ open, onClose, documents: docs }: Prop
 
         const code = ((fullDoc.document_type as Record<string, unknown> | undefined)?.code as string) ?? 'FV';
         const tpl = selectedTemplateId
-          ? templates.find(t => t.id === selectedTemplateId)
-          : templates.find(t => t.doc_type_code === code && t.is_active);
+          ? resolveTemplateById(templates, selectedTemplateId)
+          : resolveTemplate(templates, code);
 
-        const safeTpl = tpl ?? {
-          doc_type_code: code,
-          paper_size: 'A4',
-          paper_width_mm: 210,
-        } as PrintTemplate;
+        const safeTpl = tpl ?? createDefaultTemplate(code as any, 'A4');
 
         const docNum = (fullDoc as any).document_number ?? String(fullDoc.id);
         await printDocument(docNum, fullDoc as unknown as Record<string, unknown>, safeTpl, companyInfo);
