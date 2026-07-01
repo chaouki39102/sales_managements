@@ -759,7 +759,7 @@ export default function POSPage() {
     } catch (e: any) {
       toast.error(`خطأ في تجهيز الطباعة: ${e.message}`);
     }
-  }, [template, companyData, pos.client, paperWidth, copies, buildHtml, settings.printMode, paymentModes, user, lastDocNum]);
+  }, [template, companyData, pos.client, paperWidth, copies, settings.printMode, paymentModes, user, lastDocNum]);
 
   // ── Complete Sale ──────────────────────────────────────────────────────────
   const handleCompleteSale = useCallback(async (params: {
