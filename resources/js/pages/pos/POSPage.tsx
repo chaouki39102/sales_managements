@@ -141,69 +141,12 @@ export default function POSPage() {
   const [lastDocNum,  setLastDocNum]  = useState<string | undefined>();
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
 
-  const [receiptSnapshot, setReceiptSnapshot] = useState<{
-    items:    CartItem[];
-    totals:   CartTotals;
-    docNum?:  string;
-    client:   Party | null;
-    paid:     number;
-    payments: Array<{ paymentModeId: number; amount: number }>;
-    dueDate?: string;
-    prevBalance?: number;
-    newBalance?: number;
-  } | null>(null);
-
-  const { data: paymentModes } = usePaymentModes();
-
-  const posSaleSnapshot = useMemo((): POSSaleSnapshot | null => {
-    if (!receiptSnapshot) return null;
-    const snap = receiptSnapshot;
-    const totalTtc = snap.totals.total_ttc + (snap.totals.fiscal_stamp ?? 0);
-    const paid    = snap.paid ?? totalTtc;
-    const change  = paid > totalTtc ? paid - totalTtc : 0;
-    const remain  = paid < totalTtc ? totalTtc - paid : 0;
-    return {
-      docNumber:  snap.docNum ?? lastDocNum,
-      docDate:    new Date().toISOString().slice(0, 10),
-      cashierName: user?.name ?? 'الكاشير',
-      client: snap.client ? {
-        name:    snap.client.name,
-        nif:     (snap.client as any).nif,
-        phone:   (snap.client as any).phone,
-        address: (snap.client as any).address,
-      } : null,
-      items: snap.items.map(i => ({
-        name: i.product_name,
-        ref: i.ref,
-        qty: i.quantity,
-        unit_price_ht: i.unit_price_ht,
-        unit: i.unit_symbol,
-        tva_rate: i.tva_rate / 100,
-        discount_percentage: i.discount_percentage,
-        total_ht: i.total_ht,
-      })),
-      totals: {
-        total_ht:       snap.totals.total_ht,
-        total_tva:      snap.totals.total_tva,
-        total_ttc:      snap.totals.total_ttc,
-        fiscal_stamp:   snap.totals.fiscal_stamp ?? 0,
-        total_discount: snap.totals.total_discount,
-        paid, change, remaining: remain,
-      },
-      payments: (snap.payments ?? []).map(p => ({
-        mode:   paymentModes?.find(pm => pm.id === p.paymentModeId)?.name ?? `طريقة دفع #${p.paymentModeId}`,
-        amount: p.amount,
-      })),
-      prevBalance: snap.prevBalance ?? 0,
-      newBalance:  snap.newBalance ?? 0,
-      dueDate: snap.dueDate,
-    };
-  }, [receiptSnapshot, user, paymentModes, lastDocNum]);
+  const [receiptSnapshot, setReceiptSnapshot] = useState<POSSaleSnapshot | null>(null);
 
   const receiptSource = useMemo((): PipelineSource | null => {
-    if (!posSaleSnapshot) return null;
-    return { type: 'pos-snapshot', snapshot: posSaleSnapshot };
-  }, [posSaleSnapshot]);
+    if (!receiptSnapshot) return null;
+    return { type: 'pos-snapshot', snapshot: receiptSnapshot };
+  }, [receiptSnapshot]);
 
   const lastPaymentRef = useRef<{
     paid: number;
@@ -655,66 +598,10 @@ export default function POSPage() {
   const companyData: CompanyPreviewData | null = useMemo(() => mapCompany(company), [company]);
 
   const handlePrintDirect = useCallback(async (
-    printItems:  CartItem[],
-    printTotals: CartTotals,
-    printDocNumber?: string,
+    snap: POSSaleSnapshot,
   ) => {
     try {
-      const resolvedDocNum = printDocNumber ?? lastDocNum;
-      const totalTtc = printTotals.total_ttc + printTotals.fiscal_stamp;
-      const paid     = lastPaymentRef.current?.paid ?? totalTtc;
-      const change   = paid > totalTtc ? paid - totalTtc : 0;
-      const invoiceRemaining = paid < totalTtc ? totalTtc - paid : 0;
-
-      let prevBalance = 0;
-      if (pos.client?.id) {
-        try {
-          const balanceRes = await partyBalancesApi.getOne(pos.client.id);
-          const balanceData = (balanceRes as any)?.data ?? balanceRes;
-          const currentBalance = Number(balanceData?.current_balance ?? 0);
-          prevBalance = Math.max(0, currentBalance - totalTtc + paid);
-        } catch { /* prevBalance stays 0 */ }
-      }
-      const newBalance = prevBalance + invoiceRemaining;
-
-      const snap: POSSaleSnapshot = {
-        docNumber: resolvedDocNum,
-        docDate: new Date().toISOString().slice(0, 10),
-        cashierName: user?.name ?? 'الكاشير',
-        client: pos.client ? {
-          name:    pos.client.name,
-          nif:     (pos.client as any).nif,
-          phone:   (pos.client as any).phone,
-          address: (pos.client as any).address,
-        } : null,
-        items: printItems.map(i => ({
-          name: i.product_name,
-          ref: i.ref,
-          qty: i.quantity,
-          unit_price_ht: i.unit_price_ht,
-          unit: i.unit_symbol ?? null,
-          tva_rate: i.tva_rate / 100,
-          discount_percentage: i.discount_percentage,
-          total_ht: i.total_ht,
-        })),
-        totals: {
-          total_ht:       printTotals.total_ht,
-          total_tva:      printTotals.total_tva,
-          total_ttc:      printTotals.total_ttc,
-          fiscal_stamp:   printTotals.fiscal_stamp,
-          total_discount: printTotals.total_discount,
-          paid,
-          change,
-          remaining: invoiceRemaining,
-        },
-        payments: (lastPaymentRef.current?.payments ?? []).map(p => ({
-          mode:   paymentModes?.find(pm => pm.id === p.paymentModeId)?.name ?? `طريقة دفع #${p.paymentModeId}`,
-          amount: p.amount,
-        })),
-        prevBalance,
-        newBalance,
-        dueDate: lastPaymentRef.current?.dueDate,
-      };
+      const resolvedDocNum = snap.docNumber;
 
       const html = renderPreviewToHtml({
         template,
@@ -730,7 +617,6 @@ export default function POSPage() {
           toast.success('✅ تمت الطباعة الحرارية');
         } else {
           toast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
-          // fallback إلى طباعة المتصفح
           await printReceiptDirect({
             html, paperWidth, copies,
             onError: (e) => toast.error(`خطأ في طباعة المتصفح: ${e.message}`),
@@ -746,7 +632,7 @@ export default function POSPage() {
     } catch (e: any) {
       toast.error(`خطأ في تجهيز الطباعة: ${e.message}`);
     }
-  }, [template, companyData, pos.client, paperWidth, copies, settings.printMode, paymentModes, user, lastDocNum]);
+  }, [template, companyData, paperWidth, copies, settings.printMode]);
 
   // ── Complete Sale ──────────────────────────────────────────────────────────
   const handleCompleteSale = useCallback(async (params: {

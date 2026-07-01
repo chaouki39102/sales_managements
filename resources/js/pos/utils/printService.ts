@@ -724,6 +724,25 @@ function buildThermalTotals(
   b.divider('=', 42);
 }
 
+function buildThermalBalance(
+  b:        EscPosBuilder,
+  data:     UniversalDocumentData,
+  template: PrintTemplate,
+): void {
+  if (!data.balance) return;
+  if (!template.show_prev_balance && !template.show_new_balance) return;
+  b.divider('-', 42);
+  if (template.show_prev_balance) {
+    b.ascii(lineRow('الرصيد السابق:', `${fmt(data.balance.previous)} دج`)).lineFeed();
+  }
+  if (template.show_new_balance) {
+    b.setBold(true)
+     .ascii(lineRow('الرصيد الجديد:', `${fmt(data.balance.current)} دج`))
+     .lineFeed()
+     .setBold(false);
+  }
+}
+
 function buildThermalFooter(
   b:          EscPosBuilder,
   footerText: string,
@@ -804,6 +823,7 @@ export function buildReceiptBytesFromTemplate(
   buildThermalDocInfo(b, docNumber, client, template);
   buildThermalItems(b, items, template);
   buildThermalTotals(b, totals, template);
+  buildThermalBalance(b, data, template);
 
   if (opts.printQR && docNumber) {
     b.lineFeed();
