@@ -141,11 +141,12 @@ describe('SettingsSerializer — fromApiResponse', () => {
       config: null,
     } as any);
 
-    expect(result.show_logo).toBeDefined();
-    expect(result.title_text).toBeDefined();
+    // DB is the only source of truth — null config = no settings
+    expect(result.show_logo).toBeUndefined();
+    expect(result.title_text).toBeUndefined();
   });
 
-  it('should fill defaults for missing config fields', () => {
+  it('should return only explicitly stored config keys', () => {
     const result = fromApiResponse({
       id: 1,
       name: 'Minimal',
@@ -156,9 +157,10 @@ describe('SettingsSerializer — fromApiResponse', () => {
       config: {},
     } as any);
 
-    expect(result.show_logo).toBe(true);
-    expect(result.show_barcode).toBe(true);
-    expect(result.col_order).toBeDefined();
+    // DB is the only source of truth — empty config = no settings
+    expect(result.show_logo).toBeUndefined();
+    expect(result.show_barcode).toBeUndefined();
+    expect(result.col_order).toBeUndefined();
   });
 });
 

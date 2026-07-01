@@ -20,3 +20,5 @@ export {
 export { default as UniversalPrintPipeline } from './UniversalPrintPipeline';
 export type { PipelineSource } from './UniversalPrintPipeline';
 export { renderPreviewToHtml } from './renderPreviewToHtml';
+export { openPrintPopup, renderPipelineToPopup } from './UniversalPrintPipeline';
+export { mapCompany } from './PrintRuntimeAdapter';

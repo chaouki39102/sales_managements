@@ -14,7 +14,7 @@ function qrDataText(tpl: PrintTemplate, data: UniversalDocumentData): string {
     parts.push(data.doc.number);
   }
   if (tpl.qr_content === 'company-info' || tpl.qr_content === 'both') {
-    parts.push(data.company.name || '');
+    parts.push(data.company?.name || '');
   }
   return parts.join(' | ');
 }

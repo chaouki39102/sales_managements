@@ -4,7 +4,7 @@ import type { PrintTemplatesApi } from '../contracts/TemplateRepository';
 import type { PrintTemplate, PrintTemplateApiResponse, DocTypeCode } from '../types';
 import type { LibraryApiResponse } from '../template-library/types';
 import { usePrintTemplatesApi, useSlug } from '../providers/PrintSettingsContext';
-import { toApiPayload as serializePayload, normalizeTemplate } from '../services/SettingsSerializer';
+import { toApiPayload as serializePayload, fromApiResponse as deserializeResponse } from '../services/SettingsSerializer';
 
 // ─── Query key factory ─────────────────────────────────────────────────────
 export const printTemplateKeys = {
@@ -13,25 +13,7 @@ export const printTemplateKeys = {
   detail:  (slug: string, id: number)  => [slug, 'print-templates', id]         as const,
 };
 
-// ─── Pure helpers (no external deps) ───────────────────────────────────────
-
-function fromApiResponse(r: PrintTemplateApiResponse): PrintTemplate {
-  const raw: Partial<PrintTemplate> = {
-    id:            r.id as any,
-    name:          r.name,
-    doc_type_code: r.doc_type_code as DocTypeCode,
-    paper_size:    r.paper_size as PrintTemplate['paper_size'],
-    is_default:    r.is_default,
-    is_active:     r.is_active,
-    created_at:    r.created_at,
-    updated_at:    r.updated_at,
-  };
-  const config = r.config ?? {};
-  for (const key of Object.keys(config)) {
-    (raw as any)[key] = (config as any)[key];
-  }
-  return normalizeTemplate(raw, raw.doc_type_code, raw.paper_size);
-}
+// ─── Pure helpers ──────────────────────────────────────────────────────────
 
 function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
   return serializePayload(tpl) as unknown as Record<string, unknown>;
@@ -44,30 +26,30 @@ export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
     list: (docTypeCode?: string) =>
       api.get<PrintTemplateApiResponse[]>('/print-templates', docTypeCode
         ? { doc_type_code: docTypeCode } : undefined)
-        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as PrintTemplateApiResponse[]).map(fromApiResponse)),
+        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as PrintTemplateApiResponse[]).map(deserializeResponse)),
 
     show: (id: number) =>
       api.get<PrintTemplateApiResponse>(`/print-templates/${id}`)
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     create: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) =>
       api.post<PrintTemplateApiResponse>('/print-templates', toApiPayload(tpl as unknown as Partial<PrintTemplate>))
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     update: (id: number, tpl: Partial<PrintTemplate>) =>
       api.put<PrintTemplateApiResponse>(`/print-templates/${id}`, toApiPayload(tpl))
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     delete: (id: number) =>
       api.delete(`/print-templates/${id}`),
 
     setDefault: (id: number) =>
       api.post<PrintTemplateApiResponse>(`/print-templates/${id}/set-default`)
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     duplicate: (id: number, newName: string) =>
       api.post<PrintTemplateApiResponse>(`/print-templates/${id}/duplicate`, { name: newName })
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     library: () =>
       api.get<LibraryApiResponse[]>('/print-templates/library')
@@ -75,7 +57,7 @@ export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
 
     installLibrary: (templateId: string) =>
       api.post<PrintTemplateApiResponse>('/print-templates/library/install', { template_id: templateId })
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     uploadLogo: (file: File, onProgress?: (p: number) => void) => {
       const fd = new FormData();

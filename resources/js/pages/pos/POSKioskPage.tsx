@@ -29,6 +29,7 @@ import type { PaginatedResponse }      from '@/lib/api/core/types';
 import type { Product, ProductVariant, CartItem, CartTotals } from '@/types';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
 import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
+import { mapCompany } from '@/pages/settings/print-settings/runtime';
 import type { CompanyPreviewData } from '@/pages/settings/print-settings/types';
 
 import ProductSearchBar         from '@/pos/components/ProductSearchBar';
@@ -123,22 +124,9 @@ export default function POSKioskPage() {
 
   const defaultWarehouse = warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null;
 
-  const { template } = usePrintSettings('FV');
+  const { template } = usePrintSettings('POS');
 
-  const companyData: CompanyPreviewData | null = useMemo(() => {
-    if (!company) return null;
-    return {
-      name:    company.name    ?? '',
-      address: company.address ?? '',
-      phone:   company.phone   ?? '',
-      nif:     company.nif     ?? '',
-      rc:      company.rc      ?? '',
-      nis:     company.nis     ?? '',
-      ice:     '',
-      article: company.ai      ?? '',
-      logoUrl: company.avatar  ?? null,
-    };
-  }, [company]);
+  const companyData: CompanyPreviewData | null = useMemo(() => mapCompany(company), [company]);
 
   const { data: productsRaw } = useQuery({
     queryKey: ['pos-products-kiosk', slug, searchQuery, selectedCategory],

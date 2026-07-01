@@ -20,6 +20,5 @@ export function useHost(): HostDependencies {
 export function useApiClient() { return useHost().apiClient; }
 export function useNotifier() { return useHost().notifier; }
 export function usePrintTemplatesApi() { return useHost().printTemplatesApi; }
-export function useTemplateHooks() { return useHost().templateHooks; }
 export function useCompany() { return useHost().company; }
 export function useSlug() { return useHost().slug; }

@@ -74,7 +74,7 @@ import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings
 import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
-import { renderPreviewToHtml }  from '@/pages/settings/print-settings/runtime';
+import { renderPreviewToHtml, mapCompany }  from '@/pages/settings/print-settings/runtime';
 import { printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
@@ -650,22 +650,9 @@ export default function POSPage() {
 
   // ── Print Settings ──────────────────────────────────────────────────────────
   const { template, enabled: isPrintEnabled, copies, paperWidth, autoPrint, showPreview }
-    = usePrintSettings('FV');
+    = usePrintSettings('POS');
 
-  const companyData: CompanyPreviewData | null = useMemo(() => {
-    if (!company) return null;
-    return {
-      name:    company.name    ?? '',
-      address: company.address ?? '',
-      phone:   company.phone   ?? '',
-      nif:     company.nif     ?? '',
-      rc:      company.rc      ?? '',
-      nis:     company.nis     ?? '',
-      ice:     '',
-      article: company.ai      ?? '',
-      logoUrl: company.avatar  ?? null,
-    };
-  }, [company]);
+  const companyData: CompanyPreviewData | null = useMemo(() => mapCompany(company), [company]);
 
   const handlePrintDirect = useCallback(async (
     printItems:  CartItem[],

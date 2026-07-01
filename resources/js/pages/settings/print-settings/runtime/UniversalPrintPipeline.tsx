@@ -70,23 +70,20 @@ export default function UniversalPrintPipeline({ source, template, company, clas
   return (
     <Suspense fallback={FALLBACK}>
       <div className={className} style={style}>
-        <UniversalPreview tpl={template} data={data} company={company} />
+        <UniversalPreview tpl={template} data={data} />
       </div>
     </Suspense>
   );
 }
 
-// ─── Print-to-popup helper ─────────────────────────────────────────────────
+// ─── Shared popup window helper ──────────────────────────────────────────
 
-export function renderPipelineToPopup(
-  source:    PipelineSource,
-  template:  PrintTemplate,
-  company:   CompanyInfo | null,
+export function openPrintPopup(
+  width:       number,
+  height:      number,
+  extraStyles?: string,
 ): Window | null {
-  const isThermal = template.paper_size === '80mm' || template.paper_size === '58mm';
-  const w = isThermal ? 320 : template.paper_size === 'A5' ? 500 : 720;
-
-  const win = window.open('', '_blank', `width=${w},height=700`);
+  const win = window.open('', '_blank', `width=${width},height=${height}`);
   if (!win) return null;
 
   win.document.write(`<!DOCTYPE html>
@@ -98,6 +95,7 @@ export function renderPipelineToPopup(
     body { margin: 0; padding: 0; direction: rtl; font-family: 'Tajawal', sans-serif; }
     @page { margin: 0; }
     @media print { body { padding: 0; } }
+    ${extraStyles ?? ''}
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"/>
 </head>
@@ -113,6 +111,20 @@ export function renderPipelineToPopup(
 </body>
 </html>`);
   win.document.close();
+  return win;
+}
+
+// ─── Print-to-popup helper ─────────────────────────────────────────────────
+
+export function renderPipelineToPopup(
+  source:    PipelineSource,
+  template:  PrintTemplate,
+  company:   CompanyInfo | null,
+): Window | null {
+  const isThermal = template.paper_size === '80mm' || template.paper_size === '58mm';
+  const w = isThermal ? 320 : template.paper_size === 'A5' ? 500 : 720;
+  const win = openPrintPopup(w, 700);
+  if (!win) return null;
 
   const root = win.document.getElementById('print-root');
   if (!root) { win.close(); return null; }
@@ -120,7 +132,7 @@ export function renderPipelineToPopup(
   const reactRoot = ReactDOM.createRoot(root);
   reactRoot.render(
     <Suspense fallback={null}>
-      <UniversalPreview tpl={template} data={buildData(source, company)} company={company} />
+      <UniversalPreview tpl={template} data={buildData(source, company)} />
     </Suspense>
   );
 

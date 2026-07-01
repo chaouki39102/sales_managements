@@ -3,10 +3,9 @@ import React, { useState, useMemo } from 'react';
 import { formatDZD } from '@/pos/utils/calculations';
 import type { PosSession } from '@/lib/api/endpoints/posSession';
 import { useActiveCompany } from '@/lib/store/appStore';
-import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
+import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
 import TemplatePrintModal from '@/pages/settings/print-settings/components/shared/TemplatePrintModal';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
-import type { CompanyInfo } from '@/pages/settings/print-settings/types/data';
 
 interface Props {
   session:      PosSession;
@@ -26,20 +25,9 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
   const [tab, setTab] = useState<Tab>('overview');
   const [printModalOpen, setPrintModalOpen] = useState(false);
 
-  const activeCompany = useActiveCompany();
-  const companyInfo: CompanyInfo | null = useMemo(() => activeCompany ? {
-    name:    activeCompany.name    ?? '',
-    address: activeCompany.address ?? '',
-    phone:   activeCompany.phone   ?? '',
-    nif:     activeCompany.nif     ?? '',
-    rc:      activeCompany.rc      ?? '',
-    nis:     activeCompany.nis     ?? '',
-    ice:    (activeCompany as any).ice ?? '',
-    article: (activeCompany as any).ai ?? '',
-    logoUrl: (activeCompany as any).avatar ?? null,
-  } : null, [activeCompany]);
+  const companyInfo = mapCompany(useActiveCompany());
 
-  const { data: reportTemplates = [] } = usePrintTemplates('RPT');
+  const { data: reportTemplates = [] } = usePrintTemplatesList('RPT');
 
   const reportData = useMemo(
     () => companyInfo ? DocumentDataBuilder.fromSessionReport(session as unknown as Record<string, unknown>, companyInfo) : null,

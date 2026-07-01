@@ -10,4 +10,4 @@ export { default as PreviewSelector } from './components/PreviewSelector';
 
 // Types ظ¤ consumers need access to these for template data
 export * from './types';
-export type { ReceiptLiveData, CompanyPreviewData } from './types';
+export type { CompanyPreviewData } from './types';

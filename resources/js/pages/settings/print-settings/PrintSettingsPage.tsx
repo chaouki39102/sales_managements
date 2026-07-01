@@ -15,14 +15,14 @@ import { type Updater } from './components/ColumnManager';
 import {
   DOC_TYPE_LIST,
   type PrintTemplate, type DocTypeCode,
-  type CompanyData,
 } from './types';
 import { DocumentDataBuilder } from './types/data/DocumentDataBuilder';
+import { resolveTemplate } from './runtime';
 import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
-import { normalizeTemplate } from './services/SettingsSerializer';
+import { normalizeAfterLoad, validateTemplateIntegrity, TEMPLATE_VERSION } from './services/SettingsSerializer';
 
 const PAPER_DIM: Record<string, { w: number; h: number }> = {
   '80mm': { w: 80,  h: 0   },
@@ -50,20 +50,7 @@ export default function PrintSettingsPage() {
   const companyCtx = useCompany();
   const slug       = useSlug();
 
-  const companyData: CompanyData | null = useMemo(() => companyCtx
-    ? {
-        name:    companyCtx.name    ?? '',
-        address: companyCtx.address ?? '',
-        phone:   companyCtx.phone   ?? '',
-        nif:     companyCtx.nif     ?? '',
-        rc:      companyCtx.rc      ?? '',
-        nis:     companyCtx.nis     ?? '',
-        ice:     '',
-        article: companyCtx.article ?? '',
-        logoUrl: companyCtx.logoUrl ?? null,
-      }
-    : null,
-  [companyCtx]);
+
 
   const [activeCat,     setActiveCat]     = useState<string>('pos');
   const [activeDoc,     setActiveDoc]     = useState<DocTypeCode>('POS');
@@ -113,20 +100,70 @@ export default function PrintSettingsPage() {
     if (useRealData && !prevUseRealData.current) refetch();
     prevUseRealData.current = useRealData;
   }, [useRealData, refetch]);
+
+  // ── Fetch party balance for the preview document ────────────────────────
+  const partyId = useMemo(() => {
+    if (!previewDoc || typeof previewDoc !== 'object') return null;
+    const p = (previewDoc as Record<string, unknown>).party as Record<string, unknown> | undefined;
+    const id = p?.id;
+    return typeof id === 'number' ? id : null;
+  }, [previewDoc]);
+
+  const previewDocDate = useMemo(() => {
+    if (!previewDoc || typeof previewDoc !== 'object') return null;
+    const d = (previewDoc as Record<string, unknown>).document_date;
+    return typeof d === 'string' ? d : null;
+  }, [previewDoc]);
+
+  const { data: partyBalance } = useQuery({
+    queryKey: [slug, 'preview-party-balance', partyId, previewDocDate],
+    queryFn: async () => {
+      if (!partyId) return null;
+      const res = await apiClient.get<Record<string, unknown>>(`/party-balances/${partyId}`, {
+        date: previewDocDate || undefined,
+      });
+      const data = (res?.data ?? res) as Record<string, unknown> | undefined;
+      if (!data) return null;
+      return { current_balance: Number(data.current_balance ?? 0) };
+    },
+    enabled: !!slug && useRealData && !!partyId,
+    staleTime: 60_000,
+  });
+
   const previewData: UniversalDocumentData | null = useMemo(() => {
-    if (!previewDoc || !companyData) return null;
-    return DocumentDataBuilder.fromApiDocument(previewDoc, companyData);
-  }, [previewDoc, companyData]);
+    if (!previewDoc || !companyCtx) return null;
+    let balanceOpts: { prevBalance: number; newBalance: number } | undefined;
+    if (partyBalance) {
+      const raw = (previewDoc as Record<string, unknown>).totals as Record<string, unknown> | undefined;
+      const remaining = Math.max(0, Number(raw?.remaining ?? 0));
+      balanceOpts = {
+        prevBalance: Math.max(0, partyBalance.current_balance - remaining),
+        newBalance:  partyBalance.current_balance,
+      };
+    }
+    return DocumentDataBuilder.fromApiDocument(previewDoc, companyCtx, balanceOpts);
+  }, [previewDoc, companyCtx, partyBalance]);
 
   useEffect(() => {
     if (templates.length > 0) {
-      const tpl = templates.find(t => t.is_default) ?? templates[0];
-      setSelectedTplId(tpl.id);
-      setLocalTpl(normalizeTemplate(tpl, activeDoc, tpl.paper_size));
-      setIsDirty(false);
+      const tpl = resolveTemplate(templates, activeDoc);
+      if (tpl) {
+        setSelectedTplId(tpl.id);
+        // DB is the only source of truth — no normalizeTemplate on loaded data.
+        // normalizeAfterLoad only fills truly undefined keys (schema migration).
+        setLocalTpl(normalizeAfterLoad(tpl));
+        setIsDirty(false);
+      } else {
+        const anyMatch = templates.some(t => t.doc_type_code === activeDoc);
+        if (anyMatch) {
+          setSelectedTplId(null);
+          setLocalTpl(normalizeAfterLoad({ id: null, doc_type_code: activeDoc, name: 'قالب جديد' }, activeDoc));
+          setIsDirty(true);
+        }
+      }
     } else {
       setSelectedTplId(null);
-      setLocalTpl(normalizeTemplate({ id: null, doc_type_code: activeDoc, name: 'قالب جديد' }, activeDoc));
+      setLocalTpl(normalizeAfterLoad({ id: null, doc_type_code: activeDoc, name: 'قالب جديد' }, activeDoc));
       setIsDirty(true);
     }
     historyRef.current = [];
@@ -181,6 +218,7 @@ export default function PrintSettingsPage() {
   const handleSave = useCallback(async () => {
     if (!localTpl || isSaving) return;
     setIsSaving(true);
+    const preSaveTpl = { ...localTpl };
     try {
       let savedTpl: PrintTemplate;
       if (localTpl.id) {
@@ -206,9 +244,29 @@ export default function PrintSettingsPage() {
         });
         setSelectedTplId(savedTpl.id);
       }
+
+      // Step 1: Replace editor state with DB response
       setLocalTpl({ ...savedTpl });
       setIsDirty(false);
       notifier.success('✅ تم حفظ القالب');
+
+      // Step 2: Compare pre-save vs DB response — report discrepancies
+      const diffs: string[] = [];
+      const allKeys = new Set([...Object.keys(preSaveTpl), ...Object.keys(savedTpl)]);
+      for (const k of allKeys) {
+        const a = JSON.stringify((preSaveTpl as any)[k]);
+        const b = JSON.stringify((savedTpl as any)[k]);
+        if (a !== b) diffs.push(k);
+      }
+      if (diffs.length > 0) {
+        console.warn('[PrintSettings] Save verification — differences:', diffs);
+      }
+
+      // Step 3: Verify integrity — warn if any registry keys are missing
+      const missing = validateTemplateIntegrity(savedTpl, savedTpl.name || 'unknown');
+      if (missing > 0) {
+        notifier.error(`⚠️ القالب محفوظ لكن ${missing} خاصية مفقودة`);
+      }
     } catch (e: any) {
       notifier.error(e?.message ?? 'فشل الحفظ');
     } finally {
@@ -300,7 +358,7 @@ export default function PrintSettingsPage() {
           return;
         }
         imported.id = localTpl?.id ?? null;
-        const merged = normalizeTemplate(imported, imported.doc_type_code ?? activeDoc, imported.paper_size);
+        const merged = normalizeAfterLoad(imported, imported.doc_type_code ?? activeDoc, imported.paper_size);
         setLocalTpl(merged);
         setIsDirty(true);
         notifier.success('تم الاستيراد — احفظ للتطبيق');
@@ -332,7 +390,7 @@ export default function PrintSettingsPage() {
     const reactRoot = createRoot(root);
     reactRoot.render(
       React.createElement(PreviewSelector, {
-        tpl: localTpl, company: companyData,
+        tpl: localTpl, company: companyCtx,
         data: useRealData ? previewData : null,
       }),
     );
@@ -342,7 +400,7 @@ export default function PrintSettingsPage() {
     win.focus();
     win.print();
     setTimeout(() => win.close(), 500);
-  }, [localTpl, companyData, previewData, useRealData]);
+  }, [localTpl, companyCtx, previewData, useRealData]);
 
   const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving });
   useEffect(() => { refs.current = { handleSave, handleUndo, handleRedo, isDirty, isSaving }; });
@@ -529,7 +587,7 @@ export default function PrintSettingsPage() {
               >
                 <button
                   onClick={() => {
-                    setSelectedTplId(tpl.id); setLocalTpl(normalizeTemplate(tpl, activeDoc, tpl.paper_size)); setIsDirty(false);
+                    setSelectedTplId(tpl.id); setLocalTpl(normalizeAfterLoad(tpl)); setIsDirty(false);
                   }}
                   type="button"
                   style={{
@@ -617,7 +675,7 @@ export default function PrintSettingsPage() {
               </div>
 
               <QuickNav controlsRef={controlsRef} />
-              <TemplateControls tpl={localTpl} update={update} companyData={companyData} />
+              <TemplateControls tpl={localTpl} update={update} companyData={companyCtx} />
             </div>
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--t4)', fontSize: 13, gap: 8 }}>
@@ -648,14 +706,14 @@ export default function PrintSettingsPage() {
                 {paperLabel(localTpl.paper_size, localTpl.paper_width_mm)}
               </span>
             )}
-            {companyData && (
+            {companyCtx && (
               <span style={{
                 fontSize: 10.5, padding: '2px 7px', borderRadius: 8,
                 background: 'var(--emb)', border: '1px solid var(--embo)',
                 color: 'var(--em)', fontWeight: 600,
               }}>
                 <i className="ti ti-building-store" style={{ marginLeft: 4, fontSize: 10 }} />
-                {companyData.name}
+                {companyCtx.name}
               </span>
             )}
             <div style={{ flex: 1 }} />
@@ -734,7 +792,7 @@ export default function PrintSettingsPage() {
                 display: 'inline-block',
               }}>
                 <ErrorBoundary>
-                  <PreviewSelector tpl={localTpl} company={companyData} data={useRealData ? previewData : null} />
+                  <PreviewSelector tpl={localTpl} company={companyCtx} data={useRealData ? previewData : null} />
                 </ErrorBoundary>
               </div>
             ) : (

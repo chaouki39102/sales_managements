@@ -5,6 +5,7 @@ import type { PrintTemplate, DocTypeCode } from '@/pages/settings/print-settings
 import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
 import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
 import { resolveTemplate } from '@/pages/settings/print-settings/runtime/TemplateResolver';
+import { openPrintPopup } from '@/pages/settings/print-settings/runtime';
 
 const UniversalPreview = React.lazy(() => import('@/pages/settings/print-settings/components/preview/UniversalPreview'));
 
@@ -114,8 +115,6 @@ const btnSecondary: React.CSSProperties = {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-let _printWinId = 0;
-
 function TemplatePrintModal({ open, onClose, document, company, template, templates, docTypeCode, data: overrideData }: TemplatePrintModalProps) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -143,7 +142,6 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
 
   const handlePrint = useCallback(() => {
     if (!tpl) return;
-    _printWinId++;
 
     const isThermal = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
     const paperW = isThermal
@@ -157,33 +155,22 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
       window.screen.availHeight,
     );
 
-    const win = window.open('', `_tplprint_${_printWinId}`, `width=${winW},height=${winH}`);
+    const bodyStyle = isThermal
+      ? 'body{margin:0;background:#fff;display:flex;justify-content:center;padding:10px}*{box-sizing:border-box}'
+      : 'body{margin:0;background:#fff;display:flex;justify-content:center;padding:20px}*{box-sizing:border-box}';
+
+    const win = openPrintPopup(winW, winH, bodyStyle);
     if (!win) { window.print(); return; }
 
-    const bodyStyle = isThermal
-      ? 'body{margin:0;background:#fff;display:flex;justify-content:center;padding:10px}'
-      : 'body{margin:0;background:#fff;display:flex;justify-content:center;padding:20px}';
-
-    win.document.write(
-      `<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"/>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"/>
-<style>${bodyStyle}*{box-sizing:border-box}</style>
-</head><body><div id="r"></div>
-<script>
-  document.fonts.ready.then(function(){
-    setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 500); }, 300);
-  });
-<\/script></body></html>`
-    );
-    win.document.close();
+    const root = win.document.getElementById('print-root');
+    if (!root) return;
 
     import('react-dom/client').then(({ createRoot }) => {
-      const root = win!.document.getElementById('r');
-      if (root) createRoot(root).render(
-        React.createElement(UniversalPreview, { tpl, data, company }),
+      createRoot(root).render(
+        React.createElement(UniversalPreview, { tpl, data }),
       );
     });
-  }, [tpl, data, company]);
+  }, [tpl, data]);
 
   if (!open) return null;
 
@@ -203,7 +190,7 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
 
         <div style={previewAreaStyle}>
           <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>...</div>}>
-            <UniversalPreview tpl={tpl} data={data} company={company} />
+            <UniversalPreview tpl={tpl} data={data} />
           </Suspense>
         </div>
 

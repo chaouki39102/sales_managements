@@ -24,7 +24,7 @@ export function resolveTemplate(
   if (paperSize) {
     return matching.find(t => t.paper_size === paperSize) ?? matching[0];
   }
-  return matching[0];
+  return matching.find(t => t.is_default) ?? matching[0];
 }
 
 /**

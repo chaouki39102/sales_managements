@@ -30,7 +30,6 @@ export default function PrintSettingsPageAdapter() {
     apiClient:         hostApiClient,
     notifier:          hostNotifier,
     printTemplatesApi: createPrintTemplatesApi(hostApiClient),
-    templateHooks:     null as any,
     company:           activeCompany ? {
       name:    activeCompany.name    ?? '',
       address: activeCompany.address ?? '',
@@ -38,7 +37,7 @@ export default function PrintSettingsPageAdapter() {
       nif:     activeCompany.nif     ?? '',
       rc:      activeCompany.rc      ?? '',
       nis:     activeCompany.nis     ?? '',
-      ice:     '',
+      ice:     (activeCompany as any).ice ?? '',
       article: (activeCompany as any).ai ?? '',
       logoUrl: (activeCompany as any).avatar ?? null,
     } : null,

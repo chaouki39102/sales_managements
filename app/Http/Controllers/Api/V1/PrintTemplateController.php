@@ -100,6 +100,10 @@ class PrintTemplateController extends BaseApiController
             if (isset($data['config']) && !is_array($data['config'])) {
                 unset($data['config']);
             }
+            // Guard: never replace config with empty array (partial update safety)
+            if (isset($data['config']) && is_array($data['config']) && empty($data['config'])) {
+                unset($data['config']);
+            }
 
             $template->fill($data);
             $template->save();

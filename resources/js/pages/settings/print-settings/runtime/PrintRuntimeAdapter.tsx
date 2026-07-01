@@ -23,7 +23,7 @@ const __hostApiClient: ApiClient = {
   upload:   <T,>(url: string, fd: FormData, onProgress?: (p: number) => void) => apiUpload<T>(url, fd, onProgress),
 };
 
-function mapCompany(ac: ReturnType<typeof useActiveCompany>): CompanyData | null {
+export function mapCompany(ac: ReturnType<typeof useActiveCompany>): CompanyData | null {
   if (!ac) return null;
   return {
     name:    ac.name    ?? '',

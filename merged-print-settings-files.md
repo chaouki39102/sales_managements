@@ -1123,17 +1123,6 @@ export function usePrintTemplates(docTypeCode?: DocTypeCode) {
   });
 }
 
-export function usePrintTemplate(id: number | null | undefined) {
-  const api = usePrintTemplatesApi();
-  const slug = useSlug();
-  return useQuery({
-    queryKey:  printTemplateKeys.detail(slug ?? '', id!),
-    queryFn:   () => api.show(id!),
-    enabled:   !!slug && !!id,
-    staleTime: 5 * 60_000,
-  });
-}
-
 export function usePrintTemplateMutations() {
   const api = usePrintTemplatesApi();
   const slug = useSlug();
@@ -2215,39 +2204,6 @@ export default function ImagePreviewModal({ open, src, alt, onClose }: Props) {
 }
 ```
 
-## FILE: resources/js/pages/settings/print-settings/components/index.ts
-```
-export { default as PreviewSelector } from './PreviewSelector';
-export { default as RulesSection } from './RulesSection';
-export { default as FormulaEditor } from './FormulaEditor';
-export { default as ChartSection } from './ChartSection';
-export { default as ImagePreviewModal } from './ImagePreviewModal';
-export { Accordion } from './Accordion';
-export { ColumnManager, type Updater } from './ColumnManager';
-export { TemplateControls } from './TemplateControls';
-export { QuickNav } from './QuickNav';
-export { TinyBtn, toolBtnStyle } from './TinyBtn';
-export {
-  Toggle, Slider, Field, Input, Textarea, Select,
-  Pills, ColorField, Divider, SectionTitle,
-  styledInput, ALIGN_OPTS, BORDER_OPTS,
-} from './ui';
-export { renderHeader } from './preview/HeaderSection';
-export { renderDocInfo } from './preview/DocInfoSection';
-export { renderItems } from './preview/ItemsSection';
-export { renderTotals } from './preview/TotalsSection';
-export { renderPayments } from './preview/PaymentsSection';
-export { renderFooter } from './preview/FooterSection';
-export { renderReport } from './preview/ReportSection';
-export { renderLogo } from './preview/LogoRenderer';
-export {
-  mm, align, fontFamily, borderStyle, colWidth, colAlign,
-  colDefaultHeader, Separator, DocRow, TotalRow, InfoRow,
-  getCompany, getVisibleCols, formatDate, SectionWrap,
-} from './preview/shared';
-export type { CompanyData } from './preview/shared';
-```
-
 ## FILE: resources/js/pages/settings/print-settings/components/preview/DocInfoSection.tsx
 ```
 import type { PrintTemplate } from '../../types';
@@ -3276,31 +3232,6 @@ export interface CompanyData {
   logoUrl?: string | null;
 }
 
-export function getCompany(
-  tpl: PrintTemplate,
-  api?: CompanyData | null,
-): CompanyData {
-  let logoUrl: string | null = null;
-  if (tpl.logo_source === 'custom') {
-    logoUrl = tpl.custom_logo_url ?? null;
-  } else if (tpl.logo_source === 'company') {
-    logoUrl = api?.logoUrl ?? null;
-  }
-  // 'default' → null → initial letter fallback in renderLogo
-
-  return {
-    name:    tpl.company_name_text || api?.name    || '',
-    address: tpl.override_address  || api?.address  || '',
-    phone:   tpl.override_phone    || api?.phone   || '',
-    nif:     tpl.override_nif      || api?.nif     || '',
-    rc:      tpl.override_rc       || api?.rc      || '',
-    nis:     tpl.override_nis      || api?.nis     || '',
-    ice:     tpl.override_ice      || api?.ice     || '',
-    article: tpl.override_article  || api?.article || '',
-    logoUrl,
-  };
-}
-
 export function buildTvaByRate(
   lines: DocumentLine[],
 ): Array<{ rate: number; base: number; amount: number }> {
@@ -3691,7 +3622,7 @@ export default React.memo(UniversalPreview);
 ## FILE: resources/js/pages/settings/print-settings/components/PreviewSelector.tsx
 ```
 import React, { Suspense } from 'react';
-import type { PrintTemplate, CompanyData } from '../types';
+import type { PrintTemplate } from '../types';
 import type { UniversalDocumentData } from '../types/data';
 
 const UniversalPreview = React.lazy(() => import('./preview/UniversalPreview'));
@@ -3708,14 +3639,13 @@ const FALLBACK = (
 
 interface Props {
   tpl:   PrintTemplate;
-  company?: CompanyData | null;
   data?:    UniversalDocumentData | null;
 }
 
-export default function PreviewSelector({ tpl, company, data }: Props) {
+export default function PreviewSelector({ tpl, data }: Props) {
   return (
     <Suspense fallback={FALLBACK}>
-      <UniversalPreview tpl={tpl} data={data ?? null} company={company ?? null} />
+      <UniversalPreview tpl={tpl} data={data ?? null} />
     </Suspense>
   );
 }
@@ -4118,6 +4048,334 @@ function RuleCard({
     </div>
   );
 }
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/shared/PrintQueuePanel.tsx
+```
+import React from 'react';
+import { usePrintJobQueue, statusColor, statusLabel } from '../../renderers/usePrintJobQueue';
+
+const panelStyle: React.CSSProperties = {
+  position: 'fixed', bottom: 16, right: 16, width: 360, maxHeight: 400,
+  background: '#fff', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+  display: 'flex', flexDirection: 'column', zIndex: 999, overflow: 'hidden',
+};
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  padding: '10px 14px', borderBottom: '1px solid #e2e8f0',
+  fontSize: 13, fontWeight: 700,
+};
+
+const listStyle: React.CSSProperties = {
+  flex: 1, overflow: 'auto', padding: '4px 0',
+};
+
+const itemStyle: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8,
+  padding: '6px 14px', fontSize: 12, borderBottom: '1px solid #f8f9fa',
+};
+
+const badgeStyle: (color: string) => React.CSSProperties = (color) => ({
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700,
+  color: '#fff', background: color, whiteSpace: 'nowrap',
+});
+
+const btnStyle: React.CSSProperties = {
+  background: 'none', border: 'none', cursor: 'pointer', fontSize: 12,
+  color: '#dc2626', padding: '2px 6px', borderRadius: 4,
+};
+
+export default function PrintQueuePanel() {
+  const {
+    jobs, pending, completed, failed, isProcessing, cancel, cancelAll, clear,
+  } = usePrintJobQueue();
+
+  if (jobs.length === 0) return null;
+
+  const now = Date.now();
+
+  return (
+    <div style={panelStyle}>
+      <div style={headerStyle}>
+        <span>
+          <i className="ti ti-printer" style={{ marginLeft: 6 }} />
+          مهام الطباعة ({jobs.length})
+          {isProcessing && (
+            <span style={{ fontSize: 11, fontWeight: 400, marginRight: 8, color: '#3b82f6' }}>
+              <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', marginLeft: 4 }} />
+              جارٍ…
+            </span>
+          )}
+        </span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {pending > 0 && (
+            <button onClick={cancelAll} style={btnStyle} type="button">
+              إلغاء الكل
+            </button>
+          )}
+          {completed + failed > 0 && completed + failed === jobs.length && (
+            <button onClick={clear} style={{ ...btnStyle, color: '#666' }} type="button">
+              مسح
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={listStyle}>
+        {jobs.map(job => {
+          const elapsed = job.completedAt
+            ? Math.round((job.completedAt - job.createdAt) / 1000)
+            : Math.round((now - job.createdAt) / 1000);
+          return (
+            <div key={job.id} style={itemStyle}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {job.name}
+              </span>
+              {job.status === 'failed' && job.error && (
+                <span title={job.error} style={{ color: '#dc2626', fontSize: 10, cursor: 'help' }}>
+                  <i className="ti ti-alert-triangle" />
+                </span>
+              )}
+              <span style={badgeStyle(statusColor(job.status))}>
+                {job.status === 'printing' && <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />}
+                {statusLabel(job.status)}
+              </span>
+              <span style={{ color: '#999', fontSize: 10, minWidth: 30, textAlign: 'left' }}>
+                {elapsed}s
+              </span>
+              {job.status === 'pending' && (
+                <button onClick={() => cancel(job.id)} style={{ ...btnStyle, fontSize: 10 }} type="button">
+                  <i className="ti ti-x" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{
+        display: 'flex', gap: 12, padding: '6px 14px', borderTop: '1px solid #e2e8f0',
+        fontSize: 11, color: '#94a3b8',
+      }}>
+        <span>بانتظار: {pending}</span>
+        <span style={{ color: '#16a34a' }}>تم: {completed}</span>
+        {failed > 0 && <span style={{ color: '#dc2626' }}>فشل: {failed}</span>}
+      </div>
+    </div>
+  );
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/components/shared/TemplatePrintModal.tsx
+```
+import React, { Suspense, useMemo, useEffect, useRef, useCallback } from 'react';
+import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data/DocumentDataBuilder';
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
+import type { PrintTemplate, DocTypeCode } from '@/pages/settings/print-settings/types';
+import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
+import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
+import { resolveTemplate } from '@/pages/settings/print-settings/runtime/TemplateResolver';
+import { openPrintPopup } from '@/pages/settings/print-settings/runtime';
+
+const UniversalPreview = React.lazy(() => import('@/pages/settings/print-settings/components/preview/UniversalPreview'));
+
+// ─── ApiDocument ────────────────────────────────────────────────────────────
+// Minimal shape expected by DocumentDataBuilder.fromApiDocument().
+// Consumers pass their full CommercialDocument — extra fields are ignored.
+
+interface ApiDocument {
+  id?:                   number;
+  document_number?:      string;
+  document_date?:        string;
+  due_date?:             string | null;
+  notes?:                string | null;
+  document_type?:        { code?: string; name?: string } | null;
+  document_status?:      { name?: string; code?: string } | null;
+  party?:                Record<string, unknown> | null;
+  warehouse?:            Record<string, unknown> | null;
+  currency?:             { code?: string; symbol?: string; exchange_rate?: number } | null;
+  lines?:                Record<string, unknown>[];
+  payments?:             Record<string, unknown>[];
+  totals?:               Record<string, unknown> | null;
+}
+
+// ─── Props ──────────────────────────────────────────────────────────────────
+
+interface TemplatePrintModalProps {
+  open:        boolean;
+  onClose:     () => void;
+  document?:   ApiDocument;
+  company:     CompanyData;
+  templates?:  PrintTemplate[];
+  template?:   PrintTemplate;
+  docTypeCode: string;
+  /** Pre-built data (bypasses fromApiDocument when provided) */
+  data?:       UniversalDocumentData;
+}
+
+// ─── Styles ─────────────────────────────────────────────────────────────────
+
+const overlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.5)',
+  zIndex: 1000,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const modalStyle: React.CSSProperties = {
+  width: '90vw',
+  maxWidth: 900,
+  maxHeight: '90vh',
+  background: 'var(--bg1)',
+  borderRadius: 8,
+  overflow: 'hidden',
+  display: 'flex',
+  flexDirection: 'column',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+};
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '12px 16px',
+  borderBottom: '1px solid var(--b2)',
+};
+
+const previewAreaStyle: React.CSSProperties = {
+  flex: 1,
+  overflow: 'auto',
+  padding: 16,
+  display: 'flex',
+  justifyContent: 'center',
+  background: 'var(--bg3)',
+};
+
+const footerStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 8,
+  padding: '12px 16px',
+  borderTop: '1px solid var(--b2)',
+};
+
+const btnPrimary: React.CSSProperties = {
+  padding: '8px 20px',
+  border: 'none',
+  borderRadius: 6,
+  background: 'var(--em)',
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const btnSecondary: React.CSSProperties = {
+  padding: '8px 20px',
+  border: '1px solid var(--b2)',
+  borderRadius: 6,
+  background: 'var(--bg1)',
+  color: 'var(--t2)',
+  fontSize: 14,
+  cursor: 'pointer',
+};
+
+// ─── Component ──────────────────────────────────────────────────────────────
+
+function TemplatePrintModal({ open, onClose, document, company, template, templates, docTypeCode, data: overrideData }: TemplatePrintModalProps) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const data: UniversalDocumentData = useMemo(
+    () => overrideData ?? (document ? DocumentDataBuilder.fromApiDocument(document, company) : DocumentDataBuilder.empty()),
+    [overrideData, document, company],
+  );
+
+  const tpl: PrintTemplate = useMemo(() => {
+    if (template) return template;
+    const found = resolveTemplate(templates ?? [], docTypeCode);
+    if (found) return found;
+    return createDefaultTemplate(docTypeCode as DocTypeCode, 'A4');
+  }, [template, templates, docTypeCode]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open]);
+
+  const handlePrint = useCallback(() => {
+    if (!tpl) return;
+
+    const isThermal = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
+    const paperW = isThermal
+      ? (tpl.paper_width_mm ?? 80)
+      : (tpl.paper_size === 'A4' ? 210 : 148);
+    const winW = isThermal
+      ? Math.min(Math.round(paperW * 3.78) + 60, 900)
+      : 900;
+    const winH = isThermal ? 700 : Math.min(
+      tpl.paper_size === 'A4' ? 1123 : 794,
+      window.screen.availHeight,
+    );
+
+    const bodyStyle = isThermal
+      ? 'body{margin:0;background:#fff;display:flex;justify-content:center;padding:10px}*{box-sizing:border-box}'
+      : 'body{margin:0;background:#fff;display:flex;justify-content:center;padding:20px}*{box-sizing:border-box}';
+
+    const win = openPrintPopup(winW, winH, bodyStyle);
+    if (!win) { window.print(); return; }
+
+    const root = win.document.getElementById('print-root');
+    if (!root) return;
+
+    import('react-dom/client').then(({ createRoot }) => {
+      createRoot(root).render(
+        React.createElement(UniversalPreview, { tpl, data }),
+      );
+    });
+  }, [tpl, data]);
+
+  if (!open) return null;
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={modalStyle} onClick={e => e.stopPropagation()}>
+        <div style={headerStyle}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>طباعة حسب القالب</h3>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--t4)', padding: '0 4px', lineHeight: 1 }}
+            aria-label="إغلاق"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={previewAreaStyle}>
+          <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>...</div>}>
+            <UniversalPreview tpl={tpl} data={data} />
+          </Suspense>
+        </div>
+
+        <div style={footerStyle}>
+          <button style={btnSecondary} onClick={onClose}>إلغاء</button>
+          <button style={btnPrimary} onClick={handlePrint}>طباعة</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default React.memo(TemplatePrintModal);
 ```
 
 ## FILE: resources/js/pages/settings/print-settings/components/TemplateControls.tsx
@@ -4550,14 +4808,13 @@ export interface ApiClient {
 ```
 import type { ApiClient } from './ApiClient';
 import type { Notifier } from './Notifier';
-import type { PrintTemplatesApi, TemplateRepositoryHooks } from './TemplateRepository';
+import type { PrintTemplatesApi } from './TemplateRepository';
 import type { CompanyData } from '../types';
 
 export interface HostDependencies {
   apiClient: ApiClient;
   notifier: Notifier;
   printTemplatesApi: PrintTemplatesApi;
-  templateHooks: TemplateRepositoryHooks;
   company: CompanyData | null;
   slug: string | null;
 }
@@ -4573,7 +4830,7 @@ export interface Notifier {
 
 ## FILE: resources/js/pages/settings/print-settings/contracts/TemplateRepository.ts
 ```
-import type { PrintTemplate, DocTypeCode } from '../types';
+import type { PrintTemplate } from '../types';
 
 export interface PrintTemplatesApi {
   list(docTypeCode?: string): Promise<PrintTemplate[]>;
@@ -4588,40 +4845,738 @@ export interface PrintTemplatesApi {
   uploadLogo(file: File, onProgress?: (p: number) => void): Promise<{ path: string; url: string }>;
 }
 
-export interface TemplateRepositoryHooks {
-  usePrintTemplates: (docTypeCode?: DocTypeCode) => { data: PrintTemplate[] | undefined; isLoading: boolean };
-  usePrintTemplateMutations: () => {
-    create: { mutateAsync: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) => Promise<PrintTemplate> };
-    update: { mutateAsync: ({ id, data }: { id: number; data: Partial<PrintTemplate> }) => Promise<PrintTemplate> };
-    remove: { mutateAsync: (id: number) => Promise<void> };
-    setDefault: { mutateAsync: (id: number) => Promise<PrintTemplate> };
-    duplicate: { mutateAsync: ({ id, name }: { id: number; name: string }) => Promise<PrintTemplate> };
-    installLibrary: { mutateAsync: (templateId: string) => Promise<PrintTemplate> };
-  };
+
+```
+
+## FILE: resources/js/pages/settings/print-settings/engines/AdvancedFunctions.ts
+```
+import { formulaEngine, type ExpressionFunction, type ExpressionValue } from '@/pages/settings/print-settings/services/engines/FormulaEngine';
+
+// ─── Helper ──────────────────────────────────────────────────────────────────
+
+function toNum(v: ExpressionValue): number {
+  return typeof v === 'number' ? v : Number(v) || 0;
 }
 
-export const PRINT_TEMPLATE_KEYS = {
-  all:     (slug: string)              => [slug, 'print-templates']              as const,
-  list:    (slug: string, code?: string) => [slug, 'print-templates', 'list', code] as const,
-  detail:  (slug: string, id: number)  => [slug, 'print-templates', id]         as const,
+function toStr(v: ExpressionValue): string {
+  return v == null ? '' : String(v);
+}
+
+function toDate(v: ExpressionValue): Date | null {
+  if (v instanceof Date) return v;
+  const s = toStr(v);
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function isArray(v: ExpressionValue): boolean {
+  return Array.isArray(v);
+}
+
+function isNumArr(v: ExpressionValue): v is number[] {
+  return Array.isArray(v) && v.every(x => typeof x === 'number');
+}
+
+// ─── Financial Functions ─────────────────────────────────────────────────────
+
+const PMT: ExpressionFunction = ([rate, nper, pvArg, fvArg, typeArg]) => {
+  const r = toNum(rate) / 100;
+  const n = toNum(nper);
+  const pv = toNum(pvArg);
+  const fv = fvArg != null ? toNum(fvArg) : 0;
+  const type = typeArg != null ? toNum(typeArg) : 0;
+  if (r === 0) return -(pv + fv) / n;
+  const pvif = Math.pow(1 + r, n);
+  return -(r * pv * pvif + fv * r / (pvif - 1)) / (pvif - 1) / (1 + r * type);
 };
+
+const NPER: ExpressionFunction = ([rate, pmtArg, pvArg, fvArg, typeArg]) => {
+  const r = toNum(rate) / 100;
+  const pmt = toNum(pmtArg);
+  const pv = toNum(pvArg);
+  const fv = fvArg != null ? toNum(fvArg) : 0;
+  const type = typeArg != null ? toNum(typeArg) : 0;
+  if (r === 0) return -(pv + fv) / pmt;
+  const num = pmt * (1 + r * type) - fv * r;
+  const den = pmt * (1 + r * type) + pv * r;
+  return Math.log(num / den) / Math.log(1 + r);
+};
+
+const RATE: ExpressionFunction = ([nper, pmtArg, pvArg, fvArg, typeArg, guessArg]) => {
+  const n = toNum(nper);
+  const pmt = toNum(pmtArg);
+  const pv = toNum(pvArg);
+  const fv = fvArg != null ? toNum(fvArg) : 0;
+  const type = typeArg != null ? toNum(typeArg) : 0;
+  let guess = guessArg != null ? toNum(guessArg) : 0.1;
+  for (let i = 0; i < 100; i++) {
+    const y = pmt * (1 + guess * type) * (Math.pow(1 + guess, n) - 1) / guess + pv * Math.pow(1 + guess, n) + fv;
+    const dy = pmt * (1 + guess * type) * (n * Math.pow(1 + guess, n - 1) / guess - (Math.pow(1 + guess, n) - 1) / (guess * guess)) + pv * n * Math.pow(1 + guess, n - 1);
+    if (Math.abs(dy) < 1e-12) break;
+    const newGuess = guess - y / dy;
+    if (Math.abs(newGuess - guess) < 1e-10) return newGuess;
+    guess = newGuess;
+  }
+  return guess;
+};
+
+const FV: ExpressionFunction = ([rate, nper, pmtArg, pvArg, typeArg]) => {
+  const r = toNum(rate) / 100;
+  const n = toNum(nper);
+  const pmt = toNum(pmtArg);
+  const pv = pvArg != null ? toNum(pvArg) : 0;
+  const type = typeArg != null ? toNum(typeArg) : 0;
+  if (r === 0) return -(pv + pmt * n);
+  const pvif = Math.pow(1 + r, n);
+  return -pv * pvif - pmt * (1 + r * type) * (pvif - 1) / r;
+};
+
+const PV: ExpressionFunction = ([rate, nper, pmtArg, fvArg, typeArg]) => {
+  const r = toNum(rate) / 100;
+  const n = toNum(nper);
+  const pmt = toNum(pmtArg);
+  const fv = fvArg != null ? toNum(fvArg) : 0;
+  const type = typeArg != null ? toNum(typeArg) : 0;
+  if (r === 0) return -(fv + pmt * n);
+  const pvif = Math.pow(1 + r, n);
+  return -(fv / pvif + pmt * (1 + r * type) * (1 / r - 1 / (r * pvif)));
+};
+
+const NPV: ExpressionFunction = ([rate, ...values]) => {
+  const r = toNum(rate) / 100;
+  let result = 0;
+  for (let i = 0; i < values.length; i++) {
+    result += toNum(values[i]) / Math.pow(1 + r, i + 1);
+  }
+  return result;
+};
+
+const IRR: ExpressionFunction = ([...values]) => {
+  const vals = values.map(toNum);
+  let guess = 0.1;
+  for (let i = 0; i < 1000; i++) {
+    let npv = 0;
+    let dnpv = 0;
+    for (let j = 0; j < vals.length; j++) {
+      npv += vals[j] / Math.pow(1 + guess, j);
+      dnpv -= j * vals[j] / Math.pow(1 + guess, j + 1);
+    }
+    if (Math.abs(dnpv) < 1e-12) break;
+    const newGuess = guess - npv / dnpv;
+    if (Math.abs(newGuess - guess) < 1e-10) return newGuess;
+    guess = newGuess;
+  }
+  return guess;
+};
+
+// ─── Date Functions ──────────────────────────────────────────────────────────
+
+const DATEDIF: ExpressionFunction = ([start, end, unit]) => {
+  const s = toDate(start);
+  const e = toDate(end);
+  if (!s || !e) return null;
+  const u = toStr(unit).toUpperCase();
+  const ms = e.getTime() - s.getTime();
+  const years = e.getFullYear() - s.getFullYear();
+  const months = years * 12 + (e.getMonth() - s.getMonth());
+  const days = Math.floor(ms / 86400000);
+  if (u === 'Y') return years;
+  if (u === 'M') return months;
+  if (u === 'D') return days;
+  if (u === 'MD') {
+    return e.getDate() - s.getDate();
+  }
+  if (u === 'YM') return months % 12;
+  if (u === 'YD') {
+    const s2 = new Date(e.getFullYear(), s.getMonth(), s.getDate());
+    return Math.floor((e.getTime() - s2.getTime()) / 86400000);
+  }
+  return days;
+};
+
+const EOMONTH: ExpressionFunction = ([date, months]) => {
+  const d = toDate(date);
+  if (!d) return null;
+  const m = Math.floor(toNum(months));
+  d.setMonth(d.getMonth() + m + 1, 0);
+  return d.toISOString().slice(0, 10);
+};
+
+const WORKDAY: ExpressionFunction = ([start, days]) => {
+  const d = toDate(start);
+  if (!d) return null;
+  let n = Math.floor(toNum(days));
+  const dir = n >= 0 ? 1 : -1;
+  while (n !== 0) {
+    d.setDate(d.getDate() + dir);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 5) n -= dir;
+  }
+  return d.toISOString().slice(0, 10);
+};
+
+const NETWORKDAYS: ExpressionFunction = ([start, end]) => {
+  const s = toDate(start);
+  const e = toDate(end);
+  if (!s || !e) return null;
+  let count = 0;
+  const cur = new Date(s);
+  while (cur <= e) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 5) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+};
+
+const WEEKNUM: ExpressionFunction = ([date]) => {
+  const d = toDate(date);
+  if (!d) return null;
+  const s = new Date(d.getFullYear(), 0, 1);
+  const diff = d.getTime() - s.getTime() + (s.getTimezoneOffset() - d.getTimezoneOffset()) * 60000;
+  return Math.ceil((diff / 86400000 + s.getDay() + 1) / 7);
+};
+
+const ISOWEEKNUM: ExpressionFunction = ([date]) => {
+  const d = toDate(date);
+  if (!d) return null;
+  const temp = new Date(d.valueOf());
+  temp.setDate(temp.getDate() + 3 - (temp.getDay() + 6) % 7);
+  const s = new Date(temp.getFullYear(), 0, 1);
+  return 1 + Math.round(((temp.getTime() - s.getTime()) / 86400000 - 3 + (s.getDay() + 6) % 7) / 7);
+};
+
+const QUARTER: ExpressionFunction = ([date]) => {
+  const d = toDate(date);
+  if (!d) return null;
+  return Math.floor(d.getMonth() / 3) + 1;
+};
+
+const YEARFRAC: ExpressionFunction = ([start, end]) => {
+  const s = toDate(start);
+  const e = toDate(end);
+  if (!s || !e) return null;
+  return (e.getTime() - s.getTime()) / 365.25 / 86400000;
+};
+
+const EDATE: ExpressionFunction = ([date, months]) => {
+  const d = toDate(date);
+  if (!d) return null;
+  d.setMonth(d.getMonth() + Math.floor(toNum(months)));
+  return d.toISOString().slice(0, 10);
+};
+
+// ─── Array Functions ─────────────────────────────────────────────────────────
+
+const FILTER: ExpressionFunction = ([arr, cond]) => {
+  if (!isArray(arr)) return [];
+  const condVal = (cond as ExpressionValue);
+  if (typeof condVal === 'function') {
+    return (arr as ExpressionValue[]).filter((item: ExpressionValue) => condVal(item));
+  }
+  return (arr as ExpressionValue[]).filter(() => isTruthy(condVal));
+};
+
+const SORT: ExpressionFunction = ([arr, direction]) => {
+  if (!isArray(arr)) return [];
+  const dir = toStr(direction).toLowerCase() === 'desc' ? -1 : 1;
+  return [...(arr as ExpressionValue[])].sort((a, b) => {
+    if (a == null) return 1;
+    if (b == null) return -1;
+    if (typeof a === 'number' && typeof b === 'number') return (a - b) * dir;
+    return String(a).localeCompare(String(b)) * dir;
+  });
+};
+
+const UNIQUE: ExpressionFunction = ([arr]) => {
+  if (!isArray(arr)) return [];
+  return [...new Set(arr as ExpressionValue[])];
+};
+
+const FLATTEN: ExpressionFunction = ([arr]) => {
+  if (!isArray(arr)) return [];
+  const result: ExpressionValue[] = [];
+  function flatten(v: ExpressionValue): void {
+    if (Array.isArray(v)) v.forEach(flatten);
+    else result.push(v);
+  }
+  (arr as ExpressionValue[]).forEach(flatten);
+  return result;
+};
+
+const ARRAY: ExpressionFunction = ([...args]) => args;
+
+const RANGE: ExpressionFunction = ([start, end, stepParam]) => {
+  const s = Math.floor(toNum(start));
+  const e = Math.floor(toNum(end));
+  const step = stepParam != null ? Math.max(1, Math.floor(toNum(stepParam))) : 1;
+  const result: number[] = [];
+  for (let i = s; i <= e; i += step) result.push(i);
+  return result;
+};
+
+function isTruthy(val: ExpressionValue): boolean {
+  if (val === null) return false;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  return val !== '';
+}
+
+// ─── Window Functions ────────────────────────────────────────────────────────
+
+const ROW_NUMBER: ExpressionFunction = ([_arr, sortField]) => { return null; };
+
+const RANK: ExpressionFunction = ([arr, value, order]) => {
+  if (!isNumArr(arr)) return null;
+  const desc = toStr(order).toLowerCase() === 'desc';
+  const sorted = [...arr].sort((a, b) => desc ? b - a : a - b);
+  const idx = sorted.indexOf(toNum(value));
+  return idx >= 0 ? idx + 1 : null;
+};
+
+const DENSE_RANK: ExpressionFunction = ([arr, value, order]) => {
+  if (!isNumArr(arr)) return null;
+  const desc = toStr(order).toLowerCase() === 'desc';
+  const uniq = [...new Set(arr)].sort((a, b) => desc ? b - a : a - b);
+  const idx = uniq.indexOf(toNum(value));
+  return idx >= 0 ? idx + 1 : null;
+};
+
+const NTILE: ExpressionFunction = ([arr, n]) => {
+  if (!isArray(arr) || !n) return [];
+  const numTiles = Math.max(1, Math.floor(toNum(n)));
+  const len = (arr as ExpressionValue[]).length;
+  const perTile = Math.ceil(len / numTiles);
+  return (arr as ExpressionValue[]).map((_, i) => Math.min(Math.floor(i / perTile) + 1, numTiles));
+};
+
+const LAG: ExpressionFunction = ([arr, offsetParam]) => {
+  if (!isArray(arr)) return null;
+  return null;
+};
+
+const LEAD: ExpressionFunction = ([arr, offsetParam]) => {
+  if (!isArray(arr)) return null;
+  return null;
+};
+
+const FIRST_VALUE: ExpressionFunction = ([arr]) => {
+  return isArray(arr) ? (arr as ExpressionValue[])[0] ?? null : null;
+};
+
+const LAST_VALUE: ExpressionFunction = ([arr]) => {
+  return isArray(arr) ? (arr as ExpressionValue[])[(arr as ExpressionValue[]).length - 1] ?? null : null;
+};
+
+const SUM_OVER: ExpressionFunction = ([..._args]) => null;
+const AVG_OVER: ExpressionFunction = ([..._args]) => null;
+
+// ─── Aggregation Extensions ──────────────────────────────────────────────────
+
+const MEDIAN: ExpressionFunction = ([arr]) => {
+  if (!isNumArr(arr) || arr.length === 0) return null;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
+const MODE: ExpressionFunction = ([arr]) => {
+  if (!isNumArr(arr) || arr.length === 0) return null;
+  const freq = new Map<number, number>();
+  for (const n of arr) freq.set(n, (freq.get(n) ?? 0) + 1);
+  let maxFreq = 0;
+  let mode = arr[0];
+  for (const [n, f] of freq) {
+    if (f > maxFreq) { maxFreq = f; mode = n; }
+  }
+  return mode;
+};
+
+const STDDEV: ExpressionFunction = ([arr]) => {
+  if (!isNumArr(arr) || arr.length < 2) return null;
+  const mean = arr.reduce((s, v) => s + v, 0) / arr.length;
+  return Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / (arr.length - 1));
+};
+
+const VARIANCE: ExpressionFunction = ([arr]) => {
+  if (!isNumArr(arr) || arr.length < 2) return null;
+  const mean = arr.reduce((s, v) => s + v, 0) / arr.length;
+  return arr.reduce((s, v) => s + (v - mean) ** 2, 0) / (arr.length - 1);
+};
+
+const PRODUCT: ExpressionFunction = ([...args]) => {
+  const nums = args.filter((v): v is number => typeof v === 'number');
+  return nums.length > 0 ? nums.reduce((p, v) => p * v, 1) : 0;
+};
+
+const COUNTIF: ExpressionFunction = ([arr, predicate]) => {
+  if (!isArray(arr)) return 0;
+  let count = 0;
+  for (const item of (arr as ExpressionValue[])) {
+    if (typeof predicate === 'number') {
+      if (item === predicate) count++;
+    } else if (typeof predicate === 'string') {
+      if (String(item).includes(predicate)) count++;
+    } else if (predicate === true) {
+      if (isTruthy(item)) count++;
+    }
+  }
+  return count;
+};
+
+const SUMIF: ExpressionFunction = ([arr, predicate, sumArr]) => {
+  const items = isArray(arr) ? (arr as ExpressionValue[]) : [];
+  const sums = sumArr != null && isArray(sumArr) ? (sumArr as ExpressionValue[]) : null;
+  let total = 0;
+  for (let i = 0; i < items.length; i++) {
+    let match = false;
+    if (typeof predicate === 'number') match = items[i] === predicate;
+    else if (typeof predicate === 'string') match = String(items[i]).includes(predicate);
+    else if (predicate === true) match = isTruthy(items[i]);
+    if (match) total += toNum(sums ? (sums[i] ?? items[i]) : items[i]);
+  }
+  return total;
+};
+
+const AVERAGEIF: ExpressionFunction = ([arr, predicate, avgArr]) => {
+  const items = isArray(arr) ? (arr as ExpressionValue[]) : [];
+  const avgs = avgArr != null && isArray(avgArr) ? (avgArr as ExpressionValue[]) : null;
+  let total = 0;
+  let count = 0;
+  for (let i = 0; i < items.length; i++) {
+    let match = false;
+    if (typeof predicate === 'number') match = items[i] === predicate;
+    else if (typeof predicate === 'string') match = String(items[i]).includes(predicate);
+    else if (predicate === true) match = isTruthy(items[i]);
+    if (match) { total += toNum(avgs ? (avgs[i] ?? items[i]) : items[i]); count++; }
+  }
+  return count > 0 ? total / count : 0;
+};
+
+// ─── Lookup Functions ────────────────────────────────────────────────────────
+
+const VLOOKUP: ExpressionFunction = ([lookup, range, colIndex, exactMatch]) => {
+  if (!isArray(range)) return null;
+  const rows = range as ExpressionValue[];
+  const col = Math.floor(toNum(colIndex)) - 1;
+  const exact = exactMatch == null || isTruthy(exactMatch);
+  for (const row of rows) {
+    if (isArray(row)) {
+      const r = row as ExpressionValue[];
+      if (exact ? r[0] === lookup : String(r[0]).toLowerCase().includes(String(lookup).toLowerCase())) {
+        return r[col] ?? null;
+      }
+    }
+  }
+  return null;
+};
+
+const HLOOKUP: ExpressionFunction = ([lookup, range, rowIndex, exactMatch]) => {
+  if (!isArray(range)) return null;
+  const cols = range as ExpressionValue[];
+  const row = Math.floor(toNum(rowIndex)) - 1;
+  const exact = exactMatch == null || isTruthy(exactMatch);
+  for (const col of cols) {
+    if (isArray(col)) {
+      const c = col as ExpressionValue[];
+      if (exact ? c[0] === lookup : String(c[0]).toLowerCase().includes(String(lookup).toLowerCase())) {
+        return c[row] ?? null;
+      }
+    }
+  }
+  return null;
+};
+
+const INDEX: ExpressionFunction = ([arr, row, col]) => {
+  if (!isArray(arr)) return null;
+  const rows = arr as ExpressionValue[];
+  const r = Math.floor(toNum(row)) - 1;
+  if (col != null) {
+    const c = Math.floor(toNum(col)) - 1;
+    const item = rows[r];
+    return isArray(item) ? (item as ExpressionValue[])[c] ?? null : null;
+  }
+  return rows[r] ?? null;
+};
+
+const MATCH: ExpressionFunction = ([lookup, arr, matchType]) => {
+  if (!isArray(arr)) return null;
+  const items = arr as ExpressionValue[];
+  const mt = matchType != null ? Math.floor(toNum(matchType)) : 0;
+  for (let i = 0; i < items.length; i++) {
+    if (mt === 0 && items[i] === lookup) return i + 1;
+    if (mt === 1 && typeof items[i] === 'number' && typeof lookup === 'number' && items[i] <= lookup) return i + 1;
+    if (mt === -1 && typeof items[i] === 'number' && typeof lookup === 'number' && items[i] >= lookup) return i + 1;
+  }
+  return null;
+};
+
+const CHOOSE: ExpressionFunction = ([index, ...values]) => {
+  const idx = Math.floor(toNum(index)) - 1;
+  return values[idx] ?? null;
+};
+
+// ─── Register all advanced functions ─────────────────────────────────────────
+
+export function registerAdvancedFunctions(): void {
+  // Financial
+  formulaEngine.registerFunction('PMT', PMT);
+  formulaEngine.registerFunction('NPER', NPER);
+  formulaEngine.registerFunction('RATE', RATE);
+  formulaEngine.registerFunction('FV', FV);
+  formulaEngine.registerFunction('PV', PV);
+  formulaEngine.registerFunction('NPV', NPV);
+  formulaEngine.registerFunction('IRR', IRR);
+
+  // Date
+  formulaEngine.registerFunction('DATEDIF', DATEDIF);
+  formulaEngine.registerFunction('EOMONTH', EOMONTH);
+  formulaEngine.registerFunction('WORKDAY', WORKDAY);
+  formulaEngine.registerFunction('NETWORKDAYS', NETWORKDAYS);
+  formulaEngine.registerFunction('WEEKNUM', WEEKNUM);
+  formulaEngine.registerFunction('ISOWEEKNUM', ISOWEEKNUM);
+  formulaEngine.registerFunction('QUARTER', QUARTER);
+  formulaEngine.registerFunction('YEARFRAC', YEARFRAC);
+  formulaEngine.registerFunction('EDATE', EDATE);
+
+  // Array
+  formulaEngine.registerFunction('FILTER', FILTER);
+  formulaEngine.registerFunction('SORT', SORT);
+  formulaEngine.registerFunction('UNIQUE', UNIQUE);
+  formulaEngine.registerFunction('FLATTEN', FLATTEN);
+  formulaEngine.registerFunction('ARRAY', ARRAY);
+  formulaEngine.registerFunction('RANGE', RANGE);
+
+  // Window
+  formulaEngine.registerFunction('ROW_NUMBER', ROW_NUMBER);
+  formulaEngine.registerFunction('RANK', RANK);
+  formulaEngine.registerFunction('DENSE_RANK', DENSE_RANK);
+  formulaEngine.registerFunction('NTILE', NTILE);
+  formulaEngine.registerFunction('LAG', LAG);
+  formulaEngine.registerFunction('LEAD', LEAD);
+  formulaEngine.registerFunction('FIRST_VALUE', FIRST_VALUE);
+  formulaEngine.registerFunction('LAST_VALUE', LAST_VALUE);
+  formulaEngine.registerFunction('SUM_OVER', SUM_OVER);
+  formulaEngine.registerFunction('AVG_OVER', AVG_OVER);
+
+  // Aggregation extensions
+  formulaEngine.registerFunction('MEDIAN', MEDIAN);
+  formulaEngine.registerFunction('MODE', MODE);
+  formulaEngine.registerFunction('STDDEV', STDDEV);
+  formulaEngine.registerFunction('VARIANCE', VARIANCE);
+  formulaEngine.registerFunction('PRODUCT', PRODUCT);
+  formulaEngine.registerFunction('COUNTIF', COUNTIF);
+  formulaEngine.registerFunction('SUMIF', SUMIF);
+  formulaEngine.registerFunction('AVERAGEIF', AVERAGEIF);
+
+  // Lookup
+  formulaEngine.registerFunction('VLOOKUP', VLOOKUP);
+  formulaEngine.registerFunction('HLOOKUP', HLOOKUP);
+  formulaEngine.registerFunction('INDEX', INDEX);
+  formulaEngine.registerFunction('MATCH', MATCH);
+  formulaEngine.registerFunction('CHOOSE', CHOOSE);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/engines/LayoutEngine.ts
+```
+export type LayoutMode = 'flow' | 'flex' | 'absolute';
+
+export interface LayoutElement {
+  id: string;
+  type: 'text' | 'table' | 'image' | 'barcode' | 'qr' | 'line' | 'spacer';
+  mode: LayoutMode;
+  width: number;
+  height: number;
+  order: number;
+  flexBasis?: number;
+  grow?: number;
+  minHeight?: number;
+  x?: number;
+  y?: number;
+}
+
+export interface ComputedLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  consumedSpace: number;
+}
+
+export interface LayoutResult {
+  elements: Map<string, ComputedLayout>;
+  totalHeight: number;
+  pageCount: number;
+}
+
+export class LayoutEngine {
+  private getDefaultHeight(type: LayoutElement['type']): number {
+    switch (type) {
+      case 'text':
+        return 5;
+      case 'table':
+        return 20;
+      case 'image':
+        return 20;
+      case 'barcode':
+        return 15;
+      case 'qr':
+        return 15;
+      case 'line':
+        return 1;
+      case 'spacer':
+        return 5;
+    }
+  }
+
+  private resolveHeight(el: LayoutElement): number {
+    const base = el.height > 0 ? el.height : this.getDefaultHeight(el.type);
+    return el.minHeight != null ? Math.max(base, el.minHeight) : base;
+  }
+
+  estimateTableHeight(
+    rowCount: number,
+    rowHeight: number,
+    headerHeight: number,
+  ): number {
+    return headerHeight + rowCount * rowHeight;
+  }
+
+  compute(
+    elements: LayoutElement[],
+    paperWidth: number,
+    startY: number = 0,
+    maxHeight: number = 0,
+  ): LayoutResult {
+    const sorted = [...elements].sort((a, b) => a.order - b.order);
+    const result = new Map<string, ComputedLayout>();
+    let currentY = startY;
+    let currentPage = 1;
+    let totalContentHeight = 0;
+
+    let i = 0;
+    while (i < sorted.length) {
+      const el = sorted[i];
+
+      if (el.mode === 'absolute') {
+        const h = this.resolveHeight(el);
+        result.set(el.id, {
+          x: el.x ?? 0,
+          y: el.y ?? 0,
+          width: el.width,
+          height: h,
+          consumedSpace: 0,
+        });
+        i++;
+        continue;
+      }
+
+      if (el.mode === 'flow') {
+        const h = this.resolveHeight(el);
+
+        if (maxHeight > 0 && currentY - startY + h > maxHeight) {
+          currentPage++;
+          currentY = startY;
+        }
+
+        result.set(el.id, {
+          x: 0,
+          y: currentY,
+          width: paperWidth,
+          height: h,
+          consumedSpace: h,
+        });
+
+        currentY += h;
+        totalContentHeight += h;
+        i++;
+        continue;
+      }
+
+      if (el.mode === 'flex') {
+        const flexRow: LayoutElement[] = [];
+        while (i < sorted.length && sorted[i].mode === 'flex') {
+          flexRow.push(sorted[i]);
+          i++;
+        }
+
+        const totalFlexBasis = flexRow.reduce(
+          (sum, fel) => sum + (fel.flexBasis ?? fel.width),
+          0,
+        );
+        const totalGrow = flexRow.reduce(
+          (sum, fel) => sum + (fel.grow ?? 0),
+          0,
+        );
+        const remaining = Math.max(0, paperWidth - totalFlexBasis);
+
+        let rowHeight = 0;
+        const baseWidths: number[] = [];
+
+        for (const fel of flexRow) {
+          baseWidths.push(fel.flexBasis ?? fel.width);
+          const h = this.resolveHeight(fel);
+          if (h > rowHeight) rowHeight = h;
+        }
+
+        if (maxHeight > 0 && currentY - startY + rowHeight > maxHeight) {
+          currentPage++;
+          currentY = startY;
+        }
+
+        let accX = 0;
+        for (let j = 0; j < flexRow.length; j++) {
+          const fel = flexRow[j];
+          const grow = fel.grow ?? 0;
+          let w = baseWidths[j];
+          if (totalGrow > 0 && grow > 0) {
+            w += remaining * (grow / totalGrow);
+          }
+          const h = this.resolveHeight(fel);
+
+          result.set(fel.id, {
+            x: accX,
+            y: currentY,
+            width: w,
+            height: h,
+            consumedSpace: w,
+          });
+          accX += w;
+        }
+
+        currentY += rowHeight;
+        totalContentHeight += rowHeight;
+      }
+    }
+
+    return {
+      elements: result,
+      totalHeight: totalContentHeight,
+      pageCount: currentPage,
+    };
+  }
+}
+
+export const layoutEngine = new LayoutEngine();
 ```
 
 ## FILE: resources/js/pages/settings/print-settings/index.ts
 ```
-// ════════════════════════════════════════════════════════════════════════════
-// print-settings/index.ts — Public API
+﻿// ظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـ
+// print-settings/index.ts ظ¤ Public API
 //
 // Consumers import ONLY from here:
 //   import { PrintSettingsPage, PreviewSelector } from '@/pages/settings/print-settings';
-// ════════════════════════════════════════════════════════════════════════════
+// ظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـظـ
 
 export { default as PrintSettingsPage } from './PrintSettingsPage';
 export { default as PreviewSelector } from './components/PreviewSelector';
 
-// Types — consumers need access to these for template data
+// Types ظ¤ consumers need access to these for template data
 export * from './types';
-export type { ReceiptLiveData, CompanyPreviewData } from './types';
+export type { CompanyPreviewData } from './types';
 ```
 
 ## FILE: resources/js/pages/settings/print-settings/PrintSettingsPage.tsx
@@ -4640,13 +5595,12 @@ import { QuickNav } from './components/QuickNav';
 import { TinyBtn, toolBtnStyle } from './components/TinyBtn';
 import { Input } from './components/ui';
 import { type Updater } from './components/ColumnManager';
-import { dbSaveTemplate } from './services/printStoreService';
 import {
   DOC_TYPE_LIST,
   type PrintTemplate, type DocTypeCode,
-  type CompanyData, type ReceiptTemplate80mm,
 } from './types';
 import { DocumentDataBuilder } from './types/data/DocumentDataBuilder';
+import { resolveTemplate } from './runtime';
 import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
@@ -4679,20 +5633,7 @@ export default function PrintSettingsPage() {
   const companyCtx = useCompany();
   const slug       = useSlug();
 
-  const companyData: CompanyData | null = useMemo(() => companyCtx
-    ? {
-        name:    companyCtx.name    ?? '',
-        address: companyCtx.address ?? '',
-        phone:   companyCtx.phone   ?? '',
-        nif:     companyCtx.nif     ?? '',
-        rc:      companyCtx.rc      ?? '',
-        nis:     companyCtx.nis     ?? '',
-        ice:     '',
-        article: companyCtx.article ?? '',
-        logoUrl: companyCtx.logoUrl ?? null,
-      }
-    : null,
-  [companyCtx]);
+
 
   const [activeCat,     setActiveCat]     = useState<string>('pos');
   const [activeDoc,     setActiveDoc]     = useState<DocTypeCode>('POS');
@@ -4743,13 +5684,13 @@ export default function PrintSettingsPage() {
     prevUseRealData.current = useRealData;
   }, [useRealData, refetch]);
   const previewData: UniversalDocumentData | null = useMemo(() => {
-    if (!previewDoc || !companyData) return null;
-    return DocumentDataBuilder.fromApiDocument(previewDoc, companyData);
-  }, [previewDoc, companyData]);
+    if (!previewDoc || !companyCtx) return null;
+    return DocumentDataBuilder.fromApiDocument(previewDoc, companyCtx);
+  }, [previewDoc, companyCtx]);
 
   useEffect(() => {
     if (templates.length > 0) {
-      const tpl = templates.find(t => t.is_default) ?? templates[0];
+      const tpl = resolveTemplate(templates, activeDoc) ?? templates[0];
       setSelectedTplId(tpl.id);
       setLocalTpl(normalizeTemplate(tpl, activeDoc, tpl.paper_size));
       setIsDirty(false);
@@ -4837,19 +5778,13 @@ export default function PrintSettingsPage() {
       }
       setLocalTpl({ ...savedTpl });
       setIsDirty(false);
-      try {
-        await dbSaveTemplate(apiClient, activeDoc, savedTpl.paper_size, savedTpl as ReceiptTemplate80mm);
-      } catch {
-        notifier.error('❌ فشل حفظ القالب في الإعدادات — POS سيستخدم بيانات قديمة');
-        throw new Error('dbSaveTemplate failed');
-      }
       notifier.success('✅ تم حفظ القالب');
     } catch (e: any) {
       notifier.error(e?.message ?? 'فشل الحفظ');
     } finally {
       setIsSaving(false);
     }
-  }, [localTpl, isSaving, apiClient, activeDoc, templates.length, mutations, notifier]);
+  }, [localTpl, isSaving, activeDoc, templates.length, mutations, notifier]);
 
   const handleSetDefault = useCallback(async (id: number) => {
     setActionLoading(`default-${id}`);
@@ -4905,14 +5840,11 @@ export default function PrintSettingsPage() {
       setLocalTpl({ ...saved });
       setIsDirty(false);
       setShowLibrary(false);
-      try {
-        await dbSaveTemplate(apiClient, activeDoc, saved.paper_size, saved as ReceiptTemplate80mm);
-      } catch { /* ignore legacy sync */ }
       notifier.success(`✅ تم تثبيت القالب "${saved.name}"`);
     } catch (e: any) {
       notifier.error(e?.message ?? 'فشل تثبيت القالب');
     }
-  }, [apiClient, activeDoc, mutations, notifier]);
+  }, [activeDoc, mutations, notifier]);
 
   const handleExport = useCallback(() => {
     if (!localTpl) return;
@@ -4970,7 +5902,7 @@ export default function PrintSettingsPage() {
     const reactRoot = createRoot(root);
     reactRoot.render(
       React.createElement(PreviewSelector, {
-        tpl: localTpl, company: companyData,
+        tpl: localTpl, company: companyCtx,
         data: useRealData ? previewData : null,
       }),
     );
@@ -4980,7 +5912,7 @@ export default function PrintSettingsPage() {
     win.focus();
     win.print();
     setTimeout(() => win.close(), 500);
-  }, [localTpl, companyData, previewData, useRealData]);
+  }, [localTpl, companyCtx, previewData, useRealData]);
 
   const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving });
   useEffect(() => { refs.current = { handleSave, handleUndo, handleRedo, isDirty, isSaving }; });
@@ -5255,7 +6187,7 @@ export default function PrintSettingsPage() {
               </div>
 
               <QuickNav controlsRef={controlsRef} />
-              <TemplateControls tpl={localTpl} update={update} companyData={companyData} />
+              <TemplateControls tpl={localTpl} update={update} companyData={companyCtx} />
             </div>
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--t4)', fontSize: 13, gap: 8 }}>
@@ -5286,14 +6218,14 @@ export default function PrintSettingsPage() {
                 {paperLabel(localTpl.paper_size, localTpl.paper_width_mm)}
               </span>
             )}
-            {companyData && (
+            {companyCtx && (
               <span style={{
                 fontSize: 10.5, padding: '2px 7px', borderRadius: 8,
                 background: 'var(--emb)', border: '1px solid var(--embo)',
                 color: 'var(--em)', fontWeight: 600,
               }}>
                 <i className="ti ti-building-store" style={{ marginLeft: 4, fontSize: 10 }} />
-                {companyData.name}
+                {companyCtx.name}
               </span>
             )}
             <div style={{ flex: 1 }} />
@@ -5372,7 +6304,7 @@ export default function PrintSettingsPage() {
                 display: 'inline-block',
               }}>
                 <ErrorBoundary>
-                  <PreviewSelector tpl={localTpl} company={companyData} data={useRealData ? previewData : null} />
+                  <PreviewSelector tpl={localTpl} company={companyCtx} data={useRealData ? previewData : null} />
                 </ErrorBoundary>
               </div>
             ) : (
@@ -5428,9 +6360,1161 @@ export function useHost(): HostDependencies {
 export function useApiClient() { return useHost().apiClient; }
 export function useNotifier() { return useHost().notifier; }
 export function usePrintTemplatesApi() { return useHost().printTemplatesApi; }
-export function useTemplateHooks() { return useHost().templateHooks; }
 export function useCompany() { return useHost().company; }
 export function useSlug() { return useHost().slug; }
+```
+
+## FILE: resources/js/pages/settings/print-settings/renderers/CsvRenderer.ts
+```
+import type { IRenderer, RenderContext, RenderResult } from './IRenderer';
+import type { DocumentLine } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
+
+function escapeCsv(val: unknown): string {
+  const s = String(val ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function lineToRow(line: DocumentLine): string[] {
+  return [
+    String(line.rowNumber),
+    line.ref ?? '',
+    line.name,
+    line.unit ?? '',
+    String(line.quantity),
+    String(line.unitPriceHt),
+    String(line.tvaPct),
+    String(line.discountPct),
+    String(line.totalHt),
+    String(line.totalTtc),
+  ];
+}
+
+function headerRow(fields: string[]): string {
+  return fields.map(escapeCsv).join(',');
+}
+
+export class CsvRenderer implements IRenderer<string> {
+  readonly outputType = 'csv' as const;
+
+  async render(ctx: RenderContext): Promise<RenderResult<string>> {
+    const { data, template, currencySymbol } = ctx;
+    const cur = currencySymbol ?? data.currency?.symbol ?? '';
+
+    const lines: string[] = [];
+
+    // ── Company info ──
+    lines.push(`# ${escapeCsv(data.company.name)}`);
+    if (data.company.address) lines.push(`# ${escapeCsv(data.company.address)}`);
+    lines.push(`# NIF: ${escapeCsv(data.company.nif ?? '')}  RC: ${escapeCsv(data.company.rc ?? '')}`);
+    lines.push('');
+
+    // ── Document info ──
+    lines.push(`${escapeCsv(data.doc.typeName ?? '')},${escapeCsv(data.doc.number)},${escapeCsv(data.doc.date)}`);
+    if (data.party) {
+      lines.push(`عميل,${escapeCsv(data.party.name)},NIF: ${escapeCsv(data.party.nif ?? '')}`);
+    }
+    lines.push('');
+
+    // ── Items ──
+    if (data.lines.length > 0) {
+      lines.push(headerRow(['#', 'مرجع', 'المنتج', 'الوحدة', 'الكمية', 'سعر الوحدة HT', 'TVA%', 'الخصم%', 'الإجمالي HT', 'الإجمالي TTC']));
+      for (const line of data.lines) {
+        lines.push(lineToRow(line).map(escapeCsv).join(','));
+      }
+      lines.push('');
+    }
+
+    // ── Totals ──
+    const t = data.totals;
+    lines.push(`الإجمالي HT,${t.totalHt} ${cur}`);
+    lines.push(`TVA,${t.totalTva} ${cur}`);
+    lines.push(`الطابع,${t.fiscalStamp} ${cur}`);
+    lines.push(`الخصم,${t.totalDiscount} ${cur}`);
+    lines.push(`الإجمالي TTC,${t.totalTtc} ${cur}`);
+    lines.push(`المدفوع,${t.paid} ${cur}`);
+    if (t.remaining > 0) lines.push(`المتبقي,${t.remaining} ${cur}`);
+    lines.push('');
+
+    // ── Payments ──
+    if (data.payments.length > 0) {
+      lines.push(headerRow(['وسيلة الدفع', 'المبلغ']));
+      for (const p of data.payments) {
+        lines.push(`${escapeCsv(p.mode)},${p.amount}`);
+      }
+      lines.push('');
+    }
+
+    // ── Report summary ──
+    if (data.report) {
+      const r = data.report;
+      lines.push('═ تقرير الجلسة ═');
+      lines.push(`المبيعات الصافية,${r.netSales} ${cur}`);
+      lines.push(`إجمالي المبيعات,${r.grossSales} ${cur}`);
+      lines.push(`المرتجعات,${r.returnsTotal} ${cur} (${r.returnsCount})`);
+      lines.push(`عدد الفواتير,${r.invoicesCount}`);
+      lines.push(`أعلى فاتورة,${r.highestInvoice} ${cur}`);
+      lines.push(`متوسط الفاتورة,${r.avgInvoice} ${cur}`);
+      lines.push(`TVA,${r.totalTva} ${cur}`);
+      lines.push(`الخصومات,${r.totalDiscount} ${cur}`);
+      lines.push(`الطابع,${r.totalFiscalStamp} ${cur}`);
+      lines.push(`رصيد الافتتاح,${r.openingCash} ${cur}`);
+      lines.push(`المتوقع بالدرج,${r.closingCashExpected} ${cur}`);
+      lines.push(`المعدود بالدرج,${r.closingCashCounted} ${cur}`);
+      lines.push(`فرق الخزينة,${r.cashDifference} ${cur}`);
+      lines.push('');
+
+      if (r.paymentBreakdown.length > 0) {
+        lines.push(headerRow(['وسيلة الدفع', 'عدد', 'المبلغ']));
+        for (const p of r.paymentBreakdown) {
+          lines.push(`${escapeCsv(p.mode)},${p.count},${p.amount}`);
+        }
+        lines.push('');
+      }
+
+      if (r.topProducts.length > 0) {
+        lines.push(headerRow(['المنتج', 'الكمية', 'الإجمالي HT', 'الإجمالي TTC']));
+        for (const p of r.topProducts) {
+          lines.push(`${escapeCsv(p.name)},${p.quantity},${p.totalHt},${p.totalTtc}`);
+        }
+        lines.push('');
+      }
+    }
+
+    const csv = '\uFEFF' + lines.join('\r\n');
+
+    return {
+      type: 'csv',
+      payload: csv,
+      mimeType: 'text/csv;charset=utf-8',
+      filename: `${data.doc.typeName ?? 'export'}_${data.doc.number ?? 'unknown'}.csv`,
+    };
+  }
+
+  supports(): boolean {
+    return true;
+  }
+}
+
+export const csvRenderer = new CsvRenderer();
+```
+
+## FILE: resources/js/pages/settings/print-settings/renderers/ExcelRenderer.ts
+```
+import type { IRenderer, RenderContext, RenderResult } from './IRenderer';
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
+
+function escXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function cell(value: unknown, type: 'String' | 'Number' = 'String'): string {
+  if (type === 'Number') return `<Cell><Data ss:Type="Number">${value ?? 0}</Data></Cell>`;
+  return `<Cell><Data ss:Type="String">${escXml(String(value ?? ''))}</Data></Cell>`;
+}
+
+function headingRow(label: string): string {
+  return `<Row><Cell ss:StyleID="heading"><Data ss:Type="String">${escXml(label)}</Data></Cell></Row>`;
+}
+
+function dataCell(val: unknown, isNum = false): string {
+  return isNum ? cell(val, 'Number') : cell(val);
+}
+
+function stylesXml(): string {
+  return `
+<Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+    <Font ss:FontName="Tajawal" ss:Size="10" />
+    <Alignment ss:Horizontal="Right" ss:Vertical="Center" />
+  </Style>
+  <Style ss:ID="heading">
+    <Font ss:FontName="Tajawal" ss:Size="12" ss:Bold="1" />
+    <Interior ss:Color="#1e3a5f" ss:Pattern="Solid" />
+    <Font ss:Color="#ffffff" />
+  </Style>
+  <Style ss:ID="section">
+    <Font ss:FontName="Tajawal" ss:Size="11" ss:Bold="1" />
+    <Interior ss:Color="#e8eef5" ss:Pattern="Solid" />
+  </Style>
+  <Style ss:ID="total">
+    <Font ss:FontName="Tajawal" ss:Size="10" ss:Bold="1" />
+    <Interior ss:Color="#f0f4f8" ss:Pattern="Solid" />
+  </Style>
+  <Style ss:ID="number">
+    <NumberFormat ss:Format="#,##0.00" />
+  </Style>
+</Styles>`;
+}
+
+function buildSheet(data: UniversalDocumentData): string {
+  const cur = data.currency?.symbol ?? 'د.ج';
+  const rows: string[] = [];
+
+  // Company header
+  rows.push(headingRow(data.company.name));
+  if (data.company.address) rows.push(`<Row>${cell(data.company.address)}</Row>`);
+  rows.push(`<Row>${cell(`NIF: ${data.company.nif ?? '—'}  RC: ${data.company.rc ?? '—'}`)}</Row>`);
+  rows.push('<Row></Row>');
+
+  // Document info
+  rows.push(`<Row>${cell(`${data.doc.typeName ?? ''} : ${data.doc.number}`)}<Cell>${cell(data.doc.date)}</Cell></Row>`);
+  if (data.party) {
+    rows.push(`<Row>${cell(`العميل: ${data.party.name}`)}<Cell>${cell(`NIF: ${data.party.nif ?? ''}`)}</Cell></Row>`);
+  }
+  rows.push('<Row></Row>');
+
+  // Items
+  if (data.lines.length > 0) {
+    rows.push(`<Row ss:StyleID="section">${['#', 'المنتج', 'الكمية', 'سعر الوحدة', 'TVA%', 'الإجمالي HT', 'الإجمالي TTC'].map(h => cell(h)).join('')}</Row>`);
+    for (const line of data.lines) {
+      rows.push(`<Row>${[
+        dataCell(line.rowNumber),
+        dataCell(line.name),
+        dataCell(line.quantity, true),
+        dataCell(line.unitPriceHt, true),
+        dataCell(line.tvaPct, true),
+        dataCell(line.totalHt, true),
+        dataCell(line.totalTtc, true),
+      ].join('')}</Row>`);
+    }
+    rows.push('<Row></Row>');
+  }
+
+  // Totals
+  const t = data.totals;
+  rows.push(`<Row ss:StyleID="total">${cell('الإجمالي HT')}${cell(t.totalHt, 'Number')}</Row>`);
+  rows.push(`<Row>${cell('TVA')}${cell(t.totalTva, 'Number')}</Row>`);
+  rows.push(`<Row>${cell('الطابع الجبائي')}${cell(t.fiscalStamp, 'Number')}</Row>`);
+  rows.push(`<Row>${cell('الخصم')}${cell(t.totalDiscount, 'Number')}</Row>`);
+  rows.push(`<Row ss:StyleID="total">${cell('الإجمالي TTC')}${cell(t.totalTtc, 'Number')}</Row>`);
+  rows.push(`<Row>${cell('المدفوع')}${cell(t.paid, 'Number')}</Row>`);
+  if (t.remaining > 0) rows.push(`<Row>${cell('المتبقي')}${cell(t.remaining, 'Number')}</Row>`);
+  rows.push('<Row></Row>');
+
+  // Payments
+  if (data.payments.length > 0) {
+    rows.push(`<Row ss:StyleID="section">${['وسيلة الدفع', 'المبلغ'].map(h => cell(h)).join('')}</Row>`);
+    for (const p of data.payments) {
+      rows.push(`<Row>${cell(p.mode)}${cell(p.amount, 'Number')}</Row>`);
+    }
+    rows.push('<Row></Row>');
+  }
+
+  // Report
+  if (data.report) {
+    const r = data.report;
+    rows.push(headingRow('تقرير الجلسة'));
+    [
+      ['المبيعات الصافية', r.netSales, true],
+      ['إجمالي المبيعات', r.grossSales, true],
+      ['المرتجعات', r.returnsTotal, true],
+      ['عدد الفواتير', r.invoicesCount, true],
+      ['أعلى فاتورة', r.highestInvoice, true],
+      ['متوسط الفاتورة', r.avgInvoice, true],
+      ['TVA الإجمالية', r.totalTva, true],
+      ['الخصومات', r.totalDiscount, true],
+      ['الطابع الجبائي', r.totalFiscalStamp, true],
+      ['رصيد الافتتاح', r.openingCash, true],
+      ['المتوقع بالدرج', r.closingCashExpected, true],
+      ['المعدود بالدرج', r.closingCashCounted, true],
+      ['فرق الخزينة', r.cashDifference, true],
+    ].forEach(([label, val, isNum]) => {
+      rows.push(`<Row>${cell(label as string)}${cell(val as number, isNum ? 'Number' : 'String')}</Row>`);
+    });
+    rows.push('<Row></Row>');
+
+    // Payment breakdown
+    if (r.paymentBreakdown.length > 0) {
+      rows.push(`<Row ss:StyleID="section">${['وسيلة الدفع', 'عدد', 'المبلغ'].map(h => cell(h)).join('')}</Row>`);
+      for (const p of r.paymentBreakdown) {
+        rows.push(`<Row>${cell(p.mode)}${cell(p.count, 'Number')}${cell(p.amount, 'Number')}</Row>`);
+      }
+      rows.push('<Row></Row>');
+    }
+
+    // Top products
+    if (r.topProducts.length > 0) {
+      rows.push(`<Row ss:StyleID="section">${['المنتج', 'الكمية', 'الإجمالي HT', 'الإجمالي TTC'].map(h => cell(h)).join('')}</Row>`);
+      for (const p of r.topProducts) {
+        rows.push(`<Row>${cell(p.name)}${cell(p.quantity, 'Number')}${cell(p.totalHt, 'Number')}${cell(p.totalTtc, 'Number')}</Row>`);
+      }
+    }
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+          xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+          xmlns:x="urn:schemas-microsoft-com:office:excel">
+${stylesXml()}
+<Worksheet ss:Name="Report">
+  <Table ss:DefaultColumnWidth="120">
+    ${rows.join('\n    ')}
+  </Table>
+</Worksheet>
+</Workbook>`;
+}
+
+export class ExcelRenderer implements IRenderer<string> {
+  readonly outputType = 'xlsx' as const;
+
+  async render(ctx: RenderContext): Promise<RenderResult<string>> {
+    const xml = buildSheet(ctx.data);
+
+    return {
+      type: 'xlsx',
+      payload: xml,
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      filename: `${ctx.data.doc.typeName ?? 'export'}_${ctx.data.doc.number ?? 'unknown'}.xlsx`,
+    };
+  }
+
+  supports(): boolean {
+    return true;
+  }
+}
+
+export const excelRenderer = new ExcelRenderer();
+```
+
+## FILE: resources/js/pages/settings/print-settings/renderers/IRenderer.ts
+```
+// ════════════════════════════════════════════════════════════════════════════
+// reporting/renderers/IRenderer.ts
+//
+// The renderer interface. All renderers (React, ESC/POS, PDF, …) implement
+// this contract so the framework core never touches a specific output format.
+//
+// Dependency direction:
+//   Core → IRenderer ← ReactRenderer
+//                    ← ESCPOSRenderer
+//                    ← PDFRenderer (future)
+// ════════════════════════════════════════════════════════════════════════════
+
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
+
+// ─── Render output ────────────────────────────────────────────────────────────
+
+export type RendererOutputType = 'html' | 'escpos' | 'pdf' | 'image' | 'json' | 'csv' | 'xlsx';
+
+export interface RenderResult<T = unknown> {
+  /** What format this output is */
+  type:     RendererOutputType;
+  /** The actual output — HTMLElement, Uint8Array, Blob, string, etc. */
+  payload:  T;
+  /** MIME type for download/upload use */
+  mimeType?: string;
+  /** Suggested filename if downloading */
+  filename?: string;
+}
+
+// ─── Render context ───────────────────────────────────────────────────────────
+
+export interface RenderContext {
+  /** The document data to render */
+  data:     UniversalDocumentData;
+  /** The template controlling layout and visibility */
+  template: PrintTemplate;
+  /**
+   * Optional: override the company info from template's override_* fields.
+   * If not provided, renderers use data.company directly.
+   */
+  companyOverrides?: Partial<{
+    name:    string;
+    address: string;
+    phone:   string;
+    nif:     string;
+    rc:      string;
+    nis:     string;
+    ice:     string;
+    article: string;
+  }>;
+  /** Locale for number/date formatting. Defaults to 'ar-DZ'. */
+  locale?: string;
+  /** Currency symbol override. Defaults to data.currency.symbol. */
+  currencySymbol?: string;
+}
+
+// ─── IRenderer ───────────────────────────────────────────────────────────────
+
+export interface IRenderer<TOutput = unknown> {
+  /**
+   * The output format this renderer produces.
+   * Used by RendererRegistry to select the right renderer.
+   */
+  readonly outputType: RendererOutputType;
+
+  /**
+   * Render the document and return the output.
+   * Must be pure with respect to external state — all inputs are in ctx.
+   */
+  render(ctx: RenderContext): Promise<RenderResult<TOutput>>;
+
+  /**
+   * True if this renderer can handle the given template's paper_size.
+   * The registry calls this before render() to select the right adapter.
+   */
+  supports(paperSize: PrintTemplate['paper_size']): boolean;
+}
+
+// ─── Renderer registry ────────────────────────────────────────────────────────
+
+/**
+ * Simple registry mapping output type → renderer instance.
+ * Call RendererRegistry.register() to add a renderer (including plugins).
+ * Call RendererRegistry.get() to retrieve one.
+ */
+class RendererRegistryClass {
+  private readonly _renderers = new Map<RendererOutputType, IRenderer>();
+
+  register(renderer: IRenderer): void {
+    this._renderers.set(renderer.outputType, renderer);
+  }
+
+  get(type: RendererOutputType): IRenderer | undefined {
+    return this._renderers.get(type);
+  }
+
+  has(type: RendererOutputType): boolean {
+    return this._renderers.has(type);
+  }
+
+  /** Returns all registered output types */
+  types(): RendererOutputType[] {
+    return Array.from(this._renderers.keys());
+  }
+
+  /** Clear all registered renderers. Useful in tests. */
+  reset(): void {
+    this._renderers.clear();
+  }
+}
+
+export const RendererRegistry = new RendererRegistryClass();
+
+// ─── Built-in renderer registration ─────────────────────────────────────────────
+// Import and register the built-in CSV and Excel renderers so they're available
+// via RendererRegistry.get('csv') / RendererRegistry.get('xlsx') right away.
+
+import { csvRenderer } from './CsvRenderer';
+import { excelRenderer } from './ExcelRenderer';
+
+RendererRegistry.register(csvRenderer);
+RendererRegistry.register(excelRenderer);
+```
+
+## FILE: resources/js/pages/settings/print-settings/renderers/PrintJobQueue.ts
+```
+/**
+ * PrintJobQueue — a lightweight, framework-agnostic print job queue.
+ *
+ * Manages sequential processing of print jobs with status tracking,
+ * cancellation, and event emission.
+ *
+ * Usage:
+ *   import { printJobQueue } from '@/reporting';
+ *
+ *   const jobId = printJobQueue.enqueue({ name: 'FV-001', printFn: async () => { … } });
+ *   printJobQueue.on('complete', (id, result) => …);
+ *   printJobQueue.cancel(jobId);
+ *   printJobQueue.clear();
+ */
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export type PrintJobStatus = 'pending' | 'printing' | 'completed' | 'failed' | 'cancelled';
+
+export interface PrintJob {
+  id:       string;
+  name:     string;
+  status:   PrintJobStatus;
+  error?:   string;
+  createdAt: number;
+  completedAt?: number;
+}
+
+export interface PrintJobInput {
+  name:    string;
+  printFn: () => Promise<void>;
+}
+
+export type PrintJobEvent = 'enqueue' | 'start' | 'complete' | 'fail' | 'cancel' | 'drain';
+
+type Listener = (jobId: string, job: PrintJob) => void;
+
+// ─── Service ─────────────────────────────────────────────────────────────────
+
+class PrintJobQueueService {
+  private _queue: { input: PrintJobInput; job: PrintJob }[] = [];
+  private _processing = false;
+  private _cancelled = new Set<string>();
+  private _listeners = new Map<PrintJobEvent, Set<Listener>>();
+  private _idCounter = 0;
+
+  private _genId(): string {
+    this._idCounter++;
+    return `print_${Date.now()}_${this._idCounter}`;
+  }
+
+  // ── Events ───────────────────────────────────────────────────────────────
+
+  on(event: PrintJobEvent, listener: Listener): () => void {
+    if (!this._listeners.has(event)) this._listeners.set(event, new Set());
+    this._listeners.get(event)!.add(listener);
+    return () => this._listeners.get(event)?.delete(listener);
+  }
+
+  private _emit(event: PrintJobEvent, jobId: string, job: PrintJob): void {
+    this._listeners.get(event)?.forEach(fn => fn(jobId, job));
+  }
+
+  // ── Queue management ─────────────────────────────────────────────────────
+
+  enqueue(input: PrintJobInput): string {
+    const job: PrintJob = {
+      id:        this._genId(),
+      name:      input.name,
+      status:    'pending',
+      createdAt: Date.now(),
+    };
+    this._queue.push({ input, job });
+    this._emit('enqueue', job.id, job);
+    this._process();
+    return job.id;
+  }
+
+  enqueueBatch(inputs: PrintJobInput[]): string[] {
+    return inputs.map(i => this.enqueue(i));
+  }
+
+  cancel(jobId: string): void {
+    const entry = this._queue.find(e => e.job.id === jobId);
+    if (!entry) return;
+    if (entry.job.status === 'pending') {
+      entry.job.status = 'cancelled';
+      this._emit('cancel', jobId, entry.job);
+    } else if (entry.job.status === 'printing') {
+      this._cancelled.add(jobId);
+    }
+  }
+
+  cancelAll(): void {
+    this._queue.forEach(e => {
+      if (e.job.status === 'pending') {
+        e.job.status = 'cancelled';
+        this._emit('cancel', e.job.id, e.job);
+      } else if (e.job.status === 'printing') {
+        this._cancelled.add(e.job.id);
+      }
+    });
+  }
+
+  clear(): void {
+    this._queue = [];
+    this._cancelled.clear();
+  }
+
+  /** Returns a snapshot of all jobs */
+  jobs(): PrintJob[] {
+    return this._queue.map(e => ({ ...e.job }));
+  }
+
+  /** Returns jobs filtered by status */
+  jobsByStatus(status: PrintJobStatus): PrintJob[] {
+    return this._queue.filter(e => e.job.status === status).map(e => ({ ...e.job }));
+  }
+
+  /** Number of currently pending jobs */
+  get pending(): number {
+    return this._queue.filter(e => e.job.status === 'pending').length;
+  }
+
+  /** Total jobs ever queued */
+  get total(): number {
+    return this._queue.length;
+  }
+
+  /** True if the queue is actively processing */
+  get isProcessing(): boolean {
+    return this._processing;
+  }
+
+  // ── Internal processing ──────────────────────────────────────────────────
+
+  private async _process(): Promise<void> {
+    if (this._processing) return;
+    this._processing = true;
+
+    while (this._queue.length > 0) {
+      const entry = this._queue[0];
+
+      if (entry.job.status === 'cancelled') {
+        this._queue.shift();
+        continue;
+      }
+
+      if (this._cancelled.has(entry.job.id)) {
+        entry.job.status = 'cancelled';
+        this._emit('cancel', entry.job.id, entry.job);
+        this._queue.shift();
+        this._cancelled.delete(entry.job.id);
+        continue;
+      }
+
+      entry.job.status = 'printing';
+      this._emit('start', entry.job.id, entry.job);
+
+      try {
+        await entry.input.printFn();
+        if (this._cancelled.has(entry.job.id)) {
+          entry.job.status = 'cancelled';
+          this._emit('cancel', entry.job.id, entry.job);
+          this._cancelled.delete(entry.job.id);
+        } else {
+          entry.job.status = 'completed';
+          entry.job.completedAt = Date.now();
+          this._emit('complete', entry.job.id, entry.job);
+        }
+      } catch (err) {
+        entry.job.status = 'failed';
+        entry.job.error = err instanceof Error ? err.message : String(err);
+        this._emit('fail', entry.job.id, entry.job);
+      }
+
+      this._queue.shift();
+    }
+
+    this._processing = false;
+    this._emit('drain', '', {
+      id: 'drain', name: '', status: 'completed', createdAt: 0,
+    });
+  }
+}
+
+export const printJobQueue = new PrintJobQueueService();
+```
+
+## FILE: resources/js/pages/settings/print-settings/renderers/useExportDocument.ts
+```
+import { useCallback } from 'react';
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
+import { RendererRegistry } from './IRenderer';
+
+/**
+ * Triggers a file download from a Blob/string payload.
+ */
+function download(payload: string, filename: string, mimeType: string): void {
+  const blob = new Blob([payload], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * React hook: returns export functions for CSV and Excel.
+ *
+ * Usage:
+ *   const { exportCsv, exportXlsx } = useExportDocument();
+ *   await exportCsv(data, template);
+ */
+export function useExportDocument() {
+  const exportCsv = useCallback(async (data: UniversalDocumentData) => {
+    const renderer = RendererRegistry.get('csv');
+    if (!renderer) throw new Error('CSV renderer not registered');
+    const result = await renderer.render({
+      data,
+      template: { paper_size: 'A4' } as const,
+    });
+    download(result.payload as string, result.filename ?? 'export.csv', result.mimeType ?? 'text/csv');
+  }, []);
+
+  const exportXlsx = useCallback(async (data: UniversalDocumentData) => {
+    const renderer = RendererRegistry.get('xlsx');
+    if (!renderer) throw new Error('Excel renderer not registered');
+    const result = await renderer.render({
+      data,
+      template: { paper_size: 'A4' } as const,
+    });
+    download(result.payload as string, result.filename ?? 'export.xlsx', result.mimeType ?? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }, []);
+
+  return { exportCsv, exportXlsx };
+}
+
+/**
+ * Standalone function (non-hook) for use outside React components.
+ */
+export async function exportDocumentCsv(data: UniversalDocumentData): Promise<void> {
+  const renderer = RendererRegistry.get('csv');
+  if (!renderer) throw new Error('CSV renderer not registered');
+  const result = await renderer.render({
+    data,
+    template: { paper_size: 'A4' } as const,
+  });
+  download(result.payload as string, result.filename ?? 'export.csv', result.mimeType ?? 'text/csv');
+}
+
+export async function exportDocumentXlsx(data: UniversalDocumentData): Promise<void> {
+  const renderer = RendererRegistry.get('xlsx');
+  if (!renderer) throw new Error('Excel renderer not registered');
+  const result = await renderer.render({
+    data,
+    template: { paper_size: 'A4' } as const,
+  });
+  download(result.payload as string, result.filename ?? 'export.xlsx', result.mimeType ?? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/renderers/usePrintJobQueue.ts
+```
+import { useState, useEffect, useCallback } from 'react';
+import { printJobQueue } from './PrintJobQueue';
+import type { PrintJob, PrintJobInput, PrintJobStatus } from './PrintJobQueue';
+
+/**
+ * React hook that subscribes to the singleton PrintJobQueue and provides
+ * reactive state for UI components.
+ *
+ * Usage:
+ *   const { jobs, pending, enqueue, cancelAll } = usePrintJobQueue();
+ *   enqueue({ name: 'Doc-1', printFn: async () => { … } });
+ */
+export function usePrintJobQueue() {
+  const [jobs, setJobs] = useState<PrintJob[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    const update = () => {
+      setJobs(printJobQueue.jobs());
+      setIsProcessing(printJobQueue.isProcessing);
+    };
+
+    const unsub1 = printJobQueue.on('enqueue', update);
+    const unsub2 = printJobQueue.on('start', update);
+    const unsub3 = printJobQueue.on('complete', update);
+    const unsub4 = printJobQueue.on('fail', update);
+    const unsub5 = printJobQueue.on('cancel', update);
+    const unsub6 = printJobQueue.on('drain', update);
+
+    update();
+
+    return () => {
+      unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6();
+    };
+  }, []);
+
+  const enqueue = useCallback((input: PrintJobInput) => printJobQueue.enqueue(input), []);
+  const enqueueBatch = useCallback((inputs: PrintJobInput[]) => printJobQueue.enqueueBatch(inputs), []);
+  const cancel = useCallback((jobId: string) => printJobQueue.cancel(jobId), []);
+  const cancelAll = useCallback(() => printJobQueue.cancelAll(), []);
+  const clear = useCallback(() => printJobQueue.clear(), []);
+
+  const pending = jobs.filter(j => j.status === 'pending').length;
+  const completed = jobs.filter(j => j.status === 'completed').length;
+  const failed = jobs.filter(j => j.status === 'failed').length;
+
+  return {
+    jobs,
+    pending,
+    completed,
+    failed,
+    total: jobs.length,
+    isProcessing,
+    enqueue,
+    enqueueBatch,
+    cancel,
+    cancelAll,
+    clear,
+  };
+}
+
+/**
+ * Get a color for the job status badge.
+ */
+export function statusColor(status: PrintJobStatus): string {
+  switch (status) {
+    case 'pending':   return '#f59e0b';
+    case 'printing':  return '#3b82f6';
+    case 'completed': return '#16a34a';
+    case 'failed':    return '#dc2626';
+    case 'cancelled': return '#94a3b8';
+  }
+}
+
+export function statusLabel(status: PrintJobStatus): string {
+  switch (status) {
+    case 'pending':   return 'في الانتظار';
+    case 'printing':  return 'جاري الطباعة';
+    case 'completed': return 'تم';
+    case 'failed':    return 'فشل';
+    case 'cancelled': return 'ملغي';
+  }
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/runtime/index.ts
+```
+// ════════════════════════════════════════════════════════════════════════════
+// runtime/index.ts — Print Runtime barrel
+//
+// The runtime layer is a dedicated read-only layer for loading, resolving,
+// and printing templates. It depends ONLY on RuntimeContext (minimal),
+// NOT on PrintSettingsProvider (designer context with undo/redo, notifier…).
+//
+// Architectural boundary:
+//   Print Designer  ←→  Print Runtime   ←→  Host App (apiGet, slug)
+//   (print-settings)       (runtime/)
+// ════════════════════════════════════════════════════════════════════════════
+export { PrintRuntimeAdapter } from './PrintRuntimeAdapter';
+export { RuntimeProvider, useRuntime } from './PrintRuntimeContext';
+export type { RuntimeDependencies } from './PrintRuntimeContext';
+export { usePrintTemplatesList } from './usePrintTemplatesList';
+export {
+  resolveTemplate,
+  resolveTemplateById,
+} from './TemplateResolver';
+export { default as UniversalPrintPipeline } from './UniversalPrintPipeline';
+export type { PipelineSource } from './UniversalPrintPipeline';
+export { renderPreviewToHtml } from './renderPreviewToHtml';
+export { openPrintPopup, renderPipelineToPopup } from './UniversalPrintPipeline';
+export { mapCompany } from './PrintRuntimeAdapter';
+```
+
+## FILE: resources/js/pages/settings/print-settings/runtime/PrintRuntimeAdapter.tsx
+```
+// ════════════════════════════════════════════════════════════════════════════
+// PrintRuntimeAdapter — the ONLY bridge between the host app and the runtime
+// layer. This is the single place where global API functions and Zustand
+// store are imported for the runtime module.
+//
+// Mount this at the app root (or inside RequireCompany) so that all printing
+// consumers have access to the runtime context.
+// ════════════════════════════════════════════════════════════════════════════
+import React, { useMemo } from 'react';
+import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete, apiUpload } from '@/lib/api/core/client';
+import { createPrintTemplatesApi } from '@/pages/settings/print-settings/api/printTemplatesApi';
+import type { ApiClient } from '@/pages/settings/print-settings/contracts/ApiClient';
+import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
+import { RuntimeProvider } from './PrintRuntimeContext';
+
+const __hostApiClient: ApiClient = {
+  get:      <T,>(url: string, params?: Record<string, unknown>) => apiGet<T>(url, params),
+  post:     <T,>(url: string, data?: unknown)                   => apiPost<T>(url, data),
+  put:      <T,>(url: string, data?: unknown)                   => apiPut<T>(url, data),
+  patch:    <T,>(url: string, data?: unknown)                   => apiPatch<T>(url, data),
+  delete:   (url: string)                                      => apiDelete(url),
+  upload:   <T,>(url: string, fd: FormData, onProgress?: (p: number) => void) => apiUpload<T>(url, fd, onProgress),
+};
+
+export function mapCompany(ac: ReturnType<typeof useActiveCompany>): CompanyData | null {
+  if (!ac) return null;
+  return {
+    name:    ac.name    ?? '',
+    address: ac.address ?? '',
+    phone:   ac.phone   ?? '',
+    nif:     ac.nif     ?? '',
+    rc:      ac.rc      ?? '',
+    nis:     ac.nis     ?? '',
+    ice:     (ac as any).ice ?? '',
+    article: (ac as any).ai ?? '',
+    logoUrl: (ac as any).avatar ?? null,
+  };
+}
+
+export function PrintRuntimeAdapter({ children }: { children: React.ReactNode }) {
+  const slug    = useActiveSlug();
+  const company = useActiveCompany();
+  const deps = useMemo(() => ({
+    templateRepository: createPrintTemplatesApi(__hostApiClient),
+    slug,
+    company: mapCompany(company),
+  }), [slug, company]);
+  return <RuntimeProvider value={deps}>{children}</RuntimeProvider>;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/runtime/PrintRuntimeContext.tsx
+```
+import { createContext, useContext } from 'react';
+import type { PrintTemplatesApi } from '@/pages/settings/print-settings/contracts/TemplateRepository';
+import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
+
+export interface RuntimeDependencies {
+  templateRepository: PrintTemplatesApi;
+  slug: string | null;
+  company: CompanyData | null;
+}
+
+const RuntimeContext = createContext<RuntimeDependencies | null>(null);
+
+export function RuntimeProvider({ value, children }: { value: RuntimeDependencies; children: React.ReactNode }) {
+  return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
+}
+
+export function useRuntime(): RuntimeDependencies {
+  const ctx = useContext(RuntimeContext);
+  if (!ctx) throw new Error('RuntimeProvider missing — mount <PrintRuntimeAdapter> at app root');
+  return ctx;
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/runtime/renderPreviewToHtml.ts
+```
+import React from 'react';
+import ReactDOMServer from 'react-dom/server.browser';
+import UniversalPrintPipeline from './UniversalPrintPipeline';
+import type { PipelineSource } from './UniversalPrintPipeline';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
+import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
+
+export function renderPreviewToHtml(input: {
+  template: PrintTemplate;
+  company: CompanyData | null;
+  source: PipelineSource;
+}): string {
+  const { template, company, source } = input;
+
+  const element = React.createElement(UniversalPrintPipeline, {
+    source,
+    template,
+    company,
+  });
+
+  return ReactDOMServer.renderToStaticMarkup(element);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/runtime/TemplateResolver.ts
+```
+// ════════════════════════════════════════════════════════════════════════════
+// TemplateResolver — pure functions for template resolution
+//
+// No hooks, no context — just logic.
+// ════════════════════════════════════════════════════════════════════════════
+import type { PrintTemplate, PaperSize } from '@/pages/settings/print-settings/types';
+
+/**
+ * Find the first active template matching docTypeCode and optionally paperSize.
+ * Returns undefined if no match.
+ */
+export function resolveTemplate(
+  templates: PrintTemplate[],
+  docTypeCode: string,
+  paperSize?: PaperSize,
+): PrintTemplate | undefined {
+  if (!templates || templates.length === 0) return undefined;
+
+  const matching = templates.filter(
+    t => t.doc_type_code === docTypeCode && t.is_active,
+  );
+  if (matching.length === 0) return undefined;
+
+  if (paperSize) {
+    return matching.find(t => t.paper_size === paperSize) ?? matching[0];
+  }
+  return matching.find(t => t.is_default) ?? matching[0];
+}
+
+/**
+ * Find a template by ID.
+ */
+export function resolveTemplateById(
+  templates: PrintTemplate[],
+  id: number | null | undefined,
+): PrintTemplate | undefined {
+  if (!id || !templates || templates.length === 0) return undefined;
+  return templates.find(t => t.id === id);
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/runtime/UniversalPrintPipeline.tsx
+```
+// ════════════════════════════════════════════════════════════════════════════
+// reporting/runtime/UniversalPrintPipeline.tsx
+//
+// The single print pipeline for ALL consumers.
+//
+// Every print path (designer preview, POS receipt, commercial document,
+// batch print, session report) goes through this component.
+//
+// Contract:
+//   1. Caller builds UniversalDocumentData via DocumentDataBuilder.*
+//   2. Pipeline renders UniversalPreview
+//   3. Pipeline provides print-to-popup-window
+// ════════════════════════════════════════════════════════════════════════════
+
+import React, { useMemo, Suspense, useRef, useCallback } from 'react';
+import ReactDOM from 'react-dom/client';
+import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
+import type { PrintTemplate, DocTypeCode, PaperSize } from '@/pages/settings/print-settings/types';
+import type { UniversalDocumentData, CompanyInfo } from '@/pages/settings/print-settings/types/data';
+import { DocumentDataBuilder, POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
+
+const UniversalPreview = React.lazy(() => import('@/pages/settings/print-settings/components/preview/UniversalPreview'));
+
+const FALLBACK = (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    height: 400, color: '#999', fontSize: 14, fontFamily: 'sans-serif',
+    border: '1px dashed #ddd', borderRadius: 8, margin: 16,
+  }}>
+    Loading preview…
+  </div>
+);
+
+// ─── Source types ──────────────────────────────────────────────────────────
+
+export type PipelineSource =
+  | { type: 'api-document'; doc: Record<string, unknown>; options?: { prevBalance?: number; newBalance?: number } }
+  | { type: 'pos-snapshot'; snapshot: POSSaleSnapshot }
+  | { type: 'session-report'; session: Record<string, unknown> }
+  | { type: 'prebuilt'; data: UniversalDocumentData };
+
+// ─── Props ─────────────────────────────────────────────────────────────────
+
+interface Props {
+  source:    PipelineSource;
+  template:  PrintTemplate;
+  company:   CompanyInfo | null;
+  className?: string;
+  style?:    React.CSSProperties;
+}
+
+// ─── Pipeline component ────────────────────────────────────────────────────
+
+export default function UniversalPrintPipeline({ source, template, company, className, style }: Props) {
+  const data: UniversalDocumentData = useMemo(() => {
+    switch (source.type) {
+      case 'prebuilt':
+        return source.data;
+      case 'api-document':
+        return DocumentDataBuilder.fromApiDocument(source.doc, company ?? {} as CompanyInfo, source.options);
+      case 'pos-snapshot':
+        return DocumentDataBuilder.fromPOSSnapshot(source.snapshot, company ?? {} as CompanyInfo);
+      case 'session-report':
+        return DocumentDataBuilder.fromSessionReport(source.session, company ?? {} as CompanyInfo);
+      default:
+        return DocumentDataBuilder.empty();
+    }
+  }, [source, company]);
+
+  return (
+    <Suspense fallback={FALLBACK}>
+      <div className={className} style={style}>
+        <UniversalPreview tpl={template} data={data} />
+      </div>
+    </Suspense>
+  );
+}
+
+// ─── Shared popup window helper ──────────────────────────────────────────
+
+export function openPrintPopup(
+  width:       number,
+  height:      number,
+  extraStyles?: string,
+): Window | null {
+  const win = window.open('', '_blank', `width=${width},height=${height}`);
+  if (!win) return null;
+
+  win.document.write(`<!DOCTYPE html>
+<html dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Print</title>
+  <style>
+    body { margin: 0; padding: 0; direction: rtl; font-family: 'Tajawal', sans-serif; }
+    @page { margin: 0; }
+    @media print { body { padding: 0; } }
+    ${extraStyles ?? ''}
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+</head>
+<body><div id="print-root"></div>
+<script>
+  function doPrint() { window.print(); setTimeout(function() { window.close(); }, 500); }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function() { setTimeout(doPrint, 200); });
+  } else {
+    setTimeout(doPrint, 600);
+  }
+</script>
+</body>
+</html>`);
+  win.document.close();
+  return win;
+}
+
+// ─── Print-to-popup helper ─────────────────────────────────────────────────
+
+export function renderPipelineToPopup(
+  source:    PipelineSource,
+  template:  PrintTemplate,
+  company:   CompanyInfo | null,
+): Window | null {
+  const isThermal = template.paper_size === '80mm' || template.paper_size === '58mm';
+  const w = isThermal ? 320 : template.paper_size === 'A5' ? 500 : 720;
+  const win = openPrintPopup(w, 700);
+  if (!win) return null;
+
+  const root = win.document.getElementById('print-root');
+  if (!root) { win.close(); return null; }
+
+  const reactRoot = ReactDOM.createRoot(root);
+  reactRoot.render(
+    <Suspense fallback={null}>
+      <UniversalPreview tpl={template} data={buildData(source, company)} />
+    </Suspense>
+  );
+
+  return win;
+}
+
+function buildData(source: PipelineSource, company: CompanyInfo | null): UniversalDocumentData {
+  switch (source.type) {
+    case 'prebuilt':       return source.data;
+    case 'api-document':   return DocumentDataBuilder.fromApiDocument(source.doc, company ?? {} as CompanyInfo, source.options);
+    case 'pos-snapshot':   return DocumentDataBuilder.fromPOSSnapshot(source.snapshot, company ?? {} as CompanyInfo);
+    case 'session-report': return DocumentDataBuilder.fromSessionReport(source.session, company ?? {} as CompanyInfo);
+    default:               return DocumentDataBuilder.empty();
+  }
+}
+```
+
+## FILE: resources/js/pages/settings/print-settings/runtime/usePrintTemplatesList.ts
+```
+// ════════════════════════════════════════════════════════════════════════════
+// usePrintTemplatesList — runtime hook for loading print templates
+//
+// Depends ONLY on RuntimeContext (no PrintSettingsProvider needed).
+// Reads from the same React Query cache as the designer hooks, so cache
+// invalidations from the Print Settings page are reflected here.
+// ════════════════════════════════════════════════════════════════════════════
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import type { DocTypeCode } from '@/pages/settings/print-settings/types';
+import { useRuntime } from './PrintRuntimeContext';
+
+export function usePrintTemplatesList(docTypeCode?: DocTypeCode) {
+  const { templateRepository, slug } = useRuntime();
+  return useQuery({
+    queryKey:  [slug, 'print-templates', 'list', docTypeCode],
+    queryFn:   () => templateRepository.list(docTypeCode),
+    enabled:   !!slug,
+    staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
 ```
 
 ## FILE: resources/js/pages/settings/print-settings/sections/DocumentSection.tsx
@@ -7477,9 +9561,8 @@ export { fieldRegistry } from './FieldRegistry';
 export type { CalculatedField } from './CalculatedFieldService';
 export { CalculatedFieldService, calculatedFieldService } from './CalculatedFieldService';
 export {
-  dbFetchTemplates, dbFetchTemplate, dbSaveTemplate,
-  dbCopyTemplate, dbSaveDocConfigs, dbFetchDocConfigs,
-  DB_KEY_TEMPLATES, DB_KEY_DOC_CONFIGS, tplKey,
+  dbSaveDocConfigs, dbFetchDocConfigs,
+  DB_KEY_DOC_CONFIGS,
 } from './printStoreService';
 export type { ExpressionValue, EvaluationContext, ValidationResult, ExpressionFunction } from './engines/FormulaEngine';
 export { FormulaEngine, formulaEngine } from './engines/FormulaEngine';
@@ -7852,57 +9935,8 @@ export const printFieldResolver = new PrintFieldResolver();
 ## FILE: resources/js/pages/settings/print-settings/services/printStoreService.ts
 ```
 import type { ApiClient } from '../contracts/ApiClient';
-import type { ReceiptTemplate80mm, PaperSize } from '../types';
-import { defaultTemplate } from '../types';
 
-export const DB_KEY_TEMPLATES   = 'print:templates';
 export const DB_KEY_DOC_CONFIGS = 'print:doc_configs';
-
-export const tplKey = (docCode: string, size: PaperSize) => `${docCode}_${size}`;
-
-/** Fetch all templates from DB as dictionary */
-export async function dbFetchTemplates(api: ApiClient): Promise<Record<string, ReceiptTemplate80mm>> {
-  try {
-    const res = await api.get<{ value: string | object }>(`/settings/${DB_KEY_TEMPLATES}`);
-    const raw = (res as Record<string, unknown>)?.value ?? (res as Record<string, unknown>)?.data?.value ?? null;
-    if (!raw) return {};
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    return parsed as Record<string, ReceiptTemplate80mm>;
-  } catch {
-    return {};
-  }
-}
-
-/** Fetch single document template */
-export async function dbFetchTemplate(
-  api: ApiClient, docCode: string, size: PaperSize,
-): Promise<ReceiptTemplate80mm> {
-  const all = await dbFetchTemplates(api);
-  const key = tplKey(docCode, size);
-  return all[key] ? { ...defaultTemplate(), ...all[key] } : defaultTemplate();
-}
-
-/** Save one template into DB — merges with existing templates */
-export async function dbSaveTemplate(
-  api: ApiClient, docCode: string, size: PaperSize, template: ReceiptTemplate80mm,
-): Promise<void> {
-  const all = await dbFetchTemplates(api);
-  const key = tplKey(docCode, size);
-  all[key]  = template;
-  await api.patch('/settings', { [DB_KEY_TEMPLATES]: JSON.stringify(all) });
-}
-
-/** Copy template from one doc type to another (same paper size) */
-export async function dbCopyTemplate(
-  api: ApiClient, sourceCode: string, targetCode: string, size: PaperSize,
-): Promise<void> {
-  const all       = await dbFetchTemplates(api);
-  const sourceKey = tplKey(sourceCode, size);
-  const targetKey = tplKey(targetCode, size);
-  if (!all[sourceKey]) throw new Error(`لا يوجد قالب لـ ${sourceCode}`);
-  all[targetKey] = { ...all[sourceKey] };
-  await api.patch('/settings', { [DB_KEY_TEMPLATES]: JSON.stringify(all) });
-}
 
 /** Save document configs */
 export async function dbSaveDocConfigs(api: ApiClient, configs: Record<string, unknown>[]): Promise<void> {
@@ -10026,6 +12060,372 @@ export interface InstallHistoryEntry {
   version:         string;
   createdTplId:    number | null;
 }
+```
+
+## FILE: resources/js/pages/settings/print-settings/theme/ThemeSystem.ts
+```
+export interface ThemeColors {
+  primary: string;
+  text: string;
+  background: string;
+  accent: string;
+  muted: string;
+  border: string;
+  headerBg: string;
+  headerText: string;
+  alternatingRow: string;
+  success: string;
+  warning: string;
+  danger: string;
+}
+
+export interface ThemeFonts {
+  family: string;
+  sizeBase: number;
+  sizeSmall: number;
+  sizeLarge: number;
+  sizeTitle: number;
+}
+
+export interface ThemeSpacing {
+  marginTop: number;
+  marginBottom: number;
+  marginSides: number;
+  padding: number;
+  lineHeight: number;
+}
+
+export interface ThemeBorders {
+  style: 'solid' | 'dashed' | 'double' | 'none';
+  color: string;
+  width: number;
+  radius: number;
+}
+
+export interface ThemeTable {
+  headerBold: boolean;
+  headerBg: string;
+  headerText: string;
+  borderStyle: 'solid' | 'dashed' | 'double' | 'none';
+  alternatingRows: boolean;
+  alternatingColor: string;
+  cellPadding: number;
+}
+
+export interface ReportTheme {
+  name: string;
+  colors: ThemeColors;
+  fonts: ThemeFonts;
+  spacing: ThemeSpacing;
+  borders: ThemeBorders;
+  table: ThemeTable;
+  variables: Record<string, string>;
+}
+
+function cloneTheme(t: ReportTheme): ReportTheme {
+  return {
+    name: t.name,
+    colors: { ...t.colors },
+    fonts: { ...t.fonts },
+    spacing: { ...t.spacing },
+    borders: { ...t.borders },
+    table: { ...t.table },
+    variables: { ...t.variables },
+  };
+}
+
+export class ThemeSystem {
+  private themes = new Map<string, ReportTheme>();
+
+  constructor() {
+    for (const [name, theme] of Object.entries(PRESETS)) {
+      this.themes.set(name, cloneTheme(theme));
+    }
+  }
+
+  get(name: string): ReportTheme {
+    const t = this.themes.get(name);
+    if (!t) {
+      throw new Error(`Theme "${name}" not found. Available themes: ${this.list().join(', ')}`);
+    }
+    return cloneTheme(t);
+  }
+
+  register(theme: ReportTheme): void {
+    this.themes.set(theme.name, cloneTheme(theme));
+  }
+
+  list(): string[] {
+    return Array.from(this.themes.keys());
+  }
+
+  toCSSVariables(theme: ReportTheme): Record<string, string> {
+    const c = theme.colors;
+    const f = theme.fonts;
+    const s = theme.spacing;
+    const b = theme.borders;
+    const t = theme.table;
+
+    return {
+      '--color-primary': c.primary,
+      '--color-text': c.text,
+      '--color-background': c.background,
+      '--color-accent': c.accent,
+      '--color-muted': c.muted,
+      '--color-border': c.border,
+      '--color-header-bg': c.headerBg,
+      '--color-header-text': c.headerText,
+      '--color-alternating-row': c.alternatingRow,
+      '--color-success': c.success,
+      '--color-warning': c.warning,
+      '--color-danger': c.danger,
+
+      '--font-family': f.family,
+      '--font-size-base': `${f.sizeBase}px`,
+      '--font-size-small': `${f.sizeSmall}px`,
+      '--font-size-large': `${f.sizeLarge}px`,
+      '--font-size-title': `${f.sizeTitle}px`,
+
+      '--margin-top': `${s.marginTop}mm`,
+      '--margin-bottom': `${s.marginBottom}mm`,
+      '--margin-sides': `${s.marginSides}mm`,
+      '--padding': `${s.padding}px`,
+      '--line-height': String(s.lineHeight),
+
+      '--border-style': b.style,
+      '--border-color': b.color,
+      '--border-width': `${b.width}px`,
+      '--border-radius': `${b.radius}px`,
+
+      '--table-header-bold': String(t.headerBold),
+      '--table-header-bg': t.headerBg,
+      '--table-header-text': t.headerText,
+      '--table-border-style': t.borderStyle,
+      '--table-alternating-rows': String(t.alternatingRows),
+      '--table-alternating-color': t.alternatingColor,
+      '--table-cell-padding': `${t.cellPadding}px`,
+
+      ...theme.variables,
+    };
+  }
+
+  applyTemplateOverrides(
+    baseTheme: ReportTheme,
+    overrides: {
+      fontFamily?: string;
+      baseFontSize?: number;
+      marginTop?: number;
+      marginBottom?: number;
+      marginSides?: number;
+      lineSpacing?: number;
+      tableBorderStyle?: string;
+      alternatingRows?: boolean;
+      alternatingColor?: string;
+      tableHeaderBold?: boolean;
+      tableHeaderBg?: boolean;
+    },
+  ): ReportTheme {
+    const theme = cloneTheme(baseTheme);
+    theme.name = `${baseTheme.name} (overridden)`;
+
+    if (overrides.fontFamily !== undefined) {
+      theme.fonts.family = overrides.fontFamily;
+    }
+    if (overrides.baseFontSize !== undefined) {
+      theme.fonts.sizeBase = overrides.baseFontSize;
+      theme.fonts.sizeSmall = Math.round(overrides.baseFontSize * 0.8);
+      theme.fonts.sizeLarge = Math.round(overrides.baseFontSize * 1.25);
+      theme.fonts.sizeTitle = Math.round(overrides.baseFontSize * 1.6);
+    }
+    if (overrides.marginTop !== undefined) {
+      theme.spacing.marginTop = overrides.marginTop;
+    }
+    if (overrides.marginBottom !== undefined) {
+      theme.spacing.marginBottom = overrides.marginBottom;
+    }
+    if (overrides.marginSides !== undefined) {
+      theme.spacing.marginSides = overrides.marginSides;
+    }
+    if (overrides.lineSpacing !== undefined) {
+      theme.spacing.lineHeight = overrides.lineSpacing;
+    }
+    if (overrides.tableBorderStyle !== undefined) {
+      const valid = ['solid', 'dashed', 'double', 'none'] as const;
+      if (valid.includes(overrides.tableBorderStyle as typeof valid[number])) {
+        theme.table.borderStyle = overrides.tableBorderStyle as typeof valid[number];
+        theme.borders.style = overrides.tableBorderStyle as typeof valid[number];
+      }
+    }
+    if (overrides.alternatingRows !== undefined) {
+      theme.table.alternatingRows = overrides.alternatingRows;
+    }
+    if (overrides.alternatingColor !== undefined) {
+      theme.table.alternatingColor = overrides.alternatingColor;
+    }
+    if (overrides.tableHeaderBold !== undefined) {
+      theme.table.headerBold = overrides.tableHeaderBold;
+    }
+    if (overrides.tableHeaderBg !== undefined) {
+      if (overrides.tableHeaderBg) {
+        theme.table.headerBg = theme.colors.headerBg;
+        theme.table.headerText = theme.colors.headerText;
+      } else {
+        theme.table.headerBg = 'transparent';
+        theme.table.headerText = theme.colors.text;
+      }
+    }
+
+    return theme;
+  }
+}
+
+export const PRESETS: Record<string, ReportTheme> = {
+  'default-light': {
+    name: 'default-light',
+    colors: {
+      primary: '#2563eb',
+      text: '#111111',
+      background: '#ffffff',
+      accent: '#3b82f6',
+      muted: '#6b7280',
+      border: '#999999',
+      headerBg: '#f3f4f6',
+      headerText: '#111111',
+      alternatingRow: '#fafafa',
+      success: '#16a34a',
+      warning: '#d97706',
+      danger: '#dc2626',
+    },
+    fonts: {
+      family: 'Tajawal, sans-serif',
+      sizeBase: 10,
+      sizeSmall: 8,
+      sizeLarge: 12,
+      sizeTitle: 16,
+    },
+    spacing: {
+      marginTop: 10,
+      marginBottom: 10,
+      marginSides: 8,
+      padding: 4,
+      lineHeight: 1.4,
+    },
+    borders: {
+      style: 'dashed',
+      color: '#999999',
+      width: 1,
+      radius: 0,
+    },
+    table: {
+      headerBold: true,
+      headerBg: '#f3f4f6',
+      headerText: '#111111',
+      borderStyle: 'dashed',
+      alternatingRows: true,
+      alternatingColor: '#fafafa',
+      cellPadding: 4,
+    },
+    variables: {},
+  },
+
+  minimal: {
+    name: 'minimal',
+    colors: {
+      primary: '#000000',
+      text: '#000000',
+      background: '#ffffff',
+      accent: '#000000',
+      muted: '#555555',
+      border: '#cccccc',
+      headerBg: '#ffffff',
+      headerText: '#000000',
+      alternatingRow: '#ffffff',
+      success: '#000000',
+      warning: '#000000',
+      danger: '#000000',
+    },
+    fonts: {
+      family: 'Tajawal, sans-serif',
+      sizeBase: 10,
+      sizeSmall: 8,
+      sizeLarge: 12,
+      sizeTitle: 16,
+    },
+    spacing: {
+      marginTop: 5,
+      marginBottom: 5,
+      marginSides: 5,
+      padding: 2,
+      lineHeight: 1.3,
+    },
+    borders: {
+      style: 'none',
+      color: 'transparent',
+      width: 0,
+      radius: 0,
+    },
+    table: {
+      headerBold: true,
+      headerBg: '#ffffff',
+      headerText: '#000000',
+      borderStyle: 'none',
+      alternatingRows: false,
+      alternatingColor: '#ffffff',
+      cellPadding: 2,
+    },
+    variables: {},
+  },
+
+  compact: {
+    name: 'compact',
+    colors: {
+      primary: '#111111',
+      text: '#111111',
+      background: '#ffffff',
+      accent: '#333333',
+      muted: '#666666',
+      border: '#999999',
+      headerBg: '#f3f4f6',
+      headerText: '#111111',
+      alternatingRow: '#fafafa',
+      success: '#111111',
+      warning: '#111111',
+      danger: '#111111',
+    },
+    fonts: {
+      family: 'Tajawal, sans-serif',
+      sizeBase: 8,
+      sizeSmall: 7,
+      sizeLarge: 10,
+      sizeTitle: 13,
+    },
+    spacing: {
+      marginTop: 5,
+      marginBottom: 5,
+      marginSides: 4,
+      padding: 2,
+      lineHeight: 1.2,
+    },
+    borders: {
+      style: 'solid',
+      color: '#cccccc',
+      width: 1,
+      radius: 0,
+    },
+    table: {
+      headerBold: false,
+      headerBg: '#f3f4f6',
+      headerText: '#111111',
+      borderStyle: 'solid',
+      alternatingRows: true,
+      alternatingColor: '#fafafa',
+      cellPadding: 2,
+    },
+    variables: {},
+  },
+};
+
+export const themeSystem = new ThemeSystem();
 ```
 
 ## FILE: resources/js/pages/settings/print-settings/types.ts

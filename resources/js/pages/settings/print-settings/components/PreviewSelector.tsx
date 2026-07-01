@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
-import type { PrintTemplate, CompanyData } from '../types';
+import type { PrintTemplate } from '../types';
 import type { UniversalDocumentData } from '../types/data';
+import { emptyDocumentData } from '../types/data';
 
 const UniversalPreview = React.lazy(() => import('./preview/UniversalPreview'));
 
@@ -16,14 +17,13 @@ const FALLBACK = (
 
 interface Props {
   tpl:   PrintTemplate;
-  company?: CompanyData | null;
   data?:    UniversalDocumentData | null;
 }
 
-export default function PreviewSelector({ tpl, company, data }: Props) {
+export default function PreviewSelector({ tpl, data }: Props) {
   return (
     <Suspense fallback={FALLBACK}>
-      <UniversalPreview tpl={tpl} data={data ?? null} company={company ?? null} />
+      <UniversalPreview tpl={tpl} data={data ?? emptyDocumentData()} />
     </Suspense>
   );
 }

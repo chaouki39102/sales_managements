@@ -9,9 +9,8 @@ import { useFiscalYear } from '@/context/FiscalYearContext';
 import type { DocumentType } from '@/lib/api/core/types';
 import TemplatePrintModal from '@/pages/settings/print-settings/components/shared/TemplatePrintModal';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
-import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
+import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
 import { resolveTemplateById } from '@/pages/settings/print-settings/runtime/TemplateResolver';
-import type { CompanyInfo } from '@/pages/settings/print-settings/types/data';
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 
 import { useDocumentLookups }  from '../hooks/useDocumentLookups';
@@ -355,18 +354,7 @@ export default function CommercialDocumentModal({
 
   // ─── Template-based printing ──────────────────────────────────────────────
 
-  const activeCompany = useActiveCompany();
-  const companyInfo: CompanyInfo | null = useMemo(() => activeCompany ? {
-    name:    activeCompany.name    ?? '',
-    address: activeCompany.address ?? '',
-    phone:   activeCompany.phone   ?? '',
-    nif:     activeCompany.nif     ?? '',
-    rc:      activeCompany.rc      ?? '',
-    nis:     activeCompany.nis     ?? '',
-    ice:    (activeCompany as any).ice ?? '',
-    article: (activeCompany as any).ai ?? '',
-    logoUrl: (activeCompany as any).avatar ?? null,
-  } : null, [activeCompany]);
+  const companyInfo = mapCompany(useActiveCompany());
 
   const { data: printTemplates = [] } = usePrintTemplatesList(docCode);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);

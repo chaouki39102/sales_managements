@@ -237,6 +237,29 @@ function lineRow(label: string, value: string, width = 42): string {
   return label + ' '.repeat(gap) + value;
 }
 
+/** Map company_name_size (8-30 pts) to ESC/POS font multiplier */
+function mapFontSizeToEscPos(points: number): [number, number] {
+  if (points <= 10) return [1, 1];
+  if (points <= 15) return [2, 2];
+  if (points <= 22) return [3, 3];
+  return [4, 4];
+}
+
+/** Map company_info_size (6-16 pts) to ESC/POS font multiplier (info text stays small) */
+function mapInfoFontSizeToEscPos(points: number): [number, number] {
+  if (points <= 10) return [1, 1];
+  if (points <= 13) return [2, 1];
+  return [2, 2];
+}
+
+/** Map RTL-aware align string ('left'|'center'|'right') to ESC/POS n (0|1|2) */
+function mapAlignToEscPos(align: string | undefined | null): 0 | 1 | 2 {
+  if (align === 'left')   return 0;
+  if (align === 'center') return 1;
+  if (align === 'right')  return 2;
+  return 1; // default center
+}
+
 // ─── Receipt Builder ──────────────────────────────────────────────────────────
 
 export interface ReceiptOptions {
@@ -244,6 +267,10 @@ export interface ReceiptOptions {
   companyAddress?: string;
   companyPhone?:   string;
   companyNIF?:     string;
+  companyRC?:      string;
+  companyNIS?:     string;
+  companyICE?:     string;
+  companyArticle?: string;
   footerText?:     string;
   printQR?:        boolean;
   qrBaseUrl?:      string;    // مثال: https://erp.mycompany.dz/invoices/
@@ -573,6 +600,142 @@ export async function printThermal(
   return autoPrint(items, totals, client, docNumber, opts);
 }
 
+// ── Section sub-functions (Stage 1: Section Visibility Gates) ────────────────
+
+function buildThermalHeader(
+  b:        EscPosBuilder,
+  opts:     ReceiptOptions,
+  template: PrintTemplate,
+): void {
+  if (!template.show_header_section) return;
+  const {
+    companyName = 'نظام المبيعات',
+    companyAddress, companyPhone, companyNIF,
+    companyRC, companyNIS, companyICE, companyArticle,
+  } = opts;
+
+  // ── Company name (gated, with size/bold/align) ──────────────────────────
+  if (template.show_company_name !== false) {
+    const nameAlign = mapAlignToEscPos(template.company_name_align);
+    const nameBold  = template.company_name_bold !== false;
+    const [nw, nh]  = mapFontSizeToEscPos(template.company_name_size ?? 15);
+    b.setFontSize(nw, nh);
+    if (nameBold) b.setBold(true);
+    b.setAlign(nameAlign).text(companyName).lineFeed();
+    if (nameBold) b.setBold(false);
+    b.resetFontSize();
+  }
+
+  // ── Company info fields (each gated, with shared align/size) ────────────
+  const infoAlign = mapAlignToEscPos(template.company_info_align);
+  const [iw, ih]  = mapInfoFontSizeToEscPos(template.company_info_size ?? 9);
+
+  const infoField = (show: boolean | undefined, val: string | undefined, prefix = '') => {
+    if (show !== false && val) {
+      b.setFontSize(iw, ih).setAlign(infoAlign).text(prefix + val).lineFeed().resetFontSize();
+    }
+  };
+
+  infoField(template.show_address,  companyAddress);
+  infoField(template.show_phone,    companyPhone);
+  infoField(template.show_tax_id,   companyNIF,   'NIF: ');
+  infoField(template.show_rc,       companyRC,    'RC: ');
+  infoField(template.show_nis,      companyNIS,   'NIS: ');
+  infoField(template.show_ice,      companyICE,   'ICE: ');
+  infoField(template.show_article,  companyArticle, 'Article: ');
+
+  b.divider('=', 42);
+}
+
+function buildThermalDocInfo(
+  b:          EscPosBuilder,
+  docNumber:  string | undefined,
+  client:     Party | null,
+  template:   PrintTemplate,
+): void {
+  if (!template.show_doc_info_section) return;
+  const now = new Date();
+  b.setAlign(0);
+  if (docNumber) {
+    b.setBold(true)
+     .text('رقم الفاتورة: ')
+     .ascii(docNumber)
+     .lineFeed()
+     .setBold(false);
+  }
+  b.text('التاريخ: ').ascii(now.toLocaleDateString('fr-DZ')).lineFeed();
+  b.text('الوقت:   ').ascii(now.toLocaleTimeString('fr-DZ')).lineFeed();
+  if (client) {
+    b.text('الزبون:  ').text(client.name).lineFeed();
+    if (client.phone) b.text('الهاتف:  ').ascii(client.phone).lineFeed();
+  }
+  b.divider('-', 42);
+}
+
+function buildThermalItems(
+  b:        EscPosBuilder,
+  items:    CartItem[],
+  template: PrintTemplate,
+): void {
+  if (!template.show_items_section) return;
+  b.setBold(true).left('المنتج').setBold(false);
+  for (const item of items) {
+    const total = item.total_ttc;
+    b.text(item.product_name ?? '');
+    b.lineFeed();
+    const detail =
+      `  ${fmt(item.quantity)} x ${fmt(item.unit_price_ht)}` +
+      (item.discount_percentage > 0 ? ` (-${item.discount_percentage.toFixed(0)}%)` : '');
+    const totalStr = `${fmt(total)} دج`;
+    b.setAlign(0).ascii(detail);
+    b.setAlign(2).ascii(totalStr).lineFeed();
+  }
+  b.divider('-', 42);
+}
+
+function buildThermalTotals(
+  b:        EscPosBuilder,
+  totals:   CartTotals,
+  template: PrintTemplate,
+): void {
+  if (!template.show_totals_section) return;
+  b.setAlign(0);
+  b.ascii(lineRow('المجموع HT:', `${fmt(totals.total_ht)} دج`)).lineFeed();
+  if (totals.total_discount > 0) {
+    b.ascii(lineRow('الخصم:', `-${fmt(totals.total_discount)} دج`)).lineFeed();
+  }
+  if (totals.invoice_discount_amount && totals.invoice_discount_amount > 0) {
+    b.ascii(lineRow('خصم الفاتورة:', `-${fmt(totals.invoice_discount_amount)} دج`)).lineFeed();
+  }
+  b.ascii(lineRow('TVA:', `${fmt(totals.total_tva)} دج`)).lineFeed();
+  if (totals.fiscal_stamp > 0) {
+    b.ascii(lineRow('الطابع المالي:', `${fmt(totals.fiscal_stamp)} دج`)).lineFeed();
+  }
+  b.divider('=', 32);
+  const totalTtcFinal = totals.total_ttc + totals.fiscal_stamp;
+  b.setFontSize(2, 2)
+   .setBold(true)
+   .setAlign(2)
+   .ascii(`${fmt(totalTtcFinal)} دج`)
+   .lineFeed()
+   .setBold(false)
+   .resetFontSize();
+  b.text('الإجمالي شامل الضريبة').lineFeed();
+  b.divider('=', 42);
+}
+
+function buildThermalFooter(
+  b:          EscPosBuilder,
+  footerText: string,
+  template:   PrintTemplate,
+): void {
+  if (!template.show_footer_section) return;
+  const now = new Date();
+  b.divider('-', 42);
+  b.center(footerText);
+  b.center(`نظام ERP الجزائر — ${now.getFullYear()}`);
+}
+
 /**
  * Build ESC/POS bytes from the universal data contract + template.
  * Respects template visibility flags so thermal output matches the
@@ -627,11 +790,31 @@ export function buildReceiptBytesFromTemplate(
     companyAddress: String(printFieldResolver.resolve('company.address', data, template) ?? co.address ?? ''),
     companyPhone:   String(printFieldResolver.resolve('company.phone', data, template) ?? co.phone ?? ''),
     companyNIF:     String(printFieldResolver.resolve('company.nif', data, template) ?? co.nif ?? ''),
+    companyRC:      String(printFieldResolver.resolve('company.rc', data, template) ?? co.rc ?? ''),
+    companyNIS:     String(printFieldResolver.resolve('company.nis', data, template) ?? co.nis ?? ''),
+    companyICE:     String(printFieldResolver.resolve('company.ice', data, template) ?? co.ice ?? ''),
+    companyArticle: String(printFieldResolver.resolve('company.article', data, template) ?? co.article ?? ''),
     footerText:     template.show_thank_you ? template.thank_you_text : '',
     printQR:        !!template.show_qr,
   };
 
-  return buildReceiptBytes(items, totals, client, docNumber, opts);
+  const b = new EscPosBuilder().init();
+
+  buildThermalHeader(b, opts, template);
+  buildThermalDocInfo(b, docNumber, client, template);
+  buildThermalItems(b, items, template);
+  buildThermalTotals(b, totals, template);
+
+  if (opts.printQR && docNumber) {
+    b.lineFeed();
+    b.qrCode(docNumber, 4);
+    b.center(docNumber);
+  }
+
+  buildThermalFooter(b, opts.footerText, template);
+
+  b.feedAndCut();
+  return b.escposBytes();
 }
 
 /**

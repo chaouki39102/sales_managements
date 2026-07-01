@@ -175,11 +175,13 @@ export const DocumentDataBuilder = {
     const lines  = buildLinesFromApi(doc.lines ?? []);
     const totals = buildTotalsFromApi(doc, lines);
 
-    // Auto-compute balance from document when no explicit options provided:
-    // remaining > 0 indicates the party still owes this amount after this doc.
+    // Balance requires explicit options from the caller (fetched via
+    // party-balances API). Without them, we have no data → null.
+    // The old fallback buildBalance(0, totals.remaining) was always wrong
+    // (0 previous balance is incorrect for any real party).
     const balance = options?.prevBalance != null && options?.newBalance != null
       ? buildBalance(options.prevBalance, options.newBalance)
-      : buildBalance(0, totals.remaining);
+      : null;
 
     return {
       doc:         buildDocInfo(doc),

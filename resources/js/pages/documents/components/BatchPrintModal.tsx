@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
-import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
-import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
+import { usePrintTemplatesList, renderPipelineToPopup, mapCompany } from '@/pages/settings/print-settings/runtime';
 import { resolveTemplateById, resolveTemplate } from '@/pages/settings/print-settings/runtime/TemplateResolver';
 import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
 import type { CompanyInfo } from '@/pages/settings/print-settings/types/data';
@@ -50,48 +49,13 @@ const progressBarInner: React.CSSProperties = {
   height: '100%', background: '#2563eb', borderRadius: 3, transition: 'width 0.3s ease',
 };
 
-let _batchPrintId = 0;
-
-function printDocument(docNum: string, data: Record<string, unknown>, tpl: PrintTemplate, company: CompanyInfo): Promise<void> {
+function printDocument(_docNum: string, data: Record<string, unknown>, tpl: PrintTemplate, company: CompanyInfo): Promise<void> {
   return new Promise((resolve) => {
-    _batchPrintId++;
-
-    const winW = 900;
-    const winH = Math.min(800, window.screen.availHeight);
-
-    const win = window.open('', `_batchprint_${_batchPrintId}`, `width=${winW},height=${winH}`);
+    const source = { type: 'api-document' as const, doc: data };
+    const win = renderPipelineToPopup(source, tpl, company);
     if (!win) { resolve(); return; }
-
-    win.document.write(
-      `<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"/>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"/>
-<style>body{margin:0;background:#fff;display:flex;justify-content:center;padding:20px}*{box-sizing:border-box}</style>
-</head><body><div id="r"></div>
-<script>
-  document.fonts.ready.then(function(){
-    setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 500); }, 300);
-  });
-<\/script></body></html>`
-    );
-    win.document.close();
-
-    import('react-dom/client').then(({ createRoot }) => {
-      const root = win!.document.getElementById('r');
-      if (root) {
-        import('@/pages/settings/print-settings/components/preview/UniversalPreview').then(({ default: UniversalPreview }) => {
-          import('react').then((React) => {
-            const data = DocumentDataBuilder.fromApiDocument(data, company);
-            createRoot(root).render(
-              React.createElement(UniversalPreview, { tpl, data, company }),
-            );
-            win!.onafterprint = () => { resolve(); };
-            setTimeout(resolve, 3000);
-          });
-        });
-      } else {
-        resolve();
-      }
-    }).catch(() => resolve());
+    win.onafterprint = () => { resolve(); };
+    setTimeout(resolve, 3000);
   });
 }
 
@@ -107,19 +71,7 @@ interface Props {
 
 export default function BatchPrintModal({ open, onClose, documents: docs }: Props) {
   const slug = useActiveSlug();
-  const activeCompany = useActiveCompany();
-
-  const companyInfo: CompanyInfo | null = useMemo(() => activeCompany ? {
-    name:    activeCompany.name    ?? '',
-    address: activeCompany.address ?? '',
-    phone:   activeCompany.phone   ?? '',
-    nif:     activeCompany.nif     ?? '',
-    rc:      activeCompany.rc      ?? '',
-    nis:     activeCompany.nis     ?? '',
-    ice:    (activeCompany as any).ice ?? '',
-    article: (activeCompany as any).ai ?? '',
-    logoUrl: (activeCompany as any).avatar ?? null,
-  } : null, [activeCompany]);
+  const companyInfo = mapCompany(useActiveCompany());
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);

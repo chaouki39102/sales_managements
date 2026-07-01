@@ -16,8 +16,6 @@ import {
 // Minimal ApiClient adapter — only the methods printStoreService uses
 const hostApi = { get: apiGet, patch: apiPatch } as any;
 
-export const DB_KEY_DOC_CONFIGS = 'print:doc_configs';
-export const tplKey = (docCode: string, size: string) => `${docCode}_${size}`;
 
 export const dbSaveDocConfigs = (configs: any[]) => _dbSaveDocConfigs(hostApi, configs);
 export const dbFetchDocConfigs = ()         => _dbFetchDocConfigs(hostApi);
