@@ -70,12 +70,29 @@ export const obKeys = {
 
 export const obApi = {
   // المسار الصحيح من api.php: opening-balance-stocks
-  list: (yearId: number) =>
-    apiGet<OpeningBalanceStock[]>('/opening-balance-stocks', {
-      'filter[fiscal_year_id]': yearId,
-      per_page:       500,
-      include:        'product,warehouse',
-    }),
+  list: async (yearId: number) => {
+    // The API caps per_page at 100, so fetch all pages and flatten
+    const allItems: OpeningBalanceStock[] = [];
+    let page = 1;
+    let lastPage = 1;
+
+    while (page <= lastPage) {
+      const result: any = await apiGet<OpeningBalanceStock[]>('/opening-balance-stocks', {
+        'filter[fiscal_year_id]': yearId,
+        per_page:       100,
+        include:        'product,warehouse',
+        page,
+      });
+      const items = (Array.isArray(result) ? result : result?.data ?? []) as OpeningBalanceStock[];
+      allItems.push(...items);
+      if (result?.meta?.last_page) {
+        lastPage = result.meta.last_page;
+      }
+      page++;
+    }
+
+    return allItems;
+  },
 
   create: (d: CreateOpeningBalanceInput) =>
     apiPost<OpeningBalanceStock>('/opening-balance-stocks', d),

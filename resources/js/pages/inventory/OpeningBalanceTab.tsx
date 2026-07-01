@@ -2,11 +2,11 @@
 // pages/inventory/OpeningBalanceTab.tsx — تاب "الرصيد الافتتاحي"
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import {
   useQuery,
   useMutation,
   useQueryClient,
-  keepPreviousData,
 } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
@@ -33,36 +33,71 @@ export default function OpeningBalanceTab() {
   const slug = useActiveSlug();
   const qc   = useQueryClient();
   const { selectedYear } = useFiscalYear();
-  const [drafts,       setDrafts]       = useState<DraftRow[]>([]);
-  const [editingId,    setEditingId]    = useState<number | null>(null);
-  const [editDraft,    setEditDraft]    = useState<DraftRow>(emptyDraft());
-  const [deletingId,   setDeletingId]   = useState<number | null>(null);
-  const [errors,       setErrors]       = useState<Record<string, string>>({});
+  const [drafts,            setDrafts]            = useState<DraftRow[]>([]);
+  const [editingId,         setEditingId]         = useState<number | null>(null);
+  const [editDraft,         setEditDraft]         = useState<DraftRow>(emptyDraft());
+  const [deletingId,        setDeletingId]        = useState<number | null>(null);
+  const [errors,            setErrors]            = useState<Record<string, string>>({});
+  const [showAddAllModal,   setShowAddAllModal]   = useState(false);
+  const [addAllWarehouseId, setAddAllWarehouseId] = useState<number | ''>('');
+  const [addAllQty,         setAddAllQty]         = useState('');
+  const [addAllUnitPrice,   setAddAllUnitPrice]   = useState('');
+  const [allowDuplicates,   setAllowDuplicates]   = useState(true);
+  const [addAllLoading,     setAddAllLoading]     = useState(false);
+  const [addAllResult,      setAddAllResult]      = useState<{
+    added: number; skipped: number; errors: number; total: number; details: string[];
+  } | null>(null);
+  const [addAllCurrent,     setAddAllCurrent]     = useState<string | null>(null);
+  const [liveDone,         setLiveDone]           = useState(0);
+  const [liveAdded,        setLiveAdded]          = useState(0);
+  const [liveSkipped,      setLiveSkipped]        = useState(0);
+  const [liveErrors,       setLiveErrors]         = useState(0);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteAllLoading,   setDeleteAllLoading]   = useState(false);
 
   // ── خيارات المنتجات والمستودعات ──────────────────────────────────────────
 
   const { data: productsData } = useQuery({
     queryKey:  tenantKeys.products.list(slug ?? ''),
-    queryFn:   () => apiGet<any>('/products', {
-      per_page: 500, manages_stock: 1,
-    }).then(r => r?.data ?? []),
+    queryFn:   async () => {
+      const all: ProductOption[] = [];
+      let page = 1, lastPage = 1;
+      while (page <= lastPage) {
+        const r: any = await apiGet<any>('/products', {
+          per_page: 100, page,
+          manages_stock: 1,
+        });
+        const items = (Array.isArray(r) ? r : r?.data ?? []) as ProductOption[];
+        all.push(...items);
+        if (r?.meta?.last_page) lastPage = r.meta.last_page;
+        page++;
+      }
+      return all;
+    },
     enabled:   !!slug,
     staleTime: 10 * 60_000,
   });
 
-  const { data: warehousesData } = useQuery({
+  const { data: warehousesData } = useQuery<WarehouseOption[]>({
     queryKey:  tenantKeys.lookups.warehouses(slug ?? ''),
     queryFn:   () => apiGet<any>('/warehouses', { per_page: 200 }).then(r => r?.data ?? []),
     enabled:   !!slug,
     staleTime: 10 * 60_000,
+    select:    (d: unknown) => {
+      if (Array.isArray(d)) return d;
+      if (d && typeof d === 'object' && 'data' in (d as object) && Array.isArray((d as Record<'data', unknown>)['data'])) {
+        return (d as Record<'data', WarehouseOption[]>)['data'];
+      }
+      return [];
+    },
   });
 
-  const products:   ProductOption[]   = productsData   ?? [];
-  const warehouses: WarehouseOption[] = warehousesData ?? [];
+  const products:   ProductOption[]   = Array.isArray(productsData)   ? productsData   : [];
+  const warehouses: WarehouseOption[] = Array.isArray(warehousesData) ? warehousesData : [];
 
   // ── جلب سطور الرصيد الافتتاحي ─────────────────────────────────────────
 
-  const { data: obData, isLoading } = useQuery({
+  const { data: obData, isLoading, refetch } = useQuery({
     queryKey:        obKeys.list(slug ?? '', selectedYear?.id),
     queryFn:         async () => {
       if (!selectedYear?.id) return [] as OpeningBalanceStock[];
@@ -70,11 +105,10 @@ export default function OpeningBalanceTab() {
       return (Array.isArray(result) ? result : []) as OpeningBalanceStock[];
     },
     enabled:         !!slug && !!selectedYear?.id,
-    staleTime:       2 * 60_000,
-    placeholderData: keepPreviousData,
+    staleTime:       30_000,
   });
 
-  const rows: OpeningBalanceStock[] = obData ?? [];
+  const rows: OpeningBalanceStock[] = Array.isArray(obData) ? obData : [];
 
   // ── إبطال الكاش ──────────────────────────────────────────────────────────
 
@@ -194,6 +228,94 @@ export default function OpeningBalanceTab() {
     });
   };
 
+  // ── إضافة كل المنتجات ────────────────────────────────────────────────────
+
+  const handleAddAll = useCallback(async () => {
+    if (!slug || !selectedYear?.id || !addAllWarehouseId || !addAllQty) return;
+    setAddAllLoading(true);
+    setAddAllResult(null);
+    setAddAllCurrent(null);
+    setLiveDone(0);
+    setLiveAdded(0);
+    setLiveSkipped(0);
+    setLiveErrors(0);
+
+    const existingProductIds = new Set<number>([
+      ...rows.map(r => r.product_id),
+      ...drafts.map(d => d.product_id).filter((id): id is number => id !== ''),
+    ]);
+
+    let added = 0, skipped = 0, errCount = 0;
+    const details: string[] = [];
+    const qty = parseFloat(addAllQty) || 0;
+    const price = parseFloat(addAllUnitPrice) || 0;
+
+    let done = 0;
+    for (const p of products) {
+      flushSync(() => {
+        setAddAllCurrent(p.name);
+        setLiveDone(done);
+        setLiveAdded(added);
+        setLiveSkipped(skipped);
+        setLiveErrors(errCount);
+      });
+      if (!allowDuplicates && existingProductIds.has(p.id)) {
+        skipped++;
+        details.push(`⏭️ ${p.name} — موجود مسبقاً`);
+        done++;
+        continue;
+      }
+
+      try {
+        await obApi.create({
+          fiscal_year_id:     selectedYear.id,
+          product_id:         p.id,
+          warehouse_id:       addAllWarehouseId as number,
+          opening_quantity:   qty,
+          opening_value:      +(qty * price).toFixed(4),
+          lot_number:         null,
+          manufacturing_date: null,
+          expiration_date:    null,
+        });
+        added++;
+        details.push(`✅ ${p.name} — تمت الإضافة`);
+      } catch (e) {
+        errCount++;
+        const msg = e instanceof Error ? e.message : 'خطأ غير معروف';
+        details.push(`❌ ${p.name} — ${msg}`);
+      }
+      done++;
+    }
+
+    setAddAllCurrent(null);
+    setAddAllLoading(true);
+    await refetch();
+    invalidate();
+    setAddAllResult({ added, skipped, errors: errCount, total: products.length, details });
+    setAddAllLoading(false);
+    setDrafts([]);
+  }, [selectedYear, addAllWarehouseId, addAllQty, addAllUnitPrice, allowDuplicates, products, rows, drafts, refetch, invalidate]);
+
+  // ── حذف كل المنتجات ──────────────────────────────────────────────────────
+
+  const handleDeleteAll = useCallback(async () => {
+    if (!rows.length) return;
+    setDeleteAllLoading(true);
+
+    const ids = rows.map(r => r.id);
+    const CONCURRENCY = 10;
+    const total = ids.length;
+
+    for (let i = 0; i < total; i += CONCURRENCY) {
+      const batch = ids.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(batch.map(id => obApi.delete(id)));
+    }
+
+    setDeleteAllLoading(false);
+    setShowDeleteAllModal(false);
+    invalidate();
+  }, [rows, invalidate]);
+
   // ── Totals ────────────────────────────────────────────────────────────────
 
   const totalQty   = rows.reduce((s, r) => s + Number(r.opening_quantity), 0);
@@ -230,19 +352,49 @@ export default function OpeningBalanceTab() {
         <div style={{ flex: 1 }} />
 
         {selectedYear?.id && (
-          <button
-            onClick={addDraftRow}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 16px', background: 'var(--em)',
-              border: 'none', borderRadius: 8, color: '#fff',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              fontFamily: 'Tajawal, sans-serif',
-            }}
-          >
-            <i className="ti ti-plus" style={{ fontSize: 15 }} />
-            إضافة سطر
-          </button>
+          <>
+            <button
+              onClick={() => setShowAddAllModal(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 16px', background: '#0891b2',
+                border: 'none', borderRadius: 8, color: '#fff',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                fontFamily: 'Tajawal, sans-serif',
+              }}
+            >
+              <i className="ti ti-packages" style={{ fontSize: 15 }} />
+              إضافة كل المنتجات
+            </button>
+            {rows.length > 0 && (
+              <button
+                onClick={() => setShowDeleteAllModal(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 16px', background: '#ef4444',
+                  border: 'none', borderRadius: 8, color: '#fff',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  fontFamily: 'Tajawal, sans-serif',
+                }}
+              >
+                <i className="ti ti-trash" style={{ fontSize: 15 }} />
+                حذف الكل ({rows.length})
+              </button>
+            )}
+            <button
+              onClick={addDraftRow}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 16px', background: 'var(--em)',
+                border: 'none', borderRadius: 8, color: '#fff',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                fontFamily: 'Tajawal, sans-serif',
+              }}
+            >
+              <i className="ti ti-plus" style={{ fontSize: 15 }} />
+              إضافة سطر
+            </button>
+          </>
         )}
       </div>
 
@@ -780,6 +932,470 @@ export default function OpeningBalanceTab() {
           <i className="ti ti-info-circle" style={{ fontSize: 15 }} />
           الرصيد الافتتاحي يُحتسب تلقائياً ضمن المخزون الفعلي للمنتجات
           عبر حركة مخزون من نوع "رصيد افتتاحي".
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          موديل إضافة كل المنتجات (Wizard)
+          ════════════════════════════════════════════════════════════════════ */}
+      {showAddAllModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => { if (!addAllLoading) setShowAddAllModal(false); }}>
+          <div style={{
+            width: 520, maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto',
+            background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,.2)',
+          }} onClick={e => e.stopPropagation()}>
+
+            {/* ── Header ── */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '16px 20px', borderBottom: '1px solid #e2e8f0',
+            }}>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="ti ti-packages" style={{ color: '#0891b2' }} />
+                {addAllResult ? 'نتيجة الإضافة' : 'إضافة كل المنتجات للرصيد الافتتاحي'}
+              </h3>
+              {!addAllLoading && (
+                <button onClick={() => { setShowAddAllModal(false); setAddAllResult(null); }}
+                  style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#666', padding: 0, lineHeight: 1 }}>
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* ── Step 1: Config ── */}
+            {!addAllResult && !addAllLoading && (
+              <div style={{ padding: 20 }}>
+                <div style={{
+                  display: 'flex', gap: 16, marginBottom: 20,
+                  padding: 16, background: '#f0f9ff', borderRadius: 10,
+                  border: '1px solid #bae6fd',
+                }}>
+                  <div style={{ textAlign: 'center', minWidth: 60 }}>
+                    <i className="ti ti-package" style={{ fontSize: 28, color: '#0891b2' }} />
+                    <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{products.length} منتج</div>
+                  </div>
+                  <i className="ti ti-arrow-left" style={{ fontSize: 20, color: '#0891b2', alignSelf: 'center' }} />
+                  <div style={{ textAlign: 'center', minWidth: 60 }}>
+                    <i className="ti ti-building-warehouse" style={{ fontSize: 28, color: '#0891b2' }} />
+                    <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>المستودع</div>
+                  </div>
+                  <i className="ti ti-arrow-left" style={{ fontSize: 20, color: '#0891b2', alignSelf: 'center' }} />
+                  <div style={{ textAlign: 'center', minWidth: 60 }}>
+                    <i className="ti ti-clipboard-list" style={{ fontSize: 28, color: '#0891b2' }} />
+                    <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>الرصيد الافتتاحي</div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 13, color: '#333', marginBottom: 16, lineHeight: 1.6 }}>
+                  سيتم إضافة جميع المنتجات ({products.length} منتج) إلى الرصيد الافتتاحي
+                  للسنة المالية <strong>{selectedYear?.name}</strong>.
+                </div>
+
+                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: '#333' }}>
+                  المستودع الافتراضي <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <select
+                  value={addAllWarehouseId}
+                  onChange={e => setAddAllWarehouseId(e.target.value ? +e.target.value : '')}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 6,
+                    border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 14,
+                    background: '#fff', fontFamily: 'Tajawal, sans-serif',
+                  }}
+                >
+                  <option value="">— اختر المستودع —</option>
+                  {warehouses.map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+
+                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: '#333' }}>
+                  الكمية الافتراضية <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="number" step="0.001" min="0"
+                  value={addAllQty}
+                  onChange={e => setAddAllQty(e.target.value)}
+                  placeholder="مثال: 1"
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 6,
+                    border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 14,
+                    fontFamily: 'Tajawal, sans-serif',
+                  }}
+                />
+
+                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: '#333' }}>
+                  سعر الوحدة الافتراضي
+                </label>
+                <input
+                  type="number" step="0.01" min="0"
+                  value={addAllUnitPrice}
+                  onChange={e => setAddAllUnitPrice(e.target.value)}
+                  placeholder="مثال: 100"
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 6,
+                    border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 6,
+                    fontFamily: 'Tajawal, sans-serif',
+                  }}
+                />
+                <div style={{ fontSize: 11, color: '#999', marginBottom: 14 }}>
+                  {addAllQty && addAllUnitPrice
+                    ? `القيمة الإجمالية التقديرية: ${(+addAllQty * +addAllUnitPrice).toLocaleString('fr-DZ')} دج`
+                    : 'اتركه فارغاً إذا أردت أن تكون القيمة الإجمالية 0'}
+                </div>
+
+                <label style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  fontSize: 13, cursor: 'pointer', marginBottom: 16,
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={allowDuplicates}
+                    onChange={e => setAllowDuplicates(e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span>السماح بالتكرار — إضافة المنتجات المضافة مسبقاً</span>
+                </label>
+                {!allowDuplicates && (
+                  <div style={{
+                    padding: '8px 12px', background: '#fef3c7', borderRadius: 6,
+                    fontSize: 12, color: '#92400e', marginBottom: 16,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    <i className="ti ti-alert-triangle" />
+                    تم اكتشاف {rows.length + drafts.length} منتج موجود مسبقاً — سيتم تخطيها
+                  </div>
+                )}
+
+                <div style={{
+                  display: 'flex', gap: 8, justifyContent: 'flex-end',
+                  borderTop: '1px solid #e2e8f0', paddingTop: 16, marginTop: 4,
+                }}>
+                  <button onClick={() => { setShowAddAllModal(false); setAddAllResult(null); }}
+                    style={{
+                      padding: '8px 20px', border: '1px solid #e2e8f0', borderRadius: 6,
+                      background: '#fff', color: '#333', fontSize: 13, cursor: 'pointer',
+                      fontFamily: 'Tajawal, sans-serif',
+                    }}>
+                    إلغاء
+                  </button>
+                  <button
+                    onClick={handleAddAll}
+                    disabled={!addAllWarehouseId || !addAllQty || products.length === 0}
+                    style={{
+                      padding: '8px 20px', border: 'none', borderRadius: 6,
+                      background: (!addAllWarehouseId || !addAllQty || products.length === 0) ? '#94a3b8' : '#0891b2',
+                      color: '#fff', fontSize: 13, fontWeight: 600, cursor: (!addAllWarehouseId || !addAllQty || products.length === 0) ? 'not-allowed' : 'pointer',
+                      fontFamily: 'Tajawal, sans-serif',
+                    }}>
+                    <i className="ti ti-check" style={{ marginLeft: 4 }} />
+                    إضافة الكل ({products.length})
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Loading (جاري إضافة المنتجات…) ── */}
+            {addAllLoading && (
+              <div style={{ padding: 32, textAlign: 'center' }}>
+
+                <style>{`
+                  @keyframes floatY {
+                    0%, 100% { transform: translateY(0px); }
+                    50%      { transform: translateY(-6px); }
+                  }
+                  @keyframes shimmer {
+                    0%   { background-position: 200% center; }
+                    100% { background-position: -200% center; }
+                  }
+                `}</style>
+
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 2, marginBottom: 22,
+                }}>
+                  {[
+                    { icon: 'ti-package',        bg: '#0891b2', delay: '0s' },
+                    { icon: 'ti-arrow-left',     bg: 'transparent', delay: '0s', nbox: true },
+                    { icon: 'ti-building-warehouse', bg: '#2563eb', delay: '0.12s' },
+                    { icon: 'ti-arrow-left',     bg: 'transparent', delay: '0s', nbox: true },
+                    { icon: 'ti-clipboard-list', bg: '#16a34a', delay: '0.24s' },
+                  ].map((item, i) =>
+                    item.nbox ? (
+                      <span key={i} style={{ color: '#94a3b8', fontSize: 16, margin: '0 4px' }}>
+                        <i className={`ti ${item.icon}`} />
+                      </span>
+                    ) : (
+                      <div key={i} style={{
+                        width: 38, height: 38, borderRadius: 10,
+                        background: `linear-gradient(135deg, ${item.bg}, ${item.bg}dd)`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontSize: 18,
+                        animation: `floatY 1.4s ease-in-out infinite`,
+                        animationDelay: item.delay,
+                      }}>
+                        <i className={`ti ${item.icon}`} />
+                      </div>
+                    )
+                  )}
+                </div>
+
+                <div style={{
+                  position: 'relative', width: 88, height: 88, margin: '0 auto 18px',
+                }}>
+                  <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', width: 88, height: 88 }}>
+                    <defs>
+                      <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#0891b2" />
+                        <stop offset="100%" stopColor="#06b6d4" />
+                      </linearGradient>
+                    </defs>
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" strokeWidth="6" />
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="url(#progressGrad)" strokeWidth="6"
+                      strokeDasharray={2 * Math.PI * 42}
+                      strokeDashoffset={2 * Math.PI * 42 * (1 - liveDone / Math.max(products.length, 1))}
+                      strokeLinecap="round" style={{ transition: 'stroke-dashoffset .5s ease' }} />
+                  </svg>
+                  <div style={{
+                    position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontSize: 20, fontWeight: 800, color: '#0891b2', lineHeight: 1 }}>
+                      {liveDone}
+                    </span>
+                    <span style={{ fontSize: 9, color: '#94a3b8' }}>
+                      من {products.length}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{
+                  fontSize: 15, fontWeight: 700, color: '#0f172a',
+                  marginBottom: 4,
+                }}>
+                  جاري إضافة المنتجات…
+                </div>
+                <div style={{
+                  fontSize: 12, color: '#94a3b8', marginBottom: 18,
+                }}>
+                  يرجى الانتظار حتى اكتمال العملية
+                </div>
+
+                {addAllCurrent && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 12,
+                    padding: '12px 24px', marginBottom: 16,
+                    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%)',
+                    backgroundSize: '200% 100%',
+                    border: '1px solid #bae6fd', borderRadius: 12,
+                    animation: 'shimmer 2s ease-in-out infinite',
+                    boxShadow: '0 2px 12px rgba(8,145,178,.15)',
+                  }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 10,
+                      background: 'linear-gradient(135deg, #0891b2, #06b6d4)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', fontSize: 20,
+                      animation: 'floatY 1.4s ease-in-out infinite',
+                    }}>
+                      <i className="ti ti-package" />
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 10, color: '#0891b2', fontWeight: 600, marginBottom: 2 }}>
+                        جاري إضافة المنتجات…
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                        {addAllCurrent}
+                      </div>
+                    </div>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%',
+                      border: '3px solid #e2e8f0',
+                      borderTopColor: '#0891b2',
+                      animation: 'spin .8s linear infinite',
+                    }} />
+                  </div>
+                )}
+
+                <div style={{
+                  width: '80%', maxWidth: 320, margin: '0 auto 10px',
+                  height: 6, background: '#f1f5f9', borderRadius: 3,
+                  overflow: 'hidden', border: '1px solid #e2e8f0',
+                }}>
+                  <div style={{
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #0891b2, #06b6d4, #22d3ee)',
+                    backgroundSize: '200% 100%',
+                    borderRadius: 3, transition: 'width .4s ease',
+                    animation: 'shimmer 1.5s ease-in-out infinite',
+                    width: `${products.length > 0 ? (liveDone / products.length) * 100 : 0}%`,
+                  }} />
+                </div>
+
+                <div style={{
+                  fontSize: 12, color: '#94a3b8',
+                  display: 'flex', justifyContent: 'center', gap: 16,
+                }}>
+                  <span style={{ color: '#16a34a' }}>✓ {liveAdded} تمت</span>
+                  <span style={{ color: '#d97706' }}>⏭ {liveSkipped} تخطي</span>
+                  <span style={{ color: '#ef4444' }}>✕ {liveErrors} فشل</span>
+                </div>
+              </div>
+            )}
+
+            {/* ── Step 2: Results ── */}
+            {addAllResult && !addAllLoading && (
+              <div style={{ padding: 20 }}>
+                <div style={{
+                  display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap',
+                }}>
+                  <div style={{
+                    flex: 1, minWidth: 100, textAlign: 'center', padding: 14,
+                    background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0',
+                  }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: '#16a34a' }}>{addAllResult.added}</div>
+                    <div style={{ fontSize: 11, color: '#666' }}>تمت الإضافة</div>
+                  </div>
+                  {addAllResult.skipped > 0 && (
+                    <div style={{
+                      flex: 1, minWidth: 100, textAlign: 'center', padding: 14,
+                      background: '#fef3c7', borderRadius: 10, border: '1px solid #fde68a',
+                    }}>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: '#d97706' }}>{addAllResult.skipped}</div>
+                      <div style={{ fontSize: 11, color: '#666' }}>تم التخطي</div>
+                    </div>
+                  )}
+                  {addAllResult.errors > 0 && (
+                    <div style={{
+                      flex: 1, minWidth: 100, textAlign: 'center', padding: 14,
+                      background: '#fef2f2', borderRadius: 10, border: '1px solid #fecaca',
+                    }}>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: '#dc2626' }}>{addAllResult.errors}</div>
+                      <div style={{ fontSize: 11, color: '#666' }}>فشل</div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{
+                  padding: '10px 14px', background: '#f8fafc', borderRadius: 8,
+                  fontSize: 13, color: '#333', marginBottom: 12,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <i className={`ti ${addAllResult.errors > 0 ? 'ti-alert-circle' : 'ti-check-circle'}`}
+                    style={{ color: addAllResult.errors > 0 ? '#dc2626' : '#16a34a' }} />
+                  {addAllResult.errors > 0
+                    ? `تمت الإضافة بنجاح مع ${addAllResult.errors} خطأ`
+                    : `تمت إضافة ${addAllResult.added} منتج بنجاح`}
+                </div>
+
+                <div style={{
+                  maxHeight: 200, overflow: 'auto', marginBottom: 12,
+                  border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12,
+                }}>
+                  {addAllResult.details.map((d, i) => (
+                    <div key={i} style={{
+                      padding: '5px 10px',
+                      borderBottom: i < addAllResult.details.length - 1 ? '1px solid #f0f1f3' : 'none',
+                    }}>
+                      {d}
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{
+                  display: 'flex', gap: 8, justifyContent: 'flex-end',
+                  borderTop: '1px solid #e2e8f0', paddingTop: 16,
+                }}>
+                  <button onClick={() => { setShowAddAllModal(false); setAddAllResult(null); }}
+                    style={{
+                      padding: '8px 20px', border: 'none', borderRadius: 6,
+                      background: '#0891b2', color: '#fff', fontSize: 13,
+                      fontWeight: 600, cursor: 'pointer',
+                      fontFamily: 'Tajawal, sans-serif',
+                    }}>
+                    <i className="ti ti-check" style={{ marginLeft: 4 }} />
+                    تم
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          موديل حذف الكل (تأكيد)
+          ════════════════════════════════════════════════════════════════════ */}
+      {showDeleteAllModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => { if (!deleteAllLoading) setShowDeleteAllModal(false); }}>
+          <div style={{
+            width: 420, maxWidth: '95vw',
+            background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,.2)',
+            padding: 24, textAlign: 'center',
+          }} onClick={e => e.stopPropagation()}>
+
+            <div style={{
+              width: 56, height: 56, borderRadius: '50%',
+              background: '#fef2f2', margin: '0 auto 16px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <i className="ti ti-alert-triangle" style={{ fontSize: 28, color: '#ef4444' }} />
+            </div>
+
+            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+              حذف كل الرصيد الافتتاحي
+            </h3>
+
+            <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
+              هل أنت متأكد من حذف جميع المنتجات ({rows.length} منتج) من الرصيد الافتتاحي؟
+              <br />
+              <strong style={{ color: '#ef4444' }}>هذا الإجراء لا يمكن التراجع عنه.</strong>
+            </p>
+
+            <div style={{
+              display: 'flex', gap: 10, justifyContent: 'center',
+            }}>
+              <button
+                onClick={() => setShowDeleteAllModal(false)}
+                disabled={deleteAllLoading}
+                style={{
+                  padding: '9px 24px', border: '1px solid #e2e8f0', borderRadius: 8,
+                  background: '#fff', color: '#333', fontSize: 13, cursor: deleteAllLoading ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Tajawal, sans-serif', opacity: deleteAllLoading ? .6 : 1,
+                }}>
+                إلغاء
+              </button>
+              <button
+                onClick={handleDeleteAll}
+                disabled={deleteAllLoading}
+                style={{
+                  padding: '9px 24px', border: 'none', borderRadius: 8,
+                  background: deleteAllLoading ? '#94a3b8' : '#ef4444',
+                  color: '#fff', fontSize: 13, fontWeight: 600,
+                  cursor: deleteAllLoading ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Tajawal, sans-serif',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                {deleteAllLoading ? (
+                  <>
+                    <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+                    جاري الحذف…
+                  </>
+                ) : (
+                  <>
+                    <i className="ti ti-trash" />
+                    نعم، حذف الكل
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
