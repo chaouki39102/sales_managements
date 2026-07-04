@@ -1,13 +1,8 @@
 import React, { Suspense, useMemo, useEffect, useRef, useCallback } from 'react';
-import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data/DocumentDataBuilder';
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
-import type { PrintTemplate, DocTypeCode } from '@/pages/settings/print-settings/types';
-import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
-import { resolveTemplate } from '@/pages/settings/print-settings/runtime/TemplateResolver';
-import { openPrintPopup } from '@/pages/settings/print-settings/runtime';
-
-const UniversalPreview = React.lazy(() => import('@/pages/settings/print-settings/components/preview/UniversalPreview'));
+import { resolveTemplate, UniversalPrintPipeline, renderPipelineToPopup } from '@/pages/settings/print-settings/runtime';
 
 // ─── ApiDocument ────────────────────────────────────────────────────────────
 // Minimal shape expected by DocumentDataBuilder.fromApiDocument().
@@ -119,17 +114,17 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  const data: UniversalDocumentData = useMemo(
-    () => overrideData ?? (document ? DocumentDataBuilder.fromApiDocument(document, company) : DocumentDataBuilder.empty()),
-    [overrideData, document, company],
-  );
-
-  const tpl: PrintTemplate = useMemo(() => {
+  const tpl: PrintTemplate | null = useMemo(() => {
     if (template) return template;
     const found = resolveTemplate(templates ?? [], docTypeCode);
-    if (found) return found;
-    return createDefaultTemplate(docTypeCode as DocTypeCode, 'A4');
+    return found ?? null;
   }, [template, templates, docTypeCode]);
+
+  const source = useMemo(() => {
+    if (overrideData) return { type: 'prebuilt' as const, data: overrideData };
+    if (document) return { type: 'api-document' as const, doc: document, company };
+    return null;
+  }, [overrideData, document, company]);
 
   useEffect(() => {
     if (!open) return;
@@ -141,36 +136,9 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
   }, [open]);
 
   const handlePrint = useCallback(() => {
-    if (!tpl) return;
-
-    const isThermal = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
-    const paperW = isThermal
-      ? (tpl.paper_width_mm ?? 80)
-      : (tpl.paper_size === 'A4' ? 210 : 148);
-    const winW = isThermal
-      ? Math.min(Math.round(paperW * 3.78) + 60, 900)
-      : 900;
-    const winH = isThermal ? 700 : Math.min(
-      tpl.paper_size === 'A4' ? 1123 : 794,
-      window.screen.availHeight,
-    );
-
-    const bodyStyle = isThermal
-      ? 'body{margin:0;background:#fff;display:flex;justify-content:center;padding:10px}*{box-sizing:border-box}'
-      : 'body{margin:0;background:#fff;display:flex;justify-content:center;padding:20px}*{box-sizing:border-box}';
-
-    const win = openPrintPopup(winW, winH, bodyStyle);
-    if (!win) { window.print(); return; }
-
-    const root = win.document.getElementById('print-root');
-    if (!root) return;
-
-    import('react-dom/client').then(({ createRoot }) => {
-      createRoot(root).render(
-        React.createElement(UniversalPreview, { tpl, data }),
-      );
-    });
-  }, [tpl, data]);
+    if (!tpl || !source) return;
+    renderPipelineToPopup(source, tpl, company);
+  }, [tpl, source, company]);
 
   if (!open) return null;
 
@@ -189,14 +157,18 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
         </div>
 
         <div style={previewAreaStyle}>
-          <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>...</div>}>
-            <UniversalPreview tpl={tpl} data={data} />
-          </Suspense>
+          {source && tpl ? (
+            <UniversalPrintPipeline source={source} template={tpl} company={company} />
+          ) : (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>
+              {!tpl ? 'لا يوجد قالب لهذا المستند' : 'لا توجد بيانات للمعاينة'}
+            </div>
+          )}
         </div>
 
         <div style={footerStyle}>
           <button style={btnSecondary} onClick={onClose}>إلغاء</button>
-          <button style={btnPrimary} onClick={handlePrint}>طباعة</button>
+          <button style={btnPrimary} onClick={handlePrint} disabled={!tpl || !source}>طباعة</button>
         </div>
       </div>
     </div>

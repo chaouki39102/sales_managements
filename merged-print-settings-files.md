@@ -755,11 +755,12 @@ describe('SettingsSerializer — fromApiResponse', () => {
       config: null,
     } as any);
 
-    expect(result.show_logo).toBeDefined();
-    expect(result.title_text).toBeDefined();
+    // DB is the only source of truth — null config = no settings
+    expect(result.show_logo).toBeUndefined();
+    expect(result.title_text).toBeUndefined();
   });
 
-  it('should fill defaults for missing config fields', () => {
+  it('should return only explicitly stored config keys', () => {
     const result = fromApiResponse({
       id: 1,
       name: 'Minimal',
@@ -770,9 +771,10 @@ describe('SettingsSerializer — fromApiResponse', () => {
       config: {},
     } as any);
 
-    expect(result.show_logo).toBe(true);
-    expect(result.show_barcode).toBe(true);
-    expect(result.col_order).toBeDefined();
+    // DB is the only source of truth — empty config = no settings
+    expect(result.show_logo).toBeUndefined();
+    expect(result.show_barcode).toBeUndefined();
+    expect(result.col_order).toBeUndefined();
   });
 });
 
@@ -1028,7 +1030,7 @@ import type { PrintTemplatesApi } from '../contracts/TemplateRepository';
 import type { PrintTemplate, PrintTemplateApiResponse, DocTypeCode } from '../types';
 import type { LibraryApiResponse } from '../template-library/types';
 import { usePrintTemplatesApi, useSlug } from '../providers/PrintSettingsContext';
-import { toApiPayload as serializePayload, normalizeTemplate } from '../services/SettingsSerializer';
+import { toApiPayload as serializePayload, fromApiResponse as deserializeResponse } from '../services/SettingsSerializer';
 
 // ─── Query key factory ─────────────────────────────────────────────────────
 export const printTemplateKeys = {
@@ -1037,25 +1039,7 @@ export const printTemplateKeys = {
   detail:  (slug: string, id: number)  => [slug, 'print-templates', id]         as const,
 };
 
-// ─── Pure helpers (no external deps) ───────────────────────────────────────
-
-function fromApiResponse(r: PrintTemplateApiResponse): PrintTemplate {
-  const raw: Partial<PrintTemplate> = {
-    id:            r.id as any,
-    name:          r.name,
-    doc_type_code: r.doc_type_code as DocTypeCode,
-    paper_size:    r.paper_size as PrintTemplate['paper_size'],
-    is_default:    r.is_default,
-    is_active:     r.is_active,
-    created_at:    r.created_at,
-    updated_at:    r.updated_at,
-  };
-  const config = r.config ?? {};
-  for (const key of Object.keys(config)) {
-    (raw as any)[key] = (config as any)[key];
-  }
-  return normalizeTemplate(raw, raw.doc_type_code, raw.paper_size);
-}
+// ─── Pure helpers ──────────────────────────────────────────────────────────
 
 function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
   return serializePayload(tpl) as unknown as Record<string, unknown>;
@@ -1068,30 +1052,30 @@ export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
     list: (docTypeCode?: string) =>
       api.get<PrintTemplateApiResponse[]>('/print-templates', docTypeCode
         ? { doc_type_code: docTypeCode } : undefined)
-        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as PrintTemplateApiResponse[]).map(fromApiResponse)),
+        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as PrintTemplateApiResponse[]).map(deserializeResponse)),
 
     show: (id: number) =>
       api.get<PrintTemplateApiResponse>(`/print-templates/${id}`)
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     create: (tpl: Omit<PrintTemplate, 'id' | 'created_at' | 'updated_at'>) =>
       api.post<PrintTemplateApiResponse>('/print-templates', toApiPayload(tpl as unknown as Partial<PrintTemplate>))
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     update: (id: number, tpl: Partial<PrintTemplate>) =>
       api.put<PrintTemplateApiResponse>(`/print-templates/${id}`, toApiPayload(tpl))
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     delete: (id: number) =>
       api.delete(`/print-templates/${id}`),
 
     setDefault: (id: number) =>
       api.post<PrintTemplateApiResponse>(`/print-templates/${id}/set-default`)
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     duplicate: (id: number, newName: string) =>
       api.post<PrintTemplateApiResponse>(`/print-templates/${id}/duplicate`, { name: newName })
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     library: () =>
       api.get<LibraryApiResponse[]>('/print-templates/library')
@@ -1099,7 +1083,7 @@ export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
 
     installLibrary: (templateId: string) =>
       api.post<PrintTemplateApiResponse>('/print-templates/library/install', { template_id: templateId })
-        .then(fromApiResponse),
+        .then(deserializeResponse),
 
     uploadLogo: (file: File, onProgress?: (p: number) => void) => {
       const fd = new FormData();
@@ -2324,7 +2308,7 @@ function qrDataText(tpl: PrintTemplate, data: UniversalDocumentData): string {
     parts.push(data.doc.number);
   }
   if (tpl.qr_content === 'company-info' || tpl.qr_content === 'both') {
-    parts.push(data.company.name || '');
+    parts.push(data.company?.name || '');
   }
   return parts.join(' | ');
 }
@@ -3624,6 +3608,7 @@ export default React.memo(UniversalPreview);
 import React, { Suspense } from 'react';
 import type { PrintTemplate } from '../types';
 import type { UniversalDocumentData } from '../types/data';
+import { emptyDocumentData } from '../types/data';
 
 const UniversalPreview = React.lazy(() => import('./preview/UniversalPreview'));
 
@@ -3645,7 +3630,7 @@ interface Props {
 export default function PreviewSelector({ tpl, data }: Props) {
   return (
     <Suspense fallback={FALLBACK}>
-      <UniversalPreview tpl={tpl} data={data ?? null} />
+      <UniversalPreview tpl={tpl} data={data ?? emptyDocumentData()} />
     </Suspense>
   );
 }
@@ -5605,7 +5590,7 @@ import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
-import { normalizeTemplate } from './services/SettingsSerializer';
+import { normalizeAfterLoad, validateTemplateIntegrity, TEMPLATE_VERSION } from './services/SettingsSerializer';
 
 const PAPER_DIM: Record<string, { w: number; h: number }> = {
   '80mm': { w: 80,  h: 0   },
@@ -5683,20 +5668,70 @@ export default function PrintSettingsPage() {
     if (useRealData && !prevUseRealData.current) refetch();
     prevUseRealData.current = useRealData;
   }, [useRealData, refetch]);
+
+  // ── Fetch party balance for the preview document ────────────────────────
+  const partyId = useMemo(() => {
+    if (!previewDoc || typeof previewDoc !== 'object') return null;
+    const p = (previewDoc as Record<string, unknown>).party as Record<string, unknown> | undefined;
+    const id = p?.id;
+    return typeof id === 'number' ? id : null;
+  }, [previewDoc]);
+
+  const previewDocDate = useMemo(() => {
+    if (!previewDoc || typeof previewDoc !== 'object') return null;
+    const d = (previewDoc as Record<string, unknown>).document_date;
+    return typeof d === 'string' ? d : null;
+  }, [previewDoc]);
+
+  const { data: partyBalance } = useQuery({
+    queryKey: [slug, 'preview-party-balance', partyId, previewDocDate],
+    queryFn: async () => {
+      if (!partyId) return null;
+      const res = await apiClient.get<Record<string, unknown>>(`/party-balances/${partyId}`, {
+        date: previewDocDate || undefined,
+      });
+      const data = (res?.data ?? res) as Record<string, unknown> | undefined;
+      if (!data) return null;
+      return { current_balance: Number(data.current_balance ?? 0) };
+    },
+    enabled: !!slug && useRealData && !!partyId,
+    staleTime: 60_000,
+  });
+
   const previewData: UniversalDocumentData | null = useMemo(() => {
     if (!previewDoc || !companyCtx) return null;
-    return DocumentDataBuilder.fromApiDocument(previewDoc, companyCtx);
-  }, [previewDoc, companyCtx]);
+    let balanceOpts: { prevBalance: number; newBalance: number } | undefined;
+    if (partyBalance) {
+      const raw = (previewDoc as Record<string, unknown>).totals as Record<string, unknown> | undefined;
+      const remaining = Math.max(0, Number(raw?.remaining ?? 0));
+      balanceOpts = {
+        prevBalance: Math.max(0, partyBalance.current_balance - remaining),
+        newBalance:  partyBalance.current_balance,
+      };
+    }
+    return DocumentDataBuilder.fromApiDocument(previewDoc, companyCtx, balanceOpts);
+  }, [previewDoc, companyCtx, partyBalance]);
 
   useEffect(() => {
     if (templates.length > 0) {
-      const tpl = resolveTemplate(templates, activeDoc) ?? templates[0];
-      setSelectedTplId(tpl.id);
-      setLocalTpl(normalizeTemplate(tpl, activeDoc, tpl.paper_size));
-      setIsDirty(false);
+      const tpl = resolveTemplate(templates, activeDoc);
+      if (tpl) {
+        setSelectedTplId(tpl.id);
+        // DB is the only source of truth — no normalizeTemplate on loaded data.
+        // normalizeAfterLoad only fills truly undefined keys (schema migration).
+        setLocalTpl(normalizeAfterLoad(tpl));
+        setIsDirty(false);
+      } else {
+        const anyMatch = templates.some(t => t.doc_type_code === activeDoc);
+        if (anyMatch) {
+          setSelectedTplId(null);
+          setLocalTpl(normalizeAfterLoad({ id: null, doc_type_code: activeDoc, name: 'قالب جديد' }, activeDoc));
+          setIsDirty(true);
+        }
+      }
     } else {
       setSelectedTplId(null);
-      setLocalTpl(normalizeTemplate({ id: null, doc_type_code: activeDoc, name: 'قالب جديد' }, activeDoc));
+      setLocalTpl(normalizeAfterLoad({ id: null, doc_type_code: activeDoc, name: 'قالب جديد' }, activeDoc));
       setIsDirty(true);
     }
     historyRef.current = [];
@@ -5751,6 +5786,7 @@ export default function PrintSettingsPage() {
   const handleSave = useCallback(async () => {
     if (!localTpl || isSaving) return;
     setIsSaving(true);
+    const preSaveTpl = { ...localTpl };
     try {
       let savedTpl: PrintTemplate;
       if (localTpl.id) {
@@ -5776,9 +5812,29 @@ export default function PrintSettingsPage() {
         });
         setSelectedTplId(savedTpl.id);
       }
+
+      // Step 1: Replace editor state with DB response
       setLocalTpl({ ...savedTpl });
       setIsDirty(false);
       notifier.success('✅ تم حفظ القالب');
+
+      // Step 2: Compare pre-save vs DB response — report discrepancies
+      const diffs: string[] = [];
+      const allKeys = new Set([...Object.keys(preSaveTpl), ...Object.keys(savedTpl)]);
+      for (const k of allKeys) {
+        const a = JSON.stringify((preSaveTpl as any)[k]);
+        const b = JSON.stringify((savedTpl as any)[k]);
+        if (a !== b) diffs.push(k);
+      }
+      if (diffs.length > 0) {
+        console.warn('[PrintSettings] Save verification — differences:', diffs);
+      }
+
+      // Step 3: Verify integrity — warn if any registry keys are missing
+      const missing = validateTemplateIntegrity(savedTpl, savedTpl.name || 'unknown');
+      if (missing > 0) {
+        notifier.error(`⚠️ القالب محفوظ لكن ${missing} خاصية مفقودة`);
+      }
     } catch (e: any) {
       notifier.error(e?.message ?? 'فشل الحفظ');
     } finally {
@@ -5870,7 +5926,7 @@ export default function PrintSettingsPage() {
           return;
         }
         imported.id = localTpl?.id ?? null;
-        const merged = normalizeTemplate(imported, imported.doc_type_code ?? activeDoc, imported.paper_size);
+        const merged = normalizeAfterLoad(imported, imported.doc_type_code ?? activeDoc, imported.paper_size);
         setLocalTpl(merged);
         setIsDirty(true);
         notifier.success('تم الاستيراد — احفظ للتطبيق');
@@ -6099,7 +6155,7 @@ export default function PrintSettingsPage() {
               >
                 <button
                   onClick={() => {
-                    setSelectedTplId(tpl.id); setLocalTpl(normalizeTemplate(tpl, activeDoc, tpl.paper_size)); setIsDirty(false);
+                    setSelectedTplId(tpl.id); setLocalTpl(normalizeAfterLoad(tpl)); setIsDirty(false);
                   }}
                   type="button"
                   style={{
@@ -10331,6 +10387,10 @@ export interface ApiResponse {
 /**
  * Normalize a partial template: fill missing fields from registry defaults,
  * preserve valid values, add template_version, keep unknown fields.
+ *
+ * IMPORTANT: DB values are ALWAYS preserved. Only truly undefined keys
+ * (schema migration, new registry entries) get their defaults.
+ * Null, false, 0, '' are all treated as valid DB values and preserved.
  */
 export function normalizeTemplate(
   partial: Partial<PrintTemplate>,
@@ -10345,10 +10405,12 @@ export function normalizeTemplate(
     template_version: TEMPLATE_VERSION,
   };
 
+  // Fill only keys that are truly missing (undefined) — never overwrite DB values
   for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
     if (key === 'id' || key === 'name' || key === 'doc_type_code' || key === 'paper_size') continue;
     const metaKey = meta.key as string;
-    if (result[metaKey] !== undefined && result[metaKey] !== null) continue;
+    if (key in result && result[metaKey] !== undefined) continue;
+    // Key is missing from DB result — fill with registry default
     if (meta.defaultValue !== null) {
       result[metaKey] = meta.defaultValue;
     } else {
@@ -10372,9 +10434,21 @@ export function normalizeTemplate(
 }
 
 /**
- * Build the API payload from a template — strips top-level fields into config.
+ * Build API payload from a partial template.
+ *
+ * CRITICAL RULE: Only top-level fields (name, doc_type_code, paper_size,
+ * is_default, is_active) that are EXPLICITLY PRESENT in the input are included.
+ * Missing top-level fields are OMITTED so the server preserves existing values.
+ *
+ * This prevents partial updates like `{ is_active: false }` from destroying
+ * `name`, `doc_type_code`, `paper_size`, `is_default` with defaults.
+ *
+ * For CREATE (full template input): all fields are present → all included.
+ * For UPDATE (partial input): only changed fields are sent.
+ *
+ * Config is omitted when empty → server preserves stored config on partial updates.
  */
-export function toApiPayload(tpl: Partial<PrintTemplate>): TemplatePayload {
+export function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
   const t = tpl as Record<string, unknown>;
   const config: Record<string, unknown> = {};
   for (const key of Object.keys(t)) {
@@ -10382,22 +10456,26 @@ export function toApiPayload(tpl: Partial<PrintTemplate>): TemplatePayload {
       config[key] = t[key];
     }
   }
-  return {
-    name:             String(t.name ?? 'قالب جديد'),
-    doc_type_code:    String(t.doc_type_code ?? 'FV'),
-    paper_size:       String(t.paper_size ?? '80mm'),
-    is_default:       Boolean(t.is_default),
-    is_active:        Boolean(t.is_active),
-    template_version: TEMPLATE_VERSION,
-    config,
-  };
+  const hasSettings = Object.keys(config).length > 0;
+  const result: Record<string, unknown> = { template_version: TEMPLATE_VERSION };
+  // Only include top-level fields explicitly present in input
+  for (const key of (['name', 'doc_type_code', 'paper_size', 'is_default', 'is_active'] as const)) {
+    if (key in t) result[key] = t[key];
+  }
+  if (hasSettings) result.config = config;
+  return result;
 }
 
 /**
  * Reconstruct PrintTemplate from API response — top-level fields + config merge.
+ *
+ * DESIGN: The database is the ONLY source of truth. Config keys from the API
+ * response are merged directly. normalizeTemplate is NOT called — DB values
+ * are never overwritten. If a key is missing from the DB (schema migration),
+ * it remains undefined here; the first full save fills all registry keys.
  */
 export function fromApiResponse(r: ApiResponse): PrintTemplate {
-  const base: Partial<PrintTemplate> = {
+  const result: Record<string, unknown> = {
     id:              r.id,
     name:            r.name,
     doc_type_code:   r.doc_type_code as DocTypeCode,
@@ -10410,9 +10488,60 @@ export function fromApiResponse(r: ApiResponse): PrintTemplate {
   };
   const config = r.config ?? {};
   for (const key of Object.keys(config)) {
-    (base as any)[key] = (config as any)[key];
+    result[key] = (config as any)[key];
   }
-  return normalizeTemplate(base, base.doc_type_code, base.paper_size);
+  return result as unknown as PrintTemplate;
+}
+
+/**
+ * Fill missing registry keys with defaults (for new templates or migration).
+ * Only undefined keys are set — never overwrites DB values.
+ */
+export function normalizeAfterLoad(tpl: Partial<PrintTemplate>): PrintTemplate {
+  const result: Record<string, unknown> = { ...tpl, template_version: TEMPLATE_VERSION };
+  for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+    if (key === 'id' || key === 'name' || key === 'doc_type_code' || key === 'paper_size') continue;
+    const metaKey = meta.key as string;
+    if (key in result && result[metaKey] !== undefined) continue;
+    if (meta.defaultValue !== null) {
+      result[metaKey] = meta.defaultValue;
+    } else {
+      const t = typeof meta.defaultValue;
+      if (t === 'string') result[metaKey] = '';
+      else if (t === 'number') result[metaKey] = 0;
+      else if (t === 'boolean') result[metaKey] = false;
+      else if (Array.isArray(meta.defaultValue)) result[metaKey] = [];
+      else result[metaKey] = null;
+    }
+  }
+  if (typeof result.name !== 'string' || !result.name) result.name = 'قالب جديد';
+  if (!result.doc_type_code) result.doc_type_code = (tpl.doc_type_code ?? 'FV') as DocTypeCode;
+  if (!result.paper_size) result.paper_size = (tpl.paper_size ?? '80mm') as PaperSize;
+  if (result.paper_size === '80mm') (result as any).paper_width_mm = 80;
+  else if (result.paper_size === '58mm') (result as any).paper_width_mm = 58;
+  return result as unknown as PrintTemplate;
+}
+
+/**
+ * Verify that all registry keys are present in a loaded template.
+ * Logs warnings for missing keys (would be overwritten by defaults).
+ * Returns the count of missing keys.
+ */
+export function validateTemplateIntegrity(tpl: Partial<PrintTemplate>, label?: string): number {
+  const missing: string[] = [];
+  for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+    const val = (tpl as any)[key];
+    if (val === undefined || val === null) {
+      missing.push(key);
+    }
+  }
+  if (missing.length > 0) {
+    console.warn(
+      `[SettingsSerializer] Template integrity check FAILED${label ? ` (${label})` : ''}: ` +
+      `${missing.length} keys missing: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? `... (+${missing.length - 10} more)` : ''}`,
+    );
+  }
+  return missing.length;
 }
 
 
@@ -12653,11 +12782,13 @@ export const DocumentDataBuilder = {
     const lines  = buildLinesFromApi(doc.lines ?? []);
     const totals = buildTotalsFromApi(doc, lines);
 
-    // Auto-compute balance from document when no explicit options provided:
-    // remaining > 0 indicates the party still owes this amount after this doc.
+    // Balance requires explicit options from the caller (fetched via
+    // party-balances API). Without them, we have no data → null.
+    // The old fallback buildBalance(0, totals.remaining) was always wrong
+    // (0 previous balance is incorrect for any real party).
     const balance = options?.prevBalance != null && options?.newBalance != null
       ? buildBalance(options.prevBalance, options.newBalance)
-      : buildBalance(0, totals.remaining);
+      : null;
 
     return {
       doc:         buildDocInfo(doc),

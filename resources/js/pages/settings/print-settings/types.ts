@@ -7,10 +7,6 @@ export {
   DOC_TYPE_LIST,
 } from './types/domain';
 
-export {
-  createDefaultTemplate,
-  defaultTemplate,
-} from './types/defaults';
 
 export type {
   PrintTemplateApiResponse,

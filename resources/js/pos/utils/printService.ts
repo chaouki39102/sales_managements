@@ -1,29 +1,13 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pos/utils/printService.ts
 //
-// ✅ الإصلاحات عن النسخة السابقة:
-//
-//   1. Arabic encoding — Windows-1256 بدل UTF-8
-//      معظم الطابعات الحرارية الرخيصة (Epson TM-T20، XP-58) لا تدعم UTF-8.
-//      نستخدم codepage 1256 (ESC t 16) + جدول تحويل ASCII←→Win1256 للحروف العربية.
-//
-//   2. WebUSB flow صحيح:
-//      - device.open() قبل selectConfiguration
-//      - configuration check قبل selectConfiguration
-//      - claimInterface برقم صحيح (0 أو من descriptor)
-//      - transferOut على endpoint الأول bulk-out
-//
-//   3. QR Code (ESC/POS Native QR):
-//      - يطبع QR يحتوي رقم الفاتورة
-//      - يُستخدم GS ( k model 49 (QR Code Model 2)
-//
-//   4. buildReceiptBytes مُصلَح:
-//      - خصم الفاتورة يظهر في الإيصال
-//      - تنسيق أفضل للأرقام (اتجاه LTR)
+// Canonical ESC/POS thermal print pipeline.
+// All section builders consume UniversalDocumentData directly — no bridge
+// types, no CartItem/CartTotals/Party dependencies.
 // ════════════════════════════════════════════════════════════════════════════
-import type { CartItem, CartTotals, Party } from '@/types';
+
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
-import type { UniversalDocumentData, DocumentLine } from '@/pages/settings/print-settings/types/data';
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data';
 import { printFieldResolver } from '@/pages/settings/print-settings/services';
 
 // ─── ESC/POS Constants ────────────────────────────────────────────────────────
@@ -260,289 +244,10 @@ function mapAlignToEscPos(align: string | undefined | null): 0 | 1 | 2 {
   return 1; // default center
 }
 
-// ─── Receipt Builder ──────────────────────────────────────────────────────────
-
-export interface ReceiptOptions {
-  companyName?:    string;
-  companyAddress?: string;
-  companyPhone?:   string;
-  companyNIF?:     string;
-  companyRC?:      string;
-  companyNIS?:     string;
-  companyICE?:     string;
-  companyArticle?: string;
-  footerText?:     string;
-  printQR?:        boolean;
-  qrBaseUrl?:      string;    // مثال: https://erp.mycompany.dz/invoices/
-}
-
-function buildReceiptBytes(
-  items:     CartItem[],
-  totals:    CartTotals,
-  client:    Party | null,
-  docNumber?: string,
-  opts:      ReceiptOptions = {},
-): Uint8Array {
-  const b   = new EscPosBuilder().init();
-  const now = new Date();
-  const {
-    companyName    = 'نظام المبيعات',
-    companyAddress = 'الجزائر',
-    companyPhone,
-    companyNIF,
-    footerText     = 'شكراً على تعاملكم معنا',
-    printQR        = true,
-    qrBaseUrl      = '',
-  } = opts;
-
-  // ── رأس الإيصال ──────────────────────────────────────────────────────────
-  b.setFontSize(2, 2).setBold(true).center(companyName).setBold(false).resetFontSize();
-  b.center(companyAddress);
-  if (companyPhone) b.center(companyPhone);
-  if (companyNIF)   b.center(`NIF: ${companyNIF}`);
-  b.divider('=', 42);
-
-  // معلومات الفاتورة
-  b.setAlign(0);
-  if (docNumber) {
-    b.setBold(true)
-     .text('رقم الفاتورة: ')
-     .ascii(docNumber)
-     .lineFeed()
-     .setBold(false);
-  }
-  b.text('التاريخ: ').ascii(now.toLocaleDateString('fr-DZ')).lineFeed();
-  b.text('الوقت:   ').ascii(now.toLocaleTimeString('fr-DZ')).lineFeed();
-  if (client) {
-    b.text('الزبون:  ').text(client.name).lineFeed();
-    if (client.phone) b.text('الهاتف:  ').ascii(client.phone).lineFeed();
-  }
-  b.divider('-', 42);
-
-  // ── الأصناف ──────────────────────────────────────────────────────────────
-  b.setBold(true).left('المنتج').setBold(false);
-
-  for (const item of items) {
-    const total = item.total_ttc;
-
-    // اسم المنتج
-    b.text(item.product_name ?? '');
-    b.lineFeed();
-
-    // التفاصيل: qty × price HT [خصم] = total TTC
-    const detail =
-      `  ${fmt(item.quantity)} x ${fmt(item.unit_price_ht)}` +
-      (item.discount_percentage > 0 ? ` (-${item.discount_percentage.toFixed(0)}%)` : '');
-    const totalStr = `${fmt(total)} دج`;
-
-    b.setAlign(0).ascii(detail);
-    b.setAlign(2).ascii(totalStr).lineFeed();
-  }
-
-  b.divider('-', 42);
-
-  // ── المجاميع ──────────────────────────────────────────────────────────────
-  b.setAlign(0);
-  b.ascii(lineRow('المجموع HT:', `${fmt(totals.total_ht)} دج`)).lineFeed();
-
-  if (totals.total_discount > 0) {
-    b.ascii(lineRow('الخصم:', `-${fmt(totals.total_discount)} دج`)).lineFeed();
-  }
-
-  if (totals.invoice_discount_amount && totals.invoice_discount_amount > 0) {
-    b.ascii(lineRow('خصم الفاتورة:', `-${fmt(totals.invoice_discount_amount)} دج`)).lineFeed();
-  }
-
-  b.ascii(lineRow('TVA:', `${fmt(totals.total_tva)} دج`)).lineFeed();
-
-  if (totals.fiscal_stamp > 0) {
-    b.ascii(lineRow('الطابع المالي:', `${fmt(totals.fiscal_stamp)} دج`)).lineFeed();
-  }
-
-  b.divider('=', 32);
-
-  const totalTtcFinal = totals.total_ttc + totals.fiscal_stamp;
-  b.setFontSize(2, 2)
-   .setBold(true)
-   .setAlign(2)
-   .ascii(`${fmt(totalTtcFinal)} دج`)
-   .lineFeed()
-   .setBold(false)
-   .resetFontSize();
-
-  b.text('الإجمالي شامل الضريبة').lineFeed();
-  b.divider('=', 42);
-
-  // ── QR Code ───────────────────────────────────────────────────────────────
-  if (printQR && docNumber) {
-    const qrData = qrBaseUrl
-      ? `${qrBaseUrl}${docNumber}`
-      : docNumber;
-    b.lineFeed();
-    b.qrCode(qrData, 4);
-    b.center(docNumber);   // رقم الفاتورة تحت الـ QR
-  }
-
-  // ── ذيل الإيصال ──────────────────────────────────────────────────────────
-  b.divider('-', 42);
-  b.center(footerText);
-  b.center(`نظام ERP الجزائر — ${now.getFullYear()}`);
-
-  b.feedAndCut();
-  return b.escposBytes();
-}
-
-// ─── WebUSB Print ─────────────────────────────────────────────────────────────
-
 export interface ThermalPrintResult {
   ok:      boolean;
   method:  'webusb' | 'blob' | 'none';
   message: string;
-}
-
-/**
- * يُرسل بيانات ESC/POS إلى جهاز USB مُعطى (مفتوح وملفوف بالفعل)
- */
-async function sendToDevice(
-  device:    any,
-  items:     CartItem[],
-  totals:    CartTotals,
-  client:    Party | null,
-  docNumber?: string,
-  opts?:     ReceiptOptions,
-): Promise<ThermalPrintResult> {
-  try {
-    if (device.configuration === null) {
-      await device.selectConfiguration(1);
-    }
-
-    const config = device.configuration;
-    if (!config?.interfaces?.length) {
-      return { ok: false, method: 'webusb', message: 'لا توجد واجهات (interfaces) على الجهاز' };
-    }
-
-    let ifaceNum = -1;
-    let epNum = -1;
-
-    for (let i = 0; i < config.interfaces.length; i++) {
-      const iface = config.interfaces[i];
-      const alt = iface.alternates?.[0];
-      if (!alt) continue;
-      if (alt.interfaceClass === 0x02) continue;
-      const ep = alt.endpoints?.find(
-        (e: any) => e.direction === 'out' && (e.type === 'bulk' || e.type === 'interrupt'),
-      );
-      if (ep) {
-        ifaceNum = iface.interfaceNumber;
-        epNum = ep.endpointNumber;
-        break;
-      }
-    }
-
-    if (ifaceNum === -1) {
-      const firstIface = config.interfaces[0];
-      ifaceNum = firstIface.interfaceNumber;
-      const alt = firstIface.alternates?.[0];
-      const ep = alt?.endpoints?.find((e: any) => e.direction === 'out');
-      epNum = ep?.endpointNumber ?? 2;
-    }
-
-    await device.claimInterface(ifaceNum);
-    const data = buildReceiptBytes(items, totals, client, docNumber, opts);
-    const result = await device.transferOut(epNum, data);
-
-    if (result.status !== 'ok') {
-      await device.releaseInterface(ifaceNum);
-      return { ok: false, method: 'webusb', message: `فشل الإرسال: ${result.status}` };
-    }
-
-    await device.releaseInterface(ifaceNum);
-    return { ok: true, method: 'webusb', message: 'تمت الطباعة بنجاح' };
-  } catch (err: any) {
-    return { ok: false, method: 'webusb', message: err?.message ?? 'فشلت الطباعة' };
-  }
-}
-
-/**
- * يطبع عبر WebUSB — يحاول أولاً استخدام الطابعات المقترنة سابقاً (بدون حوار)،
- * وإذا لم يجد يعرض حوار اختيار الطابعة.
- */
-export async function printThermalViaWebUSB(
-  items:      CartItem[],
-  totals:     CartTotals,
-  client:     Party | null,
-  docNumber?: string,
-  opts?:      ReceiptOptions,
-): Promise<ThermalPrintResult> {
-  const usb = (navigator as any).usb;
-  if (!usb) {
-    return { ok: false, method: 'none', message: 'WebUSB غير مدعوم في هذا المتصفح — استخدم Chrome أو Edge' };
-  }
-
-  // 1. حاول استخدام طابعة مقترنة سابقاً (بدون حوار)
-  try {
-    const paired = await usb.getDevices();
-    if (paired.length > 0) {
-      const dev = paired[0];
-      await dev.open();
-      const r = await sendToDevice(dev, items, totals, client, docNumber, opts);
-      if (r.ok) {
-        try { await dev.close(); } catch {}
-        return r;
-      }
-      try { await dev.close(); } catch {}
-    }
-  } catch { /* fall through — اعرض حوار الاختيار */ }
-
-  // 2. لم يعثر على طابعة — اعرض حوار اختيار الجهاز
-  let device: any = null;
-  try {
-    device = await usb.requestDevice({ filters: [] });
-    if (!device) {
-      return { ok: false, method: 'webusb', message: 'لم يتم اختيار طابعة' };
-    }
-
-    await device.open();
-    const r = await sendToDevice(device, items, totals, client, docNumber, opts);
-    try { await device.close(); } catch {}
-    return r;
-
-  } catch (err: any) {
-    try { if (device) await device.close(); } catch {}
-    if (err?.name === 'NotFoundError') {
-      return { ok: false, method: 'webusb', message: 'تم إلغاء اختيار الطابعة' };
-    }
-    if (err?.name === 'SecurityError') {
-      return { ok: false, method: 'webusb', message: 'لا يسمح المتصفح بالوصول للطابعة — تأكد من HTTPS' };
-    }
-    return { ok: false, method: 'webusb', message: err?.message ?? 'فشلت الطباعة الحرارية' };
-  }
-}
-
-// ─── Blob Download (fallback) ─────────────────────────────────────────────────
-
-export function printThermalViaBlob(
-  items:      CartItem[],
-  totals:     CartTotals,
-  client:     Party | null,
-  docNumber?: string,
-  opts?:      ReceiptOptions,
-): ThermalPrintResult {
-  try {
-    const data = buildReceiptBytes(items, totals, client, docNumber, opts);
-    const blob = new Blob([data], { type: 'application/octet-stream' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `receipt-${docNumber ?? Date.now()}.bin`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    return { ok: true, method: 'blob', message: 'تم تحميل ملف الإيصال — أرسله للطابعة' };
-  } catch (err: any) {
-    return { ok: false, method: 'blob', message: err?.message ?? 'فشل تصدير ملف الإيصال' };
-  }
 }
 
 // ─── Capability check ─────────────────────────────────────────────────────────
@@ -565,10 +270,6 @@ export async function getConnectedPrinters(): Promise<any[]> {
   }
 }
 
-/**
- * طباعة تلقائية — يستخدم أول طابعة متصلة بدون dialog
- * إذا لم توجد → يعود لـ Blob download
- */
 // ─── Thermal auto-print preference (localStorage) ────────────────────────────
 
 const THERMAL_AUTO_PRINT_KEY = 'thermal_auto_print';
@@ -587,32 +288,29 @@ export function setThermalAutoPrint(enabled: boolean): void {
   } catch { /* ignore */ }
 }
 
-/**
- * High-level print entry point — tries WebUSB first, falls back to blob.
- */
-export async function printThermal(
-  items:      CartItem[],
-  totals:     CartTotals,
-  client:     Party | null,
-  docNumber?: string,
-  opts?:      ReceiptOptions,
-): Promise<ThermalPrintResult> {
-  return autoPrint(items, totals, client, docNumber, opts);
-}
+
 
 // ── Section sub-functions (Stage 1: Section Visibility Gates) ────────────────
 
 function buildThermalHeader(
   b:        EscPosBuilder,
-  opts:     ReceiptOptions,
+  data:     UniversalDocumentData,
   template: PrintTemplate,
 ): void {
   if (!template.show_header_section) return;
-  const {
-    companyName = 'نظام المبيعات',
-    companyAddress, companyPhone, companyNIF,
-    companyRC, companyNIS, companyICE, companyArticle,
-  } = opts;
+
+  const co = data.company ?? {};
+  const resolve = (fieldId: string, fallback: string) =>
+    String(printFieldResolver.resolve(fieldId, data, template) ?? fallback);
+
+  const companyName    = resolve('company.name', co.name ?? 'نظام المبيعات');
+  const companyAddress = resolve('company.address', co.address ?? '');
+  const companyPhone   = resolve('company.phone', co.phone ?? '');
+  const companyNIF     = resolve('company.nif', co.nif ?? '');
+  const companyRC      = resolve('company.rc', co.rc ?? '');
+  const companyNIS     = resolve('company.nis', co.nis ?? '');
+  const companyICE     = resolve('company.ice', co.ice ?? '');
+  const companyArticle = resolve('company.article', co.article ?? '');
 
   // ── Company name (gated, with size/bold/align) ──────────────────────────
   if (template.show_company_name !== false) {
@@ -630,7 +328,7 @@ function buildThermalHeader(
   const infoAlign = mapAlignToEscPos(template.company_info_align);
   const [iw, ih]  = mapInfoFontSizeToEscPos(template.company_info_size ?? 9);
 
-  const infoField = (show: boolean | undefined, val: string | undefined, prefix = '') => {
+  const infoField = (show: boolean | undefined, val: string, prefix = '') => {
     if (show !== false && val) {
       b.setFontSize(iw, ih).setAlign(infoAlign).text(prefix + val).lineFeed().resetFontSize();
     }
@@ -650,7 +348,7 @@ function buildThermalHeader(
 function buildThermalDocInfo(
   b:          EscPosBuilder,
   docNumber:  string | undefined,
-  client:     Party | null,
+  data:       UniversalDocumentData,
   template:   PrintTemplate,
 ): void {
   if (!template.show_doc_info_section) return;
@@ -665,27 +363,28 @@ function buildThermalDocInfo(
   }
   b.text('التاريخ: ').ascii(now.toLocaleDateString('fr-DZ')).lineFeed();
   b.text('الوقت:   ').ascii(now.toLocaleTimeString('fr-DZ')).lineFeed();
-  if (client) {
-    b.text('الزبون:  ').text(client.name).lineFeed();
-    if (client.phone) b.text('الهاتف:  ').ascii(client.phone).lineFeed();
+  if (data.party) {
+    b.text('الزبون:  ').text(data.party.name).lineFeed();
+    if (data.party.phone) b.text('الهاتف:  ').ascii(data.party.phone).lineFeed();
   }
   b.divider('-', 42);
 }
 
 function buildThermalItems(
   b:        EscPosBuilder,
-  items:    CartItem[],
+  data:     UniversalDocumentData,
   template: PrintTemplate,
 ): void {
   if (!template.show_items_section) return;
+  const lines = data.lines ?? [];
   b.setBold(true).left('المنتج').setBold(false);
-  for (const item of items) {
-    const total = item.total_ttc;
-    b.text(item.product_name ?? '');
+  for (const line of lines) {
+    const total = line.totalTtc;
+    b.text(line.name ?? '');
     b.lineFeed();
     const detail =
-      `  ${fmt(item.quantity)} x ${fmt(item.unit_price_ht)}` +
-      (item.discount_percentage > 0 ? ` (-${item.discount_percentage.toFixed(0)}%)` : '');
+      `  ${fmt(line.quantity)} x ${fmt(line.unitPriceHt)}` +
+      (line.discountPct > 0 ? ` (-${line.discountPct.toFixed(0)}%)` : '');
     const totalStr = `${fmt(total)} دج`;
     b.setAlign(0).ascii(detail);
     b.setAlign(2).ascii(totalStr).lineFeed();
@@ -695,24 +394,23 @@ function buildThermalItems(
 
 function buildThermalTotals(
   b:        EscPosBuilder,
-  totals:   CartTotals,
+  data:     UniversalDocumentData,
   template: PrintTemplate,
 ): void {
   if (!template.show_totals_section) return;
+  const t = data.totals;
+  if (!t) return;
   b.setAlign(0);
-  b.ascii(lineRow('المجموع HT:', `${fmt(totals.total_ht)} دج`)).lineFeed();
-  if (totals.total_discount > 0) {
-    b.ascii(lineRow('الخصم:', `-${fmt(totals.total_discount)} دج`)).lineFeed();
+  b.ascii(lineRow('المجموع HT:', `${fmt(t.totalHt)} دج`)).lineFeed();
+  if (t.totalDiscount > 0) {
+    b.ascii(lineRow('الخصم:', `-${fmt(t.totalDiscount)} دج`)).lineFeed();
   }
-  if (totals.invoice_discount_amount && totals.invoice_discount_amount > 0) {
-    b.ascii(lineRow('خصم الفاتورة:', `-${fmt(totals.invoice_discount_amount)} دج`)).lineFeed();
-  }
-  b.ascii(lineRow('TVA:', `${fmt(totals.total_tva)} دج`)).lineFeed();
-  if (totals.fiscal_stamp > 0) {
-    b.ascii(lineRow('الطابع المالي:', `${fmt(totals.fiscal_stamp)} دج`)).lineFeed();
+  b.ascii(lineRow('TVA:', `${fmt(t.totalTva)} دج`)).lineFeed();
+  if (t.fiscalStamp > 0) {
+    b.ascii(lineRow('الطابع المالي:', `${fmt(t.fiscalStamp)} دج`)).lineFeed();
   }
   b.divider('=', 32);
-  const totalTtcFinal = totals.total_ttc + totals.fiscal_stamp;
+  const totalTtcFinal = t.totalTtc + t.fiscalStamp;
   b.setFontSize(2, 2)
    .setBold(true)
    .setAlign(2)
@@ -722,6 +420,20 @@ function buildThermalTotals(
    .resetFontSize();
   b.text('الإجمالي شامل الضريبة').lineFeed();
   b.divider('=', 42);
+
+  if (template.show_paid_amount) {
+    b.ascii(lineRow('المدفوع:', `${fmt(t.paid)} دج`)).lineFeed();
+  }
+
+  if (template.show_change && t.change > 0) {
+    b.ascii(lineRow('الباقي:', `${fmt(t.change)} دج`)).lineFeed();
+  }
+
+  if (template.show_remaining && t.remaining > 0) {
+    b.setBold(true);
+    b.ascii(lineRow('المتبقي:', `${fmt(t.remaining)} دج`)).lineFeed();
+    b.setBold(false);
+  }
 }
 
 function buildThermalBalance(
@@ -744,12 +456,13 @@ function buildThermalBalance(
 }
 
 function buildThermalFooter(
-  b:          EscPosBuilder,
-  footerText: string,
-  template:   PrintTemplate,
+  b:        EscPosBuilder,
+  data:     UniversalDocumentData,
+  template: PrintTemplate,
 ): void {
   if (!template.show_footer_section) return;
   const now = new Date();
+  const footerText = template.show_thank_you ? template.thank_you_text : '';
   b.divider('-', 42);
   b.center(footerText);
   b.center(`نظام ERP الجزائر — ${now.getFullYear()}`);
@@ -765,73 +478,21 @@ export function buildReceiptBytesFromTemplate(
   data:      UniversalDocumentData,
   docNumber?: string,
 ): Uint8Array {
-  const co = data.company ?? {} as any;
-
-  // Convert DocumentLine[] → CartItem[] for the ESC/POS builder
-  const items: CartItem[] = (data.lines ?? []).map((line, idx) => ({
-    product_name:        line.name,
-    ref:                 line.ref  ?? '',
-    quantity:            line.quantity,
-    unit_price_ht:       line.unitPriceHt,
-    unit_symbol:         line.unit  ?? null,
-    tva_rate:            line.tvaPct,
-    discount_percentage: line.discountPct,
-    total_ht:            line.totalHt,
-    id:                  String(idx),
-    product_id:          0,
-    variant_id:          0,
-    unit_price_ttc:      0,
-    total_ttc:           0,
-    tva_id:              null,
-    discount_amount:     0,
-    max_stock:           null,
-    manages_stock:       false,
-    selling_price_ttc:   line.unitPriceTtc,
-  }));
-
-  const totals: CartTotals = {
-    total_ht:       data.totals?.totalHt       ?? 0,
-    total_tva:      data.totals?.totalTva      ?? 0,
-    total_ttc:      data.totals?.totalTtc      ?? 0,
-    total_discount: data.totals?.totalDiscount ?? 0,
-    fiscal_stamp:   data.totals?.fiscalStamp   ?? 0,
-    items_count:    items.length,
-    lines_count:    items.length,
-  };
-
-  const client: Party | null = data.party
-    ? { ...data.party, name: data.party.name, address: data.party.address ?? null } as any
-    : null;
-
-  // Use canonical field resolver for template-aware company overrides
-  const opts: ReceiptOptions = {
-    companyName:    String(printFieldResolver.resolve('company.name', data, template) ?? co.name ?? ''),
-    companyAddress: String(printFieldResolver.resolve('company.address', data, template) ?? co.address ?? ''),
-    companyPhone:   String(printFieldResolver.resolve('company.phone', data, template) ?? co.phone ?? ''),
-    companyNIF:     String(printFieldResolver.resolve('company.nif', data, template) ?? co.nif ?? ''),
-    companyRC:      String(printFieldResolver.resolve('company.rc', data, template) ?? co.rc ?? ''),
-    companyNIS:     String(printFieldResolver.resolve('company.nis', data, template) ?? co.nis ?? ''),
-    companyICE:     String(printFieldResolver.resolve('company.ice', data, template) ?? co.ice ?? ''),
-    companyArticle: String(printFieldResolver.resolve('company.article', data, template) ?? co.article ?? ''),
-    footerText:     template.show_thank_you ? template.thank_you_text : '',
-    printQR:        !!template.show_qr,
-  };
-
   const b = new EscPosBuilder().init();
 
-  buildThermalHeader(b, opts, template);
-  buildThermalDocInfo(b, docNumber, client, template);
-  buildThermalItems(b, items, template);
-  buildThermalTotals(b, totals, template);
+  buildThermalHeader(b, data, template);
+  buildThermalDocInfo(b, docNumber, data, template);
+  buildThermalItems(b, data, template);
+  buildThermalTotals(b, data, template);
   buildThermalBalance(b, data, template);
 
-  if (opts.printQR && docNumber) {
+  if (template.show_qr && docNumber) {
     b.lineFeed();
     b.qrCode(docNumber, 4);
     b.center(docNumber);
   }
 
-  buildThermalFooter(b, opts.footerText, template);
+  buildThermalFooter(b, data, template);
 
   b.feedAndCut();
   return b.escposBytes();
@@ -895,32 +556,4 @@ async function sendBytesToReceiptPrinter(bytes: Uint8Array): Promise<ThermalPrin
   }
 }
 
-export async function autoPrint(
-  items:      CartItem[],
-  totals:     CartTotals,
-  client:     Party | null,
-  docNumber?: string,
-  opts?:      ReceiptOptions,
-): Promise<ThermalPrintResult> {
-  const usb = (navigator as any).usb;
-  if (!usb) return printThermalViaBlob(items, totals, client, docNumber, opts);
 
-  try {
-    const devices: any[] = await usb.getDevices();
-    if (!devices.length) {
-      return printThermalViaBlob(items, totals, client, docNumber, opts);
-    }
-
-    const device = devices[0];
-    await device.open();
-    const r = await sendToDevice(device, items, totals, client, docNumber, opts);
-    try { await device.close(); } catch {}
-    if (r.ok) return r;
-
-    // فشلت الطباعة عبر webusb — fallback إلى blob
-    return printThermalViaBlob(items, totals, client, docNumber, opts);
-
-  } catch {
-    return printThermalViaBlob(items, totals, client, docNumber, opts);
-  }
-}

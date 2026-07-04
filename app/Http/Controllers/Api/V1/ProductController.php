@@ -54,6 +54,34 @@ class ProductController extends BaseApiController
         }
     }
 
+    /**
+     * بحث صور من مزود خارجي (Pexels) — لميزة "اقتراح صورة" في مودل المنتج.
+     * القراءة فقط، بدون أي كتابة على المنتج؛ الإضافة الفعلية تتم من الواجهة
+     * عبر تحديث حقل images الاعتيادي (update).
+     */
+    public function imageSearch(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('viewAny', Product::class);
+
+            $validated = $request->validate([
+                'query'   => 'required|string|min:2|max:100',
+                'page'    => 'nullable|integer|min:1|max:10',
+                'barcode' => 'nullable|string|max:50',
+            ]);
+
+            $results = $this->productService->searchProductImages(
+                $validated['query'],
+                (int) ($validated['page'] ?? 1),
+                $validated['barcode'] ?? null,
+            );
+
+            return $this->successResponse($results, 'تم جلب نتائج البحث عن الصور');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'imageSearch');
+        }
+    }
+
     // ========== تجاوز الإعدادات الخاصة بالقائمة ==========
 
     protected function getListConfig(): array

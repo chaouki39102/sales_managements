@@ -1,9 +1,9 @@
-# Module Export: Setting
-Generated at: 2026-06-20 19:17:12
+# Module Export: setting
+Generated at: 2026-07-02 12:44:04
 
 ## Models
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\Setting.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\Setting.php
 ```php
 <?php
 
@@ -211,13 +211,14 @@ class Setting extends Model
 
 ## Controllers
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\Admin\AdminSystemSettingsController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\Admin\AdminSystemSettingsController.php
 ```php
 <?php
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -230,35 +231,56 @@ class AdminSystemSettingsController extends Controller
     public function index(): JsonResponse
     {
         $settings = Cache::remember($this->cacheKey, 3600, function () {
-            return DB::table('settings')
-                ->whereNull('company_id')
-                ->pluck('value', 'key')
+            return Setting::whereNull('company_id')
+                ->get()
+                ->mapWithKeys(fn(Setting $s) => [$s->key => $s->getTypedValue()])
                 ->toArray();
         });
 
-        return response()->json([
-            'data' => $settings
-        ]);
+        return response()->json(['data' => $settings]);
     }
 
     public function update(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'settings' => 'required|array',
-            'settings.*' => 'nullable|string'
+            'allow_registration'  => 'nullable|boolean',
+            'allow_new_companies' => 'nullable|boolean',
+            'debug_mode'          => 'nullable|boolean',
+            'public_api'          => 'nullable|boolean',
+            'free_trial_days'     => 'nullable|integer|min:0',
+            'free_max_users'      => 'nullable|integer|min:0',
+            'starter_max_products'=> 'nullable|integer|min:0',
+            'maintenance_mode'    => 'nullable|boolean',
+            'maintenance_message' => 'nullable|string',
+            'mail_mailer'         => 'nullable|string',
+            'mail_host'           => 'nullable|string',
+            'mail_port'           => 'nullable|string',
+            'mail_username'       => 'nullable|string',
+            'mail_password'       => 'nullable|string',
+            'mail_encryption'     => 'nullable|string',
+            'mail_from_address'   => 'nullable|email',
+            'mail_from_name'      => 'nullable|string',
         ]);
 
         DB::transaction(function () use ($data) {
-            foreach ($data['settings'] as $key => $value) {
+            foreach ($data as $key => $value) {
+                if ($value === null) continue;
+
+                $stored = match (true) {
+                    is_bool($value)   => $value ? 'true' : 'false',
+                    is_array($value)  => json_encode($value, JSON_UNESCAPED_UNICODE),
+                    default           => (string) $value,
+                };
+
                 DB::table('settings')->updateOrInsert(
                     ['key' => $key, 'company_id' => null],
                     [
-                        'value'      => $value,
-                        'group'      => 'system',
-                        'type'       => 'string',
-                        'is_public'  => false,
-                        'is_editable'=> true,
-                        'updated_at' => now(),
+                        'value'       => $stored,
+                        'group'       => $this->guessGroup($key),
+                        'type'        => $this->guessType($value),
+                        'is_public'   => false,
+                        'is_editable' => true,
+                        'updated_at'  => now(),
                     ]
                 );
             }
@@ -267,11 +289,32 @@ class AdminSystemSettingsController extends Controller
         Cache::forget($this->cacheKey);
         return response()->json(['message' => 'تم تحديث الإعدادات']);
     }
+
+    private function guessGroup(string $key): string
+    {
+        return match (true) {
+            str_starts_with($key, 'mail_') => 'mail',
+            str_starts_with($key, 'free_') || str_starts_with($key, 'starter_') => 'plans',
+            $key === 'allow_registration' || $key === 'allow_new_companies' || $key === 'public_api' => 'general',
+            $key === 'debug_mode' => 'system',
+            $key === 'maintenance_mode' || $key === 'maintenance_message' => 'maintenance',
+            default => 'general',
+        };
+    }
+
+    private function guessType(mixed $value): string
+    {
+        if (is_bool($value)) return 'boolean';
+        if (is_int($value))  return 'integer';
+        if (is_float($value)) return 'float';
+        if (is_array($value)) return 'json';
+        return 'string';
+    }
 }
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\SettingController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\SettingController.php
 ```php
 <?php
 
@@ -354,6 +397,7 @@ class SettingController extends BaseApiController
     public function byGroup(Request $request, string $group): JsonResponse
     {
         try {
+            $group = $request->route('group');
             $settings = $this->settingService->getGroupAsArray($group);
             return $this->successResponse($settings, "إعدادات المجموعة: {$group}");
         } catch (\Throwable $e) {
@@ -366,10 +410,16 @@ class SettingController extends BaseApiController
     public function getValue(Request $request, string $key): JsonResponse
     {
         try {
+            $key = $request->route('key');
             $setting = $this->settingService->findByKey($key);
 
             if (!$setting) {
-                return $this->errorResponse("الإعداد '{$key}' غير موجود", 404, 'SETTING_NOT_FOUND');
+                return $this->successResponse([
+                    'key'   => $key,
+                    'value' => null,
+                    'group' => null,
+                    'type'  => 'string',
+                ]);
             }
 
             return $this->successResponse([
@@ -444,7 +494,7 @@ class SettingController extends BaseApiController
             // documents
             'default_warehouse_id', 'default_currency_id', 'default_price_level_id',
             'default_payment_mode_id', 'default_treasury_account_id',
-            'default_apply_stamp', 'default_is_proforma', 'default_fiscal_year_behavior',
+            'default_apply_stamp', 'default_fiscal_year_behavior',
             'documents_default_line_mode', 'documents_default_visible_cols',
 
             // inventory (expansion)
@@ -453,7 +503,19 @@ class SettingController extends BaseApiController
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',
             'timezone', 'date_format', 'time_format',
+
+            // print — تخصيص قوالب الطباعة (80mm, A4, A5)
+            'print_doc_configs', 'print_printers',
+            'print:templates', 'print:doc_configs',
         ];
+
+        // إضافة المفاتيح الديناميكية التي تبدأ بـ print_tpl_ أو print:
+        foreach ($data as $key => $value) {
+            if ($value === null) continue;
+            if (str_starts_with($key, 'print_tpl_') || str_starts_with($key, 'print:')) {
+                $allowedKeys[] = $key;
+            }
+        }
 
         return array_filter(
             array_intersect_key($data, array_flip($allowedKeys)),
@@ -466,7 +528,7 @@ class SettingController extends BaseApiController
 
 ## Services
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\SettingService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\SettingService.php
 ```php
 <?php
 
@@ -655,6 +717,17 @@ class SettingService extends BaseService
                 ];
             }
 
+            // إذا كانت فئة السعر الافتراضية 0/null نبحث عن أول is_default في price_levels
+            if ($companyId && empty($dict['default_price_level_id']['value'])) {
+                $defaultId = DB::table('price_levels')
+                    ->where('company_id', $companyId)
+                    ->where('is_default', true)
+                    ->value('id');
+                if ($defaultId) {
+                    $dict['default_price_level_id']['value'] = (int) $defaultId;
+                }
+            }
+
             return $dict;
         });
     }
@@ -829,7 +902,7 @@ class SettingService extends BaseService
 
 ## Requests
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\SettingRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\SettingRequest.php
 ```php
 <?php
 
@@ -882,7 +955,7 @@ class UpdateSettingRequest extends FormRequest
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreSettingRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreSettingRequest.php
 ```php
 <?php
 
@@ -916,7 +989,7 @@ class StoreSettingRequest extends FormRequest
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateSettingRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateSettingRequest.php
 ```php
 <?php
 
@@ -950,7 +1023,7 @@ class UpdateSettingRequest extends FormRequest
 
 ## Policies
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\SettingPolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\SettingPolicy.php
 ```php
 <?php
 
@@ -1002,7 +1075,7 @@ class SettingPolicy
 
 ## Migrations
 
-### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2025_10_15_094145_create_settings_table.php
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2025_10_15_094145_create_settings_table.php
 ```php
 <?php
 

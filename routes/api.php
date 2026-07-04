@@ -259,6 +259,7 @@ Route::prefix('v1')->group(function () {
             // منتجات وأطراف ومستودعات (قراءة)
             Route::get('products',                    [ProductController::class, 'index']);
             Route::get('products/active',             [ProductController::class, 'active']);
+            Route::get('products/image-search',       [ProductController::class, 'imageSearch']);
             Route::get('products/by-family/{family}', [ProductController::class, 'byFamily']);
             Route::get('products/by-brand/{brand}',   [ProductController::class, 'byBrand']);
             Route::get('products/{product}',          [ProductController::class, 'show']);
@@ -477,7 +478,7 @@ Route::prefix('v1')->group(function () {
 
                 Route::get('party-balances', [PartyBalanceController::class, 'index']);
                 Route::get('party-balances/{partyId}', [PartyBalanceController::class, 'show']);
-                
+
                 // ✅ expenses: المسارات المحددة قبل apiResource
                 Route::get('expenses/paid',   [ExpenseController::class, 'paid']);
                 Route::get('expenses/unpaid', [ExpenseController::class, 'unpaid']);

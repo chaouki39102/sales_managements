@@ -20,6 +20,7 @@ import React, {
 } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiPost, apiPut } from '@/lib/api/core/client';
+import { productsApi } from '@/lib/api/endpoints/products';
 import {
   useProductLookups,
   useValuationMethods,
@@ -414,6 +415,14 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   const [copied,    setCopied]    = useState(false);
   const [imageInput, setImageInput] = useState('');
 
+  // ── اقتراح صورة من الإنترنت ──
+  const [showImgSuggest, setShowImgSuggest] = useState(false);
+  const [imgQuery,       setImgQuery]       = useState('');
+  const [imgResults,     setImgResults]     = useState<{ id: string; thumb: string; full: string; exact?: boolean; label?: string; source?: string | null }[]>([]);
+  const [imgLoading,     setImgLoading]     = useState(false);
+  const [imgError,       setImgError]       = useState('');
+  const imgSearchSeq = useRef(0); // لمنع race condition بين طلبات بحث متتالية
+
   // ── Lookups من lookups.ts ──
   const {
     families, brands, units, tvas, priceLevels, productTypes,
@@ -441,12 +450,69 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     }
   }, [isEdit]);
 
+  // ── بحث الصور ──
+  // كل المصادر (Google CSE مقيّد بمواقع جزائرية، متاجر جزائرية عبر WooCommerce
+  // Store API، Open Food Facts بالباركود والاسم، Pexels احتياطياً) تُستعلَم من
+  // الباك-إند في طلب واحد. سابقاً كنا نستدعي world.openfoodfacts.org مباشرة من
+  // المتصفح، وهذا كان يفشل بخطأ CORS لأن ذلك المسار لا يرسل رؤوس
+  // Access-Control-Allow-Origin؛ طلبات الخادم لا تخضع لسياسة CORS، لذا هذا
+  // الحل هو الصحيح والنهائي.
+  const searchProductImages = useCallback(async (queryRaw: string) => {
+    const query = queryRaw.trim();
+    if (!query || query.length < 2) return;
+    const seq = ++imgSearchSeq.current;
+    setImgLoading(true);
+    setImgError('');
+    try {
+      const barcode = form.barcode?.trim() || undefined;
+      const results = await productsApi.searchImages(query, 1, barcode);
+      if (seq !== imgSearchSeq.current) return; // نتيجة بحث قديمة — تجاهل
+
+      const mapped = (results ?? [])
+        .filter(r => !!r?.thumb && !!r?.full)
+        .map(r => ({
+          id:     r.id,
+          thumb:  r.thumb as string,
+          full:   r.full as string,
+          exact:  r.exact,
+          label:  r.label ?? undefined,
+          source: r.source ?? undefined,
+        }));
+
+      setImgResults(mapped);
+      if (mapped.length === 0) setImgError('لا توجد نتائج لهذا البحث');
+    } catch (e: any) {
+      if (seq !== imgSearchSeq.current) return;
+      setImgError(e?.message || 'تعذّر البحث عن الصور، تحقق من اتصالك بالإنترنت');
+      setImgResults([]);
+    } finally {
+      if (seq === imgSearchSeq.current) setImgLoading(false);
+    }
+  }, [form.barcode]);
+
+  function addSuggestedImage(url: string) {
+    if (form.images.includes(url)) return;
+    set('images', [...form.images, url]);
+  }
+
+  function toggleImgSuggest() {
+    setShowImgSuggest(v => {
+      const next = !v;
+      if (next && imgResults.length === 0 && !imgLoading) {
+        const q = imgQuery.trim() || form.name.trim();
+        if (q) { setImgQuery(q); searchProductImages(q); }
+      }
+      return next;
+    });
+  }
+
   // ── Reset عند الفتح ──
   useEffect(() => {
     if (!open) { initDone.current = false; slugEdited.current = false; return; }
     setErrors({}); setApiError(''); setActiveTab('basic');
     setIsDirty(false); setSpecKey(''); setSpecVal(''); setKwInput('');
     setImageInput(''); setCopied(false);
+    setShowImgSuggest(false); setImgQuery(''); setImgResults([]); setImgError(''); setImgLoading(false);
 
     if ((priceLevels as PriceLevel[]).length > 0) {
       initDone.current = true;
@@ -1492,7 +1558,134 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           >
             <i className="ti ti-plus" /> إضافة
           </button>
+          <button
+            type="button"
+            onClick={toggleImgSuggest}
+            style={{
+              padding: '7px 16px', borderRadius: 'var(--r2)',
+              border: `1px solid ${showImgSuggest ? 'var(--em)' : 'var(--b3)'}`,
+              background: showImgSuggest ? 'var(--emb)' : 'var(--bg2)',
+              color: showImgSuggest ? 'var(--em)' : 'var(--t2)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <i className="ti ti-sparkles" /> اقتراح صورة
+          </button>
         </div>
+
+        {/* لوحة اقتراح الصور من الإنترنت */}
+        {showImgSuggest && (
+          <div style={{ ...s.card, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                style={{ ...s.inp(), flex: 1, fontSize: 13 }}
+                value={imgQuery}
+                onChange={e => setImgQuery(e.target.value)}
+                placeholder="اكتب اسم المنتج أو كلمة بحث..."
+                onKeyDown={e => { if (e.key === 'Enter') searchProductImages(imgQuery); }}
+              />
+              <button
+                type="button"
+                disabled={!imgQuery.trim() || imgLoading}
+                onClick={() => searchProductImages(imgQuery)}
+                style={{
+                  padding: '7px 16px', borderRadius: 'var(--r2)', border: '1px solid var(--em)',
+                  background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  opacity: (!imgQuery.trim() || imgLoading) ? 0.5 : 1,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {imgLoading
+                  ? <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+                  : <i className="ti ti-search" />}
+                بحث
+              </button>
+            </div>
+
+            {imgLoading && (
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} style={{
+                    width: 110, height: 110, borderRadius: 'var(--r2)', flexShrink: 0,
+                    background: 'var(--bg3)', border: '1px solid var(--b2)',
+                  }} />
+                ))}
+              </div>
+            )}
+
+            {!imgLoading && imgError && (
+              <div style={{ fontSize: 12, color: 'var(--t4)', textAlign: 'center', padding: '10px 0' }}>
+                <i className="ti ti-mood-empty" style={{ marginLeft: 6 }} />
+                {imgError}
+              </div>
+            )}
+
+            {!imgLoading && imgResults.length > 0 && (
+              <>
+                <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+                  {imgResults.map(r => {
+                    const added = form.images.includes(r.full);
+                    return (
+                      <button
+                        type="button"
+                        key={r.id}
+                        onClick={() => addSuggestedImage(r.full)}
+                        title={added ? 'مُضافة بالفعل' : 'اضغط للإضافة إلى المنتج'}
+                        style={{
+                          position: 'relative', width: 110, height: 110, flexShrink: 0,
+                          borderRadius: 'var(--r2)', overflow: 'hidden', padding: 0,
+                          border: `2px solid ${added ? 'var(--em)' : r.exact ? 'var(--gold, #c8952c)' : 'var(--b2)'}`,
+                          cursor: added ? 'default' : 'pointer', background: 'var(--bg3)',
+                        }}
+                      >
+                        <img
+                          src={r.thumb}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          loading="lazy"
+                          onError={e => { (e.target as HTMLImageElement).style.opacity = '0.15'; }}
+                        />
+                        {r.exact && !added && (
+                          <div style={{
+                            position: 'absolute', bottom: 0, insetInline: 0,
+                            background: 'rgba(200,149,44,.92)', color: '#fff',
+                            fontSize: 9, fontWeight: 700, textAlign: 'center', padding: '2px 0',
+                          }}>
+                            {r.label ?? 'مطابقة دقيقة'}
+                          </div>
+                        )}
+                        {!r.exact && r.source && !added && (
+                          <div style={{
+                            position: 'absolute', bottom: 0, insetInline: 0,
+                            background: 'rgba(0,0,0,.6)', color: '#fff',
+                            fontSize: 9, fontWeight: 600, textAlign: 'center', padding: '2px 4px',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {r.source}
+                          </div>
+                        )}
+                        {added && (
+                          <div style={{
+                            position: 'absolute', inset: 0, background: 'rgba(0,0,0,.35)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <i className="ti ti-check" style={{ fontSize: 22, color: '#fff' }} />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <i className="ti ti-info-circle" style={{ fontSize: 13 }} />
+                  اضغط على أي صورة لإضافتها مباشرة إلى صور المنتج. يمكنك اختيار أكثر من صورة.
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {form.images.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--t4)' }}>

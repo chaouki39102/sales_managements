@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/inventory/StockTab.tsx
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiGet }        from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
@@ -9,8 +9,10 @@ import { useFiscalYear } from '@/context/FiscalYearContext';
 import { useWarehouses } from '@/lib/api/endpoints/lookups';
 import { fmt }           from './inventoryTypes';
 import { Th }            from './InventoryShared';
+import Pagination        from '@/components/ui/Pagination';
 import type { StockAtRow } from '@/lib/api/endpoints/inventory';
 import type { Warehouse }  from '@/lib/api/core/types';
+import type { BackendMeta } from '@/hooks/usePagination';
 
 // ─── ثوابت ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,12 @@ export default function StockTab() {
   const [warehouseId, setWarehouseId] = useState<number | ''>('');
   const [search,      setSearch]      = useState('');
   const [filter,      setFilter]      = useState<Filter>('all');
+
+  // ── Pagination ──
+  const [page,    setPage]    = useState(1);
+  const [perPage, setPerPage] = useState(25);
+
+  useEffect(() => { setPage(1); }, [search, filter, warehouseId]);
 
   // ── المستودعات ──
   const { data: warehouses = [] } = useWarehouses();
@@ -87,6 +95,30 @@ export default function StockTab() {
     stock:   rows.reduce((s, r) => s + r.current_stock,    0),
     value:   rows.reduce((s, r) => s + r.total_value,      0),
   }), [rows]);
+
+  // ── Pagination computed ──
+  const lastPage = Math.max(1, Math.ceil(rows.length / perPage));
+
+  useEffect(() => {
+    if (page > lastPage) setPage(lastPage);
+  }, [page, lastPage]);
+
+  const paginatedRows = useMemo(
+    () => rows.slice((page - 1) * perPage, page * perPage),
+    [rows, page, perPage],
+  );
+
+  const meta: BackendMeta = useMemo(() => ({
+    current_page:   page,
+    last_page:      lastPage,
+    per_page:       perPage,
+    total:          rows.length,
+    from:           rows.length === 0 ? null : (page - 1) * perPage + 1,
+    to:             Math.min(page * perPage, rows.length) || null,
+    has_more_pages: page < lastPage,
+    is_first_page:  page === 1,
+    is_last_page:   page >= lastPage,
+  }), [page, lastPage, perPage, rows.length]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -213,6 +245,7 @@ export default function StockTab() {
             }} />
           )}
           {rows.length} منتج
+          {rows.length > perPage && ` • صفحة ${page} من ${lastPage}`}
         </span>
 
       </div>
@@ -268,7 +301,7 @@ export default function StockTab() {
               </tr>
 
             /* الصفوف */
-            ) : rows.map((row, i) => {
+            ) : paginatedRows.map((row, i) => {
               const st = stockStatus(row);
               const sm = STATUS[st];
               return (
@@ -391,6 +424,17 @@ export default function StockTab() {
 
         </table>
       </div>
+
+      {/* ── Pagination ── */}
+      {rows.length > perPage && (
+        <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPerPageChange={v => { setPerPage(v); setPage(1); }}
+          showPageSize
+          showTotal
+        />
+      )}
 
     </div>
   );

@@ -12,12 +12,11 @@
 //   3. Pipeline provides print-to-popup-window
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useMemo, Suspense, useRef, useCallback } from 'react';
+import React, { useMemo, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
-import type { PrintTemplate, DocTypeCode, PaperSize } from '@/pages/settings/print-settings/types';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import type { UniversalDocumentData, CompanyInfo } from '@/pages/settings/print-settings/types/data';
-import { DocumentDataBuilder, POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
+import { DocumentDataBuilder, type POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
 
 const UniversalPreview = React.lazy(() => import('@/pages/settings/print-settings/components/preview/UniversalPreview'));
 

@@ -3,7 +3,6 @@ import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { usePrintTemplatesList, renderPipelineToPopup, mapCompany } from '@/pages/settings/print-settings/runtime';
 import { resolveTemplateById, resolveTemplate } from '@/pages/settings/print-settings/runtime/TemplateResolver';
-import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
 import type { CompanyInfo } from '@/pages/settings/print-settings/types/data';
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import type { CommercialDocument } from '@/lib/api/core/types';
@@ -116,9 +115,13 @@ export default function BatchPrintModal({ open, onClose, documents: docs }: Prop
           ? resolveTemplateById(templates, selectedTemplateId)
           : resolveTemplate(templates, code);
 
-        const safeTpl = tpl ?? createDefaultTemplate(code as any, 'A4');
+        const safeTpl = tpl ?? null;
 
         const docNum = (fullDoc as any).document_number ?? String(fullDoc.id);
+        if (!safeTpl) {
+          setPrintResults(prev => [...prev, { num: docNum, ok: false }]);
+          continue;
+        }
         await printDocument(docNum, fullDoc as unknown as Record<string, unknown>, safeTpl, companyInfo);
 
         setPrintResults(prev => [...prev, { num: docNum, ok: true }]);

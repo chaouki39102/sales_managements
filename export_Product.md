@@ -1,9 +1,28 @@
-# Module Export: Product
-Generated at: 2026-06-23 22:50:04
+# Module Export: product
+Generated at: 2026-07-02 12:42:19
 
 ## Models
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\Product.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\PosSessionProduct.php
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class PosSessionProduct extends Model
+{
+    protected $fillable = ['pos_session_id', 'product_id', 'product_name', 'quantity_sold', 'total_ht', 'total_ttc'];
+    protected $casts    = ['quantity_sold' => 'decimal:3', 'total_ht' => 'decimal:2', 'total_ttc' => 'decimal:2'];
+
+    public function product(): BelongsTo { return $this->belongsTo(Product::class); }
+}
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\app\Models\Product.php
 ```php
 <?php
 
@@ -57,6 +76,8 @@ class Product extends Model
         'max_stock_alert',
         'manages_quantity_discounts',
         'valuation_method_id',
+        'is_subsidized',
+        'regulated_product_config_id',
         'weight',
         'volume',
         'length',
@@ -75,6 +96,7 @@ class Product extends Model
         'images' => 'array',
         'meta_keywords' => 'array',
         'active' => 'boolean',
+        'is_subsidized' => 'boolean',
         'manages_stock' => 'boolean',
         'allow_negative_stock' => 'boolean',
         'has_lots' => 'boolean',
@@ -130,7 +152,8 @@ class Product extends Model
         'documentLines',
         'openingBalances',
         'barcodes',
-        'primaryBarcode'
+        'primaryBarcode',
+        'regulatedProductConfig'
     ];
     public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
@@ -159,6 +182,11 @@ class Product extends Model
     {
         return $this->belongsTo(ProductType::class);
     }
+    public function regulatedProductConfig(): BelongsTo
+    {
+        return $this->belongsTo(RegulatedProductConfig::class);
+    }
+
     public function tva(): BelongsTo
     {
         return $this->belongsTo(Tva::class);
@@ -337,7 +365,7 @@ class Product extends Model
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductLot.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductLot.php
 ```php
 <?php
 
@@ -440,7 +468,7 @@ class ProductLot extends Model
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductPackaging.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductPackaging.php
 ```php
 <?php
 
@@ -496,7 +524,7 @@ class ProductPackaging extends Model
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductPrice.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductPrice.php
 ```php
 <?php
 
@@ -562,7 +590,7 @@ class ProductPrice extends Model
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductType.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductType.php
 ```php
 <?php
 
@@ -615,7 +643,7 @@ class ProductType extends Model
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Models\ProductVariant.php
+### 📁 D:\xampp\htdocs\sales-management\app\Models\ProductVariant.php
 ```php
 <?php
 
@@ -710,9 +738,56 @@ class ProductVariant extends Model
 }
 ```
 
+### 📁 D:\xampp\htdocs\sales-management\app\Models\RegulatedProductConfig.php
+```php
+<?php
+
+namespace App\Models;
+
+use App\Models\Traits\HasCompany;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class RegulatedProductConfig extends Model
+{
+    use HasCompany;
+
+    protected $table = 'regulated_products_config';
+
+    protected $fillable = [
+        'company_id',
+        'product_key',
+        'label',
+        'unit_label',
+        'category',
+        'regulated_max_price',
+        'regulated_margin',
+        'regulation_type',
+        'legal_reference',
+        'effective_date',
+        'active',
+        'notes',
+        'updated_by',
+    ];
+
+    protected $casts = [
+        'regulated_max_price' => 'decimal:4',
+        'regulated_margin'    => 'decimal:4',
+        'effective_date'      => 'date',
+        'active'              => 'boolean',
+    ];
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+}
+
+```
+
 ## Controllers
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\ProductController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\ProductController.php
 ```php
 <?php
 
@@ -770,6 +845,34 @@ class ProductController extends BaseApiController
         }
     }
 
+    /**
+     * بحث صور من مزود خارجي (Pexels) — لميزة "اقتراح صورة" في مودل المنتج.
+     * القراءة فقط، بدون أي كتابة على المنتج؛ الإضافة الفعلية تتم من الواجهة
+     * عبر تحديث حقل images الاعتيادي (update).
+     */
+    public function imageSearch(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('viewAny', Product::class);
+
+            $validated = $request->validate([
+                'query'   => 'required|string|min:2|max:100',
+                'page'    => 'nullable|integer|min:1|max:10',
+                'barcode' => 'nullable|string|max:50',
+            ]);
+
+            $results = $this->productService->searchProductImages(
+                $validated['query'],
+                (int) ($validated['page'] ?? 1),
+                $validated['barcode'] ?? null,
+            );
+
+            return $this->successResponse($results, 'تم جلب نتائج البحث عن الصور');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'imageSearch');
+        }
+    }
+
     // ========== تجاوز الإعدادات الخاصة بالقائمة ==========
 
     protected function getListConfig(): array
@@ -803,7 +906,7 @@ class ProductController extends BaseApiController
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\ProductLotController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\ProductLotController.php
 ```php
 <?php
 
@@ -859,7 +962,7 @@ class ProductLotController extends BaseApiController
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\ProductTypeController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\ProductTypeController.php
 ```php
 <?php
 
@@ -892,7 +995,7 @@ class ProductTypeController extends BaseApiController
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Controllers\Api\V1\ProductVariantController.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\ProductVariantController.php
 ```php
 <?php
 
@@ -989,9 +1092,274 @@ class ProductVariantController extends BaseApiController
 
 ```
 
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Controllers\Api\V1\RegulatedProductsController.php
+```php
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Models\Company;
+use App\Services\Fiscal\RegulatedProductsService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+
+class RegulatedProductsController extends Controller
+{
+    public function __construct(
+        private readonly RegulatedProductsService $regulatedProductsService,
+    ) {}
+
+    public function index(Request $request, Company $company): JsonResponse
+    {
+        try {
+            Gate::authorize('view', $company);
+
+            $activeOnly = $request->boolean('active_only', true);
+            $products   = $this->regulatedProductsService->getList($company->id, $activeOnly);
+
+            return response()->json([
+                'status' => 'success',
+                'data'   => $products,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function store(Request $request, Company $company): JsonResponse
+    {
+        try {
+            Gate::authorize('update', $company);
+
+            $validated = $request->validate([
+                'product_key'        => 'required|string|max:80',
+                'label'              => 'required|string|max:200',
+                'unit_label'         => 'required|string|max:50',
+                'category'           => 'required|string|max:50',
+                'regulated_max_price'=> 'required|numeric|min:0',
+                'regulated_margin'   => 'nullable|numeric|min:0',
+                'regulation_type'    => 'string|in:price,margin',
+                'legal_reference'    => 'nullable|string|max:255',
+                'effective_date'     => 'nullable|date',
+                'active'             => 'boolean',
+                'notes'              => 'nullable|string|max:500',
+            ]);
+
+            $product = $this->regulatedProductsService->create(
+                $company->id,
+                $validated,
+                auth()->id(),
+            );
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'تمت إضافة المادة المقنَّنة بنجاح',
+                'data'    => $product,
+            ], 201);
+        } catch (\Throwable $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function update(Request $request, Company $company, int $id): JsonResponse
+    {
+        try {
+            Gate::authorize('update', $company);
+
+            $validated = $request->validate([
+                'product_key'        => 'sometimes|string|max:80',
+                'label'              => 'sometimes|string|max:200',
+                'unit_label'         => 'sometimes|string|max:50',
+                'category'           => 'sometimes|string|max:50',
+                'regulated_max_price'=> 'sometimes|numeric|min:0',
+                'regulated_margin'   => 'nullable|numeric|min:0',
+                'regulation_type'    => 'sometimes|string|in:price,margin',
+                'legal_reference'    => 'nullable|string|max:255',
+                'effective_date'     => 'nullable|date',
+                'active'             => 'boolean',
+                'notes'              => 'nullable|string|max:500',
+            ]);
+
+            $product = $this->regulatedProductsService->update($id, $validated, auth()->id());
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'تم تحديث المادة المقنَّنة بنجاح',
+                'data'    => $product,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function toggle(Company $company, int $id): JsonResponse
+    {
+        try {
+            Gate::authorize('update', $company);
+
+            $product = $this->regulatedProductsService->toggle($id);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => $product->active ? 'تم تفعيل المادة' : 'تم تعطيل المادة',
+                'data'    => $product,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function destroy(Company $company, int $id): JsonResponse
+    {
+        try {
+            Gate::authorize('update', $company);
+
+            $this->regulatedProductsService->delete($id);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'تم حذف المادة المقنَّنة',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function seedDefaults(Company $company): JsonResponse
+    {
+        try {
+            Gate::authorize('update', $company);
+
+            $this->regulatedProductsService->seedDefaults($company->id);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'تمت استعادة القائمة الافتراضية للمواد المقنَّنة',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+}
+
+```
+
 ## Services
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductLotService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\Fiscal\RegulatedProductsService.php
+```php
+<?php
+
+namespace App\Services\Fiscal;
+
+use App\Models\RegulatedProductConfig;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class RegulatedProductsService
+{
+    public function getList(int $companyId, bool $activeOnly = true): Collection
+    {
+        $query = RegulatedProductConfig::forCompany($companyId);
+
+        if ($activeOnly) {
+            $query->where('active', true);
+        }
+
+        return $query->orderBy('category')->orderBy('label')->get();
+    }
+
+    public function create(int $companyId, array $data, int $userId): RegulatedProductConfig
+    {
+        $data['company_id'] = $companyId;
+        $data['updated_by'] = $userId;
+
+        return RegulatedProductConfig::create($data);
+    }
+
+    public function update(int $id, array $data, int $userId): RegulatedProductConfig
+    {
+        $config = RegulatedProductConfig::findOrFail($id);
+        $data['updated_by'] = $userId;
+        $config->update($data);
+
+        return $config->fresh();
+    }
+
+    public function toggle(int $id): RegulatedProductConfig
+    {
+        $config = RegulatedProductConfig::findOrFail($id);
+        $config->update(['active' => !$config->active]);
+
+        return $config->fresh();
+    }
+
+    public function delete(int $id): void
+    {
+        RegulatedProductConfig::findOrFail($id)->delete();
+    }
+
+    public function seedDefaults(int $companyId): void
+    {
+        $defaults = $this->getDefaults();
+        $now = now();
+
+        $rows = [];
+        foreach ($defaults as $d) {
+            $rows[] = [
+                'company_id'          => $companyId,
+                'product_key'         => $d['key'],
+                'label'               => $d['label'],
+                'unit_label'          => $d['unit'],
+                'category'            => $d['cat'],
+                'regulated_max_price' => $d['max_price'],
+                'regulation_type'     => 'price',
+                'legal_reference'     => $d['ref'],
+                'active'              => true,
+                'created_at'          => $now,
+                'updated_at'          => $now,
+            ];
+        }
+
+        foreach ($rows as $row) {
+            RegulatedProductConfig::forCompany($companyId)->updateOrCreate(
+                ['product_key' => $row['product_key']],
+                $row,
+            );
+        }
+
+        Log::info("RegulatedProductsService: تمت استعادة القائمة الافتراضية للشركة {$companyId}");
+    }
+
+    public function getDefaults(): array
+    {
+        return [
+            ['key'=>'huile_5L',     'label'=>'زيت مائدة مدعم 5ل',  'unit'=>'عبوة 5ل',   'cat'=>'huile',  'max_price'=>650.00,  'ref'=>'م.ت 20-241 بتاريخ 31/08/2020'],
+            ['key'=>'huile_2L',     'label'=>'زيت مائدة مدعم 2ل',  'unit'=>'عبوة 2ل',   'cat'=>'huile',  'max_price'=>250.00,  'ref'=>'م.ت 20-241'],
+            ['key'=>'huile_1L',     'label'=>'زيت مائدة مدعم 1ل',  'unit'=>'عبوة 1ل',   'cat'=>'huile',  'max_price'=>125.00,  'ref'=>'م.ت 20-241'],
+            ['key'=>'semoul_fin_1', 'label'=>'سميد ناعم 1كغ',       'unit'=>'كغ',         'cat'=>'semoul', 'max_price'=>42.50,   'ref'=>'م.ت 07-402 معدَّل بـ 20-242'],
+            ['key'=>'semoul_ord_1', 'label'=>'سميد عادي 1كغ',       'unit'=>'كغ',         'cat'=>'semoul', 'max_price'=>38.50,   'ref'=>'م.ت 07-402 معدَّل بـ 20-242'],
+            ['key'=>'semoul_fin_2', 'label'=>'سميد ناعم 2كغ',       'unit'=>'كيس 2كغ',   'cat'=>'semoul', 'max_price'=>84.00,   'ref'=>'م.ت 07-402'],
+            ['key'=>'semoul_ord_2', 'label'=>'سميد عادي 2كغ',       'unit'=>'كيس 2كغ',   'cat'=>'semoul', 'max_price'=>76.00,   'ref'=>'م.ت 07-402'],
+            ['key'=>'semoul_10',    'label'=>'سميد 10كغ',           'unit'=>'كيس 10كغ',  'cat'=>'semoul', 'max_price'=>410.00,  'ref'=>'م.ت 07-402'],
+            ['key'=>'farine_1',     'label'=>'فرينة 1كغ',           'unit'=>'كغ',         'cat'=>'farine', 'max_price'=>27.50,   'ref'=>'م.ت 96-132 معدَّل'],
+            ['key'=>'farine_2',     'label'=>'فرينة 2كغ',           'unit'=>'كيس 2كغ',   'cat'=>'farine', 'max_price'=>51.50,   'ref'=>'م.ت 96-132'],
+            ['key'=>'farine_5',     'label'=>'فرينة 5كغ',           'unit'=>'كيس 5كغ',   'cat'=>'farine', 'max_price'=>133.50,  'ref'=>'م.ت 96-132'],
+            ['key'=>'farine_10',    'label'=>'فرينة 10كغ',          'unit'=>'كيس 10كغ',  'cat'=>'farine', 'max_price'=>247.00,  'ref'=>'م.ت 96-132'],
+            ['key'=>'lait_sac_1',   'label'=>'حليب أكياس 1ل',       'unit'=>'كيس 1ل',    'cat'=>'lait',   'max_price'=>25.00,   'ref'=>'م.ت 01-50 معدَّل بـ 16-65'],
+            ['key'=>'pain_baguette','label'=>'خبز بڤات',            'unit'=>'وحدة',       'cat'=>'pain',   'max_price'=>7.50,    'ref'=>'سعر مقنَّن وزارة التجارة'],
+            ['key'=>'cafe_1kg',     'label'=>'قهوة 1كغ',            'unit'=>'كغ',         'cat'=>'cafe',   'max_price'=>1000.00, 'ref'=>'تسقيف وزارة التجارة 2024'],
+            ['key'=>'sucre_1kg',    'label'=>'سكر أبيض 1كغ',        'unit'=>'كغ',         'cat'=>'sucre',  'max_price'=>95.00,   'ref'=>'م.ت 20-241'],
+        ];
+    }
+}
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductLotService.php
 ```php
 <?php
 
@@ -1008,7 +1376,7 @@ class ProductLotService extends \App\Core\Services\BaseService
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductService.php
 ```php
 <?php
 
@@ -1024,6 +1392,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 
 class ProductService extends \App\Core\Services\BaseService
 {
@@ -1284,6 +1654,288 @@ class ProductService extends \App\Core\Services\BaseService
     }
 
     // =========================================================
+    // Image Search — مصادر متعددة مرتّبة حسب الدقة
+    // =========================================================
+
+    /**
+     * مواقع جزائرية حقيقية مبنية على WooCommerce — تُستعلم عبر الـ Store API
+     * الرسمي والعام (بدون مفتاح، بدون سكرابينغ HTML). هذا API مصمم أصلاً
+     * للاستهلاك البرمجي الخارجي، وليس "زحفاً" على الموقع.
+     *
+     * ملاحظة: موقعا tidjaria وcorailmarket (PrestaShop) غير مُدرجين هنا
+     * لأن robots.txt الخاص بهما يمنع الوصول الآلي صراحة، ولأنه لا يوجد
+     * API عام موثّق لهما. تغطيتهما تتم فقط عبر Google Custom Search
+     * (استعلام لفهرس Google العام، لا يزحف الموقع مباشرة).
+     */
+    protected array $algerianWooSites = [
+        'https://www.taibaoline.com',
+        'https://superette-dz.com',
+        'https://areej.store',
+        'https://shopicornermarket.com',
+        'https://topribejaia.com',
+    ];
+
+    private function searchAlgerianStores(string $query): array
+    {
+        $cacheKey = 'dz_stores_search:' . md5(mb_strtolower($query));
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($query) {
+            try {
+                $responses = Http::pool(fn ($pool) => collect($this->algerianWooSites)
+                    ->map(fn ($site) => $pool->as($site)
+                        ->timeout(6)
+                        ->get(rtrim($site, '/') . '/wp-json/wc/store/v1/products', [
+                            'search'   => $query,
+                            'per_page' => 6,
+                        ])
+                    )->all()
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Algerian stores search failed', ['error' => $e->getMessage(), 'query' => $query]);
+                return [];
+            }
+
+            $results = [];
+            foreach ($this->algerianWooSites as $site) {
+                $response = $responses[$site] ?? null;
+                if (!$response instanceof \Illuminate\Http\Client\Response || !$response->successful()) {
+                    continue;
+                }
+                $host = parse_url($site, PHP_URL_HOST);
+                foreach ((array) $response->json() as $product) {
+                    $images = $product['images'] ?? [];
+                    if (empty($images)) continue;
+                    $img = $images[0];
+                    $full = $img['src'] ?? null;
+                    if (!$full) continue;
+                    $results[] = [
+                        'id'     => 'dz-' . md5($site . ($product['id'] ?? uniqid())),
+                        'thumb'  => $img['thumbnail'] ?? $full,
+                        'full'   => $full,
+                        'source' => $host,
+                    ];
+                }
+            }
+
+            return $results;
+        });
+    }
+
+    /**
+     * Open Food Facts — مطابقة دقيقة بالباركود. مُنقولة إلى الباك-إند لأن
+     * world.openfoodfacts.org لا يُرسل رؤوس CORS على مسارات الـ API القديمة
+     * (cgi/search.pl)، فيفشل الطلب عند تنفيذه مباشرة من المتصفح.
+     * الطلبات من الخادم لا تخضع لسياسة CORS، لذا هذا هو الحل الصحيح.
+     */
+    private function searchOpenFoodFactsByBarcode(string $barcode): ?array
+    {
+        $barcode = trim($barcode);
+        if ($barcode === '') return null;
+
+        $cacheKey = 'off_barcode:' . md5($barcode);
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($barcode) {
+            try {
+                $response = Http::withHeaders([
+                        // Open Food Facts يشترط User-Agent مميز لتطبيقك
+                        'User-Agent' => 'BusinessPlusDZ/1.0 (contact: support@businessplus.dz)',
+                    ])
+                    ->timeout(6)
+                    ->get("https://world.openfoodfacts.org/api/v2/product/{$barcode}.json", [
+                        'fields' => 'code,product_name,image_url,image_front_url',
+                    ]);
+            } catch (\Throwable $e) {
+                Log::warning('Open Food Facts barcode lookup failed', ['error' => $e->getMessage(), 'barcode' => $barcode]);
+                return null;
+            }
+
+            if (!$response->successful() || (int) $response->json('status') !== 1) return null;
+
+            $product = $response->json('product', []);
+            $img = $product['image_front_url'] ?? $product['image_url'] ?? null;
+            if (!$img) return null;
+
+            return [
+                'id'    => 'off-bc-' . ($product['code'] ?? $barcode),
+                'thumb' => $img,
+                'full'  => $img,
+                'exact' => true,
+                'label' => 'مطابقة بالباركود',
+            ];
+        });
+    }
+
+    /**
+     * Open Food Facts — بحث نصي بالاسم (منتجات حقيقية بصور تعبئتها الفعلية).
+     */
+    private function searchOpenFoodFactsByName(string $query): array
+    {
+        $cacheKey = 'off_search:' . md5(mb_strtolower($query));
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($query) {
+            try {
+                $response = Http::withHeaders([
+                        'User-Agent' => 'BusinessPlusDZ/1.0 (contact: support@businessplus.dz)',
+                    ])
+                    ->timeout(6)
+                    ->get('https://world.openfoodfacts.org/cgi/search.pl', [
+                        'search_terms' => $query,
+                        'search_simple'=> 1,
+                        'action'       => 'process',
+                        'json'         => 1,
+                        'page_size'    => 16,
+                    ]);
+            } catch (\Throwable $e) {
+                Log::warning('Open Food Facts text search failed', ['error' => $e->getMessage(), 'query' => $query]);
+                return [];
+            }
+
+            if (!$response->successful()) return [];
+
+            return collect($response->json('products', []))
+                ->map(fn (array $p) => [
+                    'id'    => 'off-' . ($p['code'] ?? uniqid()),
+                    'thumb' => $p['image_front_small_url'] ?? $p['image_small_url'] ?? $p['image_url'] ?? null,
+                    'full'  => $p['image_front_url'] ?? $p['image_url'] ?? null,
+                ])
+                ->filter(fn (array $r) => $r['thumb'] && $r['full'])
+                ->values()
+                ->all();
+        });
+    }
+
+    /**
+     * Google Custom Search (مقيّد بالمواقع الجزائرية من لوحة تحكم الـ CSE نفسها).
+     * يُعيد مصفوفة فارغة بهدوء إن لم يُضبط المفتاح بعد — لا يكسر البحث.
+     */
+    private function searchGoogleImages(string $query): array
+    {
+        $apiKey = config('services.google_cse.key');
+        $cx     = config('services.google_cse.cx');
+
+        if (empty($apiKey) || empty($cx)) {
+            return [];
+        }
+
+        $cacheKey = 'google_cse_search:' . md5(mb_strtolower($query));
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($apiKey, $cx, $query) {
+            try {
+                $response = Http::timeout(8)->get('https://www.googleapis.com/customsearch/v1', [
+                    'key'        => $apiKey,
+                    'cx'         => $cx,
+                    'q'          => $query,
+                    'searchType' => 'image',
+                    'num'        => 10,
+                    'safe'       => 'active',
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Google CSE search failed', ['error' => $e->getMessage(), 'query' => $query]);
+                return [];
+            }
+
+            if (!$response->successful()) return [];
+
+            return collect($response->json('items', []))
+                ->map(fn (array $it) => [
+                    'id'     => 'g-' . md5($it['link'] ?? uniqid()),
+                    'thumb'  => $it['image']['thumbnailLink'] ?? $it['link'] ?? null,
+                    'full'   => $it['link'] ?? null,
+                    'source' => $it['displayLink'] ?? null,
+                ])
+                ->filter(fn (array $r) => $r['thumb'] && $r['full'])
+                ->values()
+                ->all();
+        });
+    }
+
+    /**
+     * Pexels — احتياطي عام (صور ستوك، ليست منتجات حقيقية بالضرورة).
+     * يُستدعى فقط عند نقص النتائج من المصادر الأدق أعلاه.
+     */
+    private function searchPexelsImages(string $query, int $page = 1): array
+    {
+        $apiKey = config('services.pexels.key');
+        if (empty($apiKey)) return [];
+
+        $cacheKey = 'pexels_image_search:' . md5(mb_strtolower($query) . '|' . $page);
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($apiKey, $query, $page) {
+            try {
+                $response = Http::withHeaders(['Authorization' => $apiKey])
+                    ->timeout(8)
+                    ->get('https://api.pexels.com/v1/search', [
+                        'query'    => $query,
+                        'per_page' => 24,
+                        'page'     => $page,
+                    ]);
+            } catch (\Throwable $e) {
+                Log::warning('Pexels image search failed (connection)', ['error' => $e->getMessage(), 'query' => $query]);
+                return [];
+            }
+
+            if (!$response->successful()) {
+                Log::warning('Pexels image search failed (http)', ['status' => $response->status(), 'query' => $query]);
+                return [];
+            }
+
+            return collect($response->json('photos', []))
+                ->map(function (array $p) {
+                    $src = $p['src'] ?? [];
+                    return [
+                        'id'           => (string) ($p['id'] ?? ''),
+                        'thumb'        => $src['medium'] ?? $src['small'] ?? null,
+                        'full'         => $src['large2x'] ?? $src['large'] ?? $src['original'] ?? null,
+                        'photographer' => $p['photographer'] ?? null,
+                    ];
+                })
+                ->filter(fn (array $p) => $p['id'] !== '' && $p['thumb'] && $p['full'])
+                ->values()
+                ->all();
+        });
+    }
+
+    /**
+     * نقطة الدخول الموحّدة لميزة "اقتراح صورة": تدمج المصادر بترتيب الدقة —
+     *   1) مطابقة الباركود عبر Open Food Facts (إن وُجد باركود) — دقة مطلقة
+     *   2) Google المقيّد بالمواقع الجزائرية + متاجر جزائرية حقيقية عبر Store API
+     *   3) Open Food Facts بحث نصي — منتجات حقيقية عالمية
+     *   4) Pexels كاحتياطي فقط عند نقص النتائج
+     * مع إزالة التكرار حسب رابط الصورة الكامل.
+     */
+    public function searchProductImages(string $query, int $page = 1, ?string $barcode = null): array
+    {
+        $query = trim($query);
+        if ($query === '') return [];
+
+        $barcodeMatch = $barcode ? $this->searchOpenFoodFactsByBarcode($barcode) : null;
+
+        $merged = array_merge(
+            $this->searchGoogleImages($query),
+            $this->searchAlgerianStores($query),
+            $this->searchOpenFoodFactsByName($query),
+        );
+
+        if (count($merged) < 6) {
+            $merged = array_merge($merged, $this->searchPexelsImages($query, $page));
+        }
+
+        if ($barcodeMatch) {
+            array_unshift($merged, $barcodeMatch);
+        }
+
+        $seen   = [];
+        $unique = [];
+        foreach ($merged as $item) {
+            if (empty($item['full']) || isset($seen[$item['full']])) continue;
+            $seen[$item['full']] = true;
+            $unique[] = $item;
+        }
+
+        return $unique;
+    }
+
+    // =========================================================
     // Slug Helper
     // =========================================================
 
@@ -1292,7 +1944,7 @@ class ProductService extends \App\Core\Services\BaseService
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductSuggestionService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductSuggestionService.php
 ```php
 <?php
 
@@ -1380,7 +2032,7 @@ class ProductSuggestionService
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductTypeService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductTypeService.php
 ```php
 <?php
 
@@ -1397,7 +2049,7 @@ class ProductTypeService extends \App\Core\Services\BaseService
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Services\ProductVariantService.php
+### 📁 D:\xampp\htdocs\sales-management\app\Services\ProductVariantService.php
 ```php
 <?php
 
@@ -1475,7 +2127,7 @@ class ProductVariantService extends BaseService
 
 ## Requests
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\Productlotrequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\Productlotrequest.php
 ```php
 <?php
 
@@ -1571,7 +2223,7 @@ class UpdateProductLotRequest extends FormRequest
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreProductLotRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreProductLotRequest.php
 ```php
 <?php
 
@@ -1632,7 +2284,7 @@ class StoreProductLotRequest extends FormRequest
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreProductRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreProductRequest.php
 ```php
 <?php
 
@@ -1771,7 +2423,7 @@ class StoreProductRequest extends FormRequest
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\StoreProductVariantRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\StoreProductVariantRequest.php
 ```php
 <?php
 
@@ -1809,7 +2461,7 @@ class StoreProductVariantRequest extends FormRequest
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateProductLotRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateProductLotRequest.php
 ```php
 <?php
 
@@ -1858,7 +2510,7 @@ class UpdateProductLotRequest extends FormRequest
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateProductRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateProductRequest.php
 ```php
 <?php
 
@@ -1987,7 +2639,7 @@ class UpdateProductRequest extends FormRequest
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Http/Requests\UpdateProductVariantRequest.php
+### 📁 D:\xampp\htdocs\sales-management\app\Http/Requests\UpdateProductVariantRequest.php
 ```php
 <?php
 
@@ -2027,7 +2679,7 @@ class UpdateProductVariantRequest extends FormRequest
 
 ## Policies
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\ProductLotPolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\ProductLotPolicy.php
 ```php
 <?php
 
@@ -2077,7 +2729,7 @@ class ProductLotPolicy
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\ProductPolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\ProductPolicy.php
 ```php
 <?php
 
@@ -2127,7 +2779,7 @@ class ProductPolicy
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\ProductTypePolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\ProductTypePolicy.php
 ```php
 <?php
 
@@ -2177,7 +2829,7 @@ class ProductTypePolicy
 }
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\app\Policies\ProductVariantPolicy.php
+### 📁 D:\xampp\htdocs\sales-management\app\Policies\ProductVariantPolicy.php
 ```php
 <?php
 
@@ -2219,7 +2871,7 @@ class ProductVariantPolicy
 
 ## Migrations
 
-### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2025_10_15_093205_create_product_types_table.php
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2025_10_15_093205_create_product_types_table.php
 ```php
 <?php
 
@@ -2249,7 +2901,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2025_10_15_093308_create_products_table.php
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2025_10_15_093308_create_products_table.php
 ```php
 <?php
 
@@ -2317,7 +2969,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_04_28_184027_create_product_packagings_table.php
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_04_28_184027_create_product_packagings_table.php
 ```php
 <?php
 
@@ -2353,7 +3005,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_04_28_184054_create_product_prices_table.php
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_04_28_184054_create_product_prices_table.php
 ```php
 <?php
 
@@ -2391,7 +3043,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_04_28_184501_create_product_lots_table.php
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_04_28_184501_create_product_lots_table.php
 ```php
 <?php
 
@@ -2449,7 +3101,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_05_02_084253_create_product_variants_table.php
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_05_02_084253_create_product_variants_table.php
 ```php
 <?php
 
@@ -2493,7 +3145,7 @@ return new class extends Migration {
 
 ```
 
-### 📁 C:\xampp\htdocs\sales_managements\database\migrations/2026_06_20_230508_add_min_margin_percentage_to_products_table.php
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_06_20_230508_add_min_margin_percentage_to_products_table.php
 ```php
 <?php
 
@@ -2517,6 +3169,104 @@ return new class extends Migration
     {
         Schema::table('products', function (Blueprint $table) {
             $table->dropColumn('min_margin_percentage');
+        });
+    }
+};
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_06_26_000003_create_regulated_products_config_table.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('regulated_products_config', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
+
+            $table->string('product_key', 80);
+            $table->string('label');
+            $table->string('unit_label');
+            $table->string('category');
+            $table->decimal('regulated_max_price', 15, 4);
+            $table->decimal('regulated_margin', 15, 4)->nullable();
+            $table->enum('regulation_type', ['price', 'margin'])->default('price');
+            $table->string('legal_reference')->nullable();
+            $table->date('effective_date')->nullable();
+            $table->boolean('active')->default(true);
+            $table->text('notes')->nullable();
+            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamps();
+
+            $table->unique(['company_id', 'product_key']);
+            $table->index(['company_id', 'category', 'active']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('regulated_products_config');
+    }
+};
+
+```
+
+### 📁 D:\xampp\htdocs\sales-management\database\migrations/2026_06_26_000004_add_subsidized_fields_to_products.php
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // SQLite triggers that reference the products table must be dropped
+        // before any ALTER TABLE on products (SQLite limitation).
+        $allTriggers = DB::select("SELECT name, sql FROM sqlite_master WHERE type = 'trigger'");
+        $dropped = [];
+        foreach ($allTriggers as $t) {
+            if (stripos($t->sql, 'products') !== false) {
+                $dropped[$t->name] = $t->sql;
+                DB::statement("DROP TRIGGER IF EXISTS `{$t->name}`");
+            }
+        }
+
+        $hasCol = !empty(DB::select("PRAGMA table_info(products)"));
+        $colExists = collect(DB::select("PRAGMA table_info(products)"))
+            ->contains(fn($c) => $c->name === 'is_subsidized');
+
+        if (!$colExists) {
+            Schema::table('products', function (Blueprint $table) {
+                $table->boolean('is_subsidized')->default(false)->after('active');
+                $table->foreignId('regulated_product_config_id')
+                      ->nullable()
+                      ->constrained('regulated_products_config')
+                      ->nullOnDelete()
+                      ->after('is_subsidized');
+            });
+        }
+
+        foreach ($dropped as $sql) {
+            DB::statement($sql);
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::table('products', function (Blueprint $table) {
+            $table->dropForeign(['regulated_product_config_id']);
+            $table->dropColumn(['is_subsidized', 'regulated_product_config_id']);
         });
     }
 };

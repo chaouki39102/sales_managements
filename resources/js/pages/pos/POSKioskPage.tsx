@@ -24,7 +24,7 @@ import { formatDZD, ttcToHt }         from '@/pos/utils/calculations';
 import { isWebUsbSupported, getThermalAutoPrint, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import { usePrintSettings }           from '@/pos/hooks/usePrintSettings';
-import { defaultTemplate }            from '@/pages/settings/print-settings/types';
+
 import type { PaginatedResponse }      from '@/lib/api/core/types';
 import type { Product, ProductVariant, CartItem, CartTotals } from '@/types';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
@@ -135,7 +135,7 @@ export default function POSKioskPage() {
       include:   'tva,unit,family,prices.priceLevel',
       search:    searchQuery || undefined,
       family_id: selectedCategory ?? undefined,
-      active:    true,
+      filter:    { active: 1 },
     }),
     placeholderData: keepPreviousData,
     staleTime:       60_000,
@@ -231,7 +231,7 @@ export default function POSKioskPage() {
       if (isWebUsbSupported() && getThermalAutoPrint()) {
         setTimeout(async () => {
           const snap = posSaleSnapshotRef.current;
-          if (!snap) return;
+          if (!snap || !template) return;
           const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? {} as any);
           const r = await printThermalViaWebUSBFromTemplate(template, data, res.document_number);
           if (!r.ok) toast.error(r.message);
@@ -374,9 +374,9 @@ export default function POSKioskPage() {
         />
       )}
 
-      {modal === 'receipt' && receiptSnapshot && receiptSource && (
+      {modal === 'receipt' && receiptSnapshot && receiptSource && template && (
         <ProfessionalReceipt
-          template={template ?? defaultTemplate()}
+          template={template}
           company={companyData}
           source={receiptSource}
           docNumber={receiptSnapshot.docNum}

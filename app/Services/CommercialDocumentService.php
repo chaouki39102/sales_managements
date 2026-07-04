@@ -10,8 +10,10 @@ use App\Models\DocumentType;
 use App\Models\FiscalYear;
 use App\Models\Setting;
 use App\Models\NumberingSeries;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Models\TreasuryAccount;
 use App\Services\CompanyContextService;
 use App\Services\InventoryValuationService;
 use App\Services\Tax\FiscalStampCalculator;
@@ -166,10 +168,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $this->createStockMovements($item);
         }
 
-        // ✅ ربط الدفعات إذا أُرسلت مع المستند
+        // ✅ ربط الدفعات إذا أُرسلت مع المستند — UPSERT/DELETE pattern
         $payments = $request?->input('payments') ?? $data['payments'] ?? [];
         if (!empty($payments)) {
-            $this->attachPayments($item, $payments);
+            $this->syncPayments($item, $payments);
         }
     }
 
@@ -230,26 +232,18 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     protected function afterUpdate(Model $item, array $data, $request): void
     {
-        $lines       = $request?->input('lines')        ?? $data['lines']        ?? [];
-        $newPayments = $request?->input('new_payments')  ?? $data['new_payments'] ?? [];
-        $payments    = $request?->input('payments')      ?? $data['payments']     ?? [];
+        $lines    = $request?->input('lines')    ?? $data['lines']    ?? [];
+        $payments = $request?->input('payments') ?? $data['payments'] ?? [];
 
         // AU1: تحديث الأسطر
         if (!empty($lines)) {
-            // ✅ حذف حركات المخزون المرتبطة أولاً (قبل حذف الأسطر)
             $this->deleteStockMovementsForDocument($item);
-
-            // ✅ حذف الأسطر القديمة
             $item->lines()->delete();
-
-            // ✅ إنشاء الأسطر الجديدة
             $this->createDocumentLines($item, $lines);
         }
 
-        // إعادة حساب الإجماليات دائماً
         $this->recalculateTotals($item);
 
-        // ✅ إعادة إنشاء حركات المخزون إذا تغيرت الأسطر
         if (!empty($lines)) {
             $item->load('documentType', 'lines.product');
             if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
@@ -257,15 +251,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             }
         }
 
-        // AU3: دفعات جديدة (additive mode)
-        if (!empty($newPayments)) {
-            $this->attachNewPayments($item, $newPayments);
-        }
-
-        // دفعات كاملة (free mode — تُستبدَل الكاملة)
-        if (!empty($payments) && empty($newPayments)) {
-            $item->payments()->detach();
-            $this->attachPayments($item, $payments);
+        // AU3: مزامنة الدفعات — UPSERT/DELETE pattern (additive + free)
+        if (!empty($payments)) {
+            $this->syncPayments($item, $payments);
         }
     }
 
@@ -397,11 +385,135 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     }
 
     /**
-     * إضافة دفعات جديدة لمستند (وضع additive — لا تمس القديمة)
+     * مزامنة الدفعات — UPSERT/DELETE pattern (مثل أسطر الفاتورة)
+     *
+     * المبدأ:
+     *   - دفعة مع id     → UPDATE موجود
+     *   - دفعة بدون id   → INSERT جديد
+     *   - دفعة محذوفة من الطلب → DELETE pivot + حذف الدفعة إن لم تكن مرتبطة بمستند آخر
+     *
+     * بعد المزامنة: يُعاد حساب paid_amount و remaining_amount من الصفر.
      */
-    public function attachNewPaymentsPublic(CommercialDocument $document, array $payments): void
+    public function syncPayments(CommercialDocument $document, array $payments): void
     {
-        $this->attachNewPayments($document, $payments);
+        $companyId = $document->company_id;
+
+        // 1. الدفعات الحالية المرتبطة بالمستند
+        $existingPivotIds = DB::table('document_payment')
+            ->where('commercial_document_id', $document->id)
+            ->pluck('payment_id')
+            ->toArray();
+
+        // 2. IDs الدفعات الواردة
+        $incomingIds = array_values(array_filter(array_map(
+            fn($p) => isset($p['id']) ? (int) $p['id'] : null,
+            $payments,
+        )));
+
+        // 3. DELETE: في pivot لكن ليس في الوارد
+        $toDelete = array_diff($existingPivotIds, $incomingIds);
+        foreach ($toDelete as $paymentId) {
+            DB::table('document_payment')
+                ->where('commercial_document_id', $document->id)
+                ->where('payment_id', $paymentId)
+                ->delete();
+
+            $payment = Payment::find($paymentId);
+            if ($payment && $payment->status === 'confirmed' && $payment->treasury_account_id) {
+                $this->adjustTreasuryBalance(
+                    (int) $payment->treasury_account_id,
+                    (float) $payment->amount,
+                    $this->oppositeDirection($this->resolvePaymentDirection($document)),
+                );
+            }
+
+            $otherAttachments = DB::table('document_payment')
+                ->where('payment_id', $paymentId)
+                ->where('commercial_document_id', '!=', $document->id)
+                ->count();
+            if ($otherAttachments === 0 && $payment) {
+                $payment->delete();
+            }
+        }
+
+        // 4. UPSERT: إنشاء أو تحديث
+        foreach ($payments as $paymentData) {
+            $paymentId = isset($paymentData['id']) ? (int) $paymentData['id'] : null;
+            $amount    = (float) ($paymentData['amount'] ?? 0);
+            if ($amount <= 0) continue;
+
+            if ($paymentId) {
+                // ── UPDATE موجود ──────────────────────────────────────────
+                $payment = Payment::find($paymentId);
+                if (!$payment) continue;
+
+                $oldAmount = (float) $payment->amount;
+                $oldAccountId = (int) $payment->treasury_account_id;
+                $oldDirection = $this->resolvePaymentDirection($document);
+
+                $payment->update([
+                    'amount'              => $amount,
+                    'payment_mode_id'     => (int) ($paymentData['payment_mode_id'] ?? $payment->payment_mode_id),
+                    'treasury_account_id' => isset($paymentData['treasury_account_id'])
+                        ? (int) $paymentData['treasury_account_id']
+                        : $payment->treasury_account_id,
+                    'reference'           => $paymentData['reference'] ?? $payment->reference,
+                    'notes'               => $paymentData['notes'] ?? $payment->notes,
+                    'payment_date'        => $paymentData['payment_date'] ?? $payment->payment_date,
+                ]);
+
+                DB::table('document_payment')
+                    ->where('commercial_document_id', $document->id)
+                    ->where('payment_id', $paymentId)
+                    ->update(['amount_applied' => $amount]);
+
+                $newAccountId = (int) $payment->treasury_account_id;
+                $delta = $amount - $oldAmount;
+                if (abs($delta) > 0.001 && $payment->status === 'confirmed' && $newAccountId > 0) {
+                    if ($oldAccountId !== $newAccountId) {
+                        $this->adjustTreasuryBalance($oldAccountId, $oldAmount, $this->oppositeDirection($oldDirection));
+                        $this->adjustTreasuryBalance($newAccountId, $amount, $oldDirection);
+                    } else {
+                        $this->adjustTreasuryBalance($newAccountId, abs($delta), $delta > 0 ? $oldDirection : $this->oppositeDirection($oldDirection));
+                    }
+                }
+            } else {
+                // ── INSERT جديد ──────────────────────────────────────────
+                $direction = $this->resolvePaymentDirection($document);
+                $payment = Payment::create([
+                    'company_id'          => $companyId,
+                    'payment_mode_id'     => (int) $paymentData['payment_mode_id'],
+                    'treasury_account_id' => isset($paymentData['treasury_account_id'])
+                        ? (int) $paymentData['treasury_account_id'] : null,
+                    'amount'              => $amount,
+                    'payment_date'        => $paymentData['payment_date'] ?? $document->document_date,
+                    'reference'           => $paymentData['reference'] ?? null,
+                    'notes'               => $paymentData['notes'] ?? null,
+                    'user_id'             => auth()->id(),
+                    'fiscal_year_id'      => $document->fiscal_year_id,
+                    'party_id'            => $document->party_id,
+                    'currency_id'         => $document->currency_id,
+                    'payment_number'      => $this->generatePaymentNumber($companyId),
+                    'status'              => 'confirmed',
+                ]);
+
+                $document->payments()->attach($payment->id, [
+                    'company_id'     => $companyId,
+                    'amount_applied' => $amount,
+                    'notes'          => $paymentData['notes'] ?? null,
+                ]);
+
+                if ($payment->treasury_account_id && $payment->status === 'confirmed') {
+                    $this->adjustTreasuryBalance($payment->treasury_account_id, $amount, $direction);
+                }
+            }
+        }
+
+        // 5. إعادة حساب paid_amount و remaining_amount من الصفر
+        $this->recalculatePaymentAmounts($document);
+
+        // 6. مزامنة حالة المستند (paid / partially_paid / validated)
+        $this->syncDocumentStatus($document);
     }
 
     /**
@@ -430,13 +542,38 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function createDocumentLines(CommercialDocument $document, array $lines): void
     {
+        foreach ($lines as $order => $line) {
+            $pid = $line['product_id'] ?? null;
+            if ($pid === null || $pid === '' || (int) $pid <= 0) {
+                throw new BusinessRuleException(
+                    'المنتج ذو المعرف غير صالح في السطر ' . ($order + 1) . '.',
+                    422
+                );
+            }
+        }
+
         $productIds = array_values(array_filter(array_column($lines, 'product_id')));
         if (!empty($productIds)) {
+            $intIds = array_map('intval', $productIds);
             $this->validateTenantRelationsMany(
-                array_map('intval', $productIds),
+                $intIds,
                 'products',
                 $document->company_id
             );
+
+            $inactiveIds = DB::table('products')
+                ->whereIn('id', $intIds)
+                ->where('company_id', $document->company_id)
+                ->where('active', false)
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($inactiveIds)) {
+                throw new BusinessRuleException(
+                    'المنتجات ذات المعرفات [' . implode(', ', $inactiveIds) . '] غير نشطة ولا يمكن بيعها.',
+                    422
+                );
+            }
         }
 
         // Load party for TVA exemption enforcement
@@ -499,59 +636,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PRIVATE: ربط الدفعات بالمستند
+    // PRIVATE: حذف حركات المخزون
     // ═══════════════════════════════════════════════════════════════════════
-
-    private function attachPayments(CommercialDocument $document, array $payments): void
-    {
-        foreach ($payments as $paymentData) {
-            if (empty($paymentData['payment_mode_id']) || empty($paymentData['amount'])) {
-                continue;
-            }
-
-            $amount = (float) $paymentData['amount'];
-            if ($amount <= 0) continue;
-
-            // ✅ FIX1-3: إضافة الحقول المفقودة من المستند
-            $payment = \App\Models\Payment::create([
-                'company_id'         => $document->company_id,
-                'payment_mode_id'    => (int) $paymentData['payment_mode_id'],
-                'treasury_account_id'=> isset($paymentData['treasury_account_id'])
-                                            ? (int) $paymentData['treasury_account_id']
-                                            : null,
-                'amount'             => $amount,
-                'payment_date'       => $paymentData['payment_date'] ?? $document->document_date,
-                'reference'          => $paymentData['reference'] ?? null,
-                'notes'              => $paymentData['notes'] ?? null,
-                'user_id'            => auth()->id(),
-                // ✅ FIX1: fiscal_year_id من المستند
-                'fiscal_year_id'     => $document->fiscal_year_id,
-                // ✅ FIX2: party_id من المستند
-                'party_id'           => $document->party_id,
-                // ✅ FIX3: currency_id من المستند
-                'currency_id'        => $document->currency_id,
-                // ✅ FIX4: payment_number تلقائي
-                'payment_number'     => $this->generatePaymentNumber($document->company_id),
-                // ✅ FIX5: status = confirmed
-                'status'             => 'confirmed',
-            ]);
-
-            $document->payments()->attach($payment->id, [
-                'company_id'     => $document->company_id,
-                'amount_applied' => $amount,
-                'notes'          => $paymentData['notes'] ?? null,
-            ]);
-        }
-
-        // ✅ إعادة حساب paid_amount و remaining_amount بعد ربط الدفعات
-        $this->recalculatePaymentAmounts($document);
-    }
-
-    private function attachNewPayments(CommercialDocument $document, array $payments): void
-    {
-        // نفس منطق attachPayments تماماً — لكن لا تحذف القديمة
-        $this->attachPayments($document, $payments);
-    }
 
     private function deleteStockMovementsForDocument(CommercialDocument $document): void
     {
@@ -594,8 +680,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function recalculatePaymentAmounts(CommercialDocument $document): void
     {
-        $document->load('payments');
-        $paidAmount = (float) $document->payments->sum('pivot.amount_applied');
+        $paidAmount = (float) DB::table('document_payment')
+            ->where('commercial_document_id', $document->id)
+            ->sum('amount_applied');
 
         $document->updateQuietly([
             'paid_amount'      => round($paidAmount, 4),
@@ -634,6 +721,70 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             'net_to_pay'       => round($netToPay,       4),
             'remaining_amount' => round($netToPay,       4), // يُحدَّث لاحقاً بعد الدفعات
         ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRIVATE: مزامنة حالة المستند حسب remaining_amount
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private function syncDocumentStatus(CommercialDocument $document): void
+    {
+        $netToPay   = (float) $document->net_to_pay;
+        $remaining  = (float) $document->remaining_amount;
+        $paidAmount = (float) $document->paid_amount;
+
+        if ($netToPay <= 0) return;
+
+        $currentStatus = $document->documentStatus?->name
+            ?? DocumentStatus::where('id', $document->document_status_id)->value('name');
+
+        if (in_array($currentStatus, ['cancelled', 'returned', 'draft'], true)) return;
+
+        if ($remaining <= 0.001) {
+            $paidId = $this->getStatusId($document->company_id, 'paid');
+            if ($paidId && $document->document_status_id !== $paidId) {
+                $document->updateQuietly(['document_status_id' => $paidId]);
+            }
+            return;
+        }
+
+        if ($paidAmount > 0.001 && $remaining > 0.001) {
+            $partialId = $this->getStatusId($document->company_id, 'partially_paid');
+            if ($partialId && $document->document_status_id !== $partialId) {
+                $document->updateQuietly(['document_status_id' => $partialId]);
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRIVATE: تحديد اتجاه الدفعة للخزينة
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private function resolvePaymentDirection(CommercialDocument $document): string
+    {
+        $baseOp = $document->documentType?->documentBaseOperation?->name;
+        if ($baseOp === 'purchase') return 'out';
+        return 'in';
+    }
+
+    private function oppositeDirection(string $direction): string
+    {
+        return $direction === 'in' ? 'out' : 'in';
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRIVATE: تعديل رصيد الخزينة (denormalized cache)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private function adjustTreasuryBalance(int $accountId, float $amount, string $direction): void
+    {
+        if ($accountId <= 0 || $amount <= 0) return;
+
+        $delta = $direction === 'in' ? $amount : -$amount;
+
+        TreasuryAccount::withoutGlobalScopes()
+            ->where('id', $accountId)
+            ->increment('current_balance', $delta);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -11,9 +11,7 @@ import {
   dbFetchDocConfigs, dbSaveDocConfigs,
   deviceGetPrinters, deviceSavePrinters,
 } from '../store/printStore';
-import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
-import { resolveTemplate } from '@/pages/settings/print-settings/runtime';
-import { createDefaultTemplate } from '@/pages/settings/print-settings/types';
+import { usePrintTemplatesList, resolveTemplate } from '@/pages/settings/print-settings/runtime';
 import type { DocTypeCode } from '@/pages/settings/print-settings/types';
 import type {
   DocumentPrintConfig,
@@ -108,8 +106,7 @@ export function usePrintSettings(docTypeCode: string) {
   const size   = (config?.paperSize ?? 'none') as PaperSize;
 
   const { data: templates = [] } = usePrintTemplatesList(docTypeCode as DocTypeCode);
-  const resolved = resolveTemplate(templates, docTypeCode, size !== 'none' ? size : '80mm');
-  const template = resolved ?? createDefaultTemplate(docTypeCode as DocTypeCode, '80mm');
+  const template = resolveTemplate(templates, docTypeCode, size !== 'none' ? size : '80mm') ?? null;
 
   return {
     config,

@@ -37,7 +37,8 @@ class PrintTemplateController extends BaseApiController
     public function show($id): JsonResponse
     {
         try {
-            $template = PrintTemplate::findOrFail($id);
+            $resolvedId = $this->extractId($id);
+            $template = PrintTemplate::whereKey($resolvedId)->firstOrFail();
             return $this->successResponse($template, 'تم جلب القالب');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'show');
@@ -76,7 +77,8 @@ class PrintTemplateController extends BaseApiController
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            $template = PrintTemplate::find($id);
+            $resolvedId = $this->extractId($id);
+            $template = PrintTemplate::whereKey($resolvedId)->first();
 
             if (!$template) {
                 return $this->errorResponse('القالب غير موجود', 404);
@@ -117,7 +119,8 @@ class PrintTemplateController extends BaseApiController
     public function destroy($id): JsonResponse
     {
         try {
-            $template = PrintTemplate::findOrFail($id);
+            $resolvedId = $this->extractId($id);
+            $template = PrintTemplate::whereKey($resolvedId)->firstOrFail();
             $template->delete();
             return $this->successResponse(null, 'تم حذف القالب');
         } catch (\Throwable $e) {
@@ -128,7 +131,7 @@ class PrintTemplateController extends BaseApiController
     public function setDefault($company, int $id): JsonResponse
     {
         try {
-            $template = PrintTemplate::findOrFail($id);
+            $template = PrintTemplate::whereKey($id)->firstOrFail();
             $template->is_default = true;
             $template->save();
             return $this->successResponse($template->fresh(), 'تم تعيين القالب الافتراضي');
@@ -140,7 +143,7 @@ class PrintTemplateController extends BaseApiController
     public function duplicate(Request $request, $company, int $id): JsonResponse
     {
         try {
-            $original = PrintTemplate::findOrFail($id);
+            $original = PrintTemplate::whereKey($id)->firstOrFail();
             $name = $request->input('name', 'نسخة من ' . $original->name);
 
             $duplicate = $original->replicate();

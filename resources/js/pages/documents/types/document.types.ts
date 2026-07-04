@@ -149,6 +149,7 @@ export interface PaymentMode {
 }
 
 export interface PaymentEntry {
+  id?:                  number;
   payment_mode_id:      string;
   amount:               string;
   reference?:           string;

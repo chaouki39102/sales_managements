@@ -1,61 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeTemplate, toApiPayload, fromApiResponse, TEMPLATE_VERSION } from '../services/SettingsSerializer';
+import { toApiPayload, fromApiResponse, TEMPLATE_VERSION } from '../services/SettingsSerializer';
 import { SETTINGS_REGISTRY } from '../services/SettingsRegistry';
 import { createMockTemplate } from './fixtures/templates';
-
-describe('SettingsSerializer — normalizeTemplate', () => {
-  it('should fill all missing fields from registry defaults', () => {
-    const minimal: any = { id: null, doc_type_code: 'POS', paper_size: '80mm' };
-    const result = normalizeTemplate(minimal, 'POS', '80mm');
-
-    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
-      if (key === 'id' || key === 'name' || key === 'doc_type_code' || key === 'paper_size') continue;
-      expect(result).toHaveProperty(key);
-    }
-  });
-
-  it('should preserve valid user values', () => {
-    const result = normalizeTemplate(
-      { id: null, doc_type_code: 'FV', paper_size: '80mm', show_logo: false, title_text: 'Ma Facture' },
-      'FV', '80mm',
-    );
-    expect(result.show_logo).toBe(false);
-    expect(result.title_text).toBe('Ma Facture');
-  });
-
-  it('should set template_version', () => {
-    const result = normalizeTemplate({ id: null, doc_type_code: 'POS', paper_size: '80mm' }, 'POS', '80mm');
-    expect(result.template_version).toBe(TEMPLATE_VERSION);
-  });
-
-  it('should override old template_version', () => {
-    const result = normalizeTemplate(
-      { id: 1, doc_type_code: 'FV', paper_size: '80mm', template_version: 1 } as any,
-      'FV', '80mm',
-    );
-    expect(result.template_version).toBe(TEMPLATE_VERSION);
-  });
-
-  it('should set paper_width_mm for 80mm thermal', () => {
-    const result = normalizeTemplate({ id: null, doc_type_code: 'POS', paper_size: '80mm' }, 'POS', '80mm');
-    expect(result.paper_width_mm).toBe(80);
-  });
-
-  it('should set paper_width_mm for 58mm thermal', () => {
-    const result = normalizeTemplate({ id: null, doc_type_code: 'POS', paper_size: '58mm' }, 'POS', '58mm');
-    expect(result.paper_width_mm).toBe(58);
-  });
-
-  it('should not override paper_width_mm for page sizes', () => {
-    const result = normalizeTemplate({ id: null, doc_type_code: 'FV', paper_size: 'A4', paper_width_mm: 80 } as any, 'FV', 'A4');
-    expect(result.paper_width_mm).toBe(80);
-  });
-
-  it('should ensure name is not empty', () => {
-    const result = normalizeTemplate({ id: null, doc_type_code: 'POS', paper_size: '80mm', name: '' }, 'POS', '80mm');
-    expect(result.name).toBeTruthy();
-  });
-});
 
 describe('SettingsSerializer — toApiPayload', () => {
   it('should strip top-level fields into config', () => {

@@ -49,6 +49,7 @@ interface Props {
   currencies?:      Currency[];
   treasuryAccounts?: TreasuryAccount[];
   totalTtcFinal:    number;
+  prevBalance?:     number;
   onClose:          () => void;
   onConfirm:        (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
@@ -151,7 +152,7 @@ function PaymentStatus({
 
 export default function ProfessionalPaymentModal({
   totals, client, paymentModes, documentTypes,
-  currencies, treasuryAccounts, totalTtcFinal, onClose, onConfirm,
+  currencies, treasuryAccounts, totalTtcFinal, prevBalance, onClose, onConfirm,
 }: Props) {
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -402,6 +403,35 @@ export default function ProfessionalPaymentModal({
                 <strong>{formatDZD(totalTtcFinal)}</strong>
               </div>
             </div>
+
+            {/* ملخص الرصيد */}
+            {prevBalance !== undefined && client && (
+              <div className="pay-v2-balance">
+                <div className="pvs-row">
+                  <span>الرصيد السابق</span>
+                  <span>{formatDZD(prevBalance)}</span>
+                </div>
+                <div className="pvs-row">
+                  <span>الإجمالي</span>
+                  <span>{formatDZD(totalTtcFinal)}</span>
+                </div>
+                <div className="pvs-row" style={{ borderTop: '1px dashed #ccc', paddingTop: 6, marginTop: 2 }}>
+                  <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + إجمالي)</span></span>
+                  <strong>{formatDZD(prevBalance + totalTtcFinal)}</strong>
+                </div>
+                <div className="pvs-row" style={{ borderTop: '1px solid #ddd', paddingTop: 6, marginTop: 2 }}>
+                  <span>المدفوع</span>
+                  <span>{formatDZD(totalPaid)}</span>
+                </div>
+                <div className="pvs-row pvs-total" style={{ marginTop: 4 }}>
+                  <span>
+                    الرصيد الجديد
+                    <span style={{ fontSize: 11, opacity: 0.6 }}> (سابق + إجمالي - مدفوع)</span>
+                  </span>
+                  <strong>{formatDZD(prevBalance + totalTtcFinal - totalPaid)}</strong>
+                </div>
+              </div>
+            )}
 
             {/* نوع الوثيقة */}
             <div className="pay-v2-section">

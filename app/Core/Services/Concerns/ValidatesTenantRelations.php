@@ -84,16 +84,30 @@ trait ValidatesTenantRelations
             return;
         }
 
-        $ids = array_unique(array_filter($ids));
+        $ids = array_values(array_unique(array_filter($ids)));
 
-        $validCount = DB::table($table)
+        $validIds = DB::table($table)
             ->whereIn('id', $ids)
             ->where('company_id', $companyId)
-            ->count();
+            ->pluck('id')
+            ->toArray();
 
-        if ($validCount !== count($ids)) {
+        $invalidIds = array_diff($ids, $validIds);
+
+        if (!empty($invalidIds)) {
+            $messages = [];
+            foreach ($invalidIds as $id) {
+                $exists = DB::table($table)->where('id', $id)->first();
+                if (!$exists) {
+                    $messages[] = "{$table}:{$id} غير موجود (ربما تم حذفه)";
+                } elseif (isset($exists->active) && !$exists->active) {
+                    $messages[] = "{$table}:{$id} غير نشط";
+                } else {
+                    $messages[] = "{$table}:{$id} تابع لشركة أخرى";
+                }
+            }
             throw new BusinessRuleException(
-                "بعض القيم المحددة في [{$table}] غير موجودة أو تابعة لشركة أخرى.",
+                implode(' ، ', $messages) . '.',
                 422
             );
         }

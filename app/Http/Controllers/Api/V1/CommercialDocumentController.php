@@ -274,7 +274,7 @@ class CommercialDocumentController extends BaseApiController
                 'payments.*.treasury_account_id'   => 'nullable|integer',
             ]);
 
-            $this->commercialDocumentService->attachNewPaymentsPublic(
+            $this->commercialDocumentService->syncPayments(
                 $commercialDocument,
                 $validated['payments']
             );

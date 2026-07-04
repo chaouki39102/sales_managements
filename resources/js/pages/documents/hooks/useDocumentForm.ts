@@ -144,8 +144,7 @@ export interface UseDocumentFormReturn {
   duplicateLine:          (idx: number) => void;
   updateLine:             (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
   paymentMode:            PaymentMode;
-  existingPayments:       PaymentEntry[];
-  newPayments:            PaymentEntry[];
+  payments:               PaymentEntry[];
   addPayment:             () => void;
   addPaymentWithValues:   (values: Partial<PaymentEntry>) => void;
   removePayment:          (idx: number) => void;
@@ -351,6 +350,7 @@ export function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
   );
 
   return {
+    id:                    p.id != null ? Number(p.id) : undefined,
     payment_mode_id:     paymentModeId,
     amount:              String(p.amount ?? '0'),
     reference:           String(p.reference ?? ''),
@@ -503,8 +503,7 @@ export function useDocumentForm({
   const [lineErr, setLineErr] = useState('');
   const [apiErr,  setApiErr]  = useState('');
 
-  const [existingPayments, setExistingPayments] = useState<PaymentEntry[]>([]);
-  const [newPayments,      setNewPayments]      = useState<PaymentEntry[]>([]);
+  const [payments, setPayments] = useState<PaymentEntry[]>([]);
   const [lineWarnings, setLineWarnings] = useState<Map<number, ComputeLineWarning[]>>(new Map());
   const [priceLevelSwitchMsg, setPriceLevelSwitchMsg] = useState<PriceLevelSwitchMsg | null>(null);
 
@@ -589,17 +588,7 @@ export function useDocumentForm({
 
     const rawPayments = ((existingDocument?.payments as Record<string, unknown>[]) ?? [])
       .map(buildPaymentFromApi);
-
-    if (pmMode === 'additive') {
-      setExistingPayments(rawPayments);
-      setNewPayments([]);
-    } else if (pmMode === 'free') {
-      setExistingPayments([]);
-      setNewPayments(rawPayments);
-    } else {
-      setExistingPayments(rawPayments);
-      setNewPayments([]);
-    }
+    setPayments(rawPayments);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, existingDocument?.id]);
 
@@ -659,18 +648,18 @@ export function useDocumentForm({
     const newPriceLevel = party?.default_price_level_id ?? party?.default_price_level?.id ?? party?.price_level?.id ?? (defaultPriceLevelId ? parseInt(defaultPriceLevelId) : null);
     const curPriceLvl   = curForm.price_level_id ? parseInt(curForm.price_level_id) : null;
 
-    if (existingPayments.length > 0) {
-      return {
-        blocked: true, blockType: 'existing_payments',
-        reason: 'لا يمكن تغيير الزبون: هناك دفعات مُسجَّلة. احذف الدفعات أولاً.',
-      };
-    }
-
-    const validNew = newPayments.filter((p) => p.payment_mode_id && parseFloat(p.amount) > 0);
-    if (validNew.length > 0) {
+    const hasPayments = payments.some((p) => p.payment_mode_id && parseFloat(p.amount) > 0);
+    if (existingDocument && hasPayments) {
+      const existingCount = payments.filter((p) => p.id).length;
+      if (existingCount > 0) {
+        return {
+          blocked: true, blockType: 'existing_payments',
+          reason: 'لا يمكن تغيير الزبون: هناك دفعات مُسجَّلة. احذف الدفعات أولاً.',
+        };
+      }
       return {
         blocked: true, blockType: 'has_payments',
-        reason: `لا يمكن تغيير الزبون: هناك ${validNew.length} دفعة في النموذج. احذفها أولاً.`,
+        reason: `لا يمكن تغيير الزبون: هناك دفعات في النموذج. احذفها أولاً.`,
       };
     }
 

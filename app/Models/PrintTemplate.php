@@ -27,18 +27,12 @@ class PrintTemplate extends Model
         'is_default'       => 'boolean',
         'is_active'        => 'boolean',
         'template_version' => 'integer',
-        'config'           => 'array',
+        'config'           => 'json',
     ];
 
     protected $attributes = [
         'config' => '{}',
     ];
-
-    public function getConfigAttribute(?string $value): array
-    {
-        $decoded = json_decode($value ?? '{}', true);
-        return is_array($decoded) ? $decoded : [];
-    }
 
     public function company(): BelongsTo
     {

@@ -46,6 +46,19 @@ export interface VariantListParams extends ListParams {
   active?:        boolean;
 }
 
+export interface ImageSearchResult {
+  id:            string;
+  thumb:         string | null;
+  full:          string | null;
+  photographer?: string | null;
+  width?:        number | null;
+  height?:       number | null;
+  source?:       string | null;
+  /** مطابقة دقيقة (باركود) — تُعرض بشارة ذهبية مميزة في الواجهة */
+  exact?:        boolean;
+  label?:        string | null;
+}
+
 // ─── Include string للـ POS ───────────────────────────────────────────────────
 // يجلب كل ما يحتاجه ProductCard + useCartStore.addItem
 // ✅ أُضيف prices.priceLevel: بدونها لا يمكن لصفحة POS تطبيق مستويات
@@ -88,6 +101,19 @@ export const productsApi = {
 
   uploadImage: (id: number, fd: FormData, onProgress?: (p: number) => void) =>
     apiUpload<Product>(`/products/${id}/image`, fd, onProgress),
+
+  /**
+   * بحث اقتراح صور المنتج — يدمج Google CSE (مقيّد بمواقع جزائرية) + متاجر
+   * جزائرية عبر WooCommerce Store API + Open Food Facts (باركود + نص) +
+   * Pexels كاحتياطي. كل الاستعلامات تتم من الخادم لتفادي مشاكل CORS
+   * والحاجة لمفاتيح API في المتصفح.
+   */
+  searchImages: (query: string, page = 1, barcode?: string) =>
+    apiGet<ImageSearchResult[]>('/products/image-search', {
+      query,
+      page,
+      ...(barcode ? { barcode } : {}),
+    }),
 } as const;
 
 // ─── Variants API ─────────────────────────────────────────────────────────────

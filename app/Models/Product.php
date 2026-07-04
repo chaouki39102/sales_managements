@@ -105,7 +105,7 @@ class Product extends Model
         'has_lots',
         'has_expiration_date',
         'manages_quantity_discounts',
-        'active'
+        'active' => ['type' => 'boolean']
     ];
     public static array $sortable = ['id', 'name', 'ref', 'purchase_price_ht', 'created_at', 'updated_at'];
     public static array $defaultWith = [];

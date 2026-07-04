@@ -22,7 +22,7 @@ import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
-import { normalizeAfterLoad, validateTemplateIntegrity, TEMPLATE_VERSION } from './services/SettingsSerializer';
+import { validateTemplateIntegrity, TEMPLATE_VERSION } from './services/SettingsSerializer';
 
 const PAPER_DIM: Record<string, { w: number; h: number }> = {
   '80mm': { w: 80,  h: 0   },
@@ -146,24 +146,23 @@ export default function PrintSettingsPage() {
 
   useEffect(() => {
     if (templates.length > 0) {
-      const tpl = resolveTemplate(templates, activeDoc);
+      const stillSelected = selectedTplId && templates.find(t => t.id === selectedTplId);
+      const tpl = stillSelected ?? resolveTemplate(templates, activeDoc);
       if (tpl) {
         setSelectedTplId(tpl.id);
-        // DB is the only source of truth — no normalizeTemplate on loaded data.
-        // normalizeAfterLoad only fills truly undefined keys (schema migration).
-        setLocalTpl(normalizeAfterLoad(tpl));
+        setLocalTpl(tpl);
         setIsDirty(false);
       } else {
         const anyMatch = templates.some(t => t.doc_type_code === activeDoc);
         if (anyMatch) {
           setSelectedTplId(null);
-          setLocalTpl(normalizeAfterLoad({ id: null, doc_type_code: activeDoc, name: 'قالب جديد' }, activeDoc));
+          setLocalTpl(null);
           setIsDirty(true);
         }
       }
     } else {
       setSelectedTplId(null);
-      setLocalTpl(normalizeAfterLoad({ id: null, doc_type_code: activeDoc, name: 'قالب جديد' }, activeDoc));
+      setLocalTpl(null);
       setIsDirty(true);
     }
     historyRef.current = [];
@@ -251,9 +250,11 @@ export default function PrintSettingsPage() {
       notifier.success('✅ تم حفظ القالب');
 
       // Step 2: Compare pre-save vs DB response — report discrepancies
+      const SERVER_MUTABLE = new Set(['updated_at', 'created_at']);
       const diffs: string[] = [];
       const allKeys = new Set([...Object.keys(preSaveTpl), ...Object.keys(savedTpl)]);
       for (const k of allKeys) {
+        if (SERVER_MUTABLE.has(k)) continue;
         const a = JSON.stringify((preSaveTpl as any)[k]);
         const b = JSON.stringify((savedTpl as any)[k]);
         if (a !== b) diffs.push(k);
@@ -358,8 +359,8 @@ export default function PrintSettingsPage() {
           return;
         }
         imported.id = localTpl?.id ?? null;
-        const merged = normalizeAfterLoad(imported, imported.doc_type_code ?? activeDoc, imported.paper_size);
-        setLocalTpl(merged);
+        if (!imported.doc_type_code) imported.doc_type_code = activeDoc;
+        setLocalTpl(imported);
         setIsDirty(true);
         notifier.success('تم الاستيراد — احفظ للتطبيق');
       } catch { notifier.error('فشل قراءة الملف'); }
@@ -587,7 +588,7 @@ export default function PrintSettingsPage() {
               >
                 <button
                   onClick={() => {
-                    setSelectedTplId(tpl.id); setLocalTpl(normalizeAfterLoad(tpl)); setIsDirty(false);
+                    setSelectedTplId(tpl.id); setLocalTpl(tpl); setIsDirty(false);
                   }}
                   type="button"
                   style={{

@@ -1,13 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/pos/POSPage.tsx
-//
-// ✅ التغييرات عن النسخة السابقة:
-//   1. pos.updateDiscountAmount مُمرَّر لـ ProfessionalCart
-//   2. treasuryAccounts مُمرَّرة لـ ProfessionalPaymentModal
-//   3. ProfessionalCart يُظهر CustomerSearchModal داخلياً
-//      (لا حاجة لإدارة modal هنا)
-//   4. getQuantityDiscount مُستوردة ومُطبَّقة في pos.addItem
-//      (منطقها الآن داخل useCartStore — لا تغيير هنا)
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -124,6 +116,20 @@ export default function POSPage() {
 
   const { settings, setSettings, resetSettings } = usePOSSettings(slug);
 
+  // ═════════════════════════════════════════════════════════════════════
+  // Clear cart on company switch — prevents stale product_id values from
+  // a different company being submitted to the new company's API scope.
+  // (Backend validateTenantRelationsMany in CommercialDocumentService
+  //  rejects cross-company product IDs with 422.)
+  // ═════════════════════════════════════════════════════════════════════
+  const prevSlugRef = useRef(slug);
+  useEffect(() => {
+    if (prevSlugRef.current && prevSlugRef.current !== slug) {
+      pos.clearCart();
+    }
+    prevSlugRef.current = slug;
+  }, [slug, pos]);
+
   const [view,       setView]       = useState<ViewMode>('grid');
   const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
   const [mobTab,     setMobTab]     = useState<'products' | 'cart'>('products');
@@ -142,6 +148,8 @@ export default function POSPage() {
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
 
   const [receiptSnapshot, setReceiptSnapshot] = useState<POSSaleSnapshot | null>(null);
+  const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
+  const [prevBalance, setPrevBalance] = useState(0);
 
   const receiptSource = useMemo((): PipelineSource | null => {
     if (!receiptSnapshot) return null;
@@ -215,7 +223,7 @@ export default function POSPage() {
       search:    isSearching ? pos.searchQuery : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       page,
-      active:    true,
+      filter:    { active: 1 },
     }),
     enabled:         !!slug,
     staleTime:       isSearching ? 2 * 60_000 : 5 * 60_000,
@@ -256,6 +264,7 @@ export default function POSPage() {
   const { data: priceLevels      } = usePriceLevels();
   const { data: currencies       } = useCurrencies();
   const { data: treasuryAccounts } = useTreasuryAccounts();   // ✅ مُضاف
+  const { data: paymentModes     } = usePaymentModes();
 
   const customers        = (customersData as PaginatedResponse<Party>)?.data ?? (customersData as Party[]) ?? [];
   const priceLevelsList  = priceLevels ?? [];
@@ -722,7 +731,9 @@ export default function POSPage() {
       };
 
       const totalTtcFinal = snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp;
-      const invoiceRemaining = Math.max(0, totalTtcFinal - params.amountPaid);
+      const totalPaid     = params.amountPaid;
+      const invoiceRemaining = Math.max(0, totalTtcFinal - totalPaid);
+      const invoiceChange    = Math.max(0, totalPaid - totalTtcFinal);
       let prevBalance = 0;
       let newBalance = 0;
       if (currentClient?.id) {
@@ -735,28 +746,44 @@ export default function POSPage() {
         } catch {}
       }
 
-      setReceiptSnapshot({
-        items:  snapshot.items,
-        totals: snapshot.totals,
+      const fullSnapshot: POSSaleSnapshot = {
+        items: snapshot.items.map(i => ({
+          name: i.product_name,
+          ref:  i.ref,
+          qty:  i.quantity,
+          unit_price_ht:      i.unit_price_ht,
+          unit:               i.unit_symbol,
+          tva_rate:           i.tva_rate / 100,
+          discount_percentage: i.discount_percentage,
+          total_ht:           i.total_ht,
+        })),
+        totals: {
+          ...snapshot.totals,
+          paid:      totalPaid,
+          change:    invoiceChange,
+          remaining: invoiceRemaining,
+        },
         docNum: res.document_number,
         client: currentClient,
-        paid:   params.amountPaid,
         payments: params.payments?.filter(p => p.amount > 0).map(p => ({
           paymentModeId: p.paymentModeId, amount: p.amount,
         })) ?? [],
         dueDate: params.dueDate,
         prevBalance,
         newBalance,
-      });
+      };
+      receiptSnapshotRef.current = fullSnapshot;
+      setReceiptSnapshot(fullSnapshot);
       setLastDocNum(res.document_number);
       setCartNote('');
       pos.setInvoiceDiscountPct(0);
       pos.clearCart();
       setSelectedCartItemId(null);
 
-      if (autoPrint && isPrintEnabled) {
+      if (autoPrint && isPrintEnabled && template) {
         setTimeout(() => {
-          handlePrintDirect(snapshot.items, snapshot.totals, res.document_number);
+          const snap = receiptSnapshotRef.current;
+          if (snap) handlePrintDirect(snap);
         }, 300);
         if (!showPreview) {
           setModal('none');
@@ -777,7 +804,7 @@ export default function POSPage() {
       toast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode, autoPrint, isPrintEnabled, handlePrintDirect, showPreview, invoiceDiscountAmount, buildIncrementInput]);
+  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode, autoPrint, isPrintEnabled, template, handlePrintDirect, showPreview, invoiceDiscountAmount, buildIncrementInput]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -962,7 +989,16 @@ export default function POSPage() {
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onSetClient={pos.setClient} onPriceLevelChange={applyPriceLevel}
           onNoteChange={setCartNote} onHold={pos.holdCart}
-          onSell={() => setModal('payment')} onClear={clearCartSafe} onHeld={() => setModal('held')}
+          onSell={async () => {
+            if (pos.client?.id) {
+              try {
+                const res = await partyBalancesApi.getOne(pos.client.id);
+                const data = (res as any)?.data ?? res;
+                setPrevBalance(Math.max(0, Number(data?.current_balance ?? 0)));
+              } catch { setPrevBalance(0); }
+            } else { setPrevBalance(0); }
+            setModal('payment');
+          }} onClear={clearCartSafe} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           invoiceDiscountPct={pos.invoiceDiscountPct}
           onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
@@ -981,6 +1017,7 @@ export default function POSPage() {
           currencies={currencies ?? []}
           treasuryAccounts={treasuryAccounts ?? []}           // ✅ جديد
           totalTtcFinal={adjustedTotalTtcFinal}
+          prevBalance={prevBalance}
           onClose={() => setModal('none')}
           onConfirm={handleCompleteSale}
         />
@@ -994,7 +1031,7 @@ export default function POSPage() {
         />
       )}
 
-      {modal === 'receipt' && receiptSnapshot && receiptSource && (
+      {modal === 'receipt' && receiptSnapshot && receiptSource && template && (
         <ProfessionalReceipt
           template={template}
           company={companyData}
@@ -1002,7 +1039,7 @@ export default function POSPage() {
           docNumber={receiptSnapshot.docNum}
           onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
           onPrint={() => {
-            handlePrintDirect(receiptSnapshot.items, receiptSnapshot.totals, receiptSnapshot.docNum);
+            handlePrintDirect(receiptSnapshot);
           }}
           onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
         />
