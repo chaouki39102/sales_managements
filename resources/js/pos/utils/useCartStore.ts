@@ -4,11 +4,21 @@ import { nanoid }  from 'nanoid';
 import type { CartItem, CartTotals, Party, ProductVariant, QuantityDiscount } from '@/types';
 import { calcTotals } from '../utils/calculations';
 
+export interface DocumentPayment {
+  id:                  number;
+  payment_mode_id:     number;
+  amount:              number;
+  payment_date:        string;
+  treasury_account_id?: number | null;
+  reference?:          string | null;
+}
+
 interface CartState {
   items:              CartItem[];
   client:             Party | null;
   notes:              string;
   invoiceDiscountPct: number;
+  payments:           DocumentPayment[];
   _isDirty:           boolean;
 
   addItem:              (variant: ProductVariant, qty?: number) => void;
@@ -19,6 +29,7 @@ interface CartState {
   updatePrice:          (id: string, price: number) => void;
   setClient:            (client: Party | null) => void;
   setNotes:             (notes: string) => void;
+  setPayments:          (payments: DocumentPayment[]) => void;
   clearCart:            () => void;
   setInvoiceDiscountPct:(pct: number) => void;
   totals:               () => CartTotals;
@@ -76,6 +87,7 @@ export const useCartStore = create<CartState>()(
       client:             null,
       notes:              '',
       invoiceDiscountPct: 0,
+      payments:           [],
       _isDirty:           false,
 
       addItem: (variant, qty = 1) => {
@@ -182,13 +194,15 @@ export const useCartStore = create<CartState>()(
 
       setClient: (client) => set({ client, _isDirty: true }),
       setNotes:  (notes)  => set({ notes, _isDirty: true }),
-      clearCart: ()       => set({ items: [], client: null, notes: '', invoiceDiscountPct: 0, _isDirty: false }),
+      setPayments: (payments) => set({ payments, _isDirty: true }),
+      clearCart: () => set({ items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false }),
       setInvoiceDiscountPct: (pct) =>
         set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)), _isDirty: true }),
 
       markClean: () => set({ _isDirty: false }),
 
-      totals: () => calcTotals(get().items, get().invoiceDiscountPct),
+      totals: (fiscalStampEnabled?: boolean) =>
+        calcTotals(get().items, get().invoiceDiscountPct, fiscalStampEnabled),
     }),
     {
       name:       'pos-cart',
@@ -197,6 +211,7 @@ export const useCartStore = create<CartState>()(
         client:             state.client,
         notes:              state.notes,
         invoiceDiscountPct: state.invoiceDiscountPct,
+        payments:           state.payments,
         _isDirty:           true,
       }),
     },

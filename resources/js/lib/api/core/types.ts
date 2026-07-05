@@ -452,6 +452,7 @@ export type DocumentStatusCode =
 
 export interface CommercialDocumentLine extends BaseModel {
   commercial_document_id: number;
+  product_id?:            number | null;
   product_variant_id?:    number | null;
   description?:           string | null;
   quantity:               number;
@@ -464,6 +465,7 @@ export interface CommercialDocumentLine extends BaseModel {
   total_ttc:              number;
   line_order:             number;
   // Relations
+  product?:         Product;
   product_variant?: ProductVariant;
 }
 

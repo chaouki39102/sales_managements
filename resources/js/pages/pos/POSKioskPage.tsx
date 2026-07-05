@@ -21,6 +21,7 @@ import {
   type ViewMode, type GridSize, type SortMode,
 } from '@/pos/utils/posHelpers';
 import { formatDZD, ttcToHt }         from '@/pos/utils/calculations';
+import { settingsApi }                from '@/lib/api/endpoints/settings';
 import { isWebUsbSupported, getThermalAutoPrint, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import { usePrintSettings }           from '@/pos/hooks/usePrintSettings';
@@ -42,8 +43,19 @@ import OpenSessionModal         from '@/pos/components/OpenSessionModal';
 const PER_PAGE = 60;
 
 export default function POSKioskPage() {
-  const pos        = usePOS();
   const slug       = useActiveSlug();
+  const { data: fiscalStampRaw } = useQuery({
+    queryKey: [slug, 'settings', 'fiscal_stamp_enabled'],
+    queryFn:  () => settingsApi.getValue('fiscal_stamp_enabled'),
+    enabled:  !!slug,
+    staleTime: 60_000,
+  });
+  const fiscalStampVal = (fiscalStampRaw as any)?.value;
+  const fiscalStampEnabled = fiscalStampVal === undefined
+    ? true
+    : (fiscalStampVal === true || fiscalStampVal === 1 || fiscalStampVal === '1'
+      || String(fiscalStampVal).toLowerCase() === 'true');
+  const pos        = usePOS(fiscalStampEnabled);
   const company    = useActiveCompany();
   const fiscalYear = useSelectedFiscalYear();
   const qc         = useQueryClient();

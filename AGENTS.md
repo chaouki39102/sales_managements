@@ -1,7 +1,15 @@
 # AGENTS.md — Context Cache for AI Coding Agents
 
 ## Date
-2026-07-04
+2026-07-05
+
+### Updated Scores (Post Phase 19 — Fiscal Stamp Mismatch Fixes)
+- **Architecture**: 10/10
+- **Feature Isolation**: 10/10
+- **Runtime Separation**: 10/10
+- **SSOT**: 10/10
+- **Print Consistency**: 10/10
+- **Overall**: 10/10
 
 ### Updated Scores (Post Phase 17 — Controller Stabilization + SSOT Enforcement)
 - **Architecture**: 10/10
@@ -394,3 +402,45 @@ Report: `docs/reports/PRINT_RUNTIME_SEPARATION_REPORT.md`
 - `app/Services/CommercialDocumentService.php` — added `active = true` check + `product_id > 0` pre-validation for all lines
 
 **Verification**: `npm run build` — 0 errors, 1033 modules. `npm test` — 158/158 pass.
+
+### Phase 19 — Payment Modification Balance Fix (July 5)
+
+**Bug**: Modifying an existing payment amount in a reopened invoice did not update the balance calculation. `newBalance` used `prevBalance + totalTtcFinal - existingTotal - newPaid` where `existingTotal` is from props (original amounts) and `newPaid` only counts lines without `dbId`. When a user changed an existing payment (e.g., 4000→5000), neither value changed — the balance remained unchanged despite the modification.
+
+**Fix** in `ProfessionalPaymentModal.tsx:461`:
+- Formula changed from `prevBalance + totalTtcFinal - existingTotal - newPaid` to `prevBalance + totalTtcFinal - totalPaid`
+- `totalPaid` sums ALL lines (including modified existing ones), so modifications are correctly reflected
+
+**All cases verified**:
+| Case | existingTotal (props) | newPaid | totalPaid | Old formula | New formula |
+|------|----------------------|---------|-----------|-------------|-------------|
+| No existing payments, new payment 10000 | 0 | 10000 | 10000 | PB+TTC-10000 ✓ | PB+TTC-10000 ✓ |
+| Existing 4000, no changes | 4000 | 0 | 4000 | PB+TTC-4000 ✓ | PB+TTC-4000 ✓ |
+| Existing 4000, modify to 5000 | 4000 | 0 | 5000 | PB+TTC-4000 ✗ | PB+TTC-5000 ✓ |
+| Existing 4000, add new 2000 | 4000 | 2000 | 6000 | PB+TTC-6000 ✓ | PB+TTC-6000 ✓ |
+| Existing 4000, modify to 3000, add 2000 | 4000 | 2000 | 5000 | PB+TTC-6000 ✗ | PB+TTC-5000 ✓ |
+| Existing 4000, delete line, add 5000 | 4000 | 5000 | 5000 | PB+TTC-9000 ✗ | PB+TTC-5000 ✓ |
+
+**Files modified**:
+- `resources/js/pos/components/ProfessionalPaymentModal.tsx` — balance formula + subtitle label
+
+### Phase 19b — Fiscal Stamp Frontend/Backend Mismatch (July 5)
+
+**Bug**: The frontend `calcFiscalStamp()` returned `0` for totals under 30,000 DZD, but the backend `FiscalStampCalculator` uses hardcoded constants `MIN_STAMP=5`, `MAX_STAMP=2500`, `RATE=0.01` — applying 1% with min 5 DZD and max 2500 DZD on ALL amounts. For a 5750 DZD invoice, the backend adds 57.5 DZD fiscal stamp, creating a client balance of 807.5 DZD after a 5000 DZD payment (vs the frontend's expectation of 750 DZD).
+
+**Two fixes**:
+
+1. **`calcFiscalStamp` in `calculations.ts`** — Rewritten to match backend constants exactly:
+   - `stamp = max(5, min(total × 1%, 2500))`
+   - No threshold — applies to ALL amounts > 0
+   - Previously used 30,000 DZD threshold + 3,000 DZD cap (old law)
+
+2. **`handleOpenInvoice` in `POSPage.tsx:448`** — Changed `doc.fiscal_stamp` (relationship object, always `undefined` → `0`) to `doc.total_stamp` (the actual amount field returned by the API). Without this, the fiscal stamp was always excluded from `docTotal` when reopening an invoice, causing `prevBalance` to be off by the stamp amount.
+
+**Impact**: After these fixes, fiscal stamp is consistently calculated at 1% (min 5 DZD, max 2500 DZD) on both frontend and backend. Payment modals and receipt previews now show the correct totals including fiscal stamp.
+
+**Files modified**:
+- `resources/js/pos/utils/calculations.ts` — `calcFiscalStamp` rewritten to match backend
+- `resources/js/pages/pos/POSPage.tsx` — `doc.fiscal_stamp` → `doc.total_stamp`
+
+**Verification**: `npm run build` — 0 errors, 1033 modules.

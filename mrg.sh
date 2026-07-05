@@ -4,9 +4,7 @@ OUTPUT="REPORTING_FRAMEWORK_SOURCE.md"
 
 > "$OUTPUT"
 
-find resources/js/reporting \
-     resources/js/pages/settings \
-     resources/js/pages/documents \
+find resources/js/pos \
      resources/js/pos/components \
      resources/js/components/ui \
      -type f \( \

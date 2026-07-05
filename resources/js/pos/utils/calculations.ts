@@ -19,16 +19,19 @@ export function calcMargin(sellingHt: number, costHt: number): number {
   return ((sellingHt - costHt) / sellingHt) * 100;
 }
 
-/** الطابع الجبائي الجزائري — LF 2024 */
+/** الطابع الجبائي الجزائري — متوافق مع App\Services\Tax\FiscalStampCalculator */
+const FISCAL_STAMP_MIN = 5.0;
+const FISCAL_STAMP_MAX = 2500.0;
+const FISCAL_STAMP_RATE = 0.01;
+
 export function calcFiscalStamp(totalTtc: number): number {
-  if (totalTtc < 30_000) return 0;
-  if (totalTtc < 300_000) return Math.ceil(totalTtc * 0.01);
-  // Cap at 3000 DZD for amounts >= 300,000
-  return 3_000;
+  if (totalTtc <= 0) return 0;
+  const calculated = totalTtc * FISCAL_STAMP_RATE;
+  return Math.round(Math.max(FISCAL_STAMP_MIN, Math.min(calculated, FISCAL_STAMP_MAX)) * 100) / 100;
 }
 
 /** حساب مجاميع العربة */
-export function calcTotals(items: CartItem[], invoiceDiscountPct = 0): CartTotals {
+export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStampEnabled = true): CartTotals {
   let totalHt       = 0;
   let totalTva      = 0;
   let totalDiscount = 0;
@@ -52,7 +55,7 @@ export function calcTotals(items: CartItem[], invoiceDiscountPct = 0): CartTotal
       }, 0)
     : totalTva;
   const totalTtc     = adjTotalHt + adjTotalTva;
-  const fiscalStamp  = calcFiscalStamp(totalTtc);
+  const fiscalStamp  = fiscalStampEnabled ? calcFiscalStamp(totalTtc) : 0;
 
   return {
     total_ht:                Math.round(adjTotalHt  * 100) / 100,

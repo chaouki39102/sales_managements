@@ -79,8 +79,19 @@ type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 const QUICK_ITEMS_KEY = (slug: string) => `pos-quick-items-${slug}`;
 
 export default function POSPage() {
-  const pos         = usePOS();
   const slug        = useActiveSlug();
+  const { data: fiscalStampRaw } = useQuery({
+    queryKey: [slug, 'settings', 'fiscal_stamp_enabled'],
+    queryFn:  () => settingsApi.getValue('fiscal_stamp_enabled'),
+    enabled:  !!slug,
+    staleTime: 60_000,
+  });
+  const fiscalStampVal = (fiscalStampRaw as any)?.value;
+  const fiscalStampEnabled = fiscalStampVal === undefined
+    ? true
+    : (fiscalStampVal === true || fiscalStampVal === 1 || fiscalStampVal === '1'
+      || String(fiscalStampVal).toLowerCase() === 'true');
+  const pos         = usePOS(fiscalStampEnabled);
   const fiscalYear  = useSelectedFiscalYear();
   const company     = useActiveCompany();
   const navigate    = useNavigate();
@@ -149,7 +160,8 @@ export default function POSPage() {
 
   const [receiptSnapshot, setReceiptSnapshot] = useState<POSSaleSnapshot | null>(null);
   const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
-  const [prevBalance, setPrevBalance] = useState(0);
+  const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
+  const [editingDocStatus, setEditingDocStatus] = useState<string | null>(null);
 
   const receiptSource = useMemo((): PipelineSource | null => {
     if (!receiptSnapshot) return null;
@@ -409,6 +421,8 @@ export default function POSPage() {
   const clearCartSafe = useCallback(() => {
     if (settings.confirmOnClear && !isEmpty && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
     pos.clearCart();
+    setEditingDocumentId(null);
+    setEditingDocStatus(null);
   }, [settings.confirmOnClear, isEmpty, pos]);
 
   const handleOpenInvoice = useCallback(async (docId: number) => {
@@ -416,21 +430,24 @@ export default function POSPage() {
     if (!isEmpty && cartState._isDirty) pos.holdCart();
     try {
       const doc = await apiGet<CommercialDocument>(`/documents/${docId}`, {
-        include: 'party,lines,lines.product_variant',
+        include: 'party,lines,lines.product,lines.product_variant,payments,payments.payment_mode',
       });
       if (!doc?.lines?.length) {
         toast.error('لا توجد أصناف في هذه الفاتورة');
         return;
       }
+
+      // الرصيد يُحسب داخل ProfessionalPaymentModal تلقائياً
       const items: CartItem[] = doc.lines.map(line => {
-        const v = (line as any).product_variant;
+        const v    = line.product_variant;
+        const prod = line.product;
         return {
           id:                  nanoid(8),
-          product_id:          v?.product_id ?? 0,
+          product_id:          line.product_id ?? prod?.id ?? 0,
           variant_id:          line.product_variant_id ?? 0,
-          product_name:        (line as any).description ?? v?.product?.name ?? '',
+          product_name:        line.description ?? v?.product?.name ?? prod?.name ?? '',
           variant_name:        v?.variant_name ?? null,
-          ref:                 v?.ref ?? '',
+          ref:                 v?.ref ?? prod?.ref ?? '',
           barcode:             v?.barcode ?? null,
           unit_symbol:         v?.unit?.abbreviation ?? 'قطعة',
           image_url:           null,
@@ -447,10 +464,20 @@ export default function POSPage() {
           manages_stock:       false,
         };
       });
-      useCartStore.setState({ items, client: (doc as any).party ?? null });
+      const payments = (doc.payments ?? []).map(p => ({
+        id:                  p.id,
+        payment_mode_id:     p.payment_mode_id,
+        amount:              Number(p.amount),
+        payment_date:        p.payment_date,
+        treasury_account_id: p.treasury_account_id ?? null,
+        reference:           p.reference ?? null,
+      }));
+      useCartStore.setState({ items, client: doc.party ?? null, payments });
       useCartStore.getState().markClean();
+      setEditingDocumentId(docId);
+      setEditingDocStatus(doc.status);
       setShowSessionInvoices(false);
-      toast.success(`تم فتح الفاتورة ${(doc as any).document_number}`);
+      toast.success(`تم فتح الفاتورة ${doc.document_number}`);
     } catch {
       toast.error('فشل تحميل الفاتورة');
     }
@@ -474,6 +501,11 @@ export default function POSPage() {
   }, [pos.items, pos.totals.total_ht, invoiceDiscountAmount]);
 
   const adjustedTotalTtcFinal = adjustedTotalHt + adjustedTotalTva + pos.totals.fiscal_stamp;
+  const existingPaymentsSum = useMemo(
+    () => pos.payments.reduce((s, p) => s + p.amount, 0),
+    [pos.payments],
+  );
+  const remainingToPay = Math.max(0, adjustedTotalTtcFinal - existingPaymentsSum);
 
   const avgMargin = useMemo(() => {
     if (!pos.items.length) return 0;
@@ -526,7 +558,7 @@ export default function POSPage() {
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
       if (matchOverride(slugRef, 'searchFocus', e))  { e.preventDefault(); searchRef.current?.focus(); }
-      if (matchOverride(slugRef, 'payment', e))      { e.preventDefault(); if (!isEmpty) setModal('payment'); }
+      if (matchOverride(slugRef, 'payment', e))      { e.preventDefault(); if (!isEmpty) { setModal('payment'); } }
       if (matchOverride(slugRef, 'holdCart', e))     { e.preventDefault(); if (!isEmpty) pos.holdCart(); }
       if (matchOverride(slugRef, 'manualProduct', e)){ e.preventDefault(); setModal('manual'); }
       if (matchOverride(slugRef, 'heldCarts', e))    { e.preventDefault(); setModal('held'); }
@@ -649,7 +681,7 @@ export default function POSPage() {
     dueDate?:     string;
     note?:        string;
     docTypeCode?: string;
-    payments?:    Array<{ paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
+    payments?:    Array<{ id?: number; paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
     currencyId?:  number | null;
   }) => {
     const typeCode = params.docTypeCode ?? settings.defaultDocTypeCode;
@@ -673,10 +705,11 @@ export default function POSPage() {
       const apiPayments = (params.payments ?? [])
         .filter(p => p.amount > 0)
         .map(p => ({
+          ...(p.id ? { id: p.id } : {}),
           payment_mode_id:     p.paymentModeId,
           amount:              p.amount,
           payment_date:        new Date().toISOString().slice(0, 10),
-          treasury_account_id: p.treasuryAccountId ?? defaultTreasury?.id ?? null,  // ✅
+          treasury_account_id: p.treasuryAccountId ?? defaultTreasury?.id ?? null,
         }));
 
       const lineDiscountShare = currentInvDisc > 0
@@ -687,24 +720,40 @@ export default function POSPage() {
           })
         : currentItems.map(() => 0);
 
-      const res = await documentsApi.create({
-        document_type_id: invType.id,
-        party_id:         currentClient?.id ?? null,
-        warehouse_id:     defaultWarehouse.id,
-        fiscal_year_id:   fiscalYear.id,
-        currency_id:      params.currencyId ?? defaultCurrency?.id ?? null,
-        document_date:    new Date().toISOString().slice(0, 10),
-        due_date:         params.dueDate ?? null,
-        notes:            params.note ?? cartNote ?? null,
-        lines: currentItems.map((i, idx) => ({
-          product_id:          i.product_id,
-          quantity:            i.quantity,
-          unit_price_ht:       i.unit_price_ht,
-          discount_percentage: Math.min(100, i.discount_percentage + (lineDiscountShare[idx] || 0)),
-          tva_rate:            i.tva_rate,
-        })),
-        payments: apiPayments,
-      });
+      const linesPayload = currentItems.map((i, idx) => ({
+        product_id:          i.product_id,
+        quantity:            i.quantity,
+        unit_price_ht:       i.unit_price_ht,
+        discount_percentage: Math.min(100, i.discount_percentage + (lineDiscountShare[idx] || 0)),
+        tva_rate:            i.tva_rate,
+      }));
+
+      const commonPayload = {
+        party_id:       currentClient?.id ?? null,
+        warehouse_id:   defaultWarehouse.id,
+        fiscal_year_id: fiscalYear.id,
+        currency_id:    params.currencyId ?? defaultCurrency?.id ?? null,
+        document_date:  new Date().toISOString().slice(0, 10),
+        due_date:       params.dueDate ?? null,
+        notes:          params.note ?? cartNote ?? null,
+      };
+
+      let res;
+      if (editingDocumentId) {
+        const isDraft = editingDocStatus === 'draft';
+        res = await documentsApi.update(editingDocumentId, {
+          ...commonPayload,
+          ...(isDraft ? { lines: linesPayload } : {}),
+          payments: apiPayments,
+        });
+      } else {
+        res = await documentsApi.create({
+          ...commonPayload,
+          document_type_id: invType.id,
+          lines:            linesPayload,
+          payments:         apiPayments,
+        });
+      }
 
       if (currentSession?.id) {
         incrementMut.mutate(
@@ -772,6 +821,8 @@ export default function POSPage() {
         prevBalance,
         newBalance,
       };
+      setEditingDocumentId(null);
+      setEditingDocStatus(null);
       receiptSnapshotRef.current = fullSnapshot;
       setReceiptSnapshot(fullSnapshot);
       setLastDocNum(res.document_number);
@@ -804,7 +855,7 @@ export default function POSPage() {
       toast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode, autoPrint, isPrintEnabled, template, handlePrintDirect, showPreview, invoiceDiscountAmount, buildIncrementInput]);
+  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode, autoPrint, isPrintEnabled, template, handlePrintDirect, showPreview, invoiceDiscountAmount, buildIncrementInput, editingDocumentId]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -989,17 +1040,9 @@ export default function POSPage() {
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onSetClient={pos.setClient} onPriceLevelChange={applyPriceLevel}
           onNoteChange={setCartNote} onHold={pos.holdCart}
-          onSell={async () => {
-            if (pos.client?.id) {
-              try {
-                const res = await partyBalancesApi.getOne(pos.client.id);
-                const data = (res as any)?.data ?? res;
-                setPrevBalance(Math.max(0, Number(data?.current_balance ?? 0)));
-              } catch { setPrevBalance(0); }
-            } else { setPrevBalance(0); }
-            setModal('payment');
-          }} onClear={clearCartSafe} onHeld={() => setModal('held')}
+          onSell={() => setModal('payment')} onClear={clearCartSafe} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
+          remainingToPay={remainingToPay}
           invoiceDiscountPct={pos.invoiceDiscountPct}
           onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
           invoiceDiscountAmount={invoiceDiscountAmount}
@@ -1017,7 +1060,7 @@ export default function POSPage() {
           currencies={currencies ?? []}
           treasuryAccounts={treasuryAccounts ?? []}           // ✅ جديد
           totalTtcFinal={adjustedTotalTtcFinal}
-          prevBalance={prevBalance}
+          existingPayments={pos.payments}
           onClose={() => setModal('none')}
           onConfirm={handleCompleteSale}
         />

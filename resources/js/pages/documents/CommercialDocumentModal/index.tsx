@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
@@ -7,11 +7,12 @@ import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type { DocumentType } from '@/lib/api/core/types';
-import TemplatePrintModal from '@/pages/settings/print-settings/components/shared/TemplatePrintModal';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
 import { resolveTemplateById } from '@/pages/settings/print-settings/runtime/TemplateResolver';
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
+
+const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 
 import { useDocumentLookups }  from '../hooks/useDocumentLookups';
 import { useDocumentForm }     from '../hooks/useDocumentForm';
@@ -197,6 +198,7 @@ export default function CommercialDocumentModal({
     baseCurrencyId:     settingsCurrencyId,
     defaultPriceLevelId: settingsPriceLevelId,
     defaultApplyStamp:   settingsApplyStamp,
+    stampEnabled:        settingsApplyStamp,
     selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
     paymentModes:       lookups.paymentModes,
     parties:            lookups.parties,
@@ -968,6 +970,7 @@ export default function CommercialDocumentModal({
             isEdit={isEdit}
             isReadOnly={isReadOnly}
             set={set}
+            stampEnabled={settingsApplyStamp}
           />
         </div>
 
@@ -1037,15 +1040,17 @@ export default function CommercialDocumentModal({
 
       {/* طباعة حسب القالب */}
       {printModalOpen && existingDocument && companyInfo && (
-        <TemplatePrintModal
-          open={printModalOpen}
-          onClose={() => setPrintModalOpen(false)}
-          document={existingDocument as Record<string, unknown>}
-          company={companyInfo as any}
-          template={selectedTemplate || undefined}
-          templates={printTemplates}
-          docTypeCode={docCode}
-        />
+        <Suspense fallback={null}>
+          <TemplatePrintModal
+            open={printModalOpen}
+            onClose={() => setPrintModalOpen(false)}
+            document={existingDocument as Record<string, unknown>}
+            company={companyInfo as any}
+            template={selectedTemplate || undefined}
+            templates={printTemplates}
+            docTypeCode={docCode}
+          />
+        </Suspense>
       )}
     </>
   );

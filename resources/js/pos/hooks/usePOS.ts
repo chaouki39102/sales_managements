@@ -3,7 +3,7 @@ import { usePOSStore }   from './usePOSStore';
 import { useCartStore }  from '../utils/useCartStore';
 import { calcTotals }    from '../utils/calculations';
 
-export function usePOS() {
+export function usePOS(fiscalStampEnabled = true) {
   const heldCarts        = usePOSStore(s => s.heldCarts);
   const searchQuery      = usePOSStore(s => s.searchQuery);
   const selectedCategory = usePOSStore(s => s.selectedCategory);
@@ -19,6 +19,7 @@ export function usePOS() {
   const items              = useCartStore(s => s.items);
   const client             = useCartStore(s => s.client);
   const invoiceDiscountPct = useCartStore(s => s.invoiceDiscountPct);
+  const payments           = useCartStore(s => s.payments);
 
   const addItem              = useCartStore(s => s.addItem);
   const removeItem           = useCartStore(s => s.removeItem);
@@ -31,8 +32,8 @@ export function usePOS() {
   const setInvoiceDiscountPct = useCartStore(s => s.setInvoiceDiscountPct);
 
   const totals = useMemo(
-    () => calcTotals(items, invoiceDiscountPct),
-    [items, invoiceDiscountPct],
+    () => calcTotals(items, invoiceDiscountPct, fiscalStampEnabled),
+    [items, invoiceDiscountPct, fiscalStampEnabled],
   );
 
   const holdCart = useCallback((label?: string) => {
@@ -47,7 +48,7 @@ export function usePOS() {
     searchQuery, selectedCategory, paymentModalOpen,
     setSearch, setCategory, openPayment, closePayment,
 
-    items, client, invoiceDiscountPct,
+    items, client, invoiceDiscountPct, payments,
     addItem, removeItem, updateQty,
     updateDiscount, updateDiscountAmount, updatePrice,
     clearCart, setClient, setInvoiceDiscountPct,

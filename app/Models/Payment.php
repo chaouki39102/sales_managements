@@ -24,6 +24,7 @@ class Payment extends Model
 
     protected $fillable = [
         'company_id',
+        'client_ref',
         'payment_number',
         'payment_date',
         'amount',

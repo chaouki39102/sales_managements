@@ -48,6 +48,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         'lines.packaging',
     ];
 
+    protected array $showWith = [
+        'payments',
+    ];
+
     protected function getResourceName(): string
     {
         return $this->resourceName;
@@ -169,8 +173,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         // ✅ ربط الدفعات إذا أُرسلت مع المستند — UPSERT/DELETE pattern
-        $payments = $request?->input('payments') ?? $data['payments'] ?? [];
-        if (!empty($payments)) {
+        // يستخدم has() بدلاً من !empty() لضمان عمل "حذف كل الدفعات" (array فارغة)
+        $hasPayments = $request?->has('payments') ?? array_key_exists('payments', $data);
+        if ($hasPayments) {
+            $payments = $request?->input('payments') ?? $data['payments'] ?? [];
             $this->syncPayments($item, $payments);
         }
     }
@@ -252,7 +258,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         // AU3: مزامنة الدفعات — UPSERT/DELETE pattern (additive + free)
-        if (!empty($payments)) {
+        $hasPayments = $request?->has('payments') ?? array_key_exists('payments', $data);
+        if ($hasPayments) {
+            $payments = $request?->input('payments') ?? $data['payments'] ?? [];
             $this->syncPayments($item, $payments);
         }
     }
@@ -394,9 +402,37 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
      *
      * بعد المزامنة: يُعاد حساب paid_amount و remaining_amount من الصفر.
      */
+
+    /**
+     * طبقة حماية API/شبكة — منفصلة تماماً عن منطق syncPayments المحاسبي.
+     *
+     * إذا كان صف وارد "جديداً" (بلا id) لكنه يحمل client_ref سبق أن تحوّل
+     * فعلياً إلى دفعة حقيقية في محاولة سابقة لنفس الطلب، نُلحق به الـ id
+     * الحقيقي قبل أن يصل إلى syncPayments. من منظور syncPayments، هذا الصف
+     * أصبح "دفعة موجودة" فيمر عبر مسار UPDATE العادي — وهو idempotent بطبيعته.
+     */
+    private function resolveIdempotentPaymentIds(int $companyId, array $payments): array
+    {
+        foreach ($payments as &$p) {
+            if (empty($p['id']) && !empty($p['client_ref'])) {
+                $existingId = Payment::where('company_id', $companyId)
+                    ->where('client_ref', $p['client_ref'])
+                    ->value('id');
+                if ($existingId) {
+                    $p['id'] = $existingId;
+                }
+            }
+        }
+        unset($p);
+        return $payments;
+    }
+
     public function syncPayments(CommercialDocument $document, array $payments): void
     {
         $companyId = $document->company_id;
+
+        // ── طبقة الحماية (API/شبكة) — تمنع إدراج مكرر عند إعادة إرسال الطلب ──
+        $payments = $this->resolveIdempotentPaymentIds($companyId, $payments);
 
         // 1. الدفعات الحالية المرتبطة بالمستند
         $existingPivotIds = DB::table('document_payment')
@@ -482,6 +518,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 $direction = $this->resolvePaymentDirection($document);
                 $payment = Payment::create([
                     'company_id'          => $companyId,
+                    'client_ref'          => $paymentData['client_ref'] ?? null,
                     'payment_mode_id'     => (int) $paymentData['payment_mode_id'],
                     'treasury_account_id' => isset($paymentData['treasury_account_id'])
                         ? (int) $paymentData['treasury_account_id'] : null,
@@ -665,6 +702,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $last = \App\Models\Payment::where('company_id', $companyId)
                 ->where('payment_number', 'like', "PAY-{$year}-%")
                 ->orderByDesc('id')
+                ->withTrashed()
                 ->lockForUpdate()
                 ->first();
 

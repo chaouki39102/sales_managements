@@ -16,12 +16,15 @@ import React, {
 import type {
   CartTotals, Party, PaymentMode, DocumentType, Currency, TreasuryAccount,
 } from '@/types';
+import type { DocumentPayment } from '@/pos/utils/useCartStore';
 import { formatDZD } from '../utils/calculations';
+import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface PaymentLine {
   id:               string;
+  dbId?:            number;
   modeId:           number;
   amount:           string;
   refNote:          string;
@@ -34,6 +37,7 @@ export interface PaymentConfirmParams {
   note?:        string;
   docTypeCode?: string;
   payments?:    Array<{
+    id?:                 number;
     paymentModeId:      number;
     amount:             number;
     treasuryAccountId?: number | null;
@@ -42,16 +46,16 @@ export interface PaymentConfirmParams {
 }
 
 interface Props {
-  totals:           CartTotals;
-  client:           Party | null;
-  paymentModes:     PaymentMode[];
-  documentTypes:    DocumentType[];
-  currencies?:      Currency[];
+  totals:            CartTotals;
+  client:            Party | null;
+  paymentModes:      PaymentMode[];
+  documentTypes:     DocumentType[];
+  currencies?:       Currency[];
   treasuryAccounts?: TreasuryAccount[];
-  totalTtcFinal:    number;
-  prevBalance?:     number;
-  onClose:          () => void;
-  onConfirm:        (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
+  totalTtcFinal:     number;
+  existingPayments?: DocumentPayment[];
+  onClose:           () => void;
+  onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -152,17 +156,28 @@ function PaymentStatus({
 
 export default function ProfessionalPaymentModal({
   totals, client, paymentModes, documentTypes,
-  currencies, treasuryAccounts, totalTtcFinal, prevBalance, onClose, onConfirm,
+  currencies, treasuryAccounts, totalTtcFinal,
+  existingPayments, onClose, onConfirm,
 }: Props) {
 
   // ── State ──────────────────────────────────────────────────────────────────
   const defaultMode = paymentModes.find(m => m.is_default) ?? paymentModes[0];
 
-  const [lines, setLines] = useState<PaymentLine[]>(() =>
-    defaultMode
+  const [lines, setLines] = useState<PaymentLine[]>(() => {
+    if (existingPayments?.length) {
+      return existingPayments.map(ep => ({
+        id:                 uid(),
+        dbId:               ep.id,
+        modeId:             ep.payment_mode_id,
+        amount:             ep.amount.toFixed(2),
+        refNote:            ep.reference ?? '',
+        treasuryAccountId:  ep.treasury_account_id ?? null,
+      }));
+    }
+    return defaultMode
       ? [{ id: uid(), modeId: defaultMode.id, amount: totalTtcFinal.toFixed(2), refNote: '', treasuryAccountId: null }]
-      : [],
-  );
+      : [];
+  });
 
   const [docTypeCode,        setDocTypeCode]        = useState<string>('FV');
   const [dueDate,            setDueDate]            = useState('');
@@ -172,6 +187,32 @@ export default function ProfessionalPaymentModal({
   const [selectedCurrencyId, setSelectedCurrencyId] = useState<number | null>(
     currencies?.find(c => c.is_base_currency)?.id ?? currencies?.[0]?.id ?? null,
   );
+
+  // ── Balance fetch (self-contained — no prevBalance prop needed) ──────────
+  const [internalPrevBalance, setInternalPrevBalance] = useState(0);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+
+  useEffect(() => {
+    if (!client?.id) {
+      setInternalPrevBalance(0);
+      return;
+    }
+    setBalanceLoading(true);
+    partyBalancesApi.getOne(client.id)
+      .then(res => {
+        const data = (res as any)?.data ?? res;
+        const currentBalance = Number(data?.current_balance ?? 0);
+        if (existingPayments?.length) {
+          const existingTotal = existingPayments.reduce((s, p) => s + p.amount, 0);
+          const remainingOnInvoice = Math.max(0, totalTtcFinal - existingTotal);
+          setInternalPrevBalance(Math.max(0, currentBalance - remainingOnInvoice));
+        } else {
+          setInternalPrevBalance(Math.max(0, currentBalance));
+        }
+      })
+      .catch(() => setInternalPrevBalance(0))
+      .finally(() => setBalanceLoading(false));
+  }, [client?.id, existingPayments, totalTtcFinal]);
 
   /** الـ line النشط الذي يتلقى مدخلات الـ numpad */
   const [activeLineId, setActiveLineId] = useState<string | null>(
@@ -190,6 +231,14 @@ export default function ProfessionalPaymentModal({
   // ── Derived ────────────────────────────────────────────────────────────────
   const totalPaid = useMemo(
     () => lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0),
+    [lines],
+  );
+  const existingTotal = useMemo(
+    () => (existingPayments ?? []).reduce((s, p) => s + p.amount, 0),
+    [existingPayments],
+  );
+  const newPaid = useMemo(
+    () => lines.reduce((s, l) => s + (l.dbId ? 0 : (parseFloat(l.amount) || 0)), 0),
     [lines],
   );
   const remaining = Math.max(0, totalTtcFinal - totalPaid);
@@ -293,6 +342,7 @@ export default function ProfessionalPaymentModal({
     const payments = lines
       .filter(l => parseFloat(l.amount) > 0.009)
       .map(l => ({
+        ...(l.dbId ? { id: l.dbId } : {}),
         paymentModeId:      l.modeId,
         amount:             parseFloat(l.amount),
         treasuryAccountId:  l.treasuryAccountId ?? null,
@@ -405,11 +455,11 @@ export default function ProfessionalPaymentModal({
             </div>
 
             {/* ملخص الرصيد */}
-            {prevBalance !== undefined && client && (
+            {client && (
               <div className="pay-v2-balance">
                 <div className="pvs-row">
                   <span>الرصيد السابق</span>
-                  <span>{formatDZD(prevBalance)}</span>
+                  <span>{balanceLoading ? '...' : formatDZD(internalPrevBalance)}</span>
                 </div>
                 <div className="pvs-row">
                   <span>الإجمالي</span>
@@ -417,18 +467,24 @@ export default function ProfessionalPaymentModal({
                 </div>
                 <div className="pvs-row" style={{ borderTop: '1px dashed #ccc', paddingTop: 6, marginTop: 2 }}>
                   <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + إجمالي)</span></span>
-                  <strong>{formatDZD(prevBalance + totalTtcFinal)}</strong>
+                  <strong>{formatDZD(internalPrevBalance + totalTtcFinal)}</strong>
                 </div>
+                {existingTotal > 0 && (
+                  <div className="pvs-row">
+                    <span style={{ color: '#888' }}>مدفوع سابقاً</span>
+                    <span style={{ color: '#888' }}>{formatDZD(existingTotal)}</span>
+                  </div>
+                )}
                 <div className="pvs-row" style={{ borderTop: '1px solid #ddd', paddingTop: 6, marginTop: 2 }}>
-                  <span>المدفوع</span>
-                  <span>{formatDZD(totalPaid)}</span>
+                  <span>{existingTotal > 0 ? 'المدفوع الآن' : 'المدفوع'}</span>
+                  <span>{formatDZD(newPaid)}</span>
                 </div>
                 <div className="pvs-row pvs-total" style={{ marginTop: 4 }}>
                   <span>
                     الرصيد الجديد
-                    <span style={{ fontSize: 11, opacity: 0.6 }}> (سابق + إجمالي - مدفوع)</span>
+                    <span style={{ fontSize: 11, opacity: 0.6 }}> (سابق + إجمالي - المدفوع)</span>
                   </span>
-                  <strong>{formatDZD(prevBalance + totalTtcFinal - totalPaid)}</strong>
+                  <strong>{formatDZD(internalPrevBalance + totalTtcFinal - totalPaid)}</strong>
                 </div>
               </div>
             )}

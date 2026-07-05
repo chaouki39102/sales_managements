@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-print-settings-files.md"
+OUTPUT="merged-core-files.md"
 
 > "$OUTPUT"
 
@@ -63,8 +63,8 @@ EXCLUDE=(
 
 
   # print settings
-merge_section "📘 print settings" \
-  \( -path "*/pages/settings/print-settings/*" \) "${EXCLUDE[@]}"
+merge_section "📘 core" \
+  \( -path "*/lib/api/core/*" \) "${EXCLUDE[@]}"
 
 
 echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"

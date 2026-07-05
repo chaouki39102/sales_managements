@@ -39,6 +39,7 @@ interface ProfessionalCartProps {
   onClear:              () => void;
   onHeld:               () => void;
   totalTtcFinal:        number;
+  remainingToPay:       number;
   invoiceDiscountPct?:  number;
   onInvoiceDiscountChange?: (pct: number) => void;
   invoiceDiscountAmount?:   number;
@@ -51,7 +52,7 @@ export default function ProfessionalCart({
   note, selectedItemId, onSelectItem,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
   onSetClient, onPriceLevelChange, onNoteChange,
-  onHold, onSell, onClear, onHeld, totalTtcFinal,
+  onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
 }: ProfessionalCartProps) {
 
@@ -345,7 +346,11 @@ export default function ProfessionalCart({
           >
             <i className="ti ti-circle-check" />
             <span>
-              {isEmpty ? 'السلة فارغة' : `دفع — ${formatDZD(totalTtcFinal)}`}
+              {isEmpty ? 'السلة فارغة' : (
+                remainingToPay <= 0
+                  ? 'مدفوعة ✓'
+                  : `دفع — ${formatDZD(remainingToPay)}`
+              )}
             </span>
             <kbd className="sell-kbd">F4</kbd>
           </button>

@@ -239,7 +239,8 @@ export const useCartStore = create<CartState>()(
       setInvoiceDiscountPct: (pct) =>
         set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)) }),
 
-      totals: () => calcTotals(get().items, get().invoiceDiscountPct),
+      totals: (fiscalStampEnabled?: boolean) =>
+        calcTotals(get().items, get().invoiceDiscountPct, fiscalStampEnabled),
     }),
     {
       name:       'pos-cart',

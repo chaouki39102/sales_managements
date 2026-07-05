@@ -158,6 +158,8 @@ export interface PaymentEntry {
   check_number?:        string;
   check_bank?:          string;
   check_due_date?:      string;
+  /** internal frontend-only ref for idempotency — translated to client_ref at API boundary */
+  _clientRef?:          string;
 }
 
 // ─── Treasury Account ─────────────────────────────────────────────────────────

@@ -84,7 +84,7 @@ export default function ReturnsModal({
         party_id: doc.party?.id ?? null,
         notes: `مرتجع من الفاتورة رقم ${doc.document_number}`,
         lines: selected.map(s => ({
-          product_id: s.line.product_variant_id ?? 0,
+          product_id: s.line.product_id ?? 0,
           description: s.line.description ?? undefined,
           quantity: -Math.abs(s.qty),
           unit_price_ht: s.line.unit_price_ht,

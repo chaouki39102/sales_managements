@@ -35,6 +35,7 @@ import type {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface DocumentPaymentInput {
+  id?:                  number;
   payment_mode_id:      number;
   amount:               number;
   reference?:           string | null;

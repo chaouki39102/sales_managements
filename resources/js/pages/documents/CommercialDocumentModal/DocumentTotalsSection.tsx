@@ -15,12 +15,14 @@ interface DocumentTotalsSectionProps {
   isEdit: boolean;
   isReadOnly: boolean;
   set: (field: string, value: unknown) => void;
+  stampEnabled?: boolean;
 }
 
 export default function DocumentTotalsSection({
   totals, existingPayments, newPayments,
   partyBalance, form, selectedParty,
   isPurchase, isEdit, isReadOnly, set,
+  stampEnabled = true,
 }: DocumentTotalsSectionProps) {
   return (
     <Section title="الإجماليات" icon="ti-calculator">
@@ -84,13 +86,15 @@ export default function DocumentTotalsSection({
         </div>
       )}
 
-      <Toggle
-        checked={form.apply_stamp}
-        onChange={(v: boolean) => set('apply_stamp', v)}
-        label="الطابع الجبائي"
-        subLabel="1% من TTC — بحد أقصى 2,500 دج — للفواتير ≥ 30,000 دج"
-        disabled={isReadOnly}
-      />
+      {stampEnabled && (
+        <Toggle
+          checked={form.apply_stamp}
+          onChange={(v: boolean) => set('apply_stamp', v)}
+          label="الطابع الجبائي"
+          subLabel="1% من TTC — بحد أقصى 2,500 دج — للفواتير ≥ 30,000 دج"
+          disabled={isReadOnly}
+        />
+      )}
     </Section>
   );
 }
