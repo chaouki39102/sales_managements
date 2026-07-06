@@ -11,6 +11,7 @@ export const KB_DEFAULTS: Record<string, string> = {
   filter: 'F3',
   manualProduct: 'F6',
   sessionStats: 'F8',
+  returns: 'F10',
   fullscreen: 'F11',
   directPrint: 'Ctrl+P',
   quickSearch: 'Ctrl+F',
@@ -25,6 +26,8 @@ export const KB_DEFAULTS: Record<string, string> = {
   enterSearch: 'Enter',
   escape: 'Escape',
   confirmPayment: 'Ctrl+Enter',
+  openDrawer: 'Ctrl+D',
+  undoClear: 'Ctrl+Z',
 };
 
 export function normalizeEventKey(e: KeyboardEvent): string {

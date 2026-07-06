@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
+use App\Core\Services\Concerns\ResolvesPaymentDirection;
 use App\Models\Payment;
-use App\Models\TreasuryAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
@@ -37,6 +37,8 @@ use Illuminate\Http\Request;
  */
 class PaymentService extends \App\Core\Services\BaseService
 {
+    use ResolvesPaymentDirection;
+
     protected string $model        = Payment::class;
     protected string $resourceName = 'payment';
 
@@ -57,7 +59,7 @@ class PaymentService extends \App\Core\Services\BaseService
         $data = parent::beforeCreate($data, $request);
 
         if (empty($data['direction'])) {
-            $data['direction'] = $this->resolveDirection($data);
+            $data['direction'] = $this->resolveDirectionFromData($data);
         }
 
         return $data;
@@ -100,7 +102,7 @@ class PaymentService extends \App\Core\Services\BaseService
         $data = parent::prepareDataForUpdate($item, $data, $request);
 
         if (empty($data['direction'])) {
-            $data['direction'] = $this->resolveDirection(
+            $data['direction'] = $this->resolveDirectionFromData(
                 array_merge($item->toArray(), $data)
             );
         }
@@ -207,46 +209,4 @@ class PaymentService extends \App\Core\Services\BaseService
         return Payment::pending()->get();
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Private helpers
-    // ═══════════════════════════════════════════════════════════════
-
-    /**
-     * تحديث current_balance كـ denormalized cache على TreasuryAccount.
-     * المصدر الحقيقي: TreasuryBalanceService::getTreasuryBalanceAt()
-     */
-    private function adjustTreasuryBalance(int $accountId, float $amount, string $direction): void
-    {
-        if ($accountId <= 0 || $amount <= 0) return;
-
-        $delta = $direction === 'in' ? $amount : -$amount;
-
-        TreasuryAccount::withoutGlobalScopes()
-            ->where('id', $accountId)
-            ->increment('current_balance', $delta);
-    }
-
-    /**
-     * تحديد direction من بيانات الدفعة:
-     *   بدون party               → out (مصروف)
-     *   party + purchase          → out (ندفع للمورد)
-     *   party + sale أو unknown  → in  (نقبض من الزبون)
-     */
-    private function resolveDirection(array $data): string
-    {
-        if (empty($data['party_id'])) {
-            return 'out';
-        }
-
-        if (($data['document_base_operation'] ?? null) === 'purchase') {
-            return 'out';
-        }
-
-        return 'in';
-    }
-
-    private function oppositeDirection(string $direction): string
-    {
-        return $direction === 'in' ? 'out' : 'in';
-    }
 }

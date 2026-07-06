@@ -446,7 +446,7 @@ export default function POSSettingsModal({
       </div>
 
       {/* Body */}
-      <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+      <div style={{ height: '55vh', overflowY: 'auto' }}>
         {renderTab()}
       </div>
     </Modal>

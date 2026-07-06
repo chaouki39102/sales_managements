@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CommercialDocument } from '@/lib/api/core/types';
 import type { PosSession } from '@/lib/api/endpoints/posSession';
 import { documentsApi } from '@/lib/api/endpoints/documents';
@@ -26,6 +26,7 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
       sort: '-document_date',
       'filter[created_at]': `${openedDate},${today}`,
       'filter[warehouse_id]': session.warehouse?.id,
+      'filter[user_id]': session.user?.id,
     }).then((res: any) => {
       if (cancelled) return;
       const list = Array.isArray(res) ? res : res?.data ?? [];
@@ -36,11 +37,21 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [session.opened_at, session.warehouse?.id, openedDate, today]);
+  }, [session.opened_at, session.warehouse?.id, session.user?.id, openedDate, today]);
 
   const handleRowClick = useCallback((doc: CommercialDocument) => {
     onOpen(doc.id);
   }, [onOpen]);
+
+  const totals = useMemo(() => {
+    let ttc = 0, paid = 0, remaining = 0;
+    for (const doc of docs) {
+      ttc       += Number(doc.total_ttc ?? 0);
+      paid      += Number(doc.paid_amount ?? doc.amount_paid ?? 0);
+      remaining += Number(doc.remaining_amount ?? doc.amount_remaining ?? 0);
+    }
+    return { ttc, paid, remaining };
+  }, [docs]);
 
   return (
     <div className="ov on" onClick={onClose}>
@@ -69,9 +80,11 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
                 <tr>
                   <th>#</th>
                   <th>رقم الفاتورة</th>
-                  <th>العميل</th>
+                  <th className="si-col-client">العميل</th>
                   <th>التاريخ</th>
                   <th>الإجمالي</th>
+                  <th>المدفوع</th>
+                  <th>المتبقي</th>
                 </tr>
               </thead>
               <tbody>
@@ -84,12 +97,24 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
                   >
                     <td>{i + 1}</td>
                     <td><strong>{doc.document_number}</strong></td>
-                    <td>{doc.party?.name ?? <span style={{ color: 'var(--t4)' }}>—</span>}</td>
+                    <td className="si-col-client">{doc.party?.name ?? <span style={{ color: 'var(--t4)' }}>—</span>}</td>
                     <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
-                    <td style={{ fontWeight: 600 }}>{formatDZD(doc.total_ttc)}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--p)' }}>{formatDZD(doc.total_ttc)}</td>
+                    <td style={{ color: 'var(--g)' }}>{formatDZD(doc.paid_amount ?? doc.amount_paid ?? 0)}</td>
+                    <td style={{ fontWeight: 600, color: Number(doc.remaining_amount ?? doc.amount_remaining ?? 0) > 0 ? 'var(--r)' : 'var(--t4)' }}>
+                      {formatDZD(doc.remaining_amount ?? doc.amount_remaining ?? 0)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr style={{ fontWeight: 700, borderTop: '2px solid var(--b3)' }}>
+                  <td colSpan={4} style={{ textAlign: 'left' }}>المجموع</td>
+                  <td style={{ color: 'var(--p)' }}>{formatDZD(totals.ttc)}</td>
+                  <td style={{ color: 'var(--g)' }}>{formatDZD(totals.paid)}</td>
+                  <td style={{ color: totals.remaining > 0 ? 'var(--r)' : 'var(--t4)' }}>{formatDZD(totals.remaining)}</td>
+                </tr>
+              </tfoot>
             </table>
           )}
         </div>

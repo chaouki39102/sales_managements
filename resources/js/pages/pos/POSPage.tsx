@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
 import { useCartStore }       from '@/pos/utils/useCartStore';
@@ -66,6 +66,7 @@ import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings
 import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
+import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
 import { renderPreviewToHtml, mapCompany }  from '@/pages/settings/print-settings/runtime';
 import { printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
@@ -162,6 +163,7 @@ export default function POSPage() {
   const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [editingDocStatus, setEditingDocStatus] = useState<string | null>(null);
+  const [editingDocumentDate, setEditingDocumentDate] = useState<string | null>(null);
 
   const receiptSource = useMemo((): PipelineSource | null => {
     if (!receiptSnapshot) return null;
@@ -198,23 +200,14 @@ export default function POSPage() {
     catch { /* storage full */ }
   }, [quickItems, slug]);
 
-  // ── Pagination ────────────────────────────────────────────────────────────
-  const productPagesRef = useRef<Product[]>([]);
-  const loadedPageRef   = useRef(0);
-  const [page, setPage] = useState(1);
-
-  useEffect(() => {
-    setPage(1);
-    productPagesRef.current = [];
-    loadedPageRef.current   = 0;
-  }, [pos.searchQuery, pos.selectedCategory]);
+  // ── Search & Filters ──────────────────────────────────────────────────────
+  const [sortBy, setSortBy] = useState<SortOption>('default');
+  const [filterInStock, setFilterInStock] = useState(false);
+  const [filterLowStock, setFilterLowStock] = useState(false);
+  const [filterMinPrice, setFilterMinPrice] = useState('');
+  const [filterMaxPrice, setFilterMaxPrice] = useState('');
 
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
-  const [filterMinPrice,  setFilterMinPrice]  = useState('');
-  const [filterMaxPrice,  setFilterMaxPrice]  = useState('');
-  const [filterInStock,   setFilterInStock]   = useState(false);
-  const [filterLowStock,  setFilterLowStock]  = useState(false);
-  const [sortBy,          setSortBy]          = useState<SortMode>('name');
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const searchRef    = useRef<HTMLInputElement>(null);
@@ -224,47 +217,25 @@ export default function POSPage() {
   const isSearching   = pos.searchQuery.trim().length >= 2;
   const queryFamilyId = pos.selectedCategory ?? undefined;
 
-  // ── Products query ─────────────────────────────────────────────────────────
-  const { data: productsRaw, isLoading: loadingAll, isPlaceholderData } = useQuery({
+  // ── Products query (all products) ───────────────────────────────────────
+  const { data: productsRaw, isLoading: loadingAll } = useQuery({
     queryKey: [slug, 'products', 'pos', {
-      search: pos.searchQuery, cat: pos.selectedCategory, page, per_page: 120,
+      search: pos.searchQuery, cat: pos.selectedCategory,
     }],
     queryFn: () => productsApi.list({
-      per_page:  120,
+      per_page:  99999,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
       search:    isSearching ? pos.searchQuery : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
-      page,
       filter:    { active: 1 },
     }),
     enabled:         !!slug,
     staleTime:       isSearching ? 2 * 60_000 : 5 * 60_000,
-    placeholderData: keepPreviousData,
   });
 
-  const productsPage = Array.isArray(productsRaw)
+  const rawProducts = Array.isArray(productsRaw)
     ? productsRaw
     : (productsRaw as PaginatedResponse<Product>)?.data ?? [];
-  const productsMeta = !Array.isArray(productsRaw)
-    ? (productsRaw as PaginatedResponse<Product>)?.meta ?? null
-    : null;
-
-  // Only accumulate real data (not keepPreviousData placeholder)
-  // This fixes pagination: placeholder renders set loadedPageRef too early,
-  // causing actual page 2+ data to never be accumulated.
-  if (productsPage.length && !isPlaceholderData && page !== loadedPageRef.current) {
-    loadedPageRef.current = page;
-    if (page === 1) {
-      productPagesRef.current = productsPage;
-    } else {
-      const ids     = new Set(productPagesRef.current.map(p => p.id));
-      const newOnes = productsPage.filter(p => !ids.has(p.id));
-      if (newOnes.length) productPagesRef.current = [...productPagesRef.current, ...newOnes];
-    }
-  }
-
-  const rawProducts = productPagesRef.current;
-  const hasMore     = productsMeta ? !productsMeta.is_last_page : false;
 
   // ── Lookups ─────────────────────────────────────────────────────────────────
   const { data: fiscalYearsData } = useFiscalYears();
@@ -398,8 +369,8 @@ export default function POSPage() {
   const filteredVariants = useMemo(() => {
     let list = allVariants;
     if (pos.selectedCategory !== null) list = list.filter(v => v.product?.family?.id === pos.selectedCategory);
-    if (settings.hideOutOfStock) list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
-    if (filterInStock)  list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
+    if (settings.hideOutOfStock && !allowNegSetting) list = list.filter(v => !v.manages_stock || v.current_stock === undefined || v.current_stock > 0);
+    if (filterInStock)  list = list.filter(v => !v.manages_stock || v.current_stock === undefined || v.current_stock > 0);
     if (filterLowStock) list = list.filter(v => v.manages_stock && (v.current_stock ?? 0) <= (v.min_stock_alert ?? 0) && (v.current_stock ?? 0) > 0);
     if (filterMinPrice) list = list.filter(v => v.default_selling_price_ht >= parseFloat(filterMinPrice));
     if (filterMaxPrice) list = list.filter(v => v.default_selling_price_ht <= parseFloat(filterMaxPrice));
@@ -410,7 +381,7 @@ export default function POSPage() {
       if (sortBy === 'family')     return (a.product?.family?.name ?? '').localeCompare(b.product?.family?.name ?? '', 'ar');
       return (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'ar');
     });
-  }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
+  }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy, allowNegSetting]);
 
   useEffect(() => {
     setHighlightedIndex(0);
@@ -418,12 +389,62 @@ export default function POSPage() {
 
   const isEmpty = pos.items.length === 0;
 
-  const clearCartSafe = useCallback(() => {
-    if (settings.confirmOnClear && !isEmpty && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+  const lastClearedSnapshotRef = useRef<{
+    items: CartItem[];
+    client: Party | null;
+    note: string;
+    invoiceDiscountPct: number;
+  } | null>(null);
+  const [canUndoClear, setCanUndoClear] = useState(false);
+  const undoClearTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleClearCart = useCallback((opts?: { skipConfirm?: boolean }) => {
+    if (isEmpty) return;
+    if (settings.confirmOnClear && !opts?.skipConfirm
+        && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+
+    lastClearedSnapshotRef.current = {
+      items:               [...pos.items],
+      client:              pos.client,
+      note:                cartNote,
+      invoiceDiscountPct:  pos.invoiceDiscountPct,
+    };
+    setCanUndoClear(true);
+    clearTimeout(undoClearTimerRef.current);
+    undoClearTimerRef.current = setTimeout(() => {
+      lastClearedSnapshotRef.current = null;
+      setCanUndoClear(false);
+    }, 20_000);
+
     pos.clearCart();
+    pos.setInvoiceDiscountPct(0);
+    setCartNote('');
     setEditingDocumentId(null);
     setEditingDocStatus(null);
-  }, [settings.confirmOnClear, isEmpty, pos]);
+    setEditingDocumentDate(null);
+  }, [settings.confirmOnClear, isEmpty, pos, cartNote]);
+
+  const clearCartSafe = handleClearCart;
+
+  const handleUndoClear = useCallback(() => {
+    const snap = lastClearedSnapshotRef.current;
+    if (!snap) return;
+    useCartStore.setState({
+      items:              snap.items,
+      client:             snap.client,
+      invoiceDiscountPct: snap.invoiceDiscountPct,
+    });
+    setCartNote(snap.note);
+    lastClearedSnapshotRef.current = null;
+    setCanUndoClear(false);
+    clearTimeout(undoClearTimerRef.current);
+    toast.success('تم استرجاع السلة');
+  }, []);
+
+  const handleOpenDrawer = useCallback(async () => {
+    const res = await openCashDrawerViaWebUSB();
+    if (!res.ok) toast.error(res.message ?? 'تعذّر فتح الدرج');
+  }, []);
 
   const handleOpenInvoice = useCallback(async (docId: number) => {
     const cartState = useCartStore.getState();
@@ -476,6 +497,7 @@ export default function POSPage() {
       useCartStore.getState().markClean();
       setEditingDocumentId(docId);
       setEditingDocStatus(doc.status);
+      setEditingDocumentDate(doc.document_date ?? null);
       setShowSessionInvoices(false);
       toast.success(`تم فتح الفاتورة ${doc.document_number}`);
     } catch {
@@ -484,25 +506,16 @@ export default function POSPage() {
   }, [isEmpty, pos]);
 
   // ── Invoice discount ───────────────────────────────────────────────────────
+  // ✅ pos.totals (من calcTotals) تُطبِّق الخصم بالفعل ومرة واحدة فقط
   const invoiceDiscountPct    = pos.invoiceDiscountPct;
-  const invoiceDiscountAmount = useMemo(() => {
-    if (!invoiceDiscountPct || invoiceDiscountPct <= 0) return 0;
-    return Math.round(pos.totals.total_ht * invoiceDiscountPct / 100 * 100) / 100;
-  }, [pos.totals.total_ht, invoiceDiscountPct]);
+  const invoiceDiscountAmount = pos.totals.invoice_discount_amount ?? 0;
 
-  const adjustedTotalHt  = pos.totals.total_ht - invoiceDiscountAmount;
-  const adjustedTotalTva = useMemo(() => {
-    if (!pos.totals.total_ht) return pos.totals.total_tva;
-    return pos.items.reduce((s, i) => {
-      const itemHt = i.unit_price_ht * i.quantity * (1 - i.discount_percentage / 100);
-      const share  = itemHt / pos.totals.total_ht;
-      return s + (itemHt - invoiceDiscountAmount * share) * i.tva_rate / 100;
-    }, 0);
-  }, [pos.items, pos.totals.total_ht, invoiceDiscountAmount]);
+  const adjustedTotalHt       = pos.totals.total_ht;
+  const adjustedTotalTva      = pos.totals.total_tva;
+  const adjustedTotalTtcFinal = pos.totals.total_ht + pos.totals.total_tva + pos.totals.fiscal_stamp;
 
-  const adjustedTotalTtcFinal = adjustedTotalHt + adjustedTotalTva + pos.totals.fiscal_stamp;
   const existingPaymentsSum = useMemo(
-    () => pos.payments.reduce((s, p) => s + p.amount, 0),
+    () => pos.payments.reduce((s, p) => s + Number(p.amount || 0), 0),
     [pos.payments],
   );
   const remainingToPay = Math.max(0, adjustedTotalTtcFinal - existingPaymentsSum);
@@ -571,8 +584,11 @@ export default function POSPage() {
         }
       }
       if (matchOverride(slugRef, 'fullscreen', e))  { e.preventDefault(); toggleFullscreen(); }
-      if (matchOverride(slugRef, 'clearCart', e))    { e.preventDefault(); if (!isEmpty) pos.clearCart(); }
+      if (matchOverride(slugRef, 'clearCart', e))    { e.preventDefault(); handleClearCart(); }
       if (matchOverride(slugRef, 'kbHelp', e))       { e.preventDefault(); setModal('kbhelp'); }
+      if (matchOverride(slugRef, 'returns', e))      { e.preventDefault(); setModal('returns'); }
+      if (matchOverride(slugRef, 'openDrawer', e))   { e.preventDefault(); handleOpenDrawer(); }
+      if (matchOverride(slugRef, 'undoClear', e))    { e.preventDefault(); handleUndoClear(); }
 
       if (!inInput) {
         if (matchOverride(slugRef, 'gridView', e))   { e.preventDefault(); setView('grid'); }
@@ -606,7 +622,8 @@ export default function POSPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [slug, pos, isEmpty, modal, showFilter, families, selectedCartItemId, toggleFullscreen]);
+  }, [slug, pos, isEmpty, modal, showFilter, families, selectedCartItemId, toggleFullscreen,
+      handleClearCart, handleOpenDrawer, handleUndoClear]);
 
   // ── Price Level ────────────────────────────────────────────────────────────
   const applyPriceLevel = useCallback((plId: number | null) => {
@@ -681,7 +698,7 @@ export default function POSPage() {
     dueDate?:     string;
     note?:        string;
     docTypeCode?: string;
-    payments?:    Array<{ id?: number; paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
+    payments?:    Array<{ id?: number; paymentModeId: number; amount: number; treasuryAccountId?: number | null; reference?: string | null }>;
     currencyId?:  number | null;
   }) => {
     const typeCode = params.docTypeCode ?? settings.defaultDocTypeCode;
@@ -710,23 +727,30 @@ export default function POSPage() {
           amount:              p.amount,
           payment_date:        new Date().toISOString().slice(0, 10),
           treasury_account_id: p.treasuryAccountId ?? defaultTreasury?.id ?? null,
+          reference:           p.reference?.trim() || null,
+          notes:               params.note?.trim() || null,
         }));
 
-      const lineDiscountShare = currentInvDisc > 0
-        ? currentItems.map(i => {
-            const lineHt = i.unit_price_ht * i.quantity * (1 - i.discount_percentage / 100);
-            const share  = currentTotals.total_ht > 0 ? lineHt / currentTotals.total_ht : 0;
-            return share * currentInvDisc;
-          })
-        : currentItems.map(() => 0);
+      const linesPayload = currentItems.map(i => {
+        const compoundedDisc = currentInvDisc > 0
+          ? 100 - (100 - i.discount_percentage) * (100 - currentInvDisc) / 100
+          : i.discount_percentage;
+        return {
+          product_id:          i.product_id,
+          quantity:            i.quantity,
+          unit_price_ht:       i.unit_price_ht,
+          discount_percentage: Math.min(100, compoundedDisc),
+          tva_rate:            i.tva_rate,
+        };
+      });
 
-      const linesPayload = currentItems.map((i, idx) => ({
-        product_id:          i.product_id,
-        quantity:            i.quantity,
-        unit_price_ht:       i.unit_price_ht,
-        discount_percentage: Math.min(100, i.discount_percentage + (lineDiscountShare[idx] || 0)),
-        tva_rate:            i.tva_rate,
-      }));
+      const effectiveTotalHt = linesPayload.reduce((s, l) =>
+        s + l.quantity * l.unit_price_ht * (1 - l.discount_percentage / 100), 0);
+      const effectiveTotalTva = linesPayload.reduce((s, l) => {
+        const lineHt = l.quantity * l.unit_price_ht * (1 - l.discount_percentage / 100);
+        return s + lineHt * l.tva_rate / 100;
+      }, 0);
+      const effectiveTotalTtc = effectiveTotalHt + effectiveTotalTva + snapshot.totals.fiscal_stamp;
 
       const commonPayload = {
         party_id:       currentClient?.id ?? null,
@@ -759,11 +783,11 @@ export default function POSPage() {
         incrementMut.mutate(
           buildIncrementInput({
             items:            currentItems,
-            totalHt:          snapshot.totals.total_ht,
-            totalTva:         snapshot.totals.total_tva,
+            totalHt:          effectiveTotalHt,
+            totalTva:         effectiveTotalTva,
             totalFiscalStamp: snapshot.totals.fiscal_stamp,
             totalDiscount:    snapshot.totals.total_discount + invoiceDiscountAmount,
-            grandTotal:       snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp,
+            grandTotal:       effectiveTotalTtc,
             payments:         apiPayments.map(p => ({
               payment_mode_id: p.payment_mode_id,
               amount:          p.amount,
@@ -779,18 +803,17 @@ export default function POSPage() {
         dueDate: params.dueDate,
       };
 
-      const totalTtcFinal = snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp;
       const totalPaid     = params.amountPaid;
-      const invoiceRemaining = Math.max(0, totalTtcFinal - totalPaid);
-      const invoiceChange    = Math.max(0, totalPaid - totalTtcFinal);
+      const invoiceRemaining = Math.max(0, effectiveTotalTtc - totalPaid);
+      const invoiceChange    = Math.max(0, totalPaid - effectiveTotalTtc);
       let prevBalance = 0;
       let newBalance = 0;
       if (currentClient?.id) {
         try {
-          const balanceRes = await partyBalancesApi.getOne(currentClient.id);
+          const balanceRes = await partyBalancesApi.getOne(currentClient.id, commonPayload.document_date);
           const balanceData = (balanceRes as any)?.data ?? balanceRes;
           const currentBalance = Number(balanceData?.current_balance ?? 0);
-          prevBalance = Math.max(0, currentBalance - totalTtcFinal + params.amountPaid);
+          prevBalance = Math.max(0, currentBalance);
           newBalance = prevBalance + invoiceRemaining;
         } catch {}
       }
@@ -808,6 +831,9 @@ export default function POSPage() {
         })),
         totals: {
           ...snapshot.totals,
+          total_ht:  effectiveTotalHt,
+          total_tva: effectiveTotalTva,
+          total_ttc: effectiveTotalTtc,
           paid:      totalPaid,
           change:    invoiceChange,
           remaining: invoiceRemaining,
@@ -823,6 +849,7 @@ export default function POSPage() {
       };
       setEditingDocumentId(null);
       setEditingDocStatus(null);
+      setEditingDocumentDate(null);
       receiptSnapshotRef.current = fullSnapshot;
       setReceiptSnapshot(fullSnapshot);
       setLastDocNum(res.document_number);
@@ -866,7 +893,7 @@ export default function POSPage() {
         variantId: variant.id,
         name:      variant.product?.name ?? '',
         priceHt:   variant.default_selling_price_ht,
-        tvaRate:   variant.tva?.rate ?? 19,
+        tvaRate:   variant.tva?.rate ?? 0,
       }];
     });
   }, []);
@@ -962,6 +989,7 @@ export default function POSPage() {
         onSettings={() => setShowSettings(true)}
         onToggleQuickbar={handleToggleQuickbar}
         onKioskMode={() => navigate('/pos/kiosk')}
+        onOpenDrawer={handleOpenDrawer}
       />
 
       <div className="pos-order-type">
@@ -1016,7 +1044,7 @@ export default function POSPage() {
           <CategoryTabs families={families} selected={pos.selectedCategory} onSelect={pos.setCategory} />
           <ProductGrid
             variants={filteredVariants} view={view} gridSize={gridSize}
-            loading={loadingAll} hasMore={hasMore} onLoadMore={() => setPage(p => p + 1)}
+            loading={loadingAll}
             onAdd={handleAddItem} onAddManual={() => setModal('manual')}
             highlightedIndex={highlightedIndex}
             onHighlightIndexChange={setHighlightedIndex}
@@ -1040,12 +1068,14 @@ export default function POSPage() {
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onSetClient={pos.setClient} onPriceLevelChange={applyPriceLevel}
           onNoteChange={setCartNote} onHold={pos.holdCart}
-          onSell={() => setModal('payment')} onClear={clearCartSafe} onHeld={() => setModal('held')}
+          onSell={() => setModal('payment')} onClear={handleClearCart} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           remainingToPay={remainingToPay}
           invoiceDiscountPct={pos.invoiceDiscountPct}
           onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
           invoiceDiscountAmount={invoiceDiscountAmount}
+          onUndoClear={handleUndoClear}
+          canUndoClear={canUndoClear}
         />
       </div>
 
@@ -1061,6 +1091,7 @@ export default function POSPage() {
           treasuryAccounts={treasuryAccounts ?? []}           // ✅ جديد
           totalTtcFinal={adjustedTotalTtcFinal}
           existingPayments={pos.payments}
+          documentDate={editingDocumentDate ?? new Date().toISOString().slice(0, 10)}
           onClose={() => setModal('none')}
           onConfirm={handleCompleteSale}
         />

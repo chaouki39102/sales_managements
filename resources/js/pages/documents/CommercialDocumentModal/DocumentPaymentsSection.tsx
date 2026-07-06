@@ -2,13 +2,12 @@ import React from 'react';
 import { Section, Label, AlertBanner } from '../components/DocumentUIPrimitives';
 import { CheckFormFields } from '../components/CheckFormFields';
 import { AdvancePaymentsPanel } from '../components/AdvancePaymentsPanel';
-import ExistingPaymentsTable from './ExistingPaymentsTable';
 import type { PaymentEntry } from '../types/document.types';
 import { fmtDZD } from '../utils/document.utils';
+import { toNum } from '../utils/document.utils';
 
 interface DocumentPaymentsSectionProps {
-  existingPayments: PaymentEntry[];
-  newPayments: PaymentEntry[];
+  payments: PaymentEntry[];
   paymentModes: Array<{ id: number; name: string }>;
   paymentModeOptions: Array<{
     id: number;
@@ -31,7 +30,7 @@ interface DocumentPaymentsSectionProps {
 }
 
 export default function DocumentPaymentsSection({
-  existingPayments, newPayments,
+  payments,
   paymentModes, paymentModeOptions, treasuryAccountMap, treasuryAccounts,
   addPayment, addPaymentWithValues, removePayment, updatePayment,
   paymentsExceedWarning,
@@ -42,12 +41,6 @@ export default function DocumentPaymentsSection({
 
   return (
     <Section title="الدفعات" icon="ti-wallet" collapsible>
-
-      <ExistingPaymentsTable
-        payments={existingPayments}
-        paymentModes={paymentModes}
-        treasuryAccountMap={treasuryAccountMap}
-      />
 
       <AdvancePaymentsPanel
         advances={advancePayments}
@@ -68,7 +61,7 @@ export default function DocumentPaymentsSection({
         <AlertBanner type="warning" message={paymentsExceedWarning} />
       )}
 
-      {existingPayments.length === 0 && newPayments.length === 0 && (
+      {payments.length === 0 && (
         <div style={{
           padding: 12, fontSize: 12, color: 'var(--t4)',
           background: 'var(--bg3)', borderRadius: 'var(--r2)', marginBottom: 12,
@@ -79,19 +72,8 @@ export default function DocumentPaymentsSection({
         </div>
       )}
 
-      {pmMode === 'additive' && newPayments.length > 0 && (
-        <div style={{
-          padding: '6px 10px', fontSize: 10.5, fontWeight: 800,
-          color: 'var(--em)', textTransform: 'uppercase', letterSpacing: 0.4,
-          borderBottom: '1px solid var(--b1)', marginBottom: 8,
-          display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          <i className="ti ti-plus" style={{ fontSize: 11 }} />
-          دفعات جديدة تُضاف
-        </div>
-      )}
-
-      {newPayments.map((pay, idx) => {
+      {payments.map((pay, idx) => {
+        const isExisting = pay.id !== undefined && pay.id !== null;
         const selectedMode = paymentModes.find(
           (pm) => String(pm.id) === pay.payment_mode_id,
         );
@@ -102,25 +84,28 @@ export default function DocumentPaymentsSection({
           : (manualTreasuryStr ? treasuryAccountMap.get(parseInt(manualTreasuryStr)) : null);
 
         const remainingForFill = totals.remaining;
-        const isLast = idx === newPayments.length - 1;
+        const isLast = idx === payments.length - 1;
 
         return (
-          <div key={idx} style={{
+          <div key={pay._clientRef ?? idx} style={{
             display: 'grid',
             gridTemplateColumns: '1fr 130px 160px 120px 1fr 32px',
             gap: 8, marginBottom: 10, alignItems: 'end',
             padding: 12, borderRadius: 'var(--r2)',
-            background: 'var(--bg2)', border: '1px solid var(--b2)',
+            background: isExisting ? 'var(--goldb)' : 'var(--bg2)',
+            border: `1px solid ${isExisting ? 'var(--gold)' : 'var(--b2)'}`,
           }}>
             <div>
               {idx === 0 && <Label>طريقة الدفع</Label>}
               <select
+                disabled={pmMode === 'locked'}
                 style={{
                   width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                   border: `1px solid ${!pay.payment_mode_id ? 'var(--red)' : 'var(--b3)'}`,
                   background: 'var(--bg1)', color: 'var(--t1)',
                   fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                  outline: 'none', cursor: 'pointer', boxSizing: 'border-box',
+                  outline: 'none', cursor: pmMode === 'locked' ? 'not-allowed' : 'pointer',
+                  boxSizing: 'border-box',
                 }}
                 value={pay.payment_mode_id}
                 onChange={(e) => updatePayment(idx, { payment_mode_id: e.target.value })}
@@ -136,6 +121,7 @@ export default function DocumentPaymentsSection({
               {idx === 0 && <Label>المبلغ</Label>}
               <input
                 type="number" min={0} step={0.01}
+                disabled={pmMode === 'locked'}
                 style={{
                   width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                   border: '1px solid var(--b3)',
@@ -168,6 +154,7 @@ export default function DocumentPaymentsSection({
               {idx === 0 && <Label>المرجع</Label>}
               <input
                 type="text"
+                disabled={pmMode === 'locked'}
                 style={{
                   width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                   border: `1px solid ${
@@ -188,6 +175,7 @@ export default function DocumentPaymentsSection({
               {idx === 0 && <Label>التاريخ</Label>}
               <input
                 type="date"
+                disabled={pmMode === 'locked'}
                 style={{
                   width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                   border: '1px solid var(--b3)',
@@ -228,12 +216,13 @@ export default function DocumentPaymentsSection({
                 </div>
               ) : (
                 <select
+                  disabled={pmMode === 'locked'}
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${!manualTreasuryStr ? 'var(--red)' : 'var(--b3)'}`,
                     background: 'var(--bg1)', color: 'var(--t1)',
                     fontSize: 12, fontFamily: 'Tajawal, sans-serif',
-                    outline: 'none', cursor: 'pointer',
+                    outline: 'none', cursor: pmMode === 'locked' ? 'not-allowed' : 'pointer',
                     height: 38, boxSizing: 'border-box',
                   }}
                   value={manualTreasuryStr}
@@ -249,19 +238,21 @@ export default function DocumentPaymentsSection({
               )}
             </div>
 
-            <button
-              onClick={() => removePayment(idx)}
-              style={{
-                width: 32, height: 32, borderRadius: 'var(--r1)',
-                border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
-                background: 'var(--redb)', color: 'var(--red)',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                alignSelf: 'flex-end',
-              }}
-            >
-              <i className="ti ti-trash" style={{ fontSize: 13 }} />
-            </button>
+            {pmMode !== 'locked' && (
+              <button
+                onClick={() => removePayment(idx)}
+                style={{
+                  width: 32, height: 32, borderRadius: 'var(--r1)',
+                  border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
+                  background: 'var(--redb)', color: 'var(--red)',
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  alignSelf: 'flex-end',
+                }}
+              >
+                <i className="ti ti-trash" style={{ fontSize: 13 }} />
+              </button>
+            )}
 
             {effectiveTreasury?.type === 'check' && (
               <div style={{ gridColumn: '1 / -1' }}>

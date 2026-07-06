@@ -13,9 +13,9 @@ use App\Models\NumberingSeries;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\StockMovement;
-use App\Models\TreasuryAccount;
 use App\Services\CompanyContextService;
 use App\Services\InventoryValuationService;
+use App\Core\Services\Concerns\ResolvesPaymentDirection;
 use App\Services\Tax\FiscalStampCalculator;
 use App\Services\Tax\TaxRuleService;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\Log;
 class CommercialDocumentService extends \App\Core\Services\BaseService
 {
     use ValidatesTenantRelations;
+    use ResolvesPaymentDirection;
 
     protected string $model        = CommercialDocument::class;
     protected string $resourceName = 'commercial_document';
@@ -214,7 +215,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         // R4: إذا كانت الوثيقة معتمدة وجاءت lines في الطلب → رفض
-        // new_payments مسموح
+        // payments مسموحة للمستندات المعتمدة (additive mode)
         $hasLines = !empty($data['lines']) || !empty($request?->input('lines'));
         if ($hasLines) {
             $currentStatusName = $item->documentStatus?->name
@@ -459,7 +460,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 $this->adjustTreasuryBalance(
                     (int) $payment->treasury_account_id,
                     (float) $payment->amount,
-                    $this->oppositeDirection($this->resolvePaymentDirection($document)),
+                    $this->oppositeDirection($this->resolveDirectionFromDocument($document)),
                 );
             }
 
@@ -485,7 +486,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
                 $oldAmount = (float) $payment->amount;
                 $oldAccountId = (int) $payment->treasury_account_id;
-                $oldDirection = $this->resolvePaymentDirection($document);
+                $oldDirection = $this->resolveDirectionFromDocument($document);
 
                 $payment->update([
                     'amount'              => $amount,
@@ -515,7 +516,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 }
             } else {
                 // ── INSERT جديد ──────────────────────────────────────────
-                $direction = $this->resolvePaymentDirection($document);
+                $direction = $this->resolveDirectionFromDocument($document);
                 $payment = Payment::create([
                     'company_id'          => $companyId,
                     'client_ref'          => $paymentData['client_ref'] ?? null,
@@ -792,37 +793,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 $document->updateQuietly(['document_status_id' => $partialId]);
             }
         }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // PRIVATE: تحديد اتجاه الدفعة للخزينة
-    // ═══════════════════════════════════════════════════════════════════════
-
-    private function resolvePaymentDirection(CommercialDocument $document): string
-    {
-        $baseOp = $document->documentType?->documentBaseOperation?->name;
-        if ($baseOp === 'purchase') return 'out';
-        return 'in';
-    }
-
-    private function oppositeDirection(string $direction): string
-    {
-        return $direction === 'in' ? 'out' : 'in';
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // PRIVATE: تعديل رصيد الخزينة (denormalized cache)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    private function adjustTreasuryBalance(int $accountId, float $amount, string $direction): void
-    {
-        if ($accountId <= 0 || $amount <= 0) return;
-
-        $delta = $direction === 'in' ? $amount : -$amount;
-
-        TreasuryAccount::withoutGlobalScopes()
-            ->where('id', $accountId)
-            ->increment('current_balance', $delta);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

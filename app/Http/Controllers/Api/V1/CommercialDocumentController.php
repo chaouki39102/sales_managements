@@ -13,6 +13,7 @@ use App\Services\NotificationService;
 use App\Models\Company;          // ✅ أضفنا هذا
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CommercialDocumentController extends BaseApiController
 {
@@ -32,7 +33,7 @@ class CommercialDocumentController extends BaseApiController
         return [
             'filters' => [
                 'document_type_id', 'fiscal_year_id', 'document_status_id',
-                'party_id', 'warehouse_id', 'currency_id',
+                'party_id', 'warehouse_id', 'currency_id', 'user_id',
                 'is_locked', 'is_exported_to_accounting',
                 'party.name', 'warehouse.name', 'document_status.name',
                 'document_date', 'due_date', 'total_ht', 'total_ttc',
@@ -65,7 +66,7 @@ class CommercialDocumentController extends BaseApiController
 
             $f = $request->input('filter', []);
 
-            foreach (['document_type_id','fiscal_year_id','document_status_id','party_id','warehouse_id'] as $field) {
+            foreach (['document_type_id','fiscal_year_id','document_status_id','party_id','warehouse_id','user_id'] as $field) {
                 if (isset($f[$field]) && $f[$field] !== '') {
                     $query->where($field, $f[$field]);
                 }
@@ -256,6 +257,16 @@ class CommercialDocumentController extends BaseApiController
         }
     }
 
+    /**
+     * LEGACY — Additive payments endpoint.
+     *
+     * Kept for backward compatibility (external API consumers).
+     * The frontend no longer calls this endpoint.
+     *
+     * Payments are now synchronized through the unified payments[]
+     * workflow inside create() and update() — see syncPayments().
+     * POST /documents/{id}/payments still works for legacy clients.
+     */
     public function addPayments(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
@@ -274,10 +285,12 @@ class CommercialDocumentController extends BaseApiController
                 'payments.*.treasury_account_id'   => 'nullable|integer',
             ]);
 
-            $this->commercialDocumentService->syncPayments(
-                $commercialDocument,
-                $validated['payments']
-            );
+            DB::transaction(function () use ($commercialDocument, $validated) {
+                $this->commercialDocumentService->syncPayments(
+                    $commercialDocument,
+                    $validated['payments']
+                );
+            });
 
             $this->notificationService->success(
                 'تمت إضافة دفعات',

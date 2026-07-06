@@ -42,20 +42,24 @@ describe('calcMargin', () => {
 });
 
 describe('calcFiscalStamp', () => {
-  it('returns 0 for amounts below 30,000', () => {
-    expect(calcFiscalStamp(20000)).toBe(0);
+  it('returns 0 for zero and negative amounts', () => {
     expect(calcFiscalStamp(0)).toBe(0);
-    expect(calcFiscalStamp(29999.99)).toBe(0);
+    expect(calcFiscalStamp(-100)).toBe(0);
   });
-  it('returns 1% for amounts between 30k and 300k', () => {
+  it('applies 1% floor at MIN_STAMP=5', () => {
+    expect(calcFiscalStamp(200)).toBe(5);
+    expect(calcFiscalStamp(499.99)).toBe(5);
+  });
+  it('applies 1% for medium amounts', () => {
     expect(calcFiscalStamp(30000)).toBe(300);
     expect(calcFiscalStamp(100000)).toBe(1000);
-    expect(calcFiscalStamp(299999)).toBe(3000);
+    expect(calcFiscalStamp(200000)).toBe(2000);
   });
-  it('caps at 3000 for amounts >= 300k', () => {
-    expect(calcFiscalStamp(300000)).toBe(3000);
-    expect(calcFiscalStamp(500000)).toBe(3000);
-    expect(calcFiscalStamp(1_000_000)).toBe(3000);
+  it('caps at MAX_STAMP=2500', () => {
+    expect(calcFiscalStamp(250000)).toBe(2500);
+    expect(calcFiscalStamp(300000)).toBe(2500);
+    expect(calcFiscalStamp(500000)).toBe(2500);
+    expect(calcFiscalStamp(1_000_000)).toBe(2500);
   });
 });
 

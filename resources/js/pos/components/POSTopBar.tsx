@@ -25,6 +25,7 @@ interface POSTopBarProps {
   onReturn:           () => void;
   onSettings:         () => void;
   onKioskMode:        () => void;
+  onOpenDrawer:       () => void;
 }
 
 export default function POSTopBar({
@@ -34,6 +35,7 @@ export default function POSTopBar({
   onHeld, onNewSale, onManual, onReceipt,
   onSession, onSessionInvoices, onFullscreen, onKbHelp,
   onToggleQuickbar, onReturn, onSettings, onKioskMode,
+  onOpenDrawer,
 }: POSTopBarProps) {
 
   const invoicesCount = session?.invoices_count ?? 0;
@@ -113,11 +115,12 @@ export default function POSTopBar({
       </div>
 
       <div className="pos-actions-row">
-        <button className="btn btn-xs" onClick={onNewSale} title="بيع جديد / تعليق">
+
+        <button className="btn btn-xs" onClick={onNewSale} title="بيع جديد / تعليق — F5">
           <i className="ti ti-plus" />
           <span className="tb-txt"> جديد</span>
         </button>
-        <button className="btn btn-xs" onClick={onReturn} title="مرتجع">
+        <button className="btn btn-xs" onClick={onReturn} title="مرتجع — F10">
           <i className="ti ti-receipt-refund" />
           <span className="tb-txt"> مرتجع</span>
         </button>
@@ -133,6 +136,9 @@ export default function POSTopBar({
         >
           <i className="ti ti-printer" />
         </button>
+
+        <span className="tb-sep" aria-hidden="true" />
+
         <button
           className={`btn btn-xs ${showQuickbar ? 'btn-p' : ''}`}
           onClick={onToggleQuickbar}
@@ -142,11 +148,14 @@ export default function POSTopBar({
         </button>
         <button
           className="btn btn-xs"
-          onClick={onSession}
-          title="إحصاءات الجلسة — F8"
+          onClick={onOpenDrawer}
+          title="فتح درج النقود — Ctrl+D"
         >
-          <i className="ti ti-chart-bar" />
+          <i className="ti ti-cash-banknote" />
         </button>
+
+        <span className="tb-sep" aria-hidden="true" />
+
         <button
           className="btn btn-xs"
           onClick={onSettings}

@@ -355,6 +355,8 @@ export function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
     payment_mode_id:     paymentModeId,
     amount:              String(p.amount ?? '0'),
     reference:           String(p.reference ?? ''),
+    notes:               p.notes ? String(p.notes) : undefined,
+    client_ref:          p.client_ref ? String(p.client_ref) : undefined,
     payment_date:        String(p.payment_date ?? today()).split('T')[0],
     treasury_account_id: treasuryId,
   };
@@ -996,18 +998,6 @@ export function useDocumentForm({
     return `cr_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   }
 
-  /** الدفعات الموجودة فعلاً في قاعدة البيانات (لها id) */
-  const existingPayments = useMemo(
-    () => payments.filter((p) => p.id != null),
-    [payments],
-  );
-
-  /** الدفعات الجديدة (لم تُحفظ بعد) */
-  const newPayments = useMemo(
-    () => payments.filter((p) => p.id == null),
-    [payments],
-  );
-
   // ── إدارة الدفعات ─────────────────────────────────────────────────────────
 
   const addPayment = useCallback(() => {
@@ -1153,9 +1143,11 @@ export function useDocumentForm({
         ...(p.id ? { id: p.id } : {}),
         // translate internal _clientRef → API field client_ref at the network boundary
         ...(!p.id && p._clientRef ? { client_ref: p._clientRef } : {}),
+        ...(p.client_ref ? { client_ref: p.client_ref } : {}),
         payment_mode_id:     parseInt(p.payment_mode_id),
         amount:              parseFloat(p.amount),
         reference:           p.reference?.trim() || null,
+        notes:               p.notes?.trim() || null,
         payment_date:        p.payment_date,
         treasury_account_id: treasuryId,
         ...(p.check_number   ? { check_number: p.check_number } : {}),
@@ -1209,16 +1201,13 @@ export function useDocumentForm({
       payment_terms:    f.payment_terms.length > 0 ? f.payment_terms : null,
     };
 
-    if (pmMode === 'additive') {
-      if (paymentsPayload.length > 0) base.new_payments = paymentsPayload;
-    } else {
+    if (pmMode !== 'additive') {
       base.lines = linesPayload;
-      // أرسل الدفعات دائماً إذا كان هناك مدفوعات صالحة، أو إذا كان المستند
-      // موجوداً مسبقاً وكانت له دفعات (حتى لو أُفرغت — لحذف كل الدفعات).
-      // الباكاند يفحص `has('payments')` وليس `!empty($payments)`.
-      if (paymentsPayload.length > 0 || (isEdit && (existingDocument?.payments as unknown[] | undefined)?.length)) {
-        base.payments = paymentsPayload;
-      }
+    }
+    // Unified payment payload — always payments[], never new_payments.
+    // syncPayments() on the backend handles UPSERT/DELETE by id presence.
+    if (paymentsPayload.length > 0 || (isEdit && (existingDocument?.payments as unknown[] | undefined)?.length)) {
+      base.payments = paymentsPayload;
     }
 
     return base;
@@ -1237,7 +1226,7 @@ export function useDocumentForm({
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
     addLine, addLineWithProduct, bulkAddLines, removeLine, duplicateLine, updateLine,
     paymentMode: pmMode,
-    payments, existingPayments, newPayments,
+    payments,
     addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
     totals, validate, buildPayload,

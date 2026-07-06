@@ -41,6 +41,7 @@ export interface PaymentConfirmParams {
     paymentModeId:      number;
     amount:             number;
     treasuryAccountId?: number | null;
+    reference?:         string | null;
   }>;
   currencyId?:  number | null;
 }
@@ -54,6 +55,7 @@ interface Props {
   treasuryAccounts?: TreasuryAccount[];
   totalTtcFinal:     number;
   existingPayments?: DocumentPayment[];
+  documentDate?:     string;   // ISO date — تاريخ الفاتورة الحقيقي لجلب الرصيد التاريخي الصحيح
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
@@ -157,7 +159,7 @@ function PaymentStatus({
 export default function ProfessionalPaymentModal({
   totals, client, paymentModes, documentTypes,
   currencies, treasuryAccounts, totalTtcFinal,
-  existingPayments, onClose, onConfirm,
+  existingPayments, documentDate, onClose, onConfirm,
 }: Props) {
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -169,7 +171,7 @@ export default function ProfessionalPaymentModal({
         id:                 uid(),
         dbId:               ep.id,
         modeId:             ep.payment_mode_id,
-        amount:             ep.amount.toFixed(2),
+        amount:             Number(ep.amount || 0).toFixed(2),
         refNote:            ep.reference ?? '',
         treasuryAccountId:  ep.treasury_account_id ?? null,
       }));
@@ -198,31 +200,21 @@ export default function ProfessionalPaymentModal({
       return;
     }
     setBalanceLoading(true);
-    partyBalancesApi.getOne(client.id)
+    partyBalancesApi.getOne(client.id, documentDate)
       .then(res => {
         const data = (res as any)?.data ?? res;
         const currentBalance = Number(data?.current_balance ?? 0);
-        if (existingPayments?.length) {
-          const existingTotal = existingPayments.reduce((s, p) => s + p.amount, 0);
-          const remainingOnInvoice = Math.max(0, totalTtcFinal - existingTotal);
-          setInternalPrevBalance(Math.max(0, currentBalance - remainingOnInvoice));
-        } else {
-          setInternalPrevBalance(Math.max(0, currentBalance));
-        }
+        setInternalPrevBalance(Math.max(0, currentBalance));
       })
       .catch(() => setInternalPrevBalance(0))
       .finally(() => setBalanceLoading(false));
-  }, [client?.id, existingPayments, totalTtcFinal]);
+  }, [client?.id, documentDate]);
 
-  /** الـ line النشط الذي يتلقى مدخلات الـ numpad */
-  const [activeLineId, setActiveLineId] = useState<string | null>(
-    () => (defaultMode ? uid() : null),
-  );
-
-  // نُوحِّد activeLineId مع أول line عند التهيئة
+  const [activeLineId, setActiveLineId] = useState<string | null>(null);
   const activeLineIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (lines.length && !activeLineId) {
+    const stillValid = lines.some(l => l.id === activeLineId);
+    if (lines.length && !stillValid) {
       setActiveLineId(lines[0].id);
     }
     activeLineIdRef.current = activeLineId;
@@ -234,7 +226,7 @@ export default function ProfessionalPaymentModal({
     [lines],
   );
   const existingTotal = useMemo(
-    () => (existingPayments ?? []).reduce((s, p) => s + p.amount, 0),
+    () => (existingPayments ?? []).reduce((s, p) => s + Number(p.amount || 0), 0),
     [existingPayments],
   );
   const newPaid = useMemo(
@@ -346,6 +338,7 @@ export default function ProfessionalPaymentModal({
         paymentModeId:      l.modeId,
         amount:             parseFloat(l.amount),
         treasuryAccountId:  l.treasuryAccountId ?? null,
+        reference:          l.refNote?.trim() || null,
       }));
 
     const res = await onConfirm({

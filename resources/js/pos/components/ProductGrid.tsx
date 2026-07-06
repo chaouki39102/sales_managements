@@ -3,14 +3,13 @@ import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
+import ProductCard from './ProductCard';
 
 interface ProductGridProps {
   variants: ProductVariant[];
   view: ViewMode;
   gridSize: GridSize;
   loading: boolean;
-  hasMore?: boolean;
-  onLoadMore?: () => void;
   onAdd: (v: ProductVariant) => void;
   onAddManual: () => void;
   onPin: (v: ProductVariant) => void;
@@ -23,19 +22,8 @@ interface ProductGridProps {
   onHighlightIndexChange?: (idx: number) => void;
 }
 
-function LoadMore({ hasMore, loading, onLoadMore }: { hasMore?: boolean; loading: boolean; onLoadMore?: () => void }) {
-  if (!hasMore) return null;
-  return (
-    <div className="pos-load-more">
-      <button className="btn btn-outline" onClick={onLoadMore} disabled={loading}>
-        {loading ? 'جاري التحميل…' : 'تحميل المزيد'}
-      </button>
-    </div>
-  );
-}
-
 export default function ProductGrid({
-  variants, view, gridSize, loading, hasMore, onLoadMore, onAdd, onAddManual,
+  variants, view, gridSize, loading, onAdd, onAddManual,
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
   highlightedIndex, onHighlightIndexChange,
 }: ProductGridProps) {
@@ -148,7 +136,6 @@ export default function ProductGrid({
             })}
           </tbody>
         </table>
-        <LoadMore hasMore={hasMore} loading={loading} onLoadMore={onLoadMore} />
       </div>
     );
   }
@@ -163,87 +150,23 @@ export default function ProductGrid({
   return (
     <div className="pos-grid-area" ref={gridRef}>
       <div className={`pgrid ${colsMap[gridSize]}`}>
-        {variants.map((v, idx) => {
-          const priceHt  = getVariantPrice(v, selectedPriceLevelId, priceLevels);
-          const tvaRate  = v.tva?.rate ?? 19;
-          const priceTtc = priceHt * (1 + tvaRate / 100);
-          const inCart   = inCartQty(v.id);
-          const stock    = v.current_stock;
-          const unknownStock = stock === undefined;
-          const outStock = isVariantOutOfStock(v, allowNegativeStock);
-          const lowStock = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= (v.min_stock_alert ?? 0);
-          const lastPiece = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= 2 && !lowStock;
-
-          const style = familyStyleFromName(v.product?.family?.name ?? '');
-
-          return (
-            <div
-              key={v.id}
-              data-hl-idx={idx}
-              className={`pcard ${outStock ? 'pcard-out' : ''} ${inCart > 0 ? 'pcard-incart' : ''} ${highlightedIndex === idx ? 'pcard-hl' : ''}`}
-              onClick={() => {
-                if (!outStock) onAdd(v);
-                if (onHighlightIndexChange !== undefined) onHighlightIndexChange(idx);
-              }}
-              title={v.product?.name}
-            >
-              <div className="pcard-img" style={{ background: style.bg }}>
-                {(v as unknown as { image_url?: string }).image_url
-                  ? <img src={(v as unknown as { image_url?: string }).image_url} alt={v.product?.name} />
-                  : <i className={`ti ${style.icon}`} style={{ color: style.color, fontSize: 22 }} />
-                }
-                {inCart > 0 && <span className="pcard-in-cart">{inCart}</span>}
-                {outStock && <span className="pcard-out-badge">نفذ</span>}
-                {lowStock && !outStock && <span className="pcard-low-badge">قليل</span>}
-                {lastPiece && <span className="pcard-last-badge">آخر قطعة</span>}
-              </div>
-
-              <div className="pcard-body">
-                <div className="pcard-name">{v.product?.name}</div>
-                {v.barcode && <div className="pcard-bc">{v.barcode}</div>}
-
-                <div className="pcard-prices">
-                  <span className="pcard-ttc">{formatDZD(priceTtc)}</span>
-                  {tvaRate > 0 && (
-                    <span className="pcard-ht">HT: {formatDZD(priceHt)}</span>
-                  )}
-                </div>
-
-                {v.manages_stock && !unknownStock && (
-                  <div className={`pcard-stock ${outStock ? 'out' : lowStock ? 'low' : 'ok'}`}>
-                    <i className={`ti ti-${outStock ? 'alert-circle' : lowStock ? 'alert-triangle' : 'package'}`} />
-                    {outStock ? 'نفذ المخزون' : `${stock} ${v.unit?.abbreviation ?? ''}`}
-                  </div>
-                )}
-                {v.manages_stock && unknownStock && (
-                  <div className="pcard-stock na">
-                    <i className="ti ti-minus" />—
-                  </div>
-                )}
-              </div>
-
-              <div className="pcard-actions" onClick={e => e.stopPropagation()}>
-                <button
-                  className={`pcard-pin ${isPinned(v.id) ? 'on' : ''}`}
-                  onClick={() => onPin(v)}
-                  title={isPinned(v.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
-                >
-                  <i className={`ti ti-star${isPinned(v.id) ? '-filled' : ''}`} />
-                </button>
-                <button
-                  className="pcard-add"
-                  onClick={() => !outStock && onAdd(v)}
-                  disabled={outStock}
-                  title="إضافة للسلة"
-                >
-                  <i className="ti ti-plus" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        {variants.map((v, idx) => (
+          <ProductCard
+            key={v.id}
+            variant={v}
+            idx={idx}
+            qtyInCart={inCartQty(v.id)}
+            highlighted={highlightedIndex === idx}
+            isPinned={isPinned(v.id)}
+            priceLevels={priceLevels}
+            selectedPriceLevelId={selectedPriceLevelId}
+            allowNegativeStock={allowNegativeStock}
+            onAdd={onAdd}
+            onPin={onPin}
+            onHighlight={onHighlightIndexChange}
+          />
+        ))}
       </div>
-      <LoadMore hasMore={hasMore} loading={loading} onLoadMore={onLoadMore} />
     </div>
   );
 }

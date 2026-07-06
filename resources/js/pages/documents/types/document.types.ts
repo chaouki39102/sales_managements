@@ -153,6 +153,8 @@ export interface PaymentEntry {
   payment_mode_id:      string;
   amount:               string;
   reference?:           string;
+  notes?:               string;
+  client_ref?:          string;
   payment_date:         string;
   treasury_account_id?: string | number;
   check_number?:        string;

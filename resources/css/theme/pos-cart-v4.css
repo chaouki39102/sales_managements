@@ -583,155 +583,21 @@
 }
 
 /* ══════════════════════════════════════════
-   8. CART CLIENT SELECTOR — محسّن
+   8. (محذوف) CART CLIENT SELECTOR — محسّن
+   ────────────────────────────────────────────
+   كان هنا تطبيق بديل كامل لمُحدِّد الزبون بنمط "dropdown"
+   (.ccv2-*, .cart-client-v2.open, .cc-dropdown, .cc-item...).
+   تأكدنا أنه غير مُستخدم في أي كومبوننت — التطبيق الفعلي
+   (ProfessionalCart.tsx) يفتح CustomerSearchModal ويستخدم
+   كلاسات .client-trigger-v2 / .ctv2-* المعرّفة في pos.css.
+   أُزيل القسم كاملاً لتفادي:
+     - تضارب .cart-client-v2 المُعرَّف مرتين بقيم مختلفة
+       (هنا سابقاً وفي pos.css) حسب ترتيب @import في app.css.
+     - ازدواجية صيانة CSS لواجهة غير مُستخدمة أصلاً.
+   لو رغبت مستقبلاً بنمط dropdown بدل Modal، انقل هذا القسم
+   من النسخة الأصلية وفعّله فعلياً داخل ProfessionalCart.tsx
+   بدل تركه ميتاً بجانب الكود الحي.
 ══════════════════════════════════════════ */
-.cart-client-v2 {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 10px;
-  background: var(--bg3);
-  border-bottom: 1px solid var(--b2);
-  cursor: pointer;
-  transition: background .13s;
-  position: relative;
-  user-select: none;
-}
-.cart-client-v2:hover { background: var(--bg4); }
-.cart-client-v2.open {
-  background: var(--emb);
-  border-bottom-color: var(--embo);
-}
-
-.ccv2-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--grad-em);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 900;
-  color: #fff;
-  flex-shrink: 0;
-  font-family: 'Tajawal', sans-serif;
-}
-.ccv2-avatar.guest {
-  background: var(--bg4);
-  border: 1.5px dashed var(--b3);
-  color: var(--t4);
-}
-
-.ccv2-info { flex: 1; min-width: 0; }
-.ccv2-name {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--t1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ccv2-meta { font-size: 10.5px; color: var(--t4); margin-top: 1px; }
-
-.ccv2-debt {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10.5px;
-  font-weight: 800;
-  color: var(--red);
-  background: var(--redb);
-  padding: 2px 8px;
-  border-radius: 20px;
-  flex-shrink: 0;
-  border: 1px solid var(--redbo);
-}
-
-.ccv2-arrow {
-  font-size: 11px;
-  color: var(--t4);
-  flex-shrink: 0;
-  transition: transform .2s;
-}
-.cart-client-v2.open .ccv2-arrow { transform: rotate(180deg); }
-
-/* Dropdown */
-.cc-dropdown {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  right: 0;
-  z-index: 200;
-  background: var(--bg2);
-  border: 1px solid var(--b3);
-  border-radius: 0 0 var(--r3) var(--r3);
-  box-shadow: var(--shadow2);
-  overflow: hidden;
-  animation: popupIn .15s ease;
-}
-.cc-search-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--b2);
-  background: var(--bg3);
-}
-.cc-search-row i { color: var(--t4); font-size: 13px; flex-shrink: 0; }
-.cc-search-row input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  font-family: 'Tajawal', sans-serif;
-  font-size: 12.5px;
-  color: var(--t1);
-}
-.cc-search-row input::placeholder { color: var(--t4); }
-
-.cc-list { max-height: 280px; overflow-y: auto; }
-.cc-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid var(--b1);
-  transition: background .12s;
-}
-.cc-item:hover    { background: var(--bg3); }
-.cc-item.selected { background: var(--emb); }
-.cc-item-av {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 900;
-  color: #fff;
-  flex-shrink: 0;
-  font-family: 'Tajawal', sans-serif;
-}
-.cc-item-body { flex: 1; min-width: 0; }
-.cc-item-name {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--t1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cc-item-sub { font-size: 10.5px; color: var(--t4); margin-top: 1px; }
-.cc-item-debt {
-  font-size: 10.5px;
-  font-weight: 800;
-  color: var(--red);
-  flex-shrink: 0;
-}
-.cc-empty { padding: 14px; text-align: center; font-size: 12px; color: var(--t4); }
 
 /* ══════════════════════════════════════════
    9. CART HEADER — الرأس المحسّن

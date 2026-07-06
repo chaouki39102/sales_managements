@@ -127,6 +127,21 @@
   flex-shrink: 0;
 }
 .tb-txt { font-size: 11px; }
+.tb-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 4px;
+  background: var(--b2);
+  flex-shrink: 0;
+}
+
+.btn-xs.btn-warn {
+  background: var(--goldb);
+  border-color: var(--goldbo);
+  color: var(--gold);
+}
+.btn-xs.btn-warn:hover:not(:disabled) { background: var(--goldbo); }
+.btn-xs.btn-warn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Keyboard strip */
 .pos-kb-strip {
@@ -2073,9 +2088,12 @@
   .ctv2-name { font-size: 12px; }
   .ctv2-debt { display: none; }
 
-  /* Session invoices table: hide party column */
-  .si-modal-tbl th:nth-child(3),
-  .si-modal-tbl td:nth-child(3) { display: none; }
+  /* Session invoices table: hide party column, shrink paid/remaining */
+  .si-modal-tbl .si-col-client { display: none; }
+  .si-modal-tbl th:nth-child(6),
+  .si-modal-tbl td:nth-child(6),
+  .si-modal-tbl th:nth-child(7),
+  .si-modal-tbl td:nth-child(7) { font-size: 12px; white-space: nowrap; }
 
   /* Product grid adjustments */
   .pgrid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
@@ -2281,6 +2299,27 @@
   min-width: 160px;
   font-size: 13px;
 }
+
+.pos-scroll-sentinel { height: 1px; }
+
+.pos-loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 0 32px;
+  color: var(--t2);
+  font-size: 13px;
+}
+.pos-loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--b2);
+  border-top-color: var(--ac);
+  border-radius: 50%;
+  animation: pos-spin .6s linear infinite;
+}
+@keyframes pos-spin { to { transform: rotate(360deg); } }
 
 .btn-thermal {
   background: var(--emb);

@@ -7,8 +7,7 @@ interface DocumentFooterProps {
     lines: Array<unknown>;
   };
   totals: DocumentTotals;
-  existingPayments: Array<unknown>;
-  newPayments: Array<unknown>;
+  payments: Array<unknown>;
   pmMode: string;
   isEdit: boolean;
   isReadOnly: boolean;
@@ -28,7 +27,7 @@ interface DocumentFooterProps {
 }
 
 export default function DocumentFooter({
-  form, totals, existingPayments, newPayments,
+  form, totals, payments,
   pmMode, isEdit, isReadOnly, isCancelled, isPending,
   successMsg, docCode,   RETURNABLE_CODES,
   handleDelete, handleExport,
@@ -52,7 +51,7 @@ export default function DocumentFooter({
             </span>
           </>
         )}
-        {totals.remaining > 0.01 && (existingPayments.length > 0 || newPayments.length > 0) && (
+        {totals.remaining > 0.01 && payments.length > 0 && (
           <>
             <span>·</span>
             <span style={{ color: 'var(--red)', fontWeight: 600 }}>
@@ -60,11 +59,11 @@ export default function DocumentFooter({
             </span>
           </>
         )}
-        {pmMode === 'additive' && newPayments.length > 0 && (
+        {pmMode === 'additive' && payments.length > 0 && (
           <>
             <span>·</span>
             <span style={{ color: 'var(--orange)', fontWeight: 600 }}>
-              {newPayments.length} دفعة جديدة
+              {payments.length} دفعة
             </span>
           </>
         )}

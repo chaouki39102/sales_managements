@@ -556,6 +556,8 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
   // Save mutation
   const saveMut = useMutation({
     mutationFn: async () => {
+      const payAmount = totals.netPay;
+
       const docPayload = {
         document_type_code: 'FV',
         party_id: partyId ? parseInt(partyId) : null,
@@ -570,25 +572,19 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
           tva_rate: l.tva_rate,
           discount_percentage: 0,
         })),
-      };
-      const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
-      const docId = Number((docRes as any).id ?? (docRes as any).data?.id);
-      const docNum = String(
-        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
-      );
-
-      // إنشاء دفعة بقيمة payAmount
-      if (docId && payAmount > 0) {
-        await apiPost('/payments', {
-          commercial_document_id: docId,
+        payments: payAmount > 0 ? [{
           payment_mode_id: parseInt(payment.payment_mode_id),
           treasury_account_id: parseInt(payment.treasury_account_id),
           amount: payAmount,
           payment_date: payment.payment_date || docDate,
           reference: payment.reference || null,
-          notes: null,
-        });
-      }
+          client_ref: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        }] : [],
+      };
+      const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
+      const docNum = String(
+        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
+      );
 
       return {
         document_number: docNum,
@@ -700,24 +696,19 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
           tva_rate: l.tva_rate,
           discount_percentage: 0,
         })),
-      };
-      const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
-      const docId = Number((docRes as any).id ?? (docRes as any).data?.id);
-      const docNum = String(
-        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
-      );
-
-      if (docId && finalPayAmount > 0) {
-        await apiPost('/payments', {
-          commercial_document_id: docId,
+        payments: finalPayAmount > 0 ? [{
           payment_mode_id: parseInt(paymentLocal.payment_mode_id),
           treasury_account_id: parseInt(paymentLocal.treasury_account_id),
           amount: finalPayAmount,
           payment_date: paymentLocal.payment_date || docDate,
           reference: paymentLocal.reference || null,
-          notes: null,
-        });
-      }
+          client_ref: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        }] : [],
+      };
+      const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
+      const docNum = String(
+        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
+      );
 
       return {
         document_number: docNum,

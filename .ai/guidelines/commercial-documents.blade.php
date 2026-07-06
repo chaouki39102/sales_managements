@@ -26,8 +26,7 @@ Frontend:
   pages/documents/CommercialDocumentModal/DocumentLinesSection.tsx
   pages/documents/CommercialDocumentModal/DocumentPaymentsSection.tsx
   pages/documents/CommercialDocumentModal/DocumentTotalsSection.tsx
-  pages/documents/CommercialDocumentModal/ExistingPaymentsTable.tsx
-  pages/documents/CommercialDocumentModal/DocumentFooter.tsx
+   pages/documents/CommercialDocumentModal/DocumentFooter.tsx
   pages/documents/CommercialDocumentModal/PartyBalanceBadge.tsx
   pages/documents/hooks/useDocumentForm.ts     — main form logic + state
   pages/documents/hooks/useDocumentLookups.ts  — remote data for selects
@@ -67,12 +66,18 @@ Fixed-amount discount flow:
 
 
 ═══════════════════════════════════════════════════════════
-PAYMENTS ARCHITECTURE — 3 MODES
+PAYMENTS ARCHITECTURE — 2 MODES
 ═══════════════════════════════════════════════════════════
 
 Mode: 'free'      — user can add/edit payments freely (draft documents)
 Mode: 'additive'  — user can add new payments, cannot edit existing ones
 Mode: 'locked'    — all payments locked, no modification allowed (validated documents)
+
+UNIFIED PAYLOAD:
+  Frontend ALWAYS sends `payments[]` (never `new_payments[]`).
+  Backend `syncPayments()` handles UPSERT/DELETE by id presence.
+  All document payments flow through a single `syncPayments()` workflow.
+  The legacy `POST /documents/{id}/payments` endpoint is preserved for external API consumers only.
 
 buildDefaultForm() rule:
   ✅ When EDITING an existing document: load payments from document.payments

@@ -1,91 +1,124 @@
 // pos/components/ProductCard.tsx
+//
+// ⚠️ ملاحظة تنظيف (راجع مراجعة صفحة POS):
+// هذه النسخة تحل محل ProductCard.tsx القديم الذي كان "كوداً ميتاً" —
+// كان يستخدم كلاسات .pc2 (من theme.css) بينما ProductGrid.tsx كان
+// يرسم البطاقة يدوياً بكلاسات .pcard-* (من pos.css) بدون استيراد هذا
+// الملف إطلاقاً. تم دمج نفس منطق .pcard-* هنا كي يصبح هذا الكومبوننت
+// هو المصدر الوحيد الفعلي المُستخدَم من ProductGrid (عرض grid فقط —
+// عرض الجدول/القائمة list-view له بنية مختلفة تماماً ويبقى داخل
+// ProductGrid.tsx كجدول <table>).
 import React from 'react';
-import type { ProductVariant } from '@/types';
+import type { ProductVariant, PriceLevel } from '@/types';
+import { formatDZD } from '../utils/calculations';
+import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
 
 interface ProductCardProps {
-  variant: ProductVariant;
-  qtyInCart: number;
-  view: 'grid' | 'list';
-  onClick: () => void;
+  variant:               ProductVariant;
+  /** فهرس العنصر داخل القائمة الحالية — يُستخدم للتنقل بلوحة المفاتيح (data-hl-idx) */
+  idx:                   number;
+  qtyInCart:             number;
+  highlighted:           boolean;
+  isPinned:              boolean;
+  priceLevels:           PriceLevel[];
+  selectedPriceLevelId:  number | null;
+  allowNegativeStock?:   boolean;
+  onAdd:                 (v: ProductVariant) => void;
+  onPin:                 (v: ProductVariant) => void;
+  /** يُستدعى عند أي تفاعل مع البطاقة (كليك) لمزامنة مؤشر التنقل بلوحة المفاتيح */
+  onHighlight?:          (idx: number) => void;
 }
 
-function stockClass(stock: number | undefined, min: number): string {
-  if (stock === undefined || stock === null) return 'ok';
-  if (stock <= 0) return 'no';
-  if (stock <= min) return 'lo';
-  return 'ok';
-}
+export default function ProductCard({
+  variant: v,
+  idx,
+  qtyInCart,
+  highlighted,
+  isPinned,
+  priceLevels,
+  selectedPriceLevelId,
+  allowNegativeStock,
+  onAdd,
+  onPin,
+  onHighlight,
+}: ProductCardProps) {
+  const priceHt  = getVariantPrice(v, selectedPriceLevelId, priceLevels);
+  const tvaRate  = v.tva?.rate ?? 0;
+  const priceTtc = priceHt * (1 + tvaRate / 100);
 
-function stockLabel(stock: number | undefined): string {
-  if (stock === undefined || stock === null) return '';
-  if (stock <= 0) return 'نفد';
-  return `${stock} ${stock === 1 ? 'وحدة' : 'وحدة'}`;
-}
+  const stock         = v.current_stock;
+  const unknownStock  = stock === undefined;
+  const outStock      = isVariantOutOfStock(v, allowNegativeStock);
+  const lowStock      = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= (v.min_stock_alert ?? 0);
+  const lastPiece     = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= 2 && !lowStock;
 
-export default function ProductCard({ variant, qtyInCart, view, onClick }: ProductCardProps) {
-  const product   = variant.product;
-  const stock     = variant.current_stock;
-  const isOOS     = variant.manages_stock && (stock ?? 1) <= 0 && !variant.allow_negative_stock;
-  const sc        = stockClass(stock ?? undefined, variant.min_stock_alert);
-  const tvaRate   = variant.tva?.rate ?? 19;
-  const priceTtc  = variant.default_selling_price_ht * (1 + tvaRate / 100);
+  const style = familyStyleFromName(v.product?.family?.name ?? '');
+  const imageUrl = (v as unknown as { image_url?: string }).image_url;
 
-  // pick icon / color based on family name
-  const familyName = product?.family?.name ?? '';
-  const { icon, color, bg } = familyStyle(familyName);
-
-  const name = [product?.name, variant.variant_name].filter(Boolean).join(' — ');
-
-  if (view === 'list') {
-    return (
-      <div
-        className={`pc2 ${qtyInCart > 0 ? 'sel' : ''} ${isOOS ? 'oos' : ''}`}
-        style={{ '--pc-color': color, '--pc-bg': bg } as React.CSSProperties}
-        onClick={isOOS ? undefined : onClick}
-      >
-        {qtyInCart > 0 && <div className="pc2-badge">{qtyInCart}</div>}
-        <div className="pc2-ic">
-          <span className="ic ic-sm"><i className={`ti ${icon}`} /></span>
-        </div>
-        <div className="pc2-info">
-          <div className="pc2-name">{name}</div>
-          <div className="pc2-price" style={{ direction: 'ltr' }}>
-            {priceTtc.toFixed(0)} دج
-          </div>
-          {variant.manages_stock && (
-            <div className={`pc2-stock ${sc}`}>{stockLabel(stock ?? undefined)}</div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const handleClick = () => {
+    if (!outStock) onAdd(v);
+    onHighlight?.(idx);
+  };
 
   return (
     <div
-      className={`pc2 ${qtyInCart > 0 ? 'sel' : ''} ${isOOS ? 'oos' : ''}`}
-      style={{ '--pc-color': color, '--pc-bg': bg } as React.CSSProperties}
-      onClick={isOOS ? undefined : onClick}
+      data-hl-idx={idx}
+      className={`pcard ${outStock ? 'pcard-out' : ''} ${qtyInCart > 0 ? 'pcard-incart' : ''} ${highlighted ? 'pcard-hl' : ''}`}
+      onClick={handleClick}
+      title={v.product?.name}
     >
-      {qtyInCart > 0 && <div className="pc2-badge">{qtyInCart}</div>}
-      <div className="pc2-ic">
-        <span className="ic ic-sm"><i className={`ti ${icon}`} /></span>
+      <div className="pcard-img" style={{ background: style.bg }}>
+        {imageUrl
+          ? <img src={imageUrl} alt={v.product?.name} />
+          : <i className={`ti ${style.icon}`} style={{ color: style.color, fontSize: 22 }} />
+        }
+        {qtyInCart > 0 && <span className="pcard-in-cart">{qtyInCart}</span>}
+        {outStock && <span className="pcard-out-badge">نفذ</span>}
+        {lowStock && !outStock && <span className="pcard-low-badge">قليل</span>}
+        {lastPiece && <span className="pcard-last-badge">آخر قطعة</span>}
       </div>
-      <div className="pc2-name">{name}</div>
-      <div className="pc2-price" style={{ direction: 'ltr' }}>{priceTtc.toFixed(0)} دج</div>
-      {variant.manages_stock && (
-        <div className={`pc2-stock ${sc}`}>{stockLabel(stock ?? undefined)}</div>
-      )}
+
+      <div className="pcard-body">
+        <div className="pcard-name">{v.product?.name}</div>
+        {v.barcode && <div className="pcard-bc">{v.barcode}</div>}
+
+        <div className="pcard-prices">
+          <span className="pcard-ttc">{formatDZD(priceTtc)}</span>
+          {tvaRate > 0 && (
+            <span className="pcard-ht">HT: {formatDZD(priceHt)}</span>
+          )}
+        </div>
+
+        {v.manages_stock && !unknownStock && (
+          <div className={`pcard-stock ${outStock ? 'out' : lowStock ? 'low' : 'ok'}`}>
+            <i className={`ti ti-${outStock ? 'alert-circle' : lowStock ? 'alert-triangle' : 'package'}`} />
+            {outStock ? 'نفذ المخزون' : `${stock} ${v.unit?.abbreviation ?? ''}`}
+          </div>
+        )}
+        {v.manages_stock && unknownStock && (
+          <div className="pcard-stock na">
+            <i className="ti ti-minus" />—
+          </div>
+        )}
+      </div>
+
+      <div className="pcard-actions" onClick={e => e.stopPropagation()}>
+        <button
+          className={`pcard-pin ${isPinned ? 'on' : ''}`}
+          onClick={() => onPin(v)}
+          title={isPinned ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
+        >
+          <i className={`ti ti-star${isPinned ? '-filled' : ''}`} />
+        </button>
+        <button
+          className="pcard-add"
+          onClick={() => !outStock && onAdd(v)}
+          disabled={outStock}
+          title="إضافة للسلة"
+        >
+          <i className="ti ti-plus" />
+        </button>
+      </div>
     </div>
   );
-}
-
-// ── Family → icon/color mapping ────────────────────
-function familyStyle(family: string): { icon: string; color: string; bg: string } {
-  const f = family.toLowerCase();
-  if (f.includes('غذ') || f.includes('أكل'))    return { icon: 'ti-apple',         color: 'var(--em)',     bg: 'var(--emb)'   };
-  if (f.includes('شراب') || f.includes('ماء'))  return { icon: 'ti-droplets',      color: 'var(--blue)',   bg: 'var(--blueb)' };
-  if (f.includes('إلكترون'))                    return { icon: 'ti-device-mobile', color: 'var(--blue)',   bg: 'var(--blueb)' };
-  if (f.includes('ملابس'))                      return { icon: 'ti-shirt',         color: 'var(--purple)', bg: 'var(--purb)'  };
-  if (f.includes('صيانة'))                      return { icon: 'ti-tool',          color: 'var(--orange)', bg: 'var(--orb)'   };
-  return { icon: 'ti-package', color: 'var(--em)', bg: 'var(--emb)' };
 }

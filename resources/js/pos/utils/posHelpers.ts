@@ -37,16 +37,19 @@ export function getVariantPrice(
   priceLevelId: number | null,
   priceLevels: PriceLevel[],
 ): number {
+  const defaultPrice = v.default_selling_price_ht ?? 0;
   if (priceLevelId) {
     const priceEntry = v.prices?.find(
       (p: ProductVariantPrice) => p.price_level_id === priceLevelId,
     );
-    if (priceEntry) return (priceEntry as any).price_ht ?? priceEntry.price ?? v.default_selling_price_ht;
-    const pl = priceLevels.find(p => p.id === priceLevelId);
-    if (pl?.discount_percent)
-      return v.default_selling_price_ht * (1 - pl.discount_percent / 100);
+    if (priceEntry) return (priceEntry as any).price_ht ?? priceEntry.price ?? defaultPrice;
+    const level = priceLevels.find((pl) => pl.id === priceLevelId);
+    if (level?.discount_percent) {
+      return Math.round(defaultPrice * (1 - level.discount_percent / 100) * 100) / 100;
+    }
+    return defaultPrice;
   }
-  return v.default_selling_price_ht;
+  return defaultPrice;
 }
 
 // ─── productToVariant ─────────────────────────────────────────────────────────

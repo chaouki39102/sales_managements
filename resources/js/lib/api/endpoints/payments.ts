@@ -63,13 +63,6 @@ export const paymentsApi = {
   delete: (id: number) =>
     apiDelete(`/payments/${id}`),
 
-  // ── Payments by document ───────────────────────────────────────────────────
-  byDocument: (documentId: number) =>
-    apiGet<Payment[]>('/payments', {
-      'filter[commercial_document_id]': documentId,
-      include: 'paymentMode,treasuryAccount',
-    }),
-
   confirmed: (params?: PaymentListParams) =>
     apiGet<PaginatedResponse<Payment>>('/payments/confirmed', params),
 
@@ -118,17 +111,6 @@ export function usePayments(params?: PaymentListParams) {
     enabled:         !!slug,
     staleTime:       3 * 60_000,
     placeholderData: keepPreviousData,
-  });
-}
-
-// ✅ جلب مدفوعات مستند معين
-export function useDocumentPayments(documentId: number | null | undefined) {
-  const slug = useActiveSlug();
-  return useQuery({
-    queryKey:  [...tenantKeys.documents.detail(slug ?? '', documentId!), 'payments'],
-    queryFn:   () => paymentsApi.byDocument(documentId!),
-    enabled:   !!slug && !!documentId,
-    staleTime: 2 * 60_000,
   });
 }
 

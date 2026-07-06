@@ -512,7 +512,7 @@ export async function printThermalViaWebUSBFromTemplate(
   return sendBytesToReceiptPrinter(bytes);
 }
 
-async function sendBytesToReceiptPrinter(bytes: Uint8Array): Promise<ThermalPrintResult> {
+export async function sendBytesToReceiptPrinter(bytes: Uint8Array): Promise<ThermalPrintResult> {
   const usb = (navigator as any).usb;
   if (!usb) {
     return { ok: false, method: 'none', message: 'WebUSB غير مدعوم في هذا المتصفح' };
@@ -556,4 +556,7 @@ async function sendBytesToReceiptPrinter(bytes: Uint8Array): Promise<ThermalPrin
   }
 }
 
-
+export async function openCashDrawerViaWebUSB(): Promise<ThermalPrintResult> {
+  const KICK_DRAWER_PIN2 = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]);
+  return sendBytesToReceiptPrinter(KICK_DRAWER_PIN2);
+}

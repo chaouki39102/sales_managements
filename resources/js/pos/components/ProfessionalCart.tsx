@@ -7,14 +7,21 @@
 //   2. onDiscountAmount مُمرَّر لـ CartRow (خصم ثابت بالمبلغ)
 //   3. عرض رصيد الزبون بشكل أوضح مع لون تحذيري
 //   4. شريط الخصومات على الفاتورة يقبل الآن % أو مبلغ ثابت
+//
+// ✅ تصحيحات هذه النسخة (تدقيق الأزرار):
+//   5. حُذف زر 🔍 "بحث أو إنشاء زبون جديد" المكرر — كان يفتح نفس المودال
+//      بالضبط الذي يفتحه النقر على صندوق الزبون نفسه (client-trigger-v2).
+//      الآن يوجد مدخل واحد فقط لفتح CustomerSearchModal.
+//   6. أُضيف زر "تراجع" (undo) بجانب زر المسح مباشرة — يعالج فجوة أمان
+//      حقيقية: مسح السلة (بالزر أو بـ F12) كان عملية نهائية بدون أي طريقة
+//      للاسترجاع. الآن onClear يحفظ نسخة تلقائياً (من POSPage) ويمكن
+//      استرجاعها بضغطة واحدة، أو Ctrl+Z.
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import type { CartItem, CartTotals, Party, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import CartRow from './CartRow';
 import CustomerSearchModal from './CustomerSearchModal';
-
-// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface ProfessionalCartProps {
   items:                CartItem[];
@@ -28,7 +35,7 @@ interface ProfessionalCartProps {
   onSelectItem:         (id: string | null) => void;
   onQty:                (id: string, qty: number) => void;
   onDiscount:           (id: string, pct: number) => void;
-  onDiscountAmount:     (id: string, amount: number) => void;   // ✅ جديد
+  onDiscountAmount:     (id: string, amount: number) => void;
   onPrice:              (id: string, price: number) => void;
   onRemove:             (id: string) => void;
   onSetClient:          (c: Party | null) => void;
@@ -43,9 +50,9 @@ interface ProfessionalCartProps {
   invoiceDiscountPct?:  number;
   onInvoiceDiscountChange?: (pct: number) => void;
   invoiceDiscountAmount?:   number;
+  onUndoClear:          () => void;
+  canUndoClear:         boolean;
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProfessionalCart({
   items, totals, client, customers, priceLevels, selectedPriceLevelId,
@@ -54,31 +61,28 @@ export default function ProfessionalCart({
   onSetClient, onPriceLevelChange, onNoteChange,
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
+  onUndoClear, canUndoClear,
 }: ProfessionalCartProps) {
 
   const [showNote,         setShowNote]         = useState(false);
-  const [showCustModal,    setShowCustModal]     = useState(false);   // ✅ مودال البحث
-  const [invDiscMode,      setInvDiscMode]       = useState<'pct' | 'amount'>('pct'); // ✅
+  const [showCustModal,    setShowCustModal]     = useState(false);
+  const [invDiscMode,      setInvDiscMode]       = useState<'pct' | 'amount'>('pct');
   const [invDiscAmtVal,    setInvDiscAmtVal]     = useState('');
 
   const isEmpty = !items.length;
 
-  // ── خصم الفاتورة بالمبلغ ──────────────────────────────────────────────────
   const handleInvDiscAmount = useCallback((raw: string) => {
     setInvDiscAmtVal(raw);
     const n = parseFloat(raw) || 0;
     if (!onInvoiceDiscountChange || totals.total_ht <= 0) return;
-    // نحوّل المبلغ لنسبة (مستوى total_ht قبل الخصم)
     const pct = Math.min(100, (n / totals.total_ht) * 100);
     onInvoiceDiscountChange(pct);
   }, [onInvoiceDiscountChange, totals.total_ht]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
       <div className="pos-cart" id="pos-cart">
 
-        {/* ── Header ── */}
         <div className="cart-top">
           <div className="cart-top-row">
             <div className="cart-ttl">
@@ -100,6 +104,14 @@ export default function ProfessionalCart({
                 <i className="ti ti-notes" />
               </button>
               <button
+                className="btn btn-xs btn-warn"
+                onClick={onUndoClear}
+                disabled={!canUndoClear}
+                title="تراجع عن آخر مسح — Ctrl+Z"
+              >
+                <i className="ti ti-arrow-back-up" />
+              </button>
+              <button
                 className="btn btn-xs btn-r"
                 onClick={onClear}
                 disabled={isEmpty}
@@ -110,7 +122,6 @@ export default function ProfessionalCart({
             </div>
           </div>
 
-          {/* ملاحظة */}
           {showNote && (
             <div className="cart-note-wrap">
               <input
@@ -123,7 +134,6 @@ export default function ProfessionalCart({
             </div>
           )}
 
-          {/* مستويات السعر */}
           {priceLevels.length > 0 && (
             <div className="cart-modes2">
               <button
@@ -151,13 +161,11 @@ export default function ProfessionalCart({
             </div>
           )}
 
-          {/* ── قسم الزبون المُحسَّن ── */}
           <div className="cart-client-v2">
-            {/* trigger */}
             <div
               className={`client-trigger-v2 ${client ? 'has-client' : ''}`}
               onClick={() => setShowCustModal(true)}
-              title="اختيار أو تغيير الزبون"
+              title="اختيار أو تغيير الزبون — بحث أو إنشاء زبون جديد"
             >
               <div className="ctv2-av">
                 {client
@@ -176,7 +184,6 @@ export default function ProfessionalCart({
                 )}
               </div>
 
-              {/* رصيد الدين */}
               {client?.balance !== undefined && Number(client.balance) > 0 && (
                 <span className="ctv2-debt" title={`رصيد الدين: ${formatDZD(Number(client.balance))}`}>
                   <i className="ti ti-alert-circle" style={{ fontSize: 11 }} />
@@ -187,17 +194,8 @@ export default function ProfessionalCart({
               <i className="ti ti-chevron-down ctv2-arrow" />
             </div>
 
-            {/* أزرار سريعة */}
-            <div className="ctv2-actions">
-              <button
-                className="btn btn-xs btn-p"
-                onClick={() => setShowCustModal(true)}
-                title="بحث أو إنشاء زبون جديد"
-                type="button"
-              >
-                <i className="ti ti-user-search" />
-              </button>
-              {client && (
+            {client && (
+              <div className="ctv2-actions">
                 <button
                   className="btn btn-xs btn-r"
                   onClick={() => onSetClient(null)}
@@ -206,12 +204,11 @@ export default function ProfessionalCart({
                 >
                   <i className="ti ti-x" />
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── أصناف السلة ── */}
         <div className="cart-items">
           {isEmpty ? (
             <div className="cart-empty">
@@ -229,7 +226,7 @@ export default function ProfessionalCart({
                 onSelect={() => onSelectItem(item.id)}
                 onQty={qty => onQty(item.id, qty)}
                 onDiscount={pct => onDiscount(item.id, pct)}
-                onDiscountAmount={amount => onDiscountAmount(item.id, amount)}  // ✅
+                onDiscountAmount={amount => onDiscountAmount(item.id, amount)}
                 onPrice={price => onPrice(item.id, price)}
                 onRemove={() => onRemove(item.id)}
               />
@@ -237,7 +234,6 @@ export default function ProfessionalCart({
           )}
         </div>
 
-        {/* ── الإجماليات ── */}
         {!isEmpty && (
           <div className="cart-totals">
             <div className="ct-row">
@@ -257,12 +253,10 @@ export default function ProfessionalCart({
               <span>{formatDZD(totals.total_tva)}</span>
             </div>
 
-            {/* ── خصم الفاتورة % أو مبلغ ── */}
             {onInvoiceDiscountChange && (
               <div className="ct-row ct-disc">
                 <span>خصم الفاتورة</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {/* تبديل الوضع */}
                   <button
                     className={`cr-disc-mode-btn ${invDiscMode === 'pct' ? 'on' : ''}`}
                     onClick={() => setInvDiscMode('pct')}
@@ -328,7 +322,6 @@ export default function ProfessionalCart({
           </div>
         )}
 
-        {/* ── أزرار الإجراءات ── */}
         <div className="cart-actions">
           <button
             className="btn btn-sm"
@@ -357,7 +350,6 @@ export default function ProfessionalCart({
         </div>
       </div>
 
-      {/* ── CustomerSearchModal ── */}
       {showCustModal && (
         <CustomerSearchModal
           currentClient={client}

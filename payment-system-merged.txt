@@ -1,4 +1,4 @@
-﻿
+
 
 ================================================================================
 FILE: resources/js/pos/components/ProfessionalPaymentModal.tsx
@@ -47,6 +47,7 @@ export interface PaymentConfirmParams {
     paymentModeId:      number;
     amount:             number;
     treasuryAccountId?: number | null;
+    reference?:         string | null;
   }>;
   currencyId?:  number | null;
 }
@@ -352,6 +353,7 @@ export default function ProfessionalPaymentModal({
         paymentModeId:      l.modeId,
         amount:             parseFloat(l.amount),
         treasuryAccountId:  l.treasuryAccountId ?? null,
+        reference:          l.refNote?.trim() || null,
       }));
 
     const res = await onConfirm({
@@ -737,7 +739,7 @@ FILE: resources/js/pages/pos/POSPage.tsx
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
 import { useCartStore }       from '@/pos/utils/useCartStore';
@@ -800,6 +802,7 @@ import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings
 import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
+import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
 import { renderPreviewToHtml, mapCompany }  from '@/pages/settings/print-settings/runtime';
 import { printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
@@ -932,23 +935,14 @@ export default function POSPage() {
     catch { /* storage full */ }
   }, [quickItems, slug]);
 
-  // ── Pagination ────────────────────────────────────────────────────────────
-  const productPagesRef = useRef<Product[]>([]);
-  const loadedPageRef   = useRef(0);
-  const [page, setPage] = useState(1);
-
-  useEffect(() => {
-    setPage(1);
-    productPagesRef.current = [];
-    loadedPageRef.current   = 0;
-  }, [pos.searchQuery, pos.selectedCategory]);
+  // ── Search & Filters ──────────────────────────────────────────────────────
+  const [sortBy, setSortBy] = useState<SortOption>('default');
+  const [filterInStock, setFilterInStock] = useState(false);
+  const [filterLowStock, setFilterLowStock] = useState(false);
+  const [filterMinPrice, setFilterMinPrice] = useState('');
+  const [filterMaxPrice, setFilterMaxPrice] = useState('');
 
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
-  const [filterMinPrice,  setFilterMinPrice]  = useState('');
-  const [filterMaxPrice,  setFilterMaxPrice]  = useState('');
-  const [filterInStock,   setFilterInStock]   = useState(false);
-  const [filterLowStock,  setFilterLowStock]  = useState(false);
-  const [sortBy,          setSortBy]          = useState<SortMode>('name');
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const searchRef    = useRef<HTMLInputElement>(null);
@@ -958,47 +952,25 @@ export default function POSPage() {
   const isSearching   = pos.searchQuery.trim().length >= 2;
   const queryFamilyId = pos.selectedCategory ?? undefined;
 
-  // ── Products query ─────────────────────────────────────────────────────────
-  const { data: productsRaw, isLoading: loadingAll, isPlaceholderData } = useQuery({
+  // ── Products query (all products) ───────────────────────────────────────
+  const { data: productsRaw, isLoading: loadingAll } = useQuery({
     queryKey: [slug, 'products', 'pos', {
-      search: pos.searchQuery, cat: pos.selectedCategory, page, per_page: 120,
+      search: pos.searchQuery, cat: pos.selectedCategory,
     }],
     queryFn: () => productsApi.list({
-      per_page:  120,
+      per_page:  99999,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
       search:    isSearching ? pos.searchQuery : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
-      page,
       filter:    { active: 1 },
     }),
     enabled:         !!slug,
     staleTime:       isSearching ? 2 * 60_000 : 5 * 60_000,
-    placeholderData: keepPreviousData,
   });
 
-  const productsPage = Array.isArray(productsRaw)
+  const rawProducts = Array.isArray(productsRaw)
     ? productsRaw
     : (productsRaw as PaginatedResponse<Product>)?.data ?? [];
-  const productsMeta = !Array.isArray(productsRaw)
-    ? (productsRaw as PaginatedResponse<Product>)?.meta ?? null
-    : null;
-
-  // Only accumulate real data (not keepPreviousData placeholder)
-  // This fixes pagination: placeholder renders set loadedPageRef too early,
-  // causing actual page 2+ data to never be accumulated.
-  if (productsPage.length && !isPlaceholderData && page !== loadedPageRef.current) {
-    loadedPageRef.current = page;
-    if (page === 1) {
-      productPagesRef.current = productsPage;
-    } else {
-      const ids     = new Set(productPagesRef.current.map(p => p.id));
-      const newOnes = productsPage.filter(p => !ids.has(p.id));
-      if (newOnes.length) productPagesRef.current = [...productPagesRef.current, ...newOnes];
-    }
-  }
-
-  const rawProducts = productPagesRef.current;
-  const hasMore     = productsMeta ? !productsMeta.is_last_page : false;
 
   // ── Lookups ─────────────────────────────────────────────────────────────────
   const { data: fiscalYearsData } = useFiscalYears();
@@ -1132,8 +1104,8 @@ export default function POSPage() {
   const filteredVariants = useMemo(() => {
     let list = allVariants;
     if (pos.selectedCategory !== null) list = list.filter(v => v.product?.family?.id === pos.selectedCategory);
-    if (settings.hideOutOfStock) list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
-    if (filterInStock)  list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
+    if (settings.hideOutOfStock && !allowNegSetting) list = list.filter(v => !v.manages_stock || v.current_stock === undefined || v.current_stock > 0);
+    if (filterInStock)  list = list.filter(v => !v.manages_stock || v.current_stock === undefined || v.current_stock > 0);
     if (filterLowStock) list = list.filter(v => v.manages_stock && (v.current_stock ?? 0) <= (v.min_stock_alert ?? 0) && (v.current_stock ?? 0) > 0);
     if (filterMinPrice) list = list.filter(v => v.default_selling_price_ht >= parseFloat(filterMinPrice));
     if (filterMaxPrice) list = list.filter(v => v.default_selling_price_ht <= parseFloat(filterMaxPrice));
@@ -1144,7 +1116,7 @@ export default function POSPage() {
       if (sortBy === 'family')     return (a.product?.family?.name ?? '').localeCompare(b.product?.family?.name ?? '', 'ar');
       return (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'ar');
     });
-  }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
+  }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy, allowNegSetting]);
 
   useEffect(() => {
     setHighlightedIndex(0);
@@ -1152,12 +1124,61 @@ export default function POSPage() {
 
   const isEmpty = pos.items.length === 0;
 
-  const clearCartSafe = useCallback(() => {
-    if (settings.confirmOnClear && !isEmpty && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+  const lastClearedSnapshotRef = useRef<{
+    items: CartItem[];
+    client: Party | null;
+    note: string;
+    invoiceDiscountPct: number;
+  } | null>(null);
+  const [canUndoClear, setCanUndoClear] = useState(false);
+  const undoClearTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleClearCart = useCallback((opts?: { skipConfirm?: boolean }) => {
+    if (isEmpty) return;
+    if (settings.confirmOnClear && !opts?.skipConfirm
+        && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+
+    lastClearedSnapshotRef.current = {
+      items:               [...pos.items],
+      client:              pos.client,
+      note:                cartNote,
+      invoiceDiscountPct:  pos.invoiceDiscountPct,
+    };
+    setCanUndoClear(true);
+    clearTimeout(undoClearTimerRef.current);
+    undoClearTimerRef.current = setTimeout(() => {
+      lastClearedSnapshotRef.current = null;
+      setCanUndoClear(false);
+    }, 20_000);
+
     pos.clearCart();
+    pos.setInvoiceDiscountPct(0);
+    setCartNote('');
     setEditingDocumentId(null);
     setEditingDocStatus(null);
-  }, [settings.confirmOnClear, isEmpty, pos]);
+  }, [settings.confirmOnClear, isEmpty, pos, cartNote]);
+
+  const clearCartSafe = handleClearCart;
+
+  const handleUndoClear = useCallback(() => {
+    const snap = lastClearedSnapshotRef.current;
+    if (!snap) return;
+    useCartStore.setState({
+      items:              snap.items,
+      client:             snap.client,
+      invoiceDiscountPct: snap.invoiceDiscountPct,
+    });
+    setCartNote(snap.note);
+    lastClearedSnapshotRef.current = null;
+    setCanUndoClear(false);
+    clearTimeout(undoClearTimerRef.current);
+    toast.success('تم استرجاع السلة');
+  }, []);
+
+  const handleOpenDrawer = useCallback(async () => {
+    const res = await openCashDrawerViaWebUSB();
+    if (!res.ok) toast.error(res.message ?? 'تعذّر فتح الدرج');
+  }, []);
 
   const handleOpenInvoice = useCallback(async (docId: number) => {
     const cartState = useCartStore.getState();
@@ -1305,8 +1326,11 @@ export default function POSPage() {
         }
       }
       if (matchOverride(slugRef, 'fullscreen', e))  { e.preventDefault(); toggleFullscreen(); }
-      if (matchOverride(slugRef, 'clearCart', e))    { e.preventDefault(); if (!isEmpty) pos.clearCart(); }
+      if (matchOverride(slugRef, 'clearCart', e))    { e.preventDefault(); handleClearCart(); }
       if (matchOverride(slugRef, 'kbHelp', e))       { e.preventDefault(); setModal('kbhelp'); }
+      if (matchOverride(slugRef, 'returns', e))      { e.preventDefault(); setModal('returns'); }
+      if (matchOverride(slugRef, 'openDrawer', e))   { e.preventDefault(); handleOpenDrawer(); }
+      if (matchOverride(slugRef, 'undoClear', e))    { e.preventDefault(); handleUndoClear(); }
 
       if (!inInput) {
         if (matchOverride(slugRef, 'gridView', e))   { e.preventDefault(); setView('grid'); }
@@ -1340,7 +1364,8 @@ export default function POSPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [slug, pos, isEmpty, modal, showFilter, families, selectedCartItemId, toggleFullscreen]);
+  }, [slug, pos, isEmpty, modal, showFilter, families, selectedCartItemId, toggleFullscreen,
+      handleClearCart, handleOpenDrawer, handleUndoClear]);
 
   // ── Price Level ────────────────────────────────────────────────────────────
   const applyPriceLevel = useCallback((plId: number | null) => {
@@ -1415,7 +1440,7 @@ export default function POSPage() {
     dueDate?:     string;
     note?:        string;
     docTypeCode?: string;
-    payments?:    Array<{ id?: number; paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
+    payments?:    Array<{ id?: number; paymentModeId: number; amount: number; treasuryAccountId?: number | null; reference?: string | null }>;
     currencyId?:  number | null;
   }) => {
     const typeCode = params.docTypeCode ?? settings.defaultDocTypeCode;
@@ -1444,6 +1469,8 @@ export default function POSPage() {
           amount:              p.amount,
           payment_date:        new Date().toISOString().slice(0, 10),
           treasury_account_id: p.treasuryAccountId ?? defaultTreasury?.id ?? null,
+          reference:           p.reference?.trim() || null,
+          notes:               params.note?.trim() || null,
         }));
 
       const lineDiscountShare = currentInvDisc > 0
@@ -1600,7 +1627,7 @@ export default function POSPage() {
         variantId: variant.id,
         name:      variant.product?.name ?? '',
         priceHt:   variant.default_selling_price_ht,
-        tvaRate:   variant.tva?.rate ?? 19,
+        tvaRate:   variant.tva?.rate ?? 0,
       }];
     });
   }, []);
@@ -1696,6 +1723,7 @@ export default function POSPage() {
         onSettings={() => setShowSettings(true)}
         onToggleQuickbar={handleToggleQuickbar}
         onKioskMode={() => navigate('/pos/kiosk')}
+        onOpenDrawer={handleOpenDrawer}
       />
 
       <div className="pos-order-type">
@@ -1750,7 +1778,7 @@ export default function POSPage() {
           <CategoryTabs families={families} selected={pos.selectedCategory} onSelect={pos.setCategory} />
           <ProductGrid
             variants={filteredVariants} view={view} gridSize={gridSize}
-            loading={loadingAll} hasMore={hasMore} onLoadMore={() => setPage(p => p + 1)}
+            loading={loadingAll}
             onAdd={handleAddItem} onAddManual={() => setModal('manual')}
             highlightedIndex={highlightedIndex}
             onHighlightIndexChange={setHighlightedIndex}
@@ -1774,12 +1802,14 @@ export default function POSPage() {
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onSetClient={pos.setClient} onPriceLevelChange={applyPriceLevel}
           onNoteChange={setCartNote} onHold={pos.holdCart}
-          onSell={() => setModal('payment')} onClear={clearCartSafe} onHeld={() => setModal('held')}
+          onSell={() => setModal('payment')} onClear={handleClearCart} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           remainingToPay={remainingToPay}
           invoiceDiscountPct={pos.invoiceDiscountPct}
           onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
           invoiceDiscountAmount={invoiceDiscountAmount}
+          onUndoClear={handleUndoClear}
+          canUndoClear={canUndoClear}
         />
       </div>
 
@@ -1890,7 +1920,6 @@ export default function POSPage() {
 }
 
 
-
 ================================================================================
 FILE: resources/js/pages/pos/POSKiosx.tsx
 ================================================================================
@@ -1916,6 +1945,8 @@ export interface DocumentPayment {
   payment_date:        string;
   treasury_account_id?: number | null;
   reference?:          string | null;
+  notes?:              string | null;
+  client_ref?:         string | null;
 }
 
 interface CartState {
@@ -2015,7 +2046,7 @@ export const useCartStore = create<CartState>()(
           }
 
           const priceHt  = variant.default_selling_price_ht;
-          const tvaRate  = variant.tva?.rate ?? 19;
+          const tvaRate  = variant.tva?.rate ?? 0;
           const autoDisc = findQuantityDiscount(variant.quantity_discounts, qty);
 
           const newItem: CartItem = recalcItem({
@@ -2247,6 +2278,7 @@ export const KB_DEFAULTS: Record<string, string> = {
   filter: 'F3',
   manualProduct: 'F6',
   sessionStats: 'F8',
+  returns: 'F10',
   fullscreen: 'F11',
   directPrint: 'Ctrl+P',
   quickSearch: 'Ctrl+F',
@@ -2261,6 +2293,8 @@ export const KB_DEFAULTS: Record<string, string> = {
   enterSearch: 'Enter',
   escape: 'Escape',
   confirmPayment: 'Ctrl+Enter',
+  openDrawer: 'Ctrl+D',
+  undoClear: 'Ctrl+Z',
 };
 
 export function normalizeEventKey(e: KeyboardEvent): string {
@@ -2376,13 +2410,12 @@ import React from 'react';
 import { Section, Label, AlertBanner } from '../components/DocumentUIPrimitives';
 import { CheckFormFields } from '../components/CheckFormFields';
 import { AdvancePaymentsPanel } from '../components/AdvancePaymentsPanel';
-import ExistingPaymentsTable from './ExistingPaymentsTable';
 import type { PaymentEntry } from '../types/document.types';
 import { fmtDZD } from '../utils/document.utils';
+import { toNum } from '../utils/document.utils';
 
 interface DocumentPaymentsSectionProps {
-  existingPayments: PaymentEntry[];
-  newPayments: PaymentEntry[];
+  payments: PaymentEntry[];
   paymentModes: Array<{ id: number; name: string }>;
   paymentModeOptions: Array<{
     id: number;
@@ -2405,7 +2438,7 @@ interface DocumentPaymentsSectionProps {
 }
 
 export default function DocumentPaymentsSection({
-  existingPayments, newPayments,
+  payments,
   paymentModes, paymentModeOptions, treasuryAccountMap, treasuryAccounts,
   addPayment, addPaymentWithValues, removePayment, updatePayment,
   paymentsExceedWarning,
@@ -2416,12 +2449,6 @@ export default function DocumentPaymentsSection({
 
   return (
     <Section title="الدفعات" icon="ti-wallet" collapsible>
-
-      <ExistingPaymentsTable
-        payments={existingPayments}
-        paymentModes={paymentModes}
-        treasuryAccountMap={treasuryAccountMap}
-      />
 
       <AdvancePaymentsPanel
         advances={advancePayments}
@@ -2442,7 +2469,7 @@ export default function DocumentPaymentsSection({
         <AlertBanner type="warning" message={paymentsExceedWarning} />
       )}
 
-      {existingPayments.length === 0 && newPayments.length === 0 && (
+      {payments.length === 0 && (
         <div style={{
           padding: 12, fontSize: 12, color: 'var(--t4)',
           background: 'var(--bg3)', borderRadius: 'var(--r2)', marginBottom: 12,
@@ -2453,19 +2480,8 @@ export default function DocumentPaymentsSection({
         </div>
       )}
 
-      {pmMode === 'additive' && newPayments.length > 0 && (
-        <div style={{
-          padding: '6px 10px', fontSize: 10.5, fontWeight: 800,
-          color: 'var(--em)', textTransform: 'uppercase', letterSpacing: 0.4,
-          borderBottom: '1px solid var(--b1)', marginBottom: 8,
-          display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          <i className="ti ti-plus" style={{ fontSize: 11 }} />
-          دفعات جديدة تُضاف
-        </div>
-      )}
-
-      {newPayments.map((pay, idx) => {
+      {payments.map((pay, idx) => {
+        const isExisting = pay.id !== undefined && pay.id !== null;
         const selectedMode = paymentModes.find(
           (pm) => String(pm.id) === pay.payment_mode_id,
         );
@@ -2476,25 +2492,28 @@ export default function DocumentPaymentsSection({
           : (manualTreasuryStr ? treasuryAccountMap.get(parseInt(manualTreasuryStr)) : null);
 
         const remainingForFill = totals.remaining;
-        const isLast = idx === newPayments.length - 1;
+        const isLast = idx === payments.length - 1;
 
         return (
-          <div key={idx} style={{
+          <div key={pay._clientRef ?? idx} style={{
             display: 'grid',
             gridTemplateColumns: '1fr 130px 160px 120px 1fr 32px',
             gap: 8, marginBottom: 10, alignItems: 'end',
             padding: 12, borderRadius: 'var(--r2)',
-            background: 'var(--bg2)', border: '1px solid var(--b2)',
+            background: isExisting ? 'var(--goldb)' : 'var(--bg2)',
+            border: `1px solid ${isExisting ? 'var(--gold)' : 'var(--b2)'}`,
           }}>
             <div>
               {idx === 0 && <Label>طريقة الدفع</Label>}
               <select
+                disabled={pmMode === 'locked'}
                 style={{
                   width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                   border: `1px solid ${!pay.payment_mode_id ? 'var(--red)' : 'var(--b3)'}`,
                   background: 'var(--bg1)', color: 'var(--t1)',
                   fontSize: 13, fontFamily: 'Tajawal, sans-serif',
-                  outline: 'none', cursor: 'pointer', boxSizing: 'border-box',
+                  outline: 'none', cursor: pmMode === 'locked' ? 'not-allowed' : 'pointer',
+                  boxSizing: 'border-box',
                 }}
                 value={pay.payment_mode_id}
                 onChange={(e) => updatePayment(idx, { payment_mode_id: e.target.value })}
@@ -2510,6 +2529,7 @@ export default function DocumentPaymentsSection({
               {idx === 0 && <Label>المبلغ</Label>}
               <input
                 type="number" min={0} step={0.01}
+                disabled={pmMode === 'locked'}
                 style={{
                   width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                   border: '1px solid var(--b3)',
@@ -2542,6 +2562,7 @@ export default function DocumentPaymentsSection({
               {idx === 0 && <Label>المرجع</Label>}
               <input
                 type="text"
+                disabled={pmMode === 'locked'}
                 style={{
                   width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                   border: `1px solid ${
@@ -2562,6 +2583,7 @@ export default function DocumentPaymentsSection({
               {idx === 0 && <Label>التاريخ</Label>}
               <input
                 type="date"
+                disabled={pmMode === 'locked'}
                 style={{
                   width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                   border: '1px solid var(--b3)',
@@ -2602,12 +2624,13 @@ export default function DocumentPaymentsSection({
                 </div>
               ) : (
                 <select
+                  disabled={pmMode === 'locked'}
                   style={{
                     width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
                     border: `1px solid ${!manualTreasuryStr ? 'var(--red)' : 'var(--b3)'}`,
                     background: 'var(--bg1)', color: 'var(--t1)',
                     fontSize: 12, fontFamily: 'Tajawal, sans-serif',
-                    outline: 'none', cursor: 'pointer',
+                    outline: 'none', cursor: pmMode === 'locked' ? 'not-allowed' : 'pointer',
                     height: 38, boxSizing: 'border-box',
                   }}
                   value={manualTreasuryStr}
@@ -2623,19 +2646,21 @@ export default function DocumentPaymentsSection({
               )}
             </div>
 
-            <button
-              onClick={() => removePayment(idx)}
-              style={{
-                width: 32, height: 32, borderRadius: 'var(--r1)',
-                border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
-                background: 'var(--redb)', color: 'var(--red)',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                alignSelf: 'flex-end',
-              }}
-            >
-              <i className="ti ti-trash" style={{ fontSize: 13 }} />
-            </button>
+            {pmMode !== 'locked' && (
+              <button
+                onClick={() => removePayment(idx)}
+                style={{
+                  width: 32, height: 32, borderRadius: 'var(--r1)',
+                  border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)',
+                  background: 'var(--redb)', color: 'var(--red)',
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  alignSelf: 'flex-end',
+                }}
+              >
+                <i className="ti ti-trash" style={{ fontSize: 13 }} />
+              </button>
+            )}
 
             {effectiveTreasury?.type === 'check' && (
               <div style={{ gridColumn: '1 / -1' }}>
@@ -2683,82 +2708,7 @@ export default function DocumentPaymentsSection({
 FILE: resources/js/pages/documents/CommercialDocumentModal/ExistingPaymentsTable.tsx
 ================================================================================
 
-import React from 'react';
-import { fmtDZD, fmtDate } from '../utils/document.utils';
-import type { PaymentEntry } from '../types/document.types';
-
-export default function ExistingPaymentsTable({
-  payments,
-  paymentModes,
-  treasuryAccountMap,
-}: {
-  payments: PaymentEntry[];
-  paymentModes: Array<{ id: number; name: string }>;
-  treasuryAccountMap: Map<number, { id: number; name: string; type: string }>;
-}) {
-  if (payments.length === 0) return null;
-
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{
-        padding: '6px 10px', fontSize: 10.5, fontWeight: 800,
-        color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: 0.4,
-        borderBottom: '1px solid var(--b1)', marginBottom: 6,
-        display: 'flex', alignItems: 'center', gap: 6,
-      }}>
-        <i className="ti ti-lock" style={{ fontSize: 11 }} />
-        دفعات مُسجَّلة (للقراءة)
-        <span style={{
-          padding: '1px 6px', borderRadius: 99, fontSize: 10,
-          background: 'var(--bg3)', color: 'var(--t4)',
-        }}>
-          {payments.length}
-        </span>
-      </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-        <thead>
-          <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--b2)' }}>
-            {['طريقة الدفع', 'المبلغ', 'المرجع', 'التاريخ', 'الحساب'].map((h) => (
-              <th key={h} style={{
-                padding: '5px 8px', textAlign: 'right', fontSize: 10.5,
-                fontWeight: 700, color: 'var(--t4)',
-              }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {payments.map((pay, idx) => {
-            const mode = paymentModes.find((pm) => String(pm.id) === pay.payment_mode_id);
-            const taId = pay.treasury_account_id ? parseInt(String(pay.treasury_account_id)) : null;
-            const ta = taId ? treasuryAccountMap.get(taId) : null;
-            return (
-              <tr key={idx} style={{ borderBottom: '1px solid var(--b1)' }}>
-                <td style={{ padding: '6px 8px', color: 'var(--t2)' }}>
-                  {mode?.name ?? `#${pay.payment_mode_id}`}
-                </td>
-                <td style={{
-                  padding: '6px 8px', fontWeight: 700, color: 'var(--green)',
-                  direction: 'ltr', textAlign: 'right',
-                }}>
-                  {fmtDZD(pay.amount)} دج
-                </td>
-                <td style={{ padding: '6px 8px', color: 'var(--t4)', fontSize: 11 }}>
-                  {pay.reference || '—'}
-                </td>
-                <td style={{ padding: '6px 8px', color: 'var(--t3)', fontSize: 11 }}>
-                  {fmtDate(pay.payment_date)}
-                </td>
-                <td style={{ padding: '6px 8px', color: 'var(--t4)', fontSize: 11 }}>
-                  {ta ? `${ta.name}` : pay.treasury_account_id ? `#${pay.treasury_account_id}` : '—'}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+***** FILE NOT FOUND *****
 
 
 
@@ -2774,8 +2724,7 @@ import { fmtDZD } from '../utils/document.utils';
 
 interface DocumentTotalsSectionProps {
   totals: DocumentTotals;
-  existingPayments: Array<unknown>;
-  newPayments: Array<unknown>;
+  payments: Array<unknown>;
   partyBalance: PartyBalanceInfo | null;
   form: DocumentFormState;
   selectedParty: { name?: string } | null;
@@ -2787,7 +2736,7 @@ interface DocumentTotalsSectionProps {
 }
 
 export default function DocumentTotalsSection({
-  totals, existingPayments, newPayments,
+  totals, payments,
   partyBalance, form, selectedParty,
   isPurchase, isEdit, isReadOnly, set,
   stampEnabled = true,
@@ -2813,7 +2762,7 @@ export default function DocumentTotalsSection({
           label="المبلغ المستحق" value={`${fmtDZD(totals.netToPay)} دج`}
           bg="var(--em)" color="white" labelColor="rgba(255,255,255,.75)" large
         />
-        {(existingPayments.length > 0 || newPayments.length > 0) && (
+        {payments.length > 0 && (
           <>
             <TotalCard
               label="المدفوع" value={`${fmtDZD(totals.totalPaid)} دج`}
@@ -3230,6 +3179,8 @@ export function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
     payment_mode_id:     paymentModeId,
     amount:              String(p.amount ?? '0'),
     reference:           String(p.reference ?? ''),
+    notes:               p.notes ? String(p.notes) : undefined,
+    client_ref:          p.client_ref ? String(p.client_ref) : undefined,
     payment_date:        String(p.payment_date ?? today()).split('T')[0],
     treasury_account_id: treasuryId,
   };
@@ -3871,18 +3822,6 @@ export function useDocumentForm({
     return `cr_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   }
 
-  /** الدفعات الموجودة فعلاً في قاعدة البيانات (لها id) */
-  const existingPayments = useMemo(
-    () => payments.filter((p) => p.id != null),
-    [payments],
-  );
-
-  /** الدفعات الجديدة (لم تُحفظ بعد) */
-  const newPayments = useMemo(
-    () => payments.filter((p) => p.id == null),
-    [payments],
-  );
-
   // ── إدارة الدفعات ─────────────────────────────────────────────────────────
 
   const addPayment = useCallback(() => {
@@ -4028,9 +3967,11 @@ export function useDocumentForm({
         ...(p.id ? { id: p.id } : {}),
         // translate internal _clientRef → API field client_ref at the network boundary
         ...(!p.id && p._clientRef ? { client_ref: p._clientRef } : {}),
+        ...(p.client_ref ? { client_ref: p.client_ref } : {}),
         payment_mode_id:     parseInt(p.payment_mode_id),
         amount:              parseFloat(p.amount),
         reference:           p.reference?.trim() || null,
+        notes:               p.notes?.trim() || null,
         payment_date:        p.payment_date,
         treasury_account_id: treasuryId,
         ...(p.check_number   ? { check_number: p.check_number } : {}),
@@ -4084,16 +4025,13 @@ export function useDocumentForm({
       payment_terms:    f.payment_terms.length > 0 ? f.payment_terms : null,
     };
 
-    if (pmMode === 'additive') {
-      if (paymentsPayload.length > 0) base.new_payments = paymentsPayload;
-    } else {
+    if (pmMode !== 'additive') {
       base.lines = linesPayload;
-      // أرسل الدفعات دائماً إذا كان هناك مدفوعات صالحة، أو إذا كان المستند
-      // موجوداً مسبقاً وكانت له دفعات (حتى لو أُفرغت — لحذف كل الدفعات).
-      // الباكاند يفحص `has('payments')` وليس `!empty($payments)`.
-      if (paymentsPayload.length > 0 || (isEdit && (existingDocument?.payments as unknown[] | undefined)?.length)) {
-        base.payments = paymentsPayload;
-      }
+    }
+    // Unified payment payload — always payments[], never new_payments.
+    // syncPayments() on the backend handles UPSERT/DELETE by id presence.
+    if (paymentsPayload.length > 0 || (isEdit && (existingDocument?.payments as unknown[] | undefined)?.length)) {
+      base.payments = paymentsPayload;
     }
 
     return base;
@@ -4112,7 +4050,7 @@ export function useDocumentForm({
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
     addLine, addLineWithProduct, bulkAddLines, removeLine, duplicateLine, updateLine,
     paymentMode: pmMode,
-    payments, existingPayments, newPayments,
+    payments,
     addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
     totals, validate, buildPayload,
@@ -6707,6 +6645,8 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
   // Save mutation
   const saveMut = useMutation({
     mutationFn: async () => {
+      const payAmount = totals.netPay;
+
       const docPayload = {
         document_type_code: 'FV',
         party_id: partyId ? parseInt(partyId) : null,
@@ -6721,25 +6661,19 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
           tva_rate: l.tva_rate,
           discount_percentage: 0,
         })),
-      };
-      const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
-      const docId = Number((docRes as any).id ?? (docRes as any).data?.id);
-      const docNum = String(
-        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
-      );
-
-      // إنشاء دفعة بقيمة payAmount
-      if (docId && payAmount > 0) {
-        await apiPost('/payments', {
-          commercial_document_id: docId,
+        payments: payAmount > 0 ? [{
           payment_mode_id: parseInt(payment.payment_mode_id),
           treasury_account_id: parseInt(payment.treasury_account_id),
           amount: payAmount,
           payment_date: payment.payment_date || docDate,
           reference: payment.reference || null,
-          notes: null,
-        });
-      }
+          client_ref: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        }] : [],
+      };
+      const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
+      const docNum = String(
+        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
+      );
 
       return {
         document_number: docNum,
@@ -6851,24 +6785,19 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
           tva_rate: l.tva_rate,
           discount_percentage: 0,
         })),
-      };
-      const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
-      const docId = Number((docRes as any).id ?? (docRes as any).data?.id);
-      const docNum = String(
-        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
-      );
-
-      if (docId && finalPayAmount > 0) {
-        await apiPost('/payments', {
-          commercial_document_id: docId,
+        payments: finalPayAmount > 0 ? [{
           payment_mode_id: parseInt(paymentLocal.payment_mode_id),
           treasury_account_id: parseInt(paymentLocal.treasury_account_id),
           amount: finalPayAmount,
           payment_date: paymentLocal.payment_date || docDate,
           reference: paymentLocal.reference || null,
-          notes: null,
-        });
-      }
+          client_ref: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        }] : [],
+      };
+      const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
+      const docNum = String(
+        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
+      );
 
       return {
         document_number: docNum,
@@ -7833,13 +7762,6 @@ export const paymentsApi = {
   delete: (id: number) =>
     apiDelete(`/payments/${id}`),
 
-  // ── Payments by document ───────────────────────────────────────────────────
-  byDocument: (documentId: number) =>
-    apiGet<Payment[]>('/payments', {
-      'filter[commercial_document_id]': documentId,
-      include: 'paymentMode,treasuryAccount',
-    }),
-
   confirmed: (params?: PaymentListParams) =>
     apiGet<PaginatedResponse<Payment>>('/payments/confirmed', params),
 
@@ -7888,17 +7810,6 @@ export function usePayments(params?: PaymentListParams) {
     enabled:         !!slug,
     staleTime:       3 * 60_000,
     placeholderData: keepPreviousData,
-  });
-}
-
-// ✅ جلب مدفوعات مستند معين
-export function useDocumentPayments(documentId: number | null | undefined) {
-  const slug = useActiveSlug();
-  return useQuery({
-    queryKey:  [...tenantKeys.documents.detail(slug ?? '', documentId!), 'payments'],
-    queryFn:   () => paymentsApi.byDocument(documentId!),
-    enabled:   !!slug && !!documentId,
-    staleTime: 2 * 60_000,
   });
 }
 
@@ -7977,22 +7888,16 @@ FILE: resources/js/lib/api/endpoints/documents.ts
 // ════════════════════════════════════════════════════════════════════════════
 // lib/api/endpoints/documents.ts — النسخة المُعاد هيكلتها
 //
-// ══ التغييرات الجوهرية ═══════════════════════════════════════════════════════
+// ══ ملاحظات ══════════════════════════════════════════════════════════════════
 //
-// 1. DocumentCreateInput: إزالة price_level_id و apply_fiscal_stamp
-//    (الباكاند لا يستخدمهما — الطابع يُحسَب تلقائياً)
+// UNIFIED PAYMENT PAYLOAD:
+//   Frontend ALWAYS sends `payments[]` (never `new_payments[]`).
+//   Backend `syncPayments()` handles UPSERT/DELETE by id presence.
+//   The legacy `POST /documents/{id}/payments` endpoint (addPayments) is
+//   preserved on the backend for external API consumers only — the frontend
+//   no longer calls it.
 //
-// 2. DocumentUpdateInput: انقسام إلى وضعَين:
-//    - free mode:     lines + payments كاملة (مستندات draft/pending)
-//    - additive mode: new_payments فقط (مستندات validated/paid/...)
-//
-// 3. documentsApi.addPayments(): endpoint جديد
-//    POST /{company}/documents/{id}/payments
-//    للوضع additive فقط
-//
-// 4. useDocumentMutations: إضافة addPayments mutation
-//
-// 5. show: إضافة العلاقات الكاملة المطلوبة
+// show: إضافة العلاقات الكاملة المطلوبة
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -8015,6 +7920,8 @@ export interface DocumentPaymentInput {
   payment_mode_id:      number;
   amount:               number;
   reference?:           string | null;
+  notes?:               string | null;
+  client_ref?:          string | null;
   payment_date:         string;
   treasury_account_id?: number | null;
 }
@@ -8064,18 +7971,7 @@ export interface DocumentUpdateFreeInput {
   payments?:         DocumentPaymentInput[];
 }
 
-/** تحديث في وضع additive (validated/paid/...) — دفعات جديدة فقط */
-export interface DocumentUpdateAdditiveInput {
-  party_id?:         number | null;
-  document_date?:    string;
-  due_date?:         string | null;
-  notes?:            string | null;
-  document_number?:  string;
-  /** ✅ دفعات جديدة تُضاف فوق الموجودة — لا تمس القديمة */
-  new_payments?:     DocumentPaymentInput[];
-}
-
-export type DocumentUpdateInput = DocumentUpdateFreeInput | DocumentUpdateAdditiveInput;
+export type DocumentUpdateInput = DocumentUpdateFreeInput;
 
 export interface DocumentListParams extends ListParams {
   document_type_id?:  number;
@@ -8162,15 +8058,6 @@ export const documentsApi = {
 
   qrcode: (id: number) =>
     apiGet<{ url: string }>(`/documents/${id}/qrcode`),
-
-  /**
-   * ✅ إضافة دفعات جديدة لمستند موجود (وضع additive).
-   * يُستخدم عندما يكون المستند معتمداً — الفرونتند يرسل new_payments.
-   *
-   * Route: POST /{company}/documents/{id}/payments
-   */
-  addPayments: (id: number, payments: DocumentPaymentInput[]) =>
-    apiPost<CommercialDocument>(`/documents/${id}/payments`, { payments }),
 
   // ── Lines ──────────────────────────────────────────────────────────────────
 
@@ -8275,17 +8162,6 @@ export function useDocumentMutations() {
     },
   });
 
-  // ── addPayments (additive mode) ───────────────────────────────────────────
-
-  const addPayments = useMutation({
-    mutationFn: ({ id, payments }: { id: number; payments: DocumentPaymentInput[] }) =>
-      documentsApi.addPayments(id, payments),
-    onSuccess: (doc) => {
-      invalidateOne(doc);
-      invalidatePartyBalance(doc.party_id);
-    },
-  });
-
   // ── delete ────────────────────────────────────────────────────────────────
 
   const remove = useMutation({
@@ -8317,7 +8193,7 @@ export function useDocumentMutations() {
   });
 
   return {
-    create, update, addPayments, remove,
+    create, update, remove,
     validate, lock, unlock, cancel,
     selectedYear,
   };
@@ -8517,7 +8393,6 @@ class PaymentModeController extends BaseApiController
 }
 
 
-
 ================================================================================
 FILE: app/Http/Controllers/Api/V1/CommercialDocumentController.php
 ================================================================================
@@ -8537,6 +8412,7 @@ use App\Services\NotificationService;
 use App\Models\Company;          // ✅ أضفنا هذا
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CommercialDocumentController extends BaseApiController
 {
@@ -8780,6 +8656,16 @@ class CommercialDocumentController extends BaseApiController
         }
     }
 
+    /**
+     * LEGACY — Additive payments endpoint.
+     *
+     * Kept for backward compatibility (external API consumers).
+     * The frontend no longer calls this endpoint.
+     *
+     * Payments are now synchronized through the unified payments[]
+     * workflow inside create() and update() — see syncPayments().
+     * POST /documents/{id}/payments still works for legacy clients.
+     */
     public function addPayments(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
@@ -8798,10 +8684,12 @@ class CommercialDocumentController extends BaseApiController
                 'payments.*.treasury_account_id'   => 'nullable|integer',
             ]);
 
-            $this->commercialDocumentService->syncPayments(
-                $commercialDocument,
-                $validated['payments']
-            );
+            DB::transaction(function () use ($commercialDocument, $validated) {
+                $this->commercialDocumentService->syncPayments(
+                    $commercialDocument,
+                    $validated['payments']
+                );
+            });
 
             $this->notificationService->success(
                 'تمت إضافة دفعات',
@@ -9395,7 +9283,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         // R4: إذا كانت الوثيقة معتمدة وجاءت lines في الطلب → رفض
-        // new_payments مسموح
+        // payments مسموحة للمستندات المعتمدة (additive mode)
         $hasLines = !empty($data['lines']) || !empty($request?->input('lines'));
         if ($hasLines) {
             $currentStatusName = $item->documentStatus?->name
@@ -10458,7 +10346,6 @@ class DocumentPayment extends Pivot
 }
 
 
-
 ================================================================================
 FILE: database/migrations/2025_10_15_094115_create_payments_table.php
 ================================================================================
@@ -10643,7 +10530,6 @@ class PaymentModeSeeder extends Seeder
 }
 
 
-
 ================================================================================
 FILE: app/Policies/PaymentPolicy.php
 ================================================================================
@@ -10694,7 +10580,6 @@ class PaymentPolicy
         return $user->can('force_delete_payment');
     }
 }
-
 
 
 ================================================================================
@@ -10920,6 +10805,7 @@ class PaymentResource extends JsonResource
             'check_id'            => $this->check_id,
             'party_id'            => $this->party_id,
             'fiscal_year_id'      => $this->fiscal_year_id,
+            'client_ref'          => $this->client_ref,
             'reference'           => $this->reference,
             'bank_reference'      => $this->bank_reference,
             'notes'               => $this->notes,

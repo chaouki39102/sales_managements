@@ -178,8 +178,7 @@ export default function CommercialDocumentModal({
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
     addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
     paymentMode: pmMode,
-    existingPayments,
-    newPayments,
+    payments,
     bulkAddLines,
     addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
@@ -424,20 +423,6 @@ export default function CommercialDocumentModal({
     mutationFn: () => {
       const payload = buildPayload();
 
-      if (pmMode === 'additive' && isEdit) {
-        const newPaymentsPayload = (payload.new_payments ?? []) as Array<Record<string, unknown>>;
-        if (newPaymentsPayload.length === 0) {
-          const basePayload = { ...payload };
-          delete basePayload.new_payments;
-          delete basePayload.lines;
-          return apiPut<Record<string, unknown>>(`/documents/${existingDocument!.id}`, basePayload);
-        }
-        return apiPost<Record<string, unknown>>(
-          `/documents/${existingDocument!.id}/payments`,
-          { payments: newPaymentsPayload },
-        );
-      }
-
       const url = isEdit ? `/documents/${existingDocument!.id}` : '/documents';
       if (isEdit && docNumber) {
         (payload as Record<string, unknown>).document_number = docNumber;
@@ -637,13 +622,12 @@ export default function CommercialDocumentModal({
   }, [affectsStock, stockDir]);
 
   const paymentsExceedWarning = useMemo(() => {
-    const allPaid = [...existingPayments, ...newPayments]
-      .reduce((acc, p) => acc + toNum(p.amount), 0);
+    const allPaid = payments.reduce((acc, p) => acc + toNum(p.amount), 0);
     if (allPaid > totals.netToPay + 0.01 && totals.netToPay > 0) {
       return `مجموع الدفعات (${fmtDZD(allPaid)} دج) يتجاوز المبلغ المستحق (${fmtDZD(totals.netToPay)} دج)`;
     }
     return null;
-  }, [existingPayments, newPayments, totals.netToPay]);
+  }, [payments, totals.netToPay]);
 
   const balanceWarning = useMemo(() => {
     if (!partyBalance || partyBalance.current_balance <= 0) return null;
@@ -940,8 +924,7 @@ export default function CommercialDocumentModal({
 
           {/* ═══ SECTION 3: الدفعات ═══ */}
           <DocumentPaymentsSection
-            existingPayments={existingPayments}
-            newPayments={newPayments}
+            payments={payments}
             paymentModes={lookups.paymentModes}
             paymentModeOptions={paymentModeOptions}
             treasuryAccountMap={treasuryAccountMap}
@@ -961,8 +944,7 @@ export default function CommercialDocumentModal({
           {/* ═══ SECTION 4: الإجماليات ═══ */}
           <DocumentTotalsSection
             totals={totals}
-            existingPayments={existingPayments}
-            newPayments={newPayments}
+            payments={payments}
             partyBalance={partyBalance}
             form={form}
             selectedParty={selectedParty}
@@ -978,8 +960,7 @@ export default function CommercialDocumentModal({
         <DocumentFooter
           form={form}
           totals={totals}
-          existingPayments={existingPayments}
-          newPayments={newPayments}
+          payments={payments}
           pmMode={pmMode}
           isEdit={isEdit}
           isReadOnly={isReadOnly}

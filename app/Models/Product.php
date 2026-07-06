@@ -132,7 +132,7 @@ class Product extends Model
     public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
     public static int $defaultPerPage = 15;
-    public static int $perPageLimit = 100;
+    public static int $perPageLimit = 99999;
     public static ?int $cacheTtl = 300;
     public static array $cacheTags = ['products'];
 

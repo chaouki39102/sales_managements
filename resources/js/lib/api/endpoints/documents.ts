@@ -1,22 +1,16 @@
 // ════════════════════════════════════════════════════════════════════════════
 // lib/api/endpoints/documents.ts — النسخة المُعاد هيكلتها
 //
-// ══ التغييرات الجوهرية ═══════════════════════════════════════════════════════
+// ══ ملاحظات ══════════════════════════════════════════════════════════════════
 //
-// 1. DocumentCreateInput: إزالة price_level_id و apply_fiscal_stamp
-//    (الباكاند لا يستخدمهما — الطابع يُحسَب تلقائياً)
+// UNIFIED PAYMENT PAYLOAD:
+//   Frontend ALWAYS sends `payments[]` (never `new_payments[]`).
+//   Backend `syncPayments()` handles UPSERT/DELETE by id presence.
+//   The legacy `POST /documents/{id}/payments` endpoint (addPayments) is
+//   preserved on the backend for external API consumers only — the frontend
+//   no longer calls it.
 //
-// 2. DocumentUpdateInput: انقسام إلى وضعَين:
-//    - free mode:     lines + payments كاملة (مستندات draft/pending)
-//    - additive mode: new_payments فقط (مستندات validated/paid/...)
-//
-// 3. documentsApi.addPayments(): endpoint جديد
-//    POST /{company}/documents/{id}/payments
-//    للوضع additive فقط
-//
-// 4. useDocumentMutations: إضافة addPayments mutation
-//
-// 5. show: إضافة العلاقات الكاملة المطلوبة
+// show: إضافة العلاقات الكاملة المطلوبة
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -39,6 +33,8 @@ export interface DocumentPaymentInput {
   payment_mode_id:      number;
   amount:               number;
   reference?:           string | null;
+  notes?:               string | null;
+  client_ref?:          string | null;
   payment_date:         string;
   treasury_account_id?: number | null;
 }
@@ -88,18 +84,7 @@ export interface DocumentUpdateFreeInput {
   payments?:         DocumentPaymentInput[];
 }
 
-/** تحديث في وضع additive (validated/paid/...) — دفعات جديدة فقط */
-export interface DocumentUpdateAdditiveInput {
-  party_id?:         number | null;
-  document_date?:    string;
-  due_date?:         string | null;
-  notes?:            string | null;
-  document_number?:  string;
-  /** ✅ دفعات جديدة تُضاف فوق الموجودة — لا تمس القديمة */
-  new_payments?:     DocumentPaymentInput[];
-}
-
-export type DocumentUpdateInput = DocumentUpdateFreeInput | DocumentUpdateAdditiveInput;
+export type DocumentUpdateInput = DocumentUpdateFreeInput;
 
 export interface DocumentListParams extends ListParams {
   document_type_id?:  number;
@@ -186,15 +171,6 @@ export const documentsApi = {
 
   qrcode: (id: number) =>
     apiGet<{ url: string }>(`/documents/${id}/qrcode`),
-
-  /**
-   * ✅ إضافة دفعات جديدة لمستند موجود (وضع additive).
-   * يُستخدم عندما يكون المستند معتمداً — الفرونتند يرسل new_payments.
-   *
-   * Route: POST /{company}/documents/{id}/payments
-   */
-  addPayments: (id: number, payments: DocumentPaymentInput[]) =>
-    apiPost<CommercialDocument>(`/documents/${id}/payments`, { payments }),
 
   // ── Lines ──────────────────────────────────────────────────────────────────
 
@@ -299,17 +275,6 @@ export function useDocumentMutations() {
     },
   });
 
-  // ── addPayments (additive mode) ───────────────────────────────────────────
-
-  const addPayments = useMutation({
-    mutationFn: ({ id, payments }: { id: number; payments: DocumentPaymentInput[] }) =>
-      documentsApi.addPayments(id, payments),
-    onSuccess: (doc) => {
-      invalidateOne(doc);
-      invalidatePartyBalance(doc.party_id);
-    },
-  });
-
   // ── delete ────────────────────────────────────────────────────────────────
 
   const remove = useMutation({
@@ -341,7 +306,7 @@ export function useDocumentMutations() {
   });
 
   return {
-    create, update, addPayments, remove,
+    create, update, remove,
     validate, lock, unlock, cancel,
     selectedYear,
   };

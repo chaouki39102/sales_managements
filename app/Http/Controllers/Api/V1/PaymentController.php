@@ -6,6 +6,9 @@ use App\Core\Http\Controllers\BaseApiController;
 use App\Http\Resources\PaymentResource;
 use App\Services\PaymentService;
 use App\Models\Payment;
+use App\Http\Requests\StorePaymentRequest;
+use App\Http\Requests\UpdatePaymentRequest;
+use Illuminate\Http\Request;
 
 class PaymentController extends BaseApiController
 {
@@ -25,6 +28,12 @@ class PaymentController extends BaseApiController
     protected function getModelClass(): string
     {
         return Payment::class;
+    }
+
+    protected function getValidatedData(Request $request, $id = null): array
+    {
+        $rules = $id ? (new UpdatePaymentRequest())->rules() : (new StorePaymentRequest())->rules();
+        return $request->validate($rules);
     }
 
     public function confirmed()

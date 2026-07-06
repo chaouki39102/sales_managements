@@ -6,8 +6,7 @@ import { fmtDZD } from '../utils/document.utils';
 
 interface DocumentTotalsSectionProps {
   totals: DocumentTotals;
-  existingPayments: Array<unknown>;
-  newPayments: Array<unknown>;
+  payments: Array<unknown>;
   partyBalance: PartyBalanceInfo | null;
   form: DocumentFormState;
   selectedParty: { name?: string } | null;
@@ -19,7 +18,7 @@ interface DocumentTotalsSectionProps {
 }
 
 export default function DocumentTotalsSection({
-  totals, existingPayments, newPayments,
+  totals, payments,
   partyBalance, form, selectedParty,
   isPurchase, isEdit, isReadOnly, set,
   stampEnabled = true,
@@ -45,7 +44,7 @@ export default function DocumentTotalsSection({
           label="المبلغ المستحق" value={`${fmtDZD(totals.netToPay)} دج`}
           bg="var(--em)" color="white" labelColor="rgba(255,255,255,.75)" large
         />
-        {(existingPayments.length > 0 || newPayments.length > 0) && (
+        {payments.length > 0 && (
           <>
             <TotalCard
               label="المدفوع" value={`${fmtDZD(totals.totalPaid)} دج`}

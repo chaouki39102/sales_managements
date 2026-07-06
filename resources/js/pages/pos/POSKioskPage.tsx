@@ -170,7 +170,7 @@ export default function POSKioskPage() {
   const handleCompleteSale = async (params: {
     paymentModeId: number;
     amount:        number;
-    payments?:     Array<{ paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
+    payments?:     Array<{ paymentModeId: number; amount: number; treasuryAccountId?: number | null; reference?: string | null }>;
   }) => {
     const invType     = documentTypes?.find(t => t.code === 'BL')
                      ?? documentTypes?.find(t => t.code === 'FV')
@@ -192,6 +192,8 @@ export default function POSKioskPage() {
           amount:              p.amount,
           payment_date:        new Date().toISOString().slice(0, 10),
           treasury_account_id: p.treasuryAccountId ?? null,
+          reference:           p.reference?.trim() || null,
+          client_ref:          `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         }));
 
       const res = await documentsApi.create({

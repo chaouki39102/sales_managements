@@ -11,6 +11,8 @@ export interface DocumentPayment {
   payment_date:        string;
   treasury_account_id?: number | null;
   reference?:          string | null;
+  notes?:              string | null;
+  client_ref?:         string | null;
 }
 
 interface CartState {
@@ -110,7 +112,7 @@ export const useCartStore = create<CartState>()(
           }
 
           const priceHt  = variant.default_selling_price_ht;
-          const tvaRate  = variant.tva?.rate ?? 19;
+          const tvaRate  = variant.tva?.rate ?? 0;
           const autoDisc = findQuantityDiscount(variant.quantity_discounts, qty);
 
           const newItem: CartItem = recalcItem({
