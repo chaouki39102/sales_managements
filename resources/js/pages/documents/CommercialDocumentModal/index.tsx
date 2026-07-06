@@ -404,6 +404,7 @@ export default function CommercialDocumentModal({
           templates={printTemplates}
           selectedTemplateId={selectedTemplateId}
           onTemplateChange={setSelectedTemplateId}
+          onReturnClick={() => setShowReturnModal(true)}
         />
       </div>
       {/* Bulk import */}

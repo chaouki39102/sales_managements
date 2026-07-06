@@ -37,7 +37,7 @@ class Audit extends Model
     ];
 
     public static array $searchableFields = ['event', 'url'];
-    public static array $filterable = ['user_id', 'event', 'auditable_type'];
+    public static array $filterable = ['user_id', 'event', 'auditable_type', 'auditable_id'];
     public static array $sortable = ['id', 'created_at', 'event'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['user', 'auditable'];

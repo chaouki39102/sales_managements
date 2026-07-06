@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { fmtDZD } from '../utils/document.utils';
 import { useCreateReturn } from '../hooks/useDocumentChain';
 import type { LineItem } from '../types/document.types';
@@ -46,6 +46,10 @@ export function ReturnDocumentModal({ document, onCreated, onClose }: ReturnDocu
   }, [document.lines]);
 
   const [returnLines, setReturnLines] = useState<ReturnLine[]>(lines);
+
+  useEffect(() => {
+    setReturnLines(lines);
+  }, [lines]);
 
   const updateQty = (lineId: number, qty: number) => {
     setReturnLines(prev => prev.map(l =>

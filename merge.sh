@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-lib-api-files.md"
+OUTPUT="merged-CommercialDocument-files.md"
 
 > "$OUTPUT"
 
@@ -61,14 +61,14 @@ EXCLUDE=(
 # الأقسام
 # =========================================
 
-# merge_section "📘 CommercialDocument" \
-#   \( -path "*/pages/documents/*" \)
+merge_section "📘 CommercialDocument" \
+  \( -path "*/pages/documents/*" \)
 
-merge_section "📘 core" \
-  \( -path "*/lib/api/core/*" \)
+# merge_section "📘 core" \
+#   \( -path "*/lib/api/core/*" \)
 
-  merge_section "📘 endpoints" \
-  \( -path "*/lib/api/endpoints/*" \)
+#   merge_section "📘 endpoints" \
+#   \( -path "*/lib/api/endpoints/*" \)
 
 
 # أمثلة لإضافة أقسام أخرى:

@@ -1443,7 +1443,10 @@ export default function CommercialDocumentsPage() {
                 disabled: !colKey,
                 onClick: () => {
                     if (colKey) {
-                        handleHiddenColumnsChange(colKey, !hiddenColumnsSet.has(colKey), hiddenColumnKeys);
+                        const updated = isHidden
+                            ? hiddenColumnKeys.filter(k => k !== colKey)
+                            : [...hiddenColumnKeys, colKey];
+                        handleHiddenColumnsChange(colKey, !isHidden, updated);
                         showToast(isHidden ? "تم إظهار العمود" : "تم إخفاء العمود", "info");
                     }
                 },

@@ -80,7 +80,7 @@ export function FieldError({ msg }: { msg?: string }) {
 
 export function Section({
   title, icon, badge, children, collapsible = false,
-  defaultOpen = true, open: openProp, onOpenChange,
+  defaultOpen = true, open: openProp, onOpenChange, fillHeight,
 }: {
   title:        string;
   icon:         string;
@@ -93,6 +93,7 @@ export function Section({
    *  (مثال: ظهور خطأ تحقق داخل قسم مطوي). عدم تمريره = نفس السلوك القديم تماماً. */
   open?:         boolean;
   onOpenChange?: (open: boolean) => void;
+  fillHeight?:  boolean;
 }) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = openProp !== undefined;
@@ -105,7 +106,10 @@ export function Section({
   };
 
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{
+      marginBottom: 20,
+      ...(fillHeight ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : {}),
+    }}>
       <div
         style={{
           display:       'flex',
@@ -129,7 +133,7 @@ export function Section({
             style={{ fontSize: 12, color: 'var(--t4)' }} />
         )}
       </div>
-      {open && children}
+      {open && (fillHeight ? <div style={{ flex: 1, minHeight: 0 }}>{children}</div> : children)}
     </div>
   );
 }

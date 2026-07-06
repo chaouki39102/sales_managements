@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
-import { toNum } from '../utils/document.utils';
 
 export interface CreditCheckResult {
   party_id:              number;

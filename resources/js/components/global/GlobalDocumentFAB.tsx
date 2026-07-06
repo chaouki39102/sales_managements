@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { DocumentType } from '@/lib/api/core/types';
@@ -44,6 +45,9 @@ function isTypingContext(el: EventTarget | null): boolean {
 export function GlobalDocumentFAB() {
   const slug = useActiveSlug();
   const { state, openQuickCreate } = useDocumentQuickCreate();
+  const location = useLocation();
+  const isDocEditor = /^\/documents\/[^/]+\/(new|[^/]+\/edit)$/.test(location.pathname);
+  if (isDocEditor) return null;
 
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);

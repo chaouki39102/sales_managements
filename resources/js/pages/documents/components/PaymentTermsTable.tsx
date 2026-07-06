@@ -86,7 +86,7 @@ export function PaymentTermsTable({
                   <input
                     type="number" min={0} max={100} step={0.01}
                     style={{ ...inputStyle(), fontSize: 11, padding: '4px 6px', textAlign: 'center' }}
-                    value={t.percentage || ''}
+                    value={t.percentage ?? ''}
                     disabled={disabled}
                     onChange={(e) => update(i, { percentage: parseFloat(e.target.value) || 0 })}
                   />
@@ -96,7 +96,7 @@ export function PaymentTermsTable({
                     <input
                       type="number" min={0} step={0.01}
                       style={{ ...inputStyle(), fontSize: 11, padding: '4px 20px 4px 6px', textAlign: 'center' }}
-                      value={t.amount || ''}
+                      value={t.amount ?? ''}
                       disabled={disabled}
                       onChange={(e) => update(i, { amount: parseFloat(e.target.value) || 0 })}
                     />

@@ -24,6 +24,7 @@ interface DocumentFooterProps {
   templates?: Array<{ id: number | null; name: string }>;
   selectedTemplateId?: number | null;
   onTemplateChange?: (id: number | null) => void;
+  onReturnClick?: () => void;
 }
 
 export default function DocumentFooter({
@@ -33,6 +34,7 @@ export default function DocumentFooter({
   handleDelete, handleExport,
   onClose, handleSave,
   onPrint, templates, selectedTemplateId, onTemplateChange,
+  onReturnClick,
 }: DocumentFooterProps) {
   return (
     <div style={{
@@ -72,6 +74,7 @@ export default function DocumentFooter({
       <div style={{ display: 'flex', gap: 8 }}>
         {isEdit && !isReadOnly && RETURNABLE_CODES.has(docCode) && (
           <button
+            onClick={onReturnClick}
             disabled={isPending}
             style={{
               padding: '8px 14px', borderRadius: 'var(--r2)',

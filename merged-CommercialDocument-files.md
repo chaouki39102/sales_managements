@@ -32,6 +32,7 @@ interface DocumentFooterProps {
   templates?: Array<{ id: number | null; name: string }>;
   selectedTemplateId?: number | null;
   onTemplateChange?: (id: number | null) => void;
+  onReturnClick?: () => void;
 }
 
 export default function DocumentFooter({
@@ -41,6 +42,7 @@ export default function DocumentFooter({
   handleDelete, handleExport,
   onClose, handleSave,
   onPrint, templates, selectedTemplateId, onTemplateChange,
+  onReturnClick,
 }: DocumentFooterProps) {
   return (
     <div style={{
@@ -80,6 +82,7 @@ export default function DocumentFooter({
       <div style={{ display: 'flex', gap: 8 }}>
         {isEdit && !isReadOnly && RETURNABLE_CODES.has(docCode) && (
           <button
+            onClick={onReturnClick}
             disabled={isPending}
             style={{
               padding: '8px 14px', borderRadius: 'var(--r2)',
@@ -811,6 +814,7 @@ export default function DocumentLinesSection({
     <Section
       title="أسطر المستند"
       icon="ti-list-details"
+      fillHeight
       badge={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {lines.length > 0 && (
@@ -1143,7 +1147,7 @@ export default function DocumentPaymentsSection({
 
       {payments.map((pay, idx) => {
         const isExisting = pay.id !== undefined && pay.id !== null;
-        const selectedMode = paymentModes.find(
+        const selectedMode = paymentModeOptions.find(
           (pm) => String(pm.id) === pay.payment_mode_id,
         );
         const autoTreasuryId = selectedMode?.treasury_account_id ?? null;
@@ -1459,7 +1463,7 @@ export default function DocumentTotalsSection({
           checked={form.apply_stamp}
           onChange={(v: boolean) => set('apply_stamp', v)}
           label="الطابع الجبائي"
-          subLabel="1% من TTC — بحد أقصى 2,500 دج — للفواتير ≥ 30,000 دج"
+          subLabel="1% من TTC — بحد أدنى 5 دج وأقصى 2,500 دج"
           disabled={isReadOnly}
         />
       )}
@@ -1471,46 +1475,17 @@ export default function DocumentTotalsSection({
 
 ## FILE: resources/js/pages/documents/CommercialDocumentModal/index.tsx
 ```
-import React, { useState, useMemo, useRef, useEffect, useCallback, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
-import { tenantKeys } from '@/lib/api/core/queryKeys';
-import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
-import { settingsApi } from '@/lib/api/endpoints/settings';
-import { useFiscalYear } from '@/context/FiscalYearContext';
+import React, { Suspense } from 'react';
 import type { DocumentType } from '@/lib/api/core/types';
-import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
-import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
-import { resolveTemplateById } from '@/pages/settings/print-settings/runtime/TemplateResolver';
-import type { PrintTemplate } from '@/pages/settings/print-settings/types';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
 
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 
-import { useDocumentLookups }  from '../hooks/useDocumentLookups';
-import { useDocumentForm }     from '../hooks/useDocumentForm';
-import type { PartyChangeResult } from '../hooks/useDocumentForm';
-import { useDocumentChain, useConvertDocument } from '../hooks/useDocumentChain';
-import { useCreditCheck }      from '../hooks/useCreditCheck';
-import { useCustomerInsights } from '../hooks/useCustomerInsights';
-import { DocumentChainPanel }  from '../components/DocumentChainPanel';
-import { ReturnDocumentModal } from '../components/ReturnDocumentModal';
-import { BulkImportModal } from '../components/BulkImportModal';
-import { ShippingInfoSection } from '../components/ShippingInfoSection';
-import { PaymentTermsTable }   from '../components/PaymentTermsTable';
-import { useProductSuggestions } from '../hooks/useProductSuggestions';
-import { useAdvancePayments } from '../hooks/useAdvancePayments';
 import type { Tab } from '../components/DocumentUIPrimitives';
-import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
 import { AlertBanner, Section } from '../components/DocumentUIPrimitives';
 import {
-  PURCHASE_CODES, CONVERSION_MAP, RETURNABLE_CODES, SHIPPING_CODES,
+  RETURNABLE_CODES, SHIPPING_CODES,
 } from '../types/document.types';
-import type { ColKey } from '../types/document.types';
-import {
-  fmtDZD, loadVisibleCols, saveVisibleCols,
-  toNum,
-} from '../utils/document.utils';
 
 import DocumentHeaderSection from './DocumentHeaderSection';
 import DocumentInfoSection from './DocumentInfoSection';
@@ -1519,7 +1494,14 @@ import DocumentPaymentsSection from './DocumentPaymentsSection';
 import DocumentTotalsSection from './DocumentTotalsSection';
 import DocumentFooter from './DocumentFooter';
 
-// ─── Props ─────────────────────────────────────────────────────────────────────
+import { DocumentChainPanel } from '../components/DocumentChainPanel';
+import { ReturnDocumentModal } from '../components/ReturnDocumentModal';
+import { BulkImportModal } from '../components/BulkImportModal';
+import { ShippingInfoSection } from '../components/ShippingInfoSection';
+import { PaymentTermsTable } from '../components/PaymentTermsTable';
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
+
+import { useCommercialDocumentController } from '../hooks/useCommercialDocumentController';
 
 interface CommercialDocumentModalProps {
   open:               boolean;
@@ -1529,8 +1511,6 @@ interface CommercialDocumentModalProps {
   onSaved:            () => void;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function CommercialDocumentModal({
   open,
   documentType,
@@ -1539,578 +1519,54 @@ export default function CommercialDocumentModal({
   onSaved,
 }: CommercialDocumentModalProps) {
 
-  const slug           = useActiveSlug();
-  const qc             = useQueryClient();
-  const navigate       = useNavigate();
-  const { selectedYear } = useFiscalYear() as { selectedYear?: { id: number; name: string } };
-
-  const docCode    = documentType?.code ?? '';
-  const isPurchase = PURCHASE_CODES.has(docCode);
-  const isEdit     = !!existingDocument;
-
-  // ─── Settings defaults ───────────────────────────────────────────────────
-  const { data: settingsDict } = useQuery({
-    queryKey: [slug, 'settings-dict'],
-    queryFn: () => settingsApi.list(),
-    enabled: !!slug,
-    staleTime: 10 * 60_000,
+  const ctrl = useCommercialDocumentController({
+    documentType,
+    existingDocument,
+    onClose,
+    onSaved,
+    active: open,
   });
-
-  const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(
-    () => loadVisibleCols(slug ?? 'default'),
-  );
-  const handleColsChange = (cols: Set<ColKey>) => {
-    setVisibleCols(cols);
-    saveVisibleCols(slug ?? 'default', cols);
-  };
-
-  const [lineMode, setLineMode] = useState<'table' | 'card'>('table');
-
-  const initialDefaultsApplied = useRef(false);
-  useEffect(() => {
-    if (!settingsDict || initialDefaultsApplied.current) return;
-    initialDefaultsApplied.current = true;
-
-    const storedCols = (() => {
-      try { return localStorage.getItem(`doc_visible_cols_${slug ?? 'default'}`); } catch {}
-      return null;
-    })();
-    if (!storedCols) {
-      const defaultCols = settingsDict.documents_default_visible_cols?.value as string[] | undefined;
-      if (defaultCols?.length) {
-        setVisibleCols(new Set(defaultCols as ColKey[]));
-      }
-    }
-
-    const storedMode = (() => {
-      try { return localStorage.getItem(`doc_line_mode_${slug ?? 'default'}`); } catch {}
-      return null;
-    })();
-    if (!storedMode) {
-      const defaultMode = settingsDict.documents_default_line_mode?.value as string | undefined;
-      if (defaultMode === 'card' || defaultMode === 'table') {
-        setLineMode(defaultMode);
-      }
-    }
-  }, [settingsDict, slug]);
-
-  // ─── Lookups ──────────────────────────────────────────────────────────────
-
-  const lookups = useDocumentLookups({
-    open,
-    isPurchase,
-    needsParty:  true,
-    warehouseId:  null,
-    fiscalYearId: selectedYear?.id ?? null,
-  });
-
-  // ── القيم الافتراضية من Settings (أولوية) مع الرجوع إلى اللوك أب ──────
-  const settingsWarehouseId = useMemo(() => {
-    const v = settingsDict?.default_warehouse_id?.value;
-    if (v) {
-      const found = lookups.warehouses.find((w: any) => w.id === Number(v));
-      if (found) return String(found.id);
-    }
-    return lookups.defaultWarehouseId;
-  }, [settingsDict, lookups.warehouses, lookups.defaultWarehouseId]);
-
-  const settingsCurrencyId = useMemo(() => {
-    const v = settingsDict?.default_currency_id?.value;
-    if (v) {
-      const found = lookups.currencies.find((c: any) => c.id === Number(v));
-      if (found) return String(found.id);
-    }
-    return lookups.baseCurrencyId;
-  }, [settingsDict, lookups.currencies, lookups.baseCurrencyId]);
-
-  const settingsPriceLevelId = useMemo(() => {
-    const v = settingsDict?.default_price_level_id?.value;
-    if (v !== null && v !== undefined && v !== '' && Number(v) > 0) {
-      return String(Number(v));
-    }
-    const defaultPl = (lookups.priceLevels as any[])?.find((pl: any) => pl.is_default);
-    if (defaultPl) return String(defaultPl.id);
-    const firstPl = (lookups.priceLevels as any[])?.[0];
-    if (firstPl) return String(firstPl.id);
-    return '';
-  }, [settingsDict, lookups.priceLevels]);
-
-  const settingsApplyStamp = useMemo(() => {
-    const v = settingsDict?.default_apply_stamp?.value;
-    return v === true || v === 'true';
-  }, [settingsDict]);
-
-  const lookupsReady = isEdit
-    ? true
-    : (settingsWarehouseId !== '' && settingsCurrencyId !== '' && settingsPriceLevelId !== '');
-
-  // ─── Form ─────────────────────────────────────────────────────────────────
 
   const {
+    slug, qc, navigate, docCode, isPurchase, isEdit,
+    lookups, lookupsReady, settingsApplyStamp,
     form, errors, lineErr, apiErr, setApiErr,
-    set, handlePartyChange, handlePriceLevelChange, priceLevelId,
+    set, handlePriceLevelChange,
     addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
-    paymentMode: pmMode,
-    payments,
-    bulkAddLines,
-    addPayment, addPaymentWithValues, removePayment, updatePayment,
+    pmMode, payments,
+    bulkAddLines, addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
     totals, validate, buildPayload,
-    updateStockData,
     needsParty, affectsStock, stockDir,
     isReadOnly, isLinesReadOnly,
     lineWarnings,
-    priceLevelSwitchMsg,
-    clearPriceLevelSwitchMsg,
-  } = useDocumentForm({
-    documentType,
-    existingDocument,
-    defaultTvaRate:     lookups.defaultTvaRate,
-    defaultWarehouseId: settingsWarehouseId,
-    baseCurrencyId:     settingsCurrencyId,
-    defaultPriceLevelId: settingsPriceLevelId,
-    defaultApplyStamp:   settingsApplyStamp,
-    stampEnabled:        settingsApplyStamp,
-    selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
-    paymentModes:       lookups.paymentModes,
-    parties:            lookups.parties,
-    products:           lookups.products,
-    stockData:          {},
-    isPurchase,
-    open,
-    priceLevels:        lookups.priceLevels,
-  });
-
-  // ─── حالة المستند ─────────────────────────────────────────────────────────
-
-  const docStatusName = String(
-    (existingDocument?.document_status as Record<string, unknown> | undefined)?.name
-    ?? existingDocument?.status
-    ?? '',
-  ).toLowerCase();
-
-  const isLocked    = !!(existingDocument?.is_locked);
-  const isCancelled = docStatusName === 'cancelled' || docStatusName === 'returned';
-  const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
-  const isValidated = !isLocked && !isCancelled && VALIDATED_STATUSES.has(docStatusName);
-
-  // ─── Stock query ──────────────────────────────────────────────────────────
-
-  const warehouseIdNum = form.warehouse_id ? parseInt(form.warehouse_id) : null;
-  const { data: stockData = {} } = useQuery<Record<number, number>>({
-    queryKey: [slug, 'warehouse-stock', warehouseIdNum, selectedYear?.id],
-    queryFn:  () =>
-      apiGet<unknown[]>('/inventory/stock-at', {
-        warehouse_id:   warehouseIdNum,
-        fiscal_year_id: selectedYear?.id,
-      }).then((rows) =>
-        Object.fromEntries(
-          (rows as Array<{ id: number; current_stock: number }>)
-            .map((r) => [r.id, r.current_stock ?? 0]),
-        ),
-      ),
-    enabled:   !!slug && !!warehouseIdNum && !isPurchase,
-    staleTime: 2 * 60_000,
-  });
-
-  useEffect(() => { updateStockData(stockData); }, [stockData, updateStockData]);
-
-  // ─── Document number ──────────────────────────────────────────────────────
-
-  const [docNumber,         setDocNumber]         = useState('');
-  const [docNumberErr,      setDocNumberErr]       = useState('');
-  const [checkingDocNumber, setCheckingDocNumber]  = useState(false);
-
-  useEffect(() => {
-    setDocNumber(isEdit && existingDocument?.document_number
-      ? String(existingDocument.document_number)
-      : '');
-  }, [isEdit, existingDocument?.document_number, open]);
-
-  const checkDocNumberMut = useMutation({
-    mutationFn: async (number: string) => {
-      if (!slug || !documentType?.id || !number) return { exists: false };
-      return apiGet<{ exists: boolean }>('/documents/check-number', {
-        document_number:  number,
-        document_type_id: documentType.id,
-        exclude_id:       isEdit ? existingDocument?.id : undefined,
-      });
-    },
-  });
-
-  const handleDocNumberChange = async (newNum: string) => {
-    setDocNumber(newNum);
-    setDocNumberErr('');
-    if (!newNum.trim()) { setDocNumberErr('رقم المستند إلزامي'); return; }
-    setCheckingDocNumber(true);
-    try {
-      const result = await checkDocNumberMut.mutateAsync(newNum);
-      if (result.exists) setDocNumberErr('رقم المستند موجود بالفعل');
-    } catch { /* ignore */ }
-    finally { setCheckingDocNumber(false); }
-  };
-
-  // ─── تحذير تغيير المتعامل ─────────────────────────────────────────────────
-
-  const [partyChangeWarning, setPartyChangeWarning] = useState<{
-    message:   string;
-    blockType: PartyChangeResult['blockType'];
-  } | null>(null);
-
-  const [showReturnModal, setShowReturnModal] = useState(false);
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [extraTab, setExtraTab] = useState('shipping');
-
-  // ─── Document chain ───────────────────────────────────────────────────────
-  const { data: chain, isLoading: isLoadingChain } = useDocumentChain(
-    isEdit ? Number(existingDocument?.id) : null,
-  );
-  const convertMutation = useConvertDocument();
-
-  const { data: docTypes = [] } = useQuery({
-    queryKey: [slug, 'document-types'],
-    queryFn:  () => apiGet<DocumentType[]>('/document-types', { per_page: 500 })
-      .then(r => (Array.isArray(r) ? r : (r as unknown as { data: DocumentType[] })?.data ?? [])),
-    staleTime: 10 * 60_000,
-    enabled:   !!slug,
-  });
-
-  const targetCodes  = CONVERSION_MAP[docCode] ?? [];
-  const allowedTargets = useMemo(() =>
-    targetCodes.map(code => {
-      const dt = docTypes.find(d => d.code === code);
-      return { code, name: dt?.name ?? code };
-    }),
-    [targetCodes, docTypes],
-  );
-
-  // ─── Credit check ─────────────────────────────────────────────────────────
-  const { data: creditCheck, isLoading: isLoadingCredit } = useCreditCheck({
-    partyId:    form.party_id ? parseInt(form.party_id) : null,
-    amount:     totals.netToPay,
-    date:       form.document_date,
-    isPurchase,
-    enabled:    open && needsParty && !isPurchase,
-  });
-
-  const { data: customerInsights, isLoading: isLoadingInsights } = useCustomerInsights(
-    form.party_id ? parseInt(form.party_id) : null,
-    !!open && needsParty && !!form.party_id,
-  );
-
-  const { data: productSuggestions, isLoading: isLoadingSuggestions } = useProductSuggestions(
-    form.party_id ? parseInt(form.party_id) : null,
-    isPurchase,
-    !!open && needsParty && !!form.party_id && !isLinesReadOnly,
-  );
-
-  const { data: advancePayments, isLoading: isLoadingAdvances } = useAdvancePayments(
-    form.party_id ? parseInt(form.party_id) : null,
-    !!open && needsParty && !!form.party_id && (documentType?.affects_accounting ?? false),
-  );
-
-  const handlePartyChangeWithWarning = (id: string) => {
-    setPartyChangeWarning(null);
-    const result = handlePartyChange(id);
-    if (result.blocked) {
-      setPartyChangeWarning({
-        message:   result.reason ?? 'لا يمكن تغيير المتعامل الآن',
-        blockType: result.blockType,
-      });
-    }
-  };
-
-  // ─── Success state ────────────────────────────────────────────────────────
-
-  const [successMsg, setSuccessMsg] = useState('');
-  const successTimer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
-
-  // ─── Template-based printing ──────────────────────────────────────────────
-
-  const companyInfo = mapCompany(useActiveCompany());
-
-  const { data: printTemplates = [] } = usePrintTemplatesList(docCode);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
-  const selectedTemplate = useMemo(() => {
-    if (selectedTemplateId) return resolveTemplateById(printTemplates, selectedTemplateId);
-    return printTemplates[0] || null;
-  }, [selectedTemplateId, printTemplates]);
-
-  const [printModalOpen, setPrintModalOpen] = useState(false);
-
-  const handlePrint = useCallback(() => {
-    if (!existingDocument || !companyInfo) return;
-    setPrintModalOpen(true);
-  }, [existingDocument, companyInfo]);
-
-  // ─── Delete confirmation modal ────────────────────────────────────────────
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-  // تنظيف حالة الـ sub-modals عند الإغلاق — منع الوميض
-  useEffect(() => {
-    if (!open) {
-      setShowDeleteModal(false);
-      setShowReturnModal(false);
-      setShowBulkImport(false);
-    }
-  }, [open]);
-
-  // ── Auto-dismiss price level switch notification ──────────────────────────
-  useEffect(() => {
-    if (!priceLevelSwitchMsg) return;
-    const t = setTimeout(clearPriceLevelSwitchMsg, 6000);
-    return () => clearTimeout(t);
-  }, [priceLevelSwitchMsg, clearPriceLevelSwitchMsg]);
-
-  // ─── Smart Memory — حفظ مسودة تلقائي ──────────────────────────────────────
-  const draftKey = `doc-draft-${slug ?? 'default'}-${documentType?.code ?? 'new'}`;
-  useEffect(() => {
-    if (!open || !form.lines.length) return;
-    const interval = setInterval(() => {
-      try {
-        const draft = { ...form, _savedAt: Date.now() };
-        localStorage.setItem(draftKey, btoa(unescape(encodeURIComponent(JSON.stringify(draft)))));
-      } catch { /* localStorage full */ }
-    }, 30_000);
-    return () => clearInterval(interval);
-  }, [open, form, draftKey]);
-
-  const restoreDraft = () => {
-    try {
-      const raw = localStorage.getItem(draftKey);
-      if (!raw) return null;
-      const draft = JSON.parse(decodeURIComponent(escape(atob(raw))));
-      if (!draft.lines?.length) return null;
-      const elapsed = Date.now() - (draft._savedAt ?? 0);
-      if (elapsed > 86_400_000) { localStorage.removeItem(draftKey); return null; }
-      return draft;
-    } catch { return null; }
-  };
-
-  const savedDraft = !isEdit && open && !form.lines.length ? restoreDraft() : null;
-
-  // ─── Mutations ────────────────────────────────────────────────────────────
-
-  const saveMut = useMutation({
-    mutationFn: () => {
-      const payload = buildPayload();
-
-      const url = isEdit ? `/documents/${existingDocument!.id}` : '/documents';
-      if (isEdit && docNumber) {
-        (payload as Record<string, unknown>).document_number = docNumber;
-      }
-      return isEdit
-        ? apiPut<Record<string, unknown>>(url, payload)
-        : apiPost<Record<string, unknown>>(url, payload);
-    },
-    onSuccess: (savedDoc) => {
-      if (slug) {
-        qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
-        if (affectsStock) {
-          qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
-        }
-        if (form.party_id) {
-          qc.invalidateQueries({ queryKey: [slug, 'party-balance', parseInt(form.party_id)] });
-        }
-      }
-      const docNum = String((savedDoc as Record<string, unknown>)?.document_number ?? '—');
-      setSuccessMsg(isEdit ? `تم تحديث المستند ${docNum}` : `تم إنشاء المستند ${docNum} ✓`);
-      navigator.clipboard?.writeText(docNum).catch(() => {});
-      successTimer.current = setTimeout(() => {
-        setSuccessMsg('');
-        onSaved();
-        onClose();
-      }, 3000);
-    },
-    onError: (e: unknown) => {
-      const err = e as Record<string, unknown>;
-      const errMsg = err?.message ?? 'حدث خطأ أثناء الحفظ';
-      const validationErrors = (err as Record<string, unknown>)?.errors as Record<string, string[]> | undefined;
-      if (validationErrors) {
-        const firstMsg = Object.values(validationErrors).flat()[0];
-        setApiErr(firstMsg ?? String(errMsg));
-      } else {
-        setApiErr(String(errMsg));
-      }
-    },
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: () => apiDelete(`/documents/${existingDocument!.id}`),
-    onSuccess: () => {
-      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
-      setSuccessMsg('تم حذف المستند بنجاح');
-      successTimer.current = setTimeout(() => {
-        setSuccessMsg(''); onSaved(); onClose();
-      }, 1500);
-    },
-    onError: (e: unknown) => {
-      const err = e as Record<string, unknown>;
-      setApiErr(String(err?.message ?? 'لا يمكن حذف هذا المستند — استخدم الإلغاء بدلاً من الحذف'));
-    },
-  });
-
-  const handleSave = () => {
-    setApiErr('');
-    if (isReadOnly) return;
-    if (isEdit && !docNumber.trim()) {
-      setDocNumberErr('رقم المستند إلزامي'); return;
-    }
-    if (docNumberErr) { setApiErr('رجاء التحقق من رقم المستند'); return; }
-    if (creditCheck?.will_exceed) {
-      if (!creditCheck.can_proceed) {
-        setApiErr('تجاوز حد الائتمان — يتطلب موافقة المدير');
-        return;
-      }
-      if (!window.confirm(`تجاوز حد الائتمان بـ ${fmtDZD(creditCheck.exceed_by)} دج — هل تريد المتابعة؟`)) return;
-    }
-    if (validate()) saveMut.mutate();
-  };
-
-  const handleDelete = () => {
-    setShowDeleteModal(true);
-  };
-
-  const handleExport = (format: 'excel' | 'pdf' | 'json' | 'xml') => {
-    const formData = {
-      documentNumber: docNumber,
-      documentDate: form.document_date,
-      dueDate: form.due_date,
-      party: lookups.parties.find(p => String(p.id) === form.party_id)?.name ?? '',
-      notes: form.notes,
-      lines: form.lines.map((l, i) => ({
-        line: i + 1,
-        product: l.description || l._product?.name || '',
-        quantity: l.quantity * (l._packQty || 1),
-        unitPrice: l.unit_price_ht,
-        total: l.quantity * (l._packQty || 1) * l.unit_price_ht,
-        tva: l.tva_rate,
-      })),
-      totals: {
-        ht: totals.ht,
-        tva: totals.tva,
-        ttc: totals.ttc,
-        stamp: totals.stamp,
-        netToPay: totals.netToPay,
-      },
-    };
-
-    if (format === 'excel') {
-      void import('exceljs').then((ExcelJS) => {
-        const wb = new ExcelJS.Workbook();
-        const ws = wb.addWorksheet('Document');
-        ws.addRow(['البيان', 'الكمية', 'سعر الوحدة', 'الإجمالي', 'TVA']);
-        formData.lines.forEach(l => ws.addRow([l.product, l.quantity, l.unitPrice, l.total, l.tva]));
-        ws.addRow([]);
-        ws.addRow(['Net HT', formData.totals.ht]);
-        ws.addRow(['TVA', formData.totals.tva]);
-        ws.addRow(['TTC', formData.totals.ttc]);
-        wb.xlsx.writeBuffer().then(buf => {
-          const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href = url;
-          a.download = `${formData.documentNumber || 'document'}.xlsx`;
-          a.click(); URL.revokeObjectURL(url);
-        });
-      });
-    } else if (format === 'pdf') {
-      window.print();
-    } else if (format === 'json') {
-      const blob = new Blob([JSON.stringify(formData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url;
-      a.download = `${formData.documentNumber || 'document'}.json`;
-      a.click(); URL.revokeObjectURL(url);
-    } else if (format === 'xml') {
-      const toXml = (obj: unknown, tag: string): string => {
-        if (Array.isArray(obj)) return obj.map(v => toXml(v, tag)).join('\n');
-        if (typeof obj === 'object' && obj !== null) {
-          const children = Object.entries(obj as Record<string, unknown>)
-            .map(([k, v]) => toXml(v, k)).join('\n');
-          return `<${tag}>\n${children}\n</${tag}>`;
-        }
-        return `<${tag}>${String(obj)}</${tag}>`;
-      };
-      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<document>\n${toXml(formData, 'data')}\n</document>`;
-      const blob = new Blob([xml], { type: 'application/xml' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url;
-      a.download = `${formData.documentNumber || 'document'}.xml`;
-      a.click(); URL.revokeObjectURL(url);
-    }
-  };
-
-  const isPending = saveMut.isPending || deleteMut.isPending || checkingDocNumber;
-
-  // ─── Memos ────────────────────────────────────────────────────────────────
-
-  const isPartyExempt = lookups.parties.find(
-    (p) => String(p.id) === form.party_id,
-  )?.is_tva_exempt ?? false;
-
-  const partyOptions = useMemo(() =>
-    lookups.parties.map((p) => ({
-      id:    p.id,
-      label: p.name,
-      sub:   [(p as Record<string, unknown>).code, (p as Record<string, unknown>).phone].filter(Boolean).join(' · '),
-      badge: (p as Record<string, unknown>).is_tva_exempt ? 'معفى' : (p as Record<string, unknown>).price_level?.name,
-    })),
-    [lookups.parties],
-  );
-
-  const priceLevelOptions = useMemo(() =>
-    lookups.priceLevels.map((pl) => ({
-      id:    Number(pl.id),
-      label: String(pl.name),
-    })),
-    [lookups.priceLevels],
-  );
-
-  const paymentModeOptions = useMemo(() =>
-    lookups.paymentModes.map((pm) => ({
-      id:                  pm.id,
-      label:               pm.name,
-      treasury_account_id: pm.treasury_account_id,
-      requires_reference:  pm.requires_reference,
-    })),
-    [lookups.paymentModes],
-  );
-
-  const treasuryAccountMap = useMemo(
-    () => new Map(lookups.treasuryAccounts.map((ta) => [ta.id, ta])),
-    [lookups.treasuryAccounts],
-  );
-
-  const selectedParty = useMemo(
-    () => lookups.parties.find((p) => String(p.id) === form.party_id),
-    [lookups.parties, form.party_id],
-  );
-
-  const stockBadge = useMemo(() => {
-    if (!affectsStock) return null;
-    return stockDir > 0
-      ? { text: 'يضيف مخزون', bg: 'var(--greenb)', color: 'var(--green)' }
-      : { text: 'يخصم مخزون', bg: 'var(--redb)',   color: 'var(--red)'   };
-  }, [affectsStock, stockDir]);
-
-  const paymentsExceedWarning = useMemo(() => {
-    const allPaid = payments.reduce((acc, p) => acc + toNum(p.amount), 0);
-    if (allPaid > totals.netToPay + 0.01 && totals.netToPay > 0) {
-      return `مجموع الدفعات (${fmtDZD(allPaid)} دج) يتجاوز المبلغ المستحق (${fmtDZD(totals.netToPay)} دج)`;
-    }
-    return null;
-  }, [payments, totals.netToPay]);
-
-  const balanceWarning = useMemo(() => {
-    if (!partyBalance || partyBalance.current_balance <= 0) return null;
-    if (partyBalance.balance_type !== 'debit') return null;
-    if (totals.netToPay <= 0) return null;
-    if (partyBalance.current_balance > totals.netToPay * 2) {
-      return `رصيد ${selectedParty?.name ?? 'المتعامل'} المتراكم (${fmtDZD(partyBalance.current_balance)} دج) كبير — تأكد من تسوية الحسابات`;
-    }
-    return null;
-  }, [partyBalance, totals.netToPay, selectedParty]);
+    priceLevelSwitchMsg, clearPriceLevelSwitchMsg,
+    isLocked, isCancelled, isValidated,
+    stockData, warehouseIdNum,
+    docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,
+    partyChangeWarning, setPartyChangeWarning,
+    showReturnModal, setShowReturnModal,
+    showBulkImport, setShowBulkImport,
+    extraTab, setExtraTab,
+    chain, isLoadingChain, convertMutation, allowedTargets,
+    creditCheck, isLoadingCredit,
+    customerInsights, isLoadingInsights,
+    productSuggestions, isLoadingSuggestions,
+    advancePayments, isLoadingAdvances,
+    successMsg, setSuccessMsg,
+    companyInfo, printTemplates,
+    selectedTemplateId, setSelectedTemplateId, selectedTemplate,
+    printModalOpen, setPrintModalOpen, handlePrint,
+    visibleCols, lineMode, handleColsChange, setLineMode,
+    showDeleteModal, setShowDeleteModal,
+    deleteMut,
+    handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
+    isPending,
+    isPartyExempt, partyOptions, priceLevelOptions,
+    paymentModeOptions, treasuryAccountMap, selectedParty,
+    stockBadge, paymentsExceedWarning, balanceWarning,
+    savedDraft, draftKey, restoreDraft,
+  } = ctrl;
 
   // ─── Guard ────────────────────────────────────────────────────────────────
 
@@ -2425,6 +1881,7 @@ export default function CommercialDocumentModal({
           templates={printTemplates}
           selectedTemplateId={selectedTemplateId}
           onTemplateChange={setSelectedTemplateId}
+          onReturnClick={() => setShowReturnModal(true)}
         />
       </div>
       {/* Bulk import */}
@@ -2581,6 +2038,1567 @@ export default function PartyBalanceBadge({
 
 ```
 
+## FILE: resources/js/pages/documents/CommercialDocumentPage.tsx
+```
+import React, { useState, useRef, useEffect, Suspense, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet } from '@/lib/api/core/client';
+import { useActiveSlug } from '@/lib/store/appStore';
+import { useNotificationStore } from '@/lib/store/notificationStore';
+
+import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
+import { fmtDZD } from './utils/document.utils';
+import type { Tab } from './components/DocumentUIPrimitives';
+import {
+  AlertBanner, Section, Label, FieldError, ComboBox,
+} from './components/DocumentUIPrimitives';
+import { RETURNABLE_CODES, SHIPPING_CODES } from './types/document.types';
+
+import DocumentLinesSection from './CommercialDocumentModal/DocumentLinesSection';
+import DocumentPaymentsSection from './CommercialDocumentModal/DocumentPaymentsSection';
+import DocumentTotalsSection from './CommercialDocumentModal/DocumentTotalsSection';
+import { DocumentChainPanel } from './components/DocumentChainPanel';
+import { ReturnDocumentModal } from './components/ReturnDocumentModal';
+import { BulkImportModal } from './components/BulkImportModal';
+import { ShippingInfoSection } from './components/ShippingInfoSection';
+import { PaymentTermsTable } from './components/PaymentTermsTable';
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
+
+const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
+
+// ── Skeleton loader ──────────────────────────────────────────────────────────
+function Skeleton({ width, height, borderRadius = 6 }: { width?: number | string; height?: number | string; borderRadius?: number }) {
+  return (
+    <div style={{
+      width: width ?? '100%', height: height ?? 14,
+      borderRadius, background: 'var(--bg3)',
+      animation: 'skeletonPulse 1.5s ease-in-out infinite',
+    }} />
+  );
+}
+
+const skeletonKeyframes = `@keyframes skeletonPulse{0%,100%{opacity:1}50%{opacity:.4}}@keyframes slideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}`;
+
+// ── Responsive hook ──────────────────────────────────────────────────────────
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(query).matches;
+  });
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const h = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mq.addEventListener('change', h);
+    return () => mq.removeEventListener('change', h);
+  }, [query]);
+  return matches;
+}
+
+export default function CommercialDocumentPage() {
+  const { typeCode, id } = useParams<{ typeCode: string; id?: string }>();
+  const navigate = useNavigate();
+  const slug = useActiveSlug();
+  const qc = useQueryClient();
+  const addToast = useNotificationStore((s) => s.addToast);
+
+  const isEdit = !!id;
+  const listPath = `/documents/${typeCode}`;
+
+  // ── Responsive ─────────────────────────────────────────────────────────────
+  const isNarrow = useMediaQuery('(max-width: 899px)');
+  const [sidebarForceOpen, setSidebarForceOpen] = useState(false);
+  const sidebarVisible = isNarrow ? sidebarForceOpen : true;
+
+  // ── Refs (hoisted early to avoid TDZ with useCallback) ──────────────────────
+  const hasUnsavedRef = useRef(false);
+
+  // ── Fetch document type by code ─────────────────────────────────────────────
+  const { data: docType, isLoading: loadingDocType } = useQuery({
+    queryKey: [slug, 'document-type-by-code', typeCode],
+    queryFn: async () => {
+      const res = await apiGet<unknown>('/document-types', { per_page: 500 });
+      const types = Array.isArray(res) ? res : ((res as Record<string, unknown>)?.data as unknown[] ?? []);
+      return (types as Array<{ code: string; name: string; id: number }>)
+        .find((dt) => dt.code === typeCode) ?? null;
+    },
+    enabled: !!slug && !!typeCode,
+  });
+
+  // ── Fetch existing document for editing ─────────────────────────────────────
+  const { data: existingDoc, isLoading: loadingExisting } = useQuery({
+    queryKey: [slug, 'document-full', id],
+    queryFn: async () => {
+      const res = await apiGet<Record<string, unknown>>(`/documents/${id}`, {
+        include: [
+          'party', 'warehouse', 'documentType', 'fiscalYear',
+          'lines.product', 'lines.productVariant', 'payments.paymentMode',
+        ].join(','),
+      });
+      const data = (res as unknown as { data: Record<string, unknown> })?.data ?? res;
+      return data as Record<string, unknown>;
+    },
+    enabled: !!slug && !!id,
+  });
+
+  // ── Audit log ──────────────────────────────────────────────────────────────
+  const { data: auditLog, isLoading: isLoadingAudit } = useQuery({
+    queryKey: [slug, 'audits', 'document', id],
+    queryFn: async () => {
+      const res = await apiGet<unknown>('/audits', {
+        filter: { auditable_type: 'App\\Models\\CommercialDocument', auditable_id: id },
+        per_page: 20,
+        include: 'user',
+      });
+      return Array.isArray(res) ? res : ((res as Record<string, unknown>)?.data as unknown[] ?? []);
+    },
+    enabled: !!slug && !!id,
+  });
+
+  const existingDocument = isEdit ? existingDoc : undefined;
+  const onClose = useCallback(() => {
+    if (hasUnsavedRef.current && !window.confirm('لديك تغييرات غير محفوظة. هل تريد المغادرة؟')) return;
+    navigate(listPath);
+  }, [navigate, listPath]);
+  const onSaved = useCallback(() => {
+    qc.invalidateQueries({ queryKey: [slug, 'documents'] });
+  }, [qc, slug]);
+
+  const ctrl = useCommercialDocumentController({
+    documentType: docType ?? null,
+    existingDocument,
+    onClose,
+    onSaved,
+    active: true,
+  });
+
+  const {
+    slug: ctrlSlug, qc: ctrlQc, navigate: ctrlNavigate, docCode, isPurchase, isEdit: ctrlIsEdit,
+    selectedYear,
+    settingsDict, settingsApplyStamp,
+    visibleCols, lineMode, handleColsChange, setLineMode,
+    lookups, lookupsReady,
+    form, errors, lineErr, apiErr, setApiErr,
+    set, handlePartyChange, handlePriceLevelChange, priceLevelId,
+    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
+    pmMode, payments,
+    bulkAddLines, addPayment, addPaymentWithValues, removePayment, updatePayment,
+    partyBalance, isLoadingBalance,
+    totals, validate, buildPayload,
+    updateStockData, needsParty, affectsStock, stockDir,
+    isReadOnly, isLinesReadOnly,
+    lineWarnings,
+    priceLevelSwitchMsg, clearPriceLevelSwitchMsg,
+    isLocked, isCancelled, isValidated,
+    stockData, warehouseIdNum,
+    docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,
+    partyChangeWarning, setPartyChangeWarning,
+    showReturnModal, setShowReturnModal,
+    showBulkImport, setShowBulkImport,
+    extraTab, setExtraTab,
+    chain, isLoadingChain, convertMutation, allowedTargets,
+    creditCheck, isLoadingCredit,
+    customerInsights, isLoadingInsights,
+    productSuggestions, isLoadingSuggestions,
+    advancePayments, isLoadingAdvances,
+    successMsg, setSuccessMsg,
+    companyInfo, printTemplates,
+    selectedTemplateId, setSelectedTemplateId, selectedTemplate,
+    printModalOpen, setPrintModalOpen, handlePrint,
+    showDeleteModal, setShowDeleteModal,
+    deleteMut,
+    handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
+    isPending,
+    isPartyExempt, partyOptions, priceLevelOptions,
+    paymentModeOptions, treasuryAccountMap, selectedParty,
+    stockBadge, paymentsExceedWarning, balanceWarning,
+    savedDraft, draftKey, restoreDraft,
+  } = ctrl;
+
+  // ── Dirty state tracking ──────────────────────────────────────────────────
+  const initialFormRef = useRef<string>('');
+  useEffect(() => {
+    if (!lookupsReady) return;
+    if (!initialFormRef.current) {
+      initialFormRef.current = JSON.stringify(form);
+    }
+  }, [form, lookupsReady]);
+  const currentFormStr = JSON.stringify(form);
+  const isDirty = lookupsReady && initialFormRef.current !== '' && initialFormRef.current !== currentFormStr;
+  hasUnsavedRef.current = isDirty;
+
+  // ── Field-level dirty indicator ───────────────────────────────────────────
+  const initialFormParsed = useRef<Record<string, unknown>>({});
+  useEffect(() => {
+    if (initialFormRef.current && !Object.keys(initialFormParsed.current).length) {
+      try { initialFormParsed.current = JSON.parse(initialFormRef.current); } catch {}
+    }
+  }, [lookupsReady]);
+  const isFieldDirty = (key: string) => {
+    if (!initialFormParsed.current || !lookupsReady) return false;
+    return String(initialFormParsed.current[key] ?? '') !== String((form as Record<string, unknown>)[key] ?? '');
+  };
+
+  // ── Toast integration ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (successMsg) {
+      addToast({ type: 'success', title: successMsg });
+      setSuccessMsg('');
+    }
+  }, [successMsg]);
+
+  useEffect(() => {
+    if (apiErr) {
+      addToast({ type: 'error', title: apiErr });
+      setApiErr('');
+    }
+  }, [apiErr]);
+
+  useEffect(() => {
+    if (priceLevelSwitchMsg) {
+      addToast({
+        type: 'warning',
+        title: `المنتج "${priceLevelSwitchMsg.productName}"`,
+        message: `ليس له سعر في فئة "${priceLevelSwitchMsg.from}"، تم التبديل إلى "${priceLevelSwitchMsg.to}".`,
+      });
+      clearPriceLevelSwitchMsg();
+    }
+  }, [priceLevelSwitchMsg]);
+
+  // ── Local UI state ─────────────────────────────────────────────────────────
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showPartyCombo, setShowPartyCombo] = useState(false);
+  const [showAllPayments, setShowAllPayments] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Close "More" dropdown on outside click
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    if (moreOpen) document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [moreOpen]);
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (drawerOpen) { setDrawerOpen(false); return; }
+        if (moreOpen) { setMoreOpen(false); return; }
+        if (showPartyCombo) { setShowPartyCombo(false); return; }
+        if (showAllPayments) { setShowAllPayments(false); return; }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (!isReadOnly && !isPending) handleSave();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [drawerOpen, moreOpen, showPartyCombo, showAllPayments, isReadOnly, isPending, handleSave]);
+
+  // ── Unsaved changes guard — beforeunload ──────────────────────────────────
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!hasUnsavedRef.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
+
+  // ── Unsaved changes guard — browser back/forward navigation ──────────────
+  useEffect(() => {
+    const handler = () => {
+      if (hasUnsavedRef.current && !window.confirm('لديك تغييرات غير محفوظة. هل تريد المغادرة؟')) {
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
+  }, []);
+
+  // ── Computed values ────────────────────────────────────────────────────────
+  const hasAdvancedError = !!(errors.fiscal_year_id || errors.currency_id || errors.due_date || errors.warehouse_id);
+
+  const statusPill = isCancelled
+    ? { label: 'ملغى', color: 'var(--red)', bg: 'var(--redb)', icon: 'ti-ban' }
+    : isLocked
+      ? { label: 'مقفل', color: 'var(--t3)', bg: 'var(--bg3)', icon: 'ti-lock' }
+      : isValidated
+        ? { label: 'معتمد', color: 'var(--blue)', bg: 'var(--blueb)', icon: 'ti-circle-check' }
+        : pmMode === 'additive'
+          ? { label: 'دفعات إضافية', color: 'var(--orange)', bg: 'color-mix(in srgb, var(--orange) 12%, transparent)', icon: 'ti-plus' }
+          : null;
+
+  const firstLetter = selectedParty?.name?.charAt(0) ?? '?';
+
+  const cck = creditCheck as Record<string, unknown> | undefined;
+  const creditLimit = Number(cck?.credit_limit ?? 0);
+  const usedCredit = Number(cck?.used_credit ?? 0);
+  const usagePercent = creditLimit > 0 ? Math.min(100, (usedCredit / creditLimit) * 100) : 0;
+  const willExceed = cck?.will_exceed === true;
+  const gaugeColor = willExceed ? 'var(--red)' : usagePercent > 80 ? 'var(--orange)' : 'var(--green)';
+
+  const ins = customerInsights as Record<string, unknown> | undefined;
+  const insightDocs = (ins?.last_documents as Array<Record<string, unknown>> | undefined) ?? [];
+  const docCount = Number(ins?.document_count ?? 0);
+  const monthlyAvg = ins?.monthly_avg_invoice as number | undefined;
+  const avgPayDays = ins?.avg_payment_days as number | undefined;
+
+  const partyBalanceVal = partyBalance as Record<string, unknown> | undefined;
+  const currentBalance = Number(partyBalanceVal?.current_balance ?? 0);
+  const balanceType = (partyBalanceVal?.balance_type as string | undefined) ?? 'credit';
+
+  const auditEntries = (auditLog as Array<Record<string, unknown>> | undefined) ?? [];
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+  const isLoading = loadingDocType || (isEdit && loadingExisting);
+  if (isLoading) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', height: '100%',
+        background: 'var(--bg0)', direction: 'rtl', gap: 0,
+      }}>
+        <style>{skeletonKeyframes}</style>
+        {/* Skeleton top bar */}
+        <div style={{
+          height: 56, flexShrink: 0,
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '0 16px', background: 'var(--bg2)',
+          borderBottom: '1px solid var(--b1)',
+        }}>
+          <Skeleton width={32} height={32} borderRadius={8} />
+          <Skeleton width={34} height={34} borderRadius={10} />
+          <div style={{ flex: 1 }}><Skeleton width={160} height={16} /></div>
+          <Skeleton width={34} height={34} borderRadius={8} />
+          <Skeleton width={90} height={34} borderRadius={8} />
+          <Skeleton width={34} height={34} borderRadius={8} />
+          <Skeleton width={60} height={34} borderRadius={8} />
+        </div>
+        {/* Skeleton body */}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          <div style={{ width: 300, flexShrink: 0, padding: 16, background: 'var(--bg2)' }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+              <Skeleton width={36} height={36} borderRadius="50%" />
+              <div style={{ flex: 1 }}><Skeleton height={16} width={120} /></div>
+            </div>
+            <Skeleton height={14} width={180} style={{ marginBottom: 8 }} />
+            <Skeleton height={4} borderRadius={99} style={{ marginBottom: 12 }} />
+            <Skeleton height={80} borderRadius={8} />
+          </div>
+          <div style={{ flex: 1, padding: '16px 20px', background: 'var(--bg1)' }}>
+            <Skeleton height={14} width={140} style={{ marginBottom: 12 }} />
+            <Skeleton height={300} borderRadius={8} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!docType) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100%', background: 'var(--bg0)',
+        flexDirection: 'column', gap: 12,
+      }}>
+        <i className="ti ti-file-off" style={{ fontSize: 48, color: 'var(--t4)' }} />
+        <span style={{ fontSize: 14, color: 'var(--t3)' }}>
+          نوع المستند "{typeCode}" غير موجود
+        </span>
+        <button onClick={() => navigate(listPath)}
+          style={{
+            padding: '8px 18px', borderRadius: 'var(--r2)',
+            border: '1px solid var(--b2)', background: 'var(--bg1)',
+            color: 'var(--t2)', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+          }}
+        >
+          ← العودة للقائمة
+        </button>
+      </div>
+    );
+  }
+
+  const fieldInputStyle = (hasError?: boolean): React.CSSProperties => ({
+    width: '100%', padding: '6px 8px', borderRadius: 'var(--r2)',
+    border: `1px solid ${hasError ? 'var(--red)' : 'var(--b3)'}`,
+    background: isReadOnly ? 'var(--bg3)' : 'var(--bg1)',
+    color: 'var(--t1)', fontSize: 12,
+    fontFamily: 'Tajawal, sans-serif', outline: 'none',
+    boxSizing: 'border-box',
+  });
+
+  // ── Totals text (compact) ──────────────────────────────────────────────────
+  const totalsText = [
+    `HT ${fmtDZD(totals.totalHt)} دج`,
+    `TVA ${fmtDZD(totals.totalTva)} دج`,
+    totals.totalStamp > 0.01 ? `الطابع ${fmtDZD(totals.totalStamp)} دج` : null,
+    `الخصم ${fmtDZD(totals.totalDiscount)} دج`,
+  ].filter(Boolean).join(' · ');
+
+  // ── Is returnable? ─────────────────────────────────────────────────────────
+  const canReturn = isEdit && RETURNABLE_CODES.has(docCode) && !isCancelled;
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0,
+      background: 'var(--bg0)', direction: 'rtl',
+    }}>
+      <style>{skeletonKeyframes}</style>
+
+      {/* ═══ TOP BAR — 56px ═══ */}
+      <div style={{
+        height: 56, flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '0 12px',
+        background: 'var(--bg2)',
+        borderBottom: '1px solid var(--b1)',
+      }}>
+        {/* Back arrow */}
+        <button onClick={onClose}
+          style={{
+            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+            border: 'none', background: 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: 'var(--t3)',
+            transition: 'background .15s ease-out',
+          }}
+          onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg3)')}
+          onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+          title="العودة للقائمة"
+        >
+          <i className="ti ti-arrow-right" style={{ fontSize: 18 }} />
+        </button>
+
+        {/* Sidebar toggle (narrow screens) */}
+        {isNarrow && (
+          <button onClick={() => setSidebarForceOpen(!sidebarForceOpen)}
+            style={{
+              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+              border: 'none', background: 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: 'var(--t3)',
+            }}
+            title="إظهار الشريط الجانبي"
+          >
+            <i className="ti ti-menu-2" style={{ fontSize: 16 }} />
+          </button>
+        )}
+
+        {/* Doc icon */}
+        <div style={{
+          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+          background: isCancelled
+            ? 'var(--redb)'
+            : `color-mix(in srgb, ${isPurchase ? 'var(--blue)' : 'var(--green)'} 12%, transparent)`,
+          border: isCancelled
+            ? '1px solid var(--red)'
+            : `1px solid color-mix(in srgb, ${isPurchase ? 'var(--blue)' : 'var(--green)'} 25%, transparent)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <i className={`ti ${isCancelled ? 'ti-ban' : isPurchase ? 'ti-truck' : 'ti-receipt'}`}
+            style={{ fontSize: 14, color: isCancelled ? 'var(--red)' : isPurchase ? 'var(--blue)' : 'var(--green)' }}
+          />
+        </div>
+
+        {/* Doc name + status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', whiteSpace: 'nowrap' }}>
+            {isEdit ? `تعديل ${docType.name}` : `${docType.name} جديد`}
+          </span>
+          {statusPill && (
+            <span style={{
+              padding: '2px 6px', borderRadius: 99, fontSize: 9.5, fontWeight: 700,
+              background: statusPill.bg, color: statusPill.color,
+              display: 'flex', alignItems: 'center', gap: 3,
+            }}>
+              <i className={`ti ${statusPill.icon}`} style={{ fontSize: 9 }} />
+              {statusPill.label}
+            </span>
+          )}
+          {isDirty && (
+            <span style={{
+              width: 7, height: 7, borderRadius: '50%',
+              background: 'var(--orange)', flexShrink: 0,
+            }} title="تغييرات غير محفوظة" />
+          )}
+        </div>
+
+        {/* Doc number inline (edit mode) */}
+        {isEdit && (
+          <div style={{ width: 140, flexShrink: 0, position: 'relative' }}>
+            <input
+              type="text"
+              style={{
+                ...fieldInputStyle(!!docNumberErr),
+                paddingRight: checkingDocNumber ? 24 : 6, paddingLeft: 6,
+                fontSize: 11, textAlign: 'center', height: 28,
+              }}
+              value={docNumber}
+              disabled={isReadOnly}
+              onChange={(e) => handleDocNumberChange(e.target.value)}
+              placeholder="رقم المستند"
+            />
+            {checkingDocNumber && (
+              <i className="ti ti-loader" style={{
+                position: 'absolute', left: 6, top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: 10, animation: 'spin 1s linear infinite',
+                color: 'var(--t4)', pointerEvents: 'none',
+              }} />
+            )}
+          </div>
+        )}
+
+        {/* Date inline */}
+        <div style={{ width: 130, flexShrink: 0 }}>
+          <input
+            type="date"
+            style={{ ...fieldInputStyle(!!errors.document_date), fontSize: 11, height: 28, padding: '0 6px' }}
+            value={form.document_date as string}
+            disabled={isReadOnly}
+            onChange={(e) => set('document_date', e.target.value)}
+          />
+        </div>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Print button */}
+        {isEdit && (
+          <button onClick={handlePrint}
+            style={{
+              width: 32, height: 32, borderRadius: 'var(--r2)',
+              border: '1px solid var(--b2)', background: 'var(--bg1)',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--t3)', flexShrink: 0,
+            }}
+            title="طباعة المستند"
+          >
+            <i className="ti ti-printer" style={{ fontSize: 14 }} />
+          </button>
+        )}
+
+        {/* Advanced options gear */}
+        <button onClick={() => setDrawerOpen(true)}
+          style={{
+            padding: '5px 10px', borderRadius: 'var(--r2)',
+            border: '1px solid var(--b2)', background: 'var(--bg1)',
+            cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--t2)',
+            display: 'flex', alignItems: 'center', gap: 4,
+            fontFamily: 'inherit', flexShrink: 0,
+          }}
+          title="خيارات متقدمة"
+        >
+          {hasAdvancedError && (
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: 'var(--orange)', flexShrink: 0,
+            }} />
+          )}
+          <i className="ti ti-adjustments" style={{ fontSize: 13 }} />
+          {!isNarrow && 'خيارات متقدمة'}
+        </button>
+
+        {/* More dropdown */}
+        <div ref={moreRef} style={{ position: 'relative', flexShrink: 0 }}>
+          <button onClick={() => setMoreOpen(!moreOpen)}
+            style={{
+              width: 32, height: 32, borderRadius: 'var(--r2)',
+              border: '1px solid var(--b2)', background: 'var(--bg1)',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--t3)',
+            }}
+            title="المزيد"
+          >
+            <i className="ti ti-dots-vertical" style={{ fontSize: 14 }} />
+          </button>
+          {moreOpen && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, zIndex: 50,
+              minWidth: 160,
+              background: 'var(--bg1)', borderRadius: 'var(--r2)',
+              border: '1px solid var(--b2)', boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+              padding: 4, marginTop: 4,
+              animation: 'fadeIn .15s ease',
+            }}>
+              <div style={{ padding: '7px 10px', fontSize: 10, fontWeight: 700, color: 'var(--t4)', borderBottom: '1px solid var(--b1)', marginBottom: 3 }}>
+                تصدير
+              </div>
+              {['excel', 'pdf', 'json', 'xml'].map((fmt) => (
+                <button key={fmt}
+                  onClick={() => { setMoreOpen(false); handleExport(fmt); }}
+                  style={{
+                    width: '100%', padding: '6px 10px', border: 'none', background: 'none',
+                    cursor: 'pointer', fontSize: 11.5, color: 'var(--t2)', fontWeight: 600,
+                    fontFamily: 'inherit', textAlign: 'right', borderRadius: 'var(--r1)',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg3)')}
+                  onMouseOut={(e) => (e.currentTarget.style.background = 'none')}
+                >
+                  <i className={`ti ${fmt === 'excel' ? 'ti-file-spreadsheet' : fmt === 'pdf' ? 'ti-file-type-pdf' : fmt === 'json' ? 'ti-file-code' : 'ti-file-type-xml'}`}
+                    style={{ fontSize: 12, color: 'var(--t4)' }} />
+                  {fmt === 'excel' ? 'Excel' : fmt === 'pdf' ? 'PDF' : fmt === 'json' ? 'JSON' : 'XML'}
+                </button>
+              ))}
+              {canReturn && (
+                <>
+                  <div style={{ borderTop: '1px solid var(--b1)', margin: '3px 0' }} />
+                  <button
+                    onClick={() => { setMoreOpen(false); setShowReturnModal(true); }}
+                    style={{
+                      width: '100%', padding: '6px 10px', border: 'none', background: 'none',
+                      cursor: 'pointer', fontSize: 11.5, color: 'var(--orange)', fontWeight: 600,
+                      fontFamily: 'inherit', textAlign: 'right', borderRadius: 'var(--r1)',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg3)')}
+                    onMouseOut={(e) => (e.currentTarget.style.background = 'none')}
+                  >
+                    <i className="ti ti-corner-up-left" style={{ fontSize: 12 }} />
+                    إنشاء مرتجع
+                  </button>
+                </>
+              )}
+              {!isReadOnly && (
+                <>
+                  <div style={{ borderTop: '1px solid var(--b1)', margin: '3px 0' }} />
+                  <button
+                    onClick={() => { setMoreOpen(false); setShowDeleteModal(true); }}
+                    style={{
+                      width: '100%', padding: '6px 10px', border: 'none', background: 'none',
+                      cursor: 'pointer', fontSize: 11.5, color: 'var(--red)', fontWeight: 600,
+                      fontFamily: 'inherit', textAlign: 'right', borderRadius: 'var(--r1)',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg3)')}
+                    onMouseOut={(e) => (e.currentTarget.style.background = 'none')}
+                  >
+                    <i className="ti ti-trash" style={{ fontSize: 12 }} />
+                    حذف المستند
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Save button */}
+        <button onClick={handleSave} disabled={isPending || isReadOnly}
+          style={{
+            padding: '6px 16px', borderRadius: 'var(--r2)',
+            border: 'none', background: isPending ? 'var(--bg3)' : 'var(--em)',
+            color: isPending ? 'var(--t3)' : '#fff',
+            cursor: isPending || isReadOnly ? 'not-allowed' : 'pointer',
+            fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', gap: 4,
+            opacity: isPending || isReadOnly ? 0.6 : 1,
+            transition: 'opacity .15s ease-out', flexShrink: 0,
+          }}
+          title="Ctrl+S — حفظ المستند"
+        >
+          {isPending ? (
+            <i className="ti ti-loader" style={{ animation: 'spin .8s linear infinite', fontSize: 13 }} />
+          ) : (
+            <i className="ti ti-device-floppy" style={{ fontSize: 13 }} />
+          )}
+          حفظ
+        </button>
+      </div>
+
+      {/* ═══ TWO-COLUMN BODY ═══ */}
+      <div style={{
+        display: 'flex', flex: 1, overflow: 'hidden',
+        background: 'var(--bg0)',
+      }}>
+        {/* ─── SIDEBAR ─── */}
+        {sidebarVisible && (
+          <div style={{
+            width: isNarrow ? '100%' : 280,
+            maxWidth: isNarrow ? '100%' : 280,
+            flexShrink: 0,
+            background: isNarrow ? 'var(--bg1)' : 'var(--bg2)',
+            display: 'flex', flexDirection: 'column',
+            overflowY: 'auto', padding: 12, gap: 10,
+            position: isNarrow ? 'absolute' : 'relative',
+            inset: isNarrow ? 0 : undefined,
+            zIndex: isNarrow ? 40 : undefined,
+            boxShadow: isNarrow ? '0 0 24px rgba(0,0,0,.15)' : undefined,
+          }}>
+            {isNarrow && (
+              <button onClick={() => setSidebarForceOpen(false)}
+                style={{
+                  alignSelf: 'flex-start', padding: '4px 8px',
+                  border: '1px solid var(--b2)', background: 'var(--bg1)',
+                  borderRadius: 'var(--r1)', cursor: 'pointer',
+                  fontSize: 11, color: 'var(--t3)', fontFamily: 'inherit',
+                }}
+              >
+                <i className="ti ti-x" style={{ fontSize: 11 }} /> إغلاق
+              </button>
+            )}
+
+            {needsParty && (
+              <div>
+                {/* Avatar + party name (click to toggle ComboBox) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                    background: 'color-mix(in srgb, var(--em) 12%, transparent)',
+                    color: 'var(--em)', fontSize: 13, fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {firstLetter}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {showPartyCombo ? (
+                      <ComboBox
+                        options={partyOptions}
+                        value={form.party_id as string}
+                        onChange={(v) => {
+                          handlePartyChangeWithWarning(v);
+                          setShowPartyCombo(false);
+                        }}
+                        placeholder={`— ابحث عن ${isPurchase ? 'مورد' : 'زبون'} —`}
+                        disabled={isReadOnly}
+                        error={!!errors.party_id}
+                      />
+                    ) : (
+                      <div
+                        onClick={() => !isReadOnly && setShowPartyCombo(true)}
+                        style={{
+                          fontSize: 13, fontWeight: 700, color: 'var(--t1)',
+                          cursor: isReadOnly ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        {selectedParty?.name ?? (
+                          <span style={{ color: 'var(--t4)', fontWeight: 400, fontSize: 12 }}>
+                            — اختر {isPurchase ? 'المورد' : 'الزبون'} —
+                          </span>
+                        )}
+                        {!isReadOnly && (
+                          <i className="ti ti-pencil" style={{ fontSize: 11, color: 'var(--t4)', opacity: 0.5 }} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Party change warning popover */}
+                {partyChangeWarning && !showPartyCombo && (
+                  <div style={{
+                    padding: '6px 8px', marginBottom: 6,
+                    borderRadius: 'var(--r2)',
+                    background: 'color-mix(in srgb, var(--orange) 10%, transparent)',
+                    border: '1px solid var(--orange)',
+                    fontSize: 11, color: 'var(--orange)',
+                    display: 'flex', alignItems: 'flex-start', gap: 4,
+                  }}>
+                    <i className="ti ti-alert-triangle" style={{ marginTop: 0, flexShrink: 0, fontSize: 10 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 0, fontSize: 10 }}>
+                        {partyChangeWarning.blockType === 'existing_payments' && 'دفعات مُسجَّلة'}
+                        {partyChangeWarning.blockType === 'has_payments' && 'دفعات في النموذج'}
+                        {partyChangeWarning.blockType === 'price_level_change' && 'تعارض فئة السعر'}
+                        {!partyChangeWarning.blockType && 'لا يمكن تغيير المتعامل'}
+                      </div>
+                      <div style={{ fontSize: 10 }}>{partyChangeWarning.message}</div>
+                    </div>
+                    <button onClick={() => setPartyChangeWarning(null)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--orange)', padding: 0, fontSize: 10, flexShrink: 0,
+                      }}
+                    >
+                      <i className="ti ti-x" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Balance — large colored number */}
+                {partyBalance && (
+                  <div style={{ marginBottom: 6, display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                    <span style={{
+                      fontSize: 16, fontWeight: 800,
+                      color: balanceType === 'debit' ? 'var(--green)' : 'var(--t1)',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}>
+                      {fmtDZD(currentBalance)} دج
+                    </span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600,
+                      color: balanceType === 'debit' ? 'var(--green)' : 'var(--t3)',
+                    }}>
+                      {balanceType === 'debit' ? 'مدين لنا' : 'رصيد دائن'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Credit gauge */}
+                {creditLimit > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: 'var(--t4)',
+                      marginBottom: 2,
+                    }}>
+                      <span>حد الائتمان: {fmtDZD(creditLimit)} دج</span>
+                      <span style={{ color: gaugeColor, fontWeight: 600 }}>
+                        {willExceed ? `تجاوز +${fmtDZD(Number(cck?.exceed_by ?? 0))}` : `${fmtDZD(usedCredit)} مستخدم`}
+                      </span>
+                    </div>
+                    <div style={{
+                      height: 3, borderRadius: 99, background: 'var(--bg3)',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        height: '100%', width: `${usagePercent}%`,
+                        background: gaugeColor, borderRadius: 99,
+                        transition: 'width .3s ease-out',
+                      }} />
+                    </div>
+                    {Number(cck?.overdue_invoices?.count ?? 0) > 0 && (
+                      <div style={{
+                        marginTop: 3, fontSize: 9.5, color: 'var(--orange)',
+                        display: 'flex', alignItems: 'center', gap: 3,
+                      }}>
+                        <i className="ti ti-alert-triangle" style={{ fontSize: 8 }} />
+                        {String(cck?.overdue_invoices?.count ?? '0')} فاتورة متأخرة
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Compact customer insights */}
+                {customerInsights && (
+                  <div style={{
+                    padding: '8px 10px', borderRadius: 'var(--r2)',
+                    background: 'var(--bg1)', border: '1px solid var(--b2)',
+                    marginBottom: 6,
+                  }}>
+                    <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+                      {docCount > 0 && (
+                        <span style={{
+                          padding: '2px 6px', borderRadius: 'var(--r1)',
+                          background: 'var(--bg3)', fontSize: 10, fontWeight: 600,
+                          color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 3,
+                        }}>
+                          <i className="ti ti-file-description" style={{ fontSize: 8, color: 'var(--t4)' }} />
+                          {docCount} مستند
+                        </span>
+                      )}
+                      {monthlyAvg != null && (
+                        <span style={{
+                          padding: '2px 6px', borderRadius: 'var(--r1)',
+                          background: 'var(--bg3)', fontSize: 10, fontWeight: 600,
+                          color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 3,
+                        }}>
+                          <i className="ti ti-calculator" style={{ fontSize: 8, color: 'var(--t4)' }} />
+                          {fmtDZD(monthlyAvg)}/شهر
+                        </span>
+                      )}
+                      {avgPayDays != null && (
+                        <span style={{
+                          padding: '2px 6px', borderRadius: 'var(--r1)',
+                          background: 'var(--bg3)', fontSize: 10, fontWeight: 600,
+                          color: avgPayDays > 0 ? 'var(--red)' : 'var(--green)',
+                          display: 'flex', alignItems: 'center', gap: 3,
+                        }}>
+                          <i className="ti ti-clock" style={{ fontSize: 8 }} />
+                          {avgPayDays > 0 ? '+' : ''}{avgPayDays} يوم
+                        </span>
+                      )}
+                    </div>
+                    {insightDocs.slice(0, 2).map((d) => (
+                      <div key={String(d.id)} style={{
+                        padding: '4px 6px', borderRadius: 'var(--r1)',
+                        background: 'var(--bg3)', border: '1px solid var(--b1)',
+                        fontSize: 10, marginBottom: 3,
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}>
+                        <span style={{ fontWeight: 600, color: 'var(--t2)' }}>
+                          {String(d.document_number ?? '')}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ color: 'var(--t3)', fontVariantNumeric: 'tabular-nums' }}>
+                            {fmtDZD(Number(d.net_to_pay ?? 0))} دج
+                          </span>
+                          {d.status === 'overdue' && <span style={{ fontSize: 7, color: 'var(--red)', fontWeight: 700 }}>متأخر</span>}
+                          {Number(d.remaining_amount ?? 0) > 0.01 && d.status !== 'overdue' && (
+                            <span style={{ fontSize: 7, color: 'var(--orange)', fontWeight: 700 }}>غير مسدد</span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                    {insightDocs.length > 2 && (
+                      <div style={{
+                        fontSize: 10, color: 'var(--em)', fontWeight: 600,
+                        cursor: 'pointer', textAlign: 'center', paddingTop: 3,
+                      }}>
+                        عرض الكل ←
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Balance warning */}
+                {balanceWarning && (
+                  <div style={{ marginTop: 2, marginBottom: 4 }}>
+                    <AlertBanner type="warning" message={balanceWarning} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Document chain */}
+            {isEdit && (
+              <div>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: 'var(--t4)', marginBottom: 4,
+                  display: 'flex', alignItems: 'center', gap: 3,
+                }}>
+                  <i className="ti ti-link" style={{ fontSize: 9 }} />
+                  سلسلة المستندات
+                </div>
+                <DocumentChainPanel
+                  chain={chain}
+                  isLoading={isLoadingChain}
+                  currentId={Number(existingDocument?.id)}
+                  allowedTargets={allowedTargets}
+                  isReadOnly={isReadOnly}
+                  onConvert={(targetCode) => {
+                    if (!window.confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
+                    convertMutation.mutate(
+                      { documentId: Number(existingDocument!.id), targetTypeCode: targetCode },
+                      { onSuccess: () => { onSaved(); onClose(); } },
+                    );
+                  }}
+                  onNavigate={(docId) => {
+                    navigate(`/documents/${typeCode}?document=${docId}`, { replace: true });
+                  }}
+                />
+              </div>
+            )}
+
+            {/* ── Audit log timeline ── */}
+            {isEdit && (
+              <div>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: 'var(--t4)', marginBottom: 4,
+                  display: 'flex', alignItems: 'center', gap: 3,
+                }}>
+                  <i className="ti ti-history" style={{ fontSize: 9 }} />
+                  سجل النشاطات
+                </div>
+                {isLoadingAudit ? (
+                  <div style={{ padding: '4px 0' }}>
+                    <Skeleton height={10} style={{ marginBottom: 4 }} />
+                    <Skeleton height={10} style={{ marginBottom: 4 }} />
+                    <Skeleton height={10} />
+                  </div>
+                ) : auditEntries.length === 0 ? (
+                  <div style={{ fontSize: 10, color: 'var(--t4)', padding: '4px 0' }}>
+                    لا توجد نشاطات بعد
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative', paddingRight: 14 }}>
+                    {/* Timeline line */}
+                    <div style={{
+                      position: 'absolute', right: 4, top: 4, bottom: 4, width: 1.5,
+                      background: 'var(--b2)', borderRadius: 99,
+                    }} />
+                    {auditEntries.slice(0, 10).map((entry: Record<string, unknown>) => {
+                      const user = entry.user as Record<string, unknown> | undefined;
+                      const userName = user?.name as string ?? 'نظام';
+                      const event = entry.event as string;
+                      const createdAt = entry.created_at as string;
+                      const eventLabel =
+                        event === 'created' ? 'إنشاء' :
+                        event === 'updated' ? 'تعديل' :
+                        event === 'deleted' ? 'حذف' :
+                        event === 'validated' ? 'اعتماد' :
+                        event === 'cancelled' ? 'إلغاء' :
+                        event === 'locked' ? 'قفل' : event;
+                      const eventColor =
+                        event === 'created' ? 'var(--green)' :
+                        event === 'deleted' ? 'var(--red)' :
+                        event === 'cancelled' ? 'var(--red)' :
+                        event === 'validated' ? 'var(--blue)' : 'var(--t3)';
+                      const timeStr = createdAt
+                        ? new Date(createdAt).toLocaleString('ar-DZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                        : '';
+                      return (
+                        <div key={String(entry.id)} style={{
+                          position: 'relative', paddingBottom: 6, paddingTop: 1,
+                        }}>
+                          {/* Timeline dot */}
+                          <div style={{
+                            position: 'absolute', right: -12, top: 5, width: 7, height: 7,
+                            borderRadius: '50%', background: eventColor,
+                            border: '1.5px solid var(--bg2)',
+                          }} />
+                          <div style={{ fontSize: 9.5, color: 'var(--t2)', fontWeight: 600 }}>
+                            {eventLabel}
+                          </div>
+                          <div style={{ fontSize: 9, color: 'var(--t4)' }}>
+                            {userName} · {timeStr}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {auditEntries.length > 10 && (
+                      <div
+                        onClick={() => setExtraTab('audit')}
+                        style={{ fontSize: 9.5, color: 'var(--em)', fontWeight: 600, cursor: 'pointer', paddingTop: 2 }}
+                      >
+                        +{auditEntries.length - 10} أخرى
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── MAIN CONTENT ─── */}
+        <div style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          overflow: 'hidden', background: 'var(--bg1)',
+        }}>
+          {/* Permanent banners — compact */}
+          <div style={{ padding: '4px 12px 0' }}>
+            {isCancelled && (
+              <div style={{
+                padding: '4px 10px', borderRadius: 'var(--r1)',
+                background: 'var(--redb)', fontSize: 11, color: 'var(--red)', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                <i className="ti ti-ban" style={{ fontSize: 11 }} />
+                هذا المستند ملغى — جميع الحقول معطلة.
+              </div>
+            )}
+            {isLocked && !isCancelled && (
+              <div style={{
+                padding: '4px 10px', borderRadius: 'var(--r1)',
+                background: 'color-mix(in srgb, var(--orange) 10%, transparent)',
+                fontSize: 11, color: 'var(--orange)', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                <i className="ti ti-lock" style={{ fontSize: 11 }} />
+                هذا المستند مقفل. لا يمكن تعديله حتى يتم فك القفل من قِبل المسؤول.
+              </div>
+            )}
+            {pmMode === 'additive' && !isLocked && (
+              <div style={{
+                padding: '4px 10px', borderRadius: 'var(--r1)',
+                background: 'color-mix(in srgb, var(--blue) 10%, transparent)',
+                fontSize: 11, color: 'var(--blue)', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                <i className="ti ti-plus" style={{ fontSize: 11 }} />
+                المستند معتمد — الأسطر محمية من التعديل. يمكنك فقط إضافة دفعات جديدة.
+              </div>
+            )}
+            {isDirty && !isLocked && !isCancelled && (
+              <div style={{
+                padding: '2px 8px', marginTop: 2,
+                fontSize: 9.5, color: 'var(--orange)', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <i className="ti ti-alert-triangle" style={{ fontSize: 9 }} />
+                توجد تغييرات غير محفوظة
+              </div>
+            )}
+          </div>
+
+          {/* Lines section — table fills remaining space — MAXIMUM SPACE */}
+          <div style={{
+            flex: 1, overflow: 'auto', padding: '6px 12px 0', minHeight: 0,
+          }}>
+            <DocumentLinesSection
+              lines={form.lines}
+              isLinesReadOnly={isLinesReadOnly}
+              isReadOnly={isReadOnly}
+              isPurchase={isPurchase}
+              isPartyExempt={isPartyExempt}
+              products={lookups.products}
+              isLoadingProducts={lookups.isLoadingProducts}
+              visibleCols={visibleCols}
+              handleColsChange={handleColsChange}
+              lineMode={lineMode}
+              setLineMode={setLineMode}
+              lineWarnings={lineWarnings}
+              stockData={stockData}
+              addLine={addLine}
+              addLineWithProduct={addLineWithProduct}
+              removeLine={removeLine}
+              duplicateLine={duplicateLine}
+              updateLine={updateLine}
+              lineErr={lineErr}
+              savedDraft={savedDraft}
+              draftKey={draftKey}
+              restoreDraft={restoreDraft}
+              set={set}
+              needsParty={needsParty}
+              productSuggestions={productSuggestions}
+              isLoadingSuggestions={isLoadingSuggestions}
+              setShowBulkImport={setShowBulkImport}
+              slug={ctrlSlug}
+              affectsStock={affectsStock}
+              stockDir={stockDir}
+              warehouses={lookups.warehouses}
+            />
+          </div>
+
+          {/* ═══ BOTTOM BAR — 52px ═══ */}
+          <div style={{
+            flexShrink: 0,
+            background: 'var(--bg2)',
+            borderTop: '1px solid var(--b1)',
+            boxShadow: '0 -4px 12px rgba(0,0,0,.04)',
+            position: 'relative',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'stretch', height: 52,
+              padding: '0 12px',
+            }}>
+              {/* Left side: compact payments + line count */}
+              <div style={{
+                flex: 1, display: 'flex', alignItems: 'center', gap: 6,
+                minWidth: 0, overflow: 'hidden',
+              }}>
+                {/* Line count chip */}
+                <span style={{
+                  padding: '2px 8px', borderRadius: 'var(--r1)',
+                  background: 'var(--bg3)', fontSize: 10.5, fontWeight: 600,
+                  color: 'var(--t3)', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 3,
+                }}>
+                  <i className="ti ti-list" style={{ fontSize: 9 }} />
+                  {form.lines.length} سطر
+                </span>
+
+                {payments.length > 0 && (
+                  <>
+                    <select
+                      style={{
+                        padding: '4px 6px', borderRadius: 'var(--r1)',
+                        border: '1px solid var(--b2)', background: 'var(--bg1)',
+                        color: 'var(--t1)', fontSize: 11, fontFamily: 'inherit',
+                        maxWidth: 100, cursor: 'pointer',
+                      }}
+                      value={String(payments[0]?.payment_mode_id ?? '')}
+                      disabled={isReadOnly}
+                      onChange={(e) => updatePayment(0, 'payment_mode_id', Number(e.target.value))}
+                    >
+                      {paymentModeOptions.map((opt: { value: string; label: string }) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      style={{
+                        width: 90, padding: '4px 6px', borderRadius: 'var(--r1)',
+                        border: '1px solid var(--b2)', background: 'var(--bg1)',
+                        color: 'var(--t1)', fontSize: 11, fontFamily: 'inherit',
+                        textAlign: 'center', direction: 'ltr',
+                      }}
+                      value={fmtDZD(Number(payments[0]?.amount ?? 0))}
+                      disabled={isReadOnly}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/[^0-9.]/g, '');
+                        updatePayment(0, 'amount', Number(clean) || 0);
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const remaining = totals.netToPay - payments.reduce((s, p) => s + Number(p.amount ?? 0), 0) + Number(payments[0]?.amount ?? 0);
+                        updatePayment(0, 'amount', Math.max(0, remaining));
+                      }}
+                      style={{
+                        padding: '3px 8px', borderRadius: 'var(--r1)',
+                        border: '1px solid var(--b2)', background: 'var(--bg1)',
+                        cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                        color: 'var(--t2)', fontFamily: 'inherit',
+                      }}
+                      disabled={isReadOnly}
+                    >
+                      دفعة كاملة
+                    </button>
+                    {payments.length > 1 && (
+                      <button
+                        onClick={() => setShowAllPayments(!showAllPayments)}
+                        style={{
+                          padding: '3px 6px', borderRadius: 'var(--r1)',
+                          border: '1px solid var(--b2)', background: 'var(--bg1)',
+                          cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                          color: 'var(--em)', fontFamily: 'inherit',
+                        }}
+                      >
+                        +{payments.length - 1}
+                      </button>
+                    )}
+                    {!isReadOnly && (
+                      <button
+                        onClick={() => addPayment()}
+                        style={{
+                          padding: '3px 6px', borderRadius: 'var(--r1)',
+                          border: '1px dashed var(--b3)', background: 'transparent',
+                          cursor: 'pointer', fontSize: 10, color: 'var(--t4)',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        + إضافة دفعة
+                      </button>
+                    )}
+                  </>
+                )}
+                {payments.length === 0 && !isReadOnly && (
+                  <button
+                    onClick={() => addPayment()}
+                    style={{
+                      padding: '3px 8px', borderRadius: 'var(--r1)',
+                      border: '1px dashed var(--b3)', background: 'transparent',
+                      cursor: 'pointer', fontSize: 10, color: 'var(--t4)',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    + إضافة دفعة
+                  </button>
+                )}
+              </div>
+
+              {/* Right side: compact totals */}
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+                justifyContent: 'center', gap: 0, flexShrink: 0,
+              }}>
+                <div style={{
+                  fontSize: 18, fontWeight: 800, color: 'var(--em)',
+                  fontVariantNumeric: 'tabular-nums', lineHeight: 1.2,
+                }}>
+                  {fmtDZD(totals.netToPay)} دج
+                </div>
+                <div style={{
+                  fontSize: 10, color: 'var(--t4)',
+                  direction: 'ltr', textAlign: 'right',
+                }}>
+                  {totalsText}
+                </div>
+              </div>
+            </div>
+
+            {/* Multi-payment popover (slide-up) */}
+            {showAllPayments && payments.length > 1 && (
+              <div style={{
+                position: 'absolute', bottom: '100%', left: 10, right: '50%',
+                zIndex: 30,
+                background: 'var(--bg1)', borderRadius: 'var(--r2)',
+                border: '1px solid var(--b2)',
+                boxShadow: '0 -4px 20px rgba(0,0,0,.1)',
+                padding: 10, maxHeight: 220, overflowY: 'auto',
+                animation: 'slideUp .15s ease-out',
+              }}>
+                <div style={{
+                  fontSize: 10.5, fontWeight: 700, color: 'var(--t4)', marginBottom: 6,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <i className="ti ti-coin" style={{ fontSize: 11 }} />
+                  جميع الدفعات
+                </div>
+                <DocumentPaymentsSection
+                  payments={payments}
+                  paymentModes={lookups.paymentModes}
+                  paymentModeOptions={paymentModeOptions}
+                  treasuryAccountMap={treasuryAccountMap}
+                  treasuryAccounts={lookups.treasuryAccounts}
+                  addPayment={addPayment}
+                  addPaymentWithValues={addPaymentWithValues}
+                  removePayment={removePayment}
+                  updatePayment={updatePayment}
+                  paymentsExceedWarning={paymentsExceedWarning}
+                  advancePayments={advancePayments}
+                  isLoadingAdvances={isLoadingAdvances}
+                  pmMode={pmMode}
+                  totals={totals}
+                  affectsAccounting={docType?.affects_accounting ?? false}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ ADVANCED OPTIONS DRAWER ═══ */}
+      {drawerOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          display: 'flex', justifyContent: 'flex-end',
+        }}>
+          <div onClick={() => setDrawerOpen(false)}
+            style={{
+              position: 'absolute', inset: 0, background: 'rgba(0,0,0,.3)',
+              backdropFilter: 'blur(2px)',
+              transition: 'opacity .2s ease-out',
+            }}
+          />
+          <div ref={drawerRef}
+            style={{
+              position: 'relative', width: 360, height: '100dvh',
+              background: 'var(--bg1)',
+              boxShadow: '-6px 0 20px rgba(0,0,0,.1)',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+              transform: 'translateX(0)',
+              transition: 'transform .2s ease-out',
+            }}
+          >
+            <div style={{
+              padding: '12px 14px', borderBottom: '1px solid var(--b2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 12, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <i className="ti ti-adjustments" style={{ fontSize: 13 }} />
+                خيارات متقدمة
+              </div>
+              <button onClick={() => setDrawerOpen(false)}
+                style={{
+                  width: 26, height: 26, borderRadius: 6,
+                  border: '1px solid var(--b2)', background: 'var(--bg1)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'var(--t3)',
+                }}
+              >
+                <i className="ti ti-x" style={{ fontSize: 12 }} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+              <div style={{ marginBottom: 12 }}>
+                <Label>تاريخ الاستحقاق</Label>
+                <input
+                  type="date"
+                  style={fieldInputStyle()}
+                  value={form.due_date as string}
+                  min={form.document_date as string}
+                  disabled={isReadOnly}
+                  onChange={(e) => set('due_date', e.target.value)}
+                />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <Label required>المستودع</Label>
+                <select
+                  style={{
+                    ...fieldInputStyle(!!errors.warehouse_id),
+                    cursor: isReadOnly ? 'not-allowed' : 'pointer',
+                  }}
+                  value={form.warehouse_id as string}
+                  disabled={isReadOnly}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    set('warehouse_id', newId);
+                    ctrlQc.invalidateQueries({ queryKey: [ctrlSlug, 'warehouse-stock', newId] });
+                  }}
+                >
+                  <option value="">— اختر —</option>
+                  {lookups.warehouses.map((w: any) => (
+                    <option key={String(w.id)} value={String(w.id)}>
+                      {String(w.name)}{w.is_default ? ' ★' : ''}
+                    </option>
+                  ))}
+                </select>
+                <FieldError msg={errors.warehouse_id} />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <Label required>السنة المالية</Label>
+                <select
+                  style={{
+                    ...fieldInputStyle(!!errors.fiscal_year_id),
+                    cursor: isReadOnly ? 'not-allowed' : 'pointer',
+                  }}
+                  value={form.fiscal_year_id as string}
+                  disabled={isReadOnly}
+                  onChange={(e) => set('fiscal_year_id', e.target.value)}
+                >
+                  <option value="">— اختر —</option>
+                  {lookups.fiscalYears.map((fy: any) => (
+                    <option key={String(fy.id)} value={String(fy.id)}>
+                      {String(fy.name)}
+                      {fy.is_current ? ' ★' : ''}
+                      {fy.is_closed ? ' (مقفلة)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <FieldError msg={errors.fiscal_year_id} />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <Label required>العملة</Label>
+                <select
+                  style={{
+                    ...fieldInputStyle(!!errors.currency_id),
+                    cursor: isReadOnly ? 'not-allowed' : 'pointer',
+                  }}
+                  value={form.currency_id as string}
+                  disabled={isReadOnly}
+                  onChange={(e) => set('currency_id', e.target.value)}
+                >
+                  <option value="">— اختر —</option>
+                  {lookups.currencies.map((c: any) => (
+                    <option key={String(c.id)} value={String(c.id)}>
+                      {String(c.code)} — {String(c.name)}{c.is_base_currency ? ' ★' : ''}
+                    </option>
+                  ))}
+                </select>
+                <FieldError msg={errors.currency_id} />
+              </div>
+
+              {!isPurchase && lookups.priceLevels.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <Label>فئة السعر</Label>
+                  <ComboBox
+                    options={priceLevelOptions}
+                    value={form.price_level_id as string}
+                    onChange={(v) => handlePriceLevelChange(v)}
+                    placeholder="— الافتراضي —"
+                    disabled={isReadOnly || isLinesReadOnly}
+                  />
+                  {isLinesReadOnly && (
+                    <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 2 }}>
+                      فئة السعر محمية — الأسطر معتمدة
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ marginBottom: 12 }}>
+                <Label>ملاحظات للزبون</Label>
+                <textarea
+                  rows={2}
+                  style={{ ...fieldInputStyle(), resize: 'vertical', fontSize: 12 }}
+                  value={form.notes as string}
+                  disabled={isReadOnly}
+                  onChange={(e) => set('notes', e.target.value)}
+                  placeholder="ملاحظات للزبون — تظهر في الطباعة"
+                />
+                <Label>ملاحظات داخلية</Label>
+                <textarea
+                  rows={1}
+                  style={{
+                    ...fieldInputStyle(),
+                    border: '1px dashed var(--b3)',
+                    color: 'var(--t3)', fontSize: 11, resize: 'vertical',
+                  }}
+                  value={form.internal_notes as string}
+                  disabled={isReadOnly}
+                  onChange={(e) => set('internal_notes', e.target.value)}
+                  placeholder="ملاحظات داخلية — لا تظهر في الطباعة"
+                />
+              </div>
+
+              <Section title="الشحن وشروط الدفع" icon="ti-truck-delivery" collapsible defaultOpen={false}>
+                {(SHIPPING_CODES.has(docCode) ? extraTab : 'payment-terms') === 'shipping' ? (
+                  <ShippingInfoSection
+                    value={form.shipping_info}
+                    deliveryDate={form.delivery_date}
+                    disabled={isReadOnly}
+                    onChange={(info) => set('shipping_info', info)}
+                    onDeliveryDateChange={(date) => set('delivery_date', date)}
+                  />
+                ) : (
+                  <PaymentTermsTable
+                    terms={form.payment_terms}
+                    netToPay={totals.netToPay}
+                    disabled={isReadOnly}
+                    onChange={(terms) => set('payment_terms', terms)}
+                  />
+                )}
+                {SHIPPING_CODES.has(docCode) && (
+                  <div style={{ marginTop: 6 }}>
+                    <button
+                      onClick={() => setExtraTab(extraTab === 'shipping' ? 'payment-terms' : 'shipping')}
+                      style={{
+                        padding: '3px 8px', borderRadius: 'var(--r1)',
+                        border: '1px solid var(--b2)', background: 'var(--bg1)',
+                        cursor: 'pointer', fontSize: 10.5, color: 'var(--t3)',
+                      }}
+                    >
+                      {extraTab === 'shipping' ? '← شروط الدفع' : 'الشحن والتسليم →'}
+                    </button>
+                  </div>
+                )}
+              </Section>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ SUB-MODALS ═══ */}
+      <BulkImportModal
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        products={lookups.products}
+        onImport={(importedLines: any) => { bulkAddLines(importedLines); }}
+      />
+
+      {showReturnModal && existingDocument && (
+        <ReturnDocumentModal
+          document={existingDocument}
+          onCreated={(returnDoc) => {
+            setShowReturnModal(false);
+            const num = String((returnDoc as Record<string, unknown>).document_number ?? '');
+            addToast({ type: 'success', title: `تم إنشاء المرتجع ${num} ✓` });
+            if (ctrlSlug) {
+              ctrlQc.invalidateQueries({ queryKey: [ctrlSlug, 'documents'] });
+            }
+            setTimeout(() => { onSaved(); onClose(); }, 1200);
+          }}
+          onClose={() => setShowReturnModal(false)}
+        />
+      )}
+
+      <ConfirmDeleteModal
+        open={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          setShowDeleteModal(false);
+          deleteMut.mutate();
+        }}
+        loading={deleteMut.isPending}
+        itemName={existingDocument?.document_number ? `#${existingDocument.document_number}` : undefined}
+        warning="ملاحظة: الحذف غير مدعوم — استخدم الإلغاء."
+      />
+
+      {printModalOpen && existingDocument && companyInfo && (
+        <Suspense fallback={null}>
+          <TemplatePrintModal
+            open={printModalOpen}
+            onClose={() => setPrintModalOpen(false)}
+            document={existingDocument as Record<string, unknown>}
+            company={companyInfo as any}
+            template={selectedTemplate || undefined}
+            templates={printTemplates}
+            docTypeCode={docCode}
+          />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+
+```
+
 ## FILE: resources/js/pages/documents/CommercialDocumentsPage.tsx
 ```
 // ════════════════════════════════════════════════════════════════════════════
@@ -2609,7 +3627,7 @@ import React, {
     useEffect,
     useRef,
 } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     useQuery,
     useMutation,
@@ -3112,6 +4130,7 @@ function DocumentViewModal({
 
 export default function CommercialDocumentsPage() {
     const { typeCode }                       = useParams<{ typeCode: string }>();
+    const navigate                           = useNavigate();
     const qc                                 = useQueryClient();
     const slug                               = useActiveSlug();
     const { selectedYear, isReadOnly }       = useFiscalYear() as { selectedYear?: { id: number; name: string }; isReadOnly?: boolean };
@@ -3980,7 +4999,7 @@ export default function CommercialDocumentsPage() {
                 editActions.push({
                     label: "تعديل المستند",
                     icon: "pencil",
-                    onClick: () => { if (row) openEditModal(row); },
+                    onClick: () => { if (row) navigate(`/documents/${typeCode}/${row.id}/edit`); },
                 });
             }
             if (canLock) {
@@ -4027,7 +5046,10 @@ export default function CommercialDocumentsPage() {
                 disabled: !colKey,
                 onClick: () => {
                     if (colKey) {
-                        handleHiddenColumnsChange(colKey, !hiddenColumnsSet.has(colKey), hiddenColumnKeys);
+                        const updated = isHidden
+                            ? hiddenColumnKeys.filter(k => k !== colKey)
+                            : [...hiddenColumnKeys, colKey];
+                        handleHiddenColumnsChange(colKey, !isHidden, updated);
                         showToast(isHidden ? "تم إظهار العمود" : "تم إخفاء العمود", "info");
                     }
                 },
@@ -4069,7 +5091,7 @@ export default function CommercialDocumentsPage() {
         }
 
         return menuItems;
-    }, [hiddenColumnsSet, hiddenColumnKeys, handleHiddenColumnsChange, isReadOnly, openEditModal, lockMut, unlockMut, cancelMut, items, showToast]);
+    }, [hiddenColumnsSet, hiddenColumnKeys, handleHiddenColumnsChange, isReadOnly, lockMut, unlockMut, cancelMut, items, showToast, navigate, typeCode]);
 
     // ════════════════════════════════════════════════════════════════════════
     // SMART FILTER CALLBACK
@@ -4106,11 +5128,11 @@ export default function CommercialDocumentsPage() {
                 <ActionBtn icon="ti-eye" title="عرض" onClick={() => { setViewDocId(row.id); setModal("view"); }} />
 
                 {/* تعديل — !is_locked && !is_exported */}
-                {canEdit && (
+                    {canEdit && (
                     <ActionBtn
                         icon={loadingEdit ? "ti-loader-2" : "ti-pencil"}
                         title="تعديل" color="var(--blue)" disabled={loadingEdit}
-                        onClick={() => openEditModal(row)}
+                        onClick={() => navigate(`/documents/${typeCode}/${row.id}/edit`)}
                     />
                 )}
 
@@ -4148,7 +5170,7 @@ export default function CommercialDocumentsPage() {
                 )}
             </div>
         );
-    }, [isReadOnly, loadingEdit, openEditModal, lockMut, unlockMut, cancelMut]);
+    }, [isReadOnly, loadingEdit, lockMut, unlockMut, cancelMut, navigate, typeCode]);
 
     // ════════════════════════════════════════════════════════════════════════
     // HEADER ACTIONS
@@ -4195,13 +5217,13 @@ export default function CommercialDocumentsPage() {
                 </button>
             )}
             {!isReadOnly && (
-                <button onClick={() => setModal("add")} style={{ height: 32, padding: "0 16px", borderRadius: 8, border: "none", background: opColor, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: `0 2px 8px color-mix(in srgb, ${opColor} 30%, transparent)`, fontFamily: "inherit" }}>
+                <button onClick={() => navigate(`/documents/${typeCode}/new`)} style={{ height: 32, padding: "0 16px", borderRadius: 8, border: "none", background: opColor, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: `0 2px 8px color-mix(in srgb, ${opColor} 30%, transparent)`, fontFamily: "inherit" }}>
                     <i className="ti ti-plus" style={{ fontSize: 15 }} aria-hidden="true" />
                     مستند جديد
                 </button>
             )}
         </div>
-    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumnKeys.length, initialSnapshot, resetColState]);
+    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumnKeys.length, initialSnapshot, resetColState, navigate, typeCode]);
 
     // ── Page title ────────────────────────────────────────────────────────────
     const tableTitle = useMemo(() => (
@@ -5151,7 +6173,7 @@ export default function BatchPrintModal({ open, onClose, documents: docs }: Prop
   const successCount = printResults.filter(r => r.ok).length;
   const failCount = printResults.filter(r => !r.ok).length;
   const done = !isPrinting && printResults.length > 0;
-  const progressPct = progress.total > 0 ? ((printResults.length) / progress.total) * 100 : 0;
+  const progressPct = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
 
   return (
     <div style={overlayStyle} onClick={handleCancel}>
@@ -6931,7 +7953,7 @@ export function FieldError({ msg }: { msg?: string }) {
 
 export function Section({
   title, icon, badge, children, collapsible = false,
-  defaultOpen = true, open: openProp, onOpenChange,
+  defaultOpen = true, open: openProp, onOpenChange, fillHeight,
 }: {
   title:        string;
   icon:         string;
@@ -6944,6 +7966,7 @@ export function Section({
    *  (مثال: ظهور خطأ تحقق داخل قسم مطوي). عدم تمريره = نفس السلوك القديم تماماً. */
   open?:         boolean;
   onOpenChange?: (open: boolean) => void;
+  fillHeight?:  boolean;
 }) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = openProp !== undefined;
@@ -6956,7 +7979,10 @@ export function Section({
   };
 
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{
+      marginBottom: 20,
+      ...(fillHeight ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : {}),
+    }}>
       <div
         style={{
           display:       'flex',
@@ -6980,7 +8006,7 @@ export function Section({
             style={{ fontSize: 12, color: 'var(--t4)' }} />
         )}
       </div>
-      {open && children}
+      {open && (fillHeight ? <div style={{ flex: 1, minHeight: 0 }}>{children}</div> : children)}
     </div>
   );
 }
@@ -7520,6 +8546,7 @@ export function LineCard({
   let totalMargin = 0;
   let marginColor = 'var(--t4)';
   let costPrice = 0;
+  const lowMarginThreshold = prod?.min_margin_percentage ?? 5;
   if (!isPurchase && prod) {
     costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
     if (costPrice > 0 && line.unit_price_ht > 0) {
@@ -7529,7 +8556,6 @@ export function LineCard({
       marginColor = marginPct < lowMarginThreshold ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
     }
   }
-  const lowMarginThreshold = prod?.min_margin_percentage ?? 5;
   const hasLowMarginWarning = (line._warnings ?? []).some(w => w.type === 'low_margin');
   const hasLowMargin = hasLowMarginWarning || (!isPurchase && marginPct !== null && marginPct < lowMarginThreshold);
   const borderColor = hasLowMargin
@@ -7959,7 +8985,7 @@ export function PaymentTermsTable({
                   <input
                     type="number" min={0} max={100} step={0.01}
                     style={{ ...inputStyle(), fontSize: 11, padding: '4px 6px', textAlign: 'center' }}
-                    value={t.percentage || ''}
+                    value={t.percentage ?? ''}
                     disabled={disabled}
                     onChange={(e) => update(i, { percentage: parseFloat(e.target.value) || 0 })}
                   />
@@ -7969,7 +8995,7 @@ export function PaymentTermsTable({
                     <input
                       type="number" min={0} step={0.01}
                       style={{ ...inputStyle(), fontSize: 11, padding: '4px 20px 4px 6px', textAlign: 'center' }}
-                      value={t.amount || ''}
+                      value={t.amount ?? ''}
                       disabled={disabled}
                       onChange={(e) => update(i, { amount: parseFloat(e.target.value) || 0 })}
                     />
@@ -8439,7 +9465,7 @@ export function ProductSearch({
 
 ## FILE: resources/js/pages/documents/components/ReturnDocumentModal.tsx
 ```
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { fmtDZD } from '../utils/document.utils';
 import { useCreateReturn } from '../hooks/useDocumentChain';
 import type { LineItem } from '../types/document.types';
@@ -8487,6 +9513,10 @@ export function ReturnDocumentModal({ document, onCreated, onClose }: ReturnDocu
   }, [document.lines]);
 
   const [returnLines, setReturnLines] = useState<ReturnLine[]>(lines);
+
+  useEffect(() => {
+    setReturnLines(lines);
+  }, [lines]);
 
   const updateQty = (lineId: number, qty: number) => {
     setReturnLines(prev => prev.map(l =>
@@ -9074,6 +10104,724 @@ export function useAlerts() {
 
 ```
 
+## FILE: resources/js/pages/documents/hooks/useCommercialDocumentController.ts
+```
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
+import { settingsApi } from '@/lib/api/endpoints/settings';
+import { useFiscalYear } from '@/context/FiscalYearContext';
+import type { DocumentType } from '@/lib/api/core/types';
+import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
+import { resolveTemplateById } from '@/pages/settings/print-settings/runtime/TemplateResolver';
+
+import { useDocumentLookups }  from './useDocumentLookups';
+import { useDocumentForm }     from './useDocumentForm';
+import type { PartyChangeResult } from './useDocumentForm';
+import { useDocumentChain, useConvertDocument } from './useDocumentChain';
+import { useCreditCheck }      from './useCreditCheck';
+import { useCustomerInsights } from './useCustomerInsights';
+import { useProductSuggestions } from './useProductSuggestions';
+import { useAdvancePayments } from './useAdvancePayments';
+import {
+  PURCHASE_CODES, CONVERSION_MAP,
+} from '../types/document.types';
+import type { ColKey } from '../types/document.types';
+import {
+  fmtDZD, loadVisibleCols, saveVisibleCols,
+  toNum,
+} from '../utils/document.utils';
+
+interface UseCommercialDocumentControllerOptions {
+  documentType:       DocumentType | null;
+  existingDocument?:  Record<string, unknown>;
+  onClose:            () => void;
+  onSaved:            () => void;
+  active:             boolean;
+}
+
+export function useCommercialDocumentController({
+  documentType,
+  existingDocument,
+  onClose,
+  onSaved,
+  active,
+}: UseCommercialDocumentControllerOptions) {
+
+  const slug           = useActiveSlug();
+  const qc             = useQueryClient();
+  const navigate       = useNavigate();
+  const { selectedYear } = useFiscalYear() as { selectedYear?: { id: number; name: string } };
+
+  const docCode    = documentType?.code ?? '';
+  const isPurchase = PURCHASE_CODES.has(docCode);
+  const isEdit     = !!existingDocument;
+
+  // ─── Settings defaults ───────────────────────────────────────────────────
+  const { data: settingsDict } = useQuery({
+    queryKey: [slug, 'settings-dict'],
+    queryFn: () => settingsApi.list(),
+    enabled: !!slug,
+    staleTime: 10 * 60_000,
+  });
+
+  const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(
+    () => loadVisibleCols(slug ?? 'default'),
+  );
+  const handleColsChange = (cols: Set<ColKey>) => {
+    setVisibleCols(cols);
+    saveVisibleCols(slug ?? 'default', cols);
+  };
+
+  const [lineMode, setLineMode] = useState<'table' | 'card'>('table');
+
+  const initialDefaultsApplied = useRef(false);
+  useEffect(() => {
+    if (!settingsDict || initialDefaultsApplied.current) return;
+    initialDefaultsApplied.current = true;
+
+    const storedCols = (() => {
+      try { return localStorage.getItem(`doc_visible_cols_${slug ?? 'default'}`); } catch {}
+      return null;
+    })();
+    if (!storedCols) {
+      const defaultCols = settingsDict.documents_default_visible_cols?.value as string[] | undefined;
+      if (defaultCols?.length) {
+        setVisibleCols(new Set(defaultCols as ColKey[]));
+      }
+    }
+
+    const storedMode = (() => {
+      try { return localStorage.getItem(`doc_line_mode_${slug ?? 'default'}`); } catch {}
+      return null;
+    })();
+    if (!storedMode) {
+      const defaultMode = settingsDict.documents_default_line_mode?.value as string | undefined;
+      if (defaultMode === 'card' || defaultMode === 'table') {
+        setLineMode(defaultMode);
+      }
+    }
+  }, [settingsDict, slug]);
+
+  // ─── Lookups ──────────────────────────────────────────────────────────────
+
+  const lookups = useDocumentLookups({
+    open: active,
+    isPurchase,
+    needsParty:  true,
+    warehouseId:  null,
+    fiscalYearId: selectedYear?.id ?? null,
+  });
+
+  // ── القيم الافتراضية من Settings (أولوية) مع الرجوع إلى اللوك أب ──────
+  const settingsWarehouseId = useMemo(() => {
+    const v = settingsDict?.default_warehouse_id?.value;
+    if (v) {
+      const found = lookups.warehouses.find((w: any) => w.id === Number(v));
+      if (found) return String(found.id);
+    }
+    return lookups.defaultWarehouseId;
+  }, [settingsDict, lookups.warehouses, lookups.defaultWarehouseId]);
+
+  const settingsCurrencyId = useMemo(() => {
+    const v = settingsDict?.default_currency_id?.value;
+    if (v) {
+      const found = lookups.currencies.find((c: any) => c.id === Number(v));
+      if (found) return String(found.id);
+    }
+    return lookups.baseCurrencyId;
+  }, [settingsDict, lookups.currencies, lookups.baseCurrencyId]);
+
+  const settingsPriceLevelId = useMemo(() => {
+    const v = settingsDict?.default_price_level_id?.value;
+    if (v !== null && v !== undefined && v !== '' && Number(v) > 0) {
+      return String(Number(v));
+    }
+    const defaultPl = (lookups.priceLevels as any[])?.find((pl: any) => pl.is_default);
+    if (defaultPl) return String(defaultPl.id);
+    const firstPl = (lookups.priceLevels as any[])?.[0];
+    if (firstPl) return String(firstPl.id);
+    return '';
+  }, [settingsDict, lookups.priceLevels]);
+
+  const settingsApplyStamp = useMemo(() => {
+    const v = settingsDict?.default_apply_stamp?.value;
+    return v === true || v === 'true';
+  }, [settingsDict]);
+
+  const lookupsReady = isEdit
+    ? true
+    : (settingsWarehouseId !== '' && settingsCurrencyId !== '' && settingsPriceLevelId !== '');
+
+  // ─── Form ─────────────────────────────────────────────────────────────────
+
+  const {
+    form, errors, lineErr, apiErr, setApiErr,
+    set, handlePartyChange, handlePriceLevelChange, priceLevelId,
+    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
+    paymentMode: pmMode,
+    payments,
+    bulkAddLines,
+    addPayment, addPaymentWithValues, removePayment, updatePayment,
+    partyBalance, isLoadingBalance,
+    totals, validate, buildPayload,
+    updateStockData,
+    needsParty, affectsStock, stockDir,
+    isReadOnly, isLinesReadOnly,
+    lineWarnings,
+    priceLevelSwitchMsg,
+    clearPriceLevelSwitchMsg,
+  } = useDocumentForm({
+    documentType,
+    existingDocument,
+    defaultTvaRate:     lookups.defaultTvaRate,
+    defaultWarehouseId: settingsWarehouseId,
+    baseCurrencyId:     settingsCurrencyId,
+    defaultPriceLevelId: settingsPriceLevelId,
+    defaultApplyStamp:   settingsApplyStamp,
+    stampEnabled:        settingsApplyStamp,
+    selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
+    paymentModes:       lookups.paymentModes,
+    parties:            lookups.parties,
+    products:           lookups.products,
+    stockData:          {},
+    isPurchase,
+    open: active,
+    priceLevels:        lookups.priceLevels,
+  });
+
+  // ─── حالة المستند ─────────────────────────────────────────────────────────
+
+  const docStatusName = String(
+    (existingDocument?.document_status as Record<string, unknown> | undefined)?.name
+    ?? existingDocument?.status
+    ?? '',
+  ).toLowerCase();
+
+  const isLocked    = !!(existingDocument?.is_locked);
+  const isCancelled = docStatusName === 'cancelled' || docStatusName === 'returned';
+  const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
+  const isValidated = !isLocked && !isCancelled && VALIDATED_STATUSES.has(docStatusName);
+
+  // ─── Stock query ──────────────────────────────────────────────────────────
+
+  const warehouseIdNum = form.warehouse_id ? parseInt(form.warehouse_id) : null;
+  const { data: stockData = {} } = useQuery<Record<number, number>>({
+    queryKey: [slug, 'warehouse-stock', warehouseIdNum, selectedYear?.id],
+    queryFn:  () =>
+      apiGet<unknown[]>('/inventory/stock-at', {
+        warehouse_id:   warehouseIdNum,
+        fiscal_year_id: selectedYear?.id,
+      }).then((rows) =>
+        Object.fromEntries(
+          (rows as Array<{ id: number; current_stock: number }>)
+            .map((r) => [r.id, r.current_stock ?? 0]),
+        ),
+      ),
+    enabled:   !!slug && !!warehouseIdNum && !isPurchase,
+    staleTime: 2 * 60_000,
+  });
+
+  useEffect(() => { updateStockData(stockData); }, [stockData, updateStockData]);
+
+  // ─── Document number ──────────────────────────────────────────────────────
+
+  const [docNumber,         setDocNumber]         = useState('');
+  const [docNumberErr,      setDocNumberErr]       = useState('');
+  const [checkingDocNumber, setCheckingDocNumber]  = useState(false);
+
+  useEffect(() => {
+    setDocNumber(isEdit && existingDocument?.document_number
+      ? String(existingDocument.document_number)
+      : '');
+  }, [isEdit, existingDocument?.document_number, active]);
+
+  const checkDocNumberMut = useMutation({
+    mutationFn: async (number: string) => {
+      if (!slug || !documentType?.id || !number) return { exists: false };
+      return apiGet<{ exists: boolean }>('/documents/check-number', {
+        document_number:  number,
+        document_type_id: documentType.id,
+        exclude_id:       isEdit ? existingDocument?.id : undefined,
+      });
+    },
+  });
+
+  const handleDocNumberChange = async (newNum: string) => {
+    setDocNumber(newNum);
+    setDocNumberErr('');
+    if (!newNum.trim()) { setDocNumberErr('رقم المستند إلزامي'); return; }
+    setCheckingDocNumber(true);
+    try {
+      const result = await checkDocNumberMut.mutateAsync(newNum);
+      if (result.exists) setDocNumberErr('رقم المستند موجود بالفعل');
+    } catch { /* ignore */ }
+    finally { setCheckingDocNumber(false); }
+  };
+
+  // ─── تحذير تغيير المتعامل ─────────────────────────────────────────────────
+
+  const [partyChangeWarning, setPartyChangeWarning] = useState<{
+    message:   string;
+    blockType: PartyChangeResult['blockType'];
+  } | null>(null);
+
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [extraTab, setExtraTab] = useState('shipping');
+
+  // ─── Document chain ───────────────────────────────────────────────────────
+  const { data: chain, isLoading: isLoadingChain } = useDocumentChain(
+    isEdit ? Number(existingDocument?.id) : null,
+  );
+  const convertMutation = useConvertDocument();
+
+  const { data: docTypes = [] } = useQuery({
+    queryKey: [slug, 'document-types'],
+    queryFn:  () => apiGet<DocumentType[]>('/document-types', { per_page: 500 })
+      .then(r => (Array.isArray(r) ? r : (r as unknown as { data: DocumentType[] })?.data ?? [])),
+    staleTime: 10 * 60_000,
+    enabled:   !!slug,
+  });
+
+  const targetCodes  = CONVERSION_MAP[docCode] ?? [];
+  const allowedTargets = useMemo(() =>
+    targetCodes.map(code => {
+      const dt = docTypes.find(d => d.code === code);
+      return { code, name: dt?.name ?? code };
+    }),
+    [targetCodes, docTypes],
+  );
+
+  // ─── Credit check ─────────────────────────────────────────────────────────
+  const { data: creditCheck, isLoading: isLoadingCredit } = useCreditCheck({
+    partyId:    form.party_id ? parseInt(form.party_id) : null,
+    amount:     totals.netToPay,
+    date:       form.document_date,
+    isPurchase,
+    enabled:    active && needsParty && !isPurchase,
+  });
+
+  const { data: customerInsights, isLoading: isLoadingInsights } = useCustomerInsights(
+    form.party_id ? parseInt(form.party_id) : null,
+    !!active && needsParty && !!form.party_id,
+  );
+
+  const { data: productSuggestions, isLoading: isLoadingSuggestions } = useProductSuggestions(
+    form.party_id ? parseInt(form.party_id) : null,
+    isPurchase,
+    !!active && needsParty && !!form.party_id && !isLinesReadOnly,
+  );
+
+  const { data: advancePayments, isLoading: isLoadingAdvances } = useAdvancePayments(
+    form.party_id ? parseInt(form.party_id) : null,
+    !!active && needsParty && !!form.party_id && (documentType?.affects_accounting ?? false),
+  );
+
+  const handlePartyChangeWithWarning = (id: string) => {
+    setPartyChangeWarning(null);
+    const result = handlePartyChange(id);
+    if (result.blocked) {
+      setPartyChangeWarning({
+        message:   result.reason ?? 'لا يمكن تغيير المتعامل الآن',
+        blockType: result.blockType,
+      });
+    }
+  };
+
+  // ─── Success state ────────────────────────────────────────────────────────
+
+  const [successMsg, setSuccessMsg] = useState('');
+  const successTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
+
+  // ─── Template-based printing ──────────────────────────────────────────────
+
+  const companyInfo = mapCompany(useActiveCompany());
+
+  const { data: printTemplates = [] } = usePrintTemplatesList(docCode);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const selectedTemplate = useMemo(() => {
+    if (selectedTemplateId) return resolveTemplateById(printTemplates, selectedTemplateId);
+    return printTemplates[0] || null;
+  }, [selectedTemplateId, printTemplates]);
+
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+
+  const handlePrint = useCallback(() => {
+    if (!existingDocument || !companyInfo) return;
+    setPrintModalOpen(true);
+  }, [existingDocument, companyInfo]);
+
+  // ─── Delete confirmation modal ────────────────────────────────────────────
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // تنظيف حالة الـ sub-modals عند الإغلاق — منع الوميض
+  useEffect(() => {
+    if (!active) {
+      setShowDeleteModal(false);
+      setShowReturnModal(false);
+      setShowBulkImport(false);
+    }
+  }, [active]);
+
+  // ── Auto-dismiss price level switch notification ──────────────────────────
+  useEffect(() => {
+    if (!priceLevelSwitchMsg) return;
+    const t = setTimeout(clearPriceLevelSwitchMsg, 6000);
+    return () => clearTimeout(t);
+  }, [priceLevelSwitchMsg, clearPriceLevelSwitchMsg]);
+
+  // ─── Smart Memory — حفظ مسودة تلقائي ──────────────────────────────────────
+  const draftKey = `doc-draft-${slug ?? 'default'}-${documentType?.code ?? 'new'}`;
+  useEffect(() => {
+    if (!active || !form.lines.length) return;
+    const interval = setInterval(() => {
+      try {
+        const draft = { ...form, _savedAt: Date.now() };
+        localStorage.setItem(draftKey, btoa(unescape(encodeURIComponent(JSON.stringify(draft)))));
+      } catch { /* localStorage full */ }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [active, form, draftKey]);
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      const draft = JSON.parse(decodeURIComponent(escape(atob(raw))));
+      if (!draft.lines?.length) return null;
+      const elapsed = Date.now() - (draft._savedAt ?? 0);
+      if (elapsed > 86_400_000) { localStorage.removeItem(draftKey); return null; }
+      return draft;
+    } catch { return null; }
+  };
+
+  const savedDraft = !isEdit && active && !form.lines.length ? restoreDraft() : null;
+
+  // ─── Mutations ────────────────────────────────────────────────────────────
+
+  const saveMut = useMutation({
+    mutationFn: () => {
+      const payload = buildPayload();
+
+      const url = isEdit ? `/documents/${existingDocument!.id}` : '/documents';
+      if (isEdit && docNumber) {
+        (payload as Record<string, unknown>).document_number = docNumber;
+      }
+      return isEdit
+        ? apiPut<Record<string, unknown>>(url, payload)
+        : apiPost<Record<string, unknown>>(url, payload);
+    },
+    onSuccess: (savedDoc) => {
+      if (slug) {
+        qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+        if (affectsStock) {
+          qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
+        }
+        if (form.party_id) {
+          qc.invalidateQueries({ queryKey: [slug, 'party-balance', parseInt(form.party_id)] });
+        }
+      }
+      const docNum = String((savedDoc as Record<string, unknown>)?.document_number ?? '—');
+      setSuccessMsg(isEdit ? `تم تحديث المستند ${docNum}` : `تم إنشاء المستند ${docNum} ✓`);
+      navigator.clipboard?.writeText(docNum).catch(() => {});
+      successTimer.current = setTimeout(() => {
+        setSuccessMsg('');
+        onSaved();
+        onClose();
+      }, 3000);
+    },
+    onError: (e: unknown) => {
+      const err = e as Record<string, unknown>;
+      const errMsg = err?.message ?? 'حدث خطأ أثناء الحفظ';
+      const validationErrors = (err as Record<string, unknown>)?.errors as Record<string, string[]> | undefined;
+      if (validationErrors) {
+        const firstMsg = Object.values(validationErrors).flat()[0];
+        setApiErr(firstMsg ?? String(errMsg));
+      } else {
+        setApiErr(String(errMsg));
+      }
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: () => apiDelete(`/documents/${existingDocument!.id}`),
+    onSuccess: () => {
+      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+      setSuccessMsg('تم حذف المستند بنجاح');
+      successTimer.current = setTimeout(() => {
+        setSuccessMsg(''); onSaved(); onClose();
+      }, 1500);
+    },
+    onError: (e: unknown) => {
+      const err = e as Record<string, unknown>;
+      setApiErr(String(err?.message ?? 'لا يمكن حذف هذا المستند — استخدم الإلغاء بدلاً من الحذف'));
+    },
+  });
+
+  const handleSave = () => {
+    setApiErr('');
+    if (isReadOnly) return;
+    if (isEdit && !docNumber.trim()) {
+      setDocNumberErr('رقم المستند إلزامي'); return;
+    }
+    if (docNumberErr) { setApiErr('رجاء التحقق من رقم المستند'); return; }
+    if (creditCheck?.will_exceed) {
+      if (!creditCheck.can_proceed) {
+        setApiErr('تجاوز حد الائتمان — يتطلب موافقة المدير');
+        return;
+      }
+      if (!window.confirm(`تجاوز حد الائتمان بـ ${fmtDZD(creditCheck.exceed_by)} دج — هل تريد المتابعة؟`)) return;
+    }
+    if (validate()) saveMut.mutate();
+  };
+
+  const handleDelete = () => {
+    setShowDeleteModal(true);
+  };
+
+  const handleExport = (format: 'excel' | 'pdf' | 'json' | 'xml') => {
+    const formData = {
+      documentNumber: docNumber,
+      documentDate: form.document_date,
+      dueDate: form.due_date,
+      party: lookups.parties.find(p => String(p.id) === form.party_id)?.name ?? '',
+      notes: form.notes,
+      lines: form.lines.map((l, i) => ({
+        line: i + 1,
+        product: l.description || l._product?.name || '',
+        quantity: l.quantity * (l._packQty || 1),
+        unitPrice: l.unit_price_ht,
+        total: l.quantity * (l._packQty || 1) * l.unit_price_ht,
+        tva: l.tva_rate,
+      })),
+      totals: {
+        ht: totals.ht,
+        tva: totals.tva,
+        ttc: totals.ttc,
+        stamp: totals.stamp,
+        netToPay: totals.netToPay,
+      },
+    };
+
+    if (format === 'excel') {
+      void import('exceljs').then((ExcelJS) => {
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Document');
+        ws.addRow(['البيان', 'الكمية', 'سعر الوحدة', 'الإجمالي', 'TVA']);
+        formData.lines.forEach(l => ws.addRow([l.product, l.quantity, l.unitPrice, l.total, l.tva]));
+        ws.addRow([]);
+        ws.addRow(['Net HT', formData.totals.ht]);
+        ws.addRow(['TVA', formData.totals.tva]);
+        ws.addRow(['TTC', formData.totals.ttc]);
+        wb.xlsx.writeBuffer().then(buf => {
+          const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href = url;
+          a.download = `${formData.documentNumber || 'document'}.xlsx`;
+          a.click(); URL.revokeObjectURL(url);
+        });
+      });
+    } else if (format === 'pdf') {
+      window.print();
+    } else if (format === 'json') {
+      const blob = new Blob([JSON.stringify(formData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `${formData.documentNumber || 'document'}.json`;
+      a.click(); URL.revokeObjectURL(url);
+    } else if (format === 'xml') {
+      const toXml = (obj: unknown, tag: string): string => {
+        if (Array.isArray(obj)) return obj.map(v => toXml(v, tag)).join('\n');
+        if (typeof obj === 'object' && obj !== null) {
+          const children = Object.entries(obj as Record<string, unknown>)
+            .map(([k, v]) => toXml(v, k)).join('\n');
+          return `<${tag}>\n${children}\n</${tag}>`;
+        }
+        return `<${tag}>${String(obj)}</${tag}>`;
+      };
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<document>\n${toXml(formData, 'data')}\n</document>`;
+      const blob = new Blob([xml], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `${formData.documentNumber || 'document'}.xml`;
+      a.click(); URL.revokeObjectURL(url);
+    }
+  };
+
+  const isPending = saveMut.isPending || deleteMut.isPending || checkingDocNumber;
+
+  // ─── Memos ────────────────────────────────────────────────────────────────
+
+  const isPartyExempt = lookups.parties.find(
+    (p) => String(p.id) === form.party_id,
+  )?.is_tva_exempt ?? false;
+
+  const partyOptions = useMemo(() =>
+    lookups.parties.map((p) => ({
+      id:    p.id,
+      label: p.name,
+      sub:   [(p as Record<string, unknown>).code, (p as Record<string, unknown>).phone].filter(Boolean).join(' · '),
+      badge: (p as Record<string, unknown>).is_tva_exempt ? 'معفى' : (p as Record<string, unknown>).price_level?.name,
+    })),
+    [lookups.parties],
+  );
+
+  const priceLevelOptions = useMemo(() =>
+    lookups.priceLevels.map((pl) => ({
+      id:    Number(pl.id),
+      label: String(pl.name),
+    })),
+    [lookups.priceLevels],
+  );
+
+  const paymentModeOptions = useMemo(() =>
+    lookups.paymentModes.map((pm) => ({
+      id:                  pm.id,
+      label:               pm.name,
+      treasury_account_id: pm.treasury_account_id,
+      requires_reference:  pm.requires_reference,
+    })),
+    [lookups.paymentModes],
+  );
+
+  const treasuryAccountMap = useMemo(
+    () => new Map(lookups.treasuryAccounts.map((ta) => [ta.id, ta])),
+    [lookups.treasuryAccounts],
+  );
+
+  const selectedParty = useMemo(
+    () => lookups.parties.find((p) => String(p.id) === form.party_id),
+    [lookups.parties, form.party_id],
+  );
+
+  const stockBadge = useMemo(() => {
+    if (!affectsStock) return null;
+    return stockDir > 0
+      ? { text: 'يضيف مخزون', bg: 'var(--greenb)', color: 'var(--green)' }
+      : { text: 'يخصم مخزون', bg: 'var(--redb)',   color: 'var(--red)'   };
+  }, [affectsStock, stockDir]);
+
+  const paymentsExceedWarning = useMemo(() => {
+    const allPaid = payments.reduce((acc, p) => acc + toNum(p.amount), 0);
+    if (allPaid > totals.netToPay + 0.01 && totals.netToPay > 0) {
+      return `مجموع الدفعات (${fmtDZD(allPaid)} دج) يتجاوز المبلغ المستحق (${fmtDZD(totals.netToPay)} دج)`;
+    }
+    return null;
+  }, [payments, totals.netToPay]);
+
+  const balanceWarning = useMemo(() => {
+    if (!partyBalance || partyBalance.current_balance <= 0) return null;
+    if (partyBalance.balance_type !== 'debit') return null;
+    if (totals.netToPay <= 0) return null;
+    if (partyBalance.current_balance > totals.netToPay * 2) {
+      return `رصيد ${selectedParty?.name ?? 'المتعامل'} المتراكم (${fmtDZD(partyBalance.current_balance)} دج) كبير — تأكد من تسوية الحسابات`;
+    }
+    return null;
+  }, [partyBalance, totals.netToPay, selectedParty]);
+
+  return {
+    // Basic
+    slug, qc, navigate, docCode, isPurchase, isEdit,
+    selectedYear,
+
+    // Settings
+    settingsDict,
+    settingsApplyStamp,
+
+    // Columns & line mode
+    visibleCols, lineMode, handleColsChange, setLineMode,
+
+    // Lookups
+    lookups,
+    lookupsReady,
+
+    // Form
+    form, errors, lineErr, apiErr, setApiErr,
+    set, handlePartyChange, handlePriceLevelChange, priceLevelId,
+    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
+    pmMode, payments,
+    bulkAddLines, addPayment, addPaymentWithValues, removePayment, updatePayment,
+    partyBalance, isLoadingBalance,
+    totals, validate, buildPayload,
+    updateStockData, needsParty, affectsStock, stockDir,
+    isReadOnly, isLinesReadOnly,
+    lineWarnings,
+    priceLevelSwitchMsg, clearPriceLevelSwitchMsg,
+
+    // Document status
+    docStatusName, isLocked, isCancelled, isValidated,
+
+    // Stock
+    stockData, warehouseIdNum,
+
+    // Document number
+    docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,
+
+    // Party change warning
+    partyChangeWarning, setPartyChangeWarning,
+
+    // Modals
+    showReturnModal, setShowReturnModal,
+    showBulkImport, setShowBulkImport,
+    extraTab, setExtraTab,
+
+    // Document chain
+    chain, isLoadingChain, convertMutation, allowedTargets,
+    docTypes,
+
+    // Credit check
+    creditCheck: creditCheck as Record<string, unknown> | undefined,
+    isLoadingCredit,
+
+    // Customer insights
+    customerInsights: customerInsights as Record<string, unknown> | undefined,
+    isLoadingInsights,
+
+    // Product suggestions
+    productSuggestions,
+    isLoadingSuggestions,
+
+    // Advance payments
+    advancePayments,
+    isLoadingAdvances,
+
+    // Success
+    successMsg, setSuccessMsg,
+
+    // Print
+    companyInfo, printTemplates,
+    selectedTemplateId, setSelectedTemplateId, selectedTemplate,
+    printModalOpen, setPrintModalOpen, handlePrint,
+
+    // Delete
+    showDeleteModal, setShowDeleteModal,
+    deleteMut,
+
+    // Actions
+    handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
+
+    // State
+    isPending,
+
+    // Memos
+    isPartyExempt, partyOptions, priceLevelOptions,
+    paymentModeOptions, treasuryAccountMap, selectedParty,
+    stockBadge, paymentsExceedWarning, balanceWarning,
+
+    // Draft
+    savedDraft, draftKey, restoreDraft,
+  };
+}
+
+export type UseCommercialDocumentControllerReturn = ReturnType<typeof useCommercialDocumentController>;
+
+```
+
 ## FILE: resources/js/pages/documents/hooks/useComputeLine.ts
 ```
 import {
@@ -9158,10 +10906,15 @@ interface UseComputeLineOptions {
 }
 
 export function useComputeLine({ enabled, onSuccess, onWarnings }: UseComputeLineOptions) {
-  const slug          = useActiveSlug();
-  const abortRefs     = useRef<Map<number, AbortController>>(new Map());
-  const debounceRefs  = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const slug            = useActiveSlug();
+  const abortRefs       = useRef<Map<number, AbortController>>(new Map());
+  const debounceRefs    = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const onSuccessRef    = useRef(onSuccess);
+  const onWarningsRef   = useRef(onWarnings);
   const [loading, setLoading] = useState<Set<number>>(new Set());
+
+  useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
+  useEffect(() => { onWarningsRef.current = onWarnings; }, [onWarnings]);
 
   useEffect(() => () => {
     debounceRefs.current.forEach(clearTimeout);
@@ -9192,11 +10945,11 @@ export function useComputeLine({ enabled, onSuccess, onWarnings }: UseComputeLin
           { signal: ctrl.signal },
         );
 
-        onSuccess?.(result, lineIdx);
+        onSuccessRef.current?.(result, lineIdx);
 
         const activeWarnings = result.warnings.filter(w => w.level !== 'info');
         if (activeWarnings.length > 0) {
-          onWarnings?.(activeWarnings, lineIdx);
+          onWarningsRef.current?.(activeWarnings, lineIdx);
         }
 
       } catch (err: unknown) {
@@ -9213,7 +10966,7 @@ export function useComputeLine({ enabled, onSuccess, onWarnings }: UseComputeLin
     }, delay);
 
     debounceRefs.current.set(lineIdx, timer);
-  }, [enabled, slug, onSuccess, onWarnings]);
+  }, [enabled, slug]);
 
   /** استدعاء فوري بدون debounce (عند اختيار منتج جديد) */
   const computeImmediate = useCallback((lineIdx: number, input: ComputeLineInput) => {
@@ -9230,7 +10983,6 @@ export function useComputeLine({ enabled, onSuccess, onWarnings }: UseComputeLin
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
-import { toNum } from '../utils/document.utils';
 
 export interface CreditCheckResult {
   party_id:              number;
@@ -10137,7 +11889,7 @@ export function useDocumentForm({
     });
     setErrors((prev) => { const n = { ...prev }; delete n.party_id; return n; });
     return { blocked: false };
-  }, [isPurchase, payments, defaultPriceLevelId]);
+  }, [isPurchase, payments, defaultPriceLevelId, existingDocument]);
 
   // ── handlePriceLevelChange ────────────────────────────────────────────────
 
@@ -10353,7 +12105,7 @@ export function useDocumentForm({
       return switched.plChanged ? { ...f, lines, price_level_id: switched.to } : { ...f, lines };
     });
     setLineErr('');
-  }, [defaultTvaRate, isPurchase, priceLevelMap]);
+  }, [defaultTvaRate, isPurchase, priceLevelMap, triggerCompute, warehouseIdForCompute, partyIdForCompute]);
 
   // ── addLine / removeLine / duplicateLine ──────────────────────────────────
 
@@ -11409,13 +13161,13 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     }
 
     // التحقق من وجود حساب خزينة (تم تعبئته افتراضياً)
-    if (!payment.treasury_account_id) {
+    if (!paymentLocal.treasury_account_id) {
       errs.treasury = 'حساب الخزينة إلزامي';
     }
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [warehouseId, lines, products, payment.treasury_account_id]);
+  }, [warehouseId, lines, products, paymentLocal.treasury_account_id]);
 
   // Save mutation
   const saveMut = useMutation({
@@ -12468,6 +14220,328 @@ function selectNumStyle(disabled: boolean, hasValue: boolean): React.CSSProperti
 
 ```
 
+## FILE: resources/js/pages/documents/todo/documentQuickCreateStore.tsx
+```
+// ════════════════════════════════════════════════════════════════════════════
+// lib/store/documentQuickCreateStore.tsx
+//
+// يوفّر نسخة واحدة عالمية من CommercialDocumentModal يمكن فتحها من أي صفحة
+// بالمشروع (زر عائم، اختصار لوحة مفاتيح، أو أي مكوّن آخر لاحقاً) دون الحاجة
+// لتمرير props عبر شجرة المكوّنات. الحالة نفسها بسيطة (Context + useState)
+// عمداً — لا تعتمد على أي مكتبة إدارة حالة خارجية حتى تعمل بمعزل عن أي بنية
+// حالية بالمشروع.
+// ════════════════════════════════════════════════════════════════════════════
+
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useActiveSlug } from '@/lib/store/appStore';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
+import type { DocumentType } from '@/lib/api/core/types';
+import CommercialDocumentModal from '@/pages/documents/CommercialDocumentModal';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface QuickCreateState {
+  open:             boolean;
+  documentType:     DocumentType | null;
+  existingDocument: Record<string, unknown> | undefined;
+}
+
+interface DocumentQuickCreateContextValue {
+  state: QuickCreateState;
+  /** يفتح مستنداً جديداً بنوع معيّن (يُستخدم من الزر العائم/الاختصار) */
+  openQuickCreate: (type: DocumentType) => void;
+  /** يفتح مستنداً موجوداً للتعديل — متروك للاستخدام المستقبلي (مثلاً من نتائج بحث عامة) */
+  openQuickEdit: (type: DocumentType, doc: Record<string, unknown>) => void;
+  closeQuickCreate: () => void;
+}
+
+const DocumentQuickCreateContext = createContext<DocumentQuickCreateContextValue | null>(null);
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useDocumentQuickCreate(): DocumentQuickCreateContextValue {
+  const ctx = useContext(DocumentQuickCreateContext);
+  if (!ctx) {
+    throw new Error(
+      'useDocumentQuickCreate يجب استخدامه داخل <DocumentQuickCreateProvider> — ' +
+      'تأكد من لف جذر التطبيق به مرة واحدة فقط.',
+    );
+  }
+  return ctx;
+}
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
+
+const EMPTY_STATE: QuickCreateState = {
+  open: false,
+  documentType: null,
+  existingDocument: undefined,
+};
+
+export function DocumentQuickCreateProvider({ children }: { children: React.ReactNode }) {
+  const slug = useActiveSlug();
+  const qc   = useQueryClient();
+
+  const [state, setState] = useState<QuickCreateState>(EMPTY_STATE);
+
+  const openQuickCreate = useCallback((type: DocumentType) => {
+    setState({ open: true, documentType: type, existingDocument: undefined });
+  }, []);
+
+  const openQuickEdit = useCallback((type: DocumentType, doc: Record<string, unknown>) => {
+    setState({ open: true, documentType: type, existingDocument: doc });
+  }, []);
+
+  const closeQuickCreate = useCallback(() => {
+    // لا نُصفّر documentType فوراً — نترك المودال يُكمل انتقال الإغلاق (opacity)
+    // بلا "قفزة" محتوى قبل زوال الخلفية، تماماً كما يفعل نمط
+    // "حاوية دائمة في DOM مع تحكم CSS بالظهور" المستخدم أصلاً في index.tsx.
+    setState((s) => ({ ...s, open: false }));
+  }, []);
+
+  const handleSaved = useCallback(() => {
+    if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+  }, [slug, qc]);
+
+  const value = useMemo<DocumentQuickCreateContextValue>(() => ({
+    state, openQuickCreate, openQuickEdit, closeQuickCreate,
+  }), [state, openQuickCreate, openQuickEdit, closeQuickCreate]);
+
+  return (
+    <DocumentQuickCreateContext.Provider value={value}>
+      {children}
+
+      {/* نسخة واحدة عالمية — تُركَّب دائماً بالـDOM، الظهور يُتحكَّم به عبر open
+          فقط (نفس نمط CommercialDocumentModal الحالي)، فلا حاجة لأي منطق
+          mount/unmount إضافي هنا. */}
+      <CommercialDocumentModal
+        open={state.open}
+        documentType={state.documentType}
+        existingDocument={state.existingDocument}
+        onClose={closeQuickCreate}
+        onSaved={handleSaved}
+      />
+    </DocumentQuickCreateContext.Provider>
+  );
+}
+
+```
+
+## FILE: resources/js/pages/documents/todo/GlobalDocumentFAB.tsx
+```
+// ════════════════════════════════════════════════════════════════════════════
+// components/global/GlobalDocumentFAB.tsx
+//
+// زر عائم ثابت (أسفل يسار الشاشة) + اختصار لوحة مفاتيح Ctrl+Alt+N لفتح إنشاء
+// مستند تجاري جديد من أي صفحة بالمشروع. يُركَّب مرة واحدة فقط داخل
+// <DocumentQuickCreateProvider> (انظر documentQuickCreateStore.tsx).
+//
+// سلوك النقر/الاختصار:
+//   - أول استخدام: لا يوجد "آخر نوع مُستخدم" بعد → يفتح قائمة صغيرة لاختيار
+//     النوع.
+//   - الاستخدام المعتاد: نقرة واحدة (أو الاختصار) تفتح مباشرة آخر نوع مستند
+//     استُخدم — صفر خطوات إضافية للعمل المتكرر طوال اليوم.
+//   - زر صغير ملتصق (▲) يفتح القائمة دائماً لتغيير النوع، بلا المرور عبر
+//     "آخر نوع مُستخدم".
+// ════════════════════════════════════════════════════════════════════════════
+
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiGet } from '@/lib/api/core/client';
+import { useActiveSlug } from '@/lib/store/appStore';
+import type { DocumentType } from '@/lib/api/core/types';
+import { useDocumentQuickCreate } from '@/lib/store/documentQuickCreateStore';
+
+const LAST_TYPE_STORAGE_KEY = 'doc_quickcreate_last_type_code';
+
+function loadLastTypeCode(slug: string | undefined): string | null {
+  try { return localStorage.getItem(`${LAST_TYPE_STORAGE_KEY}_${slug ?? 'default'}`); }
+  catch { return null; }
+}
+function saveLastTypeCode(slug: string | undefined, code: string) {
+  try { localStorage.setItem(`${LAST_TYPE_STORAGE_KEY}_${slug ?? 'default'}`, code); }
+  catch { /* تجاهل — التخزين المحلي غير إلزامي لعمل الزر */ }
+}
+
+// ─── Helper: هل التركيز حالياً داخل حقل إدخال؟ ─────────────────────────────────
+// لمنع الاختصار من العمل أثناء الكتابة (خصوصاً مع AltGr على لوحات AZERTY).
+function isTypingContext(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  return (
+    tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
+    el.isContentEditable
+  );
+}
+
+export function GlobalDocumentFAB() {
+  const slug = useActiveSlug();
+  const { state, openQuickCreate } = useDocumentQuickCreate();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // ─── جلب أنواع المستندات (نفس نمط CommercialDocumentsPage.tsx) ───────────
+  const { data: documentTypes = [] } = useQuery<DocumentType[]>({
+    queryKey: [slug, 'document-types-all'],
+    queryFn: () =>
+      apiGet<{ data?: DocumentType[] }>('/document-types', { per_page: 500 }).then((res) => {
+        const list = Array.isArray(res) ? (res as DocumentType[]) : ((res as Record<string, unknown>).data as DocumentType[]) ?? [];
+        return list;
+      }),
+    enabled: !!slug,
+    staleTime: 10 * 60_000,
+  });
+
+  const lastTypeCode = useMemo(() => loadLastTypeCode(slug), [slug]);
+  const lastType = useMemo(
+    () => documentTypes.find((t) => t.code === lastTypeCode) ?? null,
+    [documentTypes, lastTypeCode],
+  );
+
+  const chooseType = useCallback((type: DocumentType) => {
+    saveLastTypeCode(slug, type.code);
+    setMenuOpen(false);
+    openQuickCreate(type);
+  }, [slug, openQuickCreate]);
+
+  const triggerQuickAction = useCallback(() => {
+    if (state.open) return; // مودال مفتوح أصلاً — لا نفتح فوقه نسخة ثانية
+    if (lastType) {
+      openQuickCreate(lastType);
+    } else {
+      setMenuOpen(true);
+    }
+  }, [state.open, lastType, openQuickCreate]);
+
+  // ─── اختصار لوحة المفاتيح: Ctrl+Alt+N ────────────────────────────────────
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const isShortcut = e.ctrlKey && e.altKey && !e.shiftKey && e.key.toLowerCase() === 'n';
+      if (!isShortcut) return;
+      if (isTypingContext(e.target)) return; // لا نتدخل أثناء الكتابة
+      e.preventDefault();
+      triggerQuickAction();
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [triggerQuickAction]);
+
+  // ─── إغلاق القائمة عند الضغط خارجها ───────────────────────────────────────
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
+
+  return (
+    <div
+      ref={wrapperRef}
+      style={{
+        position: 'fixed', bottom: 24, left: 24, zIndex: 900,
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
+      }}
+    >
+      {/* ─── القائمة المنسدلة لاختيار نوع المستند — تفتح للأعلى لأن الزر
+           أسفل الشاشة ─── */}
+      {menuOpen && (
+        <div
+          style={{
+            position: 'absolute', bottom: 60, left: 0,
+            minWidth: 220, maxHeight: 320, overflowY: 'auto',
+            background: 'var(--bg1)', border: '1px solid var(--b2)',
+            borderRadius: 'var(--r2)', boxShadow: '0 10px 30px rgba(0,0,0,.25)',
+            padding: 6, direction: 'rtl',
+          }}
+        >
+          <div style={{
+            fontSize: 10.5, fontWeight: 700, color: 'var(--t4)',
+            padding: '4px 8px 6px', textTransform: 'uppercase', letterSpacing: 0.4,
+          }}>
+            إنشاء مستند جديد
+          </div>
+          {documentTypes.length === 0 ? (
+            <div style={{ padding: '10px 8px', fontSize: 12, color: 'var(--t4)' }}>
+              جاري تحميل الأنواع...
+            </div>
+          ) : (
+            documentTypes.map((type) => (
+              <button
+                key={type.id}
+                onClick={() => chooseType(type)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  width: '100%', textAlign: 'right', padding: '8px 10px',
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  borderRadius: 'var(--r1)', fontSize: 13, color: 'var(--t1)',
+                  fontFamily: 'inherit',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg3)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <i className="ti ti-file-plus" style={{ color: 'var(--em)', fontSize: 14 }} />
+                {type.name}
+                {type.code === lastTypeCode && (
+                  <span style={{
+                    marginRight: 'auto', fontSize: 9.5, fontWeight: 700,
+                    color: 'var(--t4)', background: 'var(--bg3)',
+                    padding: '1px 6px', borderRadius: 99,
+                  }}>
+                    الأخير
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* ─── الزر الرئيسي: نقرة = فتح آخر نوع مُستخدم مباشرة ─── */}
+        <button
+          onClick={triggerQuickAction}
+          title={lastType ? `مستند جديد: ${lastType.name} (Ctrl+Alt+N)` : 'مستند جديد (Ctrl+Alt+N)'}
+          style={{
+            width: 52, height: 52, borderRadius: '50%',
+            border: 'none', cursor: 'pointer',
+            background: 'var(--em)', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 6px 18px color-mix(in srgb, var(--em) 40%, transparent)',
+            fontSize: 22, transition: 'transform .12s',
+          }}
+          onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; }}
+          onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        >
+          <i className="ti ti-plus" />
+        </button>
+
+        {/* ─── زر صغير ملتصق: يفتح قائمة الاختيار دائماً (لتغيير النوع) ─── */}
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          title="اختيار نوع المستند"
+          style={{
+            width: 28, height: 28, borderRadius: '50%',
+            border: '1px solid var(--b2)', cursor: 'pointer',
+            background: 'var(--bg1)', color: 'var(--t3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,.15)', fontSize: 12,
+          }}
+        >
+          <i className={`ti ti-chevron-${menuOpen ? 'down' : 'up'}`} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+```
+
 ## FILE: resources/js/pages/documents/types/document.types.ts
 ```
 // ════════════════════════════════════════════════════════════════════════════
@@ -12674,6 +14748,8 @@ export interface LineItem {
   _packQty:               number;
   _warnings?:             Array<{ type: string; level: string; message: string }>;
   _computing?:            boolean;
+  _fromCompute?:          boolean;
+  discount_amount?:       number;
 }
 
 // ─── Form ─────────────────────────────────────────────────────────────────────

@@ -202,6 +202,8 @@ export interface LineItem {
   _packQty:               number;
   _warnings?:             Array<{ type: string; level: string; message: string }>;
   _computing?:            boolean;
+  _fromCompute?:          boolean;
+  discount_amount?:       number;
 }
 
 // ─── Form ─────────────────────────────────────────────────────────────────────

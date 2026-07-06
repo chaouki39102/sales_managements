@@ -60,6 +60,7 @@ export default function DocumentLinesSection({
     <Section
       title="أسطر المستند"
       icon="ti-list-details"
+      fillHeight
       badge={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {lines.length > 0 && (

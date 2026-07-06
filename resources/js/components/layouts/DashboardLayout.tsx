@@ -3,7 +3,7 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useFiscalYear, FiscalYearSelector } from '@/context/FiscalYearContext';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 import client from '@/lib/api/core/client';
 import { useTopbarTitle } from '@/hooks/useTopbarTitle';
@@ -573,6 +573,19 @@ const meta = useTopbarTitle();
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
+  // Auto-collapse sidebar on document editor pages (new/edit)
+  const isDocEditor = /^\/documents\/[^/]+\/(new|edit)$/.test(location.pathname.replace(/^\//, ''));
+  const prevIsDocEditor = useRef(false);
+  useEffect(() => {
+    if (isDocEditor && !prevIsDocEditor.current) {
+      setSidebarCollapsed(true);
+    }
+    if (!isDocEditor && prevIsDocEditor.current) {
+      setSidebarCollapsed(false);
+    }
+    prevIsDocEditor.current = isDocEditor;
+  }, [isDocEditor]);
+
   return (
     <>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -711,9 +724,11 @@ const meta = useTopbarTitle();
               <input type="text" placeholder="بحث سريع..." />
             </div>
             <NotificationBell />
-            <button className="ib" onClick={toggleTheme} title={dark ? 'الوضع الفاتح' : 'الوضع الداكن'}>
-              <span className="ic ic-sm"><i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`} /></span>
-            </button>
+            {!isDocEditor && (
+              <button className="ib" onClick={toggleTheme} title={dark ? 'الوضع الفاتح' : 'الوضع الداكن'}>
+                <span className="ic ic-sm"><i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`} /></span>
+              </button>
+            )}
             <button className="tb-btn p" onClick={() => navigate('pos')}>
               <span className="ic ic-xs"><i className="ti ti-plus" /></span>
               <span>فاتورة جديدة</span>
@@ -722,7 +737,7 @@ const meta = useTopbarTitle();
         </div>
 
         {/* ════════ المحتوى ════════ */}
-        <div style={{ flex:1 }}>
+        <div style={{ flex:1, minHeight:0 }}>
           {fiscalState === 'loading' && (
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', gap:12, color:'var(--t4)' }}>
               <i className="ti ti-loader" style={{ fontSize:20, color:'var(--em)', animation:'spin 1s linear infinite' }} />

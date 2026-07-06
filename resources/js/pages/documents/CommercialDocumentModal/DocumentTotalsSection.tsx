@@ -90,7 +90,7 @@ export default function DocumentTotalsSection({
           checked={form.apply_stamp}
           onChange={(v: boolean) => set('apply_stamp', v)}
           label="الطابع الجبائي"
-          subLabel="1% من TTC — بحد أقصى 2,500 دج — للفواتير ≥ 30,000 دج"
+          subLabel="1% من TTC — بحد أدنى 5 دج وأقصى 2,500 دج"
           disabled={isReadOnly}
         />
       )}

@@ -55,6 +55,7 @@ export function LineCard({
   let totalMargin = 0;
   let marginColor = 'var(--t4)';
   let costPrice = 0;
+  const lowMarginThreshold = prod?.min_margin_percentage ?? 5;
   if (!isPurchase && prod) {
     costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
     if (costPrice > 0 && line.unit_price_ht > 0) {
@@ -64,7 +65,6 @@ export function LineCard({
       marginColor = marginPct < lowMarginThreshold ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
     }
   }
-  const lowMarginThreshold = prod?.min_margin_percentage ?? 5;
   const hasLowMarginWarning = (line._warnings ?? []).some(w => w.type === 'low_margin');
   const hasLowMargin = hasLowMarginWarning || (!isPurchase && marginPct !== null && marginPct < lowMarginThreshold);
   const borderColor = hasLowMargin

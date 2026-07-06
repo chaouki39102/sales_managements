@@ -74,7 +74,7 @@ export default function DocumentPaymentsSection({
 
       {payments.map((pay, idx) => {
         const isExisting = pay.id !== undefined && pay.id !== null;
-        const selectedMode = paymentModes.find(
+        const selectedMode = paymentModeOptions.find(
           (pm) => String(pm.id) === pay.payment_mode_id,
         );
         const autoTreasuryId = selectedMode?.treasury_account_id ?? null;

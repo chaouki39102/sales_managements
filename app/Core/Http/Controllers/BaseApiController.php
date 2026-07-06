@@ -88,6 +88,9 @@ abstract class BaseApiController extends Controller
     {
         try {
             $data = $this->getListData($request);
+            if ($data instanceof JsonResponse) {
+                return $data;
+            }
             return $this->successResponse($data, "تم جلب قائمة {$this->resourceName} بنجاح");
         } catch (\Throwable $e) {
             return $this->handleError($e, 'index');
@@ -395,6 +398,7 @@ abstract class BaseApiController extends Controller
             $e instanceof BusinessRuleException                                                        => 'business_rule',
             $e instanceof AuthorizationException                                                       => 'authorization',
             $e instanceof \App\Core\Exceptions\UnauthorizedException                                  => 'authorization',
+            $e instanceof \App\Core\Exceptions\ApiQueryBuilderException                               => 'client_error',
             $e instanceof ValidationException                                                          => 'validation',
             $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
                 && $e->getStatusCode() < 500                                                          => 'client_error',

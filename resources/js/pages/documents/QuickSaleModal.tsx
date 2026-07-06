@@ -545,13 +545,13 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     }
 
     // التحقق من وجود حساب خزينة (تم تعبئته افتراضياً)
-    if (!payment.treasury_account_id) {
+    if (!paymentLocal.treasury_account_id) {
       errs.treasury = 'حساب الخزينة إلزامي';
     }
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [warehouseId, lines, products, payment.treasury_account_id]);
+  }, [warehouseId, lines, products, paymentLocal.treasury_account_id]);
 
   // Save mutation
   const saveMut = useMutation({

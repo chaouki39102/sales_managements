@@ -147,7 +147,7 @@ export default function BatchPrintModal({ open, onClose, documents: docs }: Prop
   const successCount = printResults.filter(r => r.ok).length;
   const failCount = printResults.filter(r => !r.ok).length;
   const done = !isPrinting && printResults.length > 0;
-  const progressPct = progress.total > 0 ? ((printResults.length) / progress.total) * 100 : 0;
+  const progressPct = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
 
   return (
     <div style={overlayStyle} onClick={handleCancel}>

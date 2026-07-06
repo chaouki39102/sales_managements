@@ -717,7 +717,7 @@ export function useDocumentForm({
     });
     setErrors((prev) => { const n = { ...prev }; delete n.party_id; return n; });
     return { blocked: false };
-  }, [isPurchase, payments, defaultPriceLevelId]);
+  }, [isPurchase, payments, defaultPriceLevelId, existingDocument]);
 
   // ── handlePriceLevelChange ────────────────────────────────────────────────
 
@@ -933,7 +933,7 @@ export function useDocumentForm({
       return switched.plChanged ? { ...f, lines, price_level_id: switched.to } : { ...f, lines };
     });
     setLineErr('');
-  }, [defaultTvaRate, isPurchase, priceLevelMap]);
+  }, [defaultTvaRate, isPurchase, priceLevelMap, triggerCompute, warehouseIdForCompute, partyIdForCompute]);
 
   // ── addLine / removeLine / duplicateLine ──────────────────────────────────
 

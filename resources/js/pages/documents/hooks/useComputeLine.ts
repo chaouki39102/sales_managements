@@ -80,10 +80,15 @@ interface UseComputeLineOptions {
 }
 
 export function useComputeLine({ enabled, onSuccess, onWarnings }: UseComputeLineOptions) {
-  const slug          = useActiveSlug();
-  const abortRefs     = useRef<Map<number, AbortController>>(new Map());
-  const debounceRefs  = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const slug            = useActiveSlug();
+  const abortRefs       = useRef<Map<number, AbortController>>(new Map());
+  const debounceRefs    = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const onSuccessRef    = useRef(onSuccess);
+  const onWarningsRef   = useRef(onWarnings);
   const [loading, setLoading] = useState<Set<number>>(new Set());
+
+  useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
+  useEffect(() => { onWarningsRef.current = onWarnings; }, [onWarnings]);
 
   useEffect(() => () => {
     debounceRefs.current.forEach(clearTimeout);
@@ -114,11 +119,11 @@ export function useComputeLine({ enabled, onSuccess, onWarnings }: UseComputeLin
           { signal: ctrl.signal },
         );
 
-        onSuccess?.(result, lineIdx);
+        onSuccessRef.current?.(result, lineIdx);
 
         const activeWarnings = result.warnings.filter(w => w.level !== 'info');
         if (activeWarnings.length > 0) {
-          onWarnings?.(activeWarnings, lineIdx);
+          onWarningsRef.current?.(activeWarnings, lineIdx);
         }
 
       } catch (err: unknown) {
@@ -135,7 +140,7 @@ export function useComputeLine({ enabled, onSuccess, onWarnings }: UseComputeLin
     }, delay);
 
     debounceRefs.current.set(lineIdx, timer);
-  }, [enabled, slug, onSuccess, onWarnings]);
+  }, [enabled, slug]);
 
   /** استدعاء فوري بدون debounce (عند اختيار منتج جديد) */
   const computeImmediate = useCallback((lineIdx: number, input: ComputeLineInput) => {
