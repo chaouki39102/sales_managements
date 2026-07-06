@@ -17,6 +17,8 @@ import { appActions }                from '@/lib/store/appStore';
 import { AuthProvider }              from '@/context/AuthContext';
 import { FiscalYearProvider }        from '@/context/FiscalYearContext';
 import { PrintRuntimeAdapter }       from '@/pages/settings/print-settings/runtime';
+import { DocumentQuickCreateProvider } from '@/lib/store/documentQuickCreateStore';
+import { GlobalDocumentFAB }         from '@/components/global/GlobalDocumentFAB';
 import { AppRoutes }                 from '@/routes/index';
 import NotificationContainer        from '@/components/notifications/NotificationContainer';
 
@@ -39,7 +41,10 @@ export default function App() {
         <AuthProvider>
           <FiscalYearProvider>
             <PrintRuntimeAdapter>
-              <AppRoutes />
+              <DocumentQuickCreateProvider>
+                <AppRoutes />
+                <GlobalDocumentFAB />
+              </DocumentQuickCreateProvider>
               <NotificationContainer />
             </PrintRuntimeAdapter>
           </FiscalYearProvider>

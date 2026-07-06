@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-core-files.md"
+OUTPUT="merged-lib-api-files.md"
 
 > "$OUTPUT"
 
@@ -25,7 +25,7 @@ merge_section() {
   local title="$1"
   shift
 
-  files=$(find "$ROOT" -type f "$@" 2>/dev/null | sort)
+  files=$(find "$ROOT" -type f "$@" "${EXCLUDE[@]}" 2>/dev/null | sort)
 
   if [ -n "$files" ]; then
     print_section "$title"
@@ -39,9 +39,12 @@ merge_section() {
 
       cat "$file" >> "$OUTPUT"
 
+      echo "" >> "$OUTPUT"
       echo '```' >> "$OUTPUT"
       echo "" >> "$OUTPUT"
     done
+  else
+    echo "⚠️ No files found for section: $title"
   fi
 }
 
@@ -55,20 +58,34 @@ EXCLUDE=(
 )
 
 # =========================================
-# الأقسام (مصححة)
+# الأقسام
 # =========================================
 
+# merge_section "📘 CommercialDocument" \
+#   \( -path "*/pages/documents/*" \)
 
-
-
-
-  # print settings
 merge_section "📘 core" \
-  \( -path "*/lib/api/core/*" \) "${EXCLUDE[@]}"
+  \( -path "*/lib/api/core/*" \)
+
+  merge_section "📘 endpoints" \
+  \( -path "*/lib/api/endpoints/*" \)
 
 
-echo "   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"
-echo "==================================================== */" >> "$OUTPUT"
+# أمثلة لإضافة أقسام أخرى:
+#
+# merge_section "📘 POS Components" \
+#   \( -path "*/pos/components/*" \)
+#
+# merge_section "📘 Payment System" \
+#   \( \
+#      -path "*/services/payment/*" \
+#      -o -path "*/hooks/payment/*" \
+#      -o -path "*/pages/payment/*" \)
+#   \)
+
 echo "" >> "$OUTPUT"
+echo "====================================================" >> "$OUTPUT"
+echo "⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة" >> "$OUTPUT"
+echo "====================================================" >> "$OUTPUT"
 
 echo "✅ Done: $OUTPUT"

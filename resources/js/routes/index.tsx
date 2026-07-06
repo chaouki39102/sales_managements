@@ -20,6 +20,7 @@ const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
 
 // â”€â”€ Documents / POS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CommercialDocumentsPage = lazy(() => import('@/pages/documents/CommercialDocumentsPage'));
+const CommercialDocumentPage  = lazy(() => import('@/pages/documents/CommercialDocumentPage'));
 const InvoicesPage            = lazy(() => import('@/pages/invoices/InvoicesPage'));
 const POSPage                 = lazy(() => import('@/pages/pos/POSPage'));
 const POSKioskPage            = lazy(() => import('@/pages/pos/POSKioskPage'));const PosSessionsPage         = lazy(() => import('@/pages/pos/PosSessionsPage'));
@@ -203,6 +204,8 @@ export function AppRoutes() {
           <Route path="invoices" element={<InvoicesPage />} />
 
           {/* Documents */}
+          <Route path="documents/:typeCode/new" element={<CommercialDocumentPage />} />
+          <Route path="documents/:typeCode/:id/edit" element={<CommercialDocumentPage />} />
           <Route path="documents/:typeCode" element={<CommercialDocumentsPage />} />
 
           {/* Products */}

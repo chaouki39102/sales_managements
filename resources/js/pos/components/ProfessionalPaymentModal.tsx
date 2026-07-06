@@ -56,6 +56,7 @@ interface Props {
   totalTtcFinal:     number;
   existingPayments?: DocumentPayment[];
   documentDate?:     string;   // ISO date — تاريخ الفاتورة الحقيقي لجلب الرصيد التاريخي الصحيح
+  isEditing?:        boolean;  // true when reopening an existing invoice
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
@@ -159,7 +160,7 @@ function PaymentStatus({
 export default function ProfessionalPaymentModal({
   totals, client, paymentModes, documentTypes,
   currencies, treasuryAccounts, totalTtcFinal,
-  existingPayments, documentDate, onClose, onConfirm,
+  existingPayments, documentDate, onClose, onConfirm, isEditing,
 }: Props) {
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -175,6 +176,11 @@ export default function ProfessionalPaymentModal({
         refNote:            ep.reference ?? '',
         treasuryAccountId:  ep.treasury_account_id ?? null,
       }));
+    }
+    if (isEditing) {
+      return defaultMode
+        ? [{ id: uid(), modeId: defaultMode.id, amount: '0.00', refNote: '', treasuryAccountId: null }]
+        : [];
     }
     return defaultMode
       ? [{ id: uid(), modeId: defaultMode.id, amount: totalTtcFinal.toFixed(2), refNote: '', treasuryAccountId: null }]
@@ -462,14 +468,14 @@ export default function ProfessionalPaymentModal({
                   <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + إجمالي)</span></span>
                   <strong>{formatDZD(internalPrevBalance + totalTtcFinal)}</strong>
                 </div>
-                {existingTotal > 0 && (
+                {(existingTotal > 0 || isEditing) && (
                   <div className="pvs-row">
                     <span style={{ color: '#888' }}>مدفوع سابقاً</span>
                     <span style={{ color: '#888' }}>{formatDZD(existingTotal)}</span>
                   </div>
                 )}
                 <div className="pvs-row" style={{ borderTop: '1px solid #ddd', paddingTop: 6, marginTop: 2 }}>
-                  <span>{existingTotal > 0 ? 'المدفوع الآن' : 'المدفوع'}</span>
+                  <span>{existingTotal > 0 || isEditing ? 'المدفوع الآن' : 'المدفوع'}</span>
                   <span>{formatDZD(newPaid)}</span>
                 </div>
                 <div className="pvs-row pvs-total" style={{ marginTop: 4 }}>

@@ -1091,6 +1091,7 @@ export default function POSPage() {
           treasuryAccounts={treasuryAccounts ?? []}           // ✅ جديد
           totalTtcFinal={adjustedTotalTtcFinal}
           existingPayments={pos.payments}
+          isEditing={editingDocumentId !== null}
           documentDate={editingDocumentDate ?? new Date().toISOString().slice(0, 10)}
           onClose={() => setModal('none')}
           onConfirm={handleCompleteSale}

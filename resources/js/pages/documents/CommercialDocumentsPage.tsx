@@ -24,7 +24,7 @@ import React, {
     useEffect,
     useRef,
 } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     useQuery,
     useMutation,
@@ -527,6 +527,7 @@ function DocumentViewModal({
 
 export default function CommercialDocumentsPage() {
     const { typeCode }                       = useParams<{ typeCode: string }>();
+    const navigate                           = useNavigate();
     const qc                                 = useQueryClient();
     const slug                               = useActiveSlug();
     const { selectedYear, isReadOnly }       = useFiscalYear() as { selectedYear?: { id: number; name: string }; isReadOnly?: boolean };
@@ -1395,7 +1396,7 @@ export default function CommercialDocumentsPage() {
                 editActions.push({
                     label: "تعديل المستند",
                     icon: "pencil",
-                    onClick: () => { if (row) openEditModal(row); },
+                    onClick: () => { if (row) navigate(`/documents/${typeCode}/${row.id}/edit`); },
                 });
             }
             if (canLock) {
@@ -1484,7 +1485,7 @@ export default function CommercialDocumentsPage() {
         }
 
         return menuItems;
-    }, [hiddenColumnsSet, hiddenColumnKeys, handleHiddenColumnsChange, isReadOnly, openEditModal, lockMut, unlockMut, cancelMut, items, showToast]);
+    }, [hiddenColumnsSet, hiddenColumnKeys, handleHiddenColumnsChange, isReadOnly, lockMut, unlockMut, cancelMut, items, showToast, navigate, typeCode]);
 
     // ════════════════════════════════════════════════════════════════════════
     // SMART FILTER CALLBACK
@@ -1521,11 +1522,11 @@ export default function CommercialDocumentsPage() {
                 <ActionBtn icon="ti-eye" title="عرض" onClick={() => { setViewDocId(row.id); setModal("view"); }} />
 
                 {/* تعديل — !is_locked && !is_exported */}
-                {canEdit && (
+                    {canEdit && (
                     <ActionBtn
                         icon={loadingEdit ? "ti-loader-2" : "ti-pencil"}
                         title="تعديل" color="var(--blue)" disabled={loadingEdit}
-                        onClick={() => openEditModal(row)}
+                        onClick={() => navigate(`/documents/${typeCode}/${row.id}/edit`)}
                     />
                 )}
 
@@ -1563,7 +1564,7 @@ export default function CommercialDocumentsPage() {
                 )}
             </div>
         );
-    }, [isReadOnly, loadingEdit, openEditModal, lockMut, unlockMut, cancelMut]);
+    }, [isReadOnly, loadingEdit, lockMut, unlockMut, cancelMut, navigate, typeCode]);
 
     // ════════════════════════════════════════════════════════════════════════
     // HEADER ACTIONS
@@ -1610,13 +1611,13 @@ export default function CommercialDocumentsPage() {
                 </button>
             )}
             {!isReadOnly && (
-                <button onClick={() => setModal("add")} style={{ height: 32, padding: "0 16px", borderRadius: 8, border: "none", background: opColor, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: `0 2px 8px color-mix(in srgb, ${opColor} 30%, transparent)`, fontFamily: "inherit" }}>
+                <button onClick={() => navigate(`/documents/${typeCode}/new`)} style={{ height: 32, padding: "0 16px", borderRadius: 8, border: "none", background: opColor, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: `0 2px 8px color-mix(in srgb, ${opColor} 30%, transparent)`, fontFamily: "inherit" }}>
                     <i className="ti ti-plus" style={{ fontSize: 15 }} aria-hidden="true" />
                     مستند جديد
                 </button>
             )}
         </div>
-    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumnKeys.length, initialSnapshot, resetColState]);
+    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumnKeys.length, initialSnapshot, resetColState, navigate, typeCode]);
 
     // ── Page title ────────────────────────────────────────────────────────────
     const tableTitle = useMemo(() => (

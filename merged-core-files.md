@@ -1066,6 +1066,8 @@ export interface CommercialDocument extends BaseModel {
   fiscal_stamp:       number;
   amount_paid:        number;
   amount_remaining:   number;
+  paid_amount:        number;
+  remaining_amount:   number;
   is_locked:          boolean;
   company_id:         number;
   // Relations
@@ -1088,6 +1090,7 @@ export interface Payment extends BaseModel {
   payment_date:           string;
   reference?:             string | null;
   notes?:                 string | null;
+  client_ref?:            string | null;
   status:                 PaymentStatus;
   company_id:             number;
   fiscal_year_id:         number;

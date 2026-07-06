@@ -80,14 +80,29 @@ export function FieldError({ msg }: { msg?: string }) {
 
 export function Section({
   title, icon, badge, children, collapsible = false,
+  defaultOpen = true, open: openProp, onOpenChange,
 }: {
   title:        string;
   icon:         string;
   badge?:       React.ReactNode;
   children:     React.ReactNode;
   collapsible?: boolean;
+  /** الحالة الابتدائية عند أول رسم — لا تُغيِّر أي استخدام حالي (افتراضياً true كما كان دائماً) */
+  defaultOpen?: boolean;
+  /** وضع "مُتحكَّم به" اختياري: مرّره من الأب لو احتجت فتح القسم تلقائياً لاحقاً
+   *  (مثال: ظهور خطأ تحقق داخل قسم مطوي). عدم تمريره = نفس السلوك القديم تماماً. */
+  open?:         boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : internalOpen;
+
+  const toggle = () => {
+    if (!collapsible) return;
+    if (isControlled) onOpenChange?.(!open);
+    else setInternalOpen(v => !v);
+  };
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -101,7 +116,7 @@ export function Section({
           borderBottom:  '1px solid var(--b1)',
           cursor:        collapsible ? 'pointer' : 'default',
         }}
-        onClick={() => collapsible && setOpen((v) => !v)}
+        onClick={toggle}
       >
         <i className={`ti ${icon}`} style={{ color: 'var(--em)', fontSize: 15 }} />
         <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--t2)',

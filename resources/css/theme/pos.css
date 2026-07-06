@@ -405,19 +405,54 @@
 .pfp-price-inp:focus { border-color: var(--em); }
 
 /* Category tabs */
-.pos-cats {
+.pos-cats-wrapper {
   display: flex;
-  padding: 0 8px;
+  align-items: center;
   background: var(--bg2);
   border-bottom: 1px solid var(--b2);
   flex-shrink: 0;
+}
+.pos-cats {
+  display: flex;
+  padding: 0 4px;
+  background: var(--bg2);
+  flex: 1;
   overflow-x: auto;
   scrollbar-width: none;
   gap: 2px;
   min-height: 40px;
   align-items: center;
+  scroll-behavior: smooth;
 }
 .pos-cats::-webkit-scrollbar { display: none; }
+.pos-cats-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  margin: 0 3px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg1);
+  color: var(--t3);
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s, color .15s, background .15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.1);
+}
+.pos-cats-btn.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pos-cats-btn:hover {
+  color: var(--t1);
+  background: var(--emb);
+}
 .pos-cat {
   display: flex;
   align-items: center;
