@@ -1,4 +1,5 @@
 import React from 'react';
+import { InfoPanel } from './DocumentUIPrimitives';
 import { fmtDZD } from '../utils/document.utils';
 import type { CustomerInsightsData } from '../hooks/useCustomerInsights';
 
@@ -32,7 +33,10 @@ export function CustomerInsightPanel({ insights, isLoading }: CustomerInsightPan
   const docLen = last_documents?.length ?? 0;
 
   return (
-    <CollapsiblePanel title="تحليلات المتعامل" icon="ti-chart-bar" defaultOpen={false}>
+    // ✅ كانت CollapsiblePanel محلية بنفس هذا الملف — أصبحت الآن InfoPanel
+    // المشتركة من DocumentUIPrimitives (نفس المكوّن تستخدمه SmartSuggestionsPanel
+    // أيضاً)، بدون أي تغيير في السلوك أو الشكل الظاهر للمستخدم.
+    <InfoPanel title="تحليلات المتعامل" icon="ti-chart-bar" defaultOpen={false}>
       {/* الإحصائيات */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <StatChip label="عدد المستندات" value={String(document_count)} icon="ti-file-description" />
@@ -146,7 +150,7 @@ export function CustomerInsightPanel({ insights, isLoading }: CustomerInsightPan
           </div>
         </div>
       )}
-    </CollapsiblePanel>
+    </InfoPanel>
   );
 }
 
@@ -165,39 +169,6 @@ function StatChip({ label, value, icon, color }: {
       <span style={{ fontWeight: 700, color: color ?? 'var(--t2)', fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </span>
-    </div>
-  );
-}
-
-function CollapsiblePanel({ title, icon, defaultOpen, children }: {
-  title: string; icon: string; defaultOpen: boolean; children: React.ReactNode;
-}) {
-  const [open, setOpen] = React.useState(defaultOpen);
-
-  return (
-    <div style={{
-      marginTop: 8, borderRadius: 'var(--r2)',
-      border: '1px solid var(--b2)', overflow: 'hidden',
-    }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          width: '100%', padding: '8px 12px', display: 'flex',
-          alignItems: 'center', gap: 6, cursor: 'pointer',
-          background: 'var(--bg3)', border: 'none',
-          color: 'var(--t2)', fontSize: 12, fontWeight: 700,
-          fontFamily: 'inherit', textAlign: 'right',
-        }}
-      >
-        <i className={`ti ${icon}`} style={{ fontSize: 12, color: 'var(--t4)' }} />
-        <span style={{ flex: 1 }}>{title}</span>
-        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 10, color: 'var(--t4)' }} />
-      </button>
-      {open && (
-        <div style={{ padding: '10px 12px', background: 'var(--bg1)' }}>
-          {children}
-        </div>
-      )}
     </div>
   );
 }

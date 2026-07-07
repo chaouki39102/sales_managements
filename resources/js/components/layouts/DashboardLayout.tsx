@@ -551,6 +551,15 @@ export default function DashboardLayout() {
   const { dark, toggle: toggleTheme }   = useTheme();
   const [drawerOpen, setDrawerOpen]     = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // ✅ يحفظ آخر اختيار يدوي للمستخدم (طي/توسيع) بمعزل عن الطي التلقائي لصفحات التحرير
+  const manualSidebarPref = useRef(false);
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(c => {
+      const next = !c;
+      manualSidebarPref.current = next;
+      return next;
+    });
+  }, []);
 
   // ✅ نستخدم FiscalYearContext مباشرة — بدون useParams
   const { years, selectedYear, isLoading: fiscalLoading, refetch } = useFiscalYear();
@@ -574,6 +583,9 @@ const meta = useTopbarTitle();
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
   // Auto-collapse sidebar on document editor pages (new/edit)
+  // ✅ عند الدخول لصفحة تحرير: نطوي القائمة تلقائياً.
+  //    عند الخروج: نعيد آخر اختيار يدوي للمستخدم بدل إجباره دائماً على "موسّعة"
+  //    (الكود القديم كان يمسح تفضيل المستخدم في كل مرة يغادر فيها صفحة تحرير).
   const isDocEditor = /^\/documents\/[^/]+\/(new|edit)$/.test(location.pathname.replace(/^\//, ''));
   const prevIsDocEditor = useRef(false);
   useEffect(() => {
@@ -581,7 +593,7 @@ const meta = useTopbarTitle();
       setSidebarCollapsed(true);
     }
     if (!isDocEditor && prevIsDocEditor.current) {
-      setSidebarCollapsed(false);
+      setSidebarCollapsed(manualSidebarPref.current);
     }
     prevIsDocEditor.current = isDocEditor;
   }, [isDocEditor]);
@@ -613,7 +625,7 @@ const meta = useTopbarTitle();
               return (
                 <Link key={item.href} to={item.href} className={`sbi${isActive ? ' on' : ''}`}>
                   <span className="sbi-ic ic"><i className={`ti ${item.icon}`} /></span>
-                  {item.name}
+                  <span className="sbi-name">{item.name}</span>
                   {'badge' in item && item.badge && <span className="sbi-badge">{item.badge}</span>}
                   {'badgeWarn' in item && item.badgeWarn && (
                     <span className="sbi-badge w ic-badge">
@@ -671,10 +683,12 @@ const meta = useTopbarTitle();
           <div style={{ padding: '0 10px 12px' }}>
             <button
               onClick={logout}
+              title={sidebarCollapsed ? 'تسجيل الخروج' : undefined}
               style={{
-                width: '100%',
+                width: sidebarCollapsed ? 36 : '100%',
                 display: 'flex', alignItems: 'center', gap: 9,
-                padding: '10px 14px',
+                padding: sidebarCollapsed ? '8px' : '10px 14px',
+                justifyContent: sidebarCollapsed ? 'center' : undefined,
                 background: 'transparent',
                 border: '1.5px solid rgba(239,68,68,.3)',
                 borderRadius: 10,
@@ -715,10 +729,11 @@ const meta = useTopbarTitle();
             <div className="tb-path">{meta.path}</div>
           </div>
           <div className="tb-actions">
-            <button className="ib" onClick={() => setSidebarCollapsed(c => !c)} title={sidebarCollapsed ? 'توسيع القائمة' : 'طي القائمة'}>
+            <button className="ib" onClick={toggleSidebar} title={sidebarCollapsed ? 'توسيع القائمة' : 'طي القائمة'}>
               <span className="ic ic-sm"><i className={`ti ${sidebarCollapsed ? 'ti-layout-sidebar-right-expand' : 'ti-layout-sidebar-right-collapse'}`} /></span>
             </button>
             <FiscalYearSelector />
+            <span className="tb-sep" aria-hidden="true" />
             <div className="srch">
               <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
               <input type="text" placeholder="بحث سريع..." />
@@ -729,6 +744,7 @@ const meta = useTopbarTitle();
                 <span className="ic ic-sm"><i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`} /></span>
               </button>
             )}
+            <span className="tb-sep" aria-hidden="true" />
             <button className="tb-btn p" onClick={() => navigate('pos')}>
               <span className="ic ic-xs"><i className="ti ti-plus" /></span>
               <span>فاتورة جديدة</span>

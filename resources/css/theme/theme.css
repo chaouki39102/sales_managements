@@ -404,7 +404,21 @@ body.dark #topbar { background: rgba(10,14,22,.92); }
   background: var(--em); border-color: var(--em);
   color: #fff; box-shadow: var(--emglow);
 }
-.tb-btn.p:hover { background: var(--em2); }
+.tb-btn.p:hover {
+  background: var(--em2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(10, 138, 92, 0.32);
+}
+.tb-btn.p:active { transform: translateY(0); }
+
+.tb-sep {
+  width: 1px;
+  height: 22px;
+  align-self: center;
+  margin: 0 2px;
+  background: var(--b2);
+  flex-shrink: 0;
+}
 
 #theme-btn {
   width: 34px; height: 34px; border-radius: var(--r2);

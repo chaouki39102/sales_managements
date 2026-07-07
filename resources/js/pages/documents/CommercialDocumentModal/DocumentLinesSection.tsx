@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Section, AlertBanner, ColumnManager } from '../components/DocumentUIPrimitives';
 import { BarcodeInput } from '../components/BarcodeInput';
 import { LineCard } from '../components/LineCard';
@@ -41,6 +41,13 @@ interface DocumentLinesSectionProps {
   affectsStock: boolean;
   stockDir: 1 | -1 | 0;
   warehouses: Array<{ id: number; name: string }>;
+  /**
+   * 🆕 عند true: القسم يملأ كامل الارتفاع المتاح داخل حاوية flex عمودية
+   * (مطلوب في الصفحة الكاملة الجديدة CommercialDocumentPage حيث منطقة
+   * الأسطر تأخذ كل المساحة المتبقية بجانب الشريط الجانبي). اختياري —
+   * القيمة الافتراضية false تُبقي السلوك القديم كما هو داخل الـ Modal.
+   */
+  fill?: boolean;
 }
 
 export default function DocumentLinesSection({
@@ -55,12 +62,62 @@ export default function DocumentLinesSection({
   setShowBulkImport, slug,
   affectsStock, stockDir,
   warehouses,
+  fill = false,
 }: DocumentLinesSectionProps) {
+  const [stockAlertOpen, setStockAlertOpen] = useState(true);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🆕 تنقّل بلوحة المفاتيح (Enter) بين حقول جدول/بطاقات الأسطر — نمط
+  // إنتاجية أساسي في ERP احترافي (Excel-like)، لم يكن موجوداً سابقاً.
+  // Tab يعمل عبر ترتيب DOM الطبيعي للمتصفح بلا أي كود إضافي؛ Enter وحده
+  // يحتاج معالجة يدوية لأنه لا يفعل شيئاً افتراضياً خارج <form>.
+  // العملية: نجمع كل الحقول القابلة للتركيز (input/select/textarea) داخل
+  // حاوية الجدول بترتيب DOM، وعند Enter ننتقل للحقل التالي — أو إن كان
+  // آخر حقل في آخر سطر، نضيف سطراً جديداً ونُركِّز أول حقل فيه تلقائياً.
+  // ═══════════════════════════════════════════════════════════════════════
+  const linesContainerRef = useRef<HTMLDivElement>(null);
+  const FOCUSABLE = 'input:not([disabled]), select:not([disabled]), textarea:not([disabled])';
+
+  const handleLinesKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter') return;
+    const target = e.target as HTMLElement;
+    const isFocusableField =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLSelectElement ||
+      target instanceof HTMLTextAreaElement;
+    if (!isFocusableField) return;
+    // ملاحظة: Enter داخل <select> مفتوح فعلياً (قائمة منسدلة أصلية) يُغلقها
+    // المتصفح ويُطبِّق الاختيار بشكل أصلي قبل وصول هذا المعالج غالباً؛
+    // preventDefault هنا لا يمنع ذلك السلوك الأصلي، فقط يمنع أي إرسال نموذج.
+    e.preventDefault();
+
+    const container = linesContainerRef.current;
+    if (!container) return;
+    const focusables = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
+    const currentIdx = focusables.indexOf(target);
+    if (currentIdx === -1) return;
+
+    if (currentIdx < focusables.length - 1) {
+      focusables[currentIdx + 1]?.focus();
+      (focusables[currentIdx + 1] as HTMLInputElement)?.select?.();
+      return;
+    }
+
+    // آخر حقل في آخر سطر — أضف سطراً جديداً وركّز أول حقل فيه
+    if (isLinesReadOnly) return;
+    const countBefore = focusables.length;
+    addLine();
+    requestAnimationFrame(() => {
+      const updated = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
+      updated[countBefore]?.focus();
+    });
+  };
+
   return (
     <Section
       title="أسطر المستند"
       icon="ti-list-details"
-      fillHeight
+      fill={fill}
       badge={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {lines.length > 0 && (
@@ -87,57 +144,101 @@ export default function DocumentLinesSection({
         </div>
       }
     >
-      {affectsStock && (
-        <AlertBanner
-          type={stockDir > 0 ? 'info' : 'warning'}
-          message={stockDir > 0
-            ? 'هذا المستند سيضيف الكميات إلى المخزون عند الحفظ'
-            : 'هذا المستند سيخصم الكميات من المخزون عند الحفظ'}
-        />
-      )}
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        {affectsStock && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 6,
+          }}>
+            {stockAlertOpen ? (
+              <div style={{ flex: 1 }}>
+                <AlertBanner
+                  type={stockDir > 0 ? 'info' : 'warning'}
+                  message={stockDir > 0
+                    ? 'هذا المستند سيضيف الكميات إلى المخزون عند الحفظ'
+                    : 'هذا المستند سيخصم الكميات من المخزون عند الحفظ'}
+                />
+              </div>
+            ) : (
+              <button
+                onClick={() => setStockAlertOpen(true)}
+                style={{
+                  padding: '4px 10px', borderRadius: 'var(--r1)',
+                  border: '1px solid var(--b2)', background: 'var(--bg2)',
+                  color: 'var(--t4)', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                  fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
+                }}
+              >
+                <i className="ti ti-info-circle" style={{ marginLeft: 4 }} />
+                المخزون
+              </button>
+            )}
+            {stockAlertOpen && (
+              <button
+                onClick={() => setStockAlertOpen(false)}
+                style={{
+                  padding: '4px 6px', borderRadius: 'var(--r1)',
+                  border: '1px solid var(--b2)', background: 'var(--bg3)',
+                  color: 'var(--t4)', cursor: 'pointer', fontSize: 10,
+                  fontFamily: 'inherit', flexShrink: 0, lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
 
-      {lineErr && <AlertBanner type="error" message={lineErr} />}
+        {lineErr && <AlertBanner type="error" message={lineErr} />}
 
-      {!isLinesReadOnly && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <BarcodeInput
-            products={products}
-            onProductFound={(productId) => {
-              addLineWithProduct(String(productId));
-            }}
-            disabled={isLinesReadOnly}
-          />
-          <button
-            onClick={() => setLineMode((m) => {
-              const next = m === 'table' ? 'card' : 'table';
-              try { localStorage.setItem(`doc_line_mode_${slug ?? 'default'}`, next); } catch {}
-              return next;
-            })}
-            style={{
-              padding: '5px 10px', borderRadius: 'var(--r1)',
-              border: '1px solid var(--b3)', background: 'transparent',
-              color: 'var(--t3)', cursor: 'pointer', fontSize: 11,
-              display: 'flex', alignItems: 'center', gap: 4,
-              fontFamily: 'inherit',
-            }}
-          >
-            <i className={`ti ti-${lineMode === 'table' ? 'layout-cards' : 'table'}`} />
-            {lineMode === 'table' ? 'عرض البطاقات' : 'عرض الجدول'}
-          </button>
-        </div>
-      )}
+        {!isLinesReadOnly && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, marginBottom: 8 }}>
+            <BarcodeInput
+              products={products}
+              onProductFound={(productId) => {
+                addLineWithProduct(String(productId));
+              }}
+              disabled={isLinesReadOnly}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 10.5, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <i className="ti ti-keyboard" style={{ fontSize: 12 }} />
+                Enter للانتقال للحقل التالي
+              </span>
+              <button
+                onClick={() => setLineMode((m) => {
+                  const next = m === 'table' ? 'card' : 'table';
+                  try { localStorage.setItem(`doc_line_mode_${slug ?? 'default'}`, next); } catch {}
+                  return next;
+                })}
+                style={{
+                  padding: '5px 10px', borderRadius: 'var(--r1)',
+                  border: '1px solid var(--b3)', background: 'transparent',
+                  color: 'var(--t3)', cursor: 'pointer', fontSize: 11,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontFamily: 'inherit',
+                }}
+              >
+                <i className={`ti ti-${lineMode === 'table' ? 'layout-cards' : 'table'}`} />
+                {lineMode === 'table' ? 'عرض البطاقات' : 'عرض الجدول'}
+              </button>
+            </div>
+          </div>
+        )}
 
-      {isLoadingProducts ? (
-        <div style={{
-          textAlign: 'center', padding: 24, color: 'var(--t4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        }}>
-          <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-          جاري تحميل المنتجات...
-        </div>
-      ) : (
-        <>
-          {lines.length === 0 ? (
+        <div
+          ref={linesContainerRef}
+          onKeyDown={handleLinesKeyDown}
+          style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+        >
+          {isLoadingProducts ? (
+            <div style={{
+              textAlign: 'center', padding: 24, color: 'var(--t4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+              جاري تحميل المنتجات...
+            </div>
+          ) : lines.length === 0 ? (
             <div>
               {savedDraft && (
                 <div style={{
@@ -263,52 +364,52 @@ export default function DocumentLinesSection({
               </table>
             </div>
           )}
+        </div>
 
-          {!isLinesReadOnly && needsParty && (
-            <SmartSuggestionsPanel
-              suggestions={productSuggestions}
-              isLoading={isLoadingSuggestions}
-              onAddProduct={(productId, suggestedPrice, suggestedTva) => {
-                addLineWithProduct(String(productId), suggestedPrice ?? undefined, suggestedTva ?? undefined);
+        {!isLinesReadOnly && (
+          <div style={{ marginTop: 10, display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button
+              onClick={addLine}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 'var(--r2)',
+                border: '1px dashed var(--b3)', background: 'transparent',
+                color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
               }}
-              disabled={isReadOnly}
-            />
-          )}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--em)'; e.currentTarget.style.color = 'var(--em)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; e.currentTarget.style.color = 'var(--t3)'; }}
+            >
+              <i className="ti ti-plus" />
+              إضافة سطر
+            </button>
+            <button
+              onClick={() => setShowBulkImport(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 'var(--r2)',
+                border: '1px dashed var(--b3)', background: 'transparent',
+                color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--purple)'; e.currentTarget.style.color = 'var(--purple)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; e.currentTarget.style.color = 'var(--t3)'; }}
+            >
+              <i className="ti ti-upload" />
+              استيراد من Excel
+            </button>
+          </div>
+        )}
 
-          {!isLinesReadOnly && (
-            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-              <button
-                onClick={addLine}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '7px 14px', borderRadius: 'var(--r2)',
-                  border: '1px dashed var(--b3)', background: 'transparent',
-                  color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--em)'; e.currentTarget.style.color = 'var(--em)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; e.currentTarget.style.color = 'var(--t3)'; }}
-              >
-                <i className="ti ti-plus" />
-                إضافة سطر
-              </button>
-              <button
-                onClick={() => setShowBulkImport(true)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '7px 14px', borderRadius: 'var(--r2)',
-                  border: '1px dashed var(--b3)', background: 'transparent',
-                  color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--purple)'; e.currentTarget.style.color = 'var(--purple)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; e.currentTarget.style.color = 'var(--t3)'; }}
-              >
-                <i className="ti ti-upload" />
-                استيراد من Excel
-              </button>
-            </div>
-          )}
-        </>
-      )}
+        {!isLinesReadOnly && needsParty && (
+          <SmartSuggestionsPanel
+            suggestions={productSuggestions}
+            isLoading={isLoadingSuggestions}
+            onAddProduct={(productId, suggestedPrice, suggestedTva) => {
+              addLineWithProduct(String(productId), suggestedPrice ?? undefined, suggestedTva ?? undefined);
+            }}
+            disabled={isReadOnly}
+          />
+        )}
+      </div>
     </Section>
   );
 }

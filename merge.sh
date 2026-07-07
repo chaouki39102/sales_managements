@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-CommercialDocument-files.md"
+OUTPUT="merged-css-files.md"
 
 > "$OUTPUT"
 
@@ -61,8 +61,8 @@ EXCLUDE=(
 # الأقسام
 # =========================================
 
-merge_section "📘 CommercialDocument" \
-  \( -path "*/pages/documents/*" \)
+merge_section "📘 css" \
+  \( -path "*/css/*" \)
 
 # merge_section "📘 core" \
 #   \( -path "*/lib/api/core/*" \)

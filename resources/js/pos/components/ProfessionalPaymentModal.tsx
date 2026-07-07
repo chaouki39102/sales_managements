@@ -164,7 +164,9 @@ export default function ProfessionalPaymentModal({
 }: Props) {
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const defaultMode = paymentModes.find(m => m.is_default) ?? paymentModes[0];
+  const defaultMode = paymentModes.find(m =>
+    /نقدا|نقداً|cash/i.test(m.name),
+  ) ?? paymentModes.find(m => m.is_default) ?? paymentModes[0];
 
   const [lines, setLines] = useState<PaymentLine[]>(() => {
     if (existingPayments?.length) {
@@ -177,13 +179,9 @@ export default function ProfessionalPaymentModal({
         treasuryAccountId:  ep.treasury_account_id ?? null,
       }));
     }
-    if (isEditing) {
-      return defaultMode
-        ? [{ id: uid(), modeId: defaultMode.id, amount: '0.00', refNote: '', treasuryAccountId: null }]
-        : [];
-    }
+    const initAmount = totalTtcFinal.toFixed(2);
     return defaultMode
-      ? [{ id: uid(), modeId: defaultMode.id, amount: totalTtcFinal.toFixed(2), refNote: '', treasuryAccountId: null }]
+      ? [{ id: uid(), modeId: defaultMode.id, amount: initAmount, refNote: '', treasuryAccountId: null }]
       : [];
   });
 
@@ -239,21 +237,22 @@ export default function ProfessionalPaymentModal({
     () => lines.reduce((s, l) => s + (l.dbId ? 0 : (parseFloat(l.amount) || 0)), 0),
     [lines],
   );
-  const remaining = Math.max(0, totalTtcFinal - totalPaid);
-  const change    = totalPaid > totalTtcFinal + 0.009 ? totalPaid - totalTtcFinal : 0;
+  const totalDue = totalTtcFinal + (client && internalPrevBalance > 0 ? internalPrevBalance : 0);
+  const remaining = Math.max(0, totalDue - totalPaid);
+  const change    = totalPaid > totalDue + 0.009 ? totalPaid - totalDue : 0;
   const canSubmit = !submitting;
 
   // ── أزرار المبالغ السريعة ─────────────────────────────────────────────────
-  // تُظهر الأوراق النقدية المساوية أو الأكبر من المبلغ المتبقي
+  // المبلغ الأول دائماً = المبلغ المستحق كاملاً (سابق + مستحق)
+  // ثم الأوراق النقدية الأقرب فالأكبر
   const quickAmounts = useMemo(() => {
     const target = remaining > 0 ? remaining : totalTtcFinal;
-    // نأخذ أقرب ورقة أكبر من المبلغ + كل الأوراق الأكبر منها (max 5)
-    const bills = DZD_BILLS.filter(b => b >= Math.ceil(target / 100) * 100 - 500);
-    // دائماً نُضيف خيار "المبلغ الدقيق"
-    const exact = Math.ceil(target);
-    const result = Array.from(new Set([exact, ...bills])).sort((a, b) => a - b).slice(0, 5);
+    const exact = target;
+    const bills = DZD_BILLS.filter(b => b >= target - 500).slice(0, 4);
+    const totalDueAmt = totalDue;
+    const result = Array.from(new Set([totalDueAmt, exact, ...bills])).slice(0, 5);
     return result;
-  }, [remaining, totalTtcFinal]);
+  }, [remaining, totalTtcFinal, totalDue]);
 
   // ── Numpad handlers ────────────────────────────────────────────────────────
   const updateActiveLine = useCallback((fn: (prev: string) => string) => {
@@ -390,7 +389,8 @@ export default function ProfessionalPaymentModal({
           maxWidth:  780,
           display:   'grid',
           gridTemplateRows: 'auto 1fr auto',
-          maxHeight: '92vh',
+          maxHeight: 'calc(100vh - 40px)',
+          overflow:  'hidden',
         }}
       >
         {/* ── Header ── */}
@@ -427,30 +427,43 @@ export default function ProfessionalPaymentModal({
 
             {/* ملخص الفاتورة */}
             <div className="pay-v2-summary">
-              <div className="pvs-row">
-                <span>HT</span>
-                <span>{formatDZD(totals.total_ht)}</span>
-              </div>
-              {totals.total_discount > 0 && (
-                <div className="pvs-row pvs-disc">
-                  <span>خصم</span>
-                  <span>- {formatDZD(totals.total_discount)}</span>
-                </div>
-              )}
-              <div className="pvs-row">
-                <span>TVA</span>
-                <span>{formatDZD(totals.total_tva)}</span>
-              </div>
-              {totals.fiscal_stamp > 0 && (
-                <div className="pvs-row">
-                  <span>طابع مالي</span>
-                  <span>{formatDZD(totals.fiscal_stamp)}</span>
-                </div>
-              )}
-              <div className="pvs-row pvs-total">
-                <span>الإجمالي</span>
-                <strong>{formatDZD(totalTtcFinal)}</strong>
-              </div>
+              {(() => {
+                const grossHt = totals.total_ht + totals.total_discount + (totals.invoice_discount_amount ?? 0);
+                return (
+                  <>
+                    <div className="pvs-row">
+                      <span>HT</span>
+                      <span>{formatDZD(grossHt)}</span>
+                    </div>
+                    {totals.total_discount > 0 && (
+                      <div className="pvs-row pvs-disc">
+                        <span>خصم</span>
+                        <span>- {formatDZD(totals.total_discount)}</span>
+                      </div>
+                    )}
+                    {totals.invoice_discount_amount != null && totals.invoice_discount_amount > 0 && (
+                      <div className="pvs-row pvs-disc">
+                        <span>Remise {totals.invoice_discount_pct ?? 0}%</span>
+                        <span>- {formatDZD(totals.invoice_discount_amount)}</span>
+                      </div>
+                    )}
+                    <div className="pvs-row">
+                      <span>TVA</span>
+                      <span>{formatDZD(totals.total_tva)}</span>
+                    </div>
+                    {totals.fiscal_stamp > 0 && (
+                      <div className="pvs-row">
+                        <span>طابع مالي</span>
+                        <span>{formatDZD(totals.fiscal_stamp)}</span>
+                      </div>
+                    )}
+                    <div className="pvs-row pvs-total">
+                      <span>الإجمالي</span>
+                      <strong>{formatDZD(totalTtcFinal)}</strong>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* ملخص الرصيد */}
@@ -460,12 +473,8 @@ export default function ProfessionalPaymentModal({
                   <span>الرصيد السابق</span>
                   <span>{balanceLoading ? '...' : formatDZD(internalPrevBalance)}</span>
                 </div>
-                <div className="pvs-row">
-                  <span>الإجمالي</span>
-                  <span>{formatDZD(totalTtcFinal)}</span>
-                </div>
                 <div className="pvs-row" style={{ borderTop: '1px dashed #ccc', paddingTop: 6, marginTop: 2 }}>
-                  <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + إجمالي)</span></span>
+                  <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + مستحق)</span></span>
                   <strong>{formatDZD(internalPrevBalance + totalTtcFinal)}</strong>
                 </div>
                 {(existingTotal > 0 || isEditing) && (
@@ -666,7 +675,7 @@ export default function ProfessionalPaymentModal({
                   onClick={() => applyQuickAmount(a)}
                   type="button"
                 >
-                  {a.toLocaleString('ar-DZ')} دج
+                  {a.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} دج
                 </button>
               ))}
             </div>

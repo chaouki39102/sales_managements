@@ -46,8 +46,6 @@ export function GlobalDocumentFAB() {
   const slug = useActiveSlug();
   const { state, openQuickCreate } = useDocumentQuickCreate();
   const location = useLocation();
-  const isDocEditor = /^\/documents\/[^/]+\/(new|[^/]+\/edit)$/.test(location.pathname);
-  if (isDocEditor) return null;
 
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -106,6 +104,9 @@ export function GlobalDocumentFAB() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [menuOpen]);
+
+  const isDocEditor = /^\/documents\/[^/]+\/(new|[^/]+\/edit)$/.test(location.pathname);
+  if (isDocEditor) return null;
 
   return (
     <div

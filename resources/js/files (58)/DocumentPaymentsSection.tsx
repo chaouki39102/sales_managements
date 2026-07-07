@@ -7,6 +7,8 @@ import { fmtDZD } from '../utils/document.utils';
 
 interface DocumentPaymentsSectionProps {
   payments: PaymentEntry[];
+  // 🔧 إصلاح: حُذف prop `paymentModes` — كان مُستقبَلاً في الواجهة لكن غير
+  // مُستخدَم إطلاقاً في الجسم (paymentModeOptions هو المستخدم فعلياً).
   paymentModeOptions: Array<{
     id: number;
     label: string;
@@ -87,6 +89,12 @@ export default function DocumentPaymentsSection({
         return (
           <div key={pay._clientRef ?? idx} style={{
             display: 'grid',
+            // 🔧 ملاحظة UX: هذا الـ grid بعمود عريض (6 أعمدة ثابتة) كان مصمَّماً
+            // لعرض ~1100px داخل الـ Modal القديم. الآن ضمن الشريط الجانبي
+            // (300px) يجب أن يتكدس عمودياً — أُبقي التخطيط الأفقي هنا فقط
+            // إن كان هذا المكوّن يُستخدم أيضاً خارج الشريط الجانبي (مثلاً
+            // تقرير/عرض مختلف)؛ داخل الـ Sidebar الجديد التصميم الفعلي
+            // (auto-fit/1fr عمودي) يجب ضبطه هنا:
             gridTemplateColumns: '1fr',
             gap: 8, marginBottom: 10,
             padding: 12, borderRadius: 'var(--r2)',

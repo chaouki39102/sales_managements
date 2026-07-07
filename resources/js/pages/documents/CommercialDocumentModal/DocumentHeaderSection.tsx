@@ -53,7 +53,7 @@ export default function DocumentHeaderSection({
             fontSize: 14, fontWeight: 800, color: 'var(--t1)',
             display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
           }}>
-            {isEdit ? `تعديل ${documentType?.name}` : `${documentType?.name} جديد`}
+            {isEdit ? `تعديل ${documentType?.name}` : `مستند جديد: ${documentType?.name}`}
 
             {isEdit && existingDocument?.document_number && (
               <span style={{

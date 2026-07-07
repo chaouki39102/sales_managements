@@ -80,7 +80,7 @@ export function FieldError({ msg }: { msg?: string }) {
 
 export function Section({
   title, icon, badge, children, collapsible = false,
-  defaultOpen = true, open: openProp, onOpenChange, fillHeight,
+  defaultOpen = true, open: openProp, onOpenChange,
 }: {
   title:        string;
   icon:         string;
@@ -93,7 +93,6 @@ export function Section({
    *  (مثال: ظهور خطأ تحقق داخل قسم مطوي). عدم تمريره = نفس السلوك القديم تماماً. */
   open?:         boolean;
   onOpenChange?: (open: boolean) => void;
-  fillHeight?:  boolean;
 }) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = openProp !== undefined;
@@ -106,10 +105,7 @@ export function Section({
   };
 
   return (
-    <div style={{
-      marginBottom: 20,
-      ...(fillHeight ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : {}),
-    }}>
+    <div style={{ marginBottom: 20 }}>
       <div
         style={{
           display:       'flex',
@@ -133,7 +129,7 @@ export function Section({
             style={{ fontSize: 12, color: 'var(--t4)' }} />
         )}
       </div>
-      {open && (fillHeight ? <div style={{ flex: 1, minHeight: 0 }}>{children}</div> : children)}
+      {open && children}
     </div>
   );
 }
@@ -608,6 +604,58 @@ export function Tabs({
         })}
       </div>
       {children}
+    </div>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════
+ * InfoPanel — لوحة صغيرة قابلة للطي (معلومات تكميلية اختيارية)
+ * ────────────────────────────────────────────────────────────────────────
+ * ✅ يوحّد تطبيقين منفصلين كانا يفعلان بالضبط نفس الشيء بكود مختلف قليلاً:
+ *    - CollapsiblePanel المحلية داخل CustomerInsightPanel.tsx
+ *    - الزر + useState المحلي داخل SmartSuggestionsPanel.tsx
+ * الفرق عن Section: هذه للمعلومات الثانوية الصغيرة (تحليلات، اقتراحات)
+ * التي تظهر ضمن قسم أكبر أصلاً — وليست تبويباً على مستوى المستند بالكامل
+ * (لذلك تبقى نمط "طي" بسيط، عكس الحقول الأساسية التي انتقلت لنظام Tabs).
+ * ════════════════════════════════════════════════════════════════════════
+ */
+export function InfoPanel({
+  title, icon, badge, defaultOpen = false, children,
+}: {
+  title:        string;
+  icon:         string;
+  badge?:       React.ReactNode;
+  defaultOpen?: boolean;
+  children:     React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div style={{
+      marginTop: 8, borderRadius: 'var(--r2)',
+      border: '1px solid var(--b2)', overflow: 'hidden',
+    }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: '100%', padding: '8px 12px', display: 'flex',
+          alignItems: 'center', gap: 6, cursor: 'pointer',
+          background: 'var(--bg3)', border: 'none',
+          color: 'var(--t2)', fontSize: 12, fontWeight: 700,
+          fontFamily: 'inherit', textAlign: 'right',
+        }}
+      >
+        <i className={`ti ${icon}`} style={{ fontSize: 12, color: 'var(--t4)' }} />
+        <span style={{ flex: 1 }}>{title}</span>
+        {badge}
+        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 10, color: 'var(--t4)' }} />
+      </button>
+      {open && (
+        <div style={{ padding: '10px 12px', background: 'var(--bg1)' }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

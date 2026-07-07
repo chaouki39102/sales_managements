@@ -1,17 +1,18 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import type { DocumentType } from '@/lib/api/core/types';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 
 import type { Tab } from '../components/DocumentUIPrimitives';
-import { AlertBanner, Section } from '../components/DocumentUIPrimitives';
+import { Tabs, AlertBanner } from '../components/DocumentUIPrimitives';
 import {
   RETURNABLE_CODES, SHIPPING_CODES,
 } from '../types/document.types';
 
 import DocumentHeaderSection from './DocumentHeaderSection';
-import DocumentInfoSection from './DocumentInfoSection';
+import DocumentInfoSection, { DocumentAdvancedFields, hasAdvancedFieldErrors } from './DocumentInfoSection';
+import DocumentStickyTotalsBar from './DocumentStickyTotalsBar';
 import DocumentLinesSection from './DocumentLinesSection';
 import DocumentPaymentsSection from './DocumentPaymentsSection';
 import DocumentTotalsSection from './DocumentTotalsSection';
@@ -70,7 +71,6 @@ export default function CommercialDocumentModal({
     partyChangeWarning, setPartyChangeWarning,
     showReturnModal, setShowReturnModal,
     showBulkImport, setShowBulkImport,
-    extraTab, setExtraTab,
     chain, isLoadingChain, convertMutation, allowedTargets,
     creditCheck, isLoadingCredit,
     customerInsights, isLoadingInsights,
@@ -90,6 +90,24 @@ export default function CommercialDocumentModal({
     stockBadge, paymentsExceedWarning, balanceWarning,
     savedDraft, draftKey, restoreDraft,
   } = ctrl;
+
+  // ✅ تذكّر آخر تبويب مُستخدَم لكل نوع مستند على حدة — يخدم سير العمل المتكرر
+  const DOC_TAB_KEY = `doc-tab:${docCode}`;
+  const [extraTab, setExtraTabState] = useState<string>(() => {
+    try { return localStorage.getItem(DOC_TAB_KEY) || 'advanced'; }
+    catch { return 'advanced'; }
+  });
+  const setExtraTab = (key: string) => {
+    setExtraTabState(key);
+    try { localStorage.setItem(DOC_TAB_KEY, key); } catch {}
+  };
+  // ✅ فتح تلقائي لتبويب "خيارات إضافية" لو ظهر خطأ تحقق بداخله
+  useEffect(() => {
+    if (hasAdvancedFieldErrors(errors) && extraTab !== 'advanced') {
+      setExtraTab('advanced');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [errors.warehouse_id, errors.fiscal_year_id, errors.currency_id]);
 
   // ─── Guard ────────────────────────────────────────────────────────────────
 
@@ -138,28 +156,61 @@ export default function CommercialDocumentModal({
           isPending={isPending}
         />
 
+        {/* ═══ INFO ALERTS — قابلة للطي ═══ */}
+        {(() => {
+          const infoAlerts: Array<{ type: 'warning' | 'error' | 'info'; message: string }> = [];
+          if (priceLevelSwitchMsg) {
+            infoAlerts.push({
+              type: 'warning',
+              message: `المنتج "${priceLevelSwitchMsg.productName}" ليس له سعر في فئة "${priceLevelSwitchMsg.from}"، تم التبديل إلى "${priceLevelSwitchMsg.to}".`,
+            });
+          }
+          if (isCancelled) {
+            infoAlerts.push({ type: 'error', message: 'هذا المستند ملغى — جميع الحقول معطلة.' });
+          }
+          if (isLocked && !isCancelled) {
+            infoAlerts.push({ type: 'warning', message: 'هذا المستند مقفل. لا يمكن تعديله حتى يتم فك القفل من قِبل المسؤول.' });
+          }
+          if (pmMode === 'additive' && !isLocked) {
+            infoAlerts.push({ type: 'info', message: 'المستند معتمد — الأسطر محمية من التعديل. يمكنك فقط إضافة دفعات جديدة.' });
+          }
+          if (infoAlerts.length === 0) return null;
+
+          const [alertsOpen, setAlertsOpen] = React.useState(true);
+          return (
+            <div style={{
+              flexShrink: 0, borderBottom: '1px solid var(--b1)',
+              background: 'var(--bg2)',
+            }}>
+              <button
+                onClick={() => setAlertsOpen(v => !v)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '6px 16px', border: 'none', cursor: 'pointer',
+                  background: 'transparent', color: 'var(--t4)', fontSize: 11, fontWeight: 600,
+                  fontFamily: 'inherit', textAlign: 'right',
+                }}
+              >
+                <i className={`ti ti-chevron-${alertsOpen ? 'up' : 'down'}`} style={{ fontSize: 10 }} />
+                {alertsOpen ? 'إخفاء التنبيهات' : `${infoAlerts.length} تنبيه`}
+              </button>
+              {alertsOpen && (
+                <div style={{ padding: '0 16px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {infoAlerts.map((a, i) => (
+                    <AlertBanner key={i} type={a.type} message={a.message} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ═══ BODY ═══ */}
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
 
-          {/* Alerts عامة */}
+          {/* Alerts عابرة — دائماً ظاهرة */}
           {successMsg         && <AlertBanner type="success" message={successMsg} />}
           {apiErr             && <AlertBanner type="error"   message={apiErr} />}
-          {priceLevelSwitchMsg && (
-            <AlertBanner
-              type="warning"
-              message={`المنتج "${priceLevelSwitchMsg.productName}" ليس له سعر في فئة "${priceLevelSwitchMsg.from}"، تم التبديل إلى "${priceLevelSwitchMsg.to}".`}
-            />
-          )}
-          {isCancelled        && <AlertBanner type="error"   message="هذا المستند ملغى — جميع الحقول معطلة." />}
-          {isLocked && !isCancelled && (
-            <AlertBanner type="warning" message="هذا المستند مقفل. لا يمكن تعديله حتى يتم فك القفل من قِبل المسؤول." />
-          )}
-          {pmMode === 'additive' && !isLocked && (
-            <AlertBanner
-              type="info"
-              message="المستند معتمد — الأسطر محمية من التعديل. يمكنك فقط إضافة دفعات جديدة."
-            />
-          )}
 
           {/* سلسلة المستندات */}
           {isEdit && (
@@ -253,64 +304,61 @@ export default function CommercialDocumentModal({
             warehouseIdNum={warehouseIdNum}
           />
 
-          {/* ═══ EXTRA TABS: الشحن والتسليم + شروط الدفع — مطوية افتراضياً ═══ */}
+          {/* ═══ خيارات إضافية + الشحن + شروط الدفع — شريط تبويب واحد،
+               بدون أي إزاحة تخطيط (reflow) عند التبديل، ويتذكر آخر تبويب
+               مُستخدَم لكل نوع مستند ═══ */}
           {(() => {
-            const extraTabs: Tab[] = [
-              { key: 'payment-terms', label: 'شروط الدفع', icon: 'ti-coin' },
+            const docTabs: Tab[] = [
+              { key: 'advanced', label: 'خيارات إضافية', icon: 'ti-adjustments' },
             ];
             if (SHIPPING_CODES.has(docCode)) {
-              extraTabs.unshift({ key: 'shipping', label: 'الشحن والتسليم', icon: 'ti-truck-delivery' });
+              docTabs.push({ key: 'shipping', label: 'الشحن والتسليم', icon: 'ti-truck-delivery' });
             }
-            const single = extraTabs.length === 1 ? extraTabs[0] : null;
+            docTabs.push({ key: 'payment-terms', label: 'شروط الدفع', icon: 'ti-coin' });
 
             return (
-              <Section
-                title={single ? single.label : 'الشحن وشروط الدفع'}
-                icon={single ? single.icon : 'ti-truck-delivery'}
-                collapsible
-                defaultOpen={false}
-              >
-                {!single && (
-                  <div style={{
-                    display: 'flex', gap: 4, marginBottom: 14,
-                    borderBottom: '1px solid var(--b1)',
-                  }}>
-                    {extraTabs.map(tab => (
-                      <button
-                        key={tab.key}
-                        onClick={() => setExtraTab(tab.key)}
-                        style={{
-                          padding: '6px 14px', borderRadius: 'var(--r1) var(--r1) 0 0',
-                          border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                          background: extraTab === tab.key ? 'var(--bg1)' : 'transparent',
-                          color: extraTab === tab.key ? 'var(--em)' : 'var(--t3)',
-                          borderBottom: extraTab === tab.key ? '2px solid var(--em)' : '2px solid transparent',
-                          display: 'flex', alignItems: 'center', gap: 5,
-                        }}
-                      >
-                        <i className={`ti ${tab.icon}`} style={{ fontSize: 13 }} />
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {(single ? single.key : extraTab) === 'shipping' ? (
-                  <ShippingInfoSection
-                    value={form.shipping_info}
-                    deliveryDate={form.delivery_date}
-                    disabled={isReadOnly}
-                    onChange={(info) => set('shipping_info', info)}
-                    onDeliveryDateChange={(date) => set('delivery_date', date)}
-                  />
-                ) : (
-                  <PaymentTermsTable
-                    terms={form.payment_terms}
-                    netToPay={totals.netToPay}
-                    disabled={isReadOnly}
-                    onChange={(terms) => set('payment_terms', terms)}
-                  />
-                )}
-              </Section>
+              <div style={{ marginBottom: 20 }}>
+                <Tabs tabs={docTabs} activeKey={extraTab} onChange={setExtraTab}>
+                  {extraTab === 'advanced' && (
+                    <DocumentAdvancedFields
+                      form={form as unknown as Record<string, unknown>}
+                      errors={errors}
+                      set={set}
+                      isReadOnly={isReadOnly}
+                      isLinesReadOnly={isLinesReadOnly}
+                      isPurchase={isPurchase}
+                      priceLevelOptions={priceLevelOptions}
+                      handlePriceLevelChange={handlePriceLevelChange}
+                      lookups={{
+                        warehouses: lookups.warehouses,
+                        fiscalYears: lookups.fiscalYears,
+                        currencies: lookups.currencies,
+                        priceLevels: lookups.priceLevels,
+                      }}
+                      qc={qc}
+                      slug={slug}
+                      warehouseIdNum={warehouseIdNum}
+                    />
+                  )}
+                  {extraTab === 'shipping' && (
+                    <ShippingInfoSection
+                      value={form.shipping_info}
+                      deliveryDate={form.delivery_date}
+                      disabled={isReadOnly}
+                      onChange={(info) => set('shipping_info', info)}
+                      onDeliveryDateChange={(date) => set('delivery_date', date)}
+                    />
+                  )}
+                  {extraTab === 'payment-terms' && (
+                    <PaymentTermsTable
+                      terms={form.payment_terms}
+                      netToPay={totals.netToPay}
+                      disabled={isReadOnly}
+                      onChange={(terms) => set('payment_terms', terms)}
+                    />
+                  )}
+                </Tabs>
+              </div>
             );
           })()}
 
@@ -352,7 +400,6 @@ export default function CommercialDocumentModal({
           {/* ═══ SECTION 3: الدفعات ═══ */}
           <DocumentPaymentsSection
             payments={payments}
-            paymentModes={lookups.paymentModes}
             paymentModeOptions={paymentModeOptions}
             treasuryAccountMap={treasuryAccountMap}
             treasuryAccounts={lookups.treasuryAccounts}
@@ -369,19 +416,28 @@ export default function CommercialDocumentModal({
         />
 
           {/* ═══ SECTION 4: الإجماليات ═══ */}
-          <DocumentTotalsSection
-            totals={totals}
-            payments={payments}
-            partyBalance={partyBalance}
-            form={form}
-            selectedParty={selectedParty}
-            isPurchase={isPurchase}
-            isEdit={isEdit}
-            isReadOnly={isReadOnly}
-            set={set}
-            stampEnabled={settingsApplyStamp}
-          />
+          <div id="doc-totals-anchor">
+            <DocumentTotalsSection
+              totals={totals}
+              payments={payments}
+              partyBalance={partyBalance}
+              form={form}
+              selectedParty={selectedParty}
+              isPurchase={isPurchase}
+              isEdit={isEdit}
+              isReadOnly={isReadOnly}
+              set={set}
+              stampEnabled={settingsApplyStamp}
+            />
+          </div>
         </div>
+
+        {/* ═══ شريط الإجمالي الثابت — خارج منطقة التمرير أعلاه تماماً ═══ */}
+        <DocumentStickyTotalsBar
+          totals={totals}
+          payments={payments}
+          linesCount={form.lines.length}
+        />
 
         {/* ═══ FOOTER ═══ */}
         <DocumentFooter
