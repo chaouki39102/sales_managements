@@ -204,7 +204,10 @@ export default function ProfessionalPaymentModal({
       return;
     }
     setBalanceLoading(true);
-    partyBalancesApi.getOne(client.id, documentDate)
+    // للسندات الجديدة نجلب الرصيد الحالي (بدون فلترة تاريخ)،
+    // للتعديل نجلب الرصيد كما كان في تاريخ المستند
+    const balanceDate = isEditing ? documentDate : undefined;
+    partyBalancesApi.getOne(client.id, balanceDate)
       .then(res => {
         const data = (res as any)?.data ?? res;
         const currentBalance = Number(data?.current_balance ?? 0);
@@ -212,7 +215,7 @@ export default function ProfessionalPaymentModal({
       })
       .catch(() => setInternalPrevBalance(0))
       .finally(() => setBalanceLoading(false));
-  }, [client?.id, documentDate]);
+  }, [client?.id, documentDate, isEditing]);
 
   const [activeLineId, setActiveLineId] = useState<string | null>(null);
   const activeLineIdRef = useRef<string | null>(null);
