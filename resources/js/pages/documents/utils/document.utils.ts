@@ -55,10 +55,11 @@ export function toNum(v: number | string | null | undefined): number {
 
 export function fmtDZD(v: number | string | null | undefined): string {
   const num = toNum(v);
-  return new Intl.NumberFormat('fr-DZ', {
+  const formatted = new Intl.NumberFormat('fr-DZ', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(num);
+  return formatted.startsWith('-') ? '\u200E' + formatted : formatted;
 }
 
 export function fmtDate(d?: string | null): string {

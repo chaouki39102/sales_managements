@@ -68,21 +68,13 @@ class PartyBalanceService
 
         $currentBalance = round(
             $openingAmount + $documentsBalance - $paymentsTotal,
-            4
+            2
         );
 
-        // ── منطق balance_type ─────────────────────────────────────────────────
-        // نستخدم القيمة المطلقة للعرض وnbalance_type لتحديد الاتجاه:
-        //
-        // currentBalance > 0 → الطرف مدين لنا   (debit)  = زبون لم يدفع
-        // currentBalance < 0 → نحن مدينون له    (credit) = مورد لم ندفع له
-        //
-        // لكن من منظور المستخدم:
-        //   الزبون المدين   = "مدين (علينا)"  ← خطأ لغوي في الـ UI، الصحيح: "مدين لنا"
-        //   المورد الدائن   = "نحن مدينون له" ← يُعرض كـ credit
-        //
-        // نُرجع current_balance بإشارته الأصلية لأغراض الحسابات
-        // ونُرجع display_balance (القيمة المطلقة) للعرض
+        // ── current_balance يُحافِظ على إشارته المالية ─────────────────────────
+        // > 0 → الطرف مدين لنا (زبون لم يدفع)
+        // < 0 → نحن مدينون للطرف (سلفة / رصيد دائن)
+        // = 0 → لا يوجد رصيد
         // ──────────────────────────────────────────────────────────────────────
         return [
             'party_id'          => $partyId,
@@ -91,8 +83,8 @@ class PartyBalanceService
             'opening_balance'   => round($openingAmount,   4),
             'documents_balance' => round($documentsBalance, 4),
             'payments_total'    => round($paymentsTotal,    4),
-            'current_balance'   => abs($currentBalance),        // ✅ قيمة موجبة دائماً للعرض
-            'signed_balance'    => $currentBalance,             // ✅ للحسابات الداخلية
+            'current_balance'   => $currentBalance,             // ✅ إشارة محفوظة (ليس abs)
+            'signed_balance'    => $currentBalance,
             'balance_type'      => $currentBalance >= 0 ? 'debit' : 'credit',
         ];
     }
@@ -188,7 +180,7 @@ class PartyBalanceService
                 'opening_balance'   => round($opening,   4),
                 'documents_balance' => round($documents, 4),
                 'payments_total'    => round($payments,  4),
-                'current_balance'   => abs($current),
+                'current_balance'   => $current,             // ✅ إشارة محفوظة (ليس abs)
                 'signed_balance'    => $current,
                 'balance_type'      => $current >= 0 ? 'debit' : 'credit',
                 'party' => [

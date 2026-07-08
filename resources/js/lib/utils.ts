@@ -6,10 +6,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number, currency = 'DZD'): string {
-  return new Intl.NumberFormat('ar-DZ', {
+  const formatted = new Intl.NumberFormat('fr-DZ', {
     style: 'currency',
     currency,
   }).format(amount);
+  return formatted.startsWith('-') ? '\u200E' + formatted : formatted;
 }
 
 export function formatDate(date: string | Date, locale = 'ar-DZ'): string {

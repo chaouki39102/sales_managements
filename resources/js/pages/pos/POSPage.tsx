@@ -69,6 +69,7 @@ import { printReceiptDirect }   from '@/pos/utils/printUtils';
 import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
 import { renderPreviewToHtml, mapCompany }  from '@/pages/settings/print-settings/runtime';
 import { printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
+import { useQueryClient }       from '@tanstack/react-query';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
@@ -80,7 +81,8 @@ type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 
 const QUICK_ITEMS_KEY = (slug: string) => `pos-quick-items-${slug}`;
 
-export default function POSPage() {
+function POSPage() {
+  const queryClient = useQueryClient();
   const slug        = useActiveSlug();
   const { data: fiscalStampRaw } = useQuery({
     queryKey: [slug, 'settings', 'fiscal_stamp_enabled'],
@@ -203,7 +205,7 @@ export default function POSPage() {
   }, [quickItems, slug]);
 
   // ── Search & Filters ──────────────────────────────────────────────────────
-  const [sortBy, setSortBy] = useState<SortOption>('default');
+  const [sortBy, setSortBy] = useState<SortMode>('name');
   const [filterInStock, setFilterInStock] = useState(false);
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [filterMinPrice, setFilterMinPrice] = useState('');
@@ -245,14 +247,14 @@ export default function POSPage() {
 
   const { data: customersData    } = useClients({ per_page: 200 });
   const { data: warehouses       } = useWarehouses();
-  const { data: documentTypes    } = useDocumentTypes();
-  const { data: priceLevels      } = usePriceLevels();
+  const { data: documentTypes }: { data?: DocumentType[] } = useDocumentTypes();
+  const { data: priceLevels }: { data?: PriceLevel[] } = usePriceLevels();
   const { data: currencies       } = useCurrencies();
   const { data: treasuryAccounts } = useTreasuryAccounts();   // ✅ مُضاف
-  const { data: paymentModes     } = usePaymentModes();
+  const { data: paymentModes }: { data?: PaymentMode[] } = usePaymentModes();
 
   const customers        = (customersData as PaginatedResponse<Party>)?.data ?? (customersData as Party[]) ?? [];
-  const priceLevelsList  = priceLevels ?? [];
+  const priceLevelsList: PriceLevel[]  = priceLevels ?? [];
 
   // ── Client balance ──────────────────────────────────────────────────────────
   const clientId = pos.client?.id;
@@ -486,7 +488,7 @@ export default function POSPage() {
           image_url:           null,
           quantity:            Number(line.quantity),
           unit_price_ht:       Number(line.unit_price_ht),
-          selling_price_ttc:   Number(line.unit_price_ht) * (1 + Number(line.tva_rate) / 100),
+          selling_price_ttc:   htToTtc(Number(line.unit_price_ht), Number(line.tva_rate)),
           tva_rate:            Number(line.tva_rate),
           tva_id:              v?.tva_id ?? null,
           discount_percentage: Number(line.discount_percentage),
@@ -525,7 +527,8 @@ export default function POSPage() {
 
   const adjustedTotalHt       = pos.totals.total_ht;
   const adjustedTotalTva      = pos.totals.total_tva;
-  const adjustedTotalTtcFinal = pos.totals.total_ht + pos.totals.total_tva + pos.totals.fiscal_stamp;
+  const fiscalStampAmount = fiscalStampEnabled ? calcFiscalStamp(pos.totals.total_ttc) : 0;
+  const adjustedTotalTtcFinal = pos.totals.total_ht + pos.totals.total_tva + fiscalStampAmount;
 
   const existingPaymentsSum = useMemo(
     () => pos.payments.reduce((s, p) => s + Number(p.amount || 0), 0),
@@ -706,7 +709,7 @@ export default function POSPage() {
   }, [template, companyData, paperWidth, copies, settings.printMode]);
 
   // ── Complete Sale ──────────────────────────────────────────────────────────
-  const handleCompleteSale = useCallback(async (params: {
+const handleCompleteSale = useCallback(async (params: {
     amountPaid:   number;
     dueDate?:     string;
     note?:        string;
@@ -775,6 +778,9 @@ export default function POSPage() {
         notes:          params.note ?? cartNote ?? null,
       };
 
+      // ✅ نحدّد نوع العملية قبل الإرسال لاستعمالها لاحقاً في شرط incrementMut
+      const isEditingExistingDocument = !!editingDocumentId;
+
       let res;
       if (editingDocumentId) {
         const isDraft = editingDocStatus === 'draft';
@@ -792,7 +798,12 @@ export default function POSPage() {
         });
       }
 
-      if (currentSession?.id) {
+      // ✅ الإصلاح: لا نزيد إحصائيات الجلسة (gross_sales, invoices_count, ...) إلا
+      // عند إنشاء فاتورة جديدة فعلاً. عند تعديل فاتورة موجودة سبق احتسابها ضمن
+      // نفس الجلسة، استدعاء incrementMut مجدداً كان يُضاعف الأرقام لأن
+      // PosSessionController::increment() يستعمل increment() التراكمي بلا
+      // إلغاء للمساهمة القديمة أولاً.
+      if (currentSession?.id && !isEditingExistingDocument) {
         incrementMut.mutate(
           buildIncrementInput({
             items:            currentItems,
@@ -823,6 +834,13 @@ export default function POSPage() {
       const bd = (res as any)?.balance_data;
       const prevBalance = bd?.previous_balance ?? 0;
       const newBalance  = bd?.new_balance ?? 0;
+
+      // Invalidate client balance so cart & payment modal show updated value
+      if (currentClient?.id) {
+        queryClient.invalidateQueries({
+          queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id),
+        });
+      }
 
       const fullSnapshot: POSSaleSnapshot = {
         items: snapshot.items.map(i => ({
@@ -1079,7 +1097,18 @@ export default function POSPage() {
           totalTtcFinal={adjustedTotalTtcFinal}
           remainingToPay={remainingToPay}
           invoiceDiscountPct={pos.invoiceDiscountPct}
-          onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
+          onInvoiceDiscountChange={pct => {
+            const check = checkDiscountAllowed(pct, settings);
+            if (!check.allowed && check.reason === 'max_exceeded') {
+              toast.error(`الخصم ${pct}% تجاوز الحد الأقصى (${settings.maxDiscountPct}%)`);
+              return;
+            }
+            if (!check.allowed && check.reason === 'pin_required') {
+              setPinModal({ requestedDiscount: pct, reason: 'pin_required', onSuccess: () => pos.setInvoiceDiscountPct(pct) });
+              return;
+            }
+            pos.setInvoiceDiscountPct(pct);
+          }}
           invoiceDiscountAmount={invoiceDiscountAmount}
           onUndoClear={handleUndoClear}
           canUndoClear={canUndoClear}
@@ -1101,7 +1130,7 @@ export default function POSPage() {
           existingPayments={pos.payments}
           isEditing={editingDocumentId !== null}
           documentDate={editingDocumentDate ?? new Date().toISOString().slice(0, 10)}
-          prevBalance={editingPrevBalanceRef.current}
+          prevBalance={editingDocumentId ? editingPrevBalanceRef.current : clientBalance?.current_balance}
           onClose={() => setModal('none')}
           onConfirm={handleCompleteSale}
         />
@@ -1195,3 +1224,5 @@ export default function POSPage() {
     </div>
   );
 }
+
+export default React.memo(POSPage);

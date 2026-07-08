@@ -154,7 +154,7 @@ abstract class BaseService
             $data = $this->prepareDataForUpdate($item, $data, $request);
             $item->update($data);
             $this->afterUpdate($item, $data, $request);
-            return $item->fresh();
+            return $this->loadDefaultRelations($item);
         });
 
         $this->performPostCommitOperations($item, $data, $request, 'update');

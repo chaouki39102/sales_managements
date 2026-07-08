@@ -89,9 +89,8 @@ export default function DocumentTotalsSection({
         }}>
           <i className="ti ti-calculator" style={{ color: 'var(--t4)' }} />
           <span>رصيد {selectedParty?.name ?? 'المتعامل'} الحالي:</span>
-          <b style={{ color: partyBalance.balance_type === 'debit' ? 'var(--green)' : 'var(--red)' }}>
+          <b style={{ color: partyBalance.balance_type === 'debit' ? 'var(--red)' : 'var(--green)' }}>
             {fmtDZD(partyBalance.current_balance)} دج
-            ({partyBalance.balance_type === 'debit' ? 'مدين لنا' : 'نحن مدينون'})
           </b>
           <span style={{ color: 'var(--t4)' }}>·</span>
           <span>بعد هذا المستند سيصبح:</span>

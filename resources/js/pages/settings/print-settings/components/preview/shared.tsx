@@ -141,7 +141,7 @@ function TotalRowFn({ label, val, red, bold }: TotalRowProps): JSX.Element {
       color: red ? '#c00' : 'inherit',
     }}>
       <span>{label}</span>
-      <span dir="ltr">{val}</span>
+      <span dir="ltr">{Number(val).toFixed(2)}</span>
     </div>
   );
 }

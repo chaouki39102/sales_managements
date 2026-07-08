@@ -61,14 +61,12 @@ function useDebounce<T>(value: T, delay: number): T {
 
 function BalanceLabel({ balance }: { balance: PartyBalance | undefined }) {
   if (!balance || balance.current_balance === 0) return null;
-  const isDebit = balance.balance_type === 'debit';
   return (
     <div style={{
       fontSize: 11, marginTop: 2, direction: 'ltr', textAlign: 'right',
-      color: isDebit ? '#e53935' : '#43a047',
+      color: balance.current_balance >= 0 ? '#ef4444' : '#22c55e',
       fontWeight: 600,
     }}>
-      {isDebit ? 'مدين: ' : 'دائن: '}
       {formatCurrency(balance.current_balance)}
     </div>
   );

@@ -455,7 +455,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             );
 
             $signedBalance   = (float) ($balanceData['signed_balance'] ?? 0);
-            $currentBalance  = abs($signedBalance); // always >= 0 for display
+            $currentBalance  = $signedBalance; // إشارة محفوظة — + للدين، - للسلفة
             $netToPay        = (float) $doc->net_to_pay;
             $paidAmount      = (float) $doc->paid_amount;
             $remainingAmount = (float) $doc->remaining_amount;
@@ -464,17 +464,17 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             // net_to_pay يُمثل مساهمة هذه الوثيقة في Σ(docs)
             // paid_amount يُمثل مساهمة دفعات هذه الوثيقة في Σ(payments)
             // previous_signed = signed_balance - net_to_pay + paid_amount
-            // نأخذ القيمة المطلقة للعرض (مثل old behavior)
+            // نحتفظ بالإشارة المالية (ليس abs)
             $previousSigned = $signedBalance - $netToPay + $paidAmount;
-            $previousBalance = abs($previousSigned);
+            $previousBalance = $previousSigned; // إشارة محفوظة
 
             $doc->balance_data = [
-                'previous_balance' => round($previousBalance,  4),
-                'invoice_total'    => round($netToPay,         4),
-                'paid_amount'      => round($paidAmount,       4),
-                'remaining'        => round($remainingAmount,  4),
-                'change'           => round(max(0, $paidAmount - $netToPay), 4),
-                'new_balance'      => round($currentBalance,   4),
+                'previous_balance' => round($previousBalance,  2),
+                'invoice_total'    => round($netToPay,         2),
+                'paid_amount'      => round($paidAmount,       2),
+                'remaining'        => round($remainingAmount,  2),
+                'change'           => round(max(0, $paidAmount - $netToPay), 2),
+                'new_balance'      => round($currentBalance,   2),
             ];
         } catch (\Throwable $e) {
             Log::warning('computeAndAttachBalances failed for doc #' . $doc->id . ': ' . $e->getMessage());
@@ -719,10 +719,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $tva      = $ht * ($tvaRate / 100);
 
         return [
-            'total_ht'        => round($ht,       4),
-            'discount_amount' => round($discount,  4),
-            'total_tva'       => round($tva,       4),
-            'total_ttc'       => round($ht + $tva, 4),
+            'total_ht'        => round($ht,       2),
+            'discount_amount' => round($discount,  2),
+            'total_tva'       => round($tva,       2),
+            'total_ttc'       => round($ht + $tva, 2),
         ];
     }
 
@@ -777,8 +777,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ->sum('amount_applied');
 
         $document->updateQuietly([
-            'paid_amount'      => round($paidAmount, 4),
-            'remaining_amount' => round(max(0, (float) $document->net_to_pay - $paidAmount), 4),
+            'paid_amount'      => round($paidAmount, 2),
+            'remaining_amount' => round(max(0, (float) $document->net_to_pay - $paidAmount), 2),
         ]);
     }
 
@@ -805,13 +805,13 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $netToPay = $totalTtc + $totalStamp;
 
         $document->updateQuietly([
-            'total_ht'         => round($totalHt,       4),
-            'total_tva'        => round($totalTva,       4),
-            'total_discount'   => round($totalDiscount,  4),
-            'total_stamp'      => round($totalStamp,     4),
-            'total_ttc'        => round($totalTtc,       4),
-            'net_to_pay'       => round($netToPay,       4),
-            'remaining_amount' => round($netToPay,       4), // يُحدَّث لاحقاً بعد الدفعات
+            'total_ht'         => round($totalHt,       2),
+            'total_tva'        => round($totalTva,       2),
+            'total_discount'   => round($totalDiscount,  2),
+            'total_stamp'      => round($totalStamp,     2),
+            'total_ttc'        => round($totalTtc,       2),
+            'net_to_pay'       => round($netToPay,       2),
+            'remaining_amount' => round($netToPay,       2), // يُحدَّث لاحقاً بعد الدفعات
         ]);
     }
 

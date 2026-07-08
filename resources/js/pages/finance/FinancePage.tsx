@@ -917,12 +917,12 @@ function OpeningBalancesTab({ slug, selectedYear }: {
                 <KpiCard variant="blue" icon="ti-building-bank"
                     label="رصيد الخزينة الافتتاحي" value={fmt(totalTreasury)} unit="دج"
                     sub={`${treasuryRows.length} حساب`} />
-                <KpiCard variant="gold" icon="ti-arrow-down-circle"
-                    label="أرصدة مدينة (زبائن)" value={fmt(totalDebit)} unit="دج"
-                    sub={`${partyRows.filter(r => r.balance_type === 'debit').length} متعامل`} />
-                <KpiCard variant="purple" icon="ti-arrow-up-circle"
-                    label="أرصدة دائنة (موردون)" value={fmt(totalCredit)} unit="دج"
-                    sub={`${partyRows.filter(r => r.balance_type === 'credit').length} متعامل`} />
+                <KpiCard variant="red" icon="ti-arrow-down-circle"
+                    label="الرصيد الموجب (زبائن)" value={fmt(totalDebit)} unit="دج"
+                    sub={`${partyRows.filter(r => (r.current_balance ?? 0) >= 0).length} متعامل`} />
+                <KpiCard variant="green" icon="ti-arrow-up-circle"
+                    label="الرصيد السالب (موردون)" value={fmt(totalCredit)} unit="دج"
+                    sub={`${partyRows.filter(r => (r.current_balance ?? 0) < 0).length} متعامل`} />
             </div>
 
             {/* Info bar */}
@@ -1309,9 +1309,9 @@ function OpeningBalancesTab({ slug, selectedYear }: {
                                         <td colSpan={3} style={{ fontWeight: 700, textAlign: 'end',
                                             padding: '8px 12px', color: 'var(--t3)', fontSize: 12 }}>المجموع</td>
                                         <td style={{ fontWeight: 900, fontFamily: 'monospace', padding: '8px 12px' }}>
-                                            <span style={{ color: 'var(--gold)' }}>عليه: {fmt(totalDebit)}</span>
+                                            <span style={{ color: 'var(--red)' }}>موجب: {fmt(totalDebit)}</span>
                                             &nbsp;|&nbsp;
-                                            <span style={{ color: 'var(--blue)' }}>له: {fmt(totalCredit)}</span>
+                                            <span style={{ color: 'var(--green)' }}>سالب: {fmt(totalCredit)}</span>
                                         </td>
                                         <td colSpan={!selectedYear?.is_closed ? 2 : 1}></td>
                                     </tr>
@@ -1337,9 +1337,9 @@ function OpeningBalancesTab({ slug, selectedYear }: {
                                     <div style={{ display: 'flex', gap: 20, fontSize: 12, color: 'var(--t3)' }}>
                                         <span><strong style={{ color: 'var(--t1)' }}>{partyRows.length}</strong> متعامل</span>
                                         <span>إجمالي{' '}
-                                            <strong style={{ color: 'var(--gold)' }}>{fmt(totalDebit)}</strong>
+                                            <strong style={{ color: 'var(--red)' }}>{fmt(totalDebit)}</strong>
                                             {' / '}
-                                            <strong style={{ color: 'var(--blue)' }}>{fmt(totalCredit)}</strong> دج
+                                            <strong style={{ color: 'var(--green)' }}>{fmt(totalCredit)}</strong> دج
                                         </span>
                                     </div>
                                 )}
@@ -1354,10 +1354,10 @@ function OpeningBalancesTab({ slug, selectedYear }: {
     flexShrink: 0,
     background: 'var(--bg3)',
     borderRadius: '0 0 var(--r4) var 20px(--r4)', }} className="al-g">
-                                <strong style={{ color: 'var(--gold)' }}>عليه = الطرف مدين
-                                لنا (عليه دين - يجب عليه أن يدفع لنا) </strong><br />
-                                <strong style={{ color: 'var(--blue)' }}>له = نحن مدينون
-                                للطرف (له دين عندنا - يجب علينا أن ندفع له) </strong><br />
+                                <strong style={{ color: 'var(--red)' }}>الرصيد الموجب
+                                (+) المتعامل عليه دين - يجب عليه أن يدفع لنا </strong><br />
+                                <strong style={{ color: 'var(--green)' }}>الرصيد السالب
+                                (-) للمتعامل رصيد عندنا - يجب علينا أن ندفع له </strong><br />
                             </div>
                         </div>
                     </Card>

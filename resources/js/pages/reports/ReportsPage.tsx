@@ -144,8 +144,8 @@ function PartyReportView({ title, data, isLoading, isError, refetch, reportId }:
       <>
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
           <KpiCard variant="red"   icon="ti-trending-up"  label="إجمالي الرصيد"   value={data.summary.total_balance.toLocaleString('fr-DZ')} unit="دج"/>
-          <KpiCard variant="blue"  icon="ti-users"        label="مدينون"           value={data.summary.debtors_count}/>
-          <KpiCard variant="green" icon="ti-users"        label="دائنون"           value={data.summary.creditors_count}/>
+          <KpiCard variant="blue"  icon="ti-users"        label="برصيد موجب"           value={data.summary.debtors_count}/>
+          <KpiCard variant="green" icon="ti-users"        label="برصيد سالب"           value={data.summary.creditors_count}/>
         </div>
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
           <div className="tw">

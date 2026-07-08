@@ -177,12 +177,12 @@ export default function ProfessionalPaymentModal({
         id:                 uid(),
         dbId:               ep.id,
         modeId:             ep.payment_mode_id,
-        amount:             Number(ep.amount || 0).toFixed(2),
+        amount:             Number(ep.amount || 0).toFixed(4),
         refNote:            ep.reference ?? '',
         treasuryAccountId:  ep.treasury_account_id ?? null,
       }));
     }
-    const initAmount = totalTtcFinal.toFixed(2);
+    const initAmount = totalTtcFinal.toFixed(4);
     return defaultMode
       ? [{ id: uid(), modeId: defaultMode.id, amount: initAmount, refNote: '', treasuryAccountId: null }]
       : [];
@@ -217,7 +217,7 @@ export default function ProfessionalPaymentModal({
       .then(res => {
         const data = (res as any)?.data ?? res;
         const currentBalance = Number(data?.current_balance ?? 0);
-        setInternalPrevBalance(Math.max(0, currentBalance));
+        setInternalPrevBalance(currentBalance);
       })
       .catch(() => setInternalPrevBalance(0))
       .finally(() => setBalanceLoading(false));
@@ -246,7 +246,7 @@ export default function ProfessionalPaymentModal({
     () => lines.reduce((s, l) => s + (l.dbId ? 0 : (parseFloat(l.amount) || 0)), 0),
     [lines],
   );
-  const totalDue = totalTtcFinal + (client && internalPrevBalance > 0 ? internalPrevBalance : 0);
+  const totalDue = totalTtcFinal + (client ? internalPrevBalance : 0);
   const remaining = Math.max(0, totalDue - totalPaid);
   const change    = totalPaid > totalDue + 0.009 ? totalPaid - totalDue : 0;
   const canSubmit = !submitting;
@@ -275,7 +275,7 @@ export default function ProfessionalPaymentModal({
   const onDigit = useCallback((d: string) => {
     updateActiveLine(prev => {
       if (prev === '0' || prev === '') return d;
-      if (prev.includes('.') && prev.split('.')[1].length >= 2) return prev;
+      if (prev.includes('.') && prev.split('.')[1].length >= 4) return prev;
       return prev + d;
     });
   }, [updateActiveLine]);
@@ -297,7 +297,7 @@ export default function ProfessionalPaymentModal({
     const id = activeLineIdRef.current;
     if (!id) return;
     setLines(prev => prev.map(l =>
-      l.id === id ? { ...l, amount: amount.toFixed(2) } : l,
+      l.id === id ? { ...l, amount: amount.toFixed(4) } : l,
     ));
   }, []);
 
@@ -311,7 +311,7 @@ export default function ProfessionalPaymentModal({
       {
         id:      newId,
         modeId:  firstMode.id,
-        amount:  Math.max(0, remaining).toFixed(2),
+        amount:  Math.max(0, remaining).toFixed(4),
         refNote: '',
         treasuryAccountId: null,
       },
@@ -336,7 +336,7 @@ export default function ProfessionalPaymentModal({
   const fillRemaining = useCallback((id: string) => {
     const others = lines.filter(l => l.id !== id).reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
     const rem    = Math.max(0, totalTtcFinal - others);
-    updateLine(id, 'amount', rem.toFixed(2));
+    updateLine(id, 'amount', rem.toFixed(4));
   }, [lines, totalTtcFinal, updateLine]);
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -346,7 +346,7 @@ export default function ProfessionalPaymentModal({
     setError('');
 
     const payments = lines
-      .filter(l => parseFloat(l.amount) > 0.009)
+      .filter(l => parseFloat(l.amount) > 0.00009)
       .map(l => ({
         ...(l.dbId ? { id: l.dbId } : {}),
         paymentModeId:      l.modeId,

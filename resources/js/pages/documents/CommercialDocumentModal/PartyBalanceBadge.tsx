@@ -27,11 +27,10 @@ export default function PartyBalanceBadge({
 
   if (!balance) return null;
 
-  const isDebit = balance.balance_type === 'debit';
-  const color = isDebit ? 'var(--green)' : 'var(--red)';
-  const bg = isDebit ? 'var(--greenb)' : 'var(--redb)';
-  const icon = isDebit ? 'ti-trending-up' : 'ti-trending-down';
-  const typeLabel = isDebit ? 'مدين لنا' : 'نحن مدينون';
+  const isPositive = balance.current_balance >= 0;
+  const color = isPositive ? 'var(--red)' : 'var(--green)';
+  const bg = isPositive ? 'var(--redb)' : 'var(--greenb)';
+  const icon = isPositive ? 'ti-trending-up' : 'ti-trending-down';
 
   return (
     <div style={{
@@ -47,12 +46,6 @@ export default function PartyBalanceBadge({
         <span style={{ color: 'var(--t3)' }}>رصيد {partyLabel}:</span>
         <span style={{ fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>
           {fmtDZD(balance.current_balance)} دج
-        </span>
-        <span style={{
-          padding: '1px 6px', borderRadius: 99, fontSize: 10, fontWeight: 700,
-          background: color, color: 'white',
-        }}>
-          {typeLabel}
         </span>
       </div>
 

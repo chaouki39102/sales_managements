@@ -74,8 +74,9 @@ export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStam
 export function formatDZD(amount: number | string | null | undefined): string {
   const n = Number(amount);
   if (!Number.isFinite(n)) return '0 دج';
-  return new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-    .format(n) + ' دج';
+  const formatted = new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .format(n);
+  return (formatted.startsWith('-') ? '\u200E' : '') + formatted + ' دج';
 }
 
 /** حساب الباقي من الدفع */

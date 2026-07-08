@@ -35,15 +35,15 @@ export default function DebtsPage() {
 
     const totalDebit = useMemo(() =>
         rawBalances
-            .filter(b => b.balance_type === 'debit')
+            .filter(b => (b.current_balance as number) >= 0)
             .reduce((s, b) => s + Number(b.current_balance), 0),
         [rawBalances]
     );
 
     const totalCredit = useMemo(() =>
         rawBalances
-            .filter(b => b.balance_type === 'credit')
-            .reduce((s, b) => s + Number(b.current_balance), 0),
+            .filter(b => (b.current_balance as number) < 0)
+            .reduce((s, b) => s + Math.abs(Number(b.current_balance)), 0),
         [rawBalances]
     );
 
@@ -111,20 +111,21 @@ export default function DebtsPage() {
             render: (b: PartyBalance) => (
                 <span style={{
                     fontWeight: 700,
-                    color: b.balance_type === 'debit' ? 'var(--gold)' : 'var(--blue)',
+                    color: (b.current_balance as number) >= 0 ? 'var(--red)' : 'var(--green)',
                 }}>
-                    {fmtNumber(Number(b.current_balance))} دج
+                    {(b.current_balance as number) >= 0 ? '+ ' : ''}{fmtNumber(Number(b.current_balance))} دج
                 </span>
             ),
         },
         {
             key: 'status',
             header: 'الحالة',
-            render: (b: PartyBalance) => (
-                <Badge variant={b.balance_type === 'debit' ? 'warning' : 'info'}>
-                    {b.balance_type === 'debit' ? 'مدين (علينا)' : 'دائن (لنا)'}
-                </Badge>
-            ),
+            render: (b: PartyBalance) => {
+                const bal = Number(b.current_balance);
+                if (bal > 0) return <Badge variant="danger">غير مسدد</Badge>;
+                if (bal < 0) return <Badge variant="success">له رصيد</Badge>;
+                return <Badge variant="gray">مسدد</Badge>;
+            },
         },
         {
             key: 'actions',
@@ -169,16 +170,16 @@ export default function DebtsPage() {
 
             <div className="kpis" style={{ marginBottom: 20 }}>
                 <KpiCard
-                    variant="gold"
+                    variant="red"
                     icon="ti-arrow-down-circle"
-                    label="إجمالي المدين (علينا)"
+                    label="الرصيد الموجب (علينا)"
                     value={fmtNumber(totalDebit)}
                     unit="دج"
                 />
                 <KpiCard
-                    variant="blue"
+                    variant="green"
                     icon="ti-arrow-up-circle"
-                    label="إجمالي الدائن (لنا)"
+                    label="الرصيد السالب (لهم)"
                     value={fmtNumber(totalCredit)}
                     unit="دج"
                 />
@@ -268,12 +269,6 @@ function BalanceDetailModal({
                     <span className="sr-v">{fmtDate(balance.date)}</span>
                 </div>
                 <div className="sr">
-                    <span className="sr-l">النوع</span>
-                    <Badge variant={balance.balance_type === 'debit' ? 'warning' : 'info'}>
-                        {balance.balance_type === 'debit' ? 'مدين' : 'دائن'}
-                    </Badge>
-                </div>
-                <div className="sr">
                     <span className="sr-l">نوع المتعامل</span>
                     <span className="sr-v">{typeLabel}</span>
                 </div>
@@ -289,16 +284,13 @@ function BalanceDetailModal({
                     <span className="sr-l">الدفعات</span>
                     <span className="sr-v">{fmtNumber(Number(balance.payments_total))} دج</span>
                 </div>
-                <div className="sr" style={{ gridColumn: '1 / -1' }}>
-                    <span className="sr-l"><strong>الرصيد الحالي</strong></span>
-                    <span
-                        className="sr-v"
-                        style={{
-                            fontWeight: 700,
-                            fontSize: 18,
-                            color: balance.balance_type === 'debit' ? 'var(--gold)' : 'var(--blue)',
-                        }}
-                    >
+                <div className="sr">
+                    <span className="sr-l">الرصيد الحالي</span>
+                    <span className="sr-v" style={{
+                        fontWeight: 700,
+                        fontSize: 18,
+                        color: (balance.current_balance as number) >= 0 ? 'var(--red)' : 'var(--green)',
+                    }}>
                         {fmtNumber(Number(balance.current_balance))} دج
                     </span>
                 </div>

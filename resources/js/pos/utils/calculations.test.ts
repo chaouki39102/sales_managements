@@ -128,14 +128,12 @@ describe('formatDZD', () => {
   it('formats amount with DZD symbol', () => {
     expect(formatDZD(1000)).toMatch(/دج/);
   });
-  it('formats whole number without decimals', () => {
+  it('formats whole number with 2 decimals', () => {
     const r = formatDZD(1000);
-    expect(r).toContain('1');
-    expect(r).not.toContain(',');
+    expect(r).toMatch(/1 000,00 دج/);
   });
   it('formats decimal amount', () => {
-    const r = formatDZD(1500.5);
-    expect(r).toContain('1');
+    expect(formatDZD(1500.5)).toMatch(/1 500,50 دج/);
   });
 });
 

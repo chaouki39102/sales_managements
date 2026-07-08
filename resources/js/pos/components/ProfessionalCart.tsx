@@ -321,15 +321,17 @@ export default function ProfessionalCart({
               <strong className="grand-amount">{formatDZD(totalTtcFinal)}</strong>
             </div>
             {client !== null && clientBalance !== undefined && (
-              <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 2 }}>
-                <span style={{ opacity: 0.65 }}>رصيد {client.name}</span>
-                <span style={{
-                  fontWeight: 600,
-                  color: clientBalance >= 0 ? '#22c55e' : '#ef4444',
-                }}>
-                  {formatDZD(Math.abs(clientBalance))}
-                  <span style={{ fontSize: 10, opacity: 0.6, marginRight: 2 }}>
-                    {clientBalance >= 0 ? 'مدين' : 'دائن'}
+              <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 4 }}>
+                <span>
+                  <span style={{ opacity: 0.65 }}>رصيد {client.name} </span>
+                  <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#ef4444' : '#22c55e' }}>
+                    {formatDZD(clientBalance)}
+                  </span>
+                </span>
+                <span>
+                  <span style={{ opacity: 0.65 }}>الرصيد الجديد </span>
+                  <span style={{ fontWeight: 700, color: '#2563eb' }}>
+                    {formatDZD(clientBalance + totalTtcFinal)}
                   </span>
                 </span>
               </div>
