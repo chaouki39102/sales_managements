@@ -67,6 +67,7 @@ class CommercialDocumentResource extends JsonResource
             'lines'                        => CommercialDocumentLineResource::collection($this->whenLoaded('lines')),
             'payments'                     => PaymentResource::collection($this->whenLoaded('payments')),
             'source_document'              => new CommercialDocumentResource($this->whenLoaded('sourceDocument')),
+            'balance_data'                 => $this->balance_data ?? null,
         ];
     }
 }

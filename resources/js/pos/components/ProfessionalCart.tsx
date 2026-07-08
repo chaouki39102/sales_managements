@@ -52,6 +52,7 @@ interface ProfessionalCartProps {
   invoiceDiscountAmount?:   number;
   onUndoClear:          () => void;
   canUndoClear:         boolean;
+  clientBalance?:       number;
 }
 
 export default function ProfessionalCart({
@@ -61,7 +62,7 @@ export default function ProfessionalCart({
   onSetClient, onPriceLevelChange, onNoteChange,
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
-  onUndoClear, canUndoClear,
+  onUndoClear, canUndoClear, clientBalance,
 }: ProfessionalCartProps) {
 
   const [showNote,         setShowNote]         = useState(false);
@@ -319,6 +320,20 @@ export default function ProfessionalCart({
               <span>الإجمالي TTC</span>
               <strong className="grand-amount">{formatDZD(totalTtcFinal)}</strong>
             </div>
+            {client !== null && clientBalance !== undefined && (
+              <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 2 }}>
+                <span style={{ opacity: 0.65 }}>رصيد {client.name}</span>
+                <span style={{
+                  fontWeight: 600,
+                  color: clientBalance >= 0 ? '#22c55e' : '#ef4444',
+                }}>
+                  {formatDZD(Math.abs(clientBalance))}
+                  <span style={{ fontSize: 10, opacity: 0.6, marginRight: 2 }}>
+                    {clientBalance >= 0 ? 'مدين' : 'دائن'}
+                  </span>
+                </span>
+              </div>
+            )}
           </div>
         )}
 

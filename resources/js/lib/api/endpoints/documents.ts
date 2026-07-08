@@ -246,7 +246,7 @@ export function useDocumentMutations() {
 
   const invalidatePartyBalance = (partyId?: number | null) => {
     if (slug && partyId) {
-      qc.invalidateQueries({ queryKey: [slug, 'party-balance', partyId] });
+      qc.invalidateQueries({ queryKey: [slug, 'party-balances', partyId] });
     }
   };
 

@@ -12,7 +12,7 @@ import type { Payment, Check, PaginatedResponse, ListParams, PaymentStatus, Chec
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface PaymentCreateInput {
-  commercial_document_id: number;   // ✅ مطلوب دائماً
+  document_ids:           number[]; // ✅ ربط بال pivot (document_payment)
   payment_mode_id:        number;
   treasury_account_id?:   number | null;
   amount:                 number;
@@ -121,21 +121,18 @@ export function usePaymentMutations() {
   const invalidate = (docId?: number) => {
     if (!slug) return;
     qc.invalidateQueries({ queryKey: tenantKeys.payments.all(slug) });
-    if (docId) {
-      // ✅ أبطل المستند أيضاً لتحديث amount_paid وamount_remaining
-      qc.invalidateQueries({ queryKey: tenantKeys.documents.detail(slug, docId) });
-    }
+    qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
   };
 
   const create = useMutation({
     mutationFn: paymentsApi.create,
-    onSuccess:  (p) => invalidate(p.commercial_document_id),
+    onSuccess:  () => invalidate(),
   });
 
   const update = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<PaymentCreateInput> }) =>
       paymentsApi.update(id, data),
-    onSuccess: (p) => invalidate(p.commercial_document_id),
+    onSuccess: () => invalidate(),
   });
 
   const remove = useMutation({

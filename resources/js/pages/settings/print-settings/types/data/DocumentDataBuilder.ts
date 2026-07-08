@@ -116,6 +116,15 @@ interface ApiDocument {
     change?:         number;
     remaining?:      number;
   } | null;
+  /** Balance computed by backend (SSOT) */
+  balance_data?: {
+    previous_balance: number;
+    invoice_total:    number;
+    paid_amount:      number;
+    remaining:        number;
+    change:           number;
+    new_balance:      number;
+  } | null;
 }
 
 // ─── Source type: POS sale snapshot ──────────────────────────────────────────
@@ -163,6 +172,10 @@ export const DocumentDataBuilder = {
   /**
    * Build from a full CommercialDocument API response.
    * Used by CommercialDocumentModal and any document-list print action.
+   *
+   * Balance is now read from `doc.balance_data` (computed by backend SSOT).
+   * The `options` parameter is kept for backward compatibility with callers
+   * that haven't migrated yet.
    */
   fromApiDocument(
     doc:     ApiDocument,
@@ -175,12 +188,18 @@ export const DocumentDataBuilder = {
     const lines  = buildLinesFromApi(doc.lines ?? []);
     const totals = buildTotalsFromApi(doc, lines);
 
-    // Balance requires explicit options from the caller (fetched via
-    // party-balances API). Without them, we have no data → null.
-    // The old fallback buildBalance(0, totals.remaining) was always wrong
-    // (0 previous balance is incorrect for any real party).
-    const balance = options?.prevBalance != null && options?.newBalance != null
-      ? buildBalance(options.prevBalance, options.newBalance)
+    // SSOT: backend computes balance_data. Fall back to options for legacy.
+    let prev: number | null | undefined;
+    let next: number | null | undefined;
+    if (doc.balance_data) {
+      prev = doc.balance_data.previous_balance;
+      next = doc.balance_data.new_balance;
+    } else if (options?.prevBalance != null && options?.newBalance != null) {
+      prev = options.prevBalance;
+      next = options.newBalance;
+    }
+    const balance = prev != null && next != null
+      ? buildBalance(prev, next)
       : null;
 
     return {

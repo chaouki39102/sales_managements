@@ -143,8 +143,9 @@ export default function CustomerSearchModal({
         const data = (r as any)?.data ?? r;
         return Array.isArray(data) ? data : [];
       }),
-    enabled:   !!slug,
-    staleTime: 60_000,
+    enabled:           !!slug,
+    staleTime:         60_000,
+    refetchOnMount:    'always',
   });
 
   const balanceMap = useMemo(() => {

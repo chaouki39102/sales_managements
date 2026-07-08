@@ -14,7 +14,14 @@ class PaymentResource extends JsonResource
             'company_id'          => $this->company_id,
             'payment_number'      => $this->payment_number,
             'payment_date'        => $this->payment_date,
+            'direction'           => $this->direction,
             'amount'              => (float) $this->amount,
+            'total_applied'       => $this->relationLoaded('commercialDocuments')
+                ? (float) $this->getTotalApplied()
+                : null,
+            'unapplied_amount'    => $this->relationLoaded('commercialDocuments')
+                ? (float) $this->getUnappliedAmount()
+                : null,
             'currency_id'         => $this->currency_id,
             'amount_local'        => $this->amount_local !== null ? (float) $this->amount_local : null,
             'payment_mode_id'     => $this->payment_mode_id,

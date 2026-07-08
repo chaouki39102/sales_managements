@@ -28,6 +28,7 @@ class Payment extends Model
         'payment_number',
         'payment_date',
         'amount',
+        'direction',
         'currency_id',
         'amount_local',
         'payment_mode_id',

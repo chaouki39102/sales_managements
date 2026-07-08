@@ -57,6 +57,8 @@ interface Props {
   existingPayments?: DocumentPayment[];
   documentDate?:     string;   // ISO date — تاريخ الفاتورة الحقيقي لجلب الرصيد التاريخي الصحيح
   isEditing?:        boolean;  // true when reopening an existing invoice
+  /** SSOT balance: pass from document.balance_data.previous_balance when editing */
+  prevBalance?:      number;
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
@@ -161,6 +163,7 @@ export default function ProfessionalPaymentModal({
   totals, client, paymentModes, documentTypes,
   currencies, treasuryAccounts, totalTtcFinal,
   existingPayments, documentDate, onClose, onConfirm, isEditing,
+  prevBalance: propPrevBalance,
 }: Props) {
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -194,18 +197,21 @@ export default function ProfessionalPaymentModal({
     currencies?.find(c => c.is_base_currency)?.id ?? currencies?.[0]?.id ?? null,
   );
 
-  // ── Balance fetch (self-contained — no prevBalance prop needed) ──────────
+  // ── Balance: SSOT from prop (when editing) or fetch from API (new doc) ──
   const [internalPrevBalance, setInternalPrevBalance] = useState(0);
   const [balanceLoading, setBalanceLoading] = useState(false);
 
   useEffect(() => {
+    // SSOT: parent passes prevBalance from document.balance_data when editing
+    if (propPrevBalance !== undefined) {
+      setInternalPrevBalance(propPrevBalance);
+      return;
+    }
     if (!client?.id) {
       setInternalPrevBalance(0);
       return;
     }
     setBalanceLoading(true);
-    // للسندات الجديدة نجلب الرصيد الحالي (بدون فلترة تاريخ)،
-    // للتعديل نجلب الرصيد كما كان في تاريخ المستند
     const balanceDate = isEditing ? documentDate : undefined;
     partyBalancesApi.getOne(client.id, balanceDate)
       .then(res => {
@@ -215,7 +221,7 @@ export default function ProfessionalPaymentModal({
       })
       .catch(() => setInternalPrevBalance(0))
       .finally(() => setBalanceLoading(false));
-  }, [client?.id, documentDate, isEditing]);
+  }, [client?.id, documentDate, isEditing, propPrevBalance]);
 
   const [activeLineId, setActiveLineId] = useState<string | null>(null);
   const activeLineIdRef = useRef<string | null>(null);

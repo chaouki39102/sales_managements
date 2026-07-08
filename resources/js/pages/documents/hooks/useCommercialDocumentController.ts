@@ -411,6 +411,8 @@ export function useCommercialDocumentController({
     onSuccess: (savedDoc) => {
       if (slug) {
         qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+        qc.invalidateQueries({ queryKey: tenantKeys.parties.all(slug) });
+        qc.invalidateQueries({ queryKey: tenantKeys.partyBalances.all(slug) });
         if (affectsStock) {
           qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
         }

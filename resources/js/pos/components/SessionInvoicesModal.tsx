@@ -47,8 +47,8 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
     let ttc = 0, paid = 0, remaining = 0;
     for (const doc of docs) {
       ttc       += Number(doc.total_ttc ?? 0);
-      paid      += Number(doc.paid_amount ?? doc.amount_paid ?? 0);
-      remaining += Number(doc.remaining_amount ?? doc.amount_remaining ?? 0);
+      paid      += Number(doc.paid_amount ?? 0);
+      remaining += Number(doc.remaining_amount ?? 0);
     }
     return { ttc, paid, remaining };
   }, [docs]);
@@ -100,9 +100,9 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
                     <td className="si-col-client">{doc.party?.name ?? <span style={{ color: 'var(--t4)' }}>—</span>}</td>
                     <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
                     <td style={{ fontWeight: 600, color: 'var(--p)' }}>{formatDZD(doc.total_ttc)}</td>
-                    <td style={{ color: 'var(--g)' }}>{formatDZD(doc.paid_amount ?? doc.amount_paid ?? 0)}</td>
-                    <td style={{ fontWeight: 600, color: Number(doc.remaining_amount ?? doc.amount_remaining ?? 0) > 0 ? 'var(--r)' : 'var(--t4)' }}>
-                      {formatDZD(doc.remaining_amount ?? doc.amount_remaining ?? 0)}
+                    <td style={{ color: 'var(--g)' }}>{formatDZD(doc.paid_amount ?? 0)}</td>
+                    <td style={{ fontWeight: 600, color: Number(doc.remaining_amount ?? 0) > 0 ? 'var(--r)' : 'var(--t4)' }}>
+                      {formatDZD(doc.remaining_amount ?? 0)}
                     </td>
                   </tr>
                 ))}

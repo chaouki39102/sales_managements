@@ -2,7 +2,7 @@ import React from 'react';
 import { Section, TotalCard, Toggle } from '../components/DocumentUIPrimitives';
 import type { DocumentTotals, DocumentFormState } from '../types/document.types';
 import type { PartyBalanceInfo } from '../hooks/useDocumentForm';
-import { fmtDZD } from '../utils/document.utils';
+import { fmtDZD, toNum } from '../utils/document.utils';
 
 interface DocumentTotalsSectionProps {
   totals: DocumentTotals;
@@ -15,6 +15,7 @@ interface DocumentTotalsSectionProps {
   isReadOnly: boolean;
   set: (field: string, value: unknown) => void;
   stampEnabled?: boolean;
+  existingDocument?: Record<string, unknown>;
 }
 
 export default function DocumentTotalsSection({
@@ -22,7 +23,26 @@ export default function DocumentTotalsSection({
   partyBalance, form, selectedParty,
   isPurchase, isEdit, isReadOnly, set,
   stampEnabled = true,
+  existingDocument,
 }: DocumentTotalsSectionProps) {
+  const futureBalance = partyBalance && form.party_id && totals.netToPay > 0
+    ? (() => {
+        const existingNetToPay = isEdit
+          ? toNum((existingDocument as Record<string, unknown> | undefined)?.total_ttc ?? 0)
+            + toNum((existingDocument as Record<string, unknown> | undefined)?.total_stamp ?? 0)
+          : 0;
+        const existingPaymentsSum = isEdit
+          ? ((existingDocument as Record<string, unknown> | undefined)?.payments as unknown[] ?? [])
+              .reduce((s: number, p: unknown) => s + toNum((p as Record<string, unknown>).amount ?? 0), 0)
+          : 0;
+        const deltaDoc = totals.netToPay - existingNetToPay;
+        const deltaPmt = totals.totalPaid - existingPaymentsSum;
+        return isPurchase
+          ? partyBalance!.signed_balance - deltaDoc + deltaPmt
+          : partyBalance!.signed_balance + deltaDoc - deltaPmt;
+      })()
+    : null;
+
   return (
     <Section title="الإجماليات" icon="ti-calculator">
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -76,11 +96,7 @@ export default function DocumentTotalsSection({
           <span style={{ color: 'var(--t4)' }}>·</span>
           <span>بعد هذا المستند سيصبح:</span>
           <b style={{ color: 'var(--em)' }}>
-            {fmtDZD(
-              isPurchase
-                ? partyBalance.signed_balance - (totals.netToPay - totals.totalPaid)
-                : partyBalance.signed_balance + (totals.netToPay - totals.totalPaid),
-            )} دج
+            {futureBalance !== null ? `${fmtDZD(futureBalance)} دج` : ''}
           </b>
         </div>
       )}

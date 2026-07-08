@@ -48,6 +48,10 @@ export function GlobalDocumentFAB() {
   const location = useLocation();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [minimized, setMinimized] = useState(() => {
+    try { return localStorage.getItem('doc_fab_minimized') === 'true'; }
+    catch { return false; }
+  });
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const { data: documentTypes = [] } = useQuery<DocumentType[]>({
@@ -81,6 +85,14 @@ export function GlobalDocumentFAB() {
       setMenuOpen(true);
     }
   }, [state.open, lastType, openQuickCreate]);
+
+  const toggleMinimized = useCallback(() => {
+    setMinimized(prev => {
+      const next = !prev;
+      try { localStorage.setItem('doc_fab_minimized', String(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -116,7 +128,7 @@ export function GlobalDocumentFAB() {
         display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
       }}
     >
-      {menuOpen && (
+      {menuOpen && !minimized && (
         <div
           style={{
             position: 'absolute', bottom: 60, left: 0,
@@ -168,38 +180,70 @@ export function GlobalDocumentFAB() {
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {minimized ? (
         <button
-          onClick={triggerQuickAction}
-          title={lastType ? `مستند جديد: ${lastType.name} (Ctrl+Alt+N)` : 'مستند جديد (Ctrl+Alt+N)'}
+          onClick={toggleMinimized}
+          title="إظهار زر الإنشاء السريع"
           style={{
-            width: 52, height: 52, borderRadius: '50%',
-            border: 'none', cursor: 'pointer',
-            background: 'var(--em)', color: '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 6px 18px color-mix(in srgb, var(--em) 40%, transparent)',
-            fontSize: 22, transition: 'transform .12s',
-          }}
-          onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; }}
-          onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-        >
-          <i className="ti ti-plus" />
-        </button>
-
-        <button
-          onClick={() => setMenuOpen((v) => !v)}
-          title="اختيار نوع المستند"
-          style={{
-            width: 28, height: 28, borderRadius: '50%',
+            width: 36, height: 36, borderRadius: '50%',
             border: '1px solid var(--b2)', cursor: 'pointer',
             background: 'var(--bg1)', color: 'var(--t3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,.15)', fontSize: 12,
+            boxShadow: '0 2px 8px rgba(0,0,0,.15)', fontSize: 14, opacity: 0.5,
           }}
         >
-          <i className={`ti ti-chevron-${menuOpen ? 'down' : 'up'}`} />
+          <i className="ti ti-plus" />
         </button>
-      </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              onClick={triggerQuickAction}
+              title={lastType ? `مستند جديد: ${lastType.name} (Ctrl+Alt+N)` : 'مستند جديد (Ctrl+Alt+N)'}
+              style={{
+                width: 52, height: 52, borderRadius: '50%',
+                border: 'none', cursor: 'pointer',
+                background: 'var(--em)', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 6px 18px color-mix(in srgb, var(--em) 40%, transparent)',
+                fontSize: 22, transition: 'transform .12s',
+              }}
+              onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; }}
+              onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+            >
+              <i className="ti ti-plus" />
+            </button>
+
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              title="اختيار نوع المستند"
+              style={{
+                width: 28, height: 28, borderRadius: '50%',
+                border: '1px solid var(--b2)', cursor: 'pointer',
+                background: 'var(--bg1)', color: 'var(--t3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,.15)', fontSize: 12,
+              }}
+            >
+              <i className={`ti ti-chevron-${menuOpen ? 'down' : 'up'}`} />
+            </button>
+          </div>
+
+          <button
+            onClick={toggleMinimized}
+            title="طي الزر"
+            style={{
+              width: 20, height: 20, borderRadius: '50%',
+              border: 'none', cursor: 'pointer',
+              background: 'var(--bg3)', color: 'var(--t4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, opacity: 0.5, marginTop: 2,
+            }}
+          >
+            <i className="ti ti-chevron-down" />
+          </button>
+        </>
+      )}
     </div>
   );
 }

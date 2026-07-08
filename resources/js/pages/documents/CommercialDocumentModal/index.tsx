@@ -428,6 +428,7 @@ export default function CommercialDocumentModal({
               isReadOnly={isReadOnly}
               set={set}
               stampEnabled={settingsApplyStamp}
+              existingDocument={existingDocument}
             />
           </div>
         </div>

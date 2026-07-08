@@ -358,7 +358,7 @@ export default function InvoicesPage() {
                                     const sb =
                                         STATUS_BADGE[inv.status] ??
                                         STATUS_BADGE.draft;
-                                    const hasBalance = inv.amount_remaining > 0;
+                                    const hasBalance = inv.remaining_amount > 0;
                                     return (
                                         <tr
                                             key={inv.id}
@@ -457,7 +457,7 @@ export default function InvoicesPage() {
                                                 دج
                                             </td>
                                             <td className="e">
-                                                {inv.amount_paid.toLocaleString(
+                                                {inv.paid_amount.toLocaleString(
                                                     "fr-DZ",
                                                     {
                                                         maximumFractionDigits: 0,
@@ -476,7 +476,7 @@ export default function InvoicesPage() {
                                                 }}
                                             >
                                                 {hasBalance
-                                                    ? `${inv.amount_remaining.toLocaleString("fr-DZ", { maximumFractionDigits: 0 })} دج`
+                                                    ? `${inv.remaining_amount.toLocaleString("fr-DZ", { maximumFractionDigits: 0 })} دج`
                                                     : "—"}
                                             </td>
                                             <td>
@@ -759,7 +759,7 @@ function InvoiceDetailModal({
                 }}
             >
                 <Badge variant={sb.variant}>{sb.label}</Badge>
-                {invoice.amount_remaining > 0 && (
+                {invoice.remaining_amount > 0 && (
                     <span
                         style={{
                             fontSize: 12,
@@ -768,7 +768,7 @@ function InvoiceDetailModal({
                         }}
                     >
                         متبقي:{" "}
-                        {invoice.amount_remaining.toLocaleString("fr-DZ")} دج
+                        {invoice.remaining_amount.toLocaleString("fr-DZ")} دج
                     </span>
                 )}
             </div>

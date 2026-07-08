@@ -101,48 +101,11 @@ export default function PrintSettingsPage() {
     prevUseRealData.current = useRealData;
   }, [useRealData, refetch]);
 
-  // ── Fetch party balance for the preview document ────────────────────────
-  const partyId = useMemo(() => {
-    if (!previewDoc || typeof previewDoc !== 'object') return null;
-    const p = (previewDoc as Record<string, unknown>).party as Record<string, unknown> | undefined;
-    const id = p?.id;
-    return typeof id === 'number' ? id : null;
-  }, [previewDoc]);
-
-  const previewDocDate = useMemo(() => {
-    if (!previewDoc || typeof previewDoc !== 'object') return null;
-    const d = (previewDoc as Record<string, unknown>).document_date;
-    return typeof d === 'string' ? d : null;
-  }, [previewDoc]);
-
-  const { data: partyBalance } = useQuery({
-    queryKey: [slug, 'preview-party-balance', partyId, previewDocDate],
-    queryFn: async () => {
-      if (!partyId) return null;
-      const res = await apiClient.get<Record<string, unknown>>(`/party-balances/${partyId}`, {
-        date: previewDocDate || undefined,
-      });
-      const data = (res?.data ?? res) as Record<string, unknown> | undefined;
-      if (!data) return null;
-      return { current_balance: Number(data.current_balance ?? 0) };
-    },
-    enabled: !!slug && useRealData && !!partyId,
-    staleTime: 60_000,
-  });
-
+  // ── Preview data (balance now comes from backend balance_data, not separate API call) ──
   const previewData: UniversalDocumentData | null = useMemo(() => {
     if (!previewDoc || !companyCtx) return null;
-    let balanceOpts: { prevBalance: number; newBalance: number } | undefined;
-    if (partyBalance) {
-      const raw = (previewDoc as Record<string, unknown>).totals as Record<string, unknown> | undefined;
-      const remaining = Math.max(0, Number(raw?.remaining ?? 0));
-      balanceOpts = {
-        prevBalance: Math.max(0, partyBalance.current_balance - remaining),
-        newBalance:  partyBalance.current_balance,
-      };
-    }
-    return DocumentDataBuilder.fromApiDocument(previewDoc, companyCtx, balanceOpts);
-  }, [previewDoc, companyCtx, partyBalance]);
+    return DocumentDataBuilder.fromApiDocument(previewDoc, companyCtx);
+  }, [previewDoc, companyCtx]);
 
   useEffect(() => {
     if (templates.length > 0) {

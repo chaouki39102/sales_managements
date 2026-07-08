@@ -486,8 +486,6 @@ export interface CommercialDocument extends BaseModel {
   total_ttc:          number;
   total_discount:     number;
   fiscal_stamp:       number;
-  amount_paid:        number;
-  amount_remaining:   number;
   paid_amount:        number;
   remaining_amount:   number;
   is_locked:          boolean;
@@ -499,16 +497,27 @@ export interface CommercialDocument extends BaseModel {
   fiscal_year?:   FiscalYear;
   lines?:         CommercialDocumentLine[];
   payments?:      Payment[];
+  /** SSOT balance computed by backend */
+  balance_data?: {
+    previous_balance: number;
+    invoice_total:    number;
+    paid_amount:      number;
+    remaining:        number;
+    change:           number;
+    new_balance:      number;
+  } | null;
 }
 
 // ─── Payments ─────────────────────────────────────────────────────────────────
 export type PaymentStatus = 'pending' | 'confirmed' | 'cancelled';
 
 export interface Payment extends BaseModel {
-  commercial_document_id: number;
   payment_mode_id:        number;
   treasury_account_id?:   number | null;
+  direction?:             'in' | 'out';
   amount:                 number;
+  total_applied?:         number | null;
+  unapplied_amount?:      number | null;
   payment_date:           string;
   reference?:             string | null;
   notes?:                 string | null;

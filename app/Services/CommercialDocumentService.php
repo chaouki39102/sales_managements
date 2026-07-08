@@ -18,6 +18,7 @@ use App\Services\InventoryValuationService;
 use App\Core\Services\Concerns\ResolvesPaymentDirection;
 use App\Services\Tax\FiscalStampCalculator;
 use App\Services\Tax\TaxRuleService;
+use App\Services\PartyBalanceService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -180,6 +181,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $payments = $request?->input('payments') ?? $data['payments'] ?? [];
             $this->syncPayments($item, $payments);
         }
+
+        // ✅ حساب الرصيد بعد الدفعات — SSOT: الباكند يحسب كل شيء
+        $this->computeAndAttachBalances($item);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -264,6 +268,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $payments = $request?->input('payments') ?? $data['payments'] ?? [];
             $this->syncPayments($item, $payments);
         }
+
+        // ✅ حساب الرصيد بعد الدفعات — SSOT: الباكند يحسب كل شيء
+        $this->computeAndAttachBalances($item);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -426,6 +433,52 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
         unset($p);
         return $payments;
+    }
+
+    /**
+     * حساب الرصيد السابق والجديد بعد مزامنة الدفعات.
+     *
+     * SSOT: الباكند يحسب كل شيء. الفرونت ينتهي لا يحسب أي رصيد.
+     * يُخزّن في `balance_data` كمفتاح ديناميكي (ليس عموداً في DB).
+     * يُقرأ من CommercialDocumentResource عند تحويل الـ JSON.
+     */
+    private function computeAndAttachBalances(CommercialDocument $doc): void
+    {
+        if (!$doc->party_id) return;
+
+        try {
+            /** @var PartyBalanceService $balanceService */
+            $balanceService = app(PartyBalanceService::class);
+            $balanceData    = $balanceService->getBalanceAt(
+                $doc->party_id,
+                $doc->document_date,
+            );
+
+            $signedBalance   = (float) ($balanceData['signed_balance'] ?? 0);
+            $currentBalance  = abs($signedBalance); // always >= 0 for display
+            $netToPay        = (float) $doc->net_to_pay;
+            $paidAmount      = (float) $doc->paid_amount;
+            $remainingAmount = (float) $doc->remaining_amount;
+
+            // signed_balance = opening + Σ(docs_up_to_date) - Σ(payments_up_to_date)
+            // net_to_pay يُمثل مساهمة هذه الوثيقة في Σ(docs)
+            // paid_amount يُمثل مساهمة دفعات هذه الوثيقة في Σ(payments)
+            // previous_signed = signed_balance - net_to_pay + paid_amount
+            // نأخذ القيمة المطلقة للعرض (مثل old behavior)
+            $previousSigned = $signedBalance - $netToPay + $paidAmount;
+            $previousBalance = abs($previousSigned);
+
+            $doc->balance_data = [
+                'previous_balance' => round($previousBalance,  4),
+                'invoice_total'    => round($netToPay,         4),
+                'paid_amount'      => round($paidAmount,       4),
+                'remaining'        => round($remainingAmount,  4),
+                'change'           => round(max(0, $paidAmount - $netToPay), 4),
+                'new_balance'      => round($currentBalance,   4),
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('computeAndAttachBalances failed for doc #' . $doc->id . ': ' . $e->getMessage());
+        }
     }
 
     public function syncPayments(CommercialDocument $document, array $payments): void

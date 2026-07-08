@@ -70,6 +70,7 @@ import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
 import { renderPreviewToHtml, mapCompany }  from '@/pages/settings/print-settings/runtime';
 import { printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
 import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
@@ -164,6 +165,7 @@ export default function POSPage() {
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [editingDocStatus, setEditingDocStatus] = useState<string | null>(null);
   const [editingDocumentDate, setEditingDocumentDate] = useState<string | null>(null);
+  const editingPrevBalanceRef = useRef<number | undefined>(undefined);
 
   const receiptSource = useMemo((): PipelineSource | null => {
     if (!receiptSnapshot) return null;
@@ -251,6 +253,16 @@ export default function POSPage() {
 
   const customers        = (customersData as PaginatedResponse<Party>)?.data ?? (customersData as Party[]) ?? [];
   const priceLevelsList  = priceLevels ?? [];
+
+  // ── Client balance ──────────────────────────────────────────────────────────
+  const clientId = pos.client?.id;
+  const { data: clientBalance } = useQuery({
+    queryKey: tenantKeys.partyBalances.detail(slug ?? '', clientId!),
+    queryFn:  () => partyBalancesApi.getOne(clientId!),
+    enabled:  !!slug && !!clientId,
+    staleTime: 30_000,
+  });
+
   const defaultWarehouse = settings.defaultWarehouseId
     ? warehouses?.find(w => w.id === settings.defaultWarehouseId)
     : (warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null);
@@ -498,6 +510,7 @@ export default function POSPage() {
       setEditingDocumentId(docId);
       setEditingDocStatus(doc.status);
       setEditingDocumentDate(doc.document_date ?? null);
+      editingPrevBalanceRef.current = (doc as any)?.balance_data?.previous_balance;
       setShowSessionInvoices(false);
       toast.success(`تم فتح الفاتورة ${doc.document_number}`);
     } catch {
@@ -803,20 +816,13 @@ export default function POSPage() {
         dueDate: params.dueDate,
       };
 
-      const totalPaid     = params.amountPaid;
-      const invoiceRemaining = Math.max(0, effectiveTotalTtc - totalPaid);
-      const invoiceChange    = Math.max(0, totalPaid - effectiveTotalTtc);
-      let prevBalance = 0;
-      let newBalance = 0;
-      if (currentClient?.id) {
-        try {
-          const balanceRes = await partyBalancesApi.getOne(currentClient.id, commonPayload.document_date);
-          const balanceData = (balanceRes as any)?.data ?? balanceRes;
-          const currentBalance = Number(balanceData?.current_balance ?? 0);
-          prevBalance = Math.max(0, currentBalance);
-          newBalance = prevBalance + invoiceRemaining;
-        } catch {}
-      }
+      const totalPaid         = params.amountPaid;
+      const invoiceRemaining  = Math.max(0, effectiveTotalTtc - totalPaid);
+      const invoiceChange     = Math.max(0, totalPaid - effectiveTotalTtc);
+      // SSOT: backend computes balance_data — no more partyBalancesApi.getOne()
+      const bd = (res as any)?.balance_data;
+      const prevBalance = bd?.previous_balance ?? 0;
+      const newBalance  = bd?.new_balance ?? 0;
 
       const fullSnapshot: POSSaleSnapshot = {
         items: snapshot.items.map(i => ({
@@ -850,6 +856,7 @@ export default function POSPage() {
       setEditingDocumentId(null);
       setEditingDocStatus(null);
       setEditingDocumentDate(null);
+      editingPrevBalanceRef.current = undefined;
       receiptSnapshotRef.current = fullSnapshot;
       setReceiptSnapshot(fullSnapshot);
       setLastDocNum(res.document_number);
@@ -1076,6 +1083,7 @@ export default function POSPage() {
           invoiceDiscountAmount={invoiceDiscountAmount}
           onUndoClear={handleUndoClear}
           canUndoClear={canUndoClear}
+          clientBalance={clientBalance?.current_balance}
         />
       </div>
 
@@ -1093,6 +1101,7 @@ export default function POSPage() {
           existingPayments={pos.payments}
           isEditing={editingDocumentId !== null}
           documentDate={editingDocumentDate ?? new Date().toISOString().slice(0, 10)}
+          prevBalance={editingPrevBalanceRef.current}
           onClose={() => setModal('none')}
           onConfirm={handleCompleteSale}
         />
