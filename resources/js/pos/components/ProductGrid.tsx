@@ -106,6 +106,12 @@ export default function ProductGrid({
     rowVirtualizer.scrollToIndex(rowIdx, { align: 'nearest' });
   }, [highlightedIndex, columns, view, rowVirtualizer]);
 
+  // Grid sizing values (computed early so hooks are before early returns)
+  const gridMod = gridSize === 'xs' ? 'pgrid--xs' : gridSize === 'sm' ? 'pgrid--sm' : gridSize === 'lg' ? 'pgrid--lg' : '';
+  const gap = gridSize === 'xs' ? 6 : gridSize === 'sm' ? 8 : gridSize === 'md' ? 10 : 12;
+  const gPad = gridSize === 'xs' ? 8 : gridSize === 'sm' ? 10 : gridSize === 'md' ? 12 : 14;
+  useEffect(() => { gapValRef.current = gap; }, [gap]);
+
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="pos-grid-area">
@@ -201,12 +207,6 @@ export default function ProductGrid({
       </div>
     );
   }
-
-  // ── Grid view (virtualised) ──────────────────────────────────────────────
-  const gridMod = gridSize === 'xs' ? 'pgrid--xs' : gridSize === 'sm' ? 'pgrid--sm' : gridSize === 'lg' ? 'pgrid--lg' : '';
-  const gap = gridSize === 'xs' ? 6 : gridSize === 'sm' ? 8 : gridSize === 'md' ? 10 : 12;
-  const gPad = gridSize === 'xs' ? 8 : gridSize === 'sm' ? 10 : gridSize === 'md' ? 12 : 14;
-  useEffect(() => { gapValRef.current = gap; }, [gap]);
 
   return (
     <div className={`pos-grid-area ${gridMod}`} ref={scrollRef} style={{ overflow: 'auto', padding: gPad }}>
