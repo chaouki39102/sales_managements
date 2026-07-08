@@ -37,6 +37,11 @@
   scrollbar-width: none;
   min-height: 46px;
   box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  position: relative;
+  /* تدرّج يُخفي حواف العناصر القابلة للتمرير تدريجياً بدل قصّها فجأة،
+     فيوحي بصرياً بوجود محتوى إضافي خارج الإطار */
+  mask-image: linear-gradient(to left, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
 }
 .pos-topbar::-webkit-scrollbar { display: none; }
 
@@ -64,8 +69,8 @@
 .pos-chip.clickable:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,.1); }
 .pic-ic { font-size: 14px; }
 .pos-chip-inner { display: flex; flex-direction: column; line-height: 1.15; }
-.pos-chip-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; opacity: .7; }
-.pos-chip-val   { font-size: 13px; font-weight: 900; }
+.pos-chip-label { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; opacity: .8; }
+.pos-chip-val   { font-size: var(--fs-base); font-weight: 900; }
 
 .pos-chip.g  { background: var(--emb);    border-color: var(--embo);    color: var(--em);     }
 .pos-chip.o  { background: var(--goldb);  border-color: var(--goldbo);  color: var(--gold);   }
@@ -521,8 +526,34 @@
   justify-content: center;
   position: relative;
   overflow: hidden;
+  /* حالة افتراضية موحّدة لعدم وجود صورة، بدل مربع أبيض فارغ يبدو كخطأ تحميل */
+  background: linear-gradient(135deg, var(--bg3), var(--bg4));
 }
-.pcard-img img { width: 100%; height: 100%; object-fit: cover; }
+.pcard-img::before {
+  /* أيقونة صندوق خفيفة تظهر فقط عند غياب <img> فوقها */
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 34%;
+  height: 34%;
+  opacity: .35;
+  background-color: var(--t4);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M21 8v13H3V8'/><path d='M1 3h22v5H1z'/><path d='M10 12h4'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M21 8v13H3V8'/><path d='M1 3h22v5H1z'/><path d='M10 12h4'/></svg>") center / contain no-repeat;
+}
+.pcard-img img { width: 100%; height: 100%; object-fit: cover; position: relative; z-index: 1; }
+
+/* نبضة تأكيد بصرية سريعة عند نجاح الإضافة للسلة.
+   ملاحظة تنفيذية: تحتاج مكوّن ProductGrid لإضافة هذا الصنف على البطاقة
+   لبضع مئات المللي ثانية بعد onAdd (setTimeout) ثم إزالته — لا يمكن
+   تفعيله من CSS وحده لأنه حدث لحظي وليس حالة دائمة كـ pcard-incart. */
+@keyframes pcardAddPulse {
+  0%   { box-shadow: 0 0 0 0 var(--emb); }
+  40%  { box-shadow: 0 0 0 8px var(--emb); }
+  100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+.pcard.pcard-just-added { animation: pcardAddPulse .5s ease-out; }
 .pcard-in-cart {
   position: absolute;
   top: 6px; right: 6px;
@@ -561,25 +592,26 @@
   border-radius: 8px;
 }
 .pcard-body { padding: 10px 10px 6px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.pcard-name { font-size: 13px; font-weight: 700; color: var(--t1); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.pcard-bc   { font-size: 10px; color: var(--t4); font-family: monospace; direction: ltr; text-align: right; }
+.pcard-name { font-size: var(--fs-base); font-weight: 700; color: var(--t1); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.pcard-bc   { font-size: var(--fs-2xs); color: var(--t4); font-family: monospace; direction: ltr; text-align: right; }
 .pcard-prices { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; }
 .pcard-ttc {
-  font-size: 17px;
+  /* السعر هو أهم معلومة على البطاقة أثناء البيع السريع — يجب أن يتصدّر بصرياً بوضوح */
+  font-size: 18px;
   font-weight: 900;
   color: var(--em);
   background: var(--emb);
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: var(--r1);
   display: inline-block;
   line-height: 1.3;
 }
-.pcard-ht  { font-size: 11px; color: var(--t4); }
+.pcard-ht  { font-size: var(--fs-2xs); color: var(--t4); opacity: .85; }
 .pcard-stock {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   margin-top: 2px;
 }
@@ -630,14 +662,24 @@
 /* ── حجم xs و sm: أيقونة فقط ── */
 .pgrid--xs .pcard-img  { aspect-ratio: auto; min-height: 55px; }
 .pgrid--xs .pcard-body { padding: 6px; }
-.pgrid--xs .pcard-name { font-size: 11px; -webkit-line-clamp: 1; }
+.pgrid--xs .pcard-name { font-size: var(--fs-xs); -webkit-line-clamp: 1; }
 .pgrid--xs .pcard-bc   { display: none; }
 .pgrid--xs .pcard-ht   { display: none; }
-.pgrid--xs .pcard-stock { display: none; }
+/* لا نُخفي حالة المخزون بالكامل — مهمة لمنع بيع صنف نافد بالخطأ في الوضع المضغوط.
+   نستبدلها بنقطة لونية صغيرة فوق الصورة بدل السطر النصي الكامل. */
+.pgrid--xs .pcard-stock {
+  position: absolute; top: 6px; left: 6px;
+  font-size: 0; width: 9px; height: 9px; padding: 0; margin: 0;
+  border-radius: 50%; border: 1.5px solid var(--bg2);
+  z-index: 2;
+}
+.pgrid--xs .pcard-stock.ok  { background: var(--green); }
+.pgrid--xs .pcard-stock.low { background: var(--gold); }
+.pgrid--xs .pcard-stock.out { background: var(--red); }
 .pgrid--xs .pcard-actions { padding: 4px 6px 6px; }
-.pgrid--xs .pcard-pin { width: 22px; height: 22px; font-size: 10px; }
-.pgrid--xs .pcard-ttc { font-size: 13px; padding: 1px 5px; }
-.pgrid--sm .pcard-ttc { font-size: 14px; padding: 1px 6px; }
+.pgrid--xs .pcard-pin { width: 22px; height: 22px; font-size: var(--fs-2xs); }
+.pgrid--xs .pcard-ttc { font-size: var(--fs-base); padding: 1px 5px; }
+.pgrid--sm .pcard-ttc { font-size: var(--fs-md); padding: 1px 6px; }
 .pgrid--sm .pcard-ht  { display: none; }
 
 /* ════════════════════════════════════════════════════

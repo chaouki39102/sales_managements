@@ -33,10 +33,17 @@ function minCardWidth(gridSize: GridSize): number {
   }
 }
 
-/** ارتفاع الصف التقريبي حسب حجم الشبكة (ارتفاع البطاقة + فجوة) */
+/** ارتفاع الصف التقريبي حسب حجم الشبكة — تقدير أوّلي فقط قبل القياس
+ *  الفعلي؛ الارتفاع الحقيقي يُقاس ديناميكياً عبر measureElement أدناه
+ *  فلا داعي لمطابقته بدقة (يمنع التداخل/الفراغات الزائدة عند تبديل
+ *  الحجم s/m/l/xl). */
 function rowEstimate(gridSize: GridSize): number {
-  const cardHeights: Record<GridSize, number> = { xs: 170, sm: 220, md: 290, lg: 330 };
-  return cardHeights[gridSize];
+  switch (gridSize) {
+    case 'xs': return 150;
+    case 'sm': return 195;
+    case 'md': return 255;
+    case 'lg': return 300;
+  }
 }
 
 export default function ProductGrid({
@@ -52,7 +59,7 @@ export default function ProductGrid({
   // Column calculation: keep cards between min‑width and max comfortable cols
   const gridWrapRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
-  const MAX_COLS: Record<GridSize, number> = { xs: 12, sm: 10, md: 8, lg: 6 };
+  const MAX_COLS: Record<GridSize, number> = { xs: 8, sm: 6, md: 5, lg: 4 };
 
   useEffect(() => {
     if (view !== 'grid') return;
@@ -85,16 +92,26 @@ export default function ProductGrid({
   }, [variants, columns, view]);
 
   const rowCount = rows.length;
+  const rowH = rowEstimate(gridSize);
 
-  // Virtualizer
+  // Virtualizer — estimateSize is only the *initial* guess; measureElement
+  // (passed as a ref on each row below) makes react-virtual re-measure the
+  // real rendered height of every row, so rows never overlap and never
+  // leave oversized gaps, regardless of gridSize or content changes.
   const scrollRef = useRef<HTMLDivElement>(null);
-  const gapValRef = useRef(10);
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => rowEstimate(gridSize) + gapValRef.current,
+    estimateSize: () => rowH,
     overscan: 3,
   });
+
+  // Re-measure everything whenever the size preset changes (image height,
+  // paddings, font sizes all change with gridSize) so stale measurements
+  // from a previous size never leak into the new layout.
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [gridSize, columns, rowVirtualizer]);
 
   // Keyboard navigation scroll sync
   const prevHl = useRef<number | undefined>(undefined);
@@ -105,12 +122,6 @@ export default function ProductGrid({
     const rowIdx = Math.floor(highlightedIndex / columns);
     rowVirtualizer.scrollToIndex(rowIdx, { align: 'nearest' });
   }, [highlightedIndex, columns, view, rowVirtualizer]);
-
-  // Grid sizing values (computed early so hooks are before early returns)
-  const gridMod = gridSize === 'xs' ? 'pgrid--xs' : gridSize === 'sm' ? 'pgrid--sm' : gridSize === 'lg' ? 'pgrid--lg' : '';
-  const gap = gridSize === 'xs' ? 6 : gridSize === 'sm' ? 8 : gridSize === 'md' ? 10 : 12;
-  const gPad = gridSize === 'xs' ? 8 : gridSize === 'sm' ? 10 : gridSize === 'md' ? 12 : 14;
-  useEffect(() => { gapValRef.current = gap; }, [gap]);
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) return (
@@ -208,8 +219,22 @@ export default function ProductGrid({
     );
   }
 
+  // ── Grid view (virtualised) ──────────────────────────────────────────────
+  const gridMod = gridSize === 'xs' ? 'pgrid--xs' : gridSize === 'sm' ? 'pgrid--sm' : gridSize === 'lg' ? 'pgrid--lg' : '';
+  const gap = gridSize === 'xs' ? 6 : gridSize === 'sm' ? 8 : gridSize === 'md' ? 10 : 12;
+
+  // عرض ثابت وموحّد لكل بطاقة = (100% - مسافات) / عدد الأعمدة.
+  // هذا يمنع تمدّد البطاقات لتملأ الصف عندما يحتوي الصف على عناصر
+  // أقل من عدد الأعمدة (مثال: منتج واحد فقط، أو صف أخير غير مكتمل) —
+  // فكل بطاقة تحافظ على نفس عرض بقية البطاقات في الشبكة دائماً.
+  const colBasis = `calc((100% - ${(columns - 1) * gap}px) / ${columns})`;
+
   return (
-    <div className={`pos-grid-area ${gridMod}`} ref={scrollRef} style={{ overflow: 'auto', padding: gPad }}>
+    // ملاحظة: 'pgrid' تُطبَّق دائماً (وليس فقط عند xs/sm/lg) لضمان أن
+    // --pcard-img-h معرّفة دوماً؛ سابقاً كانت تُطبَّق فقط كمعدِّل عند
+    // بعض الأحجام، فكان الحجم الافتراضي (md) بلا قيمة للمتغيّر وتنهار
+    // صورة البطاقة إلى ارتفاع صفري.
+    <div className={`pos-grid-area pgrid ${gridMod}`} ref={scrollRef} style={{ overflow: 'auto' }}>
       <div ref={gridWrapRef} style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
         {rowVirtualizer.getVirtualItems().map(virtualRow => {
           const rowData = rows[virtualRow.index];
@@ -217,6 +242,8 @@ export default function ProductGrid({
           return (
             <div
               key={virtualRow.index}
+              data-index={virtualRow.index}
+              ref={rowVirtualizer.measureElement}
               style={{
                 position: 'absolute',
                 top: 0,
@@ -225,11 +252,15 @@ export default function ProductGrid({
                 transform: `translateY(${virtualRow.start}px)`,
                 display: 'flex',
                 gap,
+                padding: gap,
                 direction: 'rtl',
               }}
             >
               {rowData.map(item => (
-                <div key={item.variant.id} style={{ flex: '1 1 0', minWidth: 0 }}>
+                <div
+                  key={item.variant.id}
+                  style={{ flex: `0 0 ${colBasis}`, maxWidth: colBasis, minWidth: 0 }}
+                >
                   <ProductCard
                     variant={item.variant}
                     idx={item.idx}

@@ -1,14 +1,19 @@
 // pos/components/ProductCard.tsx
 //
-// ⚠️ ملاحظة تنظيف (راجع مراجعة صفحة POS):
-// هذه النسخة تحل محل ProductCard.tsx القديم الذي كان "كوداً ميتاً" —
-// كان يستخدم كلاسات .pc2 (من theme.css) بينما ProductGrid.tsx كان
-// يرسم البطاقة يدوياً بكلاسات .pcard-* (من pos.css) بدون استيراد هذا
-// الملف إطلاقاً. تم دمج نفس منطق .pcard-* هنا كي يصبح هذا الكومبوننت
-// هو المصدر الوحيد الفعلي المُستخدَم من ProductGrid (عرض grid فقط —
+// النسخة الفعلية الوحيدة المُستخدَمة من ProductGrid (عرض grid فقط —
 // عرض الجدول/القائمة list-view له بنية مختلفة تماماً ويبقى داخل
 // ProductGrid.tsx كجدول <table>).
-import React from 'react';
+//
+// تحديث "بطاقات احترافية + صور متجاوبة بمقاس موحّد":
+// - ارتفاع صورة البطاقة أصبح ثابتاً وموحّداً عبر متغيّر CSS
+//   (--pcard-img-h المضبوط في .pgrid/.pgrid--xs/--sm/--lg) بدل
+//   aspect-ratio المتغيّر، فلم تعد الصور تظهر بمقاسات متفاوتة
+//   بين البطاقات مهما اختلفت أبعاد الصورة الأصلية.
+// - object-fit: cover + object-position: center يضمنان قصّ الصورة
+//   بشكل متناسق دون تشويه.
+// - عند فشل تحميل رابط الصورة (رابط معطوب/404) نتراجع تلقائياً
+//   لعرض أيقونة العائلة بدل مربع مكسور.
+import React, { useState } from 'react';
 import type { ProductVariant, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
@@ -55,6 +60,10 @@ export default function ProductCard({
   const style = familyStyleFromName(v.product?.family?.name ?? '');
   const imageUrl = (v as unknown as { image_url?: string }).image_url;
 
+  // تراجع تلقائي لعرض الأيقونة عند فشل تحميل الصورة (رابط معطوب/404)
+  const [imgFailed, setImgFailed] = useState(false);
+  const showImage = Boolean(imageUrl) && !imgFailed;
+
   const handleClick = () => {
     if (!outStock) onAdd(v);
     onHighlight?.(idx);
@@ -67,9 +76,16 @@ export default function ProductCard({
       onClick={handleClick}
       title={v.product?.name}
     >
-      <div className="pcard-img" style={{ background: style.bg }}>
-        {imageUrl
-          ? <img src={imageUrl} alt={v.product?.name} loading="lazy" />
+      <div className="pcard-img" style={!showImage ? { background: style.bg } : undefined}>
+        {showImage
+          ? (
+            <img
+              src={imageUrl}
+              alt={v.product?.name}
+              loading="lazy"
+              onError={() => setImgFailed(true)}
+            />
+          )
           : <i className={`ti ${style.icon}`} style={{ color: style.color, fontSize: 22 }} />
         }
         {qtyInCart > 0 && <span className="pcard-in-cart">{qtyInCart}</span>}

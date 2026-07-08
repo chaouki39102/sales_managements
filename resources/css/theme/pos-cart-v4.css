@@ -733,7 +733,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--t3);
 }
 .ct-row span:last-child {
@@ -789,10 +789,10 @@
   gap: 5px;
   padding: 9px 14px;
   border-radius: var(--r2);
-  border: 1.5px solid var(--b3);
-  background: var(--bg3);
-  color: var(--t2);
-  font-size: 12.5px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: var(--t3);
+  font-size: var(--fs-sm);
   font-weight: 700;
   cursor: pointer;
   font-family: 'Tajawal', sans-serif;
@@ -800,7 +800,7 @@
   flex-shrink: 0;
   white-space: nowrap;
 }
-.cart-hold-btn:hover { background: var(--bg4); }
+.cart-hold-btn:hover { background: var(--bg3); border-color: var(--b3); color: var(--t1); }
 .cart-hold-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 .cart-sell-btn {
@@ -809,12 +809,12 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 11px;
+  padding: 13px;
   border-radius: var(--r2);
   border: none;
   background: var(--em);
   color: #fff;
-  font-size: 13.5px;
+  font-size: var(--fs-md);
   font-weight: 800;
   cursor: pointer;
   font-family: 'Tajawal', sans-serif;
@@ -828,12 +828,12 @@
   box-shadow: var(--emglow2);
   transform: translateY(-1px);
 }
-.cart-sell-btn:active:not(:disabled) { transform: none; }
+.cart-sell-btn:active:not(:disabled) { transform: translateY(0) scale(.98); }
 .cart-sell-btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 .sell-kbd {
   position: absolute;
   left: 10px;
-  font-size: 9px;
+  font-size: var(--fs-2xs);
   font-family: monospace;
   background: rgba(255,255,255,.2);
   border-radius: 3px;
