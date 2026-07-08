@@ -20,6 +20,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import type { CartItem, CartTotals, Party, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
+import { getEffectiveShortcut, useKbOverrides } from '../hooks/useKeyboardMap';
 import CartRow from './CartRow';
 import CustomerSearchModal from './CustomerSearchModal';
 
@@ -53,6 +54,7 @@ interface ProfessionalCartProps {
   onUndoClear:          () => void;
   canUndoClear:         boolean;
   clientBalance?:       number;
+  slug?:                string | null;
 }
 
 export default function ProfessionalCart({
@@ -62,7 +64,7 @@ export default function ProfessionalCart({
   onSetClient, onPriceLevelChange, onNoteChange,
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
-  onUndoClear, canUndoClear, clientBalance,
+  onUndoClear, canUndoClear, clientBalance, slug,
 }: ProfessionalCartProps) {
 
   const [showNote,         setShowNote]         = useState(false);
@@ -71,6 +73,8 @@ export default function ProfessionalCart({
   const [invDiscAmtVal,    setInvDiscAmtVal]     = useState('');
 
   const isEmpty = !items.length;
+  const overrides = useKbOverrides(slug ?? null);
+  const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
 
   const handleInvDiscAmount = useCallback((raw: string) => {
     setInvDiscAmtVal(raw);
@@ -94,7 +98,7 @@ export default function ProfessionalCart({
               </span>
             </div>
             <div className="cart-acts2">
-              <button className="btn btn-xs" onClick={onHeld} title="الفواتير المعلقة (F7)">
+              <button className="btn btn-xs" onClick={onHeld} title={`الفواتير المعلقة (${kb('heldCarts')})`}>
                 <i className="ti ti-clock-pause" />
               </button>
               <button
@@ -108,7 +112,7 @@ export default function ProfessionalCart({
                 className="btn btn-xs btn-warn"
                 onClick={onUndoClear}
                 disabled={!canUndoClear}
-                title="تراجع عن آخر مسح — Ctrl+Z"
+                title={`تراجع عن آخر مسح — ${kb('undoClear')}`}
               >
                 <i className="ti ti-arrow-back-up" />
               </button>
@@ -116,7 +120,7 @@ export default function ProfessionalCart({
                 className="btn btn-xs btn-r"
                 onClick={onClear}
                 disabled={isEmpty}
-                title="مسح السلة — F12"
+                title={`مسح السلة — ${kb('clearCart')}`}
               >
                 <i className="ti ti-trash" />
               </button>
@@ -344,7 +348,7 @@ export default function ProfessionalCart({
             className="btn btn-sm"
             onClick={onHold}
             disabled={isEmpty}
-            title="تعليق الفاتورة — F5"
+            title={`تعليق الفاتورة — ${kb('holdCart')}`}
           >
             <i className="ti ti-clock-pause" /> تعليق
           </button>
@@ -352,7 +356,7 @@ export default function ProfessionalCart({
             className="cart-sell-btn"
             onClick={onSell}
             disabled={isEmpty}
-            title="دفع والإتمام — F4"
+            title={`دفع والإتمام — ${kb('payment')}`}
           >
             <i className="ti ti-circle-check" />
             <span>
@@ -362,7 +366,7 @@ export default function ProfessionalCart({
                   : `دفع — ${formatDZD(remainingToPay)}`
               )}
             </span>
-            <kbd className="sell-kbd">F4</kbd>
+            {kb('payment') && <kbd className="sell-kbd">{kb('payment')}</kbd>}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import type { CartItem, CartTotals } from '@/types';
 import type { PosSession }           from '@/lib/api/endpoints/posSession';
 import { formatDZD }                 from '../utils/calculations';
+import { getEffectiveShortcut, KB_DEFAULTS, useKbOverrides } from '../hooks/useKeyboardMap';
 
 interface POSTopBarProps {
   session:         PosSession | null | undefined;
@@ -13,6 +14,7 @@ interface POSTopBarProps {
   items:           CartItem[];
   totals:          CartTotals;
   totalTtcFinal:   number;
+  slug:            string | null;
   onHeld:          () => void;
   onNewSale:       () => void;
   onManual:        () => void;
@@ -31,7 +33,7 @@ interface POSTopBarProps {
 export default function POSTopBar({
   session, heldCount, avgMargin,
   isEmpty, isFullscreen, showQuickbar,
-  items, totals, totalTtcFinal,
+  items, totals, totalTtcFinal, slug,
   onHeld, onNewSale, onManual, onReceipt,
   onSession, onSessionInvoices, onFullscreen, onKbHelp,
   onToggleQuickbar, onReturn, onSettings, onKioskMode,
@@ -40,6 +42,8 @@ export default function POSTopBar({
 
   const invoicesCount = session?.invoices_count ?? 0;
   const netSales      = session?.net_sales      ?? 0;
+  const overrides     = useKbOverrides(slug);
+  const kb            = (action: string) => getEffectiveShortcut(slug, action) ?? '';
 
   return (
     <div className="pos-topbar">
@@ -60,7 +64,7 @@ export default function POSTopBar({
         <div
           className="pos-chip o clickable"
           onClick={onSession}
-          title="إحصاءات الجلسة — F8"
+          title={`إحصاءات الجلسة — ${kb('sessionStats')}`}
         >
           <i className="ti ti-cash pic-ic" />
           <div className="pos-chip-inner">
@@ -73,7 +77,7 @@ export default function POSTopBar({
           <div
             className="pos-chip b clickable"
             onClick={onHeld}
-            title="الفواتير المعلقة — F7"
+            title={`الفواتير المعلقة — ${kb('heldCarts')}`}
           >
             <i className="ti ti-clock-pause pic-ic" />
             <div className="pos-chip-inner">
@@ -116,15 +120,15 @@ export default function POSTopBar({
 
       <div className="pos-actions-row">
 
-        <button className="btn btn-xs" onClick={onNewSale} title="بيع جديد / تعليق — F5">
+        <button className="btn btn-xs" onClick={onNewSale} title={`بيع جديد / تعليق — ${kb('holdCart')}`}>
           <i className="ti ti-plus" />
           <span className="tb-txt"> جديد</span>
         </button>
-        <button className="btn btn-xs" onClick={onReturn} title="مرتجع — F10">
+        <button className="btn btn-xs" onClick={onReturn} title={`مرتجع — ${kb('returns')}`}>
           <i className="ti ti-receipt-refund" />
           <span className="tb-txt"> مرتجع</span>
         </button>
-        <button className="btn btn-xs" onClick={onManual} title="إضافة يدوي — F6">
+        <button className="btn btn-xs" onClick={onManual} title={`إضافة يدوي — ${kb('manualProduct')}`}>
           <i className="ti ti-keyboard" />
           <span className="tb-txt"> يدوي</span>
         </button>
@@ -132,7 +136,7 @@ export default function POSTopBar({
           className="btn btn-xs"
           onClick={onReceipt}
           disabled={isEmpty}
-          title="معاينة الإيصال — F9"
+          title={`معاينة الإيصال — ${kb('preview')}`}
         >
           <i className="ti ti-printer" />
         </button>
@@ -166,7 +170,7 @@ export default function POSTopBar({
         <button
           className="btn btn-xs"
           onClick={onFullscreen}
-          title={isFullscreen ? 'خروج من ملء الشاشة — F11' : 'ملء الشاشة — F11'}
+          title={isFullscreen ? `خروج من ملء الشاشة — ${kb('fullscreen')}` : `ملء الشاشة — ${kb('fullscreen')}`}
         >
           <i className={`ti ${isFullscreen ? 'ti-minimize' : 'ti-maximize'}`} />
         </button>
@@ -178,24 +182,6 @@ export default function POSTopBar({
           <i className="ti ti-device-ipad-horizontal" />
           <span className="tb-txt"> كاشير</span>
         </button>
-      </div>
-
-      <div className="pos-kb-strip">
-        {[
-          { key: 'F2', label: 'بحث' },
-          { key: 'F4', label: 'دفع' },
-          { key: 'F5', label: 'تعليق' },
-          { key: 'F6', label: 'يدوي' },
-          { key: 'F7', label: 'معلقة' },
-          { key: 'F9', label: 'طباعة' },
-          { key: 'F10', label: 'مرتجع' },
-          { key: 'F11', label: 'شاشة' },
-          { key: 'F12', label: 'مسح' },
-        ].map(({ key, label }) => (
-          <span key={key} className="kb-tip">
-            <kbd>{key}</kbd>{label}
-          </span>
-        ))}
       </div>
     </div>
   );

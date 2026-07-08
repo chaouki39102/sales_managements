@@ -586,11 +586,28 @@ function POSPage() {
       const tag     = (e.target as HTMLElement)?.tagName;
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
+      // إذا كان أي مودال مفتوح، تجاهل اختصارات الصفحة الرئيسية (المودال يتولى التحكم)
+      const anyModalOpen = modal !== 'none' || showSessionInvoices || showSettings || showCloseSession || !!pinModal;
+      if (anyModalOpen) {
+        // فقط مفتاح Escape يعمل لإغلاق المودال الحالي
+        if (matchOverride(slugRef, 'escape', e)) {
+          e.preventDefault();
+          if (modal !== 'none')                    setModal('none');
+          else if (showSessionInvoices)            setShowSessionInvoices(false);
+          else if (showSettings)                   setShowSettings(false);
+          else if (showCloseSession)               setShowCloseSession(false);
+          else if (pinModal)                       setPinModal(null);
+        }
+        return;
+      }
+
       if (matchOverride(slugRef, 'searchFocus', e))  { e.preventDefault(); searchRef.current?.focus(); }
       if (matchOverride(slugRef, 'payment', e))      { e.preventDefault(); if (!isEmpty) { setModal('payment'); } }
       if (matchOverride(slugRef, 'holdCart', e))     { e.preventDefault(); if (!isEmpty) pos.holdCart(); }
       if (matchOverride(slugRef, 'manualProduct', e)){ e.preventDefault(); setModal('manual'); }
       if (matchOverride(slugRef, 'heldCarts', e))    { e.preventDefault(); setModal('held'); }
+      if (matchOverride(slugRef, 'toggleHeld', e))   { e.preventDefault(); setModal('held'); }
+      if (matchOverride(slugRef, 'sessionInvoices', e)) { e.preventDefault(); setShowSessionInvoices(true); }
       if (matchOverride(slugRef, 'sessionStats', e)) { e.preventDefault(); setModal(m => m === 'session' ? 'none' : 'session'); }
       if (matchOverride(slugRef, 'preview', e)) {
         e.preventDefault();
@@ -638,8 +655,8 @@ function POSPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [slug, pos, isEmpty, modal, showFilter, families, selectedCartItemId, toggleFullscreen,
-      handleClearCart, handleOpenDrawer, handleUndoClear]);
+  }, [slug, pos, isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal,
+      families, selectedCartItemId, toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear]);
 
   // ── Price Level ────────────────────────────────────────────────────────────
   const applyPriceLevel = useCallback((plId: number | null) => {
@@ -997,6 +1014,7 @@ const handleCompleteSale = useCallback(async (params: {
         items={pos.items}
         totals={pos.totals}
         totalTtcFinal={adjustedTotalTtcFinal}
+        slug={slug}
         onHeld={() => setModal('held')}
         onNewSale={() => isEmpty ? pos.clearCart() : pos.holdCart()}
         onManual={() => setModal('manual')}
@@ -1056,6 +1074,7 @@ const handleCompleteSale = useCallback(async (params: {
             onArrowUp={handleArrowUp}
             onArrowDown={handleArrowDown}
             keyboardNavEnabled={settings.keyboardNav}
+            slug={slug}
           />
           {showFilter && (
             <FilterPanel
@@ -1113,6 +1132,7 @@ const handleCompleteSale = useCallback(async (params: {
           onUndoClear={handleUndoClear}
           canUndoClear={canUndoClear}
           clientBalance={clientBalance?.current_balance}
+          slug={slug}
         />
       </div>
 
@@ -1141,6 +1161,7 @@ const handleCompleteSale = useCallback(async (params: {
           carts={pos.heldCarts} onClose={() => setModal('none')}
           onRestore={id => { pos.restoreCart(id); setModal('none'); }}
           onDelete={pos.deleteHeldCart}
+          onRestoreAndPay={id => { pos.restoreCart(id); setModal('payment'); }}
         />
       )}
 

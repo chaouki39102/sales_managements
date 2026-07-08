@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ViewMode, GridSize, SortMode } from '../utils/posHelpers';
+import { getEffectiveShortcut, useKbOverrides } from '../hooks/useKeyboardMap';
 
 const SORT_OPTIONS: { value: SortMode; icon: string; label: string }[] = [
   { value: 'name',      icon: 'ti ti-text-caption',    label: 'أ-ي' },
@@ -33,15 +34,18 @@ interface ProductSearchBarProps {
   onArrowUp?: () => void;
   onArrowDown?: () => void;
   keyboardNavEnabled?: boolean;
+  slug?: string | null;
 }
 
 export default function ProductSearchBar({
   query, onQuery, view, gridSize, onView, onGridSize,
   onFilter, filterActive, inputRef, sortBy, onSort, resultsCount, onEnterFirst,
-  highlightedIndex, onArrowUp, onArrowDown, keyboardNavEnabled,
+  highlightedIndex, onArrowUp, onArrowDown, keyboardNavEnabled, slug,
 }: ProductSearchBarProps) {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
+  const overrides = useKbOverrides(slug ?? null);
+  const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -60,7 +64,7 @@ export default function ProductSearchBar({
           type="text"
           value={query}
           onChange={e => onQuery(e.target.value)}
-          placeholder="ابحث بالاسم أو الباركود أو الرمز... (F2)"
+          placeholder={`ابحث بالاسم أو الباركود أو الرمز... (${kb('searchFocus')})`}
           autoComplete="off"
           onKeyDown={e => {
             if (e.key === 'Enter') { e.preventDefault(); onEnterFirst(); }
@@ -75,7 +79,7 @@ export default function ProductSearchBar({
           </button>
         )}
         {!query && (
-          <span className="srch-hint"><kbd>F2</kbd></span>
+          <span className="srch-hint"><kbd>{kb('searchFocus')}</kbd></span>
         )}
       </div>
 

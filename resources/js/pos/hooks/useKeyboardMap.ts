@@ -1,4 +1,7 @@
+import React from 'react';
+
 const STORAGE_KEY = 'pos-kb-override-';
+const KB_CHANGE_EVENT = 'pos-kb-changed';
 
 export const KB_DEFAULTS: Record<string, string> = {
   searchFocus: 'F2',
@@ -28,6 +31,8 @@ export const KB_DEFAULTS: Record<string, string> = {
   confirmPayment: 'Ctrl+Enter',
   openDrawer: 'Ctrl+D',
   undoClear: 'Ctrl+Z',
+  toggleHeld: 'Ctrl+ArrowRight',
+  sessionInvoices: 'Ctrl+Shift+I',
 };
 
 export function normalizeEventKey(e: KeyboardEvent): string {
@@ -49,9 +54,37 @@ export function readOverrides(slug: string | null): Record<string, string> {
   } catch { return {}; }
 }
 
+/** Persist overrides and notify all components */
+export function saveOverrides(slug: string | null, overrides: Record<string, string>): void {
+  if (!slug) return;
+  localStorage.setItem(`${STORAGE_KEY}${slug}`, JSON.stringify(overrides));
+  window.dispatchEvent(new CustomEvent(KB_CHANGE_EVENT, { detail: { slug } }));
+}
+
 export function matchOverride(slug: string | null, action: string, e: KeyboardEvent): boolean {
   if (!slug) return false;
   const overrides = readOverrides(slug);
   const expected = overrides[action] ?? KB_DEFAULTS[action];
+  if (!expected) return false;
   return normalizeEventKey(e) === expected;
+}
+
+/** Get effective shortcut for an action (override or default, null if disabled) */
+export function getEffectiveShortcut(slug: string | null, action: string): string | null {
+  if (!slug) return null;
+  const overrides = readOverrides(slug);
+  const val = overrides[action];
+  if (val === '') return null;
+  return val ?? KB_DEFAULTS[action] ?? null;
+}
+
+/** React hook — returns current overrides, updates on saveOverrides() */
+export function useKbOverrides(slug: string | null): Record<string, string> {
+  const [v, setV] = React.useState(0);
+  React.useEffect(() => {
+    const handler = () => setV(x => x + 1);
+    window.addEventListener(KB_CHANGE_EVENT, handler);
+    return () => window.removeEventListener(KB_CHANGE_EVENT, handler);
+  }, []);
+  return React.useMemo(() => readOverrides(slug), [slug, v]);
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useActiveSlug } from '@/lib/store/appStore';
-import { readOverrides, KB_DEFAULTS, normalizeEventKey } from '@/pos/hooks/useKeyboardMap';
+import { readOverrides, saveOverrides, KB_DEFAULTS, normalizeEventKey } from '@/pos/hooks/useKeyboardMap';
 
 interface KeyboardHelpModalProps {
   onClose: () => void;
@@ -38,10 +38,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
   const captureRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!slug) return;
-    try {
-      localStorage.setItem(`pos-kb-override-${slug}`, JSON.stringify(overrides));
-    } catch {}
+    saveOverrides(slug, overrides);
   }, [overrides, slug]);
 
   const groups: ShortcutGroup[] = [
@@ -65,11 +62,13 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
         { action: 'sessionStats', defaultKey: 'F8', desc: 'إحصاءات الجلسة' },
         { action: 'fullscreen', defaultKey: 'F11', desc: 'وضع الشاشة الكاملة' },
         { action: 'directPrint', defaultKey: 'Ctrl+P', desc: 'طباعة مباشرة' },
+        { action: 'sessionInvoices', defaultKey: 'Ctrl+Shift+I', desc: 'فواتير الجلسة' },
       ],
     },
     {
       title: 'التنقل والعرض',
       items: [
+        { action: 'toggleHeld', defaultKey: 'Ctrl+ArrowRight', desc: 'التنقل بين السلة والمعلقة' },
         { action: 'quickSearch', defaultKey: 'Ctrl+F', desc: 'البحث السريع' },
         { action: 'gridView', defaultKey: 'Ctrl+ArrowUp', desc: 'عرض الشبكة' },
         { action: 'listView', defaultKey: 'Ctrl+ArrowDown', desc: 'عرض القائمة' },
@@ -100,7 +99,9 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
   ];
 
   function displayKey(item: ShortcutItem): string {
-    return overrides[item.action] ?? item.defaultKey;
+    const val = overrides[item.action];
+    if (val === '') return '—';
+    return val ?? item.defaultKey;
   }
 
   function isDuplicate(action: string, newKey: string): string | null {
@@ -129,6 +130,24 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
     e.stopPropagation();
 
     const combo = normalizeEventKey(e as unknown as KeyboardEvent);
+
+    // تجاهل مفاتيح التعديل وحدها (Ctrl, Alt, Shift, Meta) — ننتظر المفتاح التالي
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
+      return;
+    }
+
+    // مفتاح الحذف ← إلغاء تعيين الاختصار
+    if (combo === 'Delete' || combo === 'Backspace') {
+      setOverrides(prev => {
+        const next = { ...prev, [editing]: '' };
+        return next;
+      });
+      setEditing(null);
+      setListening(false);
+      setConflict(null);
+      return;
+    }
+
     if (combo === 'Escape') {
       setEditing(null);
       setListening(false);
@@ -183,7 +202,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
         <div className="m-body">
           {listening && editing && (
             <div className="al al-i" style={{ marginBottom: 12 }}>
-              <i className="ti ti-keyboard" /> اضغط المفتاح الذي تريد تعيينه لـ "<b>{groups.flatMap(g => g.items).find(i => i.action === editing)?.desc}</b>" — <b>Esc</b> للإلغاء
+              <i className="ti ti-keyboard" /> اضغط المفتاح الذي تريد تعيينه لـ "<b>{groups.flatMap(g => g.items).find(i => i.action === editing)?.desc}</b>" — <b>Esc</b> للإلغاء — يمكنك استخدام تركيبة مثل <kbd style={{background:'var(--bg4)',padding:'1px 5px',borderRadius:3}}>Ctrl+K</kbd>
             </div>
           )}
           {conflict && (
@@ -216,6 +235,20 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
                           </kbd>
                         )}
                         <span className="kb-desc">{s.desc}</span>
+                        {!isEditing && cur !== '—' && (
+                          <button
+                            className="kb-clear-btn"
+                            onClick={() => {
+                              setOverrides(prev => {
+                                const next = { ...prev, [s.action]: '' };
+                                return next;
+                              });
+                            }}
+                            title="إلغاء تعيين الاختصار"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     );
                   })}
