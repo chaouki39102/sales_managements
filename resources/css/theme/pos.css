@@ -628,6 +628,7 @@
 .pcard-add:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── حجم xs و sm: أيقونة فقط ── */
+.pgrid--xs .pcard-img  { aspect-ratio: auto; min-height: 55px; }
 .pgrid--xs .pcard-body { padding: 6px; }
 .pgrid--xs .pcard-name { font-size: 11px; -webkit-line-clamp: 1; }
 .pgrid--xs .pcard-bc   { display: none; }
