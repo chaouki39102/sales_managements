@@ -183,7 +183,7 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
                     <td>{i + 1}</td>
                     <td><strong>{doc.document_number}</strong></td>
                     <td className="si-col-client">{doc.party?.name ?? <span style={{ color: 'var(--t4)' }}>—</span>}</td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{doc.created_at?.slice(0, 16).replace('T', ' ') ?? doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
                     <td style={{ fontWeight: 600, color: 'var(--p)' }}>{formatDZD(doc.total_ttc)}</td>
                     <td style={{ color: 'var(--g)' }}>{formatDZD(doc.paid_amount ?? 0)}</td>
                     <td style={{ fontWeight: 600, color: Number(doc.remaining_amount ?? 0) > 0 ? 'var(--r)' : 'var(--t4)' }}>

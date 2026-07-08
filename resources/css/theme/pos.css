@@ -2161,6 +2161,8 @@
 .si-th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
 .si-th-sort:hover { color: var(--em); }
 .si-modal-tbl td { white-space: nowrap; }
+.si-modal-tbl thead { position: sticky; top: 0; z-index: 1; }
+.si-modal-tbl thead th { background: var(--bg2); }
 @media (max-width: 480px) {
   .pos-topbar { padding: 4px 8px; gap: 3px; }
   .pos-chip-label { display: none; }
