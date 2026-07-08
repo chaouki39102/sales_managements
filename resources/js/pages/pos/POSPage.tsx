@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/pos/POSPage.tsx
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
@@ -18,7 +18,10 @@ import { apiGet }             from '@/lib/api/core/client';
 import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
 import { documentsApi }       from '@/lib/api/endpoints/documents';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
-import { useAuthUser } from '@/context/AuthContext';
+import { useDebounce }                     from '@/hooks/useDebounce';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ui';
+
 import {
   calcFiscalStamp, formatDZD, htToTtc, ttcToHt, calcMargin,
 } from '@/pos/utils/calculations';
@@ -43,13 +46,6 @@ import FilterPanel              from '@/pos/components/FilterPanel';
 import CategoryTabs             from '@/pos/components/CategoryTabs';
 import ProductGrid              from '@/pos/components/ProductGrid';
 import ProfessionalCart         from '@/pos/components/ProfessionalCart';
-import ProfessionalPaymentModal from '@/pos/components/ProfessionalPaymentModal';
-import HeldCartsModal           from '@/pos/components/HeldCartsModal';
-import ProfessionalReceipt      from '@/pos/components/ProfessionalReceipt';
-import ManualProductModal       from '@/pos/components/ManualProductModal';
-import OpenSessionModal         from '@/pos/components/OpenSessionModal';
-import CloseSessionModal        from '@/pos/components/CloseSessionModal';
-import SessionStatsModal        from '@/pos/components/SessionStatsModal';
 import {
   useCurrentPosSession,
   useOpenSession,
@@ -57,11 +53,19 @@ import {
   useIncrementSession,
   buildIncrementInput,
 } from '@/lib/api/endpoints/posSession';
-import ReturnsModal             from '@/pos/components/ReturnsModal';
-import SessionInvoicesModal     from '@/pos/components/SessionInvoicesModal';
-import KeyboardHelpModal        from '@/pos/components/KeyboardHelpModal';
-import POSSettingsModal          from '@/pos/components/POSSettingsModal';
-import ManagerPinModal           from '@/pos/components/ManagerPinModal';
+
+const ProfessionalPaymentModal = React.lazy(() => import('@/pos/components/ProfessionalPaymentModal'));
+const HeldCartsModal           = React.lazy(() => import('@/pos/components/HeldCartsModal'));
+const ProfessionalReceipt      = React.lazy(() => import('@/pos/components/ProfessionalReceipt'));
+const ManualProductModal       = React.lazy(() => import('@/pos/components/ManualProductModal'));
+const OpenSessionModal         = React.lazy(() => import('@/pos/components/OpenSessionModal'));
+const CloseSessionModal        = React.lazy(() => import('@/pos/components/CloseSessionModal'));
+const SessionStatsModal        = React.lazy(() => import('@/pos/components/SessionStatsModal'));
+const ReturnsModal             = React.lazy(() => import('@/pos/components/ReturnsModal'));
+const SessionInvoicesModal     = React.lazy(() => import('@/pos/components/SessionInvoicesModal'));
+const KeyboardHelpModal        = React.lazy(() => import('@/pos/components/KeyboardHelpModal'));
+const POSSettingsModal          = React.lazy(() => import('@/pos/components/POSSettingsModal'));
+const ManagerPinModal           = React.lazy(() => import('@/pos/components/ManagerPinModal'));
 import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
 import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
@@ -76,8 +80,6 @@ import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data'
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
 import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 import type { CompanyPreviewData } from '@/pages/settings/print-settings/types';
-
-type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 
 const QUICK_ITEMS_KEY = (slug: string) => `pos-quick-items-${slug}`;
 
@@ -100,7 +102,6 @@ function POSPage() {
   const company     = useActiveCompany();
   const navigate    = useNavigate();
 
-  const user = useAuthUser();
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
   const openSessionMut   = useOpenSession();
   const closeSessionMut  = useCloseSession(currentSession?.id ?? null);
@@ -130,6 +131,7 @@ function POSPage() {
   };
 
   const { settings, setSettings, resetSettings } = usePOSSettings(slug);
+  const clearCartConfirm = useConfirm();
 
   // ═════════════════════════════════════════════════════════════════════
   // Clear cart on company switch — prevents stale product_id values from
@@ -179,8 +181,6 @@ function POSPage() {
     payments: Array<{ paymentModeId: number; amount: number }>;
     dueDate?: string;
   }>();
-  const [orderType, setOrderType] = useState<OrderType>('dine-in');
-
   const [quickItems, setQuickItems] = useState<QuickItem[]>(() => {
     if (!slug) return [];
     try {
@@ -218,18 +218,19 @@ function POSPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const barcodeTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const isSearching   = pos.searchQuery.trim().length >= 2;
-  const queryFamilyId = pos.selectedCategory ?? undefined;
+  const debouncedSearch = useDebounce(pos.searchQuery.trim(), 300);
+  const isSearching     = debouncedSearch.length >= 2;
+  const queryFamilyId   = pos.selectedCategory ?? undefined;
 
   // ── Products query (all products) ───────────────────────────────────────
   const { data: productsRaw, isLoading: loadingAll } = useQuery({
     queryKey: [slug, 'products', 'pos', {
-      search: pos.searchQuery, cat: pos.selectedCategory,
+      search: debouncedSearch, cat: pos.selectedCategory,
     }],
     queryFn: () => productsApi.list({
       per_page:  99999,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
-      search:    isSearching ? pos.searchQuery : undefined,
+      search:    isSearching ? debouncedSearch : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       filter:    { active: 1 },
     }),
@@ -342,13 +343,16 @@ function POSPage() {
     }
   }, [negSettingRaw]);
 
-  // ── Stock ──────────────────────────────────────────────────────────────────
+  // ── Stock (filtered when searching) ────────────────────────────────────────
+  const stockSearch = isSearching ? debouncedSearch : undefined;
   const { data: stockData = {}, isLoading: stockLoading } = useQuery<Record<number, number>>({
-    queryKey: [slug, 'pos-stock', effectiveWarehouseId, fiscalYear?.id],
+    queryKey: [slug, 'pos-stock', effectiveWarehouseId, fiscalYear?.id, { search: stockSearch, family_id: queryFamilyId }],
     queryFn:  () =>
       apiGet<unknown[]>('/inventory/stock-at', {
         warehouse_id:   effectiveWarehouseId,
         fiscal_year_id: fiscalYear?.id,
+        ...(stockSearch ? { search: stockSearch } : {}),
+        ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       }).then((rows) =>
         Object.fromEntries(
           (rows as Array<{ id: number; current_stock: number }>)
@@ -412,10 +416,11 @@ function POSPage() {
   const [canUndoClear, setCanUndoClear] = useState(false);
   const undoClearTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const handleClearCart = useCallback((opts?: { skipConfirm?: boolean }) => {
+  const handleClearCart = useCallback(async (opts?: { skipConfirm?: boolean }) => {
     if (isEmpty) return;
-    if (settings.confirmOnClear && !opts?.skipConfirm
-        && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+    if (settings.confirmOnClear && !opts?.skipConfirm) {
+      if (!await clearCartConfirm.confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+    }
 
     lastClearedSnapshotRef.current = {
       items:               [...pos.items],
@@ -436,7 +441,7 @@ function POSPage() {
     setEditingDocumentId(null);
     setEditingDocStatus(null);
     setEditingDocumentDate(null);
-  }, [settings.confirmOnClear, isEmpty, pos, cartNote]);
+  }, [settings.confirmOnClear, isEmpty, pos, cartNote, clearCartConfirm]);
 
   const clearCartSafe = handleClearCart;
 
@@ -966,11 +971,6 @@ const handleCompleteSale = useCallback(async (params: {
     }
   }, [filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
 
-  const orderTypeLabels: Record<OrderType, { icon: string; label: string }> = {
-    'dine-in':  { icon: 'ti-building-store', label: 'طاولة' },
-    'takeaway': { icon: 'ti-shopping-bag',   label: 'استلام' },
-    'delivery': { icon: 'ti-truck-delivery', label: 'توصيل' },
-  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -980,28 +980,30 @@ const handleCompleteSale = useCallback(async (params: {
       id="p-pos"
       dir="rtl"
     >
-      {/* جلسة مطلوبة — تظهر إذا لم تكن هناك جلسة مفتوحة */}
       {!sessionLoading && !currentSession && (
-        <OpenSessionModal
-          warehouses={warehouses ?? []}
-          fiscalYears={fiscalYears ?? []}
-          defaultWarehouseId={defaultWarehouse?.id}
-          defaultFiscalYearId={fiscalYear?.id}
-          isLoading={openSessionMut.isPending}
-          error={sessionError}
-          onOpen={handleOpenSession}
-        />
+        <Suspense fallback={null}>
+          <OpenSessionModal
+            warehouses={warehouses ?? []}
+            fiscalYears={fiscalYears ?? []}
+            defaultWarehouseId={defaultWarehouse?.id}
+            defaultFiscalYearId={fiscalYear?.id}
+            isLoading={openSessionMut.isPending}
+            error={sessionError}
+            onOpen={handleOpenSession}
+          />
+        </Suspense>
       )}
 
-      {/* نافذة إغلاق الجلسة */}
       {showCloseSession && currentSession && (
-        <CloseSessionModal
-          session={currentSession}
-          isLoading={closeSessionMut.isPending}
-          error={closeSessionMut.error?.message ?? null}
-          onClose={() => setShowCloseSession(false)}
-          onConfirm={handleCloseSession}
-        />
+        <Suspense fallback={null}>
+          <CloseSessionModal
+            session={currentSession}
+            isLoading={closeSessionMut.isPending}
+            error={closeSessionMut.error?.message ?? null}
+            onClose={() => setShowCloseSession(false)}
+            onConfirm={handleCloseSession}
+          />
+        </Suspense>
       )}
 
       <POSTopBar
@@ -1035,13 +1037,6 @@ const handleCompleteSale = useCallback(async (params: {
         onOpenDrawer={handleOpenDrawer}
       />
 
-      <div className="pos-order-type">
-        {(Object.entries(orderTypeLabels) as [OrderType, { icon: string; label: string }][]).map(([key, { icon, label }]) => (
-          <button key={key} className={`pot-btn ${orderType === key ? 'on' : ''}`} onClick={() => setOrderType(key)}>
-            <i className={`ti ${icon}`} />{label}
-          </button>
-        ))}
-      </div>
 
       {showQuickbar && quickItems.length > 0 && (
         <QuickItemsBar
@@ -1139,109 +1134,129 @@ const handleCompleteSale = useCallback(async (params: {
       {/* ── Modals ── */}
 
       {modal === 'payment' && (
-        /* ✅ ProfessionalPaymentModal v2 — مع treasuryAccounts + numpad */
-        <ProfessionalPaymentModal
-          totals={pos.totals} client={pos.client}
-          paymentModes={paymentModes ?? []}
-          documentTypes={documentTypes ?? []}
-          currencies={currencies ?? []}
-          treasuryAccounts={treasuryAccounts ?? []}           // ✅ جديد
-          totalTtcFinal={adjustedTotalTtcFinal}
-          existingPayments={pos.payments}
-          isEditing={editingDocumentId !== null}
-          documentDate={editingDocumentDate ?? new Date().toISOString().slice(0, 10)}
-          prevBalance={editingDocumentId ? editingPrevBalanceRef.current : clientBalance?.current_balance}
-          onClose={() => setModal('none')}
-          onConfirm={handleCompleteSale}
-        />
+        <Suspense fallback={null}>
+          <ProfessionalPaymentModal
+            totals={pos.totals} client={pos.client}
+            paymentModes={paymentModes ?? []}
+            documentTypes={documentTypes ?? []}
+            currencies={currencies ?? []}
+            treasuryAccounts={treasuryAccounts ?? []}
+            totalTtcFinal={adjustedTotalTtcFinal}
+            existingPayments={pos.payments}
+            isEditing={editingDocumentId !== null}
+            documentDate={editingDocumentDate ?? new Date().toISOString().slice(0, 10)}
+            prevBalance={editingDocumentId ? editingPrevBalanceRef.current : clientBalance?.current_balance}
+            onClose={() => setModal('none')}
+            onConfirm={handleCompleteSale}
+          />
+        </Suspense>
       )}
 
       {modal === 'held' && (
-        <HeldCartsModal
-          carts={pos.heldCarts} onClose={() => setModal('none')}
-          onRestore={id => { pos.restoreCart(id); setModal('none'); }}
-          onDelete={pos.deleteHeldCart}
-          onRestoreAndPay={id => { pos.restoreCart(id); setModal('payment'); }}
-        />
+        <Suspense fallback={null}>
+          <HeldCartsModal
+            carts={pos.heldCarts} onClose={() => setModal('none')}
+            onRestore={id => { pos.restoreCart(id); setModal('none'); }}
+            onDelete={pos.deleteHeldCart}
+            onRestoreAndPay={id => { pos.restoreCart(id); setModal('payment'); }}
+          />
+        </Suspense>
       )}
 
       {modal === 'receipt' && receiptSnapshot && receiptSource && template && (
-        <ProfessionalReceipt
-          template={template}
-          company={companyData}
-          source={receiptSource}
-          docNumber={receiptSnapshot.docNum}
-          onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
-          onPrint={() => {
-            handlePrintDirect(receiptSnapshot);
-          }}
-          onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
-        />
+        <Suspense fallback={null}>
+          <ProfessionalReceipt
+            template={template}
+            company={companyData}
+            source={receiptSource}
+            docNumber={receiptSnapshot.docNum}
+            onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
+            onPrint={() => { handlePrintDirect(receiptSnapshot); }}
+            onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
+          />
+        </Suspense>
       )}
 
       {modal === 'manual' && (
-        <ManualProductModal
-          onClose={() => setModal('none')}
-          onAdd={(name, priceTtc, qty, tvaRate) => {
-            pos.addItem(makeFakeVariant(name, ttcToHt(priceTtc, tvaRate), tvaRate), qty);
-            setModal('none');
-          }}
-        />
+        <Suspense fallback={null}>
+          <ManualProductModal
+            onClose={() => setModal('none')}
+            onAdd={(name, priceTtc, qty, tvaRate) => {
+              pos.addItem(makeFakeVariant(name, ttcToHt(priceTtc, tvaRate), tvaRate), qty);
+              setModal('none');
+            }}
+          />
+        </Suspense>
       )}
 
       {showSessionInvoices && currentSession && (
-        <SessionInvoicesModal
-          session={currentSession}
-          onClose={() => setShowSessionInvoices(false)}
-          onOpen={handleOpenInvoice}
-        />
+        <Suspense fallback={null}>
+          <SessionInvoicesModal
+            session={currentSession}
+            onClose={() => setShowSessionInvoices(false)}
+            onOpen={handleOpenInvoice}
+          />
+        </Suspense>
       )}
 
       {modal === 'session' && currentSession && (
-        <SessionStatsModal
-          session={currentSession}
-          onClose={() => setModal('none')}
-          onEndSession={() => { setModal('none'); setShowCloseSession(true); }}
-        />
+        <Suspense fallback={null}>
+          <SessionStatsModal
+            session={currentSession}
+            onClose={() => setModal('none')}
+            onEndSession={() => { setModal('none'); setShowCloseSession(true); }}
+          />
+        </Suspense>
       )}
 
       {modal === 'returns' && (
-        <ReturnsModal
-          documentTypes={documentTypes ?? []}
-          defaultWarehouseId={defaultWarehouse?.id}
-          fiscalYearId={fiscalYear?.id}
-          onClose={() => setModal('none')}
-          onDone={() => setModal('none')}
-        />
+        <Suspense fallback={null}>
+          <ReturnsModal
+            documentTypes={documentTypes ?? []}
+            defaultWarehouseId={defaultWarehouse?.id}
+            fiscalYearId={fiscalYear?.id}
+            onClose={() => setModal('none')}
+            onDone={() => setModal('none')}
+          />
+        </Suspense>
       )}
 
-      {modal === 'kbhelp' && <KeyboardHelpModal onClose={() => setModal('none')} />}
+      {modal === 'kbhelp' && (
+        <Suspense fallback={null}>
+          <KeyboardHelpModal onClose={() => setModal('none')} />
+        </Suspense>
+      )}
 
       {showSettings && (
-        <POSSettingsModal
-          settings={settings}
-          onSave={setSettings}
-          onReset={resetSettings}
-          onClose={() => setShowSettings(false)}
-          warehouses={warehouses ?? []}
-          documentTypes={documentTypes ?? []}
-        />
+        <Suspense fallback={null}>
+          <POSSettingsModal
+            settings={settings}
+            onSave={setSettings}
+            onReset={resetSettings}
+            onClose={() => setShowSettings(false)}
+            warehouses={warehouses ?? []}
+            documentTypes={documentTypes ?? []}
+          />
+        </Suspense>
       )}
 
       {pinModal && (
-        <ManagerPinModal
-          requestedDiscount={pinModal.requestedDiscount}
-          threshold={pinModal.reason === 'max_exceeded' ? settings.maxDiscountPct : settings.discountPinThreshold}
-          reason={pinModal.reason}
-          onSuccess={() => { pinModal.onSuccess(); setPinModal(null); }}
-          onCancel={() => setPinModal(null)}
-          verifyPin={pin => pin === settings.managerPin}
-        />
+        <Suspense fallback={null}>
+          <ManagerPinModal
+            requestedDiscount={pinModal.requestedDiscount}
+            threshold={pinModal.reason === 'max_exceeded' ? settings.maxDiscountPct : settings.discountPinThreshold}
+            reason={pinModal.reason}
+            onSuccess={() => { pinModal.onSuccess(); setPinModal(null); }}
+            onCancel={() => setPinModal(null)}
+            verifyPin={pin => pin === settings.managerPin}
+          />
+        </Suspense>
       )}
 
       <Toaster position="top-left" richColors closeButton
         toastOptions={{ style: { fontFamily: 'Tajawal, sans-serif', fontSize: 14 } }}
       />
+      <ConfirmDialog {...clearCartConfirm.confirmDialogProps} />
     </div>
   );
 }

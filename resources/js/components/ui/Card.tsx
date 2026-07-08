@@ -11,7 +11,7 @@ interface CardProps {
   noHeader?: boolean;
 }
 
-export default function Card({
+function Card({
   title, subtitle, actions, children, style, padding, noHeader = false,
 }: CardProps) {
   const hasHeader = !noHeader && (title || subtitle || actions);
@@ -30,3 +30,6 @@ export default function Card({
     </div>
   );
 }
+
+export default Card;
+export { Card };

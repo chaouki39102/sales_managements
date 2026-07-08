@@ -16,6 +16,17 @@ export default defineConfig({
         }),
         react(),
         tailwindcss(),
+        {
+            name: 'tabler-font-display',
+            transform(code, id) {
+                if (id.includes('tabler-icons.min.css')) {
+                    return code.replace(
+                        '@font-face{font-family:"tabler-icons"',
+                        '@font-face{font-display:swap;font-family:"tabler-icons"',
+                    );
+                }
+            },
+        },
     ],
     resolve: {
         alias: {

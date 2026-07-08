@@ -30,6 +30,8 @@ import type { TabDef } from '../shared';
 import { companiesApi } from '@/lib/api/admin';
 import { useCompanyMutations } from '@/hooks/admin';
 import type { AdminCompany, AdminUser } from '@/types/admin';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ui';
 
 const PLANS: Record<string, string> = {
   free: 'مجاني', starter: 'مبتدئ', professional: 'احترافي',
@@ -64,6 +66,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
 
   const muts  = useCompanyMutations();
   const close = (refresh = false) => onClose(refresh);
+  const deleteConfirm = useConfirm();
 
   const flash$ = (ok: boolean, msg: string) => {
     setFlash({ ok, msg });
@@ -262,7 +265,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
                     <button
                       title="إزالة"
                       onClick={async () => {
-                        if (!confirm(`إزالة ${u.name}؟`)) return;
+                        if (!await deleteConfirm.confirm(`إزالة ${u.name}؟`)) return;
                         await companiesApi.removeUser(co.id, u.id);
                         refetchMembers();
                         flash$(true, 'تم الإزالة');
@@ -388,8 +391,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
 
           <ActionBtn
             icon="ti-trash" label="حذف الشركة نهائياً" variant="danger"
-            onClick={() => {
-              if (!confirm(`حذف شركة "${co.name}" نهائياً؟`)) return;
+            onClick={async () => {
+              if (!await deleteConfirm.confirm(`حذف شركة "${co.name}" نهائياً؟`)) return;
               muts.remove.mutate(co.id, {
                 onSuccess: () => close(true),
                 onError:   (e: any) => flash$(false, e?.message ?? 'فشل الحذف'),
@@ -399,6 +402,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
           />
         </div>
       )}
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </DrawerShell>
   );
 }

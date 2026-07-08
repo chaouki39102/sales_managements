@@ -8,6 +8,9 @@ import Skeleton from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
 import { Input, Select, FormField, Textarea } from '@/components/ui/FormInputs';
 import { useModal } from '@/hooks/useModal';
+import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
+import { ConfirmDialog } from '@/components/ui';
 import { useRegulatedProducts, useTaxManagementMutations } from '@/lib/api/endpoints/taxManagement';
 import type { RegulatedProduct } from '@/lib/api/endpoints/taxManagement';
 
@@ -116,6 +119,8 @@ export default function RegulatedProductsPage() {
   const [editing, setEditing] = useState<RegulatedProduct | null>(null);
   const { data: products, isLoading } = useRegulatedProducts(!showInactive);
   const mutations = useTaxManagementMutations();
+  const deleteConfirm = useConfirm();
+  const notify = useNotification();
   const createModal = useModal();
   const editModal = useModal();
 
@@ -183,7 +188,7 @@ export default function RegulatedProductsPage() {
                     <Button size="xs" variant="info" icon={<i className="ti ti-edit" />}
                       style={{ marginLeft: 4 }} onClick={() => openEdit(p)} />
                     <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />}
-                      onClick={() => { if (confirm('حذف هذه المادة؟')) mutations.deleteRegulatedProduct.mutate(p.id); }}
+                      onClick={async () => { if (await deleteConfirm.confirm('حذف هذه المادة؟')) mutations.deleteRegulatedProduct.mutate(p.id, { onSuccess: () => notify.success('تم الحذف') }); }}
                     />
                   </td>
                 </tr>
@@ -195,6 +200,7 @@ export default function RegulatedProductsPage() {
 
       <RegulatedProductModal open={createModal.open} product={null} onClose={createModal.closeModal} />
       <RegulatedProductModal open={editModal.open} product={editing} onClose={editModal.closeModal} />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

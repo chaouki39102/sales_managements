@@ -5,6 +5,8 @@ import { companiesApi } from '@/lib/api/admin';
 import { usersApi } from '@/lib/api/admin';
 import { Avatar, SectionTitle, EmptyState, Spinner, StatusBadge } from '../shared';
 import type { AdminUser, AdminCompany } from '@/types/admin';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ui';
 
 interface Props {
   user:    AdminUser;
@@ -13,6 +15,7 @@ interface Props {
 }
 
 export function CompaniesTab({ user: u, onFlash, onRefreshUser }: Props) {
+  const deleteConfirm = useConfirm();
   const [searchQ, setSearchQ] = useState('');
   const [transferId, setTransferId] = useState('');
   const [searching,  setSearching]  = useState(false);
@@ -37,7 +40,7 @@ export function CompaniesTab({ user: u, onFlash, onRefreshUser }: Props) {
   };
 
   const handleRemove = async (coId: number, coName: string) => {
-    if (!confirm(`إزالة ${u.name} من ${coName}؟`)) return;
+    if (!await deleteConfirm.confirm(`إزالة ${u.name} من ${coName}؟`)) return;
     try {
       await companiesApi.removeUser(coId, u.id);
       refetch(); onRefreshUser();
@@ -141,6 +144,7 @@ export function CompaniesTab({ user: u, onFlash, onRefreshUser }: Props) {
           </div>
         )}
       </div>
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

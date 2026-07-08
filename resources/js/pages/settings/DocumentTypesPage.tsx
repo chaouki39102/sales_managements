@@ -13,6 +13,9 @@ import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
 import apiClient from '@/lib/api/core/client';
+import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
+import { ConfirmDialog } from '@/components/ui';
 import type { DocumentType } from '@/types';
 
 // ===============================================
@@ -23,6 +26,8 @@ export default function DocumentTypesPage() {
     const [editing, setEditing] = useState<DocumentType | null>(null);
     const [filter, setFilter] = useState('');
     const modal = useModal();
+    const deleteConfirm = useConfirm();
+    const notify = useNotification();
 
     // 1. جلب أنواع المستندات
     const { data: items, isLoading, isError, refetch } = useQuery<DocumentType[]>({
@@ -57,13 +62,16 @@ export default function DocumentTypesPage() {
 
     const deleteMutation = useMutation({
         mutationFn: (id: number) => apiClient.delete(`/document-types/${id}`),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ['document-types'] }),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['document-types'] });
+            notify.success('تم الحذف');
+        },
     });
 
     const openAdd = () => { setEditing(null); modal.openModal(); };
     const openEdit = (item: DocumentType) => { setEditing(item); modal.openModal(); };
-    const handleDelete = (id: number) => {
-        if (confirm('هل تريد حذف نوع المستند هذا؟')) deleteMutation.mutate(id);
+    const handleDelete = async (id: number) => {
+        if (await deleteConfirm.confirm('هل تريد حذف نوع المستند هذا؟')) deleteMutation.mutate(id);
     };
 
     return (
@@ -181,6 +189,7 @@ export default function DocumentTypesPage() {
                 docType={editing}
                 onClose={modal.closeModal}
             />
+            <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
         </div>
     );
 }

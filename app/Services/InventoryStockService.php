@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Core\Traits\ResolvesFiscalYear;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -83,8 +84,12 @@ class InventoryStockService
             ->when($warehouseId, fn($q) => $q->where('sm.warehouse_id', $warehouseId))
             ->groupBy('sm.product_id');
 
-        // ─── 3. Query الرئيسية ────────────────────────────────────────────────
-        $rows = DB::table('products as p')
+        // ─── 3. Query الرئيسية (مخزنة 30 ثانية) ────────────────────────────────
+        $cacheKey = 'stock-at:' . implode('_', [$companyId, $date, $warehouseId ?? 'all', $fiscalYearId, $search ?? '']);
+        $rows = Cache::remember($cacheKey, 30, function () use (
+            $companyId, $date, $warehouseId, $fiscalYearId, $search, $openingQuery, $movementsQuery,
+        ) {
+            return DB::table('products as p')
             ->select(
                 'p.id',
                 'p.name',
@@ -151,6 +156,7 @@ class InventoryStockService
             )
             ->orderBy('p.name')
             ->get();
+        });
 
         return $rows->map(fn($row) => [
             'id'                 => $row->id,

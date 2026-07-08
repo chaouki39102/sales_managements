@@ -8,6 +8,9 @@ import Modal from '@/components/ui/Modal';
 import { Input, Select, FormField } from '@/components/ui/FormInputs';
 import Skeleton from '@/components/ui/Skeleton';
 import { useModal } from '@/hooks/useModal';
+import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
+import { ConfirmDialog } from '@/components/ui';
 import { useSubsidizedSummary, useSubsidizedViolations, useTaxManagementMutations, type SubsidizedSalesSummary } from '@/lib/api/endpoints/taxManagement';
 import { useSelectedFiscalYear } from '@/lib/api/endpoints/fiscalYears';
 
@@ -22,6 +25,8 @@ export default function SubsidizedProductsPage() {
   const { data: summary, isLoading } = useSubsidizedSummary(fiscalYear?.id ?? null, month);
   const { data: violations } = useSubsidizedViolations(fiscalYear?.id ?? null);
   const mutations = useTaxManagementMutations();
+  const deleteConfirm = useConfirm();
+  const notify = useNotification();
 
   if (isLoading) return <Skeleton variant="card" rows={6} />;
 
@@ -112,7 +117,7 @@ export default function SubsidizedProductsPage() {
                         <i className="ti ti-pencil" />
                       </button>
                       <button className="btn btn-icon btn-ghost c-r" title="حذف"
-                        onClick={() => { if (confirm('تأكيد حذف هذه المادة؟')) mutations.deleteSubsidizedRow.mutate(s.id); }}>
+                        onClick={async () => { if (await deleteConfirm.confirm('تأكيد حذف هذه المادة؟')) mutations.deleteSubsidizedRow.mutate(s.id, { onSuccess: () => notify.success('تم الحذف') }); }}>
                         <i className="ti ti-trash" />
                       </button>
                     </div>
@@ -140,6 +145,7 @@ export default function SubsidizedProductsPage() {
           />
         )}
       </Modal>
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

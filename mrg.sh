@@ -4,9 +4,7 @@ OUTPUT="REPORTING_FRAMEWORK_SOURCE.md"
 
 > "$OUTPUT"
 
-find resources/js/pos \
-     resources/js/pos/components \
-     resources/js/components/ui \
+find resources/js/pos/*. \
      -type f \( \
         -name "*.ts" -o \
         -name "*.tsx" -o \

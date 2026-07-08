@@ -69,7 +69,7 @@ export default function ProductCard({
     >
       <div className="pcard-img" style={{ background: style.bg }}>
         {imageUrl
-          ? <img src={imageUrl} alt={v.product?.name} />
+          ? <img src={imageUrl} alt={v.product?.name} loading="lazy" />
           : <i className={`ti ${style.icon}`} style={{ color: style.color, fontSize: 22 }} />
         }
         {qtyInCart > 0 && <span className="pcard-in-cart">{qtyInCart}</span>}

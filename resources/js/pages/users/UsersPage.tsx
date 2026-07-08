@@ -7,6 +7,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import apiClient from "@/lib/api/core/client";
 import { useRoles } from "@/lib/api/endpoints/roles";
+import { useNotification } from '@/hooks/useNotification';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ui';
 
 // ─── Types ─────────────────────────────────────
 interface Permission {
@@ -366,7 +369,7 @@ function Btn({
     type = "button",
 }: {
     children?: React.ReactNode;
-    onClick?: () => void;
+    onClick?: () => void | Promise<void>;
     variant?: "default" | "primary" | "danger" | "ghost";
     size?: "sm" | "md" | "xs";
     disabled?: boolean;
@@ -1677,11 +1680,14 @@ function RoleDetailModal({
     onEdit: (r: Role) => void;
 }) {
     const qc = useQueryClient();
+    const notify = useNotification();
+    const deleteConfirm = useConfirm();
     const deleteRole = useMutation({
         mutationFn: () => apiClient.delete(`/${slug}/roles/${role!.id}`),
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ["roles", slug] });
             onClose();
+            notify.success('تم الحذف');
         },
     });
 
@@ -1873,9 +1879,9 @@ function RoleDetailModal({
                     variant="danger"
                     icon={<i className="ti ti-trash" />}
                     loading={deleteRole.isPending}
-                    onClick={() => {
+                    onClick={async () => {
                         if (
-                            confirm(
+                            await deleteConfirm.confirm(
                                 `حذف دور "${role.display_name ?? role.name}"؟`,
                             )
                         )
@@ -1893,6 +1899,7 @@ function RoleDetailModal({
                     تعديل
                 </Btn>
             </MFoot>
+            <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
         </Overlay>
     );
 }
@@ -1920,6 +1927,9 @@ export default function UsersPage() {
     const [viewRole, setViewRole] = useState<Role | null>(null);
     const [editRole, setEditRole] = useState<Role | null>(null);
     const [showAddRole, setShowAddRole] = useState(false);
+
+    const notify = useNotification();
+    const deleteConfirm = useConfirm();
 
     // ─── Queries ───────────────────────────────────
     const {
@@ -1965,7 +1975,10 @@ export default function UsersPage() {
     // ─── Mutations ─────────────────────────────────
     const deleteUser = useMutation({
         mutationFn: (id: number) => apiClient.delete(`/${slug}/users/${id}`),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ["users", slug] }),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ["users", slug] });
+            notify.success('تم الحذف');
+        },
     });
 
     // ─── Filtered users ────────────────────────────
@@ -2548,9 +2561,9 @@ export default function UsersPage() {
                                                         }}
                                                     />
                                                 }
-                                                onClick={() => {
+                                                onClick={async () => {
                                                     if (
-                                                        confirm(
+                                                        await deleteConfirm.confirm(
                                                             `حذف "${u.name}"؟`,
                                                         )
                                                     )
@@ -2972,6 +2985,7 @@ export default function UsersPage() {
                     }}
                 />
             )}
+            <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
         </>
     );
 }

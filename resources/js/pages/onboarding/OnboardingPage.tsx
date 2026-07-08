@@ -17,6 +17,8 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 import { appActions } from '@/lib/store/appStore';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ui';
 // ✅ المودال الجديد الشامل
 import { CreateCompanyModal } from '@/components/modals/CreateCompanyModal';
 import DataSeedingModal from '@/components/modals/DataSeedingModal';
@@ -452,6 +454,7 @@ function AdminModal({
   const [search, setSearch]         = useState('');
   const [saving, setSaving]         = useState(false);
   const [toast, setToast]           = useState('');
+  const deleteConfirm = useConfirm();
 
   // إعدادات Super Admin
   const [settings, setSettings] = useState({
@@ -928,7 +931,7 @@ function AdminModal({
                       { label:'نسخ احتياطي فوري',       icon:'ti-database-export', color:'var(--gold)', bg:'var(--goldb)', action:() => showToast('النسخة تُنشأ...') },
                       { label:'تصدير اللوج',            icon:'ti-download',        color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('جارٍ التصدير') },
                       { label:'إرسال إشعار للكل',       icon:'ti-speakerphone',    color:'var(--gold)', bg:'var(--goldb)', action:() => showToast('تم الإرسال') },
-                      { label:'تفعيل وضع الصيانة',      icon:'ti-alert-triangle',  color:'var(--red)',  bg:'var(--redb)',  action:() => confirm('تفعيل وضع الصيانة؟') && showToast('مفعّل') },
+                      { label:'تفعيل وضع الصيانة',      icon:'ti-alert-triangle',  color:'var(--red)',  bg:'var(--redb)',  action:async () => { if (await deleteConfirm.confirm('تفعيل وضع الصيانة؟')) showToast('مفعّل') } },
                       { label:'تشغيل المهام المجدولة',  icon:'ti-clock-play',      color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('تم تشغيل المهام') },
                     ].map(op => (
                       <button key={op.label} onClick={op.action}
@@ -977,6 +980,8 @@ function AdminModal({
           {toast}
         </div>
       )}
+
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </>
   );
 }

@@ -28,7 +28,7 @@ const sizeMap: Record<ButtonSize, string> = {
   md: '',
 };
 
-export default function Button({
+function Button({
   variant = 'default',
   size = 'md',
   icon,
@@ -59,3 +59,5 @@ export default function Button({
     </button>
   );
 }
+export default Button;
+export { Button };

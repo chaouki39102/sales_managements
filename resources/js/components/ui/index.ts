@@ -8,14 +8,16 @@
  * ══════════════════════════════════════════════════════════════
  */
 
-export { Card, CardHeader, CardTitle, CardSub }         from './Card'
-export { Button }                                        from './Button'
-export { Badge }                                         from './Badge'
-export { KpiCard }                                       from './KpiCard'
-export { Modal }                                         from './Modal'
-export { TableWrapper, Table, Th, Tr, Td }               from './Table'
+export { default as Card }                               from './Card'
+export { default as Button }                             from './Button'
+export { default as Badge }                              from './Badge'
+export { default as KpiCard }                            from './KpiCard'
+export { default as Modal }                              from './Modal'
+export { default as Table }                              from './Table'
 export { Alert }                                         from './Alert'
-export { Avatar }                                        from './Avatar'
+export { default as Avatar }                             from './Avatar'
+export { default as ConfirmDialog }                      from './ConfirmDialog'
+export { default as ConfirmDeleteModal }                 from './ConfirmDeleteModal'
 export {
   Input, Select, Textarea, Label,
   FormField, FormGrid, InputRow,

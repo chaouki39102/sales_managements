@@ -8,6 +8,8 @@ import {
 import type { TabDef } from '../shared';
 import { companiesApi, plansApi } from '@/lib/api/admin';
 import { useCompanyMutations } from '@/hooks/admin';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ui';
 import type { AdminCompany, AdminUser, AdminPlan } from '@/types/admin';
 
 const PLANS: Record<string, string> = {
@@ -45,6 +47,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
   });
 
   const muts = useCompanyMutations();
+  const deleteConfirm = useConfirm();
   const close = (refresh = false) => onClose(refresh);
 
   const { data: plans = [] } = useQuery<AdminPlan[]>({
@@ -111,7 +114,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
   };
 
   const handleRemoveUser = async (u: AdminUser) => {
-    if (!confirm(`إزالة ${u.name}؟`)) return;
+    if (!await deleteConfirm.confirm(`إزالة ${u.name}؟`)) return;
     try {
       await companiesApi.removeUser(co.id, u.id);
       refetchMembers();
@@ -367,8 +370,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
             loading={muts.seed.isPending} />
 
           <ActionBtn icon="ti-trash" label="حذف الشركة نهائياً" variant="danger"
-            onClick={() => {
-              if (!confirm(`حذف شركة "${co.name}" نهائياً؟`)) return;
+            onClick={async () => {
+              if (!await deleteConfirm.confirm(`حذف شركة "${co.name}" نهائياً؟`)) return;
               muts.remove.mutate(co.id, {
                 onSuccess: () => close(true),
                 onError:   (e: unknown) => flash$(false, errMsg(e)),
@@ -377,6 +380,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
             loading={muts.remove.isPending} />
         </div>
       )}
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </DrawerShell>
   );
 }

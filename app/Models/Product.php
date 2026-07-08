@@ -94,6 +94,8 @@ class Product extends Model
     protected $appends = ['is_low_stock', 'default_selling_price_ht'];
 
     public static array $searchableFields = ['name', 'ref', 'barcode', 'description'];
+    /** الحقول القابلة للبحث بـ FULLTEXT (MySQL فقط) */
+    public static array $fulltextFields = ['name', 'description'];
     public static array $filterable = [
         'family_id',
         'brand_id',
@@ -132,7 +134,7 @@ class Product extends Model
     public static string $defaultSort = 'name';
     public static string $defaultSortDirection = 'asc';
     public static int $defaultPerPage = 15;
-    public static int $perPageLimit = 99999;
+    public static int $perPageLimit = 2000;
     public static ?int $cacheTtl = 300;
     public static array $cacheTags = ['products'];
 

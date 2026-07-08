@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
@@ -22,22 +23,94 @@ interface ProductGridProps {
   onHighlightIndexChange?: (idx: number) => void;
 }
 
+/** أقل عرض للبطاقة حسب حجم الشبكة */
+function minCardWidth(gridSize: GridSize): number {
+  switch (gridSize) {
+    case 'xs': return 100;
+    case 'sm': return 130;
+    case 'md': return 165;
+    case 'lg': return 200;
+  }
+}
+
+/** ارتفاع الصف التقريبي حسب حجم الشبكة */
+function rowEstimate(gridSize: GridSize): number {
+  switch (gridSize) {
+    case 'xs': return 110;
+    case 'sm': return 150;
+    case 'md': return 190;
+    case 'lg': return 240;
+  }
+}
+
 export default function ProductGrid({
   variants, view, gridSize, loading, onAdd, onAddManual,
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
   highlightedIndex, onHighlightIndexChange,
 }: ProductGridProps) {
-  const gridRef = useRef<HTMLDivElement>(null);
   const inCartQty = useCallback((variantId: number) => {
     return cartItems.find(i => i.variant_id === variantId)?.quantity ?? 0;
   }, [cartItems]);
 
-  useEffect(() => {
-    if (highlightedIndex === undefined || !gridRef.current) return;
-    const el = gridRef.current.querySelector(`[data-hl-idx="${highlightedIndex}"]`);
-    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [highlightedIndex]);
+  // ── Grid view (virtualised) ──────────────────────────────────────────────
+  // Column calculation: keep cards between min‑width and max comfortable cols
+  const gridWrapRef = useRef<HTMLDivElement>(null);
+  const [columns, setColumns] = useState(4);
+  const MAX_COLS: Record<GridSize, number> = { xs: 8, sm: 6, md: 5, lg: 4 };
 
+  useEffect(() => {
+    if (view !== 'grid') return;
+    const el = gridWrapRef.current;
+    if (!el) return;
+    const minW = minCardWidth(gridSize);
+    const calc = () => {
+      const w = el.clientWidth;
+      setColumns(Math.min(MAX_COLS[gridSize], Math.max(1, Math.floor(w / minW))));
+    };
+    calc();
+    const obs = new ResizeObserver(calc);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [view, gridSize]);
+
+  // Group into rows (keep original index for keyboard nav)
+  type RowItem = { variant: ProductVariant; idx: number };
+  const rows = useMemo(() => {
+    if (view !== 'grid' || columns < 1) return [] as RowItem[][];
+    const r: RowItem[][] = [];
+    for (let i = 0; i < variants.length; i += columns) {
+      const row: RowItem[] = [];
+      for (let j = 0; j < columns && i + j < variants.length; j++) {
+        row.push({ variant: variants[i + j], idx: i + j });
+      }
+      r.push(row);
+    }
+    return r;
+  }, [variants, columns, view]);
+
+  const rowCount = rows.length;
+  const rowH = rowEstimate(gridSize);
+
+  // Virtualizer
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => rowH,
+    overscan: 3,
+  });
+
+  // Keyboard navigation scroll sync
+  const prevHl = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (view !== 'grid') return;
+    if (highlightedIndex === undefined || highlightedIndex === prevHl.current) return;
+    prevHl.current = highlightedIndex;
+    const rowIdx = Math.floor(highlightedIndex / columns);
+    rowVirtualizer.scrollToIndex(rowIdx, { align: 'nearest' });
+  }, [highlightedIndex, columns, view, rowVirtualizer]);
+
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="pos-grid-area">
       <div className="pos-loading">
@@ -48,6 +121,7 @@ export default function ProductGrid({
     </div>
   );
 
+  // ── Empty ────────────────────────────────────────────────────────────────
   if (!variants.length) return (
     <div className="pos-grid-area">
       <div className="pos-empty">
@@ -61,9 +135,10 @@ export default function ProductGrid({
     </div>
   );
 
+  // ── List view (not virtualised — ~3 500 DOM nodes, acceptable) ──────────
   if (view === 'list') {
     return (
-      <div className="pos-grid-area" ref={gridRef}>
+      <div className="pos-grid-area">
         <table className="pos-ptable">
           <thead>
             <tr>
@@ -88,13 +163,13 @@ export default function ProductGrid({
               const lowStock  = v.manages_stock && !unknownSt && (stockVal ?? 0) > 0 && (stockVal ?? 0) <= (v.min_stock_alert ?? 0);
               const lastPiece = v.manages_stock && !unknownSt && (stockVal ?? 0) > 0 && (stockVal ?? 0) <= 2 && !lowStock;
               return (
-                  <tr
-                    key={v.id}
-                    data-hl-idx={idx}
-                    className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''} ${highlightedIndex === idx ? 'prow-hl' : ''}`}
-                    onClick={() => { if (onHighlightIndexChange !== undefined) onHighlightIndexChange(idx); }}
-                    onDoubleClick={() => !outStock && onAdd(v)}
-                  >
+                <tr
+                  key={v.id}
+                  data-hl-idx={idx}
+                  className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''} ${highlightedIndex === idx ? 'prow-hl' : ''}`}
+                  onClick={() => onHighlightIndexChange?.(idx)}
+                  onDoubleClick={() => !outStock && onAdd(v)}
+                >
                   <td className="prow-name">
                     <div className="prow-nm">{v.product?.name}</div>
                     {v.barcode && <div className="prow-bc">{v.barcode}</div>}
@@ -106,27 +181,18 @@ export default function ProductGrid({
                   <td className="prow-stock">
                     {v.manages_stock && !unknownSt
                       ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : lastPiece ? 'last' : 'ok'}`}>{stockVal ?? 0}</span>
-                      : v.manages_stock && unknownSt
-                      ? <span className="stock-pill na">—</span>
                       : <span className="stock-pill na">—</span>
                     }
                   </td>
                   <td>
                     <div className="prow-acts">
                       {inCart > 0 && <span className="incart-badge">{inCart}</span>}
-                      <button
-                        className="prow-pin"
-                        onClick={e => { e.stopPropagation(); onPin(v); }}
-                        title={isPinned(v.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
-                      >
+                      <button className="prow-pin" onClick={e => { e.stopPropagation(); onPin(v); }}
+                        title={isPinned(v.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}>
                         <i className={`ti ti-star${isPinned(v.id) ? '-filled' : ''}`} />
                       </button>
-                      <button
-                        className="prow-add"
-                        onClick={() => !outStock && onAdd(v)}
-                        disabled={outStock}
-                        title="إضافة للسلة (دبل كليك)"
-                      >
+                      <button className="prow-add" onClick={() => !outStock && onAdd(v)}
+                        disabled={outStock} title="إضافة للسلة (دبل كليك)">
                         <i className="ti ti-plus" />
                       </button>
                     </div>
@@ -140,32 +206,51 @@ export default function ProductGrid({
     );
   }
 
-  const colsMap: Record<GridSize, string> = {
-    xs: 'pgrid--xs',
-    sm: 'pgrid--sm',
-    md: '',
-    lg: 'pgrid--lg',
-  };
+  // ── Grid view (virtualised) ──────────────────────────────────────────────
+  const gridMod = gridSize === 'xs' ? 'pgrid--xs' : gridSize === 'sm' ? 'pgrid--sm' : gridSize === 'lg' ? 'pgrid--lg' : '';
+  const gap = gridSize === 'xs' ? 6 : gridSize === 'sm' ? 8 : gridSize === 'md' ? 10 : 12;
 
   return (
-    <div className="pos-grid-area" ref={gridRef}>
-      <div className={`pgrid ${colsMap[gridSize]}`}>
-        {variants.map((v, idx) => (
-          <ProductCard
-            key={v.id}
-            variant={v}
-            idx={idx}
-            qtyInCart={inCartQty(v.id)}
-            highlighted={highlightedIndex === idx}
-            isPinned={isPinned(v.id)}
-            priceLevels={priceLevels}
-            selectedPriceLevelId={selectedPriceLevelId}
-            allowNegativeStock={allowNegativeStock}
-            onAdd={onAdd}
-            onPin={onPin}
-            onHighlight={onHighlightIndexChange}
-          />
-        ))}
+    <div className={`pos-grid-area ${gridMod}`} ref={scrollRef} style={{ overflow: 'auto' }}>
+      <div ref={gridWrapRef} style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+        {rowVirtualizer.getVirtualItems().map(virtualRow => {
+          const rowData = rows[virtualRow.index];
+          if (!rowData) return null;
+          return (
+            <div
+              key={virtualRow.index}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+                display: 'flex',
+                gap,
+                padding: gap,
+                direction: 'rtl',
+              }}
+            >
+              {rowData.map(item => (
+                <div key={item.variant.id} style={{ flex: '1 1 0', minWidth: 0 }}>
+                  <ProductCard
+                    variant={item.variant}
+                    idx={item.idx}
+                    qtyInCart={inCartQty(item.variant.id)}
+                    highlighted={highlightedIndex === item.idx}
+                    isPinned={isPinned(item.variant.id)}
+                    priceLevels={priceLevels}
+                    selectedPriceLevelId={selectedPriceLevelId}
+                    allowNegativeStock={allowNegativeStock}
+                    onAdd={onAdd}
+                    onPin={onPin}
+                    onHighlight={onHighlightIndexChange}
+                  />
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

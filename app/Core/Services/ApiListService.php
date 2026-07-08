@@ -312,12 +312,40 @@ class ApiListService
     {
         return AllowedFilter::callback('search', function (Builder $query, $value) use ($searchFields) {
             $query->where(function (Builder $q) use ($searchFields, $value) {
-                foreach ($searchFields as $field) {
-                    if (Str::contains($field, '.')) {
-                        [$relation, $column] = explode('.', $field, 2);
-                        $q->orWhereHas($relation, fn(Builder $qr) => $qr->where($column, 'like', "%{$value}%"));
-                    } else {
-                        $q->orWhere($field, 'like', "%{$value}%");
+                $model = $q->getModel();
+                $fulltextFields = $model->fulltextFields ?? [];
+                $isMysql = $q->getConnection()->getDriverName() === 'mysql';
+
+                if ($isMysql && !empty($fulltextFields)) {
+                    $fulltextCols = array_intersect($fulltextFields, $searchFields);
+                    $likeCols = array_diff($searchFields, $fulltextFields);
+                    if (!empty($fulltextCols)) {
+                        $cols = implode(',', $fulltextCols);
+                        $q->whereRaw("MATCH({$cols}) AGAINST(? IN BOOLEAN MODE)", [$value . '*']);
+                    }
+                    foreach ($likeCols as $field) {
+                        if (Str::contains($field, '.')) {
+                            [$relation, $column] = explode('.', $field, 2);
+                            $q->orWhereHas($relation, fn(Builder $qr) => $qr->where($column, 'like', "%{$value}%"));
+                        } else {
+                            $q->orWhere($field, 'like', "%{$value}%");
+                        }
+                    }
+                    if (!empty($fulltextCols)) {
+                        $q->orWhere(function (Builder $qr) use ($fulltextCols, $value) {
+                            foreach ($fulltextCols as $field) {
+                                $qr->orWhere($field, 'like', "%{$value}%");
+                            }
+                        });
+                    }
+                } else {
+                    foreach ($searchFields as $field) {
+                        if (Str::contains($field, '.')) {
+                            [$relation, $column] = explode('.', $field, 2);
+                            $q->orWhereHas($relation, fn(Builder $qr) => $qr->where($column, 'like', "%{$value}%"));
+                        } else {
+                            $q->orWhere($field, 'like', "%{$value}%");
+                        }
                     }
                 }
             });

@@ -9,6 +9,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
+import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
@@ -24,6 +26,7 @@ import EmptyState   from '@/components/ui/EmptyState';
 import AlertBar     from '@/components/ui/AlertBar';
 import Avatar       from '@/components/ui/Avatar';
 import { useOpeningParties, useOpeningTreasury, openingBalancesApi } from '@/lib/api/endpoints/openingBalances';
+import { ConfirmDialog } from '@/components/ui';
 import { ComboBox } from '@/pages/documents/components/DocumentUIPrimitives';
 import type { TreasuryAccount, PaymentMode } from '@/types';
 import type { ComboOption } from '@/pages/documents/components/DocumentUIPrimitives';
@@ -164,6 +167,7 @@ export default function FinancePage() {
     const modeModal    = useModal();
     const paymentModal = useModal();
     const qc           = useQueryClient();
+    const notify       = useNotification();
 
     // ── Lookups ──────────────────────────────────────────────────────────────
     const { data: rawAccountTypes } = useTreasuryAccountTypes();
@@ -220,11 +224,17 @@ export default function FinancePage() {
     // ── حذف ─────────────────────────────────────────────────────────────────
     const deleteAccount = useMutation({
         mutationFn: (id: number) => apiDelete(`/treasury-accounts/${id}`),
-        onSuccess:  () => qc.invalidateQueries({ queryKey: [slug, 'treasury-accounts'] }),
+        onSuccess:  () => {
+            qc.invalidateQueries({ queryKey: [slug, 'treasury-accounts'] });
+            notify.success('تم الحذف');
+        },
     });
     const deleteMode = useMutation({
         mutationFn: (id: number) => apiDelete(`/payment-modes/${id}`),
-        onSuccess:  () => qc.invalidateQueries({ queryKey: [slug, 'payment-modes'] }),
+        onSuccess:  () => {
+            qc.invalidateQueries({ queryKey: [slug, 'payment-modes'] });
+            notify.success('تم الحذف');
+        },
     });
 
     const openAddAccount  = () => { setEditingAccount(null); accountModal.openModal(); };
@@ -370,6 +380,7 @@ function AccountsTab({
     typeIcon, subTabStyle, KPI_COLORS, KPI_ICONS, openEditAccount,
     deleteAccount, openAddAccount,
 }: any) {
+    const deleteConfirm = useConfirm();
     return (
         <>
             <div className="kpis" style={{ marginBottom: 20 }}>
@@ -479,7 +490,7 @@ function AccountsTab({
                                                     <Button size="xs" icon={<i className="ti ti-pencil"/>}
                                                         onClick={() => openEditAccount(acc)}/>
                                                     <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
-                                                        onClick={() => { if (confirm('حذف الحساب؟')) deleteAccount.mutate(acc.id); }}/>
+                                                        onClick={async () => { if (await deleteConfirm.confirm('حذف الحساب؟')) deleteAccount.mutate(acc.id); }}/>
                                                 </div>
                                             </td>
                                         </tr>
@@ -490,6 +501,8 @@ function AccountsTab({
                     </Card>
                 )}
             </div>
+
+            <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
         </>
     );
 }
@@ -498,6 +511,7 @@ function AccountsTab({
 // TAB 1 — طرق الدفع
 // ════════════════════════════════════════════════════════════════════════════
 function PaymentModesTab({ paymentModes, loadingModes, openEditMode, deleteMode, openAddMode }: any) {
+    const deleteConfirm = useConfirm();
     return (
         <>
             <div className="kpis" style={{ marginBottom: 20 }}>
@@ -555,7 +569,7 @@ function PaymentModesTab({ paymentModes, loadingModes, openEditMode, deleteMode,
                                                 <Button size="xs" icon={<i className="ti ti-pencil"/>}
                                                     onClick={() => openEditMode(mode)}/>
                                                 <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
-                                                    onClick={() => { if (confirm('حذف طريقة الدفع؟')) deleteMode.mutate(mode.id); }}/>
+                                                    onClick={async () => { if (await deleteConfirm.confirm('حذف طريقة الدفع؟')) deleteMode.mutate(mode.id); }}/>
                                             </div>
                                         </td>
                                     </tr>
@@ -565,6 +579,8 @@ function PaymentModesTab({ paymentModes, loadingModes, openEditMode, deleteMode,
                     </div>
                 </Card>
             )}
+
+            <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
         </>
     );
 }
@@ -580,6 +596,8 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes, openEditPay
     openEditPayment: (p: any) => void;
     qc: any;
 }) {
+    const deleteConfirm = useConfirm();
+    const notify        = useNotification();
     const [filters, setFilters] = useState<PaymentFilters>({});
     const [search,  setSearch]  = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -615,6 +633,7 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes, openEditPay
         onSuccess:  () => {
             qc.invalidateQueries({ queryKey: [slug, 'payments'] });
             qc.invalidateQueries({ queryKey: [slug, 'treasury-accounts'] });
+            notify.success('تم الحذف');
         },
     });
 
@@ -755,7 +774,7 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes, openEditPay
                                                 <Button size="xs" icon={<i className="ti ti-pencil"/>}
                                                     onClick={() => openEditPayment(p)}/>
                                                 <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
-                                                    onClick={() => { if (confirm('حذف الدفعة؟')) deletePayment.mutate(p.id); }}/>
+                                                    onClick={async () => { if (await deleteConfirm.confirm('حذف الدفعة؟')) deletePayment.mutate(p.id); }}/>
                                             </div>
                                         </td>
                                     </tr>
@@ -772,6 +791,8 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes, openEditPay
                     )}
                 </Card>
             )}
+
+            <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
         </>
     );
 }
@@ -783,6 +804,8 @@ function OpeningBalancesTab({ slug, selectedYear }: {
     slug: string;
     selectedYear: any | null;
 }) {
+    const deleteConfirm = useConfirm();
+    const notify        = useNotification();
     const [subTab, setSubTab] = useState<'parties' | 'treasury'>('treasury');
     const yearId = selectedYear?.id ?? null;
     const qc = useQueryClient();
@@ -862,7 +885,7 @@ function OpeningBalancesTab({ slug, selectedYear }: {
     const deleteMut = useMutation({
         mutationFn: ({ type, id }: { type: 'party' | 'treasury'; id: number }) =>
             type === 'party' ? openingBalancesApi.deleteParty(id) : openingBalancesApi.deleteTreasury(id),
-        onSuccess: () => { invalidateAll(); },
+        onSuccess: () => { invalidateAll(); notify.success('تم الحذف'); },
     });
 
     const updateTreasuryMut = useMutation({
@@ -1090,7 +1113,7 @@ function OpeningBalancesTab({ slug, selectedYear }: {
                                                             <ActionBtn icon="ti-pencil" color="var(--blue)"
                                                                 onClick={() => startEditTreasury(row)} />
                                                             <ActionBtn icon="ti-trash" color="var(--red)"
-                                                                onClick={() => { if (confirm('حذف هذا الرصيد?')) deleteMut.mutate({ type: 'treasury', id: row.id }); }} />
+                                                                onClick={async () => { if (await deleteConfirm.confirm('حذف هذا الرصيد?')) deleteMut.mutate({ type: 'treasury', id: row.id }); }} />
                                                         </div>
                                                     )}
                                                 </td>
@@ -1295,7 +1318,7 @@ function OpeningBalancesTab({ slug, selectedYear }: {
                                                                 <ActionBtn icon="ti-pencil" color="var(--blue)"
                                                                     onClick={() => startEditParty(row)} />
                                                                 <ActionBtn icon="ti-trash" color="var(--red)"
-                                                                    onClick={() => { if (confirm('حذف هذا الرصيد?')) deleteMut.mutate({ type: 'party', id: row.id }); }} />
+                                                                    onClick={async () => { if (await deleteConfirm.confirm('حذف هذا الرصيد?')) deleteMut.mutate({ type: 'party', id: row.id }); }} />
                                                             </div>
                                                         )}
                                                     </td>
@@ -1363,6 +1386,8 @@ function OpeningBalancesTab({ slug, selectedYear }: {
                     </Card>
                 )
             )}
+
+            <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
         </>
     );
 }

@@ -1,7 +1,79 @@
 # AGENTS.md — Context Cache for AI Coding Agents
 
 ## Date
-2026-07-05
+2026-07-08
+
+### Phase 20a — POS Optimization: Render-Blocking Resources + Self-Hosted Icons (July 8)
+
+**2 render-blocking resources eliminated:**
+
+1. **Tabler Icons CDN → Vite-imported**: Removed CDN `<link>` from `app.blade.php` (was already `media="print"`), imported `tabler-icons.min.css` in `app.jsx` via Vite. Font files (woff2/woff/ttf) now bundled by Vite with content-hashed names — zero 3rd-party DNS/TLS latency, no separate HTTP request.
+
+2. **Google Fonts made non-blocking**: Changed `<link rel="stylesheet">` → `media="print" onload="this.media='all'"` pattern with `<noscript>` fallback.
+
+**Build**: 0 errors, 1040 modules, 4.48s. Chunk sizes unchanged (Tabler icons now in Vite asset pipeline).
+
+**Files modified:**
+- `resources/js/app.jsx:6` — added `import '@tabler/icons-webfont/dist/tabler-icons.min.css'`
+- `resources/views/app.blade.php` — removed Tabler CDN, Google Fonts → non-blocking pattern
+
+### Phase 20b — POS Product Loading Speed (July 8)
+
+**Root cause**: 3 factors caused ~15s serial waterfall for POS API requests:
+1. **PHP session file locking** (`SESSION_DRIVER=file`) — `StartSession` middleware acquires exclusive lock on session file, serializing all concurrent XHR requests from the same session
+2. **No search debounce** — every keystroke triggered a new `LIKE '%...%'` query with 5+ eager-loaded relationships
+3. **Stock-at query unfiltered** — computed stock for ALL products regardless of search/category context
+
+**Fixes applied:**
+
+1. **Session driver `file→cookie`** (`.env:31`) — eliminates PHP file locking, all XHR requests now execute in parallel instead of serial queue
+2. **Search debounce (300ms)** — `useDebounce(pos.searchQuery.trim(), 300)` decouples the input value (instant UI update) from the API query key (debounced). Prevents N rapid API calls per keystroke
+3. **Stock-at gets search/family filter** — when user is searching or browsing a category, the stock query now passes `search` and `family_id` params, reducing the heavy LEFT JOIN subquery result set
+
+**Impact**:
+- Before: 6 sequential requests, ~1s each, total ~15s waterfall
+- After: parallel requests (via cookie sessions), debounced search (300ms), filtered stock-at when searching
+- Build: 0 errors, 1040 modules, 2.54s. Tests: 159/159 pass.
+
+**Files modified:**
+- `.env:31` — `SESSION_DRIVER=file` → `SESSION_DRIVER=cookie`
+- `resources/js/pages/pos/POSPage.tsx:21` — added `useDebounce` import
+- `resources/js/pages/pos/POSPage.tsx:218` — added `debouncedSearch = useDebounce(pos.searchQuery.trim(), 300)`, used in query key/params
+- `resources/js/pages/pos/POSPage.tsx:345` — stock-at query now includes `search` and `family_id` params
+
+### Phase 20c — Shared Hosting Optimizations (July 8)
+
+**6 changes to protect shared hosting (limited PHP memory, no Redis, no ElasticSearch):**
+
+1. **`$perPageLimit = 99999 → 2000`** (`Product.php:135`) — prevents PHP memory exhaustion on shared hosting (typical 128–256MB limit). POS still loads many products, but 2000 is a generous safety cap.
+
+2. **Lazy-loaded product images** (`ProductCard.tsx:72`) — added `loading="lazy"` to every `<img>`. Browser defers offscreen images; critical for 500+ product cards where ~450 are below the fold. Saves 450+ HTTP requests on initial page load.
+
+3. **FULLTEXT search on MySQL** (`ApiListService.php:311`) — `createGlobalSearchFilter` now detects `$fulltextFields` on the model and uses `MATCH(name, description) AGAINST(? IN BOOLEAN MODE)` for MySQL, falling back to `LIKE '%...%'` for `ref`/`barcode` (no fulltext index) and for SQLite. FULLTEXT is 10–100× faster than `LIKE '%...%'` on large tables (used index scan instead of full table scan).
+
+4. **Stock-at cached 30s** (`InventoryStockService.php:89`) — `Cache::remember('stock-at:...', 30, ...)` caches the heavy LEFT JOIN subquery result for 30 seconds. Prevents the 284 KB stock query from running on every keystroke or rapid page navigation.
+
+5. **`Cache::tags()` already safe for file driver** (verified) — `InvalidateModelCacheJob:69` already checks `method_exists(Cache::getStore(), 'tags')` and falls back to `Cache::flush()`. No crashes from file cache driver on shared hosting.
+
+6. **Database indexes already optimal** (verified) — composite indexes on `(company_id, active)`, `(company_id, name, active)`, `(company_id, family_id, brand_id, active)`, FULLTEXT on `(name, description)`, and stock_movements composite `(company_id, product_id, warehouse_id, movement_date)`. No changes needed.
+
+**Files modified:**
+- `app/Models/Product.php:96` — added `$fulltextFields`; `:135` — `$perPageLimit 99999→2000`
+- `resources/js/pos/components/ProductCard.tsx:72` — `loading="lazy"` on `<img>`
+- `app/Core/Services/ApiListService.php:311-347` — FULLTEXT MATCH…AGAINST for MySQL
+- `app/Services/InventoryStockService.php:7,88-89` — Cache::remember 30s for stock-at
+- `resources/js/pos/components/ProductGrid.tsx` — virtual scrolling via @tanstack/react-virtual
+
+**Implemented now: Virtual scrolling** — ProductGrid grid view now uses `@tanstack/react-virtual` for row-level virtualization. Only visible rows (~20-30 cards) are rendered as DOM nodes instead of all 500+ cards (~12,500 DOM elements → ~500-750). `ResizeObserver` dynamically calculates column count per gridSize. Keyboard navigation (`scrollToIndex`) synced. List view left un-virtualised (~3,500 DOM nodes — acceptable).
+
+**Still outstanding (non-blocking):**
+- **Cursor pagination** — POS UX depends on all products being client-side for instant category/sort filtering.
+- **Image CDN / WebP pipeline** — product images are external URLs; would need image proxy or upload pipeline.
+- **Service worker** — no offline PWA; `registerOfflineInterceptor()` provides basic IndexedDB caching via Axios interceptor.
+
+**Preload hint for images** — `ProductCard.tsx:72` already has `loading="lazy"`. Browser defers offscreen fetches.
+
+**Build**: 0 errors, 1044 modules, 2.29s. Tests: 159/159 pass.
 
 ### Updated Scores (Post Phase 19 — Fiscal Stamp Mismatch Fixes)
 - **Architecture**: 10/10
@@ -444,3 +516,81 @@ Report: `docs/reports/PRINT_RUNTIME_SEPARATION_REPORT.md`
 - `resources/js/pages/pos/POSPage.tsx` — `doc.fiscal_stamp` → `doc.total_stamp`
 
 **Verification**: `npm run build` — 0 errors, 1033 modules.
+
+### Unused Tabler CSS Preload Removed (July 8)
+
+**"not used within 3 seconds" warning eliminated**: The `rel="preload"` for Tabler Icons CSS in `app.blade.php` was reverted back to a regular `<link rel="stylesheet">`. Preloading the CSS caused Chromium to emit: `The resource <tabler-icons.min.css> was preloaded but not used within 3 seconds` on pages that don't render any Tabler icons (login, dashboard, settings pages that use Lucide/Feather). The CSS is now loaded normally, eliminating the false-positive console warning.
+
+**`font-display: swap` not applied**: Attempted to override Tabler's `@font-face` in `app.css` with `font-display: swap` but Vite's Lightning CSS optimizer strips `@font-face` rules without `src` pointing to a Vite-resolvable path. Since the original Tabler CSS doesn't specify `font-display`, Chrome shows a cosmetic console warning on slow networks: `"Slow network is detected... 'font-display: swap' is not set"`. This is a dev-only cosmetic warning; no functional impact. To eliminate it, the Tabler CSS source would need patching (e.g., a Vite plugin to inject `font-display: swap` during transform).
+
+**Files modified:**
+- `resources/views/app.blade.php` — reverted Tabler CSS preload → normal `<link>`
+
+### All `window.alert()` calls replaced with toasts (July 8)
+
+**2 files scanned, 7 `alert()` calls replaced:**
+
+| File | Lines | Before | After |
+|------|-------|--------|-------|
+| `CompaniesPage.tsx:689-694` | 6 alerts | `alert('...')` plain native dialog | `notify.success('...')` via `useNotification` hook |
+| `CompaniesPage.tsx:695` | 1 confirm+alert | `confirm(...) && alert('مفعّل')` | `if (confirm(...)) notify.success('مفعّل')` |
+
+`confirm()` calls left unchanged — they serve a different purpose (Yes/No confirmation for destructive actions) and cannot be replaced with non-blocking toasts.
+
+`DataTable.usage.tsx:288` left unchanged — demo file, not used in production.
+
+**Build**: 0 errors, 1044 modules, 2.42s.
+
+### Phase 21 — `confirm()` → `ConfirmDialog` Migration (July 8)
+
+**Problem**: 22 native `window.confirm()` calls across 15 files created blocking dialogs with inconsistent UX. 9 files had no success feedback after destructive actions.
+
+**Solution**: Built reusable `ConfirmDialog` component + `useConfirm` hook:
+
+| File | Description |
+|------|-------------|
+| `components/ui/ConfirmDialog.tsx` | Modal-based confirm dialog (variant: danger/warning/info, custom icon, loading state) |
+| `hooks/useConfirm.ts` | `useConfirm()` → `confirm(msg)` returns `Promise<boolean>` — matches native `confirm()` pattern but non-blocking |
+
+**Files migrated (21 `confirm()` → `ConfirmDialog`)**:
+
+| # | File | confirm() count | Toast added? |
+|---|------|:-:|:-:|
+| 1 | `ChecksPage.tsx` | 1 | ✅ `notify.success('تم حذف الشيك')` |
+| 2 | `UsersPage.tsx` | 2 | ✅ `notify.success('تم الحذف')` |
+| 3 | `UserDrawer/index.tsx` | 2 | ❌ (had `flash$`) |
+| 4 | `UserDrawer/CompaniesTab.tsx` | 1 | ❌ (had `onFlash`) |
+| 5 | `OnboardingPage.tsx` | 1 | ❌ (had `showToast`) |
+| 6 | `SubsidizedProductsPage.tsx` | 1 | ✅ `notify.success('تم الحذف')` |
+| 7 | `RegulatedProductsPage.tsx` | 1 | ✅ `notify.success('تم الحذف')` |
+| 8 | `FinancePage.tsx` | 5 | ✅ `notify.success('تم الحذف')` |
+| 9 | `CompaniesPage.tsx` | 1 | ✅ `notify.success('تم الحذف')` |
+| 10 | `CompanyDrawer/index.tsx` | 2 | ❌ (had `flash$`) |
+| 11 | `POSSettingsModal.tsx` | 1 | ✅ `notify.success('تم إعادة الضبط')` |
+| 12 | `DocumentTypesPage.tsx` | 1 | ✅ `notify.success('تم الحذف')` |
+| 13 | `ProductsPage.tsx` | 1 | ❌ (had `showToast`) |
+| 14 | `POSPage.tsx` | 1 | ❌ (had `sonner`) |
+
+**Toast feedback added to 9 previously silent mutations**: ChecksPage, UsersPage (×2), SubsidizedProductsPage, RegulatedProductsPage, FinancePage (×5), CompaniesPage, POSSettingsModal, DocumentTypesPage.
+
+**New files created**:
+- `resources/js/components/ui/ConfirmDialog.tsx`
+- `resources/js/hooks/useConfirm.ts`
+
+**Verification**: `npm run build` — 0 errors, 1044 modules. `npm test` — 159/159 pass.
+
+### Phase 20c — Virtual Scrolling Card Clarity Fix (July 8)
+
+**Bug**: Product cards in POS grid view appeared visually unclear/squished after virtual scrolling (Phase 20b). Two root causes:
+
+1. **No `pgrid--xs/sm/lg` class** — The new virtual rows rendered without the grid-size CSS class, so all card sub-styles (`.pgrid--xs .pcard-img`, `.pgrid--xs .pcard-name`, etc.) never matched. Every card got default "medium" sizing regardless of `gridSize` setting.
+
+2. **No column cap** — `useEffect` calculated `columns = Math.max(1, Math.floor(w / minW))` with no upper bound. On a 1400px container with `xs` grid size (`minCardWidth=80px`), this produced 17 columns, each card ~82px wide — far too narrow for readable text and 1:1 images.
+
+**Fix** in `ProductGrid.tsx`:
+- Added `MAX_COLS: { xs: 8, sm: 6, md: 5, lg: 4 }` — caps column count so cards maintain readable minimum width
+- Applied `gridMod` class (`pgrid--xs/sm/lg`) to the scroll container — re-enables all card CSS cascade
+- Added `direction: 'rtl'` to virtual row wrapper (Arabic layout)
+- Removed redundant `width: ${100/columns}%` from card wrapper (flex handles it)
+
+**Verification**: `npm run build` — 0 errors, 1044 modules, 3.70s. `npm test` — 159/159 pass.

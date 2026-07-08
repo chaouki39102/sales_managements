@@ -11,6 +11,9 @@ import type { Warehouse, DocumentType } from '@/types';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Switch from '@/components/ui/Switch';
+import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
+import { ConfirmDialog } from '@/components/ui';
 
 interface POSSettingsModalProps {
   settings:      POSSettings;
@@ -70,6 +73,8 @@ export default function POSSettingsModal({
   const [activeTab, setActiveTab] = useState<Tab>('general');
   const [dirty,     setDirty]     = useState(false);
   const [showPin,   setShowPin]   = useState(false);
+  const deleteConfirm = useConfirm();
+  const notify = useNotification();
 
   const patch = (p: Partial<POSSettings>) => {
     setLocal(prev => ({ ...prev, ...p }));
@@ -82,10 +87,11 @@ export default function POSSettingsModal({
     onClose();
   };
 
-  const handleReset = () => {
-    if (!confirm('هل تريد إعادة ضبط كل الإعدادات للقيم الافتراضية؟')) return;
+  const handleReset = async () => {
+    if (!await deleteConfirm.confirm('هل تريد إعادة ضبط كل الإعدادات للقيم الافتراضية؟')) return;
     onReset();
     onClose();
+    notify.success('تم إعادة الضبط');
   };
 
   const invoiceTypes = documentTypes.filter(t =>
@@ -449,6 +455,7 @@ export default function POSSettingsModal({
       <div style={{ height: '55vh', overflowY: 'auto' }}>
         {renderTab()}
       </div>
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </Modal>
   );
 }

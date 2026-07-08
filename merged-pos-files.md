@@ -1,126 +1,8 @@
 
 
 # =========================================
-# 📘 pos
+# 📘 POS Components
 # =========================================
-
-## FILE: resources/js/lib/pos/hooks/usePOSSmartSearch.ts
-```
-import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  searchVariantsEnhanced,
-  clearSearchCache,
-  type SearchResults,
-} from '@/lib/pos/services/posSearchService';
-import type { ProductVariant } from '@/lib/api/core/types';
-
-export interface UsePOSSmartSearchOptions {
-  debounceMs?: number;
-  maxResults?: number;
-  minScore?: number;
-  activeOnly?: boolean;
-}
-
-export interface UsePOSSmartSearchResult {
-  query: string;
-  isSearching: boolean;
-  results: SearchResults;
-  setQuery: (q: string) => void;
-  clearResults: () => void;
-  executionTime: number;
-  totalResults: number;
-}
-
-const DEFAULT_DEBOUNCE = 200;
-
-export function usePOSSmartSearch(
-  variants: ProductVariant[],
-  _families?: Array<{ id: number; name: string; _count?: { products: number } }>,
-  options: UsePOSSmartSearchOptions = {},
-): UsePOSSmartSearchResult {
-  const { debounceMs = DEFAULT_DEBOUNCE, maxResults = 100, minScore, activeOnly = true } = options;
-
-  const [query, setQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<SearchResults>({
-    query: '', results: [], total: 0, executionTime: 0,
-  });
-
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const lastQueryRef = useRef('');
-
-  const performSearch = useCallback(
-    (searchQuery: string) => {
-      setIsSearching(true);
-      try {
-        const searchResults = searchVariantsEnhanced(variants, searchQuery, {
-          maxResults,
-          minScore,
-          activeOnly,
-        });
-        setResults(searchResults);
-      } finally {
-        setIsSearching(false);
-      }
-    },
-    [variants, maxResults, minScore, activeOnly],
-  );
-
-  const handleQueryChange = useCallback((newQuery: string) => {
-    setQuery(newQuery);
-    lastQueryRef.current = newQuery;
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    if (!newQuery.trim()) {
-      setResults({
-        query: '',
-        results: variants
-          .filter(v => (activeOnly ? v.active && v.product?.active : true))
-          .slice(0, maxResults)
-          .map(v => ({ variant: v, score: 0, matchType: 'partial_name' as const })),
-        total: variants.length,
-        executionTime: 0,
-      });
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    debounceTimerRef.current = setTimeout(() => {
-      if (newQuery === lastQueryRef.current) {
-        performSearch(newQuery);
-      }
-    }, debounceMs);
-  }, [variants, performSearch, debounceMs, maxResults, activeOnly]);
-
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
-  }, []);
-
-  const clearResults = useCallback(() => {
-    setQuery('');
-    setResults({ query: '', results: [], total: 0, executionTime: 0 });
-    clearSearchCache();
-  }, []);
-
-  return {
-    query,
-    isSearching,
-    results,
-    setQuery: handleQueryChange,
-    clearResults,
-    executionTime: results.executionTime,
-    totalResults: results.total,
-  };
-}
-
-export default usePOSSmartSearch;
-```
 
 ## FILE: resources/js/lib/pos/services/posSearchService.ts
 ```
@@ -585,7 +467,8 @@ export default {
   createSmartDebouncedSearch,
   clearSearchCache,
   normalizeSearchText,
-};```
+};
+```
 
 ## FILE: resources/js/pages/pos/POSKioskPage.tsx
 ```
@@ -761,7 +644,7 @@ export default function POSKioskPage() {
   const handleCompleteSale = async (params: {
     paymentModeId: number;
     amount:        number;
-    payments?:     Array<{ paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
+    payments?:     Array<{ paymentModeId: number; amount: number; treasuryAccountId?: number | null; reference?: string | null }>;
   }) => {
     const invType     = documentTypes?.find(t => t.code === 'BL')
                      ?? documentTypes?.find(t => t.code === 'FV')
@@ -783,6 +666,8 @@ export default function POSKioskPage() {
           amount:              p.amount,
           payment_date:        new Date().toISOString().slice(0, 10),
           treasury_account_id: p.treasuryAccountId ?? null,
+          reference:           p.reference?.trim() || null,
+          client_ref:          `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         }));
 
       const res = await documentsApi.create({
@@ -997,6 +882,7 @@ export default function POSKioskPage() {
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pages/pos/POSPage.tsx
@@ -1004,9 +890,9 @@ export default function POSKioskPage() {
 // ════════════════════════════════════════════════════════════════════════════
 // pages/pos/POSPage.tsx
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
 import { useCartStore }       from '@/pos/utils/useCartStore';
@@ -1021,7 +907,8 @@ import { apiGet }             from '@/lib/api/core/client';
 import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
 import { documentsApi }       from '@/lib/api/endpoints/documents';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
-import { useAuthUser } from '@/context/AuthContext';
+import { useDebounce }                     from '@/hooks/useDebounce';
+
 import {
   calcFiscalStamp, formatDZD, htToTtc, ttcToHt, calcMargin,
 } from '@/pos/utils/calculations';
@@ -1046,13 +933,6 @@ import FilterPanel              from '@/pos/components/FilterPanel';
 import CategoryTabs             from '@/pos/components/CategoryTabs';
 import ProductGrid              from '@/pos/components/ProductGrid';
 import ProfessionalCart         from '@/pos/components/ProfessionalCart';
-import ProfessionalPaymentModal from '@/pos/components/ProfessionalPaymentModal';
-import HeldCartsModal           from '@/pos/components/HeldCartsModal';
-import ProfessionalReceipt      from '@/pos/components/ProfessionalReceipt';
-import ManualProductModal       from '@/pos/components/ManualProductModal';
-import OpenSessionModal         from '@/pos/components/OpenSessionModal';
-import CloseSessionModal        from '@/pos/components/CloseSessionModal';
-import SessionStatsModal        from '@/pos/components/SessionStatsModal';
 import {
   useCurrentPosSession,
   useOpenSession,
@@ -1060,28 +940,38 @@ import {
   useIncrementSession,
   buildIncrementInput,
 } from '@/lib/api/endpoints/posSession';
-import ReturnsModal             from '@/pos/components/ReturnsModal';
-import SessionInvoicesModal     from '@/pos/components/SessionInvoicesModal';
-import KeyboardHelpModal        from '@/pos/components/KeyboardHelpModal';
-import POSSettingsModal          from '@/pos/components/POSSettingsModal';
-import ManagerPinModal           from '@/pos/components/ManagerPinModal';
+
+const ProfessionalPaymentModal = React.lazy(() => import('@/pos/components/ProfessionalPaymentModal'));
+const HeldCartsModal           = React.lazy(() => import('@/pos/components/HeldCartsModal'));
+const ProfessionalReceipt      = React.lazy(() => import('@/pos/components/ProfessionalReceipt'));
+const ManualProductModal       = React.lazy(() => import('@/pos/components/ManualProductModal'));
+const OpenSessionModal         = React.lazy(() => import('@/pos/components/OpenSessionModal'));
+const CloseSessionModal        = React.lazy(() => import('@/pos/components/CloseSessionModal'));
+const SessionStatsModal        = React.lazy(() => import('@/pos/components/SessionStatsModal'));
+const ReturnsModal             = React.lazy(() => import('@/pos/components/ReturnsModal'));
+const SessionInvoicesModal     = React.lazy(() => import('@/pos/components/SessionInvoicesModal'));
+const KeyboardHelpModal        = React.lazy(() => import('@/pos/components/KeyboardHelpModal'));
+const POSSettingsModal          = React.lazy(() => import('@/pos/components/POSSettingsModal'));
+const ManagerPinModal           = React.lazy(() => import('@/pos/components/ManagerPinModal'));
 import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
 import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
+import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
 import { renderPreviewToHtml, mapCompany }  from '@/pages/settings/print-settings/runtime';
 import { printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
+import { useQueryClient }       from '@tanstack/react-query';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
 import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 import type { CompanyPreviewData } from '@/pages/settings/print-settings/types';
 
-type OrderType = 'dine-in' | 'takeaway' | 'delivery';
-
 const QUICK_ITEMS_KEY = (slug: string) => `pos-quick-items-${slug}`;
 
-export default function POSPage() {
+function POSPage() {
+  const queryClient = useQueryClient();
   const slug        = useActiveSlug();
   const { data: fiscalStampRaw } = useQuery({
     queryKey: [slug, 'settings', 'fiscal_stamp_enabled'],
@@ -1099,7 +989,6 @@ export default function POSPage() {
   const company     = useActiveCompany();
   const navigate    = useNavigate();
 
-  const user = useAuthUser();
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
   const openSessionMut   = useOpenSession();
   const closeSessionMut  = useCloseSession(currentSession?.id ?? null);
@@ -1165,6 +1054,8 @@ export default function POSPage() {
   const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [editingDocStatus, setEditingDocStatus] = useState<string | null>(null);
+  const [editingDocumentDate, setEditingDocumentDate] = useState<string | null>(null);
+  const editingPrevBalanceRef = useRef<number | undefined>(undefined);
 
   const receiptSource = useMemo((): PipelineSource | null => {
     if (!receiptSnapshot) return null;
@@ -1176,8 +1067,6 @@ export default function POSPage() {
     payments: Array<{ paymentModeId: number; amount: number }>;
     dueDate?: string;
   }>();
-  const [orderType, setOrderType] = useState<OrderType>('dine-in');
-
   const [quickItems, setQuickItems] = useState<QuickItem[]>(() => {
     if (!slug) return [];
     try {
@@ -1201,73 +1090,43 @@ export default function POSPage() {
     catch { /* storage full */ }
   }, [quickItems, slug]);
 
-  // ── Pagination ────────────────────────────────────────────────────────────
-  const productPagesRef = useRef<Product[]>([]);
-  const loadedPageRef   = useRef(0);
-  const [page, setPage] = useState(1);
-
-  useEffect(() => {
-    setPage(1);
-    productPagesRef.current = [];
-    loadedPageRef.current   = 0;
-  }, [pos.searchQuery, pos.selectedCategory]);
+  // ── Search & Filters ──────────────────────────────────────────────────────
+  const [sortBy, setSortBy] = useState<SortMode>('name');
+  const [filterInStock, setFilterInStock] = useState(false);
+  const [filterLowStock, setFilterLowStock] = useState(false);
+  const [filterMinPrice, setFilterMinPrice] = useState('');
+  const [filterMaxPrice, setFilterMaxPrice] = useState('');
 
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
-  const [filterMinPrice,  setFilterMinPrice]  = useState('');
-  const [filterMaxPrice,  setFilterMaxPrice]  = useState('');
-  const [filterInStock,   setFilterInStock]   = useState(false);
-  const [filterLowStock,  setFilterLowStock]  = useState(false);
-  const [sortBy,          setSortBy]          = useState<SortMode>('name');
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const searchRef    = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const barcodeTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const isSearching   = pos.searchQuery.trim().length >= 2;
-  const queryFamilyId = pos.selectedCategory ?? undefined;
+  const debouncedSearch = useDebounce(pos.searchQuery.trim(), 300);
+  const isSearching     = debouncedSearch.length >= 2;
+  const queryFamilyId   = pos.selectedCategory ?? undefined;
 
-  // ── Products query ─────────────────────────────────────────────────────────
-  const { data: productsRaw, isLoading: loadingAll, isPlaceholderData } = useQuery({
+  // ── Products query (all products) ───────────────────────────────────────
+  const { data: productsRaw, isLoading: loadingAll } = useQuery({
     queryKey: [slug, 'products', 'pos', {
-      search: pos.searchQuery, cat: pos.selectedCategory, page, per_page: 120,
+      search: debouncedSearch, cat: pos.selectedCategory,
     }],
     queryFn: () => productsApi.list({
-      per_page:  120,
+      per_page:  99999,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
-      search:    isSearching ? pos.searchQuery : undefined,
+      search:    isSearching ? debouncedSearch : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
-      page,
       filter:    { active: 1 },
     }),
     enabled:         !!slug,
     staleTime:       isSearching ? 2 * 60_000 : 5 * 60_000,
-    placeholderData: keepPreviousData,
   });
 
-  const productsPage = Array.isArray(productsRaw)
+  const rawProducts = Array.isArray(productsRaw)
     ? productsRaw
     : (productsRaw as PaginatedResponse<Product>)?.data ?? [];
-  const productsMeta = !Array.isArray(productsRaw)
-    ? (productsRaw as PaginatedResponse<Product>)?.meta ?? null
-    : null;
-
-  // Only accumulate real data (not keepPreviousData placeholder)
-  // This fixes pagination: placeholder renders set loadedPageRef too early,
-  // causing actual page 2+ data to never be accumulated.
-  if (productsPage.length && !isPlaceholderData && page !== loadedPageRef.current) {
-    loadedPageRef.current = page;
-    if (page === 1) {
-      productPagesRef.current = productsPage;
-    } else {
-      const ids     = new Set(productPagesRef.current.map(p => p.id));
-      const newOnes = productsPage.filter(p => !ids.has(p.id));
-      if (newOnes.length) productPagesRef.current = [...productPagesRef.current, ...newOnes];
-    }
-  }
-
-  const rawProducts = productPagesRef.current;
-  const hasMore     = productsMeta ? !productsMeta.is_last_page : false;
 
   // ── Lookups ─────────────────────────────────────────────────────────────────
   const { data: fiscalYearsData } = useFiscalYears();
@@ -1275,14 +1134,24 @@ export default function POSPage() {
 
   const { data: customersData    } = useClients({ per_page: 200 });
   const { data: warehouses       } = useWarehouses();
-  const { data: documentTypes    } = useDocumentTypes();
-  const { data: priceLevels      } = usePriceLevels();
+  const { data: documentTypes }: { data?: DocumentType[] } = useDocumentTypes();
+  const { data: priceLevels }: { data?: PriceLevel[] } = usePriceLevels();
   const { data: currencies       } = useCurrencies();
   const { data: treasuryAccounts } = useTreasuryAccounts();   // ✅ مُضاف
-  const { data: paymentModes     } = usePaymentModes();
+  const { data: paymentModes }: { data?: PaymentMode[] } = usePaymentModes();
 
   const customers        = (customersData as PaginatedResponse<Party>)?.data ?? (customersData as Party[]) ?? [];
-  const priceLevelsList  = priceLevels ?? [];
+  const priceLevelsList: PriceLevel[]  = priceLevels ?? [];
+
+  // ── Client balance ──────────────────────────────────────────────────────────
+  const clientId = pos.client?.id;
+  const { data: clientBalance } = useQuery({
+    queryKey: tenantKeys.partyBalances.detail(slug ?? '', clientId!),
+    queryFn:  () => partyBalancesApi.getOne(clientId!),
+    enabled:  !!slug && !!clientId,
+    staleTime: 30_000,
+  });
+
   const defaultWarehouse = settings.defaultWarehouseId
     ? warehouses?.find(w => w.id === settings.defaultWarehouseId)
     : (warehouses?.find(w => w.is_default) ?? warehouses?.[0] ?? null);
@@ -1360,13 +1229,16 @@ export default function POSPage() {
     }
   }, [negSettingRaw]);
 
-  // ── Stock ──────────────────────────────────────────────────────────────────
+  // ── Stock (filtered when searching) ────────────────────────────────────────
+  const stockSearch = isSearching ? debouncedSearch : undefined;
   const { data: stockData = {}, isLoading: stockLoading } = useQuery<Record<number, number>>({
-    queryKey: [slug, 'pos-stock', effectiveWarehouseId, fiscalYear?.id],
+    queryKey: [slug, 'pos-stock', effectiveWarehouseId, fiscalYear?.id, { search: stockSearch, family_id: queryFamilyId }],
     queryFn:  () =>
       apiGet<unknown[]>('/inventory/stock-at', {
         warehouse_id:   effectiveWarehouseId,
         fiscal_year_id: fiscalYear?.id,
+        ...(stockSearch ? { search: stockSearch } : {}),
+        ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       }).then((rows) =>
         Object.fromEntries(
           (rows as Array<{ id: number; current_stock: number }>)
@@ -1401,8 +1273,8 @@ export default function POSPage() {
   const filteredVariants = useMemo(() => {
     let list = allVariants;
     if (pos.selectedCategory !== null) list = list.filter(v => v.product?.family?.id === pos.selectedCategory);
-    if (settings.hideOutOfStock) list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
-    if (filterInStock)  list = list.filter(v => !v.manages_stock || (v.current_stock ?? 0) > 0);
+    if (settings.hideOutOfStock && !allowNegSetting) list = list.filter(v => !v.manages_stock || v.current_stock === undefined || v.current_stock > 0);
+    if (filterInStock)  list = list.filter(v => !v.manages_stock || v.current_stock === undefined || v.current_stock > 0);
     if (filterLowStock) list = list.filter(v => v.manages_stock && (v.current_stock ?? 0) <= (v.min_stock_alert ?? 0) && (v.current_stock ?? 0) > 0);
     if (filterMinPrice) list = list.filter(v => v.default_selling_price_ht >= parseFloat(filterMinPrice));
     if (filterMaxPrice) list = list.filter(v => v.default_selling_price_ht <= parseFloat(filterMaxPrice));
@@ -1413,7 +1285,7 @@ export default function POSPage() {
       if (sortBy === 'family')     return (a.product?.family?.name ?? '').localeCompare(b.product?.family?.name ?? '', 'ar');
       return (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'ar');
     });
-  }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy]);
+  }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy, allowNegSetting]);
 
   useEffect(() => {
     setHighlightedIndex(0);
@@ -1421,12 +1293,62 @@ export default function POSPage() {
 
   const isEmpty = pos.items.length === 0;
 
-  const clearCartSafe = useCallback(() => {
-    if (settings.confirmOnClear && !isEmpty && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+  const lastClearedSnapshotRef = useRef<{
+    items: CartItem[];
+    client: Party | null;
+    note: string;
+    invoiceDiscountPct: number;
+  } | null>(null);
+  const [canUndoClear, setCanUndoClear] = useState(false);
+  const undoClearTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleClearCart = useCallback((opts?: { skipConfirm?: boolean }) => {
+    if (isEmpty) return;
+    if (settings.confirmOnClear && !opts?.skipConfirm
+        && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+
+    lastClearedSnapshotRef.current = {
+      items:               [...pos.items],
+      client:              pos.client,
+      note:                cartNote,
+      invoiceDiscountPct:  pos.invoiceDiscountPct,
+    };
+    setCanUndoClear(true);
+    clearTimeout(undoClearTimerRef.current);
+    undoClearTimerRef.current = setTimeout(() => {
+      lastClearedSnapshotRef.current = null;
+      setCanUndoClear(false);
+    }, 20_000);
+
     pos.clearCart();
+    pos.setInvoiceDiscountPct(0);
+    setCartNote('');
     setEditingDocumentId(null);
     setEditingDocStatus(null);
-  }, [settings.confirmOnClear, isEmpty, pos]);
+    setEditingDocumentDate(null);
+  }, [settings.confirmOnClear, isEmpty, pos, cartNote]);
+
+  const clearCartSafe = handleClearCart;
+
+  const handleUndoClear = useCallback(() => {
+    const snap = lastClearedSnapshotRef.current;
+    if (!snap) return;
+    useCartStore.setState({
+      items:              snap.items,
+      client:             snap.client,
+      invoiceDiscountPct: snap.invoiceDiscountPct,
+    });
+    setCartNote(snap.note);
+    lastClearedSnapshotRef.current = null;
+    setCanUndoClear(false);
+    clearTimeout(undoClearTimerRef.current);
+    toast.success('تم استرجاع السلة');
+  }, []);
+
+  const handleOpenDrawer = useCallback(async () => {
+    const res = await openCashDrawerViaWebUSB();
+    if (!res.ok) toast.error(res.message ?? 'تعذّر فتح الدرج');
+  }, []);
 
   const handleOpenInvoice = useCallback(async (docId: number) => {
     const cartState = useCartStore.getState();
@@ -1456,7 +1378,7 @@ export default function POSPage() {
           image_url:           null,
           quantity:            Number(line.quantity),
           unit_price_ht:       Number(line.unit_price_ht),
-          selling_price_ttc:   Number(line.unit_price_ht) * (1 + Number(line.tva_rate) / 100),
+          selling_price_ttc:   htToTtc(Number(line.unit_price_ht), Number(line.tva_rate)),
           tva_rate:            Number(line.tva_rate),
           tva_id:              v?.tva_id ?? null,
           discount_percentage: Number(line.discount_percentage),
@@ -1479,6 +1401,8 @@ export default function POSPage() {
       useCartStore.getState().markClean();
       setEditingDocumentId(docId);
       setEditingDocStatus(doc.status);
+      setEditingDocumentDate(doc.document_date ?? null);
+      editingPrevBalanceRef.current = (doc as any)?.balance_data?.previous_balance;
       setShowSessionInvoices(false);
       toast.success(`تم فتح الفاتورة ${doc.document_number}`);
     } catch {
@@ -1487,25 +1411,17 @@ export default function POSPage() {
   }, [isEmpty, pos]);
 
   // ── Invoice discount ───────────────────────────────────────────────────────
+  // ✅ pos.totals (من calcTotals) تُطبِّق الخصم بالفعل ومرة واحدة فقط
   const invoiceDiscountPct    = pos.invoiceDiscountPct;
-  const invoiceDiscountAmount = useMemo(() => {
-    if (!invoiceDiscountPct || invoiceDiscountPct <= 0) return 0;
-    return Math.round(pos.totals.total_ht * invoiceDiscountPct / 100 * 100) / 100;
-  }, [pos.totals.total_ht, invoiceDiscountPct]);
+  const invoiceDiscountAmount = pos.totals.invoice_discount_amount ?? 0;
 
-  const adjustedTotalHt  = pos.totals.total_ht - invoiceDiscountAmount;
-  const adjustedTotalTva = useMemo(() => {
-    if (!pos.totals.total_ht) return pos.totals.total_tva;
-    return pos.items.reduce((s, i) => {
-      const itemHt = i.unit_price_ht * i.quantity * (1 - i.discount_percentage / 100);
-      const share  = itemHt / pos.totals.total_ht;
-      return s + (itemHt - invoiceDiscountAmount * share) * i.tva_rate / 100;
-    }, 0);
-  }, [pos.items, pos.totals.total_ht, invoiceDiscountAmount]);
+  const adjustedTotalHt       = pos.totals.total_ht;
+  const adjustedTotalTva      = pos.totals.total_tva;
+  const fiscalStampAmount = fiscalStampEnabled ? calcFiscalStamp(pos.totals.total_ttc) : 0;
+  const adjustedTotalTtcFinal = pos.totals.total_ht + pos.totals.total_tva + fiscalStampAmount;
 
-  const adjustedTotalTtcFinal = adjustedTotalHt + adjustedTotalTva + pos.totals.fiscal_stamp;
   const existingPaymentsSum = useMemo(
-    () => pos.payments.reduce((s, p) => s + p.amount, 0),
+    () => pos.payments.reduce((s, p) => s + Number(p.amount || 0), 0),
     [pos.payments],
   );
   const remainingToPay = Math.max(0, adjustedTotalTtcFinal - existingPaymentsSum);
@@ -1560,11 +1476,28 @@ export default function POSPage() {
       const tag     = (e.target as HTMLElement)?.tagName;
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
+      // إذا كان أي مودال مفتوح، تجاهل اختصارات الصفحة الرئيسية (المودال يتولى التحكم)
+      const anyModalOpen = modal !== 'none' || showSessionInvoices || showSettings || showCloseSession || !!pinModal;
+      if (anyModalOpen) {
+        // فقط مفتاح Escape يعمل لإغلاق المودال الحالي
+        if (matchOverride(slugRef, 'escape', e)) {
+          e.preventDefault();
+          if (modal !== 'none')                    setModal('none');
+          else if (showSessionInvoices)            setShowSessionInvoices(false);
+          else if (showSettings)                   setShowSettings(false);
+          else if (showCloseSession)               setShowCloseSession(false);
+          else if (pinModal)                       setPinModal(null);
+        }
+        return;
+      }
+
       if (matchOverride(slugRef, 'searchFocus', e))  { e.preventDefault(); searchRef.current?.focus(); }
       if (matchOverride(slugRef, 'payment', e))      { e.preventDefault(); if (!isEmpty) { setModal('payment'); } }
       if (matchOverride(slugRef, 'holdCart', e))     { e.preventDefault(); if (!isEmpty) pos.holdCart(); }
       if (matchOverride(slugRef, 'manualProduct', e)){ e.preventDefault(); setModal('manual'); }
       if (matchOverride(slugRef, 'heldCarts', e))    { e.preventDefault(); setModal('held'); }
+      if (matchOverride(slugRef, 'toggleHeld', e))   { e.preventDefault(); setModal('held'); }
+      if (matchOverride(slugRef, 'sessionInvoices', e)) { e.preventDefault(); setShowSessionInvoices(true); }
       if (matchOverride(slugRef, 'sessionStats', e)) { e.preventDefault(); setModal(m => m === 'session' ? 'none' : 'session'); }
       if (matchOverride(slugRef, 'preview', e)) {
         e.preventDefault();
@@ -1574,8 +1507,11 @@ export default function POSPage() {
         }
       }
       if (matchOverride(slugRef, 'fullscreen', e))  { e.preventDefault(); toggleFullscreen(); }
-      if (matchOverride(slugRef, 'clearCart', e))    { e.preventDefault(); if (!isEmpty) pos.clearCart(); }
+      if (matchOverride(slugRef, 'clearCart', e))    { e.preventDefault(); handleClearCart(); }
       if (matchOverride(slugRef, 'kbHelp', e))       { e.preventDefault(); setModal('kbhelp'); }
+      if (matchOverride(slugRef, 'returns', e))      { e.preventDefault(); setModal('returns'); }
+      if (matchOverride(slugRef, 'openDrawer', e))   { e.preventDefault(); handleOpenDrawer(); }
+      if (matchOverride(slugRef, 'undoClear', e))    { e.preventDefault(); handleUndoClear(); }
 
       if (!inInput) {
         if (matchOverride(slugRef, 'gridView', e))   { e.preventDefault(); setView('grid'); }
@@ -1609,7 +1545,8 @@ export default function POSPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [slug, pos, isEmpty, modal, showFilter, families, selectedCartItemId, toggleFullscreen]);
+  }, [slug, pos, isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal,
+      families, selectedCartItemId, toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear]);
 
   // ── Price Level ────────────────────────────────────────────────────────────
   const applyPriceLevel = useCallback((plId: number | null) => {
@@ -1679,12 +1616,12 @@ export default function POSPage() {
   }, [template, companyData, paperWidth, copies, settings.printMode]);
 
   // ── Complete Sale ──────────────────────────────────────────────────────────
-  const handleCompleteSale = useCallback(async (params: {
+const handleCompleteSale = useCallback(async (params: {
     amountPaid:   number;
     dueDate?:     string;
     note?:        string;
     docTypeCode?: string;
-    payments?:    Array<{ id?: number; paymentModeId: number; amount: number; treasuryAccountId?: number | null }>;
+    payments?:    Array<{ id?: number; paymentModeId: number; amount: number; treasuryAccountId?: number | null; reference?: string | null }>;
     currencyId?:  number | null;
   }) => {
     const typeCode = params.docTypeCode ?? settings.defaultDocTypeCode;
@@ -1713,23 +1650,30 @@ export default function POSPage() {
           amount:              p.amount,
           payment_date:        new Date().toISOString().slice(0, 10),
           treasury_account_id: p.treasuryAccountId ?? defaultTreasury?.id ?? null,
+          reference:           p.reference?.trim() || null,
+          notes:               params.note?.trim() || null,
         }));
 
-      const lineDiscountShare = currentInvDisc > 0
-        ? currentItems.map(i => {
-            const lineHt = i.unit_price_ht * i.quantity * (1 - i.discount_percentage / 100);
-            const share  = currentTotals.total_ht > 0 ? lineHt / currentTotals.total_ht : 0;
-            return share * currentInvDisc;
-          })
-        : currentItems.map(() => 0);
+      const linesPayload = currentItems.map(i => {
+        const compoundedDisc = currentInvDisc > 0
+          ? 100 - (100 - i.discount_percentage) * (100 - currentInvDisc) / 100
+          : i.discount_percentage;
+        return {
+          product_id:          i.product_id,
+          quantity:            i.quantity,
+          unit_price_ht:       i.unit_price_ht,
+          discount_percentage: Math.min(100, compoundedDisc),
+          tva_rate:            i.tva_rate,
+        };
+      });
 
-      const linesPayload = currentItems.map((i, idx) => ({
-        product_id:          i.product_id,
-        quantity:            i.quantity,
-        unit_price_ht:       i.unit_price_ht,
-        discount_percentage: Math.min(100, i.discount_percentage + (lineDiscountShare[idx] || 0)),
-        tva_rate:            i.tva_rate,
-      }));
+      const effectiveTotalHt = linesPayload.reduce((s, l) =>
+        s + l.quantity * l.unit_price_ht * (1 - l.discount_percentage / 100), 0);
+      const effectiveTotalTva = linesPayload.reduce((s, l) => {
+        const lineHt = l.quantity * l.unit_price_ht * (1 - l.discount_percentage / 100);
+        return s + lineHt * l.tva_rate / 100;
+      }, 0);
+      const effectiveTotalTtc = effectiveTotalHt + effectiveTotalTva + snapshot.totals.fiscal_stamp;
 
       const commonPayload = {
         party_id:       currentClient?.id ?? null,
@@ -1740,6 +1684,9 @@ export default function POSPage() {
         due_date:       params.dueDate ?? null,
         notes:          params.note ?? cartNote ?? null,
       };
+
+      // ✅ نحدّد نوع العملية قبل الإرسال لاستعمالها لاحقاً في شرط incrementMut
+      const isEditingExistingDocument = !!editingDocumentId;
 
       let res;
       if (editingDocumentId) {
@@ -1758,15 +1705,20 @@ export default function POSPage() {
         });
       }
 
-      if (currentSession?.id) {
+      // ✅ الإصلاح: لا نزيد إحصائيات الجلسة (gross_sales, invoices_count, ...) إلا
+      // عند إنشاء فاتورة جديدة فعلاً. عند تعديل فاتورة موجودة سبق احتسابها ضمن
+      // نفس الجلسة، استدعاء incrementMut مجدداً كان يُضاعف الأرقام لأن
+      // PosSessionController::increment() يستعمل increment() التراكمي بلا
+      // إلغاء للمساهمة القديمة أولاً.
+      if (currentSession?.id && !isEditingExistingDocument) {
         incrementMut.mutate(
           buildIncrementInput({
             items:            currentItems,
-            totalHt:          snapshot.totals.total_ht,
-            totalTva:         snapshot.totals.total_tva,
+            totalHt:          effectiveTotalHt,
+            totalTva:         effectiveTotalTva,
             totalFiscalStamp: snapshot.totals.fiscal_stamp,
             totalDiscount:    snapshot.totals.total_discount + invoiceDiscountAmount,
-            grandTotal:       snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp,
+            grandTotal:       effectiveTotalTtc,
             payments:         apiPayments.map(p => ({
               payment_mode_id: p.payment_mode_id,
               amount:          p.amount,
@@ -1782,20 +1734,19 @@ export default function POSPage() {
         dueDate: params.dueDate,
       };
 
-      const totalTtcFinal = snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp;
-      const totalPaid     = params.amountPaid;
-      const invoiceRemaining = Math.max(0, totalTtcFinal - totalPaid);
-      const invoiceChange    = Math.max(0, totalPaid - totalTtcFinal);
-      let prevBalance = 0;
-      let newBalance = 0;
+      const totalPaid         = params.amountPaid;
+      const invoiceRemaining  = Math.max(0, effectiveTotalTtc - totalPaid);
+      const invoiceChange     = Math.max(0, totalPaid - effectiveTotalTtc);
+      // SSOT: backend computes balance_data — no more partyBalancesApi.getOne()
+      const bd = (res as any)?.balance_data;
+      const prevBalance = bd?.previous_balance ?? 0;
+      const newBalance  = bd?.new_balance ?? 0;
+
+      // Invalidate client balance so cart & payment modal show updated value
       if (currentClient?.id) {
-        try {
-          const balanceRes = await partyBalancesApi.getOne(currentClient.id);
-          const balanceData = (balanceRes as any)?.data ?? balanceRes;
-          const currentBalance = Number(balanceData?.current_balance ?? 0);
-          prevBalance = Math.max(0, currentBalance - totalTtcFinal + params.amountPaid);
-          newBalance = prevBalance + invoiceRemaining;
-        } catch {}
+        queryClient.invalidateQueries({
+          queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id),
+        });
       }
 
       const fullSnapshot: POSSaleSnapshot = {
@@ -1811,6 +1762,9 @@ export default function POSPage() {
         })),
         totals: {
           ...snapshot.totals,
+          total_ht:  effectiveTotalHt,
+          total_tva: effectiveTotalTva,
+          total_ttc: effectiveTotalTtc,
           paid:      totalPaid,
           change:    invoiceChange,
           remaining: invoiceRemaining,
@@ -1826,6 +1780,8 @@ export default function POSPage() {
       };
       setEditingDocumentId(null);
       setEditingDocStatus(null);
+      setEditingDocumentDate(null);
+      editingPrevBalanceRef.current = undefined;
       receiptSnapshotRef.current = fullSnapshot;
       setReceiptSnapshot(fullSnapshot);
       setLastDocNum(res.document_number);
@@ -1869,7 +1825,7 @@ export default function POSPage() {
         variantId: variant.id,
         name:      variant.product?.name ?? '',
         priceHt:   variant.default_selling_price_ht,
-        tvaRate:   variant.tva?.rate ?? 19,
+        tvaRate:   variant.tva?.rate ?? 0,
       }];
     });
   }, []);
@@ -1900,11 +1856,6 @@ export default function POSPage() {
     }
   }, [filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
 
-  const orderTypeLabels: Record<OrderType, { icon: string; label: string }> = {
-    'dine-in':  { icon: 'ti-building-store', label: 'طاولة' },
-    'takeaway': { icon: 'ti-shopping-bag',   label: 'استلام' },
-    'delivery': { icon: 'ti-truck-delivery', label: 'توصيل' },
-  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -1914,28 +1865,30 @@ export default function POSPage() {
       id="p-pos"
       dir="rtl"
     >
-      {/* جلسة مطلوبة — تظهر إذا لم تكن هناك جلسة مفتوحة */}
       {!sessionLoading && !currentSession && (
-        <OpenSessionModal
-          warehouses={warehouses ?? []}
-          fiscalYears={fiscalYears ?? []}
-          defaultWarehouseId={defaultWarehouse?.id}
-          defaultFiscalYearId={fiscalYear?.id}
-          isLoading={openSessionMut.isPending}
-          error={sessionError}
-          onOpen={handleOpenSession}
-        />
+        <Suspense fallback={null}>
+          <OpenSessionModal
+            warehouses={warehouses ?? []}
+            fiscalYears={fiscalYears ?? []}
+            defaultWarehouseId={defaultWarehouse?.id}
+            defaultFiscalYearId={fiscalYear?.id}
+            isLoading={openSessionMut.isPending}
+            error={sessionError}
+            onOpen={handleOpenSession}
+          />
+        </Suspense>
       )}
 
-      {/* نافذة إغلاق الجلسة */}
       {showCloseSession && currentSession && (
-        <CloseSessionModal
-          session={currentSession}
-          isLoading={closeSessionMut.isPending}
-          error={closeSessionMut.error?.message ?? null}
-          onClose={() => setShowCloseSession(false)}
-          onConfirm={handleCloseSession}
-        />
+        <Suspense fallback={null}>
+          <CloseSessionModal
+            session={currentSession}
+            isLoading={closeSessionMut.isPending}
+            error={closeSessionMut.error?.message ?? null}
+            onClose={() => setShowCloseSession(false)}
+            onConfirm={handleCloseSession}
+          />
+        </Suspense>
       )}
 
       <POSTopBar
@@ -1948,6 +1901,7 @@ export default function POSPage() {
         items={pos.items}
         totals={pos.totals}
         totalTtcFinal={adjustedTotalTtcFinal}
+        slug={slug}
         onHeld={() => setModal('held')}
         onNewSale={() => isEmpty ? pos.clearCart() : pos.holdCart()}
         onManual={() => setModal('manual')}
@@ -1965,15 +1919,9 @@ export default function POSPage() {
         onSettings={() => setShowSettings(true)}
         onToggleQuickbar={handleToggleQuickbar}
         onKioskMode={() => navigate('/pos/kiosk')}
+        onOpenDrawer={handleOpenDrawer}
       />
 
-      <div className="pos-order-type">
-        {(Object.entries(orderTypeLabels) as [OrderType, { icon: string; label: string }][]).map(([key, { icon, label }]) => (
-          <button key={key} className={`pot-btn ${orderType === key ? 'on' : ''}`} onClick={() => setOrderType(key)}>
-            <i className={`ti ${icon}`} />{label}
-          </button>
-        ))}
-      </div>
 
       {showQuickbar && quickItems.length > 0 && (
         <QuickItemsBar
@@ -2006,6 +1954,7 @@ export default function POSPage() {
             onArrowUp={handleArrowUp}
             onArrowDown={handleArrowDown}
             keyboardNavEnabled={settings.keyboardNav}
+            slug={slug}
           />
           {showFilter && (
             <FilterPanel
@@ -2019,7 +1968,7 @@ export default function POSPage() {
           <CategoryTabs families={families} selected={pos.selectedCategory} onSelect={pos.setCategory} />
           <ProductGrid
             variants={filteredVariants} view={view} gridSize={gridSize}
-            loading={loadingAll} hasMore={hasMore} onLoadMore={() => setPage(p => p + 1)}
+            loading={loadingAll}
             onAdd={handleAddItem} onAddManual={() => setModal('manual')}
             highlightedIndex={highlightedIndex}
             onHighlightIndexChange={setHighlightedIndex}
@@ -2043,112 +1992,150 @@ export default function POSPage() {
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onSetClient={pos.setClient} onPriceLevelChange={applyPriceLevel}
           onNoteChange={setCartNote} onHold={pos.holdCart}
-          onSell={() => setModal('payment')} onClear={clearCartSafe} onHeld={() => setModal('held')}
+          onSell={() => setModal('payment')} onClear={handleClearCart} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           remainingToPay={remainingToPay}
           invoiceDiscountPct={pos.invoiceDiscountPct}
-          onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
+          onInvoiceDiscountChange={pct => {
+            const check = checkDiscountAllowed(pct, settings);
+            if (!check.allowed && check.reason === 'max_exceeded') {
+              toast.error(`الخصم ${pct}% تجاوز الحد الأقصى (${settings.maxDiscountPct}%)`);
+              return;
+            }
+            if (!check.allowed && check.reason === 'pin_required') {
+              setPinModal({ requestedDiscount: pct, reason: 'pin_required', onSuccess: () => pos.setInvoiceDiscountPct(pct) });
+              return;
+            }
+            pos.setInvoiceDiscountPct(pct);
+          }}
           invoiceDiscountAmount={invoiceDiscountAmount}
+          onUndoClear={handleUndoClear}
+          canUndoClear={canUndoClear}
+          clientBalance={clientBalance?.current_balance}
+          slug={slug}
         />
       </div>
 
       {/* ── Modals ── */}
 
       {modal === 'payment' && (
-        /* ✅ ProfessionalPaymentModal v2 — مع treasuryAccounts + numpad */
-        <ProfessionalPaymentModal
-          totals={pos.totals} client={pos.client}
-          paymentModes={paymentModes ?? []}
-          documentTypes={documentTypes ?? []}
-          currencies={currencies ?? []}
-          treasuryAccounts={treasuryAccounts ?? []}           // ✅ جديد
-          totalTtcFinal={adjustedTotalTtcFinal}
-          existingPayments={pos.payments}
-          onClose={() => setModal('none')}
-          onConfirm={handleCompleteSale}
-        />
+        <Suspense fallback={null}>
+          <ProfessionalPaymentModal
+            totals={pos.totals} client={pos.client}
+            paymentModes={paymentModes ?? []}
+            documentTypes={documentTypes ?? []}
+            currencies={currencies ?? []}
+            treasuryAccounts={treasuryAccounts ?? []}
+            totalTtcFinal={adjustedTotalTtcFinal}
+            existingPayments={pos.payments}
+            isEditing={editingDocumentId !== null}
+            documentDate={editingDocumentDate ?? new Date().toISOString().slice(0, 10)}
+            prevBalance={editingDocumentId ? editingPrevBalanceRef.current : clientBalance?.current_balance}
+            onClose={() => setModal('none')}
+            onConfirm={handleCompleteSale}
+          />
+        </Suspense>
       )}
 
       {modal === 'held' && (
-        <HeldCartsModal
-          carts={pos.heldCarts} onClose={() => setModal('none')}
-          onRestore={id => { pos.restoreCart(id); setModal('none'); }}
-          onDelete={pos.deleteHeldCart}
-        />
+        <Suspense fallback={null}>
+          <HeldCartsModal
+            carts={pos.heldCarts} onClose={() => setModal('none')}
+            onRestore={id => { pos.restoreCart(id); setModal('none'); }}
+            onDelete={pos.deleteHeldCart}
+            onRestoreAndPay={id => { pos.restoreCart(id); setModal('payment'); }}
+          />
+        </Suspense>
       )}
 
       {modal === 'receipt' && receiptSnapshot && receiptSource && template && (
-        <ProfessionalReceipt
-          template={template}
-          company={companyData}
-          source={receiptSource}
-          docNumber={receiptSnapshot.docNum}
-          onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
-          onPrint={() => {
-            handlePrintDirect(receiptSnapshot);
-          }}
-          onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
-        />
+        <Suspense fallback={null}>
+          <ProfessionalReceipt
+            template={template}
+            company={companyData}
+            source={receiptSource}
+            docNumber={receiptSnapshot.docNum}
+            onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
+            onPrint={() => { handlePrintDirect(receiptSnapshot); }}
+            onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
+          />
+        </Suspense>
       )}
 
       {modal === 'manual' && (
-        <ManualProductModal
-          onClose={() => setModal('none')}
-          onAdd={(name, priceTtc, qty, tvaRate) => {
-            pos.addItem(makeFakeVariant(name, ttcToHt(priceTtc, tvaRate), tvaRate), qty);
-            setModal('none');
-          }}
-        />
+        <Suspense fallback={null}>
+          <ManualProductModal
+            onClose={() => setModal('none')}
+            onAdd={(name, priceTtc, qty, tvaRate) => {
+              pos.addItem(makeFakeVariant(name, ttcToHt(priceTtc, tvaRate), tvaRate), qty);
+              setModal('none');
+            }}
+          />
+        </Suspense>
       )}
 
       {showSessionInvoices && currentSession && (
-        <SessionInvoicesModal
-          session={currentSession}
-          onClose={() => setShowSessionInvoices(false)}
-          onOpen={handleOpenInvoice}
-        />
+        <Suspense fallback={null}>
+          <SessionInvoicesModal
+            session={currentSession}
+            onClose={() => setShowSessionInvoices(false)}
+            onOpen={handleOpenInvoice}
+          />
+        </Suspense>
       )}
 
       {modal === 'session' && currentSession && (
-        <SessionStatsModal
-          session={currentSession}
-          onClose={() => setModal('none')}
-          onEndSession={() => { setModal('none'); setShowCloseSession(true); }}
-        />
+        <Suspense fallback={null}>
+          <SessionStatsModal
+            session={currentSession}
+            onClose={() => setModal('none')}
+            onEndSession={() => { setModal('none'); setShowCloseSession(true); }}
+          />
+        </Suspense>
       )}
 
       {modal === 'returns' && (
-        <ReturnsModal
-          documentTypes={documentTypes ?? []}
-          defaultWarehouseId={defaultWarehouse?.id}
-          fiscalYearId={fiscalYear?.id}
-          onClose={() => setModal('none')}
-          onDone={() => setModal('none')}
-        />
+        <Suspense fallback={null}>
+          <ReturnsModal
+            documentTypes={documentTypes ?? []}
+            defaultWarehouseId={defaultWarehouse?.id}
+            fiscalYearId={fiscalYear?.id}
+            onClose={() => setModal('none')}
+            onDone={() => setModal('none')}
+          />
+        </Suspense>
       )}
 
-      {modal === 'kbhelp' && <KeyboardHelpModal onClose={() => setModal('none')} />}
+      {modal === 'kbhelp' && (
+        <Suspense fallback={null}>
+          <KeyboardHelpModal onClose={() => setModal('none')} />
+        </Suspense>
+      )}
 
       {showSettings && (
-        <POSSettingsModal
-          settings={settings}
-          onSave={setSettings}
-          onReset={resetSettings}
-          onClose={() => setShowSettings(false)}
-          warehouses={warehouses ?? []}
-          documentTypes={documentTypes ?? []}
-        />
+        <Suspense fallback={null}>
+          <POSSettingsModal
+            settings={settings}
+            onSave={setSettings}
+            onReset={resetSettings}
+            onClose={() => setShowSettings(false)}
+            warehouses={warehouses ?? []}
+            documentTypes={documentTypes ?? []}
+          />
+        </Suspense>
       )}
 
       {pinModal && (
-        <ManagerPinModal
-          requestedDiscount={pinModal.requestedDiscount}
-          threshold={pinModal.reason === 'max_exceeded' ? settings.maxDiscountPct : settings.discountPinThreshold}
-          reason={pinModal.reason}
-          onSuccess={() => { pinModal.onSuccess(); setPinModal(null); }}
-          onCancel={() => setPinModal(null)}
-          verifyPin={pin => pin === settings.managerPin}
-        />
+        <Suspense fallback={null}>
+          <ManagerPinModal
+            requestedDiscount={pinModal.requestedDiscount}
+            threshold={pinModal.reason === 'max_exceeded' ? settings.maxDiscountPct : settings.discountPinThreshold}
+            reason={pinModal.reason}
+            onSuccess={() => { pinModal.onSuccess(); setPinModal(null); }}
+            onCancel={() => setPinModal(null)}
+            verifyPin={pin => pin === settings.managerPin}
+          />
+        </Suspense>
       )}
 
       <Toaster position="top-left" richColors closeButton
@@ -2156,7 +2143,11 @@ export default function POSPage() {
       />
     </div>
   );
-}```
+}
+
+export default React.memo(POSPage);
+
+```
 
 ## FILE: resources/js/pages/pos/PosSessionsPage.tsx
 ```
@@ -2364,6 +2355,7 @@ export default function PosSessionsPage() {
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/CartRow.tsx
@@ -2769,11 +2761,12 @@ export default function CartRow({
       </button>
     </div>
   );
-}```
+}
+```
 
 ## FILE: resources/js/pos/components/CategoryTabs.tsx
 ```
-import React from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { familyIcon } from '../utils/posHelpers';
 
 interface CategoryTabsProps {
@@ -2782,76 +2775,73 @@ interface CategoryTabsProps {
   onSelect: (id: number | null) => void;
 }
 
+const SCROLL_AMOUNT = 200;
+
 export default function CategoryTabs({
   families, selected, onSelect,
 }: CategoryTabsProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    const maxScroll = Math.max(0, scrollWidth - clientWidth);
+    if (maxScroll === 0) {
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+      return;
+    }
+    // RTL: scrollLeft ∈ [-maxScroll, 0],  LTR: scrollLeft ∈ [0, maxScroll]
+    if (scrollLeft < 0) {
+      // RTL: -maxScroll = at start (right edge), 0 = at end (left edge)
+      setCanScrollLeft(scrollLeft < -1);              // not at end → hidden on left
+      setCanScrollRight(scrollLeft > -maxScroll + 1); // not at start → hidden on right
+    } else {
+      // LTR: 0 = at start (left edge), maxScroll = at end (right edge)
+      setCanScrollLeft(scrollLeft > 1);
+      setCanScrollRight(scrollLeft < maxScroll - 1);
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener('scroll', checkScroll, { passive: true });
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', checkScroll);
+      ro.disconnect();
+    };
+  }, [checkScroll, families.length]);
+
+  // Auto-scroll to selected category
+  useEffect(() => {
+    if (selected === null || !scrollRef.current) return;
+    const btn = scrollRef.current.querySelector<HTMLButtonElement>(`[data-cat-id="${selected}"]`);
+    btn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }, [selected]);
+
+  const scrollByAmount = useCallback((dir: 'left' | 'right') => {
+    scrollRef.current?.scrollBy({ left: dir === 'left' ? SCROLL_AMOUNT : -SCROLL_AMOUNT, behavior: 'smooth' });
+  }, []);
+
   if (!families.length) return null;
+
   return (
-    <div className="pos-cats">
+    <div className="pos-cats-wrapper">
       <button
-        className={`pos-cat ${selected === null ? 'on' : ''}`}
-        onClick={() => onSelect(null)}
-        title="الكل — Alt+0"
+        className={`pos-cats-btn pos-cats-btn-left ${canScrollLeft ? 'show' : ''}`}
+        onClick={() => scrollByAmount('left')}
+        aria-label="التصنيفات السابقة"
       >
-        <i className="ti ti-layout-2" />
-        <span>الكل</span>
+        <i className="ti ti-chevron-right" />
       </button>
-      {families.map((f, idx) => (
-        <button
-          key={f.id}
-          className={`pos-cat ${selected === f.id ? 'on' : ''}`}
-          onClick={() => onSelect(f.id)}
-          title={`${f.name} — Alt+${idx + 1}`}
-        >
-          <i className={`ti ${familyIcon(f.name)}`} />
-          <span>{f.name}</span>
-          {idx < 9 && <kbd className="cat-kb">Alt+{idx + 1}</kbd>}
-        </button>
-      ))}
-    </div>
-  );
-}
-```
-
-## FILE: resources/js/pos/components/CategoryTabsEnhanced.tsx
-```
-import React, { useMemo } from 'react';
-import { useAllFamilies } from '@/lib/api/endpoints/productsEnhanced';
-import { familyIcon } from '../utils/posHelpers';
-import type { ProductVariant } from '@/lib/api/core/types';
-
-interface CategoryTabsEnhancedProps {
-  selected: number | null;
-  onSelect: (id: number | null) => void;
-  families?: Array<{ id: number; name: string; _count?: { products: number } }>;
-  allowAll?: boolean;
-  maxVisible?: number;
-  className?: string;
-}
-
-const DEFAULT_MAX = 15;
-
-export default function CategoryTabsEnhanced({
-  selected,
-  onSelect,
-  families: externalFamilies,
-  allowAll = true,
-  maxVisible = DEFAULT_MAX,
-  className = '',
-}: CategoryTabsEnhancedProps) {
-  const { data: apiFamilies, isLoading } = useAllFamilies();
-
-  const activeFamilies = useMemo(() => {
-    const source = externalFamilies ?? (apiFamilies as Array<{ id: number; name: string; _count?: { products: number } }> | undefined) ?? [];
-    return source.slice(0, maxVisible);
-  }, [externalFamilies, apiFamilies, maxVisible]);
-
-  if (isLoading && !activeFamilies.length) return null;
-  if (!activeFamilies.length) return null;
-
-  return (
-    <div className={`pos-cats ${className}`}>
-      {allowAll && (
+      <div className="pos-cats" ref={scrollRef}>
         <button
           className={`pos-cat ${selected === null ? 'on' : ''}`}
           onClick={() => onSelect(null)}
@@ -2860,22 +2850,31 @@ export default function CategoryTabsEnhanced({
           <i className="ti ti-layout-2" />
           <span>الكل</span>
         </button>
-      )}
-      {activeFamilies.map((f, idx) => (
-        <button
-          key={f.id}
-          className={`pos-cat ${selected === f.id ? 'on' : ''}`}
-          onClick={() => onSelect(f.id)}
-          title={`${f.name} — Alt+${idx + 1}`}
-        >
-          <i className={`ti ${familyIcon(f.name)}`} />
-          <span>{f.name}</span>
-          {idx < 9 && <kbd className="cat-kb">Alt+{idx + 1}</kbd>}
-        </button>
-      ))}
+        {families.map((f, idx) => (
+          <button
+            key={f.id}
+            data-cat-id={f.id}
+            className={`pos-cat ${selected === f.id ? 'on' : ''}`}
+            onClick={() => onSelect(f.id)}
+            title={`${f.name} — Alt+${idx + 1}`}
+          >
+            <i className={`ti ${familyIcon(f.name)}`} />
+            <span>{f.name}</span>
+            {idx < 9 && <kbd className="cat-kb">Alt+{idx + 1}</kbd>}
+          </button>
+        ))}
+      </div>
+      <button
+        className={`pos-cats-btn pos-cats-btn-right ${canScrollRight ? 'show' : ''}`}
+        onClick={() => scrollByAmount('right')}
+        aria-label="التصنيفات التالية"
+      >
+        <i className="ti ti-chevron-left" />
+      </button>
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/CloseSessionModal.tsx
@@ -3324,6 +3323,7 @@ export default function CloseSessionModal({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/CustomerSearchModal.tsx
@@ -3391,14 +3391,12 @@ function useDebounce<T>(value: T, delay: number): T {
 
 function BalanceLabel({ balance }: { balance: PartyBalance | undefined }) {
   if (!balance || balance.current_balance === 0) return null;
-  const isDebit = balance.balance_type === 'debit';
   return (
     <div style={{
       fontSize: 11, marginTop: 2, direction: 'ltr', textAlign: 'right',
-      color: isDebit ? '#e53935' : '#43a047',
+      color: balance.current_balance >= 0 ? '#ef4444' : '#22c55e',
       fontWeight: 600,
     }}>
-      {isDebit ? 'مدين: ' : 'دائن: '}
       {formatCurrency(balance.current_balance)}
     </div>
   );
@@ -3473,8 +3471,9 @@ export default function CustomerSearchModal({
         const data = (r as any)?.data ?? r;
         return Array.isArray(data) ? data : [];
       }),
-    enabled:   !!slug,
-    staleTime: 60_000,
+    enabled:           !!slug,
+    staleTime:         60_000,
+    refetchOnMount:    'always',
   });
 
   const balanceMap = useMemo(() => {
@@ -3775,6 +3774,7 @@ export default function CustomerSearchModal({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/FilterPanel.tsx
@@ -3842,11 +3842,12 @@ export default function FilterPanel({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/HeldCartsModal.tsx
 ```
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { HeldCart, CartItem } from '@/types';
 import { formatDZD } from '../utils/calculations';
 
@@ -3855,15 +3856,70 @@ interface HeldCartsModalProps {
   onClose: () => void;
   onRestore: (id: string) => void;
   onDelete: (id: string) => void;
+  onRestoreAndPay?: (id: string) => void;
 }
 
 export default function HeldCartsModal({
-  carts, onClose, onRestore, onDelete,
+  carts, onClose, onRestore, onDelete, onRestoreAndPay,
 }: HeldCartsModalProps) {
   const [search, setSearch] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+
   const filtered = carts.filter(c =>
     !search || c.items?.some((i: CartItem) => i.product_name?.includes(search)) || c.client?.name?.includes(search)
   );
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [search, carts.length]);
+
+  useEffect(() => {
+    if (!listRef.current) return;
+    const el = listRef.current.children[selectedIndex] as HTMLElement | undefined;
+    el?.scrollIntoView?.({ block: 'nearest' });
+  }, [selectedIndex]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    const inInput = tag === 'INPUT' || tag === 'TEXTAREA';
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(i => Math.min(i + 1, filtered.length - 1));
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(i => Math.max(i - 1, 0));
+      return;
+    }
+    if (e.key === 'Enter') {
+      if (filtered.length === 0) return;
+      const selected = filtered[selectedIndex];
+      if (!selected) return;
+      e.preventDefault();
+      onRestore(selected.id);
+      return;
+    }
+    if (e.key === 'Delete' && !inInput) {
+      if (filtered.length === 0) return;
+      const selected = filtered[selectedIndex];
+      if (!selected) return;
+      e.preventDefault();
+      onDelete(selected.id);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  }, [filtered, selectedIndex, onRestore, onRestoreAndPay, onDelete, onClose]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown as EventListener);
+    return () => window.removeEventListener('keydown', handleKeyDown as EventListener);
+  }, [handleKeyDown]);
 
   return (
     <div className="ov on" onClick={onClose}>
@@ -3884,9 +3940,14 @@ export default function HeldCartsModal({
                 <i className="ti ti-search" style={{ fontSize: 13, color: 'var(--t4)' }} />
                 <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث في المعلقة..." />
               </div>
-              <div className="held-list">
-                {filtered.map((c: HeldCart) => (
-                  <div key={c.id} className="held-card">
+              <div className="held-list" ref={listRef}>
+                {filtered.map((c: HeldCart, i: number) => (
+                  <div
+                    key={c.id}
+                    className={`held-card${i === selectedIndex ? ' held-sel' : ''}`}
+                    onClick={() => onRestore(c.id)}
+                    onDoubleClick={() => { onRestoreAndPay?.(c.id) ?? onRestore(c.id); }}
+                  >
                     <div className="hc-info">
                       <div className="hc-client">{c.client?.name ?? 'زبون عابر'}</div>
                       <div className="hc-meta">
@@ -3896,10 +3957,10 @@ export default function HeldCartsModal({
                       <div className="hc-time">{new Date(c.heldAt).toLocaleTimeString('ar-DZ')}</div>
                     </div>
                     <div className="hc-acts">
-                      <button className="btn btn-sm btn-p" onClick={() => onRestore(c.id)}>
+                      <button className="btn btn-sm btn-p" onClick={e => { e.stopPropagation(); onRestore(c.id); }}>
                         <i className="ti ti-restore" /> استرجاع
                       </button>
-                      <button className="btn btn-sm btn-r" onClick={() => onDelete(c.id)}>
+                      <button className="btn btn-sm btn-r" onClick={e => { e.stopPropagation(); onDelete(c.id); }}>
                         <i className="ti ti-trash" />
                       </button>
                     </div>
@@ -3916,13 +3977,14 @@ export default function HeldCartsModal({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/KeyboardHelpModal.tsx
 ```
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useActiveSlug } from '@/lib/store/appStore';
-import { readOverrides, KB_DEFAULTS, normalizeEventKey } from '@/pos/hooks/useKeyboardMap';
+import { readOverrides, saveOverrides, KB_DEFAULTS, normalizeEventKey } from '@/pos/hooks/useKeyboardMap';
 
 interface KeyboardHelpModalProps {
   onClose: () => void;
@@ -3960,10 +4022,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
   const captureRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!slug) return;
-    try {
-      localStorage.setItem(`pos-kb-override-${slug}`, JSON.stringify(overrides));
-    } catch {}
+    saveOverrides(slug, overrides);
   }, [overrides, slug]);
 
   const groups: ShortcutGroup[] = [
@@ -3987,11 +4046,13 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
         { action: 'sessionStats', defaultKey: 'F8', desc: 'إحصاءات الجلسة' },
         { action: 'fullscreen', defaultKey: 'F11', desc: 'وضع الشاشة الكاملة' },
         { action: 'directPrint', defaultKey: 'Ctrl+P', desc: 'طباعة مباشرة' },
+        { action: 'sessionInvoices', defaultKey: 'Ctrl+Shift+I', desc: 'فواتير الجلسة' },
       ],
     },
     {
       title: 'التنقل والعرض',
       items: [
+        { action: 'toggleHeld', defaultKey: 'Ctrl+ArrowRight', desc: 'التنقل بين السلة والمعلقة' },
         { action: 'quickSearch', defaultKey: 'Ctrl+F', desc: 'البحث السريع' },
         { action: 'gridView', defaultKey: 'Ctrl+ArrowUp', desc: 'عرض الشبكة' },
         { action: 'listView', defaultKey: 'Ctrl+ArrowDown', desc: 'عرض القائمة' },
@@ -4022,7 +4083,9 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
   ];
 
   function displayKey(item: ShortcutItem): string {
-    return overrides[item.action] ?? item.defaultKey;
+    const val = overrides[item.action];
+    if (val === '') return '—';
+    return val ?? item.defaultKey;
   }
 
   function isDuplicate(action: string, newKey: string): string | null {
@@ -4051,6 +4114,24 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
     e.stopPropagation();
 
     const combo = normalizeEventKey(e as unknown as KeyboardEvent);
+
+    // تجاهل مفاتيح التعديل وحدها (Ctrl, Alt, Shift, Meta) — ننتظر المفتاح التالي
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
+      return;
+    }
+
+    // مفتاح الحذف ← إلغاء تعيين الاختصار
+    if (combo === 'Delete' || combo === 'Backspace') {
+      setOverrides(prev => {
+        const next = { ...prev, [editing]: '' };
+        return next;
+      });
+      setEditing(null);
+      setListening(false);
+      setConflict(null);
+      return;
+    }
+
     if (combo === 'Escape') {
       setEditing(null);
       setListening(false);
@@ -4105,7 +4186,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
         <div className="m-body">
           {listening && editing && (
             <div className="al al-i" style={{ marginBottom: 12 }}>
-              <i className="ti ti-keyboard" /> اضغط المفتاح الذي تريد تعيينه لـ "<b>{groups.flatMap(g => g.items).find(i => i.action === editing)?.desc}</b>" — <b>Esc</b> للإلغاء
+              <i className="ti ti-keyboard" /> اضغط المفتاح الذي تريد تعيينه لـ "<b>{groups.flatMap(g => g.items).find(i => i.action === editing)?.desc}</b>" — <b>Esc</b> للإلغاء — يمكنك استخدام تركيبة مثل <kbd style={{background:'var(--bg4)',padding:'1px 5px',borderRadius:3}}>Ctrl+K</kbd>
             </div>
           )}
           {conflict && (
@@ -4138,6 +4219,20 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
                           </kbd>
                         )}
                         <span className="kb-desc">{s.desc}</span>
+                        {!isEditing && cur !== '—' && (
+                          <button
+                            className="kb-clear-btn"
+                            onClick={() => {
+                              setOverrides(prev => {
+                                const next = { ...prev, [s.action]: '' };
+                                return next;
+                              });
+                            }}
+                            title="إلغاء تعيين الاختصار"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -4153,6 +4248,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/LiveSessionBanner.tsx
@@ -4223,6 +4319,7 @@ export default function LiveSessionBanner({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/ManagerPinModal.tsx
@@ -4450,6 +4547,7 @@ export default function ManagerPinModal({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/ManualProductModal.tsx
@@ -4555,6 +4653,7 @@ export default function ManualProductModal({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/MobileTabs.tsx
@@ -4588,6 +4687,7 @@ export default function MobileTabs({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/OpenSessionModal.tsx
@@ -4952,6 +5052,7 @@ export default function OpenSessionModal({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/PosSessionsCards.tsx
@@ -5048,6 +5149,7 @@ export default function PosSessionsCards({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/PosSessionsFilters.tsx
@@ -5145,6 +5247,7 @@ export default function PosSessionsFilters({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/PosSessionsPagination.tsx
@@ -5207,6 +5310,7 @@ export default function PosSessionsPagination({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/PosSessionsTable.tsx
@@ -5336,6 +5440,7 @@ export default function PosSessionsTable({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/POSSettingsModal.tsx
@@ -5788,12 +5893,13 @@ export default function POSSettingsModal({
       </div>
 
       {/* Body */}
-      <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+      <div style={{ height: '55vh', overflowY: 'auto' }}>
         {renderTab()}
       </div>
     </Modal>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/POSTopBar.tsx
@@ -5802,6 +5908,7 @@ import React from 'react';
 import type { CartItem, CartTotals } from '@/types';
 import type { PosSession }           from '@/lib/api/endpoints/posSession';
 import { formatDZD }                 from '../utils/calculations';
+import { getEffectiveShortcut, KB_DEFAULTS, useKbOverrides } from '../hooks/useKeyboardMap';
 
 interface POSTopBarProps {
   session:         PosSession | null | undefined;
@@ -5813,6 +5920,7 @@ interface POSTopBarProps {
   items:           CartItem[];
   totals:          CartTotals;
   totalTtcFinal:   number;
+  slug:            string | null;
   onHeld:          () => void;
   onNewSale:       () => void;
   onManual:        () => void;
@@ -5825,19 +5933,23 @@ interface POSTopBarProps {
   onReturn:           () => void;
   onSettings:         () => void;
   onKioskMode:        () => void;
+  onOpenDrawer:       () => void;
 }
 
 export default function POSTopBar({
   session, heldCount, avgMargin,
   isEmpty, isFullscreen, showQuickbar,
-  items, totals, totalTtcFinal,
+  items, totals, totalTtcFinal, slug,
   onHeld, onNewSale, onManual, onReceipt,
   onSession, onSessionInvoices, onFullscreen, onKbHelp,
   onToggleQuickbar, onReturn, onSettings, onKioskMode,
+  onOpenDrawer,
 }: POSTopBarProps) {
 
   const invoicesCount = session?.invoices_count ?? 0;
   const netSales      = session?.net_sales      ?? 0;
+  const overrides     = useKbOverrides(slug);
+  const kb            = (action: string) => getEffectiveShortcut(slug, action) ?? '';
 
   return (
     <div className="pos-topbar">
@@ -5858,7 +5970,7 @@ export default function POSTopBar({
         <div
           className="pos-chip o clickable"
           onClick={onSession}
-          title="إحصاءات الجلسة — F8"
+          title={`إحصاءات الجلسة — ${kb('sessionStats')}`}
         >
           <i className="ti ti-cash pic-ic" />
           <div className="pos-chip-inner">
@@ -5871,7 +5983,7 @@ export default function POSTopBar({
           <div
             className="pos-chip b clickable"
             onClick={onHeld}
-            title="الفواتير المعلقة — F7"
+            title={`الفواتير المعلقة — ${kb('heldCarts')}`}
           >
             <i className="ti ti-clock-pause pic-ic" />
             <div className="pos-chip-inner">
@@ -5913,15 +6025,16 @@ export default function POSTopBar({
       </div>
 
       <div className="pos-actions-row">
-        <button className="btn btn-xs" onClick={onNewSale} title="بيع جديد / تعليق">
+
+        <button className="btn btn-xs" onClick={onNewSale} title={`بيع جديد / تعليق — ${kb('holdCart')}`}>
           <i className="ti ti-plus" />
           <span className="tb-txt"> جديد</span>
         </button>
-        <button className="btn btn-xs" onClick={onReturn} title="مرتجع">
+        <button className="btn btn-xs" onClick={onReturn} title={`مرتجع — ${kb('returns')}`}>
           <i className="ti ti-receipt-refund" />
           <span className="tb-txt"> مرتجع</span>
         </button>
-        <button className="btn btn-xs" onClick={onManual} title="إضافة يدوي — F6">
+        <button className="btn btn-xs" onClick={onManual} title={`إضافة يدوي — ${kb('manualProduct')}`}>
           <i className="ti ti-keyboard" />
           <span className="tb-txt"> يدوي</span>
         </button>
@@ -5929,10 +6042,13 @@ export default function POSTopBar({
           className="btn btn-xs"
           onClick={onReceipt}
           disabled={isEmpty}
-          title="معاينة الإيصال — F9"
+          title={`معاينة الإيصال — ${kb('preview')}`}
         >
           <i className="ti ti-printer" />
         </button>
+
+        <span className="tb-sep" aria-hidden="true" />
+
         <button
           className={`btn btn-xs ${showQuickbar ? 'btn-p' : ''}`}
           onClick={onToggleQuickbar}
@@ -5942,11 +6058,14 @@ export default function POSTopBar({
         </button>
         <button
           className="btn btn-xs"
-          onClick={onSession}
-          title="إحصاءات الجلسة — F8"
+          onClick={onOpenDrawer}
+          title="فتح درج النقود — Ctrl+D"
         >
-          <i className="ti ti-chart-bar" />
+          <i className="ti ti-cash-banknote" />
         </button>
+
+        <span className="tb-sep" aria-hidden="true" />
+
         <button
           className="btn btn-xs"
           onClick={onSettings}
@@ -5957,7 +6076,7 @@ export default function POSTopBar({
         <button
           className="btn btn-xs"
           onClick={onFullscreen}
-          title={isFullscreen ? 'خروج من ملء الشاشة — F11' : 'ملء الشاشة — F11'}
+          title={isFullscreen ? `خروج من ملء الشاشة — ${kb('fullscreen')}` : `ملء الشاشة — ${kb('fullscreen')}`}
         >
           <i className={`ti ${isFullscreen ? 'ti-minimize' : 'ti-maximize'}`} />
         </button>
@@ -5970,139 +6089,156 @@ export default function POSTopBar({
           <span className="tb-txt"> كاشير</span>
         </button>
       </div>
-
-      <div className="pos-kb-strip">
-        {[
-          { key: 'F2', label: 'بحث' },
-          { key: 'F4', label: 'دفع' },
-          { key: 'F5', label: 'تعليق' },
-          { key: 'F6', label: 'يدوي' },
-          { key: 'F7', label: 'معلقة' },
-          { key: 'F9', label: 'طباعة' },
-          { key: 'F10', label: 'مرتجع' },
-          { key: 'F11', label: 'شاشة' },
-          { key: 'F12', label: 'مسح' },
-        ].map(({ key, label }) => (
-          <span key={key} className="kb-tip">
-            <kbd>{key}</kbd>{label}
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/ProductCard.tsx
 ```
 // pos/components/ProductCard.tsx
+//
+// ⚠️ ملاحظة تنظيف (راجع مراجعة صفحة POS):
+// هذه النسخة تحل محل ProductCard.tsx القديم الذي كان "كوداً ميتاً" —
+// كان يستخدم كلاسات .pc2 (من theme.css) بينما ProductGrid.tsx كان
+// يرسم البطاقة يدوياً بكلاسات .pcard-* (من pos.css) بدون استيراد هذا
+// الملف إطلاقاً. تم دمج نفس منطق .pcard-* هنا كي يصبح هذا الكومبوننت
+// هو المصدر الوحيد الفعلي المُستخدَم من ProductGrid (عرض grid فقط —
+// عرض الجدول/القائمة list-view له بنية مختلفة تماماً ويبقى داخل
+// ProductGrid.tsx كجدول <table>).
 import React from 'react';
-import type { ProductVariant } from '@/types';
+import type { ProductVariant, PriceLevel } from '@/types';
+import { formatDZD } from '../utils/calculations';
+import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
 
 interface ProductCardProps {
-  variant: ProductVariant;
-  qtyInCart: number;
-  view: 'grid' | 'list';
-  onClick: () => void;
+  variant:               ProductVariant;
+  /** فهرس العنصر داخل القائمة الحالية — يُستخدم للتنقل بلوحة المفاتيح (data-hl-idx) */
+  idx:                   number;
+  qtyInCart:             number;
+  highlighted:           boolean;
+  isPinned:              boolean;
+  priceLevels:           PriceLevel[];
+  selectedPriceLevelId:  number | null;
+  allowNegativeStock?:   boolean;
+  onAdd:                 (v: ProductVariant) => void;
+  onPin:                 (v: ProductVariant) => void;
+  /** يُستدعى عند أي تفاعل مع البطاقة (كليك) لمزامنة مؤشر التنقل بلوحة المفاتيح */
+  onHighlight?:          (idx: number) => void;
 }
 
-function stockClass(stock: number | undefined, min: number): string {
-  if (stock === undefined || stock === null) return 'ok';
-  if (stock <= 0) return 'no';
-  if (stock <= min) return 'lo';
-  return 'ok';
-}
+export default function ProductCard({
+  variant: v,
+  idx,
+  qtyInCart,
+  highlighted,
+  isPinned,
+  priceLevels,
+  selectedPriceLevelId,
+  allowNegativeStock,
+  onAdd,
+  onPin,
+  onHighlight,
+}: ProductCardProps) {
+  const priceHt  = getVariantPrice(v, selectedPriceLevelId, priceLevels);
+  const tvaRate  = v.tva?.rate ?? 0;
+  const priceTtc = priceHt * (1 + tvaRate / 100);
 
-function stockLabel(stock: number | undefined): string {
-  if (stock === undefined || stock === null) return '';
-  if (stock <= 0) return 'نفد';
-  return `${stock} ${stock === 1 ? 'وحدة' : 'وحدة'}`;
-}
+  const stock         = v.current_stock;
+  const unknownStock  = stock === undefined;
+  const outStock      = isVariantOutOfStock(v, allowNegativeStock);
+  const lowStock      = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= (v.min_stock_alert ?? 0);
+  const lastPiece     = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= 2 && !lowStock;
 
-export default function ProductCard({ variant, qtyInCart, view, onClick }: ProductCardProps) {
-  const product   = variant.product;
-  const stock     = variant.current_stock;
-  const isOOS     = variant.manages_stock && (stock ?? 1) <= 0 && !variant.allow_negative_stock;
-  const sc        = stockClass(stock ?? undefined, variant.min_stock_alert);
-  const tvaRate   = variant.tva?.rate ?? 19;
-  const priceTtc  = variant.default_selling_price_ht * (1 + tvaRate / 100);
+  const style = familyStyleFromName(v.product?.family?.name ?? '');
+  const imageUrl = (v as unknown as { image_url?: string }).image_url;
 
-  // pick icon / color based on family name
-  const familyName = product?.family?.name ?? '';
-  const { icon, color, bg } = familyStyle(familyName);
-
-  const name = [product?.name, variant.variant_name].filter(Boolean).join(' — ');
-
-  if (view === 'list') {
-    return (
-      <div
-        className={`pc2 ${qtyInCart > 0 ? 'sel' : ''} ${isOOS ? 'oos' : ''}`}
-        style={{ '--pc-color': color, '--pc-bg': bg } as React.CSSProperties}
-        onClick={isOOS ? undefined : onClick}
-      >
-        {qtyInCart > 0 && <div className="pc2-badge">{qtyInCart}</div>}
-        <div className="pc2-ic">
-          <span className="ic ic-sm"><i className={`ti ${icon}`} /></span>
-        </div>
-        <div className="pc2-info">
-          <div className="pc2-name">{name}</div>
-          <div className="pc2-price" style={{ direction: 'ltr' }}>
-            {priceTtc.toFixed(0)} دج
-          </div>
-          {variant.manages_stock && (
-            <div className={`pc2-stock ${sc}`}>{stockLabel(stock ?? undefined)}</div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const handleClick = () => {
+    if (!outStock) onAdd(v);
+    onHighlight?.(idx);
+  };
 
   return (
     <div
-      className={`pc2 ${qtyInCart > 0 ? 'sel' : ''} ${isOOS ? 'oos' : ''}`}
-      style={{ '--pc-color': color, '--pc-bg': bg } as React.CSSProperties}
-      onClick={isOOS ? undefined : onClick}
+      data-hl-idx={idx}
+      className={`pcard ${outStock ? 'pcard-out' : ''} ${qtyInCart > 0 ? 'pcard-incart' : ''} ${highlighted ? 'pcard-hl' : ''}`}
+      onClick={handleClick}
+      title={v.product?.name}
     >
-      {qtyInCart > 0 && <div className="pc2-badge">{qtyInCart}</div>}
-      <div className="pc2-ic">
-        <span className="ic ic-sm"><i className={`ti ${icon}`} /></span>
+      <div className="pcard-img" style={{ background: style.bg }}>
+        {imageUrl
+          ? <img src={imageUrl} alt={v.product?.name} loading="lazy" />
+          : <i className={`ti ${style.icon}`} style={{ color: style.color, fontSize: 22 }} />
+        }
+        {qtyInCart > 0 && <span className="pcard-in-cart">{qtyInCart}</span>}
+        {outStock && <span className="pcard-out-badge">نفذ</span>}
+        {lowStock && !outStock && <span className="pcard-low-badge">قليل</span>}
+        {lastPiece && <span className="pcard-last-badge">آخر قطعة</span>}
       </div>
-      <div className="pc2-name">{name}</div>
-      <div className="pc2-price" style={{ direction: 'ltr' }}>{priceTtc.toFixed(0)} دج</div>
-      {variant.manages_stock && (
-        <div className={`pc2-stock ${sc}`}>{stockLabel(stock ?? undefined)}</div>
-      )}
+
+      <div className="pcard-body">
+        <div className="pcard-name">{v.product?.name}</div>
+        {v.barcode && <div className="pcard-bc">{v.barcode}</div>}
+
+        <div className="pcard-prices">
+          <span className="pcard-ttc">{formatDZD(priceTtc)}</span>
+          {tvaRate > 0 && (
+            <span className="pcard-ht">HT: {formatDZD(priceHt)}</span>
+          )}
+        </div>
+
+        {v.manages_stock && !unknownStock && (
+          <div className={`pcard-stock ${outStock ? 'out' : lowStock ? 'low' : 'ok'}`}>
+            <i className={`ti ti-${outStock ? 'alert-circle' : lowStock ? 'alert-triangle' : 'package'}`} />
+            {outStock ? 'نفذ المخزون' : `${stock} ${v.unit?.abbreviation ?? ''}`}
+          </div>
+        )}
+        {v.manages_stock && unknownStock && (
+          <div className="pcard-stock na">
+            <i className="ti ti-minus" />—
+          </div>
+        )}
+      </div>
+
+      <div className="pcard-actions" onClick={e => e.stopPropagation()}>
+        <button
+          className={`pcard-pin ${isPinned ? 'on' : ''}`}
+          onClick={() => onPin(v)}
+          title={isPinned ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
+        >
+          <i className={`ti ti-star${isPinned ? '-filled' : ''}`} />
+        </button>
+        <button
+          className="pcard-add"
+          onClick={() => !outStock && onAdd(v)}
+          disabled={outStock}
+          title="إضافة للسلة"
+        >
+          <i className="ti ti-plus" />
+        </button>
+      </div>
     </div>
   );
 }
 
-// ── Family → icon/color mapping ────────────────────
-function familyStyle(family: string): { icon: string; color: string; bg: string } {
-  const f = family.toLowerCase();
-  if (f.includes('غذ') || f.includes('أكل'))    return { icon: 'ti-apple',         color: 'var(--em)',     bg: 'var(--emb)'   };
-  if (f.includes('شراب') || f.includes('ماء'))  return { icon: 'ti-droplets',      color: 'var(--blue)',   bg: 'var(--blueb)' };
-  if (f.includes('إلكترون'))                    return { icon: 'ti-device-mobile', color: 'var(--blue)',   bg: 'var(--blueb)' };
-  if (f.includes('ملابس'))                      return { icon: 'ti-shirt',         color: 'var(--purple)', bg: 'var(--purb)'  };
-  if (f.includes('صيانة'))                      return { icon: 'ti-tool',          color: 'var(--orange)', bg: 'var(--orb)'   };
-  return { icon: 'ti-package', color: 'var(--em)', bg: 'var(--emb)' };
-}
 ```
 
 ## FILE: resources/js/pos/components/ProductGrid.tsx
 ```
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
+import ProductCard from './ProductCard';
 
 interface ProductGridProps {
   variants: ProductVariant[];
   view: ViewMode;
   gridSize: GridSize;
   loading: boolean;
-  hasMore?: boolean;
-  onLoadMore?: () => void;
   onAdd: (v: ProductVariant) => void;
   onAddManual: () => void;
   onPin: (v: ProductVariant) => void;
@@ -6115,33 +6251,94 @@ interface ProductGridProps {
   onHighlightIndexChange?: (idx: number) => void;
 }
 
-function LoadMore({ hasMore, loading, onLoadMore }: { hasMore?: boolean; loading: boolean; onLoadMore?: () => void }) {
-  if (!hasMore) return null;
-  return (
-    <div className="pos-load-more">
-      <button className="btn btn-outline" onClick={onLoadMore} disabled={loading}>
-        {loading ? 'جاري التحميل…' : 'تحميل المزيد'}
-      </button>
-    </div>
-  );
+/** أقل عرض للبطاقة حسب حجم الشبكة */
+function minCardWidth(gridSize: GridSize): number {
+  switch (gridSize) {
+    case 'xs': return 100;
+    case 'sm': return 130;
+    case 'md': return 165;
+    case 'lg': return 200;
+  }
+}
+
+/** ارتفاع الصف التقريبي حسب حجم الشبكة */
+function rowEstimate(gridSize: GridSize): number {
+  switch (gridSize) {
+    case 'xs': return 110;
+    case 'sm': return 150;
+    case 'md': return 190;
+    case 'lg': return 240;
+  }
 }
 
 export default function ProductGrid({
-  variants, view, gridSize, loading, hasMore, onLoadMore, onAdd, onAddManual,
+  variants, view, gridSize, loading, onAdd, onAddManual,
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
   highlightedIndex, onHighlightIndexChange,
 }: ProductGridProps) {
-  const gridRef = useRef<HTMLDivElement>(null);
   const inCartQty = useCallback((variantId: number) => {
     return cartItems.find(i => i.variant_id === variantId)?.quantity ?? 0;
   }, [cartItems]);
 
-  useEffect(() => {
-    if (highlightedIndex === undefined || !gridRef.current) return;
-    const el = gridRef.current.querySelector(`[data-hl-idx="${highlightedIndex}"]`);
-    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [highlightedIndex]);
+  // ── Grid view (virtualised) ──────────────────────────────────────────────
+  // Column calculation: keep cards between min‑width and max comfortable cols
+  const gridWrapRef = useRef<HTMLDivElement>(null);
+  const [columns, setColumns] = useState(4);
+  const MAX_COLS: Record<GridSize, number> = { xs: 8, sm: 6, md: 5, lg: 4 };
 
+  useEffect(() => {
+    if (view !== 'grid') return;
+    const el = gridWrapRef.current;
+    if (!el) return;
+    const minW = minCardWidth(gridSize);
+    const calc = () => {
+      const w = el.clientWidth;
+      setColumns(Math.min(MAX_COLS[gridSize], Math.max(1, Math.floor(w / minW))));
+    };
+    calc();
+    const obs = new ResizeObserver(calc);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [view, gridSize]);
+
+  // Group into rows (keep original index for keyboard nav)
+  type RowItem = { variant: ProductVariant; idx: number };
+  const rows = useMemo(() => {
+    if (view !== 'grid' || columns < 1) return [] as RowItem[][];
+    const r: RowItem[][] = [];
+    for (let i = 0; i < variants.length; i += columns) {
+      const row: RowItem[] = [];
+      for (let j = 0; j < columns && i + j < variants.length; j++) {
+        row.push({ variant: variants[i + j], idx: i + j });
+      }
+      r.push(row);
+    }
+    return r;
+  }, [variants, columns, view]);
+
+  const rowCount = rows.length;
+  const rowH = rowEstimate(gridSize);
+
+  // Virtualizer
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => rowH,
+    overscan: 3,
+  });
+
+  // Keyboard navigation scroll sync
+  const prevHl = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (view !== 'grid') return;
+    if (highlightedIndex === undefined || highlightedIndex === prevHl.current) return;
+    prevHl.current = highlightedIndex;
+    const rowIdx = Math.floor(highlightedIndex / columns);
+    rowVirtualizer.scrollToIndex(rowIdx, { align: 'nearest' });
+  }, [highlightedIndex, columns, view, rowVirtualizer]);
+
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="pos-grid-area">
       <div className="pos-loading">
@@ -6152,6 +6349,7 @@ export default function ProductGrid({
     </div>
   );
 
+  // ── Empty ────────────────────────────────────────────────────────────────
   if (!variants.length) return (
     <div className="pos-grid-area">
       <div className="pos-empty">
@@ -6165,9 +6363,10 @@ export default function ProductGrid({
     </div>
   );
 
+  // ── List view (not virtualised — ~3 500 DOM nodes, acceptable) ──────────
   if (view === 'list') {
     return (
-      <div className="pos-grid-area" ref={gridRef}>
+      <div className="pos-grid-area">
         <table className="pos-ptable">
           <thead>
             <tr>
@@ -6192,13 +6391,13 @@ export default function ProductGrid({
               const lowStock  = v.manages_stock && !unknownSt && (stockVal ?? 0) > 0 && (stockVal ?? 0) <= (v.min_stock_alert ?? 0);
               const lastPiece = v.manages_stock && !unknownSt && (stockVal ?? 0) > 0 && (stockVal ?? 0) <= 2 && !lowStock;
               return (
-                  <tr
-                    key={v.id}
-                    data-hl-idx={idx}
-                    className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''} ${highlightedIndex === idx ? 'prow-hl' : ''}`}
-                    onClick={() => { if (onHighlightIndexChange !== undefined) onHighlightIndexChange(idx); }}
-                    onDoubleClick={() => !outStock && onAdd(v)}
-                  >
+                <tr
+                  key={v.id}
+                  data-hl-idx={idx}
+                  className={`prow ${outStock ? 'prow-out' : ''} ${inCart > 0 ? 'prow-incart' : ''} ${highlightedIndex === idx ? 'prow-hl' : ''}`}
+                  onClick={() => onHighlightIndexChange?.(idx)}
+                  onDoubleClick={() => !outStock && onAdd(v)}
+                >
                   <td className="prow-name">
                     <div className="prow-nm">{v.product?.name}</div>
                     {v.barcode && <div className="prow-bc">{v.barcode}</div>}
@@ -6210,27 +6409,18 @@ export default function ProductGrid({
                   <td className="prow-stock">
                     {v.manages_stock && !unknownSt
                       ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : lastPiece ? 'last' : 'ok'}`}>{stockVal ?? 0}</span>
-                      : v.manages_stock && unknownSt
-                      ? <span className="stock-pill na">—</span>
                       : <span className="stock-pill na">—</span>
                     }
                   </td>
                   <td>
                     <div className="prow-acts">
                       {inCart > 0 && <span className="incart-badge">{inCart}</span>}
-                      <button
-                        className="prow-pin"
-                        onClick={e => { e.stopPropagation(); onPin(v); }}
-                        title={isPinned(v.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
-                      >
+                      <button className="prow-pin" onClick={e => { e.stopPropagation(); onPin(v); }}
+                        title={isPinned(v.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}>
                         <i className={`ti ti-star${isPinned(v.id) ? '-filled' : ''}`} />
                       </button>
-                      <button
-                        className="prow-add"
-                        onClick={() => !outStock && onAdd(v)}
-                        disabled={outStock}
-                        title="إضافة للسلة (دبل كليك)"
-                      >
+                      <button className="prow-add" onClick={() => !outStock && onAdd(v)}
+                        disabled={outStock} title="إضافة للسلة (دبل كليك)">
                         <i className="ti ti-plus" />
                       </button>
                     </div>
@@ -6240,111 +6430,67 @@ export default function ProductGrid({
             })}
           </tbody>
         </table>
-        <LoadMore hasMore={hasMore} loading={loading} onLoadMore={onLoadMore} />
       </div>
     );
   }
 
-  const colsMap: Record<GridSize, string> = {
-    xs: 'pgrid--xs',
-    sm: 'pgrid--sm',
-    md: '',
-    lg: 'pgrid--lg',
-  };
+  // ── Grid view (virtualised) ──────────────────────────────────────────────
+  const gridMod = gridSize === 'xs' ? 'pgrid--xs' : gridSize === 'sm' ? 'pgrid--sm' : gridSize === 'lg' ? 'pgrid--lg' : '';
+  const gap = gridSize === 'xs' ? 6 : gridSize === 'sm' ? 8 : gridSize === 'md' ? 10 : 12;
 
   return (
-    <div className="pos-grid-area" ref={gridRef}>
-      <div className={`pgrid ${colsMap[gridSize]}`}>
-        {variants.map((v, idx) => {
-          const priceHt  = getVariantPrice(v, selectedPriceLevelId, priceLevels);
-          const tvaRate  = v.tva?.rate ?? 19;
-          const priceTtc = priceHt * (1 + tvaRate / 100);
-          const inCart   = inCartQty(v.id);
-          const stock    = v.current_stock;
-          const unknownStock = stock === undefined;
-          const outStock = isVariantOutOfStock(v, allowNegativeStock);
-          const lowStock = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= (v.min_stock_alert ?? 0);
-          const lastPiece = v.manages_stock && !unknownStock && (stock ?? 0) > 0 && (stock ?? 0) <= 2 && !lowStock;
-
-          const style = familyStyleFromName(v.product?.family?.name ?? '');
-
+    <div className={`pos-grid-area ${gridMod}`} ref={scrollRef} style={{ overflow: 'auto' }}>
+      <div ref={gridWrapRef} style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+        {rowVirtualizer.getVirtualItems().map(virtualRow => {
+          const rowData = rows[virtualRow.index];
+          if (!rowData) return null;
           return (
             <div
-              key={v.id}
-              data-hl-idx={idx}
-              className={`pcard ${outStock ? 'pcard-out' : ''} ${inCart > 0 ? 'pcard-incart' : ''} ${highlightedIndex === idx ? 'pcard-hl' : ''}`}
-              onClick={() => {
-                if (!outStock) onAdd(v);
-                if (onHighlightIndexChange !== undefined) onHighlightIndexChange(idx);
+              key={virtualRow.index}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+                display: 'flex',
+                gap,
+                padding: gap,
+                direction: 'rtl',
               }}
-              title={v.product?.name}
             >
-              <div className="pcard-img" style={{ background: style.bg }}>
-                {(v as unknown as { image_url?: string }).image_url
-                  ? <img src={(v as unknown as { image_url?: string }).image_url} alt={v.product?.name} />
-                  : <i className={`ti ${style.icon}`} style={{ color: style.color, fontSize: 22 }} />
-                }
-                {inCart > 0 && <span className="pcard-in-cart">{inCart}</span>}
-                {outStock && <span className="pcard-out-badge">نفذ</span>}
-                {lowStock && !outStock && <span className="pcard-low-badge">قليل</span>}
-                {lastPiece && <span className="pcard-last-badge">آخر قطعة</span>}
-              </div>
-
-              <div className="pcard-body">
-                <div className="pcard-name">{v.product?.name}</div>
-                {v.barcode && <div className="pcard-bc">{v.barcode}</div>}
-
-                <div className="pcard-prices">
-                  <span className="pcard-ttc">{formatDZD(priceTtc)}</span>
-                  {tvaRate > 0 && (
-                    <span className="pcard-ht">HT: {formatDZD(priceHt)}</span>
-                  )}
+              {rowData.map(item => (
+                <div key={item.variant.id} style={{ flex: '1 1 0', minWidth: 0 }}>
+                  <ProductCard
+                    variant={item.variant}
+                    idx={item.idx}
+                    qtyInCart={inCartQty(item.variant.id)}
+                    highlighted={highlightedIndex === item.idx}
+                    isPinned={isPinned(item.variant.id)}
+                    priceLevels={priceLevels}
+                    selectedPriceLevelId={selectedPriceLevelId}
+                    allowNegativeStock={allowNegativeStock}
+                    onAdd={onAdd}
+                    onPin={onPin}
+                    onHighlight={onHighlightIndexChange}
+                  />
                 </div>
-
-                {v.manages_stock && !unknownStock && (
-                  <div className={`pcard-stock ${outStock ? 'out' : lowStock ? 'low' : 'ok'}`}>
-                    <i className={`ti ti-${outStock ? 'alert-circle' : lowStock ? 'alert-triangle' : 'package'}`} />
-                    {outStock ? 'نفذ المخزون' : `${stock} ${v.unit?.abbreviation ?? ''}`}
-                  </div>
-                )}
-                {v.manages_stock && unknownStock && (
-                  <div className="pcard-stock na">
-                    <i className="ti ti-minus" />—
-                  </div>
-                )}
-              </div>
-
-              <div className="pcard-actions" onClick={e => e.stopPropagation()}>
-                <button
-                  className={`pcard-pin ${isPinned(v.id) ? 'on' : ''}`}
-                  onClick={() => onPin(v)}
-                  title={isPinned(v.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
-                >
-                  <i className={`ti ti-star${isPinned(v.id) ? '-filled' : ''}`} />
-                </button>
-                <button
-                  className="pcard-add"
-                  onClick={() => !outStock && onAdd(v)}
-                  disabled={outStock}
-                  title="إضافة للسلة"
-                >
-                  <i className="ti ti-plus" />
-                </button>
-              </div>
+              ))}
             </div>
           );
         })}
       </div>
-      <LoadMore hasMore={hasMore} loading={loading} onLoadMore={onLoadMore} />
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/ProductSearchBar.tsx
 ```
 import React, { useState, useRef, useEffect } from 'react';
 import type { ViewMode, GridSize, SortMode } from '../utils/posHelpers';
+import { getEffectiveShortcut, useKbOverrides } from '../hooks/useKeyboardMap';
 
 const SORT_OPTIONS: { value: SortMode; icon: string; label: string }[] = [
   { value: 'name',      icon: 'ti ti-text-caption',    label: 'أ-ي' },
@@ -6378,15 +6524,18 @@ interface ProductSearchBarProps {
   onArrowUp?: () => void;
   onArrowDown?: () => void;
   keyboardNavEnabled?: boolean;
+  slug?: string | null;
 }
 
 export default function ProductSearchBar({
   query, onQuery, view, gridSize, onView, onGridSize,
   onFilter, filterActive, inputRef, sortBy, onSort, resultsCount, onEnterFirst,
-  highlightedIndex, onArrowUp, onArrowDown, keyboardNavEnabled,
+  highlightedIndex, onArrowUp, onArrowDown, keyboardNavEnabled, slug,
 }: ProductSearchBarProps) {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
+  const overrides = useKbOverrides(slug ?? null);
+  const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -6405,7 +6554,7 @@ export default function ProductSearchBar({
           type="text"
           value={query}
           onChange={e => onQuery(e.target.value)}
-          placeholder="ابحث بالاسم أو الباركود أو الرمز... (F2)"
+          placeholder={`ابحث بالاسم أو الباركود أو الرمز... (${kb('searchFocus')})`}
           autoComplete="off"
           onKeyDown={e => {
             if (e.key === 'Enter') { e.preventDefault(); onEnterFirst(); }
@@ -6420,7 +6569,7 @@ export default function ProductSearchBar({
           </button>
         )}
         {!query && (
-          <span className="srch-hint"><kbd>F2</kbd></span>
+          <span className="srch-hint"><kbd>{kb('searchFocus')}</kbd></span>
         )}
       </div>
 
@@ -6497,205 +6646,6 @@ export default function ProductSearchBar({
     </div>
   );
 }
-```
-
-## FILE: resources/js/pos/components/ProductSearchBarEnhanced.tsx
-```
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import usePOSSmartSearch from '@/lib/pos/hooks/usePOSSmartSearch';
-import type { ProductVariant } from '@/lib/api/core/types';
-
-interface ProductSearchBarEnhancedProps {
-  variants: ProductVariant[];
-  families?: Array<{ id: number; name: string; _count?: { products: number } }>;
-  onSelectVariant: (variant: ProductVariant) => void;
-  onQueryChange?: (query: string) => void;
-  maxSuggestions?: number;
-  className?: string;
-}
-
-const MAX_VISIBLE = 8;
-
-export default function ProductSearchBarEnhanced({
-  variants,
-  families,
-  onSelectVariant,
-  onQueryChange,
-  maxSuggestions = MAX_VISIBLE,
-  className = '',
-}: ProductSearchBarEnhancedProps) {
-  const {
-    query, setQuery, results, isSearching,
-    totalResults,
-  } = usePOSSmartSearch(variants, families, { maxResults: maxSuggestions });
-
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [isFocused, setIsFocused] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-
-  const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setHighlightedIndex(0);
-  }, [results.results]);
-
-  const handleSelect = useCallback((variant: ProductVariant) => {
-    onSelectVariant(variant);
-    setQuery('');
-    setShowDropdown(false);
-    inputRef.current?.focus();
-  }, [onSelectVariant, setQuery]);
-
-  const handleInputChange = useCallback((val: string) => {
-    setQuery(val);
-    onQueryChange?.(val);
-    if (val.trim()) {
-      setShowDropdown(true);
-    } else {
-      setShowDropdown(false);
-    }
-  }, [setQuery, onQueryChange]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (!showDropdown || results.results.length === 0) {
-      if (e.key === 'Enter' && query.trim()) {
-        e.preventDefault();
-        handleSelect(results.results[0]?.variant);
-      }
-      return;
-    }
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setHighlightedIndex(prev => Math.min(prev + 1, results.results.length - 1));
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setHighlightedIndex(prev => Math.max(prev - 1, 0));
-        break;
-      case 'Enter': {
-        e.preventDefault();
-        const selected = results.results[highlightedIndex];
-        if (selected) handleSelect(selected.variant);
-        break;
-      }
-      case 'Escape':
-        e.preventDefault();
-        setShowDropdown(false);
-        break;
-    }
-  }, [showDropdown, results.results, query, highlightedIndex, handleSelect]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current && !inputRef.current.contains(e.target as Node)
-      ) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if (showDropdown && highlightedIndex >= 0) {
-      const el = dropdownRef.current?.querySelector(`[data-hl-idx="${highlightedIndex}"]`);
-      el?.scrollIntoView({ block: 'nearest' });
-    }
-  }, [highlightedIndex, showDropdown]);
-
-  const suggestionItems = results.results.slice(0, maxSuggestions);
-
-  return (
-    <div className={`psbe-wrap ${className}`} style={{ position: 'relative' }}>
-      <div className={`psbe-inp ${isFocused ? 'psbe-focus' : ''}`}>
-        <i className="ti ti-search" style={{ fontSize: 14, color: 'var(--t4)', flexShrink: 0 }} />
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={e => handleInputChange(e.target.value)}
-          onFocus={() => { setIsFocused(true); if (query.trim()) setShowDropdown(true); }}
-          onBlur={() => setIsFocused(false)}
-          onKeyDown={handleKeyDown}
-          placeholder="ابحث بالاسم أو الباركود أو الرمز..."
-          autoComplete="off"
-        />
-        {isSearching && (
-          <i className="ti ti-loader spin" style={{ fontSize: 14, color: 'var(--t4)', flexShrink: 0 }} />
-        )}
-        {query && !isSearching && (
-          <button className="psbe-clear" onClick={() => { setQuery(''); setShowDropdown(false); inputRef.current?.focus(); }}>
-            <i className="ti ti-x" />
-          </button>
-        )}
-      </div>
-
-      {showDropdown && suggestionItems.length > 0 && (
-        <div className={`psbe-drop ${!families ? 'psbe-drop--simple' : ''}`} ref={dropdownRef}>
-          {families ? (
-            groupByFamily(suggestionItems).map(group => (
-              <div key={group.familyId} className="psbe-grp">
-                <div className="psbe-grp-hd">{group.familyName}</div>
-                {group.items.map((item, idx) => (
-                  <div
-                    key={item.variant.id}
-                    className={`psbe-item ${highlightedIndex === item.globalIdx ? 'psbe-hl' : ''}`}
-                    data-hl-idx={item.globalIdx}
-                    onMouseDown={() => handleSelect(item.variant)}
-                    onMouseEnter={() => setHighlightedIndex(item.globalIdx)}
-                  >
-                    <span className="psbe-item-name">{item.variant.product?.name}{item.variant.variant_name ? ` — ${item.variant.variant_name}` : ''}</span>
-                    <span className="psbe-item-price">{formatPrice(item.variant)}</span>
-                  </div>
-                ))}
-              </div>
-            ))
-          ) : (
-            suggestionItems.map((item, idx) => (
-              <div
-                key={item.variant.id}
-                className={`psbe-item ${highlightedIndex === idx ? 'psbe-hl' : ''}`}
-                data-hl-idx={idx}
-                onMouseDown={() => handleSelect(item.variant)}
-                onMouseEnter={() => setHighlightedIndex(idx)}
-              >
-                <span className="psbe-item-name">{item.variant.product?.name}{item.variant.variant_name ? ` — ${item.variant.variant_name}` : ''}</span>
-                <span className="psbe-item-price">{formatPrice(item.variant)}</span>
-              </div>
-            ))
-          )}
-          <div className="psbe-footer">
-            <span>{totalResults} نتيجة</span>
-            <span className="psbe-nav-hint">
-              {highlightedIndex + 1}/{suggestionItems.length}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function groupByFamily(items: Array<{ variant: ProductVariant; score: number; matchType: string }>) {
-  const map = new Map<string, { familyId: number; familyName: string; items: Array<{ variant: ProductVariant; score: number; matchType: string; globalIdx: number }> }>();
-  items.forEach((item, globalIdx) => {
-    const fName = item.variant.product?.family?.name ?? 'أخرى';
-    const fId = item.variant.product?.family?.id ?? 0;
-    if (!map.has(fName)) map.set(fName, { familyId: fId, familyName: fName, items: [] });
-    map.get(fName)!.items.push({ ...item, globalIdx });
-  });
-  return Array.from(map.values());
-}
-
-function formatPrice(variant: ProductVariant): string {
-  const price = variant.prices?.[0]?.price_ttc ?? variant.product?.price_ttc ?? 0;
-  return new Intl.NumberFormat('ar-DZ', { style: 'decimal', maximumFractionDigits: 2 }).format(Number(price)) + ' د.ج';
-}
 
 ```
 
@@ -6710,14 +6660,22 @@ function formatPrice(variant: ProductVariant): string {
 //   2. onDiscountAmount مُمرَّر لـ CartRow (خصم ثابت بالمبلغ)
 //   3. عرض رصيد الزبون بشكل أوضح مع لون تحذيري
 //   4. شريط الخصومات على الفاتورة يقبل الآن % أو مبلغ ثابت
+//
+// ✅ تصحيحات هذه النسخة (تدقيق الأزرار):
+//   5. حُذف زر 🔍 "بحث أو إنشاء زبون جديد" المكرر — كان يفتح نفس المودال
+//      بالضبط الذي يفتحه النقر على صندوق الزبون نفسه (client-trigger-v2).
+//      الآن يوجد مدخل واحد فقط لفتح CustomerSearchModal.
+//   6. أُضيف زر "تراجع" (undo) بجانب زر المسح مباشرة — يعالج فجوة أمان
+//      حقيقية: مسح السلة (بالزر أو بـ F12) كان عملية نهائية بدون أي طريقة
+//      للاسترجاع. الآن onClear يحفظ نسخة تلقائياً (من POSPage) ويمكن
+//      استرجاعها بضغطة واحدة، أو Ctrl+Z.
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import type { CartItem, CartTotals, Party, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
+import { getEffectiveShortcut, useKbOverrides } from '../hooks/useKeyboardMap';
 import CartRow from './CartRow';
 import CustomerSearchModal from './CustomerSearchModal';
-
-// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface ProfessionalCartProps {
   items:                CartItem[];
@@ -6731,7 +6689,7 @@ interface ProfessionalCartProps {
   onSelectItem:         (id: string | null) => void;
   onQty:                (id: string, qty: number) => void;
   onDiscount:           (id: string, pct: number) => void;
-  onDiscountAmount:     (id: string, amount: number) => void;   // ✅ جديد
+  onDiscountAmount:     (id: string, amount: number) => void;
   onPrice:              (id: string, price: number) => void;
   onRemove:             (id: string) => void;
   onSetClient:          (c: Party | null) => void;
@@ -6746,9 +6704,11 @@ interface ProfessionalCartProps {
   invoiceDiscountPct?:  number;
   onInvoiceDiscountChange?: (pct: number) => void;
   invoiceDiscountAmount?:   number;
+  onUndoClear:          () => void;
+  canUndoClear:         boolean;
+  clientBalance?:       number;
+  slug?:                string | null;
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProfessionalCart({
   items, totals, client, customers, priceLevels, selectedPriceLevelId,
@@ -6757,31 +6717,30 @@ export default function ProfessionalCart({
   onSetClient, onPriceLevelChange, onNoteChange,
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
+  onUndoClear, canUndoClear, clientBalance, slug,
 }: ProfessionalCartProps) {
 
   const [showNote,         setShowNote]         = useState(false);
-  const [showCustModal,    setShowCustModal]     = useState(false);   // ✅ مودال البحث
-  const [invDiscMode,      setInvDiscMode]       = useState<'pct' | 'amount'>('pct'); // ✅
+  const [showCustModal,    setShowCustModal]     = useState(false);
+  const [invDiscMode,      setInvDiscMode]       = useState<'pct' | 'amount'>('pct');
   const [invDiscAmtVal,    setInvDiscAmtVal]     = useState('');
 
   const isEmpty = !items.length;
+  const overrides = useKbOverrides(slug ?? null);
+  const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
 
-  // ── خصم الفاتورة بالمبلغ ──────────────────────────────────────────────────
   const handleInvDiscAmount = useCallback((raw: string) => {
     setInvDiscAmtVal(raw);
     const n = parseFloat(raw) || 0;
     if (!onInvoiceDiscountChange || totals.total_ht <= 0) return;
-    // نحوّل المبلغ لنسبة (مستوى total_ht قبل الخصم)
     const pct = Math.min(100, (n / totals.total_ht) * 100);
     onInvoiceDiscountChange(pct);
   }, [onInvoiceDiscountChange, totals.total_ht]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
       <div className="pos-cart" id="pos-cart">
 
-        {/* ── Header ── */}
         <div className="cart-top">
           <div className="cart-top-row">
             <div className="cart-ttl">
@@ -6792,7 +6751,7 @@ export default function ProfessionalCart({
               </span>
             </div>
             <div className="cart-acts2">
-              <button className="btn btn-xs" onClick={onHeld} title="الفواتير المعلقة (F7)">
+              <button className="btn btn-xs" onClick={onHeld} title={`الفواتير المعلقة (${kb('heldCarts')})`}>
                 <i className="ti ti-clock-pause" />
               </button>
               <button
@@ -6803,17 +6762,24 @@ export default function ProfessionalCart({
                 <i className="ti ti-notes" />
               </button>
               <button
+                className="btn btn-xs btn-warn"
+                onClick={onUndoClear}
+                disabled={!canUndoClear}
+                title={`تراجع عن آخر مسح — ${kb('undoClear')}`}
+              >
+                <i className="ti ti-arrow-back-up" />
+              </button>
+              <button
                 className="btn btn-xs btn-r"
                 onClick={onClear}
                 disabled={isEmpty}
-                title="مسح السلة — F12"
+                title={`مسح السلة — ${kb('clearCart')}`}
               >
                 <i className="ti ti-trash" />
               </button>
             </div>
           </div>
 
-          {/* ملاحظة */}
           {showNote && (
             <div className="cart-note-wrap">
               <input
@@ -6826,7 +6792,6 @@ export default function ProfessionalCart({
             </div>
           )}
 
-          {/* مستويات السعر */}
           {priceLevels.length > 0 && (
             <div className="cart-modes2">
               <button
@@ -6854,13 +6819,11 @@ export default function ProfessionalCart({
             </div>
           )}
 
-          {/* ── قسم الزبون المُحسَّن ── */}
           <div className="cart-client-v2">
-            {/* trigger */}
             <div
               className={`client-trigger-v2 ${client ? 'has-client' : ''}`}
               onClick={() => setShowCustModal(true)}
-              title="اختيار أو تغيير الزبون"
+              title="اختيار أو تغيير الزبون — بحث أو إنشاء زبون جديد"
             >
               <div className="ctv2-av">
                 {client
@@ -6879,7 +6842,6 @@ export default function ProfessionalCart({
                 )}
               </div>
 
-              {/* رصيد الدين */}
               {client?.balance !== undefined && Number(client.balance) > 0 && (
                 <span className="ctv2-debt" title={`رصيد الدين: ${formatDZD(Number(client.balance))}`}>
                   <i className="ti ti-alert-circle" style={{ fontSize: 11 }} />
@@ -6890,17 +6852,8 @@ export default function ProfessionalCart({
               <i className="ti ti-chevron-down ctv2-arrow" />
             </div>
 
-            {/* أزرار سريعة */}
-            <div className="ctv2-actions">
-              <button
-                className="btn btn-xs btn-p"
-                onClick={() => setShowCustModal(true)}
-                title="بحث أو إنشاء زبون جديد"
-                type="button"
-              >
-                <i className="ti ti-user-search" />
-              </button>
-              {client && (
+            {client && (
+              <div className="ctv2-actions">
                 <button
                   className="btn btn-xs btn-r"
                   onClick={() => onSetClient(null)}
@@ -6909,12 +6862,11 @@ export default function ProfessionalCart({
                 >
                   <i className="ti ti-x" />
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── أصناف السلة ── */}
         <div className="cart-items">
           {isEmpty ? (
             <div className="cart-empty">
@@ -6932,7 +6884,7 @@ export default function ProfessionalCart({
                 onSelect={() => onSelectItem(item.id)}
                 onQty={qty => onQty(item.id, qty)}
                 onDiscount={pct => onDiscount(item.id, pct)}
-                onDiscountAmount={amount => onDiscountAmount(item.id, amount)}  // ✅
+                onDiscountAmount={amount => onDiscountAmount(item.id, amount)}
                 onPrice={price => onPrice(item.id, price)}
                 onRemove={() => onRemove(item.id)}
               />
@@ -6940,7 +6892,6 @@ export default function ProfessionalCart({
           )}
         </div>
 
-        {/* ── الإجماليات ── */}
         {!isEmpty && (
           <div className="cart-totals">
             <div className="ct-row">
@@ -6960,12 +6911,10 @@ export default function ProfessionalCart({
               <span>{formatDZD(totals.total_tva)}</span>
             </div>
 
-            {/* ── خصم الفاتورة % أو مبلغ ── */}
             {onInvoiceDiscountChange && (
               <div className="ct-row ct-disc">
                 <span>خصم الفاتورة</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {/* تبديل الوضع */}
                   <button
                     className={`cr-disc-mode-btn ${invDiscMode === 'pct' ? 'on' : ''}`}
                     onClick={() => setInvDiscMode('pct')}
@@ -7028,16 +6977,31 @@ export default function ProfessionalCart({
               <span>الإجمالي TTC</span>
               <strong className="grand-amount">{formatDZD(totalTtcFinal)}</strong>
             </div>
+            {client !== null && clientBalance !== undefined && (
+              <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 4 }}>
+                <span>
+                  <span style={{ opacity: 0.65 }}>رصيد {client.name} </span>
+                  <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#ef4444' : '#22c55e' }}>
+                    {formatDZD(clientBalance)}
+                  </span>
+                </span>
+                <span>
+                  <span style={{ opacity: 0.65 }}>الرصيد الجديد </span>
+                  <span style={{ fontWeight: 700, color: '#2563eb' }}>
+                    {formatDZD(clientBalance + totalTtcFinal)}
+                  </span>
+                </span>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── أزرار الإجراءات ── */}
         <div className="cart-actions">
           <button
             className="btn btn-sm"
             onClick={onHold}
             disabled={isEmpty}
-            title="تعليق الفاتورة — F5"
+            title={`تعليق الفاتورة — ${kb('holdCart')}`}
           >
             <i className="ti ti-clock-pause" /> تعليق
           </button>
@@ -7045,7 +7009,7 @@ export default function ProfessionalCart({
             className="cart-sell-btn"
             onClick={onSell}
             disabled={isEmpty}
-            title="دفع والإتمام — F4"
+            title={`دفع والإتمام — ${kb('payment')}`}
           >
             <i className="ti ti-circle-check" />
             <span>
@@ -7055,12 +7019,11 @@ export default function ProfessionalCart({
                   : `دفع — ${formatDZD(remainingToPay)}`
               )}
             </span>
-            <kbd className="sell-kbd">F4</kbd>
+            {kb('payment') && <kbd className="sell-kbd">{kb('payment')}</kbd>}
           </button>
         </div>
       </div>
 
-      {/* ── CustomerSearchModal ── */}
       {showCustModal && (
         <CustomerSearchModal
           currentClient={client}
@@ -7074,6 +7037,7 @@ export default function ProfessionalCart({
     </>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/ProfessionalPaymentModal.tsx
@@ -7121,6 +7085,7 @@ export interface PaymentConfirmParams {
     paymentModeId:      number;
     amount:             number;
     treasuryAccountId?: number | null;
+    reference?:         string | null;
   }>;
   currencyId?:  number | null;
 }
@@ -7134,6 +7099,10 @@ interface Props {
   treasuryAccounts?: TreasuryAccount[];
   totalTtcFinal:     number;
   existingPayments?: DocumentPayment[];
+  documentDate?:     string;   // ISO date — تاريخ الفاتورة الحقيقي لجلب الرصيد التاريخي الصحيح
+  isEditing?:        boolean;  // true when reopening an existing invoice
+  /** SSOT balance: pass from document.balance_data.previous_balance when editing */
+  prevBalance?:      number;
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
@@ -7237,11 +7206,14 @@ function PaymentStatus({
 export default function ProfessionalPaymentModal({
   totals, client, paymentModes, documentTypes,
   currencies, treasuryAccounts, totalTtcFinal,
-  existingPayments, onClose, onConfirm,
+  existingPayments, documentDate, onClose, onConfirm, isEditing,
+  prevBalance: propPrevBalance,
 }: Props) {
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const defaultMode = paymentModes.find(m => m.is_default) ?? paymentModes[0];
+  const defaultMode = paymentModes.find(m =>
+    /نقدا|نقداً|cash/i.test(m.name),
+  ) ?? paymentModes.find(m => m.is_default) ?? paymentModes[0];
 
   const [lines, setLines] = useState<PaymentLine[]>(() => {
     if (existingPayments?.length) {
@@ -7249,13 +7221,14 @@ export default function ProfessionalPaymentModal({
         id:                 uid(),
         dbId:               ep.id,
         modeId:             ep.payment_mode_id,
-        amount:             ep.amount.toFixed(2),
+        amount:             Number(ep.amount || 0).toFixed(4),
         refNote:            ep.reference ?? '',
         treasuryAccountId:  ep.treasury_account_id ?? null,
       }));
     }
+    const initAmount = totalTtcFinal.toFixed(4);
     return defaultMode
-      ? [{ id: uid(), modeId: defaultMode.id, amount: totalTtcFinal.toFixed(2), refNote: '', treasuryAccountId: null }]
+      ? [{ id: uid(), modeId: defaultMode.id, amount: initAmount, refNote: '', treasuryAccountId: null }]
       : [];
   });
 
@@ -7268,41 +7241,37 @@ export default function ProfessionalPaymentModal({
     currencies?.find(c => c.is_base_currency)?.id ?? currencies?.[0]?.id ?? null,
   );
 
-  // ── Balance fetch (self-contained — no prevBalance prop needed) ──────────
+  // ── Balance: SSOT from prop (when editing) or fetch from API (new doc) ──
   const [internalPrevBalance, setInternalPrevBalance] = useState(0);
   const [balanceLoading, setBalanceLoading] = useState(false);
 
   useEffect(() => {
+    // SSOT: parent passes prevBalance from document.balance_data when editing
+    if (propPrevBalance !== undefined) {
+      setInternalPrevBalance(propPrevBalance);
+      return;
+    }
     if (!client?.id) {
       setInternalPrevBalance(0);
       return;
     }
     setBalanceLoading(true);
-    partyBalancesApi.getOne(client.id)
+    const balanceDate = isEditing ? documentDate : undefined;
+    partyBalancesApi.getOne(client.id, balanceDate)
       .then(res => {
         const data = (res as any)?.data ?? res;
         const currentBalance = Number(data?.current_balance ?? 0);
-        if (existingPayments?.length) {
-          const existingTotal = existingPayments.reduce((s, p) => s + p.amount, 0);
-          const remainingOnInvoice = Math.max(0, totalTtcFinal - existingTotal);
-          setInternalPrevBalance(Math.max(0, currentBalance - remainingOnInvoice));
-        } else {
-          setInternalPrevBalance(Math.max(0, currentBalance));
-        }
+        setInternalPrevBalance(currentBalance);
       })
       .catch(() => setInternalPrevBalance(0))
       .finally(() => setBalanceLoading(false));
-  }, [client?.id, existingPayments, totalTtcFinal]);
+  }, [client?.id, documentDate, isEditing, propPrevBalance]);
 
-  /** الـ line النشط الذي يتلقى مدخلات الـ numpad */
-  const [activeLineId, setActiveLineId] = useState<string | null>(
-    () => (defaultMode ? uid() : null),
-  );
-
-  // نُوحِّد activeLineId مع أول line عند التهيئة
+  const [activeLineId, setActiveLineId] = useState<string | null>(null);
   const activeLineIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (lines.length && !activeLineId) {
+    const stillValid = lines.some(l => l.id === activeLineId);
+    if (lines.length && !stillValid) {
       setActiveLineId(lines[0].id);
     }
     activeLineIdRef.current = activeLineId;
@@ -7314,28 +7283,29 @@ export default function ProfessionalPaymentModal({
     [lines],
   );
   const existingTotal = useMemo(
-    () => (existingPayments ?? []).reduce((s, p) => s + p.amount, 0),
+    () => (existingPayments ?? []).reduce((s, p) => s + Number(p.amount || 0), 0),
     [existingPayments],
   );
   const newPaid = useMemo(
     () => lines.reduce((s, l) => s + (l.dbId ? 0 : (parseFloat(l.amount) || 0)), 0),
     [lines],
   );
-  const remaining = Math.max(0, totalTtcFinal - totalPaid);
-  const change    = totalPaid > totalTtcFinal + 0.009 ? totalPaid - totalTtcFinal : 0;
+  const totalDue = totalTtcFinal + (client ? internalPrevBalance : 0);
+  const remaining = Math.max(0, totalDue - totalPaid);
+  const change    = totalPaid > totalDue + 0.009 ? totalPaid - totalDue : 0;
   const canSubmit = !submitting;
 
   // ── أزرار المبالغ السريعة ─────────────────────────────────────────────────
-  // تُظهر الأوراق النقدية المساوية أو الأكبر من المبلغ المتبقي
+  // المبلغ الأول دائماً = المبلغ المستحق كاملاً (سابق + مستحق)
+  // ثم الأوراق النقدية الأقرب فالأكبر
   const quickAmounts = useMemo(() => {
     const target = remaining > 0 ? remaining : totalTtcFinal;
-    // نأخذ أقرب ورقة أكبر من المبلغ + كل الأوراق الأكبر منها (max 5)
-    const bills = DZD_BILLS.filter(b => b >= Math.ceil(target / 100) * 100 - 500);
-    // دائماً نُضيف خيار "المبلغ الدقيق"
-    const exact = Math.ceil(target);
-    const result = Array.from(new Set([exact, ...bills])).sort((a, b) => a - b).slice(0, 5);
+    const exact = target;
+    const bills = DZD_BILLS.filter(b => b >= target - 500).slice(0, 4);
+    const totalDueAmt = totalDue;
+    const result = Array.from(new Set([totalDueAmt, exact, ...bills])).slice(0, 5);
     return result;
-  }, [remaining, totalTtcFinal]);
+  }, [remaining, totalTtcFinal, totalDue]);
 
   // ── Numpad handlers ────────────────────────────────────────────────────────
   const updateActiveLine = useCallback((fn: (prev: string) => string) => {
@@ -7349,7 +7319,7 @@ export default function ProfessionalPaymentModal({
   const onDigit = useCallback((d: string) => {
     updateActiveLine(prev => {
       if (prev === '0' || prev === '') return d;
-      if (prev.includes('.') && prev.split('.')[1].length >= 2) return prev;
+      if (prev.includes('.') && prev.split('.')[1].length >= 4) return prev;
       return prev + d;
     });
   }, [updateActiveLine]);
@@ -7371,7 +7341,7 @@ export default function ProfessionalPaymentModal({
     const id = activeLineIdRef.current;
     if (!id) return;
     setLines(prev => prev.map(l =>
-      l.id === id ? { ...l, amount: amount.toFixed(2) } : l,
+      l.id === id ? { ...l, amount: amount.toFixed(4) } : l,
     ));
   }, []);
 
@@ -7385,7 +7355,7 @@ export default function ProfessionalPaymentModal({
       {
         id:      newId,
         modeId:  firstMode.id,
-        amount:  Math.max(0, remaining).toFixed(2),
+        amount:  Math.max(0, remaining).toFixed(4),
         refNote: '',
         treasuryAccountId: null,
       },
@@ -7410,7 +7380,7 @@ export default function ProfessionalPaymentModal({
   const fillRemaining = useCallback((id: string) => {
     const others = lines.filter(l => l.id !== id).reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
     const rem    = Math.max(0, totalTtcFinal - others);
-    updateLine(id, 'amount', rem.toFixed(2));
+    updateLine(id, 'amount', rem.toFixed(4));
   }, [lines, totalTtcFinal, updateLine]);
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -7420,12 +7390,13 @@ export default function ProfessionalPaymentModal({
     setError('');
 
     const payments = lines
-      .filter(l => parseFloat(l.amount) > 0.009)
+      .filter(l => parseFloat(l.amount) > 0.00009)
       .map(l => ({
         ...(l.dbId ? { id: l.dbId } : {}),
         paymentModeId:      l.modeId,
         amount:             parseFloat(l.amount),
         treasuryAccountId:  l.treasuryAccountId ?? null,
+        reference:          l.refNote?.trim() || null,
       }));
 
     const res = await onConfirm({
@@ -7471,7 +7442,8 @@ export default function ProfessionalPaymentModal({
           maxWidth:  780,
           display:   'grid',
           gridTemplateRows: 'auto 1fr auto',
-          maxHeight: '92vh',
+          maxHeight: 'calc(100vh - 40px)',
+          overflow:  'hidden',
         }}
       >
         {/* ── Header ── */}
@@ -7508,30 +7480,43 @@ export default function ProfessionalPaymentModal({
 
             {/* ملخص الفاتورة */}
             <div className="pay-v2-summary">
-              <div className="pvs-row">
-                <span>HT</span>
-                <span>{formatDZD(totals.total_ht)}</span>
-              </div>
-              {totals.total_discount > 0 && (
-                <div className="pvs-row pvs-disc">
-                  <span>خصم</span>
-                  <span>- {formatDZD(totals.total_discount)}</span>
-                </div>
-              )}
-              <div className="pvs-row">
-                <span>TVA</span>
-                <span>{formatDZD(totals.total_tva)}</span>
-              </div>
-              {totals.fiscal_stamp > 0 && (
-                <div className="pvs-row">
-                  <span>طابع مالي</span>
-                  <span>{formatDZD(totals.fiscal_stamp)}</span>
-                </div>
-              )}
-              <div className="pvs-row pvs-total">
-                <span>الإجمالي</span>
-                <strong>{formatDZD(totalTtcFinal)}</strong>
-              </div>
+              {(() => {
+                const grossHt = totals.total_ht + totals.total_discount + (totals.invoice_discount_amount ?? 0);
+                return (
+                  <>
+                    <div className="pvs-row">
+                      <span>HT</span>
+                      <span>{formatDZD(grossHt)}</span>
+                    </div>
+                    {totals.total_discount > 0 && (
+                      <div className="pvs-row pvs-disc">
+                        <span>خصم</span>
+                        <span>- {formatDZD(totals.total_discount)}</span>
+                      </div>
+                    )}
+                    {totals.invoice_discount_amount != null && totals.invoice_discount_amount > 0 && (
+                      <div className="pvs-row pvs-disc">
+                        <span>Remise {totals.invoice_discount_pct ?? 0}%</span>
+                        <span>- {formatDZD(totals.invoice_discount_amount)}</span>
+                      </div>
+                    )}
+                    <div className="pvs-row">
+                      <span>TVA</span>
+                      <span>{formatDZD(totals.total_tva)}</span>
+                    </div>
+                    {totals.fiscal_stamp > 0 && (
+                      <div className="pvs-row">
+                        <span>طابع مالي</span>
+                        <span>{formatDZD(totals.fiscal_stamp)}</span>
+                      </div>
+                    )}
+                    <div className="pvs-row pvs-total">
+                      <span>الإجمالي</span>
+                      <strong>{formatDZD(totalTtcFinal)}</strong>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* ملخص الرصيد */}
@@ -7541,22 +7526,18 @@ export default function ProfessionalPaymentModal({
                   <span>الرصيد السابق</span>
                   <span>{balanceLoading ? '...' : formatDZD(internalPrevBalance)}</span>
                 </div>
-                <div className="pvs-row">
-                  <span>الإجمالي</span>
-                  <span>{formatDZD(totalTtcFinal)}</span>
-                </div>
                 <div className="pvs-row" style={{ borderTop: '1px dashed #ccc', paddingTop: 6, marginTop: 2 }}>
-                  <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + إجمالي)</span></span>
+                  <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + مستحق)</span></span>
                   <strong>{formatDZD(internalPrevBalance + totalTtcFinal)}</strong>
                 </div>
-                {existingTotal > 0 && (
+                {(existingTotal > 0 || isEditing) && (
                   <div className="pvs-row">
                     <span style={{ color: '#888' }}>مدفوع سابقاً</span>
                     <span style={{ color: '#888' }}>{formatDZD(existingTotal)}</span>
                   </div>
                 )}
                 <div className="pvs-row" style={{ borderTop: '1px solid #ddd', paddingTop: 6, marginTop: 2 }}>
-                  <span>{existingTotal > 0 ? 'المدفوع الآن' : 'المدفوع'}</span>
+                  <span>{existingTotal > 0 || isEditing ? 'المدفوع الآن' : 'المدفوع'}</span>
                   <span>{formatDZD(newPaid)}</span>
                 </div>
                 <div className="pvs-row pvs-total" style={{ marginTop: 4 }}>
@@ -7747,7 +7728,7 @@ export default function ProfessionalPaymentModal({
                   onClick={() => applyQuickAmount(a)}
                   type="button"
                 >
-                  {a.toLocaleString('ar-DZ')} دج
+                  {a.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} دج
                 </button>
               ))}
             </div>
@@ -7799,6 +7780,7 @@ export default function ProfessionalPaymentModal({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/ProfessionalReceipt.tsx
@@ -7872,6 +7854,7 @@ export default function ProfessionalReceipt({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/QuickItemsBar.tsx
@@ -7964,6 +7947,7 @@ export default function QuickItemsBar({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/ReturnsModal.tsx
@@ -8157,11 +8141,12 @@ export default function ReturnsModal({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/SessionInvoicesModal.tsx
 ```
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { CommercialDocument } from '@/lib/api/core/types';
 import type { PosSession } from '@/lib/api/endpoints/posSession';
 import { documentsApi } from '@/lib/api/endpoints/documents';
@@ -8176,6 +8161,10 @@ interface Props {
 export default function SessionInvoicesModal({ session, onClose, onOpen }: Props) {
   const [docs, setDocs] = useState<CommercialDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [sortField, setSortField] = useState<string>('document_date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const listRef = useRef<HTMLTableSectionElement>(null);
 
   const openedDate = session.opened_at?.slice(0, 10);
   const today      = new Date().toISOString().slice(0, 10);
@@ -8186,9 +8175,10 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
     documentsApi.list({
       include: 'party',
       per_page: 200,
-      sort: '-document_date',
+      sort: '-created_at',
       'filter[created_at]': `${openedDate},${today}`,
       'filter[warehouse_id]': session.warehouse?.id,
+      'filter[user_id]': session.user?.id,
     }).then((res: any) => {
       if (cancelled) return;
       const list = Array.isArray(res) ? res : res?.data ?? [];
@@ -8199,11 +8189,92 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [session.opened_at, session.warehouse?.id, openedDate, today]);
+  }, [session.opened_at, session.warehouse?.id, session.user?.id, openedDate, today]);
+
+  const sorted = useMemo(() => {
+    const list = [...docs];
+    list.sort((a, b) => {
+      let va: any, vb: any;
+      switch (sortField) {
+        case 'document_number': va = a.document_number; vb = b.document_number; break;
+        case 'client':          va = a.party?.name ?? ''; vb = b.party?.name ?? ''; break;
+        case 'document_date':   va = a.document_date ?? ''; vb = b.document_date ?? ''; break;
+        case 'total_ttc':       va = Number(a.total_ttc ?? 0); vb = Number(b.total_ttc ?? 0); break;
+        case 'paid_amount':     va = Number(a.paid_amount ?? 0); vb = Number(b.paid_amount ?? 0); break;
+        case 'remaining_amount':va = Number(a.remaining_amount ?? 0); vb = Number(b.remaining_amount ?? 0); break;
+        default:                va = a.document_date ?? ''; vb = b.document_date ?? '';
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [docs, sortField, sortDir]);
+
+  // أعد تعيين التحديد بعد الترتيب
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [sorted.length]);
+
+  useEffect(() => {
+    if (!listRef.current) return;
+    const el = listRef.current.children[selectedIndex] as HTMLElement | undefined;
+    el?.scrollIntoView?.({ block: 'nearest' });
+  }, [selectedIndex]);
+
+  const toggleSort = useCallback((field: string) => {
+    setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    setSortField(field);
+  }, []);
+
+  function sortIcon(field: string): string {
+    if (sortField !== field) return 'ti ti-arrows-sort';
+    return sortDir === 'asc' ? 'ti ti-sort-ascending' : 'ti ti-sort-descending';
+  }
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(i => Math.min(i + 1, docs.length - 1));
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(i => Math.max(i - 1, 0));
+      return;
+    }
+    if (e.key === 'Enter') {
+      if (sorted.length === 0) return;
+      const selected = sorted[selectedIndex];
+      if (!selected) return;
+      e.preventDefault();
+      onOpen(selected.id);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  }, [sorted, selectedIndex, onOpen, onClose]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown as EventListener);
+    return () => window.removeEventListener('keydown', handleKeyDown as EventListener);
+  }, [handleKeyDown]);
 
   const handleRowClick = useCallback((doc: CommercialDocument) => {
     onOpen(doc.id);
   }, [onOpen]);
+
+  const totals = useMemo(() => {
+    let ttc = 0, paid = 0, remaining = 0;
+    for (const doc of sorted) {
+      ttc       += Number(doc.total_ttc ?? 0);
+      paid      += Number(doc.paid_amount ?? 0);
+      remaining += Number(doc.remaining_amount ?? 0);
+    }
+    return { ttc, paid, remaining };
+  }, [sorted]);
 
   return (
     <div className="ov on" onClick={onClose}>
@@ -8231,34 +8302,58 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>رقم الفاتورة</th>
-                  <th>العميل</th>
-                  <th>التاريخ</th>
-                  <th>الإجمالي</th>
+                  <th className="si-th-sort" onClick={() => toggleSort('document_number')}>
+                    <i className={sortIcon('document_number')} style={{ fontSize: 11, marginLeft: 3 }} /> رقم الفاتورة
+                  </th>
+                  <th className="si-col-client">العميل</th>
+                  <th className="si-th-sort" onClick={() => toggleSort('document_date')}>
+                    <i className={sortIcon('document_date')} style={{ fontSize: 11, marginLeft: 3 }} /> التاريخ
+                  </th>
+                  <th className="si-th-sort" onClick={() => toggleSort('total_ttc')}>
+                    <i className={sortIcon('total_ttc')} style={{ fontSize: 11, marginLeft: 3 }} /> الإجمالي
+                  </th>
+                  <th className="si-th-sort" onClick={() => toggleSort('paid_amount')}>
+                    <i className={sortIcon('paid_amount')} style={{ fontSize: 11, marginLeft: 3 }} /> المدفوع
+                  </th>
+                  <th className="si-th-sort" onClick={() => toggleSort('remaining_amount')}>
+                    <i className={sortIcon('remaining_amount')} style={{ fontSize: 11, marginLeft: 3 }} /> المتبقي
+                  </th>
                 </tr>
               </thead>
-              <tbody>
-                {docs.map((doc, i) => (
+              <tbody ref={listRef}>
+                {sorted.map((doc, i) => (
                   <tr
                     key={doc.id}
                     onClick={() => handleRowClick(doc)}
                     style={{ cursor: 'pointer' }}
-                    className="si-row"
+                    className={`si-row${i === selectedIndex ? ' si-row-sel' : ''}`}
                   >
                     <td>{i + 1}</td>
                     <td><strong>{doc.document_number}</strong></td>
-                    <td>{doc.party?.name ?? <span style={{ color: 'var(--t4)' }}>—</span>}</td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
-                    <td style={{ fontWeight: 600 }}>{formatDZD(doc.total_ttc)}</td>
+                    <td className="si-col-client">{doc.party?.name ?? <span style={{ color: 'var(--t4)' }}>—</span>}</td>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{doc.created_at?.slice(0, 16).replace('T', ' ') ?? doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--p)' }}>{formatDZD(doc.total_ttc)}</td>
+                    <td style={{ color: 'var(--g)' }}>{formatDZD(doc.paid_amount ?? 0)}</td>
+                    <td style={{ fontWeight: 600, color: Number(doc.remaining_amount ?? 0) > 0 ? 'var(--r)' : 'var(--t4)' }}>
+                      {formatDZD(doc.remaining_amount ?? 0)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr style={{ fontWeight: 700, borderTop: '2px solid var(--b3)' }}>
+                  <td colSpan={4} style={{ textAlign: 'left' }}>المجموع</td>
+                  <td style={{ color: 'var(--p)' }}>{formatDZD(totals.ttc)}</td>
+                  <td style={{ color: 'var(--g)' }}>{formatDZD(totals.paid)}</td>
+                  <td style={{ color: totals.remaining > 0 ? 'var(--r)' : 'var(--t4)' }}>{formatDZD(totals.remaining)}</td>
+                </tr>
+              </tfoot>
             </table>
           )}
         </div>
         <div className="m-foot">
           <span style={{ fontSize: 12, color: 'var(--t4)' }}>
-            انقر على فاتورة لفتحها في السلة
+            ↑↓ للتنقل · Enter لفتح الفاتورة · Esc للإغلاق
           </span>
           <button className="btn" onClick={onClose}>إغلاق</button>
         </div>
@@ -8266,6 +8361,7 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/SessionStatsModal.tsx
@@ -8649,6 +8745,7 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/Sparkline.tsx
@@ -8661,265 +8758,15 @@ export default function Sparkline({ value, max, color }: { value: number; max: n
     </div>
   );
 }
-```
 
-## FILE: resources/js/pos/hooks/useCartStore.ts
-```
-// ════════════════════════════════════════════════════════════════════════════
-// pos/utils/useCartStore.ts
-//
-// ✅ التحسينات عن النسخة السابقة:
-//   1. خصم الكمية التلقائي — يقرأ quantityDiscounts من الفاريانت
-//      ويطبّق الخصم المناسب عند كل تغيير في الكمية
-//   2. خصم ثابت بالمبلغ — discount_amount مباشرة (إضافة لـ discount_percentage)
-//   3. updateDiscountAmount — action جديد لتحرير الخصم كمبلغ مباشر
-//   4. Optimistic stock — current_stock يتناقص فوراً في الذاكرة عند الإضافة
-//   5. getQuantityDiscount — helper مستقل قابل للاستيراد من أي مكان
-// ════════════════════════════════════════════════════════════════════════════
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { nanoid }  from 'nanoid';
-import type { CartItem, CartTotals, Party, ProductVariant } from '@/types';
-import { calcTotals, calcFiscalStamp } from '../utils/calculations';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface CartState {
-  items:              CartItem[];
-  client:             Party | null;
-  notes:              string;
-  invoiceDiscountPct: number;
-
-  // Actions
-  addItem:              (variant: ProductVariant, qty?: number) => void;
-  removeItem:           (id: string) => void;
-  updateQty:            (id: string, qty: number) => void;
-  updateDiscount:       (id: string, pct: number) => void;
-  updateDiscountAmount: (id: string, amount: number) => void;   // ✅ جديد
-  updatePrice:          (id: string, price: number) => void;
-  setClient:            (client: Party | null) => void;
-  setNotes:             (notes: string) => void;
-  clearCart:            () => void;
-  setInvoiceDiscountPct:(pct: number) => void;
-  totals:               () => CartTotals;
-}
-
-// ─── Quantity Discount helper ─────────────────────────────────────────────────
-
-/**
- * يحسب الخصم المناسب بناءً على الكمية وجدول الخصومات.
- * يعيد نسبة مئوية (0–100) — 0 إذا لم يكن هناك خصم.
- *
- * quantityDiscounts مرتّب تصاعدياً بـ min_quantity من الباكاند.
- * نأخذ أعلى سقف لا يتجاوزه qty.
- */
-export function getQuantityDiscount(
-  variant: ProductVariant,
-  qty: number,
-): number {
-  const discounts = (variant as any).quantityDiscounts as Array<{
-    min_quantity: number;
-    discount_percentage: number;
-  }> | undefined;
-
-  if (!discounts || discounts.length === 0) return 0;
-
-  // فرز تنازلي — أكبر كمية أولاً
-  const sorted = [...discounts].sort((a, b) => b.min_quantity - a.min_quantity);
-  const match  = sorted.find(d => qty >= d.min_quantity);
-  return match ? Math.min(100, Math.max(0, match.discount_percentage)) : 0;
-}
-
-// ─── Item Totals recalculator ─────────────────────────────────────────────────
-
-/**
- * يُعيد حساب discount_percentage ← discount_amount ← total_ht ← total_ttc
- * لصنف واحد بعد أي تعديل.
- *
- * الأولوية: discount_percentage (نسبة) — إذا كانت > 0 تُعيد حساب الـ amount.
- * إذا كان discount_amount محدداً مباشرة، يُحوَّل لنسبة مكافئة.
- */
-function recalcItem(item: CartItem): CartItem {
-  const gross = item.unit_price_ht * item.quantity;   // قبل الخصم
-
-  // حساب مبلغ الخصم الفعلي
-  let discAmount: number;
-  if (item.discount_percentage > 0) {
-    discAmount = gross * (item.discount_percentage / 100);
-  } else if (item.discount_amount > 0) {
-    // خصم ثابت → نُحوِّله لنسبة لنحتفظ باتساق الحسابات
-    discAmount        = Math.min(gross, item.discount_amount);
-    item              = {
-      ...item,
-      discount_percentage: gross > 0 ? (discAmount / gross) * 100 : 0,
-    };
-  } else {
-    discAmount = 0;
-  }
-
-  const totalHt  = gross - discAmount;
-  const totalTva = totalHt * (item.tva_rate / 100);
-
-  return {
-    ...item,
-    discount_amount: round2(discAmount),
-    total_ht:        round2(totalHt),
-    total_ttc:       round2(totalHt + totalTva),
-  };
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-function getUnitSymbol(v: ProductVariant): string {
-  return v.unit?.abbreviation ?? 'قطعة';
-}
-
-// ─── Store ────────────────────────────────────────────────────────────────────
-
-export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
-      items:              [],
-      client:             null,
-      notes:              '',
-      invoiceDiscountPct: 0,
-
-      // ── addItem ──────────────────────────────────────────────────────────────
-      addItem: (variant, qty = 1) => {
-        set(state => {
-          const existing = state.items.find(i => i.variant_id === variant.id);
-
-          if (existing) {
-            // ✅ زيادة الكمية → إعادة حساب خصم الكمية التلقائي
-            const newQty    = existing.quantity + qty;
-            const autoDisc  = getQuantityDiscount(variant, newQty);
-            const updated   = recalcItem({
-              ...existing,
-              quantity:            newQty,
-              // ✅ نحدّث الخصم فقط إذا كان autoDisc أعلى من الموجود
-              // لا نطغى على خصم يدوي أعلى أعطاه الكاشير
-              discount_percentage: Math.max(existing.discount_percentage, autoDisc),
-            });
-            return {
-              items: state.items.map(i =>
-                i.variant_id === variant.id ? updated : i,
-              ),
-            };
-          }
-
-          // صنف جديد
-          const priceHt   = variant.default_selling_price_ht;
-          const tvaRate   = variant.tva?.rate ?? 19;
-          const autoDisc  = getQuantityDiscount(variant, qty);
-
-          const newItem: CartItem = recalcItem({
-            id:                  nanoid(8),
-            product_id:          variant.product_id,
-            variant_id:          variant.id,
-            ref:                 variant.ref ?? '',
-            product_name:        variant.product?.name ?? '',
-            variant_name:        variant.variant_name ?? null,
-            barcode:             variant.barcode ?? null,
-            unit_symbol:         getUnitSymbol(variant),
-            quantity:            qty,
-            unit_price_ht:       priceHt,
-            selling_price_ttc:   priceHt * (1 + tvaRate / 100),
-            tva_rate:            tvaRate,
-            tva_id:              variant.tva_id ?? null,
-            discount_percentage: autoDisc,
-            discount_amount:     0,
-            total_ht:            0,   // يُحسَب في recalcItem
-            total_ttc:           0,
-            manages_stock:       variant.manages_stock,
-            max_stock:           variant.manages_stock
-              ? (variant.current_stock ?? null)
-              : null,
-          });
-
-          return { items: [...state.items, newItem] };
-        });
-      },
-
-      // ── removeItem ───────────────────────────────────────────────────────────
-      removeItem: (id) =>
-        set(state => ({ items: state.items.filter(i => i.id !== id) })),
-
-      // ── updateQty ────────────────────────────────────────────────────────────
-      // ✅ يُعيد حساب خصم الكمية التلقائي عند تغيير الكمية
-      updateQty: (id, qty) =>
-        set(state => {
-          const item = state.items.find(i => i.id === id);
-          if (!item) return state;
-
-          // نحاول إيجاد الفاريانت من items للوصول لـ quantityDiscounts
-          // (نحتفظ بمرجع الفاريانت في CartItem._variant اختيارياً)
-          const safeQty   = Math.max(0.001, qty);
-          // لا يمكن الوصول للـ variant هنا مباشرة — نحتفظ بـ discount_percentage الحالي
-          // إلا إذا كان الكاشير عدَّله يدوياً. الحل: نُخزِّن quantityDiscounts في CartItem.
-          const updated   = recalcItem({ ...item, quantity: safeQty });
-          return { items: state.items.map(i => i.id === id ? updated : i) };
-        }),
-
-      // ── updateDiscount (نسبة) ─────────────────────────────────────────────────
-      updateDiscount: (id, pct) =>
-        set(state => ({
-          items: state.items.map(i =>
-            i.id === id
-              ? recalcItem({
-                  ...i,
-                  discount_percentage: Math.min(100, Math.max(0, pct)),
-                  discount_amount:     0,   // إعادة ضبط الخصم الثابت
-                })
-              : i,
-          ),
-        })),
-
-      // ── updateDiscountAmount (مبلغ ثابت) ✅ جديد ─────────────────────────────
-      updateDiscountAmount: (id, amount) =>
-        set(state => ({
-          items: state.items.map(i =>
-            i.id === id
-              ? recalcItem({
-                  ...i,
-                  discount_amount:     Math.max(0, amount),
-                  discount_percentage: 0,   // إعادة ضبط النسبة
-                })
-              : i,
-          ),
-        })),
-
-      // ── updatePrice ──────────────────────────────────────────────────────────
-      updatePrice: (id, price) =>
-        set(state => ({
-          items: state.items.map(i =>
-            i.id === id
-              ? recalcItem({ ...i, unit_price_ht: Math.max(0, price) })
-              : i,
-          ),
-        })),
-
-      setClient: (client) => set({ client }),
-      setNotes:  (notes)  => set({ notes }),
-      clearCart: ()       => set({ items: [], client: null, notes: '', invoiceDiscountPct: 0 }),
-      setInvoiceDiscountPct: (pct) =>
-        set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)) }),
-
-      totals: (fiscalStampEnabled?: boolean) =>
-        calcTotals(get().items, get().invoiceDiscountPct, fiscalStampEnabled),
-    }),
-    {
-      name:       'pos-cart',
-      partialize: () => ({}),   // لا نحفظ السلة في localStorage
-    },
-  ),
-);
 ```
 
 ## FILE: resources/js/pos/hooks/useKeyboardMap.ts
 ```
+import React from 'react';
+
 const STORAGE_KEY = 'pos-kb-override-';
+const KB_CHANGE_EVENT = 'pos-kb-changed';
 
 export const KB_DEFAULTS: Record<string, string> = {
   searchFocus: 'F2',
@@ -8932,6 +8779,7 @@ export const KB_DEFAULTS: Record<string, string> = {
   filter: 'F3',
   manualProduct: 'F6',
   sessionStats: 'F8',
+  returns: 'F10',
   fullscreen: 'F11',
   directPrint: 'Ctrl+P',
   quickSearch: 'Ctrl+F',
@@ -8946,6 +8794,10 @@ export const KB_DEFAULTS: Record<string, string> = {
   enterSearch: 'Enter',
   escape: 'Escape',
   confirmPayment: 'Ctrl+Enter',
+  openDrawer: 'Ctrl+D',
+  undoClear: 'Ctrl+Z',
+  toggleHeld: 'Ctrl+ArrowRight',
+  sessionInvoices: 'Ctrl+Shift+I',
 };
 
 export function normalizeEventKey(e: KeyboardEvent): string {
@@ -8967,12 +8819,41 @@ export function readOverrides(slug: string | null): Record<string, string> {
   } catch { return {}; }
 }
 
+/** Persist overrides and notify all components */
+export function saveOverrides(slug: string | null, overrides: Record<string, string>): void {
+  if (!slug) return;
+  localStorage.setItem(`${STORAGE_KEY}${slug}`, JSON.stringify(overrides));
+  window.dispatchEvent(new CustomEvent(KB_CHANGE_EVENT, { detail: { slug } }));
+}
+
 export function matchOverride(slug: string | null, action: string, e: KeyboardEvent): boolean {
   if (!slug) return false;
   const overrides = readOverrides(slug);
   const expected = overrides[action] ?? KB_DEFAULTS[action];
+  if (!expected) return false;
   return normalizeEventKey(e) === expected;
 }
+
+/** Get effective shortcut for an action (override or default, null if disabled) */
+export function getEffectiveShortcut(slug: string | null, action: string): string | null {
+  if (!slug) return null;
+  const overrides = readOverrides(slug);
+  const val = overrides[action];
+  if (val === '') return null;
+  return val ?? KB_DEFAULTS[action] ?? null;
+}
+
+/** React hook — returns current overrides, updates on saveOverrides() */
+export function useKbOverrides(slug: string | null): Record<string, string> {
+  const [v, setV] = React.useState(0);
+  React.useEffect(() => {
+    const handler = () => setV(x => x + 1);
+    window.addEventListener(KB_CHANGE_EVENT, handler);
+    return () => window.removeEventListener(KB_CHANGE_EVENT, handler);
+  }, []);
+  return React.useMemo(() => readOverrides(slug), [slug, v]);
+}
+
 ```
 
 ## FILE: resources/js/pos/hooks/usePOS.ts
@@ -9034,6 +8915,7 @@ export function usePOS(fiscalStampEnabled = true) {
     totals,
   };
 }
+
 ```
 
 ## FILE: resources/js/pos/hooks/usePosSessions.ts
@@ -9210,6 +9092,7 @@ export function usePosSessions() {
     resetFilters,
   };
 }
+
 ```
 
 ## FILE: resources/js/pos/hooks/usePOSSettings.ts
@@ -9406,6 +9289,7 @@ export function checkDiscountAllowed(
   }
   return { allowed: true };
 }
+
 ```
 
 ## FILE: resources/js/pos/hooks/usePOSStore.ts
@@ -9480,6 +9364,7 @@ export const usePOSStore = create<POSState>((set, get) => ({
   setInvoiceDiscountPct: (pct) =>
     set({ invoiceDiscountPct: Math.max(0, Math.min(100, pct)) }),
 }));
+
 ```
 
 ## FILE: resources/js/pos/hooks/usePrintSettings.ts
@@ -9606,6 +9491,7 @@ export function usePrintSettings(docTypeCode: string) {
     printerId:   config?.printerId ?? null,
   };
 }
+
 ```
 
 ## FILE: resources/js/pos/store/printStore.ts
@@ -9673,6 +9559,7 @@ export function deviceSetPrinterForDoc(slug: string, docCode: string, printerId:
     localStorage.setItem(DEV_KEY_DOC_DEVICE(slug), JSON.stringify(map));
   } catch { /* ignore */ }
 }
+
 ```
 
 ## FILE: resources/js/pos/utils/__tests__/thermal-print.baseline.spec.ts
@@ -10092,6 +9979,7 @@ describe('ThermalPrintPath — company info formatting (Stage 2)', () => {
     expect(containsBytes(right, [0x1B, 0x61, 0x02])).toBe(true);
   });
 });
+
 ```
 
 ## FILE: resources/js/pos/utils/calculations.test.ts
@@ -10140,20 +10028,24 @@ describe('calcMargin', () => {
 });
 
 describe('calcFiscalStamp', () => {
-  it('returns 0 for amounts below 30,000', () => {
-    expect(calcFiscalStamp(20000)).toBe(0);
+  it('returns 0 for zero and negative amounts', () => {
     expect(calcFiscalStamp(0)).toBe(0);
-    expect(calcFiscalStamp(29999.99)).toBe(0);
+    expect(calcFiscalStamp(-100)).toBe(0);
   });
-  it('returns 1% for amounts between 30k and 300k', () => {
+  it('applies 1% floor at MIN_STAMP=5', () => {
+    expect(calcFiscalStamp(200)).toBe(5);
+    expect(calcFiscalStamp(499.99)).toBe(5);
+  });
+  it('applies 1% for medium amounts', () => {
     expect(calcFiscalStamp(30000)).toBe(300);
     expect(calcFiscalStamp(100000)).toBe(1000);
-    expect(calcFiscalStamp(299999)).toBe(3000);
+    expect(calcFiscalStamp(200000)).toBe(2000);
   });
-  it('caps at 3000 for amounts >= 300k', () => {
-    expect(calcFiscalStamp(300000)).toBe(3000);
-    expect(calcFiscalStamp(500000)).toBe(3000);
-    expect(calcFiscalStamp(1_000_000)).toBe(3000);
+  it('caps at MAX_STAMP=2500', () => {
+    expect(calcFiscalStamp(250000)).toBe(2500);
+    expect(calcFiscalStamp(300000)).toBe(2500);
+    expect(calcFiscalStamp(500000)).toBe(2500);
+    expect(calcFiscalStamp(1_000_000)).toBe(2500);
   });
 });
 
@@ -10222,14 +10114,12 @@ describe('formatDZD', () => {
   it('formats amount with DZD symbol', () => {
     expect(formatDZD(1000)).toMatch(/دج/);
   });
-  it('formats whole number without decimals', () => {
+  it('formats whole number with 2 decimals', () => {
     const r = formatDZD(1000);
-    expect(r).toContain('1');
-    expect(r).not.toContain(',');
+    expect(r).toMatch(/1 000,00 دج/);
   });
   it('formats decimal amount', () => {
-    const r = formatDZD(1500.5);
-    expect(r).toContain('1');
+    expect(formatDZD(1500.5)).toMatch(/1 500,50 دج/);
   });
 });
 
@@ -10277,6 +10167,7 @@ describe('round2', () => {
     expect(round2(0)).toBe(0);
   });
 });
+
 ```
 
 ## FILE: resources/js/pos/utils/calculations.ts
@@ -10357,8 +10248,9 @@ export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStam
 export function formatDZD(amount: number | string | null | undefined): string {
   const n = Number(amount);
   if (!Number.isFinite(n)) return '0 دج';
-  return new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-    .format(n) + ' دج';
+  const formatted = new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .format(n);
+  return (formatted.startsWith('-') ? '\u200E' : '') + formatted + ' دج';
 }
 
 /** حساب الباقي من الدفع */
@@ -10379,6 +10271,7 @@ export function checkStock(item: CartItem, newQty: number): { ok: boolean; messa
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
 ```
 
 ## FILE: resources/js/pos/utils/posHelpers.test.ts
@@ -10553,6 +10446,7 @@ describe('familyStyleFromName', () => {
     expect(s.icon).toBe('ti-package');
   });
 });
+
 ```
 
 ## FILE: resources/js/pos/utils/posHelpers.ts
@@ -10596,16 +10490,19 @@ export function getVariantPrice(
   priceLevelId: number | null,
   priceLevels: PriceLevel[],
 ): number {
+  const defaultPrice = v.default_selling_price_ht ?? 0;
   if (priceLevelId) {
     const priceEntry = v.prices?.find(
       (p: ProductVariantPrice) => p.price_level_id === priceLevelId,
     );
-    if (priceEntry) return (priceEntry as any).price_ht ?? priceEntry.price ?? v.default_selling_price_ht;
-    const pl = priceLevels.find(p => p.id === priceLevelId);
-    if (pl?.discount_percent)
-      return v.default_selling_price_ht * (1 - pl.discount_percent / 100);
+    if (priceEntry) return (priceEntry as any).price_ht ?? priceEntry.price ?? defaultPrice;
+    const level = priceLevels.find((pl) => pl.id === priceLevelId);
+    if (level?.discount_percent) {
+      return Math.round(defaultPrice * (1 - level.discount_percent / 100) * 100) / 100;
+    }
+    return defaultPrice;
   }
-  return v.default_selling_price_ht;
+  return defaultPrice;
 }
 
 // ─── productToVariant ─────────────────────────────────────────────────────────
@@ -10761,6 +10658,7 @@ export function familyStyleFromName(
   if (f.includes('دواء'))                           return { icon: 'ti-pill',           color: 'var(--red)',    bg: 'var(--redb)'  };
   return { icon: 'ti-package', color: 'var(--em)', bg: 'var(--emb)' };
 }
+
 ```
 
 ## FILE: resources/js/pos/utils/printService.ts
@@ -11279,7 +11177,7 @@ export async function printThermalViaWebUSBFromTemplate(
   return sendBytesToReceiptPrinter(bytes);
 }
 
-async function sendBytesToReceiptPrinter(bytes: Uint8Array): Promise<ThermalPrintResult> {
+export async function sendBytesToReceiptPrinter(bytes: Uint8Array): Promise<ThermalPrintResult> {
   const usb = (navigator as any).usb;
   if (!usb) {
     return { ok: false, method: 'none', message: 'WebUSB غير مدعوم في هذا المتصفح' };
@@ -11323,6 +11221,10 @@ async function sendBytesToReceiptPrinter(bytes: Uint8Array): Promise<ThermalPrin
   }
 }
 
+export async function openCashDrawerViaWebUSB(): Promise<ThermalPrintResult> {
+  const KICK_DRAWER_PIN2 = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]);
+  return sendBytesToReceiptPrinter(KICK_DRAWER_PIN2);
+}
 
 ```
 
@@ -11406,6 +11308,7 @@ function openPrintWindow(html: string, paperWidthMm: number): Promise<void> {
 function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
+
 ```
 
 ## FILE: resources/js/pos/utils/useCartStore.ts
@@ -11423,6 +11326,8 @@ export interface DocumentPayment {
   payment_date:        string;
   treasury_account_id?: number | null;
   reference?:          string | null;
+  notes?:              string | null;
+  client_ref?:         string | null;
 }
 
 interface CartState {
@@ -11522,7 +11427,7 @@ export const useCartStore = create<CartState>()(
           }
 
           const priceHt  = variant.default_selling_price_ht;
-          const tvaRate  = variant.tva?.rate ?? 19;
+          const tvaRate  = variant.tva?.rate ?? 0;
           const autoDisc = findQuantityDiscount(variant.quantity_discounts, qty);
 
           const newItem: CartItem = recalcItem({
@@ -11629,8 +11534,10 @@ export const useCartStore = create<CartState>()(
     },
   ),
 );
+
 ```
 
-   ⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة
-==================================================== */
 
+====================================================
+⚠️ تم الدمج فقط لتسهيل المشاركة أو المراجعة
+====================================================

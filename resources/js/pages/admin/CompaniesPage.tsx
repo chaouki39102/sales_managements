@@ -5,6 +5,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
+import { useNotification } from '@/hooks/useNotification';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ui';
 
 import Card         from '@/components/ui/Card';
 import Badge        from '@/components/ui/Badge';
@@ -686,12 +689,12 @@ function SuperAdminTab() {
         <Card title="عمليات النظام" noHeader={false}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[
-              { label: 'مسح الكاش العام',          icon: 'ti-refresh',        color: 'var(--em)',   bg: 'var(--emb)',   action: () => alert('تم مسح الكاش') },
-              { label: 'تشغيل المهام المجدولة',     icon: 'ti-clock-play',     color: 'var(--blue)', bg: 'var(--blueb)', action: () => alert('تم تشغيل المهام') },
-              { label: 'تصدير ملفات اللوج',         icon: 'ti-download',       color: 'var(--blue)', bg: 'var(--blueb)', action: () => alert('جارٍ التصدير...') },
-              { label: 'نسخ احتياطي فوري',          icon: 'ti-database-export',color: 'var(--gold)', bg: 'var(--goldb)', action: () => alert('النسخة تُنشأ...') },
-              { label: 'إرسال إشعار للكل',          icon: 'ti-speakerphone',   color: 'var(--gold)', bg: 'var(--goldb)', action: () => alert('تم الإرسال') },
-              { label: 'تفعيل وضع الصيانة',         icon: 'ti-alert-triangle', color: 'var(--red)',  bg: 'var(--redb)',  action: () => confirm('تفعيل وضع الصيانة؟') && alert('مفعّل') },
+              { label: 'مسح الكاش العام',          icon: 'ti-refresh',        color: 'var(--em)',   bg: 'var(--emb)',   action: () => notify.success('تم مسح الكاش') },
+              { label: 'تشغيل المهام المجدولة',     icon: 'ti-clock-play',     color: 'var(--blue)', bg: 'var(--blueb)', action: () => notify.success('تم تشغيل المهام') },
+              { label: 'تصدير ملفات اللوج',         icon: 'ti-download',       color: 'var(--blue)', bg: 'var(--blueb)', action: () => notify.success('جارٍ التصدير...') },
+              { label: 'نسخ احتياطي فوري',          icon: 'ti-database-export',color: 'var(--gold)', bg: 'var(--goldb)', action: () => notify.success('النسخة تُنشأ...') },
+              { label: 'إرسال إشعار للكل',          icon: 'ti-speakerphone',   color: 'var(--gold)', bg: 'var(--goldb)', action: () => notify.success('تم الإرسال') },
+              { label: 'تفعيل وضع الصيانة',         icon: 'ti-alert-triangle', color: 'var(--red)',  bg: 'var(--redb)',  action: () => { if (confirm('تفعيل وضع الصيانة؟')) notify.success('مفعّل'); } },
             ].map(op => (
               <button key={op.label} onClick={op.action} style={{
                 padding: '10px 14px', borderRadius: 10, width: '100%',
@@ -741,6 +744,8 @@ function SuperAdminTab() {
 export default function CompaniesPage() {
   const { user } = useAuth() as any;
   const qc = useQueryClient();
+  const notify = useNotification();
+  const deleteConfirm = useConfirm();
 
   const [tab, setTab]                   = useState<Tab>('companies');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -781,7 +786,10 @@ export default function CompaniesPage() {
 
   const destroy = useMutation({
     mutationFn: (slug: string) => apiClient.delete(`/companies/${slug}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-companies'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-companies'] });
+      notify.success('تم الحذف');
+    },
   });
 
   // ── KPIs ───────────────────────────────────────────────────
@@ -915,7 +923,7 @@ export default function CompaniesPage() {
                     onEdit={() => setEditTarget(co)}
                     onSuspend={() => suspend.mutate({ slug: co.slug, suspended: co.is_suspended })}
                     onVerify={() => verify.mutate({ slug: co.slug, verified: co.is_verified })}
-                    onDelete={() => confirm(`تعطيل شركة "${co.name}"؟`) && destroy.mutate(co.slug)}
+                    onDelete={async () => { if (await deleteConfirm.confirm(`تعطيل شركة "${co.name}"؟`)) destroy.mutate(co.slug) }}
                   />
                 ))}
               </Card>
@@ -938,6 +946,8 @@ export default function CompaniesPage() {
           }}
         />
       )}
+
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </>
   );
 }

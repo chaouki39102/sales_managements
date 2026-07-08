@@ -6,7 +6,10 @@ import { tenantKeys } from '@/lib/api/core/queryKeys';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui';
 import { useModal } from '@/hooks/useModal';
+import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
 import type { Check } from '@/lib/api/core/types';
 
 const fmt = (n: number) =>
@@ -64,6 +67,8 @@ const emptyForm: CheckFormData = {
 export default function ChecksPage() {
   const slug = useActiveSlug();
   const qc   = useQueryClient();
+  const notify = useNotification();
+  const deleteConfirm = useConfirm();
 
   const createModal = useModal();
   const bounceModal = useModal();
@@ -121,7 +126,10 @@ export default function ChecksPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiDelete(`/checks/${id}`),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: [slug, 'checks'] }),
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: [slug, 'checks'] });
+      notify.success('تم حذف الشيك');
+    },
   });
 
   // ── Filtering ────────────────────────────────────────────────────────────
@@ -307,7 +315,7 @@ export default function ChecksPage() {
                             style={actionBtnStyle('var(--blue)')}>
                             <i className="ti ti-pencil" style={{ fontSize: 14, color: 'var(--blue)' }} />
                           </button>
-                          <button onClick={() => { if (confirm('حذف الشيك?')) deleteMutation.mutate(c.id); }} title="حذف"
+                          <button onClick={async () => { if (await deleteConfirm.confirm('حذف الشيك؟')) deleteMutation.mutate(c.id); }} title="حذف"
                             style={actionBtnStyle('var(--t4)')}>
                             <i className="ti ti-trash" style={{ fontSize: 14, color: 'var(--t4)' }} />
                           </button>
@@ -414,6 +422,8 @@ export default function ChecksPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

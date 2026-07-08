@@ -3,7 +3,7 @@
 set -e
 
 ROOT="resources"
-OUTPUT="merged-css-files.md"
+OUTPUT="merged-pos-files.md"
 
 > "$OUTPUT"
 
@@ -61,8 +61,8 @@ EXCLUDE=(
 # الأقسام
 # =========================================
 
-merge_section "📘 css" \
-  \( -path "*/css/*" \)
+# merge_section "📘 css" \
+#   \( -path "*/css/*" \)
 
 # merge_section "📘 core" \
 #   \( -path "*/lib/api/core/*" \)
@@ -73,8 +73,8 @@ merge_section "📘 css" \
 
 # أمثلة لإضافة أقسام أخرى:
 #
-# merge_section "📘 POS Components" \
-#   \( -path "*/pos/components/*" \)
+merge_section "📘 POS Components" \
+  \( -path "*/pos/*" \)
 #
 # merge_section "📘 Payment System" \
 #   \( \

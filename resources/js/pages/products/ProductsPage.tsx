@@ -18,6 +18,8 @@ import ImportWizardModal from '@/pages/import/ImportWizardModal';
 import { PRODUCT_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ui';
 import type { Column } from '@/components/ui/DataTable';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -177,6 +179,7 @@ export default function ProductsPage() {
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const deleteConfirm = useConfirm();
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
@@ -391,7 +394,7 @@ const { data: brands = [] } = useQuery<Brand[]>({
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`حذف ${selectedIds.length} منتج؟`)) return;
+    if (!await deleteConfirm.confirm(`حذف ${selectedIds.length} منتج؟`)) return;
     await Promise.all(selectedIds.map(id => apiClient.delete(`/products/${id}`)));
     qc.invalidateQueries({ queryKey: ['products'] });
     showToast(`تم حذف ${selectedIds.length} منتج`);
@@ -630,6 +633,7 @@ const { data: brands = [] } = useQuery<Brand[]>({
         onClose={importModal.closeModal}
         config={PRODUCT_IMPORT_CONFIG}
       />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }
