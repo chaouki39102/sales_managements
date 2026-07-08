@@ -68,7 +68,7 @@ interface Props {
 const DOC_CODES = ['FV', 'BL', 'BCC', 'FA'] as const;
 
 /** مبالغ الأوراق النقدية الجزائرية */
-const DZD_BILLS = [200, 500, 1000, 2000, 5000];
+const DZD_BILLS = [0, 200, 500, 1000, 2000, 5000];
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -256,11 +256,8 @@ export default function ProfessionalPaymentModal({
   // ثم الأوراق النقدية الأقرب فالأكبر
   const quickAmounts = useMemo(() => {
     const target = remaining > 0 ? remaining : totalTtcFinal;
-    const exact = target;
-    const bills = DZD_BILLS.filter(b => b >= target - 500).slice(0, 4);
     const totalDueAmt = totalDue;
-    const result = Array.from(new Set([totalDueAmt, exact, ...bills])).slice(0, 5);
-    return result;
+    return Array.from(new Set([totalDueAmt, target, ...DZD_BILLS]));
   }, [remaining, totalTtcFinal, totalDue]);
 
   // ── Numpad handlers ────────────────────────────────────────────────────────

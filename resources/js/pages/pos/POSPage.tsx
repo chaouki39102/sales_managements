@@ -403,7 +403,7 @@ function POSPage() {
 
   useEffect(() => {
     setHighlightedIndex(0);
-  }, [filteredVariants.length, pos.searchQuery]);
+  }, [filteredVariants.length, pos.searchQuery, sortBy]);
 
   const isEmpty = pos.items.length === 0;
 

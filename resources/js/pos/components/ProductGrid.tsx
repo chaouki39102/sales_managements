@@ -33,14 +33,10 @@ function minCardWidth(gridSize: GridSize): number {
   }
 }
 
-/** ارتفاع الصف التقريبي حسب حجم الشبكة */
+/** ارتفاع الصف التقريبي حسب حجم الشبكة (ارتفاع البطاقة + فجوة) */
 function rowEstimate(gridSize: GridSize): number {
-  switch (gridSize) {
-    case 'xs': return 110;
-    case 'sm': return 150;
-    case 'md': return 190;
-    case 'lg': return 240;
-  }
+  const cardHeights: Record<GridSize, number> = { xs: 170, sm: 220, md: 290, lg: 330 };
+  return cardHeights[gridSize];
 }
 
 export default function ProductGrid({
@@ -56,7 +52,7 @@ export default function ProductGrid({
   // Column calculation: keep cards between min‑width and max comfortable cols
   const gridWrapRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
-  const MAX_COLS: Record<GridSize, number> = { xs: 8, sm: 6, md: 5, lg: 4 };
+  const MAX_COLS: Record<GridSize, number> = { xs: 12, sm: 10, md: 8, lg: 6 };
 
   useEffect(() => {
     if (view !== 'grid') return;
@@ -89,14 +85,14 @@ export default function ProductGrid({
   }, [variants, columns, view]);
 
   const rowCount = rows.length;
-  const rowH = rowEstimate(gridSize);
 
   // Virtualizer
   const scrollRef = useRef<HTMLDivElement>(null);
+  const gapValRef = useRef(10);
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => rowH,
+    estimateSize: () => rowEstimate(gridSize) + gapValRef.current,
     overscan: 3,
   });
 
@@ -209,9 +205,11 @@ export default function ProductGrid({
   // ── Grid view (virtualised) ──────────────────────────────────────────────
   const gridMod = gridSize === 'xs' ? 'pgrid--xs' : gridSize === 'sm' ? 'pgrid--sm' : gridSize === 'lg' ? 'pgrid--lg' : '';
   const gap = gridSize === 'xs' ? 6 : gridSize === 'sm' ? 8 : gridSize === 'md' ? 10 : 12;
+  const gPad = gridSize === 'xs' ? 8 : gridSize === 'sm' ? 10 : gridSize === 'md' ? 12 : 14;
+  useEffect(() => { gapValRef.current = gap; }, [gap]);
 
   return (
-    <div className={`pos-grid-area ${gridMod}`} ref={scrollRef} style={{ overflow: 'auto' }}>
+    <div className={`pos-grid-area ${gridMod}`} ref={scrollRef} style={{ overflow: 'auto', padding: gPad }}>
       <div ref={gridWrapRef} style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
         {rowVirtualizer.getVirtualItems().map(virtualRow => {
           const rowData = rows[virtualRow.index];
@@ -227,7 +225,6 @@ export default function ProductGrid({
                 transform: `translateY(${virtualRow.start}px)`,
                 display: 'flex',
                 gap,
-                padding: gap,
                 direction: 'rtl',
               }}
             >
