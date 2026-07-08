@@ -35,7 +35,7 @@ function minCardWidth(gridSize: GridSize): number {
 
 /** ارتفاع الصف التقريبي حسب حجم الشبكة (ارتفاع البطاقة + فجوة) */
 function rowEstimate(gridSize: GridSize): number {
-  const cardHeights: Record<GridSize, number> = { xs: 170, sm: 220, md: 290, lg: 330 };
+  const cardHeights: Record<GridSize, number> = { xs: 200, sm: 220, md: 290, lg: 330 };
   return cardHeights[gridSize];
 }
 
