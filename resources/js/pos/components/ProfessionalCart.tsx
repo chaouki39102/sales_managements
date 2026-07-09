@@ -55,7 +55,12 @@ interface ProfessionalCartProps {
   canUndoClear:         boolean;
   clientBalance?:       number;
   slug?:                string | null;
+  cartRef?:             React.RefObject<HTMLDivElement>;
 }
+
+// كثافة عرض صفوف السلة — مفتاح حفظ محلي مستقل عن الشركة (تفضيل جهاز/كاشير)
+const CART_DENSITY_KEY = 'pos-cart-density';
+type CartDensity = 'comfortable' | 'compact';
 
 export default function ProfessionalCart({
   items, totals, client, customers, priceLevels, selectedPriceLevelId,
@@ -64,13 +69,30 @@ export default function ProfessionalCart({
   onSetClient, onPriceLevelChange, onNoteChange,
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
-  onUndoClear, canUndoClear, clientBalance, slug,
+  onUndoClear, canUndoClear, clientBalance, slug, cartRef,
 }: ProfessionalCartProps) {
 
   const [showNote,         setShowNote]         = useState(false);
   const [showCustModal,    setShowCustModal]     = useState(false);
   const [invDiscMode,      setInvDiscMode]       = useState<'pct' | 'amount'>('pct');
   const [invDiscAmtVal,    setInvDiscAmtVal]     = useState('');
+
+  // ── كثافة عرض السلة (مريح / مضغوط) ────────────────────────────────────────
+  // مضغوط: صف واحد بارتفاع ~34px لكل صنف بدل ~70-90px، فيظهر عدد أكبر
+  // بكثير من المنتجات دفعة واحدة دون تمرير — مفيد جداً للفواتير الكبيرة.
+  const [density, setDensity] = useState<CartDensity>(() => {
+    try {
+      const v = localStorage.getItem(CART_DENSITY_KEY);
+      return v === 'compact' ? 'compact' : 'comfortable';
+    } catch { return 'comfortable'; }
+  });
+  const toggleDensity = useCallback(() => {
+    setDensity(prev => {
+      const next: CartDensity = prev === 'compact' ? 'comfortable' : 'compact';
+      try { localStorage.setItem(CART_DENSITY_KEY, next); } catch {}
+      return next;
+    });
+  }, []);
 
   const isEmpty = !items.length;
   const overrides = useKbOverrides(slug ?? null);
@@ -86,7 +108,7 @@ export default function ProfessionalCart({
 
   return (
     <>
-      <div className="pos-cart" id="pos-cart">
+      <div className="pos-cart" id="pos-cart" ref={cartRef} tabIndex={-1}>
 
         <div className="cart-top">
           <div className="cart-top-row">
@@ -98,6 +120,14 @@ export default function ProfessionalCart({
               </span>
             </div>
             <div className="cart-acts2">
+              <button
+                className={`btn btn-xs density-toggle-btn ${density === 'compact' ? 'on' : ''}`}
+                onClick={toggleDensity}
+                title={density === 'compact' ? 'التبديل لعرض مريح (بطاقات أكبر)' : 'التبديل لعرض مضغوط (منتجات أكثر بدون تمرير)'}
+                type="button"
+              >
+                <i className={`ti ${density === 'compact' ? 'ti-list-details' : 'ti-list'}`} />
+              </button>
               <button className="btn btn-xs" onClick={onHeld} title={`الفواتير المعلقة (${kb('heldCarts')})`}>
                 <i className="ti ti-clock-pause" />
               </button>
@@ -234,6 +264,7 @@ export default function ProfessionalCart({
                 onDiscountAmount={amount => onDiscountAmount(item.id, amount)}
                 onPrice={price => onPrice(item.id, price)}
                 onRemove={() => onRemove(item.id)}
+                density={density}
               />
             ))
           )}

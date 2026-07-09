@@ -39,6 +39,7 @@ export const KB_DEFAULTS: Record<string, string> = {
   undoClear: 'Ctrl+Z',
   toggleHeld: 'Ctrl+ArrowRight',
   sessionInvoices: 'Ctrl+Shift+I',
+  focusCart: 'Ctrl+Space',
 };
 
 export function normalizeEventKey(e: KeyboardEvent): string {

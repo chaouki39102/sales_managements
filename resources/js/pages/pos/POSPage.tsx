@@ -46,6 +46,7 @@ import FilterPanel              from '@/pos/components/FilterPanel';
 import CategoryTabs             from '@/pos/components/CategoryTabs';
 import ProductGrid              from '@/pos/components/ProductGrid';
 import ProfessionalCart         from '@/pos/components/ProfessionalCart';
+import PanelResizer             from '@/pos/components/PanelResizer';
 import {
   useCurrentPosSession,
   useOpenSession,
@@ -58,6 +59,7 @@ const ProfessionalPaymentModal = React.lazy(() => import('@/pos/components/Profe
 const HeldCartsModal           = React.lazy(() => import('@/pos/components/HeldCartsModal'));
 const ProfessionalReceipt      = React.lazy(() => import('@/pos/components/ProfessionalReceipt'));
 const ManualProductModal       = React.lazy(() => import('@/pos/components/ManualProductModal'));
+const QtySetModal              = React.lazy(() => import('@/pos/components/QtySetModal'));
 const OpenSessionModal         = React.lazy(() => import('@/pos/components/OpenSessionModal'));
 const CloseSessionModal        = React.lazy(() => import('@/pos/components/CloseSessionModal'));
 const SessionStatsModal        = React.lazy(() => import('@/pos/components/SessionStatsModal'));
@@ -152,6 +154,52 @@ function POSPage() {
   useEffect(() => { setSettings({ defaultView: view }); }, [view, setSettings]);
   const [mobTab,     setMobTab]     = useState<'products' | 'cart'>('products');
   const [fullscreen, setFullscreen] = useState(false);
+  const [cartWidth, setCartWidth]   = useState(settings.cartWidth);
+  const cartWidthRef = useRef(cartWidth);
+  cartWidthRef.current = cartWidth;
+  const isDragging   = useRef(false);
+  const posLayoutRef = useRef<HTMLDivElement>(null);
+
+  const handleResizerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  useEffect(() => {
+    if (posLayoutRef.current) {
+      const max = posLayoutRef.current.getBoundingClientRect().width * 0.88;
+      const clamped = Math.max(280, Math.min(cartWidth, max));
+      if (clamped !== cartWidth) setCartWidth(clamped);
+      posLayoutRef.current.style.setProperty('--cart-width', `${clamped}px`);
+    }
+  }, [cartWidth]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !posLayoutRef.current) return;
+      const rect = posLayoutRef.current.getBoundingClientRect();
+      const dir = getComputedStyle(posLayoutRef.current).direction;
+      const width = dir === 'rtl' ? e.clientX - rect.left : rect.right - e.clientX;
+      const max = rect.width * 0.88;
+      const clamped = Math.max(280, Math.min(max, width));
+      setCartWidth(clamped);
+    };
+    const handleMouseUp = () => {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setSettings({ cartWidth: cartWidthRef.current });
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [setSettings]);
   const [showFilter, setShowFilter] = useState(false);
   const [modal,      setModal]      = useState<ActiveModal>('none');
   const [showSettings, setShowSettings] = useState(false);
@@ -216,6 +264,7 @@ function POSPage() {
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const searchRef    = useRef<HTMLInputElement>(null);
+  const cartRef      = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const barcodeTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -608,6 +657,7 @@ function POSPage() {
       }
 
       if (matchOverride(slugRef, 'searchFocus', e))  { e.preventDefault(); searchRef.current?.focus(); }
+      if (matchOverride(slugRef, 'focusCart', e))    { e.preventDefault(); if (document.activeElement === searchRef.current) { const lastItem = pos.items[pos.items.length - 1]; if (lastItem) setSelectedCartItemId(lastItem.id); const lastRow = cartRef.current?.querySelector<HTMLElement>('.cart-items .cr:last-child'); if (lastRow) { lastRow.focus(); lastRow.scrollIntoView({ block: 'end', behavior: 'smooth' }); } else { cartRef.current?.focus(); } } else { searchRef.current?.focus(); } }
       if (matchOverride(slugRef, 'payment', e))      { e.preventDefault(); if (!isEmpty) { setModal('payment'); } }
       if (matchOverride(slugRef, 'holdCart', e))     { e.preventDefault(); if (!isEmpty) pos.holdCart(); }
       if (matchOverride(slugRef, 'manualProduct', e)){ e.preventDefault(); setModal('manual'); }
@@ -653,15 +703,53 @@ function POSPage() {
         e.preventDefault();
       }
       if (!inInput) {
+        const inCart = cartRef.current?.contains(document.activeElement);
         const lastItem = pos.items[pos.items.length - 1];
-        if (matchOverride(slugRef, 'qtyUp', e)   && lastItem)                          { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity + 1); }
-        if (matchOverride(slugRef, 'qtyDown', e) && lastItem && lastItem.quantity > 1) { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity - 1); }
-        if (matchOverride(slugRef, 'deleteItem', e) && selectedCartItemId)             { e.preventDefault(); pos.removeItem(selectedCartItemId); setSelectedCartItemId(null); }
+        if (matchOverride(slugRef, 'qtyUp', e)   && lastItem && !inCart)                          { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity + 1); }
+        if (matchOverride(slugRef, 'qtyDown', e) && lastItem && lastItem.quantity > 1 && !inCart) { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity - 1); }
+        if (matchOverride(slugRef, 'deleteItem', e) && selectedCartItemId)                         { e.preventDefault(); pos.removeItem(selectedCartItemId); setSelectedCartItemId(null); }
       }
       if (matchOverride(slugRef, 'escape', e)) {
         if (modal !== 'none')                 setModal('none');
         else if (showFilter)                  setShowFilter(false);
         else if (!inInput && pos.searchQuery) pos.setSearch('');
+      }
+
+      // ── Cart row keyboard controls ─────────────────────────────────────
+      if (!inInput && selectedCartItemId) {
+        if (e.key === '*') {
+          e.preventDefault();
+          setModal('qty');
+          return;
+        }
+        const isPlus  = e.key === 'Enter' || (e.ctrlKey && (e.key === '+' || e.code === 'Equal')) || e.code === 'NumpadAdd';
+        const isMinus = (e.ctrlKey && e.key === '-') || e.code === 'NumpadSubtract';
+        if (isPlus) {
+          e.preventDefault();
+          const item = pos.items.find(i => i.id === selectedCartItemId);
+          if (item) pos.updateQty(item.id, item.quantity + 1);
+        } else if (isMinus) {
+          e.preventDefault();
+          const item = pos.items.find(i => i.id === selectedCartItemId);
+          if (item && item.quantity > 1) pos.updateQty(item.id, item.quantity - 1);
+        }
+      }
+
+      // ── Arrow keys navigate cart rows ──────────────────────────────────
+      if (!inInput) {
+        const crEl = (document.activeElement as HTMLElement)?.closest?.('.cr') as HTMLElement | null;
+        if (crEl && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+          e.preventDefault();
+          const rows = Array.from(crEl.closest('.cart-items')?.querySelectorAll<HTMLElement>('.cr') ?? []);
+          const idx = rows.indexOf(crEl);
+          const nextIdx = e.key === 'ArrowDown' ? idx + 1 : idx - 1;
+          if (nextIdx >= 0 && nextIdx < rows.length) {
+            rows[nextIdx].focus();
+            rows[nextIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            const nextItem = pos.items[nextIdx];
+            if (nextItem) setSelectedCartItemId(nextItem.id);
+          }
+        }
       }
     };
     window.addEventListener('keydown', handler);
@@ -1061,7 +1149,10 @@ const handleCompleteSale = useCallback(async (params: {
         isEmpty={isEmpty} onSell={() => setModal('payment')}
       />
 
-      <div className={`pos-layout ${mobTab === 'cart' ? 'mob-show-cart' : ''}`}>
+      <div
+        ref={posLayoutRef}
+        className={`pos-layout ${mobTab === 'cart' ? 'mob-show-cart' : ''}`}
+      >
         <div className="pos-left">
           <ProductSearchBar
             query={pos.searchQuery} onQuery={pos.setSearch}
@@ -1098,6 +1189,7 @@ const handleCompleteSale = useCallback(async (params: {
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
             stockPending={stockPending}
           />
+          <PanelResizer onMouseDown={handleResizerMouseDown} />
         </div>
 
         {/* ✅ ProfessionalCart مع onDiscountAmount */}
@@ -1134,6 +1226,7 @@ const handleCompleteSale = useCallback(async (params: {
           canUndoClear={canUndoClear}
           clientBalance={clientBalance?.current_balance}
           slug={slug}
+          cartRef={cartRef}
         />
       </div>
 
@@ -1189,6 +1282,19 @@ const handleCompleteSale = useCallback(async (params: {
             onClose={() => setModal('none')}
             onAdd={(name, priceTtc, qty, tvaRate) => {
               pos.addItem(makeFakeVariant(name, ttcToHt(priceTtc, tvaRate), tvaRate), qty);
+              setModal('none');
+            }}
+          />
+        </Suspense>
+      )}
+
+      {modal === 'qty' && selectedCartItemId && (
+        <Suspense fallback={null}>
+          <QtySetModal
+            item={pos.items.find(i => i.id === selectedCartItemId)!}
+            onClose={() => setModal('none')}
+            onConfirm={qty => {
+              if (selectedCartItemId) pos.updateQty(selectedCartItemId, qty);
               setModal('none');
             }}
           />

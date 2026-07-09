@@ -880,3 +880,94 @@
   }
   .cr-popup-arrow { right: auto; left: 16px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   7. CART DENSITY — كثافة عرض قابلة للتبديل (مريح / مضغوط)
+   ══════════════════════════════════════════════════════════════════════
+   الهدف: تكبير عدد المنتجات المرئية في السلة دفعة واحدة بدون تمرير،
+   بنفس فلسفة أزرار S/M/L/XL في شبكة المنتجات (ProductGrid). زر التبديل
+   موجود في شريط أزرار السلة (cart-acts2) ويمرَّر كـ density="compact"
+   من ProfessionalCart إلى كل CartRow، فيضيف كل صف صنف .cr--compact
+   على نفسه مباشرة (وليس على حاوية أب) — أبسط وأكثر أماناً لأنه لا
+   يعتمد على انتقاء وراثي عبر شجرة DOM قد تتغيّر مستقبلاً.
+
+   الفكرة الأساسية للوضع المضغوط:
+   - صف واحد بارتفاع ثابت (~34px) بدل ~70-90px.
+   - دمج "السعر + الخصم" في شارة واحدة قابلة للنقر بدل زرّين منفصلين،
+     فتُفتح نفس الـ popover الحالية دون أي تغيير في المنطق.
+   - إخفاء عناصر ثانوية (اسم المتغيّر، TVA، خط HT المشطوب) — تبقى
+     متاحة عبر الـ popover / التلميح (title) عند الحاجة.
+   - إخفاء زر الحذف بالتفويح فقط، ليكون ظاهراً دائماً بحجم أصغر بدل
+     الاعتماد على :hover (أفضل للمس على الأجهزة اللوحية أيضاً).
+════════════════════════════════════════════════════════════════════════ */
+
+/* زر تبديل الكثافة في شريط أزرار السلة */
+.density-toggle-btn.on {
+  background: var(--emb);
+  border-color: var(--embo);
+  color: var(--em);
+}
+
+.cr--compact {
+  grid-template-columns: 3px 14px 1fr auto auto 22px;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  min-height: 34px;
+}
+
+/* اسم المنتج + السعر على نفس السطر بدل سطرين */
+.cr--compact .cr-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.cr--compact .cr-name {
+  font-size: 11.5px;
+  margin-bottom: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cr--compact .cr-variant { display: none; } /* متاح عبر title على الاسم */
+
+/* شارة السعر+الخصم المدمجة تحل محل صف price-row الكامل */
+.cr--compact .cr-price-row {
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-top: 0;
+}
+.cr--compact .cr-tva { display: none; } /* يبقى ظاهراً في popover السعر */
+.cr--compact .cr-price,
+.cr--compact .cr-disc,
+.cr--compact .cr-disc-add {
+  padding: 1px 6px;
+  font-size: 10.5px;
+}
+.cr--compact .cr-price-edit-ic { display: none; }
+
+/* عناصر التحكّم بالكمية مصغّرة */
+.cr--compact .cr-qty-ctrl { padding: 1px 2px; }
+.cr--compact .cq-btn { width: 19px; height: 19px; font-size: 9.5px; }
+.cr--compact .cq-val,
+.cr--compact .cq-inp { font-size: 11.5px; min-width: 20px; }
+.cr--compact .cq-unit { display: none; } /* الوحدة معروفة من اسم المنتج/popover */
+
+/* الإجمالي — رقم واحد فقط، بدون خط HT المشطوب */
+.cr--compact .cr-total { min-width: 58px; }
+.cr--compact .cr-ttc { font-size: 12px; }
+.cr--compact .cr-ht--strike { display: none; }
+
+/* زر الحذف ظاهر دائماً بحجم مصغّر (لا يعتمد على hover) */
+.cr--compact .cr-del {
+  opacity: .55;
+  width: 20px;
+  height: 20px;
+  align-self: center;
+  padding-top: 0;
+}
+.cr--compact .cr-del:hover { opacity: 1; }
+
+/* أي popover مفتوح يفرض تلقائياً الرجوع للارتفاع الطبيعي لتلك البطاقة
+   فقط (بدون أن يزعزع بقية القائمة) لأن الـ popover موضعه absolute. */

@@ -86,6 +86,10 @@ export interface POSSettings {
   clearSearchOnAdd:     boolean;
   /** التنقل عبر نتائج البحث بلوحة المفاتيح */
   keyboardNav:          boolean;
+
+  // ── تخطيط الشاشة ──────────────────────────────────────────────────────
+  /** عرض السلة (بالـ px) — قابل للسحب */
+  cartWidth:            number;
 }
 
 // ─── Default Settings ─────────────────────────────────────────────────────────
@@ -118,6 +122,7 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   hideOutOfStock:       false,
   clearSearchOnAdd:     false,
   keyboardNav:          true,
+  cartWidth:            390,
 };
 
 // ─── Storage key ──────────────────────────────────────────────────────────────

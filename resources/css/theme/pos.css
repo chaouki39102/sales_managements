@@ -276,16 +276,47 @@
 ════════════════════════════════════════════════════ */
 .pos-layout {
   display: grid;
-  grid-template-columns: 1fr 390px;
+  grid-template-columns: 1fr var(--cart-width, 390px);
   flex: 1;
   overflow: hidden;
   min-height: 0;
 }
 
 /* ════════════════════════════════════════════════════
+   PANEL RESIZER (between product grid and cart)
+════════════════════════════════════════════════════ */
+.pos-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-end: -3px;
+  width: 9px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  z-index: 10;
+}
+.pos-resizer:hover .pos-resizer-line,
+.pos-resizer:active .pos-resizer-line {
+  background: var(--p1);
+  width: 3px;
+}
+.pos-resizer-line {
+  width: 2px;
+  height: 40px;
+  border-radius: 2px;
+  background: var(--b3);
+  transition: width .15s, background .15s;
+  pointer-events: none;
+}
+
+/* ════════════════════════════════════════════════════
    LEFT: PRODUCTS PANEL
 ════════════════════════════════════════════════════ */
 .pos-left {
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1064,209 +1095,14 @@
 .ce-ttl { font-size: 14px; font-weight: 800; color: var(--t3); }
 .ce-sub { font-size: 11.5px; color: var(--t4); text-align: center; }
 
-/* Cart Row */
-.cart-row {
-  display: grid;
-  grid-template-columns: 22px 1fr auto auto 24px;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  border-bottom: 1px solid var(--b1);
-  cursor: pointer;
-  transition: background .1s;
-  position: relative;
-}
-.cart-row:hover { background: var(--bg3); }
-.cart-row.selected { background: var(--emb); border-right: 3px solid var(--em); }
-
-.cr-idx { font-size: 10px; font-weight: 800; color: var(--t4); text-align: center; }
-.cr-info { min-width: 0; }
-.cr-name { font-size: 12.5px; font-weight: 700; color: var(--t1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cr-variant { font-size: 10.5px; color: var(--t4); }
-.cr-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
-
-/* ---- السعر والخصم (مدمج من pos.css + pos-missing.css) ---- */
-.cr-price-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 3px;
-  flex-wrap: wrap;
-}
-.cr-price {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--t3);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: baseline;
-  gap: 2px;
-  padding: 1px 4px;
-  border-radius: var(--r1);
-  transition: background .12s;
-  border: 1px dashed transparent;
-}
-.cr-price:hover {
-  background: var(--emb);
-  color: var(--em);
-}
-.cr-price-unit {
-  font-size: 10px;
-  font-weight: 400;
-  color: var(--t4);
-}
-.cr-tva { font-size: 10px; color: var(--t4); }
-
-/* الخصم المطبق */
-.cr-disc {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--red);
-  cursor: pointer;
-  padding: 1px 6px;
-  border-radius: 10px;
-  background: var(--redb);
-  border: 1px solid var(--redbo);
-  transition: all .12s;
-}
-.cr-disc:hover {
-  background: var(--red);
-  color: #fff;
-}
-.cr-disc-add {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--t4);
-  cursor: pointer;
-  padding: 1px 6px;
-  border-radius: 10px;
-  border: 1px dashed var(--b3);
-  transition: all .12s;
-}
-.cr-disc-add:hover {
-  color: var(--em);
-  border-color: var(--embo);
-  background: var(--emb);
-}
-.cr-disc-edit {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.cr-disc-mode-btn {
-  padding: 2px 7px;
-  border-radius: var(--r1);
-  border: 1px solid var(--b2);
-  background: var(--bg3);
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--t4);
-  cursor: pointer;
-  font-family: 'Tajawal', sans-serif;
-  transition: all .12s;
-  line-height: 1.4;
-}
-.cr-disc-mode-btn:hover {
-  border-color: var(--embo);
-  color: var(--em);
-}
-.cr-disc-mode-btn.on {
-  background: var(--emb);
-  border-color: var(--em);
-  color: var(--em);
-}
-
-/* حقل التحرير (قابل للاستخدام في الكمية / السعر / الخصم) */
-.cr-edit-inp {
-  padding: 4px 6px;
-  border-radius: var(--r1);
-  border: 1.5px solid var(--em);
-  background: var(--bg2);
-  font-size: 12.5px;
-  font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
-  outline: none;
-  color: var(--t1);
-  text-align: center;
-  box-shadow: 0 0 0 2px var(--emb);
-}
-
-/* Qty control */
-.cr-qty-ctrl {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  background: var(--bg3);
-  border-radius: var(--r2);
-  border: 1px solid var(--b2);
-  padding: 2px 4px;
-  flex-shrink: 0;
-}
-.cq-btn {
-  width: 22px; height: 22px;
-  display: flex; align-items: center; justify-content: center;
-  background: none;
-  border: none;
-  border-radius: var(--r1);
-  color: var(--t3);
-  font-size: 12px;
-  cursor: pointer;
-  transition: .1s;
-  flex-shrink: 0;
-}
-.cq-btn:hover { background: var(--bg4); color: var(--t1); }
-.cq-val {
-  min-width: 28px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 900;
-  color: var(--t1);
-  cursor: pointer;
-  padding: 1px;
-  border-radius: 3px;
-  transition: .1s;
-}
-.cq-val:hover { background: var(--bg4); }
-.cq-inp {
-  width: 52px;
-  text-align: center;
-  font-weight: 900;
-  font-size: 13px !important; /* يتغلب على أي تعارض */
-}
-.cq-unit { font-size: 10px; color: var(--t4); font-weight: 700; flex-shrink: 0; }
-.cq-stock-warn {
-  color: var(--gold);
-  font-size: 13px;
-  flex-shrink: 0;
-  animation: stockPulse 1.5s ease-in-out infinite;
-}
-@keyframes stockPulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.45; }
-}
-
-/* Totals */
-.cr-total { text-align: left; flex-shrink: 0; }
-.cr-ttc { font-size: 13px; font-weight: 900; color: var(--em); }
-.cr-ht  { font-size: 10px; color: var(--t4); }
-
-/* Delete btn */
-.cr-del {
-  width: 22px; height: 22px;
-  display: flex; align-items: center; justify-content: center;
-  background: none;
-  border: none;
-  border-radius: var(--r1);
-  color: var(--t4);
-  font-size: 13px;
-  cursor: pointer;
-  transition: .12s;
-  flex-shrink: 0;
-  opacity: 0;
-}
-.cart-row:hover .cr-del,
-.cart-row.selected .cr-del { opacity: 1; }
-.cr-del:hover { background: var(--redb); color: var(--red); }
+/* Cart Row — ⚠️ الكتلة القديمة (.cart-row + أصناف .cr-* مستقلة) حُذفت
+   من هنا نهائياً. كانت تتصادم مباشرة مع نفس أسماء الأصناف المُستخدَمة
+   في مكوّن CartRow.tsx (v4) المعرَّفة في pos-cart-v4.css — وتحديداً
+   قاعدة `.cq-inp { font-size: 13px !important; }` كانت تفرض نفسها
+   بغض النظر عن ترتيب الاستيراد بسبب !important، إضافة إلى
+   `.cr-price-row { flex-wrap: wrap; }` القديمة التي كانت تتسبب في
+   انكسار صف السلة لسطرين كاملين بدل سطر واحد عند ضيق العرض. التصميم
+   الوحيد المعتمد الآن لصفوف السلة موجود حصراً في pos-cart-v4.css. */
 
 /* ════════════════════════════════════════════════════
    CART TOTALS
@@ -2142,11 +1978,11 @@
    RESPONSIVE
 ════════════════════════════════════════════════════ */
 @media (max-width: 1200px) {
-  .pos-layout { grid-template-columns: 1fr 350px; }
+  .pos-layout { grid-template-columns: 1fr var(--cart-width, 350px); }
   .pos-kb-strip { display: none; }
 }
 @media (max-width: 1000px) {
-  .pos-layout { grid-template-columns: 1fr 320px; }
+  .pos-layout { grid-template-columns: 1fr var(--cart-width, 320px); }
   .pay-v2-body { grid-template-columns: 1fr; }
   .pay-v2-left { border-left: none; border-bottom: 1px solid var(--b2); }
   .kb-help-groups { grid-template-columns: 1fr; }
@@ -2159,9 +1995,10 @@
   body:has(#p-pos.on) #sidebar { display: none !important; }
   body:has(#p-pos.on) #main { margin-right: 0 !important; padding-bottom: 0; }
   #p-pos.on { height: calc(100vh - var(--tb) - 52px); }
-  .pos-layout { grid-template-columns: 1fr; position: relative; }
+  .pos-layout { grid-template-columns: 1fr !important; position: relative; }
   .pos-layout .pos-left { display: flex; }
   .pos-layout .pos-cart { display: none; }
+  .pos-resizer { display: none; }
   .pos-layout.mob-show-cart .pos-left { display: none; }
   .pos-layout.mob-show-cart .pos-cart { display: flex; height: 100%; }
   .pos-topbar { flex-wrap: wrap; gap: 4px; padding: 5px 10px; }

@@ -23,6 +23,9 @@ interface CartRowProps {
   onDiscountAmount: (amount: number) => void;
   onPrice:          (price: number) => void;
   onRemove:         () => void;
+  /** 'compact' يعرض السلة بصف واحد مصغّر لكل صنف (المزيد من المنتجات
+   *  مرئية دفعة واحدة)، 'comfortable' هو التصميم الافتراضي الحالي. */
+  density?:         'comfortable' | 'compact';
 }
 
 type DiscMode  = 'pct' | 'amount';
@@ -31,7 +34,9 @@ type PopupType = 'disc' | 'price' | null;
 export default function CartRow({
   item, idx, isSelected, onSelect,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
+  density = 'comfortable',
 }: CartRowProps) {
+  const compact = density === 'compact';
   const [popup,      setPopup]      = useState<PopupType>(null);
   const [editQty,    setEditQty]    = useState(false);
   const [discMode,   setDiscMode]   = useState<DiscMode>('pct');
@@ -120,7 +125,8 @@ export default function CartRow({
   return (
     <div
       ref={rowRef}
-      className={`cr ${isSelected ? 'sel' : ''} ${hasDisc ? 'has-disc' : ''} ${popup ? 'cr--popup-open' : ''}`}
+      tabIndex={-1}
+      className={`cr ${isSelected ? 'sel' : ''} ${hasDisc ? 'has-disc' : ''} ${popup ? 'cr--popup-open' : ''} ${compact ? 'cr--compact' : ''}`}
       onClick={onSelect}
     >
       {/* شريط اللون الجانبي */}
