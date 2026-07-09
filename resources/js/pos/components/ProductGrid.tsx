@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
@@ -61,7 +61,12 @@ export default function ProductGrid({
   const [columns, setColumns] = useState(4);
   const MAX_COLS: Record<GridSize, number> = { xs: 8, sm: 6, md: 5, lg: 4 };
 
-  useEffect(() => {
+  // نفس منطق useLayoutEffect أعلاه: نحسب عدد الأعمدة الأولي للحجم
+  // الجديد *قبل* الرسم لتفادي أي فلاش عند تبديل S/M/L/XL. تحديثات
+  // ResizeObserver اللاحقة (أثناء تغيير حجم النافذة الفعلي) تبقى غير
+  // متزامنة بطبيعتها من المتصفح، وهذا مقبول لأنها حالة مختلفة (تغيير
+  // حجم النافذة، وليس تبديل نمط العرض).
+  useLayoutEffect(() => {
     if (view !== 'grid') return;
     const el = gridWrapRef.current;
     if (!el) return;
@@ -109,7 +114,13 @@ export default function ProductGrid({
   // Re-measure everything whenever the size preset changes (image height,
   // paddings, font sizes all change with gridSize) so stale measurements
   // from a previous size never leak into the new layout.
-  useEffect(() => {
+  // useLayoutEffect (وليس useEffect) عمداً: لازم نعيد القياس *قبل* ما
+  // يرسم المتصفح الإطار (paint)، وإلا يشوف المستخدم لحظة (frame واحد
+  // أو أكثر) بارتفاعات صفوف قديمة/متراكبة قبل ما تتصحح — وهذا بالضبط
+  // كان سبب "الفلاش" اللي يبان كخطأ حتى لو يتصحح لحاله بعدين.
+  // useLayoutEffect يشتغل بشكل متزامن (synchronous) بعد تحديث DOM
+  // مباشرة وقبل الرسم، فالمستخدم ما يشوف إلا الحالة الصحيحة النهائية.
+  useLayoutEffect(() => {
     rowVirtualizer.measure();
   }, [gridSize, columns, rowVirtualizer]);
 
@@ -234,7 +245,21 @@ export default function ProductGrid({
     // --pcard-img-h معرّفة دوماً؛ سابقاً كانت تُطبَّق فقط كمعدِّل عند
     // بعض الأحجام، فكان الحجم الافتراضي (md) بلا قيمة للمتغيّر وتنهار
     // صورة البطاقة إلى ارتفاع صفري.
-    <div className={`pos-grid-area pgrid ${gridMod}`} ref={scrollRef} style={{ overflow: 'auto' }}>
+    <div
+      // key={gridSize}: يجبر React على تفكيك وإعادة تركيب هذه الحاوية
+      // بالكامل (بدل تحديثها فقط) عند تبديل حجم الشبكة (S/M/L/XL).
+      // بدونها، كان react-virtual أحياناً يحتفظ بقياسات ارتفاع صفوف
+      // من الحجم القديم قبل أن تتم إعادة قياسها بالكامل عبر
+      // rowVirtualizer.measure()، فتظهر البطاقات متراكبة/متداخلة
+      // لحظة الانتقال بين نمطين مختلفين لهما نفس عدد الأعمدة لكن
+      // ارتفاع صف مختلف (مثل L→M). التكلفة الوحيدة: يفقد موضع
+      // التمرير عند تبديل الحجم، وهو مقبول لأنه فعل مقصود من المستخدم
+      // أصلاً يغيّر ترتيب/أبعاد كل العناصر بأي حال.
+      key={gridSize}
+      className={`pos-grid-area pgrid ${gridMod}`}
+      ref={scrollRef}
+      style={{ overflow: 'auto' }}
+    >
       <div ref={gridWrapRef} style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
         {rowVirtualizer.getVirtualItems().map(virtualRow => {
           const rowData = rows[virtualRow.index];

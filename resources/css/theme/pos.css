@@ -481,24 +481,44 @@
 
 /* ════════════════════════════════════════════════════
    PRODUCT GRID
+   ملاحظة مهمة: .pgrid لا تُستخدم كحاوية CSS Grid فعلية —
+   ProductGrid.tsx يبني الأعمدة والصفوف بنفسه عبر JS
+   (useVirtualizer + flex + position:absolute لكل صف)، وداخل
+   الحاوية يوجد عنصر ابن واحد فقط (الغلاف الافتراضي). لذلك أي
+   display:grid/grid-template-columns هنا يتعارض مع ذلك: العنصر
+   الابن الوحيد كان ينحصر داخل خلية واحدة من auto-fill، فتتكدّس
+   كل البطاقات في عرض بطاقة واحدة ويبقى باقي الشبكة فارغاً.
+
+   تحذير: يوجد تعريف قديم مكرر لنفس الكلاس .pgrid في theme.css
+   (display:grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)))
+   — بقايا تصميم أقدم قبل الانتقال للـ virtualization. بما أن
+   theme.css يُستورد قبل pos.css في app.css، لازم نفرض display:block
+   هنا صراحة لإبطال ذلك التعريف القديم، وإلا يرجع نفس الخلل بقيم
+   مختلفة (كان هذا سبب "الأعمدة الضيقة على يمين الشاشة" في آخر ظهور
+   للمشكلة). الأفضل لاحقاً حذف .pgrid من theme.css نهائياً لتفادي
+   التكرار، لكن هذا أكثر أماناً كإصلاح فوري بدون لمس ملف ضخم آخر.
 ════════════════════════════════════════════════════ */
 .pgrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
-  padding: 12px;
-  overflow-y: auto;
-  flex: 1;
+  display: block;
   align-content: start;
 }
-.pgrid--xs { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; padding: 8px; }
-.pgrid--sm { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; padding: 10px; }
-.pgrid--lg { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding: 14px; }
+.pgrid--xs { }
+.pgrid--sm { }
+.pgrid--lg { }
 
 /* Product Card */
 .pcard {
   display: flex;
   flex-direction: column;
+  /* الغلاف المحيط بكل بطاقة (في ProductGrid.tsx) يتمدد تلقائياً
+     (flex align-items:stretch الافتراضي) ليطابق أطول بطاقة بنفس
+     الصف. بدون height:100% هنا، البطاقات الأقصر تبقى بحجمها الطبيعي
+     وسط غلاف أطول (فراغ غير مرئي تحتها) بينما أي بطاقة محتواها أطول
+     (اختلاف نسبة صورة حقيقية مثلاً) تبقى تبان أطول فعلياً وتدفع
+     الصف التالي لتحت — فتظهر البطاقات "غير متساوية". بهذا نضمن أن
+     كل بطاقة تملأ نفس ارتفاع الصف دائماً، و.pcard-body (flex:1)
+     يدفع زر الإضافة لأسفل بشكل موحّد داخل كل بطاقة. */
+  height: 100%;
   border-radius: var(--r2);
   border: 1.5px solid var(--b1);
   background: var(--bg2);
@@ -521,13 +541,16 @@
 
 .pcard-img {
   aspect-ratio: 1;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  /* حالة افتراضية موحّدة لعدم وجود صورة، بدل مربع أبيض فارغ يبدو كخطأ تحميل */
-  background: linear-gradient(135deg, var(--bg3), var(--bg4));
+  /* أبيض ثابت (وليس مرتبطاً بالثيم) — صور المنتجات مصوَّرة على خلفية
+     بيضاء أو شفافة دائماً، فالأبيض الثابت هو الوحيد الذي يندمج بدون
+     أن يظهر أي تدرّج/لون من خلف الأجزاء الشفافة في الصورة. */
+  background: #ffffff;
 }
 .pcard-img::before {
   /* أيقونة صندوق خفيفة تظهر فقط عند غياب <img> فوقها */
@@ -542,7 +565,19 @@
   -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M21 8v13H3V8'/><path d='M1 3h22v5H1z'/><path d='M10 12h4'/></svg>") center / contain no-repeat;
   mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M21 8v13H3V8'/><path d='M1 3h22v5H1z'/><path d='M10 12h4'/></svg>") center / contain no-repeat;
 }
-.pcard-img img { width: 100%; height: 100%; object-fit: cover; position: relative; z-index: 1; }
+.pcard-img img {
+  /* absolute + !important: يمنع الارتفاع الطبيعي للصورة (أو أي inline
+     style يحقنه مكوّن التحميل مثل next/image) من التأثير على ارتفاع
+     .pcard-img أصلاً — الحاوية (aspect-ratio:1) هي الوحيدة المتحكّمة
+     بالارتفاع دائماً، والصورة تُقصّ لتملأها بغض النظر عن نسبتها
+     الحقيقية (بذلك تتساوى الصفوف اللي فيها صور مع اللي بدون صور). */
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  z-index: 1;
+}
 
 /* نبضة تأكيد بصرية سريعة عند نجاح الإضافة للسلة.
    ملاحظة تنفيذية: تحتاج مكوّن ProductGrid لإضافة هذا الصنف على البطاقة
@@ -592,7 +627,20 @@
   border-radius: 8px;
 }
 .pcard-body { padding: 10px 10px 6px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.pcard-name { font-size: var(--fs-base); font-weight: 700; color: var(--t1); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.pcard-name {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--t1);
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  /* ارتفاع ثابت = سطرين دائماً، سواء كان الاسم سطراً واحداً أو سطرين،
+     وإلا تختلف ارتفاعات البطاقات حسب طول كل اسم (كان هذا سبب عدم
+     تساوي البطاقات في حجم S تحديداً). */
+  min-height: calc(1.3em * 2);
+}
 .pcard-bc   { font-size: var(--fs-2xs); color: var(--t4); font-family: monospace; direction: ltr; text-align: right; }
 .pcard-prices { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; }
 .pcard-ttc {
@@ -660,9 +708,9 @@
 .pcard-add:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── حجم xs و sm: أيقونة فقط ── */
-.pgrid--xs .pcard-img  { aspect-ratio: auto; min-height: 55px; }
+.pgrid--xs .pcard-img  { min-height: 55px; }
 .pgrid--xs .pcard-body { padding: 6px; }
-.pgrid--xs .pcard-name { font-size: var(--fs-xs); -webkit-line-clamp: 1; }
+.pgrid--xs .pcard-name { font-size: var(--fs-xs); -webkit-line-clamp: 1; min-height: calc(1.3em * 1); }
 .pgrid--xs .pcard-bc   { display: none; }
 .pgrid--xs .pcard-ht   { display: none; }
 /* لا نُخفي حالة المخزون بالكامل — مهمة لمنع بيع صنف نافد بالخطأ في الوضع المضغوط.
@@ -2216,8 +2264,9 @@
   .pos-search-bar { gap: 5px; padding: 6px 8px; }
   .pos-inp { padding: 7px 8px; }
   .pos-inp input { font-size: 13px; }
-  .pgrid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 5px; padding: 6px; }
-  .pgrid--xs { grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); }
+  /* أُزيل grid-template-columns هنا لنفس سبب القسم الرئيسي أعلاه —
+     .pgrid ليست حاوية CSS Grid فعلية، والتخطيط على الموبايل يُدار
+     أيضاً عبر minCardWidth()/columns في ProductGrid.tsx. */
   .grand-amount { font-size: 17px; }
   .session-grid { grid-template-columns: 1fr; }
 
