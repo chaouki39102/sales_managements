@@ -23,6 +23,13 @@ export default function QtySetModal({ item, onClose, onConfirm }: QtySetModalPro
     if (qty > 0) onConfirm(qty);
   };
 
+  const kbdStyle: React.CSSProperties = {
+    display: 'inline-block', padding: '1px 5px', borderRadius: 3,
+    background: 'var(--b2)', color: 'var(--t1)', fontSize: 10,
+    fontWeight: 600, fontFamily: 'monospace', lineHeight: '1.4',
+    border: '1px solid var(--b3)', margin: '0 1px',
+  };
+
   return (
     <div className="ov on" onClick={onClose}>
       <div className="modal modal-sm" onClick={e => e.stopPropagation()} onKeyDown={handleKey}>
@@ -46,6 +53,10 @@ export default function QtySetModal({ item, onClose, onConfirm }: QtySetModalPro
               step="1"
               style={{ fontSize: 18, padding: '10px 12px', textAlign: 'center' }}
             />
+          </div>
+          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--t3)', lineHeight: 1.7 }}>
+            <div><kbd style={kbdStyle}>Enter</kbd> تأكيد · <kbd style={kbdStyle}>Esc</kbd> إلغاء</div>
+            <div style={{ marginTop: 4 }}><kbd style={kbdStyle}>Ctrl++</kbd> زيادة · <kbd style={kbdStyle}>Ctrl+-</kbd> نقصان · <kbd style={kbdStyle}>↑↓</kbd> تنقل · <kbd style={kbdStyle}>Del</kbd> حذف</div>
           </div>
         </div>
         <div className="m-foot">

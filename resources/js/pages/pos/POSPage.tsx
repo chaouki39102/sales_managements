@@ -717,7 +717,7 @@ function POSPage() {
 
       // ── Cart row keyboard controls ─────────────────────────────────────
       if (!inInput && selectedCartItemId) {
-        if (e.key === '*') {
+        if (e.ctrlKey && e.key === '*') {
           e.preventDefault();
           setModal('qty');
           return;
@@ -1292,10 +1292,20 @@ const handleCompleteSale = useCallback(async (params: {
         <Suspense fallback={null}>
           <QtySetModal
             item={pos.items.find(i => i.id === selectedCartItemId)!}
-            onClose={() => setModal('none')}
+            onClose={() => {
+              setModal('none');
+              requestAnimationFrame(() => {
+                const cr = document.querySelector<HTMLElement>('.cr.sel');
+                cr?.focus();
+              });
+            }}
             onConfirm={qty => {
               if (selectedCartItemId) pos.updateQty(selectedCartItemId, qty);
               setModal('none');
+              requestAnimationFrame(() => {
+                const cr = document.querySelector<HTMLElement>('.cr.sel');
+                cr?.focus();
+              });
             }}
           />
         </Suspense>
