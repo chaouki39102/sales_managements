@@ -147,8 +147,9 @@ function POSPage() {
     prevSlugRef.current = slug;
   }, [slug, pos]);
 
-  const [view,       setView]       = useState<ViewMode>('grid');
+  const [view,       setView]       = useState<ViewMode>(settings.defaultView);
   const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
+  useEffect(() => { setSettings({ defaultView: view }); }, [view, setSettings]);
   const [mobTab,     setMobTab]     = useState<'products' | 'cart'>('products');
   const [fullscreen, setFullscreen] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
@@ -627,6 +628,11 @@ function POSPage() {
       if (matchOverride(slugRef, 'returns', e))      { e.preventDefault(); setModal('returns'); }
       if (matchOverride(slugRef, 'openDrawer', e))   { e.preventDefault(); handleOpenDrawer(); }
       if (matchOverride(slugRef, 'undoClear', e))    { e.preventDefault(); handleUndoClear(); }
+      if (matchOverride(slugRef, 'newSale', e))      { e.preventDefault(); if (isEmpty) { pos.clearCart(); } else { pos.holdCart(); } }
+      if (matchOverride(slugRef, 'settings', e))     { e.preventDefault(); setShowSettings(true); }
+      if (matchOverride(slugRef, 'toggleQuickbar', e)) { e.preventDefault(); handleToggleQuickbar(); }
+      if (matchOverride(slugRef, 'kioskMode', e))    { e.preventDefault(); navigate('/pos/kiosk'); }
+      if (matchOverride(slugRef, 'closeSession', e)) { e.preventDefault(); setShowCloseSession(true); }
 
       if (!inInput) {
         if (matchOverride(slugRef, 'gridView', e))   { e.preventDefault(); setView('grid'); }
@@ -661,7 +667,7 @@ function POSPage() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [slug, pos, isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal,
-      families, selectedCartItemId, toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear]);
+      families, selectedCartItemId, toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear, handleToggleQuickbar]);
 
   // ── Price Level ────────────────────────────────────────────────────────────
   const applyPriceLevel = useCallback((plId: number | null) => {

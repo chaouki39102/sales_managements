@@ -67,19 +67,20 @@ export default function ProductGrid({
   // متزامنة بطبيعتها من المتصفح، وهذا مقبول لأنها حالة مختلفة (تغيير
   // حجم النافذة، وليس تبديل نمط العرض).
   useLayoutEffect(() => {
-    if (view !== 'grid') return;
-    const el = gridWrapRef.current;
-    if (!el) return;
-    const minW = minCardWidth(gridSize);
-    const calc = () => {
-      const w = el.clientWidth;
-      setColumns(Math.min(MAX_COLS[gridSize], Math.max(1, Math.floor(w / minW))));
-    };
-    calc();
-    const obs = new ResizeObserver(calc);
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [view, gridSize]);
+  if (view !== 'grid') return;
+  const el = gridWrapRef.current;
+  if (!el) return;
+  const minW = minCardWidth(gridSize);
+  const calc = () => {
+    const w = el.clientWidth;
+    if (w <= 0) return; // تجاهل أي قراءة عرض صفرية مؤقتة (تحدث عند إعادة تركيب العنصر بعد كل بحث)
+    setColumns(Math.min(MAX_COLS[gridSize], Math.max(1, Math.floor(w / minW))));
+  };
+  calc();
+  const obs = new ResizeObserver(calc);
+  obs.observe(el);
+  return () => obs.disconnect();
+}, [view, gridSize, loading]); // ← أضفنا loading
 
   // Group into rows (keep original index for keyboard nav)
   type RowItem = { variant: ProductVariant; idx: number };
@@ -126,12 +127,16 @@ export default function ProductGrid({
 
   // Keyboard navigation scroll sync
   const prevHl = useRef<number | undefined>(undefined);
+  const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (view !== 'grid') return;
     if (highlightedIndex === undefined || highlightedIndex === prevHl.current) return;
     prevHl.current = highlightedIndex;
-    const rowIdx = Math.floor(highlightedIndex / columns);
-    rowVirtualizer.scrollToIndex(rowIdx, { align: 'nearest' });
+    if (view === 'grid') {
+      const rowIdx = Math.floor(highlightedIndex / columns);
+      rowVirtualizer.scrollToIndex(rowIdx, { align: 'nearest' });
+    } else if (view === 'list') {
+      listRef.current?.querySelector<HTMLElement>(`[data-hl-idx="${highlightedIndex}"]`)?.scrollIntoView({ block: 'nearest' });
+    }
   }, [highlightedIndex, columns, view, rowVirtualizer]);
 
   // ── Loading ──────────────────────────────────────────────────────────────
@@ -162,7 +167,7 @@ export default function ProductGrid({
   // ── List view (not virtualised — ~3 500 DOM nodes, acceptable) ──────────
   if (view === 'list') {
     return (
-      <div className="pos-grid-area">
+      <div className="pos-grid-area" ref={listRef}>
         <table className="pos-ptable">
           <thead>
             <tr>
@@ -195,7 +200,10 @@ export default function ProductGrid({
                   onDoubleClick={() => !outStock && onAdd(v)}
                 >
                   <td className="prow-name">
-                    <div className="prow-nm">{v.product?.name}</div>
+                    <div className="prow-name-inner">
+                      {inCart > 0 && <span className="prow-incart-qty">{inCart}</span>}
+                      <div className="prow-nm">{v.product?.name}</div>
+                    </div>
                     {v.barcode && <div className="prow-bc">{v.barcode}</div>}
                   </td>
                   <td className="prow-unit">{v.unit?.abbreviation ?? '—'}</td>
@@ -258,7 +266,7 @@ export default function ProductGrid({
       key={gridSize}
       className={`pos-grid-area pgrid ${gridMod}`}
       ref={scrollRef}
-      style={{ overflow: 'auto' }}
+      style={{ overflow: 'auto', display: 'block' }}
     >
       <div ref={gridWrapRef} style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
         {rowVirtualizer.getVirtualItems().map(virtualRow => {

@@ -4,6 +4,12 @@ const STORAGE_KEY = 'pos-kb-override-';
 const KB_CHANGE_EVENT = 'pos-kb-changed';
 
 export const KB_DEFAULTS: Record<string, string> = {
+  newSale: '',
+  settings: '',
+  toggleQuickbar: '',
+  kioskMode: '',
+  focusClient: '',
+  closeSession: '',
   searchFocus: 'F2',
   payment: 'F4',
   holdCart: 'F5',
@@ -20,8 +26,8 @@ export const KB_DEFAULTS: Record<string, string> = {
   quickSearch: 'Ctrl+F',
   gridView: 'Ctrl+ArrowUp',
   listView: 'Ctrl+ArrowDown',
-  zoomIn: 'Ctrl+=',
-  zoomOut: 'Ctrl+-',
+  zoomIn: 'Ctrl+]',
+  zoomOut: 'Ctrl+[',
   quickCat: 'Alt+1..9',
   qtyUp: 'NumpadAdd',
   qtyDown: 'NumpadSubtract',

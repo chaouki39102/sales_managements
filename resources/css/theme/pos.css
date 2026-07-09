@@ -763,7 +763,16 @@
 .prow.prow-out { opacity: .5; cursor: not-allowed; }
 .prow.prow-hl { outline: 2px solid var(--em); outline-offset: -2px; background: var(--emb); }
 .prow td { padding: 8px 10px; vertical-align: middle; }
-.prow-nm   { font-weight: 700; color: var(--t1); }
+.prow-name-inner { display: flex; align-items: center; gap: 7px; }
+.prow-incart-qty {
+  flex-shrink: 0;
+  min-width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--em); color: #fff;
+  font-size: 11px; font-weight: 900;
+  border-radius: 50%;
+}
+.prow-nm   { font-weight: 700; color: var(--t1); min-width: 0; }
 .prow-bc   { font-size: 10px; color: var(--t4); font-family: monospace; }
 .prow-unit { color: var(--t3); font-size: 11.5px; text-align: center; }
 .prow-price, .prow-ht { font-weight: 700; color: var(--t2); text-align: center; }

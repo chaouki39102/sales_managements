@@ -62,6 +62,8 @@ export interface POSSettings {
   // ── واجهة المستخدم ───────────────────────────────────────────────────────
   /** حجم شبكة المنتجات الافتراضي */
   defaultGridSize:      GridDefaultSize;
+  /** عرض الشبكة أو القائمة الافتراضي */
+  defaultView:          'grid' | 'list';
   /** إظهار شريط Quick Items عند فتح الصفحة */
   showQuickbarOnStart:  boolean;
   /** تشغيل صوت عند إضافة منتج */
@@ -105,6 +107,7 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   receiptFooter:        'شكراً لتعاملكم معنا',
   receiptShowQr:        false,
   defaultGridSize:      'md',
+  defaultView:          'grid',
   showQuickbarOnStart:  true,
   playSoundOnAdd:       false,
   playSoundOnSale:      false,

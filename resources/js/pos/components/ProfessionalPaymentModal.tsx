@@ -166,6 +166,11 @@ export default function ProfessionalPaymentModal({
   prevBalance: propPrevBalance,
 }: Props) {
 
+  const firstAmountRef = useRef<HTMLInputElement>(null);
+
+  // ── Focus first amount field on open ────────────────────────────────────────
+  useEffect(() => { firstAmountRef.current?.focus(); }, []);
+
   // ── State ──────────────────────────────────────────────────────────────────
   const defaultMode = paymentModes.find(m =>
     /نقدا|نقداً|cash/i.test(m.name),
@@ -597,6 +602,7 @@ export default function ProfessionalPaymentModal({
                     {/* المبلغ */}
                     <div className="plv2-amt-wrap">
                       <input
+                        ref={idx === 0 ? firstAmountRef : undefined}
                         type="number"
                         className="plv2-amount"
                         value={line.amount}
