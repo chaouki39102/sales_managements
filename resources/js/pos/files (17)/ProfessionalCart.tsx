@@ -17,7 +17,7 @@
 //      للاسترجاع. الآن onClear يحفظ نسخة تلقائياً (من POSPage) ويمكن
 //      استرجاعها بضغطة واحدة، أو Ctrl+Z.
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import type { CartItem, CartTotals, Party } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getEffectiveShortcut, useKbOverrides } from '../hooks/useKeyboardMap';
@@ -59,9 +59,6 @@ interface ProfessionalCartProps {
 const CART_DENSITY_KEY = 'pos-cart-density';
 type CartDensity = 'comfortable' | 'compact';
 
-const CART_ZOOM_KEY = 'pos-cart-zoom';
-type CartZoom = 0.75 | 0.875 | 1 | 1.125 | 1.25;
-
 export default function ProfessionalCart({
   items, totals, client, customers,
   note, selectedItemId, onSelectItem,
@@ -100,30 +97,6 @@ export default function ProfessionalCart({
     });
   }, []);
 
-  // ── تكبير/تصغير حجم النص وعرض الأسطر في السلة ────────────────────────────
-  // النطاق: 0.75 (صغير جداً) → 1.25 (كبير). القيمة الافتراضية 1 (عادي).
-  // يُطبق كـ CSS variable `--cart-zoom` على عنصر .pos-cart ويؤثر على
-  // font-size, padding, gap لكل العناصر الداخلية بنسبة الضرب.
-  const ZOOM_STEPS: CartZoom[] = [0.75, 0.875, 1, 1.125, 1.25];
-  const [cartZoom, setCartZoom] = useState<CartZoom>(() => {
-    try {
-      const v = parseFloat(localStorage.getItem(CART_ZOOM_KEY) ?? '');
-      return ZOOM_STEPS.includes(v as CartZoom) ? v as CartZoom : 1;
-    } catch { return 1; }
-  });
-  const saveZoom = useCallback((z: CartZoom) => {
-    setCartZoom(z);
-    try { localStorage.setItem(CART_ZOOM_KEY, String(z)); } catch {}
-  }, []);
-  const zoomIn = useCallback(() => {
-    const i = ZOOM_STEPS.indexOf(cartZoom);
-    if (i < ZOOM_STEPS.length - 1) saveZoom(ZOOM_STEPS[i + 1]);
-  }, [cartZoom, saveZoom]);
-  const zoomOut = useCallback(() => {
-    const i = ZOOM_STEPS.indexOf(cartZoom);
-    if (i > 0) saveZoom(ZOOM_STEPS[i - 1]);
-  }, [cartZoom, saveZoom]);
-
   const isEmpty = !items.length;
   const overrides = useKbOverrides(slug ?? null);
   const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
@@ -138,7 +111,7 @@ export default function ProfessionalCart({
 
   return (
     <>
-      <div className="pos-cart" id="pos-cart" ref={cartRef} tabIndex={-1} style={{ '--cart-zoom': cartZoom } as React.CSSProperties}>
+      <div className="pos-cart" id="pos-cart" ref={cartRef} tabIndex={-1}>
 
         <div className="cart-top">
           <div className="cart-top-row">
@@ -150,22 +123,6 @@ export default function ProfessionalCart({
               </span>
             </div>
             <div className="cart-acts2">
-              <button
-                className="btn btn-xs"
-                onClick={zoomOut}
-                disabled={cartZoom <= 0.75}
-                title="تصغير النص — Ctrl+-"
-              >
-                <i className="ti ti-minus" />
-              </button>
-              <button
-                className="btn btn-xs"
-                onClick={zoomIn}
-                disabled={cartZoom >= 1.25}
-                title="تكبير النص — Ctrl++"
-              >
-                <i className="ti ti-plus" />
-              </button>
               <button
                 className={`btn btn-xs density-toggle-btn ${density === 'compact' ? 'on' : ''}`}
                 onClick={toggleDensity}

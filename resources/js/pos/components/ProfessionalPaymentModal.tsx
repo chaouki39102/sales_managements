@@ -488,15 +488,21 @@ export default function ProfessionalPaymentModal({
                   <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + مستحق)</span></span>
                   <strong>{formatDZD(internalPrevBalance + totalTtcFinal)}</strong>
                 </div>
-                {(existingTotal > 0 || isEditing) && (
+                {isEditing && existingTotal > 0 && (
                   <div className="pvs-row">
                     <span style={{ color: '#888' }}>مدفوع سابقاً</span>
                     <span style={{ color: '#888' }}>{formatDZD(existingTotal)}</span>
                   </div>
                 )}
+                {isEditing && newPaid > 0 && (
+                  <div className="pvs-row">
+                    <span style={{ color: '#2563eb' }}>المدفوع الآن</span>
+                    <span style={{ color: '#2563eb' }}>{formatDZD(newPaid)}</span>
+                  </div>
+                )}
                 <div className="pvs-row" style={{ borderTop: '1px solid #ddd', paddingTop: 6, marginTop: 2 }}>
-                  <span>{existingTotal > 0 || isEditing ? 'المدفوع الآن' : 'المدفوع'}</span>
-                  <span>{formatDZD(newPaid)}</span>
+                  <span>{isEditing ? 'إجمالي المدفوع' : 'المدفوع'}</span>
+                  <span>{formatDZD(totalPaid)}</span>
                 </div>
                 <div className="pvs-row pvs-total" style={{ marginTop: 4 }}>
                   <span>

@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useRef, useEffect } from 'react';
 import type { CartItem, CartTotals, PriceLevel } from '@/types';
 import type { PosSession }           from '@/lib/api/endpoints/posSession';
 import { formatDZD }                 from '../utils/calculations';
@@ -51,34 +50,19 @@ export default function POSTopBar({
   const kb            = (action: string) => getEffectiveShortcut(slug, action) ?? '';
 
   // ── قائمة التعريفة (تجزئة/نصف جملة/جملة...) — منقولة من السلة إلى الشريط
-  // العلوي كي تبقى واضحة ومتاحة دائماً دون أن تحجز مساحة دائمة من السلة.
-  // الـ portal يضمن ظهور القائمة خارج نطاق overflow-x:auto لـ pos-topbar
-  // الذي يقطع (clip) المحتوى المتجاوز لحدود الشريط حسب مواصفة CSS. ──
+  // العلوي كي تبقى واضحة ومتاحة دائماً دون أن تحجز مساحة دائمة من السلة. ──
   const [showTarifDrop, setShowTarifDrop] = useState(false);
-  const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
   const tarifRef = useRef<HTMLDivElement>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
   const selectedTarifLabel = selectedPriceLevelId === null
     ? 'عادي'
     : (priceLevels.find(pl => pl.id === selectedPriceLevelId)?.name ?? 'عادي');
-
-  const openDrop = useCallback(() => {
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setDropPos({ top: r.bottom + 4, left: r.left });
-    }
-    setShowTarifDrop(true);
-  }, []);
-
   useEffect(() => {
     if (!showTarifDrop) return;
     const h = (e: MouseEvent) => {
       if (tarifRef.current && !tarifRef.current.contains(e.target as Node)) setShowTarifDrop(false);
     };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowTarifDrop(false); };
     document.addEventListener('mousedown', h);
-    document.addEventListener('keydown', esc);
-    return () => { document.removeEventListener('mousedown', h); document.removeEventListener('keydown', esc); };
+    return () => document.removeEventListener('mousedown', h);
   }, [showTarifDrop]);
 
   return (
@@ -159,19 +143,25 @@ export default function POSTopBar({
         {priceLevels.length > 0 && (
           <div className="tarif-wrap" ref={tarifRef}>
             <button
-              ref={btnRef}
-              className={`btn btn-xs ${selectedPriceLevelId !== null ? 'btn-p' : ''}`}
-              onClick={() => { if (showTarifDrop) { setShowTarifDrop(false); } else { openDrop(); } }}
+              className={`tarif-trigger ${selectedPriceLevelId !== null ? 'on' : ''}`}
+              onClick={() => setShowTarifDrop(o => !o)}
               type="button"
               title="تغيير تعريفة السعر (تجزئة / نصف جملة / جملة)"
             >
               <i className="ti ti-tag" />
-              <span className="tb-txt"> {selectedTarifLabel}</span>
-              <i className="ti ti-chevron-down" style={{ fontSize: 10, opacity: 0.6 }} />
+              <span>{selectedTarifLabel}</span>
+              <i className="ti ti-chevron-down tarif-arrow" />
             </button>
 
-            {showTarifDrop && createPortal(
-              <div className="tarif-drop" style={{ position: 'fixed', top: dropPos.top, left: dropPos.left }}>
+            {showTarifDrop && (
+              <div className="tarif-drop">
+                <button
+                  className={`cmode ${selectedPriceLevelId === null ? 'on' : ''}`}
+                  onClick={() => { onPriceLevelChange(null); setShowTarifDrop(false); }}
+                  title="السعر الافتراضي"
+                >
+                  <i className="ti ti-tag" /> عادي
+                </button>
                 {priceLevels.map(pl => (
                   <button
                     key={pl.id}
@@ -179,6 +169,7 @@ export default function POSTopBar({
                     onClick={() => { onPriceLevelChange(pl.id); setShowTarifDrop(false); }}
                     title={pl.discount_percent ? `خصم ${pl.discount_percent}%` : undefined}
                   >
+                    <i className="ti ti-tag" />
                     {pl.name}
                     {pl.discount_percent
                       ? <span className="cmode-disc">-{pl.discount_percent}%</span>
@@ -186,15 +177,7 @@ export default function POSTopBar({
                     }
                   </button>
                 ))}
-                <button
-                  className={`cmode ${selectedPriceLevelId === null ? 'on' : ''}`}
-                  onClick={() => { onPriceLevelChange(null); setShowTarifDrop(false); }}
-                  title="السعر الافتراضي"
-                >
-                  عادي
-                </button>
-              </div>,
-              document.body
+              </div>
             )}
           </div>
         )}

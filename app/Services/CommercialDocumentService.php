@@ -983,9 +983,13 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ?? NumberingSeries::create([
                 'company_id'       => $companyId,
                 'document_type_id' => $documentTypeId,
-                'name'             => (DocumentType::where('id', $documentTypeId)->value('code') ?? 'DOC') . '-' . date('Y'),
                 'prefix'           => DocumentType::where('id', $documentTypeId)->value('code') ?? 'DOC',
-                'current_number'   => 0,
+                'format'           => '{PREFIX}/{YY}/{NUMBER:6}',
+                'last_number'      => 0,
+                'padding'          => 6,
+                'start_number'     => 1,
+                'reset_yearly'     => true,
+                'active'           => true,
                 'is_locked'        => false,
             ]);
     }

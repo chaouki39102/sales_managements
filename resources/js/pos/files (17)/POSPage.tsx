@@ -978,8 +978,7 @@ const handleCompleteSale = useCallback(async (params: {
           change:    invoiceChange,
           remaining: invoiceRemaining,
         },
-        docNumber: res.document_number,
-        docDate: new Date().toISOString().slice(0, 10),
+        docNum: res.document_number,
         client: currentClient,
         payments: params.payments?.filter(p => p.amount > 0).map(p => ({
           paymentModeId: p.paymentModeId, amount: p.amount,
@@ -1270,7 +1269,7 @@ const handleCompleteSale = useCallback(async (params: {
             template={template}
             company={companyData}
             source={receiptSource}
-            docNumber={receiptSnapshot.docNumber}
+            docNumber={receiptSnapshot.docNum}
             onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
             onPrint={() => { handlePrintDirect(receiptSnapshot); }}
             onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}

@@ -11,7 +11,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { CartItem } from '@/types';
-import { formatDZD } from '../utils/calculations';
+import { formatDZD, ttcToHt } from '../utils/calculations';
 
 interface CartRowProps {
   item:             CartItem;
@@ -81,12 +81,15 @@ export default function CartRow({
     setPopup(p => p === 'disc' ? null : 'disc');
   }, [discMode, item.discount_percentage, item.discount_amount]);
 
+  const tvaRate = item.tva_rate;
+
   // ── فتح popup السعر ───────────────────────────────────────────────────────
   const openPrice = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setPriceVal(item.unit_price_ht.toFixed(2));
+    const ttc = item.unit_price_ht * (1 + tvaRate / 100);
+    setPriceVal(ttc.toFixed(2));
     setPopup(p => p === 'price' ? null : 'price');
-  }, [item.unit_price_ht]);
+  }, [item.unit_price_ht, tvaRate]);
 
   // ── Commit ────────────────────────────────────────────────────────────────
   const commitDisc = () => {
@@ -100,7 +103,7 @@ export default function CartRow({
 
   const commitPrice = () => {
     const n = parseFloat(priceVal);
-    if (!isNaN(n) && n >= 0) onPrice(n);
+    if (!isNaN(n) && n > 0) onPrice(ttcToHt(n, tvaRate));
     setPopup(null);
   };
 
@@ -119,8 +122,6 @@ export default function CartRow({
     : item.discount_amount > 0
       ? `-${formatDZD(item.discount_amount)}`
       : null;
-
-  const tvaRate = item.tva_rate;
 
   return (
     <div
@@ -151,13 +152,13 @@ export default function CartRow({
           <button
             className={`cr-price ${popup === 'price' ? 'cr-price--active' : ''}`}
             onClick={openPrice}
-            title="انقر لتعديل السعر HT"
+            title="انقر لتعديل السعر TTC"
             type="button"
           >
             <span className="cr-price-num">
-              {item.unit_price_ht.toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
+              {(item.unit_price_ht * (1 + tvaRate / 100)).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
             </span>
-            <span className="cr-price-unit">HT</span>
+            <span className="cr-price-unit">TTC</span>
             <span className="cr-price-edit-ic">✎</span>
           </button>
 
@@ -288,7 +289,7 @@ export default function CartRow({
         {popup === 'price' && (
           <div className="cr-popup cr-popup--price" onClick={e => e.stopPropagation()}>
             <div className="cr-popup-arrow" />
-            <div className="cr-popup-label">سعر البيع HT</div>
+            <div className="cr-popup-label">سعر البيع TTC</div>
             <div className="cr-popup-inp-row">
               <input
                 ref={priceInpRef}
@@ -308,7 +309,7 @@ export default function CartRow({
             </div>
             {priceVal && parseFloat(priceVal) > 0 && (
               <div className="cr-popup-preview">
-                TTC: <strong>{(parseFloat(priceVal) * (1 + tvaRate / 100)).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })} دج</strong>
+                HT: <strong>{ttcToHt(parseFloat(priceVal), tvaRate).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })} دج</strong>
               </div>
             )}
             <div className="cr-popup-actions">
