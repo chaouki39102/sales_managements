@@ -26,6 +26,9 @@ interface CartRowProps {
   /** 'compact' يعرض السلة بصف واحد مصغّر لكل صنف (المزيد من المنتجات
    *  مرئية دفعة واحدة)، 'comfortable' هو التصميم الافتراضي الحالي. */
   density?:         'comfortable' | 'compact';
+  /** يُستدعى بعنصر DOM الجذري للصف — يُستخدم من ProfessionalCart
+   *  لبناء خريطة id→عنصر تُمكّن التمرير/التركيز على صف معيّن برمجياً. */
+  registerNode?:    (id: string, el: HTMLDivElement | null) => void;
 }
 
 type DiscMode  = 'pct' | 'amount';
@@ -34,7 +37,7 @@ type PopupType = 'disc' | 'price' | null;
 export default function CartRow({
   item, idx, isSelected, onSelect,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
-  density = 'comfortable',
+  density = 'comfortable', registerNode,
 }: CartRowProps) {
   const compact = density === 'compact';
   const [popup,      setPopup]      = useState<PopupType>(null);
@@ -125,7 +128,7 @@ export default function CartRow({
 
   return (
     <div
-      ref={rowRef}
+      ref={el => { rowRef.current = el; registerNode?.(item.id, el); }}
       tabIndex={-1}
       className={`cr ${isSelected ? 'sel' : ''} ${hasDisc ? 'has-disc' : ''} ${popup ? 'cr--popup-open' : ''} ${compact ? 'cr--compact' : ''}`}
       onClick={onSelect}

@@ -594,3 +594,24 @@ Report: `docs/reports/PRINT_RUNTIME_SEPARATION_REPORT.md`
 - Removed redundant `width: ${100/columns}%` from card wrapper (flex handles it)
 
 **Verification**: `npm run build` — 0 errors, 1044 modules, 3.70s. `npm test` — 159/159 pass.
+
+### Phase 21b — POS Cart: Virtualization + Auto-Density + Toast + NodeMap (July 10)
+
+**5 features merged from `files8)` source into the POS cart subsystem**:
+
+1. **`CartRow.registerNode` prop** (`CartRow.tsx:31`) — callback ref pattern (`ref={el => { rowRef.current = el; registerNode?.(item.id, el); }}`) replaces bare `ref={rowRef}`. Called by `ProfessionalCart` to maintain an id→DOM-node `Map` for programmatic scroll-to.
+
+2. **`ProfessionalCartHandle` rename** (`ProfessionalCart.tsx:60-63`) — renamed from `CartApiRef` to `ProfessionalCartHandle` for consistency with `forwardRef` naming conventions. POSPage updated accordingly.
+
+3. **NodeMap + `useLayoutEffect` re-measure** (`ProfessionalCart.tsx:142-153`) — `nodeMap = useRef(new Map())` + `registerRowNode` callback + `useLayoutEffect` to re-measure virtualizer on density change (so compact rows get correct 38px estimate immediately instead of on next scroll).
+
+4. **Auto-density with `manualDensityRef`** (`ProfessionalCart.tsx:113-129`) — replaces `userToggledDensity`/`effectiveDensity` pattern with cleaner `manualDensityRef` (no extra state variable, no re-render from localStorage read at init).
+
+5. **Toast on barcode scan** (`POSPage.tsx:614-617`) — `toast.success(variant.product?.name, { id: 'pos-last-added', duration: 1500 })` added to barcode scanner handler (was already present for `handleAddItem` at line 1052).
+
+**Files modified**:
+- `resources/js/pos/components/ProfessionalCart.tsx` — `CartApiRef`→`ProfessionalCartHandle`, `nodeMap`, `registerRowNode`, `useLayoutEffect` re-measure, `manualDensityRef` auto-density, `export default ProfessionalCart`
+- `resources/js/pos/components/CartRow.tsx` — added `registerNode` prop + callback ref on root div
+- `resources/js/pages/pos/POSPage.tsx` — `CartApiRef`→`ProfessionalCartHandle` import/usage
+
+**Verification**: `npm run build` — 0 errors, 1052 modules, 3.33s.

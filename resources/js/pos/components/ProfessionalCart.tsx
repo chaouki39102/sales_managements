@@ -17,7 +17,8 @@
 //      للاسترجاع. الآن onClear يحفظ نسخة تلقائياً (من POSPage) ويمكن
 //      استرجاعها بضغطة واحدة، أو Ctrl+Z.
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { CartItem, CartTotals, Party } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getEffectiveShortcut, useKbOverrides } from '../hooks/useKeyboardMap';
@@ -55,6 +56,12 @@ interface ProfessionalCartProps {
   cartRef?:             React.RefObject<HTMLDivElement>;
 }
 
+/** واجهة برمجية للتحكم بالسلة من المكوّن الأب (POSPage) — بديل عن querySelectorAll */
+export interface ProfessionalCartHandle {
+  /** تمرير السلة إلى موقع صنف معيّن وتركيزه */
+  scrollToItemId: (itemId: string) => void;
+}
+
 // كثافة عرض صفوف السلة — مفتاح حفظ محلي مستقل عن الشركة (تفضيل جهاز/كاشير)
 const CART_DENSITY_KEY = 'pos-cart-density';
 type CartDensity = 'comfortable' | 'compact';
@@ -62,7 +69,7 @@ type CartDensity = 'comfortable' | 'compact';
 const CART_ZOOM_KEY = 'pos-cart-zoom';
 type CartZoom = 0.75 | 0.875 | 1 | 1.125 | 1.25;
 
-export default function ProfessionalCart({
+const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProps>(function ProfessionalCart({
   items, totals, client, customers,
   note, selectedItemId, onSelectItem,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
@@ -70,7 +77,7 @@ export default function ProfessionalCart({
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
   onUndoClear, canUndoClear, clientBalance, slug, cartRef,
-}: ProfessionalCartProps) {
+}, ref) {
 
   const [showNote,         setShowNote]         = useState(false);
   const [showCustModal,    setShowCustModal]     = useState(false);
@@ -81,19 +88,49 @@ export default function ProfessionalCart({
   // افتراضياً مطوي (يظهر فقط سطر الإجمالي TTC) لتحرير مساحة رأسية دائمة
   // لصالح قائمة الأصناف — التفاصيل (HT/TVA/الخصومات/رصيد الزبون) تظهر
   // فقط عند الحاجة الفعلية (تعديل خصم الفاتورة، أو مراجعة قبل الدفع).
-  const [showTotalsDetails, setShowTotalsDetails] = useState(false);
+  // الحالة محفوظة في localStorage لاستمرار التفضيل بين الجلسات.
+  const [showTotalsDetails, setShowTotalsDetails] = useState(() => {
+    try { return localStorage.getItem('pos-cart-totals-open') === '1'; }
+    catch { return false; }
+  });
+  const toggleTotals = useCallback(() => {
+    setShowTotalsDetails(prev => {
+      const next = !prev;
+      try { localStorage.setItem('pos-cart-totals-open', next ? '1' : '0'); } catch {}
+      return next;
+    });
+  }, []);
 
   // ── كثافة عرض السلة (مريح / مضغوط) ────────────────────────────────────────
   // مضغوط: صف واحد بارتفاع ~34px لكل صنف بدل ~70-90px، فيظهر عدد أكبر
   // بكثير من المنتجات دفعة واحدة دون تمرير — مفيد جداً للفواتير الكبيرة.
-  const [density, setDensity] = useState<CartDensity>(() => {
+  //
+  // سلوك تلقائي ذكي: إذا لم يسبق للمستخدم اختيار الكثافة يدوياً (لا يوجد
+  // تفضيل محفوظ في localStorage)، تتحوّل الكثافة تلقائياً إلى "مضغوط"
+  // بمجرد أن يتجاوز عدد أصناف السلة 7، وترجع "مريح" عندما يقل العدد عن
+  // ذلك مجدداً. أما بمجرد أن يضغط المستخدم الزر مرة واحدة يدوياً، يُحفَظ
+  // اختياره ويُحترَم نهائياً (لا يُبدَّل تلقائياً بعد ذلك أبداً).
+  const manualDensityRef = useRef(false);
+  const [density, setDensityState] = useState<CartDensity>('comfortable');
+
+  useEffect(() => {
     try {
       const v = localStorage.getItem(CART_DENSITY_KEY);
-      return v === 'compact' ? 'compact' : 'comfortable';
-    } catch { return 'comfortable'; }
-  });
+      if (v === 'compact' || v === 'comfortable') {
+        manualDensityRef.current = true;
+        setDensityState(v);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (manualDensityRef.current) return;
+    setDensityState(items.length >= 7 ? 'compact' : 'comfortable');
+  }, [items.length]);
+
   const toggleDensity = useCallback(() => {
-    setDensity(prev => {
+    manualDensityRef.current = true;
+    setDensityState(prev => {
       const next: CartDensity = prev === 'compact' ? 'comfortable' : 'compact';
       try { localStorage.setItem(CART_DENSITY_KEY, next); } catch {}
       return next;
@@ -124,9 +161,46 @@ export default function ProfessionalCart({
     if (i > 0) saveZoom(ZOOM_STEPS[i - 1]);
   }, [cartZoom, saveZoom]);
 
-  const isEmpty = !items.length;
   const overrides = useKbOverrides(slug ?? null);
   const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
+
+  // ── افتراضية قائمة الأصناف (virtualization) ──────────────────────────────
+  // نفس نمط ProductGrid: حاوية تمرير ثابتة + قياس ديناميكي لكل صف
+  // (measureElement) لأن ارتفاع CartRow يختلف حسب الكثافة ووجود خصم.
+  const cartScrollRef = useRef<HTMLDivElement>(null);
+  const nodeMap       = useRef(new Map<string, HTMLDivElement>());
+
+  const rowVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => cartScrollRef.current,
+    estimateSize: () => (density === 'compact' ? 38 : 82),
+    overscan: 8,
+  });
+
+  // إعادة قياس الكل عند تبدّل الكثافة
+  useLayoutEffect(() => {
+    rowVirtualizer.measure();
+  }, [density, rowVirtualizer]);
+
+  const registerRowNode = useCallback((id: string, el: HTMLDivElement | null) => {
+    if (el) nodeMap.current.set(id, el);
+    else nodeMap.current.delete(id);
+  }, []);
+
+  const isEmpty = !items.length;
+
+  useImperativeHandle(ref, () => ({
+    scrollToItemId: (id: string) => {
+      const idx = items.findIndex(i => i.id === id);
+      if (idx === -1) return;
+      rowVirtualizer.scrollToIndex(idx, { align: 'auto' });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          nodeMap.current.get(id)?.focus();
+        });
+      });
+    },
+  }), [items, rowVirtualizer]);
 
   const handleInvDiscAmount = useCallback((raw: string) => {
     setInvDiscAmtVal(raw);
@@ -263,7 +337,11 @@ export default function ProfessionalCart({
           </div>
         </div>
 
-        <div className="cart-items">
+        <div
+          className="cart-items"
+          ref={cartScrollRef}
+          style={{ overflow: 'auto', flexShrink: 0 }}
+        >
           {isEmpty ? (
             <div className="cart-empty">
               <div className="ce-ico"><i className="ti ti-shopping-cart-off" /></div>
@@ -271,29 +349,46 @@ export default function ProfessionalCart({
               <div className="ce-sub">ابحث عن منتج أو امسح الباركود</div>
             </div>
           ) : (
-            items.map((item, idx) => (
-              <CartRow
-                key={item.id}
-                item={item}
-                idx={idx}
-                isSelected={selectedItemId === item.id}
-                onSelect={() => onSelectItem(item.id)}
-                onQty={qty => onQty(item.id, qty)}
-                onDiscount={pct => onDiscount(item.id, pct)}
-                onDiscountAmount={amount => onDiscountAmount(item.id, amount)}
-                onPrice={price => onPrice(item.id, price)}
-                onRemove={() => onRemove(item.id)}
-                density={density}
-              />
-            ))
+            <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', flexShrink: 0, width: '100%' }}>
+              {rowVirtualizer.getVirtualItems().map(vRow => {
+                const item = items[vRow.index];
+                if (!item) return null;
+                return (
+                  <div
+                    key={item.id}
+                    data-index={vRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: 0, width: '100%',
+                      transform: `translateY(${vRow.start}px)`,
+                    }}
+                  >
+                    <CartRow
+                      item={item}
+                      idx={vRow.index}
+                      isSelected={selectedItemId === item.id}
+                      onSelect={() => onSelectItem(item.id)}
+                      onQty={qty => onQty(item.id, qty)}
+                      onDiscount={pct => onDiscount(item.id, pct)}
+                      onDiscountAmount={amount => onDiscountAmount(item.id, amount)}
+                      onPrice={price => onPrice(item.id, price)}
+                      onRemove={() => onRemove(item.id)}
+                      density={density}
+                      registerNode={registerRowNode}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
         {!isEmpty && (
           <div className="cart-totals">
             {/* ── سطر دائم: الإجمالي + زر إظهار/إخفاء التفاصيل ── */}
-            <div className="ct-row ct-grand ct-grand--toggle" onClick={() => setShowTotalsDetails(s => !s)}>
-              <span className="ct-grand-lbl">
+            <div className="ct-row ct-grand ct-grand--toggle" onClick={toggleTotals}>
+              <span className="ct-grand-label">
                 الإجمالي TTC
                 <i className={`ti ti-chevron-down ct-toggle-ic ${showTotalsDetails ? 'open' : ''}`} />
               </span>
@@ -442,4 +537,6 @@ export default function ProfessionalCart({
       )}
     </>
   );
-}
+});
+
+export default ProfessionalCart;

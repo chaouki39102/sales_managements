@@ -83,14 +83,24 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
       ],
     },
     {
-      title: 'السلة والأصناف',
+      title: 'السلة',
       items: [
+        { action: 'focusCart', defaultKey: 'Ctrl+Space', desc: 'التركيز على السلة والتنقل بينها وبين البحث' },
         { action: 'qtyUp', defaultKey: 'NumpadAdd', desc: 'زيادة كمية آخر صنف' },
         { action: 'qtyDown', defaultKey: 'NumpadSubtract', desc: 'إنقاص كمية آخر صنف' },
-        { action: 'deleteItem', defaultKey: 'Delete', desc: 'حذف الصنف المحدد' },
-        { action: 'enterSearch', defaultKey: 'Enter', desc: 'إضافة أول نتيجة' },
+        { action: 'deleteItem', defaultKey: 'Delete', desc: 'حذف الصنف المحدد من السلة' },
+        { action: 'confirmPayment', defaultKey: 'Ctrl+Enter', desc: 'تأكيد الدفع وإتمام الفاتورة' },
+        { action: 'undoClear', defaultKey: 'Ctrl+Z', desc: 'تراجع عن مسح السلة' },
+        { action: 'qtyModal', defaultKey: 'Ctrl+*', desc: 'فتح مودال تعديل الكمية للصنف المحدد' },
+        { action: 'cartNavigate', defaultKey: '↑↓', desc: 'التنقل بين أصناف السلة' },
+      ],
+    },
+    {
+      title: 'إجراءات سريعة',
+      items: [
+        { action: 'enterSearch', defaultKey: 'Enter', desc: 'إضافة أول نتيجة بحث' },
         { action: 'escape', defaultKey: 'Escape', desc: 'إغلاق المودال / مسح البحث' },
-        { action: 'confirmPayment', defaultKey: 'Ctrl+Enter', desc: 'تأكيد الدفع' },
+        { action: 'searchQtyCmd', defaultKey: '*15', desc: 'ضبط كمية الصنف المحدد في السلة (اكتب * متبوعاً بالرقم)' },
       ],
     },
     {

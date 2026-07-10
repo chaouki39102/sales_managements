@@ -71,6 +71,15 @@ export function saveOverrides(slug: string | null, overrides: Record<string, str
 export function matchOverride(slug: string | null, action: string, e: KeyboardEvent): boolean {
   if (!slug) return false;
   const overrides = readOverrides(slug);
+  return matchOverrideFromCache(overrides, action, e);
+}
+
+/** Like matchOverride but takes pre-read overrides — avoids 25× localStorage reads per keypress */
+export function matchOverrideFromCache(
+  overrides: Record<string, string>,
+  action: string,
+  e: KeyboardEvent
+): boolean {
   const expected = overrides[action] ?? KB_DEFAULTS[action];
   if (!expected) return false;
   return normalizeEventKey(e) === expected;

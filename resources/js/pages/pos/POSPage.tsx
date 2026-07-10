@@ -23,7 +23,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
 
 import {
-  calcFiscalStamp, formatDZD, htToTtc, ttcToHt, calcMargin,
+  calcFiscalStamp, formatDZD, htToTtc, ttcToHt, calcMargin, calcCompoundedDiscount,
 } from '@/pos/utils/calculations';
 import {
   productToVariant, makeFakeVariant,
@@ -45,7 +45,7 @@ import ProductSearchBar         from '@/pos/components/ProductSearchBar';
 import FilterPanel              from '@/pos/components/FilterPanel';
 import CategoryTabs             from '@/pos/components/CategoryTabs';
 import ProductGrid              from '@/pos/components/ProductGrid';
-import ProfessionalCart         from '@/pos/components/ProfessionalCart';
+import ProfessionalCart, { type ProfessionalCartHandle } from '@/pos/components/ProfessionalCart';
 import PanelResizer             from '@/pos/components/PanelResizer';
 import {
   useCurrentPosSession,
@@ -69,7 +69,7 @@ const KeyboardHelpModal        = React.lazy(() => import('@/pos/components/Keybo
 const POSSettingsModal          = React.lazy(() => import('@/pos/components/POSSettingsModal'));
 const ManagerPinModal           = React.lazy(() => import('@/pos/components/ManagerPinModal'));
 import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
-import { matchOverride }        from '@/pos/hooks/useKeyboardMap';
+import { matchOverride, matchOverrideFromCache, useKbOverrides } from '@/pos/hooks/useKeyboardMap';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
 import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
@@ -134,6 +134,13 @@ function POSPage() {
 
   const { settings, setSettings, resetSettings } = usePOSSettings(slug);
   const clearCartConfirm = useConfirm();
+  const deleteConfirm    = useConfirm();
+
+  // Read keyboard overrides ONCE (via useKbOverrides which caches + re-reads only on change),
+  // then pass to matchOverrideFromCache inside the handler to avoid 25× localStorage.read per keypress.
+  const kbOverrides    = useKbOverrides(slug);
+  const kbOverridesRef = useRef(kbOverrides);
+  kbOverridesRef.current = kbOverrides;
 
   // ═════════════════════════════════════════════════════════════════════
   // Clear cart on company switch — prevents stale product_id values from
@@ -152,6 +159,7 @@ function POSPage() {
   const [view,       setView]       = useState<ViewMode>(settings.defaultView);
   const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
   useEffect(() => { setSettings({ defaultView: view }); }, [view, setSettings]);
+  useEffect(() => { setSettings({ defaultGridSize: gridSize }); }, [gridSize, setSettings]);
   const [mobTab,     setMobTab]     = useState<'products' | 'cart'>('products');
   const [fullscreen, setFullscreen] = useState(false);
   const [cartWidth, setCartWidth]   = useState(settings.cartWidth);
@@ -266,25 +274,50 @@ function POSPage() {
   const searchRef    = useRef<HTMLInputElement>(null);
   const cartRef      = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const cartApiRef   = useRef<ProfessionalCartHandle>(null);
   const barcodeTimer = useRef<ReturnType<typeof setTimeout>>();
+  // ── Auto-focus search + select last cart row on page mount / invoice reopen ──
+  useEffect(() => {
+    if (!currentSession?.id) return;
+    const t = setTimeout(() => {
+      searchRef.current?.focus();
+      const items = useCartStore.getState().items;
+      const last = items[items.length - 1];
+      if (last) setSelectedCartItemId(last.id);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [currentSession?.id]);
+
+  const isQtyCmd = /^\*\d*$/.test(pos.searchQuery.trim());
 
   const debouncedSearch = useDebounce(pos.searchQuery.trim(), 300);
   const isSearching     = debouncedSearch.length >= 2;
   const queryFamilyId   = pos.selectedCategory ?? undefined;
 
+  // Lock the query key on transition into qty-command mode so the product grid
+  // stays EXACTLY as it was (same search results, same UI) — no visual change.
+  const qtyLockRef = useRef<string | null>(null);
+  if (isQtyCmd && qtyLockRef.current === null) {
+    qtyLockRef.current = debouncedSearch;
+  } else if (!isQtyCmd) {
+    qtyLockRef.current = null;
+  }
+  const displaySearch = qtyLockRef.current ?? debouncedSearch;
+  const displaySearching = displaySearch.length >= 2;
+
   // ── Products query (all products) ───────────────────────────────────────
   const { data: productsRaw, isLoading: loadingAll } = useQuery({
     queryKey: [slug, 'products', 'pos', {
-      search: debouncedSearch, cat: pos.selectedCategory,
+      search: displaySearch, cat: pos.selectedCategory,
     }],
     queryFn: () => productsApi.list({
       per_page:  99999,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
-      search:    isSearching ? debouncedSearch : undefined,
+      search:    displaySearching ? displaySearch : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       filter:    { active: 1 },
     }),
-    enabled:         !!slug,
+    enabled:         !!slug && !isQtyCmd,
     staleTime:       isSearching ? 2 * 60_000 : 5 * 60_000,
   });
 
@@ -452,8 +485,10 @@ function POSPage() {
   }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy, allowNegSetting]);
 
   useEffect(() => {
-    setHighlightedIndex(0);
-  }, [filteredVariants.length, pos.searchQuery, sortBy]);
+    if (isQtyCmd) return;
+    if (pos.searchQuery) { setHighlightedIndex(0); return; }
+    setHighlightedIndex(prev => Math.min(prev, filteredVariants.length - 1));
+  }, [filteredVariants.length, pos.searchQuery, sortBy, isQtyCmd]);
 
   const isEmpty = pos.items.length === 0;
 
@@ -570,6 +605,13 @@ function POSPage() {
       editingPrevBalanceRef.current = (doc as any)?.balance_data?.previous_balance;
       setShowSessionInvoices(false);
       toast.success(`تم فتح الفاتورة ${doc.document_number}`);
+      // Select last cart row + focus search so user can immediately type *<digits> Enter
+      requestAnimationFrame(() => {
+        searchRef.current?.focus();
+        const loaded = useCartStore.getState().items;
+        const last = loaded[loaded.length - 1];
+        if (last) setSelectedCartItemId(last.id);
+      });
     } catch {
       toast.error('فشل تحميل الفاتورة');
     }
@@ -605,14 +647,27 @@ function POSPage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const tag     = (e.target as HTMLElement)?.tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
       const buf = barcodeRef.current;
       if (e.key === 'Enter' && buf.length >= 4) {
         const variant = allVariants.find(v => v.barcode === buf);
-        if (variant && !isVariantOutOfStock(variant, allowNegSetting)) pos.addItem(variant);
+        if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
+          pos.addItem(variant);
+          const items = useCartStore.getState().items;
+          const added = items.find(i => i.variant_id === variant.id);
+          if (added) { setSelectedCartItemId(added.id); requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(added.id)); }
+          toast.success(variant.product?.name ?? variant.name ?? 'تمت الإضافة', {
+            id: 'pos-last-added',
+            duration: 1500,
+          });
+        }
         setBarcodeBuffer('');
         return;
       }
-      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      // Don't accumulate barcode buffer when typing in an input field
+      // (e.g. search, modal fields) — avoids swallowing Enter from ProductSearchBar
+      if (!inInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         setBarcodeBuffer(b => b + e.key);
         clearTimeout(barcodeTimer.current);
         barcodeTimer.current = setTimeout(() => setBarcodeBuffer(''), 300);
@@ -636,8 +691,8 @@ function POSPage() {
 
   // ── Keyboard Shortcuts ─────────────────────────────────────────────────────
   useEffect(() => {
-    const slugRef = slug;
     const handler = (e: KeyboardEvent) => {
+      const overrides = kbOverridesRef.current;
       const tag     = (e.target as HTMLElement)?.tagName;
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
@@ -645,7 +700,7 @@ function POSPage() {
       const anyModalOpen = modal !== 'none' || showSessionInvoices || showSettings || showCloseSession || !!pinModal;
       if (anyModalOpen) {
         // فقط مفتاح Escape يعمل لإغلاق المودال الحالي
-        if (matchOverride(slugRef, 'escape', e)) {
+        if (matchOverrideFromCache(overrides, 'escape', e)) {
           e.preventDefault();
           if (modal !== 'none')                    setModal('none');
           else if (showSessionInvoices)            setShowSessionInvoices(false);
@@ -656,42 +711,42 @@ function POSPage() {
         return;
       }
 
-      if (matchOverride(slugRef, 'searchFocus', e))  { e.preventDefault(); searchRef.current?.focus(); }
-      if (matchOverride(slugRef, 'focusCart', e))    { e.preventDefault(); if (document.activeElement === searchRef.current) { const lastItem = pos.items[pos.items.length - 1]; if (lastItem) setSelectedCartItemId(lastItem.id); const lastRow = cartRef.current?.querySelector<HTMLElement>('.cart-items .cr:last-child'); if (lastRow) { lastRow.focus(); lastRow.scrollIntoView({ block: 'end', behavior: 'smooth' }); } else { cartRef.current?.focus(); } } else { searchRef.current?.focus(); } }
-      if (matchOverride(slugRef, 'payment', e))      { e.preventDefault(); if (!isEmpty) { setModal('payment'); } }
-      if (matchOverride(slugRef, 'holdCart', e))     { e.preventDefault(); if (!isEmpty) pos.holdCart(); }
-      if (matchOverride(slugRef, 'manualProduct', e)){ e.preventDefault(); setModal('manual'); }
-      if (matchOverride(slugRef, 'heldCarts', e))    { e.preventDefault(); setModal('held'); }
-      if (matchOverride(slugRef, 'toggleHeld', e))   { e.preventDefault(); setModal('held'); }
-      if (matchOverride(slugRef, 'sessionInvoices', e)) { e.preventDefault(); setShowSessionInvoices(true); }
-      if (matchOverride(slugRef, 'sessionStats', e)) { e.preventDefault(); setModal(m => m === 'session' ? 'none' : 'session'); }
-      if (matchOverride(slugRef, 'preview', e)) {
+      if (matchOverrideFromCache(overrides, 'searchFocus', e))  { e.preventDefault(); searchRef.current?.focus(); }
+      if (matchOverrideFromCache(overrides, 'focusCart', e))    { e.preventDefault(); if (document.activeElement === searchRef.current) { const lastItem = pos.items[pos.items.length - 1]; if (lastItem) { setSelectedCartItemId(lastItem.id); cartApiRef.current?.scrollToItemId(lastItem.id); } else { cartRef.current?.focus(); } } else { searchRef.current?.focus(); } }
+      if (matchOverrideFromCache(overrides, 'payment', e))      { e.preventDefault(); if (!isEmpty) { setModal('payment'); } }
+      if (matchOverrideFromCache(overrides, 'holdCart', e))     { e.preventDefault(); if (!isEmpty) pos.holdCart(); }
+      if (matchOverrideFromCache(overrides, 'manualProduct', e)){ e.preventDefault(); setModal('manual'); }
+      if (matchOverrideFromCache(overrides, 'heldCarts', e))    { e.preventDefault(); setModal('held'); }
+      if (matchOverrideFromCache(overrides, 'toggleHeld', e))   { e.preventDefault(); setModal('held'); }
+      if (matchOverrideFromCache(overrides, 'sessionInvoices', e)) { e.preventDefault(); setShowSessionInvoices(true); }
+      if (matchOverrideFromCache(overrides, 'sessionStats', e)) { e.preventDefault(); setModal(m => m === 'session' ? 'none' : 'session'); }
+      if (matchOverrideFromCache(overrides, 'preview', e)) {
         e.preventDefault();
         if (!isEmpty) {
           setReceiptSnapshot({ items: [...pos.items], totals: { ...pos.totals } });
           setModal('receipt');
         }
       }
-      if (matchOverride(slugRef, 'fullscreen', e))  { e.preventDefault(); toggleFullscreen(); }
-      if (matchOverride(slugRef, 'clearCart', e))    { e.preventDefault(); handleClearCart(); }
-      if (matchOverride(slugRef, 'kbHelp', e))       { e.preventDefault(); setModal('kbhelp'); }
-      if (matchOverride(slugRef, 'returns', e))      { e.preventDefault(); setModal('returns'); }
-      if (matchOverride(slugRef, 'openDrawer', e))   { e.preventDefault(); handleOpenDrawer(); }
-      if (matchOverride(slugRef, 'undoClear', e))    { e.preventDefault(); handleUndoClear(); }
-      if (matchOverride(slugRef, 'newSale', e))      { e.preventDefault(); if (isEmpty) { pos.clearCart(); } else { pos.holdCart(); } }
-      if (matchOverride(slugRef, 'settings', e))     { e.preventDefault(); setShowSettings(true); }
-      if (matchOverride(slugRef, 'toggleQuickbar', e)) { e.preventDefault(); handleToggleQuickbar(); }
-      if (matchOverride(slugRef, 'kioskMode', e))    { e.preventDefault(); navigate('/pos/kiosk'); }
-      if (matchOverride(slugRef, 'closeSession', e)) { e.preventDefault(); setShowCloseSession(true); }
+      if (matchOverrideFromCache(overrides, 'fullscreen', e))  { e.preventDefault(); toggleFullscreen(); }
+      if (matchOverrideFromCache(overrides, 'clearCart', e))    { e.preventDefault(); handleClearCart(); }
+      if (matchOverrideFromCache(overrides, 'kbHelp', e))       { e.preventDefault(); setModal('kbhelp'); }
+      if (matchOverrideFromCache(overrides, 'returns', e))      { e.preventDefault(); setModal('returns'); }
+      if (matchOverrideFromCache(overrides, 'openDrawer', e))   { e.preventDefault(); handleOpenDrawer(); }
+      if (matchOverrideFromCache(overrides, 'undoClear', e))    { e.preventDefault(); handleUndoClear(); }
+      if (matchOverrideFromCache(overrides, 'newSale', e))      { e.preventDefault(); if (isEmpty) { pos.clearCart(); } else { pos.holdCart(); } }
+      if (matchOverrideFromCache(overrides, 'settings', e))     { e.preventDefault(); setShowSettings(true); }
+      if (matchOverrideFromCache(overrides, 'toggleQuickbar', e)) { e.preventDefault(); handleToggleQuickbar(); }
+      if (matchOverrideFromCache(overrides, 'kioskMode', e))    { e.preventDefault(); navigate('/pos/kiosk'); }
+      if (matchOverrideFromCache(overrides, 'closeSession', e)) { e.preventDefault(); setShowCloseSession(true); }
 
       if (!inInput) {
-        if (matchOverride(slugRef, 'gridView', e))   { e.preventDefault(); setView('grid'); }
-        if (matchOverride(slugRef, 'listView', e))   { e.preventDefault(); setView('list'); }
-        if (matchOverride(slugRef, 'zoomIn', e)) {
+        if (matchOverrideFromCache(overrides, 'gridView', e))   { e.preventDefault(); setView('grid'); }
+        if (matchOverrideFromCache(overrides, 'listView', e))   { e.preventDefault(); setView('list'); }
+        if (matchOverrideFromCache(overrides, 'zoomIn', e)) {
           e.preventDefault();
           setGridSize(s => s === 'xs' ? 'sm' : s === 'sm' ? 'md' : s === 'md' ? 'lg' : 'lg');
         }
-        if (matchOverride(slugRef, 'zoomOut', e)) {
+        if (matchOverrideFromCache(overrides, 'zoomOut', e)) {
           e.preventDefault();
           setGridSize(s => s === 'lg' ? 'md' : s === 'md' ? 'sm' : s === 'sm' ? 'xs' : 'xs');
         }
@@ -705,11 +760,21 @@ function POSPage() {
       if (!inInput) {
         const inCart = cartRef.current?.contains(document.activeElement);
         const lastItem = pos.items[pos.items.length - 1];
-        if (matchOverride(slugRef, 'qtyUp', e)   && lastItem && !inCart)                          { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity + 1); }
-        if (matchOverride(slugRef, 'qtyDown', e) && lastItem && lastItem.quantity > 1 && !inCart) { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity - 1); }
-        if (matchOverride(slugRef, 'deleteItem', e) && selectedCartItemId)                         { e.preventDefault(); pos.removeItem(selectedCartItemId); setSelectedCartItemId(null); }
+        if (matchOverrideFromCache(overrides, 'qtyUp', e)   && lastItem && !inCart)                          { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity + 1); }
+        if (matchOverrideFromCache(overrides, 'qtyDown', e) && lastItem && lastItem.quantity > 1 && !inCart) { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity - 1); }
+        if (matchOverrideFromCache(overrides, 'deleteItem', e) && selectedCartItemId) {
+          e.preventDefault();
+          const id = selectedCartItemId;
+          const name = pos.items.find(i => i.id === id)?.product_name ?? '';
+          deleteConfirm.confirm(`هل تريد حذف "${name}" من السلة؟`, {
+            title: 'حذف صنف',
+            variant: 'danger',
+            confirmText: 'حذف',
+            cancelText: 'إلغاء',
+          }).then(ok => { if (ok) { pos.removeItem(id); setSelectedCartItemId(null); } });
+        }
       }
-      if (matchOverride(slugRef, 'escape', e)) {
+      if (matchOverrideFromCache(overrides, 'escape', e)) {
         if (modal !== 'none')                 setModal('none');
         else if (showFilter)                  setShowFilter(false);
         else if (!inInput && pos.searchQuery) pos.setSearch('');
@@ -735,19 +800,16 @@ function POSPage() {
         }
       }
 
-      // ── Arrow keys navigate cart rows ──────────────────────────────────
-      if (!inInput) {
-        const crEl = (document.activeElement as HTMLElement)?.closest?.('.cr') as HTMLElement | null;
-        if (crEl && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      // ── Arrow keys navigate cart rows (via cartApiRef) ─────────────────
+      if (!inInput && cartApiRef.current && selectedCartItemId && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        const curIdx = pos.items.findIndex(i => i.id === selectedCartItemId);
+        if (curIdx >= 0) {
           e.preventDefault();
-          const rows = Array.from(crEl.closest('.cart-items')?.querySelectorAll<HTMLElement>('.cr') ?? []);
-          const idx = rows.indexOf(crEl);
-          const nextIdx = e.key === 'ArrowDown' ? idx + 1 : idx - 1;
-          if (nextIdx >= 0 && nextIdx < rows.length) {
-            rows[nextIdx].focus();
-            rows[nextIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          const nextIdx = e.key === 'ArrowDown' ? curIdx + 1 : curIdx - 1;
+          if (nextIdx >= 0 && nextIdx < pos.items.length) {
             const nextItem = pos.items[nextIdx];
-            if (nextItem) setSelectedCartItemId(nextItem.id);
+            setSelectedCartItemId(nextItem.id);
+            cartApiRef.current.scrollToItemId(nextItem.id);
           }
         }
       }
@@ -864,9 +926,7 @@ const handleCompleteSale = useCallback(async (params: {
         }));
 
       const linesPayload = currentItems.map(i => {
-        const compoundedDisc = currentInvDisc > 0
-          ? 100 - (100 - i.discount_percentage) * (100 - currentInvDisc) / 100
-          : i.discount_percentage;
+        const compoundedDisc = calcCompoundedDiscount(i.discount_percentage, currentInvDisc);
         return {
           product_id:          i.product_id,
           quantity:            i.quantity,
@@ -1045,11 +1105,28 @@ const handleCompleteSale = useCallback(async (params: {
 
   const handleAddItem = useCallback((v: ProductVariant) => {
     pos.addItem(v);
-    if (settings.clearSearchOnAdd) {
-      pos.setSearch('');
-      searchRef.current?.focus();
-    }
-  }, [pos, settings.clearSearchOnAdd]);
+    // Auto-select + scroll to added item so user can immediately set qty via *<digits> Enter
+    const items = useCartStore.getState().items;
+    const added = items.find(i => i.variant_id === v.id);
+    if (added) setSelectedCartItemId(added.id);
+    // Keep grid highlight on the added product (allVariants if search will clear, else filteredVariants)
+    const idx = (settings.clearSearchOnAdd ? allVariants : filteredVariants).findIndex(fv => fv.id === v.id);
+    if (idx >= 0) setHighlightedIndex(idx);
+    toast.success(v.product?.name ?? v.name ?? 'تمت الإضافة', {
+      id: 'pos-last-added',
+      duration: 1500,
+    });
+    if (settings.clearSearchOnAdd) pos.setSearch('');
+    // Focus search AFTER scrollToItemId's double-RAF cart-row focus finishes
+    requestAnimationFrame(() => {
+      if (added) cartApiRef.current?.scrollToItemId(added.id);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => searchRef.current?.focus());
+        });
+      });
+    });
+  }, [pos, settings, allVariants, filteredVariants]);
 
   const handleArrowUp = useCallback(() => {
     setHighlightedIndex(prev => prev > 0 ? prev - 1 : filteredVariants.length - 1);
@@ -1059,12 +1136,29 @@ const handleCompleteSale = useCallback(async (params: {
     setHighlightedIndex(prev => prev < filteredVariants.length - 1 ? prev + 1 : 0);
   }, [filteredVariants.length]);
 
-  const handleEnterHighlighted = useCallback(() => {
-    const v = filteredVariants[highlightedIndex];
-    if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending)) {
-      handleAddItem(v);
+  const handleEnter = useCallback(() => {
+    // Qty command: *<digits> on Enter sets qty of selected cart row
+    if (selectedCartItemId) {
+      const qtyMatch = pos.searchQuery.trim().match(/^\*(\d+)$/);
+      if (qtyMatch) {
+        const qty = parseInt(qtyMatch[1], 10);
+        if (qty > 0) { pos.updateQty(selectedCartItemId, qty); pos.setSearch(''); }
+        return;
+      }
     }
-  }, [filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
+    // *<digits> mode but no selected item → nothing
+    if (/^\*\d*$/.test(pos.searchQuery.trim())) return;
+    // Normal: add highlighted (keyboardNav) or first result
+    if (settings.keyboardNav) {
+      const v = filteredVariants[highlightedIndex];
+      if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending))
+        handleAddItem(v);
+    } else {
+      const first = filteredVariants[0];
+      if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending))
+        handleAddItem(first);
+    }
+  }, [pos.searchQuery, selectedCartItemId, pos, settings.keyboardNav, filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
 
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -1164,7 +1258,7 @@ const handleCompleteSale = useCallback(async (params: {
             onFilter={() => setShowFilter(s => !s)} filterActive={filterActive}
             inputRef={searchRef} sortBy={sortBy} onSort={setSortBy}
             resultsCount={filteredVariants.length}
-            onEnterFirst={settings.keyboardNav ? handleEnterHighlighted : () => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) handleAddItem(first); }}
+            onEnterFirst={handleEnter}
             highlightedIndex={highlightedIndex}
             onArrowUp={handleArrowUp}
             onArrowDown={handleArrowDown}
@@ -1197,6 +1291,7 @@ const handleCompleteSale = useCallback(async (params: {
 
         {/* ✅ ProfessionalCart مع onDiscountAmount */}
         <ProfessionalCart
+          ref={cartApiRef}
           items={pos.items} totals={pos.totals} client={pos.client} customers={customers}
           note={cartNote} selectedItemId={selectedCartItemId}
           onSelectItem={setSelectedCartItemId}
@@ -1296,18 +1391,16 @@ const handleCompleteSale = useCallback(async (params: {
             item={pos.items.find(i => i.id === selectedCartItemId)!}
             onClose={() => {
               setModal('none');
-              requestAnimationFrame(() => {
-                const cr = document.querySelector<HTMLElement>('.cr.sel');
-                cr?.focus();
-              });
+              if (selectedCartItemId) {
+                requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(selectedCartItemId));
+              }
             }}
             onConfirm={qty => {
               if (selectedCartItemId) pos.updateQty(selectedCartItemId, qty);
               setModal('none');
-              requestAnimationFrame(() => {
-                const cr = document.querySelector<HTMLElement>('.cr.sel');
-                cr?.focus();
-              });
+              if (selectedCartItemId) {
+                requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(selectedCartItemId));
+              }
             }}
           />
         </Suspense>
@@ -1381,6 +1474,7 @@ const handleCompleteSale = useCallback(async (params: {
         toastOptions={{ style: { fontFamily: 'Tajawal, sans-serif', fontSize: 14 } }}
       />
       <ConfirmDialog {...clearCartConfirm.confirmDialogProps} />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

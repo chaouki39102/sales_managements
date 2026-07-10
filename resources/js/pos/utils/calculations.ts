@@ -30,6 +30,17 @@ export function calcFiscalStamp(totalTtc: number): number {
   return Math.round(Math.max(FISCAL_STAMP_MIN, Math.min(calculated, FISCAL_STAMP_MAX)) * 100) / 100;
 }
 
+/**
+ * Calc compounded discount percentage (item discount + invoice discount stacked multiplicatively).
+ * Used by both calcTotals (display) and handleCompleteSale (save) to guarantee identical totals.
+ * Formula: 1 - (1 - itemDisc%) × (1 - invDisc%)
+ */
+export function calcCompoundedDiscount(itemDiscPct: number, invDiscPct: number): number {
+  return invDiscPct > 0
+    ? 100 - (100 - itemDiscPct) * (100 - invDiscPct) / 100
+    : itemDiscPct;
+}
+
 /** حساب مجاميع العربة */
 export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStampEnabled = true): CartTotals {
   let totalHt       = 0;
@@ -44,8 +55,10 @@ export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStam
     itemsCount    += item.quantity;
   }
 
+  // No intermediate rounding — must match handleCompleteSale's compounded-discount math
+  // exactly so the displayed total always equals the saved total (no 1-cent gaps).
   const invoiceDiscountAmount = totalHt > 0
-    ? Math.round(totalHt * invoiceDiscountPct / 100 * 100) / 100
+    ? totalHt * invoiceDiscountPct / 100
     : 0;
   const adjTotalHt  = totalHt - invoiceDiscountAmount;
   const adjTotalTva = totalHt > 0

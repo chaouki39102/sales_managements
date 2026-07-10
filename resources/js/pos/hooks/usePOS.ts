@@ -42,7 +42,7 @@ export function usePOS(fiscalStampEnabled = true) {
     });
   }, [items, totals, client, clearCart]);
 
-  return {
+  return useMemo(() => ({
     heldCarts, holdCart, restoreCart, deleteHeldCart,
 
     searchQuery, selectedCategory, paymentModalOpen,
@@ -53,5 +53,14 @@ export function usePOS(fiscalStampEnabled = true) {
     updateDiscount, updateDiscountAmount, updatePrice,
     clearCart, setClient, setInvoiceDiscountPct,
     totals,
-  };
+  }), [
+    heldCarts, holdCart, restoreCart, deleteHeldCart,
+    searchQuery, selectedCategory, paymentModalOpen,
+    setSearch, setCategory, openPayment, closePayment,
+    items, client, invoiceDiscountPct, payments,
+    addItem, removeItem, updateQty,
+    updateDiscount, updateDiscountAmount, updatePrice,
+    clearCart, setClient, setInvoiceDiscountPct,
+    totals,
+  ]);
 }

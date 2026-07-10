@@ -908,6 +908,8 @@ import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fisca
 import { documentsApi }       from '@/lib/api/endpoints/documents';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { useDebounce }                     from '@/hooks/useDebounce';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ui';
 
 import {
   calcFiscalStamp, formatDZD, htToTtc, ttcToHt, calcMargin,
@@ -932,7 +934,8 @@ import ProductSearchBar         from '@/pos/components/ProductSearchBar';
 import FilterPanel              from '@/pos/components/FilterPanel';
 import CategoryTabs             from '@/pos/components/CategoryTabs';
 import ProductGrid              from '@/pos/components/ProductGrid';
-import ProfessionalCart         from '@/pos/components/ProfessionalCart';
+import ProfessionalCart, { type ProfessionalCartHandle } from '@/pos/components/ProfessionalCart';
+import PanelResizer             from '@/pos/components/PanelResizer';
 import {
   useCurrentPosSession,
   useOpenSession,
@@ -945,6 +948,7 @@ const ProfessionalPaymentModal = React.lazy(() => import('@/pos/components/Profe
 const HeldCartsModal           = React.lazy(() => import('@/pos/components/HeldCartsModal'));
 const ProfessionalReceipt      = React.lazy(() => import('@/pos/components/ProfessionalReceipt'));
 const ManualProductModal       = React.lazy(() => import('@/pos/components/ManualProductModal'));
+const QtySetModal              = React.lazy(() => import('@/pos/components/QtySetModal'));
 const OpenSessionModal         = React.lazy(() => import('@/pos/components/OpenSessionModal'));
 const CloseSessionModal        = React.lazy(() => import('@/pos/components/CloseSessionModal'));
 const SessionStatsModal        = React.lazy(() => import('@/pos/components/SessionStatsModal'));
@@ -1018,6 +1022,8 @@ function POSPage() {
   };
 
   const { settings, setSettings, resetSettings } = usePOSSettings(slug);
+  const clearCartConfirm = useConfirm();
+  const deleteConfirm    = useConfirm();
 
   // ═════════════════════════════════════════════════════════════════════
   // Clear cart on company switch — prevents stale product_id values from
@@ -1033,10 +1039,57 @@ function POSPage() {
     prevSlugRef.current = slug;
   }, [slug, pos]);
 
-  const [view,       setView]       = useState<ViewMode>('grid');
+  const [view,       setView]       = useState<ViewMode>(settings.defaultView);
   const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
+  useEffect(() => { setSettings({ defaultView: view }); }, [view, setSettings]);
   const [mobTab,     setMobTab]     = useState<'products' | 'cart'>('products');
   const [fullscreen, setFullscreen] = useState(false);
+  const [cartWidth, setCartWidth]   = useState(settings.cartWidth);
+  const cartWidthRef = useRef(cartWidth);
+  cartWidthRef.current = cartWidth;
+  const isDragging   = useRef(false);
+  const posLayoutRef = useRef<HTMLDivElement>(null);
+
+  const handleResizerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  useEffect(() => {
+    if (posLayoutRef.current) {
+      const max = posLayoutRef.current.getBoundingClientRect().width * 0.88;
+      const clamped = Math.max(280, Math.min(cartWidth, max));
+      if (clamped !== cartWidth) setCartWidth(clamped);
+      posLayoutRef.current.style.setProperty('--cart-width', `${clamped}px`);
+    }
+  }, [cartWidth]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !posLayoutRef.current) return;
+      const rect = posLayoutRef.current.getBoundingClientRect();
+      const dir = getComputedStyle(posLayoutRef.current).direction;
+      const width = dir === 'rtl' ? e.clientX - rect.left : rect.right - e.clientX;
+      const max = rect.width * 0.88;
+      const clamped = Math.max(280, Math.min(max, width));
+      setCartWidth(clamped);
+    };
+    const handleMouseUp = () => {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setSettings({ cartWidth: cartWidthRef.current });
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [setSettings]);
   const [showFilter, setShowFilter] = useState(false);
   const [modal,      setModal]      = useState<ActiveModal>('none');
   const [showSettings, setShowSettings] = useState(false);
@@ -1101,26 +1154,52 @@ function POSPage() {
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const searchRef    = useRef<HTMLInputElement>(null);
+  const cartRef      = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const cartApiRef   = useRef<ProfessionalCartHandle>(null);
   const barcodeTimer = useRef<ReturnType<typeof setTimeout>>();
+  // ── Auto-focus search + select last cart row on page mount / invoice reopen ──
+  useEffect(() => {
+    if (!currentSession?.id) return;
+    const t = setTimeout(() => {
+      searchRef.current?.focus();
+      const items = useCartStore.getState().items;
+      const last = items[items.length - 1];
+      if (last) setSelectedCartItemId(last.id);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [currentSession?.id]);
+
+  const isQtyCmd = /^\*\d*$/.test(pos.searchQuery.trim());
 
   const debouncedSearch = useDebounce(pos.searchQuery.trim(), 300);
   const isSearching     = debouncedSearch.length >= 2;
   const queryFamilyId   = pos.selectedCategory ?? undefined;
 
+  // Lock the query key on transition into qty-command mode so the product grid
+  // stays EXACTLY as it was (same search results, same UI) — no visual change.
+  const qtyLockRef = useRef<string | null>(null);
+  if (isQtyCmd && qtyLockRef.current === null) {
+    qtyLockRef.current = debouncedSearch;
+  } else if (!isQtyCmd) {
+    qtyLockRef.current = null;
+  }
+  const displaySearch = qtyLockRef.current ?? debouncedSearch;
+  const displaySearching = displaySearch.length >= 2;
+
   // ── Products query (all products) ───────────────────────────────────────
   const { data: productsRaw, isLoading: loadingAll } = useQuery({
     queryKey: [slug, 'products', 'pos', {
-      search: debouncedSearch, cat: pos.selectedCategory,
+      search: displaySearch, cat: pos.selectedCategory,
     }],
     queryFn: () => productsApi.list({
       per_page:  99999,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
-      search:    isSearching ? debouncedSearch : undefined,
+      search:    displaySearching ? displaySearch : undefined,
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       filter:    { active: 1 },
     }),
-    enabled:         !!slug,
+    enabled:         !!slug && !isQtyCmd,
     staleTime:       isSearching ? 2 * 60_000 : 5 * 60_000,
   });
 
@@ -1288,8 +1367,10 @@ function POSPage() {
   }, [allVariants, pos.selectedCategory, settings.hideOutOfStock, filterInStock, filterLowStock, filterMinPrice, filterMaxPrice, sortBy, allowNegSetting]);
 
   useEffect(() => {
-    setHighlightedIndex(0);
-  }, [filteredVariants.length, pos.searchQuery]);
+    if (isQtyCmd) return;
+    if (pos.searchQuery) { setHighlightedIndex(0); return; }
+    setHighlightedIndex(prev => Math.min(prev, filteredVariants.length - 1));
+  }, [filteredVariants.length, pos.searchQuery, sortBy, isQtyCmd]);
 
   const isEmpty = pos.items.length === 0;
 
@@ -1302,10 +1383,11 @@ function POSPage() {
   const [canUndoClear, setCanUndoClear] = useState(false);
   const undoClearTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const handleClearCart = useCallback((opts?: { skipConfirm?: boolean }) => {
+  const handleClearCart = useCallback(async (opts?: { skipConfirm?: boolean }) => {
     if (isEmpty) return;
-    if (settings.confirmOnClear && !opts?.skipConfirm
-        && !confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+    if (settings.confirmOnClear && !opts?.skipConfirm) {
+      if (!await clearCartConfirm.confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
+    }
 
     lastClearedSnapshotRef.current = {
       items:               [...pos.items],
@@ -1326,7 +1408,7 @@ function POSPage() {
     setEditingDocumentId(null);
     setEditingDocStatus(null);
     setEditingDocumentDate(null);
-  }, [settings.confirmOnClear, isEmpty, pos, cartNote]);
+  }, [settings.confirmOnClear, isEmpty, pos, cartNote, clearCartConfirm]);
 
   const clearCartSafe = handleClearCart;
 
@@ -1405,6 +1487,13 @@ function POSPage() {
       editingPrevBalanceRef.current = (doc as any)?.balance_data?.previous_balance;
       setShowSessionInvoices(false);
       toast.success(`تم فتح الفاتورة ${doc.document_number}`);
+      // Select last cart row + focus search so user can immediately type *<digits> Enter
+      requestAnimationFrame(() => {
+        searchRef.current?.focus();
+        const loaded = useCartStore.getState().items;
+        const last = loaded[loaded.length - 1];
+        if (last) setSelectedCartItemId(last.id);
+      });
     } catch {
       toast.error('فشل تحميل الفاتورة');
     }
@@ -1440,14 +1529,27 @@ function POSPage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const tag     = (e.target as HTMLElement)?.tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
       const buf = barcodeRef.current;
       if (e.key === 'Enter' && buf.length >= 4) {
         const variant = allVariants.find(v => v.barcode === buf);
-        if (variant && !isVariantOutOfStock(variant, allowNegSetting)) pos.addItem(variant);
+        if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
+          pos.addItem(variant);
+          const items = useCartStore.getState().items;
+          const added = items.find(i => i.variant_id === variant.id);
+          if (added) { setSelectedCartItemId(added.id); requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(added.id)); }
+          toast.success(variant.product?.name ?? variant.name ?? 'تمت الإضافة', {
+            id: 'pos-last-added',
+            duration: 1500,
+          });
+        }
         setBarcodeBuffer('');
         return;
       }
-      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      // Don't accumulate barcode buffer when typing in an input field
+      // (e.g. search, modal fields) — avoids swallowing Enter from ProductSearchBar
+      if (!inInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         setBarcodeBuffer(b => b + e.key);
         clearTimeout(barcodeTimer.current);
         barcodeTimer.current = setTimeout(() => setBarcodeBuffer(''), 300);
@@ -1492,6 +1594,7 @@ function POSPage() {
       }
 
       if (matchOverride(slugRef, 'searchFocus', e))  { e.preventDefault(); searchRef.current?.focus(); }
+      if (matchOverride(slugRef, 'focusCart', e))    { e.preventDefault(); if (document.activeElement === searchRef.current) { const lastItem = pos.items[pos.items.length - 1]; if (lastItem) { setSelectedCartItemId(lastItem.id); cartApiRef.current?.scrollToItemId(lastItem.id); } else { cartRef.current?.focus(); } } else { searchRef.current?.focus(); } }
       if (matchOverride(slugRef, 'payment', e))      { e.preventDefault(); if (!isEmpty) { setModal('payment'); } }
       if (matchOverride(slugRef, 'holdCart', e))     { e.preventDefault(); if (!isEmpty) pos.holdCart(); }
       if (matchOverride(slugRef, 'manualProduct', e)){ e.preventDefault(); setModal('manual'); }
@@ -1512,6 +1615,11 @@ function POSPage() {
       if (matchOverride(slugRef, 'returns', e))      { e.preventDefault(); setModal('returns'); }
       if (matchOverride(slugRef, 'openDrawer', e))   { e.preventDefault(); handleOpenDrawer(); }
       if (matchOverride(slugRef, 'undoClear', e))    { e.preventDefault(); handleUndoClear(); }
+      if (matchOverride(slugRef, 'newSale', e))      { e.preventDefault(); if (isEmpty) { pos.clearCart(); } else { pos.holdCart(); } }
+      if (matchOverride(slugRef, 'settings', e))     { e.preventDefault(); setShowSettings(true); }
+      if (matchOverride(slugRef, 'toggleQuickbar', e)) { e.preventDefault(); handleToggleQuickbar(); }
+      if (matchOverride(slugRef, 'kioskMode', e))    { e.preventDefault(); navigate('/pos/kiosk'); }
+      if (matchOverride(slugRef, 'closeSession', e)) { e.preventDefault(); setShowCloseSession(true); }
 
       if (!inInput) {
         if (matchOverride(slugRef, 'gridView', e))   { e.preventDefault(); setView('grid'); }
@@ -1532,21 +1640,66 @@ function POSPage() {
         e.preventDefault();
       }
       if (!inInput) {
+        const inCart = cartRef.current?.contains(document.activeElement);
         const lastItem = pos.items[pos.items.length - 1];
-        if (matchOverride(slugRef, 'qtyUp', e)   && lastItem)                          { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity + 1); }
-        if (matchOverride(slugRef, 'qtyDown', e) && lastItem && lastItem.quantity > 1) { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity - 1); }
-        if (matchOverride(slugRef, 'deleteItem', e) && selectedCartItemId)             { e.preventDefault(); pos.removeItem(selectedCartItemId); setSelectedCartItemId(null); }
+        if (matchOverride(slugRef, 'qtyUp', e)   && lastItem && !inCart)                          { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity + 1); }
+        if (matchOverride(slugRef, 'qtyDown', e) && lastItem && lastItem.quantity > 1 && !inCart) { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity - 1); }
+        if (matchOverride(slugRef, 'deleteItem', e) && selectedCartItemId) {
+          e.preventDefault();
+          const id = selectedCartItemId;
+          const name = pos.items.find(i => i.id === id)?.product_name ?? '';
+          deleteConfirm.confirm(`هل تريد حذف "${name}" من السلة؟`, {
+            title: 'حذف صنف',
+            variant: 'danger',
+            confirmText: 'حذف',
+            cancelText: 'إلغاء',
+          }).then(ok => { if (ok) { pos.removeItem(id); setSelectedCartItemId(null); } });
+        }
       }
       if (matchOverride(slugRef, 'escape', e)) {
         if (modal !== 'none')                 setModal('none');
         else if (showFilter)                  setShowFilter(false);
         else if (!inInput && pos.searchQuery) pos.setSearch('');
       }
+
+      // ── Cart row keyboard controls ─────────────────────────────────────
+      if (!inInput && selectedCartItemId) {
+        if (e.ctrlKey && e.key === '*') {
+          e.preventDefault();
+          setModal('qty');
+          return;
+        }
+        const isPlus  = e.key === 'Enter' || (e.ctrlKey && (e.key === '+' || e.code === 'Equal')) || e.code === 'NumpadAdd';
+        const isMinus = (e.ctrlKey && e.key === '-') || e.code === 'NumpadSubtract';
+        if (isPlus) {
+          e.preventDefault();
+          const item = pos.items.find(i => i.id === selectedCartItemId);
+          if (item) pos.updateQty(item.id, item.quantity + 1);
+        } else if (isMinus) {
+          e.preventDefault();
+          const item = pos.items.find(i => i.id === selectedCartItemId);
+          if (item && item.quantity > 1) pos.updateQty(item.id, item.quantity - 1);
+        }
+      }
+
+      // ── Arrow keys navigate cart rows (via cartApiRef) ─────────────────
+      if (!inInput && cartApiRef.current && selectedCartItemId && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        const curIdx = pos.items.findIndex(i => i.id === selectedCartItemId);
+        if (curIdx >= 0) {
+          e.preventDefault();
+          const nextIdx = e.key === 'ArrowDown' ? curIdx + 1 : curIdx - 1;
+          if (nextIdx >= 0 && nextIdx < pos.items.length) {
+            const nextItem = pos.items[nextIdx];
+            setSelectedCartItemId(nextItem.id);
+            cartApiRef.current.scrollToItemId(nextItem.id);
+          }
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [slug, pos, isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal,
-      families, selectedCartItemId, toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear]);
+      families, selectedCartItemId, toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear, handleToggleQuickbar]);
 
   // ── Price Level ────────────────────────────────────────────────────────────
   const applyPriceLevel = useCallback((plId: number | null) => {
@@ -1769,7 +1922,8 @@ const handleCompleteSale = useCallback(async (params: {
           change:    invoiceChange,
           remaining: invoiceRemaining,
         },
-        docNum: res.document_number,
+        docNumber: res.document_number,
+        docDate: new Date().toISOString().slice(0, 10),
         client: currentClient,
         payments: params.payments?.filter(p => p.amount > 0).map(p => ({
           paymentModeId: p.paymentModeId, amount: p.amount,
@@ -1835,11 +1989,28 @@ const handleCompleteSale = useCallback(async (params: {
 
   const handleAddItem = useCallback((v: ProductVariant) => {
     pos.addItem(v);
-    if (settings.clearSearchOnAdd) {
-      pos.setSearch('');
-      searchRef.current?.focus();
-    }
-  }, [pos, settings.clearSearchOnAdd]);
+    // Auto-select + scroll to added item so user can immediately set qty via *<digits> Enter
+    const items = useCartStore.getState().items;
+    const added = items.find(i => i.variant_id === v.id);
+    if (added) setSelectedCartItemId(added.id);
+    // Keep grid highlight on the added product (allVariants if search will clear, else filteredVariants)
+    const idx = (settings.clearSearchOnAdd ? allVariants : filteredVariants).findIndex(fv => fv.id === v.id);
+    if (idx >= 0) setHighlightedIndex(idx);
+    toast.success(v.product?.name ?? v.name ?? 'تمت الإضافة', {
+      id: 'pos-last-added',
+      duration: 1500,
+    });
+    if (settings.clearSearchOnAdd) pos.setSearch('');
+    // Focus search AFTER scrollToItemId's double-RAF cart-row focus finishes
+    requestAnimationFrame(() => {
+      if (added) cartApiRef.current?.scrollToItemId(added.id);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => searchRef.current?.focus());
+        });
+      });
+    });
+  }, [pos, settings, allVariants, filteredVariants]);
 
   const handleArrowUp = useCallback(() => {
     setHighlightedIndex(prev => prev > 0 ? prev - 1 : filteredVariants.length - 1);
@@ -1849,12 +2020,29 @@ const handleCompleteSale = useCallback(async (params: {
     setHighlightedIndex(prev => prev < filteredVariants.length - 1 ? prev + 1 : 0);
   }, [filteredVariants.length]);
 
-  const handleEnterHighlighted = useCallback(() => {
-    const v = filteredVariants[highlightedIndex];
-    if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending)) {
-      handleAddItem(v);
+  const handleEnter = useCallback(() => {
+    // Qty command: *<digits> on Enter sets qty of selected cart row
+    if (selectedCartItemId) {
+      const qtyMatch = pos.searchQuery.trim().match(/^\*(\d+)$/);
+      if (qtyMatch) {
+        const qty = parseInt(qtyMatch[1], 10);
+        if (qty > 0) { pos.updateQty(selectedCartItemId, qty); pos.setSearch(''); }
+        return;
+      }
     }
-  }, [filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
+    // *<digits> mode but no selected item → nothing
+    if (/^\*\d*$/.test(pos.searchQuery.trim())) return;
+    // Normal: add highlighted (keyboardNav) or first result
+    if (settings.keyboardNav) {
+      const v = filteredVariants[highlightedIndex];
+      if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending))
+        handleAddItem(v);
+    } else {
+      const first = filteredVariants[0];
+      if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending))
+        handleAddItem(first);
+    }
+  }, [pos.searchQuery, selectedCartItemId, pos, settings.keyboardNav, filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
 
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -1902,6 +2090,8 @@ const handleCompleteSale = useCallback(async (params: {
         totals={pos.totals}
         totalTtcFinal={adjustedTotalTtcFinal}
         slug={slug}
+        priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
+        onPriceLevelChange={applyPriceLevel}
         onHeld={() => setModal('held')}
         onNewSale={() => isEmpty ? pos.clearCart() : pos.holdCart()}
         onManual={() => setModal('manual')}
@@ -1940,7 +2130,10 @@ const handleCompleteSale = useCallback(async (params: {
         isEmpty={isEmpty} onSell={() => setModal('payment')}
       />
 
-      <div className={`pos-layout ${mobTab === 'cart' ? 'mob-show-cart' : ''}`}>
+      <div
+        ref={posLayoutRef}
+        className={`pos-layout ${mobTab === 'cart' ? 'mob-show-cart' : ''}`}
+      >
         <div className="pos-left">
           <ProductSearchBar
             query={pos.searchQuery} onQuery={pos.setSearch}
@@ -1949,7 +2142,7 @@ const handleCompleteSale = useCallback(async (params: {
             onFilter={() => setShowFilter(s => !s)} filterActive={filterActive}
             inputRef={searchRef} sortBy={sortBy} onSort={setSortBy}
             resultsCount={filteredVariants.length}
-            onEnterFirst={settings.keyboardNav ? handleEnterHighlighted : () => { const first = filteredVariants[0]; if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) handleAddItem(first); }}
+            onEnterFirst={handleEnter}
             highlightedIndex={highlightedIndex}
             onArrowUp={handleArrowUp}
             onArrowDown={handleArrowDown}
@@ -1977,12 +2170,13 @@ const handleCompleteSale = useCallback(async (params: {
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
             stockPending={stockPending}
           />
+          <PanelResizer onMouseDown={handleResizerMouseDown} />
         </div>
 
         {/* ✅ ProfessionalCart مع onDiscountAmount */}
         <ProfessionalCart
+          ref={cartApiRef}
           items={pos.items} totals={pos.totals} client={pos.client} customers={customers}
-          priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
           note={cartNote} selectedItemId={selectedCartItemId}
           onSelectItem={setSelectedCartItemId}
           onQty={pos.updateQty}
@@ -1990,7 +2184,7 @@ const handleCompleteSale = useCallback(async (params: {
           onDiscountAmount={pos.updateDiscountAmount}          // ✅ جديد
           onPrice={pos.updatePrice}
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
-          onSetClient={pos.setClient} onPriceLevelChange={applyPriceLevel}
+          onSetClient={pos.setClient}
           onNoteChange={setCartNote} onHold={pos.holdCart}
           onSell={() => setModal('payment')} onClear={handleClearCart} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
@@ -2013,6 +2207,7 @@ const handleCompleteSale = useCallback(async (params: {
           canUndoClear={canUndoClear}
           clientBalance={clientBalance?.current_balance}
           slug={slug}
+          cartRef={cartRef}
         />
       </div>
 
@@ -2054,7 +2249,7 @@ const handleCompleteSale = useCallback(async (params: {
             template={template}
             company={companyData}
             source={receiptSource}
-            docNumber={receiptSnapshot.docNum}
+            docNumber={receiptSnapshot.docNumber}
             onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
             onPrint={() => { handlePrintDirect(receiptSnapshot); }}
             onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
@@ -2069,6 +2264,27 @@ const handleCompleteSale = useCallback(async (params: {
             onAdd={(name, priceTtc, qty, tvaRate) => {
               pos.addItem(makeFakeVariant(name, ttcToHt(priceTtc, tvaRate), tvaRate), qty);
               setModal('none');
+            }}
+          />
+        </Suspense>
+      )}
+
+      {modal === 'qty' && selectedCartItemId && (
+        <Suspense fallback={null}>
+          <QtySetModal
+            item={pos.items.find(i => i.id === selectedCartItemId)!}
+            onClose={() => {
+              setModal('none');
+              if (selectedCartItemId) {
+                requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(selectedCartItemId));
+              }
+            }}
+            onConfirm={qty => {
+              if (selectedCartItemId) pos.updateQty(selectedCartItemId, qty);
+              setModal('none');
+              if (selectedCartItemId) {
+                requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(selectedCartItemId));
+              }
             }}
           />
         </Suspense>
@@ -2141,6 +2357,8 @@ const handleCompleteSale = useCallback(async (params: {
       <Toaster position="top-left" richColors closeButton
         toastOptions={{ style: { fontFamily: 'Tajawal, sans-serif', fontSize: 14 } }}
       />
+      <ConfirmDialog {...clearCartConfirm.confirmDialogProps} />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }
@@ -2373,7 +2591,7 @@ export default function PosSessionsPage() {
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { CartItem } from '@/types';
-import { formatDZD } from '../utils/calculations';
+import { formatDZD, ttcToHt } from '../utils/calculations';
 
 interface CartRowProps {
   item:             CartItem;
@@ -2385,6 +2603,12 @@ interface CartRowProps {
   onDiscountAmount: (amount: number) => void;
   onPrice:          (price: number) => void;
   onRemove:         () => void;
+  /** 'compact' يعرض السلة بصف واحد مصغّر لكل صنف (المزيد من المنتجات
+   *  مرئية دفعة واحدة)، 'comfortable' هو التصميم الافتراضي الحالي. */
+  density?:         'comfortable' | 'compact';
+  /** يُستدعى بعنصر DOM الجذري للصف — يُستخدم من ProfessionalCart
+   *  لبناء خريطة id→عنصر تُمكّن التمرير/التركيز على صف معيّن برمجياً. */
+  registerNode?:    (id: string, el: HTMLDivElement | null) => void;
 }
 
 type DiscMode  = 'pct' | 'amount';
@@ -2393,7 +2617,9 @@ type PopupType = 'disc' | 'price' | null;
 export default function CartRow({
   item, idx, isSelected, onSelect,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
+  density = 'comfortable', registerNode,
 }: CartRowProps) {
+  const compact = density === 'compact';
   const [popup,      setPopup]      = useState<PopupType>(null);
   const [editQty,    setEditQty]    = useState(false);
   const [discMode,   setDiscMode]   = useState<DiscMode>('pct');
@@ -2438,12 +2664,15 @@ export default function CartRow({
     setPopup(p => p === 'disc' ? null : 'disc');
   }, [discMode, item.discount_percentage, item.discount_amount]);
 
+  const tvaRate = item.tva_rate;
+
   // ── فتح popup السعر ───────────────────────────────────────────────────────
   const openPrice = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setPriceVal(item.unit_price_ht.toFixed(2));
+    const ttc = item.unit_price_ht * (1 + tvaRate / 100);
+    setPriceVal(ttc.toFixed(2));
     setPopup(p => p === 'price' ? null : 'price');
-  }, [item.unit_price_ht]);
+  }, [item.unit_price_ht, tvaRate]);
 
   // ── Commit ────────────────────────────────────────────────────────────────
   const commitDisc = () => {
@@ -2457,7 +2686,7 @@ export default function CartRow({
 
   const commitPrice = () => {
     const n = parseFloat(priceVal);
-    if (!isNaN(n) && n >= 0) onPrice(n);
+    if (!isNaN(n) && n > 0) onPrice(ttcToHt(n, tvaRate));
     setPopup(null);
   };
 
@@ -2477,12 +2706,11 @@ export default function CartRow({
       ? `-${formatDZD(item.discount_amount)}`
       : null;
 
-  const tvaRate = item.tva_rate;
-
   return (
     <div
-      ref={rowRef}
-      className={`cr ${isSelected ? 'sel' : ''} ${hasDisc ? 'has-disc' : ''} ${popup ? 'cr--popup-open' : ''}`}
+      ref={el => { rowRef.current = el; registerNode?.(item.id, el); }}
+      tabIndex={-1}
+      className={`cr ${isSelected ? 'sel' : ''} ${hasDisc ? 'has-disc' : ''} ${popup ? 'cr--popup-open' : ''} ${compact ? 'cr--compact' : ''}`}
       onClick={onSelect}
     >
       {/* شريط اللون الجانبي */}
@@ -2507,13 +2735,13 @@ export default function CartRow({
           <button
             className={`cr-price ${popup === 'price' ? 'cr-price--active' : ''}`}
             onClick={openPrice}
-            title="انقر لتعديل السعر HT"
+            title="انقر لتعديل السعر TTC"
             type="button"
           >
             <span className="cr-price-num">
-              {item.unit_price_ht.toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
+              {(item.unit_price_ht * (1 + tvaRate / 100)).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
             </span>
-            <span className="cr-price-unit">HT</span>
+            <span className="cr-price-unit">TTC</span>
             <span className="cr-price-edit-ic">✎</span>
           </button>
 
@@ -2644,7 +2872,7 @@ export default function CartRow({
         {popup === 'price' && (
           <div className="cr-popup cr-popup--price" onClick={e => e.stopPropagation()}>
             <div className="cr-popup-arrow" />
-            <div className="cr-popup-label">سعر البيع HT</div>
+            <div className="cr-popup-label">سعر البيع TTC</div>
             <div className="cr-popup-inp-row">
               <input
                 ref={priceInpRef}
@@ -2664,7 +2892,7 @@ export default function CartRow({
             </div>
             {priceVal && parseFloat(priceVal) > 0 && (
               <div className="cr-popup-preview">
-                TTC: <strong>{(parseFloat(priceVal) * (1 + tvaRate / 100)).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })} دج</strong>
+                HT: <strong>{ttcToHt(parseFloat(priceVal), tvaRate).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })} دج</strong>
               </div>
             )}
             <div className="cr-popup-actions">
@@ -2762,6 +2990,7 @@ export default function CartRow({
     </div>
   );
 }
+
 ```
 
 ## FILE: resources/js/pos/components/CategoryTabs.tsx
@@ -4035,6 +4264,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
         { action: 'heldCarts', defaultKey: 'F7', desc: 'الفواتير المعلقة' },
         { action: 'preview', defaultKey: 'F9', desc: 'معاينة / طباعة' },
         { action: 'clearCart', defaultKey: 'F12', desc: 'مسح السلة' },
+        { action: 'newSale', defaultKey: '—', desc: 'فاتورة جديدة' },
       ],
     },
     {
@@ -4047,6 +4277,10 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
         { action: 'fullscreen', defaultKey: 'F11', desc: 'وضع الشاشة الكاملة' },
         { action: 'directPrint', defaultKey: 'Ctrl+P', desc: 'طباعة مباشرة' },
         { action: 'sessionInvoices', defaultKey: 'Ctrl+Shift+I', desc: 'فواتير الجلسة' },
+        { action: 'settings', defaultKey: '—', desc: 'إعدادات نقاط البيع' },
+        { action: 'toggleQuickbar', defaultKey: '—', desc: 'إظهار/إخفاء الشريط السريع' },
+        { action: 'kioskMode', defaultKey: '—', desc: 'وضع الكشك' },
+        { action: 'closeSession', defaultKey: '—', desc: 'إغلاق الجلسة' },
       ],
     },
     {
@@ -4056,20 +4290,30 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
         { action: 'quickSearch', defaultKey: 'Ctrl+F', desc: 'البحث السريع' },
         { action: 'gridView', defaultKey: 'Ctrl+ArrowUp', desc: 'عرض الشبكة' },
         { action: 'listView', defaultKey: 'Ctrl+ArrowDown', desc: 'عرض القائمة' },
-        { action: 'zoomIn', defaultKey: 'Ctrl+=', desc: 'تكبير الشبكة' },
-        { action: 'zoomOut', defaultKey: 'Ctrl+-', desc: 'تصغير الشبكة' },
+        { action: 'zoomIn', defaultKey: 'Ctrl+]', desc: 'تكبير الشبكة' },
+        { action: 'zoomOut', defaultKey: 'Ctrl+[', desc: 'تصغير الشبكة' },
         { action: 'quickCat', defaultKey: 'Alt+1..9', desc: 'تصنيف سريع' },
       ],
     },
     {
-      title: 'السلة والأصناف',
+      title: 'السلة',
       items: [
+        { action: 'focusCart', defaultKey: 'Ctrl+Space', desc: 'التركيز على السلة والتنقل بينها وبين البحث' },
         { action: 'qtyUp', defaultKey: 'NumpadAdd', desc: 'زيادة كمية آخر صنف' },
         { action: 'qtyDown', defaultKey: 'NumpadSubtract', desc: 'إنقاص كمية آخر صنف' },
-        { action: 'deleteItem', defaultKey: 'Delete', desc: 'حذف الصنف المحدد' },
-        { action: 'enterSearch', defaultKey: 'Enter', desc: 'إضافة أول نتيجة' },
+        { action: 'deleteItem', defaultKey: 'Delete', desc: 'حذف الصنف المحدد من السلة' },
+        { action: 'confirmPayment', defaultKey: 'Ctrl+Enter', desc: 'تأكيد الدفع وإتمام الفاتورة' },
+        { action: 'undoClear', defaultKey: 'Ctrl+Z', desc: 'تراجع عن مسح السلة' },
+        { action: 'qtyModal', defaultKey: 'Ctrl+*', desc: 'فتح مودال تعديل الكمية للصنف المحدد' },
+        { action: 'cartNavigate', defaultKey: '↑↓', desc: 'التنقل بين أصناف السلة' },
+      ],
+    },
+    {
+      title: 'إجراءات سريعة',
+      items: [
+        { action: 'enterSearch', defaultKey: 'Enter', desc: 'إضافة أول نتيجة بحث' },
         { action: 'escape', defaultKey: 'Escape', desc: 'إغلاق المودال / مسح البحث' },
-        { action: 'confirmPayment', defaultKey: 'Ctrl+Enter', desc: 'تأكيد الدفع' },
+        { action: 'searchQtyCmd', defaultKey: '*15', desc: 'ضبط كمية الصنف المحدد في السلة (اكتب * متبوعاً بالرقم)' },
       ],
     },
     {
@@ -5055,6 +5299,27 @@ export default function OpenSessionModal({
 
 ```
 
+## FILE: resources/js/pos/components/PanelResizer.tsx
+```
+import React from 'react';
+
+interface PanelResizerProps {
+  onMouseDown: (e: React.MouseEvent) => void;
+}
+
+export default function PanelResizer({ onMouseDown }: PanelResizerProps) {
+  return (
+    <div
+      className="pos-resizer"
+      onMouseDown={onMouseDown}
+    >
+      <div className="pos-resizer-line" />
+    </div>
+  );
+}
+
+```
+
 ## FILE: resources/js/pos/components/PosSessionsCards.tsx
 ```
 import Badge      from '@/components/ui/Badge';
@@ -5458,6 +5723,9 @@ import type { Warehouse, DocumentType } from '@/types';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Switch from '@/components/ui/Switch';
+import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
+import { ConfirmDialog } from '@/components/ui';
 
 interface POSSettingsModalProps {
   settings:      POSSettings;
@@ -5517,6 +5785,8 @@ export default function POSSettingsModal({
   const [activeTab, setActiveTab] = useState<Tab>('general');
   const [dirty,     setDirty]     = useState(false);
   const [showPin,   setShowPin]   = useState(false);
+  const deleteConfirm = useConfirm();
+  const notify = useNotification();
 
   const patch = (p: Partial<POSSettings>) => {
     setLocal(prev => ({ ...prev, ...p }));
@@ -5529,10 +5799,11 @@ export default function POSSettingsModal({
     onClose();
   };
 
-  const handleReset = () => {
-    if (!confirm('هل تريد إعادة ضبط كل الإعدادات للقيم الافتراضية؟')) return;
+  const handleReset = async () => {
+    if (!await deleteConfirm.confirm('هل تريد إعادة ضبط كل الإعدادات للقيم الافتراضية؟')) return;
     onReset();
     onClose();
+    notify.success('تم إعادة الضبط');
   };
 
   const invoiceTypes = documentTypes.filter(t =>
@@ -5896,6 +6167,7 @@ export default function POSSettingsModal({
       <div style={{ height: '55vh', overflowY: 'auto' }}>
         {renderTab()}
       </div>
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </Modal>
   );
 }
@@ -5904,8 +6176,9 @@ export default function POSSettingsModal({
 
 ## FILE: resources/js/pos/components/POSTopBar.tsx
 ```
-import React from 'react';
-import type { CartItem, CartTotals } from '@/types';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import type { CartItem, CartTotals, PriceLevel } from '@/types';
 import type { PosSession }           from '@/lib/api/endpoints/posSession';
 import { formatDZD }                 from '../utils/calculations';
 import { getEffectiveShortcut, KB_DEFAULTS, useKbOverrides } from '../hooks/useKeyboardMap';
@@ -5921,6 +6194,9 @@ interface POSTopBarProps {
   totals:          CartTotals;
   totalTtcFinal:   number;
   slug:            string | null;
+  priceLevels:          PriceLevel[];
+  selectedPriceLevelId: number | null;
+  onPriceLevelChange:   (plId: number | null) => void;
   onHeld:          () => void;
   onNewSale:       () => void;
   onManual:        () => void;
@@ -5940,6 +6216,7 @@ export default function POSTopBar({
   session, heldCount, avgMargin,
   isEmpty, isFullscreen, showQuickbar,
   items, totals, totalTtcFinal, slug,
+  priceLevels, selectedPriceLevelId, onPriceLevelChange,
   onHeld, onNewSale, onManual, onReceipt,
   onSession, onSessionInvoices, onFullscreen, onKbHelp,
   onToggleQuickbar, onReturn, onSettings, onKioskMode,
@@ -5950,6 +6227,37 @@ export default function POSTopBar({
   const netSales      = session?.net_sales      ?? 0;
   const overrides     = useKbOverrides(slug);
   const kb            = (action: string) => getEffectiveShortcut(slug, action) ?? '';
+
+  // ── قائمة التعريفة (تجزئة/نصف جملة/جملة...) — منقولة من السلة إلى الشريط
+  // العلوي كي تبقى واضحة ومتاحة دائماً دون أن تحجز مساحة دائمة من السلة.
+  // الـ portal يضمن ظهور القائمة خارج نطاق overflow-x:auto لـ pos-topbar
+  // الذي يقطع (clip) المحتوى المتجاوز لحدود الشريط حسب مواصفة CSS. ──
+  const [showTarifDrop, setShowTarifDrop] = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
+  const tarifRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const selectedTarifLabel = selectedPriceLevelId === null
+    ? 'عادي'
+    : (priceLevels.find(pl => pl.id === selectedPriceLevelId)?.name ?? 'عادي');
+
+  const openDrop = useCallback(() => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setDropPos({ top: r.bottom + 4, left: r.left });
+    }
+    setShowTarifDrop(true);
+  }, []);
+
+  useEffect(() => {
+    if (!showTarifDrop) return;
+    const h = (e: MouseEvent) => {
+      if (tarifRef.current && !tarifRef.current.contains(e.target as Node)) setShowTarifDrop(false);
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowTarifDrop(false); };
+    document.addEventListener('mousedown', h);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', h); document.removeEventListener('keydown', esc); };
+  }, [showTarifDrop]);
 
   return (
     <div className="pos-topbar">
@@ -6026,6 +6334,51 @@ export default function POSTopBar({
 
       <div className="pos-actions-row">
 
+        {priceLevels.length > 0 && (
+          <div className="tarif-wrap" ref={tarifRef}>
+            <button
+              ref={btnRef}
+              className={`btn btn-xs ${selectedPriceLevelId !== null ? 'btn-p' : ''}`}
+              onClick={() => { if (showTarifDrop) { setShowTarifDrop(false); } else { openDrop(); } }}
+              type="button"
+              title="تغيير تعريفة السعر (تجزئة / نصف جملة / جملة)"
+            >
+              <i className="ti ti-tag" />
+              <span className="tb-txt"> {selectedTarifLabel}</span>
+              <i className="ti ti-chevron-down" style={{ fontSize: 10, opacity: 0.6 }} />
+            </button>
+
+            {showTarifDrop && createPortal(
+              <div className="tarif-drop" style={{ position: 'fixed', top: dropPos.top, left: dropPos.left }}>
+                {priceLevels.map(pl => (
+                  <button
+                    key={pl.id}
+                    className={`cmode ${selectedPriceLevelId === pl.id ? 'on' : ''}`}
+                    onClick={() => { onPriceLevelChange(pl.id); setShowTarifDrop(false); }}
+                    title={pl.discount_percent ? `خصم ${pl.discount_percent}%` : undefined}
+                  >
+                    {pl.name}
+                    {pl.discount_percent
+                      ? <span className="cmode-disc">-{pl.discount_percent}%</span>
+                      : null
+                    }
+                  </button>
+                ))}
+                <button
+                  className={`cmode ${selectedPriceLevelId === null ? 'on' : ''}`}
+                  onClick={() => { onPriceLevelChange(null); setShowTarifDrop(false); }}
+                  title="السعر الافتراضي"
+                >
+                  عادي
+                </button>
+              </div>,
+              document.body
+            )}
+          </div>
+        )}
+
+        <span className="tb-sep" aria-hidden="true" />
+
         <button className="btn btn-xs" onClick={onNewSale} title={`بيع جديد / تعليق — ${kb('holdCart')}`}>
           <i className="ti ti-plus" />
           <span className="tb-txt"> جديد</span>
@@ -6099,15 +6452,20 @@ export default function POSTopBar({
 ```
 // pos/components/ProductCard.tsx
 //
-// ⚠️ ملاحظة تنظيف (راجع مراجعة صفحة POS):
-// هذه النسخة تحل محل ProductCard.tsx القديم الذي كان "كوداً ميتاً" —
-// كان يستخدم كلاسات .pc2 (من theme.css) بينما ProductGrid.tsx كان
-// يرسم البطاقة يدوياً بكلاسات .pcard-* (من pos.css) بدون استيراد هذا
-// الملف إطلاقاً. تم دمج نفس منطق .pcard-* هنا كي يصبح هذا الكومبوننت
-// هو المصدر الوحيد الفعلي المُستخدَم من ProductGrid (عرض grid فقط —
+// النسخة الفعلية الوحيدة المُستخدَمة من ProductGrid (عرض grid فقط —
 // عرض الجدول/القائمة list-view له بنية مختلفة تماماً ويبقى داخل
 // ProductGrid.tsx كجدول <table>).
-import React from 'react';
+//
+// تحديث "بطاقات احترافية + صور متجاوبة بمقاس موحّد":
+// - ارتفاع صورة البطاقة أصبح ثابتاً وموحّداً عبر متغيّر CSS
+//   (--pcard-img-h المضبوط في .pgrid/.pgrid--xs/--sm/--lg) بدل
+//   aspect-ratio المتغيّر، فلم تعد الصور تظهر بمقاسات متفاوتة
+//   بين البطاقات مهما اختلفت أبعاد الصورة الأصلية.
+// - object-fit: cover + object-position: center يضمنان قصّ الصورة
+//   بشكل متناسق دون تشويه.
+// - عند فشل تحميل رابط الصورة (رابط معطوب/404) نتراجع تلقائياً
+//   لعرض أيقونة العائلة بدل مربع مكسور.
+import React, { useState } from 'react';
 import type { ProductVariant, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
@@ -6154,6 +6512,10 @@ export default function ProductCard({
   const style = familyStyleFromName(v.product?.family?.name ?? '');
   const imageUrl = (v as unknown as { image_url?: string }).image_url;
 
+  // تراجع تلقائي لعرض الأيقونة عند فشل تحميل الصورة (رابط معطوب/404)
+  const [imgFailed, setImgFailed] = useState(false);
+  const showImage = Boolean(imageUrl) && !imgFailed;
+
   const handleClick = () => {
     if (!outStock) onAdd(v);
     onHighlight?.(idx);
@@ -6166,9 +6528,16 @@ export default function ProductCard({
       onClick={handleClick}
       title={v.product?.name}
     >
-      <div className="pcard-img" style={{ background: style.bg }}>
-        {imageUrl
-          ? <img src={imageUrl} alt={v.product?.name} loading="lazy" />
+      <div className="pcard-img" style={!showImage ? { background: style.bg } : undefined}>
+        {showImage
+          ? (
+            <img
+              src={imageUrl}
+              alt={v.product?.name}
+              loading="lazy"
+              onError={() => setImgFailed(true)}
+            />
+          )
           : <i className={`ti ${style.icon}`} style={{ color: style.color, fontSize: 22 }} />
         }
         {qtyInCart > 0 && <span className="pcard-in-cart">{qtyInCart}</span>}
@@ -6226,7 +6595,7 @@ export default function ProductCard({
 
 ## FILE: resources/js/pos/components/ProductGrid.tsx
 ```
-import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
@@ -6261,13 +6630,16 @@ function minCardWidth(gridSize: GridSize): number {
   }
 }
 
-/** ارتفاع الصف التقريبي حسب حجم الشبكة */
+/** ارتفاع الصف التقريبي حسب حجم الشبكة — تقدير أوّلي فقط قبل القياس
+ *  الفعلي؛ الارتفاع الحقيقي يُقاس ديناميكياً عبر measureElement أدناه
+ *  فلا داعي لمطابقته بدقة (يمنع التداخل/الفراغات الزائدة عند تبديل
+ *  الحجم s/m/l/xl). */
 function rowEstimate(gridSize: GridSize): number {
   switch (gridSize) {
-    case 'xs': return 110;
-    case 'sm': return 150;
-    case 'md': return 190;
-    case 'lg': return 240;
+    case 'xs': return 150;
+    case 'sm': return 195;
+    case 'md': return 255;
+    case 'lg': return 300;
   }
 }
 
@@ -6286,20 +6658,26 @@ export default function ProductGrid({
   const [columns, setColumns] = useState(4);
   const MAX_COLS: Record<GridSize, number> = { xs: 8, sm: 6, md: 5, lg: 4 };
 
-  useEffect(() => {
-    if (view !== 'grid') return;
-    const el = gridWrapRef.current;
-    if (!el) return;
-    const minW = minCardWidth(gridSize);
-    const calc = () => {
-      const w = el.clientWidth;
-      setColumns(Math.min(MAX_COLS[gridSize], Math.max(1, Math.floor(w / minW))));
-    };
-    calc();
-    const obs = new ResizeObserver(calc);
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [view, gridSize]);
+  // نفس منطق useLayoutEffect أعلاه: نحسب عدد الأعمدة الأولي للحجم
+  // الجديد *قبل* الرسم لتفادي أي فلاش عند تبديل S/M/L/XL. تحديثات
+  // ResizeObserver اللاحقة (أثناء تغيير حجم النافذة الفعلي) تبقى غير
+  // متزامنة بطبيعتها من المتصفح، وهذا مقبول لأنها حالة مختلفة (تغيير
+  // حجم النافذة، وليس تبديل نمط العرض).
+  useLayoutEffect(() => {
+  if (view !== 'grid') return;
+  const el = gridWrapRef.current;
+  if (!el) return;
+  const minW = minCardWidth(gridSize);
+  const calc = () => {
+    const w = el.clientWidth;
+    if (w <= 0) return; // تجاهل أي قراءة عرض صفرية مؤقتة (تحدث عند إعادة تركيب العنصر بعد كل بحث)
+    setColumns(Math.min(MAX_COLS[gridSize], Math.max(1, Math.floor(w / minW))));
+  };
+  calc();
+  const obs = new ResizeObserver(calc);
+  obs.observe(el);
+  return () => obs.disconnect();
+}, [view, gridSize, loading]); // ← أضفنا loading
 
   // Group into rows (keep original index for keyboard nav)
   type RowItem = { variant: ProductVariant; idx: number };
@@ -6319,7 +6697,10 @@ export default function ProductGrid({
   const rowCount = rows.length;
   const rowH = rowEstimate(gridSize);
 
-  // Virtualizer
+  // Virtualizer — estimateSize is only the *initial* guess; measureElement
+  // (passed as a ref on each row below) makes react-virtual re-measure the
+  // real rendered height of every row, so rows never overlap and never
+  // leave oversized gaps, regardless of gridSize or content changes.
   const scrollRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
@@ -6328,14 +6709,31 @@ export default function ProductGrid({
     overscan: 3,
   });
 
+  // Re-measure everything whenever the size preset changes (image height,
+  // paddings, font sizes all change with gridSize) so stale measurements
+  // from a previous size never leak into the new layout.
+  // useLayoutEffect (وليس useEffect) عمداً: لازم نعيد القياس *قبل* ما
+  // يرسم المتصفح الإطار (paint)، وإلا يشوف المستخدم لحظة (frame واحد
+  // أو أكثر) بارتفاعات صفوف قديمة/متراكبة قبل ما تتصحح — وهذا بالضبط
+  // كان سبب "الفلاش" اللي يبان كخطأ حتى لو يتصحح لحاله بعدين.
+  // useLayoutEffect يشتغل بشكل متزامن (synchronous) بعد تحديث DOM
+  // مباشرة وقبل الرسم، فالمستخدم ما يشوف إلا الحالة الصحيحة النهائية.
+  useLayoutEffect(() => {
+    rowVirtualizer.measure();
+  }, [gridSize, columns, rowVirtualizer]);
+
   // Keyboard navigation scroll sync
   const prevHl = useRef<number | undefined>(undefined);
+  const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (view !== 'grid') return;
     if (highlightedIndex === undefined || highlightedIndex === prevHl.current) return;
     prevHl.current = highlightedIndex;
-    const rowIdx = Math.floor(highlightedIndex / columns);
-    rowVirtualizer.scrollToIndex(rowIdx, { align: 'nearest' });
+    if (view === 'grid') {
+      const rowIdx = Math.floor(highlightedIndex / columns);
+      rowVirtualizer.scrollToIndex(rowIdx, { align: 'nearest' });
+    } else if (view === 'list') {
+      listRef.current?.querySelector<HTMLElement>(`[data-hl-idx="${highlightedIndex}"]`)?.scrollIntoView({ block: 'nearest' });
+    }
   }, [highlightedIndex, columns, view, rowVirtualizer]);
 
   // ── Loading ──────────────────────────────────────────────────────────────
@@ -6366,7 +6764,7 @@ export default function ProductGrid({
   // ── List view (not virtualised — ~3 500 DOM nodes, acceptable) ──────────
   if (view === 'list') {
     return (
-      <div className="pos-grid-area">
+      <div className="pos-grid-area" ref={listRef}>
         <table className="pos-ptable">
           <thead>
             <tr>
@@ -6399,7 +6797,10 @@ export default function ProductGrid({
                   onDoubleClick={() => !outStock && onAdd(v)}
                 >
                   <td className="prow-name">
-                    <div className="prow-nm">{v.product?.name}</div>
+                    <div className="prow-name-inner">
+                      {inCart > 0 && <span className="prow-incart-qty">{inCart}</span>}
+                      <div className="prow-nm">{v.product?.name}</div>
+                    </div>
                     {v.barcode && <div className="prow-bc">{v.barcode}</div>}
                   </td>
                   <td className="prow-unit">{v.unit?.abbreviation ?? '—'}</td>
@@ -6438,8 +6839,32 @@ export default function ProductGrid({
   const gridMod = gridSize === 'xs' ? 'pgrid--xs' : gridSize === 'sm' ? 'pgrid--sm' : gridSize === 'lg' ? 'pgrid--lg' : '';
   const gap = gridSize === 'xs' ? 6 : gridSize === 'sm' ? 8 : gridSize === 'md' ? 10 : 12;
 
+  // عرض ثابت وموحّد لكل بطاقة = (100% - مسافات) / عدد الأعمدة.
+  // هذا يمنع تمدّد البطاقات لتملأ الصف عندما يحتوي الصف على عناصر
+  // أقل من عدد الأعمدة (مثال: منتج واحد فقط، أو صف أخير غير مكتمل) —
+  // فكل بطاقة تحافظ على نفس عرض بقية البطاقات في الشبكة دائماً.
+  const colBasis = `calc((100% - ${(columns - 1) * gap}px) / ${columns})`;
+
   return (
-    <div className={`pos-grid-area ${gridMod}`} ref={scrollRef} style={{ overflow: 'auto' }}>
+    // ملاحظة: 'pgrid' تُطبَّق دائماً (وليس فقط عند xs/sm/lg) لضمان أن
+    // --pcard-img-h معرّفة دوماً؛ سابقاً كانت تُطبَّق فقط كمعدِّل عند
+    // بعض الأحجام، فكان الحجم الافتراضي (md) بلا قيمة للمتغيّر وتنهار
+    // صورة البطاقة إلى ارتفاع صفري.
+    <div
+      // key={gridSize}: يجبر React على تفكيك وإعادة تركيب هذه الحاوية
+      // بالكامل (بدل تحديثها فقط) عند تبديل حجم الشبكة (S/M/L/XL).
+      // بدونها، كان react-virtual أحياناً يحتفظ بقياسات ارتفاع صفوف
+      // من الحجم القديم قبل أن تتم إعادة قياسها بالكامل عبر
+      // rowVirtualizer.measure()، فتظهر البطاقات متراكبة/متداخلة
+      // لحظة الانتقال بين نمطين مختلفين لهما نفس عدد الأعمدة لكن
+      // ارتفاع صف مختلف (مثل L→M). التكلفة الوحيدة: يفقد موضع
+      // التمرير عند تبديل الحجم، وهو مقبول لأنه فعل مقصود من المستخدم
+      // أصلاً يغيّر ترتيب/أبعاد كل العناصر بأي حال.
+      key={gridSize}
+      className={`pos-grid-area pgrid ${gridMod}`}
+      ref={scrollRef}
+      style={{ overflow: 'auto', display: 'block' }}
+    >
       <div ref={gridWrapRef} style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
         {rowVirtualizer.getVirtualItems().map(virtualRow => {
           const rowData = rows[virtualRow.index];
@@ -6447,6 +6872,8 @@ export default function ProductGrid({
           return (
             <div
               key={virtualRow.index}
+              data-index={virtualRow.index}
+              ref={rowVirtualizer.measureElement}
               style={{
                 position: 'absolute',
                 top: 0,
@@ -6460,7 +6887,10 @@ export default function ProductGrid({
               }}
             >
               {rowData.map(item => (
-                <div key={item.variant.id} style={{ flex: '1 1 0', minWidth: 0 }}>
+                <div
+                  key={item.variant.id}
+                  style={{ flex: `0 0 ${colBasis}`, maxWidth: colBasis, minWidth: 0 }}
+                >
                   <ProductCard
                     variant={item.variant}
                     idx={item.idx}
@@ -6670,8 +7100,9 @@ export default function ProductSearchBar({
 //      للاسترجاع. الآن onClear يحفظ نسخة تلقائياً (من POSPage) ويمكن
 //      استرجاعها بضغطة واحدة، أو Ctrl+Z.
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import type { CartItem, CartTotals, Party, PriceLevel } from '@/types';
+import React, { useState, useCallback, useEffect, useRef, useMemo, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import type { CartItem, CartTotals, Party } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getEffectiveShortcut, useKbOverrides } from '../hooks/useKeyboardMap';
 import CartRow from './CartRow';
@@ -6682,8 +7113,6 @@ interface ProfessionalCartProps {
   totals:               CartTotals;
   client:               Party | null;
   customers:            Party[];
-  priceLevels:          PriceLevel[];
-  selectedPriceLevelId: number | null;
   note:                 string;
   selectedItemId:       string | null;
   onSelectItem:         (id: string | null) => void;
@@ -6693,7 +7122,6 @@ interface ProfessionalCartProps {
   onPrice:              (id: string, price: number) => void;
   onRemove:             (id: string) => void;
   onSetClient:          (c: Party | null) => void;
-  onPriceLevelChange:   (plId: number | null) => void;
   onNoteChange:         (n: string) => void;
   onHold:               () => void;
   onSell:               () => void;
@@ -6708,26 +7136,154 @@ interface ProfessionalCartProps {
   canUndoClear:         boolean;
   clientBalance?:       number;
   slug?:                string | null;
+  cartRef?:             React.RefObject<HTMLDivElement>;
 }
 
-export default function ProfessionalCart({
-  items, totals, client, customers, priceLevels, selectedPriceLevelId,
+/** واجهة برمجية للتحكم بالسلة من المكوّن الأب (POSPage) — بديل عن querySelectorAll */
+export interface ProfessionalCartHandle {
+  /** تمرير السلة إلى موقع صنف معيّن وتركيزه */
+  scrollToItemId: (itemId: string) => void;
+}
+
+// كثافة عرض صفوف السلة — مفتاح حفظ محلي مستقل عن الشركة (تفضيل جهاز/كاشير)
+const CART_DENSITY_KEY = 'pos-cart-density';
+type CartDensity = 'comfortable' | 'compact';
+
+const CART_ZOOM_KEY = 'pos-cart-zoom';
+type CartZoom = 0.75 | 0.875 | 1 | 1.125 | 1.25;
+
+const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProps>(function ProfessionalCart({
+  items, totals, client, customers,
   note, selectedItemId, onSelectItem,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
-  onSetClient, onPriceLevelChange, onNoteChange,
+  onSetClient, onNoteChange,
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
-  onUndoClear, canUndoClear, clientBalance, slug,
-}: ProfessionalCartProps) {
+  onUndoClear, canUndoClear, clientBalance, slug, cartRef,
+}, ref) {
 
   const [showNote,         setShowNote]         = useState(false);
   const [showCustModal,    setShowCustModal]     = useState(false);
   const [invDiscMode,      setInvDiscMode]       = useState<'pct' | 'amount'>('pct');
   const [invDiscAmtVal,    setInvDiscAmtVal]     = useState('');
 
-  const isEmpty = !items.length;
+  // ── طيّ تفاصيل الحساب ─────────────────────────────────────────────────────
+  // افتراضياً مطوي (يظهر فقط سطر الإجمالي TTC) لتحرير مساحة رأسية دائمة
+  // لصالح قائمة الأصناف — التفاصيل (HT/TVA/الخصومات/رصيد الزبون) تظهر
+  // فقط عند الحاجة الفعلية (تعديل خصم الفاتورة، أو مراجعة قبل الدفع).
+  // الحالة محفوظة في localStorage لاستمرار التفضيل بين الجلسات.
+  const [showTotalsDetails, setShowTotalsDetails] = useState(() => {
+    try { return localStorage.getItem('pos-cart-totals-open') === '1'; }
+    catch { return false; }
+  });
+  const toggleTotals = useCallback(() => {
+    setShowTotalsDetails(prev => {
+      const next = !prev;
+      try { localStorage.setItem('pos-cart-totals-open', next ? '1' : '0'); } catch {}
+      return next;
+    });
+  }, []);
+
+  // ── كثافة عرض السلة (مريح / مضغوط) ────────────────────────────────────────
+  // مضغوط: صف واحد بارتفاع ~34px لكل صنف بدل ~70-90px، فيظهر عدد أكبر
+  // بكثير من المنتجات دفعة واحدة دون تمرير — مفيد جداً للفواتير الكبيرة.
+  //
+  // سلوك تلقائي ذكي: إذا لم يسبق للمستخدم اختيار الكثافة يدوياً (لا يوجد
+  // تفضيل محفوظ في localStorage)، تتحوّل الكثافة تلقائياً إلى "مضغوط"
+  // بمجرد أن يتجاوز عدد أصناف السلة 7، وترجع "مريح" عندما يقل العدد عن
+  // ذلك مجدداً. أما بمجرد أن يضغط المستخدم الزر مرة واحدة يدوياً، يُحفَظ
+  // اختياره ويُحترَم نهائياً (لا يُبدَّل تلقائياً بعد ذلك أبداً).
+  const manualDensityRef = useRef(false);
+  const [density, setDensityState] = useState<CartDensity>('comfortable');
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(CART_DENSITY_KEY);
+      if (v === 'compact' || v === 'comfortable') {
+        manualDensityRef.current = true;
+        setDensityState(v);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (manualDensityRef.current) return;
+    setDensityState(items.length >= 7 ? 'compact' : 'comfortable');
+  }, [items.length]);
+
+  const toggleDensity = useCallback(() => {
+    manualDensityRef.current = true;
+    setDensityState(prev => {
+      const next: CartDensity = prev === 'compact' ? 'comfortable' : 'compact';
+      try { localStorage.setItem(CART_DENSITY_KEY, next); } catch {}
+      return next;
+    });
+  }, []);
+
+  // ── تكبير/تصغير حجم النص وعرض الأسطر في السلة ────────────────────────────
+  // النطاق: 0.75 (صغير جداً) → 1.25 (كبير). القيمة الافتراضية 1 (عادي).
+  // يُطبق كـ CSS variable `--cart-zoom` على عنصر .pos-cart ويؤثر على
+  // font-size, padding, gap لكل العناصر الداخلية بنسبة الضرب.
+  const ZOOM_STEPS: CartZoom[] = [0.75, 0.875, 1, 1.125, 1.25];
+  const [cartZoom, setCartZoom] = useState<CartZoom>(() => {
+    try {
+      const v = parseFloat(localStorage.getItem(CART_ZOOM_KEY) ?? '');
+      return ZOOM_STEPS.includes(v as CartZoom) ? v as CartZoom : 1;
+    } catch { return 1; }
+  });
+  const saveZoom = useCallback((z: CartZoom) => {
+    setCartZoom(z);
+    try { localStorage.setItem(CART_ZOOM_KEY, String(z)); } catch {}
+  }, []);
+  const zoomIn = useCallback(() => {
+    const i = ZOOM_STEPS.indexOf(cartZoom);
+    if (i < ZOOM_STEPS.length - 1) saveZoom(ZOOM_STEPS[i + 1]);
+  }, [cartZoom, saveZoom]);
+  const zoomOut = useCallback(() => {
+    const i = ZOOM_STEPS.indexOf(cartZoom);
+    if (i > 0) saveZoom(ZOOM_STEPS[i - 1]);
+  }, [cartZoom, saveZoom]);
+
   const overrides = useKbOverrides(slug ?? null);
   const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
+
+  // ── افتراضية قائمة الأصناف (virtualization) ──────────────────────────────
+  // نفس نمط ProductGrid: حاوية تمرير ثابتة + قياس ديناميكي لكل صف
+  // (measureElement) لأن ارتفاع CartRow يختلف حسب الكثافة ووجود خصم.
+  const cartScrollRef = useRef<HTMLDivElement>(null);
+  const nodeMap       = useRef(new Map<string, HTMLDivElement>());
+
+  const rowVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => cartScrollRef.current,
+    estimateSize: () => (density === 'compact' ? 38 : 82),
+    overscan: 8,
+  });
+
+  // إعادة قياس الكل عند تبدّل الكثافة
+  useLayoutEffect(() => {
+    rowVirtualizer.measure();
+  }, [density, rowVirtualizer]);
+
+  const registerRowNode = useCallback((id: string, el: HTMLDivElement | null) => {
+    if (el) nodeMap.current.set(id, el);
+    else nodeMap.current.delete(id);
+  }, []);
+
+  const isEmpty = !items.length;
+
+  useImperativeHandle(ref, () => ({
+    scrollToItemId: (id: string) => {
+      const idx = items.findIndex(i => i.id === id);
+      if (idx === -1) return;
+      rowVirtualizer.scrollToIndex(idx, { align: 'auto' });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          nodeMap.current.get(id)?.focus();
+        });
+      });
+    },
+  }), [items, rowVirtualizer]);
 
   const handleInvDiscAmount = useCallback((raw: string) => {
     setInvDiscAmtVal(raw);
@@ -6739,7 +7295,7 @@ export default function ProfessionalCart({
 
   return (
     <>
-      <div className="pos-cart" id="pos-cart">
+      <div className="pos-cart" id="pos-cart" ref={cartRef} tabIndex={-1} style={{ '--cart-zoom': cartZoom } as React.CSSProperties}>
 
         <div className="cart-top">
           <div className="cart-top-row">
@@ -6751,6 +7307,30 @@ export default function ProfessionalCart({
               </span>
             </div>
             <div className="cart-acts2">
+              <button
+                className="btn btn-xs"
+                onClick={zoomOut}
+                disabled={cartZoom <= 0.75}
+                title="تصغير النص — Ctrl+-"
+              >
+                <i className="ti ti-minus" />
+              </button>
+              <button
+                className="btn btn-xs"
+                onClick={zoomIn}
+                disabled={cartZoom >= 1.25}
+                title="تكبير النص — Ctrl++"
+              >
+                <i className="ti ti-plus" />
+              </button>
+              <button
+                className={`btn btn-xs density-toggle-btn ${density === 'compact' ? 'on' : ''}`}
+                onClick={toggleDensity}
+                title={density === 'compact' ? 'التبديل لعرض مريح (بطاقات أكبر)' : 'التبديل لعرض مضغوط (منتجات أكثر بدون تمرير)'}
+                type="button"
+              >
+                <i className={`ti ${density === 'compact' ? 'ti-list-details' : 'ti-list'}`} />
+              </button>
               <button className="btn btn-xs" onClick={onHeld} title={`الفواتير المعلقة (${kb('heldCarts')})`}>
                 <i className="ti ti-clock-pause" />
               </button>
@@ -6789,33 +7369,6 @@ export default function ProfessionalCart({
                 autoFocus
                 className="cart-note-inp"
               />
-            </div>
-          )}
-
-          {priceLevels.length > 0 && (
-            <div className="cart-modes2">
-              <button
-                className={`cmode ${selectedPriceLevelId === null ? 'on' : ''}`}
-                onClick={() => onPriceLevelChange(null)}
-                title="السعر الافتراضي"
-              >
-                <i className="ti ti-tag" /> عادي
-              </button>
-              {priceLevels.map(pl => (
-                <button
-                  key={pl.id}
-                  className={`cmode ${selectedPriceLevelId === pl.id ? 'on' : ''}`}
-                  onClick={() => onPriceLevelChange(pl.id)}
-                  title={pl.discount_percent ? `خصم ${pl.discount_percent}%` : undefined}
-                >
-                  <i className="ti ti-tag" />
-                  {pl.name}
-                  {pl.discount_percent
-                    ? <span className="cmode-disc">-{pl.discount_percent}%</span>
-                    : null
-                  }
-                </button>
-              ))}
             </div>
           )}
 
@@ -6867,7 +7420,11 @@ export default function ProfessionalCart({
           </div>
         </div>
 
-        <div className="cart-items">
+        <div
+          className="cart-items"
+          ref={cartScrollRef}
+          style={{ overflow: 'auto', flexShrink: 0 }}
+        >
           {isEmpty ? (
             <div className="cart-empty">
               <div className="ce-ico"><i className="ti ti-shopping-cart-off" /></div>
@@ -6875,123 +7432,150 @@ export default function ProfessionalCart({
               <div className="ce-sub">ابحث عن منتج أو امسح الباركود</div>
             </div>
           ) : (
-            items.map((item, idx) => (
-              <CartRow
-                key={item.id}
-                item={item}
-                idx={idx}
-                isSelected={selectedItemId === item.id}
-                onSelect={() => onSelectItem(item.id)}
-                onQty={qty => onQty(item.id, qty)}
-                onDiscount={pct => onDiscount(item.id, pct)}
-                onDiscountAmount={amount => onDiscountAmount(item.id, amount)}
-                onPrice={price => onPrice(item.id, price)}
-                onRemove={() => onRemove(item.id)}
-              />
-            ))
+            <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', flexShrink: 0, width: '100%' }}>
+              {rowVirtualizer.getVirtualItems().map(vRow => {
+                const item = items[vRow.index];
+                if (!item) return null;
+                return (
+                  <div
+                    key={item.id}
+                    data-index={vRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: 0, width: '100%',
+                      transform: `translateY(${vRow.start}px)`,
+                    }}
+                  >
+                    <CartRow
+                      item={item}
+                      idx={vRow.index}
+                      isSelected={selectedItemId === item.id}
+                      onSelect={() => onSelectItem(item.id)}
+                      onQty={qty => onQty(item.id, qty)}
+                      onDiscount={pct => onDiscount(item.id, pct)}
+                      onDiscountAmount={amount => onDiscountAmount(item.id, amount)}
+                      onPrice={price => onPrice(item.id, price)}
+                      onRemove={() => onRemove(item.id)}
+                      density={density}
+                      registerNode={registerRowNode}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
         {!isEmpty && (
           <div className="cart-totals">
-            <div className="ct-row">
-              <span>المجموع HT</span>
-              <span>{formatDZD(totals.total_ht)}</span>
-            </div>
-
-            {totals.total_discount > 0 && (
-              <div className="ct-row ct-disc">
-                <span>إجمالي الخصومات</span>
-                <span style={{ color: 'var(--red)' }}>- {formatDZD(totals.total_discount)}</span>
-              </div>
-            )}
-
-            <div className="ct-row">
-              <span>TVA</span>
-              <span>{formatDZD(totals.total_tva)}</span>
-            </div>
-
-            {onInvoiceDiscountChange && (
-              <div className="ct-row ct-disc">
-                <span>خصم الفاتورة</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <button
-                    className={`cr-disc-mode-btn ${invDiscMode === 'pct' ? 'on' : ''}`}
-                    onClick={() => setInvDiscMode('pct')}
-                    type="button"
-                    style={{ fontSize: 10, padding: '2px 5px' }}
-                  >%</button>
-                  <button
-                    className={`cr-disc-mode-btn ${invDiscMode === 'amount' ? 'on' : ''}`}
-                    onClick={() => setInvDiscMode('amount')}
-                    type="button"
-                    style={{ fontSize: 10, padding: '2px 5px' }}
-                  >دج</button>
-
-                  {invDiscMode === 'pct' ? (
-                    <>
-                      <input
-                        type="number"
-                        className="ct-disc-inp"
-                        value={invoiceDiscountPct || ''}
-                        onChange={e => onInvoiceDiscountChange(
-                          Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
-                        )}
-                        min={0} max={100} step={1}
-                        placeholder="0"
-                        style={{ width: 50 }}
-                      />
-                      <span style={{ fontSize: 11 }}>%</span>
-                      {invoiceDiscountAmount > 0 && (
-                        <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>
-                          -{formatDZD(invoiceDiscountAmount)}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <input
-                        type="number"
-                        className="ct-disc-inp"
-                        value={invDiscAmtVal}
-                        onChange={e => handleInvDiscAmount(e.target.value)}
-                        min={0}
-                        placeholder="0"
-                        style={{ width: 70 }}
-                      />
-                      <span style={{ fontSize: 11 }}>دج</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {totals.fiscal_stamp > 0 && (
-              <div className="ct-row">
-                <span>طابع مالي</span>
-                <span>{formatDZD(totals.fiscal_stamp)}</span>
-              </div>
-            )}
-
-            <div className="ct-row ct-grand">
-              <span>الإجمالي TTC</span>
+            {/* ── سطر دائم: الإجمالي + زر إظهار/إخفاء التفاصيل ── */}
+            <div className="ct-row ct-grand ct-grand--toggle" onClick={toggleTotals}>
+              <span className="ct-grand-label">
+                الإجمالي TTC
+                <i className={`ti ti-chevron-down ct-toggle-ic ${showTotalsDetails ? 'open' : ''}`} />
+              </span>
               <strong className="grand-amount">{formatDZD(totalTtcFinal)}</strong>
             </div>
-            {client !== null && clientBalance !== undefined && (
-              <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 4 }}>
-                <span>
-                  <span style={{ opacity: 0.65 }}>رصيد {client.name} </span>
-                  <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#ef4444' : '#22c55e' }}>
-                    {formatDZD(clientBalance)}
-                  </span>
-                </span>
-                <span>
-                  <span style={{ opacity: 0.65 }}>الرصيد الجديد </span>
-                  <span style={{ fontWeight: 700, color: '#2563eb' }}>
-                    {formatDZD(clientBalance + totalTtcFinal)}
-                  </span>
-                </span>
-              </div>
+
+            {showTotalsDetails && (
+              <>
+                <div className="ct-row">
+                  <span>المجموع HT</span>
+                  <span>{formatDZD(totals.total_ht)}</span>
+                </div>
+
+                {totals.total_discount > 0 && (
+                  <div className="ct-row ct-disc">
+                    <span>إجمالي الخصومات</span>
+                    <span style={{ color: 'var(--red)' }}>- {formatDZD(totals.total_discount)}</span>
+                  </div>
+                )}
+
+                <div className="ct-row">
+                  <span>TVA</span>
+                  <span>{formatDZD(totals.total_tva)}</span>
+                </div>
+
+                {onInvoiceDiscountChange && (
+                  <div className="ct-row ct-disc">
+                    <span>خصم الفاتورة</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button
+                        className={`cr-disc-mode-btn ${invDiscMode === 'pct' ? 'on' : ''}`}
+                        onClick={() => setInvDiscMode('pct')}
+                        type="button"
+                        style={{ fontSize: 10, padding: '2px 5px' }}
+                      >%</button>
+                      <button
+                        className={`cr-disc-mode-btn ${invDiscMode === 'amount' ? 'on' : ''}`}
+                        onClick={() => setInvDiscMode('amount')}
+                        type="button"
+                        style={{ fontSize: 10, padding: '2px 5px' }}
+                      >دج</button>
+
+                      {invDiscMode === 'pct' ? (
+                        <>
+                          <input
+                            type="number"
+                            className="ct-disc-inp"
+                            value={invoiceDiscountPct || ''}
+                            onChange={e => onInvoiceDiscountChange(
+                              Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
+                            )}
+                            min={0} max={100} step={1}
+                            placeholder="0"
+                            style={{ width: 50 }}
+                          />
+                          <span style={{ fontSize: 11 }}>%</span>
+                          {invoiceDiscountAmount > 0 && (
+                            <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>
+                              -{formatDZD(invoiceDiscountAmount)}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="number"
+                            className="ct-disc-inp"
+                            value={invDiscAmtVal}
+                            onChange={e => handleInvDiscAmount(e.target.value)}
+                            min={0}
+                            placeholder="0"
+                            style={{ width: 70 }}
+                          />
+                          <span style={{ fontSize: 11 }}>دج</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {totals.fiscal_stamp > 0 && (
+                  <div className="ct-row">
+                    <span>طابع مالي</span>
+                    <span>{formatDZD(totals.fiscal_stamp)}</span>
+                  </div>
+                )}
+
+                {client !== null && clientBalance !== undefined && (
+                  <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 4 }}>
+                    <span>
+                      <span style={{ opacity: 0.65 }}>رصيد {client.name} </span>
+                      <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#ef4444' : '#22c55e' }}>
+                        {formatDZD(clientBalance)}
+                      </span>
+                    </span>
+                    <span>
+                      <span style={{ opacity: 0.65 }}>الرصيد الجديد </span>
+                      <span style={{ fontWeight: 700, color: '#2563eb' }}>
+                        {formatDZD(clientBalance + totalTtcFinal)}
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -7036,7 +7620,9 @@ export default function ProfessionalCart({
       )}
     </>
   );
-}
+});
+
+export default ProfessionalCart;
 
 ```
 
@@ -7112,7 +7698,7 @@ interface Props {
 const DOC_CODES = ['FV', 'BL', 'BCC', 'FA'] as const;
 
 /** مبالغ الأوراق النقدية الجزائرية */
-const DZD_BILLS = [200, 500, 1000, 2000, 5000];
+const DZD_BILLS = [0, 200, 500, 1000, 2000, 5000];
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -7210,6 +7796,11 @@ export default function ProfessionalPaymentModal({
   prevBalance: propPrevBalance,
 }: Props) {
 
+  const firstAmountRef = useRef<HTMLInputElement>(null);
+
+  // ── Focus first amount field on open ────────────────────────────────────────
+  useEffect(() => { firstAmountRef.current?.focus(); }, []);
+
   // ── State ──────────────────────────────────────────────────────────────────
   const defaultMode = paymentModes.find(m =>
     /نقدا|نقداً|cash/i.test(m.name),
@@ -7300,11 +7891,8 @@ export default function ProfessionalPaymentModal({
   // ثم الأوراق النقدية الأقرب فالأكبر
   const quickAmounts = useMemo(() => {
     const target = remaining > 0 ? remaining : totalTtcFinal;
-    const exact = target;
-    const bills = DZD_BILLS.filter(b => b >= target - 500).slice(0, 4);
     const totalDueAmt = totalDue;
-    const result = Array.from(new Set([totalDueAmt, exact, ...bills])).slice(0, 5);
-    return result;
+    return Array.from(new Set([totalDueAmt, target, ...DZD_BILLS]));
   }, [remaining, totalTtcFinal, totalDue]);
 
   // ── Numpad handlers ────────────────────────────────────────────────────────
@@ -7530,15 +8118,21 @@ export default function ProfessionalPaymentModal({
                   <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + مستحق)</span></span>
                   <strong>{formatDZD(internalPrevBalance + totalTtcFinal)}</strong>
                 </div>
-                {(existingTotal > 0 || isEditing) && (
+                {isEditing && existingTotal > 0 && (
                   <div className="pvs-row">
                     <span style={{ color: '#888' }}>مدفوع سابقاً</span>
                     <span style={{ color: '#888' }}>{formatDZD(existingTotal)}</span>
                   </div>
                 )}
+                {isEditing && newPaid > 0 && (
+                  <div className="pvs-row">
+                    <span style={{ color: '#2563eb' }}>المدفوع الآن</span>
+                    <span style={{ color: '#2563eb' }}>{formatDZD(newPaid)}</span>
+                  </div>
+                )}
                 <div className="pvs-row" style={{ borderTop: '1px solid #ddd', paddingTop: 6, marginTop: 2 }}>
-                  <span>{existingTotal > 0 || isEditing ? 'المدفوع الآن' : 'المدفوع'}</span>
-                  <span>{formatDZD(newPaid)}</span>
+                  <span>{isEditing ? 'إجمالي المدفوع' : 'المدفوع'}</span>
+                  <span>{formatDZD(totalPaid)}</span>
                 </div>
                 <div className="pvs-row pvs-total" style={{ marginTop: 4 }}>
                   <span>
@@ -7644,6 +8238,7 @@ export default function ProfessionalPaymentModal({
                     {/* المبلغ */}
                     <div className="plv2-amt-wrap">
                       <input
+                        ref={idx === 0 ? firstAmountRef : undefined}
                         type="number"
                         className="plv2-amount"
                         value={line.amount}
@@ -7849,6 +8444,80 @@ export default function ProfessionalReceipt({
           <button className="btn btn-p" onClick={onPrint} type="button">
             <i className="ti ti-printer" /> طباعة
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+```
+
+## FILE: resources/js/pos/components/QtySetModal.tsx
+```
+import { useState, useRef, useEffect } from 'react';
+import type { CartItem } from '@/lib/api/core/types';
+
+interface QtySetModalProps {
+  item: CartItem;
+  onClose: () => void;
+  onConfirm: (qty: number) => void;
+}
+
+export default function QtySetModal({ item, onClose, onConfirm }: QtySetModalProps) {
+  const [val, setVal] = useState(String(item.quantity));
+  const inpRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inpRef.current?.focus(); inpRef.current?.select(); }, []);
+
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleOk();
+    if (e.key === 'Escape') onClose();
+  };
+
+  const handleOk = () => {
+    const qty = parseFloat(val);
+    if (qty > 0) onConfirm(qty);
+  };
+
+  const kbdStyle: React.CSSProperties = {
+    display: 'inline-block', padding: '1px 5px', borderRadius: 3,
+    background: 'var(--b2)', color: 'var(--t1)', fontSize: 10,
+    fontWeight: 600, fontFamily: 'monospace', lineHeight: '1.4',
+    border: '1px solid var(--b3)', margin: '0 1px',
+  };
+
+  return (
+    <div className="ov on" onClick={onClose}>
+      <div className="modal modal-sm" onClick={e => e.stopPropagation()} onKeyDown={handleKey}>
+        <div className="m-hd">
+          <div className="m-title"><i className="ti ti-edit" style={{ marginLeft: 6 }} /> تعديل الكمية</div>
+          <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
+        </div>
+        <div className="m-body">
+          <div style={{ marginBottom: 16, fontWeight: 600, fontSize: 15, color: 'var(--t1)' }}>
+            {item.product_name}
+          </div>
+          <div className="fg">
+            <label>الكمية</label>
+            <input
+              ref={inpRef}
+              type="number"
+              className="form-control"
+              value={val}
+              onChange={e => setVal(e.target.value)}
+              min="0.001"
+              step="1"
+              style={{ fontSize: 18, padding: '10px 12px', textAlign: 'center' }}
+            />
+          </div>
+          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--t3)', lineHeight: 1.7 }}>
+            <div><kbd style={kbdStyle}>Enter</kbd> تأكيد · <kbd style={kbdStyle}>Esc</kbd> إلغاء</div>
+            <div style={{ marginTop: 4 }}><kbd style={kbdStyle}>Ctrl++</kbd> زيادة · <kbd style={kbdStyle}>Ctrl+-</kbd> نقصان · <kbd style={kbdStyle}>↑↓</kbd> تنقل · <kbd style={kbdStyle}>Del</kbd> حذف</div>
+          </div>
+        </div>
+        <div className="m-foot">
+          <button className="btn" onClick={onClose}>إلغاء</button>
+          <button className="btn btn-p" onClick={handleOk}><i className="ti ti-check" /> موافق</button>
         </div>
       </div>
     </div>
@@ -8769,6 +9438,12 @@ const STORAGE_KEY = 'pos-kb-override-';
 const KB_CHANGE_EVENT = 'pos-kb-changed';
 
 export const KB_DEFAULTS: Record<string, string> = {
+  newSale: '',
+  settings: '',
+  toggleQuickbar: '',
+  kioskMode: '',
+  focusClient: '',
+  closeSession: '',
   searchFocus: 'F2',
   payment: 'F4',
   holdCart: 'F5',
@@ -8785,8 +9460,8 @@ export const KB_DEFAULTS: Record<string, string> = {
   quickSearch: 'Ctrl+F',
   gridView: 'Ctrl+ArrowUp',
   listView: 'Ctrl+ArrowDown',
-  zoomIn: 'Ctrl+=',
-  zoomOut: 'Ctrl+-',
+  zoomIn: 'Ctrl+]',
+  zoomOut: 'Ctrl+[',
   quickCat: 'Alt+1..9',
   qtyUp: 'NumpadAdd',
   qtyDown: 'NumpadSubtract',
@@ -8798,6 +9473,7 @@ export const KB_DEFAULTS: Record<string, string> = {
   undoClear: 'Ctrl+Z',
   toggleHeld: 'Ctrl+ArrowRight',
   sessionInvoices: 'Ctrl+Shift+I',
+  focusCart: 'Ctrl+Space',
 };
 
 export function normalizeEventKey(e: KeyboardEvent): string {
@@ -9161,6 +9837,8 @@ export interface POSSettings {
   // ── واجهة المستخدم ───────────────────────────────────────────────────────
   /** حجم شبكة المنتجات الافتراضي */
   defaultGridSize:      GridDefaultSize;
+  /** عرض الشبكة أو القائمة الافتراضي */
+  defaultView:          'grid' | 'list';
   /** إظهار شريط Quick Items عند فتح الصفحة */
   showQuickbarOnStart:  boolean;
   /** تشغيل صوت عند إضافة منتج */
@@ -9183,6 +9861,10 @@ export interface POSSettings {
   clearSearchOnAdd:     boolean;
   /** التنقل عبر نتائج البحث بلوحة المفاتيح */
   keyboardNav:          boolean;
+
+  // ── تخطيط الشاشة ──────────────────────────────────────────────────────
+  /** عرض السلة (بالـ px) — قابل للسحب */
+  cartWidth:            number;
 }
 
 // ─── Default Settings ─────────────────────────────────────────────────────────
@@ -9204,6 +9886,7 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   receiptFooter:        'شكراً لتعاملكم معنا',
   receiptShowQr:        false,
   defaultGridSize:      'md',
+  defaultView:          'grid',
   showQuickbarOnStart:  true,
   playSoundOnAdd:       false,
   playSoundOnSale:      false,
@@ -9214,6 +9897,7 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   hideOutOfStock:       false,
   clearSearchOnAdd:     false,
   keyboardNav:          true,
+  cartWidth:            390,
 };
 
 // ─── Storage key ──────────────────────────────────────────────────────────────
@@ -10474,7 +11158,7 @@ export type GridSize   = 'xs' | 'sm' | 'md' | 'lg';
 export type SortMode   = 'name' | 'price_asc' | 'price_desc' | 'stock' | 'family';
 export type ActiveModal =
   | 'none' | 'payment' | 'held' | 'receipt'
-  | 'manual' | 'kbhelp' | 'session' | 'barcode';
+  | 'manual' | 'qty' | 'kbhelp' | 'session' | 'barcode';
 
 export interface QuickItem {
   variantId: number;
