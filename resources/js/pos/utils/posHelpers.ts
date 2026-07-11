@@ -21,7 +21,7 @@ export type GridSize   = 'xs' | 'sm' | 'md' | 'lg';
 export type SortMode   = 'name' | 'price_asc' | 'price_desc' | 'stock' | 'family';
 export type ActiveModal =
   | 'none' | 'payment' | 'held' | 'receipt'
-  | 'manual' | 'qty' | 'kbhelp' | 'session' | 'barcode';
+  | 'manual' | 'qty' | 'kbhelp' | 'session' | 'barcode' | 'returns' | 'client';
 
 export interface QuickItem {
   variantId: number;

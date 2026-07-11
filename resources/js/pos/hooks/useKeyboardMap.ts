@@ -8,7 +8,7 @@ export const KB_DEFAULTS: Record<string, string> = {
   settings: '',
   toggleQuickbar: '',
   kioskMode: '',
-  focusClient: '',
+  focusClient: 'Ctrl+K',
   closeSession: '',
   searchFocus: 'F2',
   payment: 'F4',
@@ -66,12 +66,6 @@ export function saveOverrides(slug: string | null, overrides: Record<string, str
   if (!slug) return;
   localStorage.setItem(`${STORAGE_KEY}${slug}`, JSON.stringify(overrides));
   window.dispatchEvent(new CustomEvent(KB_CHANGE_EVENT, { detail: { slug } }));
-}
-
-export function matchOverride(slug: string | null, action: string, e: KeyboardEvent): boolean {
-  if (!slug) return false;
-  const overrides = readOverrides(slug);
-  return matchOverrideFrom(overrides, action, e);
 }
 
 /** Like matchOverride but takes pre-read overrides — avoids 25× localStorage reads per keypress */

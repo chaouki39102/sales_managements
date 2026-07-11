@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { CartItem, CartTotals, PriceLevel } from '@/types';
+import type { CartTotals, PriceLevel } from '@/types';
 import type { PosSession }           from '@/lib/api/endpoints/posSession';
 import { formatDZD }                 from '../utils/calculations';
-import { getEffectiveShortcut, KB_DEFAULTS, useKbOverrides } from '../hooks/useKeyboardMap';
+import { getEffectiveShortcut } from '../hooks/useKeyboardMap';
 
 interface POSTopBarProps {
   session:         PosSession | null | undefined;
@@ -12,7 +12,6 @@ interface POSTopBarProps {
   isEmpty:         boolean;
   isFullscreen:    boolean;
   showQuickbar:    boolean;
-  items:           CartItem[];
   totals:          CartTotals;
   totalTtcFinal:   number;
   slug:            string | null;
@@ -41,7 +40,7 @@ interface POSTopBarProps {
 export default function POSTopBar({
   session, heldCount, avgMargin,
   isEmpty, isFullscreen, showQuickbar,
-  items, totals, totalTtcFinal, slug,
+  totals, totalTtcFinal, slug,
   priceLevels, selectedPriceLevelId, onPriceLevelChange,
   onHeld, onNewSale, onManual, onReceipt,
   onSession, onSessionInvoices, onFullscreen, onKbHelp,
@@ -52,7 +51,6 @@ export default function POSTopBar({
 
   const invoicesCount = session?.invoices_count ?? 0;
   const netSales      = session?.net_sales      ?? 0;
-  const overrides     = useKbOverrides(slug);
   const kb            = (action: string) => getEffectiveShortcut(slug, action) ?? '';
 
   // ── قائمة التعريفة (تجزئة/نصف جملة/جملة...) — منقولة من السلة إلى الشريط

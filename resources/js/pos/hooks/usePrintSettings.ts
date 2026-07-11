@@ -99,8 +99,20 @@ const PAPER_WIDTH_MAP: Record<string, number> = {
   'A5': 148,
 };
 
+interface PrintSettingsResult {
+  config:    DocumentPrintConfig | null;
+  template:  import('@/pages/settings/print-settings/types/domain').PrintTemplate | null;
+  enabled:   boolean;
+  autoPrint: boolean;
+  showPreview: boolean;
+  copies:    number;
+  paperSize: PaperSize;
+  paperWidth: number;
+  printerId: string | null;
+}
+
 /** hook للاستخدام في POSPage — يُرجع القالب والإعدادات لنوع مستند */
-export function usePrintSettings(docTypeCode: string) {
+export function usePrintSettings(docTypeCode: string): PrintSettingsResult {
   const { data: configs = [] } = useDocPrintConfigs();
   const config = configs.find(c => c.docTypeCode === docTypeCode) ?? null;
   const size   = (config?.paperSize ?? 'none') as PaperSize;

@@ -22,7 +22,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
 
 import {
-  calcFiscalStamp, formatDZD, htToTtc, ttcToHt, calcMargin,
+  calcFiscalStamp, htToTtc, ttcToHt, calcMargin,
 } from '@/pos/utils/calculations';
 import {
   productToVariant, makeFakeVariant,
@@ -32,7 +32,7 @@ import type { ActiveModal, QuickItem, ViewMode, GridSize, SortMode } from '@/pos
 import type { PaginatedResponse } from '@/lib/api/core/types';
 import { nanoid }   from 'nanoid';
 import type {
-  Product, ProductVariant, CartItem, CartTotals,
+  Product, ProductVariant, CartItem,
   PriceLevel, Party, PaymentMode, DocumentType,
   CommercialDocument,
 } from '@/types';
@@ -68,7 +68,8 @@ const KeyboardHelpModal        = React.lazy(() => import('@/pos/components/Keybo
 const POSSettingsModal          = React.lazy(() => import('@/pos/components/POSSettingsModal'));
 const ManagerPinModal           = React.lazy(() => import('@/pos/components/ManagerPinModal'));
 import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
-import { matchOverride, matchOverrideFrom, useKbOverrides } from '@/pos/hooks/useKeyboardMap';
+import { useKbOverrides } from '@/pos/hooks/useKeyboardMap';
+import { useKeyboardShortcuts } from '@/pos/hooks/useKeyboardShortcuts';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
 import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
@@ -99,12 +100,14 @@ function POSPage() {
     enabled:  !!slug,
     staleTime: 60_000,
   });
-  const fiscalStampVal = (fiscalStampRaw as any)?.value;
+  const fiscalStampVal = fiscalStampRaw?.value;
   const fiscalStampEnabled = fiscalStampVal === undefined
     ? true
     : (fiscalStampVal === true || fiscalStampVal === 1 || fiscalStampVal === '1'
       || String(fiscalStampVal).toLowerCase() === 'true');
   const pos         = usePOS(fiscalStampEnabled);
+  const posRef      = useRef(pos);
+  posRef.current    = pos;
   const fiscalYear  = useSelectedFiscalYear();
   const company     = useActiveCompany();
   const navigate    = useNavigate();
@@ -117,12 +120,18 @@ function POSPage() {
   const [showSessionInvoices, setShowSessionInvoices] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error && error.message) return error.message;
+    if (typeof error === 'string' && error.length > 0) return error;
+    return fallback;
+  };
+
   const handleOpenSession = async (data: {
     warehouse_id: number; fiscal_year_id: number; opening_cash: number; opening_note?: string;
   }) => {
     setSessionError(null);
     try { await openSessionMut.mutateAsync(data); }
-    catch (e: any) { setSessionError(e?.message ?? 'فشل فتح الجلسة'); }
+    catch (e: unknown) { setSessionError(getErrorMessage(e, 'فشل فتح الجلسة')); }
   };
 
   const handleCloseSession = async (data: {
@@ -132,8 +141,8 @@ function POSPage() {
       await closeSessionMut.mutateAsync(data);
       setShowCloseSession(false);
       safeToast.success('تم إغلاق الجلسة بنجاح');
-    } catch (e: any) {
-      safeToast.error(e?.message ?? 'فشل إغلاق الجلسة');
+    } catch (e: unknown) {
+      safeToast.error(getErrorMessage(e, 'فشل إغلاق الجلسة'));
     }
   };
 
@@ -142,17 +151,18 @@ function POSPage() {
   // ── Toast proxy: no-op when disabled ──────────────────────────────────
   const safeToast = useMemo(() => {
     if (settings.toastEnabled) return toast;
-    const noop: any = () => '';
-    noop.success = noop; noop.error = noop; noop.warning = noop;
-    noop.info = noop;    noop.message = noop; noop.custom = noop;
-    noop.dismiss = () => {}; noop.remove = () => {};
-    return noop as typeof toast;
+    return new Proxy(toast, {
+      get: (_target, prop) => {
+        if (prop === 'dismiss' || prop === 'remove') return () => {};
+        return () => '';
+      },
+    });
   }, [settings.toastEnabled]);
   const clearCartConfirm = useConfirm();
   const deleteConfirm    = useConfirm();
 
   // Read keyboard overrides ONCE (via useKbOverrides which caches + re-reads only on change),
-  // then pass to matchOverrideFrom inside the handler to avoid 25× localStorage.read per keypress.
+  // then pass to useKeyboardShortcuts hook to avoid 25× localStorage.read per keypress.
   const kbOverrides    = useKbOverrides(slug);
   const kbOverridesRef = useRef(kbOverrides);
   kbOverridesRef.current = kbOverrides;
@@ -166,10 +176,10 @@ function POSPage() {
   const prevSlugRef = useRef(slug);
   useEffect(() => {
     if (prevSlugRef.current && prevSlugRef.current !== slug) {
-      pos.clearCart();
+      posRef.current.clearCart();
     }
     prevSlugRef.current = slug;
-  }, [slug, pos]);
+  }, [slug]);
 
   const [view,       setView]       = useState<ViewMode>(settings.defaultView);
   const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
@@ -233,7 +243,6 @@ function POSPage() {
   } | null>(null);
   const [cartNote,   setCartNote]   = useState('');
   const [selectedPriceLevelId, setSelectedPriceLevelId] = useState<number | null>(null);
-  const [lastDocNum,  setLastDocNum]  = useState<string | undefined>();
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
 
   const [receiptSnapshot, setReceiptSnapshot] = useState<POSSaleSnapshot | null>(null);
@@ -282,6 +291,7 @@ function POSPage() {
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [filterMinPrice, setFilterMinPrice] = useState('');
   const [filterMaxPrice, setFilterMaxPrice] = useState('');
+  const [filterPerPage, setFilterPerPage] = useState(120);
 
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
@@ -341,11 +351,11 @@ function POSPage() {
   const handleSearchEscape = useCallback(() => {
     if (isQtyCmd) {
       skipNextSearchResetRef.current = true;
-      pos.setSearch(prevSearchRef.current);
+      posRef.current.setSearch(prevSearchRef.current);
     } else {
-      pos.setSearch('');
+      posRef.current.setSearch('');
     }
-  }, [isQtyCmd, pos]);
+  }, [isQtyCmd]);
 
   // ── Products query (كل منتجات التصنيف الحالي — بدون نص البحث إطلاقاً) ───
   const { data: productsRaw, isLoading: loadingAll } = useQuery({
@@ -360,9 +370,11 @@ function POSPage() {
     staleTime:       5 * 60_000,
   });
 
-  const rawProducts = Array.isArray(productsRaw)
-    ? productsRaw
-    : (productsRaw as PaginatedResponse<Product>)?.data ?? [];
+  const rawProducts = useMemo(() => (
+    Array.isArray(productsRaw)
+      ? productsRaw
+      : (productsRaw as PaginatedResponse<Product>)?.data ?? []
+  ), [productsRaw]);
 
   // ── Lookups ─────────────────────────────────────────────────────────────────
   const { data: fiscalYearsData } = useFiscalYears();
@@ -376,8 +388,8 @@ function POSPage() {
   const { data: treasuryAccounts } = useTreasuryAccounts();   // ✅ مُضاف
   const { data: paymentModes }: { data?: PaymentMode[] } = usePaymentModes();
 
-  const customers        = (customersData as PaginatedResponse<Party>)?.data ?? (customersData as Party[]) ?? [];
-  const priceLevelsList: PriceLevel[]  = priceLevels ?? [];
+  const customers        = customersData?.data ?? [];
+  const priceLevelsList = useMemo<PriceLevel[]>(() => priceLevels ?? [], [priceLevels]);
 
   // ── Client balance ──────────────────────────────────────────────────────────
   const clientId = pos.client?.id;
@@ -412,7 +424,7 @@ function POSPage() {
       setCachedWarehouseId(realWarehouseId);
       try { localStorage.setItem(WAREHOUSE_CACHE_KEY, String(realWarehouseId)); } catch {}
     }
-  }, [realWarehouseId]);
+  }, [cachedWarehouseId, realWarehouseId]);
 
   // ── Company-level allow_negative_stock ─────────────────────────────────────
   const ALLOW_NEG_KEY = 'pos-neg-stock';
@@ -453,13 +465,12 @@ function POSPage() {
       // ✅ Defensive parsing: backend may return true/false, "true"/"false",
       // 1/0, or "1"/"0" depending on how the boolean setting was cast.
       // Also unwrap a possible { data: {...} } envelope just in case.
-      const raw = (negSettingRaw as any)?.value ?? (negSettingRaw as any)?.data?.value;
+      const raw = negSettingRaw?.value;
       const val = raw === true || raw === 1 || raw === '1'
         || String(raw).toLowerCase() === 'true';
       setAllowNegSetting(val);
       try { localStorage.setItem(ALLOW_NEG_KEY, val ? 'true' : 'false'); } catch {}
-      if (typeof window !== 'undefined' && (window as any).__POS_DEBUG__) {
-        // eslint-disable-next-line no-console
+      if (typeof window !== 'undefined' && (window as Window & { __POS_DEBUG__?: boolean }).__POS_DEBUG__) {
         console.debug('[POS] allow_negative_stock raw=', negSettingRaw, '→ resolved=', val);
       }
     }
@@ -575,10 +586,10 @@ function POSPage() {
     }
 
     lastClearedSnapshotRef.current = {
-      items:               [...pos.items],
-      client:              pos.client,
+      items:               [...posRef.current.items],
+      client:              posRef.current.client,
       note:                cartNote,
-      invoiceDiscountPct:  pos.invoiceDiscountPct,
+      invoiceDiscountPct:  posRef.current.invoiceDiscountPct,
     };
     setCanUndoClear(true);
     const UNDO_SECONDS = 20;
@@ -595,15 +606,13 @@ function POSPage() {
       clearInterval(undoClearIntervalRef.current);
     }, UNDO_SECONDS * 1000);
 
-    pos.clearCart();
-    pos.setInvoiceDiscountPct(0);
+    posRef.current.clearCart();
+    posRef.current.setInvoiceDiscountPct(0);
     setCartNote('');
     setEditingDocumentId(null);
     setEditingDocStatus(null);
     setEditingDocumentDate(null);
-  }, [settings.confirmOnClear, isEmpty, pos, cartNote, clearCartConfirm]);
-
-  const clearCartSafe = handleClearCart;
+  }, [settings.confirmOnClear, isEmpty, cartNote, clearCartConfirm]);
 
   const handleUndoClear = useCallback(() => {
     const snap = lastClearedSnapshotRef.current;
@@ -620,16 +629,16 @@ function POSPage() {
     clearTimeout(undoClearTimerRef.current);
     clearInterval(undoClearIntervalRef.current);
     safeToast.success('تم استرجاع السلة');
-  }, []);
+  }, [safeToast]);
 
   const handleOpenDrawer = useCallback(async () => {
     const res = await openCashDrawerViaWebUSB();
     if (!res.ok) safeToast.error(res.message ?? 'تعذّر فتح الدرج');
-  }, []);
+  }, [safeToast]);
 
   const handleOpenInvoice = useCallback(async (docId: number) => {
     const cartState = useCartStore.getState();
-    if (!isEmpty && cartState._isDirty) pos.holdCart();
+    if (!isEmpty && cartState._isDirty) posRef.current.holdCart();
     try {
       const doc = await apiGet<CommercialDocument>(`/documents/${docId}`, {
         include: 'party,lines,lines.product,lines.product_variant,payments,payments.payment_mode',
@@ -679,7 +688,7 @@ function POSPage() {
       setEditingDocumentId(docId);
       setEditingDocStatus(doc.status);
       setEditingDocumentDate(doc.document_date ?? null);
-      editingPrevBalanceRef.current = (doc as any)?.balance_data?.previous_balance;
+      editingPrevBalanceRef.current = doc.balance_data?.previous_balance;
       setShowSessionInvoices(false);
       safeToast.success(`تم فتح الفاتورة ${doc.document_number}`);
       // Select last cart row + focus search so user can immediately type *<digits> Enter
@@ -692,15 +701,12 @@ function POSPage() {
     } catch {
       safeToast.error('فشل تحميل الفاتورة');
     }
-  }, [isEmpty, pos]);
+  }, [isEmpty, safeToast]);
 
   // ── Invoice discount ───────────────────────────────────────────────────────
   // ✅ pos.totals (من calcTotals) تُطبِّق الخصم بالفعل ومرة واحدة فقط
-  const invoiceDiscountPct    = pos.invoiceDiscountPct;
   const invoiceDiscountAmount = pos.totals.invoice_discount_amount ?? 0;
 
-  const adjustedTotalHt       = pos.totals.total_ht;
-  const adjustedTotalTva      = pos.totals.total_tva;
   const fiscalStampAmount = fiscalStampEnabled ? calcFiscalStamp(pos.totals.total_ttc) : 0;
   const adjustedTotalTtcFinal = pos.totals.total_ht + pos.totals.total_tva + fiscalStampAmount;
 
@@ -712,9 +718,11 @@ function POSPage() {
 
   const avgMargin = useMemo(() => {
     if (!pos.items.length) return 0;
-    return pos.items.reduce((s, i) =>
-      s + calcMargin(i.unit_price_ht, (i as any).average_cost_price ?? 0), 0) / pos.items.length;
-  }, [pos.items]);
+    return pos.items.reduce((s, i) => {
+      const variant = allVariants.find(v => v.id === i.variant_id);
+      return s + calcMargin(i.unit_price_ht, variant?.average_cost_price ?? 0);
+    }, 0) / pos.items.length;
+  }, [pos.items, allVariants]);
 
   const filterActive = filterInStock || filterLowStock || !!filterMinPrice || !!filterMaxPrice;
 
@@ -730,11 +738,11 @@ function POSPage() {
       if (e.key === 'Enter' && buf.length >= 4) {
         const variant = allVariants.find(v => v.barcode === buf);
         if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
-          pos.addItem(variant);
+          posRef.current.addItem(variant);
           const items = useCartStore.getState().items;
           const added = items.find(i => i.variant_id === variant.id);
           if (added) { setSelectedCartItemId(added.id); requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(added.id)); }
-          safeToast.success(variant.product?.name ?? variant.name ?? 'تمت الإضافة', {
+          safeToast.success(variant.product?.name ?? variant.variant_name ?? 'تمت الإضافة', {
             id: 'pos-last-added',
             duration: 1500,
           });
@@ -752,7 +760,7 @@ function POSPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [allVariants, pos]);
+  }, [allVariants, allowNegSetting, safeToast]);
 
   // ── Fullscreen ─────────────────────────────────────────────────────────────
   const toggleFullscreen = useCallback(() => {
@@ -767,134 +775,12 @@ function POSPage() {
   }, []);
 
   // ── Keyboard Shortcuts ─────────────────────────────────────────────────────
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const overrides = kbOverridesRef.current;
-      const tag     = (e.target as HTMLElement)?.tagName;
-      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-
-      // إذا كان أي مودال مفتوح، تجاهل اختصارات الصفحة الرئيسية (المودال يتولى التحكم)
-      const anyModalOpen = modal !== 'none' || showSessionInvoices || showSettings || showCloseSession || !!pinModal;
-      if (anyModalOpen) {
-        // فقط مفتاح Escape يعمل لإغلاق المودال الحالي
-        if (matchOverrideFrom(overrides, 'escape', e)) {
-          e.preventDefault();
-          if (modal !== 'none')                    setModal('none');
-          else if (showSessionInvoices)            setShowSessionInvoices(false);
-          else if (showSettings)                   setShowSettings(false);
-          else if (showCloseSession)               setShowCloseSession(false);
-          else if (pinModal)                       setPinModal(null);
-        }
-        return;
-      }
-
-      if (matchOverrideFrom(overrides, 'searchFocus', e))  { e.preventDefault(); searchRef.current?.focus(); }
-      if (matchOverrideFrom(overrides, 'focusCart', e))    { e.preventDefault(); if (document.activeElement === searchRef.current) { const lastItem = pos.items[pos.items.length - 1]; if (lastItem) { setSelectedCartItemId(lastItem.id); cartApiRef.current?.scrollToItemId(lastItem.id); } else { cartRef.current?.focus(); } } else { searchRef.current?.focus(); } }
-      if (matchOverrideFrom(overrides, 'payment', e))      { e.preventDefault(); if (!isEmpty) { setModal('payment'); } }
-      if (matchOverrideFrom(overrides, 'holdCart', e))     { e.preventDefault(); if (!isEmpty) pos.holdCart(); }
-      if (matchOverrideFrom(overrides, 'manualProduct', e)){ e.preventDefault(); setModal('manual'); }
-      if (matchOverrideFrom(overrides, 'heldCarts', e))    { e.preventDefault(); setModal('held'); }
-      if (matchOverrideFrom(overrides, 'toggleHeld', e))   { e.preventDefault(); setModal('held'); }
-      if (matchOverrideFrom(overrides, 'sessionInvoices', e)) { e.preventDefault(); setShowSessionInvoices(true); }
-      if (matchOverrideFrom(overrides, 'sessionStats', e)) { e.preventDefault(); setModal(m => m === 'session' ? 'none' : 'session'); }
-      if (matchOverrideFrom(overrides, 'preview', e)) {
-        e.preventDefault();
-        if (!isEmpty) {
-          setReceiptSnapshot({ items: [...pos.items], totals: { ...pos.totals } });
-          setModal('receipt');
-        }
-      }
-      if (matchOverrideFrom(overrides, 'fullscreen', e))  { e.preventDefault(); toggleFullscreen(); }
-      if (matchOverrideFrom(overrides, 'clearCart', e))    { e.preventDefault(); handleClearCart(); }
-      if (matchOverrideFrom(overrides, 'kbHelp', e))       { e.preventDefault(); setModal('kbhelp'); }
-      if (matchOverrideFrom(overrides, 'returns', e))      { e.preventDefault(); setModal('returns'); }
-      if (matchOverrideFrom(overrides, 'openDrawer', e))   { e.preventDefault(); handleOpenDrawer(); }
-      if (matchOverrideFrom(overrides, 'undoClear', e))    { e.preventDefault(); handleUndoClear(); }
-      if (matchOverrideFrom(overrides, 'newSale', e))      { e.preventDefault(); if (isEmpty) { pos.clearCart(); } else { pos.holdCart(); } }
-      if (matchOverrideFrom(overrides, 'settings', e))     { e.preventDefault(); setShowSettings(true); }
-      if (matchOverrideFrom(overrides, 'toggleQuickbar', e)) { e.preventDefault(); handleToggleQuickbar(); }
-      if (matchOverrideFrom(overrides, 'kioskMode', e))    { e.preventDefault(); navigate('/pos/kiosk'); }
-      if (matchOverrideFrom(overrides, 'closeSession', e)) { e.preventDefault(); setShowCloseSession(true); }
-
-      if (!inInput) {
-        if (matchOverrideFrom(overrides, 'gridView', e))   { e.preventDefault(); setView('grid'); }
-        if (matchOverrideFrom(overrides, 'listView', e))   { e.preventDefault(); setView('list'); }
-        if (matchOverrideFrom(overrides, 'zoomIn', e)) {
-          e.preventDefault();
-          setGridSize(s => s === 'xs' ? 'sm' : s === 'sm' ? 'md' : s === 'md' ? 'lg' : 'lg');
-        }
-        if (matchOverrideFrom(overrides, 'zoomOut', e)) {
-          e.preventDefault();
-          setGridSize(s => s === 'lg' ? 'md' : s === 'md' ? 'sm' : s === 'sm' ? 'xs' : 'xs');
-        }
-      }
-      if (e.altKey && !isNaN(parseInt(e.key)) && !inInput) {
-        const idx = parseInt(e.key) - 1;
-        if (idx === -1) pos.setCategory(null);
-        else if (idx < families.length) pos.setCategory(families[idx].id);
-        e.preventDefault();
-      }
-      if (!inInput) {
-        const inCart = cartRef.current?.contains(document.activeElement);
-        const lastItem = pos.items[pos.items.length - 1];
-        if (matchOverrideFrom(overrides, 'qtyUp', e)   && lastItem && !inCart)                          { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity + 1); }
-        if (matchOverrideFrom(overrides, 'qtyDown', e) && lastItem && lastItem.quantity > 1 && !inCart) { e.preventDefault(); pos.updateQty(lastItem.id, lastItem.quantity - 1); }
-        if (matchOverrideFrom(overrides, 'deleteItem', e) && selectedCartItemId) {
-          e.preventDefault();
-          const id = selectedCartItemId;
-          const name = pos.items.find(i => i.id === id)?.product_name ?? '';
-          deleteConfirm.confirm(`هل تريد حذف "${name}" من السلة؟`, {
-            title: 'حذف صنف',
-            variant: 'danger',
-            confirmText: 'حذف',
-            cancelText: 'إلغاء',
-          }).then(ok => { if (ok) { pos.removeItem(id); setSelectedCartItemId(null); } });
-        }
-      }
-      if (matchOverrideFrom(overrides, 'escape', e)) {
-        if (modal !== 'none')                 setModal('none');
-        else if (showFilter)                  setShowFilter(false);
-        else if (!inInput && pos.searchQuery) handleSearchEscape();
-      }
-
-      // ── Cart row keyboard controls ─────────────────────────────────────
-      if (!inInput && selectedCartItemId) {
-        if (e.ctrlKey && e.key === '*') {
-          e.preventDefault();
-          setModal('qty');
-          return;
-        }
-        const isPlus  = e.key === 'Enter' || (e.ctrlKey && (e.key === '+' || e.code === 'Equal')) || e.code === 'NumpadAdd';
-        const isMinus = (e.ctrlKey && e.key === '-') || e.code === 'NumpadSubtract';
-        if (isPlus) {
-          e.preventDefault();
-          const item = pos.items.find(i => i.id === selectedCartItemId);
-          if (item) pos.updateQty(item.id, item.quantity + 1);
-        } else if (isMinus) {
-          e.preventDefault();
-          const item = pos.items.find(i => i.id === selectedCartItemId);
-          if (item && item.quantity > 1) pos.updateQty(item.id, item.quantity - 1);
-        }
-      }
-
-      // ── Arrow keys navigate cart rows (via cartApiRef) ─────────────────
-      if (!inInput && cartApiRef.current && selectedCartItemId && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-        const curIdx = pos.items.findIndex(i => i.id === selectedCartItemId);
-        if (curIdx >= 0) {
-          e.preventDefault();
-          const nextIdx = e.key === 'ArrowDown' ? curIdx + 1 : curIdx - 1;
-          if (nextIdx >= 0 && nextIdx < pos.items.length) {
-            const nextItem = pos.items[nextIdx];
-            setSelectedCartItemId(nextItem.id);
-            cartApiRef.current.scrollToItemId(nextItem.id);
-          }
-        }
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [slug, pos, isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal,
-      families, selectedCartItemId, toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear, handleToggleQuickbar, handleSearchEscape]);
+  useKeyboardShortcuts(
+    { posRef, overridesRef: kbOverridesRef, searchRef, cartRef, cartApiRef },
+    { isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal, selectedCartItemId, families },
+    { setModal, setFilter: setShowFilter, setShowSessionInvoices, setShowSettings, setShowCloseSession, setPinModal, setSelectedCartItemId, setView, setGridSize, setReceiptSnapshot },
+    { toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear, handleToggleQuickbar, handleSearchEscape, deleteConfirm },
+  );
 
   // ── Price Level ────────────────────────────────────────────────────────────
   const applyPriceLevel = useCallback((plId: number | null) => {
@@ -911,14 +797,14 @@ function POSPage() {
     if (!pl) return;
     pos.items.forEach(item => {
       const variant    = allVariants.find(v => v.id === item.variant_id);
-      const priceEntry = (variant?.prices as any[])?.find((pr: any) => pr.price_level_id === plId);
-      if (priceEntry?.price_ht)            pos.updatePrice(item.id, priceEntry.price_ht);
-      else if ((pl as any).discount_percent) {
+      const priceEntry = variant?.prices?.find(pr => pr.price_level_id === plId);
+      if (priceEntry?.price)               pos.updatePrice(item.id, priceEntry.price);
+      else if (pl.discount_percent) {
         const origPrice = variant?.default_selling_price_ht ?? item.unit_price_ht;
-        pos.updatePrice(item.id, origPrice * (1 - (pl as any).discount_percent / 100));
+        pos.updatePrice(item.id, origPrice * (1 - pl.discount_percent / 100));
       }
     });
-  }, [priceLevelsList, allVariants, pos.items, pos.updatePrice]);
+  }, [priceLevelsList, allVariants, pos]);
 
   // ── Print Settings ──────────────────────────────────────────────────────────
   const { template, enabled: isPrintEnabled, copies, paperWidth, autoPrint, showPreview }
@@ -929,6 +815,7 @@ function POSPage() {
   const handlePrintDirect = useCallback(async (
     snap: POSSaleSnapshot,
   ) => {
+    if (!template) { safeToast.error('لا يوجد قالب طاعة'); return; }
     try {
       const resolvedDocNum = snap.docNumber;
 
@@ -940,14 +827,14 @@ function POSPage() {
 
       const isThermalPaper = template.paper_size === '80mm' || template.paper_size === '58mm';
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
-        const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? {} as any);
+        const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
         const result = await printThermalViaWebUSBFromTemplate(template, data, resolvedDocNum);
         if (result.ok) {
           safeToast.success('✅ تمت الطباعة الحرارية');
         } else {
           safeToast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
           await printReceiptDirect({
-            html, paperWidth, copies,
+            html, paperWidth, copies: copies ?? 1,
             onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`),
           });
         }
@@ -958,10 +845,11 @@ function POSPage() {
           onError: (e) => safeToast.error(`خطأ في الطباعة: ${e.message}`),
         });
       }
-    } catch (e: any) {
-      safeToast.error(`خطأ في تجهيز الطباعة: ${e.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      safeToast.error(`خطأ في تجهيز الطباعة: ${message}`);
     }
-  }, [template, companyData, paperWidth, copies, settings.printMode]);
+  }, [template, safeToast, companyData, settings.printMode, paperWidth, copies]);
 
   // ── Complete Sale ──────────────────────────────────────────────────────────
 const handleCompleteSale = useCallback(async (params: {
@@ -982,10 +870,10 @@ const handleCompleteSale = useCallback(async (params: {
     if (!defaultWarehouse) return { ok: false, message: 'لا يوجد مستودع مُفعَّل' };
     if (!fiscalYear)       return { ok: false, message: 'لا توجد سنة مالية نشطة' };
 
-    const currentItems   = pos.items;
-    const currentTotals  = pos.totals;
-    const currentClient  = pos.client;
-    const currentInvDisc = pos.invoiceDiscountPct;
+    const currentItems   = posRef.current.items;
+    const currentTotals  = posRef.current.totals;
+    const currentClient  = posRef.current.client;
+    const currentInvDisc = posRef.current.invoiceDiscountPct;
 
     try {
       const snapshot = { items: [...currentItems], totals: { ...currentTotals } };
@@ -1025,7 +913,7 @@ const handleCompleteSale = useCallback(async (params: {
         party_id:       currentClient?.id ?? null,
         warehouse_id:   defaultWarehouse.id,
         fiscal_year_id: fiscalYear.id,
-        currency_id:    params.currencyId ?? defaultCurrency?.id ?? null,
+        currency_id:    params.currencyId ?? defaultCurrency?.id ?? undefined,
         document_date:  new Date().toISOString().slice(0, 10),
         due_date:       params.dueDate ?? null,
         notes:          params.note ?? cartNote ?? null,
@@ -1084,9 +972,7 @@ const handleCompleteSale = useCallback(async (params: {
       const invoiceRemaining  = Math.max(0, effectiveTotalTtc - totalPaid);
       const invoiceChange     = Math.max(0, totalPaid - effectiveTotalTtc);
       // SSOT: backend computes balance_data — no more partyBalancesApi.getOne()
-      const bd = (res as any)?.balance_data;
-      const prevBalance = bd?.previous_balance ?? 0;
-      const newBalance  = bd?.new_balance ?? 0;
+      const newBalance = res?.balance_data?.new_balance ?? 0;
 
       // Invalidate client balance so cart & payment modal show updated value
       if (currentClient?.id) {
@@ -1094,6 +980,8 @@ const handleCompleteSale = useCallback(async (params: {
           queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id),
         });
       }
+
+      const prevBalance = res?.balance_data?.previous_balance ?? editingPrevBalanceRef.current;
 
       const fullSnapshot: POSSaleSnapshot = {
         items: snapshot.items.map(i => ({
@@ -1119,7 +1007,7 @@ const handleCompleteSale = useCallback(async (params: {
         docDate: new Date().toISOString().slice(0, 10),
         client: currentClient,
         payments: params.payments?.filter(p => p.amount > 0).map(p => ({
-          paymentModeId: p.paymentModeId, amount: p.amount,
+          mode: String(p.paymentModeId), amount: p.amount,
         })) ?? [],
         dueDate: params.dueDate,
         prevBalance,
@@ -1131,10 +1019,9 @@ const handleCompleteSale = useCallback(async (params: {
       editingPrevBalanceRef.current = undefined;
       receiptSnapshotRef.current = fullSnapshot;
       setReceiptSnapshot(fullSnapshot);
-      setLastDocNum(res.document_number);
       setCartNote('');
-      pos.setInvoiceDiscountPct(0);
-      pos.clearCart();
+      posRef.current.setInvoiceDiscountPct(0);
+      posRef.current.clearCart();
       setSelectedCartItemId(null);
 
       if (autoPrint && isPrintEnabled && template) {
@@ -1156,12 +1043,13 @@ const handleCompleteSale = useCallback(async (params: {
       safeToast.success(`✅ تم حفظ الفاتورة ${res.document_number ?? ''}`);
       return { ok: true, docNumber: res.document_number };
 
-    } catch (err: any) {
-      const msg = err?.errors?.lines?.[0] ?? err?.message ?? 'فشل حفظ الفاتورة';
+    } catch (err: unknown) {
+      const parsedErr = err as { errors?: { lines?: string[] }; message?: string };
+      const msg = parsedErr.errors?.lines?.[0] ?? parsedErr.message ?? 'فشل حفظ الفاتورة';
       safeToast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode, autoPrint, isPrintEnabled, template, handlePrintDirect, showPreview, invoiceDiscountAmount, buildIncrementInput, editingDocumentId]);
+  }, [settings.defaultDocTypeCode, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, cartNote, editingDocumentId, currentSession?.id, autoPrint, isPrintEnabled, template, showPreview, safeToast, defaultTreasury?.id, editingDocStatus, incrementMut, invoiceDiscountAmount, queryClient, slug, handlePrintDirect]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -1181,7 +1069,7 @@ const handleCompleteSale = useCallback(async (params: {
     quickItems.some(q => q.variantId === variantId), [quickItems]);
 
   const handleAddItem = useCallback((v: ProductVariant) => {
-    pos.addItem(v);
+    posRef.current.addItem(v);
     // Auto-select + scroll to added item so user can immediately set qty via *<digits> Enter
     const items = useCartStore.getState().items;
     const added = items.find(i => i.variant_id === v.id);
@@ -1189,11 +1077,11 @@ const handleCompleteSale = useCallback(async (params: {
     // Keep grid highlight on the added product (allVariants if search will clear, else filteredVariants)
     const idx = (settings.clearSearchOnAdd ? allVariants : filteredVariants).findIndex(fv => fv.id === v.id);
     if (idx >= 0) setHighlightedIndex(idx);
-    safeToast.success(v.product?.name ?? v.name ?? 'تمت الإضافة', {
+    safeToast.success(v.product?.name ?? v.variant_name ?? 'تمت الإضافة', {
       id: 'pos-last-added',
       duration: 1500,
     });
-    if (settings.clearSearchOnAdd) pos.setSearch('');
+    if (settings.clearSearchOnAdd) posRef.current.setSearch('');
     // Focus search AFTER scrollToItemId's double-RAF cart-row focus finishes
     requestAnimationFrame(() => {
       if (added) cartApiRef.current?.scrollToItemId(added.id);
@@ -1203,7 +1091,7 @@ const handleCompleteSale = useCallback(async (params: {
         });
       });
     });
-  }, [pos, settings, allVariants, filteredVariants]);
+  }, [settings.clearSearchOnAdd, allVariants, filteredVariants, safeToast]);
 
   const handleArrowUp = useCallback(() => {
     setHighlightedIndex(prev => prev > 0 ? prev - 1 : filteredVariants.length - 1);
@@ -1220,11 +1108,11 @@ const handleCompleteSale = useCallback(async (params: {
         if (qtyMatch) {
         const qty = parseInt(qtyMatch[1], 10);
         if (qty > 0) {
-          pos.updateQty(selectedCartItemId, qty);
-          const itemName = pos.items.find(i => i.id === selectedCartItemId)?.product_name ?? '';
+          posRef.current.updateQty(selectedCartItemId, qty);
+          const itemName = posRef.current.items.find(i => i.id === selectedCartItemId)?.product_name ?? '';
           safeToast.success(`${itemName} — الكمية ${qty}`, { id: 'pos-qty-cmd', duration: 1200 });
           skipNextSearchResetRef.current = true;
-          pos.setSearch(prevSearchRef.current);
+          posRef.current.setSearch(prevSearchRef.current);
         } else {
           safeToast.error('الكمية يجب أن تكون أكبر من صفر', { id: 'pos-qty-cmd-err', duration: 1500 });
         }
@@ -1243,7 +1131,7 @@ const handleCompleteSale = useCallback(async (params: {
       if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending))
         handleAddItem(first);
     }
-  }, [pos.searchQuery, selectedCartItemId, pos, settings.keyboardNav, filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
+  }, [selectedCartItemId, pos.searchQuery, settings.keyboardNav, safeToast, filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
 
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -1287,7 +1175,6 @@ const handleCompleteSale = useCallback(async (params: {
         isEmpty={isEmpty}
         isFullscreen={fullscreen}
         showQuickbar={showQuickbar}
-        items={pos.items}
         totals={pos.totals}
         totalTtcFinal={adjustedTotalTtcFinal}
         slug={slug}
@@ -1299,7 +1186,17 @@ const handleCompleteSale = useCallback(async (params: {
         onReturn={() => setModal('returns')}
         onReceipt={() => {
           if (!isEmpty) {
-            setReceiptSnapshot({ items: [...pos.items], totals: { ...pos.totals } });
+            const snapItems = pos.items.map(i => ({
+              name: i.product_name, ref: i.ref, qty: i.quantity,
+              unit_price_ht: i.unit_price_ht, unit: i.unit_symbol,
+              tva_rate: i.tva_rate, discount_percentage: i.discount_percentage, total_ht: i.total_ht,
+            }));
+            setReceiptSnapshot({
+              items: snapItems,
+              totals: { ...pos.totals, paid: 0, change: 0, remaining: pos.totals.total_ttc },
+              docNumber: '', docDate: new Date().toISOString().slice(0, 10),
+              payments: [],
+            });
             setModal('receipt');
           }
         }}
@@ -1361,6 +1258,7 @@ const handleCompleteSale = useCallback(async (params: {
               lowStock={filterLowStock} onLowStock={setFilterLowStock}
               minPrice={filterMinPrice} onMinPrice={setFilterMinPrice}
               maxPrice={filterMaxPrice} onMaxPrice={setFilterMaxPrice}
+              perPage={filterPerPage} onPerPage={setFilterPerPage}
               onReset={() => { setFilterInStock(false); setFilterLowStock(false); setFilterMinPrice(''); setFilterMaxPrice(''); }}
             />
           )}
@@ -1374,7 +1272,6 @@ const handleCompleteSale = useCallback(async (params: {
             onPin={toggleQuickItem} isPinned={isQuickItem}
             priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
-            stockPending={stockPending}
           />
           <PanelResizer onMouseDown={handleResizerMouseDown} />
         </div>
@@ -1521,8 +1418,8 @@ const handleCompleteSale = useCallback(async (params: {
         <Suspense fallback={null}>
           <ReturnsModal
             documentTypes={documentTypes ?? []}
-            defaultWarehouseId={defaultWarehouse?.id}
-            fiscalYearId={fiscalYear?.id}
+            defaultWarehouseId={defaultWarehouse?.id ?? null}
+            fiscalYearId={fiscalYear?.id ?? undefined}
             onClose={() => setModal('none')}
             onDone={() => setModal('none')}
           />

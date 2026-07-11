@@ -4,7 +4,7 @@
 // واجهة إعدادات POS — يُعدِّل usePOSSettings مباشرة (يُحفظ في localStorage)
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { POSSettings, PriceDisplayMode, GridDefaultSize } from '@/pos/hooks/usePOSSettings';
 import { isWebUsbSupported } from '@/pos/utils/printService';
 import type { Warehouse, DocumentType } from '@/types';
@@ -173,7 +173,7 @@ export default function POSSettingsModal({
               <div className="fg s2" key={key}>
                 <Switch
                   checked={local[key] as boolean}
-                  onChange={v => patch({ [key]: v } as any)}
+                  onChange={v => patch({ [key]: v } as Partial<POSSettings>)}
                   label={label}
                 />
               </div>
@@ -206,7 +206,7 @@ export default function POSSettingsModal({
                   <label>مكان ظهور الإشعارات</label>
                   <select
                     value={local.toastPosition}
-                    onChange={e => patch({ toastPosition: e.target.value as any })}
+                    onChange={e => patch({ toastPosition: e.target.value as POSSettings['toastPosition'] })}
                   >
                     {TOAST_POSITION_OPTIONS.map(o => (
                       <option key={o.value} value={o.value}>{o.label}</option>
@@ -302,7 +302,7 @@ export default function POSSettingsModal({
                       type="radio" name="printMode" value={opt.value}
                       style={{ display: 'none' }}
                       checked={local.printMode === opt.value}
-                      onChange={() => patch({ printMode: opt.value as any })}
+                      onChange={() => patch({ printMode: opt.value as POSSettings['printMode'] })}
                     />
                     <div style={{ fontWeight: local.printMode === opt.value ? 700 : 400, fontSize: 13, color: local.printMode === opt.value ? 'var(--em)' : 'var(--t2)' }}>
                       {opt.label}

@@ -61,6 +61,8 @@ interface ProfessionalCartProps {
 export interface ProfessionalCartHandle {
   /** تمرير السلة إلى موقع صنف معيّن وتركيزه */
   scrollToItemId: (itemId: string) => void;
+  /** فتح مودال اختيار الزبون */
+  openCustomerModal: () => void;
 }
 
 // كثافة عرض صفوف السلة — مفتاح حفظ محلي مستقل عن الشركة (تفضيل جهاز/كاشير)
@@ -201,6 +203,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
         });
       });
     },
+    openCustomerModal: () => setShowCustModal(true),
   }), [items, rowVirtualizer]);
 
   const handleInvDiscAmount = useCallback((raw: string) => {
