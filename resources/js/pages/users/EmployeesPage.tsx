@@ -1,6 +1,5 @@
 // resources/js/pages/users/EmployeesPage.tsx
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -12,7 +11,10 @@ import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
 import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
-import apiClient from '@/lib/api/core/client';
+import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
+import { employeesApi } from '@/lib/api/endpoints/employees';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { apiGet } from '@/lib/api/core/client';
 import type { Employee } from '@/types';
 
 export default function EmployeesPage() {
@@ -20,26 +22,23 @@ export default function EmployeesPage() {
     const [statusFilter, setStatusFilter] = useState('');
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
     const modal = useModal();
-    const qc = useQueryClient();
 
-    const { data: employees, isLoading, error } = useQuery({
-        queryKey: ['employees', search, statusFilter],
-        queryFn: () => apiClient.get('/employees', {
-            params: {
-                search: search || undefined,
-                employment_status: statusFilter || undefined
-            }
-        }).then(r => r.data.data),
-    });
+    const { data: employees, isLoading, error } = useTenantQuery<Employee[]>(
+        (slug) => [slug, 'employees', search, statusFilter] as const,
+        () => employeesApi.list({
+            search: search || undefined,
+            employment_status: statusFilter || undefined
+        }),
+    );
 
     const activeEmployees = employees?.filter((emp: any) => emp.employment_status === 'active') || [];
     const suspendedEmployees = employees?.filter((emp: any) => emp.employment_status === 'suspended') || [];
     const terminatedEmployees = employees?.filter((emp: any) => emp.employment_status === 'terminated') || [];
 
-    const deleteMutation = useMutation({
-        mutationFn: (id: number) => apiClient.delete(`/employees/${id}`),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
-    });
+    const deleteMutation = useTenantMutation(
+        (id: number) => employeesApi.delete(id),
+        (slug) => [slug, 'employees'] as const,
+    );
 
     const openAdd = () => { setEditingEmployee(null); modal.openModal(); };
     const openEdit = (emp: Employee) => { setEditingEmployee(emp); modal.openModal(); };
@@ -169,7 +168,6 @@ function EmployeeModal({ open, employee, onClose }: {
     onClose: () => void;
 }) {
     const isEdit = !!employee;
-    const qc = useQueryClient();
 
     const emptyForm = {
         first_name: '',
@@ -189,12 +187,11 @@ function EmployeeModal({ open, employee, onClose }: {
     const [error, setError] = useState('');
 
     // Fetch genders
-    const { data: genders } = useQuery({
-        queryKey: ['genders'],
-        queryFn: () => apiClient.get('/genders').then(r => r.data.data),
-        staleTime: 10 * 60_000,
-        enabled: open,
-    });
+    const { data: genders } = useTenantQuery(
+        (slug) => tenantKeys.lookups.genders(slug),
+        () => apiGet('/genders').then(r => r.data.data),
+        { staleTime: 10 * 60_000, enabled: open },
+    );
 
     // إعادة تعيين النموذج
     useEffect(() => {
@@ -228,8 +225,8 @@ function EmployeeModal({ open, employee, onClose }: {
 
     // في EmployeesPage.tsx، داخل EmployeeModal، عدل saveMutation:
 
-const saveMutation = useMutation({
-    mutationFn: (data: typeof form) => {
+const saveMutation = useTenantMutation(
+    (data: typeof form) => {
         const payload: any = {
             first_name: data.first_name,
             last_name: data.last_name,
@@ -246,24 +243,24 @@ const saveMutation = useMutation({
 
         // ✅ لا نرسل created_by - الباك-إند يجب أن يتعامل معها تلقائياً
         if (isEdit) {
-            return apiClient.put(`/employees/${employee!.id}`, payload);
+            return employeesApi.update(employee!.id, payload);
         }
-        return apiClient.post('/employees', payload);
+        return employeesApi.create(payload);
     },
-    onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ['employees'] });
-        onClose();
+    (slug) => [slug, 'employees'] as const,
+    {
+        onSuccess: () => onClose(),
+        onError: (err: any) => {
+            const msg = err?.response?.data?.message || err?.response?.data?.error || 'فشل الحفظ. تحقق من البيانات.';
+            // ✅ إذا كان الخطأ يتعلق بـ created_by، نعرض رسالة أوضح
+            if (msg.includes('created_by')) {
+                setError('خطأ في الخادم: تأكد من تسجيل الدخول بشكل صحيح.');
+            } else {
+                setError(msg);
+            }
+        },
     },
-    onError: (err: any) => {
-        const msg = err?.response?.data?.message || err?.response?.data?.error || 'فشل الحفظ. تحقق من البيانات.';
-        // ✅ إذا كان الخطأ يتعلق بـ created_by، نعرض رسالة أوضح
-        if (msg.includes('created_by')) {
-            setError('خطأ في الخادم: تأكد من تسجيل الدخول بشكل صحيح.');
-        } else {
-            setError(msg);
-        }
-    },
-});
+);
 
     const handleSave = () => {
         if (!form.first_name.trim() || !form.last_name.trim() || !form.matricule.trim()) {

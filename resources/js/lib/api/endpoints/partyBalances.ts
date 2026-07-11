@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
-import { useActiveSlug } from '@/lib/store/appStore';
+import { useActiveSlug, useSelectedYearId } from '@/lib/store/appStore';
 import type { PartyBalance } from '../core/types';
 
 export const partyBalancesApi = {
@@ -14,11 +14,12 @@ export const partyBalancesApi = {
 };
 
 export function usePartyBalances(params?: { date?: string; party_type_id?: number; search?: string }) {
-    const slug = useActiveSlug();
+    const slug   = useActiveSlug();
+    const yearId = useSelectedYearId();
 
     return useQuery({
-        queryKey: tenantKeys.partyBalances.list(slug ?? '', params as Record<string, unknown>),
-        queryFn:  () => partyBalancesApi.getAll(params),
+        queryKey: tenantKeys.partyBalances.list(slug ?? '', { ...params, year_id: yearId } as Record<string, unknown>),
+        queryFn:  () => partyBalancesApi.getAll({ ...params, year_id: yearId ?? undefined }),
         enabled:  !!slug,
         staleTime: 2 * 60_000,
 

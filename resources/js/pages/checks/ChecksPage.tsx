@@ -85,13 +85,15 @@ export default function ChecksPage() {
     queryKey: [slug, 'checks'],
     queryFn:  () => apiGet<any[]>('/checks', { include: 'party' }),
     select:   (r: any) => (r?.data ?? r ?? []) as Check[],
+    enabled:  !!slug,
   });
 
   const { data: parties = [] } = useQuery({
-    queryKey: ['parties-mini', slug],
+    queryKey: [slug, 'parties-mini'],
     queryFn:  () => apiGet<any[]>('/parties', { per_page: 500, sort: 'name' }),
     select:   (r: any) => (r?.data ?? r ?? []),
     staleTime: 10 * 60_000,
+    enabled:  !!slug,
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────

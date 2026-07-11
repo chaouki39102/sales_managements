@@ -1,5 +1,5 @@
 // resources/js/pages/products/ProductsPage.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -13,11 +13,12 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import Switch from '@/components/ui/Switch';
 import ProgressBar from '@/components/ui/ProgressBar';
-import ProductModal from '@/components/products/ProductModal';
-import ImportWizardModal from '@/pages/import/ImportWizardModal';
+const ProductModal = React.lazy(() => import('@/components/products/ProductModal'));
+const ImportWizardModal = React.lazy(() => import('@/pages/import/ImportWizardModal'));
 import { PRODUCT_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
+import { useProductAggregatedLookups } from '@/lib/api/endpoints/lookups';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
 import type { Column } from '@/components/ui/DataTable';
@@ -188,32 +189,21 @@ export default function ProductsPage() {
   // Tooltip للتعبئات والأسعار
   const [priceTooltip, setPriceTooltip] = useState<number | null>(null);
 
-  // ── Lookups ──
- const { data: families = [] } = useQuery<Family[]>({
-    queryKey: ['families'],          // ← احذف slug — lookups مشتركة لا تتغير بالصفحة
-    queryFn: () => apiClient.get('/families', { params: { per_page: 200 } }).then(r => r.data.data ?? []),
-    staleTime: 30 * 60_000,         // ← من 5 إلى 30 دقيقة
-    gcTime: 60 * 60_000,            // ← أضف هذا: يبقى في الـ cache ساعة كاملة
-    enabled: !!slug,
-});
-
-const { data: brands = [] } = useQuery<Brand[]>({
-    queryKey: ['brands'],            // ← احذف slug
-    queryFn: () => apiClient.get('/brands', { params: { per_page: 200 } }).then(r => r.data.data ?? []),
-    staleTime: 30 * 60_000,         // ← من 5 إلى 30 دقيقة
-    gcTime: 60 * 60_000,            // ← أضف هذا
-    enabled: !!slug,
-});
+  // ── Lookups — single aggregated request (7 HTTP → 1) ──
+  const { data: productLookups, isLoading: lookupsLoading } = useProductAggregatedLookups();
+  const families = productLookups?.families ?? [];
+  const brands   = productLookups?.brands ?? [];
 
   // ── Products Query — include الصحيح بدون variants ──
-  const { data: response, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['products', slug, debouncedSearch, familyFilter, brandFilter, activeFilter, page, perPage, sortField, sortDir],
+  // NOTE: Key prefix MUST match tenantKeys.products.all(slug) = [slug, 'products']
+  // so that ProductModal's qc.invalidateQueries works correctly (prefix matching).
+  const { data: response, isLoading, isFetching } = useQuery({
+    queryKey: [slug, 'products', debouncedSearch, familyFilter, brandFilter, activeFilter, page, perPage, sortField, sortDir],
     queryFn: () => {
       const params: Record<string, any> = {
         sort: sortDir === 'desc' ? `-${sortField}` : sortField,
         per_page: perPage,
         page,
-        // ✅ include مسموح به فعلاً من الـ backend
         include: 'family,brand,productType,prices,packagings',
       };
       if (debouncedSearch) params['filter[search]'] = debouncedSearch;
@@ -244,7 +234,7 @@ const { data: brands = [] } = useQuery<Brand[]>({
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.delete(`/products/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: [slug, 'products'] });
       showToast('تم حذف المنتج بنجاح');
       deleteModal.closeModal();
       setDeletingId(null);
@@ -259,7 +249,7 @@ const { data: brands = [] } = useQuery<Brand[]>({
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, active }: { id: number; active: boolean }) =>
       apiClient.put(`/products/${id}`, { active }).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', slug] }),
     onError: () => showToast('فشل تغيير الحالة', 'error'),
   });
 
@@ -388,7 +378,7 @@ const { data: brands = [] } = useQuery<Brand[]>({
   // ── Bulk ──
   const bulkToggle = async (active: boolean) => {
     await Promise.all(selectedIds.map(id => toggleActiveMutation.mutateAsync({ id, active })));
-    qc.invalidateQueries({ queryKey: ['products'] });
+    qc.invalidateQueries({ queryKey: [slug, 'products'] });
     showToast(`تم ${active ? 'تفعيل' : 'تعطيل'} ${selectedIds.length} منتج`);
     setSelectedIds([]);
   };
@@ -396,7 +386,7 @@ const { data: brands = [] } = useQuery<Brand[]>({
   const bulkDelete = async () => {
     if (!await deleteConfirm.confirm(`حذف ${selectedIds.length} منتج؟`)) return;
     await Promise.all(selectedIds.map(id => apiClient.delete(`/products/${id}`)));
-    qc.invalidateQueries({ queryKey: ['products'] });
+    qc.invalidateQueries({ queryKey: [slug, 'products'] });
     showToast(`تم حذف ${selectedIds.length} منتج`);
     setSelectedIds([]);
   };
@@ -598,15 +588,16 @@ const { data: brands = [] } = useQuery<Brand[]>({
       )}
 
       {/* Product Modal */}
-      <ProductModal
-        open={modal.open}
-        product={editingProduct}
-        onClose={() => { modal.closeModal(); setEditingProduct(null); }}
-        onSaved={() => {
-          refetch();
-          showToast(editingProduct ? 'تم تعديل المنتج بنجاح' : 'تمت إضافة المنتج بنجاح');
-        }}
-      />
+      <Suspense fallback={null}>
+        <ProductModal
+          open={modal.open}
+          product={editingProduct}
+          onClose={() => { modal.closeModal(); setEditingProduct(null); }}
+          onSaved={() => {
+            showToast(editingProduct ? 'تم تعديل المنتج بنجاح' : 'تمت إضافة المنتج بنجاح');
+          }}
+        />
+      </Suspense>
 
       {/* Confirm Delete */}
       <Modal open={deleteModal.open} onClose={deleteModal.closeModal} size="sm" title="تأكيد حذف المنتج">
@@ -628,11 +619,13 @@ const { data: brands = [] } = useQuery<Brand[]>({
       </Modal>
 
       {/* Import Wizard */}
-      <ImportWizardModal
-        open={importModal.open}
-        onClose={importModal.closeModal}
-        config={PRODUCT_IMPORT_CONFIG}
-      />
+      <Suspense fallback={null}>
+        <ImportWizardModal
+          open={importModal.open}
+          onClose={importModal.closeModal}
+          config={PRODUCT_IMPORT_CONFIG}
+        />
+      </Suspense>
       <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );

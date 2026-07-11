@@ -3804,7 +3804,7 @@ function DocumentsTab({
         const diff = getDiff(current as Record<string, unknown>);
         if (Object.keys(diff).length === 0) return;
         await saveSettings(diff);
-        await qc.invalidateQueries({ queryKey: ["settings"] });
+        await qc.invalidateQueries({ queryKey: tenantKeys.settings.current(slug) });
         markClean();
         onClean?.();
     };

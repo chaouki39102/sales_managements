@@ -424,9 +424,9 @@ export function useDebtsReport() {
   const slug   = useActiveSlug();
   const yearId = useSelectedYearId();
   return useQuery({
-    queryKey:  tenantKeys.reports.debts(slug ?? ''),
+    queryKey:  [slug, 'reports', 'debts', yearId],
     queryFn:   () => reportsApi.customers({ year_id: yearId ?? undefined, with_balance: true }),
-    enabled:   !!slug,
+    enabled:   !!slug && !!yearId,
     staleTime: 3 * 60_000,
   });
 }

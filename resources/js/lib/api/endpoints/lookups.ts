@@ -94,7 +94,54 @@ export const tenantLookupsApi = {
   valuationMethods:    () => apiGet<InventoryValuationMethod[]>('/inventory-valuation-methods'),
   numberingSeries:     () => apiGet<NumberingSeries[]>('/numbering-series',       { per_page: 50  }),
   treasuryAccounts:    () => apiGet<TreasuryAccount[]>('/treasury-accounts',      { per_page: 50  }),
+  productsAggregated:  () => apiGet<ProductAggregatedLookups>('/lookups/products'),
 } as const;
+
+// ─── Aggregated lookups type ──────────────────────────────────────────────────
+export interface ProductAggregatedLookups {
+  families:          Family[];
+  brands:            Brand[];
+  units:             Unit[];
+  tvas:              Tva[];
+  priceLevels:       PriceLevel[];
+  productTypes:      ProductType[];
+  valuationMethods:  InventoryValuationMethod[];
+  regulatedProducts: { id: number; product_key: string; label: string; unit_label: string; category: string; regulated_max_price: number; active: boolean }[];
+}
+
+// ─── Aggregated products lookups hook ──────────────────────────────────────────
+const EMPTY_LOOKUPS: ProductAggregatedLookups = {
+  families: [], brands: [], units: [], tvas: [],
+  priceLevels: [], productTypes: [], valuationMethods: [], regulatedProducts: [],
+};
+
+function normalizeLookups(raw: unknown): ProductAggregatedLookups {
+  if (!raw || typeof raw !== 'object') return EMPTY_LOOKUPS;
+  const obj = raw as Record<string, unknown>;
+  const pick = (k: string) => Array.isArray(obj[k]) ? obj[k] as never[] : [];
+  return {
+    families:          pick('families'),
+    brands:            pick('brands'),
+    units:             pick('units'),
+    tvas:              pick('tvas'),
+    priceLevels:       pick('priceLevels'),
+    productTypes:      pick('productTypes'),
+    valuationMethods:  pick('valuationMethods'),
+    regulatedProducts: pick('regulatedProducts'),
+  };
+}
+
+export function useProductAggregatedLookups() {
+  const slug = useActiveSlug();
+  return useQuery<ProductAggregatedLookups>({
+    queryKey: tenantKeys.lookups.productsAggregated(slug ?? ''),
+    queryFn:  () => tenantLookupsApi.productsAggregated(),
+    select:   (raw) => normalizeLookups(raw),
+    enabled:  !!slug,
+    staleTime: TENANT_STALE,
+    gcTime:   60 * 60_000,
+  });
+}
 
 // ─── Hook factory ─────────────────────────────────────────────────────────────
 function useTenantLookup<T>(
@@ -155,7 +202,12 @@ function useLookupMutations<T extends Entity>(
 ) {
   const slug = useActiveSlug();
   const qc   = useQueryClient();
-  const inv  = () => { if (slug) qc.invalidateQueries({ queryKey: keyFn(slug) }); };
+  const inv  = () => {
+    if (!slug) return;
+    qc.invalidateQueries({ queryKey: keyFn(slug) });
+    // Also invalidate the aggregated products lookups cache (shares data with individual lookups)
+    qc.invalidateQueries({ queryKey: tenantKeys.lookups.productsAggregated(slug) });
+  };
 
   return {
     create: useMutation({ mutationFn: (data: Omit<T, 'id'>)                              => apiPost<T>(`/${resource}`, data),           onSuccess: inv }),

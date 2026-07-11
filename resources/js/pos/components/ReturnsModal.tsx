@@ -36,6 +36,7 @@ export default function ReturnsModal({
         search: search.trim(),
         include: 'lines,lines.product_variant,party',
         per_page: 5,
+        fiscal_year_id: fiscalYearId,
       });
       const found = Array.isArray(res) ? res : res.data ?? [];
       if (found.length === 0) {

@@ -1,6 +1,5 @@
 // resources/js/pages/settings/PaymentMethodsPage.tsx
-import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
 import { useModal } from '@/hooks/useModal';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -11,40 +10,18 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
-import apiClient from '@/lib/api/core/client';
+import { useTenantQueryPaginated, useTenantMutation } from '@/hooks/useTenantQuery';
+import { paymentMethodsApi } from '@/lib/api/endpoints/paymentMethods';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { useActiveSlug } from '@/lib/store/appStore';
+import { useTreasuryAccountsList } from '@/lib/api/endpoints/treasuryAccounts';
+import type { PaymentMethod } from '@/lib/api/core/types';
 
 // --------------- Types ---------------
-interface PaymentMethod {
-  id: number;
-  name: string;
-  code: string;
-  description?: string;
-  treasury_account_id?: number | null;
-  requires_reference: boolean;
-  is_cash: boolean;
-  active: boolean;
-  display_order: number;
-  relations?: {
-    treasuryAccount?: { id: number; name: string };
-  };
-}
-
 interface TreasuryAccount {
   id: number;
   name: string;
 }
-
-// --------------- API Layer ---------------
-const paymentMethodsApi = {
-  list: (params: Record<string, any>) =>
-    apiClient.get('/payment-modes', { params }).then(r => r.data),
-  create: (data: any) =>
-    apiClient.post('/payment-modes', data).then(r => r.data),
-  update: (id: number, data: any) =>
-    apiClient.put(`/payment-modes/${id}`, data).then(r => r.data),
-  delete: (id: number) =>
-    apiClient.delete(`/payment-modes/${id}`).then(r => r.data),
-};
 
 // --------------- Debounce ---------------
 function useDebounce<T>(value: T, delay = 300): T {
@@ -58,7 +35,7 @@ function useDebounce<T>(value: T, delay = 300): T {
 
 // =============== Main Component ===============
 export default function PaymentMethodsPage() {
-  const qc = useQueryClient();
+  const slug = useActiveSlug();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 350);
   const [page, setPage] = useState(1);
@@ -70,43 +47,38 @@ export default function PaymentMethodsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch payment methods
-  const { data: paginated, isLoading, isFetching } = useQuery({
-    queryKey: ['payment-modes', debouncedSearch, page, perPage],
-    queryFn: () => paymentMethodsApi.list({
+  const { data: paginated, isLoading, isFetching } = useTenantQueryPaginated(
+    (s) => [s, 'payment-modes', debouncedSearch, page, perPage] as const,
+    () => paymentMethodsApi.list({
       'filter[search]': debouncedSearch || undefined,
       sort: 'name',
       per_page: perPage,
       page,
       include: 'treasuryAccount',
     }),
-    placeholderData: keepPreviousData,
-    staleTime: 30_000,
-  });
+  );
 
   const methods: PaymentMethod[] = paginated?.data ?? [];
   const meta = paginated?.meta;
 
   // Treasury accounts (for modal)
-  const { data: treasuryAccounts } = useQuery<TreasuryAccount[]>({
-    queryKey: ['treasury-accounts-select'],
-    queryFn: () => apiClient.get('/treasury-accounts', { params: { per_page: 200 } })
-      .then(r => r.data.data),
-    staleTime: 5 * 60_000,
-  });
+  const { data: treasuryAccounts } = useTreasuryAccountsList();
 
   // Mutations
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => paymentMethodsApi.delete(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['payment-modes'] });
-      deleteModal.closeModal();
-      setError(null);
+  const deleteMutation = useTenantMutation(
+    (id: number) => paymentMethodsApi.delete(id),
+    (s) => [s, 'payment-modes'] as const,
+    {
+      onSuccess: () => {
+        deleteModal.closeModal();
+        setError(null);
+      },
+      onError: (err: any) => {
+        setError(err?.response?.data?.message || 'فشل الحذف');
+        deleteModal.closeModal();
+      },
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.message || 'فشل الحذف');
-      deleteModal.closeModal();
-    },
-  });
+  );
 
   const handleDelete = (id: number) => {
     setDeletingId(id);
@@ -233,6 +205,7 @@ export default function PaymentMethodsPage() {
         open={modal.open}
         record={editing}
         treasuryAccounts={treasuryAccounts ?? []}
+        slug={slug}
         onClose={modal.closeModal}
       />
 
@@ -269,12 +242,11 @@ function ConfirmDeleteModal({ open, onClose, onConfirm, loading }: {
 
 // =============== Add/Edit Modal ===============
 function PaymentMethodModal({
-  open, record, treasuryAccounts, onClose,
+  open, record, treasuryAccounts, slug, onClose,
 }: {
-  open: boolean; record: PaymentMethod | null; treasuryAccounts: TreasuryAccount[]; onClose: () => void;
+  open: boolean; record: PaymentMethod | null; treasuryAccounts: TreasuryAccount[]; slug: string; onClose: () => void;
 }) {
   const isEdit = !!record;
-  const qc = useQueryClient();
 
   const emptyForm = {
     name: '',
@@ -325,8 +297,8 @@ function PaymentMethodModal({
     return Object.keys(errs).length === 0;
   };
 
-  const saveMutation = useMutation({
-    mutationFn: (data: typeof form) => {
+  const saveMutation = useTenantMutation(
+    (data: typeof form) => {
       const payload = {
         ...data,
         treasury_account_id: data.treasury_account_id ? parseInt(String(data.treasury_account_id)) : null,
@@ -335,23 +307,23 @@ function PaymentMethodModal({
         ? paymentMethodsApi.update(record!.id, payload)
         : paymentMethodsApi.create(payload);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['payment-modes'] });
-      onClose();
-    },
-    onError: (err: any) => {
-      const msg = err?.response?.data;
-      if (msg?.errors) {
-        const fieldErrors: Record<string, string> = {};
-        for (const [k, v] of Object.entries(msg.errors)) {
-          fieldErrors[k] = (v as string[])[0];
+    (s) => [s, 'payment-modes'] as const,
+    {
+      onSuccess: () => onClose(),
+      onError: (err: any) => {
+        const msg = err?.response?.data;
+        if (msg?.errors) {
+          const fieldErrors: Record<string, string> = {};
+          for (const [k, v] of Object.entries(msg.errors)) {
+            fieldErrors[k] = (v as string[])[0];
+          }
+          setErrors(fieldErrors);
+        } else {
+          setServerError(msg?.message || 'فشل الحفظ');
         }
-        setErrors(fieldErrors);
-      } else {
-        setServerError(msg?.message || 'فشل الحفظ');
-      }
+      },
     },
-  });
+  );
 
   const handleSave = () => {
     if (!validate()) return;

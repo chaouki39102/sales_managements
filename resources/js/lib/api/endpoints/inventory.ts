@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut, apiDelete } from "../core/client";
 import { tenantKeys } from "../core/queryKeys";
-import { useActiveSlug } from "../../store/appStore";
+import { useActiveSlug, useSelectedYearId } from "../../store/appStore";
 import type {
     StockMovement,
     ProductLot,
@@ -102,6 +102,7 @@ export interface StockAtParams {
     date?: string;
     warehouse_id?: number | null;
     search?: string;
+    fiscal_year_id?: number;
 }
 // ─── API ──────────────────────────────────────────────────────────────────────
 
@@ -194,10 +195,11 @@ export function useStockSummary() {
 
 /** قائمة حركات المخزون */
 export function useStockMovements(params?: StockMovementListParams) {
-    const slug = useActiveSlug();
+    const slug   = useActiveSlug();
+    const yearId = useSelectedYearId();
     return useQuery({
-        queryKey: tenantKeys.inventory.movements(slug ?? "", params),
-        queryFn: () => inventoryApi.movements(params),
+        queryKey: tenantKeys.inventory.movements(slug ?? "", { ...params, fiscal_year_id: yearId }),
+        queryFn: () => inventoryApi.movements({ ...params, fiscal_year_id: yearId ?? undefined }),
         enabled: !!slug,
         staleTime: 2 * 60_000,
         placeholderData: keepPreviousData,
@@ -271,10 +273,11 @@ export function useInventoryMutations() {
     };
 }
 export function useStockAt(params?: StockAtParams) {
-    const slug = useActiveSlug();
+    const slug   = useActiveSlug();
+    const yearId = useSelectedYearId();
     return useQuery({
-        queryKey: [slug, "inventory", "stock-at", params],
-        queryFn: () => inventoryApi.stockAt(params),
+        queryKey: [slug, "inventory", "stock-at", yearId, params],
+        queryFn: () => inventoryApi.stockAt({ ...params, fiscal_year_id: yearId ?? undefined } as Record<string, unknown>),
         enabled: !!slug,
         staleTime: 2 * 60_000,
         placeholderData: keepPreviousData,

@@ -151,6 +151,7 @@ export default function POSKioskPage() {
     }),
     placeholderData: keepPreviousData,
     staleTime:       60_000,
+    enabled:         !!slug,
   });
 
   const products    = (productsRaw as PaginatedResponse<Product> | undefined)?.data ?? [];

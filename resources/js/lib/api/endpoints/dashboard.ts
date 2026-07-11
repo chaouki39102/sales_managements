@@ -34,9 +34,10 @@ export function useDashboardStats() {
 }
 
 export function useSalesChart(period = 'monthly') {
-  const slug = useActiveSlug();
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
   return useQuery({
-    queryKey: [slug, 'dashboard', 'chart', period],
+    queryKey: [slug, 'dashboard', 'chart', period, yearId],
     queryFn:  () => dashboardApi.salesChart(period),
     enabled:  !!slug,
     staleTime: 5 * 60_000,
@@ -44,9 +45,10 @@ export function useSalesChart(period = 'monthly') {
 }
 
 export function useTopProducts(limit = 5) {
-  const slug = useActiveSlug();
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
   return useQuery({
-    queryKey: [slug, 'dashboard', 'top-products', limit],
+    queryKey: [slug, 'dashboard', 'top-products', limit, yearId],
     queryFn:  () => dashboardApi.topProducts(limit),
     enabled:  !!slug,
     staleTime: 5 * 60_000,
@@ -54,9 +56,10 @@ export function useTopProducts(limit = 5) {
 }
 
 export function useRecentTransactions() {
-  const slug = useActiveSlug();
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
   return useQuery({
-    queryKey: [slug, 'dashboard', 'recent-transactions'],
+    queryKey: [slug, 'dashboard', 'recent-transactions', yearId],
     queryFn:  dashboardApi.recentTransactions,
     enabled:  !!slug,
     staleTime: 60_000,

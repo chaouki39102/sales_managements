@@ -1,7 +1,5 @@
 // resources/js/pages/settings/DocumentTypesPage.tsx
-// resources/js/pages/settings/DocumentTypesPage.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -12,7 +10,10 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
-import apiClient from '@/lib/api/core/client';
+import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
+import { documentTypesApi, useDocumentBaseOpsList } from '@/lib/api/endpoints/documentTypes';
+import type { DocumentBaseOperation } from '@/lib/api/endpoints/documentTypes';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
 import { ConfirmDialog } from '@/components/ui';
@@ -22,7 +23,6 @@ import type { DocumentType } from '@/types';
 // MAIN COMPONENT
 // ===============================================
 export default function DocumentTypesPage() {
-    const qc = useQueryClient();
     const [editing, setEditing] = useState<DocumentType | null>(null);
     const [filter, setFilter] = useState('');
     const modal = useModal();
@@ -30,17 +30,13 @@ export default function DocumentTypesPage() {
     const notify = useNotification();
 
     // 1. جلب أنواع المستندات
-    const { data: items, isLoading, isError, refetch } = useQuery<DocumentType[]>({
-        queryKey: ['document-types', filter],
-        queryFn: () => apiClient.get('/document-types', { params: { filter: filter || undefined } }).then(r => r.data.data),
-    });
+    const { data: items, isLoading, isError, refetch } = useTenantQuery<DocumentType[]>(
+        (slug) => tenantKeys.lookups.documentTypes(slug),
+        () => documentTypesApi.list({ filter: filter || undefined }),
+    );
 
     // 2. جلب العمليات الأساسية لتحويل id -> اسم
-    const { data: operationsData } = useQuery({
-        queryKey: ['document-base-operations'],
-        queryFn: () => apiClient.get('/document-base-operations').then(r => r.data.data),
-        staleTime: 10 * 60_000, // تخزين طويل
-    });
+    const { data: operationsData } = useDocumentBaseOpsList();
 
     // إنشاء خريطة id -> label
     const operationMap = useMemo(() => {
@@ -60,13 +56,13 @@ export default function DocumentTypesPage() {
         return map;
     }, [operationsData]);
 
-    const deleteMutation = useMutation({
-        mutationFn: (id: number) => apiClient.delete(`/document-types/${id}`),
-        onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ['document-types'] });
-            notify.success('تم الحذف');
+    const deleteMutation = useTenantMutation(
+        (id: number) => documentTypesApi.delete(id),
+        (slug) => tenantKeys.lookups.documentTypes(slug),
+        {
+            onSuccess: () => notify.success('تم الحذف'),
         },
-    });
+    );
 
     const openAdd = () => { setEditing(null); modal.openModal(); };
     const openEdit = (item: DocumentType) => { setEditing(item); modal.openModal(); };
@@ -187,6 +183,7 @@ export default function DocumentTypesPage() {
             <DocumentTypeModal
                 open={modal.open}
                 docType={editing}
+                slug={slug}
                 onClose={modal.closeModal}
             />
             <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
@@ -212,11 +209,10 @@ export default function DocumentTypesPage() {
 // ===============================================
 // MODAL: Add / Edit Document Type (مع حماية البيانات التاريخية)
 // ===============================================
-function DocumentTypeModal({ open, docType, onClose }: {
-    open: boolean; docType: DocumentType | null; onClose: () => void;
+function DocumentTypeModal({ open, docType, slug, onClose }: {
+    open: boolean; docType: DocumentType | null; slug: string; onClose: () => void;
 }) {
     const isEdit = !!docType;
-    const qc = useQueryClient();
 
     // ---------- العمليات الأساسية ----------
     const STATIC_OPERATIONS = [
@@ -236,12 +232,11 @@ function DocumentTypeModal({ open, docType, onClose }: {
         return map[name] || name;
     };
 
-    const { data: serverOps, isLoading: opsLoading } = useQuery({
-        queryKey: ['document-base-operations'],
-        queryFn: () => apiClient.get('/document-base-operations').then(r => r.data.data),
-        enabled: open,
-        staleTime: 2 * 60_000,
-    });
+    const { data: serverOps, isLoading: opsLoading } = useTenantQuery<DocumentBaseOperation[]>(
+        (slug) => tenantKeys.lookups.documentBaseOps(slug),
+        () => documentTypesApi.listBaseOperations(),
+        { enabled: open, staleTime: 2 * 60_000 },
+    );
 
     const operations = React.useMemo(() => {
         const source = (Array.isArray(serverOps) && serverOps.length > 0) ? serverOps : STATIC_OPERATIONS;
@@ -255,15 +250,13 @@ function DocumentTypeModal({ open, docType, onClose }: {
     useEffect(() => {
         if (open && isEdit && docType?.id) {
             setCheckingDocs(true);
-            apiClient.get('/commercial-documents', {
-                params: { document_type_id: docType.id, per_page: 1 }
-            })
-            .then(res => {
-                const meta = res.data?.meta;
-                setDocsCount(meta?.total ?? 0);
-            })
-            .catch(() => setDocsCount(0))
-            .finally(() => setCheckingDocs(false));
+            documentTypesApi.countDocumentsForType(docType.id)
+                .then(res => {
+                    const meta = (res as any)?.meta;
+                    setDocsCount(meta?.total ?? 0);
+                })
+                .catch(() => setDocsCount(0))
+                .finally(() => setCheckingDocs(false));
         } else {
             setDocsCount(0);
         }
@@ -322,8 +315,8 @@ function DocumentTypeModal({ open, docType, onClose }: {
 
     const set = (k: string, v: any) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
 
-    const saveMutation = useMutation({
-        mutationFn: (data: typeof form) => {
+    const saveMutation = useTenantMutation(
+        (data: typeof form) => {
             const payload = {
                 ...data,
                 document_base_operation_id: parseInt(data.document_base_operation_id) || null,
@@ -331,12 +324,15 @@ function DocumentTypeModal({ open, docType, onClose }: {
                 display_order: parseInt(String(data.display_order)) || 0,
             };
             return isEdit
-                ? apiClient.put(`/document-types/${docType!.id}`, payload)
-                : apiClient.post('/document-types', payload);
+                ? documentTypesApi.update(docType!.id, payload)
+                : documentTypesApi.create(payload);
         },
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['document-types'] }); onClose(); },
-        onError: (err: any) => setError(err?.response?.data?.message || 'فشل الحفظ'),
-    });
+        (slug) => tenantKeys.lookups.documentTypes(slug),
+        {
+            onSuccess: () => onClose(),
+            onError: (err: any) => setError(err?.response?.data?.message || 'فشل الحفظ'),
+        },
+    );
 
     const handleSave = () => {
         if (!form.name.trim()) { setError('الاسم العربي مطلوب'); return; }

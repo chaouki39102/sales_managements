@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost, apiPut, apiPatch } from '../core/client';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug, useSelectedYearId, useAppStore } from '../../store/appStore';
 import type { FiscalYear, ListParams, PaginatedResponse } from '../core/types';
@@ -31,6 +31,15 @@ export const fiscalYearsApi = {
   // ✅ patch للتعديلات العادية
   setCurrent: (id: number) =>
     apiPatch<FiscalYear>(`/fiscal-years/${id}`, { is_current: true }),
+
+  delete: (id: number) =>
+    apiDelete(`/fiscal-years/${id}`),
+
+  relatedData: (id: number) =>
+    apiGet<any>(`/fiscal-years/${id}/related-data`),
+
+  importFrom: (yearId: number, sourceYearId: number, options: { stock: boolean; parties: boolean; treasury: boolean }) =>
+    apiPost<any>(`/fiscal-years/${yearId}/import-from/${sourceYearId}`, options),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

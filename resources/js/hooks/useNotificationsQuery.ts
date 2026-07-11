@@ -1,57 +1,68 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@/lib/api/endpoints/notifications';
+import { useActiveSlug } from '@/lib/store/appStore';
 import type { NotificationsFilters } from '@/lib/api/endpoints/notifications';
 
 export const notificationKeys = {
-  all:    ['notifications'] as const,
-  unread: () => [...notificationKeys.all, 'unread'] as const,
-  list:   (filters: NotificationsFilters) => [...notificationKeys.all, 'list', filters] as const,
+  all:    (slug: string) => [slug, 'notifications'] as const,
+  unread: (slug: string) => [...notificationKeys.all(slug), 'unread'] as const,
+  list:   (slug: string, filters: NotificationsFilters) => [...notificationKeys.all(slug), 'list', filters] as const,
 };
 
-export const useUnreadNotificationsQuery = () =>
-  useQuery({
-    queryKey: notificationKeys.unread(),
+export const useUnreadNotificationsQuery = () => {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey: notificationKeys.unread(slug ?? ''),
     queryFn:  api.getUnreadNotifications,
     staleTime: 30_000,
     refetchInterval: 30_000,
+    enabled: !!slug,
   });
+};
 
-export const useNotificationsQuery = (filters: NotificationsFilters = {}) =>
-  useQuery({
-    queryKey: notificationKeys.list(filters),
+export const useNotificationsQuery = (filters: NotificationsFilters = {}) => {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey: notificationKeys.list(slug ?? '', filters),
     queryFn:  () => api.getNotifications(filters),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
+    enabled: !!slug,
   });
+};
 
 export const useMarkAsReadMutation = () => {
+  const slug = useActiveSlug();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.markNotificationAsRead(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
+    onSuccess: () => slug && qc.invalidateQueries({ queryKey: notificationKeys.all(slug) }),
   });
 };
 
 export const useMarkAllAsReadMutation = () => {
+  const slug = useActiveSlug();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: api.markAllNotificationsAsRead,
-    onSuccess: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
+    onSuccess: () => slug && qc.invalidateQueries({ queryKey: notificationKeys.all(slug) }),
   });
 };
 
 export const useDeleteNotificationMutation = () => {
+  const slug = useActiveSlug();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteNotification(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
+    onSuccess: () => slug && qc.invalidateQueries({ queryKey: notificationKeys.all(slug) }),
   });
 };
 
 export const useDeleteMultipleNotificationsMutation = () => {
+  const slug = useActiveSlug();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids: string[]) => api.deleteMultipleNotifications(ids),
-    onSuccess: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
+    onSuccess: () => slug && qc.invalidateQueries({ queryKey: notificationKeys.all(slug) }),
   });
 };

@@ -22,12 +22,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiPost, apiPut } from '@/lib/api/core/client';
 import { productsApi } from '@/lib/api/endpoints/products';
 import {
-  useProductLookups,
-  useValuationMethods,
+  useProductAggregatedLookups,
 } from '@/lib/api/endpoints/lookups';
 import { tenantKeys }  from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
-import { useRegulatedProducts } from '@/lib/api/endpoints/taxManagement';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -423,17 +421,16 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   const [imgError,       setImgError]       = useState('');
   const imgSearchSeq = useRef(0); // لمنع race condition بين طلبات بحث متتالية
 
-  // ── Lookups من lookups.ts ──
-  const {
-    families, brands, units, tvas, priceLevels, productTypes,
-    isLoading: lookupsLoading,
-  } = useProductLookups();
-
-  // valuation methods خارج useProductLookups — نضيفه مباشرة
-  const { data: valuationMethods = [] } = useValuationMethods();
-
-  // المواد المقننة (للمنتجات المدعمة)
-  const { data: regulatedProducts = [] } = useRegulatedProducts(true);
+  // ── Lookups — single aggregated request (7 HTTP → 1) ──
+  const { data: productLookups, isLoading: lookupsLoading } = useProductAggregatedLookups();
+  const families          = productLookups?.families ?? [];
+  const brands            = productLookups?.brands ?? [];
+  const units             = productLookups?.units ?? [];
+  const tvas              = productLookups?.tvas ?? [];
+  const priceLevels       = productLookups?.priceLevels ?? [];
+  const productTypes      = productLookups?.productTypes ?? [];
+  const valuationMethods  = productLookups?.valuationMethods ?? [];
+  const regulatedProducts = productLookups?.regulatedProducts ?? [];
 
   const defaultTvaId = useMemo(
     () => (tvas as TvaRate[]).find(t => t.is_default)?.id ?? null,

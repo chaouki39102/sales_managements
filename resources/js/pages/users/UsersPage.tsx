@@ -2,11 +2,12 @@
 // ════════════════════════════════════════════════
 // إدارة المستخدمين + الأدوار + الصلاحيات — واجهة متكاملة
 // ════════════════════════════════════════════════
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
-import apiClient from "@/lib/api/core/client";
 import { useRoles } from "@/lib/api/endpoints/roles";
+import { usersApi, rolesApi, usePermissions } from "@/lib/api/endpoints/users";
+import { tenantKeys } from "@/lib/api/core/queryKeys";
+import { useTenantQuery, useTenantMutation } from "@/hooks/useTenantQuery";
 import { useNotification } from '@/hooks/useNotification';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
@@ -652,19 +653,15 @@ function UserDetailModal({
     user,
     onClose,
     onEdit,
-    slug,
 }: {
     user: User | null;
     onClose: () => void;
     onEdit: (u: User) => void;
-    slug: string;
 }) {
-    const qc = useQueryClient();
-    const toggleActive = useMutation({
-        mutationFn: () =>
-            apiClient.post(`/${slug}/users/${user!.id}/toggle-active`),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ["users", slug] }),
-    });
+    const toggleActive = useTenantMutation(
+        () => usersApi.toggleActive(user!.id),
+        (slug) => tenantKeys.users.all(slug),
+    );
 
     if (!user) return null;
     const permissions = user.permissions ?? [];
@@ -991,17 +988,14 @@ function UserFormModal({
     user,
     roles,
     permissions,
-    slug,
     onClose,
 }: {
     user: User | null;
     roles: Role[];
     permissions: Permission[];
-    slug: string;
     onClose: () => void;
 }) {
     const isEdit = !!user;
-    const qc = useQueryClient();
     const nameRef = useRef<HTMLInputElement>(null);
     const [tab, setTab] = useState<"info" | "perms">("info");
     const [error, setError] = useState("");
@@ -1054,21 +1048,18 @@ function UserFormModal({
         setTimeout(() => nameRef.current?.focus(), 80);
     }, [user]);
 
-    const mutation = useMutation({
-        mutationFn: async (data: typeof form) => {
-            // نرسل كل البيانات بما فيها permission_ids
-            // UserService.afterUpdate يعالجها عبر syncPermissions
-            if (isEdit)
-                return apiClient.put(`/${slug}/users/${user!.id}`, data);
-            return apiClient.post(`/${slug}/users`, data);
+    const mutation = useTenantMutation(
+        (formData: typeof form) =>
+            isEdit
+                ? usersApi.update(user!.id, formData)
+                : usersApi.create(formData),
+        (slug) => tenantKeys.users.all(slug),
+        {
+            onSuccess: () => onClose(),
+            onError: (e: any) =>
+                setError(err2str(e, isEdit ? "فشل التحديث" : "فشل إنشاء المستخدم")),
         },
-        onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ["users", slug] });
-            onClose();
-        },
-        onError: (e) =>
-            setError(err2str(e, isEdit ? "فشل التحديث" : "فشل إنشاء المستخدم")),
-    });
+    );
 
     const f =
         <T extends keyof typeof form>(k: T) =>
@@ -1424,16 +1415,13 @@ function UserFormModal({
 function RoleFormModal({
     role,
     permissions,
-    slug,
     onClose,
 }: {
     role: Role | null;
     permissions: Permission[];
-    slug: string;
     onClose: () => void;
 }) {
     const isEdit = !!role;
-    const qc = useQueryClient();
     const [error, setError] = useState("");
     const [form, setForm] = useState({
         name: "",
@@ -1462,24 +1450,24 @@ function RoleFormModal({
         }
     }, [role]);
 
-    const mutation = useMutation({
-        mutationFn: async () => {
+    const mutation = useTenantMutation(
+        () => {
             const payload = {
                 name: form.name,
                 display_name: form.display_name,
                 description: form.description,
                 permission_ids: form.permission_ids,
             };
-            if (isEdit)
-                return apiClient.put(`/${slug}/roles/${role!.id}`, payload);
-            return apiClient.post(`/${slug}/roles`, payload);
+            return isEdit
+                ? rolesApi.update(role!.id, payload)
+                : rolesApi.create(payload);
         },
-        onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ["roles", slug] });
-            onClose();
+        (slug) => tenantKeys.lookups.roles(slug),
+        {
+            onSuccess: () => onClose(),
+            onError: (e: any) => setError(err2str(e, "فشل الحفظ")),
         },
-        onError: (e) => setError(err2str(e, "فشل الحفظ")),
-    });
+    );
 
     return (
         <Overlay open onClose={onClose} width={640}>
@@ -1670,26 +1658,25 @@ function RoleFormModal({
 // ════════════════════════════════════════════════
 function RoleDetailModal({
     role,
-    slug,
     onClose,
     onEdit,
 }: {
     role: Role | null;
-    slug: string;
     onClose: () => void;
     onEdit: (r: Role) => void;
 }) {
-    const qc = useQueryClient();
     const notify = useNotification();
     const deleteConfirm = useConfirm();
-    const deleteRole = useMutation({
-        mutationFn: () => apiClient.delete(`/${slug}/roles/${role!.id}`),
-        onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ["roles", slug] });
-            onClose();
-            notify.success('تم الحذف');
+    const deleteRole = useTenantMutation(
+        () => rolesApi.delete(role!.id),
+        (slug) => tenantKeys.lookups.roles(slug),
+        {
+            onSuccess: () => {
+                onClose();
+                notify.success('تم الحذف');
+            },
         },
-    });
+    );
 
     if (!role) return null;
     const perms = role.permissions ?? role.relations?.permissions ?? [];
@@ -1910,7 +1897,6 @@ function RoleDetailModal({
 export default function UsersPage() {
     const { activeCompany } = useAuth() as any;
     const slug = activeCompany?.slug as string | undefined;
-    const qc = useQueryClient();
 
     const [mainTab, setMainTab] = useState<"users" | "roles" | "permissions">(
         "users",
@@ -1935,51 +1921,26 @@ export default function UsersPage() {
     const {
         data: users = [],
         isLoading: usersLoading,
-        isError: usersError,
-    } = useQuery<User[]>({
-        queryKey: ["users", slug, search],
-        queryFn: async () => {
-            if (!slug) return [];
-            const res = await apiClient.get(`/${slug}/users`, {
-                params: {
-                    search: search || undefined,
-                    per_page: 100,
-                    include: "roles,permissions",
-                },
-            });
-            const raw = res.data?.data ?? res.data;
-            return Array.isArray(raw) ? raw : (raw?.data ?? []);
-        },
-        enabled: !!slug,
-        staleTime: 30_000,
-    });
+    } = useTenantQuery<User[]>(
+        (slug) => tenantKeys.users.list(slug, { search: search || undefined, per_page: 100, include: 'roles,permissions' }),
+        () => usersApi.list({ search: search || undefined, per_page: 100, include: 'roles,permissions' } as any).then(
+            (res: any) => res?.data ?? [],
+        ),
+        { staleTime: 30_000 },
+    );
 
     const { data: roles = [], isLoading: rolesLoading } = useRoles();
 
-    const { data: permissions = [], isLoading: permsLoading } = useQuery<
-        Permission[]
-    >({
-        queryKey: ["permissions", slug],
-        queryFn: async () => {
-            if (!slug) return [];
-            const res = await apiClient.get(`/${slug}/permissions`, {
-                params: { per_page: 200 },
-            });
-            const raw = res.data?.data ?? res.data;
-            return Array.isArray(raw) ? raw : (raw?.data ?? []);
-        },
-        enabled: !!slug,
-        staleTime: 600_000,
-    });
+    const { data: permissions = [], isLoading: permsLoading } = usePermissions();
 
     // ─── Mutations ─────────────────────────────────
-    const deleteUser = useMutation({
-        mutationFn: (id: number) => apiClient.delete(`/${slug}/users/${id}`),
-        onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ["users", slug] });
-            notify.success('تم الحذف');
+    const deleteUser = useTenantMutation(
+        (id: number) => usersApi.delete(id),
+        (slug) => tenantKeys.users.all(slug),
+        {
+            onSuccess: () => notify.success('تم الحذف'),
         },
-    });
+    );
 
     // ─── Filtered users ────────────────────────────
     const filteredUsers = users.filter((u) => {
@@ -2943,7 +2904,6 @@ export default function UsersPage() {
             {viewUser && (
                 <UserDetailModal
                     user={viewUser}
-                    slug={slug!}
                     onClose={() => setViewUser(null)}
                     onEdit={(u) => {
                         setViewUser(null);
@@ -2956,7 +2916,6 @@ export default function UsersPage() {
                     user={editUser}
                     roles={roles}
                     permissions={permissions}
-                    slug={slug!}
                     onClose={() => {
                         setShowAdd(false);
                         setEditUser(null);
@@ -2966,7 +2925,6 @@ export default function UsersPage() {
             {viewRole && (
                 <RoleDetailModal
                     role={viewRole}
-                    slug={slug!}
                     onClose={() => setViewRole(null)}
                     onEdit={(r) => {
                         setViewRole(null);
@@ -2978,7 +2936,6 @@ export default function UsersPage() {
                 <RoleFormModal
                     role={editRole}
                     permissions={permissions}
-                    slug={slug!}
                     onClose={() => {
                         setShowAddRole(false);
                         setEditRole(null);

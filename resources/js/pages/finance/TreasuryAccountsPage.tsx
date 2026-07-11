@@ -3,7 +3,7 @@
 // صفحة الحسابات المالية — نسخة مُصلَحة
 // ════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
 import PageHeader  from '@/components/ui/PageHeader';
 import Card        from '@/components/ui/Card';
@@ -14,15 +14,9 @@ import KpiCard     from '@/components/ui/KpiCard';
 import EmptyState  from '@/components/ui/EmptyState';
 import AlertBar    from '@/components/ui/AlertBar';
 import Switch      from '@/components/ui/Switch';
-import apiClient   from '@/lib/api/core/client';
-
-// ─── helper: استخراج البيانات من أي هيكل استجابة ────────────────────────────
-function extractList<T>(res: any): T[] {
-  const d = res?.data;
-  if (Array.isArray(d))       return d;
-  if (Array.isArray(d?.data)) return d.data;
-  return [];
-}
+import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
+import { treasuryAccountsApi } from '@/lib/api/endpoints/treasuryAccounts';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
 
 // ─── أيقونات حسب كود النوع ───────────────────────────────────────────────────
 const TYPE_ICONS: Record<string, string> = {
@@ -74,7 +68,6 @@ interface TreasuryAccount {
 // MAIN PAGE
 // ════════════════════════════════════════════════════════════════════
 export default function TreasuryAccountsPage() {
-  const qc = useQueryClient();
   const [search,      setSearch]      = useState('');
   const [typeTabId,   setTypeTabId]   = useState<number | null>(null);
   const [editing,     setEditing]     = useState<TreasuryAccount | null>(null);
@@ -83,28 +76,32 @@ export default function TreasuryAccountsPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // ── أنواع الحسابات (مسار عام — بدون slug) ─────────────────────────────────
-  // ✅ هذا المسار مُدرج في PUBLIC_PATH_PREFIXES في client.ts
   const { data: rawTypes } = useQuery({
     queryKey: ['treasury-account-types'],
-    queryFn:  () => apiClient.get('/treasury-account-types').then(extractList),
+    queryFn:  () => treasuryAccountsApi.listAccountTypes().then((res: any) => {
+      const d = res?.data;
+      if (Array.isArray(d))       return d;
+      if (Array.isArray(d?.data)) return d.data;
+      return [];
+    }),
     staleTime: Infinity,
   });
   const accountTypes: any[] = rawTypes ?? [];
 
   // ── الحسابات (مسار tenant — يُضاف إليه الـ slug تلقائياً) ─────────────────
-  // ⚠️ لا تستخدم /treasury-accounts/bank-accounts لأن apiResource يلتقطها أولاً
-  //    استخدم /treasury-accounts مع include=treasuryAccountType وفلتر على الواجهة
   const {
     data: rawAccounts,
     isLoading,
     error: fetchError,
-  } = useQuery({
-    queryKey: ['treasury-accounts'],
-    queryFn:  () =>
-      apiClient.get('/treasury-accounts', {
-        params: { include: 'treasuryAccountType' },
-      }).then(extractList<TreasuryAccount>),
-  });
+  } = useTenantQuery<TreasuryAccount[]>(
+    (slug) => tenantKeys.lookups.treasuryAccounts(slug),
+    () => treasuryAccountsApi.list({ include: 'treasuryAccountType' }).then((res: any) => {
+      const d = res?.data;
+      if (Array.isArray(d))       return d;
+      if (Array.isArray(d?.data)) return d.data;
+      return [];
+    }),
+  );
 
   // ── إثراء البيانات: نضيف _typeId/_typeName/_typeCode ─────────────────────
   const accounts: TreasuryAccount[] = useMemo(() => {
@@ -153,14 +150,16 @@ export default function TreasuryAccountsPage() {
   }, [accounts, accountTypes]);
 
   // ── حذف ──────────────────────────────────────────────────────────────────
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiClient.delete(`/treasury-accounts/${id}`),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: ['treasury-accounts'] });
-      deleteModal.closeModal();
-      setDeletingId(null);
+  const deleteMutation = useTenantMutation(
+    (id: number) => treasuryAccountsApi.delete(id),
+    (slug) => tenantKeys.lookups.treasuryAccounts(slug),
+    {
+      onSuccess: () => {
+        deleteModal.closeModal();
+        setDeletingId(null);
+      },
     },
-  });
+  );
 
   const openAdd  = () => { setEditing(null); modal.openModal(); };
   const openEdit = (acc: TreasuryAccount) => { setEditing(acc); modal.openModal(); };
@@ -373,7 +372,6 @@ function TreasuryAccountModal({
   onClose:      () => void;
 }) {
   const isEdit = !!account;
-  const qc     = useQueryClient();
 
   // تحديد كود النوع المختار (لإظهار حقول البنك فقط عند الحاجة)
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
@@ -433,8 +431,8 @@ function TreasuryAccountModal({
     if (k === 'treasury_account_type_id') setSelectedTypeId(v);
   };
 
-  const saveMutation = useMutation({
-    mutationFn: (data: typeof form) => {
+  const saveMutation = useTenantMutation(
+    (data: typeof form) => {
       const payload = {
         ...data,
         treasury_account_type_id: data.treasury_account_type_id
@@ -447,16 +445,16 @@ function TreasuryAccountModal({
         swift_bic:      isBankType ? (data.swift_bic      || null) : null,
       };
       return isEdit
-        ? apiClient.put(`/treasury-accounts/${account!.id}`, payload)
-        : apiClient.post('/treasury-accounts', payload);
+        ? treasuryAccountsApi.update(account!.id, payload)
+        : treasuryAccountsApi.create(payload);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['treasury-accounts'] });
-      onClose();
+    (slug) => tenantKeys.lookups.treasuryAccounts(slug),
+    {
+      onSuccess: () => onClose(),
+      onError: (err: any) =>
+        setError(err?.response?.data?.message || 'فشل الحفظ، تحقق من البيانات.'),
     },
-    onError: (err: any) =>
-      setError(err?.response?.data?.message || 'فشل الحفظ، تحقق من البيانات.'),
-  });
+  );
 
   return (
     <Modal

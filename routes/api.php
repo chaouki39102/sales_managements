@@ -222,6 +222,9 @@ Route::prefix('v1')->group(function () {
                 Route::get('aging',     [ReportController::class, 'aging']);
             });
 
+            // جداول مرجعية — endpoint مجمّع للمنتجات ( families + brands + units + tvas + ... )
+            Route::get('lookups/products', [\App\Http\Controllers\Api\V1\ProductLookupsController::class, 'index']);
+
             // جداول مرجعية (قراءة)
             Route::apiResource('families',       FamilyController::class)->only(['index', 'show']);
             Route::apiResource('brands',         BrandController::class)->only(['index', 'show']);

@@ -1,11 +1,5 @@
 // resources/js/pages/expenses/ExpensesPage.tsx
 import React, { useState, useEffect } from "react";
-import {
-    useQuery,
-    useMutation,
-    useQueryClient,
-    keepPreviousData,
-} from "@tanstack/react-query";
 import { useModal } from "@/hooks/useModal";
 import { useFiscalYear } from "@/context/FiscalYearContext";
 import PageHeader from "@/components/ui/PageHeader";
@@ -17,7 +11,19 @@ import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import AlertBar from "@/components/ui/AlertBar";
 import Switch from "@/components/ui/Switch";
-import apiClient from "@/lib/api/core/client";
+import { expensesApi } from "@/lib/api/endpoints/expenses";
+import {
+    useTenantQueryPaginated,
+    useTenantQuery,
+    useTenantMutation,
+} from "@/hooks/useTenantQuery";
+import { tenantKeys } from "@/lib/api/core/queryKeys";
+import { apiGet } from "@/lib/api/core/client";
+import {
+    useExpenseCategories,
+    usePaymentModes,
+    useTreasuryAccounts,
+} from "@/lib/api/endpoints/lookups";
 
 // --------------- Types ---------------
 interface Expense {
@@ -35,18 +41,6 @@ interface Expense {
     is_recurring?: boolean;
 }
 
-// --------------- API Layer ---------------
-const expensesApi = {
-    list: (params: Record<string, any>) =>
-        apiClient.get("/expenses", { params }).then((r) => r.data),
-    create: (data: any) =>
-        apiClient.post("/expenses", data).then((r) => r.data),
-    update: (id: number, data: any) =>
-        apiClient.put(`/expenses/${id}`, data).then((r) => r.data),
-    delete: (id: number) =>
-        apiClient.delete(`/expenses/${id}`).then((r) => r.data),
-};
-
 function useDebounce<T>(value: T, delay = 300): T {
     const [debounced, setDebounced] = useState<T>(value);
     useEffect(() => {
@@ -63,7 +57,6 @@ const formatDZD = (amount: number) =>
     }).format(amount) + " دج";
 
 export default function ExpensesPage() {
-    const qc = useQueryClient();
     const { selectedYear } = useFiscalYear() as any;
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search, 350);
@@ -84,17 +77,17 @@ export default function ExpensesPage() {
         data: paginated,
         isLoading,
         isFetching,
-    } = useQuery({
-        queryKey: [
-            "expenses",
-            selectedYear?.id,
-            debouncedSearch,
-            paidFilter,
-            categoryFilter,
-            page,
-            perPage,
-        ],
-        queryFn: () =>
+    } = useTenantQueryPaginated(
+        (slug) =>
+            tenantKeys.expenses.list(slug, {
+                year: selectedYear?.id,
+                search: debouncedSearch,
+                paidFilter,
+                categoryFilter,
+                page,
+                perPage,
+            }),
+        () =>
             expensesApi.list({
                 "filter[fiscal_year_id]": selectedYear?.id,
                 "filter[search]": debouncedSearch || undefined,
@@ -104,50 +97,28 @@ export default function ExpensesPage() {
                 per_page: perPage,
                 page,
             }),
-        enabled: !!selectedYear?.id,
-        placeholderData: keepPreviousData,
-        staleTime: 30_000,
-    });
+        { enabled: !!selectedYear?.id },
+    );
 
     const expenses: Expense[] = paginated?.data ?? [];
     const meta = paginated?.meta;
 
     // قوائم الاختيار – سنستخدمها لعرض الأسماء
-    const { data: categories } = useQuery({
-        queryKey: ["expense-categories-select"],
-        queryFn: () =>
-            apiClient
-                .get("/expense-categories", { params: { per_page: 200 } })
-                .then((r) => r.data.data),
-        staleTime: 5 * 60_000,
-    });
+    const { data: categories } = useExpenseCategories();
 
-    const { data: parties } = useQuery({
-        queryKey: ["suppliers-select"],
-        queryFn: () =>
-            apiClient
-                .get("/suppliers", { params: { per_page: 200 } })
-                .then((r) => r.data.data),
-        staleTime: 5 * 60_000,
-    });
+    const { data: parties } = useTenantQuery(
+        (slug) => [slug, "suppliers-select"] as const,
+        () => apiGet<any[]>("/suppliers", { per_page: 200 }),
+        {
+            staleTime: 5 * 60_000,
+            select: (d: any) =>
+                Array.isArray(d) ? d : d?.data ?? [],
+        },
+    );
 
-    const { data: paymentModes } = useQuery({
-        queryKey: ["payment-modes-select"],
-        queryFn: () =>
-            apiClient
-                .get("/payment-modes", { params: { per_page: 200 } })
-                .then((r) => r.data.data),
-        staleTime: 5 * 60_000,
-    });
+    const { data: paymentModes } = usePaymentModes();
 
-    const { data: treasuryAccounts } = useQuery({
-        queryKey: ["treasury-accounts-select"],
-        queryFn: () =>
-            apiClient
-                .get("/treasury-accounts", { params: { per_page: 200 } })
-                .then((r) => r.data.data),
-        staleTime: 5 * 60_000,
-    });
+    const { data: treasuryAccounts } = useTreasuryAccounts();
 
     // دوال مساعدة للبحث عن الاسم باستخدام id
     const getCategoryName = (id: number) =>
@@ -159,18 +130,20 @@ export default function ExpensesPage() {
             ? "—"
             : (paymentModes?.find((pm: any) => pm.id === id)?.name ?? "—");
 
-    const deleteMutation = useMutation({
-        mutationFn: (id: number) => expensesApi.delete(id),
-        onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ["expenses"] });
-            deleteModal.closeModal();
-            setError(null);
+    const deleteMutation = useTenantMutation(
+        (id: number) => expensesApi.delete(id),
+        (slug) => tenantKeys.expenses.all(slug),
+        {
+            onSuccess: () => {
+                deleteModal.closeModal();
+                setError(null);
+            },
+            onError: (err: any) => {
+                setError(err?.response?.data?.message || "فشل الحذف");
+                deleteModal.closeModal();
+            },
         },
-        onError: (err: any) => {
-            setError(err?.response?.data?.message || "فشل الحذف");
-            deleteModal.closeModal();
-        },
-    });
+    );
 
     const handleDelete = (id: number) => {
         setDeletingId(id);
@@ -533,7 +506,6 @@ function ExpenseModal({
     onClose: () => void;
 }) {
     const isEdit = !!record;
-    const qc = useQueryClient();
     const { selectedYear: sy } = useFiscalYear() as any;
 
     const defaultDate = (): string => {
@@ -613,8 +585,8 @@ function ExpenseModal({
         return Object.keys(errs).length === 0;
     };
 
-    const saveMutation = useMutation({
-        mutationFn: (data: typeof form) => {
+    const saveMutation = useTenantMutation(
+        (data: typeof form) => {
             const payload = {
                 date: data.date,
                 amount: parseFloat(data.amount),
@@ -638,22 +610,24 @@ function ExpenseModal({
                 ? expensesApi.update(record!.id, payload)
                 : expensesApi.create(payload);
         },
-        onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ["expenses"] });
-            onClose();
+        (slug) => tenantKeys.expenses.all(slug),
+        {
+            onSuccess: () => {
+                onClose();
+            },
+            onError: (err: any) => {
+                const msg = err?.response?.data;
+                if (msg?.errors) {
+                    const fieldErrors: Record<string, string> = {};
+                    for (const [k, v] of Object.entries(msg.errors))
+                        fieldErrors[k] = (v as string[])[0];
+                    setErrors(fieldErrors);
+                } else {
+                    setServerError(msg?.message || "فشل الحفظ");
+                }
+            },
         },
-        onError: (err: any) => {
-            const msg = err?.response?.data;
-            if (msg?.errors) {
-                const fieldErrors: Record<string, string> = {};
-                for (const [k, v] of Object.entries(msg.errors))
-                    fieldErrors[k] = (v as string[])[0];
-                setErrors(fieldErrors);
-            } else {
-                setServerError(msg?.message || "فشل الحفظ");
-            }
-        },
-    });
+    );
 
     const handleSave = () => {
         if (!validate()) return;

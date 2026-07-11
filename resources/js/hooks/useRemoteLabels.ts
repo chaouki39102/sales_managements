@@ -5,6 +5,7 @@
 import { useMemo }    from 'react';
 import { useQueries } from '@tanstack/react-query';
 import apiClient      from '@/lib/api/core/client';
+import { useActiveSlug } from '@/lib/store/appStore';
 
 // ── Types (مستقلة — لا تستورد من LookupPage) ──
 // نفس تعريفات LookupPage لكن هنا لتجنب circular import
@@ -24,6 +25,8 @@ export function useRemoteLabels(
   endpoint: string,
 ): RemoteLabels {
 
+  const slug = useActiveSlug();
+
   // استخراج الحقول التي تحتاج remote fetch
   // [endpoint] كـ dependency بدل fields لأن fields تتغير مرجعها كل render
   const remoteFields = useMemo(
@@ -35,7 +38,7 @@ export function useRemoteLabels(
   // useQueries — hook واحد يدير N queries بأمان
   const results = useQueries({
     queries: remoteFields.map(f => ({
-      queryKey: ['remote-labels', f.remoteEndpoint] as const,
+      queryKey: [slug, 'remote-labels', f.remoteEndpoint] as const,
       queryFn: () =>
         apiClient
           .get(f.remoteEndpoint!, { params: { per_page: 500 } })

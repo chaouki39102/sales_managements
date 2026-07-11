@@ -1,6 +1,5 @@
 // resources/js/pages/lookups/NumberingSeriesPage.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -11,7 +10,11 @@ import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
-import apiClient from '@/lib/api/core/client';
+import { useTenantQueryPaginated, useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
+import { numberingSeriesApi } from '@/lib/api/endpoints/numberingSeries';
+import { documentTypesApi } from '@/lib/api/endpoints/documentTypes';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { useWarehouses } from '@/lib/api/endpoints/lookups';
 
 // =============== Types ===============
 interface NumberingSeriesRecord {
@@ -42,26 +45,6 @@ interface NumberingSeriesRecord {
 interface DocumentTypeOption { id: number; name: string; code: string }
 interface WarehouseOption { id: number; name: string }
 
-// =============== API Layer ===============
-const numberingSeriesApi = {
-  list: (params: Record<string, any>) =>
-    apiClient.get('/numbering-series', { params }).then(r => r.data),
-  create: (data: any) =>
-    apiClient.post('/numbering-series', data).then(r => r.data),
-  update: (id: number, data: any) =>
-    apiClient.put(`/numbering-series/${id}`, data).then(r => r.data),
-  delete: (id: number) =>
-    apiClient.delete(`/numbering-series/${id}`).then(r => r.data),
-  preview: (id: number) =>
-    apiClient.get(`/numbering-series/${id}/next-number?preview=true`).then(r => r.data),
-  lock: (id: number) =>
-    apiClient.post(`/numbering-series/${id}/lock`).then(r => r.data),
-  unlock: (id: number) =>
-    apiClient.post(`/numbering-series/${id}/unlock`).then(r => r.data),
-  sync: (id: number) =>
-    apiClient.post(`/numbering-series/${id}/sync`).then(r => r.data),
-};
-
 // =============== Helpers ===============
 function simulateNumber(series: NumberingSeriesRecord, next = true): string {
   try {
@@ -85,7 +68,6 @@ function haveDocumentsBeenCreated(series: NumberingSeriesRecord): boolean {
 
 // =============== Main Component ===============
 export default function NumberingSeriesPage() {
-  const qc = useQueryClient();
   const [editing, setEditing] = useState<NumberingSeriesRecord | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -103,63 +85,62 @@ export default function NumberingSeriesPage() {
   }, [search]);
 
   // Queries
-  const { data: paginated, isLoading, isFetching } = useQuery({
-    queryKey: ['numbering-series', debouncedSearch, page, perPage],
-    queryFn: () => numberingSeriesApi.list({
+  const { data: paginated, isLoading, isFetching } = useTenantQueryPaginated(
+    (slug) => [slug, 'numbering-series', debouncedSearch, page, perPage] as const,
+    () => numberingSeriesApi.list({
       'filter[search]': debouncedSearch || undefined,
       include: 'documentType,warehouse',
       sort: '-id',
       per_page: perPage,
       page,
     }),
-    placeholderData: keepPreviousData,
-    staleTime: 30_000,
-  });
+  );
 
   const items: NumberingSeriesRecord[] = paginated?.data ?? [];
   const meta = paginated?.meta;
 
-  const { data: documentTypes } = useQuery<DocumentTypeOption[]>({
-    queryKey: ['document-types-select'],
-    queryFn: () => apiClient.get('/document-types', { params: { per_page: 500 } }).then(r => r.data.data),
-    staleTime: 5 * 60_000,
-  });
+  const { data: documentTypes } = useTenantQuery<DocumentTypeOption[]>(
+    (slug) => tenantKeys.lookups.documentTypes(slug),
+    () => documentTypesApi.list({ per_page: 500 }),
+    { staleTime: 5 * 60_000 },
+  );
 
-  const { data: warehouses } = useQuery<WarehouseOption[]>({
-    queryKey: ['warehouses-select'],
-    queryFn: () => apiClient.get('/warehouses', { params: { per_page: 500 } }).then(r => r.data.data),
-    staleTime: 5 * 60_000,
-  });
+  const { data: warehouses } = useWarehouses();
 
   // Mutations with error handling
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => numberingSeriesApi.delete(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['numbering-series'] });
-      deleteModal.closeModal();
-      setSyncError(null);
+  const deleteMutation = useTenantMutation(
+    (id: number) => numberingSeriesApi.delete(id),
+    (slug) => tenantKeys.lookups.numberingSeries(slug),
+    {
+      onSuccess: () => { deleteModal.closeModal(); setSyncError(null); },
+      onError: (err: any) => { setSyncError(err?.response?.data?.message || 'فشل حذف السلسلة'); deleteModal.closeModal(); },
     },
-    onError: (err: any) => {
-      setSyncError(err?.response?.data?.message || 'فشل حذف السلسلة');
-      deleteModal.closeModal();
-    },
-  });
+  );
 
-  const lockMutation = useMutation({
-    mutationFn: (id: number) => numberingSeriesApi.lock(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['numbering-series'] }); setSyncError(null); },
-    onError: (err: any) => setSyncError(err?.response?.data?.message || 'فشل القفل'),
-  });
-  const unlockMutation = useMutation({
-    mutationFn: (id: number) => numberingSeriesApi.unlock(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['numbering-series'] }); setSyncError(null); },
-    onError: (err: any) => setSyncError(err?.response?.data?.message || 'فشل فتح القفل'),
-  });
-  const syncMutation = useMutation({
-    mutationFn: (id: number) => numberingSeriesApi.sync(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['numbering-series'] }); setSyncError(null); },
-    onError: (err: any) => setSyncError(err?.response?.data?.message || 'فشل المزامنة'),
-  });
+  const lockMutation = useTenantMutation(
+    (id: number) => numberingSeriesApi.lock(id),
+    (slug) => tenantKeys.lookups.numberingSeries(slug),
+    {
+      onSuccess: () => setSyncError(null),
+      onError: (err: any) => setSyncError(err?.response?.data?.message || 'فشل القفل'),
+    },
+  );
+  const unlockMutation = useTenantMutation(
+    (id: number) => numberingSeriesApi.unlock(id),
+    (slug) => tenantKeys.lookups.numberingSeries(slug),
+    {
+      onSuccess: () => setSyncError(null),
+      onError: (err: any) => setSyncError(err?.response?.data?.message || 'فشل فتح القفل'),
+    },
+  );
+  const syncMutation = useTenantMutation(
+    (id: number) => numberingSeriesApi.sync(id),
+    (slug) => tenantKeys.lookups.numberingSeries(slug),
+    {
+      onSuccess: () => setSyncError(null),
+      onError: (err: any) => setSyncError(err?.response?.data?.message || 'فشل المزامنة'),
+    },
+  );
 
   const handleDelete = (id: number) => {
     setDeletingId(id);
@@ -324,6 +305,7 @@ export default function NumberingSeriesPage() {
         record={editing}
         documentTypes={documentTypes ?? []}
         warehouses={warehouses ?? []}
+        slug={slug}
         onClose={modal.closeModal}
       />
 
@@ -360,12 +342,11 @@ function ConfirmDeleteModal({ open, onClose, onConfirm, loading }: {
 
 // =============== NumberingSeries Modal (محسّن) ===============
 function NumberingSeriesModal({
-  open, record, documentTypes, warehouses, onClose,
+  open, record, documentTypes, warehouses, slug, onClose,
 }: {
-  open: boolean; record: NumberingSeriesRecord | null; documentTypes: DocumentTypeOption[]; warehouses: WarehouseOption[]; onClose: () => void;
+  open: boolean; record: NumberingSeriesRecord | null; documentTypes: DocumentTypeOption[]; warehouses: WarehouseOption[]; slug: string | null; onClose: () => void;
 }) {
   const isEdit = !!record;
-  const qc = useQueryClient();
 
   // إذا وصلنا إلى مرحلة التحرير، نتحقق من وجود مستندات سابقة
   const hasExistingDocuments = record ? haveDocumentsBeenCreated(record) : false;
@@ -442,8 +423,8 @@ function NumberingSeriesModal({
     } catch { return '...'; }
   }, [form]);
 
-  const saveMutation = useMutation({
-    mutationFn: (data: typeof form) => {
+  const saveMutation = useTenantMutation(
+    (data: typeof form) => {
       const payload = {
         document_type_id: parseInt(data.document_type_id || '0') || null,
         warehouse_id: data.warehouse_id ? parseInt(String(data.warehouse_id)) : null,
@@ -462,23 +443,23 @@ function NumberingSeriesModal({
         ? numberingSeriesApi.update(record!.id, payload)
         : numberingSeriesApi.create(payload);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['numbering-series'] });
-      onClose();
-    },
-    onError: (err: any) => {
-      const msg = err?.response?.data;
-      if (msg?.errors) {
-        const fieldErrors: Record<string, string> = {};
-        for (const [k, v] of Object.entries(msg.errors)) {
-          fieldErrors[k] = (v as string[])[0];
+    (slug) => tenantKeys.lookups.numberingSeries(slug),
+    {
+      onSuccess: () => onClose(),
+      onError: (err: any) => {
+        const msg = err?.response?.data;
+        if (msg?.errors) {
+          const fieldErrors: Record<string, string> = {};
+          for (const [k, v] of Object.entries(msg.errors)) {
+            fieldErrors[k] = (v as string[])[0];
+          }
+          setErrors(fieldErrors);
+        } else {
+          setServerError(msg?.message || 'فشل الحفظ');
         }
-        setErrors(fieldErrors);
-      } else {
-        setServerError(msg?.message || 'فشل الحفظ');
-      }
+      },
     },
-  });
+  );
 
   const handleSave = () => {
     if (!validate()) return;

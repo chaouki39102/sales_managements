@@ -84,6 +84,7 @@ export const tenantKeys = {
     valuationMethods:     (slug: string) => [slug, 'lookups', 'inventory-valuation-methods']       as const,
     numberingSeries:      (slug: string) => [slug, 'lookups', 'numbering-series']                  as const,
     treasuryAccounts:     (slug: string) => [slug, 'lookups', 'treasury-accounts']                 as const,
+    productsAggregated:   (slug: string) => [slug, 'lookups', 'products']                         as const,
     roles:                (slug: string) => [slug, 'lookups', 'roles']                             as const,
   },
 

@@ -3,8 +3,10 @@
 // النسخة النهائية المُحسَّنة — تجمع أفضل الميزات
 // ════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
+import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
+import { fiscalYearsApi } from '@/lib/api/endpoints/fiscalYears';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -14,7 +16,6 @@ import KpiCard from '@/components/ui/KpiCard';
 import AlertBar from '@/components/ui/AlertBar';
 import ProgressBar from '@/components/ui/ProgressBar';
 import EmptyState from '@/components/ui/EmptyState';
-import apiClient from '@/lib/api/core/client';
 import type { FiscalYear } from '@/types';
 
 // ─────────────────────────────────────────────────────────────
@@ -128,8 +129,6 @@ function StatusBadge({ year }: { year: FiscalYear }) {
 // MAIN PAGE
 // ════════════════════════════════════════════════════════════
 export default function FiscalYearsPage() {
-    const qc = useQueryClient();
-
     const [editingYear, setEditingYear] = useState<FiscalYear | null>(null);
     const [closingYear, setClosingYear] = useState<FiscalYear | null>(null);
     const [viewingYear, setViewingYear] = useState<FiscalYear | null>(null);
@@ -142,15 +141,13 @@ export default function FiscalYearsPage() {
     const detailModal = useModal();
     const importModal = useModal();
 
-    const { data, isLoading, isError, refetch } = useQuery({
-        queryKey: ['fiscal-years'],
-        queryFn: () => apiClient
-            .get('/fiscal-years', { params: { include: 'closedBy', per_page: 50 } })
-            .then(r => r.data.data as FiscalYear[]),
-        staleTime: 60_000,
-    });
+    const { data: apiData, isLoading, isError, refetch } = useTenantQuery(
+        (slug) => tenantKeys.fiscalYears.all(slug),
+        () => fiscalYearsApi.list({ include: 'closedBy' }),
+        { staleTime: 60_000 },
+    );
 
-    const years = data ?? [];
+    const years = apiData?.data ?? [];
     const currentYear = years.find(y => y.is_current);
     const openYears = years.filter(y => !y.is_closed);
     const closedYears = years.filter(y => y.is_closed);
@@ -164,25 +161,23 @@ export default function FiscalYearsPage() {
     }, [currentYear]);
 
     // تعيين سنة كحالية
-    const setCurrent = useMutation({
-        mutationFn: (id: number) => apiClient.put(`/fiscal-years/${id}`, { is_current: true }),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ['fiscal-years'] }),
-    });
+    const setCurrent = useTenantMutation(
+        (id: number) => fiscalYearsApi.setCurrent(id),
+        (slug) => tenantKeys.fiscalYears.all(slug),
+    );
 
     // حذف سنة
-    const deleteYear = useMutation({
-        mutationFn: (id: number) => apiClient.delete(`/fiscal-years/${id}`),
-        onSuccess: (res) => {
-            qc.invalidateQueries({ queryKey: ['fiscal-years'] });
-            setDeleteTarget(null);
-            setRelatedData(null);
-        },
-    });
+    const deleteYear = useTenantMutation(
+        (id: number) => fiscalYearsApi.delete(id),
+        (slug) => tenantKeys.fiscalYears.all(slug),
+        { onSuccess: () => { setDeleteTarget(null); setRelatedData(null); } },
+    );
 
-    const fetchRelatedData = useMutation({
-        mutationFn: (id: number) => apiClient.get(`/fiscal-years/${id}/related-data`).then(r => r.data.data),
-        onSuccess: (data) => setRelatedData(data),
-    });
+    const fetchRelatedData = useTenantMutation(
+        (id: number) => fiscalYearsApi.relatedData(id),
+        (slug) => tenantKeys.fiscalYears.all(slug),
+        { onSuccess: (data: any) => setRelatedData(data) },
+    );
 
     const openAdd = () => { setEditingYear(null); addModal.openModal(); };
     const openEdit = (y: FiscalYear) => { if (!y.is_closed) { setEditingYear(y); addModal.openModal(); } };
@@ -424,7 +419,6 @@ function FiscalYearModal({ open, year, years, onClose }: {
     open: boolean; year: FiscalYear | null; years: FiscalYear[]; onClose: () => void;
 }) {
     const isEdit = !!year;
-    const qc = useQueryClient();
     const nextY = new Date().getFullYear();
 
     const [form, setForm] = useState({ name: '', start_date: '', end_date: '', is_current: false });
@@ -470,18 +464,21 @@ function FiscalYearModal({ open, year, years, onClose }: {
         ? `${Math.round(daysBetween(form.start_date, form.end_date) / 30.44)} شهراً`
         : null;
 
-    const saveMut = useMutation({
-        mutationFn: (d: typeof form) => {
+    const saveMut = useTenantMutation(
+        (d: typeof form) => {
             const payload = { name: d.name, start_date: d.start_date, end_date: d.end_date, is_current: d.is_current };
-            return isEdit ? apiClient.put(`/fiscal-years/${year!.id}`, payload) : apiClient.post('/fiscal-years', payload);
+            return isEdit ? fiscalYearsApi.update(year!.id, payload) : fiscalYearsApi.create(payload);
         },
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['fiscal-years'] }); onClose(); },
-        onError: (err: unknown) => {
-            const msg = parseApiError(err, 'فشل الحفظ. تحقق من البيانات.');
-            setError(msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('already')
-                ? `اسم السنة المالية "${form.name}" موجود مسبقاً` : msg);
+        (slug) => tenantKeys.fiscalYears.all(slug),
+        {
+            onSuccess: () => onClose(),
+            onError: (err: Error) => {
+                const msg = parseApiError(err, 'فشل الحفظ. تحقق من البيانات.');
+                setError(msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('already')
+                    ? `اسم السنة المالية "${form.name}" موجود مسبقاً` : msg);
+            },
         },
-    });
+    );
 
     return (
         <Modal open={open} onClose={onClose} size="md"
@@ -548,7 +545,6 @@ function FiscalYearModal({ open, year, years, onClose }: {
 function CloseYearModal({ open, year, onClose }: {
     open: boolean; year: FiscalYear | null; onClose: () => void;
 }) {
-    const qc = useQueryClient();
     const [notes, setNotes] = useState('');
     const [error, setError] = useState('');
     const [checked, setChecked] = useState<Set<number>>(new Set());
@@ -561,17 +557,19 @@ function CloseYearModal({ open, year, onClose }: {
     const allChecked = checked.size === CLOSURE_CHECKLIST.length;
     const nextYearName = year ? safeNextYear(year.name) : null;
 
-    const closeMut = useMutation({
-        mutationFn: (id: number) => apiClient.post(`/fiscal-years/${id}/close`, { notes: notes || null }),
-        onSuccess: async () => {
-            setStep('success');
-            await qc.refetchQueries({ queryKey: ['fiscal-years'] });
-            setTimeout(onClose, 800);
+    const closeMut = useTenantMutation(
+        (id: number) => fiscalYearsApi.close(id, notes || undefined),
+        (slug) => tenantKeys.fiscalYears.all(slug),
+        {
+            onSuccess: () => {
+                setStep('success');
+                setTimeout(onClose, 800);
+            },
+            onError: (err: Error) => {
+                setError(parseApiError(err, 'فشل إقفال السنة المالية. تحقق من المتطلبات.'));
+            },
         },
-        onError: (err: unknown) => {
-            setError(parseApiError(err, 'فشل إقفال السنة المالية. تحقق من المتطلبات.'));
-        },
-    });
+    );
 
     if (!year) return null;
 
@@ -784,27 +782,25 @@ function ImportModal({ open, year, years, onClose }: {
     const [error, setError] = useState('');
     const [result, setResult] = useState<any>(null);
 
-    const qc = useQueryClient();
-
     useEffect(() => {
         if (open) { setSourceYearId(null); setError(''); setResult(null); }
     }, [open]);
 
-    const importMut = useMutation({
-        mutationFn: () => {
+    const importMut = useTenantMutation(
+        () => {
             if (!year || !sourceYearId) throw new Error('Missing data');
-            return apiClient.post(`/fiscal-years/${year.id}/import-from/${sourceYearId}`, {
+            return fiscalYearsApi.importFrom(year.id, sourceYearId, {
                 stock: importStock, parties: importParties, treasury: importTreasury,
-            }).then(r => r.data.data);
+            });
         },
-        onSuccess: (data) => {
-            setResult(data);
-            qc.invalidateQueries({ queryKey: ['fiscal-years'] });
+        (slug) => tenantKeys.fiscalYears.all(slug),
+        {
+            onSuccess: (data: any) => setResult(data),
+            onError: (err: Error) => {
+                setError(parseApiError(err, 'فشل استيراد الأرصدة'));
+            },
         },
-        onError: (err: unknown) => {
-            setError(parseApiError(err, 'فشل استيراد الأرصدة'));
-        },
-    });
+    );
 
     const sourceYears = useMemo(() =>
         years.filter(y => !y.is_closed && y.id !== year?.id),

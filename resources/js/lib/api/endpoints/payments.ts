@@ -6,7 +6,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
-import { useActiveSlug } from '../../store/appStore';
+import { useActiveSlug, useSelectedYearId } from '../../store/appStore';
 import type { Payment, Check, PaginatedResponse, ListParams, PaymentStatus, CheckStatus } from '../core/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -104,10 +104,11 @@ export const checksApi = {
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 export function usePayments(params?: PaymentListParams) {
-  const slug = useActiveSlug();
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
   return useQuery({
-    queryKey:        tenantKeys.payments.list(slug ?? '', params),
-    queryFn:         () => paymentsApi.list(params),
+    queryKey:        tenantKeys.payments.list(slug ?? '', { ...params, fiscal_year_id: yearId }),
+    queryFn:         () => paymentsApi.list({ ...params, fiscal_year_id: yearId ?? undefined }),
     enabled:         !!slug,
     staleTime:       3 * 60_000,
     placeholderData: keepPreviousData,
