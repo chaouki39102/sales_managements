@@ -51,6 +51,7 @@ interface ProfessionalCartProps {
   invoiceDiscountAmount?:   number;
   onUndoClear:          () => void;
   canUndoClear:         boolean;
+  undoClearSecondsLeft?: number;
   clientBalance?:       number;
   slug?:                string | null;
   cartRef?:             React.RefObject<HTMLDivElement>;
@@ -76,7 +77,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
   onSetClient, onNoteChange,
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
-  onUndoClear, canUndoClear, clientBalance, slug, cartRef,
+  onUndoClear, canUndoClear, undoClearSecondsLeft = 0, clientBalance, slug, cartRef,
 }, ref) {
 
   const [showNote,         setShowNote]         = useState(false);
@@ -259,12 +260,13 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 <i className="ti ti-notes" />
               </button>
               <button
-                className="btn btn-xs btn-warn"
+                className={`btn btn-xs btn-warn ${undoClearSecondsLeft > 0 ? 'btn-pulse' : ''}`}
                 onClick={onUndoClear}
                 disabled={!canUndoClear}
-                title={`تراجع عن آخر مسح — ${kb('undoClear')}`}
+                title={`تراجع عن آخر مسح — ${kb('undoClear')}${undoClearSecondsLeft > 0 ? ` (${undoClearSecondsLeft}s)` : ''}`}
               >
                 <i className="ti ti-arrow-back-up" />
+                {undoClearSecondsLeft > 0 && <span className="undo-ct">{undoClearSecondsLeft}</span>}
               </button>
               <button
                 className="btn btn-xs btn-r"

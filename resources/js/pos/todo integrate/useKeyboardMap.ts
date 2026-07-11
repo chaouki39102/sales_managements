@@ -74,12 +74,17 @@ export function matchOverride(slug: string | null, action: string, e: KeyboardEv
   return matchOverrideFrom(overrides, action, e);
 }
 
-/** Like matchOverride but takes pre-read overrides — avoids 25× localStorage reads per keypress */
-export function matchOverrideFrom(
-  overrides: Record<string, string>,
-  action: string,
-  e: KeyboardEvent
-): boolean {
+/**
+ * نفس منطق matchOverride، لكن تاخذ خريطة overrides جاهزة بدل قراءتها من
+ * localStorage. استُخدمت لأن معالج اختصارات لوحة المفاتيح بـ POSPage.tsx
+ * كان يستدعي matchOverride(slug, action, e) حوالي 25 مرة منفصلة بنفس حدث
+ * الـ keydown الواحد — كل استدعاء يسوي localStorage.getItem + JSON.parse
+ * لحاله، يعني ~25 عملية قراءة/تحليل متزامنة بكل ضغطة مفتاح على الصفحة.
+ * بمكان POS يفترض يستجيب فوري للطباعة السريعة وسكانر الباركود، هذا تأخير
+ * غير ضروري إطلاقاً. الحل: اقرأ الخريطة مرة وحدة بأول المعالج عبر
+ * readOverrides(slug)، وبعدين استخدم matchOverrideFrom لكل تحقق تالي.
+ */
+export function matchOverrideFrom(overrides: Record<string, string>, action: string, e: KeyboardEvent): boolean {
   const expected = overrides[action] ?? KB_DEFAULTS[action];
   if (!expected) return false;
   return normalizeEventKey(e) === expected;

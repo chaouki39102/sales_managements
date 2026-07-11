@@ -90,6 +90,14 @@ export interface POSSettings {
   // ── تخطيط الشاشة ──────────────────────────────────────────────────────
   /** عرض السلة (بالـ px) — قابل للسحب */
   cartWidth:            number;
+
+  // ── الإشعارات ─────────────────────────────────────────────────────────
+  /** تفعيل/تعطيل الإشعارات (toast) */
+  toastEnabled:         boolean;
+  /** مدة عرض الإشعارات (toast) بالميللي ثانية — 0 = حتى يُضغط عليها */
+  toastDuration:        number;
+  /** مكان ظهور الإشعارات (toast) */
+  toastPosition:        'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
 }
 
 // ─── Default Settings ─────────────────────────────────────────────────────────
@@ -123,6 +131,9 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   clearSearchOnAdd:     false,
   keyboardNav:          true,
   cartWidth:            390,
+  toastEnabled:         true,
+  toastDuration:        3000,
+  toastPosition:        'top-left',
 };
 
 // ─── Storage key ──────────────────────────────────────────────────────────────

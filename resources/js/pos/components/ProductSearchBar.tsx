@@ -33,6 +33,7 @@ interface ProductSearchBarProps {
   highlightedIndex?: number;
   onArrowUp?: () => void;
   onArrowDown?: () => void;
+  onEscape?: () => void;
   keyboardNavEnabled?: boolean;
   slug?: string | null;
 }
@@ -40,7 +41,7 @@ interface ProductSearchBarProps {
 export default function ProductSearchBar({
   query, onQuery, view, gridSize, onView, onGridSize,
   onFilter, filterActive, inputRef, sortBy, onSort, resultsCount, onEnterFirst,
-  highlightedIndex, onArrowUp, onArrowDown, keyboardNavEnabled, slug,
+  highlightedIndex, onArrowUp, onArrowDown, onEscape, keyboardNavEnabled, slug,
 }: ProductSearchBarProps) {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -68,7 +69,7 @@ export default function ProductSearchBar({
           autoComplete="off"
           onKeyDown={e => {
             if (e.key === 'Enter') { e.preventDefault(); onEnterFirst(); }
-            if (e.key === 'Escape') { e.preventDefault(); onQuery(''); }
+            if (e.key === 'Escape') { e.preventDefault(); if (onEscape) onEscape(); else onQuery(''); }
             if (keyboardNavEnabled && onArrowUp && e.key === 'ArrowUp') { e.preventDefault(); onArrowUp(); }
             if (keyboardNavEnabled && onArrowDown && e.key === 'ArrowDown') { e.preventDefault(); onArrowDown(); }
           }}

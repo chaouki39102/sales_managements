@@ -54,6 +54,23 @@ const PRINT_COPIES: { value: 1 | 2 | 3; label: string }[] = [
   { value: 3, label: '3 نسخ' },
 ];
 
+const TOAST_DURATION_OPTIONS: { value: number; label: string }[] = [
+  { value: 1500, label: 'سريع (1.5 ثانية)' },
+  { value: 3000, label: 'عادي (3 ثواني)' },
+  { value: 5000, label: 'بطيء (5 ثواني)' },
+  { value: 8000, label: 'بطيء جداً (8 ثواني)' },
+  { value: 0,    label: 'حتى يُضغط عليها' },
+];
+
+const TOAST_POSITION_OPTIONS: { value: string; label: string }[] = [
+  { value: 'top-left',     label: 'أعلى يسار' },
+  { value: 'top-center',   label: 'أعلى وسط' },
+  { value: 'top-right',    label: 'أعلى يمين' },
+  { value: 'bottom-left',  label: 'أسفل يسار' },
+  { value: 'bottom-center',label: 'أسفل وسط' },
+  { value: 'bottom-right', label: 'أسفل يمين' },
+];
+
 const toggleSettings: { key: keyof POSSettings; label: string }[] = [
   { key: 'showQuickbarOnStart', label: 'إظهار شريط المنتجات السريعة عند الفتح' },
   { key: 'confirmOnClear',      label: 'طلب تأكيد قبل مسح السلة' },
@@ -161,6 +178,43 @@ export default function POSSettingsModal({
                 />
               </div>
             ))}
+
+            <div className="fg s2">
+              <Switch
+                checked={local.toastEnabled}
+                onChange={v => patch({ toastEnabled: v })}
+                label="إشعارات toast"
+              />
+            </div>
+
+            {local.toastEnabled && (
+              <>
+                <div className="fg s2">
+                  <label>مدة عرض الإشعارات</label>
+                  <select
+                    value={local.toastDuration}
+                    onChange={e => patch({ toastDuration: parseInt(e.target.value) })}
+                  >
+                    {TOAST_DURATION_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  <div className="fg-hint">مدة ظهور إشعارات النجاح والخطأ أعلى الشاشة</div>
+                </div>
+
+                <div className="fg s2">
+                  <label>مكان ظهور الإشعارات</label>
+                  <select
+                    value={local.toastPosition}
+                    onChange={e => patch({ toastPosition: e.target.value as any })}
+                  >
+                    {TOAST_POSITION_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
           </div>
         );
 

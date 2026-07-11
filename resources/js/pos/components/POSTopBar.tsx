@@ -32,6 +32,10 @@ interface POSTopBarProps {
   onSettings:         () => void;
   onKioskMode:        () => void;
   onOpenDrawer:       () => void;
+  toastEnabled:       boolean;
+  onToggleToast:      () => void;
+  clearSearchOnAdd:   boolean;
+  onToggleClearSearch:() => void;
 }
 
 export default function POSTopBar({
@@ -42,7 +46,8 @@ export default function POSTopBar({
   onHeld, onNewSale, onManual, onReceipt,
   onSession, onSessionInvoices, onFullscreen, onKbHelp,
   onToggleQuickbar, onReturn, onSettings, onKioskMode,
-  onOpenDrawer,
+  onOpenDrawer, toastEnabled, onToggleToast,
+  clearSearchOnAdd, onToggleClearSearch,
 }: POSTopBarProps) {
 
   const invoicesCount = session?.invoices_count ?? 0;
@@ -240,6 +245,21 @@ export default function POSTopBar({
         </button>
 
         <span className="tb-sep" aria-hidden="true" />
+
+        <button
+          className={`btn btn-xs ${toastEnabled ? 'btn-p' : ''}`}
+          onClick={onToggleToast}
+          title={toastEnabled ? 'تعطيل الإشعارات' : 'تفعيل الإشعارات'}
+        >
+          <i className={`ti ${toastEnabled ? 'ti-bell' : 'ti-bell-off'}`} />
+        </button>
+        <button
+          className={`btn btn-xs ${clearSearchOnAdd ? 'btn-p' : ''}`}
+          onClick={onToggleClearSearch}
+          title={clearSearchOnAdd ? 'إيقاف تفريغ البحث تلقائياً' : 'تفريغ البحث بعد كل إضافة'}
+        >
+          <i className={`ti ${clearSearchOnAdd ? 'ti-letter-case-toggle' : 'ti-letter-case'}`} />
+        </button>
 
         <button
           className="btn btn-xs"

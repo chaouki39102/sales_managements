@@ -68,7 +68,7 @@ const KeyboardHelpModal        = React.lazy(() => import('@/pos/components/Keybo
 const POSSettingsModal          = React.lazy(() => import('@/pos/components/POSSettingsModal'));
 const ManagerPinModal           = React.lazy(() => import('@/pos/components/ManagerPinModal'));
 import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
-import { matchOverride, matchOverrideFrom, useKbOverrides } from '@/pos/hooks/useKeyboardMap';
+import { matchOverride, matchOverrideFrom, readOverrides } from '@/pos/hooks/useKeyboardMap';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
 import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
@@ -84,6 +84,20 @@ import type { CompanyPreviewData } from '@/pages/settings/print-settings/types';
 
 const QUICK_ITEMS_KEY = (slug: string) => `pos-quick-items-${slug}`;
 
+/**
+ * تركيب خصم السطر مع خصم الفاتورة (كلاهما نسبة مئوية) ضرباً لا جمعاً —
+ * هذا هو الأسلوب الصحيح رياضياً (خصم 20% على السطر + خصم 10% على
+ * الفاتورة = 28% إجمالي، مو 30%).
+ *
+ * ⚠️ TODO مهم: هذي الصيغة مستخدمة هنا فقط (عند إتمام البيع فعلياً)،
+ * بينما الإجمالي المعروض للكاشير طول وقت تعديل السلة (`pos.totals`,
+ * عبر `adjustedTotalTtcFinal`) يُحسب بدالة `calcTotals` بملف
+ * `@/pos/utils/calculations.ts`. لازم نتأكد إن calcTotals تستخدم نفس
+ * الصيغة بالضبط (تركيب ضربي، مو جمعي) — وإلا ممكن يشوف الكاشير رقم
+ * على الشاشة يختلف شوي عن رقم الفاتورة المحفوظة فعلياً. الأصح هو نقل
+ * هذي الدالة لـ calculations.ts واستدعاؤها من المكانين (DRY) بدل
+ * وجود نسختين قد تنحرفان عن بعض مستقبلاً.
+ */
 function compoundDiscountPct(linePct: number, invoicePct: number): number {
   if (invoicePct <= 0) return linePct;
   const compounded = 100 - (100 - linePct) * (100 - invoicePct) / 100;
@@ -131,31 +145,15 @@ function POSPage() {
     try {
       await closeSessionMut.mutateAsync(data);
       setShowCloseSession(false);
-      safeToast.success('تم إغلاق الجلسة بنجاح');
+      toast.success('تم إغلاق الجلسة بنجاح');
     } catch (e: any) {
-      safeToast.error(e?.message ?? 'فشل إغلاق الجلسة');
+      toast.error(e?.message ?? 'فشل إغلاق الجلسة');
     }
   };
 
   const { settings, setSettings, resetSettings } = usePOSSettings(slug);
-
-  // ── Toast proxy: no-op when disabled ──────────────────────────────────
-  const safeToast = useMemo(() => {
-    if (settings.toastEnabled) return toast;
-    const noop: any = () => '';
-    noop.success = noop; noop.error = noop; noop.warning = noop;
-    noop.info = noop;    noop.message = noop; noop.custom = noop;
-    noop.dismiss = () => {}; noop.remove = () => {};
-    return noop as typeof toast;
-  }, [settings.toastEnabled]);
   const clearCartConfirm = useConfirm();
   const deleteConfirm    = useConfirm();
-
-  // Read keyboard overrides ONCE (via useKbOverrides which caches + re-reads only on change),
-  // then pass to matchOverrideFrom inside the handler to avoid 25× localStorage.read per keypress.
-  const kbOverrides    = useKbOverrides(slug);
-  const kbOverridesRef = useRef(kbOverrides);
-  kbOverridesRef.current = kbOverrides;
 
   // ═════════════════════════════════════════════════════════════════════
   // Clear cart on company switch — prevents stale product_id values from
@@ -564,6 +562,11 @@ function POSPage() {
     invoiceDiscountPct: number;
   } | null>(null);
   const [canUndoClear, setCanUndoClear] = useState(false);
+  // عدد الثواني المتبقية للتراجع عن المسح — كانت المهلة (20 ثانية) صامتة
+  // تماماً بدون أي مؤشر مرئي، فالكاشير المستعجل يفوّت فرصة التراجع بدون
+  // ما يعرف أصلاً إنها متاحة أو كم بقالها وقت. الآن تُمرَّر كـ prop
+  // لـ ProfessionalCart لعرضها (مثلاً "تراجع (14)") — يحتاج تعديل بسيط
+  // بمكوّن ProfessionalCart.tsx لعرض الرقم، ما عندي الملف حالياً لأضيفه.
   const [undoClearSecondsLeft, setUndoClearSecondsLeft] = useState(0);
   const undoClearTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const undoClearIntervalRef = useRef<ReturnType<typeof setInterval>>();
@@ -619,12 +622,12 @@ function POSPage() {
     setUndoClearSecondsLeft(0);
     clearTimeout(undoClearTimerRef.current);
     clearInterval(undoClearIntervalRef.current);
-    safeToast.success('تم استرجاع السلة');
+    toast.success('تم استرجاع السلة');
   }, []);
 
   const handleOpenDrawer = useCallback(async () => {
     const res = await openCashDrawerViaWebUSB();
-    if (!res.ok) safeToast.error(res.message ?? 'تعذّر فتح الدرج');
+    if (!res.ok) toast.error(res.message ?? 'تعذّر فتح الدرج');
   }, []);
 
   const handleOpenInvoice = useCallback(async (docId: number) => {
@@ -635,7 +638,7 @@ function POSPage() {
         include: 'party,lines,lines.product,lines.product_variant,payments,payments.payment_mode',
       });
       if (!doc?.lines?.length) {
-        safeToast.error('لا توجد أصناف في هذه الفاتورة');
+        toast.error('لا توجد أصناف في هذه الفاتورة');
         return;
       }
 
@@ -681,7 +684,7 @@ function POSPage() {
       setEditingDocumentDate(doc.document_date ?? null);
       editingPrevBalanceRef.current = (doc as any)?.balance_data?.previous_balance;
       setShowSessionInvoices(false);
-      safeToast.success(`تم فتح الفاتورة ${doc.document_number}`);
+      toast.success(`تم فتح الفاتورة ${doc.document_number}`);
       // Select last cart row + focus search so user can immediately type *<digits> Enter
       requestAnimationFrame(() => {
         searchRef.current?.focus();
@@ -690,7 +693,7 @@ function POSPage() {
         if (last) setSelectedCartItemId(last.id);
       });
     } catch {
-      safeToast.error('فشل تحميل الفاتورة');
+      toast.error('فشل تحميل الفاتورة');
     }
   }, [isEmpty, pos]);
 
@@ -734,7 +737,7 @@ function POSPage() {
           const items = useCartStore.getState().items;
           const added = items.find(i => i.variant_id === variant.id);
           if (added) { setSelectedCartItemId(added.id); requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(added.id)); }
-          safeToast.success(variant.product?.name ?? variant.name ?? 'تمت الإضافة', {
+          toast.success(variant.product?.name ?? variant.name ?? 'تمت الإضافة', {
             id: 'pos-last-added',
             duration: 1500,
           });
@@ -768,10 +771,13 @@ function POSPage() {
 
   // ── Keyboard Shortcuts ─────────────────────────────────────────────────────
   useEffect(() => {
+    const slugRef = slug;
     const handler = (e: KeyboardEvent) => {
-      const overrides = kbOverridesRef.current;
       const tag     = (e.target as HTMLElement)?.tagName;
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      // قراءة وحيدة من localStorage بدل 30 قراءة منفصلة (كل matchOverride
+      // كانت تقرأ وتحلّل JSON لحالها) — راجع التعليق بـ matchOverrideFrom.
+      const overrides = readOverrides(slugRef);
 
       // إذا كان أي مودال مفتوح، تجاهل اختصارات الصفحة الرئيسية (المودال يتولى التحكم)
       const anyModalOpen = modal !== 'none' || showSessionInvoices || showSettings || showCloseSession || !!pinModal;
@@ -943,23 +949,23 @@ function POSPage() {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? {} as any);
         const result = await printThermalViaWebUSBFromTemplate(template, data, resolvedDocNum);
         if (result.ok) {
-          safeToast.success('✅ تمت الطباعة الحرارية');
+          toast.success('✅ تمت الطباعة الحرارية');
         } else {
-          safeToast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
+          toast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
           await printReceiptDirect({
             html, paperWidth, copies,
-            onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`),
+            onError: (e) => toast.error(`خطأ في طباعة المتصفح: ${e.message}`),
           });
         }
       } else {
         await printReceiptDirect({
           html, paperWidth, copies,
-          onDone:  () => safeToast.success('✅ تم إرسال الطباعة'),
-          onError: (e) => safeToast.error(`خطأ في الطباعة: ${e.message}`),
+          onDone:  () => toast.success('✅ تم إرسال الطباعة'),
+          onError: (e) => toast.error(`خطأ في الطباعة: ${e.message}`),
         });
       }
     } catch (e: any) {
-      safeToast.error(`خطأ في تجهيز الطباعة: ${e.message}`);
+      toast.error(`خطأ في تجهيز الطباعة: ${e.message}`);
     }
   }, [template, companyData, paperWidth, copies, settings.printMode]);
 
@@ -1002,16 +1008,13 @@ const handleCompleteSale = useCallback(async (params: {
           notes:               params.note?.trim() || null,
         }));
 
-      const linesPayload = currentItems.map(i => {
-        const compoundedDisc = compoundDiscountPct(i.discount_percentage, currentInvDisc);
-        return {
-          product_id:          i.product_id,
-          quantity:            i.quantity,
-          unit_price_ht:       i.unit_price_ht,
-          discount_percentage: Math.min(100, compoundedDisc),
-          tva_rate:            i.tva_rate,
-        };
-      });
+      const linesPayload = currentItems.map(i => ({
+        product_id:          i.product_id,
+        quantity:            i.quantity,
+        unit_price_ht:       i.unit_price_ht,
+        discount_percentage: compoundDiscountPct(i.discount_percentage, currentInvDisc),
+        tva_rate:            i.tva_rate,
+      }));
 
       const effectiveTotalHt = linesPayload.reduce((s, l) =>
         s + l.quantity * l.unit_price_ht * (1 - l.discount_percentage / 100), 0);
@@ -1153,12 +1156,12 @@ const handleCompleteSale = useCallback(async (params: {
         setModal('none');
       }
 
-      safeToast.success(`✅ تم حفظ الفاتورة ${res.document_number ?? ''}`);
+      toast.success(`✅ تم حفظ الفاتورة ${res.document_number ?? ''}`);
       return { ok: true, docNumber: res.document_number };
 
     } catch (err: any) {
       const msg = err?.errors?.lines?.[0] ?? err?.message ?? 'فشل حفظ الفاتورة';
-      safeToast.error(String(msg));
+      toast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
   }, [pos, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency, defaultTreasury, cartNote, settings.defaultDocTypeCode, autoPrint, isPrintEnabled, template, handlePrintDirect, showPreview, invoiceDiscountAmount, buildIncrementInput, editingDocumentId]);
@@ -1189,7 +1192,7 @@ const handleCompleteSale = useCallback(async (params: {
     // Keep grid highlight on the added product (allVariants if search will clear, else filteredVariants)
     const idx = (settings.clearSearchOnAdd ? allVariants : filteredVariants).findIndex(fv => fv.id === v.id);
     if (idx >= 0) setHighlightedIndex(idx);
-    safeToast.success(v.product?.name ?? v.name ?? 'تمت الإضافة', {
+    toast.success(v.product?.name ?? v.name ?? 'تمت الإضافة', {
       id: 'pos-last-added',
       duration: 1500,
     });
@@ -1217,16 +1220,17 @@ const handleCompleteSale = useCallback(async (params: {
     // Qty command: *<digits> on Enter sets qty of selected cart row
     if (selectedCartItemId) {
       const qtyMatch = pos.searchQuery.trim().match(/^\*(\d+)$/);
-        if (qtyMatch) {
+      if (qtyMatch) {
         const qty = parseInt(qtyMatch[1], 10);
         if (qty > 0) {
           pos.updateQty(selectedCartItemId, qty);
-          const itemName = pos.items.find(i => i.id === selectedCartItemId)?.product_name ?? '';
-          safeToast.success(`${itemName} — الكمية ${qty}`, { id: 'pos-qty-cmd', duration: 1200 });
+          toast.success(`الكمية → ${qty}`, { id: 'pos-qty-cmd', duration: 1200 });
           skipNextSearchResetRef.current = true;
           pos.setSearch(prevSearchRef.current);
         } else {
-          safeToast.error('الكمية يجب أن تكون أكبر من صفر', { id: 'pos-qty-cmd-err', duration: 1500 });
+          // تنبيه فقط، بدون منع — نسيب نص البحث كما هو حتى يقدر المستخدم
+          // يصحّح الرقم (مثلاً يكمل كتابة رقم أطول) بدل ما نتدخل بمسحه.
+          toast.error('الكمية يجب أن تكون أكبر من صفر', { id: 'pos-qty-cmd-err', duration: 1500 });
         }
         return;
       }
@@ -1311,10 +1315,6 @@ const handleCompleteSale = useCallback(async (params: {
         onToggleQuickbar={handleToggleQuickbar}
         onKioskMode={() => navigate('/pos/kiosk')}
         onOpenDrawer={handleOpenDrawer}
-        toastEnabled={settings.toastEnabled}
-        onToggleToast={() => setSettings({ toastEnabled: !settings.toastEnabled })}
-        clearSearchOnAdd={settings.clearSearchOnAdd}
-        onToggleClearSearch={() => setSettings({ clearSearchOnAdd: !settings.clearSearchOnAdd })}
       />
 
 
@@ -1399,7 +1399,7 @@ const handleCompleteSale = useCallback(async (params: {
           onInvoiceDiscountChange={pct => {
             const check = checkDiscountAllowed(pct, settings);
             if (!check.allowed && check.reason === 'max_exceeded') {
-              safeToast.error(`الخصم ${pct}% تجاوز الحد الأقصى (${settings.maxDiscountPct}%)`);
+              toast.error(`الخصم ${pct}% تجاوز الحد الأقصى (${settings.maxDiscountPct}%)`);
               return;
             }
             if (!check.allowed && check.reason === 'pin_required') {
@@ -1561,8 +1561,7 @@ const handleCompleteSale = useCallback(async (params: {
         </Suspense>
       )}
 
-      <Toaster key={settings.toastPosition} position={settings.toastPosition} richColors closeButton
-        duration={settings.toastDuration || undefined}
+      <Toaster position="top-left" richColors closeButton
         toastOptions={{ style: { fontFamily: 'Tajawal, sans-serif', fontSize: 14 } }}
       />
       <ConfirmDialog {...clearCartConfirm.confirmDialogProps} />
