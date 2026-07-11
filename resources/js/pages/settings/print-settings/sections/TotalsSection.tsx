@@ -5,6 +5,7 @@ import { Toggle, SliderField } from './ToggleSwitch';
 import { AlignButtons, BorderSelect } from './HeaderSection';
 import { ColorField } from '../components/ui';
 import { isSettingVisible } from '../services/SettingsRegistry';
+import { RowManager } from '../components/RowManager';
 
 interface Props {
   tpl: PrintTemplate;
@@ -53,7 +54,11 @@ export default function TotalsSectionControls({ tpl, update }: Props) {
       {sec('show_prev_balance') && <Toggle value={tpl.show_prev_balance} onChange={v => update('show_prev_balance', v)} label="الرصيد السابق" />}
       {sec('show_new_balance') && <Toggle value={tpl.show_new_balance} onChange={v => update('show_new_balance', v)} label="الرصيد الجديد" />}
 
-
-    </>
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+      <div className="ps-section-title" style={{ fontSize: 12 }}>ترتيب الصفوف</div>
+      <RowManager
+        rows={tpl.totals_rows ?? []}
+        onChange={rows => update('totals_rows', rows)}
+      /></>
   );
 }

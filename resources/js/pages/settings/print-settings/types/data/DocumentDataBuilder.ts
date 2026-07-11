@@ -83,6 +83,7 @@ interface ApiDocument {
     id?:      number;
     name?:    string;
     type?:    string;
+    code?:    string | null;
     nif?:     string | null;
     rc?:      string | null;
     nis?:     string | null;
@@ -395,6 +396,7 @@ function buildPartyFromApi(
     id:      party.id,
     name:    party.name ?? '',
     type:    (party.type as 'customer' | 'supplier') ?? undefined,
+    code:    party.code ?? null,
     nif:     party.nif ?? null,
     rc:      party.rc  ?? null,
     nis:     party.nis ?? null,

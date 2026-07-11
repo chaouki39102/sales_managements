@@ -6,7 +6,12 @@ import type {
   AlignOption,
   BorderStyle,
   FontFamily,
+  LayoutRow,
+  BoxBorder,
 } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+import { printFieldRegistry } from '../../services/PrintFieldRegistry';
+import { printFieldResolver } from '../../services/PrintFieldResolver';
 
 export function formatDate(iso: string): string {
   if (!iso) return '';
@@ -176,4 +181,121 @@ export function SectionWrap({ highlight, children }: {
 }) {
   if (!highlight) return <>{children}</>;
   return <div style={highlight}>{children}</div>;
+}
+
+// ─── Box border helper (any side, color, width, radius) ───────────────────────
+
+const BORDER_STYLE_CSS: Record<string, string> = {
+  solid: 'solid', dashed: 'dashed', double: 'double', none: 'none',
+};
+
+export function boxBorderCss(b?: Partial<BoxBorder>): React.CSSProperties {
+  if (!b || !b.style || b.style === 'none') return {};
+  const w = b.width ?? 1;
+  const c = b.color ?? '#111';
+  const st = BORDER_STYLE_CSS[b.style] ?? 'solid';
+  const sides = b.sides ?? {};
+  const css: React.CSSProperties = {};
+  if (sides.top !== false)    css.borderTop = `${w}px ${st} ${c}`;
+  if (sides.bottom !== false) css.borderBottom = `${w}px ${st} ${c}`;
+  if (sides.start !== false)  css.borderRight = `${w}px ${st} ${c}`;
+  if (sides.end !== false)    css.borderLeft = `${w}px ${st} ${c}`;
+  if (b.radius) css.borderRadius = b.radius;
+  return css;
+}
+
+// ─── Format field value by type from PrintFieldRegistry ───────────────────────
+
+function formatFieldValue(fieldId: string, value: unknown): string {
+  if (fieldId === 'literal') return String(value ?? '');
+  const def = printFieldRegistry.get(fieldId);
+  if (!def) return String(value ?? '');
+  if (def.type === 'currency') return Number(value ?? 0).toFixed(2);
+  if (def.type === 'number')   return String(Number(value ?? 0));
+  if (def.type === 'date')     return formatDate(String(value ?? ''));
+  return String(value ?? '');
+}
+
+const sideToOrder = (side: 'start' | 'end') => (side === 'start' ? 0 : 1);
+
+// ─── LayoutRowPair: label + value row from LayoutRow ──────────────────────────
+
+function LayoutRowPairFn({
+  row, label, value,
+}: { row: LayoutRow; label: string; value: unknown }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+      padding: '3px 2px',
+      marginRight: row.indent ?? 0,
+      fontWeight: row.bold ? 800 : 'inherit',
+      color: row.color ?? 'inherit',
+      fontSize: row.fontSize,
+      ...boxBorderCss(row.border),
+    }}>
+      <span style={{ order: sideToOrder(row.labelSide) }}>{label}</span>
+      <span style={{ order: sideToOrder(row.valueSide) }} dir="ltr">
+        {formatFieldValue(row.field, value)}
+      </span>
+    </div>
+  );
+}
+export const LayoutRowPair = React.memo(LayoutRowPairFn);
+
+// ─── LayoutRowLine: free-text line (footer etc.) ──────────────────────────────
+
+function LayoutRowLineFn({ row, text }: { row: LayoutRow; text: string }) {
+  return (
+    <div style={{
+      textAlign: row.labelSide === 'start' ? 'right' : row.labelSide === 'end' ? 'left' : 'center',
+      fontWeight: row.bold ? 800 : 'inherit',
+      color: row.color ?? 'inherit',
+      fontSize: row.fontSize,
+      padding: '2px 0',
+      ...boxBorderCss(row.border),
+    }}>
+      {text}
+    </div>
+  );
+}
+export const LayoutRowLine = React.memo(LayoutRowLineFn);
+
+// ─── renderLayoutRows: generic interpreter for LayoutRow[] ────────────────────
+
+export function renderLayoutRows(
+  rows: LayoutRow[] | undefined,
+  data: UniversalDocumentData,
+  tpl: PrintTemplate,
+): JSX.Element[] {
+  if (!rows || rows.length === 0) return [];
+
+  const visible = [...rows].filter(r => r.visible).sort((a, b) => a.order - b.order);
+  const out: JSX.Element[] = [];
+
+  for (const r of visible) {
+    if (r.field === 'totals.tvaBreakdownGroup') {
+      for (const br of data.taxBreakdown ?? []) {
+        out.push(
+          <LayoutRowPair
+            key={`${r.id}-${br.rate}`}
+            row={r}
+            label={`TVA ${br.rate}%`}
+            value={br.tva}
+          />,
+        );
+      }
+      continue;
+    }
+
+    if (r.field === 'literal') {
+      out.push(<LayoutRowLine key={r.id} row={r} text={r.literalText ?? ''} />);
+      continue;
+    }
+
+    const value = printFieldResolver.resolve(r.field, data, tpl);
+    const label = r.label ?? printFieldRegistry.get(r.field)?.label ?? r.field;
+    out.push(<LayoutRowPair key={r.id} row={r} label={label} value={value} />);
+  }
+
+  return out;
 }

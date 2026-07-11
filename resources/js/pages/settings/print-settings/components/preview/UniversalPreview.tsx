@@ -96,7 +96,7 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
     }}>
       {tpl.show_header_section && sectionVisible('header') && (
         <SectionWrap highlight={sectionHighlight('header')}>
-          {renderHeader(tpl, data, isThermal)}
+          {renderHeader(tpl, data, isThermal, paperWidth)}
         </SectionWrap>
       )}
       {tpl.show_doc_info_section && sectionVisible('doc-info') && (

@@ -3,6 +3,7 @@ import type { UniversalDocumentData } from '../../types/data';
 import { renderLogo } from './LogoRenderer';
 import { align, formatDate, Separator, InfoRow } from './shared';
 import { printFieldResolver } from '../../services';
+import { renderHeaderColumns } from './HeaderColumns';
 
 function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
   return printFieldResolver.resolve(fieldId, data, tpl);
@@ -103,7 +104,11 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
   );
 }
 
-export function renderHeader(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+export function renderHeader(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean, paperWidth: number) {
+  if (!isThermal && tpl.header_layout?.mode === 'columns') {
+    const cols = renderHeaderColumns(tpl.header_layout, data, tpl, paperWidth);
+    if (cols) return cols;
+  }
   if (isThermal) return renderThermalHeader(tpl, data);
   return renderPageHeader(tpl, data);
 }

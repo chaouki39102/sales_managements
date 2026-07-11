@@ -1,5 +1,6 @@
 import type { DocTypeCode, PaperSize, PrintTemplate } from '../types/domain';
 import { SETTINGS_REGISTRY } from './SettingsRegistry';
+import { ensureLayoutFields } from './layoutMigration';
 
 export const TEMPLATE_VERSION = 2;
 
@@ -69,7 +70,7 @@ export function fromApiResponse(r: ApiResponse): PrintTemplate {
   for (const key of Object.keys(config)) {
     result[key] = (config as any)[key];
   }
-  return result as unknown as PrintTemplate;
+  return ensureLayoutFields(result as unknown as PrintTemplate);
 }
 
 /**

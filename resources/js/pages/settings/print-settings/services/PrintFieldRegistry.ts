@@ -41,6 +41,7 @@ export const PRINT_FIELDS: PrintFieldDefinition[] = [
   { id: 'customer.address',        label: 'عنوان العميل',         group: 'customer', type: 'string',   sourcePath: 'party.address',        settingKey: 'show_client_address',  align: 'right',   visibleByDefault: true },
   { id: 'customer.deliveryAddress', label: 'عنوان التسليم',       group: 'customer', type: 'string',   sourcePath: 'party.deliveryAddress', settingKey: 'show_delivery_address', align: 'right',   visibleByDefault: false },
   { id: 'customer.cashierName',    label: 'الكاشير',              group: 'customer', type: 'string',   sourcePath: 'party.cashierName',    settingKey: 'show_cashier',         align: 'right',   visibleByDefault: true },
+  { id: 'customer.code',           label: 'رمز الزبون',           group: 'customer', type: 'string',   sourcePath: 'party.code',           align: 'right',   visibleByDefault: true },
 
   // ── Document ─────────────────────────────────────────────────────────
   { id: 'document.number',         label: 'رقم المستند',          group: 'document', type: 'string',   sourcePath: 'doc.number',           settingKey: 'show_doc_number',      align: 'right',   visibleByDefault: true },
@@ -71,6 +72,8 @@ export const PRINT_FIELDS: PrintFieldDefinition[] = [
   { id: 'company.ice',             label: 'رقم ICE',              group: 'company',  type: 'string',   sourcePath: 'company.ice',           settingKey: 'show_ice',             align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_ice' },
   { id: 'company.article',         label: 'المادة',               group: 'company',  type: 'string',   sourcePath: 'company.article',       settingKey: 'show_article',         align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_article' },
   { id: 'company.logo',            label: 'الشعار',               group: 'company',  type: 'image',    sourcePath: 'company.logoUrl',       settingKey: 'show_logo',            align: 'center',  visibleByDefault: true },
+  { id: 'company.capital',         label: 'رأس مال الشركة',       group: 'company',  type: 'string',   sourcePath: 'company.capital',       align: 'right',   visibleByDefault: true },
+  { id: 'company.mobile',          label: 'الهاتف المحمول',       group: 'company',  type: 'string',   sourcePath: 'company.mobile',        align: 'right',   visibleByDefault: true },
 
   // ── Items (table) ─────────────────────────────────────────────────────
   { id: 'item.index',              label: 'الرقم',                group: 'item',     type: 'number',   sourcePath: '',                      align: 'center',  visibleByDefault: true,  isRepeating: true, relativePath: '_index' },

@@ -111,6 +111,10 @@ class PrintTemplateSeeder extends Seeder
         'show_prev_balance'        => true,
         'show_new_balance'         => true,
 
+        'totals_rows'              => [],
+        'footer_rows'              => [],
+        'header_layout'            => ['mode' => 'simple', 'columns' => []],
+
         'show_payment_details'     => true,
         'payment_font_size'        => 9,
 

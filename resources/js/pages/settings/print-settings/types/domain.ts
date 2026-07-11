@@ -5,6 +5,59 @@ export type PriceMode       = 'ht' | 'ttc';
 export type PageOrientation = 'portrait' | 'landscape';
 export type FontFamily      = 'tajawal' | 'monospace' | 'times' | 'arial';
 
+// ─── Layout Row System ────────────────────────────────────────────────────────
+
+/** Logical side: start = right in RTL, end = left. No explicit left/right so design stays correct for future LTR. */
+export type LogicalSide = 'start' | 'end';
+export type LogicalAlign = 'start' | 'center' | 'end';
+
+export interface BoxBorder {
+  style: BorderStyle;
+  width: number;      // px
+  color: string;       // hex
+  radius?: number;     // px
+  sides?: {
+    top?: boolean; end?: boolean; bottom?: boolean; start?: boolean;
+  };
+}
+
+export interface BoxSpacing { top: number; end: number; bottom: number; start: number; }
+
+/** A "label + value" row — used for totals, company info, footer lines. */
+export interface LayoutRow {
+  id: string;           // Fixed key: 'total_ht' | 'discount' | 'custom_1'
+  field: string;        // PrintFieldRegistry ID, or 'literal' for free text
+  literalText?: string; // Used only when field === 'literal'
+  label?: string;       // Custom label; defaults to PrintFieldRegistry label
+  visible: boolean;
+  order: number;
+  labelSide: LogicalSide;
+  valueSide: LogicalSide;
+  bold?: boolean;
+  color?: string;
+  fontSize?: number;
+  indent?: number;      // px
+  border?: Partial<BoxBorder>;
+}
+
+/** A box/container holding a group of rows with its own positioning — for A4 header columns. */
+export interface LayoutBlock {
+  id: string;
+  order: number;
+  visible: boolean;
+  width?: number;       // % of paper width (for side-by-side columns)
+  align: LogicalAlign;
+  border?: BoxBorder;
+  padding?: BoxSpacing;
+  background?: string;
+  rows: LayoutRow[];
+}
+
+export interface HeaderLayout {
+  mode: 'simple' | 'columns';
+  columns: LayoutBlock[]; // Empty when mode === 'simple'
+}
+
 export type ColumnKey =
   | 'rowNumber' | 'barcode' | 'ref' | 'name'
   | 'unit' | 'quantity' | 'price' | 'discount' | 'tva' | 'total';
@@ -138,6 +191,10 @@ export interface PrintTemplate {
   show_remaining:      boolean;
   show_prev_balance:   boolean;
   show_new_balance:    boolean;
+
+  totals_rows:   LayoutRow[];
+  footer_rows:   LayoutRow[];
+  header_layout: HeaderLayout;
 
   show_payment_details:boolean;
   payment_font_size:   number;

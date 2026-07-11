@@ -40,6 +40,7 @@ export interface CompanyInfo {
   name:     string;
   address?: string | null;
   phone?:   string | null;
+  mobile?:  string | null;
   nif?:     string | null;
   rc?:      string | null;
   nis?:     string | null;
@@ -48,12 +49,14 @@ export interface CompanyInfo {
   logoUrl?: string | null;
   email?:   string | null;
   website?: string | null;
+  capital?: string | null;
 }
 
 export interface PartyInfo {
   id?:          number;
   name:         string;
   type?:        'customer' | 'supplier';
+  code?:        string | null;
   nif?:         string | null;
   rc?:          string | null;
   nis?:         string | null;
@@ -288,12 +291,14 @@ export function emptyDocumentData(): UniversalDocumentData {
       name:    '',
       address: null,
       phone:   null,
+      mobile:  null,
       nif:     null,
       rc:      null,
       nis:     null,
       ice:     null,
       article: null,
       logoUrl: null,
+      capital: null,
     },
     party:       null,
     session:     null,
