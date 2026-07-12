@@ -46,7 +46,6 @@ export interface RenderContext {
     nif:     string;
     rc:      string;
     nis:     string;
-    ice:     string;
     article: string;
   }>;
   /** Locale for number/date formatting. Defaults to 'ar-DZ'. */

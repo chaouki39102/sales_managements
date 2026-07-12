@@ -16,7 +16,6 @@ export interface HeaderConfig {
   showTaxId: boolean;
   showRc: boolean;
   showNis: boolean;
-  showIce: boolean;
   showArticle: boolean;
   companyInfoAlign: AlignOption;
   companyInfoSize: number;
@@ -35,13 +34,12 @@ export function headerConfig(size: PaperSize): HeaderConfig {
     companyNameBold: true,
     companyNameAlign: 'right',
     companyNameColor: COLOR_PRIMARY,
-    showAddress: true,
-    showPhone: true,
-    showTaxId: true,
-    showRc: true,
-    showNis: true,
-    showIce: true,
-    showArticle: true,
+    showAddress: false,
+    showPhone: false,
+    showTaxId: false,
+    showRc: false,
+    showNis: false,
+    showArticle: false,
     companyInfoAlign: 'right',
     companyInfoSize: isA4 ? 8.5 : 7.5,
     headerSeparator: 'solid',

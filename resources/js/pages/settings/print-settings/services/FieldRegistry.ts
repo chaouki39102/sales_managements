@@ -149,7 +149,6 @@ const ALL_FIELDS: FieldDefinition[] = [
   { path: 'company.nif',     label: 'ط§ظ„ط±ظ‚ظ… ط§ظ„ط¬ط¨ط§ط¦ظٹ',      group: 'company', type: 'string', description: 'ط±ظ‚ظ… ط§ظ„طھط¹ط±ظٹظپ ط§ظ„ط¬ط¨ط§ط¦ظٹ' },
   { path: 'company.rc',      label: 'ط§ظ„ط³ط¬ظ„ ط§ظ„طھط¬ط§ط±ظٹ',      group: 'company', type: 'string', description: 'ط±ظ‚ظ… ط§ظ„ط³ط¬ظ„ ط§ظ„طھط¬ط§ط±ظٹ' },
   { path: 'company.nis',     label: 'ط§ظ„ط±ظ‚ظ… ط§ظ„ط¥ط­طµط§ط¦ظٹ',     group: 'company', type: 'string', description: 'ط§ظ„ط±ظ‚ظ… ط§ظ„ط¥ط­طµط§ط¦ظٹ' },
-  { path: 'company.ice',     label: 'ط±ظ‚ظ… ط§ظ„ط­ط³ط§ط¨ ICE',     group: 'company', type: 'string', description: 'ط±ظ‚ظ… ط§ظ„ط­ط³ط§ط¨ ط§ظ„ط¬ط§ط±ظٹ ICE' },
   { path: 'company.article', label: 'ط§ظ„ظ…ط§ط¯ط©',             group: 'company', type: 'string', description: 'ط±ظ‚ظ… ط§ظ„ظ…ط§ط¯ط©' },
   { path: 'company.logoUrl', label: 'ط±ط§ط¨ط· ط§ظ„ط´ط¹ط§ط±',        group: 'company', type: 'string', description: 'ط±ط§ط¨ط· طµظˆط±ط© ط´ط¹ط§ط± ط§ظ„ط´ط±ظƒط©' },
   { path: 'company.email',   label: 'ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ',  group: 'company', type: 'string', description: 'ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ ظ„ظ„ط´ط±ظƒط©' },

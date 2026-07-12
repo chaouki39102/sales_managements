@@ -309,7 +309,6 @@ function buildThermalHeader(
   const companyNIF     = resolve('company.nif', co.nif ?? '');
   const companyRC      = resolve('company.rc', co.rc ?? '');
   const companyNIS     = resolve('company.nis', co.nis ?? '');
-  const companyICE     = resolve('company.ice', co.ice ?? '');
   const companyArticle = resolve('company.article', co.article ?? '');
 
   // ── Company name (gated, with size/bold/align) ──────────────────────────
@@ -339,7 +338,6 @@ function buildThermalHeader(
   infoField(template.show_tax_id,   companyNIF,   'NIF: ');
   infoField(template.show_rc,       companyRC,    'RC: ');
   infoField(template.show_nis,      companyNIS,   'NIS: ');
-  infoField(template.show_ice,      companyICE,   'ICE: ');
   infoField(template.show_article,  companyArticle, 'Article: ');
 
   b.divider('=', 42);

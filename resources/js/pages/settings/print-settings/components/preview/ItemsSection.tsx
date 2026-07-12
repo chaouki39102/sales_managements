@@ -21,6 +21,11 @@ const FIELD_MAP: Record<string, string> = {
   total:     'item.total',
 };
 
+function formatCellValue(value: unknown, emptyText = ''): string {
+  if (value === null || value === undefined || value === '') return emptyText;
+  return String(value);
+}
+
 function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: number): string {
   const fieldId = FIELD_MAP[col];
   if (!fieldId) return '';
@@ -32,7 +37,7 @@ function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: 
   }
   if (col === 'tva') {
     const pct = printFieldResolver.resolveItemField('item.tvaPct', line, idx) as number;
-    return `${pct}%`;
+    return pct != null ? `${pct}%` : 'معفى';
   }
   if (col === 'price') {
     const display = _tpl.price_display === 'ttc' ? line.unitPriceTtc : line.unitPriceHt;
@@ -42,7 +47,7 @@ function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: 
     const display = _tpl.show_line_total_ttc ? line.totalTtc : line.totalHt;
     return Number(display).toFixed(2);
   }
-  return val !== undefined ? String(val) : '';
+  return formatCellValue(val);
 }
 
 function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
@@ -55,6 +60,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
 
   const bs = borderStyle(tpl.table_border_style);
   const border = tpl.table_border_style === 'none' ? 'none' : `1px ${bs} #999`;
+  const cp = tpl.table_cell_padding || 6;
 
   return (
     <div style={{ fontSize: tpl.items_font_size, fontFamily: ff, marginBottom: 4 }}>
@@ -63,7 +69,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
           display: 'flex', gap: 2,
           fontWeight: tpl.table_header_bold ? 800 : 400,
           color: tpl.table_header_color,
-          background: tpl.table_header_bg ? '#f0f0f0' : 'transparent',
+          background: tpl.table_header_bg || 'transparent',
           borderBottom: border,
           paddingBottom: 3, marginBottom: 2,
         }}>
@@ -71,6 +77,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
             <div key={col} style={{
               flex: `0 0 ${colWidth(tpl, col, COL_WIDTH_DEFAULTS)}%`,
               textAlign: align(colAlign(tpl, col)),
+              padding: `${cp / 2}px`,
             }}>
               {tpl.col_headers[col] ?? colDefaultHeader(col)}
             </div>
@@ -82,7 +89,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
         <div key={idx} style={{
           display: 'flex', gap: 2,
           background: tpl.alternating_rows && idx % 2 === 1 ? tpl.alternating_color : 'transparent',
-          padding: '1px 0',
+          padding: `${cp / 2}px 0`,
           borderBottom: tpl.table_border_style !== 'none' ? `1px ${bs} #eee` : 'none',
         }}>
           {visibleCols.map(col => (
@@ -105,16 +112,21 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
   if (visibleCols.length === 0 || data.lines.length === 0) return null;
 
   const isA4 = tpl.paper_size === 'A4';
-  const cellPad = isA4 ? '10px' : '5px 6px';
+  const cp = tpl.table_cell_padding || 6;
+  const cellPad = `${cp}px ${Math.round(cp * 1.2)}px`;
   const totalPct = visibleCols.reduce((s, c) => s + colWidth(tpl, c, COL_WIDTH_DEFAULTS), 0);
   const scale = totalPct > 0 ? 100 / totalPct : 1;
+  const ff = tpl.items_font_family === 'monospace'
+    ? "'Courier New', monospace"
+    : "'Tajawal', sans-serif";
 
   return (
-    <div style={{ marginBottom: isA4 ? 20 : 12 }}>
+    <div style={{ marginBottom: isA4 ? 20 : 12, fontFamily: ff }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: tpl.items_font_size }}>
+        {tpl.show_col_header && (
         <thead>
           <tr style={{
-            background: tpl.table_header_bg ? (tpl.table_header_color || '#111') : '#f5f5f5',
+            background: tpl.table_header_bg || '#f5f5f5',
             borderBottom: isA4 ? '2px solid #111' : '1.5px solid #111',
           }}>
             {visibleCols.map(col => (
@@ -123,7 +135,7 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
                 padding: cellPad,
                 textAlign: align(colAlign(tpl, col)),
                 fontWeight: tpl.table_header_bold ? 700 : 600,
-                color: tpl.table_header_bg ? '#fff' : tpl.table_header_color || '#111',
+                color: tpl.table_header_color || '#111',
                 fontSize: tpl.items_font_size,
               }}>
                 {tpl.col_headers[col] ?? colDefaultHeader(col)}
@@ -131,6 +143,7 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
             ))}
           </tr>
         </thead>
+        )}
         <tbody>
           {data.lines.map((line, i) => (
             <tr key={i} style={{

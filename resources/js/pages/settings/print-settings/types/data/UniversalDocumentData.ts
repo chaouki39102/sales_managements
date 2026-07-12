@@ -37,19 +37,23 @@ export interface DocumentInfo {
 }
 
 export interface CompanyInfo {
-  name:     string;
-  address?: string | null;
-  phone?:   string | null;
-  mobile?:  string | null;
-  nif?:     string | null;
-  rc?:      string | null;
-  nis?:     string | null;
-  ice?:     string | null;
-  article?: string | null;
-  logoUrl?: string | null;
-  email?:   string | null;
-  website?: string | null;
-  capital?: string | null;
+  name:            string;
+  commercialName?: string | null;
+  address?:        string | null;
+  phone?:          string | null;
+  mobile?:         string | null;
+  fax?:            string | null;
+  email?:          string | null;
+  nif?:            string | null;
+  rc?:             string | null;
+  nis?:            string | null;
+  article?:        string | null;
+  logoUrl?:        string | null;
+  capital?:        string | null;
+  bankName?:       string | null;
+  rib?:            string | null;
+  activity?:       string | null;
+  website?:        string | null;
 }
 
 export interface PartyInfo {
@@ -60,10 +64,17 @@ export interface PartyInfo {
   nif?:         string | null;
   rc?:          string | null;
   nis?:         string | null;
+  ai?:          string | null;
   phone?:       string | null;
+  mobile?:      string | null;
+  fax?:         string | null;
   email?:       string | null;
   address?:     string | null;
   deliveryAddress?: string | null;
+  commercialName?: string | null;
+  activity?:    string | null;
+  bankName?:    string | null;
+  rib?:         string | null;
   /** Cashier name for POS context */
   cashierName?: string | null;
 }
@@ -295,7 +306,6 @@ export function emptyDocumentData(): UniversalDocumentData {
       nif:     null,
       rc:      null,
       nis:     null,
-      ice:     null,
       article: null,
       logoUrl: null,
       capital: null,

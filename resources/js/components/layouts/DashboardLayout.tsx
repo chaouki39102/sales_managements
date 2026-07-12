@@ -366,8 +366,9 @@ function CompanySwitcher() {
     if (co.id === activeCompany?.id) { setOpen(false); return; }
     setSwitching(co.id);
     try {
-      await client.post('/companies/switch', { company_id: co.id });
-      setActiveCompany({ id: co.id, name: co.name, slug: co.slug });
+      const res = await client.post('/companies/switch', { company_id: co.id });
+      const full = res.data?.data ?? res.data ?? co;
+      setActiveCompany(full as any);
       setOpen(false);
       // نحذف السنة المالية المخزّنة ونوجّه للـ onboarding لاختيار السنة
       sessionStorage.removeItem('selected_fiscal_year');

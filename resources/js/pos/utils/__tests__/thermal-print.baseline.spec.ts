@@ -95,7 +95,7 @@ describe('ThermalPrintPath — baseline structural', () => {
   it('contains company name in output', () => {
     const tpl = makeTemplate({ company_name_text: 'MaSocieteTest' });
     const data = makeData({
-      company: { name: 'MaSocieteTest', address: null, phone: null, nif: null, rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'MaSocieteTest', address: null, phone: null, nif: null, rc: null, nis: null, article: null, logoUrl: null },
     });
     const bytes = buildReceiptBytesFromTemplate(tpl, data);
     expect(containsAscii(bytes, 'MaSocieteTest')).toBe(true);
@@ -129,9 +129,9 @@ describe('ThermalPrintPath — baseline structural', () => {
 
   it('contains company NIF when provided', () => {
     const data = makeData({
-      company: { name: 'Co', address: null, phone: null, nif: '123456789012345', rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'Co', address: null, phone: null, nif: '123456789012345', rc: null, nis: null, article: null, logoUrl: null },
     });
-    const bytes = buildReceiptBytesFromTemplate(makeTemplate(), data);
+    const bytes = buildReceiptBytesFromTemplate(makeTemplate({ show_tax_id: true }), data);
     expect(containsAscii(bytes, '123456789012345')).toBe(true);
   });
 
@@ -167,9 +167,9 @@ describe('ThermalPrintPath — baseline structural', () => {
   });
 
   it('uses override_address when provided (resolver override)', () => {
-    const tpl = makeTemplate({ override_address: '15 Rue Didouche Mourad' });
+    const tpl = makeTemplate({ show_address: true, override_address: '15 Rue Didouche Mourad' });
     const data = makeData({
-      company: { name: 'Co', address: 'Old Address', phone: null, nif: null, rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'Co', address: 'Old Address', phone: null, nif: null, rc: null, nis: null, article: null, logoUrl: null },
     });
     const bytes = buildReceiptBytesFromTemplate(tpl, data);
     expect(containsAscii(bytes, '15 Rue Didouche Mourad')).toBe(true);
@@ -194,7 +194,7 @@ describe('ThermalPrintPath — baseline structural', () => {
 
   it('has reasonable length (> 200 bytes for minimal receipt)', () => {
     const data = makeData({
-      company: { name: 'A', address: 'B', phone: 'C', nif: 'D', rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'A', address: 'B', phone: 'C', nif: 'D', rc: null, nis: null, article: null, logoUrl: null },
       doc: { number: 'FV-1', date: '2026-07-01', dueDate: null, time: '12:00', typeCode: 'FV', typeName: 'فاتورة', status: 'validated' },
     });
     const bytes = buildReceiptBytesFromTemplate(makeTemplate(), data, 'FV-1');
@@ -203,7 +203,7 @@ describe('ThermalPrintPath — baseline structural', () => {
 
   it('has reasonable length for receipt with items (> 400 bytes)', () => {
     const data = makeData({
-      company: { name: 'Co', address: 'Addr', phone: '0550000000', nif: 'NIF123', rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'Co', address: 'Addr', phone: '0550000000', nif: 'NIF123', rc: null, nis: null, article: null, logoUrl: null },
       doc: { number: 'FV-001', date: '2026-07-01', dueDate: null, time: '14:30', typeCode: 'FV', typeName: 'فاتورة', status: 'validated' },
       lines: [{
         rowNumber: 1, ref: 'R1', barcode: null,
@@ -233,7 +233,7 @@ describe('ThermalPrintPath — section visibility gates (Stage 1)', () => {
       company_name_text: 'HiddenHeaderSectionCo',
     });
     const data = makeData({
-      company: { name: 'HiddenHeaderSectionCo', address: null, phone: null, nif: null, rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'HiddenHeaderSectionCo', address: null, phone: null, nif: null, rc: null, nis: null, article: null, logoUrl: null },
     });
     const bytes = buildReceiptBytesFromTemplate(tpl, data);
     expect(containsAscii(bytes, 'HiddenHeaderSectionCo')).toBe(false);
@@ -305,7 +305,7 @@ describe('ThermalPrintPath — section visibility gates (Stage 1)', () => {
 const HEADER_CO = {
   name: 'Stage2Co', address: '15 Rue Test', phone: '0550123456',
   nif: 'NIF123456789', rc: 'RC00123', nis: 'NIS00999',
-  ice: 'ICE00555', article: '12-34', logoUrl: null,
+  article: '12-34', logoUrl: null,
 };
 
 function headerData(overrides = {}): UniversalDocumentData {
@@ -357,13 +357,6 @@ describe('ThermalPrintPath — company info visibility gates (Stage 2)', () => {
     expect(containsAscii(off, HEADER_CO.nis)).toBe(false);
   });
 
-  it('shows ICE when show_ice is ON, hides when OFF', () => {
-    const on  = buildReceiptBytesFromTemplate(makeTemplate({ show_ice: true  }), headerData());
-    const off = buildReceiptBytesFromTemplate(makeTemplate({ show_ice: false }), headerData());
-    expect(containsAscii(on, HEADER_CO.ice)).toBe(true);
-    expect(containsAscii(off, HEADER_CO.ice)).toBe(false);
-  });
-
   it('shows article when show_article is ON, hides when OFF', () => {
     const on  = buildReceiptBytesFromTemplate(makeTemplate({ show_article: true  }), headerData());
     const off = buildReceiptBytesFromTemplate(makeTemplate({ show_article: false }), headerData());
@@ -400,8 +393,8 @@ describe('ThermalPrintPath — company name formatting (Stage 2)', () => {
 describe('ThermalPrintPath — company info formatting (Stage 2)', () => {
 
   it('different company_info_size values produce different byte output', () => {
-    const small = buildReceiptBytesFromTemplate(makeTemplate({ company_info_size: 6  }), headerData());
-    const large = buildReceiptBytesFromTemplate(makeTemplate({ company_info_size: 16 }), headerData());
+    const small = buildReceiptBytesFromTemplate(makeTemplate({ show_address: true, company_info_size: 6  }), headerData());
+    const large = buildReceiptBytesFromTemplate(makeTemplate({ show_address: true, company_info_size: 16 }), headerData());
     expect(small).not.toEqual(large);
   });
 

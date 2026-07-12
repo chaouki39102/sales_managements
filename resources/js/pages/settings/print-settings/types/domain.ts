@@ -5,6 +5,17 @@ export type PriceMode       = 'ht' | 'ttc';
 export type PageOrientation = 'portrait' | 'landscape';
 export type FontFamily      = 'tajawal' | 'monospace' | 'times' | 'arial';
 
+// ─── CellStyle (v2) ────────────────────────────────────────────────────────────
+
+export interface CellStyle {
+  bold?: boolean;
+  italic?: boolean;
+  fontSize?: number;
+  color?: string;
+  fontFamily?: FontFamily;
+  align?: AlignOption;
+}
+
 // ─── Layout Row System ────────────────────────────────────────────────────────
 
 /** Logical side: start = right in RTL, end = left. No explicit left/right so design stays correct for future LTR. */
@@ -23,20 +34,38 @@ export interface BoxBorder {
 
 export interface BoxSpacing { top: number; end: number; bottom: number; start: number; }
 
-/** A "label + value" row — used for totals, company info, footer lines. */
-export interface LayoutRow {
-  id: string;           // Fixed key: 'total_ht' | 'discount' | 'custom_1'
-  field: string;        // PrintFieldRegistry ID, or 'literal' for free text
-  literalText?: string; // Used only when field === 'literal'
-  label?: string;       // Custom label; defaults to PrintFieldRegistry label
-  visible: boolean;
-  order: number;
+/** A single column within a layout row — holds one field + its display config. */
+export interface LayoutColumn {
+  id: string;              // unique within the row: 'col_0', 'col_1', …
+  field: string;           // PrintFieldRegistry ID or 'literal'
+  literalText?: string;
+  label?: string;
+  width: number;           // flex weight 1–12 (default 1)
+  alignment: AlignOption;
   labelSide: LogicalSide;
   valueSide: LogicalSide;
   bold?: boolean;
   color?: string;
   fontSize?: number;
-  indent?: number;      // px
+}
+
+/** A layout row — holds 1+ columns (multi-column) or uses legacy single-field mode. */
+export interface LayoutRow {
+  id: string;
+  order: number;
+  visible: boolean;
+  /** Multi-column mode: when present and non-empty, columns define the row content. */
+  columns?: LayoutColumn[];
+  /** Legacy single-field mode (backward compatible, used when columns is absent/empty). */
+  field?: string;
+  literalText?: string;
+  label?: string;
+  labelSide?: LogicalSide;
+  valueSide?: LogicalSide;
+  bold?: boolean;
+  color?: string;
+  fontSize?: number;
+  indent?: number;
   border?: Partial<BoxBorder>;
 }
 
@@ -51,6 +80,8 @@ export interface LayoutBlock {
   padding?: BoxSpacing;
   background?: string;
   rows: LayoutRow[];
+  titleField?: string;   // PrintFieldRegistry ID — rendered as heading above rows
+  titleStyle?: CellStyle;
 }
 
 export interface HeaderLayout {
@@ -118,17 +149,48 @@ export interface PrintTemplate {
   show_tax_id:         boolean;
   show_rc:             boolean;
   show_nis:            boolean;
-  show_ice:            boolean;
   show_article:        boolean;
+  show_capital:        boolean;
+  show_mobile:         boolean;
+  show_commercial_name: boolean;
+  show_email:          boolean;
+  show_fax:            boolean;
+  show_bank_name:      boolean;
+  show_rib:            boolean;
+  show_activity:       boolean;
   company_info_align:  AlignOption;
   company_info_size:   number;
+  company_info_bold:   boolean;
+  company_info_italic: boolean;
+  company_info_font_family: FontFamily;
+  label_address:       string;
+  label_phone:         string;
+  label_nif:           string;
+  label_rc:            string;
+  label_nis:           string;
+  label_article:       string;
+  label_capital:       string;
+  label_mobile:        string;
+  label_commercial_name: string;
+  label_email:         string;
+  label_fax:           string;
+  label_bank_name:     string;
+  label_rib:           string;
+  label_activity:      string;
   override_address:    string;
   override_phone:      string;
   override_nif:        string;
   override_rc:         string;
   override_nis:        string;
-  override_ice:        string;
   override_article:    string;
+  override_capital:    string;
+  override_mobile:     string;
+  override_commercial_name: string;
+  override_email:      string;
+  override_fax:        string;
+  override_bank_name:  string;
+  override_rib:        string;
+  override_activity:   string;
 
   header_custom_text:  string;
   header_separator:    BorderStyle;
@@ -148,6 +210,51 @@ export interface PrintTemplate {
   show_client_phone:boolean;
   show_client_address: boolean;
   show_delivery_address: boolean;
+  label_client:          string;
+  label_client_nif:      string;
+  label_client_phone:    string;
+  label_client_address:  string;
+  label_delivery_address: string;
+  override_client_name:  string;
+  override_client_nif:   string;
+  override_client_phone: string;
+  override_client_address: string;
+  override_delivery_address: string;
+  show_customer_commercial_name: boolean;
+  show_customer_rc:    boolean;
+  show_customer_nis:   boolean;
+  show_customer_ai:    boolean;
+  show_customer_mobile: boolean;
+  show_customer_fax:   boolean;
+  show_customer_email: boolean;
+  show_customer_activity: boolean;
+  show_customer_bank_name: boolean;
+  show_customer_rib:   boolean;
+  label_customer_commercial_name: string;
+  label_customer_rc:  string;
+  label_customer_nis: string;
+  label_customer_ai:  string;
+  label_customer_mobile: string;
+  label_customer_fax: string;
+  label_customer_email: string;
+  label_customer_activity: string;
+  label_customer_bank_name: string;
+  label_customer_rib: string;
+  override_customer_commercial_name: string;
+  override_customer_rc: string;
+  override_customer_nis: string;
+  override_customer_ai: string;
+  override_customer_mobile: string;
+  override_customer_fax: string;
+  override_customer_email: string;
+  override_customer_activity: string;
+  override_customer_bank_name: string;
+  override_customer_rib: string;
+  customer_info_font_family: FontFamily;
+  customer_info_size:   number;
+  customer_info_bold:   boolean;
+  customer_info_italic: boolean;
+  customer_info_align:  AlignOption;
   show_session:     boolean;
   show_payment_term:boolean;
   show_bank_details:boolean;
@@ -164,8 +271,9 @@ export interface PrintTemplate {
   items_font_family:  FontFamily;
   show_col_header:    boolean;
   table_header_bold:  boolean;
-  table_header_bg:    boolean;
+  table_header_bg:    string;
   table_header_color: string;
+  table_cell_padding: number;
   table_border_style: BorderStyle;
   alternating_rows:   boolean;
   alternating_color:  string;
@@ -195,6 +303,15 @@ export interface PrintTemplate {
   totals_rows:   LayoutRow[];
   footer_rows:   LayoutRow[];
   header_layout: HeaderLayout;
+
+  doc_info_rows:    LayoutRow[];
+  customer_info_rows: LayoutRow[];
+  company_info_rows:  LayoutRow[];
+  col_styles:       ColumnStyleConfig[];
+  page_frame:       PageFrameConfig;
+  sections_order:   SectionMeta[];
+  totals_grid:      TotalsGridConfig;
+  watermark:        WatermarkConfig;
 
   show_payment_details:boolean;
   payment_font_size:   number;
@@ -251,6 +368,52 @@ export interface PrintTemplate {
 }
 
 export type SectionTarget = 'header' | 'doc-info' | 'items' | 'totals' | 'payments' | 'footer';
+
+export type SectionMeta = {
+  key: SectionTarget;
+  visible: boolean;
+  order: number;
+};
+
+export interface ColumnStyleConfig {
+  key: ColumnKey;
+  style?: Partial<CellStyle>;
+}
+
+export interface WatermarkConfig {
+  enabled: boolean;
+  text?: string;
+  fontSize?: number;
+  color?: string;
+  rotation?: number;
+}
+
+export interface PageFrameConfig {
+  enabled: boolean;
+  borderStyle?: BorderStyle;
+  borderColor?: string;
+  borderWidth?: number;
+  borderRadius?: number;
+  margin?: number;
+}
+
+export interface TotalsGridColumn {
+  id: string;
+  field: string;
+  label: string;
+  order: number;
+  visible: boolean;
+  align: AlignOption;
+}
+
+export interface TotalsGridConfig {
+  enabled: boolean;
+  headerBg?: string;
+  headerColor?: string;
+  borderColor?: string;
+  columns: TotalsGridColumn[];
+  summaryRows?: LayoutRow[];
+}
 
 export interface ReportRule {
   id: string;

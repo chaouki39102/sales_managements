@@ -61,16 +61,24 @@ export interface User extends BaseModel {
 
 // ─── Active Company (Zustand state only) ──────────────────────────────────────
 export interface ActiveCompany {
-  id:      number;
-  name:    string;
-  slug:    string;
-  address?: string | null;
-  phone?:   string | null;
-  nif?:     string | null;
-  nis?:     string | null;
-  rc?:      string | null;
-  ai?:      string | null;
-  avatar?:  string | null;
+  id:               number;
+  name:             string;
+  slug:             string;
+  commercial_name?: string | null;
+  address?:         string | null;
+  phone?:           string | null;
+  mobile?:          string | null;
+  fax?:             string | null;
+  email?:           string | null;
+  nif?:             string | null;
+  nis?:             string | null;
+  rc?:              string | null;
+  ai?:              string | null;
+  capital_amount?:  string | null;
+  bank_name?:       string | null;
+  rib?:             string | null;
+  activity?:        string | null;
+  avatar?:          string | null;
 }
 
 // ─── Company ──────────────────────────────────────────────────────────────────

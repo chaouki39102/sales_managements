@@ -14,3 +14,5 @@ export type { PrintFieldDefinition, PrintFieldGroup } from './PrintFieldRegistry
 export { PRINT_FIELDS, printFieldRegistry } from './PrintFieldRegistry';
 export type { ColumnDefinition } from './PrintFieldResolver';
 export { printFieldResolver } from './PrintFieldResolver';
+export { layoutEngine } from '../engines/LayoutEngine';
+export type { LayoutElement, LayoutResult } from '../engines/LayoutEngine';

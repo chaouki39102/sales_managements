@@ -7,7 +7,9 @@ import type {
   BorderStyle,
   FontFamily,
   LayoutRow,
+  LayoutColumn,
   BoxBorder,
+  CellStyle,
 } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { printFieldRegistry } from '../../services/PrintFieldRegistry';
@@ -86,15 +88,22 @@ export function colAlign(tpl: PrintTemplate, col: ColumnKey): AlignOption {
 }
 
 export interface CompanyData {
-  name:    string;
-  address: string;
-  phone:   string;
-  nif:     string;
-  rc:      string;
-  nis:     string;
-  ice:     string;
-  article: string;
-  logoUrl?: string | null;
+  name:            string;
+  commercialName:  string;
+  address:         string;
+  phone:           string;
+  mobile:          string;
+  fax:             string;
+  email:           string;
+  nif:             string;
+  rc:              string;
+  nis:             string;
+  article:         string;
+  capital:         string;
+  bankName:        string;
+  rib:             string;
+  activity:        string;
+  logoUrl?:        string | null;
 }
 
 export function buildTvaByRate(
@@ -204,6 +213,18 @@ export function boxBorderCss(b?: Partial<BoxBorder>): React.CSSProperties {
   return css;
 }
 
+export function cellStyleCss(s?: CellStyle): React.CSSProperties {
+  if (!s) return {};
+  const css: React.CSSProperties = {};
+  if (s.bold)      css.fontWeight = 800;
+  if (s.italic)    css.fontStyle = 'italic';
+  if (s.fontSize)   css.fontSize = s.fontSize;
+  if (s.color)      css.color = s.color;
+  if (s.fontFamily) css.fontFamily = fontFamily(s.fontFamily);
+  if (s.align)      css.textAlign = align(s.align);
+  return css;
+}
+
 // ─── Format field value by type from PrintFieldRegistry ───────────────────────
 
 function formatFieldValue(fieldId: string, value: unknown): string {
@@ -233,9 +254,9 @@ function LayoutRowPairFn({
       fontSize: row.fontSize,
       ...boxBorderCss(row.border),
     }}>
-      <span style={{ order: sideToOrder(row.labelSide) }}>{label}</span>
-      <span style={{ order: sideToOrder(row.valueSide) }} dir="ltr">
-        {formatFieldValue(row.field, value)}
+      <span style={{ order: sideToOrder(row.labelSide ?? 'start'), flexShrink: 0 }}>{label}</span>
+      <span style={{ order: sideToOrder(row.valueSide ?? 'end'), unicodeBidi: 'isolate', minWidth: 0, overflow: 'hidden' }} dir="auto">
+        {formatFieldValue(row.field ?? '', value)}
       </span>
     </div>
   );
@@ -260,7 +281,77 @@ function LayoutRowLineFn({ row, text }: { row: LayoutRow; text: string }) {
 }
 export const LayoutRowLine = React.memo(LayoutRowLineFn);
 
+// ─── LayoutColumnCell: renders one column within a multi-column row ────────────
+
+function LayoutColumnCellFn({
+  column, data, tpl,
+}: { column: LayoutColumn; data: UniversalDocumentData; tpl: PrintTemplate }) {
+  const def = printFieldRegistry.get(column.field);
+  const value = printFieldResolver.resolve(column.field, data, tpl);
+
+  const isEmpty = value === null || value === undefined || value === '';
+  const shouldHideWhenEmpty = def ? (def.type === 'string' || def.type === 'date') : true;
+  if (isEmpty && shouldHideWhenEmpty) return null;
+
+  const labelSetting = COMPANY_FIELD_LABEL_SETTING[column.field] || CUSTOMER_FIELD_LABEL_SETTING[column.field];
+  const label = (labelSetting ? (tpl as any)[labelSetting] : '') || column.label ?? def?.label ?? column.field;
+
+  const flex = column.width || 1;
+  const css: React.CSSProperties = {
+    flex: `${flex} 1 0`,
+    padding: '2px 4px',
+    textAlign: column.alignment,
+    fontWeight: column.bold ? 800 : 'inherit',
+    color: column.color ?? 'inherit',
+    fontSize: column.fontSize,
+    minWidth: 0,
+  };
+
+  return (
+    <div style={css}>
+      <span>{label}: </span>
+      <span dir="auto">{formatFieldValue(column.field, value)}</span>
+    </div>
+  );
+}
+const LayoutColumnCell = React.memo(LayoutColumnCellFn);
+
 // ─── renderLayoutRows: generic interpreter for LayoutRow[] ────────────────────
+
+const COMPANY_FIELD_LABEL_SETTING: Record<string, string> = {
+  'company.commercialName': 'label_commercial_name',
+  'company.address':        'label_address',
+  'company.phone':          'label_phone',
+  'company.mobile':         'label_mobile',
+  'company.fax':            'label_fax',
+  'company.email':          'label_email',
+  'company.nif':            'label_nif',
+  'company.rc':             'label_rc',
+  'company.nis':            'label_nis',
+  'company.article':        'label_article',
+  'company.capital':        'label_capital',
+  'company.bankName':       'label_bank_name',
+  'company.rib':            'label_rib',
+  'company.activity':       'label_activity',
+};
+
+const CUSTOMER_FIELD_LABEL_SETTING: Record<string, string> = {
+  'customer.name':           'label_client',
+  'customer.nif':            'label_client_nif',
+  'customer.phone':          'label_client_phone',
+  'customer.address':        'label_client_address',
+  'customer.deliveryAddress': 'label_delivery_address',
+  'customer.commercialName': 'label_customer_commercial_name',
+  'customer.rc':             'label_customer_rc',
+  'customer.nis':            'label_customer_nis',
+  'customer.ai':             'label_customer_ai',
+  'customer.mobile':         'label_customer_mobile',
+  'customer.fax':            'label_customer_fax',
+  'customer.email':          'label_customer_email',
+  'customer.activity':       'label_customer_activity',
+  'customer.bankName':       'label_customer_bank_name',
+  'customer.rib':            'label_customer_rib',
+};
 
 export function renderLayoutRows(
   rows: LayoutRow[] | undefined,
@@ -273,27 +364,54 @@ export function renderLayoutRows(
   const out: JSX.Element[] = [];
 
   for (const r of visible) {
+    // ── Multi-column mode: row has columns[] ──
+    if (r.columns && r.columns.length > 0) {
+      const cells = r.columns
+        .map(col => <LayoutColumnCell key={col.id} column={col} data={data} tpl={tpl} />)
+        .filter(Boolean);
+      if (cells.length === 0) continue;
+      out.push(
+        <div key={r.id} style={{
+          display: 'flex',
+          flexDirection: 'row',
+          gap: 8,
+          padding: '2px 2px',
+          marginRight: r.indent ?? 0,
+          fontWeight: r.bold ? 800 : 'inherit',
+          color: r.color ?? 'inherit',
+          fontSize: r.fontSize,
+          flexWrap: 'wrap',
+          ...boxBorderCss(r.border),
+        }}>
+          {cells}
+        </div>,
+      );
+      continue;
+    }
+
+    // ── Legacy single-field mode (backward compatible) ──
     if (r.field === 'totals.tvaBreakdownGroup') {
       for (const br of data.taxBreakdown ?? []) {
-        out.push(
-          <LayoutRowPair
-            key={`${r.id}-${br.rate}`}
-            row={r}
-            label={`TVA ${br.rate}%`}
-            value={br.tva}
-          />,
-        );
+        out.push(<LayoutRowPair key={`${r.id}-${br.rate}`} row={r} label={`TVA ${br.rate}%`} value={br.tva} />);
       }
       continue;
     }
 
     if (r.field === 'literal') {
-      out.push(<LayoutRowLine key={r.id} row={r} text={r.literalText ?? ''} />);
+      if (!r.literalText) continue;
+      out.push(<LayoutRowLine key={r.id} row={r} text={r.literalText} />);
       continue;
     }
 
-    const value = printFieldResolver.resolve(r.field, data, tpl);
-    const label = r.label ?? printFieldRegistry.get(r.field)?.label ?? r.field;
+    const def = printFieldRegistry.get(r.field ?? '');
+    const value = printFieldResolver.resolve(r.field ?? '', data, tpl);
+
+    const isEmpty = value === null || value === undefined || value === '';
+    const shouldHideWhenEmpty = def ? (def.type === 'string' || def.type === 'date') : true;
+    if (isEmpty && shouldHideWhenEmpty) continue;
+
+    const labelSetting = COMPANY_FIELD_LABEL_SETTING[r.field ?? ''] || CUSTOMER_FIELD_LABEL_SETTING[r.field ?? ''];
+    const label = (labelSetting ? (tpl as any)[labelSetting] : '') || r.label ?? def?.label ?? r.field;
     out.push(<LayoutRowPair key={r.id} row={r} label={label} value={value} />);
   }
 

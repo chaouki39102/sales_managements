@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
 import type { UniversalDocumentData } from '../../types/data';
-import type { PrintTemplate } from '../../types';
+import type { PrintTemplate, SectionTarget } from '../../types';
 import {
   mm, fontFamily, SectionWrap,
 } from './shared';
@@ -14,6 +14,7 @@ import { renderReport } from './ReportSection';
 import { rulesEngine } from '../../services/engines/RulesEngine';
 import { formulaEngine, type EvaluationContext, type ExpressionValue } from '../../services/engines/FormulaEngine';
 import { calculatedFieldService } from '../../services/CalculatedFieldService';
+import { PageFrame } from './PageFrame';
 
 export interface UniversalPreviewProps {
   tpl:      PrintTemplate;
@@ -42,6 +43,15 @@ function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
   Object.assign(computed, calcFields);
   return { data, computed };
 }
+
+const SECTION_RENDERERS: Record<SectionTarget, (tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean, paperWidth: number) => React.ReactNode> = {
+  'header':   (tpl, data, isThermal, pw) => renderHeader(tpl, data, isThermal, pw),
+  'doc-info': (tpl, data, isThermal)     => renderDocInfo(tpl, data, isThermal),
+  'items':    (tpl, data, isThermal)     => renderItems(tpl, data, isThermal),
+  'totals':   (tpl, data, isThermal)     => renderTotals(tpl, data, isThermal),
+  'payments': (tpl, data, isThermal)     => renderPayments(tpl, data, isThermal),
+  'footer':   (tpl, data, isThermal)     => renderFooter(tpl, data, isThermal),
+};
 
 function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   useEffect(() => { formulaEngine.clearCache(); }, [data]);
@@ -76,9 +86,24 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
     return null;
   };
 
-  const paddingTop   = isThermal ? mm(tpl.margin_top) : (isA4 ? 40 : 20);
-  const paddingSide  = isThermal ? mm(tpl.margin_sides) : (isA4 ? 50 : 24);
-  const paddingBottom = isThermal ? mm(tpl.margin_bottom) : (isA4 ? 40 : 20);
+  const paddingTop   = mm(tpl.margin_top);
+  const paddingSide  = mm(tpl.margin_sides);
+  const paddingBottom = mm(tpl.margin_bottom);
+
+  const orderedSections = tpl.sections_order
+    ? [...tpl.sections_order].sort((a, b) => a.order - b.order)
+    : [];
+
+  const showSection = (key: SectionTarget): boolean => {
+    const visibilityKey = `show_${key.replace('-', '_')}_section` as keyof PrintTemplate;
+    if (visibilityKey in tpl && !(tpl as any)[visibilityKey]) return false;
+    if (!sectionVisible(key)) return false;
+    const meta = orderedSections.find(s => s.key === key);
+    if (meta && !meta.visible) return false;
+    return true;
+  };
+
+  const frameConfig = tpl.page_frame;
 
   return (
     <div style={{
@@ -94,37 +119,19 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
       minHeight,
       boxSizing: 'border-box',
     }}>
-      {tpl.show_header_section && sectionVisible('header') && (
-        <SectionWrap highlight={sectionHighlight('header')}>
-          {renderHeader(tpl, data, isThermal, paperWidth)}
-        </SectionWrap>
-      )}
-      {tpl.show_doc_info_section && sectionVisible('doc-info') && (
-        <SectionWrap highlight={sectionHighlight('doc-info')}>
-          {renderDocInfo(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
-      {tpl.show_items_section && sectionVisible('items') && (
-        <SectionWrap highlight={sectionHighlight('items')}>
-          {renderItems(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
-      {data.report && renderReport(tpl, data, isThermal, paperWidth)}
-      {tpl.show_totals_section && sectionVisible('totals') && (
-        <SectionWrap highlight={sectionHighlight('totals')}>
-          {renderTotals(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
-      {tpl.show_payments_section && sectionVisible('payments') && (
-        <SectionWrap highlight={sectionHighlight('payments')}>
-          {renderPayments(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
-      {tpl.show_footer_section && sectionVisible('footer') && (
-        <SectionWrap highlight={sectionHighlight('footer')}>
-          {renderFooter(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
+      <PageFrame config={frameConfig ?? { enabled: false }} tpl={tpl}>
+        {orderedSections.map(meta => {
+          if (!showSection(meta.key)) return null;
+          const renderer = SECTION_RENDERERS[meta.key];
+          if (!renderer) return null;
+          return (
+            <SectionWrap key={meta.key} highlight={sectionHighlight(meta.key)}>
+              {renderer(tpl, data, isThermal, paperWidth)}
+            </SectionWrap>
+          );
+        })}
+        {data.report && renderReport(tpl, data, isThermal, paperWidth)}
+      </PageFrame>
     </div>
   );
 }

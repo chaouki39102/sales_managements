@@ -16,7 +16,7 @@ export interface TableConfig {
   itemsFontFamily: FontFamily;
   showColHeader: boolean;
   tableHeaderBold: boolean;
-  tableHeaderBg: boolean;
+  tableHeaderBg: string;
   tableHeaderColor: string;
   tableBorderStyle: BorderStyle;
   alternatingRows: boolean;
@@ -34,7 +34,7 @@ export const INVOICE_COLUMNS: TableConfig = {
   itemsFontFamily: 'tajawal',
   showColHeader: true,
   tableHeaderBold: true,
-  tableHeaderBg: true,
+  tableHeaderBg: '#f5f5f5',
   tableHeaderColor: COLOR_PRIMARY,
   tableBorderStyle: 'solid',
   alternatingRows: true,

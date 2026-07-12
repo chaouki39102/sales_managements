@@ -23,7 +23,6 @@ export function getMockDocumentData(): UniversalDocumentData {
       nif:     '09991234567890',
       rc:      '99B1234567',
       nis:     '09991234567890',
-      ice:     '09991234567890',
       article: '1604123456',
       logoUrl: null,
       email:   'contact@entreprise.dz',

@@ -1,7 +1,164 @@
 # AGENTS.md — Context Cache for AI Coding Agents
 
 ## Date
-2026-07-08
+2026-07-12
+
+### Phase 22 — Row-Driven Print Layout Integration (July 12)
+
+**Goal**: Make the print template engine fully config-driven. The backend `config` JSON becomes the single source of truth; the React preview layer becomes a pure interpreter of `sections_order`, `header_layout`, `doc_info_rows`, `customer_info_rows`, `company_info_rows`, `totals_grid`, and `col_styles`.
+
+**Types added** (`types/domain.ts`):
+- `CellStyle` — padding/margin/font/width/align/alignSelf for grid cells
+- `ColumnStyleConfig` — per-column width/align/labelStyle/cellStyle for A4 table layouts
+- `WatermarkConfig` — text/font/size/color/opacity/rotate
+- `PageFrameConfig` — border/padding/width/height/radius
+- `SectionMeta` — label/show/hide/icon for section toggles
+- `TotalsGridColumn` — field/label/type/hideOnZero/colSpan
+- `TotalsGridConfig` — enabled/columns/labelText/labelAlign/alwaysShow
+- `PrintTemplate` gained: `doc_info_rows`, `customer_info_rows`, `company_info_rows`, `col_styles`, `page_frame`, `sections_order`, `totals_grid`, `watermark`
+- `LayoutBlock` gained: `titleField`, `titleStyle`
+
+**Layout migration** (`services/layoutMigration.ts`):
+- New builders: `buildDefaultDocInfoRows`, `buildDefaultCustomerInfoRows`, `buildDefaultCompanyInfoRows`, `buildDefaultSectionsOrder`
+- `ensureLayoutFields` handles all 8 new array/object fields with safe fallbacks
+
+**shared.tsx renderLayoutRows FIX**:
+- Now hides empty string/date fields (matching old truthy-check behavior) while always showing currency/number fields
+- Added `cellStyleCss()` helper for `CellStyle` → CSS object conversion
+
+**New components**:
+- `TotalsGrid.tsx` — config-driven VAT-rate-grouped totals table; `buildGridRows` uses `discountAmt` (not `discountAmount`) and pre-computed `totalTva`
+- `PageFrame.tsx` — wraps children in configurable border/padding frame per `page_frame` config
+
+**UniversalPreview.tsx rewrite**:
+- Now loops over `tpl.sections_order` instead of hardcoded JSX sequence
+- Each section is rendered via a name→component lookup map
+- Sections wrapped in `PageFrame` when `tpl.page_frame?.enabled`
+- Report section appended after loop (unchanged)
+
+**PrintFieldRegistry additions**:
+- `company.mobile` (sourcePath: `company.mobile`)
+- `company.capital` (sourcePath: `company.capital`)
+- `customer.code` (sourcePath: `party.code`)
+- Fixed duplicate `company.mobile` and `customer.code` entries
+
+**services/index.ts**:
+- Added `layoutEngine` and `LayoutEngine` type exports
+
+**TemplateLibraryService.php** replaced with `23-TemplateLibraryService.PATCHED.php`:
+- `header_layout` — 3-column boxed header for `dz-invoice-a4` with NIF/RC/ICE/Article/Capital fields
+- `totals_grid` — VAT-rate-grouped totals table for `dz-invoice-a4` (19% and 7% groups, base/tva/ttc columns)
+- `table_header_bg` changed from boolean `true` to color string `'#f5f5f5'` (all 3 templates)
+- Added `table_cell_padding => 6` (all 3 templates)
+
+### Phase 22b — Dead Control Elimination + Cell Padding (July 12)
+
+**6 changes to make every control in the editor produce real output in the preview:**
+
+1. **`table_header_bg` type change: boolean → color string** — Was a boolean Toggle that switched between two hardcoded color schemes. Now a `ColorField` storing an actual hex color (`'#f5f5f5'` default). Preview reads the value directly as `background` (thermal: `tpl.table_header_bg || 'transparent'`; page: `tpl.table_header_bg || '#f5f5f5'`). Editor changed from Toggle to ColorField.
+
+2. **New setting: `table_cell_padding`** (slider, 2–20px, default 6) — Preview was hardcoded to `isA4 ? '10px' : '5px 6px'`. Now uses `tpl.table_cell_padding` with proportional width (`${cp}px ${Math.round(cp * 1.2)}px`). Editor has SliderField. Registry: 144 → 145 settings.
+
+3. **A4 footer: barcode + QR added** — `renderA4Footer` was missing `show_barcode`, `show_qr`, and `show_returns_policy` in `hasContent` check + render body. Added full barcode (48-bar pattern) + QR SVG rendering matching thermal/A5 patterns.
+
+4. **`doc_separator` wired to page mode** — `renderPageDocInfo` was separator-free for both A4 and non-A4. Now renders `<Separator style={tpl.doc_separator} />` at the bottom of the card/box when `tpl.doc_separator !== 'none'`.
+
+5. **HeaderSection.tsx JSX bug fixed** — Missing `</div>` for outer wrapper in `renderPageHeader` caused build failure after structural edit. Added closing tag.
+
+6. **`table_header_bg` type + defaults updated everywhere**: `domain.ts` (boolean→string), `SettingsRegistry.ts` (toggle→color), `TableConfig.ts` (boolean→string), `TemplateLibraryService.php` (true→'#f5f5f5'), `fixtures/templates.ts` (false→'#f5f5f5'), `registry.ts` buildTemplate.
+
+**Files modified (12)**:
+- `types/domain.ts` — `table_header_bg: string`, added `table_cell_padding: number`
+- `services/SettingsRegistry.ts` — `table_header_bg` component toggle→color, default false→'#f5f5f5'; new `table_cell_padding` entry (145 total)
+- `template-library/config/TableConfig.ts` — `tableHeaderBg: boolean`→`string`, default `true`→`'#f5f5f5'`
+- `template-library/registry.ts` — `table_cell_padding: 6` in buildTemplate
+- `__tests__/fixtures/templates.ts` — `table_header_bg: '#f5f5f5'`, added `table_cell_padding: 6`
+- `__tests__/registry-validation.spec.ts` — count 144→145
+- `sections/ItemsSection.tsx` — Toggle→ColorField for table_header_bg; added SliderField for table_cell_padding
+- `components/preview/ItemsSection.tsx` — `table_header_bg` reads as color string; `cellPad` uses `tpl.table_cell_padding`
+- `components/preview/FooterSection.tsx` — A4 footer: added show_barcode, show_qr, show_returns_policy to hasContent + render body
+- `components/preview/DocInfoSection.tsx` — Page mode (A4 + non-A4) renders Separator when doc_separator !== 'none'
+- `components/preview/HeaderSection.tsx` — Fixed missing </div> in renderPageHeader
+- `app/Services/TemplateLibraryService.php` — `table_header_bg` true→'#f5f5f5', added `table_cell_padding => 6`
+
+**Build**: 0 errors, 1065 modules, 2.06s. **Tests**: 159/159 pass.
+
+### Phase 22c — Partial Control Audit + 6 Parity Fixes (July 12)
+
+**Full audit of 145 registry keys vs preview renderers** identified 6 settings that only worked in some renderers (partial), plus 0 dead controls.
+
+**6 partial controls fixed:**
+
+1. **`items_font_family` (page mode)** — Thermal renderer set `fontFamily` on the container div; page mode (`renderPageItems`) did not. Now applies `items_font_family` to the page-mode wrapper div.
+
+2. **`table_cell_padding` (thermal mode)** — Page mode used `tpl.table_cell_padding`; thermal renderer had hardcoded `padding: '1px 0'` and header cells had no padding. Now uses `tpl.table_cell_padding / 2` for both row padding and header cell padding.
+
+3. **`totals_align` (thermal mode)** — Page mode used `flexDirection` + `justifyContent`; thermal had no alignment. Now applies `textAlign` from `tpl.totals_align`.
+
+4. **`thank_you_color` (A4 footer)** — A4 footer set `fontSize` and `fontWeight` but not `color`. Now applies `tpl.thank_you_color`.
+
+5. **`footer_line3` (A5 footer)** — A5 footer only rendered `footer_line1` and `footer_line2`. Now renders all three lines.
+
+6. **`show_client_address` (non-A4 page fallback)** — When `customer_info_rows` is empty, the non-A4 page doc info showed NIF and phone but not address. Now shows address when `show_client_address` is true.
+
+**Audit result: 139 wired, 0 dead, 0 partial (was 6 partial).**
+
+**Files modified (5):**
+- `components/preview/ItemsSection.tsx` — `items_font_family` in page mode; `table_cell_padding` in thermal mode
+- `components/preview/TotalsSection.tsx` — `totals_align` in thermal mode
+- `components/preview/FooterSection.tsx` — `thank_you_color` in A4 footer; `footer_line3` in A5 footer
+- `components/preview/DocInfoSection.tsx` — `show_client_address` in non-A4 page fallback
+
+**Build**: 0 errors, 1065 modules, 2.06s. **Tests**: 159/159 pass.
+
+### Phase 23 — Company Info: Full Control + Customizable Labels + Font Controls (July 12)
+
+**Problem**: Company info section labels were hardcoded ("NIF", "RC", "NIS", "ICE", "النشاط") — user couldn't write Arabic equivalents like "الرقم الجبائي", "السجل التجاري". No font controls (family, bold, italic) for company info. Capital and mobile fields were registered but not rendered. ICE override badge was missing in editor. Page-mode preview rendered empty `<div>` tags when values were null/empty.
+
+**16 new settings added** (145 → 161 total):
+
+| Setting | Type | Default | Purpose |
+|---------|------|---------|---------|
+| `company_info_bold` | toggle | false | Bold for all company info lines |
+| `company_info_italic` | toggle | false | Italic for all company info lines |
+| `company_info_font_family` | select | tajawal | Font family for company info |
+| `label_address` | input | العنوان | Customizable label for address |
+| `label_phone` | input | الهاتف | Customizable label for phone |
+| `label_nif` | input | NIF | Customizable label for tax ID |
+| `label_rc` | input | RC | Customizable label for commercial register |
+| `label_nis` | input | NIS | Customizable label for NIS |
+| `label_ice` | input | ICE | Customizable label for ICE |
+| `label_article` | input | النشاط | Customizable label for article/activity |
+| `label_capital` | input | الرأس المال | Customizable label for capital |
+| `label_mobile` | input | المحمول | Customizable label for mobile |
+| `show_capital` | toggle | false | Show/hide capital field |
+| `show_mobile` | toggle | false | Show/hide mobile field |
+| `override_capital` | input | (empty) | Override capital value |
+| `override_mobile` | input | (empty) | Override mobile value |
+
+**Preview refactored** — `renderCompanyInfo()` helper shared between thermal and page mode:
+- Uses configurable labels (`tpl.label_nif`, etc.) instead of hardcoded "NIF:", "RC:"
+- Applies font family, bold, italic from `company_info_font_family/bold/italic`
+- Renders capital and mobile fields when toggled on
+- Skips empty/null values with proper truthiness checks (fixes page-mode empty div bug)
+
+**Editor expanded** — Company info section now has:
+- Font controls: font family dropdown, bold toggle, italic toggle
+- Label inputs: shown per-field when the corresponding `show_*` is on
+- Capital + mobile toggles + overrides
+- Fixed ICE override badge (was missing `apiValue={company?.ice}`)
+
+**Files modified (8)**:
+- `types/domain.ts` — 16 new fields in PrintTemplate
+- `types/live-data.ts` — Added `capital` + `mobile` to CompanyData
+- `services/SettingsRegistry.ts` — 16 new entries (145 → 161)
+- `template-library/registry.ts` — buildTemplate defaults for all 16 new fields
+- `sections/HeaderSection.tsx` — Font controls + label inputs + capital/mobile fields + fixed ICE badge
+- `components/preview/HeaderSection.tsx` — `renderCompanyInfo()` helper, configurable labels, capital/mobile, empty-value fix
+- `runtime/PrintRuntimeAdapter.tsx` — `mapCompany()` now includes `capital` + `mobile`
+- `__tests__/fixtures/templates.ts` + `__tests__/registry-validation.spec.ts` — Updated for 161 settings
+
+**Build**: 0 errors, 1065 modules, 2.00s. **Tests**: 159/159 pass.
 
 ### Phase 20a — POS Optimization: Render-Blocking Resources + Self-Hosted Icons (July 8)
 

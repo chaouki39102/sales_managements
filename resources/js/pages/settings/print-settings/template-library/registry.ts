@@ -1,15 +1,21 @@
-import type { PrintTemplate, PaperSize, DocTypeCode, CompanyData } from '../types';
+import type { PrintTemplate, PaperSize, DocTypeCode, CompanyData, FontFamily } from '../types';
 import type { UniversalDocumentData } from '../types/data';
 import type { LibraryTemplateEntry, LibraryTemplateMeta } from './types';
 import {
   TEMPLATE_AUTHOR, LAYOUT_ENGINE_VERSION, TEMPLATE_COUNTRY_DZ,
 } from './constants';
+import type { LayoutRow, HeaderLayout, SectionMeta, TotalsGridConfig } from '../types';
 import {
   INVOICE_COLUMNS, INVOICE_TOTALS, INVOICE_FOOTER,
   DELIVERY_COLUMNS, DELIVERY_TOTALS, DELIVERY_FOOTER,
   DELIVERY_A5_COLUMNS, DELIVERY_A5_TOTALS, DELIVERY_A5_FOOTER,
 } from './config';
 import { headerConfig, paperConfig, typographyConfig } from './config';
+import {
+  buildDefaultTotalsRows, buildDefaultFooterRows, buildDefaultHeaderLayout,
+  buildDefaultDocInfoRows, buildDefaultCustomerInfoRows, buildDefaultCompanyInfoRows,
+  buildDefaultSectionsOrder,
+} from '../services/layoutMigration';
 import { categoryFromDocType } from './categories';
 import { getMockDocumentData } from './mockData';
 
@@ -88,8 +94,15 @@ class TemplateRegistryClass {
       tpl.override_nif = companyOverride.nif || '';
       tpl.override_rc = companyOverride.rc || '';
       tpl.override_nis = companyOverride.nis || '';
-      tpl.override_ice = companyOverride.ice || '';
       tpl.override_article = companyOverride.article || '';
+      tpl.override_capital = companyOverride.capital || '';
+      tpl.override_mobile = companyOverride.mobile || '';
+      tpl.override_commercial_name = companyOverride.commercialName || '';
+      tpl.override_email = companyOverride.email || '';
+      tpl.override_fax = companyOverride.fax || '';
+      tpl.override_bank_name = companyOverride.bankName || '';
+      tpl.override_rib = companyOverride.rib || '';
+      tpl.override_activity = companyOverride.activity || '';
     }
     return { tpl, data: this.getMockData() };
   }
@@ -203,18 +216,49 @@ export function buildTemplate(
     show_tax_id: header.showTaxId,
     show_rc: header.showRc,
     show_nis: header.showNis,
-    show_ice: header.showIce,
     show_article: header.showArticle,
+    show_capital: false,
+    show_mobile: false,
+    show_commercial_name: false,
+    show_email: false,
+    show_fax: false,
+    show_bank_name: false,
+    show_rib: false,
+    show_activity: false,
     company_info_align: header.companyInfoAlign,
     company_info_size: header.companyInfoSize,
+    company_info_bold: false,
+    company_info_italic: false,
+    company_info_font_family: 'tajawal' as FontFamily,
+    label_address: 'العنوان',
+    label_phone: 'الهاتف',
+    label_nif: 'NIF',
+    label_rc: 'RC',
+    label_nis: 'NIS',
+    label_article: 'المادة الجبائية',
+    label_capital: 'الرأس المال',
+    label_mobile: 'المحمول',
+    label_commercial_name: 'الاسم التجاري',
+    label_email: 'البريد الإلكتروني',
+    label_fax: 'الفاكس',
+    label_bank_name: 'اسم البنك',
+    label_rib: 'RIB',
+    label_activity: 'النشاط',
 
     override_address: '',
     override_phone: '',
     override_nif: '',
     override_rc: '',
     override_nis: '',
-    override_ice: '',
     override_article: '',
+    override_capital: '',
+    override_mobile: '',
+    override_commercial_name: '',
+    override_email: '',
+    override_fax: '',
+    override_bank_name: '',
+    override_rib: '',
+    override_activity: '',
     header_custom_text: '',
     header_separator: header.headerSeparator,
 
@@ -228,11 +272,56 @@ export function buildTemplate(
     show_time: false,
     show_due_date: isInvoice,
     show_cashier: isInvoice,
-    show_client: true,
-    show_client_nif: true,
-    show_client_phone: true,
-    show_client_address: true,
-    show_delivery_address: !isInvoice,
+    show_client: false,
+    show_client_nif: false,
+    show_client_phone: false,
+    show_client_address: false,
+    show_delivery_address: false,
+    show_customer_commercial_name: false,
+    show_customer_rc: false,
+    show_customer_nis: false,
+    show_customer_ai: false,
+    show_customer_mobile: false,
+    show_customer_fax: false,
+    show_customer_email: false,
+    show_customer_activity: false,
+    show_customer_bank_name: false,
+    show_customer_rib: false,
+    label_client: 'العميل',
+    label_client_nif: 'NIF العميل',
+    label_client_phone: 'هاتف العميل',
+    label_client_address: 'العنوان',
+    label_delivery_address: 'عنوان التسليم',
+    label_customer_commercial_name: 'الاسم التجاري',
+    label_customer_rc: 'RC',
+    label_customer_nis: 'NIS',
+    label_customer_ai: 'المادة الجبائية',
+    label_customer_mobile: 'المحمول',
+    label_customer_fax: 'الفاكس',
+    label_customer_email: 'البريد الإلكتروني',
+    label_customer_activity: 'النشاط',
+    label_customer_bank_name: 'اسم البنك',
+    label_customer_rib: 'RIB',
+    override_client_name: '',
+    override_client_nif: '',
+    override_client_phone: '',
+    override_client_address: '',
+    override_delivery_address: '',
+    override_customer_commercial_name: '',
+    override_customer_rc: '',
+    override_customer_nis: '',
+    override_customer_ai: '',
+    override_customer_mobile: '',
+    override_customer_fax: '',
+    override_customer_email: '',
+    override_customer_activity: '',
+    override_customer_bank_name: '',
+    override_customer_rib: '',
+    customer_info_font_family: 'tajawal' as FontFamily,
+    customer_info_size: 9,
+    customer_info_bold: false,
+    customer_info_italic: false,
+    customer_info_align: 'right' as any,
     show_session: false,
     show_payment_term: false,
     show_bank_details: isInvoice,
@@ -251,6 +340,7 @@ export function buildTemplate(
     table_header_bold: table.tableHeaderBold,
     table_header_bg: table.tableHeaderBg,
     table_header_color: table.tableHeaderColor,
+    table_cell_padding: 6,
     table_border_style: table.tableBorderStyle,
     alternating_rows: table.alternatingRows,
     alternating_color: table.alternatingColor,
@@ -326,6 +416,25 @@ export function buildTemplate(
     show_report_summary_cards: false,
     show_report_payment_breakdown: false,
     show_report_top_products: false,
+
+    totals_rows: [],
+    footer_rows: [],
+    header_layout: { mode: 'simple', columns: [] } as HeaderLayout,
+    doc_info_rows: [],
+    customer_info_rows: [],
+    company_info_rows: [],
+    col_styles: [],
+    page_frame: { enabled: false },
+    sections_order: [
+      { key: 'header',     visible: true, order: 0 },
+      { key: 'doc-info',   visible: true, order: 1 },
+      { key: 'items',      visible: true, order: 2 },
+      { key: 'totals',     visible: true, order: 3 },
+      { key: 'payments',   visible: true, order: 4 },
+      { key: 'footer',     visible: true, order: 5 },
+    ] as SectionMeta[],
+    totals_grid: { enabled: false, columns: [] } as TotalsGridConfig,
+    watermark: { enabled: false },
   };
 
   return overrides ? { ...base, ...overrides } : base;
@@ -345,7 +454,78 @@ export function registerBuiltinTemplates(): void {
       paperSize: 'A4',
       tags: ['algeria', 'arabic', 'fiscal', 'official', 'tva', 'qrcode', 'barcode', 'signature', 'invoice', 'a4'],
     }),
-    createConfig: () => buildTemplate('قالب الفاتورة الجزائري A4', 'FV', 'A4'),
+    createConfig: () => buildTemplate('قالب الفاتورة الجزائري A4', 'FV', 'A4', {
+      show_commercial_name: true,
+      show_mobile: true,
+      show_fax: true,
+      show_email: true,
+      show_capital: true,
+      show_bank_name: true,
+      show_rib: true,
+      header_layout: {
+        mode: 'columns',
+        columns: [
+          {
+            id: 'col_company_info', order: 0, visible: true,
+            width: 34, align: 'start',
+            padding: { top: 0, end: 6, bottom: 0, start: 10 },
+            rows: [
+              { id: 'r1', field: 'company.phone',           label: 'هاتف',         visible: true, order: 0,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r2', field: 'company.mobile',          label: 'محمول',        visible: true, order: 1,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r3', field: 'company.fax',             label: 'فاكس',         visible: true, order: 2,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r4', field: 'company.email',           label: 'بريد',          visible: true, order: 3,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r5', field: 'company.nif',             label: 'NIF',          visible: true, order: 4,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r6', field: 'company.rc',              label: 'RC',           visible: true, order: 5,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r7', field: 'company.nis',             label: 'NIS',          visible: true, order: 6,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r8', field: 'company.article',         label: 'المادة',       visible: true, order: 7,  labelSide: 'start', valueSide: 'end' },
+            ],
+          },
+          {
+            id: 'col_company_name', order: 1, visible: true,
+            width: 36, align: 'center',
+            padding: { top: 0, end: 6, bottom: 0, start: 6 },
+            titleField: 'company.name',
+            titleStyle: { bold: true, fontSize: 18 },
+            rows: [
+              { id: 'cname',  field: 'company.commercialName', label: 'الاسم التجاري', visible: true, order: 0, labelSide: 'start', valueSide: 'start', label: '' },
+              { id: 'addr',   field: 'company.address',        visible: true, order: 1, labelSide: 'start', valueSide: 'start', label: '' },
+              { id: 'capital', field: 'company.capital',       label: 'رأس المال',     visible: true, order: 2, labelSide: 'start', valueSide: 'end' },
+            ],
+          },
+          {
+            id: 'col_reference_box', order: 2, visible: true,
+            width: 30, align: 'start',
+            border: { style: 'solid', width: 1, color: '#333333', radius: 4 },
+            padding: { top: 8, end: 10, bottom: 8, start: 10 },
+            rows: [
+              { id: 'num',  field: 'document.number', label: 'رقم الفاتورة', visible: true, order: 0, labelSide: 'start', valueSide: 'end' },
+              { id: 'date', field: 'document.date',   label: 'التاريخ',      visible: true, order: 1, labelSide: 'start', valueSide: 'end' },
+              { id: 'ttc',  field: 'totals.ttc',      label: 'المبلغ',       visible: true, order: 2, labelSide: 'start', valueSide: 'end', bold: true },
+            ],
+          },
+        ],
+      },
+      totals_grid: {
+        enabled: true,
+        headerBg: '#f5f5f5',
+        headerColor: '#111111',
+        borderColor: '#333333',
+        columns: [
+          { id: 'c1', field: 'grid.baseExcl',      label: 'المبلغ خارج الرسم', order: 0, visible: true, align: 'center' },
+          { id: 'c2', field: 'grid.discountPct',    label: 'التخفيض',          order: 1, visible: true, align: 'center' },
+          { id: 'c3', field: 'grid.discountAmount', label: 'مبلغ التخفيض',      order: 2, visible: true, align: 'center' },
+          { id: 'c4', field: 'grid.tvaRate',        label: 'TVA',              order: 3, visible: true, align: 'center' },
+          { id: 'c5', field: 'grid.tvaAmount',      label: 'مبلغ TVA',         order: 4, visible: true, align: 'center' },
+        ],
+        summaryRows: [
+          { id: 'total_ht', field: 'totals.ht',       label: 'المجموع بدون رسوم', visible: true, order: 0, labelSide: 'start', valueSide: 'end' },
+          { id: 'discount', field: 'totals.discount',  label: 'مجموع التخفيض',     visible: true, order: 1, labelSide: 'start', valueSide: 'end' },
+          { id: 'tva',      field: 'totals.tva',       label: 'مجموع الضريبة',     visible: true, order: 2, labelSide: 'start', valueSide: 'end' },
+          { id: 'ttc',      field: 'totals.ttc',       label: 'الصافي للدفع',      visible: true, order: 3, labelSide: 'start', valueSide: 'end', bold: true,
+            border: { style: 'double', width: 3, color: '#111', sides: { top: true } } },
+        ],
+      } as TotalsGridConfig,
+    }),
   });
 
   templateRegistry.register({
@@ -359,7 +539,16 @@ export function registerBuiltinTemplates(): void {
       paperSize: 'A4',
       tags: ['algeria', 'arabic', 'fiscal', 'official', 'tva', 'qrcode', 'barcode', 'signature', 'delivery', 'a4'],
     }),
-    createConfig: () => buildTemplate('قالب وصل التسليم الجزائري A4', 'BL', 'A4'),
+    createConfig: () => buildTemplate('قالب وصل التسليم الجزائري A4', 'BL', 'A4', {
+      show_commercial_name: true,
+      show_mobile: true,
+      show_fax: true,
+      show_email: true,
+      show_capital: true,
+      show_bank_name: true,
+      show_rib: true,
+      show_activity: true,
+    }),
   });
 
   templateRegistry.register({
@@ -373,7 +562,16 @@ export function registerBuiltinTemplates(): void {
       paperSize: 'A5',
       tags: ['algeria', 'arabic', 'fiscal', 'official', 'delivery', 'a5'],
     }),
-    createConfig: () => buildTemplate('قالب وصل التسليم الجزائري A5', 'BL', 'A5'),
+    createConfig: () => buildTemplate('قالب وصل التسليم الجزائري A5', 'BL', 'A5', {
+      show_commercial_name: true,
+      show_mobile: true,
+      show_fax: true,
+      show_email: true,
+      show_capital: true,
+      show_bank_name: true,
+      show_rib: true,
+      show_activity: true,
+    }),
   });
 }
 

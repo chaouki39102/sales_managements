@@ -32,15 +32,22 @@ export interface TemplateLiveData {
 }
 
 export interface CompanyData {
-  name:     string;
-  address:  string;
-  phone:    string;
-  nif:      string;
-  rc:       string;
-  nis:      string;
-  ice:      string;
-  article:  string;
-  logoUrl?: string | null;
+  name:            string;
+  commercialName:  string;
+  address:         string;
+  phone:           string;
+  mobile:          string;
+  fax:             string;
+  email:           string;
+  nif:             string;
+  rc:              string;
+  nis:             string;
+  article:         string;
+  capital:         string;
+  bankName:        string;
+  rib:             string;
+  activity:        string;
+  logoUrl?:        string | null;
 }
 
 export interface DetectedPrinter {

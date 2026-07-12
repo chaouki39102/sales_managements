@@ -5,6 +5,7 @@ import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { ColorField, Field, Input, Textarea } from '../components/ui';
 import { BorderSelect } from './HeaderSection';
 import { isSettingVisible } from '../services/SettingsRegistry';
+import { RowManager } from '../components/RowManager';
 
 interface Props {
   tpl: PrintTemplate;
@@ -30,6 +31,13 @@ export default function FooterSectionControls({ tpl, update }: Props) {
           <Input value={tpl.footer_line3}
             onChange={v => update('footer_line3', v)} />
         </Field>}
+
+        <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+        <div className="ps-section-title" style={{ fontSize: 12 }}>ترتيب صفوف التذييل</div>
+        <RowManager
+          rows={tpl.footer_rows ?? []}
+          onChange={rows => update('footer_rows', rows)}
+        />
 
         {sec('footer_separator') && <BorderSelect label="فاصل التذييل" value={tpl.footer_separator}
           onChange={v => update('footer_separator', v as BorderStyle)} />}

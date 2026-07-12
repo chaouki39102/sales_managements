@@ -183,8 +183,8 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
         {sec('show_col_header') && tpl.show_col_header && (
           <>
             {sec('table_header_bold') && <Toggle value={tpl.table_header_bold} onChange={v => update('table_header_bold', v)} label="خط عريض للرأس" />}
-            {sec('table_header_bg') && <Toggle value={tpl.table_header_bg} onChange={v => update('table_header_bg', v)} label="خلفية للرأس" />}
-            {sec('table_header_color') && <ColorField label="لون نص الرأس" value={tpl.table_header_color} onChange={v => update('table_header_color', v)} />}
+            {sec('table_header_bg') && <ColorField label="لون خلفية الرأس" value={tpl.table_header_bg || '#f5f5f5'} onChange={v => update('table_header_bg', v)} />}
+            {sec('table_header_color') && <ColorField label="لون نص الرأس" value={tpl.table_header_color || '#111111'} onChange={v => update('table_header_color', v)} />}
             {COLUMNS.filter(c => tpl.col_show[c.key] !== false).map(col => (
               <div className="ps-field" key={col.key} style={{ marginTop: 2 }}>
                 <label className="ps-field-label">رأس: {col.label}</label>
@@ -197,6 +197,8 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
           </>
         )}
 
+        {sec('table_cell_padding') && <SliderField value={tpl.table_cell_padding || 6} min={2} max={20} step={1}
+          onChange={v => update('table_cell_padding', v)} label="مسافة الخلايا (px)" />}
         {sec('table_border_style') && <BorderSelect label="حدود الجدول" value={tpl.table_border_style}
           onChange={v => update('table_border_style', v as BorderStyle)} />}
         {sec('alternating_rows') && <Toggle value={tpl.alternating_rows} onChange={v => update('alternating_rows', v)} label="تلوين متناوب للأسطر" />}

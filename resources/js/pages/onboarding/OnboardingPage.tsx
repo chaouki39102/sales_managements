@@ -1045,11 +1045,7 @@ export default function OnboardingPage() {
     if (yearId) {
       appActions.setSelectedYearId(yearId);
     }
-    setActiveCompany({
-      id:   pendingCompany.id,
-      name: pendingCompany.name,
-      slug: pendingCompany.slug,
-    });
+    setActiveCompany(pendingCompany as any);
     setPendingCompany(null);
     navigate('/dashboard', { replace: true });
   };
@@ -1067,22 +1063,14 @@ const handleNewCompanyCreated = (company: Company, fiscalYear: { id: number }) =
 const handleSeedingComplete = () => {
   if (!seedingCompany) return;
   // ✅ الآن نفعّل الشركة وننتقل إلى داشبورد
-  setActiveCompany({
-    id: seedingCompany.id,
-    name: seedingCompany.name,
-    slug: seedingCompany.slug,
-  });
+  setActiveCompany(seedingCompany as any);
   setSeedingCompany(null);
   navigate('/dashboard', { replace: true });
 };
 const handleSeedingSkip = () => {
   if (!seedingCompany) return;
   // ✅ نفس الشيء: نفعّل الشركة وننتقل
-  setActiveCompany({
-    id: seedingCompany.id,
-    name: seedingCompany.name,
-    slug: seedingCompany.slug,
-  });
+  setActiveCompany(seedingCompany as any);
   setSeedingCompany(null);
   navigate('/dashboard', { replace: true });
 };

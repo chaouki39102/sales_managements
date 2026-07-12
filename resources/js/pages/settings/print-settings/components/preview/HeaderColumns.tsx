@@ -50,6 +50,9 @@ export function renderHeaderColumns(
               textAlign: alignCss(col.align),
               padding: spacingCss(col.padding),
               background: col.background,
+              overflowWrap: 'break-word',
+              wordBreak: 'break-word',
+              minWidth: 0,
               ...boxBorderCss(col.border),
             }}
           >

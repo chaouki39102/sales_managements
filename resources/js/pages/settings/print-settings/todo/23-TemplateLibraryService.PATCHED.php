@@ -80,19 +80,18 @@ class TemplateLibraryService
                 'bank_details_text'    => 'RIB: 007 99999 000012345678 90',
                 'doc_separator'        => 'solid',
 
-                'col_order'            => ['rowNumber','name','quantity','price','tva','total'],
-                'col_show'             => ['rowNumber'=>true,'name'=>true,'quantity'=>true,'price'=>true,'tva'=>true,'total'=>true],
-                'col_widths'           => ['rowNumber'=>8,'name'=>28,'quantity'=>10,'price'=>18,'tva'=>12,'total'=>18],
-                'col_headers'          => ['rowNumber'=>'م','name'=>'البيان','quantity'=>'الكمية','price'=>'س.و.ح','tva'=>'%TVA','total'=>'المبلغ'],
-                'col_aligns'           => ['rowNumber'=>'center','name'=>'right','quantity'=>'center','price'=>'center','tva'=>'center','total'=>'center'],
+                'col_order'            => ['ref','name','quantity','price','tva','total'],
+                'col_show'             => ['ref'=>true,'name'=>true,'quantity'=>true,'price'=>true,'tva'=>true,'total'=>true],
+                'col_widths'           => ['ref'=>8,'name'=>28,'quantity'=>10,'price'=>18,'tva'=>12,'total'=>18],
+                'col_headers'          => ['ref'=>'م','name'=>'البيان','quantity'=>'الكمية','price'=>'س.و.ح','tva'=>'%TVA','total'=>'المبلغ'],
+                'col_aligns'           => ['ref'=>'center','name'=>'right','quantity'=>'center','price'=>'center','tva'=>'center','total'=>'center'],
 
                 'items_font_size'      => 9,
                 'items_font_family'    => 'tajawal',
                 'show_col_header'      => true,
                 'table_header_bold'    => true,
-                'table_header_bg'      => '#f5f5f5',
+                'table_header_bg'      => true,
                 'table_header_color'   => '#1a1a2e',
-                'table_cell_padding'   => 6,
                 'table_border_style'   => 'solid',
                 'alternating_rows'     => true,
                 'alternating_color'    => '#f8f9fa',
@@ -169,7 +168,7 @@ class TemplateLibraryService
                 'show_report_payment_breakdown' => false,
                 'show_report_top_products'  => false,
 
-                // ─── 3-column boxed header layout ──
+                // ─── رأس مؤطر بثلاثة أعمدة (يتجاوز show_company_name/show_address...) ──
                 'header_layout' => [
                     'mode' => 'columns',
                     'columns' => [
@@ -210,7 +209,7 @@ class TemplateLibraryService
                     ],
                 ],
 
-                // ─── VAT-rate-grouped totals grid ──
+                // ─── جدول مجاميع بأعمدة حسب معدل TVA (بدل القائمة المتراصة) ──────────────
                 'totals_grid' => [
                     'enabled' => true,
                     'headerBg' => '#f5f5f5',
@@ -304,19 +303,18 @@ class TemplateLibraryService
                 'bank_details_text'    => '',
                 'doc_separator'        => 'solid',
 
-                'col_order'            => ['rowNumber','name','quantity','price','tva','total'],
-                'col_show'             => ['rowNumber'=>true,'name'=>true,'quantity'=>true,'price'=>true,'tva'=>true,'total'=>true],
-                'col_widths'           => ['rowNumber'=>8,'name'=>28,'quantity'=>12,'price'=>16,'tva'=>12,'total'=>18],
-                'col_headers'          => ['rowNumber'=>'م','name'=>'البيان','quantity'=>'الكمية','price'=>'س.و.ح','tva'=>'%TVA','total'=>'المبلغ'],
-                'col_aligns'           => ['rowNumber'=>'center','name'=>'right','quantity'=>'center','price'=>'center','tva'=>'center','total'=>'center'],
+                'col_order'            => ['ref','name','quantity','price','tva','total'],
+                'col_show'             => ['ref'=>true,'name'=>true,'quantity'=>true,'price'=>true,'tva'=>true,'total'=>true],
+                'col_widths'           => ['ref'=>8,'name'=>28,'quantity'=>12,'price'=>16,'tva'=>12,'total'=>18],
+                'col_headers'          => ['ref'=>'م','name'=>'البيان','quantity'=>'الكمية','price'=>'س.و.ح','tva'=>'%TVA','total'=>'المبلغ'],
+                'col_aligns'           => ['ref'=>'center','name'=>'right','quantity'=>'center','price'=>'center','tva'=>'center','total'=>'center'],
 
                 'items_font_size'      => 9,
                 'items_font_family'    => 'tajawal',
                 'show_col_header'      => true,
                 'table_header_bold'    => true,
-                'table_header_bg'      => '#f5f5f5',
+                'table_header_bg'      => true,
                 'table_header_color'   => '#1a1a2e',
-                'table_cell_padding'   => 6,
                 'table_border_style'   => 'solid',
                 'alternating_rows'     => true,
                 'alternating_color'    => '#f8f9fa',
@@ -465,19 +463,18 @@ class TemplateLibraryService
                 'bank_details_text'    => '',
                 'doc_separator'        => 'solid',
 
-                'col_order'            => ['rowNumber','name','quantity','price','total'],
-                'col_show'             => ['rowNumber'=>true,'name'=>true,'quantity'=>true,'price'=>true,'total'=>true],
-                'col_widths'           => ['rowNumber'=>8,'name'=>32,'quantity'=>14,'price'=>20,'total'=>22],
-                'col_headers'          => ['rowNumber'=>'م','name'=>'البيان','quantity'=>'الكمية','price'=>'س.و.ح','total'=>'المبلغ'],
-                'col_aligns'           => ['rowNumber'=>'center','name'=>'right','quantity'=>'center','price'=>'center','total'=>'center'],
+                'col_order'            => ['ref','name','quantity','price','total'],
+                'col_show'             => ['ref'=>true,'name'=>true,'quantity'=>true,'price'=>true,'total'=>true],
+                'col_widths'           => ['ref'=>8,'name'=>32,'quantity'=>14,'price'=>20,'total'=>22],
+                'col_headers'          => ['ref'=>'م','name'=>'البيان','quantity'=>'الكمية','price'=>'س.و.ح','total'=>'المبلغ'],
+                'col_aligns'           => ['ref'=>'center','name'=>'right','quantity'=>'center','price'=>'center','total'=>'center'],
 
                 'items_font_size'      => 8,
                 'items_font_family'    => 'tajawal',
                 'show_col_header'      => true,
                 'table_header_bold'    => true,
-                'table_header_bg'      => '#f5f5f5',
+                'table_header_bg'      => true,
                 'table_header_color'   => '#1a1a2e',
-                'table_cell_padding'   => 6,
                 'table_border_style'   => 'solid',
                 'alternating_rows'     => true,
                 'alternating_color'    => '#f8f9fa',

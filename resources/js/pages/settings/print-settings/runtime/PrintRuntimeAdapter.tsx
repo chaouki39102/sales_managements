@@ -26,15 +26,22 @@ const __hostApiClient: ApiClient = {
 export function mapCompany(ac: ReturnType<typeof useActiveCompany>): CompanyData | null {
   if (!ac) return null;
   return {
-    name:    ac.name    ?? '',
-    address: ac.address ?? '',
-    phone:   ac.phone   ?? '',
-    nif:     ac.nif     ?? '',
-    rc:      ac.rc      ?? '',
-    nis:     ac.nis     ?? '',
-    ice:     (ac as any).ice ?? '',
-    article: (ac as any).ai ?? '',
-    logoUrl: (ac as any).avatar ?? null,
+    name:            ac.name            ?? '',
+    commercialName:  (ac as any).commercial_name ?? '',
+    address:         ac.address         ?? '',
+    phone:           ac.phone           ?? '',
+    mobile:          ac.mobile          ?? '',
+    fax:             ac.fax             ?? '',
+    email:           ac.email           ?? '',
+    nif:             ac.nif             ?? '',
+    rc:              ac.rc              ?? '',
+    nis:             ac.nis             ?? '',
+    article:         (ac as any).ai     ?? '',
+    activity:        ac.activity        ?? '',
+    capital:         (ac as any).capital_amount ?? '',
+    bankName:        (ac as any).bank_name ?? '',
+    rib:             ac.rib             ?? '',
+    logoUrl:         ac.avatar          ?? null,
   };
 }
 
