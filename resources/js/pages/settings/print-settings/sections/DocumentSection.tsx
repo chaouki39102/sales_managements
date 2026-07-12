@@ -77,10 +77,12 @@ const FONT_OPTIONS: { value: FontFamily; label: string }[] = [
 export default function DocumentSectionControls({ tpl, update }: Props) {
   const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
 
+  const fieldToRowId = (field: string) => 'cust_' + field.replace('customer.', '');
+
   const syncRow = (settingKey: string, val: boolean) => {
     const meta = CUST_ROW_MAP[settingKey];
     if (!meta) { update(settingKey as any, val as any); return; }
-    const rowId = settingKey.replace('show_', 'cust_');
+    const rowId = fieldToRowId(meta.field);
     const rows = [...(tpl.customer_info_rows ?? [])];
     const existingIdx = rows.findIndex(r => r.id === rowId);
     if (val && existingIdx === -1) {

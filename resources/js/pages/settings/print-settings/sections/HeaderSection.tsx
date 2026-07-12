@@ -90,10 +90,12 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
     }
   };
 
+  const fieldToRowId = (field: string) => 'co_' + field.replace('company.', '');
+
   const syncRow = (settingKey: string, val: boolean) => {
-    const rowId = settingKey.replace('show_', 'co_');
     const meta = ROW_ID_MAP[settingKey];
     if (!meta) { update(settingKey as any, val as any); return; }
+    const rowId = fieldToRowId(meta.field);
     const rows = [...(tpl.company_info_rows ?? [])];
     const existingIdx = rows.findIndex(r => r.id === rowId);
     if (val && existingIdx === -1) {

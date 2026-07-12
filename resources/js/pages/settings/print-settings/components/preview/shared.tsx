@@ -289,10 +289,6 @@ function LayoutColumnCellFn({
   const def = printFieldRegistry.get(column.field);
   const value = printFieldResolver.resolve(column.field, data, tpl);
 
-  const isEmpty = value === null || value === undefined || value === '';
-  const shouldHideWhenEmpty = def ? (def.type === 'string' || def.type === 'date') : true;
-  if (isEmpty && shouldHideWhenEmpty) return null;
-
   const labelSetting = COMPANY_FIELD_LABEL_SETTING[column.field] || CUSTOMER_FIELD_LABEL_SETTING[column.field];
   const label = (labelSetting ? (tpl as any)[labelSetting] : '') || column.label ?? def?.label ?? column.field;
 
@@ -405,10 +401,6 @@ export function renderLayoutRows(
 
     const def = printFieldRegistry.get(r.field ?? '');
     const value = printFieldResolver.resolve(r.field ?? '', data, tpl);
-
-    const isEmpty = value === null || value === undefined || value === '';
-    const shouldHideWhenEmpty = def ? (def.type === 'string' || def.type === 'date') : true;
-    if (isEmpty && shouldHideWhenEmpty) continue;
 
     const labelSetting = COMPANY_FIELD_LABEL_SETTING[r.field ?? ''] || CUSTOMER_FIELD_LABEL_SETTING[r.field ?? ''];
     const label = (labelSetting ? (tpl as any)[labelSetting] : '') || r.label ?? def?.label ?? r.field;
