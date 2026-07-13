@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// lib/api/endpoints/parties.ts — النسخة الكاملة مع stats
+// lib/api/endpoints/parties.ts
 // ════════════════════════════════════════════════════════════════════════════
 import {
   useQuery, useMutation, useQueryClient, keepPreviousData,
@@ -21,31 +21,6 @@ export interface PartyListParams {
   [key: string]:  unknown;
 }
 
-export interface PartyStatRow {
-  count:            number;
-  total_ttc:        number;
-  total_ht:         number;
-  total_tva:        number;
-  amount_paid:      number;
-  amount_remaining: number;
-  total_discount:   number;
-}
-
-export interface PartyStats {
-  party:         Party;
-  balance:       number;
-  sales:         PartyStatRow;
-  purchases:     PartyStatRow;
-  payments:      { count: number; total: number };
-  checks:        { count: number; total: number; pending_total: number; bounced_total: number };
-  expenses:      { count: number; total: number; total_paid: number };
-  last_document: {
-    id: number; document_number: string; document_date: string;
-    total_ttc: number; status: string; type_name: string;
-  } | null;
-  active_years:  { id: number; name: string; start_date: string; end_date: string }[];
-}
-
 // ─── API ──────────────────────────────────────────────────────────────────────
 export const partiesApi = {
   list: (p?: PartyListParams) =>
@@ -61,11 +36,6 @@ export const partiesApi = {
     apiGet<Party>(`/parties/${id}`, {
       include: 'partyType,legalForm,defaultPriceLevel,wilaya,commune',
     }),
-
-  stats: (id: number, fiscalYearId?: number) =>
-    apiGet<PartyStats>(`/parties/${id}/stats`,
-      fiscalYearId ? { fiscal_year_id: fiscalYearId } : undefined,
-    ),
 
   create: (data: Partial<Party>) => apiPost<Party>('/parties', data),
   update: (id: number, data: Partial<Party>) => apiPut<Party>(`/parties/${id}`, data),
@@ -113,17 +83,6 @@ export function useParty(id: number | null | undefined) {
     queryFn:   () => partiesApi.show(id!),
     enabled:   !!slug && !!id,
     staleTime: 5 * 60_000,
-  });
-}
-
-// ✅ hook إحصاءات الطرف — يُشغَّل فقط عند فتح مودال التفاصيل
-export function usePartyStats(id: number | null | undefined, fiscalYearId?: number) {
-  const slug = useActiveSlug();
-  return useQuery({
-    queryKey:  [slug, 'parties', id, 'stats', fiscalYearId],
-    queryFn:   () => partiesApi.stats(id!, fiscalYearId),
-    enabled:   !!slug && !!id,
-    staleTime: 2 * 60_000,  // 2 دقيقة — تتغير بتغير المعاملات
   });
 }
 

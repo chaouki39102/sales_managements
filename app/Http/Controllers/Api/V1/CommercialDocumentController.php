@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateCommercialDocumentRequest;
 use App\Http\Resources\CommercialDocumentResource;
 use App\Services\QRCodeService;
 use App\Services\CommercialDocumentService;
+use App\Services\PaymentSynchronizer;
 use App\Models\CommercialDocument;
 use App\Services\NotificationService;
 use App\Models\Company;          // ✅ أضفنا هذا
@@ -22,6 +23,7 @@ class CommercialDocumentController extends BaseApiController
 
     public function __construct(
         private CommercialDocumentService $commercialDocumentService,
+        private PaymentSynchronizer $paymentSynchronizer,
         private QRCodeService $qrCodeService,
         private NotificationService $notificationService,
     ) {
@@ -286,7 +288,7 @@ class CommercialDocumentController extends BaseApiController
             ]);
 
             DB::transaction(function () use ($commercialDocument, $validated) {
-                $this->commercialDocumentService->syncPayments(
+                $this->paymentSynchronizer->syncPayments(
                     $commercialDocument,
                     $validated['payments']
                 );

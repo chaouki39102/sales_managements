@@ -4,9 +4,11 @@
 import React, { useState } from 'react';
 import StockTab          from './StockTab';
 import OpeningBalanceTab from './OpeningBalanceTab';
+import ProductLotsTab    from './ProductLotsTab';
 
 const TABS = [
   { key: 'stock',   label: 'المخزون الحالي',    icon: 'ti-packages' },
+  { key: 'lots',    label: 'دفعات المنتجات',    icon: 'ti-barcode'  },
   { key: 'opening', label: 'الرصيد الافتتاحي',  icon: 'ti-flag-2'   },
 ] as const;
 
@@ -64,6 +66,7 @@ export default function InventoryPage() {
 
       {/* ── محتوى ── */}
       {tab === 'stock'   && <StockTab />}
+      {tab === 'lots'    && <ProductLotsTab />}
       {tab === 'opening' && <OpeningBalanceTab />}
 
     </div>

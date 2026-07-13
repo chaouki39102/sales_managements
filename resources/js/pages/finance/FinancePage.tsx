@@ -128,7 +128,7 @@ interface PaymentFilters {
 
 function usePayments(slug: string, yearId: number | null, filters: PaymentFilters) {
     const params: Record<string, unknown> = {
-        fiscal_year_id: yearId ?? undefined,
+        'filter[fiscal_year_id]': yearId ?? undefined,
         per_page:       50,
         include:        'party,paymentMode,treasuryAccount',
         ...filters,

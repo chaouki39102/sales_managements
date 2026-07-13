@@ -199,7 +199,7 @@ export function useStockMovements(params?: StockMovementListParams) {
     const yearId = useSelectedYearId();
     return useQuery({
         queryKey: tenantKeys.inventory.movements(slug ?? "", { ...params, fiscal_year_id: yearId }),
-        queryFn: () => inventoryApi.movements({ ...params, fiscal_year_id: yearId ?? undefined }),
+        queryFn: () => inventoryApi.movements({ ...params, 'filter[fiscal_year_id]': yearId ?? undefined } as StockMovementListParams),
         enabled: !!slug,
         staleTime: 2 * 60_000,
         placeholderData: keepPreviousData,

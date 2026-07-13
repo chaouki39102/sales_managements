@@ -69,7 +69,17 @@ export default function InvoicesPage() {
     setFilters(prev => ({ ...prev, page: 1, fiscal_year_id: selectedYear?.id }));
   }, [selectedYear?.id]);
 
-  const { data, isLoading, isFetching } = useInvoices(filters);
+  // تحويل fiscal_year_id إلى filter[fiscal_year_id] للباكند
+  const apiFilters = useMemo(() => {
+    const params: Record<string, unknown> = { ...filters };
+    if (params.fiscal_year_id) {
+      params['filter[fiscal_year_id]'] = params.fiscal_year_id;
+      delete params.fiscal_year_id;
+    }
+    return params;
+  }, [filters]);
+
+  const { data, isLoading, isFetching } = useInvoices(apiFilters as any);
   const { data: customers } = useCustomers({ per_page: 200, type: 'client' }); // ✅ تمرير النوع كزبون
 
   const invoices = data?.data ?? [];

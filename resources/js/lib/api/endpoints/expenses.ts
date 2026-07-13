@@ -2,10 +2,10 @@
 // lib/api/endpoints/expenses.ts
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
-import { useActiveSlug, useSelectedYearId } from '../../store/appStore';
+import { useActiveSlug } from '../../store/appStore';
 import type { Expense, PaginatedResponse, ListParams } from '../core/types';
 
 export const expensesApi = {
@@ -15,18 +15,6 @@ export const expensesApi = {
   update: (id: number, data: Partial<Expense>) => apiPut<Expense>(`/expenses/${id}`, data),
   delete: (id: number)          => apiDelete(`/expenses/${id}`),
 } as const;
-
-export function useExpenses(params?: ListParams) {
-  const slug   = useActiveSlug();
-  const yearId = useSelectedYearId();
-  return useQuery({
-    queryKey:        tenantKeys.expenses.list(slug ?? '', { ...params, year_id: yearId }),
-    queryFn:         () => expensesApi.list({ ...params, year_id: yearId ?? undefined }),
-    enabled:         !!slug,
-    staleTime:       3 * 60_000,
-    placeholderData: keepPreviousData,
-  });
-}
 
 export function useExpenseMutations() {
   const slug = useActiveSlug();

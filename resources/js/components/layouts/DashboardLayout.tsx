@@ -9,6 +9,7 @@ import client from '@/lib/api/core/client';
 import { useTopbarTitle } from '@/hooks/useTopbarTitle';
 import OfflineIndicator from '@/components/OfflineIndicator';
 import NotificationBell from '@/components/topbar/NotificationBell';
+import { AlertBell } from '@/pages/documents/components/AlertBell';
 import PrintQueuePanel from '@/pages/settings/print-settings/components/shared/PrintQueuePanel';
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -740,6 +741,7 @@ const meta = useTopbarTitle();
               <input type="text" placeholder="بحث سريع..." />
             </div>
             <NotificationBell />
+            <AlertBell />
             {!isDocEditor && (
               <button className="ib" onClick={toggleTheme} title={dark ? 'الوضع الفاتح' : 'الوضع الداكن'}>
                 <span className="ic ic-sm"><i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`} /></span>

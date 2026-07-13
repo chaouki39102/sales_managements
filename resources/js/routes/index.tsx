@@ -40,6 +40,9 @@ const DebtsPage    = lazy(() => import('@/pages/debts/DebtsPage'));
 const TvaPage      = lazy(() => import('@/pages/fiscal/TvaPage'));
 const ChecksPage   = lazy(() => import('@/pages/checks/ChecksPage'));
 
+// ─── Finance (bank reconciliation) ──────────────────────────────────────────
+const BankReconciliationPage = lazy(() => import('@/pages/finance/BankReconciliationPage'));
+
 // â”€â”€ Fiscal / Reports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FiscalYearsPage       = lazy(() => import('@/pages/fiscal/FiscalYearsPage'));
 const TaxSettingsPage       = lazy(() => import('@/pages/fiscal/TaxSettingsPage'));
@@ -51,6 +54,12 @@ const ReportsPage           = lazy(() => import('@/pages/reports/ReportsPage'));
 
 // â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
+
+// ─── Audit ──────────────────────────────────────────────────────────────────
+const AuditLogPage = lazy(() => import('@/pages/audit/AuditLogPage'));
+
+// ─── Alerts ──────────────────────────────────────────────────────────────────
+const AlertsPage = lazy(() => import('@/pages/alerts/AlertsPage'));
 
 // â”€â”€ Users / Roles / Employees â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const UsersPage     = lazy(() => import('@/pages/users/UsersPage'));
@@ -222,6 +231,7 @@ export function AppRoutes() {
           <Route path="debts"    element={<DebtsPage />} />
           <Route path="tva"      element={<TvaPage />} />
           <Route path="checks"  element={<ChecksPage />} />
+          <Route path="bank-reconciliation" element={<BankReconciliationPage />} />
 
           {/* Fiscal */}
           <Route path="fiscalyears"     element={<FiscalYearsPage />} />
@@ -243,6 +253,12 @@ export function AppRoutes() {
 
           {/* Notifications */}
           <Route path="notifications" element={<NotificationsPage />} />
+
+          {/* Audit Log */}
+          <Route path="audit-log" element={<AuditLogPage />} />
+
+          {/* Alerts */}
+          <Route path="alerts" element={<AlertsPage />} />
 
           {/* Settings */}
           <Route path="settings"                 element={<SettingsPage />} />

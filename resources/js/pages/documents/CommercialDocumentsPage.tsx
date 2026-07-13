@@ -49,6 +49,8 @@ import QuickSaleModal from "./QuickSaleModal";
 import { DeliveryProgressBar } from "./components/DeliveryProgressBar";
 import ConvertDocumentModal from "./components/ConvertDocumentModal";
 import BatchPrintModal from "./components/BatchPrintModal";
+import { ApprovalStatusBadge, ApprovalActions } from "./components/ApprovalWorkflow";
+import { SendDocumentMailModal } from "./components/SendDocumentMailModal";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
@@ -546,6 +548,14 @@ export default function CommercialDocumentsPage() {
     // ── Cancel modal state ────────────────────────────────────────────────────
     const [cancelModal, setCancelModal] = useState<{ id: number; reason: string } | null>(null);
 
+    // ── Send email modal state ────────────────────────────────────────────────
+    const [mailModal, setMailModal] = useState<{
+        id: number;
+        documentNumber: string;
+        partyName: string;
+        partyEmail: string | null;
+    } | null>(null);
+
     // ── Batch print ───────────────────────────────────────────────────────────
     const [batchPrintOpen, setBatchPrintOpen] = useState(false);
     const [batchDocs, setBatchDocs] = useState<CommercialDocument[]>([]);
@@ -914,7 +924,12 @@ export default function CommercialDocumentsPage() {
                 options: Object.entries(STATUS_CFG).map(([v, c]) => ({ value: v, label: c.label })),
             },
             accessor: r => getDocStatus(r),
-            render: row => <StatusBadge status={getDocStatus(row)} />,
+            render: row => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <StatusBadge status={getDocStatus(row)} />
+                    <ApprovalStatusBadge documentId={row.id} statusSlug={getDocStatus(row)} />
+                </div>
+            ),
         },
         {
             key: "total_ht",
@@ -1399,6 +1414,21 @@ export default function CommercialDocumentsPage() {
                     onClick: () => { if (row) navigate(`/documents/${typeCode}/${row.id}/edit`); },
                 });
             }
+            if (!isReadOnly && row) {
+                const party = row.party as Record<string, unknown> | undefined;
+                editActions.push({
+                    label: "إرسال بالبريد",
+                    icon: "mail",
+                    onClick: () => {
+                        setMailModal({
+                            id: row.id,
+                            documentNumber: String(row.document_number ?? `#${row.id}`),
+                            partyName: String(party?.name ?? ''),
+                            partyEmail: (party?.email as string) ?? null,
+                        });
+                    },
+                });
+            }
             if (canLock) {
                 editActions.push({
                     label: "قفل المستند",
@@ -1453,7 +1483,7 @@ export default function CommercialDocumentsPage() {
             });
         }
 
-        // ─── جدول — قفل/فتح جماعي للصفحة الحالية ──────────────────────────
+        // ─── جدول — قفل/فتح جماعي + إرسال جماعي للموافقة ──────────────────
         if (ctx.type === "table" && !isReadOnly) {
             const lockable   = items.filter(r => getRowPermissions(r, false).canLock);
             const unlockable = items.filter(r => getRowPermissions(r, false).canUnlock);
@@ -1519,8 +1549,10 @@ export default function CommercialDocumentsPage() {
             setCancelModal({ id: row.id, reason: '' });
         };
 
+        const rowStatus = getDocStatus(row);
+
         return (
-            <div style={{ display: "flex", gap: 3, justifyContent: "center" }}>
+            <div style={{ display: "flex", gap: 3, justifyContent: "center", alignItems: "center" }}>
                 {/* عرض — دائماً متاح */}
                 <ActionBtn icon="ti-eye" title="عرض" onClick={() => { setViewDocId(row.id); setModal("view"); }} />
 
@@ -1530,6 +1562,22 @@ export default function CommercialDocumentsPage() {
                         icon={loadingEdit ? "ti-loader-2" : "ti-pencil"}
                         title="تعديل" color="var(--blue)" disabled={loadingEdit}
                         onClick={() => navigate(`/documents/${typeCode}/${row.id}/edit`)}
+                    />
+                )}
+
+                {/* إرسال بالبريد */}
+                {!isReadOnly && (
+                    <ActionBtn
+                        icon="ti-mail" title="إرسال بالبريد" color="var(--blue)"
+                        onClick={() => {
+                            const party = row.party as Record<string, unknown> | undefined;
+                            setMailModal({
+                                id: row.id,
+                                documentNumber: String(row.document_number ?? `#${row.id}`),
+                                partyName: String(party?.name ?? ''),
+                                partyEmail: (party?.email as string) ?? null,
+                            });
+                        }}
                     />
                 )}
 
@@ -1565,6 +1613,13 @@ export default function CommercialDocumentsPage() {
                         onClick={handleCancel}
                     />
                 )}
+
+                {/* موافقة / رفض */}
+                <ApprovalActions
+                    documentId={row.id}
+                    statusSlug={rowStatus}
+                    netToPay={Number((row as unknown as Record<string, unknown>).net_to_pay ?? row.total_ttc ?? 0)}
+                />
             </div>
         );
     }, [isReadOnly, loadingEdit, lockMut, unlockMut, cancelMut, navigate, typeCode]);
@@ -1891,6 +1946,17 @@ export default function CommercialDocumentsPage() {
                 onClose={() => setBatchPrintOpen(false)}
                 documents={batchDocs}
             />
+
+            {/* Send email modal */}
+            {mailModal && (
+                <SendDocumentMailModal
+                    documentId={mailModal.id}
+                    documentNumber={mailModal.documentNumber}
+                    partyName={mailModal.partyName}
+                    partyEmail={mailModal.partyEmail}
+                    onClose={() => setMailModal(null)}
+                />
+            )}
 
             <ToastContainer />
         </>

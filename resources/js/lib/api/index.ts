@@ -23,12 +23,14 @@ export * from './endpoints/documents';
 export * from './endpoints/parties';
 export * from './endpoints/products';
 export * from './endpoints/payments';
+export * from './endpoints/checks';
 export * from './endpoints/expenses';
-export * from './endpoints/inventory';
 export * from './endpoints/users';
 export * as settings from './endpoints/settings';
 export * from './endpoints/dashboard';
 export * from './endpoints/reports';
 export * from './endpoints/taxManagement';
-
+export * from './endpoints/approvals';
+export * from './endpoints/audits';
+export * from './endpoints/reconciliation';
 

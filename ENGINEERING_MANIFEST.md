@@ -1,6 +1,6 @@
 # ENGINEERING_MANIFEST.md
 
-> **System Constitution** for `sales_managements` — Last updated: 2026-07-11
+> **System Constitution** for `sales_managements` — Last updated: 2026-07-13
 
 ---
 
@@ -93,7 +93,74 @@ HTTP Request
 - Cache management (`Cache::tags()` when available, fallback to `Cache::forget()`)
 - Event dispatching
 
-### 1.3 Dependency Injection (DI) Policy
+### 1.3 Payment System Architecture
+
+Payment lifecycle is isolated in **`PaymentSynchronizer`** — a dedicated service extracted from `CommercialDocumentService`. This enforces single-responsibility: document service handles documents, payment service handles payments.
+
+**`PaymentSynchronizer`** (`app/Services/PaymentSynchronizer.php`):
+
+| Method | Responsibility |
+|--------|---------------|
+| `syncPayments()` | Create/update/delete payment lines for a document |
+| `resolveIdempotentPaymentIds()` | Prevent duplicate payments on re-submission |
+| `computeAndAttachBalances()` | Recalculate party balance after payment changes |
+| `recalculatePaymentAmounts()` | Update payment summary totals on document |
+| `syncDocumentStatus()` | Update document `document_status_id` based on payment state |
+| `generatePaymentNumber()` | Generate unique payment reference numbers |
+
+**Usage from `CommercialDocumentService`:**
+
+```php
+// Service delegates to PaymentSynchronizer via composition:
+$this->payments()->syncPayments($document, $paymentLines);
+$this->payments()->computeAndAttachBalances($document);
+
+// PaymentSynchronizer owns the ResolvesPaymentDirection trait exclusively.
+// CommercialDocumentService no longer imports or uses ResolvesPaymentDirection.
+```
+
+**Frontend API isolation:**
+
+| Module | File | Domain |
+|--------|------|--------|
+| Payments | `endpoints/payments.ts` | Payment CRUD + `usePayments` hook |
+| Checks | `endpoints/checks.ts` | Check CRUD + `useChecks` hook |
+
+Cross-domain cache invalidation is **not** used between payments and documents — each domain invalidates only its own query keys.
+
+### 1.4 Fiscal Year Isolation
+
+Every tenant-scoped list endpoint must filter by the active fiscal year. The format depends on the backend controller pattern.
+
+**Three backend patterns:**
+
+| Pattern | How Backend Reads | Frontend Param Format | Examples |
+|---------|-------------------|----------------------|----------|
+| **A: Spatie QueryBuilder** | `AllowedFilter::exact('fiscal_year_id')` | `'filter[fiscal_year_id]': yearId` | Expenses, StockMovements, OpeningBalances |
+| **B: Manual filter array** | `$request->input('filter', [])['fiscal_year_id']` | `'filter[fiscal_year_id]': yearId` | CommercialDocuments (custom `index()`) |
+| **C: Direct request input** | `$request->integer('fiscal_year_id')` | `fiscal_year_id: yearId` (flat) | Tax declarations, SubsidizedSales, Stock-At |
+
+**Authoritative endpoint mapping:**
+
+| Endpoint | Pattern | Frontend Format |
+|----------|---------|----------------|
+| `GET /documents` | B (manual filter) | `'filter[fiscal_year_id]'` |
+| `GET /expenses` | A (Spatie) | `'filter[fiscal_year_id]'` |
+| `GET /stock-movements` | A (Spatie) | `'filter[fiscal_year_id]'` |
+| `GET /opening-balance-*` | A (Spatie) | `'filter[fiscal_year_id]'` |
+| `GET /subsidized-sales/*` | C (flat) | `fiscal_year_id` |
+| `GET /g50-declaration/*` | C (flat) | `fiscal_year_id` |
+| `GET /ifu-declaration/*` | C (flat) | `fiscal_year_id` |
+| `GET /inventory/stock-at` | C (flat) | `fiscal_year_id` |
+| `GET /payments` | A (Spatie) | `'filter[fiscal_year_id]'` |
+
+**Shared entities (NO fiscal year filter needed):**
+
+Products, Parties, Currencies, Payment Modes, Warehouses, Document Types, Units, Families, Brands — these are shared across all fiscal years.
+
+**Critical rule:** Sending a flat `fiscal_year_id` to a Spatie/Pattern-B endpoint is **silently ignored** — the backend never reads it, returning data from ALL fiscal years. This is the most common cause of cross-year data leakage.
+
+### 1.5 Dependency Injection (DI) Policy
 
 | Context | Allowed | Prohibited |
 |---------|---------|------------|
@@ -391,7 +458,8 @@ This prevents `X.map is not a function` runtime crashes when the backend returns
 | 7 | **All mutations use `BusinessRuleException`** | Never return raw `response()->json(['error' => ...])` from services |
 | 8 | **Frontend: slug in query keys** | Every `useQuery` in pages/ must include slug from `useActiveSlug()` |
 | 9 | **Frontend: `enabled: !!slug`** | Every tenant query must gate on slug availability |
-| 10 | **Build passes** | `npm run build` — 0 errors |
+| 10 | **Frontend: fiscal year filter format** | Pattern A/B endpoints use `'filter[fiscal_year_id]'`; Pattern C endpoints use flat `fiscal_year_id`. Check backend controller before coding. |
+| 11 | **Build passes** | `npm run build` — 0 errors |
 
 ### 5.2 Controller Method Signatures — LSP Enforcement
 
@@ -550,6 +618,7 @@ qc.invalidateQueries({ queryKey: tenantKeys.newResource.all(slug) });
 | File | Role |
 |------|------|
 | `app/Services/CompanyContextService.php` | Tenant context singleton (get/set/has/clear/runAs) |
+| `app/Services/PaymentSynchronizer.php` | Payment lifecycle (sync, balance, status) — owns `ResolvesPaymentDirection` |
 | `app/Models/Scopes/CompanyScope.php` | Global scope applying `WHERE company_id = ?` |
 | `app/Models/Traits/HasCompany.php` | Trait that wires CompanyScope + auto-fill + relationship |
 | `app/Models/Traits/HasTenantRouteBinding.php` | Secure route model binding through query builder |
@@ -562,6 +631,8 @@ qc.invalidateQueries({ queryKey: tenantKeys.newResource.all(slug) });
 | `bootstrap/app.php` | Middleware pipeline + aliases |
 | `routes/api.php` | All API routes with middleware assignments |
 | `resources/js/lib/api/core/client.ts` | Axios client with slug injection + extractData |
+| `resources/js/lib/api/endpoints/payments.ts` | Payment API + `usePayments` hook |
+| `resources/js/lib/api/endpoints/checks.ts` | Check API + `useChecks` hook (isolated from payments) |
 | `resources/js/hooks/useTenantQuery.ts` | React Query wrappers enforcing slug |
 | `resources/js/lib/api/core/queryKeys.ts` | Centralized query key taxonomy |
 | `resources/js/lib/api/endpoints/lookups.ts` | Shared endpoint hooks with defensive normalization |
