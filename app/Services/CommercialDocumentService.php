@@ -8,6 +8,7 @@ use App\Models\CommercialDocument;
 use App\Models\DocumentStatus;
 use App\Models\DocumentType;
 use App\Models\FiscalYear;
+use App\Models\Party;
 use App\Models\Setting;
 use App\Models\NumberingSeries;
 use App\Models\Product;
@@ -92,7 +93,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         if ($documentType->requires_party && empty($data['party_id'])) {
-            throw new BusinessRuleException('يجب تحديد الزبون/المورد لهذا النوع من الوثائق.', 422);
+            $data['party_id'] = $this->resolveCashPartyId($companyId);
         }
 
         // السلسلة الترقيمية ورقم المستند
@@ -817,6 +818,39 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ->sum('quantity');
 
         return $opening + $incoming - $outgoing;
+    }
+
+    private function resolveCashPartyId(int $companyId): int
+    {
+        $party = Party::where('company_id', $companyId)
+            ->where('slug', 'client-cash')
+            ->first();
+
+        if ($party) {
+            return $party->id;
+        }
+
+        $clientTypeId = DB::table('party_types')
+            ->where('company_id', $companyId)
+            ->where('name', 'client')
+            ->value('id')
+            ?? DB::table('party_types')
+                ->where('company_id', $companyId)
+                ->value('id');
+
+        $party = Party::create([
+            'company_id'        => $companyId,
+            'party_type_id'     => $clientTypeId,
+            'code'              => 'CC000',
+            'name'              => 'Client Cash',
+            'slug'              => 'client-cash',
+            'is_tva_exempt'     => true,
+            'is_taxable'        => false,
+            'is_final_consumer' => true,
+            'active'            => true,
+        ]);
+
+        return $party->id;
     }
 
     private function buildLineAttributes(array $lineData): ?array

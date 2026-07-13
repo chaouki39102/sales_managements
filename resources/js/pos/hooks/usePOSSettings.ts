@@ -70,6 +70,10 @@ export interface POSSettings {
   playSoundOnAdd:       boolean;
   /** تشغيل صوت عند إتمام البيع */
   playSoundOnSale:      boolean;
+  /** النغمة المختارة للصوت */
+  soundPreset:          string;
+  /** مستوى الصوت 0-100 */
+  soundVolume:          number;
   /** إغلاق نافذة الدفع تلقائياً بعد النجاح (بدلاً من الانتظار للطباعة) */
   autoClosePayment:     boolean;
   /** طلب تأكيد قبل مسح السلة */
@@ -86,6 +90,8 @@ export interface POSSettings {
   clearSearchOnAdd:     boolean;
   /** التنقل عبر نتائج البحث بلوحة المفاتيح */
   keyboardNav:          boolean;
+  /** التقدم تلقائياً للمنتج التالي بعد الإضافة (true) أو البقاء على نفس المنتج (false) */
+  advanceOnAdd:         boolean;
 
   // ── تخطيط الشاشة ──────────────────────────────────────────────────────
   /** عرض السلة (بالـ px) — قابل للسحب */
@@ -123,6 +129,8 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   showQuickbarOnStart:  true,
   playSoundOnAdd:       false,
   playSoundOnSale:      false,
+  soundPreset:          'classic',
+  soundVolume:          60,
   autoClosePayment:     false,
   confirmOnClear:       true,
   defaultPaymentCode:   'cash',
@@ -130,6 +138,7 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   hideOutOfStock:       false,
   clearSearchOnAdd:     false,
   keyboardNav:          true,
+  advanceOnAdd:         true,
   cartWidth:            390,
   toastEnabled:         true,
   toastDuration:        3000,

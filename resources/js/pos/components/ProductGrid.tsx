@@ -19,6 +19,8 @@ interface ProductGridProps {
   selectedPriceLevelId: number | null;
   cartItems: CartItem[];
   allowNegativeStock?: boolean | undefined;
+  showStock?: boolean;
+  priceDisplayMode?: 'ttc' | 'ht';
   highlightedIndex?: number;
   onHighlightIndexChange?: (idx: number) => void;
 }
@@ -49,6 +51,7 @@ function rowEstimate(gridSize: GridSize): number {
 export default function ProductGrid({
   variants, view, gridSize, loading, onAdd, onAddManual,
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
+  showStock = true, priceDisplayMode = 'ttc',
   highlightedIndex, onHighlightIndexChange,
 }: ProductGridProps) {
   const inCartQty = useCallback((variantId: number) => {
@@ -173,10 +176,10 @@ export default function ProductGrid({
             <tr>
               <th>المنتج</th>
               <th>الوحدة</th>
-              <th>السعر HT</th>
+              {priceDisplayMode !== 'ht' && <th>السعر HT</th>}
               <th>TVA</th>
-              <th>السعر TTC</th>
-              <th>مخزون</th>
+              <th>{priceDisplayMode === 'ht' ? 'السعر HT' : 'السعر TTC'}</th>
+              {showStock && <th>مخزون</th>}
               <th></th>
             </tr>
           </thead>
@@ -207,15 +210,17 @@ export default function ProductGrid({
                     {v.barcode && <div className="prow-bc">{v.barcode}</div>}
                   </td>
                   <td className="prow-unit">{v.unit?.abbreviation ?? '—'}</td>
-                  <td className="prow-price">{formatDZD(priceHt)}</td>
+                  {priceDisplayMode !== 'ht' && <td className="prow-price">{formatDZD(priceHt)}</td>}
                   <td className="prow-tva">{tvaRate}%</td>
-                  <td className="prow-ttc">{formatDZD(priceTtc)}</td>
-                  <td className="prow-stock">
-                    {v.manages_stock && !unknownSt
-                      ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : lastPiece ? 'last' : 'ok'}`}>{stockVal ?? 0}</span>
-                      : <span className="stock-pill na">—</span>
-                    }
-                  </td>
+                  <td className="prow-ttc">{formatDZD(priceDisplayMode === 'ht' ? priceHt : priceTtc)}</td>
+                  {showStock && (
+                    <td className="prow-stock">
+                      {v.manages_stock && !unknownSt
+                        ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : lastPiece ? 'last' : 'ok'}`}>{stockVal ?? 0}</span>
+                        : <span className="stock-pill na">—</span>
+                      }
+                    </td>
+                  )}
                   <td>
                     <div className="prow-acts">
                       {inCart > 0 && <span className="incart-badge">{inCart}</span>}
@@ -303,6 +308,8 @@ export default function ProductGrid({
                     priceLevels={priceLevels}
                     selectedPriceLevelId={selectedPriceLevelId}
                     allowNegativeStock={allowNegativeStock}
+                    showStock={showStock}
+                    priceDisplayMode={priceDisplayMode}
                     onAdd={onAdd}
                     onPin={onPin}
                     onHighlight={onHighlightIndexChange}

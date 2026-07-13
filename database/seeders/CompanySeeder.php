@@ -62,6 +62,9 @@ class CompanySeeder extends Seeder
             TreasuryAccountTypeSeeder::class,
         ]);
 
+        // ─── المرحلة 1ب: زبون الصندوق الافتراضي ─────────────────
+        $this->seedCashClient($companyId);
+
         // ─── المرحلة 2: عمليات المستندات وحالاتها ────────────────
         $this->call([
             DocumentBaseOperationSeeder::class,
@@ -118,6 +121,51 @@ class CompanySeeder extends Seeder
     }
 
     // ─────────────────────────────────────────────────────────────
+
+    private function seedCashClient(int $companyId): void
+    {
+        // تجنب التكرار
+        if (DB::table('parties')->where('company_id', $companyId)->where('slug', 'client-cash')->exists()) {
+            return;
+        }
+
+        $clientTypeId = DB::table('party_types')
+            ->where('company_id', $companyId)
+            ->where('name', 'client')
+            ->value('id');
+
+        if (!$clientTypeId) {
+            return;
+        }
+
+        DB::table('parties')->insert([
+            'company_id'           => $companyId,
+            'party_type_id'        => $clientTypeId,
+            'code'                 => 'CC000',
+            'name'                 => 'Client Cash',
+            'commercial_name'      => null,
+            'slug'                 => 'client-cash',
+            'nif'                  => null,
+            'rc'                   => null,
+            'nis'                  => null,
+            'ai'                   => null,
+            'address'              => null,
+            'phone'                => null,
+            'mobile'               => null,
+            'email'                => null,
+            'initial_balance'      => 0.00,
+            'credit_limit'         => 0.00,
+            'is_tva_exempt'        => true,
+            'is_taxable'           => false,
+            'is_final_consumer'    => true,
+            'is_vat_registered'    => false,
+            'active'               => true,
+            'created_at'           => now(),
+            'updated_at'           => now(),
+        ]);
+
+        $this->command?->line("  ↳ Client Cash party created");
+    }
 
     private function seedFiscalYear(int $companyId): void
     {

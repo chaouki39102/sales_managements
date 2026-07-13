@@ -28,6 +28,10 @@ interface ProductCardProps {
   priceLevels:           PriceLevel[];
   selectedPriceLevelId:  number | null;
   allowNegativeStock?:   boolean;
+  /** إظهار المخزون في البطاقة — يتحكم به showStockOnCard */
+  showStock?:            boolean;
+  /** طريقة عرض السعر: 'ttc' شامل الضريبة أو 'ht' قبل الضريبة */
+  priceDisplayMode?:     'ttc' | 'ht';
   onAdd:                 (v: ProductVariant) => void;
   onPin:                 (v: ProductVariant) => void;
   /** يُستدعى عند أي تفاعل مع البطاقة (كليك) لمزامنة مؤشر التنقل بلوحة المفاتيح */
@@ -43,6 +47,8 @@ export default function ProductCard({
   priceLevels,
   selectedPriceLevelId,
   allowNegativeStock,
+  showStock = true,
+  priceDisplayMode = 'ttc',
   onAdd,
   onPin,
   onHighlight,
@@ -65,8 +71,17 @@ export default function ProductCard({
   const showImage = Boolean(imageUrl) && !imgFailed;
 
   const handleClick = () => {
-    if (!outStock) onAdd(v);
-    onHighlight?.(idx);
+    if (!outStock) {
+      onAdd(v);
+      // handleAddItem already computes the correct highlightedIndex
+      // (in allVariants when clearSearchOnAdd, in filteredVariants otherwise).
+      // Calling onHighlight here would overwrite it with the stale idx
+      // from the OLD filteredVariants — causing the highlight to jump
+      // to the wrong product after the search is cleared.
+    } else {
+      // Out of stock: just highlight (don't add)
+      onHighlight?.(idx);
+    }
   };
 
   return (
@@ -99,19 +114,25 @@ export default function ProductCard({
         {v.barcode && <div className="pcard-bc">{v.barcode}</div>}
 
         <div className="pcard-prices">
-          <span className="pcard-ttc">{formatDZD(priceTtc)}</span>
-          {tvaRate > 0 && (
-            <span className="pcard-ht">HT: {formatDZD(priceHt)}</span>
+          {priceDisplayMode === 'ht' ? (
+            <span className="pcard-ttc">{formatDZD(priceHt)}</span>
+          ) : (
+            <>
+              <span className="pcard-ttc">{formatDZD(priceTtc)}</span>
+              {tvaRate > 0 && (
+                <span className="pcard-ht">HT: {formatDZD(priceHt)}</span>
+              )}
+            </>
           )}
         </div>
 
-        {v.manages_stock && !unknownStock && (
+        {showStock && v.manages_stock && !unknownStock && (
           <div className={`pcard-stock ${outStock ? 'out' : lowStock ? 'low' : 'ok'}`}>
             <i className={`ti ti-${outStock ? 'alert-circle' : lowStock ? 'alert-triangle' : 'package'}`} />
             {outStock ? 'نفذ المخزون' : `${stock} ${v.unit?.abbreviation ?? ''}`}
           </div>
         )}
-        {v.manages_stock && unknownStock && (
+        {showStock && v.manages_stock && unknownStock && (
           <div className="pcard-stock na">
             <i className="ti ti-minus" />—
           </div>

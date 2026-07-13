@@ -280,6 +280,7 @@ Route::prefix('v1')->group(function () {
 
             Route::get('parties',         [PartyController::class, 'index']);
             Route::get('parties/{party}', [PartyController::class, 'show']);
+            Route::get('cash-client',     [PartyController::class, 'cashClient']);
             Route::get('customers',       [PartyController::class, 'customers']);
             Route::get('suppliers',       [PartyController::class, 'suppliers']);
 

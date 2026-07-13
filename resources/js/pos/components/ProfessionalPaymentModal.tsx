@@ -59,6 +59,7 @@ interface Props {
   isEditing?:        boolean;  // true when reopening an existing invoice
   /** SSOT balance: pass from document.balance_data.previous_balance when editing */
   prevBalance?:      number;
+  defaultPaymentCode?: string;
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
@@ -164,6 +165,7 @@ export default function ProfessionalPaymentModal({
   currencies, treasuryAccounts, totalTtcFinal,
   existingPayments, documentDate, onClose, onConfirm, isEditing,
   prevBalance: propPrevBalance,
+  defaultPaymentCode = 'cash',
 }: Props) {
 
   const firstAmountRef = useRef<HTMLInputElement>(null);
@@ -173,7 +175,7 @@ export default function ProfessionalPaymentModal({
 
   // ── State ──────────────────────────────────────────────────────────────────
   const defaultMode = paymentModes.find(m =>
-    /نقدا|نقداً|cash/i.test(m.name),
+    new RegExp(defaultPaymentCode, 'i').test(m.name),
   ) ?? paymentModes.find(m => m.is_default) ?? paymentModes[0];
 
   const [lines, setLines] = useState<PaymentLine[]>(() => {

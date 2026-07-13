@@ -15,12 +15,13 @@ class AlertController extends BaseApiController
         parent::__construct();
     }
 
-    public function unread($company): JsonResponse
+    public function unread(): JsonResponse
     {
         try {
+            $companyId = $this->extractId(request()->route('company'));
             $userId = auth()->id();
-            $alerts = $this->alertEngine->getUnreadAlerts((int) $company, $userId);
-            $count  = $this->alertEngine->getUnreadCount((int) $company, $userId);
+            $alerts = $this->alertEngine->getUnreadAlerts($companyId, $userId);
+            $count  = $this->alertEngine->getUnreadCount($companyId, $userId);
 
             return response()->json([
                 'alerts' => $alerts,
@@ -31,11 +32,12 @@ class AlertController extends BaseApiController
         }
     }
 
-    public function all($company): JsonResponse
+    public function all(): JsonResponse
     {
         try {
+            $companyId = $this->extractId(request()->route('company'));
             $userId = auth()->id();
-            $alerts = $this->alertEngine->getAllAlerts((int) $company, $userId);
+            $alerts = $this->alertEngine->getAllAlerts($companyId, $userId);
 
             return response()->json($alerts);
         } catch (\Throwable $e) {
@@ -43,7 +45,7 @@ class AlertController extends BaseApiController
         }
     }
 
-    public function markAsRead($company, int $alertId): JsonResponse
+    public function markAsRead(int $alertId): JsonResponse
     {
         try {
             $this->alertEngine->markAlertAsRead($alertId);
@@ -53,29 +55,31 @@ class AlertController extends BaseApiController
         }
     }
 
-    public function markAllAsRead($company): JsonResponse
+    public function markAllAsRead(): JsonResponse
     {
         try {
+            $companyId = $this->extractId(request()->route('company'));
             $userId = auth()->id();
-            $this->alertEngine->markAllAsRead((int) $company, $userId);
+            $this->alertEngine->markAllAsRead($companyId, $userId);
             return response()->json(['message' => 'تم تعليم الكل كمقروء']);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 
-    public function count($company): JsonResponse
+    public function count(): JsonResponse
     {
         try {
+            $companyId = $this->extractId(request()->route('company'));
             $userId = auth()->id();
-            $count  = $this->alertEngine->getUnreadCount((int) $company, $userId);
+            $count  = $this->alertEngine->getUnreadCount($companyId, $userId);
             return response()->json(['count' => $count]);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 
-    public function runDaily($company): JsonResponse
+    public function runDaily(): JsonResponse
     {
         try {
             $alerts = $this->alertEngine->runDailyChecks();

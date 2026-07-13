@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
 import { useCartStore }       from '@/pos/utils/useCartStore';
-import { useClients }         from '@/lib/api/endpoints/parties';
+import { useClients, useCashClient }  from '@/lib/api/endpoints/parties';
 import {
   usePaymentModes, useWarehouses, usePriceLevels,
   useCurrencies, useTreasuryAccounts, useDocumentTypes,
@@ -73,6 +73,8 @@ import { useKeyboardShortcuts } from '@/pos/hooks/useKeyboardShortcuts';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
 import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
+import { playAddSound, playSaleSound } from '@/pos/utils/posSounds';
+import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { renderPreviewToHtml, mapCompany }  from '@/pages/settings/print-settings/runtime';
 import { printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { useQueryClient }       from '@tanstack/react-query';
@@ -180,6 +182,14 @@ function POSPage() {
     }
     prevSlugRef.current = slug;
   }, [slug]);
+
+  // ── Default client: "Client Cash" on mount ────────────────────────
+  const { data: cashClient } = useCashClient();
+  useEffect(() => {
+    if (cashClient && !posRef.current.client) {
+      pos.setClient(cashClient);
+    }
+  }, [cashClient]);
 
   const [view,       setView]       = useState<ViewMode>(settings.defaultView);
   const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
@@ -807,28 +817,59 @@ function POSPage() {
   }, [priceLevelsList, allVariants, pos]);
 
   // ── Print Settings ──────────────────────────────────────────────────────────
-  const { template, enabled: isPrintEnabled, copies, paperWidth, autoPrint, showPreview }
+  const { template, enabled: isPrintEnabled, copies: dbCopies, paperWidth, autoPrint: dbAutoPrint, showPreview }
     = usePrintSettings('POS');
+
+  // POSSettings overrides DB config for POS context
+  const autoPrint = settings.autoPrint || dbAutoPrint;
+  const copies = settings.printCopies || dbCopies;
+
+  // Template with POS receipt overrides applied
+  const posTemplate = useMemo(() => {
+    if (!template) return null;
+    const overrides: Partial<typeof template.config> = {};
+    let changed = false;
+    if (settings.receiptCompanyName) {
+      const name = settings.receiptHeader2
+        ? `${settings.receiptCompanyName}\n${settings.receiptHeader2}`
+        : settings.receiptCompanyName;
+      overrides.company_name_text = name;
+      changed = true;
+    } else if (settings.receiptHeader2) {
+      overrides.company_name_text = settings.receiptHeader2;
+      changed = true;
+    }
+    if (settings.receiptFooter) {
+      overrides.footer_line1 = settings.receiptFooter;
+      changed = true;
+    }
+    if (settings.receiptShowQr !== undefined) {
+      overrides.show_qr = settings.receiptShowQr;
+      changed = true;
+    }
+    if (!changed) return template;
+    return { ...template, config: { ...template.config, ...overrides } };
+  }, [template, settings.receiptCompanyName, settings.receiptHeader2, settings.receiptFooter, settings.receiptShowQr]);
 
   const companyData: CompanyPreviewData | null = useMemo(() => mapCompany(company), [company]);
 
   const handlePrintDirect = useCallback(async (
     snap: POSSaleSnapshot,
   ) => {
-    if (!template) { safeToast.error('لا يوجد قالب طاعة'); return; }
+    if (!posTemplate) { safeToast.error('لا يوجد قالب طاعة'); return; }
     try {
       const resolvedDocNum = snap.docNumber;
 
       const html = renderPreviewToHtml({
-        template,
+        template: posTemplate,
         company: companyData,
         source: { type: 'pos-snapshot', snapshot: snap },
       });
 
-      const isThermalPaper = template.paper_size === '80mm' || template.paper_size === '58mm';
+      const isThermalPaper = posTemplate.paper_size === '80mm' || posTemplate.paper_size === '58mm';
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalViaWebUSBFromTemplate(template, data, resolvedDocNum);
+        const result = await printThermalViaWebUSBFromTemplate(posTemplate, data, resolvedDocNum);
         if (result.ok) {
           safeToast.success('✅ تمت الطباعة الحرارية');
         } else {
@@ -849,7 +890,7 @@ function POSPage() {
       const message = error instanceof Error ? error.message : String(error);
       safeToast.error(`خطأ في تجهيز الطباعة: ${message}`);
     }
-  }, [template, safeToast, companyData, settings.printMode, paperWidth, copies]);
+  }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies]);
 
   // ── Complete Sale ──────────────────────────────────────────────────────────
 const handleCompleteSale = useCallback(async (params: {
@@ -870,9 +911,9 @@ const handleCompleteSale = useCallback(async (params: {
     if (!defaultWarehouse) return { ok: false, message: 'لا يوجد مستودع مُفعَّل' };
     if (!fiscalYear)       return { ok: false, message: 'لا توجد سنة مالية نشطة' };
 
+    const currentClient  = posRef.current.client;
     const currentItems   = posRef.current.items;
     const currentTotals  = posRef.current.totals;
-    const currentClient  = posRef.current.client;
     const currentInvDisc = posRef.current.invoiceDiscountPct;
 
     try {
@@ -1041,6 +1082,22 @@ const handleCompleteSale = useCallback(async (params: {
       }
 
       safeToast.success(`✅ تم حفظ الفاتورة ${res.document_number ?? ''}`);
+      if (settings.playSoundOnSale) playSaleSound(settings.soundPreset as SoundPresetId, settings.soundVolume);
+
+      // Auto-open cash drawer if payment includes cash and setting is enabled
+      if (settings.openCashDrawer) {
+        const hasCash = apiPayments.some(p => {
+          const mode = (paymentModes ?? []).find(m => m.id === p.payment_mode_id);
+          return mode && /نقدا|نقداً|cash/i.test(mode.name);
+        });
+        if (hasCash) openCashDrawerViaWebUSB();
+      }
+
+      // Auto-close payment modal after a brief delay (receipt visible briefly)
+      if (settings.autoClosePayment && (autoPrint || showPreview)) {
+        setTimeout(() => setModal('none'), 1200);
+      }
+
       return { ok: true, docNumber: res.document_number };
 
     } catch (err: unknown) {
@@ -1049,7 +1106,7 @@ const handleCompleteSale = useCallback(async (params: {
       safeToast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [settings.defaultDocTypeCode, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, cartNote, editingDocumentId, currentSession?.id, autoPrint, isPrintEnabled, template, showPreview, safeToast, defaultTreasury?.id, editingDocStatus, incrementMut, invoiceDiscountAmount, queryClient, slug, handlePrintDirect]);
+  }, [settings.defaultDocTypeCode, settings.playSoundOnSale, settings.soundPreset, settings.soundVolume, settings.openCashDrawer, settings.autoClosePayment, settings.autoPrint, settings.printCopies, paymentModes, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, cartNote, editingDocumentId, currentSession?.id, autoPrint, isPrintEnabled, template, showPreview, safeToast, defaultTreasury?.id, editingDocStatus, incrementMut, invoiceDiscountAmount, queryClient, slug, handlePrintDirect]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -1081,6 +1138,7 @@ const handleCompleteSale = useCallback(async (params: {
       id: 'pos-last-added',
       duration: 1500,
     });
+    if (settings.playSoundOnAdd) playAddSound(settings.soundPreset as SoundPresetId, settings.soundVolume);
     if (settings.clearSearchOnAdd) posRef.current.setSearch('');
     // Focus search AFTER scrollToItemId's double-RAF cart-row focus finishes
     requestAnimationFrame(() => {
@@ -1091,7 +1149,7 @@ const handleCompleteSale = useCallback(async (params: {
         });
       });
     });
-  }, [settings.clearSearchOnAdd, allVariants, filteredVariants, safeToast]);
+  }, [settings.clearSearchOnAdd, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume, allVariants, filteredVariants, safeToast]);
 
   const handleArrowUp = useCallback(() => {
     setHighlightedIndex(prev => prev > 0 ? prev - 1 : filteredVariants.length - 1);
@@ -1124,14 +1182,23 @@ const handleCompleteSale = useCallback(async (params: {
     // Normal: add highlighted (keyboardNav) or first result
     if (settings.keyboardNav) {
       const v = filteredVariants[highlightedIndex];
-      if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending))
+      if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending)) {
         handleAddItem(v);
+        if (settings.advanceOnAdd) {
+          const next = highlightedIndex + 1;
+          setHighlightedIndex(next < filteredVariants.length ? next : 0);
+        }
+      }
     } else {
       const first = filteredVariants[0];
-      if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending))
+      if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) {
         handleAddItem(first);
+        if (settings.advanceOnAdd) {
+          setHighlightedIndex(filteredVariants.length > 1 ? 1 : 0);
+        }
+      }
     }
-  }, [selectedCartItemId, pos.searchQuery, settings.keyboardNav, safeToast, filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
+  }, [selectedCartItemId, pos.searchQuery, settings.keyboardNav, settings.advanceOnAdd, safeToast, filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
 
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -1272,6 +1339,8 @@ const handleCompleteSale = useCallback(async (params: {
             onPin={toggleQuickItem} isPinned={isQuickItem}
             priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
+            showStock={settings.showStockOnCard}
+            priceDisplayMode={settings.priceDisplayMode}
           />
           <PanelResizer onMouseDown={handleResizerMouseDown} />
         </div>
@@ -1330,6 +1399,7 @@ const handleCompleteSale = useCallback(async (params: {
             isEditing={editingDocumentId !== null}
             documentDate={editingDocumentDate ?? new Date().toISOString().slice(0, 10)}
             prevBalance={editingDocumentId ? editingPrevBalanceRef.current : clientBalance?.current_balance}
+            defaultPaymentCode={settings.defaultPaymentCode}
             onClose={() => setModal('none')}
             onConfirm={handleCompleteSale}
           />
@@ -1347,10 +1417,10 @@ const handleCompleteSale = useCallback(async (params: {
         </Suspense>
       )}
 
-      {modal === 'receipt' && receiptSnapshot && receiptSource && template && (
+      {modal === 'receipt' && receiptSnapshot && receiptSource && posTemplate && (
         <Suspense fallback={null}>
           <ProfessionalReceipt
-            template={template}
+            template={posTemplate}
             company={companyData}
             source={receiptSource}
             docNumber={receiptSnapshot.docNumber}

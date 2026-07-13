@@ -17,6 +17,7 @@ import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
 import { ConfirmDialog } from '@/components/ui';
+import { useActiveSlug } from '@/lib/store/appStore';
 import type { DocumentType } from '@/types';
 
 // ===============================================
@@ -28,6 +29,7 @@ export default function DocumentTypesPage() {
     const modal = useModal();
     const deleteConfirm = useConfirm();
     const notify = useNotification();
+    const slug = useActiveSlug();
 
     // 1. جلب أنواع المستندات
     const { data: items, isLoading, isError, refetch } = useTenantQuery<DocumentType[]>(
@@ -41,7 +43,8 @@ export default function DocumentTypesPage() {
     // إنشاء خريطة id -> label
     const operationMap = useMemo(() => {
         const map: Record<number, string> = {};
-        if (operationsData) {
+        const ops = Array.isArray(operationsData) ? operationsData : (operationsData as any)?.data;
+        if (Array.isArray(ops)) {
             // دالة ترجمة احتياطية
             const translate = (name: string) => {
                 const dict: Record<string, string> = {
@@ -49,7 +52,7 @@ export default function DocumentTypesPage() {
                 };
                 return dict[name] || name;
             };
-            operationsData.forEach((op: any) => {
+            ops.forEach((op: any) => {
                 map[op.id] = op.label || translate(op.name) || op.name;
             });
         }

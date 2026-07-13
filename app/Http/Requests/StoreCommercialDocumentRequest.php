@@ -2,16 +2,14 @@
 
 namespace App\Http\Requests;
 
-use App\Models\DocumentType;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * StoreCommercialDocumentRequest
  * ══════════════════════════════════════════════════════════════════
  *
- * ✅ party_id: required/nullable يُحدَّد ديناميكياً حسب نوع الوثيقة.
- *    - Bon de transfert (BT): requires_party = false → nullable
- *    - باقي الأنواع: requires_party = true → required
+ * ✅ party_id: nullable دائماً — يُعيَّن "Client Cash" تلقائياً في Service
+ *    إذا لم يُرسل party_id مع نوع وثيقة يتطلب طرف.
  *
  * ✅ lines.*.packaging_id: nullable لأن migration أضافها لاحقاً
  *    ويجب أن يكون الـ Service هو من يتجاهلها لا الـ Request.
@@ -31,17 +29,12 @@ class StoreCommercialDocumentRequest extends FormRequest
 
     public function rules(): array
     {
-        // تحديد إذا كان نوع الوثيقة يتطلب طرفاً (زبون/مورد)
-        $partyRequired = $this->resolvePartyRequired();
-
         return [
             // ── بيانات الوثيقة الأساسية ──────────────────────────────
             'document_type_id'    => 'required|integer|exists:document_types,id',
 
-            // ✅ party_id: required أو nullable حسب نوع الوثيقة
-            'party_id'            => $partyRequired
-                                        ? 'required|integer|exists:parties,id'
-                                        : 'nullable|integer|exists:parties,id',
+            // ✅ party_id: nullable دائماً — إذا لم يُرسل، يُعيَّن "Client Cash" تلقائياً في Service
+            'party_id'            => 'nullable|integer|exists:parties,id',
 
             'warehouse_id'        => 'nullable|integer|exists:warehouses,id',
             'currency_id'         => 'nullable|integer|exists:currencies,id',
@@ -112,7 +105,6 @@ class StoreCommercialDocumentRequest extends FormRequest
     {
         return [
             'document_type_id.required'   => 'يجب تحديد نوع الوثيقة.',
-            'party_id.required'           => 'يجب تحديد الزبون أو المورد لهذا النوع من الوثائق.',
             'lines.required'              => 'يجب إضافة سطر واحد على الأقل.',
             'lines.min'                   => 'يجب إضافة سطر واحد على الأقل.',
             'lines.*.product_id.required' => 'يجب تحديد المنتج لكل سطر.',
@@ -122,25 +114,5 @@ class StoreCommercialDocumentRequest extends FormRequest
             'lines.*.unit_price_ht.min'   => 'يجب أن يكون السعر غير سلبي.',
             'due_date.after_or_equal'     => 'يجب أن يكون تاريخ الاستحقاق بعد أو مساوياً لتاريخ الوثيقة.',
         ];
-    }
-
-    /**
-     * تحديد إذا كان party_id إلزامياً حسب نوع الوثيقة.
-     *
-     * ✅ نجلب DocumentType مرة واحدة ونخزّنها في الـ instance
-     * ✅ إذا لم نتمكن من تحديد النوع، نعتبره إلزامياً (الأكثر أماناً)
-     */
-    private function resolvePartyRequired(): bool
-    {
-        $documentTypeId = $this->input('document_type_id');
-
-        if (!$documentTypeId) {
-            return true; // إلزامي افتراضياً — validation ستفشل على document_type_id
-        }
-
-        $documentType = DocumentType::find($documentTypeId);
-
-        // إذا لم يُعثر على النوع، requires_party = true افتراضياً
-        return $documentType?->requires_party ?? true;
     }
 }

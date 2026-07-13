@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import type { POSSettings, PriceDisplayMode, GridDefaultSize } from '@/pos/hooks/usePOSSettings';
 import { isWebUsbSupported } from '@/pos/utils/printService';
+import { SOUND_PRESETS, previewSound } from '@/pos/utils/posSounds';
 import type { Warehouse, DocumentType } from '@/types';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
@@ -81,6 +82,7 @@ const toggleSettings: { key: keyof POSSettings; label: string }[] = [
   { key: 'hideOutOfStock',      label: 'إخفاء المنتجات النافذة من الشبكة' },
   { key: 'clearSearchOnAdd',    label: 'تفريغ البحث بعد إضافة منتج' },
   { key: 'keyboardNav',         label: 'التنقل عبر النتائج بلوحة المفاتيح (↑↓)' },
+  { key: 'advanceOnAdd',        label: 'الانتقال للمنتج التالي بعد الإضافة' },
 ];
 
 export default function POSSettingsModal({
@@ -178,6 +180,59 @@ export default function POSSettingsModal({
                 />
               </div>
             ))}
+
+            {(local.playSoundOnAdd || local.playSoundOnSale) && (
+              <>
+                <div className="fg s2">
+                  <label>مستوى الصوت — {local.soundVolume}%</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <i className="ti ti-volume" style={{ color: 'var(--t4)', fontSize: 16 }} />
+                    <input
+                      type="range" min={0} max={100} step={5}
+                      value={local.soundVolume}
+                      onChange={e => patch({ soundVolume: parseInt(e.target.value) })}
+                      style={{ flex: 1, accentColor: 'var(--em)' }}
+                    />
+                    <i className="ti ti-volume-2" style={{ color: 'var(--t4)', fontSize: 16 }} />
+                  </div>
+                </div>
+
+                <div className="fg s2">
+                  <label>النغمة</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8, marginTop: 6 }}>
+                    {SOUND_PRESETS.map(p => (
+                      <div
+                        key={p.id}
+                        style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                          padding: '10px 6px', borderRadius: 8, cursor: 'pointer',
+                          background: local.soundPreset === p.id ? 'var(--emb)' : 'var(--bg2)',
+                          border: `1.5px solid ${local.soundPreset === p.id ? 'var(--embo)' : 'var(--b2)'}`,
+                          color: local.soundPreset === p.id ? 'var(--em)' : 'var(--t2)',
+                          fontWeight: local.soundPreset === p.id ? 700 : 400,
+                          transition: 'all .15s',
+                        }}
+                        onClick={() => patch({ soundPreset: p.id })}
+                      >
+                        <i className={`ti ${p.icon}`} style={{ fontSize: 18 }} />
+                        <span style={{ fontSize: 12 }}>{p.label}</span>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); previewSound(p.id, local.soundVolume); }}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: 'var(--t4)', fontSize: 14, padding: 2,
+                          }}
+                          title="استمع"
+                        >
+                          <i className="ti ti-player-play" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="fg s2">
               <Switch

@@ -113,6 +113,16 @@ export async function fetchAllCustomers(search?: string, active?: boolean): Prom
   return all;
 }
 
+export function useCashClient() {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:        ['parties', slug, 'cash-client'],
+    queryFn:         () => apiGet<Party>('/cash-client'),
+    enabled:         !!slug,
+    staleTime:       Infinity,
+  });
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 export function usePartyMutations() {
   const slug = useActiveSlug();
