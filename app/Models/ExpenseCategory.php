@@ -9,13 +9,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
-use App\Core\Traits\Auditable;
+use App\Core\Traits\AuditableEnhanced;
 use App\Models\Traits\HasCompany;
 
 #[Cacheable]
 class ExpenseCategory extends Model
 {
-    use HasStandardizedConfiguration, SoftDeletes, Auditable, HasCompany;
+    use HasStandardizedConfiguration, SoftDeletes, AuditableEnhanced, HasCompany;
 
     protected $table = 'expense_categories';
 

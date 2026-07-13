@@ -84,10 +84,20 @@ class InventoryStockService
             ->when($warehouseId, fn($q) => $q->where('sm.warehouse_id', $warehouseId))
             ->groupBy('sm.product_id');
 
+        // ─── 2.5. عدد الدفعات النشطة لكل منتج ──────────────────────────────────
+        $lotsCountQuery = DB::table('product_lots')
+            ->select('product_id', DB::raw('COUNT(*) as lots_count'))
+            ->where('company_id', $companyId)
+            ->where('active', true)
+            ->where('remaining_quantity', '>', 0)
+            ->whereNull('deleted_at')
+            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+            ->groupBy('product_id');
+
         // ─── 3. Query الرئيسية (مخزنة 30 ثانية) ────────────────────────────────
         $cacheKey = 'stock-at:' . implode('_', [$companyId, $date, $warehouseId ?? 'all', $fiscalYearId, $search ?? '']);
         $rows = Cache::remember($cacheKey, 30, function () use (
-            $companyId, $date, $warehouseId, $fiscalYearId, $search, $openingQuery, $movementsQuery,
+            $companyId, $date, $warehouseId, $fiscalYearId, $search, $openingQuery, $movementsQuery, $lotsCountQuery,
         ) {
             return DB::table('products as p')
             ->select(
@@ -136,12 +146,14 @@ class InventoryStockService
                         ELSE 0
                     END as total_value
                 '),
+                DB::raw('COALESCE(lc.lots_count, 0) as lots_count'),
                 'f.name   as family_name',
                 'u.name   as unit_name',
                 'u.symbol as unit_symbol',
             )
             ->leftJoinSub($openingQuery,   'ob', fn($j) => $j->on('p.id', '=', 'ob.product_id'))
             ->leftJoinSub($movementsQuery, 'mv', fn($j) => $j->on('p.id', '=', 'mv.product_id'))
+            ->leftJoinSub($lotsCountQuery, 'lc', fn($j) => $j->on('p.id', '=', 'lc.product_id'))
             ->leftJoin('families as f', 'f.id', '=', 'p.family_id')
             ->leftJoin('units as u',    'u.id', '=', 'p.unit_id')
             ->where('p.company_id',    $companyId)
@@ -170,6 +182,7 @@ class InventoryStockService
             'current_cost_price' => (float) $row->effective_cost_price,
             'total_value'        => (float) $row->total_value,
             'manages_stock'      => (bool)  $row->manages_stock,
+            'lots_count'         => (int)   $row->lots_count,
             'family'             => $row->family_name
                                      ? ['name' => $row->family_name]
                                      : null,

@@ -491,7 +491,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'tva_rate'               => (float) ($lineData['tva_rate'] ?? 0),
                 'packaging_id'           => $lineData['packaging_id'] ?? null,
                 'stock_lot_id'           => $lineData['stock_lot_id'] ?? null,
-                'line_attributes'        => $lineData['line_attributes'] ?? null,
+                'line_attributes'        => $this->buildLineAttributes($lineData),
                 'total_ht'               => $totals['total_ht'],
                 'discount_amount'        => $totals['discount_amount'],
                 'total_tva'              => $totals['total_tva'],
@@ -608,11 +608,22 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         $valuationService    = app(InventoryValuationService::class);
-        $stockMovementTypeId = match (true) {
-            $direction > 0 => 1,
-            $direction < 0 => 2,
-            default        => 3,
+
+        // ✅ تحديد نوع الحركة حسب الشركة (الأنواع multi-tenant، IDs مختلفة لكل شركة)
+        $typeName = match (true) {
+            $direction > 0 => 'in',
+            $direction < 0 => 'out',
+            default        => 'adjustment',
         };
+        $stockMovementType = \App\Models\StockMovementType::where('company_id', $document->company_id)
+            ->where('name', $typeName)
+            ->where('active', true)
+            ->first();
+        if (!$stockMovementType) {
+            Log::warning("createStockMovements: no type '{$typeName}' for company {$document->company_id}");
+            return;
+        }
+        $stockMovementTypeId = $stockMovementType->id;
 
         foreach ($document->lines as $line) {
             if (!$line->product_id || !$line->product) continue;
@@ -666,7 +677,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'total_price'                 => round((float) $line->quantity * $costPrice, 4),
                 'movement_date'               => $document->document_date,
                 'price_source'                => $direction < 0 ? 'sale' : 'purchase',
-                'lot_number'                  => $line->lot_number ?? null,
+                'lot_number'                  => $line->line_attributes['lot_number'] ?? $line->lot_number ?? null,
+                'manufacturing_date'          => $line->line_attributes['manufacturing_date'] ?? null,
+                'expiration_date'             => $line->line_attributes['expiration_date'] ?? null,
                 'is_validated'                => true,
                 'user_id'                     => auth()->id(),
                 'stock_balance_after'         => 0, // يُحدَّث بـ StockMovementObserver
@@ -804,5 +817,19 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ->sum('quantity');
 
         return $opening + $incoming - $outgoing;
+    }
+
+    private function buildLineAttributes(array $lineData): ?array
+    {
+        $attrs = $lineData['line_attributes'] ?? [];
+        if (!is_array($attrs)) $attrs = [];
+
+        foreach (['lot_number', 'manufacturing_date', 'expiration_date', 'supplier_lot_number'] as $key) {
+            if (!empty($lineData[$key])) {
+                $attrs[$key] = $lineData[$key];
+            }
+        }
+
+        return empty($attrs) ? null : $attrs;
     }
 }

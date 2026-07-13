@@ -59,6 +59,10 @@ class UpdateCommercialDocumentRequest extends FormRequest
             'lines.*.description'              => 'nullable|string|max:1000',
             'lines.*.packaging_id'             => 'nullable|integer|exists:product_packagings,id',
             'lines.*.stock_lot_id'             => 'nullable|integer|exists:product_lots,id',
+            'lines.*.lot_number'               => 'nullable|string|max:100',
+            'lines.*.manufacturing_date'       => 'nullable|date',
+            'lines.*.expiration_date'          => 'nullable|date',
+            'lines.*.supplier_lot_number'      => 'nullable|string|max:100',
             'lines.*.line_attributes'          => 'nullable|array',
         ];
     }

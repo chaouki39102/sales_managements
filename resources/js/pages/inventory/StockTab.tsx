@@ -7,10 +7,12 @@ import { apiGet }        from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import { useWarehouses } from '@/lib/api/endpoints/lookups';
+import { useProductLots } from '@/lib/api/endpoints/inventory';
 import { fmt }           from './inventoryTypes';
 import { Th }            from './InventoryShared';
 import Pagination        from '@/components/ui/Pagination';
 import type { StockAtRow } from '@/lib/api/endpoints/inventory';
+import type { ProductLot } from '@/lib/api/core/types';
 import type { Warehouse }  from '@/lib/api/core/types';
 import type { BackendMeta } from '@/hooks/usePagination';
 
@@ -38,6 +40,97 @@ function stockStatus(row: StockAtRow): StatusKey {
   return 'ok';
 }
 
+// ─── صف الدفعات الفرعي ──────────────────────────────────────────────────────
+
+function LotsSubRow({
+  productId, warehouseId, colSpan,
+}: { productId: number; warehouseId: number | ''; colSpan: number }) {
+  const { data, isLoading } = useProductLots({
+    'filter[product_id]': productId,
+    ...(warehouseId ? { 'filter[warehouse_id]': warehouseId } : {}),
+    include: 'warehouse',
+    sort: '-purchase_date',
+    per_page: 50,
+  } as any);
+
+  const lots = useMemo(() => {
+    const raw = (data as unknown as { data?: ProductLot[] } | undefined)?.data
+      ?? (Array.isArray(data) ? data : []) as ProductLot[];
+    return raw;
+  }, [data]);
+
+  return (
+    <tr>
+      <td colSpan={colSpan} style={{ padding: 0, background: 'var(--bg1)' }}>
+        <div style={{ padding: '10px 20px 14px 40px' }}>
+          {isLoading ? (
+            <div style={{ fontSize: 12, color: 'var(--t4)', padding: 10 }}>
+              <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite', marginLeft: 6 }} />
+              {"\u062c\u0627\u0631\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u062f\u0641\u0639\u0627\u062a..."}
+            </div>
+          ) : lots.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--t4)', padding: 10 }}>{"\u0644\u0627 \u062a\u0648\u062c\u062f \u062f\u0641\u0639\u0627\u062a \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u0646\u062a\u062c"}</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ color: 'var(--t4)' }}>
+                  <th style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u062f\u0641\u0639\u0629"}</th>
+                  <th style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u0645\u0633\u062a\u0648\u062f\u0639"}</th>
+                  <th style={{ textAlign: 'left',  padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u0623\u0635\u0644\u064a\u0629"}</th>
+                  <th style={{ textAlign: 'left',  padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u0645\u062a\u0628\u0642\u064a\u0629"}</th>
+                  <th style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 600 }}>{"\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621"}</th>
+                  <th style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u062d\u0627\u0644\u0629"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lots.map((lt) => {
+                  const remaining = Number(lt.remaining_quantity ?? 0);
+                  const original  = Number(lt.original_quantity ?? 0);
+                  const pct       = original > 0 ? (remaining / original) * 100 : 0;
+                  const depleted  = remaining <= 0;
+                  const expired   = !!lt.expiration_date && new Date(lt.expiration_date).getTime() < Date.now();
+                  const expiring  = !depleted && !expired && !!lt.expiration_date &&
+                    (new Date(lt.expiration_date).getTime() - Date.now()) < 30 * 86400000;
+                  return (
+                    <tr key={lt.id} style={{ borderTop: '1px solid var(--b1)' }}>
+                      <td style={{ padding: '5px 8px', fontFamily: 'monospace', fontSize: 11 }}>{lt.lot_number}</td>
+                      <td style={{ padding: '5px 8px', color: 'var(--t3)' }}>{(lt as any).warehouse?.name ?? '\u2014'}</td>
+                      <td style={{ padding: '5px 8px', textAlign: 'left' }}>{original}</td>
+                      <td style={{ padding: '5px 8px', textAlign: 'left' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                          <span style={{ fontWeight: 700, color: depleted ? 'var(--t4)' : pct < 20 ? '#ef4444' : 'var(--t1)' }}>{remaining}</span>
+                          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--bg4)', overflow: 'hidden' }}>
+                            <div style={{
+                              width: `${pct}%`, height: '100%',
+                              background: pct < 20 ? '#ef4444' : pct < 50 ? '#f59e0b' : '#10b981',
+                            }} />
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '5px 8px', color: expired ? '#ef4444' : expiring ? '#f59e0b' : 'var(--t3)' }}>
+                        {lt.expiration_date ? new Date(lt.expiration_date).toLocaleDateString('ar-DZ') : '\u2014'}
+                      </td>
+                      <td style={{ padding: '5px 8px' }}>
+                        <span style={{
+                          padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+                          color:      depleted ? 'var(--t4)' : expired ? '#ef4444' : expiring ? '#f59e0b' : '#10b981',
+                          background: depleted ? 'var(--bg3)' : expired ? 'rgba(239,68,68,.12)' : expiring ? 'rgba(245,158,11,.12)' : 'rgba(16,185,129,.12)',
+                        }}>
+                          {depleted ? '\u0641\u0627\u0631\u063a\u0629' : expired ? '\u0645\u0646\u062a\u0647\u064a\u0629' : expiring ? '\u062a\u0646\u062a\u0647\u064a' : '\u0646\u0634\u0637\u0629'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function StockTab() {
@@ -52,6 +145,16 @@ export default function StockTab() {
   // ── Pagination ──
   const [page,    setPage]    = useState(1);
   const [perPage, setPerPage] = useState(25);
+
+  // ── صفوف مفتوحة ──
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+  const toggleExpand = (id: number) =>
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   useEffect(() => { setPage(1); }, [search, filter, warehouseId]);
 
@@ -119,6 +222,8 @@ export default function StockTab() {
     is_first_page:  page === 1,
     is_last_page:   page >= lastPage,
   }), [page, lastPage, perPage, rows.length]);
+
+  const COL_COUNT = 11;
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -268,6 +373,7 @@ export default function StockTab() {
               <Th width="110px">الحد الأدنى</Th>
               <Th width="140px">القيمة الإجمالية</Th>
               <Th width="90px">الحالة</Th>
+              <Th width="80px">الدفعات</Th>
             </tr>
           </thead>
           <tbody>
@@ -275,7 +381,7 @@ export default function StockTab() {
             {/* تحميل */}
             {isLoading ? (
               <tr>
-                <td colSpan={10} style={{ padding: 60, textAlign: 'center', color: 'var(--t4)' }}>
+                <td colSpan={COL_COUNT} style={{ padding: 60, textAlign: 'center', color: 'var(--t4)' }}>
                   <i className="ti ti-loader-2" style={{
                     fontSize: 28, display: 'block', marginBottom: 8,
                     animation: 'spin .8s linear infinite',
@@ -287,7 +393,7 @@ export default function StockTab() {
             /* لا نتائج */
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ padding: 60, textAlign: 'center', color: 'var(--t4)' }}>
+                <td colSpan={COL_COUNT} style={{ padding: 60, textAlign: 'center', color: 'var(--t4)' }}>
                   <i className="ti ti-cube-off" style={{
                     fontSize: 36, display: 'block', marginBottom: 8,
                   }} />
@@ -304,86 +410,115 @@ export default function StockTab() {
             ) : paginatedRows.map((row, i) => {
               const st = stockStatus(row);
               const sm = STATUS[st];
+              const expanded  = expandedIds.has(row.id);
+              const lotsCount = row.lots_count ?? 0;
               return (
-                <tr
-                  key={row.id}
-                  style={{
-                    borderBottom: '1px solid var(--b1)',
-                    background: i % 2 === 0 ? 'transparent' : 'var(--bg1)',
-                  }}
-                >
-                  {/* المنتج */}
-                  <td style={{ padding: '10px 12px' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--t1)' }}>{row.name}</div>
-                    {row.ref && (
-                      <div style={{ fontSize: 11, color: 'var(--t4)' }}>{row.ref}</div>
-                    )}
-                  </td>
+                <React.Fragment key={row.id}>
+                  <tr
+                    style={{
+                      borderBottom: '1px solid var(--b1)',
+                      background: i % 2 === 0 ? 'transparent' : 'var(--bg1)',
+                    }}
+                  >
+                    {/* المنتج */}
+                    <td style={{ padding: '10px 12px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--t1)' }}>{row.name}</div>
+                      {row.ref && (
+                        <div style={{ fontSize: 11, color: 'var(--t4)' }}>{row.ref}</div>
+                      )}
+                    </td>
 
-                  {/* التصنيف */}
-                  <td style={{ padding: '10px 12px', color: 'var(--t3)', fontSize: 12 }}>
-                    {row.family?.name ?? '—'}
-                  </td>
+                    {/* التصنيف */}
+                    <td style={{ padding: '10px 12px', color: 'var(--t3)', fontSize: 12 }}>
+                      {row.family?.name ?? '—'}
+                    </td>
 
-                  {/* الوحدة */}
-                  <td style={{ padding: '10px 12px', color: 'var(--t4)', fontSize: 12, textAlign: 'center' }}>
-                    {row.unit?.symbol ?? '—'}
-                  </td>
+                    {/* الوحدة */}
+                    <td style={{ padding: '10px 12px', color: 'var(--t4)', fontSize: 12, textAlign: 'center' }}>
+                      {row.unit?.symbol ?? '—'}
+                    </td>
 
-                  {/* الافتتاحي */}
-                  <td style={{ padding: '10px 12px', color: 'var(--t3)' }}>
-                    {fmt(row.opening_quantity, 3)}
-                  </td>
+                    {/* الافتتاحي */}
+                    <td style={{ padding: '10px 12px', color: 'var(--t3)' }}>
+                      {fmt(row.opening_quantity, 3)}
+                    </td>
 
-                  {/* المدخلات */}
-                  <td style={{ padding: '10px 12px' }}>
-                    <span style={{ color: '#10b981', fontWeight: 600 }}>
-                      +{fmt(row.total_in, 3)}
-                    </span>
-                  </td>
+                    {/* المدخلات */}
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{ color: '#10b981', fontWeight: 600 }}>
+                        +{fmt(row.total_in, 3)}
+                      </span>
+                    </td>
 
-                  {/* المخرجات */}
-                  <td style={{ padding: '10px 12px' }}>
-                    <span style={{ color: '#ef4444', fontWeight: 600 }}>
-                      -{fmt(row.total_out, 3)}
-                    </span>
-                  </td>
+                    {/* المخرجات */}
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{ color: '#ef4444', fontWeight: 600 }}>
+                        -{fmt(row.total_out, 3)}
+                      </span>
+                    </td>
 
-                  {/* المخزون الحالي */}
-                  <td style={{ padding: '10px 12px' }}>
-                    <span style={{
-                      fontWeight: 700, fontSize: 14,
-                      color: st === 'out' ? '#ef4444'
-                           : st === 'low' ? '#f59e0b'
-                           : 'var(--t1)',
-                    }}>
-                      {fmt(row.current_stock, 3)}
-                    </span>
-                  </td>
+                    {/* المخزون الحالي */}
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{
+                        fontWeight: 700, fontSize: 14,
+                        color: st === 'out' ? '#ef4444'
+                             : st === 'low' ? '#f59e0b'
+                             : 'var(--t1)',
+                      }}>
+                        {fmt(row.current_stock, 3)}
+                      </span>
+                    </td>
 
-                  {/* الحد الأدنى */}
-                  <td style={{ padding: '10px 12px', color: 'var(--t4)', fontSize: 12 }}>
-                    {fmt(row.min_stock_alert, 3)}
-                  </td>
+                    {/* الحد الأدنى */}
+                    <td style={{ padding: '10px 12px', color: 'var(--t4)', fontSize: 12 }}>
+                      {fmt(row.min_stock_alert, 3)}
+                    </td>
 
-                  {/* القيمة الإجمالية */}
-                  <td style={{ padding: '10px 12px', color: 'var(--t1)' }}>
-                    {fmt(row.total_value)}{' '}
-                    <span style={{ fontSize: 11, color: 'var(--t4)' }}>دج</span>
-                  </td>
+                    {/* القيمة الإجمالية */}
+                    <td style={{ padding: '10px 12px', color: 'var(--t1)' }}>
+                      {fmt(row.total_value)}{' '}
+                      <span style={{ fontSize: 11, color: 'var(--t4)' }}>دج</span>
+                    </td>
 
-                  {/* الحالة */}
-                  <td style={{ padding: '10px 12px' }}>
-                    <span style={{
-                      display: 'inline-block', padding: '3px 10px',
-                      borderRadius: 20, fontSize: 11, fontWeight: 700,
-                      color: sm.color, background: sm.bg,
-                    }}>
-                      {sm.label}
-                    </span>
-                  </td>
+                    {/* الحالة */}
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{
+                        display: 'inline-block', padding: '3px 10px',
+                        borderRadius: 20, fontSize: 11, fontWeight: 700,
+                        color: sm.color, background: sm.bg,
+                      }}>
+                        {sm.label}
+                      </span>
+                    </td>
 
-                </tr>
+                    {/* الدفعات */}
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      {row.manages_stock && lotsCount > 0 ? (
+                        <button
+                          onClick={() => toggleExpand(row.id)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                            border: '1px solid var(--b2)', cursor: 'pointer',
+                            background: expanded ? 'var(--emb)' : 'var(--bg3)',
+                            color: expanded ? 'var(--em)' : 'var(--t3)',
+                            transition: 'all .15s',
+                          }}
+                        >
+                          <i className={`ti ${expanded ? 'ti-chevron-up' : 'ti-chevron-down'}`} style={{ fontSize: 11 }} />
+                          {lotsCount}
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--t4)', fontSize: 12 }}>—</span>
+                      )}
+                    </td>
+
+                  </tr>
+
+                  {expanded && (
+                    <LotsSubRow productId={row.id} warehouseId={warehouseId} colSpan={COL_COUNT} />
+                  )}
+                </React.Fragment>
               );
             })}
 
@@ -417,6 +552,7 @@ export default function StockTab() {
                   {fmt(totals.value)}{' '}
                   <span style={{ fontSize: 11, color: 'var(--t4)' }}>دج</span>
                 </td>
+                <td />
                 <td />
               </tr>
             </tfoot>

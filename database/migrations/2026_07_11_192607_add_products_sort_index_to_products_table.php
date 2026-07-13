@@ -9,12 +9,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('products', function (Blueprint $table) {
-            // Composite indexes for ProductsPage query patterns
-            $table->index(['company_id', 'active', 'created_at'], 'idx_products_list_sort');
-            $table->index(['company_id', 'active']);
-            $table->index(['company_id', 'name', 'active']);
-            $table->index(['company_id', 'ref', 'barcode'], 'idx_products_lookup');
-            $table->index(['company_id', 'family_id', 'brand_id', 'active'], 'idx_products_filter');
+            if (!Schema::hasIndex('products', 'idx_products_list_sort')) {
+                $table->index(['company_id', 'active', 'created_at'], 'idx_products_list_sort');
+            }
+            if (!Schema::hasIndex('products', 'products_company_id_active_index')) {
+                $table->index(['company_id', 'active']);
+            }
+            if (!Schema::hasIndex('products', 'products_company_id_name_active_index')) {
+                $table->index(['company_id', 'name', 'active']);
+            }
+            if (!Schema::hasIndex('products', 'idx_products_lookup')) {
+                $table->index(['company_id', 'ref', 'barcode'], 'idx_products_lookup');
+            }
+            if (!Schema::hasIndex('products', 'idx_products_filter')) {
+                $table->index(['company_id', 'family_id', 'brand_id', 'active'], 'idx_products_filter');
+            }
         });
     }
 

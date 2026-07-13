@@ -5,38 +5,53 @@
 
 import React, { useState } from 'react';
 import { useAuditLogs, type AuditLog, type AuditListParams } from '@/lib/api/endpoints/audits';
-import { useNotification } from '@/hooks/useNotification';
+import PageHeader from '@/components/ui/PageHeader';
+import Badge from '@/components/ui/Badge';
+import Skeleton from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
+import Pagination from '@/components/ui/Pagination';
+import type { BackendMeta } from '@/hooks/usePagination';
 
-const EVENT_LABELS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  created: { label: 'إنشاء', color: 'var(--green)',  bg: 'color-mix(in srgb, var(--green) 12%, transparent)', icon: 'ti-plus' },
-  updated: { label: 'تعديل', color: 'var(--blue)',   bg: 'color-mix(in srgb, var(--blue) 12%, transparent)',  icon: 'ti-pencil' },
-  deleted: { label: 'حذف',   color: 'var(--red)',    bg: 'color-mix(in srgb, var(--red) 8%, transparent)',   icon: 'ti-trash' },
+const EVENT_CONFIG: Record<string, { label: string; variant: 'success' | 'info' | 'danger'; icon: string }> = {
+  created: { label: 'إنشاء', variant: 'success', icon: 'ti-plus' },
+  updated: { label: 'تعديل', variant: 'info',    icon: 'ti-pencil' },
+  deleted: { label: 'حذف',   variant: 'danger',  icon: 'ti-trash' },
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  Product: 'منتج', Party: 'طرف', CommercialDocument: 'مستند', Payment: 'دفعة',
+  Expense: 'مصروف', Check: 'شيك', Family: 'فئة', Brand: 'علامة',
+  Warehouse: 'مستودع', User: 'مستخدم', Employee: 'موظف', Company: 'شركة',
+  TreasuryAccount: 'خزينة', ExpenseCategory: 'فئة مصروف', ApprovalThreshold: 'عتبة موافقة',
 };
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('ar-DZ', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(d).toLocaleDateString('ar-DZ', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
 function DiffView({ oldValues, newValues }: { oldValues: Record<string, unknown>; newValues: Record<string, unknown> }) {
   const allKeys = [...new Set([...Object.keys(oldValues), ...Object.keys(newValues)])];
-  if (allKeys.length === 0) return <span style={{ color: 'var(--t3)', fontSize: 12 }}>—</span>;
+  if (allKeys.length === 0) return <span style={{ color: 'var(--t4)', fontSize: 12 }}>—</span>;
 
   return (
-    <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+    <div style={{ fontSize: 12, lineHeight: 1.8 }}>
       {allKeys.map(key => {
         const oldVal = oldValues[key];
         const newVal = newValues[key];
         if (oldVal === newVal) return null;
         return (
           <div key={key} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-            <span style={{ color: 'var(--t3)', fontWeight: 600, minWidth: 80 }}>{key}:</span>
+            <span style={{ color: 'var(--t4)', fontWeight: 600, minWidth: 90, fontFamily: 'monospace', fontSize: 11 }}>{key}</span>
             {oldVal !== undefined && (
-              <span style={{ color: 'var(--red)', textDecoration: 'line-through' }}>
+              <span style={{ color: 'var(--red)', textDecoration: 'line-through', opacity: 0.8 }}>
                 {String(oldVal ?? '—')}
               </span>
             )}
-            {oldVal !== undefined && <span style={{ color: 'var(--t3)' }}>→</span>}
-            <span style={{ color: 'var(--green)' }}>
+            {oldVal !== undefined && <span style={{ color: 'var(--t4)' }}>→</span>}
+            <span style={{ color: 'var(--em)', fontWeight: 500 }}>
               {String(newVal ?? '—')}
             </span>
           </div>
@@ -47,162 +62,167 @@ function DiffView({ oldValues, newValues }: { oldValues: Record<string, unknown>
 }
 
 export default function AuditLogPage() {
-  const { notify } = useNotification();
   const [filters, setFilters] = useState<AuditListParams>({ page: 1, per_page: 25 });
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const { data, isLoading, isFetching } = useAuditLogs(filters);
   const items = data?.data ?? [];
-  const meta  = data?.meta;
+  const meta  = data?.meta as BackendMeta | undefined;
 
   return (
-    <div style={{ padding: '16px 24px', maxWidth: 1200, margin: '0 auto', direction: 'rtl' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 12,
-          background: 'color-mix(in srgb, var(--purple) 12%, transparent)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <i className="ti ti-history" style={{ fontSize: 20, color: 'var(--purple)' }} />
-        </div>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>سجل التدقيق</h1>
-          <p style={{ margin: 0, fontSize: 12, color: 'var(--t3)' }}>سجل جميع العمليات على البيانات</p>
+    <div className="page-container">
+      <PageHeader
+        title="سجل التدقيق"
+        description="سجل جميع العمليات على البيانات"
+        breadcrumb={[
+          { label: 'النظام', href: '/settings' },
+          { label: 'سجل التدقيق' },
+        ]}
+        badge={meta ? { label: `${meta.total ?? items.length} سجل`, variant: 'info' } : undefined}
+      />
+
+      {/* ── Filters ─────────────────────────────────────────────────── */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {([
+            { key: '',      label: 'جميع الأحداث' },
+            { key: 'created', label: 'إنشاء' },
+            { key: 'updated', label: 'تعديل' },
+            { key: 'deleted', label: 'حذف' },
+          ]).map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setFilters(f => ({ ...f, event: opt.key || undefined, page: 1 }))}
+              className={`tab-pill ${filters.event === opt.key || (!filters.event && opt.key === '') ? 'active' : ''}`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <select
-          value={filters.event ?? ''}
-          onChange={e => setFilters(f => ({ ...f, event: e.target.value || undefined, page: 1 }))}
-          style={{
-            padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)',
-            background: 'var(--bg2)', fontSize: 13,
-          }}
-        >
-          <option value="">جميع الأحداث</option>
-          <option value="created">إنشاء</option>
-          <option value="updated">تعديل</option>
-          <option value="deleted">حذف</option>
-        </select>
-      </div>
-
-      {/* Loading */}
-      {isLoading && (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
-          <i className="ti ti-loader-2" style={{ fontSize: 24, animation: 'spin 1s linear infinite' }} />
-        </div>
-      )}
-
-      {/* Empty */}
-      {!isLoading && items.length === 0 && (
-        <div style={{
-          textAlign: 'center', padding: 60, color: 'var(--t3)',
-          background: 'var(--bg2)', borderRadius: 12,
-        }}>
-          <i className="ti ti-history-off" style={{ fontSize: 40, display: 'block', marginBottom: 12, opacity: 0.3 }} />
-          لا توجد سجلات
-        </div>
-      )}
-
-      {/* Table */}
-      {!isLoading && items.length > 0 && (
-        <div style={{
-          background: 'var(--bg1)', borderRadius: 12,
-          border: '1px solid var(--border)', overflow: 'hidden',
-        }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: 'var(--bg2)' }}>
-                <th style={thStyle}>التاريخ</th>
-                <th style={thStyle}>المستخدم</th>
-                <th style={thStyle}>الحدث</th>
-                <th style={thStyle}>النوع</th>
-                <th style={thStyle}>الرقم</th>
-                <th style={thStyle}>التفاصيل</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(log => {
-                const evt = EVENT_LABELS[log.event] ?? EVENT_LABELS.updated;
-                const isExpanded = expandedId === log.id;
-                return (
-                  <React.Fragment key={log.id}>
-                    <tr
-                      style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
-                      onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                    >
-                      <td style={tdStyle}>{formatDate(log.created_at)}</td>
-                      <td style={tdStyle}>{log.user?.name ?? `#${log.user_id}`}</td>
-                      <td style={tdStyle}>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '2px 8px', borderRadius: 12, fontSize: 11,
-                          fontWeight: 600, background: evt.bg, color: evt.color,
-                        }}>
-                          <i className={`ti ${evt.icon}`} style={{ fontSize: 12 }} />
-                          {evt.label}
-                        </span>
-                      </td>
-                      <td style={tdStyle}>{log.auditable_type.split('\\').pop()}</td>
-                      <td style={tdStyle}>#{log.auditable_id}</td>
-                      <td style={tdStyle}>
-                        <i className={`ti ti-chevron-${isExpanded ? 'up' : 'down'}`} style={{ fontSize: 14, color: 'var(--t3)' }} />
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr>
-                        <td colSpan={6} style={{ padding: '12px 20px', background: 'var(--bg2)' }}>
-                          <DiffView oldValues={log.old_values} newValues={log.new_values} />
-                          {log.ip_address && (
-                            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--t3)' }}>
-                              IP: {log.ip_address}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {/* Pagination */}
-          {meta && meta.last_page > 1 && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: 4, padding: '12px 0', borderTop: '1px solid var(--border)',
-            }}>
-              {Array.from({ length: Math.min(meta.last_page, 7) }, (_, i) => i + 1).map(page => (
-                <button
-                  key={page}
-                  onClick={() => setFilters(f => ({ ...f, page }))}
-                  style={{
-                    width: 32, height: 32, borderRadius: 8, border: 'none',
-                    background: page === (filters.page ?? 1) ? 'var(--blue)' : 'transparent',
-                    color: page === (filters.page ?? 1) ? '#fff' : 'var(--t2)',
-                    cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                  }}
-                >
-                  {page}
-                </button>
-              ))}
+      {/* ── Table ───────────────────────────────────────────────────── */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {isLoading ? (
+          <div style={{ padding: 24 }}>
+            <Skeleton variant="table" rows={6} />
+          </div>
+        ) : items.length === 0 ? (
+          <EmptyState icon="ti-history-off" text="لا توجد سجلات" sub="لم يتم تسجيل أي عملية بعد" />
+        ) : (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th className="th">التاريخ</th>
+                    <th className="th">المستخدم</th>
+                    <th className="th">الحدث</th>
+                    <th className="th">النوع</th>
+                    <th className="th">الرقم</th>
+                    <th className="th" style={{ width: 40 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map(log => {
+                    const evt = EVENT_CONFIG[log.event] ?? EVENT_CONFIG.updated;
+                    const isExpanded = expandedId === log.id;
+                    const typeLabel = TYPE_LABELS[log.auditable_type.split('\\').pop() ?? ''] ?? log.auditable_type.split('\\').pop();
+                    return (
+                      <React.Fragment key={log.id}>
+                        <tr
+                          className={`tr-hover ${isExpanded ? 'tr-active' : ''}`}
+                          onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <td className="td" style={{ color: 'var(--t3)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                            {formatDate(log.created_at)}
+                          </td>
+                          <td className="td">
+                            <span style={{ fontWeight: 600 }}>
+                              {log.user?.name ?? `#${log.user_id}`}
+                            </span>
+                          </td>
+                          <td className="td">
+                            <Badge variant={evt.variant} noDot>
+                              <i className={`ti ${evt.icon}`} style={{ marginLeft: 4, fontSize: 11 }} />
+                              {evt.label}
+                            </Badge>
+                          </td>
+                          <td className="td" style={{ color: 'var(--t2)' }}>
+                            {typeLabel}
+                          </td>
+                          <td className="td" style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--t4)' }}>
+                            #{log.auditable_id}
+                          </td>
+                          <td className="td" style={{ textAlign: 'center' }}>
+                            <i
+                              className={`ti ti-chevron-${isExpanded ? 'up' : 'down'}`}
+                              style={{ fontSize: 14, color: 'var(--t4)', transition: 'transform .2s' }}
+                            />
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={6} style={{ padding: '16px 20px', background: 'var(--bg3)' }}>
+                              <DiffView oldValues={log.old_values} newValues={log.new_values} />
+                              {log.ip_address && (
+                                <div style={{ marginTop: 10, fontSize: 11, color: 'var(--t4)', display: 'flex', gap: 12 }}>
+                                  <span><i className="ti ti/world" style={{ marginLeft: 4 }} />IP: {log.ip_address}</span>
+                                  {log.url && <span style={{ fontFamily: 'monospace', fontSize: 10, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>{log.url}</span>}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
-      )}
+
+            {meta && meta.last_page > 1 && (
+              <div style={{ padding: '0 16px', borderTop: '1px solid var(--b1)' }}>
+                <Pagination
+                  meta={meta}
+                  onPageChange={(page) => setFilters(f => ({ ...f, page }))}
+                  onPerPageChange={(per_page) => setFilters(f => ({ ...f, per_page, page: 1 }))}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {isFetching && !isLoading && (
+          <div style={{ position: 'absolute', top: 8, right: 8 }}>
+            <i className="ti ti-loader-2" style={{ fontSize: 14, animation: 'spin 1s linear infinite', color: 'var(--em)' }} />
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        .page-container { padding: 20px 24px; max-width: 1200px; margin: 0 auto; direction: rtl; }
+        .tab-pill {
+          padding: 6px 14px; border-radius: 99px; border: none;
+          font-size: 12px; font-weight: 600; cursor: pointer;
+          background: var(--bg3); color: var(--t3);
+          transition: all .15s; font-family: inherit;
+        }
+        .tab-pill:hover { background: var(--bg4); color: var(--t2); }
+        .tab-pill.active { background: var(--em); color: #fff; }
+        .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .th {
+          padding: 10px 16px; text-align: right; font-weight: 700;
+          font-size: 11px; color: var(--t4); white-space: nowrap;
+          background: var(--bg3); border-bottom: 2px solid var(--b2);
+        }
+        .td { padding: 10px 16px; text-align: right; vertical-align: middle; }
+        .tr-hover { transition: background .1s; border-bottom: 1px solid var(--b1); }
+        .tr-hover:hover { background: var(--bg3); }
+        .tr-active { background: var(--bg3); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
-
-const thStyle: React.CSSProperties = {
-  padding: '10px 16px', textAlign: 'right', fontWeight: 700, fontSize: 12,
-  color: 'var(--t3)', borderBottom: '2px solid var(--border)',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: '10px 16px', textAlign: 'right', verticalAlign: 'middle',
-};

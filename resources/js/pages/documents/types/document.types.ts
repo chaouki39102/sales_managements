@@ -196,6 +196,9 @@ export interface LineItem {
   packaging_id:           string;
   stock_lot_id:           string;
   lot_number_new?:        string;
+  manufacturing_date?:    string | null;
+  expiration_date?:       string | null;
+  supplier_lot_number?:   string | null;
   warehouse_id?:          string;
   line_note?:             string;
   _product?:              Product;

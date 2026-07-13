@@ -359,7 +359,7 @@ export interface QuantityDiscount extends BaseModel {
 }
 
 export interface ProductLot extends BaseModel {
-  product_variant_id:    number;
+  product_id:            number;
   warehouse_id:          number;
   lot_number:            string;
   supplier_lot_number?:  string | null;
@@ -368,10 +368,17 @@ export interface ProductLot extends BaseModel {
   purchase_date?:        string | null;
   purchase_price?:       number | null;
   legal_selling_price?:  number | null;
+  margin_percentage?:    number | null;
   original_quantity:     number;
   remaining_quantity:    number;
+  stock_movement_id?:    number | null;
+  is_depleted?:          boolean;
+  total_cost?:           number | null;
+  remaining_value?:      number | null;
   active:                boolean;
   company_id:            number;
+  product?:              { id: number; name: string; ref?: string };
+  warehouse?:            { id: number; name: string };
 }
 
 export interface ProductVariant extends BaseModel {

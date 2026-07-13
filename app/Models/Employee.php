@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
-use App\Core\Traits\Auditable;
+use App\Core\Traits\AuditableEnhanced;
 use App\Models\Traits\HasCompany;
 use App\Models\Traits\HasTenantRouteBinding;
 
@@ -16,7 +16,7 @@ use App\Models\Traits\HasTenantRouteBinding;
 class Employee extends Model
 {
     use HasStandardizedConfiguration, HasCompany,
-        SoftDeletes, Auditable, HasTenantRouteBinding;
+        SoftDeletes, AuditableEnhanced, HasTenantRouteBinding;
 
     protected $table = 'employees';
 

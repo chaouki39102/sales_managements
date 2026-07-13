@@ -69,6 +69,7 @@ const NAV_GROUPS = [
       { name: 'السنوات المالية',  href: 'fiscalyears', icon: 'ti-calendar'        },
       { name: 'العملات',          href: 'currencies',  icon: 'ti-currency-dollar' },
       { name: 'مستويات الأسعار',  href: 'pricelevels', icon: 'ti-tag'             },
+      { name: 'المطابقة البنكية', href: 'bank-reconciliation', icon: 'ti-arrows-exchange' },
     ],
   },
   {
@@ -84,6 +85,8 @@ const NAV_GROUPS = [
       { name: 'الموظفون',        href: 'employees',               icon: 'ti-id-badge'     },
       { name: 'المستخدمون',      href: 'users',                   icon: 'ti-user'         },
       { name: 'التنبيهات',       href: 'notifications',           icon: 'ti-bell'         },
+      { name: 'التنبيهات الذكية', href: 'alerts',                icon: 'ti-alert-triangle' },
+      { name: 'سجل التدقيق',     href: 'audit-log',               icon: 'ti-history'      },
       { name: 'الإعدادات',       href: 'settings',                icon: 'ti-settings'     },
       { name: 'أنواع المستندات', href: 'settings/document-types', icon: 'ti-file'         },
       { name: 'إعدادات الطباعة', href: '/settings/print',         icon: 'ti-printer'       },
@@ -146,6 +149,9 @@ const PAGE_META: Record<string, { title: string; path: string }> = {
   'settings/print/designer': { title: 'مصمم القوالب',        path: 'نظام ← مصمم القوالب' },
   'numbering-series':        { title: 'سلاسل الترقيم',      path: 'نظام ← سلاسل الترقيم'   },
   'expense-categories':      { title: 'فئات المصروفات',     path: 'نظام ← فئات المصروفات'  },
+  'bank-reconciliation':    { title: 'المطابقة البنكية',   path: 'محاسبة ← مطابقة بنكية' },
+  'audit-log':              { title: 'سجل التدقيق',        path: 'نظام ← سجل تدقيق'       },
+  'alerts':                 { title: 'التنبيهات الذكية',   path: 'نظام ← تنبيهات ذكية'    },
   'admin/companies':         { title: 'إدارة الشركات',      path: 'Super Admin ← الشركات'  },
 };
 

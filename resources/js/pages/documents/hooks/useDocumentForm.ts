@@ -190,6 +190,9 @@ function makeLine(defaultTvaRate: number): LineItem {
     packaging_id:          '',
     stock_lot_id:          '',
     lot_number_new:        '',
+    manufacturing_date:    undefined as string | undefined,
+    expiration_date:       undefined as string | undefined,
+    supplier_lot_number:   undefined as string | undefined,
     line_note:             '',
     _packQty:              1,
   };
@@ -329,6 +332,9 @@ function buildLineFromApi(
     lot_number_new:        String(
       stockLotRel?.lot_number ?? l.lot_number ?? l.lot_number_new ?? '',
     ),
+    manufacturing_date:    l.manufacturing_date ?? l.line_attributes?.manufacturing_date ?? undefined,
+    expiration_date:       l.expiration_date ?? l.line_attributes?.expiration_date ?? undefined,
+    supplier_lot_number:   l.supplier_lot_number ?? l.line_attributes?.supplier_lot_number ?? undefined,
     line_note:             String(l.notes ?? l.line_note ?? ''),
     _product:              productRel as Product | undefined,
     _packQty:              packQty,
@@ -824,6 +830,9 @@ export function useDocumentForm({
           } else {
             L.stock_lot_id   = '';
             L.lot_number_new = '';
+            L.manufacturing_date = undefined;
+            L.expiration_date    = undefined;
+            L.supplier_lot_number = undefined;
           }
 
           L._product = product;
@@ -1180,6 +1189,9 @@ export function useDocumentForm({
         ...(line.packaging_id ? { packaging_id: parseInt(line.packaging_id) } : {}),
         ...(line.stock_lot_id ? { stock_lot_id: parseInt(line.stock_lot_id) } : {}),
         ...(isPurchase && line.lot_number_new ? { lot_number: line.lot_number_new } : {}),
+        ...(isPurchase && line.manufacturing_date ? { manufacturing_date: line.manufacturing_date } : {}),
+        ...(isPurchase && line.expiration_date ? { expiration_date: line.expiration_date } : {}),
+        ...(isPurchase && line.supplier_lot_number ? { supplier_lot_number: line.supplier_lot_number } : {}),
         ...(line.warehouse_id ? { warehouse_id: parseInt(line.warehouse_id) } : {}),
         notes: line.line_note || null,
       };

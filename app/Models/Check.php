@@ -9,13 +9,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
-use App\Core\Traits\Auditable;
+use App\Core\Traits\AuditableEnhanced;
 use App\Models\Traits\HasCompany;
 
 #[Cacheable]
 class Check extends Model
 {
-    use HasStandardizedConfiguration, HasCompany, Auditable;
+    use HasStandardizedConfiguration, HasCompany, AuditableEnhanced;
 
     protected $table = 'checks';
 

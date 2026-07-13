@@ -94,6 +94,7 @@ export interface StockAtRow {
     current_cost_price: number;
     total_value: number;
     manages_stock: boolean;
+    lots_count?: number;
     family?: { name: string } | null;
     unit?: { name: string; symbol: string } | null;
 }

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
-use App\Core\Traits\Auditable;
+use App\Core\Traits\AuditableEnhanced;
 use App\Models\Traits\HasCompany;
 use App\Models\Traits\HasTenantRouteBinding;
 use App\Models\Traits\HasTenantSlug;
@@ -19,7 +19,7 @@ use App\Services\PartyBalanceService;
 class Party extends Model
 {
     use HasStandardizedConfiguration, SoftDeletes,
-        HasCompany, Auditable, HasTenantSlug, HasTenantRouteBinding;
+        HasCompany, AuditableEnhanced, HasTenantSlug, HasTenantRouteBinding;
 
     protected $table = 'parties';
 

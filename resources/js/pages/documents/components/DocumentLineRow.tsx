@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { calcLineTotal, fmtDZD, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
+import { LotCell } from './LotCell';
 import { cellStyle } from './DocumentUIPrimitives';
 import type { LineItem, Product, ColKey } from '../types/document.types';
 import type { LineStockValidation } from '../utils/document.utils';
@@ -142,12 +143,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         {col('lot') && (
           <td style={{ padding: '3px 4px' }}>
             {isPurchase ? (
-              <CellInput
-                type="text"
-                value={line.lot_number_new ?? ''}
-                onChange={(v) => onUpdate(idx, { lot_number_new: v })}
-                disabled={disabled}
-              />
+              <LotCell line={line} idx={idx} prod={prod} disabled={disabled} onUpdate={onUpdate} />
             ) : (
               prod?.has_lots ? (
                 <select

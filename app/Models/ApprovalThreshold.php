@@ -6,13 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
-use App\Core\Traits\Auditable;
+use App\Core\Traits\AuditableEnhanced;
 use App\Models\Traits\HasCompany;
 
 #[Cacheable]
 class ApprovalThreshold extends Model
 {
-    use HasStandardizedConfiguration, HasCompany, Auditable;
+    use HasStandardizedConfiguration, HasCompany, AuditableEnhanced;
 
     protected $table = 'approval_thresholds';
 

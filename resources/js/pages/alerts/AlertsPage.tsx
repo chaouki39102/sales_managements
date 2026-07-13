@@ -8,6 +8,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useNotification } from '@/hooks/useNotification';
+import PageHeader from '@/components/ui/PageHeader';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import EmptyState from '@/components/ui/EmptyState';
+import Skeleton from '@/components/ui/Skeleton';
 
 interface Alert {
   id:           number;
@@ -24,21 +29,24 @@ interface Alert {
   created_at:   string;
 }
 
-const severityCfg: Record<string, { label: string; color: string; bg: string }> = {
-  critical: { label: 'حرج',   color: '#dc2626', bg: '#fef2f2' },
-  high:     { label: 'مهم',   color: '#f59e0b', bg: '#fffbeb' },
-  medium:   { label: 'متوسط', color: '#2563eb', bg: '#eff6ff' },
-  low:      { label: 'منخفض', color: '#6b7280', bg: '#f3f4f6' },
+const SEVERITY_CONFIG: Record<string, { label: string; variant: 'danger' | 'warning' | 'info' | 'gray'; icon: string }> = {
+  critical: { label: 'حرج',   variant: 'danger',  icon: 'ti-alert-triangle' },
+  high:     { label: 'مهم',   variant: 'warning', icon: 'ti-alert-circle' },
+  medium:   { label: 'متوسط', variant: 'info',    icon: 'ti-info-circle' },
+  low:      { label: 'منخفض', variant: 'gray',    icon: 'ti-bell' },
 };
 
-const typeIcon: Record<string, string> = {
-  overdue_invoice: 'ti-alert-circle',
+const TYPE_ICON: Record<string, string> = {
+  overdue_invoice: 'ti-file-invoice',
   upcoming_check:  'ti-checks',
   low_stock:       'ti-package-off',
   credit_exceeded: 'ti-credit-card-off',
 };
 
-const fmtDate = (d: string) => new Date(d).toLocaleDateString('ar-DZ', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('ar-DZ', {
+  year: 'numeric', month: 'short', day: 'numeric',
+  hour: '2-digit', minute: '2-digit',
+});
 
 export default function AlertsPage() {
   const slug   = useActiveSlug();
@@ -60,108 +68,153 @@ export default function AlertsPage() {
 
   const markAll = useMutation({
     mutationFn: () => apiPost('/alerts/mark-all-read'),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: [slug, 'alerts'] }); notify.success('تم تحديد الكل كمقروء'); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [slug, 'alerts'] });
+      notify.success('تم تحديد الكل كمقروء');
+    },
   });
 
   const filtered = filter === 'unread' ? alerts.filter(a => !a.is_read) : alerts;
   const unreadCount = alerts.filter(a => !a.is_read).length;
 
   return (
-    <div style={{ padding: 24, direction: 'rtl' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--t1)' }}>
-          التنبيهات
-          {unreadCount > 0 && (
-            <span style={{
-              marginRight: 10, fontSize: 11, fontWeight: 700, padding: '2px 8px',
-              borderRadius: 12, background: 'color-mix(in srgb, var(--red) 12%, transparent)',
-              color: 'var(--red)',
-            }}>
-              {unreadCount} جديد
-            </span>
-          )}
-        </h2>
-        {unreadCount > 0 && (
-          <button
-            onClick={() => markAll.mutate()}
-            disabled={markAll.isPending}
-            style={{
-              padding: '6px 14px', borderRadius: 8, border: '1px solid var(--b2)',
-              background: 'var(--bg2)', color: 'var(--t2)', cursor: 'pointer',
-              fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            <i className="ti ti-checks" style={{ fontSize: 13 }} />
-            تحديد الكل كمقروء
-          </button>
-        )}
-      </div>
+    <div className="page-container">
+      <PageHeader
+        title="التنبيهات الذكية"
+        description="مراقبة الأحداث والتنبيهات المهمة"
+        breadcrumb={[
+          { label: 'النظام', href: '/settings' },
+          { label: 'التنبيهات الذكية' },
+        ]}
+        badge={unreadCount > 0 ? { label: `${unreadCount} جديد`, variant: 'danger' } : undefined}
+        actions={
+          unreadCount > 0 ? (
+            <Button
+              variant="default"
+              size="sm"
+              icon={<i className="ti ti-checks" />}
+              onClick={() => markAll.mutate()}
+              loading={markAll.isPending}
+            >
+              تحديد الكل كمقروء
+            </Button>
+          ) : undefined
+        }
+      />
 
-      {/* Filter tabs */}
+      {/* ── Filter Tabs ─────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-        {(['all', 'unread'] as const).map(f => (
+        {([
+          { key: 'all',    label: 'الكل', count: alerts.length },
+          { key: 'unread', label: 'غير مقروء', count: unreadCount },
+        ] as const).map(tab => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
-            style={{
-              padding: '6px 16px', borderRadius: 8, border: 'none',
-              background: filter === f ? 'color-mix(in srgb, var(--em) 12%, transparent)' : 'transparent',
-              color: filter === f ? 'var(--em)' : 'var(--t3)',
-              cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-            }}
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={`tab-pill ${filter === tab.key ? 'active' : ''}`}
           >
-            {f === 'all' ? 'الكل' : 'غير مقروء'} ({f === 'all' ? alerts.length : unreadCount})
+            {tab.label}
+            <span style={{
+              marginRight: 6, fontSize: 10, fontWeight: 700,
+              padding: '1px 6px', borderRadius: 10,
+              background: filter === tab.key ? 'rgba(255,255,255,0.25)' : 'var(--bg4)',
+              color: filter === tab.key ? '#fff' : 'var(--t4)',
+            }}>
+              {tab.count}
+            </span>
           </button>
         ))}
       </div>
 
-      {isLoading && (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--t4)' }}>
-          <i className="ti ti-loader-2" style={{ animation: 'spin 1s linear infinite', fontSize: 20 }} />
-          <div style={{ marginTop: 8 }}>جارٍ التحميل…</div>
-        </div>
-      )}
-
-      {!isLoading && filtered.length === 0 && (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--t4)', fontSize: 14 }}>
-          {filter === 'unread' ? 'لا توجد تنبيهات جديدة' : 'لا توجد تنبيهات'}
-        </div>
-      )}
-
-      {filtered.map(alert => {
-        const sev = severityCfg[alert.severity] ?? severityCfg.low;
-        return (
-          <div
-            key={alert.id}
-            onClick={() => { if (!alert.is_read) markRead.mutate(alert.id); }}
-            style={{
-              padding: '12px 16px', borderRadius: 10,
-              background: alert.is_read ? 'var(--bg2)' : 'color-mix(in srgb, var(--blue) 4%, var(--bg2))',
-              border: `1px solid var(--b1)`, marginBottom: 8,
-              borderRight: `4px solid ${sev.color}`,
-              cursor: 'pointer', transition: 'background .12s',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <i className={`ti ${typeIcon[alert.type] ?? 'ti-bell'}`} style={{ fontSize: 16, color: sev.color }} />
-                <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--t1)' }}>{alert.title}</span>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '1px 8px', borderRadius: 10,
-                  background: sev.bg, color: sev.color,
-                }}>
-                  {sev.label}
-                </span>
-              </div>
-              <span style={{ fontSize: 10, color: 'var(--t4)' }}>{fmtDate(alert.created_at)}</span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.6, paddingRight: 24 }}>
-              {alert.body}
-            </div>
+      {/* ── Content ─────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {isLoading ? (
+          <div className="card">
+            <Skeleton variant="table" rows={5} />
           </div>
-        );
-      })}
+        ) : filtered.length === 0 ? (
+          <div className="card">
+            <EmptyState
+              icon={filter === 'unread' ? 'ti-bell' : 'ti-bell-off'}
+              text={filter === 'unread' ? 'لا توجد تنبيهات جديدة' : 'لا توجد تنبيهات'}
+              sub={filter === 'unread' ? 'جميع التنبيهات مقروءة' : 'لم يتم تسجيل أي تنبيه بعد'}
+            />
+          </div>
+        ) : (
+          filtered.map(alert => {
+            const sev = SEVERITY_CONFIG[alert.severity] ?? SEVERITY_CONFIG.low;
+            const icon = TYPE_ICON[alert.type] ?? 'ti-bell';
+            return (
+              <div
+                key={alert.id}
+                onClick={() => { if (!alert.is_read) markRead.mutate(alert.id); }}
+                className="card alert-card"
+                style={{
+                  cursor: 'pointer',
+                  borderRight: `4px solid ${alert.is_read ? 'var(--b2)' : `var(--${sev.variant === 'danger' ? 'red' : sev.variant === 'warning' ? 'gold' : sev.variant === 'info' ? 'blue' : 't4'})`}`,
+                  background: alert.is_read ? 'var(--bg2)' : 'var(--bg3)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  {/* Icon */}
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: alert.is_read ? 'var(--bg4)' : `color-mix(in srgb, var(--${sev.variant === 'danger' ? 'red' : sev.variant === 'warning' ? 'gold' : sev.variant === 'info' ? 'blue' : 't4'}) 10%, transparent)`,
+                    color: alert.is_read ? 'var(--t4)' : `var(--${sev.variant === 'danger' ? 'red' : sev.variant === 'warning' ? 'gold' : sev.variant === 'info' ? 'blue' : 't4'})`,
+                  }}>
+                    <i className={`ti ${icon}`} style={{ fontSize: 16 }} />
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--t1)' }}>
+                        {alert.title}
+                      </span>
+                      <Badge variant={sev.variant} noDot>
+                        {sev.label}
+                      </Badge>
+                      {!alert.is_read && (
+                        <span style={{
+                          width: 7, height: 7, borderRadius: '50%',
+                          background: 'var(--em)', flexShrink: 0,
+                        }} />
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.7 }}>
+                      {alert.body}
+                    </div>
+                  </div>
+
+                  {/* Date */}
+                  <div style={{ flexShrink: 0, textAlign: 'left' }}>
+                    <span style={{ fontSize: 11, color: 'var(--t4)', whiteSpace: 'nowrap' }}>
+                      {fmtDate(alert.created_at)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <style>{`
+        .page-container { padding: 20px 24px; max-width: 1200px; margin: 0 auto; direction: rtl; }
+        .tab-pill {
+          padding: 6px 14px; border-radius: 99px; border: none;
+          font-size: 12px; font-weight: 600; cursor: pointer;
+          background: var(--bg3); color: var(--t3);
+          transition: all .15s; font-family: inherit;
+          display: inline-flex; align-items: center;
+        }
+        .tab-pill:hover { background: var(--bg4); color: var(--t2); }
+        .tab-pill.active { background: var(--em); color: #fff; }
+        .alert-card { transition: transform .15s, box-shadow .15s; }
+        .alert-card:hover { transform: translateY(-1px); box-shadow: var(--shadow2); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

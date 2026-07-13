@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use App\Core\Attributes\Cacheable;
 use App\Core\Traits\HasStandardizedConfiguration;
-use App\Core\Traits\Auditable;
+use App\Core\Traits\AuditableEnhanced;
 
 #[Cacheable]
 class Company extends Model
 {
-    use HasStandardizedConfiguration, Auditable;
+    use HasStandardizedConfiguration, AuditableEnhanced;
 
     protected $table = 'companies';
 

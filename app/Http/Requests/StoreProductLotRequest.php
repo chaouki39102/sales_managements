@@ -16,7 +16,7 @@ class StoreProductLotRequest extends FormRequest
             ?? app(\App\Services\CompanyContextService::class)->get();
 
         return [
-            'lot_number'          => ['required', 'string', 'max:50',
+            'lot_number'          => ['nullable', 'string', 'max:50',
                                        Rule::unique('product_lots', 'lot_number')
                                            ->where('product_id',   $this->input('product_id'))
                                            ->where('company_id',   $companyId)],

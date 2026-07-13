@@ -119,6 +119,7 @@ class StockMovementObserver
         }
 
         $lot = ProductLot::create([
+            'company_id' => $movement->company_id,
             'lot_number' => $lotNumber,
             'product_id' => $product->id,
             'warehouse_id' => $movement->warehouse_id,
@@ -129,6 +130,7 @@ class StockMovementObserver
             'original_quantity' => $movement->quantity,
             'remaining_quantity' => $movement->quantity,
             'stock_movement_id' => $movement->id,
+            'manufacturing_date' => $movement->manufacturing_date ?? null,
             'expiration_date' => $movement->expiration_date ?? null,
             'active' => true,
         ]);
@@ -144,7 +146,11 @@ class StockMovementObserver
             );
         }
 
-        Log::info("✅ تم إنشاء دفعة: {$lot->lot_number} للمنتج {$product->name}");
+        Log::info("✅ تم إنشاء دفعة: {$lot->lot_number} للمنتج {$product->name}", [
+            'movement_id' => $movement->id,
+            'company_id' => $movement->company_id,
+            'lot_id' => $lot->id,
+        ]);
     }
 
     /**
