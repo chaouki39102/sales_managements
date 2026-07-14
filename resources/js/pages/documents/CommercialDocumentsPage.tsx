@@ -1411,7 +1411,7 @@ export default function CommercialDocumentsPage() {
                 editActions.push({
                     label: "تعديل المستند",
                     icon: "pencil",
-                    onClick: () => { if (row) navigate(`/documents/${typeCode}/${row.id}/edit`); },
+                    onClick: () => { if (row) navigate(typeCode === 'POS' ? `/pos?edit=${row.id}` : `/documents/${typeCode}/${row.id}/edit`); },
                 });
             }
             if (!isReadOnly && row) {
@@ -1561,7 +1561,7 @@ export default function CommercialDocumentsPage() {
                     <ActionBtn
                         icon={loadingEdit ? "ti-loader-2" : "ti-pencil"}
                         title="تعديل" color="var(--blue)" disabled={loadingEdit}
-                        onClick={() => navigate(`/documents/${typeCode}/${row.id}/edit`)}
+                        onClick={() => navigate(typeCode === 'POS' ? `/pos?edit=${row.id}` : `/documents/${typeCode}/${row.id}/edit`)}
                     />
                 )}
 
@@ -1873,7 +1873,10 @@ export default function CommercialDocumentsPage() {
                     onClose={closeModal}
                     onEdit={() => {
                         const doc = items.find(d => d.id === viewDocId);
-                        if (doc) { closeModal(); openEditModal(doc); }
+                        if (doc) {
+                          if (typeCode === 'POS') { closeModal(); navigate(`/pos?edit=${viewDocId}`); }
+                          else { closeModal(); openEditModal(doc); }
+                        }
                     }}
                     isReadOnly={!!isReadOnly}
                 />

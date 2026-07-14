@@ -41,9 +41,13 @@ export default function DocumentTypesPage() {
     const { data: operationsData } = useDocumentBaseOpsList();
 
     // إنشاء خريطة id -> label
+    const operationsArray = useMemo(() => {
+        return Array.isArray(operationsData) ? operationsData : (operationsData as any)?.data ?? [];
+    }, [operationsData]);
+
     const operationMap = useMemo(() => {
         const map: Record<number, string> = {};
-        const ops = Array.isArray(operationsData) ? operationsData : (operationsData as any)?.data;
+        const ops = operationsArray;
         if (Array.isArray(ops)) {
             // دالة ترجمة احتياطية
             const translate = (name: string) => {
@@ -57,7 +61,7 @@ export default function DocumentTypesPage() {
             });
         }
         return map;
-    }, [operationsData]);
+    }, [operationsArray]);
 
     const deleteMutation = useTenantMutation(
         (id: number) => documentTypesApi.delete(id),
@@ -129,7 +133,7 @@ export default function DocumentTypesPage() {
                                 {items.map((item: any) => {
                                     // الحصول على اسم العملية من الخريطة
                                     const operationName = operationMap[item.document_base_operation_id] || '-';
-                                    const operationCode = operationsData?.find((o: any) => o.id === item.document_base_operation_id)?.name || '';
+                                    const operationCode = operationsArray.find((o: any) => o.id === item.document_base_operation_id)?.name || '';
                                     // اختيار لون البادج
                                     let badgeVariant: any = 'info';
                                     if (operationCode === 'sale') badgeVariant = 'success';

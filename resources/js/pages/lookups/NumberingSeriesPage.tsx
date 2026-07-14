@@ -15,6 +15,7 @@ import { numberingSeriesApi } from '@/lib/api/endpoints/numberingSeries';
 import { documentTypesApi } from '@/lib/api/endpoints/documentTypes';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useWarehouses } from '@/lib/api/endpoints/lookups';
+import { useActiveSlug } from '@/lib/store/appStore';
 
 // =============== Types ===============
 interface NumberingSeriesRecord {
@@ -77,6 +78,7 @@ export default function NumberingSeriesPage() {
   const deleteModal = useModal();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const slug = useActiveSlug();
 
   // Debounce search
   useEffect(() => {

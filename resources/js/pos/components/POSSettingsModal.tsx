@@ -114,7 +114,7 @@ export default function POSSettingsModal({
   };
 
   const invoiceTypes = documentTypes.filter(t =>
-    ['FV', 'BL', 'FAC', 'PRO', 'DEV'].includes(t.code),
+    ['POS', 'FV', 'BL', 'FAC', 'PRO', 'DEV'].includes(t.code),
   );
 
   const renderTab = () => {

@@ -60,13 +60,14 @@ interface Props {
   /** SSOT balance: pass from document.balance_data.previous_balance when editing */
   prevBalance?:      number;
   defaultPaymentCode?: string;
+  defaultDocTypeCode?: string;
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DOC_CODES = ['FV', 'BL', 'BCC', 'FA'] as const;
+const DOC_CODES = ['POS', 'FV', 'BL', 'BCC', 'FA'] as const;
 
 /** مبالغ الأوراق النقدية الجزائرية */
 const DZD_BILLS = [0, 200, 500, 1000, 2000, 5000];
@@ -166,6 +167,7 @@ export default function ProfessionalPaymentModal({
   existingPayments, documentDate, onClose, onConfirm, isEditing,
   prevBalance: propPrevBalance,
   defaultPaymentCode = 'cash',
+  defaultDocTypeCode = 'POS',
 }: Props) {
 
   const firstAmountRef = useRef<HTMLInputElement>(null);
@@ -195,7 +197,7 @@ export default function ProfessionalPaymentModal({
       : [];
   });
 
-  const [docTypeCode,        setDocTypeCode]        = useState<string>('FV');
+  const [docTypeCode,        setDocTypeCode]        = useState<string>(defaultDocTypeCode);
   const [dueDate,            setDueDate]            = useState('');
   const [note,               setNote]               = useState('');
   const [submitting,         setSubmitting]         = useState(false);

@@ -110,7 +110,7 @@ export interface POSSettings {
 
 export const DEFAULT_POS_SETTINGS: POSSettings = {
   defaultWarehouseId:   null,
-  defaultDocTypeCode:   'FV',
+  defaultDocTypeCode:   'POS',
   priceDisplayMode:     'ttc',
   maxDiscountPct:       0,
   discountRequirePin:   false,

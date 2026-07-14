@@ -2,7 +2,7 @@
 // pages/pos/POSPage.tsx
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
@@ -113,6 +113,7 @@ function POSPage() {
   const fiscalYear  = useSelectedFiscalYear();
   const company     = useActiveCompany();
   const navigate    = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
   const openSessionMut   = useOpenSession();
@@ -713,6 +714,21 @@ function POSPage() {
     }
   }, [isEmpty, safeToast]);
 
+  // ── Auto-open document from URL param ?edit=docId ──────────────────────────
+  const openedFromUrlRef = useRef(false);
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId && !openedFromUrlRef.current) {
+      openedFromUrlRef.current = true;
+      const id = Number(editId);
+      if (id > 0) {
+        handleOpenInvoice(id).then(() => {
+          setSearchParams({}, { replace: true });
+        });
+      }
+    }
+  }, [searchParams, handleOpenInvoice, setSearchParams]);
+
   // ── Invoice discount ───────────────────────────────────────────────────────
   // ✅ pos.totals (من calcTotals) تُطبِّق الخصم بالفعل ومرة واحدة فقط
   const invoiceDiscountAmount = pos.totals.invoice_discount_amount ?? 0;
@@ -903,8 +919,9 @@ const handleCompleteSale = useCallback(async (params: {
   }) => {
     const typeCode = params.docTypeCode ?? settings.defaultDocTypeCode;
     const invType  = documentTypes?.find(t => t.code === typeCode)
+                  ?? documentTypes?.find(t => t.code === 'POS')
+                  ?? documentTypes?.find(t => t.code === 'FV')
                   ?? documentTypes?.find(t => t.code === 'BL')
-                  ?? documentTypes?.find(t => t.code === 'FAC')
                   ?? documentTypes?.[0];
 
     if (!invType)          return { ok: false, message: 'لم يُعثَر على نوع مستند' };
@@ -1400,6 +1417,7 @@ const handleCompleteSale = useCallback(async (params: {
             documentDate={editingDocumentDate ?? new Date().toISOString().slice(0, 10)}
             prevBalance={editingDocumentId ? editingPrevBalanceRef.current : clientBalance?.current_balance}
             defaultPaymentCode={settings.defaultPaymentCode}
+            defaultDocTypeCode={settings.defaultDocTypeCode}
             onClose={() => setModal('none')}
             onConfirm={handleCompleteSale}
           />

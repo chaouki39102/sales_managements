@@ -91,6 +91,7 @@ interface VirtualRowProps {
   /** renderFn: يُستدعى بدلاً من rowNode إذا مُرِّر — يمنع حساب rowNode في الأب */
   renderFn?:  () => React.ReactNode;
   rowDataKey: string | number;  // row key للمقارنة في areEqual
+  dataHash?:  string;           // hash للبيانات — تغييره يُجبر إعادة Render
   isSelected: boolean;
   isExpanded: boolean;
   isEditing:  boolean;          // أي خلية في هذا الصف تُعدَّل
@@ -102,6 +103,7 @@ interface VirtualRowProps {
 function virtualRowAreEqual(prev: VirtualRowProps, next: VirtualRowProps): boolean {
   return (
     prev.rowDataKey === next.rowDataKey &&
+    prev.dataHash    === next.dataHash    &&
     prev.isSelected === next.isSelected &&
     prev.isExpanded === next.isExpanded &&
     prev.isEditing  === next.isEditing  &&
@@ -298,7 +300,7 @@ export function DataTable<T = Record<string, unknown>>({
   const defaultOrder = useMemo(
     () => initialColumnOrder ?? (columnDefs ?? columns).map(c => c.key),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [columnDefs, columns, initialColumnOrder],
   );
 
   const { columnOrder, setColumnOrder, dragOverKey, dragHandlers } = useColumnDragReorder(
@@ -480,6 +482,7 @@ export function DataTable<T = Record<string, unknown>>({
     toggleGroup,
     expandAll: expandAllGroups,
     collapseAll: collapseAllGroups,
+    groupSubTotals,
   } = useRowGrouping(processedData, groupBy, orderedColumns as Column<Record<string, unknown>>[]);
 
   // ── Pagination (state مُعرَّف أعلاه قبل filters) ────────────────────────
@@ -1222,7 +1225,7 @@ export function DataTable<T = Record<string, unknown>>({
                 data-row-index={absoluteIdx}
                 data-col-key={col.key}
                 onClick={e => {
-                  if (keyboardNav) activateCell({ rowIndex: absoluteIdx, colIndex: colIdx });
+                  if (keyboardNav) activateCell({ rowIndex: isVirtual ? idx : absoluteIdx, colIndex: colIdx });
                   if (enableRangeSelection) selectCell(absoluteIdx, colIdx, e.shiftKey);
                   if (canEdit && !isEditing) startEdit(rKey, col.key, rawVal, e);
                 }}
@@ -1940,14 +1943,14 @@ export function DataTable<T = Record<string, unknown>>({
                   </td>
                 </tr>
               ) : (
-                treeRows.map(({ row, level, hasChildren, collapsed: nodeCollapsed, id }) => {
+                treeRows.map(({ row, level, hasChildren, collapsed: nodeCollapsed, id }, treeIdx) => {
                   const rKey = id;
                   return (
                     <tr
                       key={String(rKey)}
                       className="dt-row"
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
-                      data-row-index={0}
+                      data-row-index={treeIdx}
                     >
                       {expandable && <td className="dt-td-exp" />}
                       {selectable && <td className="dt-td-sel" />}
@@ -2043,7 +2046,8 @@ export function DataTable<T = Record<string, unknown>>({
                           {selectable && <td />}
                           {showIndex && <td />}
                           {visibleCols.map((col, ci) => {
-                            const agg = aggregates[col.key];
+                            const groupAgg = groupSubTotals?.[String(group.value)]?.[col.key] as { value: unknown; type: string } | undefined;
+                            const agg = groupAgg ?? aggregates[col.key];
                             if (ci === 0)
                               return (
                                 <td key={col.key}>
@@ -2088,7 +2092,7 @@ export function DataTable<T = Record<string, unknown>>({
                 // حتى تحرك الـ scroll لا يُعيد render الصف ما لم تتغير بياناته
                 if (isVirtual) {
                   const isRowEditing = editingCell?.rowKey === rKey;
-                  const isRowActive = !!(activeCell && activeCell.rowIndex === absoluteIdx);
+                  const isRowActive = !!(activeCell && activeCell.rowIndex === (isVirtual ? idx : absoluteIdx));
                   const rowInRange = enableRangeSelection
                     ? isInRange(absoluteIdx, 0) // تحقق أن الصف داخل النطاق
                     : false;
