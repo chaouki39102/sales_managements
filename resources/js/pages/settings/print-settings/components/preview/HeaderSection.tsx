@@ -1,8 +1,7 @@
 import type { PrintTemplate } from '../../types';
-import type { LayoutRow } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { renderLogo } from './LogoRenderer';
-import { align, formatDate, Separator, InfoRow, renderLayoutRows, fontFamily } from './shared';
+import { align, formatDate, Separator, InfoRow, renderLayoutRows } from './shared';
 import { printFieldResolver } from '../../services';
 import { renderHeaderColumns } from './HeaderColumns';
 
@@ -60,7 +59,7 @@ const COMPANY_LABEL_MAP: Record<string, string> = {
   'co_activity':        'label_activity',
 };
 
-function renderCompanyInfo(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+function renderCompanyInfo(tpl: PrintTemplate, data: UniversalDocumentData, _isThermal: boolean) {
   const st = companyInfoStyle(tpl);
   const rows = tpl.company_info_rows ?? [];
 
@@ -80,7 +79,7 @@ function renderCompanyInfo(tpl: PrintTemplate, data: UniversalDocumentData, isTh
     if (!str.trim()) return null;
     return <div><span style={{ fontWeight: 600 }}>{label}: </span>{str}</div>;
   };
-  const SimpleField = ({ label, val }: { label: string; val: unknown }) => {
+  const SimpleField = ({ _label, val }: { _label: string; val: unknown }) => {
     if (!val) return null;
     const str = String(val);
     if (!str.trim()) return null;

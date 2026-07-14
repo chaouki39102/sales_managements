@@ -5,7 +5,7 @@
 // قابلة للتصدير واستخدامها في أي مكان آخر.
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ALL_COLUMNS, STATUS_CONFIG } from '../types/document.types';
 import type { ColKey } from '../types/document.types';
 

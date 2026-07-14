@@ -27,7 +27,7 @@ export function LineCard({
   onUpdate, onRemove, onDuplicate,
 }: LineCardProps) {
   const prod = products.find((p) => String(p.id) === line.product_id) ?? line._product;
-  const { baseQty, gross, ht, tva, ttc, discountAmt, discPct } = calcLineTotal(line);
+  const { baseQty, gross: _gross, ht, tva, ttc, discountAmt, discPct: _discPct } = calcLineTotal(line);
   const packagings = prod?.packagings ?? [];
   const selectedPack = line.packaging_id
     ? packagings.find((p) => String(p.id) === line.packaging_id)

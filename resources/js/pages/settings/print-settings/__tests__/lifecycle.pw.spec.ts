@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { createMockTemplate } from './fixtures/templates';
 
 test.describe('Print Settings — Lifecycle', () => {
   test('loads the page without errors', async ({ page }) => {

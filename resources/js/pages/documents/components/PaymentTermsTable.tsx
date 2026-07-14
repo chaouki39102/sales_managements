@@ -1,6 +1,6 @@
 import React from 'react';
-import { inputStyle, labelStyle } from './DocumentUIPrimitives';
-import { fmtDZD, toNum } from '../utils/document.utils';
+import { inputStyle } from './DocumentUIPrimitives';
+import { fmtDZD } from '../utils/document.utils';
 import type { PaymentTerm } from '../types/document.types';
 
 interface PaymentTermsTableProps {

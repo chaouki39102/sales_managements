@@ -22,7 +22,7 @@ import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
-import { validateTemplateIntegrity, TEMPLATE_VERSION } from './services/SettingsSerializer';
+import { validateTemplateIntegrity } from './services/SettingsSerializer';
 
 const PAPER_DIM: Record<string, { w: number; h: number }> = {
   '80mm': { w: 80,  h: 0   },

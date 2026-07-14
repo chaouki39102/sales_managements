@@ -14,7 +14,7 @@ function makeTpl(doc: DocType, paper: PaperSize, overrides: Record<string, any> 
   );
 
   // Enable all toggle dependsOn parents so children are un-gated for doc/paper tests
-  for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+  for (const [_key, meta] of Object.entries(SETTINGS_REGISTRY)) {
     if (meta.dependsOn) {
       const parentMeta = SETTINGS_REGISTRY[meta.dependsOn];
       if (parentMeta && parentMeta.component === 'toggle') {

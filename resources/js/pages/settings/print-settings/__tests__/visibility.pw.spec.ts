@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { getRegistryKeys } from './helpers/test-utils';
 
 test.describe('Print Settings — Visibility', () => {
   test.beforeEach(async ({ page }) => {

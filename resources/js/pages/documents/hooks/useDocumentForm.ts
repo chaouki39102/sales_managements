@@ -50,7 +50,6 @@ import {
 import { useComputeLine } from './useComputeLine';
 import type { ComputeLineWarning } from './useComputeLine';
 import {
-  PURCHASE_CODES,
   REQUIRES_PARTY,
   STOCK_IN_CODES,
   STOCK_OUT_CODES,

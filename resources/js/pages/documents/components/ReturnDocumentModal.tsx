@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { fmtDZD } from '../utils/document.utils';
 import { useCreateReturn } from '../hooks/useDocumentChain';
-import type { LineItem } from '../types/document.types';
+
 
 interface ReturnLine {
   line_id:       number;

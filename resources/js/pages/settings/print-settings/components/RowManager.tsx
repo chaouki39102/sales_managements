@@ -32,7 +32,7 @@ function nextColId(rowId: string, cols: LayoutColumn[]): string {
   return `${rowId}_col_${cols.length}`;
 }
 
-function createDefaultColumn(field: string, label: string): LayoutColumn {
+function _createDefaultColumn(field: string, label: string): LayoutColumn {
   return {
     id: '',
     field,
@@ -156,7 +156,7 @@ export function RowManager({ rows, onChange, fields, addLabel = '+ إضافة س
     }];
   };
 
-  const fieldLabel = (fieldVal: string) =>
+  const _fieldLabel = (fieldVal: string) =>
     fields?.find(f => f.value === fieldVal)?.label ?? fieldVal;
 
   return (

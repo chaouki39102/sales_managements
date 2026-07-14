@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import type { PrintTemplate, FontFamily } from '../types';
+import type { PrintTemplate } from '../types';
 import type { CompanyData } from '../types';
-import { Toggle, Field, Input, Select, Pills, SectionTitle } from './ui';
+import { Toggle, Field, Input, Pills, SectionTitle } from './ui';
 import { Accordion } from './Accordion';
 import type { Updater } from './ColumnManager';
 import { Section } from '../sections/ToggleSwitch';

@@ -30,7 +30,6 @@ import { ConfirmDialog } from '@/components/ui';
 import { ComboBox } from '@/pages/documents/components/DocumentUIPrimitives';
 import type { TreasuryAccount, PaymentMode } from '@/types';
 
-
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
     n.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

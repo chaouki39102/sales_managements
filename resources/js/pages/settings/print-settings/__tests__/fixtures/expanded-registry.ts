@@ -35,7 +35,7 @@ export interface ExpandedSetting extends SettingMeta {
 }
 
 export function getExpandedRegistry(): ExpandedSetting[] {
-  return Object.entries(SETTINGS_REGISTRY).map(([key, meta]) => ({
+  return Object.entries(SETTINGS_REGISTRY).map(([_key, meta]) => ({
     ...meta,
     expandedDocs: expand(meta.supportedDocs as unknown as string[]),
     expandedPapers: expand(meta.supportedPapers as unknown as string[]),

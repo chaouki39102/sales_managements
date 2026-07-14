@@ -11,7 +11,7 @@ interface LotCellProps {
   onUpdate:   (idx: number, patch: Partial<LineItem>) => void;
 }
 
-export function LotCell({ line, idx, prod, disabled, onUpdate }: LotCellProps) {
+export function LotCell({ line, idx, prod: _prod, disabled, onUpdate }: LotCellProps) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);

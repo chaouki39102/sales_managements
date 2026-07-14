@@ -3,7 +3,7 @@ import {
 } from 'react';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { apiPost } from '@/lib/api/core/client';
-import type { LineItem } from '../types/document.types';
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

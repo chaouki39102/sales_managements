@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SETTINGS_REGISTRY, getSettingMeta } from '../services/SettingsRegistry';
-import { getExpandedRegistry, ALL_DOC_TYPES, ALL_PAPER_SIZES, SETTING_COUNT } from './fixtures/expanded-registry';
+import { getExpandedRegistry, ALL_DOC_TYPES, SETTING_COUNT } from './fixtures/expanded-registry';
 
 const VALID_CATEGORIES = [
   'global', 'paper', 'header', 'company', 'document', 'columns', 'items',
@@ -33,13 +33,13 @@ describe('SettingsRegistry — Structural Validation', () => {
   });
 
   it('every entry should have a valid category', () => {
-    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+    for (const [_key, meta] of Object.entries(SETTINGS_REGISTRY)) {
       expect(VALID_CATEGORIES.includes(meta.category as any)).toBe(true);
     }
   });
 
   it('every entry should have a valid component', () => {
-    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+    for (const [_key, meta] of Object.entries(SETTINGS_REGISTRY)) {
       expect(VALID_COMPONENTS.includes(meta.component as any)).toBe(true);
     }
   });
@@ -111,7 +111,7 @@ describe('SettingsRegistry — Visibility Scope Validation', () => {
   });
 
   it('paper_width_mm should only be for thermal papers', () => {
-    const meta = getSettingMeta('paper_width_mm')!;
+    const _meta = getSettingMeta('paper_width_mm')!;
     const expandedPapers = expanded.find(s => s.key === 'paper_width_mm')!.expandedPapers;
     expect(expandedPapers).toContain('80mm');
     expect(expandedPapers).toContain('58mm');
