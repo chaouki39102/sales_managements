@@ -354,7 +354,7 @@ function Step4({ form, onChange }: { form: FiscalForm; onChange: (k: keyof Fisca
         <div style={{ marginTop:24, padding:'14px 18px', background:'var(--emb)', border:'1px solid var(--embo)', borderRadius:'var(--r2)', display:'flex', alignItems:'center', gap:12 }}>
           <i className="ti ti-circle-check" style={{ color:'var(--em)', fontSize:20 }} />
           <div style={{ fontSize:13, color:'var(--t1)' }}>
-            سيتم إنشاء <strong>"{form.name}"</strong> من{' '}
+            سيتم إنشاء <strong>&ldquo;{form.name}&rdquo;</strong> من{' '}
             <strong>{new Date(form.start_date).toLocaleDateString('ar-DZ')}</strong> إلى{' '}
             <strong>{new Date(form.end_date).toLocaleDateString('ar-DZ')}</strong>
           </div>

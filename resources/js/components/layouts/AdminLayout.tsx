@@ -54,7 +54,7 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
 
 export default function AdminLayout() {
   const { user, logout }   = useAuth();
-  const navigate            = useNavigate();
+  const _navigate           = useNavigate();
   const location            = useLocation();
   const { data: stats }     = useAdminDashboard();
   const { dark, toggle: toggleTheme } = useTheme();

@@ -11,7 +11,7 @@
 // ✅ createPortal + Smart positioning (RTL-aware)
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useLayoutEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { createPortal }                          from 'react-dom';
 import type { Column }                           from './types';
 import { decodeRange, encodeRange, getRawValue } from './utils';
@@ -128,7 +128,16 @@ const FilterPopup = memo(function FilterPopup({
 
   const popupRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  // تاب التاريخ: 'shortcuts' | 'manual'
+  // For dynamic-multiselect with fetchOptions: async loaded values
+  const [fetchedValues, setFetchedValues] = useState<string[] | null>(null);
+  const fetchFn = col.filter?.type === 'dynamic-multiselect' ? col.filter.fetchOptions : undefined;
+  useEffect(() => {
+    if (!fetchFn) { setFetchedValues(null); return; }
+    let cancelled = false;
+    fetchFn().then(vals => { if (!cancelled) setFetchedValues(vals); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [fetchFn]);
+
   const [dateTab, setDateTab] = useState<'shortcuts' | 'manual'>(
     () => {
       if (col.filter?.type !== 'date') return 'shortcuts';
@@ -471,9 +480,8 @@ const FilterPopup = memo(function FilterPopup({
   );
 
   if (type === 'dynamic-multiselect') {
-    const sourceData = allData ?? data ?? [];
-    const rawValues = [...new Set(
-      sourceData.map(row => { const v = getRawValue(row, col); return v == null ? '' : String(v); }).filter(Boolean)
+    const rawValues = fetchedValues ?? [...new Set(
+      (allData ?? data ?? []).map(row => { const v = getRawValue(row, col); return v == null ? '' : String(v); }).filter(Boolean)
     )];
     return createPortal(
       <div ref={popupRef} className="dt-flt-popup dt-flt-popup--multi"

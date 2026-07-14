@@ -112,6 +112,8 @@ class CommercialDocument extends Model
         'document_status_id',
         'is_locked',
         'is_exported_to_accounting',
+        'validated_by',
+        'user_id',
         // حقول تاريخية (يدعم Spatie النطاق: filter[document_date]=2024-01-01,2024-12-31)
         'document_date',
         'due_date',
@@ -134,6 +136,8 @@ class CommercialDocument extends Model
         'party.name',
         'warehouse.name',
         'document_status.name',
+        'validatedBy.name',
+        'user.name',
         // بحث نصي موحد
         'search',
     ];

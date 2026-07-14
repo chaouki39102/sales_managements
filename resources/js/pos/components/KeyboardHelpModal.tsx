@@ -217,12 +217,12 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
         <div className="m-body">
           {listening && editing && (
             <div className="al al-i" style={{ marginBottom: 12 }}>
-              <i className="ti ti-keyboard" /> اضغط المفتاح الذي تريد تعيينه لـ "<b>{groups.flatMap(g => g.items).find(i => i.action === editing)?.desc}</b>" — <b>Esc</b> للإلغاء — يمكنك استخدام تركيبة مثل <kbd style={{background:'var(--bg4)',padding:'1px 5px',borderRadius:3}}>Ctrl+K</kbd>
+              <i className="ti ti-keyboard" /> اضغط المفتاح الذي تريد تعيينه لـ &ldquo;<b>{groups.flatMap(g => g.items).find(i => i.action === editing)?.desc}</b>&rdquo; — <b>Esc</b> للإلغاء — يمكنك استخدام تركيبة مثل <kbd style={{background:'var(--bg4)',padding:'1px 5px',borderRadius:3}}>Ctrl+K</kbd>
             </div>
           )}
           {conflict && (
             <div className="al al-r" style={{ marginBottom: 12 }}>
-              <i className="ti ti-alert-triangle" /> هذا المفتاح مستخدم بالفعل لـ "<b>{conflict}</b>"
+              <i className="ti ti-alert-triangle" /> هذا المفتاح مستخدم بالفعل لـ &ldquo;<b>{conflict}</b>&rdquo;
             </div>
           )}
           <div className="kb-help-groups">

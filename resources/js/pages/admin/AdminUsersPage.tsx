@@ -355,7 +355,7 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
                   border: '1px solid #ef444430', background: '#ef444410',
                 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>
-                    هل أنت متأكد من حذف "{user.name}"؟
+                    هل أنت متأكد من حذف &ldquo;{user.name}&rdquo;؟
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--t3)', marginBottom: 12 }}>
                     هذا الإجراء لا يمكن التراجع عنه. سيتم حذف المستخدم وكل بياناته.

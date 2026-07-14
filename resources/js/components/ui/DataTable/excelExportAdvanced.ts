@@ -16,7 +16,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import ExcelJS from 'exceljs';
-import React, { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Column, AggregateType, DocumentInfo, ExcelExportAdvancedOptions } from './types';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -219,41 +219,41 @@ const outerBold = (): Partial<ExcelJS.Borders> => ({
 function styleTitle(cell: ExcelJS.Cell) {
   cell.font      = { bold: true, size: 16, color: { argb: T.titleFg }, name: 'Calibri' };
   cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.titleBg } };
-  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true, readingOrder: 'rightToLeft' };
+  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true, readingOrder: 'rtl' };
   cell.border    = thickBox();
 }
 
 function styleSubtitle(cell: ExcelJS.Cell) {
   cell.font      = { italic: true, size: 10, color: { argb: 'FFAABBCC' }, name: 'Calibri' };
   cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.titleBg } };
-  cell.alignment = { horizontal: 'center', vertical: 'middle', readingOrder: 'rightToLeft' };
+  cell.alignment = { horizontal: 'center', vertical: 'middle', readingOrder: 'rtl' };
 }
 
 function styleHeader(cell: ExcelJS.Cell) {
   cell.font      = { bold: true, size: 11, color: { argb: T.headerFg }, name: 'Calibri' };
   cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.headerBg } };
-  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true, readingOrder: 'rightToLeft' };
+  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true, readingOrder: 'rtl' };
   cell.border    = allBorders('thin', T.borderDark);
 }
 
 function styleFooter(cell: ExcelJS.Cell, isLabel = false) {
   cell.font      = { bold: true, size: 11, color: { argb: T.footerFg }, name: 'Calibri' };
   cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: isLabel ? T.footerBg : T.footerSumBg } };
-  cell.alignment = { horizontal: isLabel ? 'right' : 'center', vertical: 'middle', readingOrder: 'rightToLeft' };
+  cell.alignment = { horizontal: isLabel ? 'right' : 'center', vertical: 'middle', readingOrder: 'rtl' };
   cell.border    = outerBold();
 }
 
 function styleInfoLabel(cell: ExcelJS.Cell) {
   cell.font      = { bold: true, size: 10, color: { argb: T.infoFg }, name: 'Calibri' };
   cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.infoBg } };
-  cell.alignment = { horizontal: 'right', vertical: 'middle', readingOrder: 'rightToLeft' };
+  cell.alignment = { horizontal: 'right', vertical: 'middle', readingOrder: 'rtl' };
   cell.border    = allBorders('thin', T.borderLight);
 }
 
 function styleInfoValue(cell: ExcelJS.Cell) {
   cell.font      = { size: 10, color: { argb: T.textSub }, name: 'Calibri' };
   cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.whiteBg } };
-  cell.alignment = { horizontal: 'right', vertical: 'middle', readingOrder: 'rightToLeft' };
+  cell.alignment = { horizontal: 'right', vertical: 'middle', readingOrder: 'rtl' };
   cell.border    = allBorders('thin', T.borderLight);
 }
 
@@ -261,7 +261,7 @@ function styleInfoValue(cell: ExcelJS.Cell) {
 function styleData(cell: ExcelJS.Cell, value: unknown, isAlt: boolean, align: 'right' | 'center' | 'left' = 'right') {
   cell.font      = { size: 10, name: 'Calibri', color: { argb: T.textMain } };
   cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? T.altRowBg : T.whiteBg } };
-  cell.alignment = { horizontal: align, vertical: 'middle', readingOrder: 'rightToLeft' };
+  cell.alignment = { horizontal: align, vertical: 'middle', readingOrder: 'rtl' };
   cell.border    = allBorders('thin', T.borderLight);
 
   // ✅ للأرقام السالبة: أحمر + قوسين محاسبيين
@@ -274,7 +274,7 @@ function styleData(cell: ExcelJS.Cell, value: unknown, isAlt: boolean, align: 'r
 function styleAmountWords(cell: ExcelJS.Cell) {
   cell.font      = { italic: true, size: 9, color: { argb: T.infoFg }, name: 'Calibri' };
   cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: T.aggLabelBg } };
-  cell.alignment = { horizontal: 'right', vertical: 'middle', readingOrder: 'rightToLeft', wrapText: true };
+  cell.alignment = { horizontal: 'right', vertical: 'middle', readingOrder: 'rtl', wrapText: true };
   cell.border    = allBorders('thin', T.borderLight);
 }
 

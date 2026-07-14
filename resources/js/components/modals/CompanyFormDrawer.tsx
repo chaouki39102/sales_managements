@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════
 import React, { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/coreclient';
+
 import { useAuth } from '@/context/AuthContext';
 import client from '@/lib/api/core/client';
 

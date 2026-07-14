@@ -6,7 +6,7 @@
 // ════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback } from "react";
 import client from "@/lib/api/core/client";
-import { appActions } from '@/lib/store/appStore';
+
 
 // ── Types ─────────────────────────────────────────────────────────
 interface Company {

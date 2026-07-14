@@ -286,7 +286,7 @@ export default function CustomerSearchModal({
                       type="button"
                       style={{ marginTop: 8 }}
                     >
-                      <i className="ti ti-plus" /> إنشاء "{query}"
+                      <i className="ti ti-plus" /> إنشاء &ldquo;{query}&rdquo;
                     </button>
                   </div>
                 )}

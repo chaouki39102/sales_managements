@@ -43,6 +43,8 @@ export default function CommercialDocumentModal({
   onSaved,
 }: CommercialDocumentModalProps) {
 
+  const [alertsOpen, setAlertsOpen] = React.useState(true);
+
   const ctrl = useCommercialDocumentController({
     documentType,
     existingDocument,
@@ -176,7 +178,6 @@ export default function CommercialDocumentModal({
           }
           if (infoAlerts.length === 0) return null;
 
-          const [alertsOpen, setAlertsOpen] = React.useState(true);
           return (
             <div style={{
               flexShrink: 0, borderBottom: '1px solid var(--b1)',

@@ -39,6 +39,37 @@ class ApprovalController extends BaseApiController
         }
     }
 
+    public function checkBatch(Request $request, $company): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'document_ids' => 'required|array|max:100',
+                'document_ids.*' => 'integer|exists:commercial_documents,id',
+            ]);
+
+            $documents = \App\Models\CommercialDocument::whereIn('id', $validated['document_ids'])->get();
+            $results = [];
+
+            foreach ($documents as $document) {
+                $requiresApproval = $this->approvalService->requiresApproval($document);
+                $threshold = $this->approvalService->findThreshold($document);
+                $results[$document->id] = [
+                    'requires_approval' => $requiresApproval,
+                    'threshold' => $threshold ? [
+                        'id' => $threshold->id,
+                        'min_amount' => (float) $threshold->min_amount,
+                        'max_amount' => $threshold->max_amount ? (float) $threshold->max_amount : null,
+                        'role_id' => $threshold->role_id,
+                    ] : null,
+                ];
+            }
+
+            return response()->json($results);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
     public function submit($company, int $documentId): JsonResponse
     {
         try {
@@ -95,7 +126,7 @@ class ApprovalController extends BaseApiController
     public function thresholds($company): JsonResponse
     {
         try {
-            $thresholds = ApprovalThreshold::where('company_id', (int) $company)->get();
+            $thresholds = ApprovalThreshold::all();
             return response()->json($thresholds);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);

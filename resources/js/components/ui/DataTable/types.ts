@@ -12,7 +12,7 @@ export type FilterDef =
   | { type: 'date';   presets?: string[] }   // قائمة preset keys من DATE_SHORTCUT_GROUPS
   | { type: 'select'; options: readonly { value: string; label: string }[] }
   | { type: 'multiselect'; options: readonly { value: string; label: string }[] }
-  | { type: 'dynamic-multiselect'; labelFormatter?: (v: string) => string };
+  | { type: 'dynamic-multiselect'; labelFormatter?: (v: string) => string; fetchOptions?: () => Promise<string[]> };
 
 export type RangeFilter = { min: string; max: string };
 
@@ -69,6 +69,10 @@ export interface Column<T = Record<string, unknown>> {
   disablePin?: boolean;
   validation?: CellValidationRule;
   groupRenderer?: (groupValue: unknown, rows: T[]) => ReactNode;
+  /** Tooltip shown on cell hover — static string or dynamic function */
+  tooltip?: string | ((row: T, rowIndex: number) => string);
+  /** Tooltip shown on column header hover */
+  headerTooltip?: string;
 }
 
 export interface SortState {
@@ -282,9 +286,9 @@ export interface SavedViewsConfig {
 // ─── Context Menu ───────────────────────────────────────────────────────────
 
 export interface ContextMenuItem {
-  label: string;
+  label?: string;
   icon?: string;
-  onClick: (context: ContextMenuContext) => void;
+  onClick?: (context: ContextMenuContext) => void;
   divider?: boolean;
   disabled?: boolean;
 }
@@ -295,6 +299,7 @@ export interface ContextMenuContext {
   rowIndex?: number;
   colKey?: string;
   value?: unknown;
+  selectedKeys?: ReadonlySet<string | number>;
   originalEvent: React.MouseEvent;
 }
 
@@ -344,6 +349,8 @@ export interface DataTableProps<T = Record<string, unknown>> {
   indexHeader?: string;
 
   rowActions?: (row: T) => ReactNode;
+  /** Floating action bar rendered on row hover — more compact than rowActions column */
+  hoverActions?: (row: T) => ReactNode;
   headerActions?: ReactNode;
   title?: ReactNode;
   emptyText?: ReactNode;
@@ -402,6 +409,9 @@ export interface DataTableProps<T = Record<string, unknown>> {
   treeData?: import('./hooks').TreeConfig;
   columnGroups?: import('./hooks').ColumnGroupDef[];
   enableRangeSelection?: boolean;
+  enableQuickFilter?: boolean;
+  /** For server-paged tables: called during export to fetch ALL rows across all pages */
+  fetchAllForExport?: () => Promise<T[]>;
 }
 
 export interface EditingCell {
@@ -416,6 +426,7 @@ export const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100] as const;
 export const SKELETON_WIDTHS = [70, 55, 82, 60, 75, 50, 88, 63, 72, 58] as const;
 export const MIN_COL_WIDTH = 60;
 export const SEARCH_DEBOUNCE = 180;
+export const FILTER_DEBOUNCE = 250;
 export const DEFAULT_ROW_HEIGHT = 40;
 export const DEFAULT_CONTAINER_HEIGHT = 500;
 export const DEFAULT_OVERSCAN = 5;

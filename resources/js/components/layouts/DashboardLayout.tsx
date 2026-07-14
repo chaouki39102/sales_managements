@@ -109,52 +109,7 @@ const NAV_GROUPS = [
 
 const LABEL_COLORS = ['var(--em)','var(--blue)','var(--purple)','var(--gold)','var(--orange)','var(--teal)'];
 
-const PAGE_META: Record<string, { title: string; path: string }> = {
-  'dashboard':               { title: 'لوحة التحكم',        path: 'الرئيسية ← إحصائيات'   },
-  'pos':                     { title: 'نقطة البيع',          path: 'الرئيسية ← POS'         },
-  'documents/DEV':           { title: 'فاتورة شكلية',       path: 'مبيعات ← عروض أسعار'   },
-  'documents/BCC':           { title: 'طلبيات الزبائن',     path: 'مبيعات ← طلبيات'       },
-  'documents/BL':            { title: 'وصل التسليم',        path: 'مبيعات ← وصل تسليم'    },
-  'documents/FV':            { title: 'فواتير البيع',       path: 'مبيعات ← فواتير'        },
-  'documents/AV':            { title: 'مرتجعات البيع',      path: 'مبيعات ← مرتجعات'      },
-  'documents/DDP':           { title: 'طلبات فاتورة شكلية', path: 'مشتريات ← طلبات عروض'  },
-  'documents/BCF':           { title: 'أوامر الشراء',       path: 'مشتريات ← أوامر شراء'  },
-  'documents/BR':            { title: 'وصل الاستلام',       path: 'مشتريات ← وصل استلام'  },
-  'documents/FA':            { title: 'فواتير الشراء',      path: 'مشتريات ← فواتير شراء' },
-  'documents/AA':            { title: 'مرتجعات الشراء',     path: 'مشتريات ← مرتجعات'     },
-  'products':                { title: 'المنتجات',            path: 'مخزون ← منتجات'         },
-  'inventory':               { title: 'إدارة المخزون',      path: 'مخزون ← جرد'            },
-  'categories':              { title: 'الفئات',              path: 'مخزون ← فئات'           },
-  'brands':                  { title: 'العلامات التجارية',  path: 'مخزون ← علامات'         },
-  'units':                   { title: 'وحدات القياس',       path: 'مخزون ← وحدات'          },
-  'suppliers':               { title: 'الموردون',            path: 'مخزون ← موردون'         },
-  'warehouses':              { title: 'المستودعات',          path: 'مخزون ← مستودعات'       },
-  'clients':                 { title: 'الزبائن',             path: 'محاسبة ← زبائن'         },
-  'finance':                 { title: 'الخزينة',             path: 'محاسبة ← خزينة'         },
-  'checks':                  { title: 'الشيكات',             path: 'محاسبة ← شيكات'         },
-  'expenses':                { title: 'المصروفات',           path: 'محاسبة ← مصروفات'       },
-  'debts':                   { title: 'الديون',              path: 'محاسبة ← ديون'          },
-  'tva':                     { title: 'إقرار TVA — G50',     path: 'محاسبة ← TVA'           },
-  'fiscal':                  { title: 'الملف الجبائي',      path: 'محاسبة ← جبايات'        },
-  'fiscalyears':             { title: 'السنوات المالية',     path: 'محاسبة ← سنوات مالية'  },
-  'currencies':              { title: 'العملات',             path: 'محاسبة ← عملات'         },
-  'pricelevels':             { title: 'مستويات الأسعار',    path: 'محاسبة ← مستويات أسعار' },
-  'employees':               { title: 'الموظفون',            path: 'موارد بشرية ← موظفون'   },
-  'reports':                 { title: 'التقارير',            path: 'تقارير'                  },
-  'balance':                 { title: 'الميزانية التقديرية', path: 'تقارير ← ميزانية'       },
-  'notifications':           { title: 'التنبيهات',           path: 'نظام ← تنبيهات'          },
-  'users':                   { title: 'المستخدمون',          path: 'نظام ← مستخدمون'        },
-  'settings':                { title: 'الإعدادات',           path: 'نظام ← إعدادات'         },
-  'settings/document-types': { title: 'أنواع المستندات',    path: 'نظام ← أنواع المستندات' },
-  'settings/print':          { title: 'إعدادات الطباعة',     path: 'نظام ← إعدادات الطباعة' },
-  'settings/print/designer': { title: 'مصمم القوالب',        path: 'نظام ← مصمم القوالب' },
-  'numbering-series':        { title: 'سلاسل الترقيم',      path: 'نظام ← سلاسل الترقيم'   },
-  'expense-categories':      { title: 'فئات المصروفات',     path: 'نظام ← فئات المصروفات'  },
-  'bank-reconciliation':    { title: 'المطابقة البنكية',   path: 'محاسبة ← مطابقة بنكية' },
-  'audit-log':              { title: 'سجل التدقيق',        path: 'نظام ← سجل تدقيق'       },
-  'alerts':                 { title: 'التنبيهات الذكية',   path: 'نظام ← تنبيهات ذكية'    },
-  'admin/companies':         { title: 'إدارة الشركات',      path: 'Super Admin ← الشركات'  },
-};
+
 
 // ════════════════════════════════════════════════
 // نافذة إنشاء السنة المالية — إجبارية لا تُغلَق
@@ -336,7 +291,7 @@ function NoFiscalYearModal({ onCreated }: { onCreated: () => void }) {
 // CompanySwitcher — تبديل الشركة من الـ Sidebar
 // ════════════════════════════════════════════════
 function CompanySwitcher() {
-  const { user, activeCompany, setActiveCompany } = useAuth() as any;
+  const { user: _user, activeCompany, setActiveCompany } = useAuth() as any;
   const navigate = useNavigate();
   const [open, setOpen]         = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -478,7 +433,7 @@ function CompanySwitcher() {
           )}
 
           {/* List */}
-          {!loading && companies.map((co: any, i: number) => {
+          {!loading && companies.map((co: any, _i: number) => {
             const isActive   = co.id === activeCompany?.id;
             const isSwitching = switching === co.id;
             const suspended  = co.is_suspended;

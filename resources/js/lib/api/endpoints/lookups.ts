@@ -80,6 +80,7 @@ export const tenantLookupsApi = {
   warehouses:          () => apiGet<Warehouse[]>('/warehouses',                   { per_page: 50  }),
   paymentModes:        () => apiGet<PaymentMode[]>('/payment-modes',              { per_page: 50  }),
   exchangeRates:       () => apiGet<ExchangeRate[]>('/exchange-rates',            { per_page: 50  }),
+  latestExchangeRates: () => apiGet<ExchangeRate[]>('/exchange-rates/latest'),
   expenseCategories:   () => apiGet<ExpenseCategory[]>('/expense-categories',     { per_page: 100 }),
   documentTypes:       () => apiGet<DocumentType[]>('/document-types',            { per_page: 50  }),
   documentStatuses:    () => apiGet<DocumentStatus[]>('/document-statuses',       { per_page: 50  }),
@@ -175,6 +176,17 @@ export const usePriceLevels         = () => useTenantLookup(tenantKeys.lookups.p
 export const useWarehouses          = () => useTenantLookup(tenantKeys.lookups.warehouses,          tenantLookupsApi.warehouses);
 export const usePaymentModes        = () => useTenantLookup(tenantKeys.lookups.paymentModes,        tenantLookupsApi.paymentModes);
 export const useExchangeRates       = () => useTenantLookup(tenantKeys.lookups.exchangeRates,       tenantLookupsApi.exchangeRates);
+
+// P4.1 — Latest exchange rates (single query, not paginated)
+export function useExchangeRateLatest() {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:  [slug, 'exchange-rates-latest'],
+    queryFn:   () => tenantLookupsApi.latestExchangeRates(),
+    enabled:   !!slug,
+    staleTime: 5 * 60_000,
+  });
+}
 export const useExpenseCategories   = () => useTenantLookup(tenantKeys.lookups.expenseCategories,   tenantLookupsApi.expenseCategories);
 export const useDocumentTypes       = () => useTenantLookup(tenantKeys.lookups.documentTypes,       tenantLookupsApi.documentTypes);
 export const useDocumentStatuses    = () => useTenantLookup(tenantKeys.lookups.documentStatuses,    tenantLookupsApi.documentStatuses);

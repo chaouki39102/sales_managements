@@ -17,7 +17,7 @@ interface Props {
 export function CompaniesTab({ user: u, onFlash, onRefreshUser }: Props) {
   const deleteConfirm = useConfirm();
   const [searchQ, setSearchQ] = useState('');
-  const [transferId, setTransferId] = useState('');
+  const [_transferId, _setTransferId] = useState('');
   const [searching,  setSearching]  = useState(false);
   const [searchRes,  setSearchRes]  = useState<AdminCompany[]>([]);
 

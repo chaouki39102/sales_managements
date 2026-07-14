@@ -35,28 +35,26 @@ import './datatable.css';
 import React, {
   useState, useMemo, useCallback,
   useRef, useEffect, memo,
-  type ReactNode, type CSSProperties,
 } from 'react';
 
 import type {
-  DataTableProps, Column, MultiSortState, EditingCell,
-  FilterMap, AggregateType, PaginationConfig,
-  ActiveCell, PendingEdit, SavedView, ContextMenuContext,
-  ContextMenuItem, ExcelExportOptions, ExportConfig, ExportFormat,
+  DataTableProps, Column, EditingCell,
+  FilterMap, AggregateType,
+  SavedView, ContextMenuContext,
+  ContextMenuItem, ExportFormat,
 } from './types';
 
 import {
   AGG_CYCLE, AGG_LABELS,
-  PER_PAGE_OPTIONS, SKELETON_WIDTHS, MIN_COL_WIDTH, SEARCH_DEBOUNCE,
+  PER_PAGE_OPTIONS, SEARCH_DEBOUNCE, FILTER_DEBOUNCE,
   DEFAULT_ROW_HEIGHT, DEFAULT_CONTAINER_HEIGHT,
 } from './types';
 
 import {
   getRawValue, getTextAlign,
-  applyClientFilter, applyGlobalSearch, applyClientSort, applyMultiSort,
   applyConditionalFormat,
   computeAggregate, exportToCSV, buildPageNumbers,
-  exportToExcel, exportToJSON, exportToPrint, parseTSV,
+  exportToExcel, exportToJSON, exportToPrint,
 } from './utils';
 
 import {
@@ -121,7 +119,7 @@ const VirtualRow = memo(function VirtualRow({ rowNode, renderFn }: VirtualRowPro
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
-export function DataTable<T = Record<string, unknown>>({
+export function DataTable<T extends Record<string, unknown> = Record<string, unknown>>({
   // بيانات أساسية
   data,
   columns,
@@ -168,6 +166,7 @@ export function DataTable<T = Record<string, unknown>>({
 
   // أزرار وإجراءات
   rowActions,
+  hoverActions,
   headerActions,
   title,
   emptyText = 'لا توجد بيانات',
@@ -211,6 +210,8 @@ export function DataTable<T = Record<string, unknown>>({
   treeData: treeConfig,
   columnGroups,
   enableRangeSelection = false,
+  fetchAllForExport,
+  enableQuickFilter = false,
 }: DataTableProps<T>) {
   // ── Responsive ────────────────────────────────────────────────────────────
   const isMobile = useIsMobile(639);
@@ -227,6 +228,13 @@ export function DataTable<T = Record<string, unknown>>({
     const src = columnDefs ?? columns;
     return new Set(src.filter(c => c.defaultHidden).map(c => c.key));
   });
+
+  // Sync from parent prop when it changes (controlled mode)
+  useEffect(() => {
+    if (hiddenColumnKeys) {
+      setHiddenKeys(new Set(hiddenColumnKeys));
+    }
+  }, [hiddenColumnKeys]);
 
   // updateHidden: دالة مركزية تُعدِّل hiddenKeys وتُعلم الأب دائماً
   // تستخدمها: toggleColVisibility + toggleCollapseAll + handleApplyView
@@ -267,7 +275,7 @@ export function DataTable<T = Record<string, unknown>>({
     setHiddenKeys(prev => {
       const next = new Set(prev);
       const willBeHidden = !next.has(key);
-      willBeHidden ? next.add(key) : next.delete(key);
+      if (willBeHidden) next.add(key); else next.delete(key);
       // إعلام الأب: toggle فردي
       onHiddenColumnsChangeRef.current?.(key, willBeHidden, [...next]);
       return next;
@@ -294,7 +302,7 @@ export function DataTable<T = Record<string, unknown>>({
   const initialWidthsRef = useRef<Record<string, number>>(
     Object.fromEntries((columnDefs ?? columns).filter(c => c.width).map(c => [c.key, c.width!])),
   );
-  const { widths: colWidths, startResize, resetWidth } = useColumnResize(initialWidthsRef.current);
+  const { widths: colWidths, startResize, autoSize } = useColumnResize(initialWidthsRef.current);
 
   // ── Column Reorder (v9) ───────────────────────────────────────────────────
   const defaultOrder = useMemo(
@@ -359,6 +367,7 @@ export function DataTable<T = Record<string, unknown>>({
 
   useEffect(() => () => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
   }, []);
 
   // ── Pagination state — مُعرَّف هنا لأن handleFilterChange تحتاجه ──────────
@@ -368,6 +377,7 @@ export function DataTable<T = Record<string, unknown>>({
   // ── Column filters ────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<FilterMap>(() => url.readInitialFilters());
   const onFilterChangeRef = useRef(onFilterChange);
+  const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     onFilterChangeRef.current = onFilterChange;
   }, [onFilterChange]);
@@ -378,9 +388,12 @@ export function DataTable<T = Record<string, unknown>>({
     (key: string, val: string) => {
       setFilters(prev => {
         const next = { ...prev };
-        val ? (next[key] = val) : delete next[key];
+        if (val) next[key] = val; else delete next[key];
         url.writeFilters(next);
-        Promise.resolve().then(() => onFilterChangeRef.current?.(next));
+        if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+        filterTimerRef.current = setTimeout(() => {
+          onFilterChangeRef.current?.(next);
+        }, FILTER_DEBOUNCE);
         return next;
       });
       // setLocalPage مُعرَّف لاحقاً لكن useState يعمل بـ hoisting — آمن
@@ -441,8 +454,6 @@ export function DataTable<T = Record<string, unknown>>({
   );
 
   // كتابة URL بعد تحديث sorts (ليس أثناء render)
-  const sortsRef = useRef(sorts);
-  useEffect(() => { sortsRef.current = sorts; }, [sorts]);
   useEffect(() => {
     if (!url.enabled) return;
     url.writeSort(sorts);
@@ -485,6 +496,83 @@ export function DataTable<T = Record<string, unknown>>({
     groupSubTotals,
   } = useRowGrouping(processedData, groupBy, orderedColumns as Column<Record<string, unknown>>[]);
 
+  // ── Virtual Scrolling (v9) — must come before quick filter & pagination ───
+  const isVirtual = !!virtual;
+  const {
+    scrollContainerRef,
+    totalHeight,
+    offsetY,
+    visibleRange,
+    containerHeight: virtualHeight,
+    rowHeight,
+  } = useVirtualScroll({
+    rowCount: isVirtual ? processedData.length : 0,
+    rowHeight: virtual?.rowHeight ?? DEFAULT_ROW_HEIGHT,
+    containerHeight: virtual?.containerHeight ?? DEFAULT_CONTAINER_HEIGHT,
+    overscan: virtual?.overscan,
+  });
+
+  const displayData = useMemo(() => {
+    if (isVirtual) return processedData;
+    if (isServerPaged) return processedData;
+    const s = (localPage - 1) * localPerPage;
+    return processedData.slice(s, s + localPerPage);
+  }, [processedData, isVirtual, isServerPaged, localPage, localPerPage]);
+
+  // ── Quick Filter (Ctrl+F) — must be before pagination (total/lastPage depend on it) ──
+  // Inline to avoid Rolldown TDZ issue with cross-module hook
+  const [qfIsOpen, setQfIsOpen] = useState(false);
+  const [quickFilterQuery, setQuickFilterQuery] = useState('');
+  const qfInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!enableQuickFilter) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setQfIsOpen(true);
+        setTimeout(() => qfInputRef.current?.focus(), 50);
+      }
+      if (e.key === 'Escape' && qfIsOpen) {
+        e.preventDefault();
+        setQfIsOpen(false);
+        setQuickFilterQuery('');
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [enableQuickFilter, qfIsOpen]);
+  const qfMatchCount = useMemo(() => {
+    if (!quickFilterQuery.trim()) return null;
+    const q = quickFilterQuery.trim().toLowerCase();
+    const cols = orderedColumns.filter(c => c.searchable !== false);
+    return processedData.filter(row =>
+      cols.some(col => {
+        const v = getRawValue(row, col as Column<T>);
+        return v != null && String(v).toLowerCase().includes(q);
+      }),
+    ).length;
+  }, [quickFilterQuery, processedData, orderedColumns]);
+  const qfCloseFn = useCallback(() => { setQfIsOpen(false); setQuickFilterQuery(''); }, []);
+  const isQuickFiltered = enableQuickFilter && !!quickFilterQuery.trim();
+
+  // Quick-filtered display data — computed from processedData directly (not displayData)
+  // to avoid circular dependency with selection/displayKeys
+  const effectiveDisplayData = useMemo(() => {
+    if (!isQuickFiltered) return displayData;
+    const q = quickFilterQuery.trim().toLowerCase();
+    const cols = orderedColumns.filter(c => c.searchable !== false);
+    const filtered = processedData.filter(row =>
+      cols.some(col => {
+        const v = getRawValue(row, col as Column<T>);
+        return v != null && String(v).toLowerCase().includes(q);
+      }),
+    );
+    if (isVirtual) return filtered;
+    if (isServerPaged) return filtered;
+    const s = (localPage - 1) * localPerPage;
+    return filtered.slice(s, s + localPerPage);
+  }, [isQuickFiltered, quickFilterQuery, processedData, orderedColumns, isVirtual, isServerPaged, localPage, localPerPage, displayData]);
+
   // ── Pagination (state مُعرَّف أعلاه قبل filters) ────────────────────────
 
   const paginationRef = useRef(pagination);
@@ -495,10 +583,23 @@ export function DataTable<T = Record<string, unknown>>({
 
   const curPage = isServerPaged ? pagination!.page : localPage;
   const perPage = isServerPaged ? pagination!.perPage : localPerPage;
-  const total = isServerPaged ? pagination!.total : processedData.length;
+  // Quick-filtered total (unpaginated count)
+  const quickFilterTotal = useMemo(() => {
+    if (!isQuickFiltered) return 0;
+    const q = quickFilterQuery.trim().toLowerCase();
+    const cols = orderedColumns.filter(c => c.searchable !== false);
+    return processedData.filter(row =>
+      cols.some(col => {
+        const v = getRawValue(row, col as Column<T>);
+        return v != null && String(v).toLowerCase().includes(q);
+      }),
+    ).length;
+  }, [isQuickFiltered, quickFilterQuery, processedData, orderedColumns]);
+
+  const total = isServerPaged ? pagination!.total : isQuickFiltered ? quickFilterTotal : processedData.length;
   const lastPage = isServerPaged
     ? pagination!.lastPage
-    : Math.max(1, Math.ceil(processedData.length / localPerPage));
+    : Math.max(1, Math.ceil((isQuickFiltered ? quickFilterTotal : processedData.length) / localPerPage));
 
   useEffect(() => {
     lastPageRef.current = lastPage;
@@ -526,34 +627,6 @@ export function DataTable<T = Record<string, unknown>>({
     },
     [isServerPaged],
   );
-
-  // ── Virtual Scrolling (v9) ────────────────────────────────────────────────
-  const isVirtual = !!virtual;
-  const {
-    scrollContainerRef,
-    totalHeight,
-    offsetY,
-    visibleRange,
-    containerHeight: virtualHeight,
-    rowHeight,
-  } = useVirtualScroll({
-    rowCount: isVirtual ? processedData.length : 0,
-    rowHeight: virtual?.rowHeight ?? DEFAULT_ROW_HEIGHT,
-    containerHeight: virtual?.containerHeight ?? DEFAULT_CONTAINER_HEIGHT,
-    overscan: virtual?.overscan,
-  });
-
-  const displayData = useMemo(() => {
-    if (isVirtual) return processedData;
-    if (isServerPaged) return processedData;
-    const s = (localPage - 1) * localPerPage;
-    return processedData.slice(s, s + localPerPage);
-  }, [processedData, isVirtual, isServerPaged, localPage, localPerPage]);
-
-  const virtualDisplayData = useMemo(() => {
-    if (!isVirtual) return displayData;
-    return displayData.slice(visibleRange.start, visibleRange.end + 1);
-  }, [isVirtual, displayData, visibleRange]);
 
   const pageNumbers = useMemo(() => buildPageNumbers(curPage, lastPage), [curPage, lastPage]);
 
@@ -611,6 +684,7 @@ export function DataTable<T = Record<string, unknown>>({
 
   // ── Selection ─────────────────────────────────────────────────────────────
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string | number>>(new Set());
+  const [hoveredRowKey, setHoveredRowKey] = useState<string | number | null>(null);
   const indRef = useRef<HTMLInputElement>(null);
   const onSelectRef = useRef(onSelect);
   useEffect(() => {
@@ -618,8 +692,8 @@ export function DataTable<T = Record<string, unknown>>({
   }, [onSelect]);
 
   const displayKeys = useMemo(
-    () => displayData.map((r, i) => rowKey(r, i)),
-    [displayData, rowKey],
+    () => effectiveDisplayData.map((r, i) => rowKey(r, i)),
+    [effectiveDisplayData, rowKey],
   );
   const allChecked = displayKeys.length > 0 && displayKeys.every(k => selectedKeys.has(k));
   const someChecked = !allChecked && displayKeys.some(k => selectedKeys.has(k));
@@ -631,9 +705,11 @@ export function DataTable<T = Record<string, unknown>>({
   const toggleAll = useCallback(() => {
     setSelectedKeys(prev => {
       const next = new Set(prev);
-      allChecked
-        ? displayKeys.forEach(k => next.delete(k))
-        : displayKeys.forEach(k => next.add(k));
+      if (allChecked) {
+        displayKeys.forEach(k => next.delete(k));
+      } else {
+        displayKeys.forEach(k => next.add(k));
+      }
       return next;
     });
   }, [allChecked, displayKeys]);
@@ -642,7 +718,7 @@ export function DataTable<T = Record<string, unknown>>({
     e.stopPropagation();
     setSelectedKeys(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }, []);
@@ -662,7 +738,7 @@ export function DataTable<T = Record<string, unknown>>({
     e.stopPropagation();
     setExpandedKeys(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }, []);
@@ -740,15 +816,14 @@ export function DataTable<T = Record<string, unknown>>({
   // ── Keyboard Navigation (v10) ─────────────────────────────────────────────
   const {
     activeCell,
-    isEditing: kbIsEditing,
     handleKeyDown: kbHandleKeyDown,
     activateCell,
   } = useKeyboardNav({
     enabled: keyboardNav,
-    rowCount: (isVirtual ? virtualDisplayData : displayData).length,
+    rowCount: (isVirtual ? effectiveVirtualDisplayData : effectiveDisplayData).length,
     colCount: visibleCols.length,
     onStartEdit: cell => {
-      const rowData = (isVirtual ? virtualDisplayData : displayData)[cell.rowIndex];
+      const rowData = (isVirtual ? effectiveVirtualDisplayData : effectiveDisplayData)[cell.rowIndex];
       if (!rowData) return;
       const col = visibleCols[cell.colIndex];
       if (!col?.editable) return;
@@ -783,12 +858,30 @@ export function DataTable<T = Record<string, unknown>>({
   const smartFilterRef = useRef<HTMLDivElement>(null);
   const smartInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Keyboard Shortcuts Overlay (? key) ──────────────────────────────────
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        setShortcutsOpen(prev => !prev);
+      }
+      if (e.key === 'Escape' && shortcutsOpen) {
+        setShortcutsOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [shortcutsOpen]);
+
   // ── Tree Data (v10.2) ─────────────────────────────────────────────────────
   const {
     treeRows,
     toggleTreeNode,
-    expandAll: expandTree,
-    collapseAll: collapseTree,
+    expandAll: expandAllTree,
+    collapseAll: collapseAllTree,
     isTreeMode,
   } = useTreeData(data, treeConfig);
 
@@ -800,13 +893,19 @@ export function DataTable<T = Record<string, unknown>>({
   );
 
   // ── Range Selection (v10.2) ───────────────────────────────────────────────
-  const { range, selectCell, clearRange, isInRange, getRangeText } = useRangeSelection(
+  const { selectCell, isInRange } = useRangeSelection(
     enableRangeSelection,
     displayData.length,
     visibleCols.length,
   );
 
-  // ── Smart Filter (اللغة العربية) 🆕 ───────────────────────────────────────
+  // effectiveVirtualDisplayData depends on visibleRange from useRangeSelection
+  const effectiveVirtualDisplayData = useMemo(() => {
+    if (!isVirtual) return effectiveDisplayData;
+    return effectiveDisplayData.slice(visibleRange.start, visibleRange.end + 1);
+  }, [isVirtual, effectiveDisplayData, visibleRange]);
+
+  // Smart Filter (اللغة العربية) 🆕 ───────────────────────────────────────
   const { applySmartFilter } = useSmartFilter(allColDefs, (newFilters, newSorts) => {
     setFilters(newFilters);
     if (newSorts) setSorts(newSorts);
@@ -978,7 +1077,7 @@ export function DataTable<T = Record<string, unknown>>({
             icon: 'arrows-expand',
             onClick: c => {
               if (c.rowIndex !== undefined) {
-                toggleExpanded(rowKey(data[c.rowIndex], c.rowIndex), new MouseEvent('click'));
+                toggleExpanded(rowKey(data[c.rowIndex], c.rowIndex), new MouseEvent('click') as unknown as React.MouseEvent);
               }
             },
           },
@@ -1010,6 +1109,7 @@ export function DataTable<T = Record<string, unknown>>({
     enableContextMenu ? contextMenuItems || defaultContextMenuItems : () => [],
     tableWrapRef,
     data,   // ✅ context.row يحتاج بيانات الصف الفعلية
+    selectedKeys,
   );
 
   // ✅ إصلاح: إغلاق قائمة السياق بـ Escape (كانت تبقى مفتوحة بدون هذا)
@@ -1065,11 +1165,17 @@ export function DataTable<T = Record<string, unknown>>({
   }, []);
 
   // helper: تنفيذ الـ export حسب الصيغة
-  const handleExport = useCallback((format: ExportFormat) => {
+  const handleExport = useCallback(async (format: ExportFormat) => {
     const cfg      = exportConfig ?? {};
-    const fileName = cfg.fileName ?? exportName;
-    const title    = cfg.title;
-    const includeHiddenColumns = cfg.includeHiddenColumns ?? false;
+    const legacy   = excelExportOptions ?? {};
+    const fileName = cfg.fileName ?? legacy.fileName ?? exportName;
+    const title    = cfg.title ?? legacy.title;
+    const includeHiddenColumns = cfg.includeHiddenColumns ?? legacy.includeHiddenColumns ?? false;
+
+    // For server-paged tables, fetch ALL rows before exporting
+    const exportData = isServerPaged && fetchAllForExport
+      ? await fetchAllForExport()
+      : processedData;
 
     // ✅ تحويل aggregates من format الـ state إلى format التصدير
     const aggregatesForExport = showAggregates && aggregates
@@ -1098,20 +1204,25 @@ export function DataTable<T = Record<string, unknown>>({
 
     setExportMenuOpen(false);
     switch (format) {
-      case 'csv':   exportToCSV(processedData, visibleCols, fileName); break;
-      case 'excel': exportToExcel(processedData, visibleCols, opts); break;
-      case 'json':  exportToJSON(processedData, visibleCols, opts); break;
-      case 'print': exportToPrint(processedData, visibleCols, opts); break;
+      case 'csv':   exportToCSV(exportData, visibleCols, fileName); break;
+      case 'excel': exportToExcel(exportData, visibleCols, opts); break;
+      case 'json':  exportToJSON(exportData, visibleCols, opts); break;
+      case 'print': exportToPrint(exportData, visibleCols, opts); break;
     }
   }, [
-    exportConfig, exportName, processedData, visibleCols,
+    exportConfig, excelExportOptions, exportName, processedData, visibleCols,
     documentInfo, excelExportAdvancedOptions,
-    showAggregates, aggregates,
+    showAggregates, aggregates, isServerPaged, fetchAllForExport,
   ]);
 
   // helper: رتبة العمود في الفرز المتعدد
-  const getSortIndex = (key: string) => sorts.findIndex(s => s.key === key);
-  const getSortDir = (key: string) => sorts.find(s => s.key === key)?.dir ?? null;
+  const sortMap = useMemo(() => {
+    const map = new Map<string, { index: number; dir: 'asc' | 'desc' | null }>();
+    sorts.forEach((s, i) => map.set(s.key, { index: i, dir: s.dir }));
+    return map;
+  }, [sorts]);
+  const getSortIndex = useCallback((key: string) => sortMap.get(key)?.index ?? -1, [sortMap]);
+  const getSortDir = useCallback((key: string) => sortMap.get(key)?.dir ?? null, [sortMap]);
 
   // ─── Render Helper: صف بيانات (useCallback لتجنب إعادة إنشاء الدالة) ──────
   const renderDataRow = useCallback((row: T, absoluteIdx: number) => {
@@ -1120,6 +1231,7 @@ export function DataTable<T = Record<string, unknown>>({
     const isExpanded = expandedKeys.has(rKey);
     const canExpand = expandable && (!isExpandable || isExpandable(row));
     const extraClass = rowClassName?.(row) ?? '';
+    const hasHoverActions = !!hoverActions && hoveredRowKey === rKey;
 
     return (
       <React.Fragment key={rKey}>
@@ -1128,12 +1240,15 @@ export function DataTable<T = Record<string, unknown>>({
             'dt-row',
             isSelected ? 'dt-row-sel' : '',
             onRowClick ? 'dt-row-click' : '',
+            hasHoverActions ? 'dt-row-hovered' : '',
             extraClass,
           ]
             .filter(Boolean)
             .join(' ')}
           style={isVirtual ? { height: rowHeight } : undefined}
           onClick={onRowClick ? () => onRowClick(row) : undefined}
+          onMouseEnter={hoverActions ? () => setHoveredRowKey(rKey) : undefined}
+          onMouseLeave={hoverActions ? () => setHoveredRowKey(null) : undefined}
           aria-selected={selectable ? isSelected : undefined}
           data-row-index={absoluteIdx}
         >
@@ -1225,11 +1340,19 @@ export function DataTable<T = Record<string, unknown>>({
                 data-row-index={absoluteIdx}
                 data-col-key={col.key}
                 onClick={e => {
-                  if (keyboardNav) activateCell({ rowIndex: isVirtual ? idx : absoluteIdx, colIndex: colIdx });
+                  if (keyboardNav) activateCell({ rowIndex: absoluteIdx, colIndex: colIdx });
                   if (enableRangeSelection) selectCell(absoluteIdx, colIdx, e.shiftKey);
                   if (canEdit && !isEditing) startEdit(rKey, col.key, rawVal, e);
                 }}
-                title={canEdit && !isEditing ? 'انقر للتعديل' : undefined}
+                title={
+                  isEditing ? undefined
+                  : canEdit ? 'انقر للتعديل'
+                  : col.tooltip
+                    ? typeof col.tooltip === 'function'
+                      ? col.tooltip(row, absoluteIdx)
+                      : col.tooltip
+                    : undefined
+                }
                 tabIndex={keyboardNav ? 0 : undefined}
               >
                 {isEditing && col.editable ? (
@@ -1252,6 +1375,26 @@ export function DataTable<T = Record<string, unknown>>({
                     {String(displayVal ?? '—')}
                   </span>
                 )}
+                {!isEditing && (
+                  <button
+                    className="dt-copy-btn"
+                    type="button"
+                    title="نسخ"
+                    aria-label="نسخ القيمة"
+                    tabIndex={-1}
+                    onClick={e => {
+                      e.stopPropagation();
+                      const val = String(displayVal ?? '');
+                      navigator.clipboard.writeText(val).then(() => {
+                        const btn = e.currentTarget;
+                        btn.classList.add('dt-copy-ok');
+                        setTimeout(() => btn.classList.remove('dt-copy-ok'), 1000);
+                      }).catch(() => {});
+                    }}
+                  >
+                    <i className="ti ti-copy" />
+                  </button>
+                )}
               </td>
             );
           })}
@@ -1266,6 +1409,16 @@ export function DataTable<T = Record<string, unknown>>({
           )}
         </tr>
 
+        {hasHoverActions && (
+          <tr className="dt-hover-row">
+            <td colSpan={totalColSpan} className="dt-hover-td">
+              <div className="dt-hover-bar">
+                {hoverActions!(row)}
+              </div>
+            </td>
+          </tr>
+        )}
+
         {isExpanded && renderExpanded && (
           <tr>
             <td colSpan={totalColSpan} className="dt-exp-td">
@@ -1277,13 +1430,13 @@ export function DataTable<T = Record<string, unknown>>({
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    rowKey, selectable, expandable, showIndex, rowActions, keyboardNav,
+    rowKey, selectable, expandable, showIndex, rowActions, hoverActions, keyboardNav,
     visibleCols, editingCell, batchEdit, batch, conditionalFormatting,
     getEffectiveSticky, activeCell, getError, startEdit, activateCell,
     commitEdit, cancelEdit, onRowClick, rowClassName,
     curPage, perPage, isVirtual, rowHeight, totalColSpan,
     renderExpanded, expandedKeys, toggleExpanded, selectedKeys, toggleRow,
-    enableRangeSelection, isInRange, selectCell,
+    enableRangeSelection, isInRange, selectCell, hoveredRowKey,
   ]);
 
   // ════════════════════════════════════════════════════════════════════════
@@ -1352,6 +1505,29 @@ export function DataTable<T = Record<string, unknown>>({
                 onClick={collapseAllGroups}
                 type="button"
                 title="طي كل المجموعات"
+              >
+                <i className="ti ti-layout-rows" />
+                طي الكل
+              </button>
+            </div>
+          )}
+
+          {isTreeMode && (
+            <div className="dt-toolbar-group-btns">
+              <button
+                className="dt-tbtn"
+                onClick={expandAllTree}
+                type="button"
+                title="توسيع كل العناصر"
+              >
+                <i className="ti ti-layout-list" />
+                توسيع الكل
+              </button>
+              <button
+                className="dt-tbtn"
+                onClick={collapseAllTree}
+                type="button"
+                title="طي كل العناصر"
               >
                 <i className="ti ti-layout-rows" />
                 طي الكل
@@ -1520,7 +1696,9 @@ export function DataTable<T = Record<string, unknown>>({
                   <div className="dt-export-menu" role="menu">
                     <div className="dt-export-menu-title">تصدير البيانات</div>
                     <div className="dt-export-menu-count">
-                      {processedData.length.toLocaleString('ar-DZ')} سجل
+                      {isServerPaged
+                        ? `${(pagination?.total ?? processedData.length).toLocaleString('ar-DZ')} سجل (الكل)`
+                        : `${processedData.length.toLocaleString('ar-DZ')} سجل`}
                     </div>
                     {ITEMS.map(item => (
                       <button
@@ -1630,6 +1808,50 @@ export function DataTable<T = Record<string, unknown>>({
         </div>
       </div>
 
+      {/* ══ QUICK FILTER BAR ═════════════════════════════════════════════════ */}
+      {enableQuickFilter && qfIsOpen && (
+        <div className="dt-qf-bar" role="search" aria-label="بحث سريع">
+          <span className="dt-qf-icon">
+            <i className="ti ti-search" aria-hidden="true" />
+          </span>
+          <input
+            ref={qfInputRef}
+            className="dt-qf-input"
+            type="text"
+            value={quickFilterQuery}
+            onChange={e => setQuickFilterQuery(e.target.value)}
+            placeholder="بحث سريع في الجدول..."
+            aria-label="بحث سريع"
+            autoFocus
+          />
+          {quickFilterQuery && qfMatchCount !== null && (
+            <span className="dt-qf-count">
+              {qfMatchCount.toLocaleString('ar-DZ')} نتيجة
+            </span>
+          )}
+          {quickFilterQuery && (
+            <button
+              className="dt-qf-clear"
+              onClick={() => setQuickFilterQuery('')}
+              type="button"
+              title="مسح البحث (Escape)"
+              aria-label="مسح البحث"
+            >
+              <i className="ti ti-x" />
+            </button>
+          )}
+          <button
+            className="dt-qf-close"
+            onClick={qfCloseFn}
+            type="button"
+            title="إغلاق (Escape)"
+            aria-label="إغلاق البحث"
+          >
+            <i className="ti ti-x" />
+          </button>
+        </div>
+      )}
+
       {/* ══ BULK BAR ════════════════════════════════════════════════════════ */}
       {selectable && selectedKeys.size > 0 && bulkActions && (
         <div className="dt-bulk" role="toolbar" aria-label="إجراءات المحددين">
@@ -1660,7 +1882,10 @@ export function DataTable<T = Record<string, unknown>>({
       {/* ══ TABLE — Desktop ═════════════════════════════════════════════════ */}
       <div
         className="dt-desktop dt-table-outer"
-        ref={tableWrapRef}
+        ref={node => {
+          tableWrapRef.current = node;
+          scrollContainerRef.current = node;
+        }}
         style={
           isVirtual
             ? {
@@ -1803,6 +2028,7 @@ export function DataTable<T = Record<string, unknown>>({
                         : undefined
                     }
                     draggable={canDrag}
+                    title={col.headerTooltip}
                     onDragStart={
                       canDrag ? e => dragHandlers.onDragStart(col.key, e) : undefined
                     }
@@ -1890,7 +2116,7 @@ export function DataTable<T = Record<string, unknown>>({
                             e,
                           )
                         }
-                        onDoubleClick={() => resetWidth(col.key)}
+                        onDoubleClick={() => autoSize(tableWrapRef.current, col.key)}
                         aria-hidden="true"
                         title="اسحب لتغيير العرض • دوبل-كليك لإعادة الضبط"
                       />
@@ -1939,6 +2165,7 @@ export function DataTable<T = Record<string, unknown>>({
                     <div className="dt-empty" role="status">
                       <i className="ti ti-inbox" aria-hidden="true" />
                       <span className="dt-empty-text">{emptyText}</span>
+                      {emptyAction}
                     </div>
                   </td>
                 </tr>
@@ -2051,18 +2278,22 @@ export function DataTable<T = Record<string, unknown>>({
                             if (ci === 0)
                               return (
                                 <td key={col.key}>
-                                  <span className="dt-agg-label">Σ</span>
+                                  <span className="dt-agg-label">
+                                    <i className="ti ti-math-function" aria-hidden="true" />
+                                    {aggregateLabel ?? 'Σ'}
+                                  </span>
                                 </td>
                               );
                             if (!agg || agg.value == null) return <td key={col.key} />;
                             const fmt = col.aggregateFormat
                               ? col.aggregateFormat(agg.value, agg.type)
-                              : agg.value.toLocaleString('fr-DZ', {
+                              : Number(agg.value).toLocaleString('fr-DZ', {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
                                 });
                             return (
-                              <td key={col.key} style={{ textAlign: getTextAlign(col.align) }}>
+                              <td key={col.key} style={{ textAlign: getTextAlign(col.align), direction: 'ltr' }}>
+                                <span className="dt-agg-type">{AGG_LABELS[agg.type as AggregateType]}</span>
                                 <span className="dt-agg-value">{fmt}</span>
                               </td>
                             );
@@ -2073,7 +2304,7 @@ export function DataTable<T = Record<string, unknown>>({
                   </React.Fragment>
                 ))
               )
-            ) : (isVirtual ? virtualDisplayData : displayData).length === 0 ? (
+            ) : (isVirtual ? effectiveVirtualDisplayData : effectiveDisplayData).length === 0 ? (
               <tr>
                 <td colSpan={totalColSpan} className="dt-empty-td">
                   <div className="dt-empty" role="status">
@@ -2084,7 +2315,7 @@ export function DataTable<T = Record<string, unknown>>({
                 </td>
               </tr>
             ) : (
-              (isVirtual ? virtualDisplayData : displayData).map((row, idx) => {
+              (isVirtual ? effectiveVirtualDisplayData : effectiveDisplayData).map((row, idx) => {
                 const absoluteIdx = isVirtual ? visibleRange.start + idx : idx;
                 const rKey = rowKey(row, absoluteIdx);
 
@@ -2092,7 +2323,7 @@ export function DataTable<T = Record<string, unknown>>({
                 // حتى تحرك الـ scroll لا يُعيد render الصف ما لم تتغير بياناته
                 if (isVirtual) {
                   const isRowEditing = editingCell?.rowKey === rKey;
-                  const isRowActive = !!(activeCell && activeCell.rowIndex === (isVirtual ? idx : absoluteIdx));
+                  const isRowActive = !!(activeCell && activeCell.rowIndex === absoluteIdx);
                   const rowInRange = enableRangeSelection
                     ? isInRange(absoluteIdx, 0) // تحقق أن الصف داخل النطاق
                     : false;
@@ -2147,7 +2378,7 @@ export function DataTable<T = Record<string, unknown>>({
                   const canCycle = typeof col.aggregate === 'string';
                   const formatted = col.aggregateFormat
                     ? col.aggregateFormat(agg.value, agg.type)
-                    : agg.value.toLocaleString('fr-DZ', {
+                    : Number(agg.value).toLocaleString('fr-DZ', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       });
@@ -2187,13 +2418,13 @@ export function DataTable<T = Record<string, unknown>>({
       <div className="dt-mobile dt-mobile-wrap">
         {loading ? (
           <SkeletonCards count={4} />
-        ) : displayData.length === 0 ? (
+        ) : effectiveDisplayData.length === 0 ? (
           <div className="dt-empty" role="status">
             <i className="ti ti-inbox" aria-hidden="true" />
             <span className="dt-empty-text">{emptyText}</span>
           </div>
         ) : (
-          displayData.map((row, idx) => {
+          effectiveDisplayData.map((row, idx) => {
             const rKey = rowKey(row, idx);
             const cardCols = visibleCols.slice(0, 4);
             return (
@@ -2508,6 +2739,58 @@ export function DataTable<T = Record<string, unknown>>({
           </div>
         </div>
       )}
+
+      {/* 🆕 KEYBOARD SHORTCUTS OVERLAY (? key) */}
+      {shortcutsOpen && (
+        <div className="dt-overlay" role="presentation" aria-hidden="true">
+          <div
+            className="dt-dialog dt-shortcuts-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="اختصارات لوحة المفاتيح"
+            style={{ maxWidth: 480 }}
+          >
+            <div className="dt-dialog-header">
+              <span className="dt-dialog-title">
+                <i className="ti ti-keyboard" />
+                اختصارات لوحة المفاتيح
+              </span>
+              <button
+                className="dt-dialog-close"
+                onClick={() => setShortcutsOpen(false)}
+                type="button"
+                aria-label="إغلاق"
+              >
+                <i className="ti ti-x" />
+              </button>
+            </div>
+            <div className="dt-dialog-body" style={{ padding: '12px 16px' }}>
+              <table className="dt-shortcuts-table">
+                <tbody>
+                  <tr><td><kbd>?</kbd></td><td>إظهار/إخفاء الاختصارات</td></tr>
+                  <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>بحث سريع</td></tr>
+                  <tr><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>تصدير</td></tr>
+                  <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>حفظ الفلتر</td></tr>
+                  <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>حفظ العرض</td></tr>
+                  <tr><td><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></td><td>التنقل بين الخلايا</td></tr>
+                  <tr><td><kbd>Enter</kbd></td><td>تعديل الخلايا / فتح السطر</td></tr>
+                  <tr><td><kbd>Escape</kbd></td><td>إلغاء التعديل / إغلاق النافذة</td></tr>
+                  <tr><td><kbd>Space</kbd></td><td>تحديد السطر</td></tr>
+                  <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>تحديد الكل</td></tr>
+                  <tr><td><kbd>Home</kbd></td><td>العمود الأول</td></tr>
+                  <tr><td><kbd>End</kbd></td><td>العمود الأخير</td></tr>
+                  {enableSmartFilter && <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td><td>فلتر ذكي (NL)</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div className="dt-dialog-footer">
+              <button className="dt-tbtn" onClick={() => setShortcutsOpen(false)} type="button">
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2517,7 +2800,7 @@ export function DataTable<T = Record<string, unknown>>({
 // ════════════════════════════════════════════════════════════════════════════
 
 const PinMenu = memo(function PinMenu({
-  colKey,
+  colKey: _colKey,
   current,
   onPin,
   onClose,

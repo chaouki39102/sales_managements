@@ -71,7 +71,44 @@ export function useColumnResize(initialWidths: Record<string, number>) {
   const resetWidth = useCallback((key: string) => {
     setWidths(p => { const n = { ...p }; delete n[key]; return n; });
   }, []);
-  return { widths, startResize, resetWidth };
+
+  const autoSize = useCallback((tableEl: HTMLDivElement | null, key: string) => {
+    if (!tableEl) return;
+    const table = tableEl.querySelector('table');
+    if (!table) return;
+
+    // Find the col index for this key
+    const colKeyAttr = `[data-col-key="${key}"]`;
+    const headerCell = table.querySelector(`thead ${colKeyAttr}`) as HTMLElement | null;
+    if (!headerCell) return;
+
+    // Measure header text width
+    const headerClone = headerCell.cloneNode(true) as HTMLElement;
+    const measure = document.createElement('div');
+    measure.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;white-space:nowrap;font:inherit;direction:inherit;';
+    document.body.appendChild(measure);
+
+    // Measure header
+    measure.textContent = headerCell.textContent ?? '';
+    let maxWidth = measure.getBoundingClientRect().width;
+
+    // Measure visible cells in this column (sample up to 100 rows)
+    const cells = table.querySelectorAll(`tbody td${colKeyAttr}`);
+    const sample = Array.from(cells).slice(0, 100);
+    for (const cell of sample) {
+      measure.textContent = (cell as HTMLElement).textContent ?? '';
+      const w = measure.getBoundingClientRect().width;
+      if (w > maxWidth) maxWidth = w;
+    }
+
+    document.body.removeChild(measure);
+
+    // Add padding (16px) + sort/filter icon space (24px)
+    const finalWidth = Math.ceil(maxWidth) + 44;
+    setWidths(p => ({ ...p, [key]: Math.max(MIN_COL_WIDTH, finalWidth) }));
+  }, []);
+
+  return { widths, startResize, resetWidth, autoSize };
 }
 
 export function useEscapeKey(onClose: () => void): void {
@@ -217,7 +254,7 @@ export function useURLState(config: URLStateConfig | undefined) {
     const params = new URLSearchParams(window.location.search);
     Object.entries(updates).forEach(([name, value]) => {
       const k = buildKey(name);
-      value ? params.set(k, value) : params.delete(k);
+      if (value) params.set(k, value); else params.delete(k);
     });
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   }, [config?.enabled, buildKey]);
@@ -354,7 +391,7 @@ export function useRowGrouping<T>(
       if (!groupMap.has(val)) groupMap.set(val, []);
       groupMap.get(val)!.push(row);
     });
-    let entries = [...groupMap.entries()];
+    const entries = [...groupMap.entries()];
     if (config.sortGroups === 'asc') entries.sort(([a], [b]) => a.localeCompare(b, 'ar-DZ'));
     if (config.sortGroups === 'desc') entries.sort(([a], [b]) => b.localeCompare(a, 'ar-DZ'));
     // ✅ إصلاح: الصفوف المطوية تُحذف من الـ render فعلياً (تُخرج من DOM)
@@ -422,7 +459,7 @@ export function useRowGrouping<T>(
   const toggleGroup = useCallback((value: string) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
-      next.has(value) ? next.delete(value) : next.add(value);
+      if (next.has(value)) next.delete(value); else next.add(value);
       return next;
     });
   }, []);
@@ -490,7 +527,7 @@ export function useColumnPinning(
       .reduce((sum, k) => sum + (colWidths[k] ?? defaultWidth), 0);
   }, [pinConfig]);
 
-  return { pinConfig, pinColumn, isPinned, clearAllPins, getPinnedOffset };
+  return { pinConfig, pinColumn, isPinned, clearAllPins, getPinnedOffset, setPinConfigBatch };
 }
 
 export function useKeyboardNav({
@@ -861,9 +898,14 @@ export function useContextMenu<T = Record<string, unknown>>(
   menuItems: (context: ContextMenuContext) => ContextMenuItem[],
   containerRef: React.RefObject<HTMLElement>,
   // ✅ إصلاح: data مطلوبة لملء context.row الذي كان فارغاً دائماً
-  data: T[] = []
+  data: T[] = [],
+  selectedKeys?: ReadonlySet<string | number>,
 ) {
   const [state, setState] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, context: null });
+
+  // نحفظ data في ref لتجنب إعادة تسجيل الـ event listener عند كل تغيير
+  const dataRef = useRef(data);
+  useEffect(() => { dataRef.current = data; }, [data]);
 
   // نستخدم DOM MouseEvent مباشرةً لأن الـ listener مسجَّل عبر addEventListener
   const handleContextMenu = useCallback((e: MouseEvent) => {
@@ -884,26 +926,26 @@ export function useContextMenu<T = Record<string, unknown>>(
       if (rowIndexStr !== null && colKey) {
         const rowIndex = parseInt(rowIndexStr, 10);
         // ✅ نملأ row data فعلياً من مصفوفة data
-        const row = (data[rowIndex] ?? null) as Record<string, unknown> | undefined;
-        context = { type: 'cell', rowIndex, colKey, row, originalEvent: reactEvent };
+        const row = (dataRef.current[rowIndex] ?? null) as Record<string, unknown> | undefined;
+        context = { type: 'cell', rowIndex, colKey, row, selectedKeys, originalEvent: reactEvent };
       }
     } else if (rowEl) {
       const rowIndexStr = rowEl.getAttribute('data-row-index');
       if (rowIndexStr !== null) {
         const rowIndex = parseInt(rowIndexStr, 10);
-        const row = (data[rowIndex] ?? null) as Record<string, unknown> | undefined;
-        context = { type: 'row', rowIndex, row, originalEvent: reactEvent };
+        const row = (dataRef.current[rowIndex] ?? null) as Record<string, unknown> | undefined;
+        context = { type: 'row', rowIndex, row, selectedKeys, originalEvent: reactEvent };
       }
     } else if (thEl) {
       const colKey = thEl.getAttribute('data-col-key');
       if (colKey) {
-        context = { type: 'header', colKey, originalEvent: reactEvent };
+        context = { type: 'header', colKey, selectedKeys, originalEvent: reactEvent };
       }
     }
 
     if (!context) return;
     setState({ visible: true, x: e.clientX, y: e.clientY, context });
-  }, [data]);
+  }, []);
 
   const closeMenu = useCallback(() => {
     setState(prev => ({ ...prev, visible: false }));
@@ -1255,7 +1297,7 @@ export function useTreeData<T>(
   const toggleTreeNode = useCallback((id: string | number) => {
     setCollapsed(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }, []);
@@ -1332,7 +1374,7 @@ export function useColumnGroups(
   const toggleGroupCollapse = useCallback((key: string) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }, []);
@@ -1429,4 +1471,64 @@ export function useRangeSelection(
   }, [enabled, clearRange, range]);
 
   return { range, anchorCell: anchor, selectCell, clearRange, isInRange, getRangeText };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ─── useQuickFilter — بحث سريع Ctrl+F داخل الجدول ─────────────────────────
+//
+// يُنشئ شريط بحث صغير فوق الجدول. يُفلتر البيانات المُعالجة client-side
+// عبر جميع الأعمدة المرئية. يعمل بشكل مستقل عن البحث العالمي (globalQuery).
+// ════════════════════════════════════════════════════════════════════════════
+
+export function useQuickFilter<T>(
+  enabled: boolean,
+  data: T[],
+  columns: Column<T>[],
+): [
+  query: string,
+  setQuery: (q: string) => void,
+  isOpen: boolean,
+  open: () => void,
+  close: () => void,
+  matchCount: number | null,
+] {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Ctrl+F / Cmd+F to open
+  useEffect(() => {
+    if (!enabled) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setIsOpen(true);
+        setTimeout(() => inputRef.current?.focus(), 50);
+      }
+      if (e.key === 'Escape' && isOpen) {
+        e.preventDefault();
+        setIsOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [enabled, isOpen]);
+
+  const matchCount = useMemo(() => {
+    if (!query.trim()) return null;
+    const q = query.trim().toLowerCase();
+    const cols = columns.filter(c => c.searchable !== false);
+    return data.filter(row =>
+      cols.some(col => {
+        const v = getRawValue(row, col as Column<T>);
+        return v != null && String(v).toLowerCase().includes(q);
+      }),
+    ).length;
+  }, [query, data, columns]);
+
+  const open  = useCallback(() => { setIsOpen(true);  setTimeout(() => inputRef.current?.focus(), 50); }, []);
+  const close = useCallback(() => { setIsOpen(false); setQuery(''); }, []);
+
+  return [query, setQuery, isOpen, open, close, matchCount];
 }

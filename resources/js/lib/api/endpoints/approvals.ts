@@ -54,6 +54,9 @@ export const approvalsApi = {
   check: (documentId: number) =>
     apiGet<ApprovalCheck>(`/approvals/check/${documentId}`),
 
+  checkBatch: (documentIds: number[]) =>
+    apiPost<Record<number, ApprovalCheck>>('/approvals/check-batch', { document_ids: documentIds }),
+
   submit: (documentId: number) =>
     apiPost<{ message: string; document: CommercialDocument }>(`/approvals/submit/${documentId}`),
 
@@ -74,10 +77,25 @@ export const approvalsApi = {
 
 export function useApprovalCheck(documentId: number | null | undefined) {
   const slug = useActiveSlug();
+  const { data: thresholds } = useApprovalThresholds();
+  const noThresholds = thresholds !== undefined && thresholds.length === 0;
   return useQuery({
     queryKey:  [slug, 'approvals', 'check', documentId],
     queryFn:   () => approvalsApi.check(documentId!),
-    enabled:   !!slug && !!documentId,
+    enabled:   !!slug && !!documentId && !noThresholds,
+    staleTime: 30_000,
+  });
+}
+
+export function useApprovalCheckBatch(documentIds: number[]) {
+  const slug = useActiveSlug();
+  const { data: thresholds } = useApprovalThresholds();
+  const noThresholds = thresholds !== undefined && thresholds.length === 0;
+  const ids = documentIds.length > 0 ? documentIds : [];
+  return useQuery({
+    queryKey:  [slug, 'approvals', 'check-batch', ids.sort((a, b) => a - b).join(',')],
+    queryFn:   () => approvalsApi.checkBatch(ids),
+    enabled:   !!slug && ids.length > 0 && !noThresholds,
     staleTime: 30_000,
   });
 }

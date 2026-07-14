@@ -53,7 +53,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, context, 
               className="dt-context-item"
               onClick={() => {
                 // ✅ تمرير ContextMenuContext الصحيح — وليس ContextMenuItem
-                item.onClick(context);
+                item.onClick?.(context);
                 onClose();
               }}
               disabled={item.disabled}

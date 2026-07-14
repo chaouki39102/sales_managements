@@ -877,14 +877,31 @@ export default function ImagePreviewModal({ open, src, alt, onClose }: Props) {
 ```
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { align, formatDate, DocRow, Separator } from './shared';
+import { align, formatDate, DocRow, Separator, renderLayoutRows, fontFamily } from './shared';
 import { printFieldResolver } from '../../services';
 
 function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
   return printFieldResolver.resolve(fieldId, data, tpl);
 }
 
+function customerInfoStyle(tpl: PrintTemplate) {
+  return {
+    fontSize: tpl.customer_info_size,
+    fontFamily: fontFamily(tpl.customer_info_font_family),
+    fontWeight: tpl.customer_info_bold ? 700 : 400,
+    fontStyle: tpl.customer_info_italic ? 'italic' : 'normal' as const,
+    textAlign: align(tpl.customer_info_align) as React.CSSProperties['textAlign'],
+  };
+}
+
+function labelOf(key: string, tpl: PrintTemplate): string {
+  return ((tpl as any)[key] || '') as string;
+}
+
 function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
+  const cs = customerInfoStyle(tpl);
+  const hasCustomerRows = tpl.customer_info_rows && tpl.customer_info_rows.length > 0;
+
   return (
     <div style={{ marginBottom: 5 }}>
       <div style={{
@@ -908,15 +925,28 @@ function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
         {tpl.show_session && r('session.code', data, tpl) && (
           <DocRow label="الجلسة:" value={r('session.code', data, tpl) as string} />
         )}
-        {tpl.show_client && r('customer.name', data, tpl) && (
-          <>
-            <DocRow label="العميل:" value={r('customer.name', data, tpl) as string} />
-            {tpl.show_client_nif     && r('customer.nif', data, tpl)      && <DocRow label="NIF العميل:" value={r('customer.nif', data, tpl) as string} />}
-            {tpl.show_client_phone   && r('customer.phone', data, tpl)    && <DocRow label="هاتف العميل:" value={r('customer.phone', data, tpl) as string} />}
-            {tpl.show_client_address && r('customer.address', data, tpl)  && <DocRow label="العنوان:" value={r('customer.address', data, tpl) as string} />}
-            {tpl.show_delivery_address && r('customer.deliveryAddress', data, tpl) && <DocRow label="عنوان التسليم:" value={r('customer.deliveryAddress', data, tpl) as string} />}
-          </>
-        )}
+        {hasCustomerRows
+          ? <div style={cs}>{renderLayoutRows(tpl.customer_info_rows, data, tpl)}</div>
+          : tpl.show_client && (
+              <div style={cs}>
+                {r('customer.name', data, tpl) && <DocRow label={(labelOf('label_client', tpl) || 'العميل') + ':'} value={r('customer.name', data, tpl) as string} />}
+                {tpl.show_client_nif     && <DocRow label={(labelOf('label_client_nif', tpl) || 'NIF العميل') + ':'} value={r('customer.nif', data, tpl) as string} />}
+                {tpl.show_customer_commercial_name && <DocRow label={(labelOf('label_customer_commercial_name', tpl) || 'الاسم التجاري') + ':'} value={r('customer.commercialName', data, tpl) as string} />}
+                {tpl.show_customer_rc    && <DocRow label={(labelOf('label_customer_rc', tpl) || 'RC') + ':'} value={r('customer.rc', data, tpl) as string} />}
+                {tpl.show_customer_nis   && <DocRow label={(labelOf('label_customer_nis', tpl) || 'NIS') + ':'} value={r('customer.nis', data, tpl) as string} />}
+                {tpl.show_customer_ai    && <DocRow label={(labelOf('label_customer_ai', tpl) || 'المادة الجبائية') + ':'} value={r('customer.ai', data, tpl) as string} />}
+                {tpl.show_client_phone   && <DocRow label={(labelOf('label_client_phone', tpl) || 'هاتف العميل') + ':'} value={r('customer.phone', data, tpl) as string} />}
+                {tpl.show_customer_mobile && <DocRow label={(labelOf('label_customer_mobile', tpl) || 'المحمول') + ':'} value={r('customer.mobile', data, tpl) as string} />}
+                {tpl.show_customer_fax   && <DocRow label={(labelOf('label_customer_fax', tpl) || 'الفاكس') + ':'} value={r('customer.fax', data, tpl) as string} />}
+                {tpl.show_customer_email && <DocRow label={(labelOf('label_customer_email', tpl) || 'البريد الإلكتروني') + ':'} value={r('customer.email', data, tpl) as string} />}
+                {tpl.show_customer_activity && <DocRow label={(labelOf('label_customer_activity', tpl) || 'النشاط') + ':'} value={r('customer.activity', data, tpl) as string} />}
+                {tpl.show_client_address && <DocRow label={(labelOf('label_client_address', tpl) || 'العنوان') + ':'} value={r('customer.address', data, tpl) as string} />}
+                {tpl.show_delivery_address && <DocRow label={(labelOf('label_delivery_address', tpl) || 'عنوان التسليم') + ':'} value={r('customer.deliveryAddress', data, tpl) as string} />}
+                {tpl.show_customer_bank_name && <DocRow label={(labelOf('label_customer_bank_name', tpl) || 'اسم البنك') + ':'} value={r('customer.bankName', data, tpl) as string} />}
+                {tpl.show_customer_rib  && <DocRow label={(labelOf('label_customer_rib', tpl) || 'RIB') + ':'} value={r('customer.rib', data, tpl) as string} />}
+              </div>
+            )
+        }
         {tpl.show_payment_term && r('document.dueDate', data, tpl) && (
           <DocRow label="شروط الدفع:" value={r('document.dueDate', data, tpl) as string} />
         )}
@@ -933,38 +963,76 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
 
   if (!tpl.show_client || !clientName) return null;
 
+  const hasCustomerRows = tpl.customer_info_rows && tpl.customer_info_rows.length > 0;
+  const cs = customerInfoStyle(tpl);
+
   if (isA4) {
     return (
-      <div style={{ display: 'flex', gap: 30, marginBottom: 24 }}>
-        <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
-          <div style={{ fontWeight: 700, fontSize: tpl.company_info_size + 1, marginBottom: 6, color: '#111' }}>بيانات العميل</div>
-          <div style={{ fontSize: tpl.company_info_size, color: '#333' }}>
-            <div style={{ fontWeight: 600, marginBottom: 2 }}>{clientName}</div>
-            {tpl.show_client_nif     && r('customer.nif', data, tpl)     && <div>NIF: {r('customer.nif', data, tpl) as string}</div>}
-            {tpl.show_client_phone   && r('customer.phone', data, tpl)   && <div>☎ {r('customer.phone', data, tpl) as string}</div>}
-            {tpl.show_client_address && r('customer.address', data, tpl) && <div>{r('customer.address', data, tpl) as string}</div>}
-          </div>
-        </div>
-        {tpl.show_delivery_address && r('customer.deliveryAddress', data, tpl) && (
+      <div>
+        <div style={{ display: 'flex', gap: 30, marginBottom: 24 }}>
           <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
-            <div style={{ fontWeight: 700, fontSize: tpl.company_info_size + 1, marginBottom: 6, color: '#111' }}>عنوان التسليم</div>
-            <div style={{ fontSize: tpl.company_info_size, color: '#333' }}>
-              {r('customer.deliveryAddress', data, tpl) as string}
+            <div style={{ ...cs, fontWeight: 700, fontSize: tpl.customer_info_size + 1, marginBottom: 6, color: '#111' }}>بيانات العميل</div>
+            <div style={{ ...cs, color: '#333' }}>
+              {hasCustomerRows
+                ? renderLayoutRows(tpl.customer_info_rows, data, tpl)
+                : <>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{clientName}</div>
+                    {tpl.show_client_nif     && <div>{labelOf('label_client_nif', tpl) || 'NIF'}: {r('customer.nif', data, tpl) as string}</div>}
+                    {tpl.show_customer_commercial_name && <div>{labelOf('label_customer_commercial_name', tpl) || 'الاسم التجاري'}: {r('customer.commercialName', data, tpl) as string}</div>}
+                    {tpl.show_customer_rc    && <div>{labelOf('label_customer_rc', tpl) || 'RC'}: {r('customer.rc', data, tpl) as string}</div>}
+                    {tpl.show_customer_nis   && <div>{labelOf('label_customer_nis', tpl) || 'NIS'}: {r('customer.nis', data, tpl) as string}</div>}
+                    {tpl.show_customer_ai    && <div>{labelOf('label_customer_ai', tpl) || 'المادة الجبائية'}: {r('customer.ai', data, tpl) as string}</div>}
+                    {tpl.show_client_phone   && <div>{labelOf('label_client_phone', tpl) || '☎'}: {r('customer.phone', data, tpl) as string}</div>}
+                    {tpl.show_customer_mobile && <div>{labelOf('label_customer_mobile', tpl) || 'المحمول'}: {r('customer.mobile', data, tpl) as string}</div>}
+                    {tpl.show_customer_fax   && <div>{labelOf('label_customer_fax', tpl) || 'الفاكس'}: {r('customer.fax', data, tpl) as string}</div>}
+                    {tpl.show_customer_email && <div>{labelOf('label_customer_email', tpl) || 'البريد'}: {r('customer.email', data, tpl) as string}</div>}
+                    {tpl.show_customer_activity && <div>{labelOf('label_customer_activity', tpl) || 'النشاط'}: {r('customer.activity', data, tpl) as string}</div>}
+                    {tpl.show_client_address && <div>{labelOf('label_client_address', tpl) || 'العنوان'}: {r('customer.address', data, tpl) as string}</div>}
+                    {tpl.show_customer_bank_name && <div>{labelOf('label_customer_bank_name', tpl) || 'البنك'}: {r('customer.bankName', data, tpl) as string}</div>}
+                    {tpl.show_customer_rib  && <div>{labelOf('label_customer_rib', tpl) || 'RIB'}: {r('customer.rib', data, tpl) as string}</div>}
+                  </>
+              }
             </div>
           </div>
-        )}
+          {tpl.show_delivery_address && (
+            <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
+              <div style={{ ...cs, fontWeight: 700, fontSize: tpl.customer_info_size + 1, marginBottom: 6, color: '#111' }}>{labelOf('label_delivery_address', tpl) || 'عنوان التسليم'}</div>
+              <div style={{ ...cs, color: '#333' }}>
+                {r('customer.deliveryAddress', data, tpl) as string}
+              </div>
+            </div>
+          )}
+        </div>
+        {tpl.doc_separator && tpl.doc_separator !== 'none' && <Separator style={tpl.doc_separator} />}
       </div>
     );
   }
 
   return (
     <div style={{
-      fontSize: tpl.company_info_size, marginBottom: 10,
+      ...cs, marginBottom: 10,
       padding: 8, background: '#f9fafb', borderRadius: 4,
     }}>
-      <span style={{ fontWeight: 700 }}>العميل: </span>{clientName}
-      {tpl.show_client_nif   && r('customer.nif', data, tpl)   && <span style={{ marginRight: 12 }}>NIF: {r('customer.nif', data, tpl) as string}</span>}
-      {tpl.show_client_phone && r('customer.phone', data, tpl) && <span style={{ marginRight: 12 }}>☎ {r('customer.phone', data, tpl) as string}</span>}
+      {hasCustomerRows
+        ? renderLayoutRows(tpl.customer_info_rows, data, tpl)
+        : <>
+            <span style={{ fontWeight: 700 }}>{labelOf('label_client', tpl) || 'العميل'}: </span>{clientName}
+            {tpl.show_client_nif     && <span style={{ marginRight: 12 }}>{labelOf('label_client_nif', tpl) || 'NIF'}: {r('customer.nif', data, tpl) as string}</span>}
+            {tpl.show_customer_commercial_name && <span style={{ marginRight: 12 }}>{labelOf('label_customer_commercial_name', tpl) || 'الاسم التجاري'}: {r('customer.commercialName', data, tpl) as string}</span>}
+            {tpl.show_customer_rc    && <span style={{ marginRight: 12 }}>{labelOf('label_customer_rc', tpl) || 'RC'}: {r('customer.rc', data, tpl) as string}</span>}
+            {tpl.show_customer_nis   && <span style={{ marginRight: 12 }}>{labelOf('label_customer_nis', tpl) || 'NIS'}: {r('customer.nis', data, tpl) as string}</span>}
+            {tpl.show_customer_ai    && <span style={{ marginRight: 12 }}>{labelOf('label_customer_ai', tpl) || 'المادة الجبائية'}: {r('customer.ai', data, tpl) as string}</span>}
+            {tpl.show_client_phone   && <span style={{ marginRight: 12 }}>{labelOf('label_client_phone', tpl) || '☎'}: {r('customer.phone', data, tpl) as string}</span>}
+            {tpl.show_customer_mobile && <span style={{ marginRight: 12 }}>{labelOf('label_customer_mobile', tpl) || 'المحمول'}: {r('customer.mobile', data, tpl) as string}</span>}
+            {tpl.show_customer_fax   && <span style={{ marginRight: 12 }}>{labelOf('label_customer_fax', tpl) || 'الفاكس'}: {r('customer.fax', data, tpl) as string}</span>}
+            {tpl.show_customer_email && <span style={{ marginRight: 12 }}>{labelOf('label_customer_email', tpl) || 'البريد'}: {r('customer.email', data, tpl) as string}</span>}
+            {tpl.show_customer_activity && <span style={{ marginRight: 12 }}>{labelOf('label_customer_activity', tpl) || 'النشاط'}: {r('customer.activity', data, tpl) as string}</span>}
+            {tpl.show_client_address && <div style={{ marginTop: 2 }}>{labelOf('label_client_address', tpl) || 'العنوان'}: {r('customer.address', data, tpl) as string}</div>}
+            {tpl.show_customer_bank_name && <span style={{ marginRight: 12 }}>{labelOf('label_customer_bank_name', tpl) || 'البنك'}: {r('customer.bankName', data, tpl) as string}</span>}
+            {tpl.show_customer_rib  && <span style={{ marginRight: 12 }}>{labelOf('label_customer_rib', tpl) || 'RIB'}: {r('customer.rib', data, tpl) as string}</span>}
+          </>
+      }
+      {tpl.doc_separator && tpl.doc_separator !== 'none' && <Separator style={tpl.doc_separator} />}
     </div>
   );
 }
@@ -981,7 +1049,7 @@ export function renderDocInfo(tpl: PrintTemplate, data: UniversalDocumentData, i
 ```
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { Separator } from './shared';
+import { Separator, borderStyle } from './shared';
 
 function barcodeText(tpl: PrintTemplate, data: UniversalDocumentData): string {
   if (tpl.barcode_content === 'custom') return tpl.barcode_custom_text;
@@ -1127,6 +1195,7 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
   const hasContent =
     tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
     tpl.show_thank_you || tpl.show_returns_policy || tpl.footer_legal_text ||
+    tpl.show_barcode || tpl.show_qr ||
     tpl.show_bank_details;
 
   if (!hasContent) return null;
@@ -1134,7 +1203,7 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
   return (
     <div style={{
       fontSize: tpl.base_font_size - 0.5,
-      borderTop: tpl.footer_separator === 'none' ? 'none' : '2px solid #111',
+      borderTop: tpl.footer_separator === 'none' ? 'none' : `2px ${borderStyle(tpl.footer_separator)} #111`,
       paddingTop: 16,
       marginTop: 12,
     }}>
@@ -1161,6 +1230,7 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
         <div style={{
           fontWeight: 700, margin: '8px 0',
           fontSize: tpl.thank_you_size,
+          color: tpl.thank_you_color,
           textAlign: 'center',
         }}>
           {tpl.thank_you_text}
@@ -1170,6 +1240,44 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       {tpl.footer_legal_text && (
         <div style={{ fontSize: tpl.base_font_size - 1.5, color: '#888', margin: '6px 0', textAlign: 'center' }}>
           {tpl.footer_legal_text}
+        </div>
+      )}
+
+      {tpl.show_barcode && (
+        <div style={{ margin: '8px 0 4px', textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
+            {Array.from({ length: 48 }, (_, i) => (
+              <div key={i} style={{
+                width: i % 3 === 0 ? 2 : 1,
+                height: i % 5 === 0 ? 28 : 22,
+                background: '#111',
+              }} />
+            ))}
+          </div>
+          <div style={{ fontSize: tpl.base_font_size - 1, letterSpacing: 2, marginTop: 2 }}>
+            {barcodeText(tpl, data)}
+          </div>
+        </div>
+      )}
+
+      {tpl.show_qr && (
+        <div style={{ margin: '4px auto', width: 48, height: 48, textAlign: 'center' }}>
+          <svg viewBox="0 0 10 10" width={48} height={48}>
+            <rect x="0" y="0" width="3" height="3" fill="#111" />
+            <rect x="1" y="1" width="1" height="1" fill="#fff" />
+            <rect x="7" y="0" width="3" height="3" fill="#111" />
+            <rect x="8" y="1" width="1" height="1" fill="#fff" />
+            <rect x="0" y="7" width="3" height="3" fill="#111" />
+            <rect x="1" y="8" width="1" height="1" fill="#fff" />
+            <rect x="4" y="0" width="1" height="1" fill="#111" />
+            <rect x="4" y="2" width="2" height="1" fill="#111" />
+            <rect x="3" y="4" width="4" height="1" fill="#111" />
+            <rect x="5" y="6" width="2" height="3" fill="#111" />
+            <rect x="3" y="7" width="1" height="1" fill="#111" />
+          </svg>
+          <div style={{ fontSize: 7, color: '#666', marginTop: 1 }}>
+            {qrDataText(tpl, data)}
+          </div>
         </div>
       )}
 
@@ -1210,6 +1318,7 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
     tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
     tpl.show_thank_you || tpl.footer_legal_text ||
     tpl.show_cashier_signature || tpl.show_client_signature ||
+    tpl.show_barcode || tpl.show_qr ||
     tpl.show_bank_details;
 
   if (!hasContent) return null;
@@ -1218,7 +1327,7 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
     <div style={{
       textAlign: 'center',
       fontSize: tpl.base_font_size - 0.5,
-      borderTop: tpl.footer_separator === 'none' ? 'none' : '1.5px solid #111',
+      borderTop: tpl.footer_separator === 'none' ? 'none' : `1.5px ${borderStyle(tpl.footer_separator)} #111`,
       paddingTop: 10,
     }}>
       {tpl.show_bank_details && tpl.bank_details_text && (
@@ -1231,6 +1340,13 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       )}
       {tpl.footer_line1 && <div style={{ marginBottom: 1 }}>{tpl.footer_line1}</div>}
       {tpl.footer_line2 && <div style={{ marginBottom: 1 }}>{tpl.footer_line2}</div>}
+      {tpl.footer_line3 && <div style={{ marginBottom: 1 }}>{tpl.footer_line3}</div>}
+
+      {tpl.show_returns_policy && tpl.returns_policy_text && (
+        <div style={{ fontSize: tpl.base_font_size - 1, color: '#666', marginBottom: 3 }}>
+          {tpl.returns_policy_text}
+        </div>
+      )}
 
       {tpl.show_thank_you && (
         <div style={{
@@ -1244,6 +1360,44 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       {tpl.footer_legal_text && (
         <div style={{ fontSize: tpl.base_font_size - 1.5, color: '#888' }}>
           {tpl.footer_legal_text}
+        </div>
+      )}
+
+      {tpl.show_barcode && (
+        <div style={{ margin: '6px 0 4px' }}>
+          <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
+            {Array.from({ length: 36 }, (_, i) => (
+              <div key={i} style={{
+                width: i % 3 === 0 ? 2 : 1,
+                height: i % 5 === 0 ? 22 : 16,
+                background: '#111',
+              }} />
+            ))}
+          </div>
+          <div style={{ fontSize: tpl.base_font_size - 1.5, letterSpacing: 2, marginTop: 2 }}>
+            {barcodeText(tpl, data)}
+          </div>
+        </div>
+      )}
+
+      {tpl.show_qr && (
+        <div style={{ margin: '4px auto', width: 36, height: 36 }}>
+          <svg viewBox="0 0 10 10" width={36} height={36}>
+            <rect x="0" y="0" width="3" height="3" fill="#111" />
+            <rect x="1" y="1" width="1" height="1" fill="#fff" />
+            <rect x="7" y="0" width="3" height="3" fill="#111" />
+            <rect x="8" y="1" width="1" height="1" fill="#fff" />
+            <rect x="0" y="7" width="3" height="3" fill="#111" />
+            <rect x="1" y="8" width="1" height="1" fill="#fff" />
+            <rect x="4" y="0" width="1" height="1" fill="#111" />
+            <rect x="4" y="2" width="2" height="1" fill="#111" />
+            <rect x="3" y="4" width="4" height="1" fill="#111" />
+            <rect x="5" y="6" width="2" height="3" fill="#111" />
+            <rect x="3" y="7" width="1" height="1" fill="#111" />
+          </svg>
+          <div style={{ fontSize: 6, color: '#666', marginTop: 1 }}>
+            {qrDataText(tpl, data)}
+          </div>
         </div>
       )}
 
@@ -1263,6 +1417,17 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
           )}
         </div>
       )}
+
+      {tpl.show_stamp && (
+        <div style={{
+          width: 50, height: 50, margin: '10px auto',
+          border: '2px solid #111', borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 9, fontWeight: 900, transform: 'rotate(-12deg)',
+        }}>
+          ختم
+        </div>
+      )}
     </div>
   );
 }
@@ -1275,17 +1440,189 @@ export function renderFooter(tpl: PrintTemplate, data: UniversalDocumentData, is
 
 ```
 
+## FILE: ./resources/js/pages/settings/print-settings/components/preview/HeaderColumns.tsx
+
+```
+import React from 'react';
+import { layoutEngine, type LayoutElement } from '../../engines/LayoutEngine';
+import type { PrintTemplate, HeaderLayout, LayoutBlock } from '../../types/domain';
+import type { UniversalDocumentData } from '../../types/data';
+import { renderLayoutRows, boxBorderCss } from './shared';
+
+function spacingCss(p?: LayoutBlock['padding']): string {
+  if (!p) return '4px 8px';
+  return `${p.top}px ${p.start}px ${p.bottom}px ${p.end}px`;
+}
+
+function alignCss(a: LayoutBlock['align']): React.CSSProperties['textAlign'] {
+  return a === 'start' ? 'right' : a === 'end' ? 'left' : 'center';
+}
+
+export function renderHeaderColumns(
+  layout: HeaderLayout,
+  data: UniversalDocumentData,
+  tpl: PrintTemplate,
+  paperWidth: number,
+): JSX.Element | null {
+  if (layout.mode !== 'columns' || layout.columns.length === 0) return null;
+
+  const cols = layout.columns.filter(c => c.visible).sort((a, b) => a.order - b.order);
+  if (cols.length === 0) return null;
+
+  const evenWidth = 100 / cols.length;
+  const elements: LayoutElement[] = cols.map(col => ({
+    id: col.id,
+    type: 'text',
+    mode: 'flex',
+    width: ((col.width ?? evenWidth) / 100) * paperWidth,
+    flexBasis: ((col.width ?? evenWidth) / 100) * paperWidth,
+    height: 0,
+    order: col.order,
+  }));
+
+  const computed = layoutEngine.compute(elements, paperWidth);
+
+  return (
+    <div style={{ display: 'flex', width: paperWidth, marginBottom: 16, alignItems: 'stretch' }}>
+      {cols.map(col => {
+        const c = computed.elements.get(col.id);
+        return (
+          <div
+            key={col.id}
+            style={{
+              width: c?.width ?? `${evenWidth}%`,
+              boxSizing: 'border-box',
+              textAlign: alignCss(col.align),
+              padding: spacingCss(col.padding),
+              background: col.background,
+              overflowWrap: 'break-word',
+              wordBreak: 'break-word',
+              minWidth: 0,
+              ...boxBorderCss(col.border),
+            }}
+          >
+            {renderLayoutRows(col.rows, data, tpl)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+```
+
 ## FILE: ./resources/js/pages/settings/print-settings/components/preview/HeaderSection.tsx
 
 ```
 import type { PrintTemplate } from '../../types';
+import type { LayoutRow } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { renderLogo } from './LogoRenderer';
-import { align, formatDate, Separator, InfoRow } from './shared';
+import { align, formatDate, Separator, InfoRow, renderLayoutRows, fontFamily } from './shared';
 import { printFieldResolver } from '../../services';
+import { renderHeaderColumns } from './HeaderColumns';
 
 function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
   return printFieldResolver.resolve(fieldId, data, tpl);
+}
+
+function companyInfoStyle(tpl: PrintTemplate) {
+  const ff = tpl.company_info_font_family === 'monospace'
+    ? "'Courier New', monospace"
+    : tpl.company_info_font_family === 'times'
+      ? "'Times New Roman', serif"
+      : tpl.company_info_font_family === 'arial'
+        ? "'Arial', sans-serif"
+        : "'Tajawal', sans-serif";
+  return {
+    fontSize: tpl.company_info_size,
+    fontFamily: ff,
+    fontWeight: tpl.company_info_bold ? 700 : 400,
+    fontStyle: tpl.company_info_italic ? 'italic' : 'normal' as const,
+  };
+}
+
+const COMPANY_FIELD_MAP: Record<string, { settingKey: string; label: string; rawField: string; simple?: boolean }> = {
+  'co_commercial_name': { settingKey: 'show_commercial_name', label: 'الاسم التجاري', rawField: 'company.commercialName' },
+  'co_address':         { settingKey: 'show_address',         label: 'العنوان',       rawField: 'company.address', simple: true },
+  'co_phone':           { settingKey: 'show_phone',           label: 'الهاتف',        rawField: 'company.phone' },
+  'co_mobile':          { settingKey: 'show_mobile',          label: 'المحمول',       rawField: 'company.mobile' },
+  'co_fax':             { settingKey: 'show_fax',             label: 'الفاكس',        rawField: 'company.fax' },
+  'co_email':           { settingKey: 'show_email',           label: 'البريد الإلكتروني', rawField: 'company.email' },
+  'co_nif':             { settingKey: 'show_tax_id',          label: 'NIF',            rawField: 'company.nif' },
+  'co_rc':              { settingKey: 'show_rc',              label: 'RC',             rawField: 'company.rc' },
+  'co_nis':             { settingKey: 'show_nis',             label: 'NIS',            rawField: 'company.nis' },
+  'co_article':         { settingKey: 'show_article',         label: 'المادة الجبائية', rawField: 'company.article' },
+  'co_capital':         { settingKey: 'show_capital',         label: 'الرأس المال',    rawField: 'company.capital' },
+  'co_bank_name':       { settingKey: 'show_bank_name',       label: 'اسم البنك',     rawField: 'company.bankName' },
+  'co_rib':             { settingKey: 'show_rib',             label: 'RIB',            rawField: 'company.rib' },
+  'co_activity':        { settingKey: 'show_activity',        label: 'النشاط',        rawField: 'company.activity' },
+};
+
+const COMPANY_LABEL_MAP: Record<string, string> = {
+  'co_commercial_name': 'label_commercial_name',
+  'co_address':         'label_address',
+  'co_phone':           'label_phone',
+  'co_mobile':          'label_mobile',
+  'co_fax':             'label_fax',
+  'co_email':           'label_email',
+  'co_nif':             'label_nif',
+  'co_rc':              'label_rc',
+  'co_nis':             'label_nis',
+  'co_article':         'label_article',
+  'co_capital':         'label_capital',
+  'co_bank_name':       'label_bank_name',
+  'co_rib':             'label_rib',
+  'co_activity':        'label_activity',
+};
+
+function renderCompanyInfo(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+  const st = companyInfoStyle(tpl);
+  const rows = tpl.company_info_rows ?? [];
+
+  if (rows.length > 0) {
+    return (
+      <div style={{ ...st, color: '#444' }}>
+        {renderLayoutRows(rows, data, tpl)}
+      </div>
+    );
+  }
+
+  // Legacy fallback: no company_info_rows, show based on show_* toggles
+  const color = '#444';
+  const Label = ({ label, val }: { label: string; val: unknown }) => {
+    if (!val) return null;
+    const str = String(val);
+    if (!str.trim()) return null;
+    return <div><span style={{ fontWeight: 600 }}>{label}: </span>{str}</div>;
+  };
+  const SimpleField = ({ label, val }: { label: string; val: unknown }) => {
+    if (!val) return null;
+    const str = String(val);
+    if (!str.trim()) return null;
+    return <div>{str}</div>;
+  };
+
+  const labelOf = (rowId: string) => {
+    const labelKey = COMPANY_LABEL_MAP[rowId];
+    return (labelKey ? (tpl as any)[labelKey] : '') || COMPANY_FIELD_MAP[rowId]?.label || '';
+  };
+
+  const entries = Object.entries(COMPANY_FIELD_MAP)
+    .filter(([id, meta]) => (tpl as any)[meta.settingKey])
+    .map(([id, meta]) => ({ rowId: id, label: labelOf(id), simple: meta.simple }));
+
+  return (
+    <div style={{ ...st, color }}>
+      {entries.map(({ rowId, label, simple }) => {
+        const meta = COMPANY_FIELD_MAP[rowId];
+        if (!meta) return null;
+        const val = r(meta.rawField, data, tpl);
+        if (simple) return <SimpleField key={rowId} label={label} val={val} />;
+        return <Label key={rowId} label={label} val={val} />;
+      })}
+    </div>
+  );
 }
 
 function renderThermalHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
@@ -1304,15 +1641,7 @@ function renderThermalHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
           {r('company.name', data, tpl)}
         </div>
       )}
-      <div style={{ fontSize: tpl.company_info_size, color: '#444' }}>
-        {tpl.show_address && r('company.address', data, tpl) && <div>{r('company.address', data, tpl)}</div>}
-        {tpl.show_phone   && r('company.phone', data, tpl)   && <div>☏ {r('company.phone', data, tpl)}</div>}
-        {tpl.show_tax_id  && r('company.nif', data, tpl)     && <div>NIF: {r('company.nif', data, tpl)}</div>}
-        {tpl.show_rc      && r('company.rc', data, tpl)      && <div>RC: {r('company.rc', data, tpl)}</div>}
-        {tpl.show_nis     && r('company.nis', data, tpl)     && <div>NIS: {r('company.nis', data, tpl)}</div>}
-        {tpl.show_ice     && r('company.ice', data, tpl)     && <div>ICE: {r('company.ice', data, tpl)}</div>}
-        {tpl.show_article && r('company.article', data, tpl) && <div>{r('company.article', data, tpl)}</div>}
-      </div>
+      {renderCompanyInfo(tpl, data, true)}
       {tpl.header_custom_text && (
         <div style={{ fontSize: tpl.company_info_size, color: '#555', marginTop: 2 }}>
           {tpl.header_custom_text}
@@ -1323,37 +1652,67 @@ function renderThermalHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
   );
 }
 
-function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
+function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paperWidth: number) {
   const isA4 = tpl.paper_size === 'A4';
+
+  const logoAndTitle = (
+    <>
+      {tpl.show_logo && renderLogo(tpl, data)}
+      {tpl.title_text && (
+        <div style={{
+          fontSize: tpl.title_size + (isA4 ? 4 : 2),
+          fontWeight: tpl.title_bold ? 900 : 400,
+          color: tpl.title_color,
+          textAlign: align(tpl.title_align),
+          marginBottom: isA4 ? 12 : 8,
+        }}>
+          {tpl.title_text}
+        </div>
+      )}
+    </>
+  );
+
+  if (tpl.header_layout?.mode === 'columns') {
+    const columns = renderHeaderColumns(tpl.header_layout, data, tpl, paperWidth);
+    if (columns) {
+      return (
+        <div style={{ marginBottom: isA4 ? 30 : 16 }}>
+          {logoAndTitle}
+          {columns}
+        </div>
+      );
+    }
+  }
+
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      marginBottom: isA4 ? 30 : 16,
-      paddingBottom: isA4 ? 20 : 10,
-      borderBottom: isA4 ? '2px solid #111' : '1.5px solid #111',
-    }}>
-      <div style={{ flex: 1 }}>
+    <div style={{ marginBottom: isA4 ? 30 : 16 }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        paddingBottom: isA4 ? 20 : 10,
+        borderBottom: tpl.header_separator === 'none' ? 'none'
+          : `2px ${tpl.header_separator === 'double' ? 'double' : tpl.header_separator === 'dashed' ? 'dashed' : 'solid'} #111`,
+      }}>
+        <div style={{ textAlign: align(tpl.company_info_align) }}>
         {tpl.show_logo && renderLogo(tpl, data)}
         {tpl.show_company_name && (
           <div style={{
             fontSize: tpl.company_name_size + (isA4 ? 4 : 2),
             fontWeight: tpl.company_name_bold ? 900 : 400,
+            color: tpl.company_name_color,
+            textAlign: align(tpl.company_name_align),
             fontFamily: "'Tajawal', sans-serif",
             marginBottom: 4,
           }}>
             {r('company.name', data, tpl)}
           </div>
         )}
-        <div style={{ fontSize: tpl.company_info_size, color: '#555' }}>
-          {tpl.show_address && <div>{r('company.address', data, tpl)}</div>}
-          {tpl.show_phone   && <div>☎ {r('company.phone', data, tpl)}</div>}
-          {tpl.show_tax_id  && <div>NIF: {r('company.nif', data, tpl)}</div>}
-          {tpl.show_rc      && <div>RC: {r('company.rc', data, tpl)}</div>}
-          {tpl.show_nis     && <div>NIS: {r('company.nis', data, tpl)}</div>}
-          {tpl.show_ice     && <div>ICE: {r('company.ice', data, tpl)}</div>}
-          {tpl.show_article && <div>{r('company.article', data, tpl)}</div>}
-        </div>
+        {renderCompanyInfo(tpl, data, false)}
+        {tpl.header_custom_text && (
+          <div style={{ fontSize: tpl.company_info_size, color: '#555', marginTop: 4 }}>
+            {tpl.header_custom_text}
+          </div>
+        )}
       </div>
 
       <div style={{ textAlign: 'left', minWidth: isA4 ? 250 : 180 }}>
@@ -1380,12 +1739,13 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
         </table>
       </div>
     </div>
+    </div>
   );
 }
 
-export function renderHeader(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
+export function renderHeader(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean, paperWidth: number) {
   if (isThermal) return renderThermalHeader(tpl, data);
-  return renderPageHeader(tpl, data);
+  return renderPageHeader(tpl, data, paperWidth);
 }
 
 ```
@@ -1416,6 +1776,11 @@ const FIELD_MAP: Record<string, string> = {
   total:     'item.total',
 };
 
+function formatCellValue(value: unknown, emptyText = ''): string {
+  if (value === null || value === undefined || value === '') return emptyText;
+  return String(value);
+}
+
 function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: number): string {
   const fieldId = FIELD_MAP[col];
   if (!fieldId) return '';
@@ -1427,7 +1792,7 @@ function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: 
   }
   if (col === 'tva') {
     const pct = printFieldResolver.resolveItemField('item.tvaPct', line, idx) as number;
-    return `${pct}%`;
+    return pct != null ? `${pct}%` : 'معفى';
   }
   if (col === 'price') {
     const display = _tpl.price_display === 'ttc' ? line.unitPriceTtc : line.unitPriceHt;
@@ -1437,7 +1802,7 @@ function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: 
     const display = _tpl.show_line_total_ttc ? line.totalTtc : line.totalHt;
     return Number(display).toFixed(2);
   }
-  return val !== undefined ? String(val) : '';
+  return formatCellValue(val);
 }
 
 function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
@@ -1450,6 +1815,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
 
   const bs = borderStyle(tpl.table_border_style);
   const border = tpl.table_border_style === 'none' ? 'none' : `1px ${bs} #999`;
+  const cp = tpl.table_cell_padding || 6;
 
   return (
     <div style={{ fontSize: tpl.items_font_size, fontFamily: ff, marginBottom: 4 }}>
@@ -1458,7 +1824,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
           display: 'flex', gap: 2,
           fontWeight: tpl.table_header_bold ? 800 : 400,
           color: tpl.table_header_color,
-          background: tpl.table_header_bg ? '#f0f0f0' : 'transparent',
+          background: tpl.table_header_bg || 'transparent',
           borderBottom: border,
           paddingBottom: 3, marginBottom: 2,
         }}>
@@ -1466,6 +1832,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
             <div key={col} style={{
               flex: `0 0 ${colWidth(tpl, col, COL_WIDTH_DEFAULTS)}%`,
               textAlign: align(colAlign(tpl, col)),
+              padding: `${cp / 2}px`,
             }}>
               {tpl.col_headers[col] ?? colDefaultHeader(col)}
             </div>
@@ -1477,7 +1844,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
         <div key={idx} style={{
           display: 'flex', gap: 2,
           background: tpl.alternating_rows && idx % 2 === 1 ? tpl.alternating_color : 'transparent',
-          padding: '1px 0',
+          padding: `${cp / 2}px 0`,
           borderBottom: tpl.table_border_style !== 'none' ? `1px ${bs} #eee` : 'none',
         }}>
           {visibleCols.map(col => (
@@ -1500,16 +1867,21 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
   if (visibleCols.length === 0 || data.lines.length === 0) return null;
 
   const isA4 = tpl.paper_size === 'A4';
-  const cellPad = isA4 ? '10px' : '5px 6px';
+  const cp = tpl.table_cell_padding || 6;
+  const cellPad = `${cp}px ${Math.round(cp * 1.2)}px`;
   const totalPct = visibleCols.reduce((s, c) => s + colWidth(tpl, c, COL_WIDTH_DEFAULTS), 0);
   const scale = totalPct > 0 ? 100 / totalPct : 1;
+  const ff = tpl.items_font_family === 'monospace'
+    ? "'Courier New', monospace"
+    : "'Tajawal', sans-serif";
 
   return (
-    <div style={{ marginBottom: isA4 ? 20 : 12 }}>
+    <div style={{ marginBottom: isA4 ? 20 : 12, fontFamily: ff }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: tpl.items_font_size }}>
+        {tpl.show_col_header && (
         <thead>
           <tr style={{
-            background: tpl.table_header_bg ? (tpl.table_header_color || '#111') : '#f5f5f5',
+            background: tpl.table_header_bg || '#f5f5f5',
             borderBottom: isA4 ? '2px solid #111' : '1.5px solid #111',
           }}>
             {visibleCols.map(col => (
@@ -1518,7 +1890,7 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
                 padding: cellPad,
                 textAlign: align(colAlign(tpl, col)),
                 fontWeight: tpl.table_header_bold ? 700 : 600,
-                color: tpl.table_header_bg ? '#fff' : tpl.table_header_color || '#111',
+                color: tpl.table_header_color || '#111',
                 fontSize: tpl.items_font_size,
               }}>
                 {tpl.col_headers[col] ?? colDefaultHeader(col)}
@@ -1526,6 +1898,7 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
             ))}
           </tr>
         </thead>
+        )}
         <tbody>
           {data.lines.map((line, i) => (
             <tr key={i} style={{
@@ -1604,6 +1977,44 @@ export function renderLogo(tpl: PrintTemplate, data: UniversalDocumentData) {
     </div>
   );
 }
+
+```
+
+## FILE: ./resources/js/pages/settings/print-settings/components/preview/PageFrame.tsx
+
+```
+import React from 'react';
+import type { PrintTemplate, PageFrameConfig } from '../../types';
+import { borderStyle } from './shared';
+
+interface Props {
+  config: PageFrameConfig;
+  tpl: PrintTemplate;
+  children: React.ReactNode;
+}
+
+function PageFrameFn({ config, tpl, children }: Props): JSX.Element {
+  if (!config.enabled) return <>{children}</>;
+
+  const bs = config.borderStyle ?? 'solid';
+  const bw = config.borderWidth ?? 1;
+  const bc = config.borderColor ?? '#111';
+  const br = config.borderRadius ?? 0;
+  const margin = config.margin ?? 8;
+
+  return (
+    <div style={{
+      border: `${bw}px ${borderStyle(bs)} ${bc}`,
+      borderRadius: br,
+      padding: margin,
+      margin: `${margin}px 0`,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+export const PageFrame = React.memo(PageFrameFn);
 
 ```
 
@@ -1829,7 +2240,14 @@ import type {
   AlignOption,
   BorderStyle,
   FontFamily,
+  LayoutRow,
+  LayoutColumn,
+  BoxBorder,
+  CellStyle,
 } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+import { printFieldRegistry } from '../../services/PrintFieldRegistry';
+import { printFieldResolver } from '../../services/PrintFieldResolver';
 
 export function formatDate(iso: string): string {
   if (!iso) return '';
@@ -1904,15 +2322,22 @@ export function colAlign(tpl: PrintTemplate, col: ColumnKey): AlignOption {
 }
 
 export interface CompanyData {
-  name:    string;
-  address: string;
-  phone:   string;
-  nif:     string;
-  rc:      string;
-  nis:     string;
-  ice:     string;
-  article: string;
-  logoUrl?: string | null;
+  name:            string;
+  commercialName:  string;
+  address:         string;
+  phone:           string;
+  mobile:          string;
+  fax:             string;
+  email:           string;
+  nif:             string;
+  rc:              string;
+  nis:             string;
+  article:         string;
+  capital:         string;
+  bankName:        string;
+  rib:             string;
+  activity:        string;
+  logoUrl?:        string | null;
 }
 
 export function buildTvaByRate(
@@ -2001,6 +2426,353 @@ export function SectionWrap({ highlight, children }: {
   return <div style={highlight}>{children}</div>;
 }
 
+// ─── Box border helper (any side, color, width, radius) ───────────────────────
+
+const BORDER_STYLE_CSS: Record<string, string> = {
+  solid: 'solid', dashed: 'dashed', double: 'double', none: 'none',
+};
+
+export function boxBorderCss(b?: Partial<BoxBorder>): React.CSSProperties {
+  if (!b || !b.style || b.style === 'none') return {};
+  const w = b.width ?? 1;
+  const c = b.color ?? '#111';
+  const st = BORDER_STYLE_CSS[b.style] ?? 'solid';
+  const sides = b.sides ?? {};
+  const css: React.CSSProperties = {};
+  if (sides.top !== false)    css.borderTop = `${w}px ${st} ${c}`;
+  if (sides.bottom !== false) css.borderBottom = `${w}px ${st} ${c}`;
+  if (sides.start !== false)  css.borderRight = `${w}px ${st} ${c}`;
+  if (sides.end !== false)    css.borderLeft = `${w}px ${st} ${c}`;
+  if (b.radius) css.borderRadius = b.radius;
+  return css;
+}
+
+export function cellStyleCss(s?: CellStyle): React.CSSProperties {
+  if (!s) return {};
+  const css: React.CSSProperties = {};
+  if (s.bold)      css.fontWeight = 800;
+  if (s.italic)    css.fontStyle = 'italic';
+  if (s.fontSize)   css.fontSize = s.fontSize;
+  if (s.color)      css.color = s.color;
+  if (s.fontFamily) css.fontFamily = fontFamily(s.fontFamily);
+  if (s.align)      css.textAlign = align(s.align);
+  return css;
+}
+
+// ─── Format field value by type from PrintFieldRegistry ───────────────────────
+
+function formatFieldValue(fieldId: string, value: unknown): string {
+  if (fieldId === 'literal') return String(value ?? '');
+  const def = printFieldRegistry.get(fieldId);
+  if (!def) return String(value ?? '');
+  if (def.type === 'currency') return Number(value ?? 0).toFixed(2);
+  if (def.type === 'number')   return String(Number(value ?? 0));
+  if (def.type === 'date')     return formatDate(String(value ?? ''));
+  return String(value ?? '');
+}
+
+const sideToOrder = (side: 'start' | 'end') => (side === 'start' ? 0 : 1);
+
+// ─── LayoutRowPair: label + value row from LayoutRow ──────────────────────────
+
+function LayoutRowPairFn({
+  row, label, value,
+}: { row: LayoutRow; label: string; value: unknown }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+      padding: '3px 2px',
+      marginRight: row.indent ?? 0,
+      fontWeight: row.bold ? 800 : 'inherit',
+      color: row.color ?? 'inherit',
+      fontSize: row.fontSize,
+      ...boxBorderCss(row.border),
+    }}>
+      <span style={{ order: sideToOrder(row.labelSide ?? 'start'), flexShrink: 0 }}>{label}</span>
+      <span style={{ order: sideToOrder(row.valueSide ?? 'end'), unicodeBidi: 'isolate', minWidth: 0, overflow: 'hidden' }} dir="auto">
+        {formatFieldValue(row.field ?? '', value)}
+      </span>
+    </div>
+  );
+}
+export const LayoutRowPair = React.memo(LayoutRowPairFn);
+
+// ─── LayoutRowLine: free-text line (footer etc.) ──────────────────────────────
+
+function LayoutRowLineFn({ row, text }: { row: LayoutRow; text: string }) {
+  return (
+    <div style={{
+      textAlign: row.labelSide === 'start' ? 'right' : row.labelSide === 'end' ? 'left' : 'center',
+      fontWeight: row.bold ? 800 : 'inherit',
+      color: row.color ?? 'inherit',
+      fontSize: row.fontSize,
+      padding: '2px 0',
+      ...boxBorderCss(row.border),
+    }}>
+      {text}
+    </div>
+  );
+}
+export const LayoutRowLine = React.memo(LayoutRowLineFn);
+
+// ─── LayoutColumnCell: renders one column within a multi-column row ────────────
+
+function LayoutColumnCellFn({
+  column, data, tpl,
+}: { column: LayoutColumn; data: UniversalDocumentData; tpl: PrintTemplate }) {
+  const def = printFieldRegistry.get(column.field);
+  const value = printFieldResolver.resolve(column.field, data, tpl);
+
+  const labelSetting = COMPANY_FIELD_LABEL_SETTING[column.field] || CUSTOMER_FIELD_LABEL_SETTING[column.field];
+  const label = (labelSetting ? (tpl as any)[labelSetting] : '') || column.label ?? def?.label ?? column.field;
+
+  const flex = column.width || 1;
+  const css: React.CSSProperties = {
+    flex: `${flex} 1 0`,
+    padding: '2px 4px',
+    textAlign: column.alignment,
+    fontWeight: column.bold ? 800 : 'inherit',
+    color: column.color ?? 'inherit',
+    fontSize: column.fontSize,
+    minWidth: 0,
+  };
+
+  return (
+    <div style={css}>
+      <span>{label}: </span>
+      <span dir="auto">{formatFieldValue(column.field, value)}</span>
+    </div>
+  );
+}
+const LayoutColumnCell = React.memo(LayoutColumnCellFn);
+
+// ─── renderLayoutRows: generic interpreter for LayoutRow[] ────────────────────
+
+const COMPANY_FIELD_LABEL_SETTING: Record<string, string> = {
+  'company.commercialName': 'label_commercial_name',
+  'company.address':        'label_address',
+  'company.phone':          'label_phone',
+  'company.mobile':         'label_mobile',
+  'company.fax':            'label_fax',
+  'company.email':          'label_email',
+  'company.nif':            'label_nif',
+  'company.rc':             'label_rc',
+  'company.nis':            'label_nis',
+  'company.article':        'label_article',
+  'company.capital':        'label_capital',
+  'company.bankName':       'label_bank_name',
+  'company.rib':            'label_rib',
+  'company.activity':       'label_activity',
+};
+
+const CUSTOMER_FIELD_LABEL_SETTING: Record<string, string> = {
+  'customer.name':           'label_client',
+  'customer.nif':            'label_client_nif',
+  'customer.phone':          'label_client_phone',
+  'customer.address':        'label_client_address',
+  'customer.deliveryAddress': 'label_delivery_address',
+  'customer.commercialName': 'label_customer_commercial_name',
+  'customer.rc':             'label_customer_rc',
+  'customer.nis':            'label_customer_nis',
+  'customer.ai':             'label_customer_ai',
+  'customer.mobile':         'label_customer_mobile',
+  'customer.fax':            'label_customer_fax',
+  'customer.email':          'label_customer_email',
+  'customer.activity':       'label_customer_activity',
+  'customer.bankName':       'label_customer_bank_name',
+  'customer.rib':            'label_customer_rib',
+};
+
+export function renderLayoutRows(
+  rows: LayoutRow[] | undefined,
+  data: UniversalDocumentData,
+  tpl: PrintTemplate,
+): JSX.Element[] {
+  if (!rows || rows.length === 0) return [];
+
+  const visible = [...rows].filter(r => r.visible).sort((a, b) => a.order - b.order);
+  const out: JSX.Element[] = [];
+
+  for (const r of visible) {
+    // ── Multi-column mode: row has columns[] ──
+    if (r.columns && r.columns.length > 0) {
+      const cells = r.columns
+        .map(col => <LayoutColumnCell key={col.id} column={col} data={data} tpl={tpl} />)
+        .filter(Boolean);
+      if (cells.length === 0) continue;
+      out.push(
+        <div key={r.id} style={{
+          display: 'flex',
+          flexDirection: 'row',
+          gap: 8,
+          padding: '2px 2px',
+          marginRight: r.indent ?? 0,
+          fontWeight: r.bold ? 800 : 'inherit',
+          color: r.color ?? 'inherit',
+          fontSize: r.fontSize,
+          flexWrap: 'wrap',
+          ...boxBorderCss(r.border),
+        }}>
+          {cells}
+        </div>,
+      );
+      continue;
+    }
+
+    // ── Legacy single-field mode (backward compatible) ──
+    if (r.field === 'totals.tvaBreakdownGroup') {
+      for (const br of data.taxBreakdown ?? []) {
+        out.push(<LayoutRowPair key={`${r.id}-${br.rate}`} row={r} label={`TVA ${br.rate}%`} value={br.tva} />);
+      }
+      continue;
+    }
+
+    if (r.field === 'literal') {
+      if (!r.literalText) continue;
+      out.push(<LayoutRowLine key={r.id} row={r} text={r.literalText} />);
+      continue;
+    }
+
+    const def = printFieldRegistry.get(r.field ?? '');
+    const value = printFieldResolver.resolve(r.field ?? '', data, tpl);
+
+    const labelSetting = COMPANY_FIELD_LABEL_SETTING[r.field ?? ''] || CUSTOMER_FIELD_LABEL_SETTING[r.field ?? ''];
+    const label = (labelSetting ? (tpl as any)[labelSetting] : '') || r.label ?? def?.label ?? r.field;
+    out.push(<LayoutRowPair key={r.id} row={r} label={label} value={value} />);
+  }
+
+  return out;
+}
+
+```
+
+## FILE: ./resources/js/pages/settings/print-settings/components/preview/TotalsGrid.tsx
+
+```
+import React from 'react';
+import type { PrintTemplate, TotalsGridConfig, TotalsGridColumn, LayoutRow, AlignOption } from '../../types';
+import type { UniversalDocumentData } from '../../types/data';
+import { renderLayoutRows, align, boxBorderCss } from './shared';
+
+interface GridRow {
+  rate: number;
+  baseExcl: number;
+  discountPct: number;
+  discountAmount: number;
+  tvaAmount: number;
+  netExcl: number;
+}
+
+function buildGridRows(data: UniversalDocumentData): GridRow[] {
+  const groups = new Map<number, GridRow>();
+
+  for (const line of data.lines) {
+    const rate = Number(line.tvaPct ?? 0);
+    const baseBeforeDiscount = Number(line.unitPriceHt ?? 0) * Number(line.quantity ?? 0);
+    const discountAmount = Number(line.discountAmt ?? 0);
+    const netExcl = Number(line.totalHt ?? 0);
+    const tvaAmount = Number(line.totalTva ?? 0);
+
+    const g = groups.get(rate) ?? { rate, baseExcl: 0, discountPct: 0, discountAmount: 0, tvaAmount: 0, netExcl: 0 };
+    g.baseExcl += baseBeforeDiscount;
+    g.discountAmount += discountAmount;
+    g.netExcl += netExcl;
+    g.tvaAmount += tvaAmount;
+    groups.set(rate, g);
+  }
+
+  return [...groups.values()]
+    .map(g => ({ ...g, discountPct: g.baseExcl > 0 ? (g.discountAmount / g.baseExcl) * 100 : 0 }))
+    .sort((a, b) => b.rate - a.rate);
+}
+
+function gridCellValue(col: TotalsGridColumn, row: GridRow): string {
+  switch (col.field) {
+    case 'grid.baseExcl':      return row.baseExcl.toFixed(2);
+    case 'grid.discountPct':   return row.discountPct > 0 ? `${row.discountPct.toFixed(1)}%` : '—';
+    case 'grid.discountAmount': return row.discountAmount.toFixed(2);
+    case 'grid.tvaRate':       return row.rate > 0 ? `${row.rate}%` : 'معفى';
+    case 'grid.tvaAmount':     return row.tvaAmount.toFixed(2);
+    default:                   return '';
+  }
+}
+
+function TotalsGridFn({
+  config, tpl, data,
+}: {
+  config: TotalsGridConfig;
+  tpl: PrintTemplate;
+  data: UniversalDocumentData;
+}): JSX.Element | null {
+  const gridRows = buildGridRows(data);
+  if (gridRows.length === 0 && !config.summaryRows?.length) return null;
+
+  const sortedCols = [...config.columns]
+    .filter(c => c.visible)
+    .sort((a, b) => a.order - b.order);
+
+  const borderColor = config.borderColor ?? '#333';
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <table style={{
+        width: '100%',
+        borderCollapse: 'collapse',
+        fontSize: tpl.totals_font_size,
+        direction: 'rtl',
+      }}>
+        <thead>
+          <tr style={{
+            background: config.headerBg ?? '#f5f5f5',
+            color: config.headerColor ?? '#111',
+            borderBottom: `2px solid ${borderColor}`,
+          }}>
+            {sortedCols.map(col => (
+              <th key={col.id} style={{
+                padding: '6px 8px',
+                textAlign: align(col.align as AlignOption),
+                fontWeight: 700,
+              }}>
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {gridRows.map((row, i) => (
+            <tr key={i} style={{
+              borderBottom: `1px solid ${borderColor}44`,
+            }}>
+              {sortedCols.map(col => (
+                <td key={col.id} style={{
+                  padding: '5px 8px',
+                  textAlign: align(col.align as AlignOption),
+                  direction: 'ltr',
+                }}>
+                  {gridCellValue(col, row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {config.summaryRows && config.summaryRows.length > 0 && (
+        <div style={{
+          marginTop: 8,
+          fontSize: tpl.totals_font_size,
+          fontWeight: tpl.totals_bold ? 700 : 400,
+          maxWidth: 320,
+        }}>
+          {renderLayoutRows(config.summaryRows, data, tpl)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export const TotalsGrid = React.memo(TotalsGridFn);
+
 ```
 
 ## FILE: ./resources/js/pages/settings/print-settings/components/preview/TotalsSection.tsx
@@ -2008,163 +2780,54 @@ export function SectionWrap({ highlight, children }: {
 ```
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { TotalRow, borderStyle } from './shared';
-import { printFieldResolver } from '../../services';
-
-function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
-  return printFieldResolver.resolve(fieldId, data, tpl);
-}
-
-function PageTotalRow({ label, val, red, bold }: { label: string; val: number; red?: boolean; bold?: boolean }) {
-  return (
-    <tr>
-      <td style={{
-        padding: '5px 12px',
-        textAlign: 'right',
-        fontWeight: bold ? 800 : 400,
-        color: red ? '#c00' : 'inherit',
-      }}>
-        {label}
-      </td>
-      <td style={{
-        padding: '5px 12px',
-        textAlign: 'right',
-        fontWeight: bold ? 800 : 400,
-        color: red ? '#c00' : 'inherit',
-      }}>
-        {Number(val).toFixed(2)}
-      </td>
-    </tr>
-  );
-}
+import { renderLayoutRows } from './shared';
+import { TotalsGrid } from './TotalsGrid';
 
 function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
-  const fs = tpl.totals_font_size;
-  const totalTtc = r('totals.ttc', data, tpl) as number;
-  const totalDiscount = r('totals.discount', data, tpl) as number;
-  const taxBreakdown = data.taxBreakdown;
+  const textAlign =
+    tpl.totals_align === 'left'  ? 'left' :
+    tpl.totals_align === 'center' ? 'center' : 'right';
 
   return (
     <div style={{
-      fontSize: fs,
+      fontSize: tpl.totals_font_size,
       fontWeight: tpl.totals_bold ? 700 : 400,
-      textAlign: tpl.totals_align === 'left' ? 'left' : tpl.totals_align === 'center' ? 'center' : 'right',
+      textAlign,
       marginBottom: 4,
     }}>
-      {tpl.show_total_ht      && <TotalRow label="المجموع HT"        val={r('totals.ht', data, tpl) as number} />}
-      {tpl.show_discount_total && totalDiscount > 0 && (
-        <TotalRow label="إجمالي الخصومات" val={-totalDiscount} red />
-      )}
-      {tpl.show_total_tva     && <TotalRow label="TVA"               val={r('totals.tva', data, tpl) as number} />}
-      {tpl.show_tva_breakdown && taxBreakdown.map(rr => (
-        <TotalRow key={rr.rate} label={`  TVA ${rr.rate}%`} val={rr.tva} />
-      ))}
-      {tpl.show_fiscal_stamp  && (r('totals.fiscalStamp', data, tpl) as number) > 0 && (
-        <TotalRow label="الطابع الجبائي" val={r('totals.fiscalStamp', data, tpl) as number} />
-      )}
-
-      {tpl.show_total_ttc && (
-        <div style={{
-          display: 'flex', justifyContent: 'space-between',
-          border: tpl.total_border_style === 'none'
-            ? 'none'
-            : `2px ${borderStyle(tpl.total_border_style)} #111`,
-          padding: '3px 5px', margin: '5px 0',
-          fontWeight: tpl.total_ttc_bold ? 900 : 700,
-          fontSize: tpl.total_ttc_font_size,
-          color: tpl.total_ttc_color,
-          fontFamily: "'Tajawal', sans-serif",
-        }}>
-          <span>المجموع TTC:</span>
-          <span dir="ltr">{Number(totalTtc).toFixed(2)} دج</span>
-        </div>
-      )}
-
-      {tpl.show_amount_in_words && r('totals.amountInWords', data, tpl) && (
-        <div style={{ fontSize: fs - 1, textAlign: 'center', color: '#555', marginTop: 2 }}>
-          <em>فقط: {r('totals.amountInWords', data, tpl)} ديناراً جزائرياً</em>
-        </div>
-      )}
-
-      {tpl.show_paid_amount   && <TotalRow label="المدفوع"        val={r('totals.paid', data, tpl) as number} bold />}
-      {tpl.show_change        && <TotalRow label="الباقي"         val={r('totals.change', data, tpl) as number} />}
-      {tpl.show_remaining     && (r('totals.remaining', data, tpl) as number) > 0 && <TotalRow label="المتبقي"  val={r('totals.remaining', data, tpl) as number} red />}
-      {tpl.show_prev_balance  && data.balance && <TotalRow label="الرصيد السابق"  val={r('balance.previous', data, tpl) as number} />}
-      {tpl.show_new_balance   && data.balance && <TotalRow label="الرصيد الجديد"  val={r('balance.current', data, tpl) as number} bold />}
+      {renderLayoutRows(tpl.totals_rows, data, tpl)}
     </div>
   );
 }
 
 function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
   const isA4 = tpl.paper_size === 'A4';
-  const tblW = isA4 ? 320 : 260;
-  const totalTtc = r('totals.ttc', data, tpl) as number;
-  const totalDiscount = r('totals.discount', data, tpl) as number;
-  const taxBreakdown = data.taxBreakdown;
-
-  const borderTop = tpl.total_border_style === 'none'
-    ? 'none'
-    : `${isA4 ? '3px' : '2px'} ${borderStyle(tpl.total_border_style)} #111`;
-
-  const totalsJustify = tpl.totals_align === 'left' ? 'flex-start' : tpl.totals_align === 'center' ? 'center' : 'flex-end';
+  const blockWidth = isA4 ? 320 : 260;
+  const justify =
+    tpl.totals_align === 'left'  ? 'flex-start' :
+    tpl.totals_align === 'center' ? 'center' : 'flex-end';
 
   return (
     <div style={{
-      display: 'flex', justifyContent: totalsJustify,
-      fontSize: tpl.totals_font_size,
-      fontWeight: tpl.totals_bold ? 700 : 400,
+      display: 'flex', justifyContent: justify,
       marginBottom: isA4 ? 24 : 12,
-      direction: 'ltr',
     }}>
-      <table style={{ width: tblW, borderCollapse: 'collapse' }}>
-        <tbody>
-          {tpl.show_total_ht      && <PageTotalRow label="المجموع HT"      val={r('totals.ht', data, tpl) as number} />}
-          {tpl.show_discount_total && totalDiscount > 0 && <PageTotalRow label="إجمالي الخصومات" val={-totalDiscount} red />}
-          {tpl.show_total_tva     && <PageTotalRow label="TVA"             val={r('totals.tva', data, tpl) as number} />}
-          {tpl.show_tva_breakdown && taxBreakdown.map(rr => (
-            <PageTotalRow key={rr.rate} label={`  TVA ${rr.rate}%`} val={rr.tva} />
-          ))}
-          {tpl.show_fiscal_stamp  && (r('totals.fiscalStamp', data, tpl) as number) > 0 && <PageTotalRow label="الطابع الجبائي" val={r('totals.fiscalStamp', data, tpl) as number} />}
-
-          {tpl.show_total_ttc && (
-            <tr>
-              <td style={{
-                padding: isA4 ? '10px 12px' : '6px 8px',
-                borderTop: borderTop,
-                fontWeight: tpl.total_ttc_bold ? 900 : 700,
-                fontSize: tpl.total_ttc_font_size,
-                textAlign: 'right',
-                color: tpl.total_ttc_color,
-              }}>
-                المجموع TTC:
-              </td>
-              <td style={{
-                padding: isA4 ? '10px 12px' : '6px 8px',
-                borderTop: borderTop,
-                fontWeight: tpl.total_ttc_bold ? 900 : 700,
-                fontSize: tpl.total_ttc_font_size,
-                textAlign: 'right',
-                color: tpl.total_ttc_color,
-              }}>
-                {Number(totalTtc).toFixed(2)}
-              </td>
-            </tr>
-          )}
-
-          {tpl.show_paid_amount  && <PageTotalRow label="المدفوع"       val={r('totals.paid', data, tpl) as number} bold />}
-          {tpl.show_change       && <PageTotalRow label="الباقي"        val={r('totals.change', data, tpl) as number} />}
-          {tpl.show_remaining    && (r('totals.remaining', data, tpl) as number) > 0 && <PageTotalRow label="المبلغ المتبقي" val={r('totals.remaining', data, tpl) as number} red />}
-          {tpl.show_prev_balance && data.balance && <PageTotalRow label="الرصيد السابق" val={r('balance.previous', data, tpl) as number} />}
-          {tpl.show_new_balance  && data.balance && <PageTotalRow label="الرصيد الجديد" val={r('balance.current', data, tpl) as number} bold />}
-        </tbody>
-      </table>
+      <div style={{
+        width: blockWidth,
+        fontSize: tpl.totals_font_size,
+        fontWeight: tpl.totals_bold ? 700 : 400,
+      }}>
+        {renderLayoutRows(tpl.totals_rows, data, tpl)}
+      </div>
     </div>
   );
 }
 
 export function renderTotals(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
-  if (isThermal) return renderThermalTotals(tpl, data);
-  return renderPageTotals(tpl, data);
+  if (!isThermal && tpl.totals_grid?.enabled) {
+    return <TotalsGrid config={tpl.totals_grid} tpl={tpl} data={data} />;
+  }
+  return isThermal ? renderThermalTotals(tpl, data) : renderPageTotals(tpl, data);
 }
 
 ```
@@ -2174,7 +2837,7 @@ export function renderTotals(tpl: PrintTemplate, data: UniversalDocumentData, is
 ```
 import React, { useMemo, useEffect } from 'react';
 import type { UniversalDocumentData } from '../../types/data';
-import type { PrintTemplate } from '../../types';
+import type { PrintTemplate, SectionTarget } from '../../types';
 import {
   mm, fontFamily, SectionWrap,
 } from './shared';
@@ -2188,6 +2851,7 @@ import { renderReport } from './ReportSection';
 import { rulesEngine } from '../../services/engines/RulesEngine';
 import { formulaEngine, type EvaluationContext, type ExpressionValue } from '../../services/engines/FormulaEngine';
 import { calculatedFieldService } from '../../services/CalculatedFieldService';
+import { PageFrame } from './PageFrame';
 
 export interface UniversalPreviewProps {
   tpl:      PrintTemplate;
@@ -2216,6 +2880,15 @@ function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
   Object.assign(computed, calcFields);
   return { data, computed };
 }
+
+const SECTION_RENDERERS: Record<SectionTarget, (tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean, paperWidth: number) => React.ReactNode> = {
+  'header':   (tpl, data, isThermal, pw) => renderHeader(tpl, data, isThermal, pw),
+  'doc-info': (tpl, data, isThermal)     => renderDocInfo(tpl, data, isThermal),
+  'items':    (tpl, data, isThermal)     => renderItems(tpl, data, isThermal),
+  'totals':   (tpl, data, isThermal)     => renderTotals(tpl, data, isThermal),
+  'payments': (tpl, data, isThermal)     => renderPayments(tpl, data, isThermal),
+  'footer':   (tpl, data, isThermal)     => renderFooter(tpl, data, isThermal),
+};
 
 function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   useEffect(() => { formulaEngine.clearCache(); }, [data]);
@@ -2250,9 +2923,24 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
     return null;
   };
 
-  const paddingTop   = isThermal ? mm(tpl.margin_top) : (isA4 ? 40 : 20);
-  const paddingSide  = isThermal ? mm(tpl.margin_sides) : (isA4 ? 50 : 24);
-  const paddingBottom = isThermal ? mm(tpl.margin_bottom) : (isA4 ? 40 : 20);
+  const paddingTop   = mm(tpl.margin_top);
+  const paddingSide  = mm(tpl.margin_sides);
+  const paddingBottom = mm(tpl.margin_bottom);
+
+  const orderedSections = tpl.sections_order
+    ? [...tpl.sections_order].sort((a, b) => a.order - b.order)
+    : [];
+
+  const showSection = (key: SectionTarget): boolean => {
+    const visibilityKey = `show_${key.replace('-', '_')}_section` as keyof PrintTemplate;
+    if (visibilityKey in tpl && !(tpl as any)[visibilityKey]) return false;
+    if (!sectionVisible(key)) return false;
+    const meta = orderedSections.find(s => s.key === key);
+    if (meta && !meta.visible) return false;
+    return true;
+  };
+
+  const frameConfig = tpl.page_frame;
 
   return (
     <div style={{
@@ -2268,37 +2956,19 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
       minHeight,
       boxSizing: 'border-box',
     }}>
-      {tpl.show_header_section && sectionVisible('header') && (
-        <SectionWrap highlight={sectionHighlight('header')}>
-          {renderHeader(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
-      {tpl.show_doc_info_section && sectionVisible('doc-info') && (
-        <SectionWrap highlight={sectionHighlight('doc-info')}>
-          {renderDocInfo(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
-      {tpl.show_items_section && sectionVisible('items') && (
-        <SectionWrap highlight={sectionHighlight('items')}>
-          {renderItems(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
-      {data.report && renderReport(tpl, data, isThermal, paperWidth)}
-      {tpl.show_totals_section && sectionVisible('totals') && (
-        <SectionWrap highlight={sectionHighlight('totals')}>
-          {renderTotals(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
-      {tpl.show_payments_section && sectionVisible('payments') && (
-        <SectionWrap highlight={sectionHighlight('payments')}>
-          {renderPayments(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
-      {tpl.show_footer_section && sectionVisible('footer') && (
-        <SectionWrap highlight={sectionHighlight('footer')}>
-          {renderFooter(tpl, data, isThermal)}
-        </SectionWrap>
-      )}
+      <PageFrame config={frameConfig ?? { enabled: false }} tpl={tpl}>
+        {orderedSections.map(meta => {
+          if (!showSection(meta.key)) return null;
+          const renderer = SECTION_RENDERERS[meta.key];
+          if (!renderer) return null;
+          return (
+            <SectionWrap key={meta.key} highlight={sectionHighlight(meta.key)}>
+              {renderer(tpl, data, isThermal, paperWidth)}
+            </SectionWrap>
+          );
+        })}
+        {data.report && renderReport(tpl, data, isThermal, paperWidth)}
+      </PageFrame>
     </div>
   );
 }
@@ -2407,6 +3077,374 @@ export function QuickNav({ controlsRef }: { controlsRef: React.RefObject<HTMLDiv
           {s.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+```
+
+## FILE: ./resources/js/pages/settings/print-settings/components/RowManager.tsx
+
+```
+import React, { useState } from 'react';
+import type { LayoutRow, LayoutColumn, AlignOption, LogicalSide } from '../types/domain';
+
+export interface FieldOption {
+  value: string;
+  label: string;
+}
+
+const miniBtn: React.CSSProperties = {
+  width: 20, height: 20, borderRadius: 4, border: '1px solid var(--b2)',
+  background: 'var(--bg3)', cursor: 'pointer', display: 'flex',
+  alignItems: 'center', justifyContent: 'center', fontSize: 10,
+  color: 'var(--t3)', padding: 0, flexShrink: 0,
+};
+
+const selectStyle: React.CSSProperties = {
+  padding: '2px 4px', borderRadius: 4, border: '1px solid var(--b2)',
+  background: 'var(--bg2)', fontSize: 10, color: 'var(--t2)',
+  minWidth: 0, flex: 1,
+};
+
+function makeColId(rowId: string, idx: number): string {
+  return `${rowId}_col_${idx}`;
+}
+
+let _nextRow = 0;
+function nextRowId(): string {
+  return `row_${Date.now()}_${_nextRow++}`;
+}
+
+function nextColId(rowId: string, cols: LayoutColumn[]): string {
+  return `${rowId}_col_${cols.length}`;
+}
+
+function createDefaultColumn(field: string, label: string): LayoutColumn {
+  return {
+    id: '',
+    field,
+    label,
+    width: 1,
+    alignment: 'right',
+    labelSide: 'start',
+    valueSide: 'end',
+  };
+}
+
+interface Props {
+  rows: LayoutRow[];
+  onChange: (rows: LayoutRow[]) => void;
+  /** Available fields for the column picker. When provided, multi-column mode is enabled. */
+  fields?: FieldOption[];
+  /** Placeholder text for the "Add Row" button */
+  addLabel?: string;
+}
+
+export function RowManager({ rows, onChange, fields, addLabel = '+ إضافة سطر' }: Props) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const sorted = [...rows].sort((a, b) => a.order - b.order);
+  const multiCol = !!fields && fields.length > 0;
+
+  const patch = (id: string, p: Partial<LayoutRow>) =>
+    onChange(rows.map(r => (r.id === id ? { ...r, ...p } : r)));
+
+  const move = (id: string, dir: -1 | 1) => {
+    const idx = sorted.findIndex(r => r.id === id);
+    const targetIdx = idx + dir;
+    if (targetIdx < 0 || targetIdx >= sorted.length) return;
+    const reordered = [...sorted];
+    [reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]];
+    onChange(reordered.map((r, i) => ({ ...r, order: i })));
+  };
+
+  const removeRow = (id: string) => {
+    onChange(rows.filter(r => r.id !== id).map((r, i) => ({ ...r, order: i })));
+  };
+
+  const handleDragOver = (e: React.DragEvent, overId: string) => {
+    e.preventDefault();
+    if (!dragId || dragId === overId) return;
+    const from = sorted.findIndex(r => r.id === dragId);
+    const to = sorted.findIndex(r => r.id === overId);
+    if (from < 0 || to < 0) return;
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    onChange(reordered.map((r, i) => ({ ...r, order: i })));
+    setDragId(overId);
+  };
+
+  const addRow = () => {
+    const id = nextRowId();
+    const maxOrder = rows.reduce((m, r) => Math.max(m, r.order), -1) + 1;
+    const col: LayoutColumn = {
+      id: nextColId(id, []),
+      field: fields?.[0]?.value ?? '',
+      label: fields?.[0]?.label ?? '',
+      width: 1,
+      alignment: 'right',
+      labelSide: 'start',
+      valueSide: 'end',
+    };
+    const newRow: LayoutRow = {
+      id,
+      order: maxOrder,
+      visible: true,
+      columns: [col],
+    };
+    onChange([...rows, newRow]);
+  };
+
+  const addColumn = (rowId: string) => {
+    const row = rows.find(r => r.id === rowId);
+    if (!row) return;
+    const cols = row.columns ?? [];
+    const col: LayoutColumn = {
+      id: nextColId(rowId, cols),
+      field: fields?.[0]?.value ?? '',
+      label: fields?.[0]?.label ?? '',
+      width: 1,
+      alignment: 'right',
+      labelSide: 'start',
+      valueSide: 'end',
+    };
+    patch(rowId, { columns: [...cols, col] });
+  };
+
+  const patchColumn = (rowId: string, colId: string, p: Partial<LayoutColumn>) => {
+    const row = rows.find(r => r.id === rowId);
+    if (!row) return;
+    const cols = (row.columns ?? []).map(c => c.id === colId ? { ...c, ...p } : c);
+    patch(rowId, { columns: cols });
+  };
+
+  const removeColumn = (rowId: string, colId: string) => {
+    const row = rows.find(r => r.id === rowId);
+    if (!row) return;
+    const cols = (row.columns ?? []).filter(c => c.id !== colId);
+    patch(rowId, { columns: cols });
+  };
+
+  /** Legacy mode: convert single-field row to columns array */
+  const ensureColumns = (row: LayoutRow): LayoutColumn[] => {
+    if (row.columns && row.columns.length > 0) return row.columns;
+    return [{
+      id: makeColId(row.id, 0),
+      field: row.field ?? '',
+      literalText: row.literalText,
+      label: row.label,
+      width: 1,
+      alignment: 'right',
+      labelSide: row.labelSide ?? 'start',
+      valueSide: row.valueSide ?? 'end',
+      bold: row.bold,
+      color: row.color,
+      fontSize: row.fontSize,
+    }];
+  };
+
+  const fieldLabel = (fieldVal: string) =>
+    fields?.find(f => f.value === fieldVal)?.label ?? fieldVal;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {sorted.map((row, idx) => {
+        const isDragging = dragId === row.id;
+        const cols = ensureColumns(row);
+        const hasTopBorder = row.border?.style && row.border.style !== 'none';
+
+        return (
+          <div
+            key={row.id}
+            draggable
+            onDragStart={() => setDragId(row.id)}
+            onDragOver={e => handleDragOver(e, row.id)}
+            onDragEnd={() => setDragId(null)}
+            style={{
+              borderRadius: 'var(--r1)',
+              background: row.visible ? 'var(--emb)' : 'var(--bg3)',
+              border: `1px solid ${row.visible ? 'var(--embo)' : 'var(--b1)'}`,
+              cursor: 'grab', opacity: isDragging ? 0.4 : 1,
+              padding: 4,
+            }}
+          >
+            {/* Row header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div
+                onClick={() => patch(row.id, { visible: !row.visible })}
+                style={{
+                  width: 28, height: 15, borderRadius: 8, flexShrink: 0,
+                  background: row.visible ? 'var(--em)' : 'var(--bg5)',
+                  border: `1px solid ${row.visible ? 'var(--em)' : 'var(--b3)'}`,
+                  position: 'relative', cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 1.5,
+                  left: row.visible ? 12 : 1.5,
+                  width: 10, height: 10, borderRadius: '50%', background: '#fff',
+                  transition: 'left .15s',
+                }} />
+              </div>
+
+              <span style={{
+                flex: 1, fontSize: 10.5, fontWeight: 600, color: 'var(--t3)',
+                minWidth: 0, display: 'flex', alignItems: 'center', gap: 3,
+              }}>
+                <i className="ti ti-grip-vertical" style={{ fontSize: 9, opacity: 0.3 }} />
+                {multiCol
+                  ? `${cols.length === 1 ? 'عمود واحد' : `${cols.length} أعمدة`}`
+                  : (row.label ?? row.id)
+                }
+              </span>
+
+              <button onClick={() => move(row.id, -1)} disabled={idx <= 0}
+                style={{ ...miniBtn, opacity: idx <= 0 ? .3 : 1 }} type="button" title="لأعلى">
+                <i className="ti ti-chevron-up" />
+              </button>
+              <button onClick={() => move(row.id, 1)} disabled={idx >= sorted.length - 1}
+                style={{ ...miniBtn, opacity: idx >= sorted.length - 1 ? .3 : 1 }} type="button" title="لأسفل">
+                <i className="ti ti-chevron-down" />
+              </button>
+
+              <button
+                onClick={() => patch(row.id, { bold: !row.bold })}
+                style={{ ...miniBtn, fontWeight: 900, color: row.bold ? 'var(--em)' : 'var(--t3)' }}
+                type="button" title="عريض"
+              >
+                B
+              </button>
+
+              <button
+                onClick={() => patch(row.id, {
+                  border: hasTopBorder
+                    ? { ...row.border, style: 'none' }
+                    : { style: 'solid', width: 1, color: '#111', sides: { top: true } },
+                })}
+                style={{ ...miniBtn, color: hasTopBorder ? 'var(--em)' : 'var(--t3)' }}
+                type="button" title="خط فاصل"
+              >
+                <i className="ti ti-separator-horizontal" />
+              </button>
+
+              <button
+                onClick={() => removeRow(row.id)}
+                style={{ ...miniBtn, color: '#c44' }}
+                type="button" title="حذف الصف"
+              >
+                <i className="ti ti-trash" />
+              </button>
+            </div>
+
+            {/* Columns */}
+            <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3, paddingInlineStart: 20 }}>
+              {cols.map((col, ci) => (
+                <div key={col.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  {multiCol && (
+                    <span style={{ fontSize: 8, color: 'var(--t4)', width: 10, textAlign: 'center', flexShrink: 0 }}>
+                      {ci + 1}
+                    </span>
+                  )}
+
+                  {fields ? (
+                    <select
+                      value={col.field}
+                      onChange={e => {
+                        const opt = fields.find(f => f.value === e.target.value);
+                        patchColumn(row.id, col.id, {
+                          field: e.target.value,
+                          label: opt?.label ?? e.target.value,
+                        });
+                      }}
+                      style={selectStyle}
+                    >
+                      <option value="">— اختر حقل —</option>
+                      {fields.map(f => (
+                        <option key={f.value} value={f.value}>{f.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={col.field}
+                      onChange={e => patchColumn(row.id, col.id, { field: e.target.value })}
+                      style={{ ...selectStyle, fontFamily: 'monospace', fontSize: 9 }}
+                      placeholder="field.id"
+                    />
+                  )}
+
+                  <input
+                    value={col.label ?? ''}
+                    onChange={e => patchColumn(row.id, col.id, { label: e.target.value })}
+                    style={{ ...selectStyle, flex: 0.6 }}
+                    placeholder="تسمية"
+                  />
+
+                  <select
+                    value={col.alignment}
+                    onChange={e => patchColumn(row.id, col.id, { alignment: e.target.value as AlignOption })}
+                    style={{ ...selectStyle, flex: 'none', width: 50 }}
+                  >
+                    <option value="right">يمين</option>
+                    <option value="center">وسط</option>
+                    <option value="left">يسار</option>
+                  </select>
+
+                  <select
+                    value={col.width}
+                    onChange={e => patchColumn(row.id, col.id, { width: Number(e.target.value) })}
+                    style={{ ...selectStyle, flex: 'none', width: 40 }}
+                  >
+                    {[1,2,3,4,5,6].map(w => (
+                      <option key={w} value={w}>{w}</option>
+                    ))}
+                  </select>
+
+                  {cols.length > 1 && (
+                    <button
+                      onClick={() => removeColumn(row.id, col.id)}
+                      style={{ ...miniBtn, color: '#c44', width: 16, height: 16, fontSize: 8 }}
+                      type="button" title="حذف العمود"
+                    >
+                      <i className="ti ti-x" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Add Column button */}
+            {multiCol && (
+              <button
+                onClick={() => addColumn(row.id)}
+                style={{
+                  marginTop: 3, marginLeft: 20, padding: '2px 8px',
+                  background: 'none', border: '1px dashed var(--b3)',
+                  borderRadius: 4, fontSize: 9, color: 'var(--t4)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2,
+                }}
+                type="button"
+              >
+                <i className="ti ti-plus" style={{ fontSize: 8 }} /> إضافة عمود
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Add Row button */}
+      <button
+        onClick={addRow}
+        style={{
+          padding: '5px 10px', background: 'none',
+          border: '1px dashed var(--b3)', borderRadius: 'var(--r1)',
+          fontSize: 11, color: 'var(--t4)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        }}
+        type="button"
+      >
+        <i className="ti ti-plus" style={{ fontSize: 10 }} /> {addLabel}
+      </button>
     </div>
   );
 }
@@ -4653,7 +5691,6 @@ export interface RenderContext {
     nif:     string;
     rc:      string;
     nis:     string;
-    ice:     string;
     article: string;
   }>;
   /** Locale for number/date formatting. Defaults to 'ar-DZ'. */
@@ -5096,20 +6133,121 @@ export function statusLabel(status: PrintJobStatus): string {
 
 ```
 import React from 'react';
-import type { BorderStyle } from '../types';
+import type { BorderStyle, FontFamily } from '../types';
 import type { PrintTemplate } from '../types';
-import { Toggle, SliderField } from './ToggleSwitch';
+import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { AlignButtons, BorderSelect } from './HeaderSection';
 import { Field, ColorField, Textarea, Input } from '../components/ui';
 import { isSettingVisible } from '../services/SettingsRegistry';
+import { RowManager, type FieldOption } from '../components/RowManager';
+
+const CUSTOMER_FIELD_OPTIONS: FieldOption[] = [
+  { value: 'customer.name',            label: 'اسم العميل' },
+  { value: 'customer.nif',             label: 'NIF العميل' },
+  { value: 'customer.commercialName',  label: 'الاسم التجاري' },
+  { value: 'customer.rc',              label: 'السجل التجاري' },
+  { value: 'customer.nis',             label: 'NIS' },
+  { value: 'customer.ai',              label: 'المادة الجبائية' },
+  { value: 'customer.phone',           label: 'الهاتف' },
+  { value: 'customer.mobile',          label: 'المحمول' },
+  { value: 'customer.fax',             label: 'الفاكس' },
+  { value: 'customer.email',           label: 'البريد الإلكتروني' },
+  { value: 'customer.activity',        label: 'النشاط' },
+  { value: 'customer.address',         label: 'العنوان' },
+  { value: 'customer.deliveryAddress', label: 'عنوان التسليم' },
+  { value: 'customer.bankName',        label: 'اسم البنك' },
+  { value: 'customer.rib',             label: 'RIB' },
+  { value: 'customer.code',            label: 'الرمز' },
+];
 
 interface Props {
   tpl: PrintTemplate;
   update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
 }
 
+const CUST_ROW_MAP: Record<string, { field: string; label: string }> = {
+  show_client:                        { field: 'customer.name',            label: 'العميل' },
+  show_client_nif:                    { field: 'customer.nif',             label: 'NIF العميل' },
+  show_client_phone:                  { field: 'customer.phone',           label: 'هاتف العميل' },
+  show_client_address:                { field: 'customer.address',         label: 'العنوان' },
+  show_delivery_address:              { field: 'customer.deliveryAddress', label: 'عنوان التسليم' },
+  show_customer_commercial_name:      { field: 'customer.commercialName',  label: 'الاسم التجاري' },
+  show_customer_rc:                   { field: 'customer.rc',              label: 'السجل التجاري' },
+  show_customer_nis:                  { field: 'customer.nis',             label: 'NIS' },
+  show_customer_ai:                   { field: 'customer.ai',              label: 'المادة الجبائية' },
+  show_customer_mobile:               { field: 'customer.mobile',          label: 'المحمول' },
+  show_customer_fax:                  { field: 'customer.fax',             label: 'الفاكس' },
+  show_customer_email:                { field: 'customer.email',           label: 'البريد الإلكتروني' },
+  show_customer_activity:             { field: 'customer.activity',        label: 'النشاط' },
+  show_customer_bank_name:            { field: 'customer.bankName',        label: 'اسم البنك' },
+  show_customer_rib:                  { field: 'customer.rib',             label: 'RIB' },
+};
+
+const CUST_LABEL_MAP: Record<string, string> = {
+  label_client:                       'cust_name',
+  label_client_nif:                   'cust_nif',
+  label_client_phone:                 'cust_phone',
+  label_client_address:               'cust_address',
+  label_delivery_address:             'cust_delivery',
+  label_customer_commercial_name:     'cust_commercial_name',
+  label_customer_rc:                  'cust_rc',
+  label_customer_nis:                 'cust_nis',
+  label_customer_ai:                  'cust_ai',
+  label_customer_mobile:              'cust_mobile',
+  label_customer_fax:                 'cust_fax',
+  label_customer_email:               'cust_email',
+  label_customer_activity:            'cust_activity',
+  label_customer_bank_name:           'cust_bank_name',
+  label_customer_rib:                 'cust_rib',
+};
+
+const FONT_OPTIONS: { value: FontFamily; label: string }[] = [
+  { value: 'tajawal', label: 'Tajawal' },
+  { value: 'monospace', label: 'Monospace' },
+  { value: 'times', label: 'Times New Roman' },
+  { value: 'arial', label: 'Arial' },
+];
+
 export default function DocumentSectionControls({ tpl, update }: Props) {
   const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
+
+  const fieldToRowId = (field: string) => 'cust_' + field.replace('customer.', '');
+
+  const syncRow = (settingKey: string, val: boolean) => {
+    const meta = CUST_ROW_MAP[settingKey];
+    if (!meta) { update(settingKey as any, val as any); return; }
+    const rowId = fieldToRowId(meta.field);
+    const rows = [...(tpl.customer_info_rows ?? [])];
+    const existingIdx = rows.findIndex(r => r.id === rowId);
+    if (val && existingIdx === -1) {
+      const maxOrder = rows.reduce((m, r) => Math.max(m, r.order), -1) + 1;
+      rows.push({
+        id: rowId,
+        field: meta.field,
+        label: meta.label,
+        visible: true,
+        order: maxOrder,
+        labelSide: 'end' as const,
+        valueSide: 'start' as const,
+      });
+    } else if (!val && existingIdx !== -1) {
+      rows.splice(existingIdx, 1);
+    }
+    update(settingKey as any, val as any);
+    update('customer_info_rows', rows);
+  };
+
+  const syncLabel = (key: string, val: string) => {
+    update(key as any, val as any);
+    const rowId = CUST_LABEL_MAP[key];
+    if (!rowId) return;
+    const rows = [...(tpl.customer_info_rows ?? [])];
+    const idx = rows.findIndex(r => r.id === rowId);
+    if (idx !== -1) {
+      rows[idx] = { ...rows[idx], label: val };
+      update('customer_info_rows', rows);
+    }
+  };
 
   return (
     <>
@@ -5123,23 +6261,115 @@ export default function DocumentSectionControls({ tpl, update }: Props) {
       {sec('title_color') && <ColorField label="لون العنوان" value={tpl.title_color} onChange={v => update('title_color', v)} />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+      <div className="ps-section-title" style={{ fontSize: 12 }}>ترتيب معلومات المستند</div>
+      <RowManager
+        rows={tpl.doc_info_rows ?? []}
+        onChange={rows => update('doc_info_rows', rows)}
+      />
+
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
 
       {sec('show_doc_number') && <Toggle value={tpl.show_doc_number} onChange={v => update('show_doc_number', v)} label="رقم الوثيقة" />}
       {sec('show_date') && <Toggle value={tpl.show_date} onChange={v => update('show_date', v)} label="التاريخ" />}
       {sec('show_time') && <Toggle value={tpl.show_time} onChange={v => update('show_time', v)} label="الوقت" />}
       {sec('show_due_date') && <Toggle value={tpl.show_due_date} onChange={v => update('show_due_date', v)} label="تاريخ الاستحقاق" />}
       {sec('show_cashier') && <Toggle value={tpl.show_cashier} onChange={v => update('show_cashier', v)} label="اسم الكاشير" />}
-      {sec('show_client') && <Toggle value={tpl.show_client} onChange={v => update('show_client', v)} label="اسم العميل" />}
 
-      {sec('show_client') && tpl.show_client && (
-        <>
-          <div className="ps-section-title" style={{ fontSize: 12, marginTop: 4 }}>تفاصيل العميل</div>
-          {sec('show_client_nif') && <Toggle value={tpl.show_client_nif} onChange={v => update('show_client_nif', v)} label="الرقم الضريبي للعميل" />}
-          {sec('show_client_phone') && <Toggle value={tpl.show_client_phone} onChange={v => update('show_client_phone', v)} label="هاتف العميل" />}
-          {sec('show_client_address') && <Toggle value={tpl.show_client_address} onChange={v => update('show_client_address', v)} label="عنوان العميل" />}
-          {sec('show_delivery_address') && <Toggle value={tpl.show_delivery_address} onChange={v => update('show_delivery_address', v)} label="  ↳ عنوان التسليم" />}
-        </>
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+
+      {/* ── Customer Section ── */}
+      <div className="ps-section-title" style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>بيانات العميل</div>
+
+      {/* Style controls */}
+      {sec('customer_info_font_family') && (
+        <Field label="نوع خط معلومات العميل">
+          <select
+            value={tpl.customer_info_font_family}
+            onChange={e => update('customer_info_font_family', e.target.value as FontFamily)}
+            style={{ width: '100%', padding: '4px 8px', borderRadius: 4, border: '1px solid var(--b2)' }}
+          >
+            {FONT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </Field>
       )}
+      {sec('customer_info_size') && <SliderField label="حجم الخط" value={tpl.customer_info_size} min={6} max={16} step={0.5} unit="px"
+        onChange={v => update('customer_info_size', v)} />}
+      {sec('customer_info_bold') && <Toggle value={tpl.customer_info_bold} onChange={v => update('customer_info_bold', v)} label="خط عريض" />}
+      {sec('customer_info_italic') && <Toggle value={tpl.customer_info_italic} onChange={v => update('customer_info_italic', v)} label="خط مائل" />}
+      {sec('customer_info_align') && <AlignButtons label="محاذاة النص" value={tpl.customer_info_align} onChange={v => update('customer_info_align', v)} />}
+
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+
+      {/* Show/hide toggles */}
+      <div className="ps-section-title" style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 4 }}>إظهار / إخفاء الحقول</div>
+      <Toggle value={tpl.show_client}                        onChange={v => syncRow('show_client', v)}                        label="اسم العميل (customer.name)" />
+      <Toggle value={tpl.show_client_nif}                    onChange={v => syncRow('show_client_nif', v)}                    label="NIF العميل (customer.nif)" />
+      <Toggle value={tpl.show_customer_commercial_name}      onChange={v => syncRow('show_customer_commercial_name', v)}      label="الاسم التجاري (customer.commercialName)" />
+      <Toggle value={tpl.show_customer_rc}                   onChange={v => syncRow('show_customer_rc', v)}                   label="السجل التجاري (customer.rc)" />
+      <Toggle value={tpl.show_customer_nis}                  onChange={v => syncRow('show_customer_nis', v)}                  label="NIS (customer.nis)" />
+      <Toggle value={tpl.show_customer_ai}                   onChange={v => syncRow('show_customer_ai', v)}                   label="المادة الجبائية (customer.ai)" />
+      <Toggle value={tpl.show_client_phone}                  onChange={v => syncRow('show_client_phone', v)}                  label="الهاتف (customer.phone)" />
+      <Toggle value={tpl.show_customer_mobile}               onChange={v => syncRow('show_customer_mobile', v)}               label="المحمول (customer.mobile)" />
+      <Toggle value={tpl.show_customer_fax}                  onChange={v => syncRow('show_customer_fax', v)}                  label="الفاكس (customer.fax)" />
+      <Toggle value={tpl.show_customer_email}                onChange={v => syncRow('show_customer_email', v)}                label="البريد الإلكتروني (customer.email)" />
+      <Toggle value={tpl.show_customer_activity}             onChange={v => syncRow('show_customer_activity', v)}             label="النشاط (customer.activity)" />
+      <Toggle value={tpl.show_client_address}                onChange={v => syncRow('show_client_address', v)}                label="العنوان (customer.address)" />
+      <Toggle value={tpl.show_delivery_address}              onChange={v => syncRow('show_delivery_address', v)}              label="عنوان التسليم (customer.deliveryAddress)" />
+      <Toggle value={tpl.show_customer_bank_name}            onChange={v => syncRow('show_customer_bank_name', v)}            label="اسم البنك (customer.bankName)" />
+      <Toggle value={tpl.show_customer_rib}                  onChange={v => syncRow('show_customer_rib', v)}                  label="RIB (customer.rib)" />
+
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+
+      {/* Row order */}
+      <div className="ps-section-title" style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 4 }}>ترتيب صفوف العميل</div>
+      <RowManager
+        rows={tpl.customer_info_rows ?? []}
+        onChange={rows => update('customer_info_rows', rows)}
+        fields={CUSTOMER_FIELD_OPTIONS}
+        addLabel="+ إضافة سطر"
+      />
+
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+
+      {/* Labels */}
+      <div className="ps-section-title" style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 4 }}>تسميات الحقول</div>
+      <Field label="تسمية اسم العميل"><Input value={tpl.label_client} onChange={v => syncLabel('label_client', v)} placeholder="العميل" /></Field>
+      <Field label="تسمية الرقم الضريبي"><Input value={tpl.label_client_nif} onChange={v => syncLabel('label_client_nif', v)} placeholder="NIF العميل" /></Field>
+      <Field label="تسمية الاسم التجاري"><Input value={tpl.label_customer_commercial_name} onChange={v => syncLabel('label_customer_commercial_name', v)} placeholder="الاسم التجاري" /></Field>
+      <Field label="تسمية السجل التجاري"><Input value={tpl.label_customer_rc} onChange={v => syncLabel('label_customer_rc', v)} placeholder="RC" /></Field>
+      <Field label="تسمية NIS"><Input value={tpl.label_customer_nis} onChange={v => syncLabel('label_customer_nis', v)} placeholder="NIS" /></Field>
+      <Field label="تسمية المادة الجبائية"><Input value={tpl.label_customer_ai} onChange={v => syncLabel('label_customer_ai', v)} placeholder="المادة الجبائية" /></Field>
+      <Field label="تسمية الهاتف"><Input value={tpl.label_client_phone} onChange={v => syncLabel('label_client_phone', v)} placeholder="هاتف العميل" /></Field>
+      <Field label="تسمية المحمول"><Input value={tpl.label_customer_mobile} onChange={v => syncLabel('label_customer_mobile', v)} placeholder="المحمول" /></Field>
+      <Field label="تسمية الفاكس"><Input value={tpl.label_customer_fax} onChange={v => syncLabel('label_customer_fax', v)} placeholder="الفاكس" /></Field>
+      <Field label="تسمية البريد الإلكتروني"><Input value={tpl.label_customer_email} onChange={v => syncLabel('label_customer_email', v)} placeholder="البريد الإلكتروني" /></Field>
+      <Field label="تسمية النشاط"><Input value={tpl.label_customer_activity} onChange={v => syncLabel('label_customer_activity', v)} placeholder="النشاط" /></Field>
+      <Field label="تسمية العنوان"><Input value={tpl.label_client_address} onChange={v => syncLabel('label_client_address', v)} placeholder="العنوان" /></Field>
+      <Field label="تسمية عنوان التسليم"><Input value={tpl.label_delivery_address} onChange={v => syncLabel('label_delivery_address', v)} placeholder="عنوان التسليم" /></Field>
+      <Field label="تسمية اسم البنك"><Input value={tpl.label_customer_bank_name} onChange={v => syncLabel('label_customer_bank_name', v)} placeholder="اسم البنك" /></Field>
+      <Field label="تسمية RIB"><Input value={tpl.label_customer_rib} onChange={v => syncLabel('label_customer_rib', v)} placeholder="RIB" /></Field>
+
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+
+      {/* Overrides */}
+      <div className="ps-section-title" style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 4 }}>بيانات العميل (تجاوز)</div>
+      <Field label="تجاوز اسم العميل"><Input value={tpl.override_client_name} onChange={v => update('override_client_name', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز الرقم الضريبي"><Input value={tpl.override_client_nif} onChange={v => update('override_client_nif', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز الاسم التجاري"><Input value={tpl.override_customer_commercial_name} onChange={v => update('override_customer_commercial_name', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز السجل التجاري"><Input value={tpl.override_customer_rc} onChange={v => update('override_customer_rc', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز NIS"><Input value={tpl.override_customer_nis} onChange={v => update('override_customer_nis', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز المادة الجبائية"><Input value={tpl.override_customer_ai} onChange={v => update('override_customer_ai', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز الهاتف"><Input value={tpl.override_client_phone} onChange={v => update('override_client_phone', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز المحمول"><Input value={tpl.override_customer_mobile} onChange={v => update('override_customer_mobile', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز الفاكس"><Input value={tpl.override_customer_fax} onChange={v => update('override_customer_fax', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز البريد الإلكتروني"><Input value={tpl.override_customer_email} onChange={v => update('override_customer_email', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز النشاط"><Input value={tpl.override_customer_activity} onChange={v => update('override_customer_activity', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز العنوان"><Input value={tpl.override_client_address} onChange={v => update('override_client_address', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز عنوان التسليم"><Input value={tpl.override_delivery_address} onChange={v => update('override_delivery_address', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز اسم البنك"><Input value={tpl.override_customer_bank_name} onChange={v => update('override_customer_bank_name', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+      <Field label="تجاوز RIB"><Input value={tpl.override_customer_rib} onChange={v => update('override_customer_rib', v)} placeholder="اتركه فارغاً للبيانات الأصلية" /></Field>
+
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
 
       {sec('show_session') && <Toggle value={tpl.show_session} onChange={v => update('show_session', v)} label="رقم الجلسة" />}
       {sec('show_payment_term') && <Toggle value={tpl.show_payment_term} onChange={v => update('show_payment_term', v)} label="شروط الدفع" />}
@@ -5167,6 +6397,7 @@ import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { ColorField, Field, Input, Textarea } from '../components/ui';
 import { BorderSelect } from './HeaderSection';
 import { isSettingVisible } from '../services/SettingsRegistry';
+import { RowManager } from '../components/RowManager';
 
 interface Props {
   tpl: PrintTemplate;
@@ -5192,6 +6423,13 @@ export default function FooterSectionControls({ tpl, update }: Props) {
           <Input value={tpl.footer_line3}
             onChange={v => update('footer_line3', v)} />
         </Field>}
+
+        <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+        <div className="ps-section-title" style={{ fontSize: 12 }}>ترتيب صفوف التذييل</div>
+        <RowManager
+          rows={tpl.footer_rows ?? []}
+          onChange={rows => update('footer_rows', rows)}
+        />
 
         {sec('footer_separator') && <BorderSelect label="فاصل التذييل" value={tpl.footer_separator}
           onChange={v => update('footer_separator', v as BorderStyle)} />}
@@ -5344,14 +6582,33 @@ export default function FormattingSectionControls({ tpl, update }: Props) {
 
 ```
 import React, { useRef, useState } from 'react';
-import type { AlignOption, BorderStyle } from '../types';
+import type { AlignOption, BorderStyle, LayoutBlock } from '../types';
 import type { PrintTemplate } from '../types';
 import type { CompanyData } from '../types';
-import { Toggle, SliderField } from './ToggleSwitch';
+import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { Field, ColorField, Input } from '../components/ui';
 import { usePrintTemplatesApi } from '../providers/PrintSettingsContext';
 import { isSettingVisible } from '../services/SettingsRegistry';
 import ImagePreviewModal from '../components/ImagePreviewModal';
+import { RowManager, type FieldOption } from '../components/RowManager';
+
+const COMPANY_FIELD_OPTIONS: FieldOption[] = [
+  { value: 'company.name',            label: 'اسم الشركة' },
+  { value: 'company.commercialName',  label: 'الاسم التجاري' },
+  { value: 'company.address',         label: 'العنوان' },
+  { value: 'company.phone',           label: 'الهاتف' },
+  { value: 'company.mobile',          label: 'المحمول' },
+  { value: 'company.fax',             label: 'الفاكس' },
+  { value: 'company.email',           label: 'البريد الإلكتروني' },
+  { value: 'company.nif',             label: 'NIF' },
+  { value: 'company.rc',              label: 'RC' },
+  { value: 'company.nis',             label: 'NIS' },
+  { value: 'company.article',         label: 'المادة الجبائية' },
+  { value: 'company.capital',         label: 'الرأس المال' },
+  { value: 'company.bankName',        label: 'اسم البنك' },
+  { value: 'company.rib',             label: 'RIB' },
+  { value: 'company.activity',        label: 'النشاط' },
+];
 
 interface Props {
   tpl: PrintTemplate;
@@ -5363,8 +6620,115 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
   const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
   const [uploading, setUploading] = useState(false);
   const [zoomImg, setZoomImg] = useState<string | null>(null);
+  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
   const templatesApi = usePrintTemplatesApi();
+
+  const hl = tpl.header_layout ?? { mode: 'simple' as const, columns: [] };
+  const isColumns = hl.mode === 'columns';
+
+  const ROW_ID_MAP: Record<string, { field: string; label: string }> = {
+    show_commercial_name: { field: 'company.commercialName', label: 'الاسم التجاري' },
+    show_address:         { field: 'company.address',       label: 'العنوان' },
+    show_phone:           { field: 'company.phone',         label: 'الهاتف' },
+    show_mobile:          { field: 'company.mobile',        label: 'المحمول' },
+    show_fax:             { field: 'company.fax',           label: 'الفاكس' },
+    show_email:           { field: 'company.email',         label: 'البريد الإلكتروني' },
+    show_tax_id:          { field: 'company.nif',           label: 'NIF' },
+    show_rc:              { field: 'company.rc',            label: 'RC' },
+    show_nis:             { field: 'company.nis',           label: 'NIS' },
+    show_article:         { field: 'company.article',       label: 'المادة الجبائية' },
+    show_capital:         { field: 'company.capital',       label: 'الرأس المال' },
+    show_bank_name:       { field: 'company.bankName',      label: 'اسم البنك' },
+    show_rib:             { field: 'company.rib',           label: 'RIB' },
+    show_activity:        { field: 'company.activity',      label: 'النشاط' },
+  };
+
+  const ROW_LABEL_MAP: Record<string, string> = {
+    label_commercial_name: 'co_commercial_name',
+    label_address:         'co_address',
+    label_phone:           'co_phone',
+    label_mobile:          'co_mobile',
+    label_fax:             'co_fax',
+    label_email:           'co_email',
+    label_nif:             'co_nif',
+    label_rc:              'co_rc',
+    label_nis:             'co_nis',
+    label_article:         'co_article',
+    label_capital:         'co_capital',
+    label_bank_name:       'co_bank_name',
+    label_rib:             'co_rib',
+    label_activity:        'co_activity',
+  };
+
+  const syncLabel = (key: string, val: string) => {
+    update(key as any, val as any);
+    const rowId = ROW_LABEL_MAP[key];
+    if (!rowId) return;
+    const rows = [...(tpl.company_info_rows ?? [])];
+    const idx = rows.findIndex(r => r.id === rowId);
+    if (idx !== -1) {
+      rows[idx] = { ...rows[idx], label: val };
+      update('company_info_rows', rows);
+    }
+  };
+
+  const fieldToRowId = (field: string) => 'co_' + field.replace('company.', '');
+
+  const syncRow = (settingKey: string, val: boolean) => {
+    const meta = ROW_ID_MAP[settingKey];
+    if (!meta) { update(settingKey as any, val as any); return; }
+    const rowId = fieldToRowId(meta.field);
+    const rows = [...(tpl.company_info_rows ?? [])];
+    const existingIdx = rows.findIndex(r => r.id === rowId);
+    if (val && existingIdx === -1) {
+      const maxOrder = rows.reduce((m, r) => Math.max(m, r.order), -1) + 1;
+      rows.push({
+        id: rowId,
+        field: meta.field,
+        label: meta.label,
+        visible: true,
+        order: maxOrder,
+        labelSide: 'end' as const,
+        valueSide: 'start' as const,
+      });
+    } else if (!val && existingIdx !== -1) {
+      rows.splice(existingIdx, 1);
+    }
+    update(settingKey as any, val as any);
+    update('company_info_rows', rows);
+  };
+
+  const toggleColumnExpand = (colId: string) => {
+    setExpandedColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(colId)) next.delete(colId); else next.add(colId);
+      return next;
+    });
+  };
+
+  const updateHeaderLayout = (patch: Partial<typeof hl>) => {
+    update('header_layout', { ...hl, ...patch });
+  };
+
+  const addColumn = () => {
+    const newCol: LayoutBlock = {
+      id: `col_${Date.now()}`, order: hl.columns.length, visible: true,
+      width: 30, align: 'center', rows: [],
+    };
+    updateHeaderLayout({ columns: [...hl.columns, newCol] });
+    setExpandedColumns(prev => new Set(prev).add(newCol.id));
+  };
+
+  const removeColumn = (colId: string) => {
+    updateHeaderLayout({ columns: hl.columns.filter(c => c.id !== colId) });
+  };
+
+  const updateColumn = (colId: string, patch: Partial<LayoutBlock>) => {
+    updateHeaderLayout({
+      columns: hl.columns.map(c => c.id === colId ? { ...c, ...patch } : c),
+    });
+  };
 
   const logoPreviewUrl = tpl.logo_source === 'custom' ? tpl.custom_logo_url
     : tpl.logo_source === 'company' ? (company?.logoUrl ?? null)
@@ -5464,19 +6828,160 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
           placeholder="مثال: السجل التجاري: 13/B.0123456" />
       </Field>}
 
-      <div className="ps-section-title" style={{ marginTop: 8, fontSize: 12 }}>معلومات الشركة</div>
-      {sec('show_address') && <Toggle value={tpl.show_address} onChange={v => update('show_address', v)} label="العنوان" />}
-      {sec('show_phone') && <Toggle value={tpl.show_phone}   onChange={v => update('show_phone', v)} label="الهاتف" />}
-      {sec('show_tax_id') && <Toggle value={tpl.show_tax_id}   onChange={v => update('show_tax_id', v)} label="رقم NIF" />}
-      {sec('show_rc') && <Toggle value={tpl.show_rc}      onChange={v => update('show_rc', v)} label="السجل التجاري RC" />}
-      {sec('show_nis') && <Toggle value={tpl.show_nis}     onChange={v => update('show_nis', v)} label="رقم NIS / STAT" />}
-      {sec('show_ice') && <Toggle value={tpl.show_ice}     onChange={v => update('show_ice', v)} label="رقم ICE" />}
-      {sec('show_article') && <Toggle value={tpl.show_article} onChange={v => update('show_article', v)} label="النشاط (Article)" />}
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+      <div className="ps-field">
+        <label className="ps-field-label">تخطيط الرأس</label>
+        <div className="ps-paper-pills" style={{ marginTop: 2 }}>
+          {(['simple', 'columns'] as const).map(m => (
+            <button key={m} className={`ps-paper-pill ${hl.mode === m ? 'on' : ''}`}
+              onClick={() => updateHeaderLayout({ mode: m, columns: m === 'simple' ? [] : hl.columns })}>
+              {m === 'simple' ? 'بسيط' : 'أعمدة'}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {sec('company_info_size') && <SliderField label="حجم خط معلومات الشركة" value={tpl.company_info_size} min={7} max={14} unit="px"
+      {isColumns && (
+        <Section title="أعمدة الرأس" icon="ti-columns" defaultOpen>
+          {hl.columns.length === 0 && (
+            <div style={{ fontSize: 11, color: 'var(--t4)', padding: '4px 0' }}>
+              لا توجد أعمدة. اضغط "+ إضافة عمود" للبدء.
+            </div>
+          )}
+          {hl.columns
+            .slice()
+            .sort((a, b) => a.order - b.order)
+            .map((col) => {
+              const open = expandedColumns.has(col.id);
+              const colIdx = hl.columns.indexOf(col);
+              return (
+                <div key={col.id} style={{
+                  border: '1px solid var(--b2)', borderRadius: 'var(--r1)',
+                  marginBottom: 4, overflow: 'hidden',
+                }}>
+                  <div
+                    onClick={() => toggleColumnExpand(col.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '5px 8px', cursor: 'pointer',
+                      background: open ? 'var(--emb)' : 'var(--bg3)',
+                      borderBottom: open ? '1px solid var(--b2)' : 'none',
+                    }}
+                  >
+                    <i className={`ti ti-chevron-${open ? 'down' : 'left'}`} style={{ fontSize: 10, color: 'var(--t4)' }} />
+                    <span style={{ flex: 1, fontSize: 11.5, fontWeight: 600, color: 'var(--t2)' }}>
+                      عمود {colIdx + 1}
+                      {col.width ? ` (${col.width}%)` : ''}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeColumn(col.id); }}
+                      style={{
+                        width: 18, height: 18, borderRadius: 4,
+                        border: '1px solid var(--b2)', background: 'var(--bg3)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', fontSize: 10, color: '#c00', padding: 0,
+                      }}
+                      type="button" title="حذف العمود"
+                    >
+                      <i className="ti ti-trash" />
+                    </button>
+                  </div>
+                  {open && (
+                    <div style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <SliderField label="العرض" value={col.width ?? 30} min={10} max={60} unit="%"
+                        onChange={v => updateColumn(col.id, { width: v })} />
+                      <AlignButtons label="المحاذاة" value={col.align}
+                        onChange={v => updateColumn(col.id, { align: v })} />
+                      <BorderSelect label="الإطار" value={col.border?.style ?? 'none'}
+                        onChange={v => updateColumn(col.id, {
+                          border: { ...(col.border ?? { style: 'none', width: 1, color: '#333' }), style: v },
+                        })} />
+                      <div style={{ borderTop: '1px solid var(--b2)', margin: '4px 0' }} />
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--t3)', marginBottom: 2 }}>صفوف العمود</div>
+                      <RowManager
+                        rows={col.rows ?? []}
+                        onChange={rows => updateColumn(col.id, { rows })}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          <button
+            onClick={addColumn}
+            type="button"
+            style={{
+              width: '100%', padding: '5px 0', marginTop: 4, borderRadius: 'var(--r1)',
+              border: '1px dashed var(--b2)', background: 'transparent',
+              cursor: 'pointer', fontSize: 11, color: 'var(--t3)',
+              fontFamily: 'Tajawal, sans-serif', fontWeight: 600,
+            }}
+          >
+            + إضافة عمود
+          </button>
+        </Section>
+      )}
+
+      <div className="ps-section-title" style={{ marginTop: 8, fontSize: 12 }}>معلومات الشركة</div>
+      <RowManager
+        rows={tpl.company_info_rows ?? []}
+        onChange={rows => update('company_info_rows', rows)}
+        fields={COMPANY_FIELD_OPTIONS}
+        addLabel="+ إضافة سطر"
+      />
+
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+      <div className="ps-section-title" style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 4 }}>إظهار / إخفاء الحقول</div>
+      <Toggle value={tpl.show_address}        onChange={v => syncRow('show_address', v)}        label="العنوان (address)" />
+      <Toggle value={tpl.show_phone}          onChange={v => syncRow('show_phone', v)}          label="الهاتف (phone)" />
+      <Toggle value={tpl.show_mobile}         onChange={v => syncRow('show_mobile', v)}         label="المحمول (mobile)" />
+      <Toggle value={tpl.show_fax}            onChange={v => syncRow('show_fax', v)}            label="الفاكس (fax)" />
+      <Toggle value={tpl.show_email}          onChange={v => syncRow('show_email', v)}          label="البريد الإلكتروني (email)" />
+      <Toggle value={tpl.show_commercial_name} onChange={v => syncRow('show_commercial_name', v)} label="الاسم التجاري (commercial_name)" />
+      <Toggle value={tpl.show_tax_id}         onChange={v => syncRow('show_tax_id', v)}         label="رقم الضريبة NIF (nif)" />
+      <Toggle value={tpl.show_rc}             onChange={v => syncRow('show_rc', v)}             label="السجل التجاري RC (rc)" />
+      <Toggle value={tpl.show_nis}            onChange={v => syncRow('show_nis', v)}            label="رقم NIS / STAT (nis)" />
+      <Toggle value={tpl.show_article}        onChange={v => syncRow('show_article', v)}        label="المادة الجبائية (ai)" />
+      <Toggle value={tpl.show_capital}        onChange={v => syncRow('show_capital', v)}        label="الرأس المال (capital_amount)" />
+      <Toggle value={tpl.show_bank_name}      onChange={v => syncRow('show_bank_name', v)}      label="اسم البنك (bank_name)" />
+      <Toggle value={tpl.show_rib}            onChange={v => syncRow('show_rib', v)}            label="الحساب البنكي (rib)" />
+      <Toggle value={tpl.show_activity}       onChange={v => syncRow('show_activity', v)}       label="النشاط (activity)" />
+
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+      <div className="ps-section-title" style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 4 }}>سمة ومحاذاة</div>
+      {sec('company_info_size') && <SliderField label="حجم الخط" value={tpl.company_info_size} min={7} max={14} unit="px"
         onChange={v => update('company_info_size', v)} />}
-      {sec('company_info_align') && <AlignButtons label="محاذاة معلومات الشركة" value={tpl.company_info_align}
+      {sec('company_info_font_family') && <div className="ps-field">
+        <label className="ps-field-label">نوع الخط</label>
+        <select className="ps-select" value={tpl.company_info_font_family}
+          onChange={e => update('company_info_font_family', e.target.value as any)}>
+          <option value="tajawal">Tajawal (واضح)</option>
+          <option value="monospace">Courier (أحادي)</option>
+          <option value="times">Times (كلاسيكي)</option>
+          <option value="arial">Arial (حديث)</option>
+        </select>
+      </div>}
+      {sec('company_info_bold') && <Toggle value={tpl.company_info_bold} onChange={v => update('company_info_bold', v)} label="خط عريض" />}
+      {sec('company_info_italic') && <Toggle value={tpl.company_info_italic} onChange={v => update('company_info_italic', v)} label="خط مائل" />}
+      {sec('company_info_align') && <AlignButtons label="محاذاة المعلومات" value={tpl.company_info_align}
         onChange={v => update('company_info_align', v)} />}
+
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+      <div className="ps-section-title" style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 4 }}>تسميات الحقول</div>
+      <Field label="تسمية العنوان (address)"><Input value={tpl.label_address} onChange={v => syncLabel('label_address', v)} placeholder="العنوان" /></Field>
+      <Field label="تسمية الهاتف (phone)"><Input value={tpl.label_phone} onChange={v => syncLabel('label_phone', v)} placeholder="الهاتف" /></Field>
+      <Field label="تسمية المحمول (mobile)"><Input value={tpl.label_mobile} onChange={v => syncLabel('label_mobile', v)} placeholder="المحمول" /></Field>
+      <Field label="تسمية الفاكس (fax)"><Input value={tpl.label_fax} onChange={v => syncLabel('label_fax', v)} placeholder="الفاكس" /></Field>
+      <Field label="تسمية البريد الإلكتروني (email)"><Input value={tpl.label_email} onChange={v => syncLabel('label_email', v)} placeholder="البريد الإلكتروني" /></Field>
+      <Field label="تسمية الاسم التجاري (commercial_name)"><Input value={tpl.label_commercial_name} onChange={v => syncLabel('label_commercial_name', v)} placeholder="الاسم التجاري" /></Field>
+      <Field label="تسمية رقم الضريبة (nif)"><Input value={tpl.label_nif} onChange={v => syncLabel('label_nif', v)} placeholder="NIF" /></Field>
+      <Field label="تسمية السجل التجاري (rc)"><Input value={tpl.label_rc} onChange={v => syncLabel('label_rc', v)} placeholder="RC" /></Field>
+      <Field label="تسمية NIS (nis)"><Input value={tpl.label_nis} onChange={v => syncLabel('label_nis', v)} placeholder="NIS" /></Field>
+      <Field label="تسمية المادة الجبائية (ai)"><Input value={tpl.label_article} onChange={v => syncLabel('label_article', v)} placeholder="المادة الجبائية" /></Field>
+      <Field label="تسمية الرأس المال (capital_amount)"><Input value={tpl.label_capital} onChange={v => syncLabel('label_capital', v)} placeholder="الرأس المال" /></Field>
+      <Field label="تسمية اسم البنك (bank_name)"><Input value={tpl.label_bank_name} onChange={v => syncLabel('label_bank_name', v)} placeholder="اسم البنك" /></Field>
+      <Field label="تسمية الحساب البنكي (rib)"><Input value={tpl.label_rib} onChange={v => syncLabel('label_rib', v)} placeholder="RIB" /></Field>
+      <Field label="تسمية النشاط (activity)"><Input value={tpl.label_activity} onChange={v => syncLabel('label_activity', v)} placeholder="النشاط" /></Field>
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
       <div className="ps-section-title" style={{ fontSize: 12, marginBottom: 4 }}>
@@ -5485,14 +6990,21 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
           (اتركها فارغة لاستخدام بيانات الشركة تلقائياً)
         </span>
       </div>
-      {sec('company_name_text') && <CompanyField label="الاسم" value={tpl.company_name_text} onChange={v => update('company_name_text', v)} placeholder="اسم المؤسسة" apiValue={company?.name} />}
-      {sec('override_address') && <CompanyField label="العنوان" value={tpl.override_address} onChange={v => update('override_address', v)} placeholder="عنوان المؤسسة" apiValue={company?.address} />}
-      {sec('override_phone') && <CompanyField label="الهاتف" value={tpl.override_phone} onChange={v => update('override_phone', v)} placeholder="رقم الهاتف" apiValue={company?.phone} />}
-      {sec('override_nif') && <CompanyField label="NIF" value={tpl.override_nif} onChange={v => update('override_nif', v)} placeholder="الرقم الضريبي" apiValue={company?.nif} />}
-      {sec('override_rc') && <CompanyField label="RC" value={tpl.override_rc} onChange={v => update('override_rc', v)} placeholder="السجل التجاري" apiValue={company?.rc} />}
-      {sec('override_nis') && <CompanyField label="NIS" value={tpl.override_nis} onChange={v => update('override_nis', v)} placeholder="رقم NIS" apiValue={company?.nis} />}
-      {sec('override_ice') && <CompanyField label="ICE" value={tpl.override_ice} onChange={v => update('override_ice', v)} placeholder="رقم ICE" />}
-      {sec('override_article') && <CompanyField label="النشاط" value={tpl.override_article} onChange={v => update('override_article', v)} placeholder="نشاط المؤسسة" apiValue={company?.article} />}
+      <CompanyField label="الاسم" value={tpl.company_name_text} onChange={v => update('company_name_text', v)} placeholder="اسم المؤسسة" apiValue={company?.name} />
+      <CompanyField label="العنوان" value={tpl.override_address} onChange={v => update('override_address', v)} placeholder="عنوان المؤسسة" apiValue={company?.address} />
+      <CompanyField label="الهاتف" value={tpl.override_phone} onChange={v => update('override_phone', v)} placeholder="رقم الهاتف" apiValue={company?.phone} />
+      <CompanyField label="المحمول" value={tpl.override_mobile} onChange={v => update('override_mobile', v)} placeholder="رقم المحمول" apiValue={company?.mobile} />
+      <CompanyField label="الفاكس" value={tpl.override_fax} onChange={v => update('override_fax', v)} placeholder="الفاكس" apiValue={company?.fax} />
+      <CompanyField label="البريد الإلكتروني" value={tpl.override_email} onChange={v => update('override_email', v)} placeholder="البريد الإلكتروني" apiValue={company?.email} />
+      <CompanyField label="الاسم التجاري" value={tpl.override_commercial_name} onChange={v => update('override_commercial_name', v)} placeholder="الاسم التجاري" apiValue={company?.commercialName} />
+      <CompanyField label="NIF" value={tpl.override_nif} onChange={v => update('override_nif', v)} placeholder="الرقم الضريبي" apiValue={company?.nif} />
+      <CompanyField label="RC" value={tpl.override_rc} onChange={v => update('override_rc', v)} placeholder="السجل التجاري" apiValue={company?.rc} />
+      <CompanyField label="NIS" value={tpl.override_nis} onChange={v => update('override_nis', v)} placeholder="رقم NIS" apiValue={company?.nis} />
+      <CompanyField label="المادة الجبائية" value={tpl.override_article} onChange={v => update('override_article', v)} placeholder="المادة الجبائية" apiValue={company?.article} />
+      <CompanyField label="الرأس المال" value={tpl.override_capital} onChange={v => update('override_capital', v)} placeholder="الرأس المال" apiValue={company?.capital} />
+      <CompanyField label="اسم البنك" value={tpl.override_bank_name} onChange={v => update('override_bank_name', v)} placeholder="اسم البنك" apiValue={company?.bankName} />
+      <CompanyField label="الحساب البنكي" value={tpl.override_rib} onChange={v => update('override_rib', v)} placeholder="RIB" apiValue={company?.rib} />
+      <CompanyField label="النشاط" value={tpl.override_activity} onChange={v => update('override_activity', v)} placeholder="النشاط" apiValue={company?.activity} />
 
       {sec('logo_border_radius') && <SliderField label="تدوير الزوايا" value={tpl.logo_border_radius} min={0} max={50} unit="%" onChange={v => update('logo_border_radius', v)} />}
       {sec('header_separator') && <BorderSelect label="فاصل الرأس" value={tpl.header_separator}
@@ -5745,8 +7257,8 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
         {sec('show_col_header') && tpl.show_col_header && (
           <>
             {sec('table_header_bold') && <Toggle value={tpl.table_header_bold} onChange={v => update('table_header_bold', v)} label="خط عريض للرأس" />}
-            {sec('table_header_bg') && <Toggle value={tpl.table_header_bg} onChange={v => update('table_header_bg', v)} label="خلفية للرأس" />}
-            {sec('table_header_color') && <ColorField label="لون نص الرأس" value={tpl.table_header_color} onChange={v => update('table_header_color', v)} />}
+            {sec('table_header_bg') && <ColorField label="لون خلفية الرأس" value={tpl.table_header_bg || '#f5f5f5'} onChange={v => update('table_header_bg', v)} />}
+            {sec('table_header_color') && <ColorField label="لون نص الرأس" value={tpl.table_header_color || '#111111'} onChange={v => update('table_header_color', v)} />}
             {COLUMNS.filter(c => tpl.col_show[c.key] !== false).map(col => (
               <div className="ps-field" key={col.key} style={{ marginTop: 2 }}>
                 <label className="ps-field-label">رأس: {col.label}</label>
@@ -5759,6 +7271,8 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
           </>
         )}
 
+        {sec('table_cell_padding') && <SliderField value={tpl.table_cell_padding || 6} min={2} max={20} step={1}
+          onChange={v => update('table_cell_padding', v)} label="مسافة الخلايا (px)" />}
         {sec('table_border_style') && <BorderSelect label="حدود الجدول" value={tpl.table_border_style}
           onChange={v => update('table_border_style', v as BorderStyle)} />}
         {sec('alternating_rows') && <Toggle value={tpl.alternating_rows} onChange={v => update('alternating_rows', v)} label="تلوين متناوب للأسطر" />}
@@ -5870,12 +7384,28 @@ export function Section({ title, icon, children, defaultOpen = true, id, collaps
 
 ```
 import React from 'react';
-import type { BorderStyle } from '../types';
+import type { BorderStyle, LayoutRow, TotalsGridConfig, TotalsGridColumn } from '../types';
 import type { PrintTemplate } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { AlignButtons, BorderSelect } from './HeaderSection';
 import { ColorField } from '../components/ui';
 import { isSettingVisible } from '../services/SettingsRegistry';
+import { RowManager } from '../components/RowManager';
+
+const SHOW_TO_FIELD: Record<string, string> = {
+  show_total_ht:        'totals.ht',
+  show_total_tva:       'totals.tva',
+  show_tva_breakdown:   'totals.tvaBreakdownGroup',
+  show_discount_total:  'totals.discount',
+  show_fiscal_stamp:    'totals.fiscalStamp',
+  show_total_ttc:       'totals.ttc',
+  show_amount_in_words: 'totals.amountInWords',
+  show_paid_amount:     'totals.paid',
+  show_change:          'totals.change',
+  show_remaining:       'totals.remaining',
+  show_prev_balance:    'balance.previous',
+  show_new_balance:     'balance.current',
+};
 
 interface Props {
   tpl: PrintTemplate;
@@ -5884,6 +7414,39 @@ interface Props {
 
 export default function TotalsSectionControls({ tpl, update }: Props) {
   const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
+
+  const toggleWithRow = (key: keyof PrintTemplate, val: boolean) => {
+    update(key, val as any);
+    const field = SHOW_TO_FIELD[key as string];
+    if (field) {
+      const rows = [...(tpl.totals_rows ?? [])];
+      const idx = rows.findIndex(r => r.field === field);
+      if (idx >= 0) {
+        rows[idx] = { ...rows[idx], visible: val };
+      } else if (val) {
+        const maxOrder = rows.reduce((m, r) => Math.max(m, r.order), -1);
+        rows.push({
+          id: key as string, field, visible: true, order: maxOrder + 1,
+          labelSide: 'start', valueSide: 'end',
+          ...(field === 'totals.ttc' ? { bold: true, fontSize: tpl.total_ttc_font_size, color: tpl.total_ttc_color } : {}),
+          ...(field === 'totals.discount' ? { color: '#c00' } : {}),
+          ...(field === 'totals.remaining' ? { color: '#c00' } : {}),
+          ...(field === 'totals.paid' ? { bold: true } : {}),
+          ...(field === 'balance.current' ? { bold: true } : {}),
+        } as LayoutRow);
+      }
+      update('totals_rows', rows);
+    }
+  };
+
+  const updateTtcRowStyle = (patch: Partial<LayoutRow>) => {
+    const rows = [...(tpl.totals_rows ?? [])];
+    const idx = rows.findIndex(r => r.field === 'totals.ttc');
+    if (idx >= 0) {
+      rows[idx] = { ...rows[idx], ...patch };
+      update('totals_rows', rows);
+    }
+  };
 
   return (
     <>
@@ -5895,37 +7458,91 @@ export default function TotalsSectionControls({ tpl, update }: Props) {
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
 
-      {sec('show_total_ht') && <Toggle value={tpl.show_total_ht} onChange={v => update('show_total_ht', v)} label="المجموع HT" />}
-      {sec('show_total_tva') && <Toggle value={tpl.show_total_tva} onChange={v => update('show_total_tva', v)} label="مبلغ TVA" />}
-      {sec('show_tva_breakdown') && <Toggle value={tpl.show_tva_breakdown} onChange={v => update('show_tva_breakdown', v)} label="تفصيل TVA حسب النسبة" />}
-      {sec('show_discount_total') && <Toggle value={tpl.show_discount_total} onChange={v => update('show_discount_total', v)} label="إجمالي الخصومات" />}
-      {sec('show_fiscal_stamp') && <Toggle value={tpl.show_fiscal_stamp} onChange={v => update('show_fiscal_stamp', v)} label="الطابع الجبائي" />}
+      {sec('show_total_ht') && <Toggle value={tpl.show_total_ht} onChange={v => toggleWithRow('show_total_ht', v)} label="المجموع HT" />}
+      {sec('show_total_tva') && <Toggle value={tpl.show_total_tva} onChange={v => toggleWithRow('show_total_tva', v)} label="مبلغ TVA" />}
+      {sec('show_tva_breakdown') && <Toggle value={tpl.show_tva_breakdown} onChange={v => toggleWithRow('show_tva_breakdown', v)} label="تفصيل TVA حسب النسبة" />}
+      {sec('show_discount_total') && <Toggle value={tpl.show_discount_total} onChange={v => toggleWithRow('show_discount_total', v)} label="إجمالي الخصومات" />}
+      {sec('show_fiscal_stamp') && <Toggle value={tpl.show_fiscal_stamp} onChange={v => toggleWithRow('show_fiscal_stamp', v)} label="الطابع الجبائي" />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
-      {sec('show_total_ttc') && <Toggle value={tpl.show_total_ttc} onChange={v => update('show_total_ttc', v)} label="المجموع TTC (الإجمالي)" />}
+      {sec('show_total_ttc') && <Toggle value={tpl.show_total_ttc} onChange={v => toggleWithRow('show_total_ttc', v)} label="المجموع TTC (الإجمالي)" />}
       {sec('show_total_ttc') && tpl.show_total_ttc && (
         <>
           {sec('total_ttc_font_size') && <SliderField label="حجم خط TTC" value={tpl.total_ttc_font_size} min={12} max={24} unit="px"
-            onChange={v => update('total_ttc_font_size', v)} />}
-          {sec('total_ttc_bold') && <Toggle value={tpl.total_ttc_bold} onChange={v => update('total_ttc_bold', v)} label="خط عريض" />}
-          {sec('total_ttc_color') && <ColorField label="لون TTC" value={tpl.total_ttc_color} onChange={v => update('total_ttc_color', v)} />}
+            onChange={v => { update('total_ttc_font_size', v); updateTtcRowStyle({ fontSize: v }); }} />}
+          {sec('total_ttc_bold') && <Toggle value={tpl.total_ttc_bold} onChange={v => { update('total_ttc_bold', v); updateTtcRowStyle({ bold: v }); }} label="خط عريض" />}
+          {sec('total_ttc_color') && <ColorField label="لون TTC" value={tpl.total_ttc_color} onChange={v => { update('total_ttc_color', v); updateTtcRowStyle({ color: v }); }} />}
           {sec('total_border_style') && <BorderSelect label="إطار TTC" value={tpl.total_border_style}
-            onChange={v => update('total_border_style', v as BorderStyle)} />}
+            onChange={v => { update('total_border_style', v as BorderStyle); updateTtcRowStyle({ border: { style: v as BorderStyle, width: 2, color: '#111', sides: { top: true } } }); }} />}
         </>
       )}
 
-      {sec('show_amount_in_words') && <Toggle value={tpl.show_amount_in_words} onChange={v => update('show_amount_in_words', v)} label="المبلغ بالكتابة" />}
+      {sec('show_amount_in_words') && <Toggle value={tpl.show_amount_in_words} onChange={v => toggleWithRow('show_amount_in_words', v)} label="المبلغ بالكتابة" />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
       <div className="ps-section-title" style={{ fontSize: 12 }}>المبالغ والرصيد</div>
-      {sec('show_paid_amount') && <Toggle value={tpl.show_paid_amount} onChange={v => update('show_paid_amount', v)} label="المبلغ المدفوع" />}
-      {sec('show_change') && <Toggle value={tpl.show_change} onChange={v => update('show_change', v)} label="الباقي (الصرف)" />}
-      {sec('show_remaining') && <Toggle value={tpl.show_remaining} onChange={v => update('show_remaining', v)} label="المبلغ المتبقي" />}
-      {sec('show_prev_balance') && <Toggle value={tpl.show_prev_balance} onChange={v => update('show_prev_balance', v)} label="الرصيد السابق" />}
-      {sec('show_new_balance') && <Toggle value={tpl.show_new_balance} onChange={v => update('show_new_balance', v)} label="الرصيد الجديد" />}
+      {sec('show_paid_amount') && <Toggle value={tpl.show_paid_amount} onChange={v => toggleWithRow('show_paid_amount', v)} label="المبلغ المدفوع" />}
+      {sec('show_change') && <Toggle value={tpl.show_change} onChange={v => toggleWithRow('show_change', v)} label="الباقي (الصرف)" />}
+      {sec('show_remaining') && <Toggle value={tpl.show_remaining} onChange={v => toggleWithRow('show_remaining', v)} label="المبلغ المتبقي" />}
+      {sec('show_prev_balance') && <Toggle value={tpl.show_prev_balance} onChange={v => toggleWithRow('show_prev_balance', v)} label="الرصيد السابق" />}
+      {sec('show_new_balance') && <Toggle value={tpl.show_new_balance} onChange={v => toggleWithRow('show_new_balance', v)} label="الرصيد الجديد" />}
 
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+      <div className="ps-section-title" style={{ fontSize: 12 }}>ترتيب الصفوف</div>
+      <RowManager
+        rows={tpl.totals_rows ?? []}
+        onChange={rows => update('totals_rows', rows)}
+      />
 
-    </>
+      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+      <div className="ps-section-title" style={{ fontSize: 12 }}>جدول الإجماليات (TVA)</div>
+      <Toggle
+        value={tpl.totals_grid?.enabled ?? false}
+        onChange={v => {
+          const grid: TotalsGridConfig = {
+            ...(tpl.totals_grid ?? {}),
+            enabled: v,
+            columns: tpl.totals_grid?.columns ?? [
+              { id: 'c1', field: 'grid.baseExcl',      label: 'المبلغ خارج الرسم', order: 0, visible: true, align: 'center' },
+              { id: 'c2', field: 'grid.discountPct',    label: 'التخفيض',          order: 1, visible: true, align: 'center' },
+              { id: 'c3', field: 'grid.discountAmount', label: 'مبلغ التخفيض',      order: 2, visible: true, align: 'center' },
+              { id: 'c4', field: 'grid.tvaRate',        label: 'TVA',              order: 3, visible: true, align: 'center' },
+              { id: 'c5', field: 'grid.tvaAmount',      label: 'مبلغ TVA',         order: 4, visible: true, align: 'center' },
+            ],
+            summaryRows: tpl.totals_grid?.summaryRows ?? [
+              { id: 'total_ht', field: 'totals.ht',      label: 'المجموع بدون رسوم', visible: true, order: 0, labelSide: 'start', valueSide: 'end' },
+              { id: 'discount', field: 'totals.discount', label: 'مجموع التخفيض',    visible: true, order: 1, labelSide: 'start', valueSide: 'end' },
+              { id: 'tva',      field: 'totals.tva',      label: 'مجموع الضريبة',    visible: true, order: 2, labelSide: 'start', valueSide: 'end' },
+              { id: 'ttc',      field: 'totals.ttc',      label: 'الصافي للدفع',     visible: true, order: 3, labelSide: 'start', valueSide: 'end', bold: true,
+                border: { style: 'double', width: 3, color: '#111', sides: { top: true } } },
+            ],
+          };
+          update('totals_grid', grid);
+        }}
+        label="تفعيل جدول TVA"
+      />
+      {tpl.totals_grid?.enabled && (
+        <>
+          <ColorField label="لون رأس الجدول" value={tpl.totals_grid?.headerBg ?? '#f5f5f5'}
+            onChange={v => update('totals_grid', { ...(tpl.totals_grid!), headerBg: v })} />
+          <ColorField label="لون حدود الجدول" value={tpl.totals_grid?.borderColor ?? '#333333'}
+            onChange={v => update('totals_grid', { ...(tpl.totals_grid!), borderColor: v })} />
+          {(tpl.totals_grid?.columns ?? []).map((col, i) => (
+            <div key={col.id} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2, fontSize: 11 }}>
+              <Toggle
+                value={col.visible}
+                onChange={v => {
+                  const cols = [...(tpl.totals_grid!.columns)];
+                  cols[i] = { ...cols[i], visible: v };
+                  update('totals_grid', { ...(tpl.totals_grid!), columns: cols });
+                }}
+                label=""
+              />
+              <span style={{ flex: 1 }}>{col.label}</span>
+            </div>
+          ))}
+        </>
+      )}</>
   );
 }
 
@@ -7069,7 +8686,6 @@ const ALL_FIELDS: FieldDefinition[] = [
   { path: 'company.nif',     label: 'ط§ظ„ط±ظ‚ظ… ط§ظ„ط¬ط¨ط§ط¦ظٹ',      group: 'company', type: 'string', description: 'ط±ظ‚ظ… ط§ظ„طھط¹ط±ظٹظپ ط§ظ„ط¬ط¨ط§ط¦ظٹ' },
   { path: 'company.rc',      label: 'ط§ظ„ط³ط¬ظ„ ط§ظ„طھط¬ط§ط±ظٹ',      group: 'company', type: 'string', description: 'ط±ظ‚ظ… ط§ظ„ط³ط¬ظ„ ط§ظ„طھط¬ط§ط±ظٹ' },
   { path: 'company.nis',     label: 'ط§ظ„ط±ظ‚ظ… ط§ظ„ط¥ط­طµط§ط¦ظٹ',     group: 'company', type: 'string', description: 'ط§ظ„ط±ظ‚ظ… ط§ظ„ط¥ط­طµط§ط¦ظٹ' },
-  { path: 'company.ice',     label: 'ط±ظ‚ظ… ط§ظ„ط­ط³ط§ط¨ ICE',     group: 'company', type: 'string', description: 'ط±ظ‚ظ… ط§ظ„ط­ط³ط§ط¨ ط§ظ„ط¬ط§ط±ظٹ ICE' },
   { path: 'company.article', label: 'ط§ظ„ظ…ط§ط¯ط©',             group: 'company', type: 'string', description: 'ط±ظ‚ظ… ط§ظ„ظ…ط§ط¯ط©' },
   { path: 'company.logoUrl', label: 'ط±ط§ط¨ط· ط§ظ„ط´ط¹ط§ط±',        group: 'company', type: 'string', description: 'ط±ط§ط¨ط· طµظˆط±ط© ط´ط¹ط§ط± ط§ظ„ط´ط±ظƒط©' },
   { path: 'company.email',   label: 'ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ',  group: 'company', type: 'string', description: 'ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ ظ„ظ„ط´ط±ظƒط©' },
@@ -7174,6 +8790,240 @@ export type { PrintFieldDefinition, PrintFieldGroup } from './PrintFieldRegistry
 export { PRINT_FIELDS, printFieldRegistry } from './PrintFieldRegistry';
 export type { ColumnDefinition } from './PrintFieldResolver';
 export { printFieldResolver } from './PrintFieldResolver';
+export { layoutEngine } from '../engines/LayoutEngine';
+export type { LayoutElement, LayoutResult } from '../engines/LayoutEngine';
+
+```
+
+## FILE: ./resources/js/pages/settings/print-settings/services/layoutMigration.ts
+
+```
+import type { PrintTemplate, LayoutRow, HeaderLayout, SectionMeta, TotalsGridConfig, PageFrameConfig, WatermarkConfig } from '../types/domain';
+
+function row(
+  id: string,
+  field: string,
+  order: number,
+  overrides: Partial<LayoutRow> = {},
+): LayoutRow {
+  return {
+    id,
+    field,
+    visible: true,
+    order,
+    labelSide: 'start',
+    valueSide: 'end',
+    ...overrides,
+  };
+}
+
+/** Build totals_rows from legacy show_* flags. */
+export function buildDefaultTotalsRows(tpl: PrintTemplate): LayoutRow[] {
+  let o = 0;
+  const rows: LayoutRow[] = [];
+
+  if (tpl.show_total_ht)
+    rows.push(row('total_ht', 'totals.ht', o++));
+
+  if (tpl.show_discount_total)
+    rows.push(row('discount', 'totals.discount', o++, { color: '#c00' }));
+
+  if (tpl.show_total_tva)
+    rows.push(row('total_tva', 'totals.tva', o++));
+
+  if (tpl.show_tva_breakdown)
+    rows.push(row('tva_breakdown', 'totals.tvaBreakdownGroup', o++, { fontSize: (tpl.totals_font_size ?? 10) - 1 }));
+
+  if (tpl.show_fiscal_stamp)
+    rows.push(row('fiscal_stamp', 'totals.fiscalStamp', o++));
+
+  if (tpl.show_total_ttc)
+    rows.push(row('total_ttc', 'totals.ttc', o++, {
+      bold: true,
+      fontSize: tpl.total_ttc_font_size,
+      color: tpl.total_ttc_color,
+      border: { style: tpl.total_border_style, width: 2, color: '#111', sides: { top: true } },
+    }));
+
+  if (tpl.show_amount_in_words)
+    rows.push(row('amount_in_words', 'totals.amountInWords', o++, { labelSide: 'start', valueSide: 'start' }));
+
+  if (tpl.show_paid_amount)
+    rows.push(row('paid', 'totals.paid', o++, { bold: true }));
+
+  if (tpl.show_change)
+    rows.push(row('change', 'totals.change', o++));
+
+  if (tpl.show_remaining)
+    rows.push(row('remaining', 'totals.remaining', o++, { color: '#c00' }));
+
+  if (tpl.show_prev_balance)
+    rows.push(row('prev_balance', 'balance.previous', o++));
+
+  if (tpl.show_new_balance)
+    rows.push(row('new_balance', 'balance.current', o++, { bold: true }));
+
+  return rows;
+}
+
+/** Build footer_rows from footer_line1/2/3 + thank_you + returns_policy. */
+export function buildDefaultFooterRows(tpl: PrintTemplate): LayoutRow[] {
+  let o = 0;
+  const rows: LayoutRow[] = [];
+
+  const pushLiteral = (id: string, text: string, extra: Partial<LayoutRow> = {}) => {
+    if (!text) return;
+    rows.push(row(id, 'literal', o++, { literalText: text, labelSide: 'start', valueSide: 'start', ...extra }));
+  };
+
+  pushLiteral('footer_line1', tpl.footer_line1);
+  pushLiteral('footer_line2', tpl.footer_line2);
+  pushLiteral('footer_line3', tpl.footer_line3);
+
+  if (tpl.show_thank_you)
+    pushLiteral('thank_you', tpl.thank_you_text, { color: tpl.thank_you_color, fontSize: tpl.thank_you_size, bold: true });
+
+  if (tpl.show_returns_policy)
+    pushLiteral('returns_policy', tpl.returns_policy_text);
+
+  if (tpl.footer_legal_text)
+    pushLiteral('legal_text', tpl.footer_legal_text);
+
+  return rows;
+}
+
+/** No legacy multi-column header — default is always 'simple'. */
+export function buildDefaultHeaderLayout(): HeaderLayout {
+  return { mode: 'simple', columns: [] };
+}
+
+/** Build doc_info_rows from legacy show_doc_number/show_date/etc. flags. */
+export function buildDefaultDocInfoRows(tpl: PrintTemplate): LayoutRow[] {
+  let o = 0;
+  const rows: LayoutRow[] = [];
+
+  if (tpl.show_doc_number)
+    rows.push(row('doc_number', 'document.number', o++, { label: 'رقم:' }));
+  if (tpl.show_date)
+    rows.push(row('doc_date', 'document.date', o++, { label: 'التاريخ:' }));
+  if (tpl.show_time)
+    rows.push(row('doc_time', 'document.time', o++, { label: 'الوقت:' }));
+  if (tpl.show_due_date)
+    rows.push(row('doc_due_date', 'document.dueDate', o++, { label: 'تاريخ الاستحقاق:' }));
+  if (tpl.show_cashier)
+    rows.push(row('doc_cashier', 'customer.cashierName', o++, { label: 'الكاشير:' }));
+  if (tpl.show_session)
+    rows.push(row('doc_session', 'session.code', o++, { label: 'الجلسة:' }));
+
+  return rows;
+}
+
+/** Build customer_info_rows from legacy show_client/show_client_* flags. */
+export function buildDefaultCustomerInfoRows(tpl: PrintTemplate): LayoutRow[] {
+  let o = 0;
+  const rows: LayoutRow[] = [];
+
+  if (tpl.show_client)
+    rows.push(row('cust_name', 'customer.name', o++, { label: 'العميل:' }));
+  if (tpl.show_client_nif)
+    rows.push(row('cust_nif', 'customer.nif', o++, { label: 'NIF العميل:' }));
+  if (tpl.show_customer_commercial_name)
+    rows.push(row('cust_commercial_name', 'customer.commercialName', o++, { label: 'الاسم التجاري:' }));
+  if (tpl.show_customer_rc)
+    rows.push(row('cust_rc', 'customer.rc', o++, { label: 'RC:' }));
+  if (tpl.show_customer_nis)
+    rows.push(row('cust_nis', 'customer.nis', o++, { label: 'NIS:' }));
+  if (tpl.show_customer_ai)
+    rows.push(row('cust_ai', 'customer.ai', o++, { label: 'المادة الجبائية:' }));
+  if (tpl.show_client_phone)
+    rows.push(row('cust_phone', 'customer.phone', o++, { label: 'هاتف العميل:' }));
+  if (tpl.show_customer_mobile)
+    rows.push(row('cust_mobile', 'customer.mobile', o++, { label: 'المحمول:' }));
+  if (tpl.show_customer_fax)
+    rows.push(row('cust_fax', 'customer.fax', o++, { label: 'الفاكس:' }));
+  if (tpl.show_customer_email)
+    rows.push(row('cust_email', 'customer.email', o++, { label: 'البريد الإلكتروني:' }));
+  if (tpl.show_customer_activity)
+    rows.push(row('cust_activity', 'customer.activity', o++, { label: 'النشاط:' }));
+  if (tpl.show_client_address)
+    rows.push(row('cust_address', 'customer.address', o++, { label: 'العنوان:' }));
+  if (tpl.show_delivery_address)
+    rows.push(row('cust_delivery', 'customer.deliveryAddress', o++, { label: 'عنوان التسليم:' }));
+  if (tpl.show_customer_bank_name)
+    rows.push(row('cust_bank_name', 'customer.bankName', o++, { label: 'اسم البنك:' }));
+  if (tpl.show_customer_rib)
+    rows.push(row('cust_rib', 'customer.rib', o++, { label: 'RIB:' }));
+
+  return rows;
+}
+
+/** Build company_info_rows from legacy show_address/show_phone/etc. flags. */
+export function buildDefaultCompanyInfoRows(tpl: PrintTemplate): LayoutRow[] {
+  let o = 0;
+  const rows: LayoutRow[] = [];
+
+  if (tpl.show_commercial_name)
+    rows.push(row('co_commercial_name', 'company.commercialName', o++, { label: 'الاسم التجاري' }));
+  if (tpl.show_address)
+    rows.push(row('co_address', 'company.address', o++));
+  if (tpl.show_phone)
+    rows.push(row('co_phone', 'company.phone', o++, { label: 'هاتف' }));
+  if (tpl.show_mobile)
+    rows.push(row('co_mobile', 'company.mobile', o++, { label: 'محمول' }));
+  if (tpl.show_fax)
+    rows.push(row('co_fax', 'company.fax', o++, { label: 'فاكس' }));
+  if (tpl.show_email)
+    rows.push(row('co_email', 'company.email', o++, { label: 'بريد' }));
+  if (tpl.show_tax_id)
+    rows.push(row('co_nif', 'company.nif', o++, { label: 'NIF' }));
+  if (tpl.show_rc)
+    rows.push(row('co_rc', 'company.rc', o++, { label: 'RC' }));
+  if (tpl.show_nis)
+    rows.push(row('co_nis', 'company.nis', o++, { label: 'NIS' }));
+  if (tpl.show_article)
+    rows.push(row('co_article', 'company.article', o++, { label: 'المادة الجبائية' }));
+  if (tpl.show_capital)
+    rows.push(row('co_capital', 'company.capital', o++, { label: 'رأس المال' }));
+  if (tpl.show_bank_name)
+    rows.push(row('co_bank_name', 'company.bankName', o++, { label: 'بنك' }));
+  if (tpl.show_rib)
+    rows.push(row('co_rib', 'company.rib', o++, { label: 'RIB' }));
+  if (tpl.show_activity)
+    rows.push(row('co_activity', 'company.activity', o++, { label: 'النشاط' }));
+
+  return rows;
+}
+
+/** Default sections_order — all 6 sections in standard sequence. */
+export function buildDefaultSectionsOrder(): SectionMeta[] {
+  return [
+    { key: 'header',     visible: true, order: 0 },
+    { key: 'doc-info',   visible: true, order: 1 },
+    { key: 'items',      visible: true, order: 2 },
+    { key: 'totals',     visible: true, order: 3 },
+    { key: 'payments',   visible: true, order: 4 },
+    { key: 'footer',     visible: true, order: 5 },
+  ];
+}
+
+/** Single entry point — call from SettingsSerializer.fromApiResponse() */
+export function ensureLayoutFields(tpl: PrintTemplate): PrintTemplate {
+  const result = {
+    ...tpl,
+    totals_rows: tpl.totals_rows?.length ? tpl.totals_rows : buildDefaultTotalsRows(tpl),
+    footer_rows: tpl.footer_rows?.length ? tpl.footer_rows : buildDefaultFooterRows(tpl),
+    header_layout: tpl.header_layout ?? buildDefaultHeaderLayout(),
+    doc_info_rows: tpl.doc_info_rows?.length ? tpl.doc_info_rows : buildDefaultDocInfoRows(tpl),
+    customer_info_rows: tpl.customer_info_rows?.length ? tpl.customer_info_rows : buildDefaultCustomerInfoRows(tpl),
+    company_info_rows: tpl.company_info_rows?.length ? tpl.company_info_rows : buildDefaultCompanyInfoRows(tpl),
+    sections_order: tpl.sections_order?.length ? tpl.sections_order : buildDefaultSectionsOrder(),
+    col_styles: tpl.col_styles ?? [],
+    page_frame: tpl.page_frame ?? { enabled: false } as PageFrameConfig,
+    totals_grid: tpl.totals_grid ?? { enabled: false, columns: [] } as TotalsGridConfig,
+    watermark: tpl.watermark ?? { enabled: false } as WatermarkConfig,
+  };
+  return result;
+}
 
 ```
 
@@ -7217,12 +9067,23 @@ export type PrintFieldGroup =
 
 export const PRINT_FIELDS: PrintFieldDefinition[] = [
   // ── Customer / Party ─────────────────────────────────────────────────
-  { id: 'customer.name',           label: 'اسم العميل',          group: 'customer', type: 'string',   sourcePath: 'party.name',           settingKey: 'show_client',          align: 'right',   visibleByDefault: true },
-  { id: 'customer.nif',            label: 'رقم ضريبة العميل',    group: 'customer', type: 'string',   sourcePath: 'party.nif',            settingKey: 'show_client_nif',      align: 'right',   visibleByDefault: true },
-  { id: 'customer.phone',          label: 'هاتف العميل',          group: 'customer', type: 'string',   sourcePath: 'party.phone',          settingKey: 'show_client_phone',    align: 'right',   visibleByDefault: true },
-  { id: 'customer.address',        label: 'عنوان العميل',         group: 'customer', type: 'string',   sourcePath: 'party.address',        settingKey: 'show_client_address',  align: 'right',   visibleByDefault: true },
-  { id: 'customer.deliveryAddress', label: 'عنوان التسليم',       group: 'customer', type: 'string',   sourcePath: 'party.deliveryAddress', settingKey: 'show_delivery_address', align: 'right',   visibleByDefault: false },
+  { id: 'customer.name',           label: 'اسم العميل',          group: 'customer', type: 'string',   sourcePath: 'party.name',           settingKey: 'show_client',          align: 'right',   visibleByDefault: true,  overrideTemplatePath: 'override_client_name' },
+  { id: 'customer.nif',            label: 'رقم ضريبة العميل',    group: 'customer', type: 'string',   sourcePath: 'party.nif',            settingKey: 'show_client_nif',      align: 'right',   visibleByDefault: true,  overrideTemplatePath: 'override_client_nif' },
+  { id: 'customer.phone',          label: 'هاتف العميل',          group: 'customer', type: 'string',   sourcePath: 'party.phone',          settingKey: 'show_client_phone',    align: 'right',   visibleByDefault: true,  overrideTemplatePath: 'override_client_phone' },
+  { id: 'customer.address',        label: 'عنوان العميل',         group: 'customer', type: 'string',   sourcePath: 'party.address',        settingKey: 'show_client_address',  align: 'right',   visibleByDefault: true,  overrideTemplatePath: 'override_client_address' },
+  { id: 'customer.deliveryAddress', label: 'عنوان التسليم',       group: 'customer', type: 'string',   sourcePath: 'party.deliveryAddress', settingKey: 'show_delivery_address', align: 'right',   visibleByDefault: false, overrideTemplatePath: 'override_delivery_address' },
   { id: 'customer.cashierName',    label: 'الكاشير',              group: 'customer', type: 'string',   sourcePath: 'party.cashierName',    settingKey: 'show_cashier',         align: 'right',   visibleByDefault: true },
+  { id: 'customer.code',           label: 'رمز الزبون',           group: 'customer', type: 'string',   sourcePath: 'party.code',           align: 'right',   visibleByDefault: true },
+  { id: 'customer.commercialName', label: 'الاسم التجاري للعميل', group: 'customer', type: 'string',   sourcePath: 'party.commercial_name', settingKey: 'show_customer_commercial_name', align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_commercial_name' },
+  { id: 'customer.rc',             label: 'سجل تجاري العميل',     group: 'customer', type: 'string',   sourcePath: 'party.rc',              settingKey: 'show_customer_rc',      align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_rc' },
+  { id: 'customer.nis',            label: 'رقم NIS للعميل',       group: 'customer', type: 'string',   sourcePath: 'party.nis',             settingKey: 'show_customer_nis',     align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_nis' },
+  { id: 'customer.ai',             label: 'المادة الجبائية للعميل', group: 'customer', type: 'string', sourcePath: 'party.ai',              settingKey: 'show_customer_ai',      align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_ai' },
+  { id: 'customer.mobile',         label: 'محمول العميل',         group: 'customer', type: 'string',   sourcePath: 'party.mobile',          settingKey: 'show_customer_mobile',  align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_mobile' },
+  { id: 'customer.fax',            label: 'فاكس العميل',          group: 'customer', type: 'string',   sourcePath: 'party.fax',             settingKey: 'show_customer_fax',     align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_fax' },
+  { id: 'customer.email',          label: 'بريد العميل الإلكتروني', group: 'customer', type: 'string', sourcePath: 'party.email',           settingKey: 'show_customer_email',   align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_email' },
+  { id: 'customer.activity',       label: 'نشاط العميل',          group: 'customer', type: 'string',   sourcePath: 'party.activity',        settingKey: 'show_customer_activity', align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_activity' },
+  { id: 'customer.bankName',       label: 'بنك العميل',           group: 'customer', type: 'string',   sourcePath: 'party.bank_name',       settingKey: 'show_customer_bank_name', align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_bank_name' },
+  { id: 'customer.rib',            label: 'حساب العميل البنكي',   group: 'customer', type: 'string',   sourcePath: 'party.rib',             settingKey: 'show_customer_rib',     align: 'right', visibleByDefault: false, overrideTemplatePath: 'override_customer_rib' },
 
   // ── Document ─────────────────────────────────────────────────────────
   { id: 'document.number',         label: 'رقم المستند',          group: 'document', type: 'string',   sourcePath: 'doc.number',           settingKey: 'show_doc_number',      align: 'right',   visibleByDefault: true },
@@ -7250,9 +9111,16 @@ export const PRINT_FIELDS: PrintFieldDefinition[] = [
   { id: 'company.nif',             label: 'رقم الضريبة',          group: 'company',  type: 'string',   sourcePath: 'company.nif',           settingKey: 'show_tax_id',          align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_nif' },
   { id: 'company.rc',              label: 'السجل التجاري',        group: 'company',  type: 'string',   sourcePath: 'company.rc',            settingKey: 'show_rc',              align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_rc' },
   { id: 'company.nis',             label: 'الرقم الإحصائي',       group: 'company',  type: 'string',   sourcePath: 'company.nis',           settingKey: 'show_nis',             align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_nis' },
-  { id: 'company.ice',             label: 'رقم ICE',              group: 'company',  type: 'string',   sourcePath: 'company.ice',           settingKey: 'show_ice',             align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_ice' },
-  { id: 'company.article',         label: 'المادة',               group: 'company',  type: 'string',   sourcePath: 'company.article',       settingKey: 'show_article',         align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_article' },
+  { id: 'company.article',         label: 'المادة الجبائية',       group: 'company',  type: 'string',   sourcePath: 'company.article',       settingKey: 'show_article',         align: 'center',  visibleByDefault: true,  overrideTemplatePath: 'override_article' },
   { id: 'company.logo',            label: 'الشعار',               group: 'company',  type: 'image',    sourcePath: 'company.logoUrl',       settingKey: 'show_logo',            align: 'center',  visibleByDefault: true },
+  { id: 'company.capital',          label: 'رأس مال الشركة',       group: 'company',  type: 'string',   sourcePath: 'company.capital',       align: 'right',   visibleByDefault: true },
+  { id: 'company.mobile',          label: 'الهاتف المحمول',       group: 'company',  type: 'string',   sourcePath: 'company.mobile',        align: 'right',   visibleByDefault: true },
+  { id: 'company.commercialName',  label: 'الاسم التجاري',        group: 'company',  type: 'string',   sourcePath: 'company.commercialName', settingKey: 'show_commercial_name', align: 'center', visibleByDefault: false, overrideTemplatePath: 'override_commercial_name' },
+  { id: 'company.email',           label: 'البريد الإلكتروني',     group: 'company',  type: 'string',   sourcePath: 'company.email',         settingKey: 'show_email',           align: 'center', visibleByDefault: false, overrideTemplatePath: 'override_email' },
+  { id: 'company.fax',             label: 'الفاكس',               group: 'company',  type: 'string',   sourcePath: 'company.fax',           settingKey: 'show_fax',             align: 'center', visibleByDefault: false, overrideTemplatePath: 'override_fax' },
+  { id: 'company.bankName',        label: 'اسم البنك',            group: 'company',  type: 'string',   sourcePath: 'company.bankName',      settingKey: 'show_bank_name',       align: 'center', visibleByDefault: false, overrideTemplatePath: 'override_bank_name' },
+  { id: 'company.rib',             label: 'الحساب البنكي',         group: 'company',  type: 'string',   sourcePath: 'company.rib',           settingKey: 'show_rib',             align: 'center', visibleByDefault: false, overrideTemplatePath: 'override_rib' },
+  { id: 'company.activity',        label: 'النشاط',               group: 'company',  type: 'string',   sourcePath: 'company.activity',      settingKey: 'show_activity',        align: 'center', visibleByDefault: false, overrideTemplatePath: 'override_activity' },
 
   // ── Items (table) ─────────────────────────────────────────────────────
   { id: 'item.index',              label: 'الرقم',                group: 'item',     type: 'number',   sourcePath: '',                      align: 'center',  visibleByDefault: true,  isRepeating: true, relativePath: '_index' },
@@ -7709,17 +9577,48 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   show_tax_id:        { key: 'show_tax_id', label: 'Show Tax ID (NIF)', labelAr: 'إظهار رقم الضريبة', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.nif' },
   show_rc:            { key: 'show_rc', label: 'Show RC', labelAr: 'إظهار السجل التجاري', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.rc' },
   show_nis:           { key: 'show_nis', label: 'Show NIS', labelAr: 'إظهار رقم NIS', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.nis' },
-  show_ice:           { key: 'show_ice', label: 'Show ICE', labelAr: 'إظهار رقم ICE', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.ice' },
-  show_article:       { key: 'show_article', label: 'Show Article', labelAr: 'إظهار المادة', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.article' },
+  show_article:       { key: 'show_article', label: 'Show Article', labelAr: 'إظهار المادة الجبائية', category: 'company', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.article' },
+  show_capital:       { key: 'show_capital', label: 'Show Capital', labelAr: 'إظهار الرأس المال', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.capital' },
+  show_mobile:        { key: 'show_mobile', label: 'Show Mobile', labelAr: 'إظهار المحمول', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.mobile' },
+  show_commercial_name: { key: 'show_commercial_name', label: 'Show Commercial Name', labelAr: 'إظهار الاسم التجاري', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.commercialName' },
+  show_email:         { key: 'show_email', label: 'Show Email', labelAr: 'إظهار البريد الإلكتروني', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.email' },
+  show_fax:           { key: 'show_fax', label: 'Show Fax', labelAr: 'إظهار الفاكس', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.fax' },
+  show_bank_name:     { key: 'show_bank_name', label: 'Show Bank Name', labelAr: 'إظهار اسم البنك', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.bankName' },
+  show_rib:           { key: 'show_rib', label: 'Show RIB', labelAr: 'إظهار الحساب البنكي', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.rib' },
+  show_activity:      { key: 'show_activity', label: 'Show Activity', labelAr: 'إظهار النشاط', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.activity' },
   company_info_align: { key: 'company_info_align', label: 'Info Alignment', labelAr: 'محاذاة المعلومات', category: 'company', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
   company_info_size:  { key: 'company_info_size', label: 'Info Font Size', labelAr: 'حجم خط المعلومات', category: 'company', component: 'slider', defaultValue: 9, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 16, step: 0.5 },
+  company_info_bold:  { key: 'company_info_bold', label: 'Bold Info', labelAr: 'تسميك معلومات الشركة', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  company_info_italic:{ key: 'company_info_italic', label: 'Italic Info', labelAr: 'مائل معلومات الشركة', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  company_info_font_family: { key: 'company_info_font_family', label: 'Info Font Family', labelAr: 'نوع خط المعلومات', category: 'company', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times' }, { v: 'arial', l: 'Arial' }] },
+  label_address:      { key: 'label_address', label: 'Label: Address', labelAr: 'تسمية العنوان', category: 'company', component: 'input', defaultValue: 'العنوان', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_address' },
+  label_phone:        { key: 'label_phone', label: 'Label: Phone', labelAr: 'تسمية الهاتف', category: 'company', component: 'input', defaultValue: 'الهاتف', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_phone' },
+  label_nif:          { key: 'label_nif', label: 'Label: NIF', labelAr: 'تسمية رقم الضريبة', category: 'company', component: 'input', defaultValue: 'NIF', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_tax_id' },
+  label_rc:           { key: 'label_rc', label: 'Label: RC', labelAr: 'تسمية السجل التجاري', category: 'company', component: 'input', defaultValue: 'RC', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_rc' },
+  label_nis:          { key: 'label_nis', label: 'Label: NIS', labelAr: 'تسمية رقم NIS', category: 'company', component: 'input', defaultValue: 'NIS', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_nis' },
+  label_article:      { key: 'label_article', label: 'Label: Article', labelAr: 'تسمية المادة الجبائية', category: 'company', component: 'input', defaultValue: 'المادة الجبائية', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_article' },
+  label_capital:      { key: 'label_capital', label: 'Label: Capital', labelAr: 'تسمية الرأس المال', category: 'company', component: 'input', defaultValue: 'الرأس المال', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_capital' },
+  label_mobile:       { key: 'label_mobile', label: 'Label: Mobile', labelAr: 'تسمية المحمول', category: 'company', component: 'input', defaultValue: 'المحمول', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_mobile' },
+  label_commercial_name: { key: 'label_commercial_name', label: 'Label: Commercial Name', labelAr: 'تسمية الاسم التجاري', category: 'company', component: 'input', defaultValue: 'الاسم التجاري', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_commercial_name' },
+  label_email:        { key: 'label_email', label: 'Label: Email', labelAr: 'تسمية البريد الإلكتروني', category: 'company', component: 'input', defaultValue: 'البريد الإلكتروني', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_email' },
+  label_fax:          { key: 'label_fax', label: 'Label: Fax', labelAr: 'تسمية الفاكس', category: 'company', component: 'input', defaultValue: 'الفاكس', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_fax' },
+  label_bank_name:    { key: 'label_bank_name', label: 'Label: Bank Name', labelAr: 'تسمية اسم البنك', category: 'company', component: 'input', defaultValue: 'اسم البنك', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_bank_name' },
+  label_rib:          { key: 'label_rib', label: 'Label: RIB', labelAr: 'تسمية الحساب البنكي', category: 'company', component: 'input', defaultValue: 'RIB', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_rib' },
+  label_activity:     { key: 'label_activity', label: 'Label: Activity', labelAr: 'تسمية النشاط', category: 'company', component: 'input', defaultValue: 'النشاط', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_activity' },
   override_address:   { key: 'override_address', label: 'Override Address', labelAr: 'تجاوز العنوان', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_phone:     { key: 'override_phone', label: 'Override Phone', labelAr: 'تجاوز الهاتف', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_nif:       { key: 'override_nif', label: 'Override NIF', labelAr: 'تجاوز رقم الضريبة', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_rc:        { key: 'override_rc', label: 'Override RC', labelAr: 'تجاوز السجل التجاري', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_nis:       { key: 'override_nis', label: 'Override NIS', labelAr: 'تجاوز NIS', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
-  override_ice:       { key: 'override_ice', label: 'Override ICE', labelAr: 'تجاوز ICE', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
-  override_article:   { key: 'override_article', label: 'Override Article', labelAr: 'تجاوز المادة', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_article:   { key: 'override_article', label: 'Override Article', labelAr: 'تجاوز المادة الجبائية', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_capital:   { key: 'override_capital', label: 'Override Capital', labelAr: 'تجاوز الرأس المال', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_mobile:    { key: 'override_mobile', label: 'Override Mobile', labelAr: 'تجاوز المحمول', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_commercial_name: { key: 'override_commercial_name', label: 'Override Commercial Name', labelAr: 'تجاوز الاسم التجاري', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_email:     { key: 'override_email', label: 'Override Email', labelAr: 'تجاوز البريد الإلكتروني', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_fax:       { key: 'override_fax', label: 'Override Fax', labelAr: 'تجاوز الفاكس', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_bank_name: { key: 'override_bank_name', label: 'Override Bank Name', labelAr: 'تجاوز اسم البنك', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_rib:       { key: 'override_rib', label: 'Override RIB', labelAr: 'تجاوز الحساب البنكي', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_activity:  { key: 'override_activity', label: 'Override Activity', labelAr: 'تجاوز النشاط', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   header_custom_text: { key: 'header_custom_text', label: 'Header Custom Text', labelAr: 'نص مخصص للرأس', category: 'header', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   header_separator:   { key: 'header_separator', label: 'Header Separator', labelAr: 'فاصل الرأس', category: 'header', component: 'pills', defaultValue: 'dashed' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
 
@@ -7739,6 +9638,51 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   show_client_phone:    { key: 'show_client_phone', label: 'Show Client Phone', labelAr: 'إظهار هاتف العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.phone' },
   show_client_address:  { key: 'show_client_address', label: 'Show Client Address', labelAr: 'إظهار عنوان العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.address' },
   show_delivery_address:{ key: 'show_delivery_address', label: 'Show Delivery Address', labelAr: 'إظهار عنوان التسليم', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS, field: 'customer.deliveryAddress' },
+  label_client:          { key: 'label_client', label: 'Label: Client Name', labelAr: 'تسمية اسم العميل', category: 'document', component: 'input', defaultValue: 'العميل', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_client' },
+  label_client_nif:      { key: 'label_client_nif', label: 'Label: Client NIF', labelAr: 'تسمية رقم ضريبة العميل', category: 'document', component: 'input', defaultValue: 'NIF العميل', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_client_nif' },
+  label_client_phone:    { key: 'label_client_phone', label: 'Label: Client Phone', labelAr: 'تسمية هاتف العميل', category: 'document', component: 'input', defaultValue: 'هاتف العميل', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_client_phone' },
+  label_client_address:  { key: 'label_client_address', label: 'Label: Client Address', labelAr: 'تسمية عنوان العميل', category: 'document', component: 'input', defaultValue: 'العنوان', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_client_address' },
+  label_delivery_address: { key: 'label_delivery_address', label: 'Label: Delivery Address', labelAr: 'تسمية عنوان التسليم', category: 'document', component: 'input', defaultValue: 'عنوان التسليم', supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS, dependsOn: 'show_delivery_address' },
+  override_client_name:  { key: 'override_client_name', label: 'Override Client Name', labelAr: 'تجاوز اسم العميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_client_nif:   { key: 'override_client_nif', label: 'Override Client NIF', labelAr: 'تجاوز رقم ضريبة العميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_client_phone: { key: 'override_client_phone', label: 'Override Client Phone', labelAr: 'تجاوز هاتف العميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_client_address: { key: 'override_client_address', label: 'Override Client Address', labelAr: 'تجاوز عنوان العميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_delivery_address: { key: 'override_delivery_address', label: 'Override Delivery Address', labelAr: 'تجاوز عنوان التسليم', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS },
+  show_customer_commercial_name: { key: 'show_customer_commercial_name', label: 'Show Customer Trade Name', labelAr: 'إظهار الاسم التجاري للعميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.commercialName' },
+  show_customer_rc:   { key: 'show_customer_rc', label: 'Show Customer RC', labelAr: 'إظهار السجل التجاري للعميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.rc' },
+  show_customer_nis:  { key: 'show_customer_nis', label: 'Show Customer NIS', labelAr: 'إظهار رقم NIS للعميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.nis' },
+  show_customer_ai:   { key: 'show_customer_ai', label: 'Show Customer AI', labelAr: 'إظهار المادة الجبائية للعميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.ai' },
+  show_customer_mobile: { key: 'show_customer_mobile', label: 'Show Customer Mobile', labelAr: 'إظهار المحمول للعميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.mobile' },
+  show_customer_fax:  { key: 'show_customer_fax', label: 'Show Customer Fax', labelAr: 'إظهار الفاكس للعميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.fax' },
+  show_customer_email: { key: 'show_customer_email', label: 'Show Customer Email', labelAr: 'إظهار البريد الإلكتروني للعميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.email' },
+  show_customer_activity: { key: 'show_customer_activity', label: 'Show Customer Activity', labelAr: 'إظهار نشاط العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.activity' },
+  show_customer_bank_name: { key: 'show_customer_bank_name', label: 'Show Customer Bank', labelAr: 'إظهار اسم البنك للعميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.bankName' },
+  show_customer_rib:  { key: 'show_customer_rib', label: 'Show Customer RIB', labelAr: 'إظهار الحساب البنكي للعميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'customer.rib' },
+  label_customer_commercial_name: { key: 'label_customer_commercial_name', label: 'Label: Customer Trade Name', labelAr: 'تسمية الاسم التجاري للعميل', category: 'document', component: 'input', defaultValue: 'الاسم التجاري', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_commercial_name' },
+  label_customer_rc: { key: 'label_customer_rc', label: 'Label: Customer RC', labelAr: 'تسمية السجل التجاري للعميل', category: 'document', component: 'input', defaultValue: 'RC', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_rc' },
+  label_customer_nis: { key: 'label_customer_nis', label: 'Label: Customer NIS', labelAr: 'تسمية رقم NIS للعميل', category: 'document', component: 'input', defaultValue: 'NIS', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_nis' },
+  label_customer_ai: { key: 'label_customer_ai', label: 'Label: Customer AI', labelAr: 'تسمية المادة الجبائية للعميل', category: 'document', component: 'input', defaultValue: 'المادة الجبائية', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_ai' },
+  label_customer_mobile: { key: 'label_customer_mobile', label: 'Label: Customer Mobile', labelAr: 'تسمية المحمول للعميل', category: 'document', component: 'input', defaultValue: 'المحمول', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_mobile' },
+  label_customer_fax: { key: 'label_customer_fax', label: 'Label: Customer Fax', labelAr: 'تسمية الفاكس للعميل', category: 'document', component: 'input', defaultValue: 'الفاكس', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_fax' },
+  label_customer_email: { key: 'label_customer_email', label: 'Label: Customer Email', labelAr: 'تسمية البريد الإلكتروني للعميل', category: 'document', component: 'input', defaultValue: 'البريد الإلكتروني', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_email' },
+  label_customer_activity: { key: 'label_customer_activity', label: 'Label: Customer Activity', labelAr: 'تسمية نشاط العميل', category: 'document', component: 'input', defaultValue: 'النشاط', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_activity' },
+  label_customer_bank_name: { key: 'label_customer_bank_name', label: 'Label: Customer Bank', labelAr: 'تسمية اسم البنك للعميل', category: 'document', component: 'input', defaultValue: 'اسم البنك', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_bank_name' },
+  label_customer_rib: { key: 'label_customer_rib', label: 'Label: Customer RIB', labelAr: 'تسمية الحساب البنكي للعميل', category: 'document', component: 'input', defaultValue: 'RIB', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_customer_rib' },
+  override_customer_commercial_name: { key: 'override_customer_commercial_name', label: 'Override Customer Trade Name', labelAr: 'تجاوز الاسم التجاري للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_customer_rc: { key: 'override_customer_rc', label: 'Override Customer RC', labelAr: 'تجاوز السجل التجاري للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_customer_nis: { key: 'override_customer_nis', label: 'Override Customer NIS', labelAr: 'تجاوز رقم NIS للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_customer_ai: { key: 'override_customer_ai', label: 'Override Customer AI', labelAr: 'تجاوز المادة الجبائية للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_customer_mobile: { key: 'override_customer_mobile', label: 'Override Customer Mobile', labelAr: 'تجاوز المحمول للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_customer_fax: { key: 'override_customer_fax', label: 'Override Customer Fax', labelAr: 'تجاوز الفاكس للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_customer_email: { key: 'override_customer_email', label: 'Override Customer Email', labelAr: 'تجاوز البريد الإلكتروني للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_customer_activity: { key: 'override_customer_activity', label: 'Override Customer Activity', labelAr: 'تجاوز نشاط العميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_customer_bank_name: { key: 'override_customer_bank_name', label: 'Override Customer Bank', labelAr: 'تجاوز اسم البنك للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_customer_rib: { key: 'override_customer_rib', label: 'Override Customer RIB', labelAr: 'تجاوز الحساب البنكي للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  customer_info_font_family: { key: 'customer_info_font_family', label: 'Customer Info Font', labelAr: 'نوع خط معلومات العميل', category: 'document', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times' }, { v: 'arial', l: 'Arial' }] },
+  customer_info_size: { key: 'customer_info_size', label: 'Customer Info Size', labelAr: 'حجم خط معلومات العميل', category: 'document', component: 'slider', defaultValue: 9, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 16, step: 0.5 },
+  customer_info_bold: { key: 'customer_info_bold', label: 'Customer Info Bold', labelAr: 'تسميك معلومات العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  customer_info_italic: { key: 'customer_info_italic', label: 'Customer Info Italic', labelAr: 'مائل معلومات العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  customer_info_align: { key: 'customer_info_align', label: 'Customer Info Alignment', labelAr: 'محاذاة معلومات العميل', category: 'document', component: 'pills', defaultValue: 'right' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
   show_session:         { key: 'show_session', label: 'Show Session', labelAr: 'إظهار الجلسة', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: POS_DOCS, field: 'session.code' },
   show_payment_term:    { key: 'show_payment_term', label: 'Show Payment Term', labelAr: 'إظهار شرط الدفع', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: COMMERCIAL_DOCS, field: 'document.paymentTerm' },
   show_bank_details:    { key: 'show_bank_details', label: 'Show Bank Details', labelAr: 'إظهار تفاصيل البنك', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: PAGE, supportedDocs: COMMERCIAL_DOCS, field: 'footer.bankDetails' },
@@ -7757,8 +9701,9 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   items_font_family:    { key: 'items_font_family', label: 'Items Font Family', labelAr: 'نوع خط الجدول', category: 'items', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times' }, { v: 'arial', l: 'Arial' }] },
   show_col_header:      { key: 'show_col_header', label: 'Show Column Headers', labelAr: 'إظهار رؤوس الأعمدة', category: 'items', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   table_header_bold:    { key: 'table_header_bold', label: 'Bold Table Header', labelAr: 'تسميك رأس الجدول', category: 'items', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
-  table_header_bg:      { key: 'table_header_bg', label: 'Table Header Background', labelAr: 'خلفية رأس الجدول', category: 'items', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
-  table_header_color:   { key: 'table_header_color', label: 'Table Header Color', labelAr: 'لون رأس الجدول', category: 'items', component: 'color', defaultValue: '#333333', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
+  table_header_bg:      { key: 'table_header_bg', label: 'Table Header Background', labelAr: 'لون خلفية رأس الجدول', category: 'items', component: 'color', defaultValue: '#f5f5f5', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
+  table_header_color:   { key: 'table_header_color', label: 'Table Header Text Color', labelAr: 'لون نص رأس الجدول', category: 'items', component: 'color', defaultValue: '#333333', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
+  table_cell_padding:   { key: 'table_cell_padding', label: 'Cell Padding', labelAr: 'مسافة الخلايا', category: 'items', component: 'slider', defaultValue: 6, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 2, max: 20, step: 1 },
   table_border_style:   { key: 'table_border_style', label: 'Table Border Style', labelAr: 'نمط حدود الجدول', category: 'items', component: 'pills', defaultValue: 'dashed' as BorderStyle, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: BORDER_OPTS },
   alternating_rows:     { key: 'alternating_rows', label: 'Alternating Row Colors', labelAr: 'تلوين الصفوف بالتناوب', category: 'items', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   alternating_color:    { key: 'alternating_color', label: 'Alternating Color', labelAr: 'لون التناوب', category: 'items', component: 'color', defaultValue: '#f5f5f5', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'alternating_rows' },
@@ -7909,6 +9854,7 @@ export function isSettingVisible(key: string, docType: DocTypeCode, paperSize: P
 ```
 import type { DocTypeCode, PaperSize, PrintTemplate } from '../types/domain';
 import { SETTINGS_REGISTRY } from './SettingsRegistry';
+import { ensureLayoutFields } from './layoutMigration';
 
 export const TEMPLATE_VERSION = 2;
 
@@ -7978,7 +9924,7 @@ export function fromApiResponse(r: ApiResponse): PrintTemplate {
   for (const key of Object.keys(config)) {
     result[key] = (config as any)[key];
   }
-  return result as unknown as PrintTemplate;
+  return ensureLayoutFields(result as unknown as PrintTemplate);
 }
 
 /**
@@ -8130,7 +10076,6 @@ export interface HeaderConfig {
   showTaxId: boolean;
   showRc: boolean;
   showNis: boolean;
-  showIce: boolean;
   showArticle: boolean;
   companyInfoAlign: AlignOption;
   companyInfoSize: number;
@@ -8149,13 +10094,12 @@ export function headerConfig(size: PaperSize): HeaderConfig {
     companyNameBold: true,
     companyNameAlign: 'right',
     companyNameColor: COLOR_PRIMARY,
-    showAddress: true,
-    showPhone: true,
-    showTaxId: true,
-    showRc: true,
-    showNis: true,
-    showIce: true,
-    showArticle: true,
+    showAddress: false,
+    showPhone: false,
+    showTaxId: false,
+    showRc: false,
+    showNis: false,
+    showArticle: false,
     companyInfoAlign: 'right',
     companyInfoSize: isA4 ? 8.5 : 7.5,
     headerSeparator: 'solid',
@@ -8256,7 +10200,7 @@ export interface TableConfig {
   itemsFontFamily: FontFamily;
   showColHeader: boolean;
   tableHeaderBold: boolean;
-  tableHeaderBg: boolean;
+  tableHeaderBg: string;
   tableHeaderColor: string;
   tableBorderStyle: BorderStyle;
   alternatingRows: boolean;
@@ -8274,7 +10218,7 @@ export const INVOICE_COLUMNS: TableConfig = {
   itemsFontFamily: 'tajawal',
   showColHeader: true,
   tableHeaderBold: true,
-  tableHeaderBg: true,
+  tableHeaderBg: '#f5f5f5',
   tableHeaderColor: COLOR_PRIMARY,
   tableBorderStyle: 'solid',
   alternatingRows: true,
@@ -8560,7 +10504,6 @@ export function getMockDocumentData(): UniversalDocumentData {
       nif:     '09991234567890',
       rc:      '99B1234567',
       nis:     '09991234567890',
-      ice:     '09991234567890',
       article: '1604123456',
       logoUrl: null,
       email:   'contact@entreprise.dz',
@@ -8665,18 +10608,24 @@ export function getMockDocumentData(): UniversalDocumentData {
 ## FILE: ./resources/js/pages/settings/print-settings/template-library/registry.ts
 
 ```
-import type { PrintTemplate, PaperSize, DocTypeCode, CompanyData } from '../types';
+import type { PrintTemplate, PaperSize, DocTypeCode, CompanyData, FontFamily } from '../types';
 import type { UniversalDocumentData } from '../types/data';
 import type { LibraryTemplateEntry, LibraryTemplateMeta } from './types';
 import {
   TEMPLATE_AUTHOR, LAYOUT_ENGINE_VERSION, TEMPLATE_COUNTRY_DZ,
 } from './constants';
+import type { LayoutRow, HeaderLayout, SectionMeta, TotalsGridConfig } from '../types';
 import {
   INVOICE_COLUMNS, INVOICE_TOTALS, INVOICE_FOOTER,
   DELIVERY_COLUMNS, DELIVERY_TOTALS, DELIVERY_FOOTER,
   DELIVERY_A5_COLUMNS, DELIVERY_A5_TOTALS, DELIVERY_A5_FOOTER,
 } from './config';
 import { headerConfig, paperConfig, typographyConfig } from './config';
+import {
+  buildDefaultTotalsRows, buildDefaultFooterRows, buildDefaultHeaderLayout,
+  buildDefaultDocInfoRows, buildDefaultCustomerInfoRows, buildDefaultCompanyInfoRows,
+  buildDefaultSectionsOrder,
+} from '../services/layoutMigration';
 import { categoryFromDocType } from './categories';
 import { getMockDocumentData } from './mockData';
 
@@ -8755,8 +10704,15 @@ class TemplateRegistryClass {
       tpl.override_nif = companyOverride.nif || '';
       tpl.override_rc = companyOverride.rc || '';
       tpl.override_nis = companyOverride.nis || '';
-      tpl.override_ice = companyOverride.ice || '';
       tpl.override_article = companyOverride.article || '';
+      tpl.override_capital = companyOverride.capital || '';
+      tpl.override_mobile = companyOverride.mobile || '';
+      tpl.override_commercial_name = companyOverride.commercialName || '';
+      tpl.override_email = companyOverride.email || '';
+      tpl.override_fax = companyOverride.fax || '';
+      tpl.override_bank_name = companyOverride.bankName || '';
+      tpl.override_rib = companyOverride.rib || '';
+      tpl.override_activity = companyOverride.activity || '';
     }
     return { tpl, data: this.getMockData() };
   }
@@ -8870,18 +10826,49 @@ export function buildTemplate(
     show_tax_id: header.showTaxId,
     show_rc: header.showRc,
     show_nis: header.showNis,
-    show_ice: header.showIce,
     show_article: header.showArticle,
+    show_capital: false,
+    show_mobile: false,
+    show_commercial_name: false,
+    show_email: false,
+    show_fax: false,
+    show_bank_name: false,
+    show_rib: false,
+    show_activity: false,
     company_info_align: header.companyInfoAlign,
     company_info_size: header.companyInfoSize,
+    company_info_bold: false,
+    company_info_italic: false,
+    company_info_font_family: 'tajawal' as FontFamily,
+    label_address: 'العنوان',
+    label_phone: 'الهاتف',
+    label_nif: 'NIF',
+    label_rc: 'RC',
+    label_nis: 'NIS',
+    label_article: 'المادة الجبائية',
+    label_capital: 'الرأس المال',
+    label_mobile: 'المحمول',
+    label_commercial_name: 'الاسم التجاري',
+    label_email: 'البريد الإلكتروني',
+    label_fax: 'الفاكس',
+    label_bank_name: 'اسم البنك',
+    label_rib: 'RIB',
+    label_activity: 'النشاط',
 
     override_address: '',
     override_phone: '',
     override_nif: '',
     override_rc: '',
     override_nis: '',
-    override_ice: '',
     override_article: '',
+    override_capital: '',
+    override_mobile: '',
+    override_commercial_name: '',
+    override_email: '',
+    override_fax: '',
+    override_bank_name: '',
+    override_rib: '',
+    override_activity: '',
     header_custom_text: '',
     header_separator: header.headerSeparator,
 
@@ -8895,11 +10882,56 @@ export function buildTemplate(
     show_time: false,
     show_due_date: isInvoice,
     show_cashier: isInvoice,
-    show_client: true,
-    show_client_nif: true,
-    show_client_phone: true,
-    show_client_address: true,
-    show_delivery_address: !isInvoice,
+    show_client: false,
+    show_client_nif: false,
+    show_client_phone: false,
+    show_client_address: false,
+    show_delivery_address: false,
+    show_customer_commercial_name: false,
+    show_customer_rc: false,
+    show_customer_nis: false,
+    show_customer_ai: false,
+    show_customer_mobile: false,
+    show_customer_fax: false,
+    show_customer_email: false,
+    show_customer_activity: false,
+    show_customer_bank_name: false,
+    show_customer_rib: false,
+    label_client: 'العميل',
+    label_client_nif: 'NIF العميل',
+    label_client_phone: 'هاتف العميل',
+    label_client_address: 'العنوان',
+    label_delivery_address: 'عنوان التسليم',
+    label_customer_commercial_name: 'الاسم التجاري',
+    label_customer_rc: 'RC',
+    label_customer_nis: 'NIS',
+    label_customer_ai: 'المادة الجبائية',
+    label_customer_mobile: 'المحمول',
+    label_customer_fax: 'الفاكس',
+    label_customer_email: 'البريد الإلكتروني',
+    label_customer_activity: 'النشاط',
+    label_customer_bank_name: 'اسم البنك',
+    label_customer_rib: 'RIB',
+    override_client_name: '',
+    override_client_nif: '',
+    override_client_phone: '',
+    override_client_address: '',
+    override_delivery_address: '',
+    override_customer_commercial_name: '',
+    override_customer_rc: '',
+    override_customer_nis: '',
+    override_customer_ai: '',
+    override_customer_mobile: '',
+    override_customer_fax: '',
+    override_customer_email: '',
+    override_customer_activity: '',
+    override_customer_bank_name: '',
+    override_customer_rib: '',
+    customer_info_font_family: 'tajawal' as FontFamily,
+    customer_info_size: 9,
+    customer_info_bold: false,
+    customer_info_italic: false,
+    customer_info_align: 'right' as any,
     show_session: false,
     show_payment_term: false,
     show_bank_details: isInvoice,
@@ -8918,6 +10950,7 @@ export function buildTemplate(
     table_header_bold: table.tableHeaderBold,
     table_header_bg: table.tableHeaderBg,
     table_header_color: table.tableHeaderColor,
+    table_cell_padding: 6,
     table_border_style: table.tableBorderStyle,
     alternating_rows: table.alternatingRows,
     alternating_color: table.alternatingColor,
@@ -8993,6 +11026,25 @@ export function buildTemplate(
     show_report_summary_cards: false,
     show_report_payment_breakdown: false,
     show_report_top_products: false,
+
+    totals_rows: [],
+    footer_rows: [],
+    header_layout: { mode: 'simple', columns: [] } as HeaderLayout,
+    doc_info_rows: [],
+    customer_info_rows: [],
+    company_info_rows: [],
+    col_styles: [],
+    page_frame: { enabled: false },
+    sections_order: [
+      { key: 'header',     visible: true, order: 0 },
+      { key: 'doc-info',   visible: true, order: 1 },
+      { key: 'items',      visible: true, order: 2 },
+      { key: 'totals',     visible: true, order: 3 },
+      { key: 'payments',   visible: true, order: 4 },
+      { key: 'footer',     visible: true, order: 5 },
+    ] as SectionMeta[],
+    totals_grid: { enabled: false, columns: [] } as TotalsGridConfig,
+    watermark: { enabled: false },
   };
 
   return overrides ? { ...base, ...overrides } : base;
@@ -9012,7 +11064,78 @@ export function registerBuiltinTemplates(): void {
       paperSize: 'A4',
       tags: ['algeria', 'arabic', 'fiscal', 'official', 'tva', 'qrcode', 'barcode', 'signature', 'invoice', 'a4'],
     }),
-    createConfig: () => buildTemplate('قالب الفاتورة الجزائري A4', 'FV', 'A4'),
+    createConfig: () => buildTemplate('قالب الفاتورة الجزائري A4', 'FV', 'A4', {
+      show_commercial_name: true,
+      show_mobile: true,
+      show_fax: true,
+      show_email: true,
+      show_capital: true,
+      show_bank_name: true,
+      show_rib: true,
+      header_layout: {
+        mode: 'columns',
+        columns: [
+          {
+            id: 'col_company_info', order: 0, visible: true,
+            width: 34, align: 'start',
+            padding: { top: 0, end: 6, bottom: 0, start: 10 },
+            rows: [
+              { id: 'r1', field: 'company.phone',           label: 'هاتف',         visible: true, order: 0,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r2', field: 'company.mobile',          label: 'محمول',        visible: true, order: 1,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r3', field: 'company.fax',             label: 'فاكس',         visible: true, order: 2,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r4', field: 'company.email',           label: 'بريد',          visible: true, order: 3,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r5', field: 'company.nif',             label: 'NIF',          visible: true, order: 4,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r6', field: 'company.rc',              label: 'RC',           visible: true, order: 5,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r7', field: 'company.nis',             label: 'NIS',          visible: true, order: 6,  labelSide: 'start', valueSide: 'end' },
+              { id: 'r8', field: 'company.article',         label: 'المادة',       visible: true, order: 7,  labelSide: 'start', valueSide: 'end' },
+            ],
+          },
+          {
+            id: 'col_company_name', order: 1, visible: true,
+            width: 36, align: 'center',
+            padding: { top: 0, end: 6, bottom: 0, start: 6 },
+            titleField: 'company.name',
+            titleStyle: { bold: true, fontSize: 18 },
+            rows: [
+              { id: 'cname',  field: 'company.commercialName', label: 'الاسم التجاري', visible: true, order: 0, labelSide: 'start', valueSide: 'start', label: '' },
+              { id: 'addr',   field: 'company.address',        visible: true, order: 1, labelSide: 'start', valueSide: 'start', label: '' },
+              { id: 'capital', field: 'company.capital',       label: 'رأس المال',     visible: true, order: 2, labelSide: 'start', valueSide: 'end' },
+            ],
+          },
+          {
+            id: 'col_reference_box', order: 2, visible: true,
+            width: 30, align: 'start',
+            border: { style: 'solid', width: 1, color: '#333333', radius: 4 },
+            padding: { top: 8, end: 10, bottom: 8, start: 10 },
+            rows: [
+              { id: 'num',  field: 'document.number', label: 'رقم الفاتورة', visible: true, order: 0, labelSide: 'start', valueSide: 'end' },
+              { id: 'date', field: 'document.date',   label: 'التاريخ',      visible: true, order: 1, labelSide: 'start', valueSide: 'end' },
+              { id: 'ttc',  field: 'totals.ttc',      label: 'المبلغ',       visible: true, order: 2, labelSide: 'start', valueSide: 'end', bold: true },
+            ],
+          },
+        ],
+      },
+      totals_grid: {
+        enabled: true,
+        headerBg: '#f5f5f5',
+        headerColor: '#111111',
+        borderColor: '#333333',
+        columns: [
+          { id: 'c1', field: 'grid.baseExcl',      label: 'المبلغ خارج الرسم', order: 0, visible: true, align: 'center' },
+          { id: 'c2', field: 'grid.discountPct',    label: 'التخفيض',          order: 1, visible: true, align: 'center' },
+          { id: 'c3', field: 'grid.discountAmount', label: 'مبلغ التخفيض',      order: 2, visible: true, align: 'center' },
+          { id: 'c4', field: 'grid.tvaRate',        label: 'TVA',              order: 3, visible: true, align: 'center' },
+          { id: 'c5', field: 'grid.tvaAmount',      label: 'مبلغ TVA',         order: 4, visible: true, align: 'center' },
+        ],
+        summaryRows: [
+          { id: 'total_ht', field: 'totals.ht',       label: 'المجموع بدون رسوم', visible: true, order: 0, labelSide: 'start', valueSide: 'end' },
+          { id: 'discount', field: 'totals.discount',  label: 'مجموع التخفيض',     visible: true, order: 1, labelSide: 'start', valueSide: 'end' },
+          { id: 'tva',      field: 'totals.tva',       label: 'مجموع الضريبة',     visible: true, order: 2, labelSide: 'start', valueSide: 'end' },
+          { id: 'ttc',      field: 'totals.ttc',       label: 'الصافي للدفع',      visible: true, order: 3, labelSide: 'start', valueSide: 'end', bold: true,
+            border: { style: 'double', width: 3, color: '#111', sides: { top: true } } },
+        ],
+      } as TotalsGridConfig,
+    }),
   });
 
   templateRegistry.register({
@@ -9026,7 +11149,16 @@ export function registerBuiltinTemplates(): void {
       paperSize: 'A4',
       tags: ['algeria', 'arabic', 'fiscal', 'official', 'tva', 'qrcode', 'barcode', 'signature', 'delivery', 'a4'],
     }),
-    createConfig: () => buildTemplate('قالب وصل التسليم الجزائري A4', 'BL', 'A4'),
+    createConfig: () => buildTemplate('قالب وصل التسليم الجزائري A4', 'BL', 'A4', {
+      show_commercial_name: true,
+      show_mobile: true,
+      show_fax: true,
+      show_email: true,
+      show_capital: true,
+      show_bank_name: true,
+      show_rib: true,
+      show_activity: true,
+    }),
   });
 
   templateRegistry.register({
@@ -9040,7 +11172,16 @@ export function registerBuiltinTemplates(): void {
       paperSize: 'A5',
       tags: ['algeria', 'arabic', 'fiscal', 'official', 'delivery', 'a5'],
     }),
-    createConfig: () => buildTemplate('قالب وصل التسليم الجزائري A5', 'BL', 'A5'),
+    createConfig: () => buildTemplate('قالب وصل التسليم الجزائري A5', 'BL', 'A5', {
+      show_commercial_name: true,
+      show_mobile: true,
+      show_fax: true,
+      show_email: true,
+      show_capital: true,
+      show_bank_name: true,
+      show_rib: true,
+      show_activity: true,
+    }),
   });
 }
 
@@ -10154,6 +12295,7 @@ interface ApiDocument {
     id?:      number;
     name?:    string;
     type?:    string;
+    code?:    string | null;
     nif?:     string | null;
     rc?:      string | null;
     nis?:     string | null;
@@ -10466,6 +12608,7 @@ function buildPartyFromApi(
     id:      party.id,
     name:    party.name ?? '',
     type:    (party.type as 'customer' | 'supplier') ?? undefined,
+    code:    party.code ?? null,
     nif:     party.nif ?? null,
     rc:      party.rc  ?? null,
     nis:     party.nis ?? null,
@@ -10693,30 +12836,44 @@ export interface DocumentInfo {
 }
 
 export interface CompanyInfo {
-  name:     string;
-  address?: string | null;
-  phone?:   string | null;
-  nif?:     string | null;
-  rc?:      string | null;
-  nis?:     string | null;
-  ice?:     string | null;
-  article?: string | null;
-  logoUrl?: string | null;
-  email?:   string | null;
-  website?: string | null;
+  name:            string;
+  commercialName?: string | null;
+  address?:        string | null;
+  phone?:          string | null;
+  mobile?:         string | null;
+  fax?:            string | null;
+  email?:          string | null;
+  nif?:            string | null;
+  rc?:             string | null;
+  nis?:            string | null;
+  article?:        string | null;
+  logoUrl?:        string | null;
+  capital?:        string | null;
+  bankName?:       string | null;
+  rib?:            string | null;
+  activity?:       string | null;
+  website?:        string | null;
 }
 
 export interface PartyInfo {
   id?:          number;
   name:         string;
   type?:        'customer' | 'supplier';
+  code?:        string | null;
   nif?:         string | null;
   rc?:          string | null;
   nis?:         string | null;
+  ai?:          string | null;
   phone?:       string | null;
+  mobile?:      string | null;
+  fax?:         string | null;
   email?:       string | null;
   address?:     string | null;
   deliveryAddress?: string | null;
+  commercialName?: string | null;
+  activity?:    string | null;
+  bankName?:    string | null;
+  rib?:         string | null;
   /** Cashier name for POS context */
   cashierName?: string | null;
 }
@@ -10944,12 +13101,13 @@ export function emptyDocumentData(): UniversalDocumentData {
       name:    '',
       address: null,
       phone:   null,
+      mobile:  null,
       nif:     null,
       rc:      null,
       nis:     null,
-      ice:     null,
       article: null,
       logoUrl: null,
+      capital: null,
     },
     party:       null,
     session:     null,
@@ -10985,6 +13143,90 @@ export type BorderStyle     = 'solid' | 'dashed' | 'double' | 'none';
 export type PriceMode       = 'ht' | 'ttc';
 export type PageOrientation = 'portrait' | 'landscape';
 export type FontFamily      = 'tajawal' | 'monospace' | 'times' | 'arial';
+
+// ─── CellStyle (v2) ────────────────────────────────────────────────────────────
+
+export interface CellStyle {
+  bold?: boolean;
+  italic?: boolean;
+  fontSize?: number;
+  color?: string;
+  fontFamily?: FontFamily;
+  align?: AlignOption;
+}
+
+// ─── Layout Row System ────────────────────────────────────────────────────────
+
+/** Logical side: start = right in RTL, end = left. No explicit left/right so design stays correct for future LTR. */
+export type LogicalSide = 'start' | 'end';
+export type LogicalAlign = 'start' | 'center' | 'end';
+
+export interface BoxBorder {
+  style: BorderStyle;
+  width: number;      // px
+  color: string;       // hex
+  radius?: number;     // px
+  sides?: {
+    top?: boolean; end?: boolean; bottom?: boolean; start?: boolean;
+  };
+}
+
+export interface BoxSpacing { top: number; end: number; bottom: number; start: number; }
+
+/** A single column within a layout row — holds one field + its display config. */
+export interface LayoutColumn {
+  id: string;              // unique within the row: 'col_0', 'col_1', …
+  field: string;           // PrintFieldRegistry ID or 'literal'
+  literalText?: string;
+  label?: string;
+  width: number;           // flex weight 1–12 (default 1)
+  alignment: AlignOption;
+  labelSide: LogicalSide;
+  valueSide: LogicalSide;
+  bold?: boolean;
+  color?: string;
+  fontSize?: number;
+}
+
+/** A layout row — holds 1+ columns (multi-column) or uses legacy single-field mode. */
+export interface LayoutRow {
+  id: string;
+  order: number;
+  visible: boolean;
+  /** Multi-column mode: when present and non-empty, columns define the row content. */
+  columns?: LayoutColumn[];
+  /** Legacy single-field mode (backward compatible, used when columns is absent/empty). */
+  field?: string;
+  literalText?: string;
+  label?: string;
+  labelSide?: LogicalSide;
+  valueSide?: LogicalSide;
+  bold?: boolean;
+  color?: string;
+  fontSize?: number;
+  indent?: number;
+  border?: Partial<BoxBorder>;
+}
+
+/** A box/container holding a group of rows with its own positioning — for A4 header columns. */
+export interface LayoutBlock {
+  id: string;
+  order: number;
+  visible: boolean;
+  width?: number;       // % of paper width (for side-by-side columns)
+  align: LogicalAlign;
+  border?: BoxBorder;
+  padding?: BoxSpacing;
+  background?: string;
+  rows: LayoutRow[];
+  titleField?: string;   // PrintFieldRegistry ID — rendered as heading above rows
+  titleStyle?: CellStyle;
+}
+
+export interface HeaderLayout {
+  mode: 'simple' | 'columns';
+  columns: LayoutBlock[]; // Empty when mode === 'simple'
+}
 
 export type ColumnKey =
   | 'rowNumber' | 'barcode' | 'ref' | 'name'
@@ -11046,17 +13288,48 @@ export interface PrintTemplate {
   show_tax_id:         boolean;
   show_rc:             boolean;
   show_nis:            boolean;
-  show_ice:            boolean;
   show_article:        boolean;
+  show_capital:        boolean;
+  show_mobile:         boolean;
+  show_commercial_name: boolean;
+  show_email:          boolean;
+  show_fax:            boolean;
+  show_bank_name:      boolean;
+  show_rib:            boolean;
+  show_activity:       boolean;
   company_info_align:  AlignOption;
   company_info_size:   number;
+  company_info_bold:   boolean;
+  company_info_italic: boolean;
+  company_info_font_family: FontFamily;
+  label_address:       string;
+  label_phone:         string;
+  label_nif:           string;
+  label_rc:            string;
+  label_nis:           string;
+  label_article:       string;
+  label_capital:       string;
+  label_mobile:        string;
+  label_commercial_name: string;
+  label_email:         string;
+  label_fax:           string;
+  label_bank_name:     string;
+  label_rib:           string;
+  label_activity:      string;
   override_address:    string;
   override_phone:      string;
   override_nif:        string;
   override_rc:         string;
   override_nis:        string;
-  override_ice:        string;
   override_article:    string;
+  override_capital:    string;
+  override_mobile:     string;
+  override_commercial_name: string;
+  override_email:      string;
+  override_fax:        string;
+  override_bank_name:  string;
+  override_rib:        string;
+  override_activity:   string;
 
   header_custom_text:  string;
   header_separator:    BorderStyle;
@@ -11076,6 +13349,51 @@ export interface PrintTemplate {
   show_client_phone:boolean;
   show_client_address: boolean;
   show_delivery_address: boolean;
+  label_client:          string;
+  label_client_nif:      string;
+  label_client_phone:    string;
+  label_client_address:  string;
+  label_delivery_address: string;
+  override_client_name:  string;
+  override_client_nif:   string;
+  override_client_phone: string;
+  override_client_address: string;
+  override_delivery_address: string;
+  show_customer_commercial_name: boolean;
+  show_customer_rc:    boolean;
+  show_customer_nis:   boolean;
+  show_customer_ai:    boolean;
+  show_customer_mobile: boolean;
+  show_customer_fax:   boolean;
+  show_customer_email: boolean;
+  show_customer_activity: boolean;
+  show_customer_bank_name: boolean;
+  show_customer_rib:   boolean;
+  label_customer_commercial_name: string;
+  label_customer_rc:  string;
+  label_customer_nis: string;
+  label_customer_ai:  string;
+  label_customer_mobile: string;
+  label_customer_fax: string;
+  label_customer_email: string;
+  label_customer_activity: string;
+  label_customer_bank_name: string;
+  label_customer_rib: string;
+  override_customer_commercial_name: string;
+  override_customer_rc: string;
+  override_customer_nis: string;
+  override_customer_ai: string;
+  override_customer_mobile: string;
+  override_customer_fax: string;
+  override_customer_email: string;
+  override_customer_activity: string;
+  override_customer_bank_name: string;
+  override_customer_rib: string;
+  customer_info_font_family: FontFamily;
+  customer_info_size:   number;
+  customer_info_bold:   boolean;
+  customer_info_italic: boolean;
+  customer_info_align:  AlignOption;
   show_session:     boolean;
   show_payment_term:boolean;
   show_bank_details:boolean;
@@ -11092,8 +13410,9 @@ export interface PrintTemplate {
   items_font_family:  FontFamily;
   show_col_header:    boolean;
   table_header_bold:  boolean;
-  table_header_bg:    boolean;
+  table_header_bg:    string;
   table_header_color: string;
+  table_cell_padding: number;
   table_border_style: BorderStyle;
   alternating_rows:   boolean;
   alternating_color:  string;
@@ -11119,6 +13438,19 @@ export interface PrintTemplate {
   show_remaining:      boolean;
   show_prev_balance:   boolean;
   show_new_balance:    boolean;
+
+  totals_rows:   LayoutRow[];
+  footer_rows:   LayoutRow[];
+  header_layout: HeaderLayout;
+
+  doc_info_rows:    LayoutRow[];
+  customer_info_rows: LayoutRow[];
+  company_info_rows:  LayoutRow[];
+  col_styles:       ColumnStyleConfig[];
+  page_frame:       PageFrameConfig;
+  sections_order:   SectionMeta[];
+  totals_grid:      TotalsGridConfig;
+  watermark:        WatermarkConfig;
 
   show_payment_details:boolean;
   payment_font_size:   number;
@@ -11176,6 +13508,52 @@ export interface PrintTemplate {
 
 export type SectionTarget = 'header' | 'doc-info' | 'items' | 'totals' | 'payments' | 'footer';
 
+export type SectionMeta = {
+  key: SectionTarget;
+  visible: boolean;
+  order: number;
+};
+
+export interface ColumnStyleConfig {
+  key: ColumnKey;
+  style?: Partial<CellStyle>;
+}
+
+export interface WatermarkConfig {
+  enabled: boolean;
+  text?: string;
+  fontSize?: number;
+  color?: string;
+  rotation?: number;
+}
+
+export interface PageFrameConfig {
+  enabled: boolean;
+  borderStyle?: BorderStyle;
+  borderColor?: string;
+  borderWidth?: number;
+  borderRadius?: number;
+  margin?: number;
+}
+
+export interface TotalsGridColumn {
+  id: string;
+  field: string;
+  label: string;
+  order: number;
+  visible: boolean;
+  align: AlignOption;
+}
+
+export interface TotalsGridConfig {
+  enabled: boolean;
+  headerBg?: string;
+  headerColor?: string;
+  borderColor?: string;
+  columns: TotalsGridColumn[];
+  summaryRows?: LayoutRow[];
+}
+
 export interface ReportRule {
   id: string;
   condition: string;
@@ -11224,15 +13602,22 @@ export interface TemplateLiveData {
 }
 
 export interface CompanyData {
-  name:     string;
-  address:  string;
-  phone:    string;
-  nif:      string;
-  rc:       string;
-  nis:      string;
-  ice:      string;
-  article:  string;
-  logoUrl?: string | null;
+  name:            string;
+  commercialName:  string;
+  address:         string;
+  phone:           string;
+  mobile:          string;
+  fax:             string;
+  email:           string;
+  nif:             string;
+  rc:              string;
+  nis:             string;
+  article:         string;
+  capital:         string;
+  bankName:        string;
+  rib:             string;
+  activity:        string;
+  logoUrl?:        string | null;
 }
 
 export interface DetectedPrinter {

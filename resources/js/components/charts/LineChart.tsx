@@ -120,7 +120,7 @@ const LineChart: React.FC<LineChartProps> = ({
         {showDots && points.map((p, i) => (
           <g key={i}>
             <circle
-              cx={p.x} cy={p.y} r="4"
+              cx={p.x} cy={p.y}
               fill="var(--color-background-primary)"
               stroke={color}
               strokeWidth="2"

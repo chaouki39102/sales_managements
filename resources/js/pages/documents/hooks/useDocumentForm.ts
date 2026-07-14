@@ -781,7 +781,7 @@ export function useDocumentForm({
 
     setForm((f) => {
       const lines           = [...f.lines];
-      let   L               = { ...lines[idx], ...patch };
+      const L               = { ...lines[idx], ...patch };
       const effectivePLRaw  = switched.plChanged ? switched.to : f.price_level_id;
       const curPriceLevelId = effectivePLRaw ? parseInt(effectivePLRaw) : null;
 
@@ -1047,7 +1047,7 @@ export function useDocumentForm({
     if (pmMode === 'locked') return;
     setPayments((prev) => {
       const payments = [...prev];
-      let   P        = { ...payments[idx], ...patch };
+      const P        = { ...payments[idx], ...patch };
       if (patch.payment_mode_id !== undefined) {
         const selectedMode = paymentModsRef.current.find(
           (pm) => String(pm.id) === patch.payment_mode_id,

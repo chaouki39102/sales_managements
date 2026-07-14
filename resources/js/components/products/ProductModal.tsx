@@ -1332,7 +1332,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--t4)' }}>
           <i className="ti ti-discount-off" style={{ fontSize: 40, opacity: 0.3 }} />
           <div style={{ marginTop: 12, fontSize: 14, fontWeight: 700 }}>خصومات الكمية معطّلة</div>
-          <div style={{ fontSize: 12, marginTop: 6 }}>فعّل خيار "خصومات الكمية" في تاب المخزون أولاً</div>
+          <div style={{ fontSize: 12, marginTop: 6 }}>فعّل خيار &ldquo;خصومات الكمية&rdquo; في تاب المخزون أولاً</div>
           <button
             onClick={() => switchTab('stock')}
             style={{ marginTop: 16, padding: '8px 20px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}

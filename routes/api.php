@@ -505,6 +505,7 @@ Route::prefix('v1')->group(function () {
 
                 // ── نظام الموافقات ──────────────────────────────────
                 Route::get('approvals/check/{documentId}',  [ApprovalController::class, 'check']);
+                Route::post('approvals/check-batch',        [ApprovalController::class, 'checkBatch']);
                 Route::post('approvals/submit/{documentId}',[ApprovalController::class, 'submit']);
                 Route::post('approvals/{documentId}/approve',[ApprovalController::class, 'approve']);
                 Route::post('approvals/{documentId}/reject', [ApprovalController::class, 'reject']);

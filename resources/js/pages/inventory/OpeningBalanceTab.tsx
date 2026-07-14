@@ -857,7 +857,7 @@ export default function OpeningBalanceTab() {
                         لا يوجد رصيد افتتاحي لهذه السنة
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--t4)', marginBottom: 16 }}>
-                        اضغط "إضافة سطر" لتسجيل المخزون الافتتاحي
+                        اضغط &ldquo;إضافة سطر&rdquo; لتسجيل المخزون الافتتاحي
                       </div>
                       <button
                         onClick={addDraftRow}
@@ -931,7 +931,7 @@ export default function OpeningBalanceTab() {
         }}>
           <i className="ti ti-info-circle" style={{ fontSize: 15 }} />
           الرصيد الافتتاحي يُحتسب تلقائياً ضمن المخزون الفعلي للمنتجات
-          عبر حركة مخزون من نوع "رصيد افتتاحي".
+          عبر حركة مخزون من نوع &ldquo;رصيد افتتاحي&rdquo;.
         </div>
       )}
 

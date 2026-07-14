@@ -176,7 +176,7 @@ class SettingsErrorBoundary extends React.Component<
                 <div className="p-10 text-center text-t4">
                     <i className="ti ti-alert-triangle block text-5xl text-red mb-3" />
                     <div className="font-bold text-lg text-t1 mb-2">
-                        خطأ في تحميل إعدادات "{this.props.tabLabel}"
+                        خطأ في تحميل إعدادات &ldquo;{this.props.tabLabel}&rdquo;
                     </div>
                     <div className="text-md text-t4 mb-4">
                         {this.state.error}
@@ -502,7 +502,7 @@ function SettingsSearch({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
                                         opacity: 0.4,
                                     }}
                                 />
-                                لا نتائج لـ "{q}"
+                                لا نتائج لـ &ldquo;{q}&rdquo;
                             </div>
                         )}
 

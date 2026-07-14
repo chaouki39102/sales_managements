@@ -85,7 +85,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
       <div
         className={`fu-zone ${dragging ? 'dragging' : ''} ${disabled ? 'disabled' : ''} ${error || localErrors.length ? 'has-error' : ''}`}
-        onDragOver={e => { e.preventDefault(); !disabled && setDragging(true); }}
+        onDragOver={e => { e.preventDefault(); if (!disabled) setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         onClick={() => !disabled && inputRef.current?.click()}

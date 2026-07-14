@@ -2990,3 +2990,241 @@
         color: #93c5fd !important;
     }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Quick Filter Bar (Ctrl+F)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.dt-qf-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--b1);
+    animation: dt-qf-slide-in 0.15s ease-out;
+}
+
+@keyframes dt-qf-slide-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.dt-qf-icon {
+    display: flex;
+    align-items: center;
+    color: var(--t3);
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.dt-qf-input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 10px;
+    border: 1px solid var(--b2);
+    border-radius: var(--r2, 6px);
+    background: var(--bg1);
+    color: var(--t1);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.dt-qf-input:focus {
+    border-color: var(--primary, #2563eb);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary, #2563eb) 15%, transparent);
+}
+
+.dt-qf-count {
+    font-size: 11px;
+    color: var(--t3);
+    white-space: nowrap;
+    padding: 2px 8px;
+    background: var(--bg3);
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.dt-qf-clear,
+.dt-qf-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    color: var(--t3);
+    border-radius: var(--r2, 4px);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s, color 0.12s;
+}
+
+.dt-qf-clear:hover,
+.dt-qf-close:hover {
+    background: var(--bg3);
+    color: var(--t1);
+}
+
+.dt-qf-clear { font-size: 12px; }
+.dt-qf-close { font-size: 14px; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Row Hover Actions (floating action bar)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.dt-hover-row {
+    background: var(--bg2);
+}
+
+.dt-hover-td {
+    padding: 0 !important;
+    border: none !important;
+}
+
+.dt-hover-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    background: var(--bg2);
+    border-top: 1px solid var(--b1);
+    border-bottom: 1px solid var(--b1);
+    animation: dt-hover-fade-in 0.1s ease-out;
+}
+
+@keyframes dt-hover-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.dt-hover-bar .dt-tbtn,
+.dt-hover-bar button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border: none;
+    background: none;
+    color: var(--t2);
+    font-size: 12px;
+    font-family: inherit;
+    border-radius: var(--r2, 4px);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.12s, color 0.12s;
+}
+
+.dt-hover-bar .dt-tbtn:hover,
+.dt-hover-bar button:hover {
+    background: var(--bg3);
+    color: var(--t1);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Inline Cell Copy (copy icon on hover, delegated via JS)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.dt-copy-btn {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--t3);
+    background: var(--bg1);
+    border: 1px solid var(--b2);
+    border-radius: 3px;
+    cursor: pointer;
+    z-index: 2;
+    line-height: 1;
+    padding: 0;
+    font-family: inherit;
+}
+
+[dir="rtl"] .dt-copy-btn {
+    left: auto;
+    right: 2px;
+}
+
+.dt-td:hover > .dt-copy-btn {
+    display: flex;
+}
+
+.dt-copy-btn:hover {
+    color: var(--primary, #2563eb);
+    background: var(--bg2);
+}
+
+.dt-copy-btn.dt-copy-ok {
+    display: flex !important;
+    color: #16a34a;
+    background: #dcfce7;
+    border-color: #16a34a;
+}
+
+.dt-td.dt-td-editable > .dt-copy-btn {
+    display: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Keyboard Shortcuts Overlay
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.dt-shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.dt-shortcuts-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--b1);
+    font-size: 13px;
+    vertical-align: middle;
+    color: var(--t2);
+}
+
+.dt-shortcuts-table td:first-child {
+    width: 160px;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.dt-shortcuts-table td:last-child {
+    color: var(--t2);
+}
+
+.dt-shortcuts-table kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--t1);
+    background: var(--bg2);
+    border: 1px solid var(--b2);
+    border-radius: 3px;
+    box-shadow: 0 1px 0 var(--b2);
+    margin: 0 2px;
+}
+
+.dt-shortcuts-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Cell Tooltip (when column has tooltip prop)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Native title tooltip — browser handles positioning.
+   Add subtle delay to prevent flash on rapid mouse movement: */
+.dt-td[title] {
+    cursor: default;
+}

@@ -245,14 +245,6 @@ export default function SetupHub({ companySlug, onFinish }: Props) {
     return false;
   });
 
-  React.useEffect(() => {
-    if (!isNewCompany) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, []); // eslint-disable-line
-
-  if (!isNewCompany) return null;
-
   const [selected, setSelected]   = useState<Set<string>>(getInitialSelected);
   const [states,   setStates]     = useState<Record<string, RunState>>({});
   const [running,  setRunning]    = useState(false);
@@ -260,6 +252,14 @@ export default function SetupHub({ companySlug, onFinish }: Props) {
   const [logs,     setLogs]       = useState<{ text: string; type: 'info' | 'success' | 'error' | 'warn' }[]>([]);
   const [progress, setProgress]   = useState(0);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!isNewCompany) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, []); // eslint-disable-line
+
+  if (!isNewCompany) return null;
 
   const total     = ALL_SEEDERS.length;
   const selCount  = selected.size;
@@ -555,7 +555,7 @@ export default function SetupHub({ companySlug, onFinish }: Props) {
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--t4)', marginTop: 16 }}>
-          <i className="ti ti-info-circle" style={{ fontSize: 12 }} /> المكوّنات الإجبارية لا يمكن إلغاؤها — تُشغَّل تلقائياً عند الضغط على "تشغيل"
+          <i className="ti ti-info-circle" style={{ fontSize: 12 }} /> المكوّنات الإجبارية لا يمكن إلغاؤها — تُشغَّل تلقائياً عند الضغط على &ldquo;تشغيل&rdquo;
         </p>
       </div>
     </div>

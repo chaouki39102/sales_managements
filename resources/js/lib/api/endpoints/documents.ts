@@ -49,9 +49,50 @@ export interface DocumentLineInput {
   discount_amount?:       number;
   tva_rate:               number;
   packaging_id?:          number | null;
+  packaging_price?:       number | null;
+  price_level_id?:        number | null;
   stock_lot_id?:          number | null;
-  lot_number?:            string | null;
-  notes?:                 string | null;
+}
+
+// ─── P4.2 Compute Types ──────────────────────────────────────────────────────
+
+export interface ComputeLineInput {
+  product_id:             number;
+  quantity:               number;
+  packaging_id?:          number | null;
+  price_level_id?:        number | null;
+  warehouse_id?:          number | null;
+  party_id?:              number | null;
+  is_purchase?:           boolean;
+  document_date?:         string;
+}
+
+export interface ComputeLineResult {
+  product_id:             number;
+  unit_price_ht:          number;
+  packaging_id:           number | null;
+  packaging_price:        number | null;
+  quantity:               number;
+  discount_percentage:    number;
+  discount_amount:        number;
+  tva_rate:               number;
+  tva_amount:             number;
+  total_ht:               number;
+  total_ttc:              number;
+  margin:                 number;
+  stock_available:        number | null;
+  warnings:               string[];
+  lot_suggestions:        { id: number; label: string; quantity: number }[];
+}
+
+export interface ComputeTotalsResult {
+  total_ht:               number;
+  total_tva:              number;
+  total_discount:         number;
+  total_ttc:              number;
+  total_stamp:            number;
+  net_to_pay:             number;
+  lines:                  ComputeLineResult[];
 }
 
 export interface DocumentCreateInput {
@@ -190,6 +231,23 @@ export const documentsApi = {
     delete: (id: number) =>
       apiDelete(`/commercial-document-lines/${id}`),
   },
+
+  // ── Compute (P4.2) ──────────────────────────────────────────────────────────
+
+  computeLine: (data: ComputeLineInput) =>
+    apiPost<ComputeLineResult>('/documents/compute-line', data),
+
+  computeTotals: (data: { lines: ComputeLineInput[]; apply_stamp?: boolean }) =>
+    apiPost<ComputeTotalsResult>('/documents/compute-totals', data),
+
+  convert: (id: number, data: { target_type_code: string }) =>
+    apiPost<CommercialDocument>(`/documents/${id}/convert`, data),
+
+  chain: (id: number) =>
+    apiGet<{ chain: CommercialDocument[] }>(`/documents/${id}/chain`),
+
+  creditCheck: (partyId: number, params: { amount: number; date?: string }) =>
+    apiGet<{ credit_ok: boolean; outstanding: number; limit: number | null }>(`/parties/${partyId}/credit-check`, params),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

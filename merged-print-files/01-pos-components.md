@@ -3162,6 +3162,7 @@ export default function PosSessionsTable({
 import { useState } from 'react';
 import type { POSSettings, PriceDisplayMode, GridDefaultSize } from '@/pos/hooks/usePOSSettings';
 import { isWebUsbSupported } from '@/pos/utils/printService';
+import { SOUND_PRESETS, previewSound } from '@/pos/utils/posSounds';
 import type { Warehouse, DocumentType } from '@/types';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
@@ -3236,6 +3237,7 @@ const toggleSettings: { key: keyof POSSettings; label: string }[] = [
   { key: 'hideOutOfStock',      label: 'إخفاء المنتجات النافذة من الشبكة' },
   { key: 'clearSearchOnAdd',    label: 'تفريغ البحث بعد إضافة منتج' },
   { key: 'keyboardNav',         label: 'التنقل عبر النتائج بلوحة المفاتيح (↑↓)' },
+  { key: 'advanceOnAdd',        label: 'الانتقال للمنتج التالي بعد الإضافة' },
 ];
 
 export default function POSSettingsModal({
@@ -3267,7 +3269,7 @@ export default function POSSettingsModal({
   };
 
   const invoiceTypes = documentTypes.filter(t =>
-    ['FV', 'BL', 'FAC', 'PRO', 'DEV'].includes(t.code),
+    ['POS', 'FV', 'BL', 'FAC', 'PRO', 'DEV'].includes(t.code),
   );
 
   const renderTab = () => {
@@ -3333,6 +3335,59 @@ export default function POSSettingsModal({
                 />
               </div>
             ))}
+
+            {(local.playSoundOnAdd || local.playSoundOnSale) && (
+              <>
+                <div className="fg s2">
+                  <label>مستوى الصوت — {local.soundVolume}%</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <i className="ti ti-volume" style={{ color: 'var(--t4)', fontSize: 16 }} />
+                    <input
+                      type="range" min={0} max={100} step={5}
+                      value={local.soundVolume}
+                      onChange={e => patch({ soundVolume: parseInt(e.target.value) })}
+                      style={{ flex: 1, accentColor: 'var(--em)' }}
+                    />
+                    <i className="ti ti-volume-2" style={{ color: 'var(--t4)', fontSize: 16 }} />
+                  </div>
+                </div>
+
+                <div className="fg s2">
+                  <label>النغمة</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8, marginTop: 6 }}>
+                    {SOUND_PRESETS.map(p => (
+                      <div
+                        key={p.id}
+                        style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                          padding: '10px 6px', borderRadius: 8, cursor: 'pointer',
+                          background: local.soundPreset === p.id ? 'var(--emb)' : 'var(--bg2)',
+                          border: `1.5px solid ${local.soundPreset === p.id ? 'var(--embo)' : 'var(--b2)'}`,
+                          color: local.soundPreset === p.id ? 'var(--em)' : 'var(--t2)',
+                          fontWeight: local.soundPreset === p.id ? 700 : 400,
+                          transition: 'all .15s',
+                        }}
+                        onClick={() => patch({ soundPreset: p.id })}
+                      >
+                        <i className={`ti ${p.icon}`} style={{ fontSize: 18 }} />
+                        <span style={{ fontSize: 12 }}>{p.label}</span>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); previewSound(p.id, local.soundVolume); }}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: 'var(--t4)', fontSize: 14, padding: 2,
+                          }}
+                          title="استمع"
+                        >
+                          <i className="ti ti-player-play" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="fg s2">
               <Switch
@@ -3997,6 +4052,10 @@ interface ProductCardProps {
   priceLevels:           PriceLevel[];
   selectedPriceLevelId:  number | null;
   allowNegativeStock?:   boolean;
+  /** إظهار المخزون في البطاقة — يتحكم به showStockOnCard */
+  showStock?:            boolean;
+  /** طريقة عرض السعر: 'ttc' شامل الضريبة أو 'ht' قبل الضريبة */
+  priceDisplayMode?:     'ttc' | 'ht';
   onAdd:                 (v: ProductVariant) => void;
   onPin:                 (v: ProductVariant) => void;
   /** يُستدعى عند أي تفاعل مع البطاقة (كليك) لمزامنة مؤشر التنقل بلوحة المفاتيح */
@@ -4012,6 +4071,8 @@ export default function ProductCard({
   priceLevels,
   selectedPriceLevelId,
   allowNegativeStock,
+  showStock = true,
+  priceDisplayMode = 'ttc',
   onAdd,
   onPin,
   onHighlight,
@@ -4034,8 +4095,17 @@ export default function ProductCard({
   const showImage = Boolean(imageUrl) && !imgFailed;
 
   const handleClick = () => {
-    if (!outStock) onAdd(v);
-    onHighlight?.(idx);
+    if (!outStock) {
+      onAdd(v);
+      // handleAddItem already computes the correct highlightedIndex
+      // (in allVariants when clearSearchOnAdd, in filteredVariants otherwise).
+      // Calling onHighlight here would overwrite it with the stale idx
+      // from the OLD filteredVariants — causing the highlight to jump
+      // to the wrong product after the search is cleared.
+    } else {
+      // Out of stock: just highlight (don't add)
+      onHighlight?.(idx);
+    }
   };
 
   return (
@@ -4068,19 +4138,25 @@ export default function ProductCard({
         {v.barcode && <div className="pcard-bc">{v.barcode}</div>}
 
         <div className="pcard-prices">
-          <span className="pcard-ttc">{formatDZD(priceTtc)}</span>
-          {tvaRate > 0 && (
-            <span className="pcard-ht">HT: {formatDZD(priceHt)}</span>
+          {priceDisplayMode === 'ht' ? (
+            <span className="pcard-ttc">{formatDZD(priceHt)}</span>
+          ) : (
+            <>
+              <span className="pcard-ttc">{formatDZD(priceTtc)}</span>
+              {tvaRate > 0 && (
+                <span className="pcard-ht">HT: {formatDZD(priceHt)}</span>
+              )}
+            </>
           )}
         </div>
 
-        {v.manages_stock && !unknownStock && (
+        {showStock && v.manages_stock && !unknownStock && (
           <div className={`pcard-stock ${outStock ? 'out' : lowStock ? 'low' : 'ok'}`}>
             <i className={`ti ti-${outStock ? 'alert-circle' : lowStock ? 'alert-triangle' : 'package'}`} />
             {outStock ? 'نفذ المخزون' : `${stock} ${v.unit?.abbreviation ?? ''}`}
           </div>
         )}
-        {v.manages_stock && unknownStock && (
+        {showStock && v.manages_stock && unknownStock && (
           <div className="pcard-stock na">
             <i className="ti ti-minus" />—
           </div>
@@ -4134,6 +4210,8 @@ interface ProductGridProps {
   selectedPriceLevelId: number | null;
   cartItems: CartItem[];
   allowNegativeStock?: boolean | undefined;
+  showStock?: boolean;
+  priceDisplayMode?: 'ttc' | 'ht';
   highlightedIndex?: number;
   onHighlightIndexChange?: (idx: number) => void;
 }
@@ -4164,6 +4242,7 @@ function rowEstimate(gridSize: GridSize): number {
 export default function ProductGrid({
   variants, view, gridSize, loading, onAdd, onAddManual,
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
+  showStock = true, priceDisplayMode = 'ttc',
   highlightedIndex, onHighlightIndexChange,
 }: ProductGridProps) {
   const inCartQty = useCallback((variantId: number) => {
@@ -4288,10 +4367,10 @@ export default function ProductGrid({
             <tr>
               <th>المنتج</th>
               <th>الوحدة</th>
-              <th>السعر HT</th>
+              {priceDisplayMode !== 'ht' && <th>السعر HT</th>}
               <th>TVA</th>
-              <th>السعر TTC</th>
-              <th>مخزون</th>
+              <th>{priceDisplayMode === 'ht' ? 'السعر HT' : 'السعر TTC'}</th>
+              {showStock && <th>مخزون</th>}
               <th></th>
             </tr>
           </thead>
@@ -4322,15 +4401,17 @@ export default function ProductGrid({
                     {v.barcode && <div className="prow-bc">{v.barcode}</div>}
                   </td>
                   <td className="prow-unit">{v.unit?.abbreviation ?? '—'}</td>
-                  <td className="prow-price">{formatDZD(priceHt)}</td>
+                  {priceDisplayMode !== 'ht' && <td className="prow-price">{formatDZD(priceHt)}</td>}
                   <td className="prow-tva">{tvaRate}%</td>
-                  <td className="prow-ttc">{formatDZD(priceTtc)}</td>
-                  <td className="prow-stock">
-                    {v.manages_stock && !unknownSt
-                      ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : lastPiece ? 'last' : 'ok'}`}>{stockVal ?? 0}</span>
-                      : <span className="stock-pill na">—</span>
-                    }
-                  </td>
+                  <td className="prow-ttc">{formatDZD(priceDisplayMode === 'ht' ? priceHt : priceTtc)}</td>
+                  {showStock && (
+                    <td className="prow-stock">
+                      {v.manages_stock && !unknownSt
+                        ? <span className={`stock-pill ${outStock ? 'out' : lowStock ? 'low' : lastPiece ? 'last' : 'ok'}`}>{stockVal ?? 0}</span>
+                        : <span className="stock-pill na">—</span>
+                      }
+                    </td>
+                  )}
                   <td>
                     <div className="prow-acts">
                       {inCart > 0 && <span className="incart-badge">{inCart}</span>}
@@ -4418,6 +4499,8 @@ export default function ProductGrid({
                     priceLevels={priceLevels}
                     selectedPriceLevelId={selectedPriceLevelId}
                     allowNegativeStock={allowNegativeStock}
+                    showStock={showStock}
+                    priceDisplayMode={priceDisplayMode}
                     onAdd={onAdd}
                     onPin={onPin}
                     onHighlight={onHighlightIndexChange}
@@ -5216,13 +5299,15 @@ interface Props {
   isEditing?:        boolean;  // true when reopening an existing invoice
   /** SSOT balance: pass from document.balance_data.previous_balance when editing */
   prevBalance?:      number;
+  defaultPaymentCode?: string;
+  defaultDocTypeCode?: string;
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DOC_CODES = ['FV', 'BL', 'BCC', 'FA'] as const;
+const DOC_CODES = ['POS', 'FV', 'BL', 'BCC', 'FA'] as const;
 
 /** مبالغ الأوراق النقدية الجزائرية */
 const DZD_BILLS = [0, 200, 500, 1000, 2000, 5000];
@@ -5321,6 +5406,8 @@ export default function ProfessionalPaymentModal({
   currencies, treasuryAccounts, totalTtcFinal,
   existingPayments, documentDate, onClose, onConfirm, isEditing,
   prevBalance: propPrevBalance,
+  defaultPaymentCode = 'cash',
+  defaultDocTypeCode = 'POS',
 }: Props) {
 
   const firstAmountRef = useRef<HTMLInputElement>(null);
@@ -5330,7 +5417,7 @@ export default function ProfessionalPaymentModal({
 
   // ── State ──────────────────────────────────────────────────────────────────
   const defaultMode = paymentModes.find(m =>
-    /نقدا|نقداً|cash/i.test(m.name),
+    new RegExp(defaultPaymentCode, 'i').test(m.name),
   ) ?? paymentModes.find(m => m.is_default) ?? paymentModes[0];
 
   const [lines, setLines] = useState<PaymentLine[]>(() => {
@@ -5350,7 +5437,7 @@ export default function ProfessionalPaymentModal({
       : [];
   });
 
-  const [docTypeCode,        setDocTypeCode]        = useState<string>('FV');
+  const [docTypeCode,        setDocTypeCode]        = useState<string>(defaultDocTypeCode);
   const [dueDate,            setDueDate]            = useState('');
   const [note,               setNote]               = useState('');
   const [submitting,         setSubmitting]         = useState(false);
@@ -6190,7 +6277,8 @@ export default function ReturnsModal({
         search: search.trim(),
         include: 'lines,lines.product_variant,party',
         per_page: 5,
-      });
+        'filter[fiscal_year_id]': fiscalYearId,
+      } as any);
       const found = Array.isArray(res) ? res : res.data ?? [];
       if (found.length === 0) {
         toast.error('لا توجد فاتورة بهذا الرقم');
@@ -7613,6 +7701,10 @@ export interface POSSettings {
   playSoundOnAdd:       boolean;
   /** تشغيل صوت عند إتمام البيع */
   playSoundOnSale:      boolean;
+  /** النغمة المختارة للصوت */
+  soundPreset:          string;
+  /** مستوى الصوت 0-100 */
+  soundVolume:          number;
   /** إغلاق نافذة الدفع تلقائياً بعد النجاح (بدلاً من الانتظار للطباعة) */
   autoClosePayment:     boolean;
   /** طلب تأكيد قبل مسح السلة */
@@ -7629,6 +7721,8 @@ export interface POSSettings {
   clearSearchOnAdd:     boolean;
   /** التنقل عبر نتائج البحث بلوحة المفاتيح */
   keyboardNav:          boolean;
+  /** التقدم تلقائياً للمنتج التالي بعد الإضافة (true) أو البقاء على نفس المنتج (false) */
+  advanceOnAdd:         boolean;
 
   // ── تخطيط الشاشة ──────────────────────────────────────────────────────
   /** عرض السلة (بالـ px) — قابل للسحب */
@@ -7647,7 +7741,7 @@ export interface POSSettings {
 
 export const DEFAULT_POS_SETTINGS: POSSettings = {
   defaultWarehouseId:   null,
-  defaultDocTypeCode:   'FV',
+  defaultDocTypeCode:   'POS',
   priceDisplayMode:     'ttc',
   maxDiscountPct:       0,
   discountRequirePin:   false,
@@ -7666,6 +7760,8 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   showQuickbarOnStart:  true,
   playSoundOnAdd:       false,
   playSoundOnSale:      false,
+  soundPreset:          'classic',
+  soundVolume:          60,
   autoClosePayment:     false,
   confirmOnClear:       true,
   defaultPaymentCode:   'cash',
@@ -7673,6 +7769,7 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   hideOutOfStock:       false,
   clearSearchOnAdd:     false,
   keyboardNav:          true,
+  advanceOnAdd:         true,
   cartWidth:            390,
   toastEnabled:         true,
   toastDuration:        3000,
@@ -8140,7 +8237,7 @@ describe('ThermalPrintPath — baseline structural', () => {
   it('contains company name in output', () => {
     const tpl = makeTemplate({ company_name_text: 'MaSocieteTest' });
     const data = makeData({
-      company: { name: 'MaSocieteTest', address: null, phone: null, nif: null, rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'MaSocieteTest', address: null, phone: null, nif: null, rc: null, nis: null, article: null, logoUrl: null },
     });
     const bytes = buildReceiptBytesFromTemplate(tpl, data);
     expect(containsAscii(bytes, 'MaSocieteTest')).toBe(true);
@@ -8174,9 +8271,9 @@ describe('ThermalPrintPath — baseline structural', () => {
 
   it('contains company NIF when provided', () => {
     const data = makeData({
-      company: { name: 'Co', address: null, phone: null, nif: '123456789012345', rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'Co', address: null, phone: null, nif: '123456789012345', rc: null, nis: null, article: null, logoUrl: null },
     });
-    const bytes = buildReceiptBytesFromTemplate(makeTemplate(), data);
+    const bytes = buildReceiptBytesFromTemplate(makeTemplate({ show_tax_id: true }), data);
     expect(containsAscii(bytes, '123456789012345')).toBe(true);
   });
 
@@ -8212,9 +8309,9 @@ describe('ThermalPrintPath — baseline structural', () => {
   });
 
   it('uses override_address when provided (resolver override)', () => {
-    const tpl = makeTemplate({ override_address: '15 Rue Didouche Mourad' });
+    const tpl = makeTemplate({ show_address: true, override_address: '15 Rue Didouche Mourad' });
     const data = makeData({
-      company: { name: 'Co', address: 'Old Address', phone: null, nif: null, rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'Co', address: 'Old Address', phone: null, nif: null, rc: null, nis: null, article: null, logoUrl: null },
     });
     const bytes = buildReceiptBytesFromTemplate(tpl, data);
     expect(containsAscii(bytes, '15 Rue Didouche Mourad')).toBe(true);
@@ -8239,7 +8336,7 @@ describe('ThermalPrintPath — baseline structural', () => {
 
   it('has reasonable length (> 200 bytes for minimal receipt)', () => {
     const data = makeData({
-      company: { name: 'A', address: 'B', phone: 'C', nif: 'D', rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'A', address: 'B', phone: 'C', nif: 'D', rc: null, nis: null, article: null, logoUrl: null },
       doc: { number: 'FV-1', date: '2026-07-01', dueDate: null, time: '12:00', typeCode: 'FV', typeName: 'فاتورة', status: 'validated' },
     });
     const bytes = buildReceiptBytesFromTemplate(makeTemplate(), data, 'FV-1');
@@ -8248,7 +8345,7 @@ describe('ThermalPrintPath — baseline structural', () => {
 
   it('has reasonable length for receipt with items (> 400 bytes)', () => {
     const data = makeData({
-      company: { name: 'Co', address: 'Addr', phone: '0550000000', nif: 'NIF123', rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'Co', address: 'Addr', phone: '0550000000', nif: 'NIF123', rc: null, nis: null, article: null, logoUrl: null },
       doc: { number: 'FV-001', date: '2026-07-01', dueDate: null, time: '14:30', typeCode: 'FV', typeName: 'فاتورة', status: 'validated' },
       lines: [{
         rowNumber: 1, ref: 'R1', barcode: null,
@@ -8278,7 +8375,7 @@ describe('ThermalPrintPath — section visibility gates (Stage 1)', () => {
       company_name_text: 'HiddenHeaderSectionCo',
     });
     const data = makeData({
-      company: { name: 'HiddenHeaderSectionCo', address: null, phone: null, nif: null, rc: null, nis: null, ice: null, article: null, logoUrl: null },
+      company: { name: 'HiddenHeaderSectionCo', address: null, phone: null, nif: null, rc: null, nis: null, article: null, logoUrl: null },
     });
     const bytes = buildReceiptBytesFromTemplate(tpl, data);
     expect(containsAscii(bytes, 'HiddenHeaderSectionCo')).toBe(false);
@@ -8350,7 +8447,7 @@ describe('ThermalPrintPath — section visibility gates (Stage 1)', () => {
 const HEADER_CO = {
   name: 'Stage2Co', address: '15 Rue Test', phone: '0550123456',
   nif: 'NIF123456789', rc: 'RC00123', nis: 'NIS00999',
-  ice: 'ICE00555', article: '12-34', logoUrl: null,
+  article: '12-34', logoUrl: null,
 };
 
 function headerData(overrides = {}): UniversalDocumentData {
@@ -8402,13 +8499,6 @@ describe('ThermalPrintPath — company info visibility gates (Stage 2)', () => {
     expect(containsAscii(off, HEADER_CO.nis)).toBe(false);
   });
 
-  it('shows ICE when show_ice is ON, hides when OFF', () => {
-    const on  = buildReceiptBytesFromTemplate(makeTemplate({ show_ice: true  }), headerData());
-    const off = buildReceiptBytesFromTemplate(makeTemplate({ show_ice: false }), headerData());
-    expect(containsAscii(on, HEADER_CO.ice)).toBe(true);
-    expect(containsAscii(off, HEADER_CO.ice)).toBe(false);
-  });
-
   it('shows article when show_article is ON, hides when OFF', () => {
     const on  = buildReceiptBytesFromTemplate(makeTemplate({ show_article: true  }), headerData());
     const off = buildReceiptBytesFromTemplate(makeTemplate({ show_article: false }), headerData());
@@ -8445,8 +8535,8 @@ describe('ThermalPrintPath — company name formatting (Stage 2)', () => {
 describe('ThermalPrintPath — company info formatting (Stage 2)', () => {
 
   it('different company_info_size values produce different byte output', () => {
-    const small = buildReceiptBytesFromTemplate(makeTemplate({ company_info_size: 6  }), headerData());
-    const large = buildReceiptBytesFromTemplate(makeTemplate({ company_info_size: 16 }), headerData());
+    const small = buildReceiptBytesFromTemplate(makeTemplate({ show_address: true, company_info_size: 6  }), headerData());
+    const large = buildReceiptBytesFromTemplate(makeTemplate({ show_address: true, company_info_size: 16 }), headerData());
     expect(small).not.toEqual(large);
   });
 
@@ -9157,6 +9247,232 @@ export function familyStyleFromName(
 
 ```
 
+## FILE: ./resources/js/pos/utils/posSounds.ts
+
+```
+// ════════════════════════════════════════════════════════════════════════════
+// pos/utils/posSounds.ts
+//
+// أصوات POS — مُولَّدة بـ Web Audio API بدون ملفات خارجية
+// كل preset يحتوي على نغمتين: واحدة عند إضافة منتج، وأخرى عند إتمام البيع
+// volume: 0-100 → يُحوَّل داخلياً إلى 0.0-1.0
+// ════════════════════════════════════════════════════════════════════════════
+
+let ctx: AudioContext | null = null;
+
+function getCtx(): AudioContext {
+  if (!ctx) ctx = new AudioContext();
+  return ctx;
+}
+
+function note(
+  ac: AudioContext,
+  freq: number,
+  start: number,
+  dur: number,
+  type: OscillatorType = 'sine',
+  vol = 0.12,
+) {
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, ac.currentTime + start);
+  gain.gain.setValueAtTime(vol, ac.currentTime + start);
+  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + start + dur);
+  osc.start(ac.currentTime + start);
+  osc.stop(ac.currentTime + start + dur);
+}
+
+function noise(ac: AudioContext, start: number, dur: number, vol = 0.06) {
+  const bufSize = ac.sampleRate * dur;
+  const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * vol;
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const gain = ac.createGain();
+  src.connect(gain);
+  gain.connect(ac.destination);
+  gain.gain.setValueAtTime(vol, ac.currentTime + start);
+  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + start + dur);
+  src.start(ac.currentTime + start);
+  src.stop(ac.currentTime + start + dur);
+}
+
+// ─── Volume scaling ──────────────────────────────────────────────────────────
+
+/** Convert 0-100 volume to a 0-1 multiplier */
+function volScale(v: number): number {
+  return Math.max(0, Math.min(1, v / 100));
+}
+
+// ─── Preset definitions ─────────────────────────────────────────────────────
+
+type SoundFn = (volume: number) => void;
+
+const presets: Record<string, {
+  label: string;
+  icon: string;
+  add: SoundFn;
+  sale: SoundFn;
+}> = {
+  classic: {
+    label: 'كلاسيك',
+    icon: 'ti-music',
+    add(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 600, 0, 0.08, 'sine', 0.12 * s);
+      note(ac, 900, 0.08, 0.1, 'sine', 0.10 * s);
+    },
+    sale(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 523, 0, 0.1, 'sine', 0.12 * s);
+      note(ac, 659, 0.1, 0.1, 'sine', 0.10 * s);
+      note(ac, 784, 0.2, 0.15, 'sine', 0.10 * s);
+    },
+  },
+  pop: {
+    label: 'بوب',
+    icon: 'ti-bubble',
+    add(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 800, 0, 0.04, 'sine', 0.18 * s);
+      note(ac, 1200, 0.02, 0.06, 'sine', 0.10 * s);
+    },
+    sale(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 600, 0, 0.06, 'sine', 0.15 * s);
+      note(ac, 900, 0.06, 0.06, 'sine', 0.12 * s);
+      note(ac, 1200, 0.12, 0.1, 'sine', 0.10 * s);
+    },
+  },
+  digital: {
+    label: 'رقمي',
+    icon: 'ti-device-desktop',
+    add(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 1047, 0, 0.05, 'square', 0.08 * s);
+      note(ac, 1319, 0.04, 0.07, 'square', 0.06 * s);
+    },
+    sale(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 880, 0, 0.08, 'square', 0.07 * s);
+      note(ac, 1109, 0.07, 0.08, 'square', 0.06 * s);
+      note(ac, 1397, 0.14, 0.12, 'square', 0.05 * s);
+    },
+  },
+  bell: {
+    label: 'جرس',
+    icon: 'ti-bell',
+    add(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 1568, 0, 0.2, 'sine', 0.10 * s);
+      note(ac, 2093, 0, 0.15, 'sine', 0.06 * s);
+    },
+    sale(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 1047, 0, 0.25, 'sine', 0.12 * s);
+      note(ac, 1319, 0, 0.2, 'sine', 0.08 * s);
+      note(ac, 1568, 0.15, 0.3, 'sine', 0.08 * s);
+    },
+  },
+  soft: {
+    label: 'ناعم',
+    icon: 'ti-feather',
+    add(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 440, 0, 0.12, 'sine', 0.08 * s);
+      note(ac, 554, 0.06, 0.1, 'sine', 0.06 * s);
+    },
+    sale(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 392, 0, 0.15, 'sine', 0.10 * s);
+      note(ac, 494, 0.1, 0.15, 'sine', 0.08 * s);
+      note(ac, 587, 0.2, 0.2, 'sine', 0.08 * s);
+    },
+  },
+  click: {
+    label: 'نقرة',
+    icon: 'ti-mouse',
+    add(v) {
+      const ac = getCtx(); const s = volScale(v);
+      noise(ac, 0, 0.03, 0.15 * s);
+    },
+    sale(v) {
+      const ac = getCtx(); const s = volScale(v);
+      noise(ac, 0, 0.03, 0.12 * s);
+      noise(ac, 0.06, 0.03, 0.12 * s);
+      note(ac, 800, 0.1, 0.08, 'sine', 0.10 * s);
+    },
+  },
+  cash: {
+    label: 'صندوق',
+    icon: 'ti-cash',
+    add(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 1200, 0, 0.03, 'square', 0.10 * s);
+      note(ac, 1600, 0.02, 0.05, 'square', 0.08 * s);
+    },
+    sale(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 800, 0, 0.06, 'triangle', 0.15 * s);
+      note(ac, 1000, 0.05, 0.06, 'triangle', 0.12 * s);
+      note(ac, 1400, 0.1, 0.06, 'triangle', 0.10 * s);
+      note(ac, 1800, 0.15, 0.1, 'triangle', 0.08 * s);
+    },
+  },
+  bios: {
+    label: 'بيوس',
+    icon: 'ti-cpu',
+    add(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 1000, 0, 0.15, 'square', 0.35 * s);
+    },
+    sale(v) {
+      const ac = getCtx(); const s = volScale(v);
+      note(ac, 800, 0, 0.1, 'square', 0.30 * s);
+      note(ac, 1200, 0.12, 0.2, 'square', 0.35 * s);
+    },
+  },
+  none: {
+    label: 'صامت',
+    icon: 'ti-volume-off',
+    add() {},
+    sale() {},
+  },
+};
+
+export type SoundPresetId = keyof typeof presets;
+
+/** قائمة النغمات المتاحة لعرضها في الإعدادات */
+export const SOUND_PRESETS = Object.entries(presets).map(([id, p]) => ({
+  id: id as SoundPresetId,
+  label: p.label,
+  icon: p.icon,
+}));
+
+/** تشغيل صوت إضافة منتج حسب الـ preset والصوت المختار */
+export function playAddSound(presetId: SoundPresetId = 'classic', volume = 60) {
+  try { presets[presetId]?.add(volume); } catch { /* noop */ }
+}
+
+/** تشغيل صوت إتمام البيع حسب الـ preset والصوت المختار */
+export function playSaleSound(presetId: SoundPresetId = 'classic', volume = 60) {
+  try { presets[presetId]?.sale(volume); } catch { /* noop */ }
+}
+
+/** معاينة صوت (للعرض في الإعدادات) — يشغل add ثم sale بتأخير بسيط */
+export function previewSound(presetId: SoundPresetId, volume = 60) {
+  try {
+    presets[presetId]?.add(volume);
+    setTimeout(() => presets[presetId]?.sale(volume), 350);
+  } catch { /* noop */ }
+}
+
+```
+
 ## FILE: ./resources/js/pos/utils/printService.ts
 
 ```
@@ -9471,7 +9787,6 @@ function buildThermalHeader(
   const companyNIF     = resolve('company.nif', co.nif ?? '');
   const companyRC      = resolve('company.rc', co.rc ?? '');
   const companyNIS     = resolve('company.nis', co.nis ?? '');
-  const companyICE     = resolve('company.ice', co.ice ?? '');
   const companyArticle = resolve('company.article', co.article ?? '');
 
   // ── Company name (gated, with size/bold/align) ──────────────────────────
@@ -9501,7 +9816,6 @@ function buildThermalHeader(
   infoField(template.show_tax_id,   companyNIF,   'NIF: ');
   infoField(template.show_rc,       companyRC,    'RC: ');
   infoField(template.show_nis,      companyNIS,   'NIS: ');
-  infoField(template.show_ice,      companyICE,   'ICE: ');
   infoField(template.show_article,  companyArticle, 'Article: ');
 
   b.divider('=', 42);

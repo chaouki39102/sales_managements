@@ -445,7 +445,7 @@ export function ColumnManager({
     const col = ALL_COLUMNS.find((c) => c.key === key);
     if (col?.fixed) return;
     const next = new Set(visible);
-    next.has(key) ? next.delete(key) : next.add(key);
+    if (next.has(key)) next.delete(key); else next.add(key);
     onChange(next);
   };
 

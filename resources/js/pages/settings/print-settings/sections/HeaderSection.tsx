@@ -262,7 +262,7 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
         <Section title="أعمدة الرأس" icon="ti-columns" defaultOpen>
           {hl.columns.length === 0 && (
             <div style={{ fontSize: 11, color: 'var(--t4)', padding: '4px 0' }}>
-              لا توجد أعمدة. اضغط "+ إضافة عمود" للبدء.
+              لا توجد أعمدة. اضغط &ldquo;+ إضافة عمود&rdquo; للبدء.
             </div>
           )}
           {hl.columns

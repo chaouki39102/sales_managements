@@ -3,7 +3,7 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
-  { ignores: ['public/build/**', 'vendor/**'] },
+  { ignores: ['public/build/**', 'vendor/**', 'resources/js/pages/settings/print-settings/todo/**'] },
   {
     extends: [
       ...tseslint.configs.recommended,
@@ -24,7 +24,7 @@ export default tseslint.config(
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
     },
     settings: {
       react: { version: 'detect' },

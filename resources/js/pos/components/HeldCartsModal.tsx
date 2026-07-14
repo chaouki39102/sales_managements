@@ -97,7 +97,7 @@ export default function HeldCartsModal({
                     key={c.id}
                     className={`held-card${i === selectedIndex ? ' held-sel' : ''}`}
                     onClick={() => onRestore(c.id)}
-                    onDoubleClick={() => { onRestoreAndPay?.(c.id) ?? onRestore(c.id); }}
+                    onDoubleClick={() => { if (onRestoreAndPay) onRestoreAndPay(c.id); else onRestore(c.id); }}
                   >
                     <div className="hc-info">
                       <div className="hc-client">{c.client?.name ?? 'زبون عابر'}</div>

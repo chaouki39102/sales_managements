@@ -6,7 +6,7 @@ import Button from '@/components/ui/Button';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
 import { useWilayas, useCommunes, useLegalForms, usePriceLevels } from '@/lib/api/endpoints/lookups';
-import type { Party, Wilaya, Commune, LegalForm, PriceLevel } from '@/types';
+import type { Party, Wilaya, LegalForm, PriceLevel } from '@/types';
 
 interface ClientModalProps {
   open: boolean;

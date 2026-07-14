@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════
 import { useState, useRef, useEffect } from 'react';
 import { useFiscalYear } from '@/context/FiscalYearContext';
-import type { FiscalYear } from '@/context/FiscalYearContext';
+
 
 export default function FiscalYearSelector() {
     const { years, selected, loading, isReadOnly, selectYear } = useFiscalYear();

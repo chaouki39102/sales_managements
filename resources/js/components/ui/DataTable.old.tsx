@@ -866,7 +866,14 @@ const FilterPopup = memo(function FilterPopup({
   const hasVal   = value !== '' && value !== '|';
   const header   = typeof col.header === 'string' ? col.header : '';
 
-  const renderInput = () => {
+  const RenderInput = () => {
+    // Hooks must be called unconditionally (rules-of-hooks)
+    const [tempSelected, setTempSelected] = useState<string[]>(value ? value.split(',') : []);
+    const [search, setSearch] = useState('');
+    useEffect(() => {
+      setTempSelected(value ? value.split(',') : []);
+    }, [value]);
+
     if (type === 'text') {
       return (
         <input
@@ -952,15 +959,6 @@ const FilterPopup = memo(function FilterPopup({
   )];
   const options = uniqueValues.map(v => ({ value: v, label: v }));
 
-  // State مؤقت للتحديدات داخل الـ popup
-  const [tempSelected, setTempSelected] = useState<string[]>(value ? value.split(',') : []);
-  const [search, setSearch] = useState('');
-
-  // تحديث القائمة المؤقتة عند تغير value من الخارج (نادراً)
-  useEffect(() => {
-    setTempSelected(value ? value.split(',') : []);
-  }, [value]);
-
   const filtered = options.filter(opt => !search || opt.label.includes(search));
 
   const toggleOption = (val: string) => {
@@ -1042,7 +1040,6 @@ const FilterPopup = memo(function FilterPopup({
     // standard multiselect (static options)
     if (type === 'multiselect') {
       const selected = value ? value.split(',').filter(Boolean) : [];
-      const [search, setSearch] = useState('');
       const filtered = col.filter.options.filter((o: { value: string; label: string }) =>
         !search || o.label.toLowerCase().includes(search.toLowerCase())
       );
@@ -1090,7 +1087,7 @@ const FilterPopup = memo(function FilterPopup({
       style={{ top: pos.top, left: pos.left, width: 230 }}
     >
       {header && <div className="dt-flt-popup-title">{header}</div>}
-      {renderInput()}
+      {RenderInput()}
       {hasVal && (
         <div className="dt-flt-footer">
           <button className="dt-flt-clear" onClick={() => { onChange(''); onClose(); }}>مسح الفلتر ✕</button>
@@ -1265,7 +1262,7 @@ export function DataTable<T = Record<string, unknown>>({
   const toggleColVisibility = useCallback((key: string) => {
     setHiddenKeys(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }, []);
@@ -1319,7 +1316,7 @@ export function DataTable<T = Record<string, unknown>>({
   const handleFilterChange = useCallback((key: string, val: string) => {
     setFilters(prev => {
       const next = { ...prev };
-      val ? (next[key] = val) : delete next[key];
+      if (val) next[key] = val; else delete next[key];
       Promise.resolve().then(() => onFilterChangeRef.current?.(next));
       return next;
     });
@@ -1481,7 +1478,11 @@ export function DataTable<T = Record<string, unknown>>({
   const toggleAll = useCallback(() => {
     setSelectedKeys(prev => {
       const next = new Set(prev);
-      allChecked ? displayKeys.forEach(k => next.delete(k)) : displayKeys.forEach(k => next.add(k));
+      if (allChecked) {
+        displayKeys.forEach(k => next.delete(k));
+      } else {
+        displayKeys.forEach(k => next.add(k));
+      }
       return next;
     });
   }, [allChecked, displayKeys]);
@@ -1490,7 +1491,7 @@ export function DataTable<T = Record<string, unknown>>({
     e.stopPropagation();
     setSelectedKeys(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }, []);
@@ -1510,7 +1511,7 @@ export function DataTable<T = Record<string, unknown>>({
     e.stopPropagation();
     setExpandedKeys(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }, []);

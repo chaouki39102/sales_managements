@@ -6,16 +6,19 @@
 import React, { useState } from 'react';
 import { useApprovalCheck, useApprovalMutations } from '@/lib/api/endpoints/approvals';
 import { useNotification } from '@/hooks/useNotification';
+import type { ApprovalCheck } from '@/lib/api/endpoints/approvals';
 
 // ─── Approval Status Badge ────────────────────────────────────────────────────
 
 interface ApprovalStatusBadgeProps {
   documentId: number;
   statusSlug: string;
+  approvalCheck?: ApprovalCheck;
 }
 
-export function ApprovalStatusBadge({ documentId, statusSlug }: ApprovalStatusBadgeProps) {
-  const { data: check } = useApprovalCheck(documentId);
+export function ApprovalStatusBadge({ documentId, statusSlug, approvalCheck }: ApprovalStatusBadgeProps) {
+  const { data: hookCheck } = useApprovalCheck(approvalCheck === undefined ? documentId : null);
+  const check = approvalCheck ?? hookCheck;
 
   if (statusSlug === 'pending_approval') {
     return (
@@ -68,11 +71,13 @@ interface ApprovalActionsProps {
   documentId: number;
   statusSlug: string;
   netToPay: number;
+  approvalCheck?: ApprovalCheck;
 }
 
-export function ApprovalActions({ documentId, statusSlug, netToPay }: ApprovalActionsProps) {
+export function ApprovalActions({ documentId, statusSlug, netToPay, approvalCheck }: ApprovalActionsProps) {
   const { notify } = useNotification();
-  const { data: check } = useApprovalCheck(documentId);
+  const { data: hookCheck } = useApprovalCheck(approvalCheck === undefined ? documentId : null);
+  const check = approvalCheck ?? hookCheck;
   const { submit, approve, reject } = useApprovalMutations();
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');

@@ -30,32 +30,6 @@ class CommercialDocumentController extends BaseApiController
         parent::__construct();
     }
 
-    protected function getListConfig(): array
-    {
-        return [
-            'filters' => [
-                'document_type_id', 'fiscal_year_id', 'document_status_id',
-                'party_id', 'warehouse_id', 'currency_id', 'user_id',
-                'is_locked', 'is_exported_to_accounting',
-                'party.name', 'warehouse.name', 'document_status.name',
-                'document_date', 'due_date', 'total_ht', 'total_ttc',
-                'net_to_pay', 'remaining_amount', 'reference', 'search',
-            ],
-            'allowed_includes' => [
-                'party', 'warehouse', 'documentType', 'documentStatus',
-                'currency', 'fiscalYear', 'lines', 'lines.product',
-                'payments', 'payments.paymentMode', 'payments.treasuryAccount', 'validatedBy', 'user',
-            ],
-            'sorts' => [
-                'document_number', 'document_date', 'total_ht', 'total_ttc',
-                'created_at', 'updated_at', 'party.name', 'warehouse.name', 'document_status.name',
-            ],
-            'default_sort'           => 'document_date',
-            'default_sort_direction' => 'desc',
-            'search_fields'          => ['document_number', 'notes', 'internal_notes', 'reference'],
-        ];
-    }
-
     public function index(Request $request): JsonResponse
     {
         try {
@@ -80,45 +54,82 @@ class CommercialDocumentController extends BaseApiController
 
             if (isset($f['search']) && $f['search'] !== '') {
                 $search = $f['search'];
-                $query->where(function ($q) use ($search) {
-                    $q->where('document_number', 'like', "%{$search}%")
-                      ->orWhere('notes',          'like', "%{$search}%")
-                      ->orWhere('internal_notes', 'like', "%{$search}%")
-                      ->orWhere('reference',      'like', "%{$search}%");
+                $isMysql = DB::getDriverName() === 'mysql';
+
+                $query->where(function ($q) use ($search, $isMysql) {
+                    if ($isMysql) {
+                        $q->whereRaw("MATCH(document_number, reference) AGAINST(? IN BOOLEAN MODE)", [$search . '*']);
+                    } else {
+                        $q->where('document_number', 'like', "%{$search}%")
+                          ->orWhere('reference', 'like', "%{$search}%");
+                    }
+                    $q->orWhere('notes', 'like', "%{$search}%")
+                      ->orWhere('internal_notes', 'like', "%{$search}%");
                 });
             }
 
             if (isset($f['party.name']) && $f['party.name'] !== '') {
                 $names = array_filter(array_map('trim', explode(',', $f['party.name'])));
-                $query->whereHas('party', function ($q) use ($names) {
-                    $q->where(function ($inner) use ($names) {
-                        foreach ($names as $name) {
-                            $inner->orWhere('name', 'like', "%{$name}%");
-                        }
+                $hasWildcard = fn(string $n) => str_contains($n, '%') || str_contains($n, '_');
+                if (count($names) === 1 && !$hasWildcard($names[0])) {
+                    $query->whereIn('party_id', fn($q) => $q->select('id')->from('parties')
+                        ->where('name', 'like', $names[0]));
+                } else {
+                    $query->whereHas('party', function ($q) use ($names) {
+                        $q->where(function ($inner) use ($names) {
+                            foreach ($names as $name) {
+                                $inner->orWhere('name', 'like', "%{$name}%");
+                            }
+                        });
                     });
-                });
+                }
             }
 
             if (isset($f['warehouse.name']) && $f['warehouse.name'] !== '') {
                 $names = array_filter(array_map('trim', explode(',', $f['warehouse.name'])));
-                $query->whereHas('warehouse', function ($q) use ($names) {
-                    $q->where(function ($inner) use ($names) {
-                        foreach ($names as $name) {
-                            $inner->orWhere('name', 'like', "%{$name}%");
-                        }
+                $hasWildcard = fn(string $n) => str_contains($n, '%') || str_contains($n, '_');
+                if (count($names) === 1 && !$hasWildcard($names[0])) {
+                    $query->whereIn('warehouse_id', fn($q) => $q->select('id')->from('warehouses')
+                        ->where('name', 'like', $names[0]));
+                } else {
+                    $query->whereHas('warehouse', function ($q) use ($names) {
+                        $q->where(function ($inner) use ($names) {
+                            foreach ($names as $name) {
+                                $inner->orWhere('name', 'like', "%{$name}%");
+                            }
+                        });
                     });
-                });
+                }
             }
 
             if (isset($f['document_status.name']) && $f['document_status.name'] !== '') {
                 $names = array_filter(array_map('trim', explode(',', $f['document_status.name'])));
-                $query->whereHas('documentStatus', function ($q) use ($names) {
-                    $q->where(function ($inner) use ($names) {
+                $query->whereIn('document_status_id', fn($q) => $q->select('id')->from('document_statuses')
+                    ->where(function ($inner) use ($names) {
                         foreach ($names as $name) {
                             $inner->orWhereRaw('LOWER(name) = LOWER(?)', [$name]);
                         }
-                    });
-                });
+                    }));
+            }
+
+            if (isset($f['user.name']) && $f['user.name'] !== '') {
+                $names = array_filter(array_map('trim', explode(',', $f['user.name'])));
+                $query->whereIn('user_id', fn($q) => $q->select('id')->from('users')
+                    ->where(function ($inner) use ($names) {
+                        foreach ($names as $name) {
+                            $inner->orWhereRaw('LOWER(name) = LOWER(?)', [$name]);
+                        }
+                    }));
+            }
+
+            if (isset($f['validatedBy.name']) && $f['validatedBy.name'] !== '') {
+                $names = array_filter(array_map('trim', explode(',', $f['validatedBy.name'])));
+                $query->whereIn('validated_by', fn($q) => $q->select('id')->from('users')
+                    ->where(function ($inner) use ($names) {
+                        foreach ($names as $name) {
+                            $inner->orWhereRaw('LOWER(name) = LOWER(?)', [$name]);
+                        }
+                    }));
             }
 
             $dateFields = ['document_date', 'due_date', 'validated_at', 'created_at', 'updated_at'];
@@ -129,17 +140,37 @@ class CommercialDocumentController extends BaseApiController
                 $minDate = $parts[0] ?? '';
                 $maxDate = $parts[1] ?? '';
 
+                $isTimestamp = in_array($field, ['validated_at', 'created_at', 'updated_at']);
+
                 if ($minDate !== '' && $maxDate !== '') {
                     if ($minDate === $maxDate) {
-                        $query->whereDate($field, $minDate);
+                        if ($isTimestamp) {
+                            $query->where($field, '>=', $minDate . ' 00:00:00')
+                                  ->where($field, '<=', $minDate . ' 23:59:59');
+                        } else {
+                            $query->where($field, $minDate);
+                        }
                     } else {
-                        $query->whereDate($field, '>=', $minDate)
-                              ->whereDate($field, '<=', $maxDate);
+                        if ($isTimestamp) {
+                            $query->where($field, '>=', $minDate . ' 00:00:00')
+                                  ->where($field, '<=', $maxDate . ' 23:59:59');
+                        } else {
+                            $query->where($field, '>=', $minDate)
+                                  ->where($field, '<=', $maxDate);
+                        }
                     }
                 } elseif ($minDate !== '') {
-                    $query->whereDate($field, '>=', $minDate);
+                    if ($isTimestamp) {
+                        $query->where($field, '>=', $minDate . ' 00:00:00');
+                    } else {
+                        $query->where($field, '>=', $minDate);
+                    }
                 } elseif ($maxDate !== '') {
-                    $query->whereDate($field, '<=', $maxDate);
+                    if ($isTimestamp) {
+                        $query->where($field, '<=', $maxDate . ' 23:59:59');
+                    } else {
+                        $query->where($field, '<=', $maxDate);
+                    }
                 }
             }
 

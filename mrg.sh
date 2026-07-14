@@ -1,10 +1,11 @@
 #!/bin/bash
 
-OUTPUT="REPORTING_FRAMEWORK_SOURCE.md"
+OUTPUT="FULL_DATATABLE_CODE.md"
 
 > "$OUTPUT"
 
-find resources/js/pos/*. \
+
+find resources/js/components/ui/DataTable/*. \
      -type f \( \
         -name "*.ts" -o \
         -name "*.tsx" -o \

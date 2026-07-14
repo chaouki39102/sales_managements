@@ -86,6 +86,7 @@ export const tenantKeys = {
     treasuryAccounts:     (slug: string) => [slug, 'lookups', 'treasury-accounts']                 as const,
     productsAggregated:   (slug: string) => [slug, 'lookups', 'products']                         as const,
     roles:                (slug: string) => [slug, 'lookups', 'roles']                             as const,
+    attachments:          (slug: string) => [slug, 'lookups', 'attachments']                       as const,
   },
 
   // ── Fiscal Years ──────────────────────────────────────────────────────────

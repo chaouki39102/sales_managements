@@ -51,7 +51,7 @@ function simulateNumber(series: NumberingSeriesRecord, next = true): string {
   try {
     const num = next ? series.last_number + 1 : series.last_number;
     const padded = String(num).padStart(series.padding, '0');
-    let fmt = series.format
+    const fmt = series.format
       .replace('{PREFIX}', series.prefix || '')
       .replace('{SUFFIX}', series.suffix || '')
       .replace('{YY}', String(series.current_year || new Date().getFullYear()).slice(-2))
@@ -414,7 +414,7 @@ function NumberingSeriesModal({
     try {
       const num = form.start_number;
       const padded = String(num).padStart(form.padding, '0');
-      let fmt = form.format
+      const fmt = form.format
         .replace('{PREFIX}', form.prefix || 'XXX')
         .replace('{SUFFIX}', form.suffix || '')
         .replace('{YY}', new Date().getFullYear().toString().slice(-2))

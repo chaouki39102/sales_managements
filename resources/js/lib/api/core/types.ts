@@ -512,6 +512,8 @@ export interface CommercialDocument extends BaseModel {
   fiscal_year?:   FiscalYear;
   lines?:         CommercialDocumentLine[];
   payments?:      Payment[];
+  validatedBy?:   User;
+  user?:          User;
   /** SSOT balance computed by backend */
   balance_data?: {
     previous_balance: number;

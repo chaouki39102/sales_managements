@@ -81,7 +81,7 @@ function dedup<T extends { id: number; name?: string }>(arr: T[]): T[] {
   const seen = new Set<number>();
 
   // أولاً: dedup حسب id (التكرار الحقيقي)
-  let result = arr.filter(item => {
+  const result = arr.filter(item => {
     if (seen.has(item.id)) return false;
     seen.add(item.id);
     return true;

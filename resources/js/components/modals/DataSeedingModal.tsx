@@ -160,7 +160,7 @@ const handleApply = async () => {
     if (g?.required) return;
     setEnabled(prev => {
       const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) n.delete(id); else n.add(id);
       return n;
     });
   };
@@ -302,8 +302,8 @@ const handleApply = async () => {
   // ─────────────────────────────────────────────────────────
   const renderApplying = () => {
     const currentLog = logs.find(l => l.status === 'running');
-    const doneLogs   = logs.filter(l => l.status === 'done' || l.status === 'error');
-    const idleLogs   = logs.filter(l => l.status === 'idle');
+    const _doneLogs  = logs.filter(l => l.status === 'done' || l.status === 'error');
+    const _idleLogs  = logs.filter(l => l.status === 'idle');
 
     return (
       <div style={{ direction: 'rtl' }}>

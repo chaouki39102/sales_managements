@@ -648,7 +648,7 @@ function CloseYearModal({ open, year, onClose }: {
                                     <input type="checkbox" checked={checked.has(item.id)}
                                         onChange={() => setChecked(prev => {
                                             const n = new Set(prev);
-                                            n.has(item.id) ? n.delete(item.id) : n.add(item.id);
+                                            if (n.has(item.id)) n.delete(item.id); else n.add(item.id);
                                             return n;
                                         })}
                                         style={{ accentColor: 'var(--em)', width: 16, height: 16, flexShrink: 0 }}/>

@@ -50,6 +50,7 @@ import { DeliveryProgressBar } from "./components/DeliveryProgressBar";
 import ConvertDocumentModal from "./components/ConvertDocumentModal";
 import BatchPrintModal from "./components/BatchPrintModal";
 import { ApprovalStatusBadge, ApprovalActions } from "./components/ApprovalWorkflow";
+import { useApprovalCheckBatch } from "@/lib/api/endpoints/approvals";
 import { SendDocumentMailModal } from "./components/SendDocumentMailModal";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
@@ -564,7 +565,7 @@ export default function CommercialDocumentsPage() {
     const [page, setPage]               = useState(1);
     const [perPage, setPerPage]         = useState(15);
     const [serverFilters, setServerFilters] = useState<Record<string, string>>({});
-    const [multiSort, setMultiSort]     = useState<MultiSortState>([]);
+    const [multiSort, setMultiSort]     = useState<MultiSortState>([{ key: 'document_number', dir: 'desc' }]);
 
     const isPurch   = PURCHASE_CODES.has(typeCode ?? "");
     const isSalable = SALE_CODES.has(typeCode ?? "");
@@ -586,7 +587,7 @@ export default function CommercialDocumentsPage() {
 
     // ── Sort → server param ───────────────────────────────────────────────────
     const sortParam = useMemo(() => {
-        if (!multiSort.length) return "id";
+        if (!multiSort.length) return "-document_number";
         return multiSort.map(s => `${s.dir === "desc" ? "-" : ""}${s.key}`).join(",");
     }, [multiSort]);
 
@@ -662,6 +663,7 @@ export default function CommercialDocumentsPage() {
 
         const filterMap: Record<string, string> = {
             search:                   "filter[search]",
+            document_number:          "filter[document_number]",
             "party.name":             "filter[party.name]",
             "warehouse.name":         "filter[warehouse.name]",
             "document_status.name":   "filter[document_status.name]",
@@ -681,8 +683,8 @@ export default function CommercialDocumentsPage() {
             created_at:               "filter[created_at]",
             updated_at:               "filter[updated_at]",
             // ✅ إضافة: فلتر باسم المستخدم الذي اعتمد / أنشأ المستند
-            validated_by:             "filter[validated_by]",
-            created_by:               "filter[created_by]",
+            validated_by:             "filter[validatedBy.name]",
+            created_by:               "filter[user.name]",
         };
         for (const [fk, pk] of Object.entries(filterMap)) {
             if (serverFilters[fk]) params[pk] = serverFilters[fk];
@@ -749,6 +751,10 @@ export default function CommercialDocumentsPage() {
 
         return { total: 0, last_page: 1, current_page: 1, per_page: perPage };
     }, [docsRaw, perPage]);
+
+    // ── Approval batch check — single request for all visible rows ────────────
+    const docIds = useMemo(() => items.map(d => d.id), [items]);
+    const { data: approvalBatch } = useApprovalCheckBatch(docIds);
 
     // ── Mutations ─────────────────────────────────────────────────────────────
     const lockMut = useMutation({
@@ -887,7 +893,13 @@ export default function CommercialDocumentsPage() {
             exportHeader: isPurch ? "المورد" : "الزبون",
             sortable: true,
             searchable: true,
-            filter: { type: "dynamic-multiselect" },
+            filter: {
+                type: "dynamic-multiselect" as const,
+                fetchOptions: async () => {
+                    const res = await apiGet<{ data: { name?: string }[] }>('/parties', { per_page: 9999 });
+                    return [...new Set((res?.data ?? []).map(p => p.name).filter(Boolean))] as string[];
+                },
+            },
             accessor: r => getPartyName(r),
             render: row => {
                 const name = getPartyName(row);
@@ -909,7 +921,13 @@ export default function CommercialDocumentsPage() {
             exportHeader: "المستودع",
             sortable: false,
             hideOnMobile: true,
-            filter: { type: "dynamic-multiselect" },
+            filter: {
+                type: "dynamic-multiselect" as const,
+                fetchOptions: async () => {
+                    const res = await apiGet<{ data: { name?: string }[] }>('/warehouses', { per_page: 9999 });
+                    return [...new Set((res?.data ?? []).map(w => w.name).filter(Boolean))] as string[];
+                },
+            },
             accessor: r => getWarehouseName(r),
             render: row => <span style={{ fontSize: 12, color: "var(--t3)" }}>{getWarehouseName(row) || "—"}</span>,
         },
@@ -927,7 +945,7 @@ export default function CommercialDocumentsPage() {
             render: row => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <StatusBadge status={getDocStatus(row)} />
-                    <ApprovalStatusBadge documentId={row.id} statusSlug={getDocStatus(row)} />
+                    <ApprovalStatusBadge documentId={row.id} statusSlug={getDocStatus(row)} approvalCheck={approvalBatch?.[row.id]} />
                 </div>
             ),
         },
@@ -1168,7 +1186,13 @@ export default function CommercialDocumentsPage() {
             width: 150,
             sortable: false,
             defaultHidden: true,
-            filter: { type: "text" as const },
+            filter: {
+                type: "dynamic-multiselect" as const,
+                fetchOptions: async () => {
+                    const res = await apiGet<{ data: { name?: string }[] }>('/users', { per_page: 9999 });
+                    return [...new Set((res?.data ?? []).map(u => u.name).filter(Boolean))] as string[];
+                },
+            },
             // validated_by في DB = integer FK — الـ Resource يُرسل العلاقة بـ camelCase
             accessor: (r: CommercialDocument) => {
                 const vb = (r as unknown as Record<string,unknown>).validatedBy as Record<string,unknown> | null | undefined;
@@ -1187,7 +1211,13 @@ export default function CommercialDocumentsPage() {
             width: 150,
             sortable: false,
             defaultHidden: true,
-            filter: { type: "text" as const },
+            filter: {
+                type: "dynamic-multiselect" as const,
+                fetchOptions: async () => {
+                    const res = await apiGet<{ data: { name?: string }[] }>('/users', { per_page: 9999 });
+                    return [...new Set((res?.data ?? []).map(u => u.name).filter(Boolean))] as string[];
+                },
+            },
             // المنشئ = user_id في DB → العلاقة هي user() وليس created_by
             accessor: (r: CommercialDocument) => {
                 const u = (r as unknown as Record<string,unknown>).user as Record<string,unknown> | null | undefined;
@@ -1619,6 +1649,7 @@ export default function CommercialDocumentsPage() {
                     documentId={row.id}
                     statusSlug={rowStatus}
                     netToPay={Number((row as unknown as Record<string, unknown>).net_to_pay ?? row.total_ttc ?? 0)}
+                    approvalCheck={approvalBatch?.[row.id]}
                 />
             </div>
         );
@@ -1771,7 +1802,7 @@ export default function CommercialDocumentsPage() {
                         }}
                         onFilterChange={handleFilterChange}
                         onSearchChange={q => {
-                            setServerFilters(prev => { const n = { ...prev }; q ? (n.search = q) : delete n.search; return n; });
+                            setServerFilters(prev => { const n = { ...prev }; if (q) n.search = q; else delete n.search; return n; });
                             setPage(1);
                         }}
                         allData={items as unknown as Record<string, unknown>[]}
@@ -1817,6 +1848,17 @@ export default function CommercialDocumentsPage() {
                             includeAggregates:    true,
                             includeHiddenColumns: false,
                             title: docType?.name ?? typeCode,
+                        }}
+                        fetchAllForExport={async () => {
+                            const total = Number(meta.total ?? 0);
+                            if (total === 0) return [];
+                            const { page: _p, per_page: _pp, ...params } = queryParams;
+                            const res = await apiGet<{ data: CommercialDocument[] }>("/documents", {
+                                ...params,
+                                per_page: Math.min(total, 10000),
+                                page: 1,
+                            });
+                            return Array.isArray(res.data) ? res.data : [];
                         }}
 
                         // ── 🆕 Smart Filter عربي — مع أنماط ERP الجزائري ──

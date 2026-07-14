@@ -121,7 +121,6 @@ export default function AdminBootModal({
     startRef.current = Date.now();
     setElapsed(0);
 
-    let done = 0;
     const errors: string[] = [];
 
     for (const step of INSTALL_STEPS) {
@@ -138,7 +137,6 @@ export default function AdminBootModal({
       try {
         await client.post(step.endpoint);
         setStep(step.key, { status: 'done', ms: Date.now() - t0 });
-        done++;
       } catch (e: any) {
         const msg = e?.response?.data?.message ?? 'خطأ غير معروف';
         setStep(step.key, { status: 'error', message: msg });
