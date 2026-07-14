@@ -234,7 +234,7 @@ function Step2({ form, onChange }: { form: TaxForm; onChange: (k: keyof TaxForm,
 }
 
 // ════ STEP 3 — الشعار ════════════════════════════
-function Step3({ logo, onLogo, companyName }: { logo: File | null; onLogo: (f: File | null) => void; companyName: string }) {
+function Step3({ _logo, onLogo, companyName }: { _logo: File | null; onLogo: (f: File | null) => void; companyName: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 

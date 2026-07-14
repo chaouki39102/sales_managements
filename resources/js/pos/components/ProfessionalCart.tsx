@@ -17,7 +17,7 @@
 //      للاسترجاع. الآن onClear يحفظ نسخة تلقائياً (من POSPage) ويمكن
 //      استرجاعها بضغطة واحدة، أو Ctrl+Z.
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useCallback, useEffect, useRef, useMemo, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { CartItem, CartTotals, Party } from '@/types';
 import { formatDZD } from '../utils/calculations';
@@ -73,7 +73,7 @@ const CART_ZOOM_KEY = 'pos-cart-zoom';
 type CartZoom = 0.75 | 0.875 | 1 | 1.125 | 1.25;
 
 const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProps>(function ProfessionalCart({
-  items, totals, client, customers,
+  items, totals, client, _customers,
   note, selectedItemId, onSelectItem,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
   onSetClient, onNoteChange,
@@ -164,7 +164,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
     if (i > 0) saveZoom(ZOOM_STEPS[i - 1]);
   }, [cartZoom, saveZoom]);
 
-  const overrides = useKbOverrides(slug ?? null);
+  const _overrides = useKbOverrides(slug ?? null);
   const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
 
   // ── افتراضية قائمة الأصناف (virtualization) ──────────────────────────────

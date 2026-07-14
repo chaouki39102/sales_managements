@@ -1,7 +1,7 @@
 import React from 'react';
-import type { PrintTemplate, TotalsGridConfig, TotalsGridColumn, LayoutRow, AlignOption } from '../../types';
+import type { PrintTemplate, TotalsGridConfig, TotalsGridColumn, AlignOption } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { renderLayoutRows, align, boxBorderCss } from './shared';
+import { renderLayoutRows, align } from './shared';
 
 interface GridRow {
   rate: number;

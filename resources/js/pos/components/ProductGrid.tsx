@@ -3,7 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
-import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
+import { getVariantPrice, isVariantOutOfStock } from '../utils/posHelpers';
 import ProductCard from './ProductCard';
 
 interface ProductGridProps {

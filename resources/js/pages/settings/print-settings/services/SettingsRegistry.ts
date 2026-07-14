@@ -25,9 +25,9 @@ export interface SettingMeta {
 const ALL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT'];
 const COMMERCIAL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV'];
 const POS_DOCS: DocTypeCode[] = ['POS', 'RPT'];
-const WAREHOUSE_DOCS: DocTypeCode[] = ['DDP', 'BT'];
+const _WAREHOUSE_DOCS: DocTypeCode[] = ['DDP', 'BT'];
 const REPORT_DOC: DocTypeCode[] = ['RPT'];
-const NON_REPORT_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS'];
+const _NON_REPORT_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS'];
 const THERMAL: PaperSize[] = ['80mm', '58mm'];
 const PAGE: PaperSize[] = ['A4', 'A5'];
 const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5'];

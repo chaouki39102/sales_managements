@@ -32,7 +32,7 @@ export class CsvRenderer implements IRenderer<string> {
   readonly outputType = 'csv' as const;
 
   async render(ctx: RenderContext): Promise<RenderResult<string>> {
-    const { data, template, currencySymbol } = ctx;
+    const { data, _template, currencySymbol } = ctx;
     const cur = currencySymbol ?? data.currency?.symbol ?? '';
 
     const lines: string[] = [];

@@ -273,7 +273,7 @@ function isTruthy(val: ExpressionValue): boolean {
 
 // ─── Window Functions ────────────────────────────────────────────────────────
 
-const ROW_NUMBER: ExpressionFunction = ([_arr, sortField]) => { return null; };
+const ROW_NUMBER: ExpressionFunction = ([_arr, _sortField]) => { return null; };
 
 const RANK: ExpressionFunction = ([arr, value, order]) => {
   if (!isNumArr(arr)) return null;
@@ -299,12 +299,12 @@ const NTILE: ExpressionFunction = ([arr, n]) => {
   return (arr as ExpressionValue[]).map((_, i) => Math.min(Math.floor(i / perTile) + 1, numTiles));
 };
 
-const LAG: ExpressionFunction = ([arr, offsetParam]) => {
+const LAG: ExpressionFunction = ([arr, _offsetParam]) => {
   if (!isArray(arr)) return null;
   return null;
 };
 
-const LEAD: ExpressionFunction = ([arr, offsetParam]) => {
+const LEAD: ExpressionFunction = ([arr, _offsetParam]) => {
   if (!isArray(arr)) return null;
   return null;
 };

@@ -24,7 +24,7 @@ import React, {
     useCallback,
     useMemo,
 } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
@@ -1355,7 +1355,7 @@ function CompanyTab({
     const deactivateMutation = useDeactivateCompany();
     const navigate = useNavigate();
     const deleteModal = useModal();
-    const qc = useQueryClient();
+    const _qc = useQueryClient();
     const { isDirty, markDirty, markClean } = useDirtyState();
 
     const [form, setForm] = useState({

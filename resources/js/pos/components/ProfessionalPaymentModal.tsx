@@ -129,11 +129,11 @@ function Numpad({
 function PaymentStatus({
   remaining,
   change,
-  totalTtcFinal,
+  _totalTtcFinal,
 }: {
   remaining:     number;
   change:        number;
-  totalTtcFinal: number;
+  _totalTtcFinal: number;
 }) {
   if (remaining > 0.009) {
     return (

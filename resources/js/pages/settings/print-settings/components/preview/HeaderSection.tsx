@@ -92,7 +92,7 @@ function renderCompanyInfo(tpl: PrintTemplate, data: UniversalDocumentData, _isT
   };
 
   const entries = Object.entries(COMPANY_FIELD_MAP)
-    .filter(([id, meta]) => (tpl as any)[meta.settingKey])
+    .filter(([_id, meta]) => (tpl as any)[meta.settingKey])
     .map(([id, meta]) => ({ rowId: id, label: labelOf(id), simple: meta.simple }));
 
   return (

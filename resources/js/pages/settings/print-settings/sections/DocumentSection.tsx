@@ -1,7 +1,7 @@
 import React from 'react';
 import type { BorderStyle, FontFamily } from '../types';
 import type { PrintTemplate } from '../types';
-import { Toggle, SliderField, Section } from './ToggleSwitch';
+import { Toggle, SliderField } from './ToggleSwitch';
 import { AlignButtons, BorderSelect } from './HeaderSection';
 import { Field, ColorField, Textarea, Input } from '../components/ui';
 import { isSettingVisible } from '../services/SettingsRegistry';

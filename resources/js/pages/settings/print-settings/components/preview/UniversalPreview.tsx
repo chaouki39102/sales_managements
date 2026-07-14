@@ -58,7 +58,7 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
 
   const isThermal   = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
   const isA4        = tpl.paper_size === 'A4';
-  const isA5        = tpl.paper_size === 'A5';
+  const _isA5        = tpl.paper_size === 'A5';
   const isLandscape = !isThermal && tpl.page_orientation === 'landscape';
 
   const portraitW = isA4 ? 794 : 559;

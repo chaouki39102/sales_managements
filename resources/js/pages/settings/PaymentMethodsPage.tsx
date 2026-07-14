@@ -12,7 +12,6 @@ import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
 import { useTenantQueryPaginated, useTenantMutation } from '@/hooks/useTenantQuery';
 import { paymentMethodsApi } from '@/lib/api/endpoints/paymentMethods';
-import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useTreasuryAccountsList } from '@/lib/api/endpoints/treasuryAccounts';
 import type { PaymentMethod } from '@/lib/api/core/types';
@@ -242,9 +241,9 @@ function ConfirmDeleteModal({ open, onClose, onConfirm, loading }: {
 
 // =============== Add/Edit Modal ===============
 function PaymentMethodModal({
-  open, record, treasuryAccounts, slug, onClose,
+  open, record, treasuryAccounts, _slug, onClose,
 }: {
-  open: boolean; record: PaymentMethod | null; treasuryAccounts: TreasuryAccount[]; slug: string; onClose: () => void;
+  open: boolean; record: PaymentMethod | null; treasuryAccounts: TreasuryAccount[]; _slug: string; onClose: () => void;
 }) {
   const isEdit = !!record;
 

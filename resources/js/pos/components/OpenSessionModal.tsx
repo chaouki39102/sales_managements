@@ -36,7 +36,7 @@ export default function OpenSessionModal({
 
   const [step,         setStep]         = useState<1 | 2>(1);
   const [warehouseId,  setWarehouseId]  = useState<number>(initWh);
-  const [fiscalYearId, setFiscalYearId] = useState<number>(initFy);
+  const [fiscalYearId, _setFiscalYearId] = useState<number>(initFy);
   const [openingCash,  setOpeningCash]  = useState('');
   const [confirmCash,  setConfirmCash]  = useState('');
   const [note,         setNote]         = useState('');

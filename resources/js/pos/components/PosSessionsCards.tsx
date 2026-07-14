@@ -6,13 +6,13 @@ import type { PosSession } from '@/lib/api/endpoints/posSession';
 export default function PosSessionsCards({
   sessions,
   isFetching,
-  selectedId,
+  _selectedId,
   onStats,
   onClose,
 }: {
   sessions: PosSession[];
   isFetching: boolean;
-  selectedId: number | null;
+  _selectedId: number | null;
   onStats: (id: number) => void;
   onClose: (id: number) => void;
 }) {

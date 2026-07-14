@@ -1,4 +1,4 @@
-import type { PrintTemplate, ColumnKey, AlignOption } from '../../types';
+import type { PrintTemplate, ColumnKey } from '../../types';
 import type { UniversalDocumentData, DocumentLine } from '../../types/data';
 import { getVisibleCols, colWidth, colAlign, colDefaultHeader, borderStyle, align } from './shared';
 import { COLUMN_DEFAULTS } from '../../services/SettingsRegistry';

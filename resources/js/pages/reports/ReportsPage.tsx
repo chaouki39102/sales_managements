@@ -25,14 +25,8 @@ import {
   useSuppliersReport, useProductsReport, useInventoryReport,
   usePaymentsReport, useTvaReport,
   useVelocityReport, useMarginReport, useAgingReport,
-  type SalesReportData, type PurchasesReportData,
-  type PartyReportData, type ProductsReportData,
-  type InventoryReportData, type PaymentsReportData,
-  type TaxesReportData,
-  type VelocityReportData, type MarginReportData,
-  type AgingReportData,
+  type PartyReportData,
 } from '@/lib/api/endpoints/reports';
-import apiClient from '@/lib/api/core/client';
 
 // ─── Report Card meta (UI فقط — بدون endpoint مباشر) ────────────────────────
 

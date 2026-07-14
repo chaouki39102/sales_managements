@@ -45,7 +45,7 @@ export default function ProductSearchBar({
 }: ProductSearchBarProps) {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
-  const overrides = useKbOverrides(slug ?? null);
+  const _overrides = useKbOverrides(slug ?? null);
   const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
 
   useEffect(() => {

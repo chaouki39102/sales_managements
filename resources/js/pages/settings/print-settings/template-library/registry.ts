@@ -4,18 +4,13 @@ import type { LibraryTemplateEntry, LibraryTemplateMeta } from './types';
 import {
   TEMPLATE_AUTHOR, LAYOUT_ENGINE_VERSION, TEMPLATE_COUNTRY_DZ,
 } from './constants';
-import type { LayoutRow, HeaderLayout, SectionMeta, TotalsGridConfig } from '../types';
+import type { HeaderLayout, SectionMeta, TotalsGridConfig } from '../types';
 import {
   INVOICE_COLUMNS, INVOICE_TOTALS, INVOICE_FOOTER,
   DELIVERY_COLUMNS, DELIVERY_TOTALS, DELIVERY_FOOTER,
   DELIVERY_A5_COLUMNS, DELIVERY_A5_TOTALS, DELIVERY_A5_FOOTER,
 } from './config';
 import { headerConfig, paperConfig, typographyConfig } from './config';
-import {
-  buildDefaultTotalsRows, buildDefaultFooterRows, buildDefaultHeaderLayout,
-  buildDefaultDocInfoRows, buildDefaultCustomerInfoRows, buildDefaultCompanyInfoRows,
-  buildDefaultSectionsOrder,
-} from '../services/layoutMigration';
 import { categoryFromDocType } from './categories';
 import { getMockDocumentData } from './mockData';
 

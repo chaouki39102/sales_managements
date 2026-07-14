@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 
 export default function ReportDesignerPage() {
   const navigate = useNavigate();

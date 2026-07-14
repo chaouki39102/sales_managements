@@ -80,7 +80,7 @@ export function fromApiResponse(r: ApiResponse): PrintTemplate {
  */
 export function validateTemplateIntegrity(tpl: Partial<PrintTemplate>, label?: string): number {
   const missing: string[] = [];
-  for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+  for (const [key, _meta] of Object.entries(SETTINGS_REGISTRY)) {
     const val = (tpl as any)[key];
     if (val === undefined) {
       missing.push(key);

@@ -16,8 +16,6 @@ import type { PrintTemplate } from '../types';
 import { printFieldRegistry, type PrintFieldDefinition } from './PrintFieldRegistry';
 import { numberToArabicWords } from '../utils';
 
-type ResolveContext = UniversalDocumentData | DocumentLine | Record<string, any>;
-
 function getByPath(obj: any, path: string): any {
   if (!obj || !path) return undefined;
   return path.split('.').reduce((acc: any, key: string) => {

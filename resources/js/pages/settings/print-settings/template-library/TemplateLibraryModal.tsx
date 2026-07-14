@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense, useRef } from 'react';
 import { templateRegistry } from './registry';
-import { TEMPLATE_CATEGORIES, ALL_TAGS } from './categories';
-import type { LibraryTemplateEntry, LibraryFilterState, FavoriteEntry, InstallHistoryEntry } from './types';
-import type { PrintTemplate, PaperSize, DocTypeCode } from '../types';
+import { TEMPLATE_CATEGORIES } from './categories';
+import type { LibraryTemplateEntry, FavoriteEntry, InstallHistoryEntry } from './types';
+import type { PrintTemplate } from '../types';
 import type { UniversalDocumentData } from '../types/data';
 import {
   MODAL_MAX_WIDTH, CARD_MIN_WIDTH, CARD_PREVIEW_HEIGHT,
@@ -217,7 +217,7 @@ const STYLES = {
   },
 };
 
-export default function TemplateLibraryModal({ open, onClose, onInstall, activeDoc }: Props) {
+export default function TemplateLibraryModal({ open, onClose, onInstall, _activeDoc }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [filterDocType, setFilterDocType] = useState<string | null>(null);
@@ -227,7 +227,7 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
   const [installing, setInstalling] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
   const [recentIds, setRecentIds] = useState<string[]>(loadRecent);
-  const [previewZoom, setPreviewZoom] = useState<'fit' | '100' | 'page'>('fit');
+  const [_previewZoom, _setPreviewZoom] = useState<'fit' | '100' | 'page'>('fit');
 
   // ── Cached mock data (never recreate) ──────────────────────────────────────
   const mockDataRef = useRef<UniversalDocumentData | null>(null);

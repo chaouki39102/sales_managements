@@ -216,8 +216,8 @@ export default function DocumentTypesPage() {
 // ===============================================
 // MODAL: Add / Edit Document Type (مع حماية البيانات التاريخية)
 // ===============================================
-function DocumentTypeModal({ open, docType, slug, onClose }: {
-    open: boolean; docType: DocumentType | null; slug: string; onClose: () => void;
+function DocumentTypeModal({ open, docType, _slug, onClose }: {
+    open: boolean; docType: DocumentType | null; _slug: string; onClose: () => void;
 }) {
     const isEdit = !!docType;
 
@@ -239,7 +239,7 @@ function DocumentTypeModal({ open, docType, slug, onClose }: {
         return map[name] || name;
     };
 
-    const { data: serverOps, isLoading: opsLoading } = useTenantQuery<DocumentBaseOperation[]>(
+    const { data: serverOps, isLoading: _opsLoading } = useTenantQuery<DocumentBaseOperation[]>(
         (slug) => tenantKeys.lookups.documentBaseOps(slug),
         () => documentTypesApi.listBaseOperations(),
         { enabled: open, staleTime: 2 * 60_000 },
