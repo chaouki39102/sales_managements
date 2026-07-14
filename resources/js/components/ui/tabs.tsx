@@ -1,5 +1,5 @@
 // resources/js/components/ui/tabs.tsx
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext } from 'react';
 
 interface TabsContextValue {
   value: string;

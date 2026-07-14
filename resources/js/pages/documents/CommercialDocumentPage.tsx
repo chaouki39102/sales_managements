@@ -93,7 +93,7 @@ export default function CommercialDocumentPage() {
     visibleCols, lineMode, handleColsChange, setLineMode,
     showDeleteModal, setShowDeleteModal,
     deleteMut,
-    handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
+    handleSave, _handleDelete, handleExport, handlePartyChangeWithWarning,
     isPending,
     isPartyExempt, partyOptions, priceLevelOptions,
     paymentModeOptions, treasuryAccountMap, selectedParty,
@@ -118,7 +118,7 @@ export default function CommercialDocumentPage() {
   }, [errors.warehouse_id, errors.fiscal_year_id, errors.currency_id]);
 
   const [alertsOpen, setAlertsOpen] = useState(true);
-  const canDismiss = !isPending && !successMsg;
+  const _canDismiss = !isPending && !successMsg;
 
   if (!lookupsReady) {
     return (

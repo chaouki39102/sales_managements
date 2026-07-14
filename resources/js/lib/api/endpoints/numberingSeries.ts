@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
-import { tenantKeys } from '../core/queryKeys';
+
 import { useTenantQueryPaginated, useTenantMutation } from '@/hooks/useTenantQuery';
 import type { NumberingSeries, PaginatedResponse, ListParams } from '../core/types';
 

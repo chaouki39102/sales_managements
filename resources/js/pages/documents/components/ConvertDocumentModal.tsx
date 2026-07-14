@@ -17,7 +17,7 @@ interface ConvertDocumentModalProps {
 
 export default function ConvertDocumentModal({
   isOpen, onClose, onDone,
-  documentId, sourceCode, sourceDate,
+  documentId, sourceCode, sourceDate: _sourceDate,
 }: ConvertDocumentModalProps) {
   const slug  = useActiveSlug();
   const convertMut = useConvertDocument();

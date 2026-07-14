@@ -179,7 +179,7 @@ function RemoteSelect({ field, value, onChange, parentValue, inputRef }: {
   }, [parentValue]);
 
   const isDisabled = loading || (!!field.cascadeParent && !parentValue);
-  const selected = options.find(o => String(o.value) === String(value));
+  const _selected = options.find(o => String(o.value) === String(value));
 
   return (
     <div style={{ position: 'relative' }}>
@@ -650,7 +650,7 @@ export default function LookupPage({
     setFormErr(null);
   }
 
-  function handleFieldBlur(f: FieldDef, v: any) {
+  function _handleFieldBlur(f: FieldDef, v: any) {
     const err = validateField(f, v);
     if (err) setFieldErrs(prev => ({ ...prev, [f.key]: err }));
   }

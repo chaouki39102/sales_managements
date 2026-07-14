@@ -46,7 +46,7 @@ const STATUS_BADGE: Record<
     locked: { label: "مقفولة", variant: "purple" },
 };
 
-const PAY_ICON: Record<string, string> = {
+const _PAY_ICON: Record<string, string> = {
     cash: "💵",
     cib: "💳",
     ccp: "📮",
@@ -637,7 +637,7 @@ function InvoiceDetailModal({
     open,
     invoice,
     onClose,
-    onValidate,
+    onValidate: _onValidate,
     onCancel,
 }: {
     open: boolean;
@@ -954,7 +954,7 @@ function NewInvoiceModal({
     const { data: warehouses } = useWarehouses();
     const { fiscalYear } = useFiscalYear();
     const { data: docTypes } = useDocumentTypes();
-    const { data: payModes } = usePaymentModes();
+    const { data: _payModes } = usePaymentModes();
 
     const defaultDate = (): string => {
         const d = new Date().toISOString().split("T")[0];
@@ -1012,7 +1012,7 @@ function NewInvoiceModal({
         return { ht, tva, ttc: ht + tva };
     }, [lines]);
 
-    const handleSave = async (draft = false) => {
+    const handleSave = async (_draft = false) => {
         const invType = docTypes?.find(
             (t) => t.code === "FAC" || t.name_latin?.includes("Invoice"),
         );

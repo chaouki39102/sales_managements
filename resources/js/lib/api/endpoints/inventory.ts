@@ -14,7 +14,6 @@ import { useActiveSlug, useSelectedYearId } from "../../store/appStore";
 import type {
     StockMovement,
     ProductLot,
-    Product,
     PaginatedResponse,
     ListParams,
 } from "../core/types";

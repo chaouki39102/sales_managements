@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════
 // pages/admin/CompaniesPage.tsx — إدارة الشركات (Super Admin)
 // ════════════════════════════════════════════════════════════
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
@@ -10,7 +10,6 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
 
 import Card         from '@/components/ui/Card';
-import Badge        from '@/components/ui/Badge';
 import Button       from '@/components/ui/Button';
 import PageHeader   from '@/components/ui/PageHeader';
 import AlertBar     from '@/components/ui/AlertBar';
@@ -742,7 +741,7 @@ function SuperAdminTab() {
 // Main Page
 // ════════════════════════════════════════════════════════════
 export default function CompaniesPage() {
-  const { user } = useAuth() as any;
+  const { user: _user } = useAuth() as any;
   const qc = useQueryClient();
   const notify = useNotification();
   const deleteConfirm = useConfirm();
@@ -940,7 +939,7 @@ export default function CompaniesPage() {
         <EditCompanyDrawer
           company={editTarget}
           onClose={() => setEditTarget(null)}
-          onSaved={(updated) => {
+          onSaved={(_updated) => {
             qc.invalidateQueries({ queryKey: ['admin-companies'] });
             setEditTarget(null);
           }}

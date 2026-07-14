@@ -56,8 +56,8 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
 
   // State
   const [step, setStep] = useState<Step>('upload');
-  const [fileName, setFileName] = useState('');
-  const [columns, setColumns] = useState<ParsedColumn[]>([]);
+  const [_fileName, _setFileName] = useState('');
+  const [_columns, _setColumns] = useState<ParsedColumn[]>([]);
   const [rawRows, setRawRows] = useState<Record<string, unknown>[]>([]);
   const [mappings, setMappings] = useState<MappingDef[]>([]);
   const [previewResult, setPreviewResult] = useState<PreviewResponse | null>(null);
@@ -205,7 +205,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
     result:  4,
   };
 
-  const totalRows = useMemo(() => {
+  const _totalRows = useMemo(() => {
     if (previewResult) return previewResult.validated.length + previewResult.errors.length;
     return rawRows.length;
   }, [previewResult, rawRows]);

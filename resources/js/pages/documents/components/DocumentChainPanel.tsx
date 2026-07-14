@@ -88,7 +88,7 @@ function NodeWithChildren({
 }
 
 export function DocumentChainPanel({
-  chain, isLoading, currentId, allowedTargets, onConvert, onNavigate, isReadOnly,
+  chain, isLoading, currentId: _currentId, allowedTargets, onConvert, onNavigate, isReadOnly,
 }: DocumentChainPanelProps) {
   const [showConvert, setShowConvert] = useState(false);
 
@@ -175,7 +175,7 @@ export function DocumentChainPanel({
 
       {hasRelations && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {chain.ancestors.map((ancestor, i) => (
+          {chain.ancestors.map((ancestor, _i) => (
             <div key={ancestor.id}>
               <ChainNodeCard node={ancestor} isCurrent={false} onNavigate={onNavigate} />
               <div style={{ marginRight: 16, borderRight: '2px solid var(--b2)', height: 6 }} />

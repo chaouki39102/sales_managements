@@ -566,7 +566,7 @@ function AdminModal({
   };
 
   // ✅ PATCH /admin/companies/{slug}/plan
-  const handleChangePlan = async (co: Company, plan: typeof PLANS[number]) => {
+  const _handleChangePlan = async (co: Company, plan: typeof PLANS[number]) => {
     try {
       await apiClient.patch(`/admin/companies/${co.slug}/plan`, { plan });
       setCompanies(prev => prev.map(c =>
@@ -579,7 +579,7 @@ function AdminModal({
   };
 
   // ✅ PATCH /admin/companies/{slug}/notes
-  const handleSaveNotes = async () => {
+  const _handleSaveNotes = async () => {
     if (!editTarget) return;
     setSaving(true);
     try {

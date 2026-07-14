@@ -1,8 +1,8 @@
 // lib/api/endpoints/openingBalances.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
-import { useActiveSlug } from '@/lib/store/appStore';
+
 
 export const openingBalancesApi = {
     getParties: (fiscalYearId: number) =>

@@ -94,7 +94,7 @@ export default function AdminSettingsPage() {
   };
 
   // ── Queries ────────────────────────────────────────────────────────────────
-  const { data: settings, isLoading } = useQuery({
+  const { data: _settings, isLoading } = useQuery({
     queryKey: ['admin', 'system', 'settings'],
     queryFn:  adminApi.getSettings,
     staleTime: 2 * 60_000,

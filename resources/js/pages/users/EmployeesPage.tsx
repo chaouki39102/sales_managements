@@ -9,7 +9,6 @@ import Modal from '@/components/ui/Modal';
 import KpiCard from '@/components/ui/KpiCard';
 import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
-import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
 import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
 import { employeesApi } from '@/lib/api/endpoints/employees';

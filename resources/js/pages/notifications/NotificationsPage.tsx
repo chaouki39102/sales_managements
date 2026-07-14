@@ -16,7 +16,7 @@ import {
   useDeleteMultipleNotificationsMutation,
 } from '@/hooks/useNotificationsQuery';
 import { useNotification } from '@/hooks/useNotification';
-import type { RemoteNotificationType, RemoteNotification } from '@/lib/api/endpoints/notifications';
+import type { RemoteNotificationType } from '@/lib/api/endpoints/notifications';
 import {
   NOTIFICATION_TYPE_ICON,
   NOTIFICATION_TYPE_COLOR,

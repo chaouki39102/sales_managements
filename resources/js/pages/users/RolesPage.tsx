@@ -70,7 +70,7 @@ function MyPermissionsSection() {
   const permissions = data.permissions ?? [];
 
   // تجميع الصلاحيات حسب prefix (الجزء قبل أول _)
-  const grouped = permissions.reduce<Record<string, string[]>>((acc, p) => {
+  const _grouped = permissions.reduce<Record<string, string[]>>((acc, p) => {
     const parts = p.split('_');
     // الجزء الأخير هو الفعل (view, create...) والأول هو المجال
     const group = parts.slice(1).join('_') || 'أخرى';
@@ -129,7 +129,7 @@ function MyPermissionsSection() {
             <div style={{ color: 'var(--t4)', fontSize: 12 }}>لا توجد صلاحيات مخصصة</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {permissions.map((p, i) => (
+              {permissions.map((p, _i) => (
                 <span
                   key={p}
                   style={{

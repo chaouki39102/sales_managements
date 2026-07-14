@@ -6,7 +6,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 import { useActiveSlug } from '../../store/appStore';
-import type { Check, PaginatedResponse, ListParams, CheckStatus } from '../core/types';
+import type { Check, PaginatedResponse, ListParams } from '../core/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

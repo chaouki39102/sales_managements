@@ -5,7 +5,7 @@ import type {
   MultiSortState, URLStateConfig, FilterMap,
   RowGroupConfig, RowGroup, ColumnPinConfig, ActiveCell,
   Column, CellValidationRule, PendingEdit, BatchEditState,
-  CellEditPayload, EditingCell, PasteOptions, SmartFilterResult, SavedView,
+  CellEditPayload, PasteOptions, SmartFilterResult, SavedView,
   SavedViewsConfig, ContextMenuItem, ContextMenuContext, ContextMenuState,
 } from './types';
 import {
@@ -16,7 +16,7 @@ import {
   getRawValue, parseTSV,
   applyClientFilter, applyGlobalSearch, applyClientSort, applyMultiSort,
 } from './utils';
-import type { SortState } from './types';
+
 
 // ==================== hooks الموجودة سابقاً (محفوظة بالكامل) ====================
 
@@ -83,7 +83,7 @@ export function useColumnResize(initialWidths: Record<string, number>) {
     if (!headerCell) return;
 
     // Measure header text width
-    const headerClone = headerCell.cloneNode(true) as HTMLElement;
+    const _headerClone = headerCell.cloneNode(true) as HTMLElement;
     const measure = document.createElement('div');
     measure.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;white-space:nowrap;font:inherit;direction:inherit;';
     document.body.appendChild(measure);
@@ -1230,7 +1230,7 @@ export function useTreeData<T>(
   const tree = useMemo(() => {
     if (!config) return null;
 
-    const { idKey, parentKey, defaultCollapsed = false } = config;
+    const { idKey, parentKey, defaultCollapsed: _defaultCollapsed = false } = config;
 
     // فهرسة البيانات
     const byId = new Map<string | number, T>();
@@ -1271,7 +1271,7 @@ export function useTreeData<T>(
   const treeRows = useMemo<TreeRow<T>[]>(() => {
     if (!config || !tree) return [];
 
-    const { idKey, parentKey } = config;
+    const { idKey: _idKey, parentKey: _parentKey } = config;
     const { byId, childrenOf, parentIds } = tree;
 
     const result: TreeRow<T>[] = [];
@@ -1401,8 +1401,8 @@ export interface CellRange {
 
 export function useRangeSelection(
   enabled: boolean,
-  rowCount: number,
-  colCount: number
+  _rowCount: number,
+  _colCount: number
 ): {
   range: CellRange | null;
   anchorCell: { row: number; col: number } | null;

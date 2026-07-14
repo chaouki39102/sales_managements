@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, { useState } from 'react';
-import { useAuditLogs, type AuditLog, type AuditListParams } from '@/lib/api/endpoints/audits';
+import { useAuditLogs, type AuditListParams } from '@/lib/api/endpoints/audits';
 import PageHeader from '@/components/ui/PageHeader';
 import Badge from '@/components/ui/Badge';
 import Skeleton from '@/components/ui/Skeleton';

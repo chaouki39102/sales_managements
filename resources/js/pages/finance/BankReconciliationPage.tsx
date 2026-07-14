@@ -5,7 +5,6 @@
 
 import React, { useState } from 'react';
 import { useReconciliationQueries, useReconciliationMutations } from '@/lib/api/endpoints/reconciliation';
-import type { ReconciledPayment } from '@/lib/api/endpoints/reconciliation';
 import PageHeader from '@/components/ui/PageHeader';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';

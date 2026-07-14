@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost, apiDelete, apiUpload } from '../core/client';
+import { apiGet, apiDelete, apiUpload } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug } from '../../store/appStore';
 

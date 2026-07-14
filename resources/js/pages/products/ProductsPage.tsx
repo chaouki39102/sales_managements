@@ -187,10 +187,10 @@ export default function ProductsPage() {
   };
 
   // Tooltip للتعبئات والأسعار
-  const [priceTooltip, setPriceTooltip] = useState<number | null>(null);
+  const [_priceTooltip, _setPriceTooltip] = useState<number | null>(null);
 
   // ── Lookups — single aggregated request (7 HTTP → 1) ──
-  const { data: productLookups, isLoading: lookupsLoading } = useProductAggregatedLookups();
+  const { data: productLookups, isLoading: _lookupsLoading } = useProductAggregatedLookups();
   const families = productLookups?.families ?? [];
   const brands   = productLookups?.brands ?? [];
 

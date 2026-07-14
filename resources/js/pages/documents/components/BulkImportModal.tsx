@@ -75,7 +75,7 @@ export function BulkImportModal({ open, onClose, onImport, products }: BulkImpor
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
 
-      const parsed: ParsedRow[] = json.map((row, i) => {
+      const parsed: ParsedRow[] = json.map((row, _i) => {
         const out: ParsedRow = { quantity: 0 };
         for (const [header, value] of Object.entries(row)) {
           const key = COLUMN_MAP[header.trim()] ?? guessColumn(header.trim());

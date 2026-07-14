@@ -11,7 +11,7 @@
 // ✅ createPortal + Smart positioning (RTL-aware)
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, memo } from 'react';
 import { createPortal }                          from 'react-dom';
 import type { Column }                           from './types';
 import { decodeRange, encodeRange, getRawValue } from './utils';
@@ -141,7 +141,7 @@ const FilterPopup = memo(function FilterPopup({
   const [dateTab, setDateTab] = useState<'shortcuts' | 'manual'>(
     () => {
       if (col.filter?.type !== 'date') return 'shortcuts';
-      const { min, max } = decodeRange(value);
+      const { min: _min, max: _max } = decodeRange(value);
       // إذا لا توجد قيمة أو تطابق اختصار → tab الاختصارات
       return 'shortcuts';
     }

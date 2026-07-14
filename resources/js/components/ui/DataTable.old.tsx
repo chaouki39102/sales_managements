@@ -7,7 +7,7 @@
 
 import React, {
   useState, useMemo, useCallback,
-  useRef, useEffect, useId, memo,
+  useRef, useEffect, memo,
   type ReactNode, type CSSProperties, type KeyboardEvent,
 } from 'react';
 
@@ -1269,7 +1269,7 @@ export function DataTable<T = Record<string, unknown>>({
 
   const nonIndexCols = useMemo(() => columns, [columns]);
   const allHidden    = nonIndexCols.length > 0 && nonIndexCols.every(c => hiddenKeys.has(c.key));
-  const someHidden   = !allHidden && nonIndexCols.some(c => hiddenKeys.has(c.key));
+  const _someHidden   = !allHidden && nonIndexCols.some(c => hiddenKeys.has(c.key));
 
   const toggleCollapseAll = useCallback(() => {
     if (allHidden) {

@@ -2,7 +2,7 @@
 // ✅ يدعم static routes + dynamic routes (/documents/:code, /admin/*)
 // ✅ المصدر الوحيد للـ page meta — DashboardLayout يستورد منه بدل PAGE_META المحلي
 
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 export interface PageMeta {
   title: string;

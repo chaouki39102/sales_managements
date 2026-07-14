@@ -6,7 +6,7 @@
 //   2: الدفعات             (جديد) ← POST /payments
 //   3: الأرصدة الافتتاحية  (جديد) ← /opening-balances/parties + /opening-balances/treasury
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -29,7 +29,7 @@ import { useOpeningParties, useOpeningTreasury, openingBalancesApi } from '@/lib
 import { ConfirmDialog } from '@/components/ui';
 import { ComboBox } from '@/pages/documents/components/DocumentUIPrimitives';
 import type { TreasuryAccount, PaymentMode } from '@/types';
-import type { ComboOption } from '@/pages/documents/components/DocumentUIPrimitives';
+
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
@@ -588,7 +588,7 @@ function PaymentModesTab({ paymentModes, loadingModes, openEditMode, deleteMode,
 // ════════════════════════════════════════════════════════════════════════════
 // TAB 2 — الدفعات
 // ════════════════════════════════════════════════════════════════════════════
-function PaymentsTab({ slug, selectedYearId, accounts, paymentModes, openEditPayment, qc }: {
+function PaymentsTab({ slug, selectedYearId, accounts, paymentModes: _paymentModes, openEditPayment, qc }: {
     slug: string;
     selectedYearId: number | null;
     accounts: any[];
@@ -598,7 +598,7 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes, openEditPay
 }) {
     const deleteConfirm = useConfirm();
     const notify        = useNotification();
-    const [filters, setFilters] = useState<PaymentFilters>({});
+    const [_filters, _setFilters] = useState<PaymentFilters>({});
     const [search,  setSearch]  = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [accountFilter, setAccountFilter] = useState('');

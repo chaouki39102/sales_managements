@@ -1,5 +1,5 @@
 // lib/api/admin/system.ts
-import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '@/lib/api/core/client';
+import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api/core/client';
 import { apiGetPaginated }         from './client';
 import type {
   AdminDashboardStats,

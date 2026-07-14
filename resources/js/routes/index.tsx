@@ -2,7 +2,7 @@
 // routes/index.tsx â€” Routing ط§ظ„ظƒط§ظ…ظ„ ظ„ظ„ظ†ط¸ط§ظ…
 // â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
 import React, { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes, Outlet } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useActiveCompany } from '@/lib/store/appStore';
 
@@ -117,17 +117,10 @@ function PageLoader() {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** ظٹطھط·ظ„ط¨ طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ ظپظ‚ط· */
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) return <PageLoader />;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
 /** طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ + ظ„ط§ ط´ط±ظƒط© ظ†ط´ط·ط© + ظ„ظٹط³ super-admin */
 function RequireNoCompany({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
-  const activeCompany = useActiveCompany();
+  const _activeCompany = useActiveCompany();
   if (isLoading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   // ط§ظ„ط³ظˆط¨ط± ط£ط¯ظ…ظ† ظ„ط§ ظٹظ…ط± ظ…ظ† ظ‡ظ†ط§ ط£ط¨ط¯ط§ظ‹ â€” ظ„ظ‡ ط¯ط§ط´ط¨ظˆط±ط¯ظ‡ ط§ظ„ط®ط§طµ

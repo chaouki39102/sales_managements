@@ -21,7 +21,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAdminCompanies } from '@/hooks/admin';
 import { useDebounce }       from '@/hooks/useDebounce';
 import CompanyDrawer         from '@/components/admin/CompanyDrawer';
-import { companiesApi, plansApi } from '@/lib/api/admin';
+import { plansApi } from '@/lib/api/admin';
 import {
   Avatar, StatusBadge, EmptyState, Spinner, fmtDate,
 } from '@/components/admin/shared';

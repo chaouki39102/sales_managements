@@ -59,7 +59,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt, lineWarnings, warehouses,
 }: DocumentLineRowProps) {
 
-  const { baseQty, gross, discountAmt, discPct, ht, tva: lineTva, ttc } = calcLineTotal(line);
+  const { baseQty, gross: _gross, discountAmt, discPct: _discPct, ht, tva: _lineTva, ttc } = calcLineTotal(line);
 
   const prodFromList = products.find((p) => String(p.id) === line.product_id);
   const prod         = prodFromList ?? line._product;

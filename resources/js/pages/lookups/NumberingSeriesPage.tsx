@@ -344,7 +344,7 @@ function ConfirmDeleteModal({ open, onClose, onConfirm, loading }: {
 
 // =============== NumberingSeries Modal (محسّن) ===============
 function NumberingSeriesModal({
-  open, record, documentTypes, warehouses, slug, onClose,
+  open, record, documentTypes, warehouses, slug: _slug, onClose,
 }: {
   open: boolean; record: NumberingSeriesRecord | null; documentTypes: DocumentTypeOption[]; warehouses: WarehouseOption[]; slug: string | null; onClose: () => void;
 }) {

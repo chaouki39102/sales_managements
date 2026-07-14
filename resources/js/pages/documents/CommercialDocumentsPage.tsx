@@ -1809,7 +1809,7 @@ export default function CommercialDocumentsPage() {
 
                         // ── Selection + Batch Print ──────────────────────
                         selectable
-                        bulkActions={(selectedRows: CommercialDocument[], clearSelection: () => void) => (
+                        bulkActions={(selectedRows: CommercialDocument[], _clearSelection: () => void) => (
                             <button
                                 onClick={() => { setBatchDocs(selectedRows as CommercialDocument[]); setBatchPrintOpen(true); }}
                                 className="dt-bulk-btn"

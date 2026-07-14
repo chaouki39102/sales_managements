@@ -9,7 +9,7 @@ import { tenantKeys }                        from '../core/queryKeys';
 import { useActiveSlug, useSelectedYearId }  from '../../store/appStore';
 import type {
   Party, Product, ProductVariant,
-  CommercialDocument, Payment, StockMovement,
+  CommercialDocument, Payment,
 } from '../core/types';
 
 // ─── Report Params ────────────────────────────────────────────────────────────

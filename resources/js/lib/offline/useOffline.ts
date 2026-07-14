@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPendingOpsCount, clearPendingOps, type PendingOp } from './db';
+import { getPendingOpsCount } from './db';
 
 export function useOnlineStatus(): boolean {
   const [online, setOnline] = useState(() =>

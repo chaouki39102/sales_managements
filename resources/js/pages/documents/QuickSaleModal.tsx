@@ -514,8 +514,8 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     return { ht, tva, ttc, stamp, netPay };
   }, [lines]);
 
-  const payAmount = useMemo(() => {
-    // إذا كان المبلغ 0 أو أكبر من المستحق، نستخدم المستحق
+  const _payAmount = useMemo(() => {
+    // اگر المبلغ 0 أو أكبر من المستحق، نستخدم المستحق
     const amt = payment.amount;
     if (amt <= 0 || amt >= totals.netPay) return totals.netPay;
     return amt;
@@ -623,7 +623,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
   }, []);
   const getPartyLabel = useCallback((p: Record<string, unknown>) => String(p.name), []);
 
-  const handleSave = useCallback(() => {
+  const _handleSave = useCallback(() => {
     setApiErr('');
     if (validate()) saveMut.mutate();
   }, [validate, saveMut]);
@@ -1046,7 +1046,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
                       <SearchSelect
                         items={products as any}
                         value={line.product_id}
-                        onChange={(id, item) => updateLine(idx, 'product_id', id)}
+                        onChange={(id, _item) => updateLine(idx, 'product_id', id)}
                         getLabel={getProductLabel as any}
                         getSub={getProductSub as any}
                         placeholder="— اختر منتجاً —"
@@ -1551,7 +1551,7 @@ function cellStyle(): React.CSSProperties {
   };
 }
 
-function selectStyle(disabled: boolean, hasValue: boolean): React.CSSProperties {
+function _selectStyle(disabled: boolean, hasValue: boolean): React.CSSProperties {
   return {
     width: '100%',
     padding: '8px 12px 8px 34px',
@@ -1568,7 +1568,7 @@ function selectStyle(disabled: boolean, hasValue: boolean): React.CSSProperties 
   };
 }
 
-function inpNumStyle(err?: boolean): React.CSSProperties {
+function _inpNumStyle(err?: boolean): React.CSSProperties {
   return {
     width: '100%',
     boxSizing: 'border-box',
@@ -1584,7 +1584,7 @@ function inpNumStyle(err?: boolean): React.CSSProperties {
   };
 }
 
-function selectNumStyle(disabled: boolean, hasValue: boolean): React.CSSProperties {
+function _selectNumStyle(disabled: boolean, hasValue: boolean): React.CSSProperties {
   return {
     width: '100%',
     padding: '8px 12px 8px 34px',

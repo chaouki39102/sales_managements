@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { apiGet, apiPost, apiPut, apiDelete, apiPatch } from '../core/client';
+import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug } from '../../store/appStore';
 import type { User, Role, Permission, PaginatedResponse, ListParams } from '../core/types';

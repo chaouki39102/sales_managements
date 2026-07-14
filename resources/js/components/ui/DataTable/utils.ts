@@ -2,7 +2,7 @@
 
 import type {
   Column, SortState, MultiSortState, FilterMap, AggregateType, RangeFilter,
-  ConditionalFormat, ExcelExportOptions, ExcelExportAdvancedOptions,
+  ConditionalFormat, ExcelExportOptions,
 } from './types';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -313,7 +313,7 @@ export async function exportToExcel<T>(
         onSave,
       },
     );
-  } catch (error) {
+  } catch (_error) {
     // Fallback: CSV مع إشعار المستخدم
     console.warn(
       'DataTable: مكتبة exceljs غير متوفرة — جارٍ التصدير بصيغة CSV.\n' +

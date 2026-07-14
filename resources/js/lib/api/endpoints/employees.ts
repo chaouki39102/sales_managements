@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
-import { tenantKeys } from '../core/queryKeys';
+
 import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
 import type { Employee } from '../core/types';
 

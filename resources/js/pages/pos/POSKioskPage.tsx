@@ -17,10 +17,10 @@ import {
   buildIncrementInput,
 } from '@/lib/api/endpoints/posSession';
 import {
-  productToVariant, makeFakeVariant,
+  productToVariant,
   type ViewMode, type GridSize, type SortMode,
 } from '@/pos/utils/posHelpers';
-import { formatDZD, ttcToHt }         from '@/pos/utils/calculations';
+import { formatDZD }         from '@/pos/utils/calculations';
 import { settingsApi }                from '@/lib/api/endpoints/settings';
 import { isWebUsbSupported, getThermalAutoPrint, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';

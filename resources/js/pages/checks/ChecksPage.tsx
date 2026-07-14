@@ -1,8 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api/core/client';
-import { tenantKeys } from '@/lib/api/core/queryKeys';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
@@ -439,7 +438,7 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-const actionBtnStyle = (color: string): React.CSSProperties => ({
+const actionBtnStyle = (_color: string): React.CSSProperties => ({
   width: 30, height: 30, borderRadius: 6,
   border: '1px solid var(--b2)', background: 'var(--bg3)',
   cursor: 'pointer', display: 'inline-flex',

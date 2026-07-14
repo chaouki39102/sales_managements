@@ -65,7 +65,7 @@ const sectionTitleCls: React.CSSProperties = {
 
 export default function ProductLotsTab() {
   const slug = useActiveSlug();
-  const qc = useQueryClient();
+  const _qc = useQueryClient();
   const { notify } = useNotification();
   const deleteConfirm = useConfirm();
   const createModal = useModal();
@@ -413,7 +413,7 @@ export default function ProductLotsTab() {
             {meta && meta.last_page > 1 && (
               <div style={{ padding: '0 16px', borderTop: '1px solid var(--b1)' }}>
                 <Pagination meta={meta} onPageChange={setPage}
-                  onPerPageChange={(pp) => { setPage(1); }} />
+                  onPerPageChange={(_pp) => { setPage(1); }} />
               </div>
             )}
           </>

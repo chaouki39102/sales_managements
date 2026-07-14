@@ -9,13 +9,11 @@ import {
     useMutation,
     useQueryClient,
     keepPreviousData,
-    type UseQueryOptions,
 } from "@tanstack/react-query";
 import {
     apiGet,
     apiPost,
     apiPut,
-    apiPatch,
     apiDelete,
     apiUpload,
 } from "../core/client";
@@ -25,7 +23,7 @@ import type { PaginatedResponse, ListParams, BaseModel } from "../core/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ResourceConfig<T> {
+interface ResourceConfig {
     resource: string;
     /** * التعديل هنا: جعل params اختيارية في النوع ليتوافق مع تعريف queryKeys
      * واستخدام any لتجنب صرامة التوافق مع Record<string, unknown>
@@ -37,7 +35,7 @@ interface ResourceConfig<T> {
 // ─── Hook Factory ─────────────────────────────────────────────────────────────
 
 export function createResourceHooks<T extends BaseModel>(
-    config: ResourceConfig<T>,
+    config: ResourceConfig,
 ) {
     const { resource, queryKey, staleTime = 5 * 60_000 } = config;
 
@@ -79,7 +77,7 @@ export function createResourceHooks<T extends BaseModel>(
 
         return useMutation({
             mutationFn: (data: Partial<T>) => apiPost<T>(`/${resource}`, data),
-            onSuccess: (created) => {
+            onSuccess: (_created) => {
                 if (slug) {
                     // Optimistic: أضف للكاش مباشرة بدلاً من إعادة الجلب
                     qc.invalidateQueries({ queryKey: queryKey(slug) });

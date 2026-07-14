@@ -74,7 +74,7 @@ interface ApprovalActionsProps {
   approvalCheck?: ApprovalCheck;
 }
 
-export function ApprovalActions({ documentId, statusSlug, netToPay, approvalCheck }: ApprovalActionsProps) {
+export function ApprovalActions({ documentId, statusSlug, netToPay: _netToPay, approvalCheck }: ApprovalActionsProps) {
   const { notify } = useNotification();
   const { data: hookCheck } = useApprovalCheck(approvalCheck === undefined ? documentId : null);
   const check = approvalCheck ?? hookCheck;
