@@ -26,12 +26,12 @@ import { buildReceiptBytesFromTemplate } from '@/pos/utils/printService';
 import { emptyDocumentData } from '@/pages/settings/print-settings/types/data';
 import { createMockTemplate } from '@/pages/settings/print-settings/__tests__/fixtures/templates';
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data';
-import type { PrintTemplate, DocTypeCode } from '@/pages/settings/print-settings/types';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Convert a Uint8Array to a hex string for readable test output */
-function toHex(bytes: Uint8Array): string {
+function _toHex(bytes: Uint8Array): string {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
 }
 

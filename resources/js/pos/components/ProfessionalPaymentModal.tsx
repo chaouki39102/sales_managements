@@ -388,7 +388,7 @@ export default function ProfessionalPaymentModal({
   const availableDocTypes = documentTypes.filter(t => DOC_CODES.includes(t.code as typeof DOC_CODES[number]));
 
   // ── Treasury accounts per mode ─────────────────────────────────────────────
-  const getAccountsForMode = useCallback((modeId: number) => {
+  const getAccountsForMode = useCallback((_modeId: number) => {
     if (!treasuryAccounts) return [];
     // نُظهر حسابات الخزينة المرتبطة بوسيلة الدفع (أو كلها)
     return treasuryAccounts;

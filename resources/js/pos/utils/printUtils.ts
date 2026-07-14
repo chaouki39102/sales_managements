@@ -24,7 +24,7 @@ export async function printReceiptDirect(opts: PrintDirectOptions): Promise<void
   }
 }
 
-function openPrintWindow(html: string, paperWidthMm: number): Promise<void> {
+function openPrintWindow(html: string, _paperWidthMm: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const win = window.open('', '_blank', 'width=400,height=600');
     if (!win) {
