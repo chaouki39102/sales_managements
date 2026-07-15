@@ -116,7 +116,7 @@ export default function ProductSearchBar({
       <button
         className={`pos-tool-icon ${filterActive ? 'pos-tool-icon--active' : ''}`}
         onClick={onFilter}
-        title="فلتر متقدم — F3"
+        title={`فلتر متقدم — ${kb('filter')}`}
         style={{ width: 34, height: 34 }}
       >
         <i className="ti ti-adjustments-horizontal" />

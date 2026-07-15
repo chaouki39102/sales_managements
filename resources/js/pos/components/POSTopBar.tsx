@@ -53,10 +53,6 @@ export default function POSTopBar({
   const netSales      = session?.net_sales      ?? 0;
   const kb            = (action: string) => getEffectiveShortcut(slug, action) ?? '';
 
-  // ── قائمة التعريفة (تجزئة/نصف جملة/جملة...) — منقولة من السلة إلى الشريط
-  // العلوي كي تبقى واضحة ومتاحة دائماً دون أن تحجز مساحة دائمة من السلة.
-  // الـ portal يضمن ظهور القائمة خارج نطاق overflow-x:auto لـ pos-topbar
-  // الذي يقطع (clip) المحتوى المتجاوز لحدود الشريط حسب مواصفة CSS. ──
   const [showTarifDrop, setShowTarifDrop] = useState(false);
   const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
   const tarifRef = useRef<HTMLDivElement>(null);
@@ -91,7 +87,7 @@ export default function POSTopBar({
         <div
           className="pos-chip g clickable"
           onClick={onSessionInvoices}
-          title="فواتير الجلسة"
+          title={`فواتير الجلسة — ${kb('sessionInvoices')}`}
         >
           <i className="ti ti-receipt pic-ic" />
           <div className="pos-chip-inner">
@@ -204,25 +200,29 @@ export default function POSTopBar({
 
         <span className="tb-sep" aria-hidden="true" />
 
-        <button className="btn btn-xs" onClick={onNewSale} title={`بيع جديد / تعليق — ${kb('holdCart')}`}>
+        <button className="btn btn-xs" onClick={onNewSale} title="بيع جديد / تعليق">
           <i className="ti ti-plus" />
           <span className="tb-txt"> جديد</span>
+          {kb('holdCart') && <kbd className="pos-kbd">{kb('holdCart')}</kbd>}
         </button>
-        <button className="btn btn-xs" onClick={onReturn} title={`مرتجع — ${kb('returns')}`}>
+        <button className="btn btn-xs" onClick={onReturn} title="مرتجع">
           <i className="ti ti-receipt-refund" />
           <span className="tb-txt"> مرتجع</span>
+          {kb('returns') && <kbd className="pos-kbd">{kb('returns')}</kbd>}
         </button>
-        <button className="btn btn-xs" onClick={onManual} title={`إضافة يدوي — ${kb('manualProduct')}`}>
+        <button className="btn btn-xs" onClick={onManual} title="إضافة يدوي">
           <i className="ti ti-keyboard" />
           <span className="tb-txt"> يدوي</span>
+          {kb('manualProduct') && <kbd className="pos-kbd">{kb('manualProduct')}</kbd>}
         </button>
         <button
-          className="btn btn-xs"
+          className="btn btn-xs pos-sc"
           onClick={onReceipt}
           disabled={isEmpty}
-          title={`معاينة الإيصال — ${kb('preview')}`}
+          title="معاينة الإيصال"
         >
           <i className="ti ti-printer" />
+          {kb('preview') && <kbd>{kb('preview')}</kbd>}
         </button>
 
         <span className="tb-sep" aria-hidden="true" />
@@ -237,7 +237,7 @@ export default function POSTopBar({
         <button
           className="btn btn-xs"
           onClick={onOpenDrawer}
-          title="فتح درج النقود — Ctrl+D"
+          title={`فتح درج النقود — ${kb('openDrawer')}`}
         >
           <i className="ti ti-cash-banknote" />
         </button>
@@ -267,13 +267,14 @@ export default function POSTopBar({
           <i className="ti ti-settings-2" />
         </button>
         <button
-          className="btn btn-xs"
+          className="btn btn-xs pos-sc"
           onClick={onFullscreen}
-          title={isFullscreen ? `خروج من ملء الشاشة — ${kb('fullscreen')}` : `ملء الشاشة — ${kb('fullscreen')}`}
+          title={isFullscreen ? 'خروج من ملء الشاشة' : 'ملء الشاشة'}
         >
           <i className={`ti ${isFullscreen ? 'ti-minimize' : 'ti-maximize'}`} />
+          {kb('fullscreen') && <kbd>{kb('fullscreen')}</kbd>}
         </button>
-        <button className="btn btn-xs" onClick={onKbHelp} title="اختصارات لوحة المفاتيح — F1">
+        <button className="btn btn-xs" onClick={onKbHelp} title="اختصارات لوحة المفاتيح">
           <i className="ti ti-keyboard" />
           <span className="tb-txt"> F1</span>
         </button>

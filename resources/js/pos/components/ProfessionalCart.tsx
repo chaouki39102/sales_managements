@@ -232,7 +232,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 className="btn btn-xs"
                 onClick={zoomOut}
                 disabled={cartZoom <= 0.75}
-                title="تصغير النص — Ctrl+-"
+                title={`تصغير النص — ${kb('zoomOut')}`}
               >
                 <i className="ti ti-minus" />
               </button>
@@ -240,7 +240,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 className="btn btn-xs"
                 onClick={zoomIn}
                 disabled={cartZoom >= 1.25}
-                title="تكبير النص — Ctrl++"
+                title={`تكبير النص — ${kb('zoomIn')}`}
               >
                 <i className="ti ti-plus" />
               </button>
@@ -252,8 +252,9 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
               >
                 <i className={`ti ${density === 'compact' ? 'ti-list-details' : 'ti-list'}`} />
               </button>
-              <button className="btn btn-xs" onClick={onHeld} title={`الفواتير المعلقة (${kb('heldCarts')})`}>
+              <button className="btn btn-xs pos-sc" onClick={onHeld} title="الفواتير المعلقة">
                 <i className="ti ti-clock-pause" />
+                {kb('heldCarts') && <kbd>{kb('heldCarts')}</kbd>}
               </button>
               <button
                 className={`btn btn-xs ${note ? 'btn-p' : ''}`}
@@ -272,12 +273,13 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 {undoClearSecondsLeft > 0 && <span className="undo-ct">{undoClearSecondsLeft}</span>}
               </button>
               <button
-                className="btn btn-xs btn-r"
+                className="btn btn-xs btn-r pos-sc"
                 onClick={onClear}
                 disabled={isEmpty}
-                title={`مسح السلة — ${kb('clearCart')}`}
+                title="مسح السلة"
               >
                 <i className="ti ti-trash" />
+                {kb('clearCart') && <kbd>{kb('clearCart')}</kbd>}
               </button>
             </div>
           </div>
@@ -507,9 +509,10 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
             className="btn btn-sm"
             onClick={onHold}
             disabled={isEmpty}
-            title={`تعليق الفاتورة — ${kb('holdCart')}`}
+            title="تعليق الفاتورة"
           >
             <i className="ti ti-clock-pause" /> تعليق
+            {kb('holdCart') && <kbd className="pos-kbd">{kb('holdCart')}</kbd>}
           </button>
           <button
             className="cart-sell-btn"
