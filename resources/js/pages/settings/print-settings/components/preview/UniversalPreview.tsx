@@ -11,6 +11,7 @@ import { renderTotals } from './TotalsSection';
 import { renderPayments } from './PaymentsSection';
 import { renderFooter } from './FooterSection';
 import { renderReport } from './ReportSection';
+import DeliveryReceiptA5 from './DeliveryReceiptA5';
 import { rulesEngine } from '../../services/engines/RulesEngine';
 import { formulaEngine, type EvaluationContext, type ExpressionValue } from '../../services/engines/FormulaEngine';
 import { calculatedFieldService } from '../../services/CalculatedFieldService';
@@ -59,6 +60,7 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   const isThermal   = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
   const isA4        = tpl.paper_size === 'A4';
   const _isA5        = tpl.paper_size === 'A5';
+  const isDeliveryA5 = tpl.doc_type_code === 'BL' && tpl.paper_size === 'A5';
   const isLandscape = !isThermal && tpl.page_orientation === 'landscape';
 
   const portraitW = isA4 ? 794 : 559;
@@ -120,17 +122,23 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
       boxSizing: 'border-box',
     }}>
       <PageFrame config={frameConfig ?? { enabled: false }} tpl={tpl}>
-        {orderedSections.map(meta => {
-          if (!showSection(meta.key)) return null;
-          const renderer = SECTION_RENDERERS[meta.key];
-          if (!renderer) return null;
-          return (
-            <SectionWrap key={meta.key} highlight={sectionHighlight(meta.key)}>
-              {renderer(tpl, data, isThermal, paperWidth)}
-            </SectionWrap>
-          );
-        })}
-        {data.report && renderReport(tpl, data, isThermal, paperWidth)}
+        {isDeliveryA5 ? (
+          <DeliveryReceiptA5 tpl={tpl} data={data} />
+        ) : (
+          <>
+            {orderedSections.map(meta => {
+              if (!showSection(meta.key)) return null;
+              const renderer = SECTION_RENDERERS[meta.key];
+              if (!renderer) return null;
+              return (
+                <SectionWrap key={meta.key} highlight={sectionHighlight(meta.key)}>
+                  {renderer(tpl, data, isThermal, paperWidth)}
+                </SectionWrap>
+              );
+            })}
+            {data.report && renderReport(tpl, data, isThermal, paperWidth)}
+          </>
+        )}
       </PageFrame>
     </div>
   );

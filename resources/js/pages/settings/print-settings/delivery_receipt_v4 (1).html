@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>وصل تسليم BL3257</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a0a0a;     /* نص أساسي وحدود قوية */
+    --muted:#5c5c5c;   /* نص ثانوي/تسميات — رمادي متوسط (كانت مطابقة للأسود سابقاً بالخطأ) */
+    --line:#2a2a2a;
+    --paper:#ffffff;
+    --tint:#f5f5f5;    /* تظليل خفيف: تناوب الصفوف */
+    --dark:#e7e7e7;    /* رمادي فاتح: لمسة الشريط العلوي فقط */
+  }
+  @page { size: A5; margin: 5mm; }
+  * { box-sizing: border-box; }
+  html, body{
+    margin:0; padding:0;
+    font-family:"Tajawal","Cairo",Arial,sans-serif;
+    color:var(--ink);
+    background:#dfe2e8;
+  }
+
+  .page{
+    width:148mm;
+    min-height:210mm;
+    background:var(--paper);
+    margin:10mm auto;
+    padding:8mm 8mm 6mm;
+    position:relative;
+    box-shadow:0 4px 18px rgba(0,0,0,.18);
+    overflow:hidden;
+  }
+  .page::before{
+    content:"";
+    position:absolute; top:0; left:0; right:0;
+    height:2.5mm;
+    background:var(--dark);
+  }
+
+  .no-print{ text-align:center; margin:12px 0 30px; }
+  .no-print button{
+    background:#1a1a1a;
+    color:#fff; border:none;
+    padding:11px 30px;
+    font-size:15px; font-weight:700;
+    border-radius:7px; cursor:pointer;
+    font-family:inherit;
+    letter-spacing:.3px;
+    box-shadow:0 3px 8px rgba(0,0,0,.25);
+  }
+  .no-print button:hover{ background:#000; }
+  .no-print button:focus-visible{ outline:2px solid #000; outline-offset:3px; }
+
+  /* ===================== HEADER ===================== */
+  .header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-top:4mm;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .logo-mark{
+    width:44px; height:44px;
+    border-radius:50%;
+    background:var(--ink);
+    color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:12px;
+    text-align:center;
+    line-height:1.15;
+    flex-shrink:0;
+  }
+  .brand-text .company-name{
+    font-size:20px; font-weight:800;
+    color:var(--ink);
+    line-height:1.15;
+  }
+  .brand-text .company-sub{
+    font-size:10.5px;
+    color:var(--muted);
+    font-weight:500;
+    margin-top:1px;
+  }
+  /* ===================== HEADER GRID (يمين: معلومات الشركة | يسار: رقم الوصل/التاريخ + الزبون) ===================== */
+  .header-grid{
+    margin-top:4mm;
+    display:flex;
+    justify-content:space-between;
+    align-items:stretch;
+    gap:10px;
+  }
+  .col-right{
+    flex:1;
+  }
+  .company-contact{
+    margin-top:5px;
+    border:1px solid var(--line);
+    border-right:3px solid var(--ink);
+    border-radius:4px;
+    padding:7px 12px;
+    font-size:11px;
+    line-height:1.85;
+    color:var(--muted);
+  }
+  .company-contact b{ color:var(--ink); }
+
+  .col-left{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .box{
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:6px 12px;
+    font-size:11.5px;
+    line-height:1.9;
+  }
+  .box b{ color:var(--ink); }
+
+  hr.sep{
+    border:none;
+    border-top:1px solid #d5d5d5;
+    margin:4mm 0 3mm;
+  }
+
+  /* ===================== CLIENT + TITLE ===================== */
+  .client-card{
+    border:1px solid var(--line);
+    border-right:3px solid var(--ink);
+    border-radius:4px;
+    padding:7px 12px;
+    font-size:12px;
+    line-height:1.9;
+  }
+  .client-card .k{ color:var(--muted); font-weight:500; }
+  .client-card .v{ font-weight:700; color:var(--ink); }
+
+  .title-block{
+    margin-top:5mm;
+    text-align:center;
+  }
+  .title-block .doc-title{
+    font-size:23px;
+    font-weight:800;
+    color:var(--ink);
+    letter-spacing:1.5px;
+    position:relative;
+    display:inline-block;
+    padding-bottom:4px;
+  }
+  .title-block .doc-title::after{
+    content:"";
+    position:absolute;
+    bottom:0; right:0; left:0;
+    height:2px;
+    background:var(--ink);
+  }
+
+  /* ===================== ITEMS TABLE ===================== */
+  table.items{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:3mm;
+    font-size:11.5px;
+  }
+  table.items thead th{
+    background:var(--ink);
+    color:#fff;
+    font-weight:700;
+    padding:6px 4px;
+    border:1px solid var(--ink);
+  }
+  table.items tbody td{
+    border:1px solid #d5d5d5;
+    padding:6px 5px;
+    text-align:center;
+  }
+  table.items tbody tr:nth-child(even){ background:var(--tint); }
+  table.items td.designation{ text-align:right; font-weight:600; font-size:12.5px; }
+  table.items .num-col{ width:6%; color:var(--muted); }
+  table.items .qty-col{ width:9%; font-weight:800; font-size:13px; }
+  table.items .op-col{ width:5%; color:var(--muted); font-weight:700; }
+  table.items .unit-col{ width:15%; }
+  table.items .totalqty-col{ width:11%; }
+  table.items .unitprice-col{ width:12%; }
+  table.items .amount-col{ width:16%; font-weight:800; }
+
+  /* ===================== TOTALS + STAMP + INFO ===================== */
+  /* الترتيب البصري (يمين->يسار): معلومات الطباعة | الختم | جدول المجاميع (أقصى اليسار) */
+  .bottom-grid{
+    display:flex;
+    gap:8px;
+    margin-top:3mm;
+    align-items:stretch;
+  }
+  .info-card{
+    flex:0.85;
+    border:1px solid var(--line);
+    border-radius:4px;
+    overflow:hidden;
+    font-size:11px;
+    align-self:flex-start;
+  }
+  .info-card .i-head{
+    display:flex;
+    background:var(--tint);
+    font-weight:700;
+    border-bottom:1px solid var(--line);
+  }
+  .info-card .i-head div, .info-card .i-row div{
+    flex:1; padding:5px 6px; text-align:center;
+  }
+  .info-card .i-row{ border-bottom:1px solid #e8e8e8; }
+  .info-card .i-row:last-child{ border-bottom:none; }
+  .info-card .i-row div:first-child{ color:var(--muted); }
+  .info-card .i-row div:last-child{ font-weight:700; }
+
+  .middle-col{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+  }
+  .stamp-box{
+    border:1.5px dashed #a3a3a3;
+    border-radius:4px;
+    flex:1;
+    min-height:78px;
+    position:relative;
+  }
+  .stamp-box .stamp-label{
+    position:absolute; top:5px; right:8px;
+    font-size:11px; color:var(--muted); font-weight:600;
+  }
+  .warning-note{
+    font-size:9.5px;
+    color:var(--muted);
+    line-height:1.5;
+    text-align:center;
+    padding:0 2px;
+  }
+
+  .totals-card{
+    flex:1.25;
+    border:1px solid var(--line);
+    border-radius:4px;
+    overflow:hidden;
+    font-size:12px;
+    align-self:flex-start;
+  }
+  .totals-card .t-row{
+    display:flex;
+    justify-content:space-between;
+    padding:5px 10px;
+    border-bottom:1px solid #e8e8e8;
+  }
+  .totals-card .t-row:last-child{
+    border-bottom:none;
+    background:var(--ink);
+    color:#fff;
+    font-weight:800;
+    font-size:13px;
+    padding:7px 10px;
+    border-top:1px solid var(--ink);
+  }
+  .totals-card .t-row .label{ color:var(--ink); font-weight:600; }
+  .totals-card .t-row:last-child .label{ color:#fff; }
+  .totals-card .t-row .value{ font-weight:800; direction:ltr; }
+
+  /* ===================== FOOTER ===================== */
+  .footer{
+    margin-top:4mm;
+    text-align:center;
+  }
+  .footer .printed-meta{
+    font-size:10px;
+    color:var(--muted);
+    line-height:1.6;
+  }
+  .barcode-area{
+    margin-top:4px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+  }
+  .barcode-graphic{
+    direction:ltr;
+    line-height:0;
+  }
+  .barcode-graphic svg{ display:block; }
+  .bcode-num{
+    font-family:"Courier New",monospace;
+    font-size:11px;
+    letter-spacing:2px;
+    color:var(--muted);
+    direction:ltr;
+  }
+
+
+
+  @media print{
+    *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; color-adjust:exact; }
+    body{ background:#fff; }
+    .page{ margin:0 auto; box-shadow:none; }
+    .no-print{ display:none; }
+    table.items tr{ page-break-inside:avoid; }
+    .bottom-grid, .footer{ page-break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page" id="receiptPage">
+
+  <!-- Header: يمين = معلومات الشركة + عنوان الوصل | يسار = رقم الوصل والتاريخ + معلومات الزبون -->
+  <div class="header-grid">
+    <div class="col-right">
+      <div class="brand">
+        <div class="logo-mark">08<br>ماي</div>
+        <div class="brand-text">
+          <div class="company-name">شركة سوف للتموين</div>
+          <div class="company-sub">تجارة بالجملة للمواد الغذائية</div>
+        </div>
+      </div>
+      <div class="company-contact">
+        <div>  الهاتف: 0560618448</div>
+        <div> العنوان: <b>الوادي</b> </div>
+        <div>  الكاشير: <b>ABDESSADOK Chaouki</b> </div>
+      </div>
+      <div class="title-block">
+        <span class="doc-title">وصل تسليم</span>
+      </div>
+    </div>
+
+    <div class="col-left">
+      <div class="box">
+        <div>  وصل رقم: <b>3257BL</b></div>
+        <div>  التاريخ: <b>2026-06-17</b></div>
+        <div>  الصفحة: <b>1/1</b></div>
+      </div>
+      <div class="client-card">
+        <span class="k">المطلوب من:</span> <span class="v">شركة سوبيرات عسيلة للتجارة ش ذ</span><br>
+        <span class="k">الهاتف:</span> <span class="v">05 05 05 05 05</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- Items Table -->
+  <table class="items">
+    <thead>
+      <tr>
+        <th class="num-col">رقم</th>
+        <th>التعين</th>
+        <th class="qty-col">الكمية</th>
+        <th class="op-col"></th>
+        <th class="unit-col">الوحدة</th>
+        <th class="totalqty-col">الكمية الاجمالية</th>
+        <th class="unitprice-col">الثمن الوحدي</th>
+        <th class="amount-col">المبلغ</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td class="designation">زيت لابل 05 ل</td>
+        <td class="qty-col">24</td>
+        <td class="op-col">×</td>
+        <td>بليطة(168)</td>
+        <td>4032</td>
+        <td>590.00</td>
+        <td>2 378 880.00</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ترتيب العناصر بالأسفل: معلومات (يمين) ، ختم (وسط) ، مجاميع (يسار) -->
+  <div class="bottom-grid">
+    <div class="info-card">
+      <div class="i-head"><div>معلومة</div><div>القيمة</div></div>
+      <div class="i-row"><div>صفحات</div><div>1</div></div>
+      <div class="i-row"><div>الكمية</div><div>24</div></div>
+    </div>
+
+    <div class="middle-col">
+      <div class="stamp-box">
+        <div class="stamp-label">الختم</div>
+      </div>
+      <div class="warning-note">عزيزي الزبون تأكد من سلعتك قبل التسليم.</div>
+    </div>
+
+    <div class="totals-card">
+      <div class="t-row"><span class="label">المبلغ TTC</span><span class="value">2 378 880.00</span></div>
+      <div class="t-row"><span class="label">الدين القديم</span><span class="value">0.00</span></div>
+      <div class="t-row"><span class="label">المجموع</span><span class="value">2 378 880.00</span></div>
+      <div class="t-row"><span class="label">المدفوع</span><span class="value">0.00</span></div>
+      <div class="t-row"><span class="label">الرصيد الجديد</span><span class="value">2 378 880.00</span></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="printed-meta">
+      <div>2026-06-21 09:08:38 : مطبوعة</div>
+      <div>ABDESSADOK Chaouki : من طرف</div>
+    </div>
+    <div class="barcode-area">
+      <div class="barcode-graphic" id="barcodeBars"></div>
+      <div class="bcode-num" id="barcodeNum">14290</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="no-print">
+  <button onclick="window.print()">🖨️ طباعة الوصل</button>
+</div>
+
+<script>
+  // ============================================================
+  // مولّد باركود Code 39 حقيقي (وليس زخرفة عشوائية كما كان سابقاً).
+  // جدول الأنماط منقول حرفياً من مكتبة python-barcode المرجعية
+  // وتم التحقق من تطابقه بايت-بايت قبل اعتماده هنا.
+  // يقرأ القيمة من #barcodeNum مباشرة، فالرسم يطابق دائماً الرقم المطبوع تحته.
+  // ============================================================
+  (function(){
+    var REF = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%".split("");
+    var CODES = [
+      "101000111011101","111010001010111","101110001010111","111011100010101",
+      "101000111010111","111010001110101","101110001110101","101000101110111",
+      "111010001011101","101110001011101","111010100010111","101110100010111",
+      "111011101000101","101011100010111","111010111000101","101110111000101",
+      "101010001110111","111010100011101","101110100011101","101011100011101",
+      "111010101000111","101110101000111","111011101010001","101011101000111",
+      "111010111010001","101110111010001","101010111000111","111010101110001",
+      "101110101110001","101011101110001","111000101010111","100011101010111",
+      "111000111010101","100010111010111","111000101110101","100011101110101",
+      "100010101110111","111000101011101","100011101011101","100010001000101",
+      "100010001010001","100010100010001","101000100010001"
+    ];
+    var EDGE = "100010111011101";
+    var MAP = {};
+    REF.forEach(function(ch, i){ MAP[ch] = CODES[i]; });
+
+    function encodeCode39(raw){
+      var code = String(raw).toUpperCase();
+      var parts = [EDGE];
+      for (var i = 0; i < code.length; i++){
+        if (MAP[code[i]]) parts.push(MAP[code[i]]);
+      }
+      parts.push(EDGE);
+      return parts.join("0");
+    }
+
+    function renderBars(pattern, hostEl){
+      var unit = 0.34;   // عرض الوحدة الواحدة بالملم
+      var height = 13;   // ارتفاع الأعمدة بالملم
+      var svgParts = [];
+      var x = 0, i = 0;
+      while (i < pattern.length){
+        var bit = pattern[i], start = i;
+        while (i < pattern.length && pattern[i] === bit) i++;
+        var w = (i - start) * unit;
+        if (bit === '1'){
+          svgParts.push('<rect x="' + x.toFixed(2) + '" y="0" width="' + w.toFixed(2) + '" height="' + height + '" fill="#0a0a0a"/>');
+        }
+        x += w;
+      }
+      var totalW = x.toFixed(2);
+      hostEl.innerHTML = '<svg width="' + totalW + 'mm" height="' + height + 'mm" viewBox="0 0 ' + totalW + ' ' + height + '" xmlns="http://www.w3.org/2000/svg">' + svgParts.join('') + '</svg>';
+    }
+
+    var numEl = document.getElementById('barcodeNum');
+    var host = document.getElementById('barcodeBars');
+    var value = numEl ? numEl.textContent.trim() : '';
+    if (value && host){
+      renderBars(encodeCode39(value), host);
+    }
+  })();
+</script>
+
+</body>
+</html>
