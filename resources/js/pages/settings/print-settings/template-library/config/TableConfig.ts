@@ -18,6 +18,7 @@ export interface TableConfig {
   tableHeaderBold: boolean;
   tableHeaderBg: string;
   tableHeaderColor: string;
+  tableHeaderRadius: number;
   tableBorderStyle: BorderStyle;
   alternatingRows: boolean;
   alternatingColor: string;
@@ -36,6 +37,7 @@ export const INVOICE_COLUMNS: TableConfig = {
   tableHeaderBold: true,
   tableHeaderBg: '#f5f5f5',
   tableHeaderColor: COLOR_PRIMARY,
+  tableHeaderRadius: 6,
   tableBorderStyle: 'solid',
   alternatingRows: true,
   alternatingColor: TABLE_ROW_ALT,

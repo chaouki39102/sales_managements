@@ -273,6 +273,7 @@ export interface PrintTemplate {
   table_header_bold:  boolean;
   table_header_bg:    string;
   table_header_color: string;
+  table_header_radius:number;
   table_cell_padding: number;
   table_border_style: BorderStyle;
   alternating_rows:   boolean;

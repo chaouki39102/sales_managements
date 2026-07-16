@@ -165,6 +165,7 @@ export function createMockTemplate(
     table_header_bold: true,
     table_header_bg: '#f5f5f5',
     table_header_color: '#333333',
+    table_header_radius: 6,
     table_cell_padding: 6,
     table_border_style: 'dashed',
     alternating_rows: false,

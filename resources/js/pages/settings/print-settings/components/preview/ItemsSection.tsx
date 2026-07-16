@@ -72,6 +72,8 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
           background: tpl.table_header_bg || 'transparent',
           borderBottom: border,
           paddingBottom: 3, marginBottom: 2,
+          borderRadius: tpl.table_header_radius || 0,
+          overflow: 'hidden',
         }}>
           {visibleCols.map(col => (
             <div key={col} style={{
@@ -120,16 +122,18 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
     ? "'Courier New', monospace"
     : "'Tajawal', sans-serif";
 
+  const thR = tpl.table_header_radius || 0;
+
   return (
     <div style={{ marginBottom: isA4 ? 20 : 12, fontFamily: ff }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: tpl.items_font_size }}>
+      <table style={{ width: '100%', borderCollapse: thR ? 'separate' : 'collapse', borderSpacing: 0, fontSize: tpl.items_font_size }}>
         {tpl.show_col_header && (
         <thead>
           <tr style={{
             background: tpl.table_header_bg || '#f5f5f5',
             borderBottom: isA4 ? '2px solid #111' : '1.5px solid #111',
           }}>
-            {visibleCols.map(col => (
+            {visibleCols.map((col, ci) => (
               <th key={col} style={{
                 width: `${colWidth(tpl, col, COL_WIDTH_DEFAULTS) * scale}%`,
                 padding: cellPad,
@@ -137,6 +141,11 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
                 fontWeight: tpl.table_header_bold ? 700 : 600,
                 color: tpl.table_header_color || '#111',
                 fontSize: tpl.items_font_size,
+                borderRadius: thR
+                  ? ci === 0 ? `0 ${thR}px ${thR}px 0`
+                    : ci === visibleCols.length - 1 ? `${thR}px 0 0 ${thR}px`
+                    : undefined
+                  : undefined,
               }}>
                 {tpl.col_headers[col] ?? colDefaultHeader(col)}
               </th>
