@@ -500,10 +500,16 @@ class CommercialDocumentController extends BaseApiController
 
             $doc->loadMissing('documentType.documentBaseOperation');
             $isSale = $doc->documentType?->documentBaseOperation?->name === 'sale';
+            $isAccounting = $doc->documentType?->affects_accounting ?? true;
 
-            $previousBalance = $isSale
-                ? $currentBalance - $doc->net_to_pay
-                : $currentBalance + $doc->net_to_pay;
+            // For non-accounting documents (BL, DEV, BCC, etc.), getBalanceAt() excludes
+            // this document's net_to_pay from currentBalance because it filters by
+            // affects_accounting=true. So subtracting net_to_pay would produce a
+            // incorrect negative previousBalance. Instead, use currentBalance directly
+            // as the old debt — this document doesn't affect it.
+            $previousBalance = $isAccounting
+                ? ($isSale ? $currentBalance - $doc->net_to_pay : $currentBalance + $doc->net_to_pay)
+                : $currentBalance;
 
             $doc->balance_data = [
                 'previous_balance' => round($previousBalance, 2),
