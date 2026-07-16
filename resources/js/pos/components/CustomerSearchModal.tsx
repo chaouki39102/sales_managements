@@ -135,7 +135,7 @@ export default function CustomerSearchModal({
 
   // ── أرصدة الزبائن ─────────────────────────────────────────────────────────
   const { data: balances } = useQuery<PartyBalance[]>({
-    queryKey: [slug, 'party-balances'],
+    queryKey: [slug, 'party-balance'],
     queryFn:  () =>
       apiGet<PartyBalance[]>('/party-balances').then(r => {
         const data = (r as any)?.data ?? r;
