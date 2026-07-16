@@ -9,6 +9,7 @@ use App\Http\Resources\CommercialDocumentResource;
 use App\Services\QRCodeService;
 use App\Services\CommercialDocumentService;
 use App\Services\PaymentSynchronizer;
+use App\Services\PartyBalanceService;
 use App\Models\CommercialDocument;
 use App\Services\NotificationService;
 use App\Models\Company;          // ✅ أضفنا هذا
@@ -26,6 +27,7 @@ class CommercialDocumentController extends BaseApiController
         private PaymentSynchronizer $paymentSynchronizer,
         private QRCodeService $qrCodeService,
         private NotificationService $notificationService,
+        private PartyBalanceService $partyBalanceService,
     ) {
         parent::__construct();
     }
@@ -247,6 +249,57 @@ class CommercialDocumentController extends BaseApiController
     // دوال Route Model Binding المُصلحة (أضفنا Company $company كأول معامل)
     // ══════════════════════════════════════════════════════════════════════════
 
+    /**
+     * Override show() to attach balance_data from backend SSOT.
+     */
+    public function show($id): JsonResponse
+    {
+        try {
+            $resolvedId = $this->extractId($id);
+            $item = $this->getService()->findById($resolvedId);
+            $this->authorizeAction('view', $item);
+            $this->attachBalanceData($item);
+            return $this->successResponse($this->transformItem($item));
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'show');
+        }
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('create', $this->getModelClass());
+            $data = $this->getValidatedData($request);
+            $item = $this->getService()->create($data, $request);
+            $this->attachBalanceData($item);
+            return $this->successResponse(
+                $this->transformItem($item),
+                "تم إنشاء {$this->resourceName} بنجاح",
+                201
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'store');
+        }
+    }
+
+    public function update(Request $request, $id): JsonResponse
+    {
+        try {
+            $resolvedId = $this->extractId($id);
+            $item       = $this->getService()->findById($resolvedId);
+            $this->authorizeAction('update', $item);
+            $data = $this->getValidatedData($request, $resolvedId);
+            $item = $this->getService()->update($item, $data, $request);
+            $this->attachBalanceData($item);
+            return $this->successResponse(
+                $this->transformItem($item),
+                "تم تحديث {$this->resourceName} بنجاح"
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'update');
+        }
+    }
+
     public function unpaid(Request $request): JsonResponse
     {
         try {
@@ -434,4 +487,30 @@ class CommercialDocumentController extends BaseApiController
 
     protected function getService(): CommercialDocumentService { return $this->commercialDocumentService; }
     protected function getModelClass(): string { return CommercialDocument::class; }
+
+    private function attachBalanceData(CommercialDocument $doc): void
+    {
+        if (!$doc->party_id || !$doc->document_date) return;
+        try {
+            $balanceData = $this->partyBalanceService->getBalanceAt(
+                $doc->party_id,
+                $doc->document_date
+            );
+            $currentBalance = $balanceData['current_balance'];
+
+            $doc->loadMissing('documentType.documentBaseOperation');
+            $isSale = $doc->documentType?->documentBaseOperation?->name === 'sale';
+
+            $previousBalance = $isSale
+                ? $currentBalance - $doc->net_to_pay
+                : $currentBalance + $doc->net_to_pay;
+
+            $doc->balance_data = [
+                'previous_balance' => round($previousBalance, 2),
+                'new_balance'      => round($currentBalance, 2),
+            ];
+        } catch (\Throwable) {
+            $doc->balance_data = null;
+        }
+    }
 }

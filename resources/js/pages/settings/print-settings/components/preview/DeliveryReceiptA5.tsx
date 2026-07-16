@@ -25,6 +25,7 @@ function fmt(v: unknown): string {
 
 function fmtCurrency(v: unknown): string {
   const n = Number(v ?? 0);
+  if (!Number.isFinite(n)) return '0.00';
   const [intPart, decPart] = n.toFixed(2).split('.');
   const withSpaces = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return `${withSpaces}.${decPart}`;
@@ -124,7 +125,10 @@ function DeliveryReceiptA5({ tpl, data }: { tpl: PrintTemplate; data: UniversalD
 
   const prevBalance = data.balance?.previous ?? 0;
   const newBalance  = data.balance?.current ?? 0;
-  const totalAmount = data.totals.totalTtc + prevBalance;
+  // ✅ استخدام net_to_pay (وليس totalTtc) ليطابق تماماً ما استخدمه الباك اند
+  // في حساب previous_balance (attachBalanceData: previousBalance = currentBalance
+  // - net_to_pay). هذا يضمن: totalAmount === newBalance رياضياً عندما paid = 0.
+  const totalAmount = data.totals.netToPay + prevBalance;
 
   // ── Barcode (pre-computed) ──
   const barcodeValue = tpl.show_barcode

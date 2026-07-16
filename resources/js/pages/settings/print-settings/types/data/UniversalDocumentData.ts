@@ -154,6 +154,8 @@ export interface DocumentTotals {
   change:        number;
   /** Amount still owed */
   remaining:     number;
+  /** = total_ttc + fiscal_stamp — matches backend net_to_pay used in attachBalanceData() */
+  netToPay:      number;
 }
 
 export interface Payment {
@@ -323,6 +325,7 @@ export function emptyDocumentData(): UniversalDocumentData {
       paid:          0,
       change:        0,
       remaining:     0,
+      netToPay:      0,
     },
     taxBreakdown: [],
     payments:     [],

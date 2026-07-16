@@ -48,9 +48,10 @@ export default function CommercialDocumentPage() {
   });
 
   const { data: existingDoc } = useQuery({
-    queryKey: ['document', slug, id],
+    queryKey: tenantKeys.documents.detail(slug ?? '', Number(id)),
     queryFn: () => apiGet(`/documents/${id}`),
     enabled: !!slug && !!id,
+    staleTime: 0,
   });
 
   const ctrl = useCommercialDocumentController({
@@ -464,6 +465,8 @@ export default function CommercialDocumentPage() {
             template={selectedTemplate || undefined}
             templates={printTemplates}
             docTypeCode={docCode}
+            prevBalance={partyBalance?.current_balance ?? 0}
+            newBalance={partyBalance?.current_balance ?? 0}
           />
         </Suspense>
       )}

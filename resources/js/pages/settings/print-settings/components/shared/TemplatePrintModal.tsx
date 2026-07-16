@@ -23,6 +23,20 @@ interface ApiDocument {
   lines?:                Record<string, unknown>[];
   payments?:             Record<string, unknown>[];
   totals?:               Record<string, unknown> | null;
+  /** Flat totals from backend (SSOT) */
+  total_ht?:             number;
+  total_tva?:            number;
+  total_ttc?:            number;
+  total_discount?:       number;
+  total_stamp?:          number;
+  net_to_pay?:           number;
+  paid_amount?:          number;
+  remaining_amount?:     number;
+  /** Balance computed by backend */
+  balance_data?: {
+    previous_balance: number;
+    new_balance:      number;
+  } | null;
 }
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -37,6 +51,9 @@ interface TemplatePrintModalProps {
   docTypeCode: string;
   /** Pre-built data (bypasses fromApiDocument when provided) */
   data?:       UniversalDocumentData;
+  /** Fallback balance when document.balance_data is absent (e.g., from list endpoint) */
+  prevBalance?: number;
+  newBalance?:  number;
 }
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
@@ -111,7 +128,7 @@ const btnSecondary: React.CSSProperties = {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-function TemplatePrintModal({ open, onClose, document, company, template, templates, docTypeCode, data: overrideData }: TemplatePrintModalProps) {
+function TemplatePrintModal({ open, onClose, document, company, template, templates, docTypeCode, data: overrideData, prevBalance, newBalance }: TemplatePrintModalProps) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -123,9 +140,9 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
 
   const source = useMemo(() => {
     if (overrideData) return { type: 'prebuilt' as const, data: overrideData };
-    if (document) return { type: 'api-document' as const, doc: document, company };
+    if (document) return { type: 'api-document' as const, doc: document, options: { prevBalance, newBalance } };
     return null;
-  }, [overrideData, document, company]);
+  }, [overrideData, document, prevBalance, newBalance]);
 
   useEffect(() => {
     if (!open) return;

@@ -29,6 +29,25 @@ import type {
 
 import { emptyDocumentData } from './UniversalDocumentData';
 
+/**
+ * Laravel's `decimal:N` cast (Illuminate\Database\Eloquent\Concerns\HasAttributes::asDecimal)
+ * uses number_format() internally and therefore ALWAYS returns a string — even in the
+ * JSON response (e.g. "5027.4400", not 5027.44). Every backend field that is a
+ * decimal-cast column (total_ht, total_tva, total_discount, total_stamp, total_ttc,
+ * net_to_pay, paid_amount, remaining_amount, exchange_rate, line quantities/prices/taxes,
+ * payment amounts) MUST pass through this before any arithmetic. Fields set via plain
+ * PHP round()/floats (like balance_data.*) are already real numbers but this is safe
+ * to apply universally as a defensive normalization.
+ *
+ * Without this, "5027.4400" + 57.04 in JS performs STRING CONCATENATION
+ * ("5027.440057.04"), which then formats as NaN → "0.00" — this was the exact bug.
+ */
+function num(v: unknown): number {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
 // ─── Source type: CommercialDocument from API ─────────────────────────────────
 //
 // We define a minimal interface here so this file has no circular dependency
@@ -106,7 +125,16 @@ interface ApiDocument {
   } | null;
   lines?:    ApiDocumentLine[];
   payments?: ApiPayment[];
-  /** Totals computed by backend */
+  /** Flat totals from backend (SSOT) */
+  total_ht?:       number;
+  total_tva?:      number;
+  total_ttc?:      number;
+  total_discount?: number;
+  total_stamp?:    number;
+  net_to_pay?:     number;
+  paid_amount?:    number;
+  remaining_amount?: number;
+  /** Totals computed by backend (nested, legacy) */
   totals?: {
     total_ht?:       number;
     total_tva?:      number;
@@ -120,10 +148,6 @@ interface ApiDocument {
   /** Balance computed by backend (SSOT) */
   balance_data?: {
     previous_balance: number;
-    invoice_total:    number;
-    paid_amount:      number;
-    remaining:        number;
-    change:           number;
     new_balance:      number;
   } | null;
 }
@@ -238,6 +262,7 @@ export const DocumentDataBuilder = {
       paid:          snapshot.totals.paid,
       change:        snapshot.totals.change,
       remaining:     snapshot.totals.remaining,
+      netToPay:      snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp,
     };
 
     return {
@@ -327,6 +352,7 @@ export const DocumentDataBuilder = {
         paid:          grossSales,
         change:        0,
         remaining:     0,
+        netToPay:      grossSales + Number(session.total_fiscal_stamp ?? 0),
       },
       taxBreakdown: [],
       payments: sessionPayments.map(p => ({
@@ -426,20 +452,20 @@ function buildCurrencyFromApi(
   return {
     code:   currency.code   ?? 'DZD',
     symbol: currency.symbol ?? 'دج',
-    rate:   currency.exchange_rate ?? 1,
+    rate:   num(currency.exchange_rate ?? 1),
   };
 }
 
 function buildLineFromApi(line: ApiDocumentLine, index: number): DocumentLine {
-  const tvaRate   = line.tva_rate ?? 0;
+  const tvaRate   = num(line.tva_rate);
   const tvaPct    = Math.round(tvaRate * 100);
-  const discPct   = line.discount_percentage ?? 0;
-  const discAmt   = line.discount_amount     ?? 0;
-  const totalHt   = line.total_ht ?? 0;
-  const totalTva  = line.total_tva  ?? totalHt * tvaRate;
-  const totalTtc  = line.total_ttc  ?? totalHt + totalTva;
-  const uPriceHt  = line.unit_price_ht  ?? 0;
-  const uPriceTtc = line.unit_price_ttc ?? uPriceHt * (1 + tvaRate);
+  const discPct   = num(line.discount_percentage);
+  const discAmt   = num(line.discount_amount);
+  const totalHt   = num(line.total_ht);
+  const totalTva  = line.total_tva != null ? num(line.total_tva) : totalHt * tvaRate;
+  const totalTtc  = line.total_ttc != null ? num(line.total_ttc) : totalHt + totalTva;
+  const uPriceHt  = num(line.unit_price_ht);
+  const uPriceTtc = line.unit_price_ttc != null ? num(line.unit_price_ttc) : uPriceHt * (1 + tvaRate);
 
   return {
     rowNumber:    index + 1,
@@ -447,7 +473,7 @@ function buildLineFromApi(line: ApiDocumentLine, index: number): DocumentLine {
     barcode:      line.product?.barcode    ?? null,
     name:         line.product?.name ?? line.description ?? '',
     unit:         line.product?.unit?.name ?? line.packaging?.name ?? null,
-    quantity:     line.quantity,
+    quantity:     num(line.quantity),
     unitPriceHt:  uPriceHt,
     unitPriceTtc: uPriceTtc,
     tvaRate,
@@ -516,24 +542,32 @@ function buildTotalsFromApi(
   doc:   ApiDocument,
   lines: DocumentLine[],
 ): DocumentTotals {
-  // Prefer backend-computed totals; fall back to summing lines
   const t = doc.totals;
+  const lineSums = {
+    ht:  lines.reduce((s, l) => s + l.totalHt,  0),
+    tva: lines.reduce((s, l) => s + l.totalTva, 0),
+    ttc: lines.reduce((s, l) => s + l.totalTtc, 0),
+    disc: lines.reduce((s, l) => s + l.discountAmt, 0),
+  };
+  const totalTtc    = num(doc.total_ttc      ?? t?.total_ttc      ?? lineSums.ttc);
+  const fiscalStamp = num(doc.total_stamp    ?? t?.fiscal_stamp   ?? 0);
   return {
-    totalHt:       t?.total_ht       ?? lines.reduce((s, l) => s + l.totalHt,  0),
-    totalTva:      t?.total_tva      ?? lines.reduce((s, l) => s + l.totalTva, 0),
-    totalTtc:      t?.total_ttc      ?? lines.reduce((s, l) => s + l.totalTtc, 0),
-    fiscalStamp:   t?.fiscal_stamp   ?? 0,
-    totalDiscount: t?.total_discount ?? lines.reduce((s, l) => s + l.discountAmt, 0),
-    paid:          t?.paid           ?? 0,
-    change:        t?.change         ?? 0,
-    remaining:     t?.remaining      ?? 0,
+    totalHt:       num(doc.total_ht       ?? t?.total_ht       ?? lineSums.ht),
+    totalTva:      num(doc.total_tva      ?? t?.total_tva      ?? lineSums.tva),
+    totalTtc,
+    fiscalStamp,
+    totalDiscount: num(doc.total_discount ?? t?.total_discount ?? lineSums.disc),
+    paid:          num(doc.paid_amount    ?? t?.paid           ?? 0),
+    change:        num(t?.change ?? 0),
+    remaining:     num(doc.remaining_amount ?? t?.remaining     ?? 0),
+    netToPay:      num(doc.net_to_pay ?? (totalTtc + fiscalStamp)),
   };
 }
 
 function buildPaymentsFromApi(apiPayments: ApiPayment[]): Payment[] {
   return apiPayments.map(p => ({
     mode:      p.payment_mode?.name ?? '—',
-    amount:    p.amount,
+    amount:    num(p.amount),
     reference: p.reference    ?? null,
     date:      p.payment_date ?? null,
   }));
@@ -543,12 +577,12 @@ function buildBalance(
   prev?: number | null,
   next?: number | null,
 ): BalanceInfo | null {
-  // Both prev and next must be present for a meaningful balance snapshot.
-  // Partial data (one null) → null (caller should provide both or neither).
   if (prev == null || next == null) return null;
+  const p = num(prev);
+  const n = num(next);
   return {
-    previous: prev,
-    movement: next - prev,
-    current:  next,
+    previous: p,
+    movement: n - p,
+    current:  n,
   };
 }

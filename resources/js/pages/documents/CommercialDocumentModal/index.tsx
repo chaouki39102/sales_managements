@@ -516,6 +516,8 @@ export default function CommercialDocumentModal({
             template={selectedTemplate || undefined}
             templates={printTemplates}
             docTypeCode={docCode}
+            prevBalance={partyBalance?.current_balance ?? 0}
+            newBalance={partyBalance?.current_balance ?? 0}
           />
         </Suspense>
       )}
