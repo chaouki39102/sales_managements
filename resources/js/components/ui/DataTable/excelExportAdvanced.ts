@@ -84,7 +84,8 @@ export function formatDateShort(val: string | Date | null | undefined): string {
  */
 export function calcFiscalStamp(ttcAmount: number): number {
   if (ttcAmount <= 0) return 0;
-  return Math.min(Math.round(ttcAmount * 0.01 * 100) / 100, 2500);
+  const calculated = ttcAmount * 0.01;
+  return Math.round(Math.max(5, Math.min(calculated, 2500)) * 100) / 100;
 }
 
 // ─── تحويل الأرقام إلى كلمات عربية ─────────────────────────────────────────

@@ -87,7 +87,7 @@ class CommercialDocumentLineService extends \App\Core\Services\BaseService
 
         $totalStamp = 0.0;
         try {
-            $totalStamp = (float) app(FiscalStampCalculator::class)->calculate($document);
+            $totalStamp = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
         } catch (\Throwable $e) {
             Log::warning("LineService: فشل حساب الطابع للوثيقة #{$document->id}: " . $e->getMessage());
         }

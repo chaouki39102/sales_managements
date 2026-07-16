@@ -371,8 +371,8 @@ class ComputeLineService
         $totalTtc = round($totalHt + $totalTva, 4);
 
         $stampAmount = 0;
-        if ($applyStamp && $totalTtc >= 30_000) {
-            $stampAmount = min((int) ceil($totalTtc * 0.01), 2_500);
+        if ($applyStamp) {
+            $stampAmount = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
         }
 
         return [

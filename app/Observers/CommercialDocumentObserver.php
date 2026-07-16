@@ -73,7 +73,7 @@ class CommercialDocumentObserver
         // الطابع الجبائي
         $totalStamp = 0.0;
         try {
-            $totalStamp = (float) app(FiscalStampCalculator::class)->calculate($document);
+            $totalStamp = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
         } catch (\Throwable $e) {
             Log::warning("CommercialDocumentObserver [saving]: فشل حساب الطابع للوثيقة #{$document->id}", [
                 'error' => $e->getMessage(),

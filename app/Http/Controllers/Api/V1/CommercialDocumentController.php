@@ -502,13 +502,13 @@ class CommercialDocumentController extends BaseApiController
             $isSale = $doc->documentType?->documentBaseOperation?->name === 'sale';
             $isAccounting = $doc->documentType?->affects_accounting ?? true;
 
-            // For non-accounting documents (BL, DEV, BCC, etc.), getBalanceAt() excludes
-            // this document's net_to_pay from currentBalance because it filters by
-            // affects_accounting=true. So subtracting net_to_pay would produce a
-            // incorrect negative previousBalance. Instead, use currentBalance directly
-            // as the old debt — this document doesn't affect it.
+            // getBalanceAt() includes BOTH this document's net_to_pay AND its payment(s).
+            // For sale:  currentBalance = oldBalance + net_to_pay - paid_amount
+            // So:        previousBalance = currentBalance - net_to_pay + paid_amount
+            // For purchase (reverse): previousBalance = currentBalance + net_to_pay - paid_amount
+            $paidAmount = (float) ($doc->paid_amount ?? 0);
             $previousBalance = $isAccounting
-                ? ($isSale ? $currentBalance - $doc->net_to_pay : $currentBalance + $doc->net_to_pay)
+                ? ($isSale ? $currentBalance - $doc->net_to_pay + $paidAmount : $currentBalance + $doc->net_to_pay - $paidAmount)
                 : $currentBalance;
 
             $doc->balance_data = [

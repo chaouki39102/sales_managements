@@ -74,10 +74,14 @@ export function today(): string {
 }
 
 // ─── Fiscal stamp ─────────────────────────────────────────────────────────────
+// SSOT: App\Services\Tax\FiscalStampCalculator — no threshold, min=5, max=2500, rate=1%
+const STAMP_MIN = 5;
+const STAMP_MAX = 2_500;
 
 export function calcFiscalStamp(ttc: number): number {
-  if (ttc < 30_000) return 0;
-  return Math.min(Math.ceil(ttc * 0.01), 2_500);
+  if (ttc <= 0) return 0;
+  const calculated = ttc * 0.01;
+  return Math.round(Math.max(STAMP_MIN, Math.min(calculated, STAMP_MAX)) * 100) / 100;
 }
 
 // ─── Line calculations ────────────────────────────────────────────────────────

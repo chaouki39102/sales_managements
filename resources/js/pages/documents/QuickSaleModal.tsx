@@ -509,7 +509,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
       tva += lineTva;
     });
     const ttc = ht + tva;
-    const stamp = ttc >= 30_000 ? Math.min(Math.ceil(ttc * 0.01), 2_500) : 0;
+    const stamp = ttc <= 0 ? 0 : Math.round(Math.max(5, Math.min(ttc * 0.01, 2_500)) * 100) / 100;
     const netPay = ttc + stamp;
     return { ht, tva, ttc, stamp, netPay };
   }, [lines]);

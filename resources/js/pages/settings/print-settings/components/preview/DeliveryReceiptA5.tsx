@@ -124,11 +124,11 @@ function DeliveryReceiptA5({ tpl, data }: { tpl: PrintTemplate; data: UniversalD
   const totalQty = data.lines.reduce((sum, l) => sum + computeTotalQty(l), 0);
 
   const prevBalance = data.balance?.previous ?? 0;
-  const newBalance  = data.balance?.current ?? 0;
-  // ✅ استخدام net_to_pay (وليس totalTtc) ليطابق تماماً ما استخدمه الباك اند
-  // في حساب previous_balance (attachBalanceData: previousBalance = currentBalance
-  // - net_to_pay). هذا يضمن: totalAmount === newBalance رياضياً عندما paid = 0.
+  // ✅ totalAmount - paid: works for ALL doc types (accounting + non-accounting).
+  // For non-accounting docs (BL, DEV, BCC), data.balance?.current = previousBalance
+  // (unchanged), but the receipt must show the running total debt.
   const totalAmount = data.totals.netToPay + prevBalance;
+  const newBalance  = totalAmount - (data.totals.paid ?? 0);
 
   // ── Barcode (pre-computed) ──
   const barcodeValue = tpl.show_barcode
