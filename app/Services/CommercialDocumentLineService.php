@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CommercialDocument;
 use App\Models\CommercialDocumentLine;
+use App\Models\Setting;
 use App\Services\Tax\FiscalStampCalculator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
@@ -86,10 +87,13 @@ class CommercialDocumentLineService extends \App\Core\Services\BaseService
         $totalTtc      = $totalHt + $totalTva;
 
         $totalStamp = 0.0;
-        try {
-            $totalStamp = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
-        } catch (\Throwable $e) {
-            Log::warning("LineService: فشل حساب الطابع للوثيقة #{$document->id}: " . $e->getMessage());
+        $stampEnabled = Setting::getSetting('fiscal_stamp_enabled', true, $document->company_id);
+        if ($stampEnabled) {
+            try {
+                $totalStamp = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
+            } catch (\Throwable $e) {
+                Log::warning("LineService: فشل حساب الطابع للوثيقة #{$document->id}: " . $e->getMessage());
+            }
         }
 
         $netToPay   = $totalTtc + $totalStamp;

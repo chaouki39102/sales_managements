@@ -144,6 +144,11 @@ export function useCommercialDocumentController({
     return v === true || v === 'true';
   }, [settingsDict]);
 
+  const fiscalStampEnabled = useMemo(() => {
+    const v = settingsDict?.fiscal_stamp_enabled?.value;
+    return v === undefined || v === true || v === 'true' || v === 1 || v === '1';
+  }, [settingsDict]);
+
   const lookupsReady = isEdit
     ? true
     : (settingsWarehouseId !== '' && settingsCurrencyId !== '' && settingsPriceLevelId !== '');
@@ -174,7 +179,7 @@ export function useCommercialDocumentController({
     baseCurrencyId:     settingsCurrencyId,
     defaultPriceLevelId: settingsPriceLevelId,
     defaultApplyStamp:   settingsApplyStamp,
-    stampEnabled:        settingsApplyStamp,
+    stampEnabled:        fiscalStampEnabled,
     selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
     paymentModes:       lookups.paymentModes,
     parties:            lookups.parties,

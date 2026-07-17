@@ -337,6 +337,17 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
   const productInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const quantityInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  const { data: fiscalStampRaw } = useQuery({
+    queryKey: [slug, 'settings', 'fiscal_stamp_enabled'],
+    queryFn:  () => settingsApi.getValue('fiscal_stamp_enabled'),
+    enabled:  !!slug && open,
+    staleTime: 60_000,
+  });
+  const fiscalStampEnabled = useMemo(() => {
+    const v = fiscalStampRaw?.value;
+    return v === undefined || v === true || v === 'true' || v === 1 || v === '1';
+  }, [fiscalStampRaw]);
+
   // Queries
   const { data: rawProducts = [], isLoading: loadingProds } = useQuery({
     queryKey: [slug, 'quick-sale-products'],
@@ -509,10 +520,10 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
       tva += lineTva;
     });
     const ttc = ht + tva;
-    const stamp = ttc <= 0 ? 0 : Math.round(Math.max(5, Math.min(ttc * 0.01, 2_500)) * 100) / 100;
+    const stamp = !fiscalStampEnabled ? 0 : (ttc <= 0 ? 0 : Math.round(Math.max(5, Math.min(ttc * 0.01, 2_500)) * 100) / 100);
     const netPay = ttc + stamp;
     return { ht, tva, ttc, stamp, netPay };
-  }, [lines]);
+  }, [lines, fiscalStampEnabled]);
 
   const _payAmount = useMemo(() => {
     // اگر المبلغ 0 أو أكبر من المستحق، نستخدم المستحق

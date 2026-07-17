@@ -167,28 +167,30 @@ class InventoryStockService
                 )
             )
             ->orderBy('p.name')
-            ->get();
+            ->get()
+            ->map(fn($r) => (array) $r)
+            ->toArray();
         });
 
-        return $rows->map(fn($row) => [
-            'id'                 => $row->id,
-            'name'               => $row->name,
-            'ref'                => $row->ref,
-            'opening_quantity'   => (float) $row->opening_quantity,
-            'total_in'           => (float) $row->total_in,
-            'total_out'          => (float) $row->total_out,
-            'current_stock'      => (float) $row->current_stock,
-            'min_stock_alert'    => (float) $row->min_stock_alert,
-            'current_cost_price' => (float) $row->effective_cost_price,
-            'total_value'        => (float) $row->total_value,
-            'manages_stock'      => (bool)  $row->manages_stock,
-            'lots_count'         => (int)   $row->lots_count,
-            'family'             => $row->family_name
-                                     ? ['name' => $row->family_name]
+        return array_map(fn($row) => [
+            'id'                 => $row['id'],
+            'name'               => $row['name'],
+            'ref'                => $row['ref'],
+            'opening_quantity'   => (float) $row['opening_quantity'],
+            'total_in'           => (float) $row['total_in'],
+            'total_out'          => (float) $row['total_out'],
+            'current_stock'      => (float) $row['current_stock'],
+            'min_stock_alert'    => (float) $row['min_stock_alert'],
+            'current_cost_price' => (float) $row['effective_cost_price'],
+            'total_value'        => (float) $row['total_value'],
+            'manages_stock'      => (bool)  $row['manages_stock'],
+            'lots_count'         => (int)   $row['lots_count'],
+            'family'             => $row['family_name']
+                                     ? ['name' => $row['family_name']]
                                      : null,
-            'unit'               => $row->unit_name
-                                     ? ['name' => $row->unit_name, 'symbol' => $row->unit_symbol]
+            'unit'               => $row['unit_name']
+                                     ? ['name' => $row['unit_name'], 'symbol' => $row['unit_symbol']]
                                      : null,
-        ])->toArray();
+        ], $rows);
     }
 }

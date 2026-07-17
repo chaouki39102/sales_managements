@@ -371,7 +371,8 @@ class ComputeLineService
         $totalTtc = round($totalHt + $totalTva, 4);
 
         $stampAmount = 0;
-        if ($applyStamp) {
+        $stampEnabled = Setting::getSetting('fiscal_stamp_enabled', true, $companyId);
+        if ($applyStamp && $stampEnabled) {
             $stampAmount = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
         }
 

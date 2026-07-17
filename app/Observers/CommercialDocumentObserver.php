@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\CommercialDocument;
 use App\Models\DocumentStatus;
+use App\Models\Setting;
 use App\Services\Tax\FiscalStampCalculator;
 use Illuminate\Support\Facades\Log;
 
@@ -70,14 +71,17 @@ class CommercialDocumentObserver
         $totalDiscount = (float) $document->lines->sum('discount_amount');
         $totalTtc      = $totalHt + $totalTva;
 
-        // الطابع الجبائي
+        // الطابع الجبائي — يُحسب فقط إذا كان الإعداد مفعّلاً
         $totalStamp = 0.0;
-        try {
-            $totalStamp = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
-        } catch (\Throwable $e) {
-            Log::warning("CommercialDocumentObserver [saving]: فشل حساب الطابع للوثيقة #{$document->id}", [
-                'error' => $e->getMessage(),
-            ]);
+        $stampEnabled = Setting::getSetting('fiscal_stamp_enabled', true, $document->company_id);
+        if ($stampEnabled) {
+            try {
+                $totalStamp = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
+            } catch (\Throwable $e) {
+                Log::warning("CommercialDocumentObserver [saving]: فشل حساب الطابع للوثيقة #{$document->id}", [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $netToPay   = $totalTtc + $totalStamp;

@@ -558,10 +558,13 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $totalTtc      = $totalHt + $totalTva;
 
         $totalStamp = 0.0;
-        try {
-            $totalStamp = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
-        } catch (\Throwable $e) {
-            Log::warning("FiscalStamp error doc#{$document->id}: " . $e->getMessage());
+        $stampEnabled = Setting::getSetting('fiscal_stamp_enabled', true, $document->company_id);
+        if ($stampEnabled) {
+            try {
+                $totalStamp = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);
+            } catch (\Throwable $e) {
+                Log::warning("FiscalStamp error doc#{$document->id}: " . $e->getMessage());
+            }
         }
 
         $netToPay = $totalTtc + $totalStamp;
