@@ -1,7 +1,32 @@
 # AGENTS.md — Context Cache for AI Coding Agents
 
 ## Date
-2026-07-13
+2026-07-18
+
+### Phase 23 — Balance Calculation Bug Fix: Redundant In-Transaction Balance Computation (July 18)
+
+**Bug**: Receipt showed incorrect `new_balance` (e.g., 52688 instead of 0) when party balance was 26344, invoice 1800, and full payment 28144.
+
+**Root cause**: Two competing balance computations existed — `PaymentSynchronizer::computeAndAttachBalances()` ran **inside** the DB transaction (via `afterCreate`/`afterUpdate` hooks), while the controller's `attachBalanceData()` ran **after** the transaction committed. The in-transaction version:
+- Lacked sale/purchase direction check (always treated documents as sales)
+- Set `balance_data` on the model that was then silently overwritten by the controller's version
+- Created confusing dual-write semantics
+
+**Fix (2 changes):**
+
+1. **Removed redundant `computeAndAttachBalances()` calls** from `afterCreate()` and `afterUpdate()` in `CommercialDocumentService.php`. The controller's `attachBalanceData()` is now the sole authority for `balance_data` — it runs after transaction commit with correct sale/purchase direction detection via `$isSale = in_array($docType->documentBaseOperation?->name, ['sale', 'service'])`.
+
+2. **Added `attachBalanceData()` to legacy `addPayments` endpoint** in `CommercialDocumentController.php`. Previously this endpoint returned no `balance_data` at all, creating inconsistency with `store()` and `update()` which both called `attachBalanceData()`.
+
+**Architectural rule established**: `balance_data` is ALWAYS computed by the controller layer via `attachBalanceData()` after the DB transaction commits. PaymentSynchronizer's `computeAndAttachBalances()` is retained as a public utility method but no longer called automatically in the document lifecycle.
+
+**Files modified:**
+- `app/Services/CommercialDocumentService.php` — removed `computeAndAttachBalances()` calls from `afterCreate()` (line 188) and `afterUpdate()` (line 275); replaced with comment explaining SSOT
+- `app/Http/Controllers/Api/V1/CommercialDocumentController.php` — added `attachBalanceData($item)` to legacy `addPayments` endpoint
+
+**Verification**: `php -l` — 0 syntax errors. `npm run build` — 0 errors, 1080 modules. `npm test` — 158/158 pass.
+
+---
 
 ### Phase 22 — Payment System Isolation + Fiscal Year Filter Fix (July 13)
 

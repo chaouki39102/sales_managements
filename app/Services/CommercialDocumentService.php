@@ -184,8 +184,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $this->payments()->syncPayments($item, $payments);
         }
 
-        // ✅ حساب الرصيد بعد الدفعات — SSOT: الباكند يحسب كل شيء
-        $this->payments()->computeAndAttachBalances($item);
+        // ✅ balance_data يُحسب في Controlleur بعد انتهاء الـ transaction
+        // بواسطة attachBalanceData() — أي تعديل هنا لا يُaltaffect النتيجة النهائية
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -271,8 +271,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $this->payments()->syncPayments($item, $payments);
         }
 
-        // ✅ حساب الرصيد بعد الدفعات — SSOT: الباكند يحسب كل شيء
-        $this->payments()->computeAndAttachBalances($item);
+        // ✅ balance_data يُحسب في Controlleur بعد انتهاء الـ transaction
+        // بواسطة attachBalanceData() — أي تعديل هنا لا يُaltaffect النتيجة النهائية
     }
 
     // ═══════════════════════════════════════════════════════════════════════

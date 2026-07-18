@@ -13,6 +13,11 @@ class PaymentModeSeeder extends Seeder
         $cashAccountId = DB::table('treasury_accounts')->where('company_id', $companyId)->where('code', 'CASH01')->value('id');
         $bankAccountId = DB::table('treasury_accounts')->where('company_id', $companyId)->where('code', 'BNA710')->value('id');
 
+        if (!$cashAccountId && !$bankAccountId) {
+            $this->command?->warn("  ⚠️  PaymentModeSeeder: treasury_accounts مفقودة — تم التخطي");
+            return;
+        }
+
         DB::table('payment_modes')->insert([
             ['company_id' => $companyId, 'name' => 'نقداً',         'code' => 'CASH',  'treasury_account_id' => $cashAccountId, 'requires_reference' => false, 'is_cash' => true,  'active' => true, 'display_order' => 1, 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'name' => 'شيك',           'code' => 'CHQ',   'treasury_account_id' => $bankAccountId, 'requires_reference' => true,  'is_cash' => false, 'active' => true, 'display_order' => 2, 'created_at' => now(), 'updated_at' => now()],

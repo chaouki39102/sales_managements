@@ -693,7 +693,7 @@ export type SeedKey =
   | 'currencies' | 'tvas' | 'units' | 'legal-forms' | 'fiscal-stamps'
   | 'price-levels' | 'party-types' | 'product-types' | 'stock-movement-types'
   | 'treasury-account-types' | 'document-base-operations' | 'document-statuses'
-  | 'document-types' | 'inventory-valuation-methods' | 'warehouses'
+  | 'document-types' | 'document-type-conversions' | 'inventory-valuation-methods' | 'warehouses'
   | 'treasury-accounts' | 'payment-modes' | 'expense-categories'
   | 'numbering-series' | 'wilayas-communes';
 

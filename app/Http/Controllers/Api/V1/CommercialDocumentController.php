@@ -378,13 +378,16 @@ class CommercialDocumentController extends BaseApiController
                 );
             });
 
+            $freshDoc = $commercialDocument->fresh(['payments.paymentMode', 'payments.treasuryAccount', 'documentStatus']);
+            $this->attachBalanceData($freshDoc);
+
             $this->notificationService->success(
                 'تمت إضافة دفعات',
                 $commercialDocument->document_number ?? '',
             );
 
             return $this->successResponse(
-                new CommercialDocumentResource($commercialDocument->fresh(['payments.paymentMode', 'payments.treasuryAccount', 'documentStatus'])),
+                new CommercialDocumentResource($freshDoc),
                 'تمت إضافة الدفعات بنجاح'
             );
 

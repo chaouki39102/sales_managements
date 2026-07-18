@@ -123,6 +123,7 @@ public function seedAll(Company $company): JsonResponse
     $ordered = array_keys(self::SEEDERS);
     $applied = [];
     $skipped = [];
+    $errors  = [];
 
     foreach ($ordered as $key) {
         [$class, $table] = self::SEEDERS[$key];
@@ -143,11 +144,7 @@ public function seedAll(Company $company): JsonResponse
             $applied[] = $key;
         } catch (\Throwable $e) {
             logger()->error("SeedAll فشل ($key) للشركة {$company->id}: " . $e->getMessage());
-            return response()->json([
-                'message' => "فشل تطبيق {$key}: " . $e->getMessage(),
-                'applied' => $applied,
-                'skipped' => $skipped,
-            ], 500);
+            $errors[$key] = $e->getMessage();
         }
     }
 
@@ -166,9 +163,12 @@ public function seedAll(Company $company): JsonResponse
     }
 
     return response()->json([
-        'message' => 'تم تطبيق جميع البيانات الأساسية بنجاح',
+        'message' => empty($errors)
+            ? 'تم تطبيق جميع البيانات الأساسية بنجاح'
+            : 'تم تطبيق '.count($applied).' من '.count($ordered).' — '.count($errors).' فشل',
         'applied' => $applied,
         'skipped' => $skipped,
+        'errors'  => $errors,
     ]);
 }
 

@@ -190,7 +190,7 @@ class SettingsSeeder extends Seeder
                 'display_order' => 33,
             ],
             'fiscal_stamp_enabled' => [
-                'value'         => true,
+                'value'         => false,
                 'group'         => 'fiscal',
                 'type'          => 'boolean',
                 'description'   => 'تفعيل الطابع الجبائي',

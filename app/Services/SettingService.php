@@ -82,13 +82,10 @@ class SettingService extends BaseService
             foreach ($settingsDict as $key => $value) {
 
                 // ① تحقق من is_editable قبل أي تعديل
-                $existing = Setting::where('key', $key)
-                    ->when(
-                        $companyId,
-                        fn($q) => $q->where('company_id', $companyId),
-                        fn($q) => $q->whereNull('company_id')
-                    )
-                    ->first();
+                $existing = $companyId
+                    ? Setting::where('key', $key)->where('company_id', $companyId)->first()
+                        ?? Setting::where('key', $key)->whereNull('company_id')->first()
+                    : Setting::where('key', $key)->whereNull('company_id')->first();
 
                 if ($existing && !$existing->is_editable) {
                     continue; // تخطّى الإعدادات المحمية
@@ -150,6 +147,12 @@ class SettingService extends BaseService
 
         $this->clearCache();
 
+        // Also clear per-key cache used by Setting::getSetting()
+        foreach ($settingsDict as $key => $value) {
+            Cache::forget("setting:{$companyId}:{$key}");
+            Cache::forget("setting:null:{$key}");
+        }
+
         return $upserted;
     }
 
@@ -165,24 +168,31 @@ class SettingService extends BaseService
         $cacheKey  = "settings:{$companyId}:all";
 
         return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($companyId) {
-            $query = Setting::query();
+            // ① Start with global (null company_id) rows as base
+            $globalRows = Setting::whereNull('company_id')->orderBy('display_order')->get();
+            $dict = [];
 
-            if ($companyId) {
-                $query->where('company_id', $companyId);
-            } else {
-                $query->whereNull('company_id');
-            }
-
-            $settings = $query->orderBy('display_order')->get();
-            $dict     = [];
-
-            foreach ($settings as $setting) {
+            foreach ($globalRows as $setting) {
                 $dict[$setting->key] = [
                     'value'       => $this->castValue($setting),
                     'group'       => $setting->group,
                     'type'        => $setting->type ?? 'string',
                     'is_editable' => $setting->is_editable ?? true,
                 ];
+            }
+
+            // ② Override with company-specific rows
+            if ($companyId) {
+                $companyRows = Setting::where('company_id', $companyId)->orderBy('display_order')->get();
+
+                foreach ($companyRows as $setting) {
+                    $dict[$setting->key] = [
+                        'value'       => $this->castValue($setting),
+                        'group'       => $setting->group,
+                        'type'        => $setting->type ?? 'string',
+                        'is_editable' => $setting->is_editable ?? true,
+                    ];
+                }
             }
 
             // إذا كانت فئة السعر الافتراضية 0/null نبحث عن أول is_default في price_levels
@@ -213,17 +223,25 @@ class SettingService extends BaseService
         $cacheKey  = "settings:{$companyId}:{$group}";
 
         return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($group, $companyId) {
-            $query = Setting::query()->where('group', $group);
+            // ① Start with global rows as base
+            $globalRows = Setting::where('group', $group)->whereNull('company_id')->orderBy('display_order')->get();
+            $merged = [];
 
-            if ($companyId) {
-                $query->where('company_id', $companyId);
-            } else {
-                $query->whereNull('company_id');
+            foreach ($globalRows as $s) {
+                $merged[$s->key] = $s;
             }
 
-            return $query
-                ->orderBy('display_order')
-                ->get()
+            // ② Override with company-specific rows
+            if ($companyId) {
+                $companyRows = Setting::where('group', $group)->where('company_id', $companyId)->orderBy('display_order')->get();
+
+                foreach ($companyRows as $s) {
+                    $merged[$s->key] = $s;
+                }
+            }
+
+            return collect($merged)
+                ->values()
                 ->map(fn(Setting $s) => [
                     'key'         => $s->key,
                     'value'       => $this->castValue($s),
@@ -245,15 +263,16 @@ class SettingService extends BaseService
     {
         $companyId = $this->getCurrentCompanyId();
 
-        $query = Setting::where('key', $key);
-
+        // ① Try company-specific first
         if ($companyId) {
-            $query->where('company_id', $companyId);
-        } else {
-            $query->whereNull('company_id');
+            $setting = Setting::where('key', $key)->where('company_id', $companyId)->first();
+            if ($setting) {
+                return $setting;
+            }
         }
 
-        return $query->first();
+        // ② Fall back to global (null company_id)
+        return Setting::where('key', $key)->whereNull('company_id')->first();
     }
 
     // ═══════════════════════════════════════════════════════════════

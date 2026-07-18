@@ -83,11 +83,5 @@ Algerian-specific columns on parties/warehouses:
 TRIGGERS
 ═══════════════════════════════════════════════════════════
 
-current_stock_cached on products table:
-  Updated by MySQL trigger on stock_movements INSERT/UPDATE/DELETE
-  Trigger defined in Migration_CurrentStockCached.php
-  Fixed in 2026_06_14_000004_fix_current_stock_cached_triggers.php
-
-❌ Do NOT manually update current_stock_cached in PHP code
-✅ Insert/update stock_movements → trigger handles the rest
+No active triggers. The optional stock-caching triggers were removed.
 --}}

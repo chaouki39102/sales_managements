@@ -21,10 +21,9 @@ KEY SERVICES
   InventoryValuationService — FIFO/LIFO/WMAC valuation methods
 
 CURRENT STOCK CACHED
-  Column: products.current_stock_cached — maintained by DB trigger
-  Trigger: Migration_CurrentStockCached.php + 2026_06_14_000004_fix_current_stock_cached_triggers.php
-  MySQL/MariaDB only — NOT compatible with SQLite
-  ❌ Never update current_stock_cached manually — let trigger handle it
+  Column: products.current_stock_cached — optional denormalized column
+  Stock is computed via InventoryStockService (with 30s cache)
+  No active DB triggers — triggers were removed
 
 OPENING BALANCE — CRITICAL BUG TO AVOID
   seedCurrentStock() MUST filter by is_current = 1 on fiscal_years table

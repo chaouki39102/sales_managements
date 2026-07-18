@@ -77,15 +77,16 @@ class Setting extends Model
 
         // ✅ Cache::remember بدون tags — يعمل مع كل drivers
         return Cache::remember($cacheKey, now()->addHours(24), function () use ($key, $default, $companyId) {
-            $query = static::where('key', $key);
-
+            // ① First try company-specific row
             if ($companyId !== null) {
-                $query->where('company_id', $companyId);
-            } else {
-                $query->whereNull('company_id');
+                $setting = static::where('key', $key)->where('company_id', $companyId)->first();
+                if ($setting) {
+                    return $setting->getTypedValue();
+                }
             }
 
-            $setting = $query->first();
+            // ② Fall back to global (null company_id) row
+            $setting = static::where('key', $key)->whereNull('company_id')->first();
 
             if (!$setting) {
                 return $default;

@@ -14,6 +14,11 @@ class TreasuryAccountSeeder extends Seeder
         $bankTypeId = DB::table('treasury_account_types')->where('company_id', $companyId)->where('name', 'bank')->value('id');
         $cashTypeId = DB::table('treasury_account_types')->where('company_id', $companyId)->where('name', 'cash')->value('id');
 
+        if (!$cashTypeId && !$bankTypeId) {
+            $this->command?->warn("  ⚠️  TreasuryAccountSeeder: treasury_account_types مفقودة — تم التخطي");
+            return;
+        }
+
         DB::table('treasury_accounts')->insert([
             [
                 'company_id'               => $companyId,

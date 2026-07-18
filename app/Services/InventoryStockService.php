@@ -96,7 +96,7 @@ class InventoryStockService
 
         // ─── 3. Query الرئيسية (مخزنة 30 ثانية) ────────────────────────────────
         $cacheKey = 'stock-at:' . implode('_', [$companyId, $date, $warehouseId ?? 'all', $fiscalYearId, $search ?? '']);
-        $rows = Cache::remember($cacheKey, 30, function () use (
+        $rows = Cache::remember($cacheKey, 5, function () use (
             $companyId, $date, $warehouseId, $fiscalYearId, $search, $openingQuery, $movementsQuery, $lotsCountQuery,
         ) {
             return DB::table('products as p')

@@ -30,9 +30,8 @@ class CompanyObserver
         config(['seeding.company_id' => $company->id]);
 
         try {
-            DB::transaction(function () use ($company) {
-                app(CompanySeeder::class)->run();
-            });
+            // ⚠️ لا نستخدم DB::transaction() هنا — إذا فشل سيدر واحد لا نريد فقدان بيانات بقية السيدرات
+            app(CompanySeeder::class)->run();
 
             app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 

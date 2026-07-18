@@ -15,6 +15,11 @@ class DocumentTypeSeeder extends Seeder
         $purchase = DB::table('document_base_operations')->where('company_id', $companyId)->where('name', 'purchase')->value('id');
         $transfer = DB::table('document_base_operations')->where('company_id', $companyId)->where('name', 'transfer')->value('id');
 
+        if (!$sale && !$purchase && !$transfer) {
+            $this->command?->warn("  ⚠️  DocumentTypeSeeder: document_base_operations مفقودة — تم التخطي");
+            return;
+        }
+
         $types = [
             // ─── مبيعات ───────────────────────────────────────────────────────
             ['name' => 'Devis',                       'name_latin' => 'Quote',               'code' => 'DEV', 'document_base_operation_id' => $sale,     'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  1],
