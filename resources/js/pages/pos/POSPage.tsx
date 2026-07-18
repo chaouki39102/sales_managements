@@ -263,6 +263,7 @@ function POSPage() {
   const [editingDocumentDate, setEditingDocumentDate] = useState<string | null>(null);
   const editingPrevBalanceRef = useRef<number | undefined>(undefined);
 
+
   const receiptSource = useMemo((): PipelineSource | null => {
     if (!receiptSnapshot) return null;
     return { type: 'pos-snapshot', snapshot: receiptSnapshot };
@@ -502,7 +503,7 @@ function POSPage() {
         ),
       ),
     enabled:   !!slug && !!effectiveWarehouseId,
-    staleTime: 2 * 60_000,
+    staleTime: 10_000,
   });
   // True while stock is still unresolved for the first time — used by ProductGrid
   // to avoid flashing products as "available" before we actually know their stock.
@@ -623,6 +624,7 @@ function POSPage() {
     setEditingDocumentId(null);
     setEditingDocStatus(null);
     setEditingDocumentDate(null);
+    editingPrevBalanceRef.current = undefined;
   }, [settings.confirmOnClear, isEmpty, cartNote, clearCartConfirm]);
 
   const handleUndoClear = useCallback(() => {
@@ -843,7 +845,7 @@ function POSPage() {
   // Template with POS receipt overrides applied
   const posTemplate = useMemo(() => {
     if (!template) return null;
-    const overrides: Partial<typeof template.config> = {};
+    const overrides: Partial<typeof template> = {};
     let changed = false;
     if (settings.receiptCompanyName) {
       const name = settings.receiptHeader2
@@ -864,7 +866,7 @@ function POSPage() {
       changed = true;
     }
     if (!changed) return template;
-    return { ...template, config: { ...template.config, ...overrides } };
+    return { ...template, ...overrides };
   }, [template, settings.receiptCompanyName, settings.receiptHeader2, settings.receiptFooter, settings.receiptShowQr]);
 
   const companyData: CompanyPreviewData | null = useMemo(() => mapCompany(company), [company]);
@@ -936,17 +938,24 @@ const handleCompleteSale = useCallback(async (params: {
     try {
       const snapshot = { items: [...currentItems], totals: { ...currentTotals } };
 
+      const existingPaymentsMap = new Map(
+        (pos.payments ?? []).map(p => [p.id, p.payment_date])
+      );
+      const today = new Date().toISOString().slice(0, 10);
       const apiPayments = (params.payments ?? [])
         .filter(p => p.amount > 0)
-        .map(p => ({
-          ...(p.id ? { id: p.id } : {}),
-          payment_mode_id:     p.paymentModeId,
-          amount:              p.amount,
-          payment_date:        new Date().toISOString().slice(0, 10),
-          treasury_account_id: p.treasuryAccountId ?? defaultTreasury?.id ?? null,
-          reference:           p.reference?.trim() || null,
-          notes:               params.note?.trim() || null,
-        }));
+        .map(p => {
+          const existingPaymentDate = p.id ? existingPaymentsMap.get(p.id) : undefined;
+          return {
+            ...(p.id ? { id: p.id } : {}),
+            payment_mode_id:     p.paymentModeId,
+            amount:              p.amount,
+            payment_date:        typeof existingPaymentDate === 'string' ? existingPaymentDate : today,
+            treasury_account_id: p.treasuryAccountId ?? defaultTreasury?.id ?? null,
+            reference:           p.reference?.trim() || null,
+            notes:               params.note?.trim() || null,
+          };
+        });
 
       const linesPayload = currentItems.map(i => {
         const compoundedDisc = compoundDiscountPct(i.discount_percentage, currentInvDisc);
@@ -972,7 +981,7 @@ const handleCompleteSale = useCallback(async (params: {
         warehouse_id:   defaultWarehouse.id,
         fiscal_year_id: fiscalYear.id,
         currency_id:    params.currencyId ?? defaultCurrency?.id ?? undefined,
-        document_date:  new Date().toISOString().slice(0, 10),
+        document_date:  editingDocumentDate ?? new Date().toISOString().slice(0, 10),
         due_date:       params.dueDate ?? null,
         notes:          params.note ?? cartNote ?? null,
       };
@@ -1038,6 +1047,17 @@ const handleCompleteSale = useCallback(async (params: {
           queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id),
         });
       }
+
+      // Invalidate stock so product cards show updated quantities
+      queryClient.invalidateQueries({
+        queryKey: [slug, 'pos-stock'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [slug, 'inventory', 'stock-at'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [slug, 'warehouse-stock'],
+      });
 
       const prevBalance = res?.balance_data?.previous_balance ?? editingPrevBalanceRef.current;
 
@@ -1123,7 +1143,7 @@ const handleCompleteSale = useCallback(async (params: {
       safeToast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [settings.defaultDocTypeCode, settings.playSoundOnSale, settings.soundPreset, settings.soundVolume, settings.openCashDrawer, settings.autoClosePayment, settings.autoPrint, settings.printCopies, paymentModes, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, cartNote, editingDocumentId, currentSession?.id, autoPrint, isPrintEnabled, template, showPreview, safeToast, defaultTreasury?.id, editingDocStatus, incrementMut, invoiceDiscountAmount, queryClient, slug, handlePrintDirect]);
+  }, [settings.defaultDocTypeCode, settings.playSoundOnSale, settings.soundPreset, settings.soundVolume, settings.openCashDrawer, settings.autoClosePayment, settings.autoPrint, settings.printCopies, paymentModes, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, cartNote, editingDocumentId, editingDocumentDate, currentSession?.id, autoPrint, isPrintEnabled, template, showPreview, safeToast, defaultTreasury?.id, editingDocStatus, incrementMut, invoiceDiscountAmount, queryClient, slug, handlePrintDirect]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
