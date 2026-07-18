@@ -111,6 +111,23 @@ export const companiesApi = {
   seedSingle: (id: number, seeder: string) =>
     apiPost<{ message: string }>(`${ADMIN}/${id}/seed/${seeder}`),
 
+  // ── Bulk Actions ─────────────────────────────────────────────────────────────
+
+  bulkSuspend:   (ids: number[], reason: string) =>
+    apiPost<{ message: string; count: number }>(`${ADMIN}/bulk-suspend`, { ids, reason }),
+  bulkUnsuspend: (ids: number[]) =>
+    apiPost<{ message: string; count: number }>(`${ADMIN}/bulk-unsuspend`, { ids }),
+  bulkVerify:    (ids: number[]) =>
+    apiPost<{ message: string; count: number }>(`${ADMIN}/bulk-verify`, { ids }),
+  bulkActivate:  (ids: number[]) =>
+    apiPost<{ message: string; count: number }>(`${ADMIN}/bulk-activate`, { ids }),
+  bulkDeactivate:(ids: number[]) =>
+    apiPost<{ message: string; count: number }>(`${ADMIN}/bulk-deactivate`, { ids }),
+
+  // ── Export ───────────────────────────────────────────────────────────────────
+  export: (params?: { status?: string; plan?: string }) =>
+    apiGet<{ data: Record<string, unknown>[]; total: number }>(`${ADMIN}/export`, params as any),
+
 } as const;
 
 // ─── Type helpers للـ hooks ───────────────────────────────────────────────────

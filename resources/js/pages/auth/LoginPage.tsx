@@ -36,7 +36,7 @@ export default function LoginPage() {
             if (err.response) {
                 const msg =
                     err.response.data?.message || err.response.statusText;
-                setError(`خطأ ${err.response.status}: ${msg}`);
+                setError(msg);
             } else if (err.request) {
                 setError(
                     "لا يمكن الاتصال بالخادم. تأكد من تشغيل الخادم وإعدادات CORS."

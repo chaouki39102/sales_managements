@@ -61,6 +61,11 @@ interface Props {
   prevBalance?:      number;
   defaultPaymentCode?: string;
   defaultDocTypeCode?: string;
+  /** Fields restored from document when editing */
+  initialDueDate?:   string | null;
+  initialTypeCode?:  string | null;
+  initialCurrencyId?: number | null;
+  initialNote?:      string | null;
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
@@ -168,6 +173,10 @@ export default function ProfessionalPaymentModal({
   prevBalance: propPrevBalance,
   defaultPaymentCode = 'cash',
   defaultDocTypeCode = 'POS',
+  initialDueDate,
+  initialTypeCode,
+  initialCurrencyId,
+  initialNote,
 }: Props) {
 
   const firstAmountRef = useRef<HTMLInputElement>(null);
@@ -197,14 +206,21 @@ export default function ProfessionalPaymentModal({
       : [];
   });
 
-  const [docTypeCode,        setDocTypeCode]        = useState<string>(defaultDocTypeCode);
-  const [dueDate,            setDueDate]            = useState('');
-  const [note,               setNote]               = useState('');
+  const [docTypeCode,        setDocTypeCode]        = useState<string>(
+    isEditing && initialTypeCode ? initialTypeCode : defaultDocTypeCode,
+  );
+  const [dueDate,            setDueDate]            = useState(
+    isEditing && initialDueDate ? initialDueDate : '',
+  );
+  const [note,               setNote]               = useState(
+    isEditing && initialNote ? initialNote : '',
+  );
   const [submitting,         setSubmitting]         = useState(false);
   const [error,              setError]              = useState('');
-  const [selectedCurrencyId, setSelectedCurrencyId] = useState<number | null>(
-    currencies?.find(c => c.is_base_currency)?.id ?? currencies?.[0]?.id ?? null,
-  );
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState<number | null>(() => {
+    if (isEditing && initialCurrencyId) return initialCurrencyId;
+    return currencies?.find(c => c.is_base_currency)?.id ?? currencies?.[0]?.id ?? null;
+  });
 
   // ── Balance: SSOT from prop (when editing) or fetch from API (new doc) ──
   const [internalPrevBalance, setInternalPrevBalance] = useState(0);

@@ -22,6 +22,7 @@ const NAV = [
     items: [
       { to: '/admin/companies', icon: 'ti-building-store',   label: 'الشركات',      badge: 'companies' },
       { to: '/admin/users',     icon: 'ti-users',            label: 'المستخدمون',   badge: 'users'     },
+      { to: '/admin/approvals', icon: 'ti-user-check',       label: 'طلبات التفعيل' },
     ],
   },
   {
@@ -46,6 +47,7 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   '/admin':           { title: 'لوحة تحكم النظام',  sub: 'نظرة شاملة على كامل المنصة' },
   '/admin/companies': { title: 'إدارة الشركات',      sub: 'كل الشركات المسجلة في المنصة' },
   '/admin/users':     { title: 'إدارة المستخدمين',   sub: 'كل المستخدمين عبر الشركات'  },
+  '/admin/approvals': { title: 'طلبات التفعيل',       sub: 'المستخدمون بانتظار الموافقة' },
   '/admin/plans':     { title: 'الخطط والاشتراكات',  sub: 'إدارة خطط وحدود المنصة'     },
   '/admin/activity':  { title: 'سجل النشاط',         sub: 'تتبع كل الأحداث والعمليات' },
   '/admin/settings':  { title: 'إعدادات النظام',     sub: 'إعدادات البنية التحتية'     },
@@ -254,7 +256,7 @@ export default function AdminLayout() {
           height: 54, display: 'flex', alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 20px',
-          background: 'rgba(255,255,255,.92)',
+          background: 'var(--bg2)',
           backdropFilter: 'blur(14px)',
           borderBottom: '1px solid var(--b2)',
           flexShrink: 0,

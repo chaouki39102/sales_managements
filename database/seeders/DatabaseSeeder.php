@@ -40,6 +40,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(GlobalSeeder::class);
+        $this->call(PlanSeeder::class);
 
         // بذر document_type_conversions للشركات القائمة
         // (يُسكّب إذا كان الجدول فارغاً لتلك الشركة)

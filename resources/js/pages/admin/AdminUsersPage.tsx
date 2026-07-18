@@ -123,6 +123,11 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
             background: user.active ? '#10b98120' : '#ef444420',
             color: user.active ? '#10b981' : '#ef4444',
           }}>{user.active ? 'نشط' : 'معطل'}</span>
+          <span style={{
+            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+            background: user.is_approved ? '#10b98120' : '#f59e0b20',
+            color: user.is_approved ? '#10b981' : '#f59e0b',
+          }}>{user.is_approved ? 'مفعّل' : 'بانتظار التفعيل'}</span>
           <button onClick={() => onClose()} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             fontSize: 20, color: 'var(--t4)', lineHeight: 1, padding: 4,
@@ -174,6 +179,8 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
                 ['الدور',        user.role ?? '—'],
                 ['الهاتف',       user.phone ?? '—'],
                 ['الشركات',      String(user.companies_count ?? 0)],
+                ['الحالة',       user.active ? 'نشط' : 'معطل'],
+                ['التفعيل',     user.is_approved ? 'مفعّل' : 'بانتظار التفعيل'],
                 ['آخر دخول',    user.last_login_at ? fmtDate(user.last_login_at) : '—'],
                 ['تاريخ الإنشاء', fmtDate(user.created_at)],
               ].map(([k, v]) => (
@@ -336,6 +343,40 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
                 </div>
               </button>
 
+              {/* Toggle Approval */}
+              <button
+                disabled={busy === 'approval'}
+                onClick={() => run('approval', () => adminApi.toggleApproval(user.id),
+                  user.is_approved ? 'تم إلغاء تفعيل الحساب' : 'تم تفعيل الحساب'
+                )}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px', borderRadius: 10,
+                  border: `1px solid ${user.is_approved ? '#f59e0b25' : '#10b98125'}`,
+                  background: user.is_approved ? '#f59e0b08' : '#10b98108',
+                  cursor: 'pointer', textAlign: 'right', width: '100%',
+                  fontFamily: 'Tajawal,sans-serif',
+                }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                  background: user.is_approved ? '#f59e0b20' : '#10b98120',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: user.is_approved ? '#f59e0b' : '#10b981', fontSize: 17,
+                }}>
+                  {busy === 'approval'
+                    ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+                    : <i className={`ti ${user.is_approved ? 'ti-user-off' : 'ti-user-check'}`} />}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: user.is_approved ? '#f59e0b' : '#10b981' }}>
+                    {user.is_approved ? 'إلغاء تفعيل الحساب' : 'تفعيل الحساب'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--t4)' }}>
+                    {user.is_approved ? 'سيتم منع المستخدم من تسجيل الدخول' : 'السماح للمستخدم بتسجيل الدخول'}
+                  </div>
+                </div>
+              </button>
+
               {/* Delete */}
               {!showConfirm ? (
                 <button
@@ -486,7 +527,7 @@ export default function AdminUsersPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--b1)' }}>
-                  {['المستخدم', 'الدور', 'الشركات', 'الحالة', 'تاريخ الإنشاء', ''].map(h => (
+                  {['المستخدم', 'الدور', 'الشركات', 'الحالة', 'التفعيل', 'تاريخ الإنشاء', ''].map(h => (
                     <th key={h} style={{
                       padding: '10px 14px', fontSize: 11.5, fontWeight: 700,
                       color: 'var(--t4)', textAlign: 'right', whiteSpace: 'nowrap',
@@ -497,7 +538,7 @@ export default function AdminUsersPage() {
               <tbody>
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--t4)', fontSize: 13 }}>
+                    <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--t4)', fontSize: 13 }}>
                       <i className="ti ti-users" style={{ fontSize: 30, display: 'block', marginBottom: 8, opacity: .5 }} />
                       لا يوجد مستخدمون
                     </td>
@@ -539,6 +580,13 @@ export default function AdminUsersPage() {
                         background: u.active ? '#10b98120' : '#6b728020',
                         color: u.active ? '#10b981' : '#6b7280',
                       }}>{u.active ? 'نشط' : 'معطل'}</span>
+                    </td>
+                    <td style={{ padding: '11px 14px' }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
+                        background: u.is_approved ? '#10b98120' : '#f59e0b20',
+                        color: u.is_approved ? '#10b981' : '#f59e0b',
+                      }}>{u.is_approved ? 'مفعّل' : 'بانتظار'}</span>
                     </td>
                     <td style={{ padding: '11px 14px', fontSize: 12, color: 'var(--t4)', whiteSpace: 'nowrap' }}>
                       {fmtDate(u.created_at)}

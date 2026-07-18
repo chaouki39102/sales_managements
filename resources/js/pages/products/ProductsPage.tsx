@@ -540,7 +540,17 @@ export default function ProductsPage() {
                   {buildTableCols(hiddenCols).map(col => (
                     <th key={col.key} style={col.thStyle}
                       onClick={col.sortable ? () => handleSort(col.sortField ?? col.key) : undefined}>
-                      {col.label}{col.sortable && sortField === (col.sortField ?? col.key) ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                      {col.key === 'checkbox' ? (() => {
+                        const pageIds = products.map(p => p.id);
+                        const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id));
+                        const someSelected = pageIds.some(id => selectedIds.includes(id));
+                        return (
+                          <input type="checkbox" checked={allSelected} ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                            onChange={() => setSelectedIds(prev => allSelected ? prev.filter(id => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])])} />
+                        );
+                      })() : (
+                        <>{col.label}{col.sortable && sortField === (col.sortField ?? col.key) ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</>
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -622,7 +632,7 @@ export default function ProductsPage() {
       <Suspense fallback={null}>
         <ImportWizardModal
           open={importModal.open}
-          onClose={importModal.closeModal}
+          onClose={() => { importModal.closeModal(); qc.invalidateQueries({ queryKey: [slug, 'products'] }); }}
           config={PRODUCT_IMPORT_CONFIG}
         />
       </Suspense>

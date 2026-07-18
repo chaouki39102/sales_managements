@@ -15,9 +15,26 @@ export const usersApi = {
   update:        (id: number, d: Partial<AdminUser>)             => apiPut<AdminUser>(`${BASE}/${id}`, d),
   remove:        (id: number)                                    => apiDelete(`${BASE}/${id}`),
   toggleActive:  (id: number)                                    => apiPost<AdminUser>(`${BASE}/${id}/toggle-active`),
+  toggleApproval: (id: number)                                   => apiPost<AdminUser>(`${BASE}/${id}/toggle-approval`),
   resetPassword: (id: number, password: string)                  =>
     apiPost(`${BASE}/${id}/reset-password`, { password, password_confirmation: password }),
   companies:     (id: number)                                    => apiGet<AdminCompany[]>(`${BASE}/${id}/companies`),
+} as const;
+
+export type PendingUser = {
+  id: number;
+  name: string;
+  email: string;
+  created_at: string;
+};
+
+export const approvalApi = {
+  pending:  (params?: { search?: string; per_page?: number }) =>
+    apiGetPaginated<Paginated<PendingUser>>('/admin/users/pending-approval', params as any),
+  approve:  (id: number)                          => apiPost(`/admin/users/${id}/approve`),
+  reject:   (id: number)                          => apiPost(`/admin/users/${id}/reject`),
+  bulkApprove: (ids: number[])                    => apiPost<{ message: string; count: number }>('/admin/users/bulk-approve', { ids }),
+  bulkReject:  (ids: number[])                    => apiPost<{ message: string; count: number }>('/admin/users/bulk-reject', { ids }),
 } as const;
 
 export const impersonateApi = {

@@ -11,6 +11,7 @@ import {
   companiesApi,
   usersApi,
   impersonateApi,
+  approvalApi,
   dashboardApi,
   plansApi,
   settingsApi,
@@ -24,6 +25,7 @@ export {
   companiesApi,
   usersApi,
   impersonateApi,
+  approvalApi,
   dashboardApi,
   plansApi,
   settingsApi,
@@ -58,6 +60,14 @@ export const adminApi = {
   toggleCompanyUser: companiesApi.toggleUser,
   seedCompany:       companiesApi.seed,
 
+  // Bulk actions
+  bulkSuspendCompanies:   companiesApi.bulkSuspend,
+  bulkUnsuspendCompanies: companiesApi.bulkUnsuspend,
+  bulkVerifyCompanies:    companiesApi.bulkVerify,
+  bulkActivateCompanies:  companiesApi.bulkActivate,
+  bulkDeactivateCompanies: companiesApi.bulkDeactivate,
+  exportCompanies:        companiesApi.export,
+
   // Users
   getUsers:         usersApi.list,
   getUser:          usersApi.show,
@@ -66,11 +76,19 @@ export const adminApi = {
   deleteUser:       usersApi.remove,
   resetPassword:    usersApi.resetPassword,
   toggleActive:     usersApi.toggleActive,
+  toggleApproval:   usersApi.toggleApproval,
   getUserCompanies: usersApi.companies,
 
   // Impersonate
   impersonate:     impersonateApi.start,
   stopImpersonate: impersonateApi.stop,
+
+  // Approvals
+  getPendingUsers: approvalApi.pending,
+  approveUser:     approvalApi.approve,
+  rejectUser:      approvalApi.reject,
+  bulkApproveUsers: approvalApi.bulkApprove,
+  bulkRejectUsers:  approvalApi.bulkReject,
 
   // Plans
   getPlans: plansApi.list,

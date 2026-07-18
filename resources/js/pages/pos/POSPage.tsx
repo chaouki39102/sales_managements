@@ -261,7 +261,13 @@ function POSPage() {
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [editingDocStatus, setEditingDocStatus] = useState<string | null>(null);
   const [editingDocumentDate, setEditingDocumentDate] = useState<string | null>(null);
+  const [editingDocumentNumber, setEditingDocumentNumber] = useState<string | null>(null);
   const editingPrevBalanceRef = useRef<number | undefined>(undefined);
+  const editingDocMetaRef = useRef<{
+    dueDate?:   string | null;
+    typeCode?:  string | null;
+    currencyId?: number | null;
+  }>(null);
 
 
   const receiptSource = useMemo((): PipelineSource | null => {
@@ -624,7 +630,9 @@ function POSPage() {
     setEditingDocumentId(null);
     setEditingDocStatus(null);
     setEditingDocumentDate(null);
+    setEditingDocumentNumber(null);
     editingPrevBalanceRef.current = undefined;
+    editingDocMetaRef.current = null;
   }, [settings.confirmOnClear, isEmpty, cartNote, clearCartConfirm]);
 
   const handleUndoClear = useCallback(() => {
@@ -654,7 +662,7 @@ function POSPage() {
     if (!isEmpty && cartState._isDirty) posRef.current.holdCart();
     try {
       const doc = await apiGet<CommercialDocument>(`/documents/${docId}`, {
-        include: 'party,lines,lines.product,lines.product_variant,payments,payments.payment_mode',
+        include: 'party,documentType,lines,lines.product,lines.product_variant,payments,payments.payment_mode',
       });
       if (!doc?.lines?.length) {
         safeToast.error('لا توجد أصناف في هذه الفاتورة');
@@ -696,12 +704,24 @@ function POSPage() {
         treasury_account_id: p.treasury_account_id ?? null,
         reference:           p.reference ?? null,
       }));
-      useCartStore.setState({ items, client: doc.party ?? null, payments });
+      useCartStore.setState({
+        items,
+        client: doc.party ?? null,
+        payments,
+        notes: doc.notes ?? '',
+      });
       useCartStore.getState().markClean();
       setEditingDocumentId(docId);
       setEditingDocStatus(doc.status);
       setEditingDocumentDate(doc.document_date ?? null);
+      setEditingDocumentNumber(doc.document_number ?? null);
       editingPrevBalanceRef.current = doc.balance_data?.previous_balance;
+      editingDocMetaRef.current = {
+        dueDate:   doc.due_date ?? null,
+        typeCode:  doc.documentType?.code ?? null,
+        currencyId: doc.currency_id ?? null,
+      };
+      setCartNote(doc.notes ?? '');
       setShowSessionInvoices(false);
       safeToast.success(`تم فتح الفاتورة ${doc.document_number}`);
       // Select last cart row + focus search so user can immediately type *<digits> Enter
@@ -991,10 +1011,9 @@ const handleCompleteSale = useCallback(async (params: {
 
       let res;
       if (editingDocumentId) {
-        const isDraft = editingDocStatus === 'draft';
         res = await documentsApi.update(editingDocumentId, {
           ...commonPayload,
-          ...(isDraft ? { lines: linesPayload } : {}),
+          lines:    linesPayload,
           payments: apiPayments,
         });
       } else {
@@ -1094,7 +1113,9 @@ const handleCompleteSale = useCallback(async (params: {
       setEditingDocumentId(null);
       setEditingDocStatus(null);
       setEditingDocumentDate(null);
+      setEditingDocumentNumber(null);
       editingPrevBalanceRef.current = undefined;
+      editingDocMetaRef.current = null;
       receiptSnapshotRef.current = fullSnapshot;
       setReceiptSnapshot(fullSnapshot);
       setCartNote('');
@@ -1282,6 +1303,7 @@ const handleCompleteSale = useCallback(async (params: {
         totals={pos.totals}
         totalTtcFinal={adjustedTotalTtcFinal}
         slug={slug}
+        editingDocumentNumber={editingDocumentId ? editingDocumentNumber : null}
         priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
         onPriceLevelChange={applyPriceLevel}
         onHeld={() => setModal('held')}
@@ -1438,6 +1460,10 @@ const handleCompleteSale = useCallback(async (params: {
             prevBalance={editingDocumentId ? editingPrevBalanceRef.current : clientBalance?.current_balance}
             defaultPaymentCode={settings.defaultPaymentCode}
             defaultDocTypeCode={settings.defaultDocTypeCode}
+            initialDueDate={editingDocMetaRef.current?.dueDate}
+            initialTypeCode={editingDocMetaRef.current?.typeCode}
+            initialCurrencyId={editingDocMetaRef.current?.currencyId}
+            initialNote={cartNote}
             onClose={() => setModal('none')}
             onConfirm={handleCompleteSale}
           />

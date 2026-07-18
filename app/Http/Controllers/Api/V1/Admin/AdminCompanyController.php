@@ -288,4 +288,129 @@ class AdminCompanyController extends Controller
             'message' => $newStatus ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم',
         ]);
     }
+
+    // ─── Bulk Actions ───────────────────────────────────────────────────
+
+    public function bulkSuspend(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids'    => 'required|array|min:1',
+            'ids.*'  => 'integer|exists:companies,id',
+            'reason' => 'required|string|max:500',
+        ]);
+
+        $companies = Company::whereIn('id', $data['ids'])->whereNull('suspended_at')->get();
+        $count = 0;
+        foreach ($companies as $company) {
+            $company->suspend($data['reason'], auth()->id());
+            $count++;
+        }
+        return response()->json(['message' => "تم إيقاف {$count} شركة", 'count' => $count]);
+    }
+
+    public function bulkUnsuspend(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer|exists:companies,id',
+        ]);
+
+        $companies = Company::whereIn('id', $data['ids'])->whereNotNull('suspended_at')->get();
+        $count = 0;
+        foreach ($companies as $company) {
+            $company->unsuspend();
+            $count++;
+        }
+        return response()->json(['message' => "تم إعادة تفعيل {$count} شركة", 'count' => $count]);
+    }
+
+    public function bulkVerify(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer|exists:companies,id',
+        ]);
+
+        $companies = Company::whereIn('id', $data['ids'])->whereNull('verified_at')->get();
+        $count = 0;
+        foreach ($companies as $company) {
+            $company->verify(auth()->id());
+            $count++;
+        }
+        return response()->json(['message' => "تم توثيق {$count} شركة", 'count' => $count]);
+    }
+
+    public function bulkDeactivate(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer|exists:companies,id',
+        ]);
+
+        $companies = Company::whereIn('id', $data['ids'])->where('active', true)->get();
+        $count = 0;
+        foreach ($companies as $company) {
+            $company->deactivate(auth()->id());
+            $count++;
+        }
+        return response()->json(['message' => "تم تعطيل {$count} شركة", 'count' => $count]);
+    }
+
+    public function bulkActivate(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer|exists:companies,id',
+        ]);
+
+        $companies = Company::whereIn('id', $data['ids'])->where('active', false)->get();
+        $count = 0;
+        foreach ($companies as $company) {
+            $company->activate();
+            $count++;
+        }
+        return response()->json(['message' => "تم تفعيل {$count} شركة", 'count' => $count]);
+    }
+
+    public function export(Request $request): JsonResponse
+    {
+        $query = Company::query()->whereNull('deleted_at');
+
+        if ($status = $request->get('status')) {
+            match ($status) {
+                'active'     => $query->where('active', true)->whereNull('suspended_at'),
+                'suspended'  => $query->whereNotNull('suspended_at'),
+                'inactive'   => $query->where('active', false),
+                'verified'   => $query->whereNotNull('verified_at'),
+                'unverified' => $query->whereNull('verified_at'),
+                default      => null,
+            };
+        }
+        if ($plan = $request->get('plan')) {
+            $query->where('plan', $plan);
+        }
+
+        $companies = $query->select('id', 'name', 'slug', 'email', 'phone', 'plan', 'active', 'suspended_at', 'verified_at', 'created_at')
+            ->withCount('users')
+            ->orderBy('created_at', 'desc')
+            ->limit(5000)
+            ->get();
+
+        return response()->json([
+            'data' => $companies->map(fn($c) => [
+                'id'         => $c->id,
+                'name'       => $c->name,
+                'slug'       => $c->slug,
+                'email'      => $c->email,
+                'phone'      => $c->phone,
+                'plan'       => $c->plan,
+                'active'     => $c->active,
+                'verified'   => !is_null($c->verified_at),
+                'suspended'  => !is_null($c->suspended_at),
+                'users_count' => $c->users_count,
+                'created_at' => $c->created_at?->toIso8601String(),
+            ]),
+            'total' => $companies->count(),
+        ]);
+    }
 }

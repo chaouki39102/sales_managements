@@ -63,6 +63,15 @@ class ProductService extends \App\Core\Services\BaseService
     {
         if (!empty($data['packagings'])) {
             $this->syncPackagings($item, $data['packagings']);
+        } else {
+            $item->packagings()->create([
+                'code'          => '1',
+                'label'         => 'unite',
+                'quantity'      => 1,
+                'is_default'    => true,
+                'active'        => true,
+                'display_order' => 1,
+            ]);
         }
         if (!empty($data['prices'])) {
             $this->syncPrices($item, $data['prices'], (float)($data['purchase_price_ht'] ?? 0));

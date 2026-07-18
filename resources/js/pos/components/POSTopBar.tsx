@@ -15,6 +15,7 @@ interface POSTopBarProps {
   totals:          CartTotals;
   totalTtcFinal:   number;
   slug:            string | null;
+  editingDocumentNumber?: string | null;
   priceLevels:          PriceLevel[];
   selectedPriceLevelId: number | null;
   onPriceLevelChange:   (plId: number | null) => void;
@@ -40,7 +41,7 @@ interface POSTopBarProps {
 export default function POSTopBar({
   session, heldCount, avgMargin,
   isEmpty, isFullscreen, showQuickbar,
-  totals, totalTtcFinal, slug,
+  totals, totalTtcFinal, slug, editingDocumentNumber,
   priceLevels, selectedPriceLevelId, onPriceLevelChange,
   onHeld, onNewSale, onManual, onReceipt,
   onSession, onSessionInvoices, onFullscreen, onKbHelp,
@@ -148,6 +149,16 @@ export default function POSTopBar({
             <div className="pos-chip-inner">
               <span className="pos-chip-label">الإجمالي</span>
               <strong className="pos-chip-val">{formatDZD(totalTtcFinal)}</strong>
+            </div>
+          </div>
+        )}
+
+        {editingDocumentNumber && (
+          <div className="pos-chip editing" title="جاري تعديل فاتورة" style={{ background: 'var(--y)', color: '#000', fontWeight: 700 }}>
+            <i className="ti ti-edit pic-ic" style={{ color: '#000' }} />
+            <div className="pos-chip-inner">
+              <span className="pos-chip-label" style={{ color: '#000', opacity: 0.8 }}>تعديل فاتورة</span>
+              <strong className="pos-chip-val" style={{ color: '#000' }}>{editingDocumentNumber}</strong>
             </div>
           </div>
         )}

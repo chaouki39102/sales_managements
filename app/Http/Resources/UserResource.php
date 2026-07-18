@@ -27,6 +27,7 @@ class UserResource extends JsonResource
             'wilaya_id'           => $this->wilaya_id,
             'role_id'             => $this->role_id,
             'active'              => $this->active,
+            'is_approved'         => $this->is_approved,
             'last_login_at'       => $this->last_login_at,
             'last_login_ip'       => $this->last_login_ip,
             'register_ip'         => $this->register_ip,

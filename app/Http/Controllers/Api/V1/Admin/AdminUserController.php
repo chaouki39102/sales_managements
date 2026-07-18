@@ -137,6 +137,15 @@ class AdminUserController extends Controller
         ]);
     }
 
+    public function toggleApproval(User $user): JsonResponse
+    {
+        $user->update(['is_approved' => !$user->is_approved]);
+        return response()->json([
+            'data'    => new UserResource($user->fresh()),
+            'message' => $user->is_approved ? 'تم تفعيل الحساب' : 'تم إلغاء تفعيل الحساب'
+        ]);
+    }
+
     public function companies(User $user): JsonResponse
     {
         $companies = $user->companies()->withPivot(['role', 'active'])->get();

@@ -56,7 +56,8 @@ class UserService extends \App\Core\Services\BaseService
         $companyId          = $this->getCurrentCompanyId();
         $data['company_id'] = $companyId;
         $data['created_by'] = auth()->id();
-        $data['active']     ??= true;
+        $data['active']      ??= true;
+        $data['is_approved'] ??= true;
 
         if (!empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);

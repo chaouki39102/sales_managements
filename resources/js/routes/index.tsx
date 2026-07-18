@@ -91,6 +91,7 @@ const AdminBootPage      = lazy(() => import('@/pages/admin/AdminBootPage'));
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'));
 const AdminCompaniesPage = lazy(() => import('@/pages/admin/AdminCompaniesPage'));
 const AdminUsersPage     = lazy(() => import('@/pages/admin/AdminUsersPage'));
+const AdminApprovalsPage = lazy(() => import('@/pages/admin/AdminApprovalsPage'));
 const AdminActivityPage  = lazy(() => import('@/pages/admin/AdminActivityPage'));
 const AdminSettingsPage  = lazy(() => import('@/pages/admin/AdminSettingsPage'));
 const AdminPlansPage     = lazy(() => import('@/pages/admin/AdminPlansPage'));
@@ -291,6 +292,7 @@ export function AppRoutes() {
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="companies" element={<AdminCompaniesPage />} />
           <Route path="users"     element={<AdminUsersPage />} />
+          <Route path="approvals" element={<AdminApprovalsPage />} />
           <Route path="activity"  element={<AdminActivityPage />} />
           <Route path="settings"  element={<AdminSettingsPage />} />
                     <Route path="plans"     element={<AdminPlansPage />} />

@@ -33,6 +33,7 @@ export interface AdminUser {
   email:            string;
   phone?:           string | null;
   active:           boolean;
+  is_approved:      boolean;
   role?:            string;
   companies_count?: number;
   last_login_at?:   string | null;
@@ -100,15 +101,32 @@ export interface AdminDashboardStats {
     active:         number;
     suspended:      number;
     verified:       number;
+    unverified:     number;
     by_plan:        Record<string, number>;
   };
   users: {
-    total:          number;
-    active:         number;
-    new_this_month: number;
+    total:            number;
+    active:           number;
+    new_this_month:   number;
+    pending_approval: number;
+    by_role:          Record<string, number>;
   };
-  recent_companies: AdminCompany[];
-  recent_users:     AdminUser[];
+  recent_companies:  AdminCompany[];
+  recent_users:      AdminUser[];
+  recent_activity:   ActivityLog[];
+  growth_7d:         { date: string; companies: number; users: number }[];
+  at_risk_companies: { id: number; name: string; plan: string; current: number; max: number; pct: number }[];
+  system_health: {
+    php_version:      string;
+    laravel_version:  string;
+    db_size_mb:       number;
+    cache_driver:     string;
+    queue_driver:     string;
+    queue_pending:    number;
+    queue_failed:     number;
+    maintenance_mode: boolean;
+    disk_free_gb:     number;
+  };
 }
 
 // ─── Shared ───────────────────────────────────────────────────────────────────

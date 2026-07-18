@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use Database\Seeders\GlobalRolesAndPermissionsSeeder;
+use Database\Seeders\PlanSeeder;
 use Database\Seeders\WilayaCommuneSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -39,11 +40,14 @@ class AdminSystemBootController extends Controller
                                   ->whereNull('roles.company_id')
                             )->exists();
 
+        $plansCount = DB::table('plans')->count();
+
         $isReady = $wilayasCount >= 48
                 && $communesCount > 0
                 && $permissionsCount > 0
                 && $superAdminRole
-                && $superAdminUser;
+                && $superAdminUser
+                && $plansCount > 0;
 
         return response()->json([
             'is_ready'    => $isReady,
@@ -76,6 +80,13 @@ class AdminSystemBootController extends Controller
                     'done'    => $superAdminUser,
                     'count'   => $superAdminUser ? 'مُعيَّن' : 'غير مُعيَّن',
                 ],
+                [
+                    'key'     => 'plans',
+                    'label'   => 'الخطط والاشتراكات',
+                    'icon'    => 'ti-credit-card',
+                    'done'    => $plansCount > 0,
+                    'count'   => "{$plansCount} خطة",
+                ],
             ],
         ]);
     }
@@ -94,6 +105,9 @@ class AdminSystemBootController extends Controller
 
             // 2. صلاحيات + دور super-admin + تعيين للمستخدم
             $results['permissions'] = $this->runPermissions();
+
+            // 3. خطط الاشتراك
+            $results['plans'] = $this->runPlans();
 
             return response()->json([
                 'message' => 'تم إعداد النظام بنجاح',
@@ -156,6 +170,15 @@ class AdminSystemBootController extends Controller
 
         return [
             'permissions' => \Spatie\Permission\Models\Permission::whereNull('company_id')->count(),
+        ];
+    }
+
+    private function runPlans(): array
+    {
+        (new PlanSeeder())->run();
+
+        return [
+            'plans' => DB::table('plans')->count(),
         ];
     }
 }

@@ -14,7 +14,7 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
   const [docs, setDocs] = useState<CommercialDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [sortField, setSortField] = useState<string>('document_date');
+  const [sortField, setSortField] = useState<string>('document_number');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const listRef = useRef<HTMLTableSectionElement>(null);
 

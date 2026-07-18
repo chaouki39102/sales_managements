@@ -62,6 +62,13 @@ Route::prefix('v1/admin')
         Route::prefix('companies')->name('companies.')->group(function () {
             Route::get('/',    [AdminCompanyController::class, 'index']);
             Route::post('/',   [AdminCompanyController::class, 'store']);
+            // Bulk actions — before wildcard
+            Route::post('bulk-suspend',    [AdminCompanyController::class, 'bulkSuspend']);
+            Route::post('bulk-unsuspend',  [AdminCompanyController::class, 'bulkUnsuspend']);
+            Route::post('bulk-verify',     [AdminCompanyController::class, 'bulkVerify']);
+            Route::post('bulk-activate',   [AdminCompanyController::class, 'bulkActivate']);
+            Route::post('bulk-deactivate', [AdminCompanyController::class, 'bulkDeactivate']);
+            Route::get('export',           [AdminCompanyController::class, 'export']);
             Route::get('{companyId}',    [AdminCompanyController::class, 'show']);
             Route::put('{companyId}',    [AdminCompanyController::class, 'update']);
             Route::delete('{companyId}', [AdminCompanyController::class, 'destroy']);
@@ -95,16 +102,19 @@ Route::prefix('v1/admin')
         Route::prefix('users')->name('users.')->group(function () {
             Route::get('/',                       [AdminUserController::class, 'index']);
             Route::post('/',                      [AdminUserController::class, 'store']);
+            // موافقات التسجيل — قبل wildcard {user}
+            Route::get('pending-approval',           [AdminApprovalController::class, 'pending'])->name('pending');
+            Route::post('bulk-approve',              [AdminApprovalController::class, 'bulkApprove'])->name('bulk-approve');
+            Route::post('bulk-reject',               [AdminApprovalController::class, 'bulkReject'])->name('bulk-reject');
+            Route::post('{user}/approve',            [AdminApprovalController::class, 'approve'])->name('approve');
+            Route::post('{user}/reject',             [AdminApprovalController::class, 'reject'])->name('reject');
             Route::get('{user}',                  [AdminUserController::class, 'show']);
             Route::put('{user}',                  [AdminUserController::class, 'update']);
             Route::delete('{user}',               [AdminUserController::class, 'destroy']);
             Route::post('{user}/reset-password',  [AdminUserController::class, 'resetPassword']);
             Route::post('{user}/toggle-active',   [AdminUserController::class, 'toggleActive']);
+            Route::post('{user}/toggle-approval', [AdminUserController::class, 'toggleApproval']);
             Route::get('{user}/companies',        [AdminUserController::class, 'companies']);
-            // موافقات التسجيل
-            Route::get('pending-approval',     [AdminApprovalController::class, 'pending'])->name('users.pending');
-            Route::post('{user}/approve',      [AdminApprovalController::class, 'approve'])->name('users.approve');
-            Route::post('{user}/reject',       [AdminApprovalController::class, 'reject'])->name('users.reject');
         });
 
         // ══════════════════════════════════════════════════════════

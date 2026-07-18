@@ -224,6 +224,16 @@ class ImportService
 
                     $product = Product::create($data);
 
+                    // Auto-create default packaging if none provided
+                    $product->packagings()->create([
+                        'code'          => '1',
+                        'label'         => 'unite',
+                        'quantity'      => 1,
+                        'is_default'    => true,
+                        'active'        => true,
+                        'display_order' => 1,
+                    ]);
+
                     // Create a price record if selling price was provided
                     if ($sellPrice !== null && $sellPrice > 0) {
                         $defaultLevel = PriceLevel::where('company_id', $companyId)

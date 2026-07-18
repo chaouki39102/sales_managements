@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/inventory/OpeningBalanceTab.tsx — تاب "الرصيد الافتتاحي"
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import {
   useQuery,
@@ -42,6 +42,7 @@ export default function OpeningBalanceTab() {
   const [addAllWarehouseId, setAddAllWarehouseId] = useState<number | ''>('');
   const [addAllQty,         setAddAllQty]         = useState('');
   const [addAllUnitPrice,   setAddAllUnitPrice]   = useState('');
+  const [addAllPriceSource, setAddAllPriceSource] = useState<'manual' | 'purchase_price'>('purchase_price');
   const [allowDuplicates,   setAllowDuplicates]   = useState(true);
   const [addAllLoading,     setAddAllLoading]     = useState(false);
   const [addAllResult,      setAddAllResult]      = useState<{
@@ -54,6 +55,15 @@ export default function OpeningBalanceTab() {
   const [liveErrors,       setLiveErrors]         = useState(0);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deleteAllLoading,   setDeleteAllLoading]   = useState(false);
+
+  // Lock body scroll when any modal is open
+  useEffect(() => {
+    const anyOpen = showAddAllModal || showDeleteAllModal;
+    if (anyOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [showAddAllModal, showDeleteAllModal]);
 
   // ── خيارات المنتجات والمستودعات ──────────────────────────────────────────
 
@@ -248,10 +258,11 @@ export default function OpeningBalanceTab() {
     let added = 0, skipped = 0, errCount = 0;
     const details: string[] = [];
     const qty = parseFloat(addAllQty) || 0;
-    const price = parseFloat(addAllUnitPrice) || 0;
+    const manualPrice = parseFloat(addAllUnitPrice) || 0;
 
     let done = 0;
     for (const p of products) {
+      const price = addAllPriceSource === 'purchase_price' ? (p.purchase_price_ht || 0) : manualPrice;
       flushSync(() => {
         setAddAllCurrent(p.name);
         setLiveDone(done);
@@ -294,7 +305,7 @@ export default function OpeningBalanceTab() {
     setAddAllResult({ added, skipped, errors: errCount, total: products.length, details });
     setAddAllLoading(false);
     setDrafts([]);
-  }, [selectedYear, addAllWarehouseId, addAllQty, addAllUnitPrice, allowDuplicates, products, rows, drafts, refetch, invalidate]);
+  }, [selectedYear, addAllWarehouseId, addAllQty, addAllUnitPrice, addAllPriceSource, allowDuplicates, products, rows, drafts, refetch, invalidate]);
 
   // ── حذف كل المنتجات ──────────────────────────────────────────────────────
 
@@ -944,14 +955,15 @@ export default function OpeningBalanceTab() {
           zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }} onClick={() => { if (!addAllLoading) setShowAddAllModal(false); }}>
           <div style={{
-            width: 520, maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto',
+            width: 520, maxWidth: '95vw', maxHeight: '90vh',
             background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,.2)',
+            display: 'flex', flexDirection: 'column',
           }} onClick={e => e.stopPropagation()}>
 
             {/* ── Header ── */}
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '16px 20px', borderBottom: '1px solid #e2e8f0',
+              padding: '16px 20px', borderBottom: '1px solid #e2e8f0', flexShrink: 0,
             }}>
               <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <i className="ti ti-packages" style={{ color: '#0891b2' }} />
@@ -967,7 +979,8 @@ export default function OpeningBalanceTab() {
 
             {/* ── Step 1: Config ── */}
             {!addAllResult && !addAllLoading && (
-              <div style={{ padding: 20 }}>
+              <>
+              <div style={{ padding: 20, flex: 1, overflowY: 'auto', minHeight: 0 }}>
                 <div style={{
                   display: 'flex', gap: 16, marginBottom: 20,
                   padding: 16, background: '#f0f9ff', borderRadius: 10,
@@ -1028,24 +1041,88 @@ export default function OpeningBalanceTab() {
                 />
 
                 <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: '#333' }}>
-                  سعر الوحدة الافتراضي
+                  مصدر السعر
                 </label>
-                <input
-                  type="number" step="0.01" min="0"
-                  value={addAllUnitPrice}
-                  onChange={e => setAddAllUnitPrice(e.target.value)}
-                  placeholder="مثال: 100"
-                  style={{
-                    width: '100%', padding: '8px 12px', borderRadius: 6,
-                    border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 6,
-                    fontFamily: 'Tajawal, sans-serif',
-                  }}
-                />
-                <div style={{ fontSize: 11, color: '#999', marginBottom: 14 }}>
-                  {addAllQty && addAllUnitPrice
-                    ? `القيمة الإجمالية التقديرية: ${(+addAllQty * +addAllUnitPrice).toLocaleString('fr-DZ')} دج`
-                    : 'اتركه فارغاً إذا أردت أن تكون القيمة الإجمالية 0'}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', flex: 1, padding: '8px 12px', borderRadius: 6, border: `1px solid ${addAllPriceSource === 'purchase_price' ? '#0891b2' : '#e2e8f0'}`, background: addAllPriceSource === 'purchase_price' ? '#f0f9ff' : '#fff' }}>
+                    <input type="radio" name="priceSource" value="purchase_price" checked={addAllPriceSource === 'purchase_price'} onChange={() => setAddAllPriceSource('purchase_price')} style={{ accentColor: '#0891b2' }} />
+                    <div>
+                      <div style={{ fontWeight: 600 }}>سعر الشراء للمنتج</div>
+                      <div style={{ fontSize: 11, color: '#666' }}>كل منتج بسعر شرائه</div>
+                    </div>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', flex: 1, padding: '8px 12px', borderRadius: 6, border: `1px solid ${addAllPriceSource === 'manual' ? '#0891b2' : '#e2e8f0'}`, background: addAllPriceSource === 'manual' ? '#f0f9ff' : '#fff' }}>
+                    <input type="radio" name="priceSource" value="manual" checked={addAllPriceSource === 'manual'} onChange={() => setAddAllPriceSource('manual')} style={{ accentColor: '#0891b2' }} />
+                    <div>
+                      <div style={{ fontWeight: 600 }}>سعر يدوي</div>
+                      <div style={{ fontSize: 11, color: '#666' }}>سعر واحد للكل</div>
+                    </div>
+                  </label>
                 </div>
+
+                {addAllPriceSource === 'purchase_price' ? (() => {
+                  const qty = parseFloat(addAllQty) || 0;
+                  const prices = products.map(p => p.purchase_price_ht || 0).filter(p => p > 0);
+                  const total = prices.reduce((s, p) => s + p, 0);
+                  const avg = prices.length ? total / prices.length : 0;
+                  const withPrice = prices.length;
+                  const withoutPrice = products.length - withPrice;
+                  const grandTotal = qty * total;
+                  return (
+                    <div style={{ marginBottom: 14, padding: '12px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 12, color: '#166534' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, marginBottom: 10 }}>
+                        <i className="ti ti-check-circle" style={{ fontSize: 16 }} />
+                        سيتم استخدام سعر الشراء لكل منتج على حدة
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#fff', borderRadius: 4 }}>
+                          <span style={{ color: '#555' }}>منتجات بها سعر</span>
+                          <strong>{withPrice}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#fff', borderRadius: 4 }}>
+                          <span style={{ color: '#555' }}>بلا سعر (0 دج)</span>
+                          <strong style={{ color: withoutPrice > 0 ? '#ef4444' : undefined }}>{withoutPrice}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#fff', borderRadius: 4 }}>
+                          <span style={{ color: '#555' }}>متوسط السعر</span>
+                          <strong>{fmt(avg)} دج</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#fff', borderRadius: 4 }}>
+                          <span style={{ color: '#555' }}>إجمالي أسعار الشراء</span>
+                          <strong>{fmt(total)} دج</strong>
+                        </div>
+                      </div>
+                      {qty > 0 && (
+                        <div style={{ marginTop: 8, padding: '6px 10px', background: '#dcfce7', borderRadius: 4, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 13 }}>
+                          <span>القيمة الإجمالية ({qty} × {fmt(total)} دج)</span>
+                          <span>{fmt(grandTotal)} دج</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })() : (
+                  <>
+                    <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: '#333' }}>
+                      سعر الوحدة الافتراضي
+                    </label>
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={addAllUnitPrice}
+                      onChange={e => setAddAllUnitPrice(e.target.value)}
+                      placeholder="مثال: 100"
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: 6,
+                        border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 6,
+                        fontFamily: 'Tajawal, sans-serif',
+                      }}
+                    />
+                    <div style={{ fontSize: 11, color: '#999', marginBottom: 14 }}>
+                      {addAllQty && addAllUnitPrice
+                        ? `القيمة الإجمالية التقديرية: ${(+addAllQty * +addAllUnitPrice).toLocaleString('fr-DZ')} دج`
+                        : 'اتركه فارغاً إذا أردت أن تكون القيمة الإجمالية 0'}
+                    </div>
+                  </>
+                )}
 
                 <label style={{
                   display: 'flex', alignItems: 'center', gap: 8,
@@ -1069,10 +1146,11 @@ export default function OpeningBalanceTab() {
                     تم اكتشاف {rows.length + drafts.length} منتج موجود مسبقاً — سيتم تخطيها
                   </div>
                 )}
-
-                <div style={{
+              </div>
+              <div style={{
                   display: 'flex', gap: 8, justifyContent: 'flex-end',
-                  borderTop: '1px solid #e2e8f0', paddingTop: 16, marginTop: 4,
+                  padding: '12px 20px', borderTop: '1px solid #e2e8f0', flexShrink: 0,
+                  background: '#fff',
                 }}>
                   <button onClick={() => { setShowAddAllModal(false); setAddAllResult(null); }}
                     style={{
@@ -1095,12 +1173,12 @@ export default function OpeningBalanceTab() {
                     إضافة الكل ({products.length})
                   </button>
                 </div>
-              </div>
+              </>
             )}
 
             {/* ── Loading (جاري إضافة المنتجات…) ── */}
             {addAllLoading && (
-              <div style={{ padding: 32, textAlign: 'center' }}>
+              <div style={{ padding: 32, textAlign: 'center', flex: 1, overflowY: 'auto', minHeight: 0 }}>
 
                 <style>{`
                   @keyframes floatY {
@@ -1248,7 +1326,8 @@ export default function OpeningBalanceTab() {
 
             {/* ── Step 2: Results ── */}
             {addAllResult && !addAllLoading && (
-              <div style={{ padding: 20 }}>
+              <>
+              <div style={{ padding: 20, flex: 1, overflowY: 'auto', minHeight: 0 }}>
                 <div style={{
                   display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap',
                 }}>
@@ -1304,10 +1383,11 @@ export default function OpeningBalanceTab() {
                     </div>
                   ))}
                 </div>
-
-                <div style={{
+              </div>
+              <div style={{
                   display: 'flex', gap: 8, justifyContent: 'flex-end',
-                  borderTop: '1px solid #e2e8f0', paddingTop: 16,
+                  padding: '12px 20px', borderTop: '1px solid #e2e8f0', flexShrink: 0,
+                  background: '#fff',
                 }}>
                   <button onClick={() => { setShowAddAllModal(false); setAddAllResult(null); }}
                     style={{
@@ -1320,7 +1400,7 @@ export default function OpeningBalanceTab() {
                     تم
                   </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>

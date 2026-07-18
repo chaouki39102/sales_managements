@@ -2,7 +2,7 @@
 // pages/admin/AdminSettingsPage.tsx — النسخة الخارقة
 // ✅ إعدادات النظام + الصيانة + مسح الكاش + تجميد التسجيل
 // ════════════════════════════════════════════════════════════════════════════
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/admin';
 import type { SystemSettings } from '@/types/admin';
@@ -94,12 +94,26 @@ export default function AdminSettingsPage() {
   };
 
   // ── Queries ────────────────────────────────────────────────────────────────
-  const { data: _settings, isLoading } = useQuery({
+  const { data: _settings, isLoading } = useQuery<SystemSettings>({
     queryKey: ['admin', 'system', 'settings'],
     queryFn:  adminApi.getSettings,
     staleTime: 2 * 60_000,
-    onSuccess: (data: SystemSettings) => { if (!form) setForm(data); },
-  } as any);
+  });
+
+  useEffect(() => {
+    if (_settings && !form) setForm({
+      allow_registration:   false,
+      allow_new_companies:  false,
+      debug_mode:           false,
+      public_api:           false,
+      maintenance_mode:     false,
+      maintenance_message:  '',
+      free_trial_days:      0,
+      free_max_users:       0,
+      starter_max_products: 0,
+      ..._settings,
+    } as SystemSettings);
+  }, [_settings]);
 
   const { data: maintenance } = useQuery({
     queryKey: ['admin', 'system', 'maintenance'],
@@ -311,6 +325,23 @@ export default function AdminSettingsPage() {
           </button>
         </div>
 
+        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--b1)' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)', marginBottom: 6 }}>رسالة الصيانة</div>
+          <div style={{ fontSize: 11.5, color: 'var(--t4)', marginBottom: 6 }}>الرسالة المعروضة للمستخدمين أثناء الصيانة</div>
+          <textarea
+            value={form.maintenance_message || ''}
+            onChange={e => setF('maintenance_message', e.target.value)}
+            placeholder="الموقع في صيانة مجدولة..."
+            rows={2}
+            style={{
+              width: '100%', padding: '8px 12px', borderRadius: 8,
+              border: '1.5px solid var(--b2)', background: 'var(--bg1)',
+              color: 'var(--t1)', fontSize: 13, fontFamily: 'Tajawal,sans-serif',
+              resize: 'vertical', outline: 'none',
+            }}
+          />
+        </div>
+
         <Toggle
           checked={form.debug_mode}
           onChange={v => setF('debug_mode', v)}
@@ -325,7 +356,7 @@ export default function AdminSettingsPage() {
         <div style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.6, padding: '10px 0 14px' }}>
           تثبيت البيانات الأساسية للنظام. يمكن إعادة تشغيلها في أي وقت بأمان.
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
           <button
             disabled={bootWilMut.isPending}
             onClick={() => bootWilMut.mutate()}
@@ -338,7 +369,7 @@ export default function AdminSettingsPage() {
             {bootWilMut.isPending
               ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
               : <i className="ti ti-map-pin" />}
-            تثبيت الولايات والبلديات
+            الولايات والبلديات
           </button>
           <button
             disabled={bootPermMut.isPending}
@@ -352,7 +383,27 @@ export default function AdminSettingsPage() {
             {bootPermMut.isPending
               ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
               : <i className="ti ti-shield-lock" />}
-            تثبيت الصلاحيات والأدوار
+            الصلاحيات والأدوار
+          </button>
+          <button
+            disabled={bootPermMut.isPending}
+            onClick={() => {
+              import('@/lib/admin').then(({ adminApi }) => {
+                fetch('/api/v1/admin/system/boot', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                  credentials: 'include',
+                }).then(r => r.json()).then(d => showFlash(d.message || 'تم تثبيت الخطط ✓'));
+              });
+            }}
+            style={{
+              padding: '11px 14px', borderRadius: 9, border: '1px solid #10b98120',
+              background: '#10b98110', color: '#10b981', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'Tajawal,sans-serif',
+              display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
+            }}>
+            <i className="ti ti-credit-card" />
+            الخطط والاشتراكات
           </button>
         </div>
       </Section>

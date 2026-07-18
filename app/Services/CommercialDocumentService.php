@@ -219,21 +219,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 );
             }
         }
-
-        // R4: إذا كانت الوثيقة معتمدة وجاءت lines في الطلب → رفض
-        // payments مسموحة للمستندات المعتمدة (additive mode)
-        $hasLines = !empty($data['lines']) || !empty($request?->input('lines'));
-        if ($hasLines) {
-            $currentStatusName = $item->documentStatus?->name
-                ?? DocumentStatus::where('id', $item->document_status_id)->value('name');
-            $protectedStatuses = ['validated', 'paid', 'partially_paid', 'overdue'];
-            if (in_array($currentStatusName, $protectedStatuses, true)) {
-                throw new BusinessRuleException(
-                    'لا يمكن تعديل أسطر مستند معتمد. الأسطر محمية بعد الاعتماد. استخدم مستند تصحيح أو مرتجع.',
-                    409
-                );
-            }
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

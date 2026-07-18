@@ -35,7 +35,7 @@ export interface OpeningBalanceStock {
   warehouse?: { id: number; name: string; code?: string | null } | null;
 }
 
-export interface ProductOption   { id: number; name: string; ref?: string | null; unit?: { symbol: string } | null }
+export interface ProductOption   { id: number; name: string; ref?: string | null; purchase_price_ht?: number; unit?: { symbol: string } | null }
 export interface WarehouseOption { id: number; name: string; code?: string | null }
 
 export interface DraftRow {
